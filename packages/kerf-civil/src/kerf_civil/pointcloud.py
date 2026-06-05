@@ -7,6 +7,7 @@ Supported input formats
   or lazperf back-ends bundled with laspy >= 2.0).
 * XYZ text — space/tab/comma-delimited with columns X Y Z (optional I R G B).
 * PLY ASCII — header + vertex data (x y z fields).
+* PLY Binary (little-endian / big-endian) — via read_ply_binary().
 
 Pipeline
 --------
@@ -16,6 +17,12 @@ Pipeline
    (Zhang et al. 2003, IEEE TGRS 41(4):872-882).
 4. Ground return → TIN handoff via kerf_civil.tin.build_tin.
 
+Plant/infrastructure extensions (as-built / brownfield scan-vs-model):
+  statistical_outlier_removal — remove sparse noise points (SOR filter)
+  point_cloud_aabb            — axis-aligned bounding box
+  cloud_to_mesh_deviation     — per-point nearest-triangle distance
+  ransac_fit_plane            — RANSAC plane extraction for as-built detection
+
 References
 ----------
 Zhang, K., Chen, S.-C., Whitman, D., Shyu, M.-L., Yan, J. & Zhang, C. (2003).
@@ -24,20 +31,38 @@ Zhang, K., Chen, S.-C., Whitman, D., Shyu, M.-L., Yan, J. & Zhang, C. (2003).
 
 ASPRS (2019). LAS Specification 1.4-R15.
 
+Fischler, M.A. & Bolles, R.C. (1981). "Random Sample Consensus: A Paradigm
+  for Model Fitting with Applications to Image Analysis and Automated
+  Cartography." Commun. ACM 24(6):381-395.
+
+Besl, P.J. & McKay, N.D. (1992). "A Method for Registration of 3-D Shapes."
+  IEEE TPAMI 14(2):239-256. (nearest-point distance foundation)
+
+Rusu, R.B. & Cousins, S. (2011). "3D is here: Point Cloud Library (PCL)."
+  IEEE ICRA. (SOR filter, VoxelGrid)
+
 Public API
 ----------
 read_xyz(path_or_text, *, delimiter=None) -> np.ndarray   shape (N, 3+)
 read_ply_ascii(path_or_text) -> np.ndarray                shape (N, 3+)
+read_ply_binary(path) -> np.ndarray                       shape (N, 3+)
+read_ply(path_or_text) -> np.ndarray                      auto-dispatch ASCII/binary
 read_las(path) -> np.ndarray                              shape (N, 3)   (laspy req.)
 voxel_downsample(pts, cell_size) -> np.ndarray
 pmf_ground_classify(pts, *, cell_size, ...) -> np.ndarray (ground subset)
 surface_from_points(pts, *, cell_size, ...) -> TIN
+statistical_outlier_removal(pts, k, std_ratio) -> np.ndarray
+point_cloud_aabb(pts) -> dict
+cloud_to_mesh_deviation(pts, vertices, triangles) -> np.ndarray  shape (N,) float64
+ransac_fit_plane(pts, *, threshold, max_iterations, min_inliers) -> dict
 """
 
 from __future__ import annotations
 
 import io
 import math
+import struct
+import random
 from pathlib import Path
 from typing import Sequence
 
@@ -512,4 +537,576 @@ def point_cloud_stats(pts: np.ndarray) -> dict:
         "y_range_m": float(ymax - ymin),
         "z_range_m": float(zmax - zmin),
         "density_per_m2": round(float(len(pts)) / area, 4),
+    }
+
+
+# ---------------------------------------------------------------------------
+# I/O: PLY Binary (little-endian / big-endian)
+# ---------------------------------------------------------------------------
+
+# PLY scalar type → (struct format char, byte size)
+_PLY_SCALAR_FMT = {
+    "char": ("b", 1), "uchar": ("B", 1), "uint8": ("B", 1), "int8": ("b", 1),
+    "short": ("h", 2), "ushort": ("H", 2), "int16": ("h", 2), "uint16": ("H", 2),
+    "int": ("i", 4), "uint": ("I", 4), "int32": ("i", 4), "uint32": ("I", 4),
+    "float": ("f", 4), "float32": ("f", 4),
+    "double": ("d", 8), "float64": ("d", 8),
+    "long": ("l", 4), "ulong": ("L", 4), "int64": ("q", 8), "uint64": ("Q", 8),
+}
+
+
+def read_ply_binary(path: str | Path) -> np.ndarray:
+    """
+    Parse a binary PLY point-cloud file (little-endian or big-endian).
+
+    Reads the ASCII header, then unpacks vertex x/y/z (plus optional
+    intensity / nx / ny / nz / r / g / b) from the binary payload.
+
+    Parameters
+    ----------
+    path : file path to a binary PLY file
+
+    Returns
+    -------
+    np.ndarray of shape (N, C), dtype float64.
+    Columns: [x, y, z] followed by any extra scalar vertex properties
+    in the order they appear in the header (intensity, nx, ny, nz, r, g, b, …).
+
+    Raises
+    ------
+    ValueError  if the file is ASCII PLY (use read_ply_ascii instead)
+                or has no x/y/z vertex properties.
+    IOError     if the file is truncated.
+
+    References
+    ----------
+    PLY polygon file format spec (Turk 1994).
+    """
+    path = Path(path)
+    raw = path.read_bytes()
+
+    # ---- Parse ASCII header ----
+    # Find end_header boundary
+    header_bytes = b""
+    end_pos = raw.find(b"end_header")
+    if end_pos == -1:
+        raise ValueError("PLY file has no 'end_header' token")
+    # Include the newline after end_header
+    nl = raw.find(b"\n", end_pos)
+    data_start = nl + 1 if nl != -1 else end_pos + len("end_header")
+    header_text = raw[:end_pos].decode("ascii", errors="replace")
+
+    # ---- Parse header fields ----
+    fmt_code = None  # 'little_endian' or 'big_endian'
+    n_vertices = 0
+    in_vertex = False
+    props: list[tuple[str, str]] = []  # (type_str, name)
+
+    for line in header_text.splitlines():
+        tok = line.strip().split()
+        if not tok:
+            continue
+        if tok[0] == "format":
+            if tok[1] == "ascii":
+                raise ValueError(
+                    "read_ply_binary: file is ASCII PLY; use read_ply_ascii()"
+                )
+            fmt_code = tok[1]  # binary_little_endian / binary_big_endian
+        elif tok[0] == "element":
+            in_vertex = tok[1] == "vertex"
+            if in_vertex:
+                n_vertices = int(tok[2])
+        elif tok[0] == "property" and in_vertex:
+            if tok[1] == "list":
+                # Skip list properties in vertex (unusual; present in face elements)
+                pass
+            else:
+                ptype = tok[1]
+                pname = tok[2]
+                props.append((ptype, pname))
+
+    if not fmt_code:
+        raise ValueError("PLY header missing 'format' line")
+
+    endian = "<" if "little" in fmt_code else ">"
+
+    # Identify column indices
+    prop_names = [p[1] for p in props]
+    try:
+        xi = prop_names.index("x")
+        yi = prop_names.index("y")
+        zi = prop_names.index("z")
+    except ValueError as e:
+        raise ValueError(f"PLY vertex missing x/y/z property: {e}") from e
+
+    # Build per-row struct format + byte offsets for wanted columns
+    # We read the full row struct and pick columns we want.
+    row_fmt_chars = []
+    row_sizes = []
+    for ptype, pname in props:
+        info = _PLY_SCALAR_FMT.get(ptype)
+        if info is None:
+            raise ValueError(f"Unsupported PLY property type: {ptype!r}")
+        row_fmt_chars.append(info[0])
+        row_sizes.append(info[1])
+
+    row_struct_fmt = endian + "".join(row_fmt_chars)
+    row_size = sum(row_sizes)
+    n_cols = len(props)
+
+    # Desired output columns: x, y, z + extras in order
+    extra_indices = [i for i, n in enumerate(prop_names)
+                     if n in ("intensity", "nx", "ny", "nz", "r", "g", "b", "red", "green", "blue")
+                     and i not in (xi, yi, zi)]
+    out_indices = [xi, yi, zi] + extra_indices
+
+    data_bytes = raw[data_start:]
+    expected = n_vertices * row_size
+    if len(data_bytes) < expected:
+        raise IOError(
+            f"PLY data truncated: expected {expected} bytes, got {len(data_bytes)}"
+        )
+
+    # Unpack rows
+    result = np.zeros((n_vertices, len(out_indices)), dtype=np.float64)
+    offset = 0
+    for k in range(n_vertices):
+        row_vals = struct.unpack_from(row_struct_fmt, data_bytes, offset)
+        for j, idx in enumerate(out_indices):
+            result[k, j] = float(row_vals[idx])
+        offset += row_size
+
+    return result
+
+
+def read_ply(source: str | Path | bytes) -> np.ndarray:
+    """
+    Auto-dispatching PLY reader: detects ASCII vs binary from the header.
+
+    Parameters
+    ----------
+    source : file path (str/Path) or raw bytes/text
+
+    Returns
+    -------
+    np.ndarray of shape (N, 3+), dtype float64.
+    """
+    # If we have bytes, peek at the format line
+    if isinstance(source, bytes):
+        text_head = source[:512].decode("ascii", errors="replace")
+    elif isinstance(source, Path) or (isinstance(source, str) and "\n" not in source
+                                      and len(source) < 4096
+                                      and Path(source).exists()):
+        # File path
+        path = Path(source)
+        raw = path.read_bytes()
+        text_head = raw[:512].decode("ascii", errors="replace")
+        # Check for binary
+        if "format binary" in text_head:
+            return read_ply_binary(path)
+        return read_ply_ascii(source)
+    else:
+        text_head = source[:512] if isinstance(source, str) else ""
+
+    if "format binary" in text_head:
+        raise ValueError(
+            "Binary PLY supplied as text; pass a file path or bytes to read_ply()"
+        )
+    return read_ply_ascii(source)
+
+
+# ---------------------------------------------------------------------------
+# Plant / brownfield extensions
+# ---------------------------------------------------------------------------
+
+def statistical_outlier_removal(
+    pts: np.ndarray,
+    k: int = 20,
+    std_ratio: float = 2.0,
+) -> np.ndarray:
+    """
+    Remove statistical outliers from a point cloud (SOR filter).
+
+    Method: for each point compute the mean distance to its k nearest
+    neighbours.  Points whose mean distance exceeds
+        global_mean + std_ratio * global_std
+    are labelled outliers and removed.
+
+    This is the PCL StatisticalOutlierRemoval algorithm
+    (Rusu & Cousins 2011, ICRA).
+
+    Parameters
+    ----------
+    pts       : (N, 3+) point array — xyz [+ extra columns]
+    k         : number of nearest neighbours (default 20)
+    std_ratio : outlier threshold multiplier (default 2.0)
+
+    Returns
+    -------
+    np.ndarray of shape (M, C), inlier points only.
+
+    Notes
+    -----
+    Uses a brute-force O(N*k) neighbour search (numpy only, no scipy
+    dependency).  For clouds > 1M points, voxel-downsample first.
+    """
+    if len(pts) <= k:
+        return pts.copy()
+
+    xyz = pts[:, :3]
+    n = len(xyz)
+    k_clamp = min(k, n - 1)
+
+    # Compute squared distances matrix in chunks to avoid O(N²) memory
+    chunk = 4096
+    mean_dists = np.empty(n, dtype=np.float64)
+
+    for start in range(0, n, chunk):
+        end = min(start + chunk, n)
+        block = xyz[start:end]  # (B, 3)
+        # Squared distances to all other points: (B, N)
+        diff = block[:, np.newaxis, :] - xyz[np.newaxis, :, :]  # (B, N, 3)
+        sq_dist = (diff ** 2).sum(axis=2)  # (B, N)
+        # Partition to find k+1 smallest (include self at distance 0)
+        idx = np.argpartition(sq_dist, k_clamp + 1, axis=1)[:, :k_clamp + 1]
+        # Get those distances
+        topk_sq = sq_dist[np.arange(len(block))[:, None], idx]
+        # Exclude self (dist=0): sum of k smallest non-zero
+        topk_sq_sorted = np.sort(topk_sq, axis=1)
+        # topk_sq_sorted[:,0] is 0 (self), take columns 1..k_clamp
+        mean_dists[start:end] = np.sqrt(topk_sq_sorted[:, 1:k_clamp + 1]).mean(axis=1)
+
+    threshold = mean_dists.mean() + std_ratio * mean_dists.std()
+    mask = mean_dists <= threshold
+    return pts[mask].copy()
+
+
+def point_cloud_aabb(pts: np.ndarray) -> dict:
+    """
+    Compute the axis-aligned bounding box (AABB) of a point cloud.
+
+    Parameters
+    ----------
+    pts : (N, 3+) point array
+
+    Returns
+    -------
+    dict with keys:
+        min_x, min_y, min_z : float  — lower corner
+        max_x, max_y, max_z : float  — upper corner
+        size_x, size_y, size_z : float — extents
+        center_x, center_y, center_z : float — centroid
+        diagonal_m : float — space diagonal length
+        volume_m3 : float  — bounding-box volume
+    """
+    if len(pts) == 0:
+        return {}
+
+    xyz = pts[:, :3]
+    mn = xyz.min(axis=0)
+    mx = xyz.max(axis=0)
+    sz = mx - mn
+    ctr = (mn + mx) / 2.0
+    diagonal = float(np.linalg.norm(sz))
+    volume = float(sz[0] * sz[1] * sz[2])
+
+    return {
+        "min_x": float(mn[0]), "min_y": float(mn[1]), "min_z": float(mn[2]),
+        "max_x": float(mx[0]), "max_y": float(mx[1]), "max_z": float(mx[2]),
+        "size_x": float(sz[0]), "size_y": float(sz[1]), "size_z": float(sz[2]),
+        "center_x": float(ctr[0]), "center_y": float(ctr[1]), "center_z": float(ctr[2]),
+        "diagonal_m": round(diagonal, 6),
+        "volume_m3": round(volume, 6),
+    }
+
+
+def cloud_to_mesh_deviation(
+    pts: np.ndarray,
+    vertices: np.ndarray,
+    triangles: np.ndarray,
+) -> np.ndarray:
+    """
+    Compute per-point signed distance from a scanned point cloud to a CAD mesh.
+
+    For each point the minimum distance to any triangle in *triangles* is
+    computed.  Sign is positive when the point is above the nearest triangle
+    face (in the direction of the face normal), negative when below.
+
+    Method: brute-force nearest-triangle search with analytic
+    point-to-triangle distance (Eberly 2003, "Distance Between Point and Triangle
+    in 3D").
+
+    Parameters
+    ----------
+    pts       : (N, 3) scanned point cloud (float64)
+    vertices  : (V, 3) mesh vertex positions (float64)
+    triangles : (T, 3) integer face indices into vertices
+
+    Returns
+    -------
+    np.ndarray of shape (N,), dtype float64 — signed deviation in model units.
+    Positive = scan point above mesh face (protrusion).
+    Negative = scan point below mesh face (depression / gap).
+
+    Notes
+    -----
+    Time complexity: O(N * T).  For large meshes build a spatial hierarchy
+    before calling this function.
+
+    References
+    ----------
+    Eberly, D. (2003). "Distance Between Point and Triangle in 3D."
+      Geometric Tools, LLC. https://www.geometrictools.com
+    """
+    pts = np.asarray(pts, dtype=np.float64)
+    verts = np.asarray(vertices, dtype=np.float64)
+    tris = np.asarray(triangles, dtype=np.int64)
+
+    n_pts = len(pts)
+    n_tri = len(tris)
+
+    if n_pts == 0 or n_tri == 0:
+        return np.zeros(n_pts, dtype=np.float64)
+
+    # Pre-extract triangle vertex arrays
+    v0 = verts[tris[:, 0]]  # (T, 3)
+    v1 = verts[tris[:, 1]]
+    v2 = verts[tris[:, 2]]
+
+    edge1 = v1 - v0  # (T, 3)
+    edge2 = v2 - v0  # (T, 3)
+
+    # Triangle normals (un-normalised)
+    normals = np.cross(edge1, edge2)  # (T, 3)
+    norm_len = np.linalg.norm(normals, axis=1, keepdims=True).clip(min=1e-15)
+    unit_normals = normals / norm_len  # (T, 3) normalised
+
+    deviations = np.empty(n_pts, dtype=np.float64)
+
+    for i, p in enumerate(pts):
+        best_dist = np.inf
+        best_sign = 1.0
+
+        for t in range(n_tri):
+            a = v0[t]
+            b = v1[t]
+            c = v2[t]
+            e1 = edge1[t]
+            e2 = edge2[t]
+            n = unit_normals[t]
+
+            # Point-to-triangle closest point (Eberly barycentric method)
+            d = a - p
+            dot_e1_e1 = float(e1 @ e1)
+            dot_e1_e2 = float(e1 @ e2)
+            dot_e2_e2 = float(e2 @ e2)
+            dot_d_e1 = float(d @ e1)
+            dot_d_e2 = float(d @ e2)
+
+            det = dot_e1_e1 * dot_e2_e2 - dot_e1_e2 * dot_e1_e2
+            s = dot_e1_e2 * dot_d_e2 - dot_e2_e2 * dot_d_e1
+            t_ = dot_e1_e2 * dot_d_e1 - dot_e1_e1 * dot_d_e2
+
+            if det < 1e-15:
+                # Degenerate triangle — fallback to vertex distances
+                dist_a = float(np.linalg.norm(p - a))
+                dist_b = float(np.linalg.norm(p - b))
+                dist_c = float(np.linalg.norm(p - c))
+                dist = min(dist_a, dist_b, dist_c)
+                closest = a if dist == dist_a else (b if dist == dist_b else c)
+            else:
+                if s + t_ <= det:
+                    if s < 0:
+                        if t_ < 0:
+                            # Region 4
+                            if dot_d_e1 < 0:
+                                t_ = 0; s = -dot_d_e1 / dot_e1_e1
+                                s = max(0.0, min(s, 1.0))
+                            else:
+                                s = 0; t_ = -dot_d_e2 / dot_e2_e2
+                                t_ = max(0.0, min(t_, 1.0))
+                        else:
+                            # Region 3
+                            s = 0; t_ = -dot_d_e2 / dot_e2_e2
+                            t_ = max(0.0, min(t_, 1.0))
+                    elif t_ < 0:
+                        # Region 5
+                        t_ = 0; s = -dot_d_e1 / dot_e1_e1
+                        s = max(0.0, min(s, 1.0))
+                    else:
+                        # Region 0 (interior)
+                        inv_det = 1.0 / det
+                        s *= inv_det
+                        t_ *= inv_det
+                else:
+                    if s < 0:
+                        # Region 2
+                        tmp0 = dot_e1_e2 + dot_d_e1
+                        tmp1 = dot_e2_e2 + dot_d_e2
+                        if tmp1 > tmp0:
+                            numer = tmp1 - tmp0
+                            denom = dot_e1_e1 - 2 * dot_e1_e2 + dot_e2_e2
+                            s = max(0.0, min(1.0, numer / denom))
+                            t_ = 1.0 - s
+                        else:
+                            s = 0; t_ = max(0.0, min(1.0, tmp1 / dot_e2_e2))
+                    elif t_ < 0:
+                        # Region 6
+                        tmp0 = dot_e1_e2 + dot_d_e2
+                        tmp1 = dot_e1_e1 + dot_d_e1
+                        if tmp1 > tmp0:
+                            numer = tmp1 - tmp0
+                            denom = dot_e1_e1 - 2 * dot_e1_e2 + dot_e2_e2
+                            t_ = max(0.0, min(1.0, numer / denom))
+                            s = 1.0 - t_
+                        else:
+                            t_ = 0; s = max(0.0, min(1.0, tmp1 / dot_e1_e1))
+                    else:
+                        # Region 1
+                        numer = dot_e2_e2 + dot_d_e2 - dot_e1_e2 - dot_d_e1
+                        denom = dot_e1_e1 - 2 * dot_e1_e2 + dot_e2_e2
+                        s = max(0.0, min(1.0, numer / denom))
+                        t_ = 1.0 - s
+
+                closest = a + s * e1 + t_ * e2
+                dist = float(np.linalg.norm(p - closest))
+
+            if dist < best_dist:
+                best_dist = dist
+                # Sign: positive if point is on the normal side
+                best_sign = float(np.sign(float((p - closest) @ n) + 1e-30))
+
+        deviations[i] = best_sign * best_dist
+
+    return deviations
+
+
+def ransac_fit_plane(
+    pts: np.ndarray,
+    *,
+    threshold: float = 0.02,
+    max_iterations: int = 1000,
+    min_inliers: int = 10,
+    seed: int | None = None,
+) -> dict:
+    """
+    Fit a plane to a point cloud using RANSAC.
+
+    Method: Fischler & Bolles (1981) RANSAC — iteratively sample 3 random
+    points, fit plane, count inliers within *threshold* distance, keep
+    best model.
+
+    Plane equation: ax + by + cz + d = 0, where (a,b,c) is the unit normal.
+
+    Parameters
+    ----------
+    pts            : (N, 3) point cloud
+    threshold      : float — inlier distance threshold (m), default 0.02
+    max_iterations : int   — RANSAC iteration budget, default 1000
+    min_inliers    : int   — minimum inliers to accept a plane, default 10
+    seed           : int   — RNG seed for reproducibility (None = random)
+
+    Returns
+    -------
+    dict with keys:
+        success        : bool
+        normal         : [a, b, c] unit-normal vector
+        d              : float — plane constant (n . x + d = 0)
+        inlier_count   : int
+        inlier_fraction: float (0..1)
+        inlier_mask    : list[bool] — per-point inlier flag (N,)
+        rmse_m         : float — RMS distance of inliers to plane
+        centroid       : [x, y, z] — centroid of inlier points
+        iterations     : int — RANSAC iterations run
+
+    Raises
+    ------
+    ValueError if N < 3.
+
+    References
+    ----------
+    Fischler, M.A. & Bolles, R.C. (1981). RANSAC. Commun. ACM 24(6):381-395.
+    """
+    pts = np.asarray(pts, dtype=np.float64)
+    n = len(pts)
+    if n < 3:
+        raise ValueError(f"ransac_fit_plane requires >= 3 points, got {n}")
+
+    rng = random.Random(seed)
+
+    best_inlier_mask = np.zeros(n, dtype=bool)
+    best_count = 0
+    best_normal = np.array([0.0, 0.0, 1.0])
+    best_d = 0.0
+    iters_done = 0
+
+    for it in range(max_iterations):
+        iters_done = it + 1
+        # Sample 3 non-collinear points
+        indices = rng.sample(range(n), 3)
+        p0, p1, p2 = pts[indices[0]], pts[indices[1]], pts[indices[2]]
+
+        e1 = p1 - p0
+        e2 = p2 - p0
+        normal = np.cross(e1, e2)
+        norm_len = float(np.linalg.norm(normal))
+        if norm_len < 1e-12:
+            continue  # Collinear — skip
+
+        normal /= norm_len
+        d = -float(normal @ p0)
+
+        # Count inliers: |ax+by+cz+d| <= threshold
+        dists = np.abs(pts @ normal + d)
+        mask = dists <= threshold
+        count = int(mask.sum())
+
+        if count > best_count:
+            best_count = count
+            best_inlier_mask = mask
+            best_normal = normal.copy()
+            best_d = d
+
+        # Early exit if we have > 90% inliers
+        if best_count > 0.9 * n:
+            break
+
+    success = best_count >= min_inliers
+
+    # Refine plane by least-squares fit on inliers
+    if success and best_count >= 3:
+        inlier_pts = pts[best_inlier_mask]
+        centroid = inlier_pts.mean(axis=0)
+        centered = inlier_pts - centroid
+        # SVD: smallest singular value direction = plane normal
+        _, _, Vt = np.linalg.svd(centered, full_matrices=False)
+        refined_normal = Vt[-1]
+        if float(refined_normal @ best_normal) < 0:
+            refined_normal = -refined_normal
+        refined_d = -float(refined_normal @ centroid)
+        best_normal = refined_normal
+        best_d = refined_d
+
+        # Recount inliers with refined plane
+        dists = np.abs(pts @ best_normal + best_d)
+        best_inlier_mask = dists <= threshold
+        best_count = int(best_inlier_mask.sum())
+        inlier_pts = pts[best_inlier_mask]
+        centroid = inlier_pts.mean(axis=0)
+
+        rmse = float(np.sqrt((dists[best_inlier_mask] ** 2).mean()))
+    else:
+        centroid = pts.mean(axis=0)
+        rmse = float("nan")
+
+    return {
+        "success": success,
+        "normal": best_normal.tolist(),
+        "d": float(best_d),
+        "inlier_count": best_count,
+        "inlier_fraction": round(best_count / max(n, 1), 4),
+        "inlier_mask": best_inlier_mask.tolist(),
+        "rmse_m": rmse,
+        "centroid": centroid.tolist(),
+        "iterations": iters_done,
     }

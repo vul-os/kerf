@@ -84,9 +84,9 @@ features:
       note: "Point cloud import from any laser scanner; brownfield retrofit design against as-built geometry"
       source: "https://www.aveva.com/en/products/e3d-design/"
     kerf:
-      status: no
-      note: "No point cloud / laser scan integration"
-      evidence: ""
+      status: partial
+      note: "PLY ASCII + binary, XYZ text, LAS ingest; voxel-grid downsample (Zhang 2003); statistical outlier removal (SOR, Rusu & Cousins 2011); AABB; RANSAC plane fit (Fischler & Bolles 1981) for as-built floor/wall/pipe-rack extraction; cloud-to-mesh signed deviation (Eberly 2003) for scan-vs-model QA; isometric canvas viewport with deviation heatmap and stats sidebar; LLM tools: pointcloud_import, pointcloud_deviation_check, pointcloud_fit_plane. Missing: interactive 3D plant overlay, E3D-style brownfield pipe routing against scan, automated pipe-segment detection."
+      evidence: "packages/kerf-civil/src/kerf_civil/pointcloud.py, packages/kerf-civil/src/kerf_civil/tools_pointcloud_plant.py, src/components/civil/PointCloudPanel.jsx"
   - domain: D4
     feature: "HVAC duct sizing"
     competitor:
@@ -140,7 +140,7 @@ Kerf saturates **73%** of AVEVA E3D Design's feature surface (6 yes, 4 partial, 
 | Clash detection (hard/soft) | ✅ | Yes | Clash detection in assembly (OBB-SAT + BVH backend); no P&ID/plant-specific clash UI |
 | Multi-discipline plant design (structural/HVAC/civil) | ⚠️ (partial) | Yes | Structural FEA, HVAC sizing, civil — separate packages but not a unified plant model |
 | Global multi-user concurrent design | ⚠️ (partial) | Yes | Cloud git workspace with branch/merge; not real-time concurrent design at plant-model scale |
-| Laser scan / point cloud integration | 🔴 (no) | Yes | No point cloud / laser scan integration |
+| Laser scan / point cloud integration | ⚠️ (partial) | Yes | PLY ASCII/binary + XYZ ingest; voxel downsample; SOR filter; RANSAC plane fit; cloud-to-mesh deviation heatmap; viewport panel; no interactive 3D plant overlay |
 | HVAC duct sizing | ✅ | Yes | SMACNA duct sizing + flat-pattern (backend) |
 | Piping stress / structural FEA | ✅ | Partial | Full structural FEA: 1D beam, ASME VIII pressure vessels, API 650 tanks (backend) |
 | LLM / industrial AI assistant | ✅ | Partial | Chat-native: plain-language design edits; full LLM tool routing for all backend engines |
@@ -151,7 +151,7 @@ Kerf saturates **73%** of AVEVA E3D Design's feature surface (6 yes, 4 partial, 
 - **Piping component catalogue** (Partial): P&ID component library (vessels, pumps, HX, valves, instruments with ISA 5.1 symbols); ASME B36.10M pipe size/schedule catalogue; ASME B16.9 elbow radius table; no 3D parametric fitting catalogue
 - **Multi-discipline plant design (structural/HVAC/civil)** (Partial): Structural FEA, HVAC sizing, civil — separate packages but not a unified plant model
 - **Global multi-user concurrent design** (Partial): Cloud git workspace with branch/merge; not real-time concurrent design at plant-model scale
-- **Laser scan / point cloud integration** (Not yet implemented): No point cloud / laser scan integration
+- **Laser scan / point cloud integration** (Partial): PLY (ASCII + binary), XYZ, LAS ingest; voxel-grid downsample; SOR outlier removal; RANSAC plane fit for as-built extraction; cloud-to-mesh signed deviation for QA; isometric canvas viewport with deviation heatmap. Missing: interactive 3D plant overlay and automated pipe-segment detection against scan.
 
 ## Pricing
 

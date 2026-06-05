@@ -1,7 +1,7 @@
 /**
  * civilbim.js — panel-registry fragment for CIVIL / BIM / INTERIOR / PIPING panels.
  *
- * Wires ten domain panels into the Editor's panel-registry seam.
+ * Wires domain panels into the Editor's panel-registry seam.
  * Each entry maps a file `kind` string and a filename extension to a lazily-
  * loaded React panel.  The registry (panelRegistry.js) auto-collects this
  * file via import.meta.glob('./panels/*.js', { eager: true }).
@@ -10,9 +10,23 @@
  *   The Editor passes a `content` string (the raw file text / JSON) to the
  *   resolved Panel.  Each panel JSON.parse-parses it in a try/catch and
  *   merges any recognised keys over its own default props.
+ *
+ * Point-cloud panel content shape (from LLM tools):
+ *   pointcloud_import result → { points, stats, aabb }
+ *   pointcloud_deviation_check result → { deviations, heatmapColors, … }
+ *   pointcloud_fit_plane result → { planeResult, … }
  */
 
 export default [
+  // ── Plant / Civil: Laser-scan Point Cloud ────────────────────────────────
+  {
+    id: 'plant_pointcloud',
+    kinds: ['plant_pointcloud', 'civil_pointcloud', 'laser_scan'],
+    exts: ['.pointcloud', '.laserscan', '.ptc'],
+    label: 'Point Cloud Viewer',
+    load: () => import('./misc-wrappers/PointCloudWrapper.jsx'),
+  },
+
   // ── Civil: Dry Utility Network ───────────────────────────────────────────
   {
     id: 'civil_dry_utility',

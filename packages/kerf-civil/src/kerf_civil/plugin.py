@@ -9,7 +9,8 @@ Registers:
                civil_storm_rational, civil_culvert_capacity,
                civil_drainage_rational_method, civil_time_of_concentration,
                civil_gravity_sewer_profile, civil_gravity_network_solve,
-               civil_landxml_import, civil_landxml_export
+               civil_landxml_import, civil_landxml_export,
+               pointcloud_import, pointcloud_deviation_check, pointcloud_fit_plane
 """
 
 from __future__ import annotations
@@ -107,6 +108,17 @@ async def register(app: FastAPI, ctx):
             "kerf-civil: failed to load tools_dry_utilities: %s", _exc
         )
 
+    # Plant/infrastructure point-cloud: laser-scan import, deviation check, RANSAC (2026-06-05)
+    try:
+        from kerf_civil.tools_pointcloud_plant import TOOLS as _pc_plant_tools
+        for _tool_name, _tool_spec, _tool_handler in _pc_plant_tools:
+            ctx.tools.register(_tool_name, _tool_spec, _tool_handler)
+    except Exception as _exc:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "kerf-civil: failed to load tools_pointcloud_plant: %s", _exc
+        )
+
     provides = [
         "civil.horizontal_alignment",
         "civil.vertical_alignment",
@@ -146,6 +158,12 @@ async def register(app: FastAPI, ctx):
         "civil.dry-utilities-electrical",
         "civil.dry-utilities-telecom",
         "civil.dry-utilities-clearance",
+        "plant.pointcloud-import",
+        "plant.pointcloud-ply-binary",
+        "plant.pointcloud-sor-filter",
+        "plant.pointcloud-deviation",
+        "plant.pointcloud-ransac-plane",
+        "plant.pointcloud-aabb",
     ]
 
     try:

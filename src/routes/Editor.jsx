@@ -2640,6 +2640,9 @@ export default function Editor() {
                   content={w.currentFileContent}
                   projectId={projectId}
                   fileId={w.currentFileId}
+                  callTool={api.callTool}
+                  onCallTool={api.callTool}
+                  onDispatch={api.callTool}
                 />
               </Suspense>
             </div>

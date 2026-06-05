@@ -81,6 +81,16 @@ def _register_tools(ctx, provides: list) -> None:
         ("kerf_bim.tools.walls_slabs", "bim.walls-slabs"),
         # IFC 4 façade parser + thermal summary
         ("kerf_bim.tools.facade_ifc", "bim.facade-ifc"),
+        # 4D construction sequencing (Revit parity)
+        ("kerf_bim.tools.construction_sequencing", "bim.4d-construction-sequencing"),
+        # 5D cost estimation (Revit parity)
+        ("kerf_bim.tools.cost_estimation", "bim.5d-cost-estimation"),
+        # Parametric family editor with nested families + type catalogue (Revit parity)
+        ("kerf_bim.tools.parametric_family_editor", "bim.parametric-family-editor"),
+        # GDL parametric object library (ArchiCAD parity)
+        ("kerf_bim.tools.gdl_library", "bim.gdl-library"),
+        # Site terrain / mesh modelling (ArchiCAD parity)
+        ("kerf_bim.tools.site_terrain", "bim.site-terrain"),
     ]
 
     for module_path, capability in tool_modules:

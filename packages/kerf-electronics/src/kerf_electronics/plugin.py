@@ -253,6 +253,11 @@ def _register_tools(ctx, provides: list) -> None:
         # import_idf_board: parse .emn → board outline + holes + placements
         # validate_idf_roundtrip: export→reimport consistency check (Altium MCAD CoDesigner §6)
         "kerf_electronics.idf_roundtrip",
+        # Virtual instrument bench (Multisim parity) — oscilloscope, multimeter, function-gen
+        # eda_virtual_instrument: multi-channel scope (Vpp/freq/rise-time/RMS) +
+        #   multimeter (DC/AC/RMS) + function-gen (sine/square/triangle stimulus)
+        # eda_probe_nodes: per-node V / per-branch I overlay for schematic probes
+        "kerf_electronics.virtual_instruments.tools",
     ]
 
     for module_path in tool_modules:

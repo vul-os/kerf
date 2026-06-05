@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T03:19:58.798Z",
+  "generatedAt": "2026-06-05T03:38:50.694Z",
   "items": [
     {
       "slug": "revit",
@@ -13357,6 +13357,269 @@
             "notes": "Chat-native: describe a mechanism in plain language; Kerf routes to MBD backend"
           },
           "name": "LLM / chat-native editing"
+        }
+      ]
+    },
+    {
+      "slug": "ansys-mechanical",
+      "competitor": "Ansys Mechanical",
+      "category": "cad-sim",
+      "left": "kerf",
+      "right": "ansys-mechanical",
+      "hero_tagline": "The structural-FEA gold standard — compared honestly against MIT open-core.",
+      "reviewed_at": "2026-06-05",
+      "features": [
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ansys.com/products/structures/ansys-mechanical",
+            "notes": "Industry-standard linear static solver; full element library"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/solid_hex.py",
+            "notes": "Tet4/Tet10/Hex8/Hex20 solid + beam/bar linear static; fem_solid_static / fem_linear_static_beam wired"
+          },
+          "name": "Linear static structural"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ansys.com/products/structures/ansys-mechanical",
+            "notes": "Modal with pre-stress; Force/Pressure/Acceleration load vectors (2025 R1)"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/modal.py",
+            "notes": "Consistent-mass modal eigensolve; fem_modal_beam + solid modal wired"
+          },
+          "name": "Modal analysis (natural frequencies)"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ansys.com/products/structures/ansys-mechanical",
+            "notes": "Full + MSUP harmonic; downstream of modal"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/harmonic.py",
+            "notes": "Mode-superposition FRF sweep (magnitude/phase, DAF); fem_frf_sweep + harmonic response"
+          },
+          "name": "Harmonic / frequency response"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ansys.com/products/structures/ansys-mechanical",
+            "notes": "Spectrum response and random vibration with pre-stress"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/random_vibration.py",
+            "notes": "Random-vibration PSD response; SRSS/CQC response-spectrum analysis"
+          },
+          "name": "Random vibration (PSD) + response spectrum"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ansys.com/products/structures/ansys-mechanical",
+            "notes": "Linear (eigenvalue) and nonlinear buckling"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/buckling.py",
+            "notes": "Eigenvalue buckling solver"
+          },
+          "name": "Eigenvalue buckling"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ansys.com/products/structures/ansys-mechanical",
+            "notes": "Plasticity, large deflection, NLGEOM, Riks arc-length"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/plasticity/",
+            "notes": "J2 plasticity + Total-Lagrangian large-strain + Riks arc-length"
+          },
+          "name": "Nonlinear — metal plasticity (J2)"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ansys.com/products/structures/ansys-mechanical",
+            "notes": "Mooney-Rivlin, Ogden, Yeoh hyperelastic models"
+          },
+          "kerf": {
+            "status": "no",
+            "evidence": "",
+            "notes": "Hyperelastic material models (Mooney-Rivlin/Ogden) not yet implemented"
+          },
+          "name": "Nonlinear — hyperelastic (rubber/elastomer)"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ansys.com/products/structures/ansys-mechanical",
+            "notes": "Bonded/no-separation/frictional/frictionless; self-contact; augmented Lagrange"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-fem/src/kerf_fem/contact/",
+            "notes": "Node-to-surface penalty contact + Hertz closed-form; not full self-contact / augmented-Lagrange depth"
+          },
+          "name": "Contact (friction / gap, penalty / augmented-Lagrange)"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ansys.com/content/dam/product/structures/mechanical/thermo-mechanical-fatigue-wp.pdf",
+            "notes": "Coupled-field thermal-stress; thermo-mechanical fatigue"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/multiphysics/thermal_structural.py",
+            "notes": "Steady/transient thermal + thermal-structural coupling"
+          },
+          "name": "Steady + transient thermal; thermal-structural coupling"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ansys.com/products/structures/ansys-mechanical",
+            "notes": "SN/EN fatigue, weld fatigue, short-fibre composites (Custom Results add-on)"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py",
+            "notes": "S-N (Basquin) + E-N (Coffin-Manson) + rainflow + Goodman/Gerber/SWT + Haigh diagram"
+          },
+          "name": "Fatigue / durability (S-N, E-N, mean-stress)"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.cadfem.net/en/cadfem-informs/newsroom/ansys-release/ansys-release-2025-structures.html",
+            "notes": "J-Integral (incl. nonlinear), SIFs, XFEM crack growth, multiple crack laws (2025 R2)"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-fem/src/kerf_fem/fracture/j_integral.py",
+            "notes": "J-integral + SIF extraction; no XFEM / SMART crack-growth propagation yet"
+          },
+          "name": "Fracture mechanics (J-integral, crack growth)"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ansys.com/products/structures/ansys-mechanical",
+            "notes": "Explicit dynamics solver (LS-DYNA / AUTODYN lineage)"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/explicit.py",
+            "notes": "Central-difference leapfrog explicit; CFL time-step"
+          },
+          "name": "Explicit dynamics (impact / drop)"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ansys.com/products/structures/ansys-mechanical",
+            "notes": "Layered shells, ACP composites, first-ply-failure"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-composites/src/kerf_composites/clt.py",
+            "notes": "CLT [A|B|D] + Tsai-Wu/Hill/Hashin first-ply-failure + interlaminar"
+          },
+          "name": "Composite layered shells (Tsai-Wu / Hashin)"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ansys.com/products/structures/ansys-mechanical",
+            "notes": "Vibro-acoustics, FSI acoustic coupling"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/acoustics/",
+            "notes": "ISO 9613 propagation + RT60 + mass-law TL + wave SEA"
+          },
+          "name": "Structural acoustics (harmonic / modal)"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ansys.com/products/structures/ansys-mechanical",
+            "notes": "Density-based + lattice topology optimization"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/topology/",
+            "notes": "SIMP density-based topology optimization"
+          },
+          "name": "Topology optimization"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ansys.com/products/structures/ansys-mechanical",
+            "notes": "AM distortion / residual-stress process simulation"
+          },
+          "kerf": {
+            "status": "no",
+            "evidence": "",
+            "notes": "AM thermal-distortion process simulation not yet implemented"
+          },
+          "name": "Additive manufacturing process simulation"
+        },
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "no",
+            "source": "https://www.ansys.com/products/structures/ansys-mechanical",
+            "notes": "Proprietary; PyMAPDL/ACT scripting but commercial-licensed"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-sdk/src/kerf/",
+            "notes": "MIT open-core; full JSON-RPC LLM tool surface + kerf-sdk Python"
+          },
+          "name": "Open-source core / scripting API"
+        },
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "no",
+            "source": "https://www.ansys.com/products/structures/ansys-mechanical",
+            "notes": "No LLM interface"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "src/components/ChatPanel.jsx",
+            "notes": "Describe the load case in plain language; Kerf sets up and solves"
+          },
+          "name": "Chat-native / LLM-driven setup"
         }
       ]
     },

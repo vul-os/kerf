@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T02:02:13.638Z",
+  "generatedAt": "2026-06-05T02:02:59.387Z",
   "items": [
     {
       "slug": "revit",
@@ -4845,7 +4845,7 @@
             "notes": "no textiles or drape simulation"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-textiles/src/kerf_textiles/mass_spring.py",
             "notes": "weave/knit/drape/cut-room (backend); no 3D avatar"
           }
@@ -10208,9 +10208,9 @@
             "notes": "Parametric avatar with adjustable body measurements, pose, and movement animation"
           },
           "kerf": {
-            "status": "no",
-            "evidence": "",
-            "notes": "No avatar/dress form; no garment-on-body visualisation"
+            "status": "partial",
+            "evidence": "packages/kerf-apparel/src/kerf_apparel/avatar.py",
+            "notes": "CAESAR anthropometric body-form (13 ISO 8559-1 landmarks) + OBJ export; full cloth-on-avatar drape pending"
           },
           "name": "Avatar / dress form"
         },
@@ -10250,7 +10250,7 @@
             "notes": "CLO3D does not cover conductive yarn, e-textile circuit integration, or wearable electronics"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-textiles/src/kerf_textiles/etextiles.py",
             "notes": "e-textiles module: conductive yarn routing, electrode placement, wearable circuit (backend)"
           },

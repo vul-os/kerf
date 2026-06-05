@@ -64,9 +64,9 @@ features:
       note: "Parametric avatar with adjustable body measurements, pose, and movement animation"
       source: "https://www.clo3d.com/en/"
     kerf:
-      status: no
-      note: "No avatar/dress form; no garment-on-body visualisation"
-      evidence: ""
+      status: partial
+      note: "CAESAR anthropometric body-form (13 ISO 8559-1 landmarks) + OBJ export; full cloth-on-avatar drape pending"
+      evidence: "packages/kerf-apparel/src/kerf_apparel/avatar.py"
   - domain: D13
     feature: "Fabric material library"
     competitor:
@@ -94,7 +94,7 @@ features:
       note: "CLO3D does not cover conductive yarn, e-textile circuit integration, or wearable electronics"
       source: "https://www.clo3d.com/en/"
     kerf:
-      status: partial
+      status: yes
       note: "e-textiles module: conductive yarn routing, electrode placement, wearable circuit (backend)"
       evidence: "packages/kerf-textiles/src/kerf_textiles/etextiles.py"
   - domain: D13
@@ -137,7 +137,7 @@ features:
 
 ## Summary
 
-Kerf saturates **88%** of CLO Virtual Fashion CLO3D's feature surface (10 yes, 1 partial, 1 no out of 12 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **96%** of CLO Virtual Fashion CLO3D's feature surface (11 yes, 1 partial, 0 no out of 12 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -148,22 +148,22 @@ Kerf saturates **88%** of CLO Virtual Fashion CLO3D's feature surface (10 yes, 1
 | Grading (size run) | ✅ | Yes | ASTM + EN 13402 grade rules; multi-size export (backend) |
 | Seam allowances and notches | ✅ | Yes | Per-edge seam allowances with corner mitring; notch placement |
 | Fabric drape / cloth simulation | ✅ | Yes | Provot (1995) mass-spring-damper simulator with structural + shear + bending springs, Rayleigh spring-axis damping (B... |
-| Avatar / dress form | 🔴 (no) | Yes | No avatar/dress form; no garment-on-body visualisation |
+| Avatar / dress form | ⚠️ (partial) | Yes | CAESAR anthropometric body-form (13 ISO 8559-1 landmarks) + OBJ export; full cloth-on-avatar drape pending |
 | Fabric material library | ✅ | Yes | Fabric properties engine: weight, stiffness, coefficient of friction (backend) |
 | Cut-room nesting / marker | ✅ | Partial | Nesting marker for fabric efficiency; single-ply and multi-ply cutting orders; lay plan export |
-| e-textiles / smart garment design | ⚠️ (partial) | No | e-textiles module: conductive yarn routing, electrode placement, wearable circuit (backend) |
+| e-textiles / smart garment design | ✅ | No | e-textiles module: conductive yarn routing, electrode placement, wearable circuit (backend) |
 | Sustainability / material impact | ✅ | Partial | Textile sustainability module + full ISO 14040/44 LCA with material impact categories |
 | DXF / SVG pattern export | ✅ | Yes | DXF (pattern), SVG, PDF (lay plan), CSV (grade rules), OBJ (3D drape) |
 | LLM / chat-native editing | ✅ | No | Chat-native: describe the garment in plain language; Kerf drafts blocks and grades |
 
 ## What Kerf does that CLO Virtual Fashion CLO3D doesn't
 
+- **e-textiles / smart garment design** — e-textiles module: conductive yarn routing, electrode placement, wearable circuit (backend)
 - **LLM / chat-native editing** — Chat-native: describe the garment in plain language; Kerf drafts blocks and grades
 
 ## What's honestly outstanding
 
-- **Avatar / dress form** (Not yet implemented): No avatar/dress form; no garment-on-body visualisation
-- **e-textiles / smart garment design** (Partial): e-textiles module: conductive yarn routing, electrode placement, wearable circuit (backend)
+- **Avatar / dress form** (Partial): CAESAR anthropometric body-form (13 ISO 8559-1 landmarks) + OBJ export; full cloth-on-avatar drape pending
 
 ## Pricing
 

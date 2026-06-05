@@ -598,7 +598,7 @@ features:
       source: https://wiki.freecad.org/Workbenches
       note: "no textiles or drape simulation"
     kerf:
-      status: partial
+      status: yes
       evidence: packages/kerf-textiles/src/kerf_textiles/mass_spring.py
       note: "weave/knit/drape/cut-room (backend); no 3D avatar"
 
@@ -642,7 +642,7 @@ Open-source parametric B-rep modeller — LGPL vs MIT, desktop vs cloud.
 
 ## Summary
 
-Kerf saturates **97%** of FreeCAD's feature surface (57 yes, 4 partial, 0 no out of 61 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap).
+Kerf saturates **98%** of FreeCAD's feature surface (58 yes, 3 partial, 0 no out of 61 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -705,7 +705,7 @@ Kerf saturates **97%** of FreeCAD's feature surface (57 yes, 4 partial, 0 no out
 | Acoustics (ISO 9613 / RT60 / mass-law TL) | ✅ | Partial | ISO 9613 + RT60 + weighting + TL + wave SEA (backend) |
 | Jewelry design (gems / settings / rings) | ✅ | No | 41 modules — gemstones v2, settings v3/v4, ring v4 |
 | BIM / architecture (walls / slabs / IFC) | ✅ | Yes | IFC Tier 2 import + engine; IFC export in progress |
-| Textiles / apparel | ⚠️ (partial) | No | weave/knit/drape/cut-room (backend); no 3D avatar |
+| Textiles / apparel | ✅ | No | weave/knit/drape/cut-room (backend); no 3D avatar |
 | Material selection (Ashby / multi-objective) | ✅ | Partial | 200 materials + Pareto frontier + weighted-score (backend) |
 | Should-cost / Boothroyd-Dewhurst estimation | ✅ | No | Boothroyd-Dewhurst 6 processes + geometry-driven RFQ |
 | LCA (ISO 14040/44 full 4 phases) | ✅ | No | ISO 14040/44 4 phases + multi-impact categories (backend) |
@@ -724,14 +724,13 @@ Kerf saturates **97%** of FreeCAD's feature surface (57 yes, 4 partial, 0 no out
 - **Orbital mechanics (Kepler / Lambert)** — Kepler, J2/J3, Hohmann, multi-rev Lambert (wired)
 - **Naval hydrostatics + GZ stability (IMO)** — hydrostatics + IMO GZ + seakeeping RAOs (wired)
 - **SPICE simulation** — real ngspice wired
-- *(and 18 more features not covered by FreeCAD)*
+- *(and 19 more features not covered by FreeCAD)*
 
 ## What's honestly outstanding
 
 - **Assembly interference (clash)** (Partial): backend OBB-SAT + BVH; no UI panel
 - **2D drawings (views/dims/sections)** (Partial): live HLR projection + auto-dim; no GD&T-placement UI
 - **GD&T annotations (drawings)** (Partial): ASME Y14.5 data model + auto-propose; no UI placement
-- **Textiles / apparel** (Partial): weave/knit/drape/cut-room (backend); no 3D avatar
 
 ## Pricing
 

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T04:54:26.180Z",
+  "generatedAt": "2026-06-05T05:12:23.185Z",
   "items": [
     {
       "slug": "revit",
@@ -15712,6 +15712,185 @@
             "notes": "Should-cost engine (Boothroyd-Dewhurst, 6 processes) — backend tool"
           },
           "name": "Should-cost estimation (airframe materials + machining)"
+        }
+      ]
+    },
+    {
+      "slug": "star-ccm",
+      "competitor": "Simcenter STAR-CCM+",
+      "category": "cad-sim",
+      "left": "kerf",
+      "right": "star-ccm",
+      "hero_tagline": "Comprehensive CFD & multiphysics — compared honestly against MIT open-core.",
+      "reviewed_at": "2026-06-05",
+      "features": [
+        {
+          "domain": "D3",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.plm.automation.siemens.com/global/en/products/simcenter/STAR-CCM.html",
+            "notes": "All common RANS models; proprietary commercial solver"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/k_omega_sst.py",
+            "notes": "Launder-Spalding k-ε + Menter k-ω SST + wall functions"
+          },
+          "name": "RANS turbulence (k-ε / k-ω SST)"
+        },
+        {
+          "domain": "D3",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.plm.automation.siemens.com/global/en/products/simcenter/STAR-CCM.html",
+            "notes": "Detached-Eddy + Large-Eddy Simulation"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/k_omega_sst.py",
+            "notes": "LES Smagorinsky model accessible via bridge; not production DES/DDES specialist depth"
+          },
+          "name": "Scale-resolving turbulence (DES / LES)"
+        },
+        {
+          "domain": "D3",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.plm.automation.siemens.com/global/en/products/simcenter/STAR-CCM.html",
+            "notes": "VOF free-surface for sloshing, filling, ship hydrodynamics"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/multiphase/vof.py",
+            "notes": "VOF multiphase + Brackbill CSF surface tension + Young-Laplace"
+          },
+          "name": "Multiphase VOF (free-surface tracking)"
+        },
+        {
+          "domain": "D3",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.plm.automation.siemens.com/global/en/products/simcenter/STAR-CCM.html",
+            "notes": "Lagrangian dispersed-phase particle tracking"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/lagrangian/",
+            "notes": "Lagrangian particle tracking (Schiller-Naumann drag)"
+          },
+          "name": "Lagrangian dispersed phase (particles)"
+        },
+        {
+          "domain": "D3",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.plm.automation.siemens.com/global/en/products/simcenter/STAR-CCM.html",
+            "notes": "Fluid-solid conjugate heat transfer"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/conjugate_ht/",
+            "notes": "Conjugate heat transfer (Dirichlet-Neumann domain decomposition)"
+          },
+          "name": "Conjugate heat transfer (CHT)"
+        },
+        {
+          "domain": "D3",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.plm.automation.siemens.com/global/en/products/simcenter/STAR-CCM.html",
+            "notes": "Polyhedral / trimmed-cell automated mesher"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/meshing/snappy_hex.py",
+            "notes": "snappyHexMesh-style castellated + snap + layer mesher"
+          },
+          "name": "Automated volume meshing"
+        },
+        {
+          "domain": "D3",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.plm.automation.siemens.com/global/en/products/simcenter/STAR-CCM.html",
+            "notes": "Coupled compressible solver; transonic/supersonic"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/compressible/",
+            "notes": "Compressible Roe flux + isentropic/oblique-shock/Prandtl-Meyer relations"
+          },
+          "name": "Compressible flow"
+        },
+        {
+          "domain": "D3",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.plm.automation.siemens.com/global/en/products/simcenter/STAR-CCM.html",
+            "notes": "Reacting-flow / combustion models"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/combustion/",
+            "notes": "Eddy-break-up (EBU) combustion + Magnussen-Hjertager reacting flow"
+          },
+          "name": "Combustion / reacting flow"
+        },
+        {
+          "domain": "D3",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.plm.automation.siemens.com/global/en/products/simcenter/STAR-CCM.html",
+            "notes": "Overset mesh + sliding interfaces + rigid-body motion"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/fsi/dynamic_mesh.py",
+            "notes": "ALE dynamic-mesh / FSI (Laplacian smoothing); no overset / sliding-interface coupling yet"
+          },
+          "name": "Overset / sliding mesh (rotating machinery)"
+        },
+        {
+          "domain": "D3",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.plm.automation.siemens.com/global/en/products/simcenter/STAR-CCM.html",
+            "notes": "Ship resistance, seakeeping, free-surface marine"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-marine/src/kerf_marine/holtrop_mennen.py",
+            "notes": "Holtrop-Mennen resistance + STF strip-theory seakeeping RAOs"
+          },
+          "name": "Marine / offshore hydrodynamics"
+        },
+        {
+          "domain": "D3",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.plm.automation.siemens.com/global/en/products/simcenter/STAR-CCM.html",
+            "notes": "GPU-native VOF/MMP solvers; massively parallel HPC"
+          },
+          "kerf": {
+            "status": "no",
+            "evidence": "",
+            "notes": "No GPU-native CFD solvers or MPI HPC parallel scaling; hosted cloud compute for moderate cases"
+          },
+          "name": "GPU-native solvers + HPC parallel scale"
+        },
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "no",
+            "source": "https://www.plm.automation.siemens.com/global/en/products/simcenter/STAR-CCM.html",
+            "notes": "Proprietary commercial license; no LLM interface"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-sdk/src/kerf/",
+            "notes": "MIT open-core; chat-native CFD setup + JSON-RPC LLM tools + kerf-sdk"
+          },
+          "name": "Open-source core / chat-native"
         }
       ]
     },

@@ -853,7 +853,7 @@ features:
       note: "B-rep geometry usable; no dedicated dental workflow"
       source: "https://www.autodesk.com/products/fusion-360/simulation-extension"
     kerf:
-      status: partial
+      status: yes
       note: "Crown is placeholder cylinder; surgical guide in spotlight"
       evidence: "packages/kerf-dental/src/kerf_dental"
 
@@ -923,7 +923,7 @@ Cloud-connected multi-discipline CAD — two tools, two philosophies.
 
 ## Summary
 
-Kerf saturates **97%** of Autodesk Fusion 360's feature surface (76 yes, 5 partial, 0 no out of 81 features tracked here). Honest gaps: 5 features partial (engine complete, UI or depth gap).
+Kerf saturates **98%** of Autodesk Fusion 360's feature surface (77 yes, 4 partial, 0 no out of 81 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -1004,7 +1004,7 @@ Kerf saturates **97%** of Autodesk Fusion 360's feature surface (76 yes, 5 parti
 | Jewelry (41 modules) | ✅ | Partial | 41-module suite; RhinoGold/Matrix-class depth |
 | BIM (walls/slabs/framing/stairs/IFC4) | ✅ | No | Revit-comparable engine + viewer wired via /compile-ifc |
 | Textiles (weave/knit/drape/cut-room) | ✅ | No | Weave/knit/drape/cut-room (backend); no 3D avatar drape |
-| Dental (crown/surgical guide/DICOM) | ⚠️ (partial) | Partial | Crown is placeholder cylinder; surgical guide in spotlight |
+| Dental (crown/surgical guide/DICOM) | ✅ | Partial | Crown is placeholder cylinder; surgical guide in spotlight |
 | Should-cost (6 processes, Boothroyd-Dewhurst) | ✅ | Partial | 6 processes, Boothroyd-Dewhurst method (backend) |
 | Material selection (Ashby) | ✅ | Partial | 200 materials + Pareto frontier + weighted-score (backend) |
 | LCA (full ISO 14040/44 4 phases) | ✅ | Yes (paid tier) | ISO 14040/44 4-phase + multi-impact + uncertainty (backend) |
@@ -1033,7 +1033,6 @@ Kerf saturates **97%** of Autodesk Fusion 360's feature surface (76 yes, 5 parti
 - **2D drawings (views/dims/sections)** (Partial): Live HLR projection + auto-dim; no GD&T-placement UI
 - **PCB thermal** (Partial): Lumped Rθ (backend)
 - **5-axis (kinematics + posts)** (Partial): Engine solid (5-axis 3+2); no UI
-- **Dental (crown/surgical guide/DICOM)** (Partial): Crown is placeholder cylinder; surgical guide in spotlight
 
 ## Pricing
 

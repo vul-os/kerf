@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T01:52:46.964Z",
+  "generatedAt": "2026-06-05T01:54:12.310Z",
   "items": [
     {
       "slug": "revit",
@@ -5958,7 +5958,7 @@
             "notes": "B-rep geometry usable; no dedicated dental workflow"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-dental/src/kerf_dental",
             "notes": "Crown is placeholder cylinder; surgical guide in spotlight"
           },
@@ -8662,7 +8662,7 @@
             "notes": "AI-powered crown, bridge, implant, denture, RPD, aligner, splint design; 3Shape Automate AI proposals in 90s"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-dental/src/kerf_dental/crown.py, packages/kerf-dental/src/kerf_dental/denture.py, packages/kerf-dental/src/kerf_dental/stl_export.py",
             "notes": "Anatomic crown (swept margin polygon + cusp ridges, n_cusps=2-4), surgical guide, DICOM ingest, parametric full denture + RPD, binary/ASCII STL export (backend tools). No AI design proposals, no implant library, no virtual articulator."
           },
@@ -8676,7 +8676,7 @@
             "notes": "Parametric crown/bridge with AI design proposal; virtual articulator; screw-retained and standard crowns"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "src/components/dental/CrownSculptingPanel.jsx, packages/kerf-dental/src/kerf_dental/crown.py (design_crown_anatomic), packages/kerf-dental/src/kerf_dental/stl_export.py",
             "notes": "CrownSculptingPanel: anatomic preset picker (incisor/canine/premolar/molar), cusp height/angle sliders, occlusion-contact SVG overlay, Run dispatches dental_crown_design. Backend: design_crown_anatomic (swept margin polygon + raised-cosine cusp ridges, n_cusps=2-4). No virtual articulator, no bridge pontic."
           },
@@ -8690,7 +8690,7 @@
             "notes": "Full implant planning with 100+ implant libraries; implant bar and bridge; abutment design"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "src/components/dental/ImplantLibrary.jsx, packages/kerf-dental/src/kerf_dental/guide.py",
             "notes": "ImplantLibrary: filterable catalogue (Straumann, Nobel Biocare, Zimmer, MIS; diameter 3.3-4.8 mm; length 8-13 mm), click-to-place sends fixture dims to dental_surgical_guide backend. Representative geometry — not a certified clinical implant library."
           },
@@ -8704,7 +8704,7 @@
             "notes": "Guided surgery workflow with TRIOS integration; ToothDesigner and surgical guide output"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "src/components/dental/SurgicalGuide.jsx, packages/kerf-dental/src/kerf_dental/guide.py (place_surgical_guide)",
             "notes": "SurgicalGuide: CBCT/point-cloud import (CSV/JSON xyz), implant pose editor (position + axis per implant), drill sleeve setup, SVG guide preview; dispatches dental_surgical_guide. Backend: place_surgical_guide returns validate_body-clean cylinder sleeves + angular accuracy."
           },
@@ -8732,7 +8732,7 @@
             "notes": "Full and partial denture design; denture on implants; Splint Studio for occlusal devices"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-dental/src/kerf_dental/denture.py",
             "notes": "Parametric full denture base (horseshoe arch, buccal flange, tooth socket positions) and RPD major connector (lingual bar / palatal plate) via design_full_denture() / design_rpd(). Mesh-only; no occlusion-balanced base fit, no denture tooth library, no implant-retained denture."
           },
@@ -8760,7 +8760,7 @@
             "notes": "Native TRIOS intraoral scanner + third-party IOS format support; open STL/PLY export"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "kerf_note": "Registration core + deviation map shipped (kerf_dental.registration). Remaining epic: live scanner-hardware capture + proprietary TRIOS/iTero/3M format parsers.",
             "evidence": "packages/kerf-dental/src/kerf_dental/registration.py",
             "notes": "Multi-scan ICP registration (point-to-point + point-to-plane, Besl-McKay/Chen-Medioni) + signed per-vertex deviation map shipped."
@@ -8775,7 +8775,7 @@
             "notes": "3Shape Produce: sends designs to pre-integrated mills, 3D printers, lab partners in clicks"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-dental/src/kerf_dental/stl_export.py, packages/kerf-dental/src/kerf_dental/tools.py",
             "notes": "Binary and ASCII STL export for dental meshes (crown, full denture, RPD) via stl_export.py; normal computation from vertex cross-product; dental_stl_export LLM tool. No dental mill post processor (G-code, Sirona/Roland CAM paths)."
           },

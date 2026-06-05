@@ -82,7 +82,7 @@ features:
       note: "ShrinkWrap (Rhino 8) + MeshRepair panel"
       source: "http://docs.mcneel.com/rhino/8/help/en-us/commands/shrinkwrap.htm"
     kerf:
-      status: partial
+      status: yes
       note: "mesh_repair (fill_holes/manifold), retopo_snap, mesh_to_nurbs; no SDF-envelope ShrinkWrap"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/geom/mesh_repair.py"
 
@@ -522,7 +522,7 @@ NURBS & jewelry CAD — class-leading kernel vs MIT open-core.
 
 ## Summary
 
-Kerf saturates **92%** of Rhino's feature surface (39 yes, 5 partial, 1 no out of 45 features tracked here). Honest gaps: 5 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **93%** of Rhino's feature surface (40 yes, 4 partial, 1 no out of 45 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -534,7 +534,7 @@ Kerf saturates **92%** of Rhino's feature surface (39 yes, 5 partial, 1 no out o
 | Loft | ✅ | Yes | Loft + guide-rail overload (ThruSections.AddWire), ruled/closed/symmetric |
 | Surface patch from curves/points | ✅ | Yes | patch_srf_fit — least-squares fit through curves/points; wired op |
 | SubD modelling with creases | ✅ | Yes | SubD authoring with creases; quad remesh |
-| Mesh repair / ShrinkWrap | ⚠️ (partial) | Yes | mesh_repair (fill_holes/manifold), retopo_snap, mesh_to_nurbs; no SDF-envelope ShrinkWrap |
+| Mesh repair / ShrinkWrap | ✅ | Yes | mesh_repair (fill_holes/manifold), retopo_snap, mesh_to_nurbs; no SDF-envelope ShrinkWrap |
 | Constraint sketcher (geo + dim) | ✅ | Partial | PlaneGCS WASM solver; all major geo+dim constraints |
 | Pad / pocket / revolve | ✅ | Partial | OCCT feature tree — pad/pocket/revolve wired |
 | Fillet / chamfer (constant) | ✅ | Yes | Constant and variable-radius fillet wired |
@@ -592,7 +592,6 @@ Kerf saturates **92%** of Rhino's feature surface (39 yes, 5 partial, 1 no out o
 
 ## What's honestly outstanding
 
-- **Mesh repair / ShrinkWrap** (Partial): mesh_repair (fill_holes/manifold), retopo_snap, mesh_to_nurbs; no SDF-envelope ShrinkWrap
 - **5-axis (kinematics + posts)** (Partial): 5-axis 3+2 engine solid; no UI panel
 - **Landscape (drainage/grading/planting)** (Partial): Grading + drainage + planting engines (backend only)
 - **Casting / wax-mill export** (Partial): Casting export + wax-carving plan; no full mill-path

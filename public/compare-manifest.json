@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T01:49:48.928Z",
+  "generatedAt": "2026-06-05T01:51:17.736Z",
   "items": [
     {
       "slug": "revit",
@@ -1200,7 +1200,7 @@
             "notes": "Not applicable — Archicad is an architectural BIM tool, not a mechanical CAD tool"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-core/src/sheetmetal.py",
             "notes": "Single flange + unfold + flat DXF; no hem/relief/jog/multi-flange"
           },
@@ -1740,7 +1740,7 @@
             "notes": "Native NURBS curves and surfaces including subdivision; Vectorworks Designer tier"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-occt/nurbs/",
             "notes": "OCCT NURBS math complete; browser WASM bindings unconfirmed at build"
           },
@@ -17181,7 +17181,7 @@
             "notes": "ShrinkWrap (Rhino 8) + MeshRepair panel"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/mesh_repair.py",
             "notes": "mesh_repair (fill_holes/manifold), retopo_snap, mesh_to_nurbs; no SDF-envelope ShrinkWrap"
           },

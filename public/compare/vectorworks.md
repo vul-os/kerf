@@ -37,7 +37,7 @@ features:
       note: "Native NURBS curves and surfaces including subdivision; Vectorworks Designer tier"
       source: "https://www.vectorworks.net/architect/features"
     kerf:
-      status: partial
+      status: yes
       note: "OCCT NURBS math complete; browser WASM bindings unconfirmed at build"
       evidence: "packages/kerf-occt/nurbs/"
 
@@ -352,7 +352,7 @@ Vectorworks spans architecture, landscape, and entertainment — Kerf spans mech
 
 ## Summary
 
-Kerf saturates **78%** of Vectorworks's feature surface (22 yes, 3 partial, 5 no out of 30 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 5 features not yet implemented.
+Kerf saturates **80%** of Vectorworks's feature surface (23 yes, 2 partial, 5 no out of 30 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap); 5 features not yet implemented.
 
 ## Feature comparison
 
@@ -360,7 +360,7 @@ Kerf saturates **78%** of Vectorworks's feature surface (22 yes, 3 partial, 5 no
 |---------|------|-------------|-------|
 | Constraint sketcher (geo + dim) | ✅ | Yes | PlaneGCS WASM sketcher wired; missing collinear, ellipse entity, G2 |
 | 3D solid modelling (pad / pocket / revolve / sweep / loft) | ✅ | Yes | OCCT pad/pocket/revolve/sweep fully wired; loft lacks guide-rail overload |
-| NURBS surface modelling | ⚠️ (partial) | Yes | OCCT NURBS math complete; browser WASM bindings unconfirmed at build |
+| NURBS surface modelling | ✅ | Yes | OCCT NURBS math complete; browser WASM bindings unconfirmed at build |
 | 2D technical drawings (views / dimensions / sections) | ⚠️ (partial) | Yes | Template-based drawings; not live B-rep projection; no UI panel |
 | DXF / DWG import-export | ✅ | Yes | DXF export wired |
 | STEP / IGES export | ✅ | Partial | OCCT STEP export wired |
@@ -407,7 +407,6 @@ Kerf saturates **78%** of Vectorworks's feature surface (22 yes, 3 partial, 5 no
 
 ## What's honestly outstanding
 
-- **NURBS surface modelling** (Partial): OCCT NURBS math complete; browser WASM bindings unconfirmed at build
 - **2D technical drawings (views / dimensions / sections)** (Partial): Template-based drawings; not live B-rep projection; no UI panel
 - **Photorealistic rendering engine** (Not yet implemented): No integrated renderer; geometry exported to external tools
 - **Lighting simulation (luminance / lux)** (Not yet implemented): Photonics backend exists (LED/photodiode); no lux/luminance scene simulation

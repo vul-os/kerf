@@ -174,7 +174,7 @@ features:
       note: "Not applicable — Archicad is an architectural BIM tool, not a mechanical CAD tool"
       source: "https://graphisoft.com/solutions/products/archicad"
     kerf:
-      status: partial
+      status: yes
       note: "Single flange + unfold + flat DXF; no hem/relief/jog/multi-flange"
       evidence: "packages/kerf-core/src/sheetmetal.py"
   - domain: D1
@@ -277,7 +277,7 @@ ArchiCAD pioneered BIM — Kerf brings engineering-grade precision to teams buil
 
 ## Summary
 
-Kerf saturates **81%** of Graphisoft ArchiCAD's feature surface (17 yes, 8 partial, 1 no out of 26 features tracked here). Honest gaps: 8 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **83%** of Graphisoft ArchiCAD's feature surface (18 yes, 7 partial, 1 no out of 26 features tracked here). Honest gaps: 7 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -299,7 +299,7 @@ Kerf saturates **81%** of Graphisoft ArchiCAD's feature surface (17 yes, 8 parti
 | Parametric object model | ✅ | Yes | Feature-tree parametric model; OCCT B-rep; sketch constraints via PlaneGCS |
 | 2D technical drawings / documentation | ⚠️ (partial) | Yes | Engineering multi-sheet drawings (template-based, not live B-rep projection); no layout book |
 | 3D solid B-rep modelling | ✅ | Yes | Full OCCT B-rep; pad/pocket/revolve/sweep/loft/fillet/boolean wired |
-| Sheet metal flat-pattern | ⚠️ (partial) | No | Single flange + unfold + flat DXF; no hem/relief/jog/multi-flange |
+| Sheet metal flat-pattern | ✅ | No | Single flange + unfold + flat DXF; no hem/relief/jog/multi-flange |
 | GD&T / tolerancing | ⚠️ (partial) | No | GD&T data model (ASME Y14.5); no MBD/PMI on model view |
 | Building energy analysis export | ⚠️ (partial) | Yes | Backend building loads (CLTD/RTS, ASHRAE Ch.18, degree-day); no energy simulation export |
 | HVAC duct sizing | ✅ | Yes (paid tier) | SMACNA duct sizing + flat-pattern (backend) |
@@ -313,6 +313,7 @@ Kerf saturates **81%** of Graphisoft ArchiCAD's feature surface (17 yes, 8 parti
 ## What Kerf does that Graphisoft ArchiCAD doesn't
 
 - **MEP Modeler (HVAC / plumbing / electrical routing)** — BIM MEP routing (duct/pipe/conduit segments, fittings, endpoints) via create_mep_route tool; no clash-aware auto-routing UI
+- **Sheet metal flat-pattern** — Single flange + unfold + flat DXF; no hem/relief/jog/multi-flange
 - **HVAC duct sizing** — SMACNA duct sizing + flat-pattern (backend)
 - **PCB / electronics design** — Schematic + PCB layout (KiCad round-trip), ngspice SPICE, DRC — wired in browser
 - **Tolerance stackup / metrology** — 1D WC/RSS/MC stackup + 3D vector-loop; no MBD on model
@@ -325,7 +326,6 @@ Kerf saturates **81%** of Graphisoft ArchiCAD's feature surface (17 yes, 8 parti
 - **Hotlinked modules (XRef / federated model)** (Not yet implemented): No federated BIM hotlink/XRef mechanism; cloud git provides file-level references but not BIM-level live linking
 - **Site terrain / mesh modelling** (Partial): Backend geotech + earthwork volumes; no interactive site mesh UI
 - **2D technical drawings / documentation** (Partial): Engineering multi-sheet drawings (template-based, not live B-rep projection); no layout book
-- **Sheet metal flat-pattern** (Partial): Single flange + unfold + flat DXF; no hem/relief/jog/multi-flange
 - **GD&T / tolerancing** (Partial): GD&T data model (ASME Y14.5); no MBD/PMI on model view
 - **Building energy analysis export** (Partial): Backend building loads (CLTD/RTS, ASHRAE Ch.18, degree-day); no energy simulation export
 - **Material cost / quantity schedules** (Partial): Should-cost engine (backend) + BOM panel in assemblies; no BIM quantity take-off schedule

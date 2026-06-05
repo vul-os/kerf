@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T03:38:50.694Z",
+  "generatedAt": "2026-06-05T03:40:11.473Z",
   "items": [
     {
       "slug": "revit",
@@ -11285,6 +11285,199 @@
             "notes": "Chat-native: describe layup in plain language; Kerf routes to composites backend"
           },
           "name": "LLM / chat-native editing"
+        }
+      ]
+    },
+    {
+      "slug": "mastercam",
+      "competitor": "Mastercam",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "mastercam",
+      "hero_tagline": "The most-used CAM on the shop floor — compared honestly against MIT open-core.",
+      "reviewed_at": "2026-06-05",
+      "features": [
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.mastercam.com/solutions/products/mill/",
+            "notes": "Full Mill toolpath library; Dynamic Motion engagement control"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cam/src/kerf_cam/routes.py",
+            "notes": "Profile/contour/pocket/face/drill toolpaths wired in CAMView"
+          },
+          "name": "2D / 3D milling toolpaths (contour/pocket/face/drill)"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.mastercam.com/solutions/products/mill/",
+            "notes": "Dynamic Mill — constant engagement adaptive roughing"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cam/src/kerf_cam/adaptive.py",
+            "notes": "Iterative-offset adaptive clearing + 50% trochoid overlap"
+          },
+          "name": "High-speed adaptive roughing (trochoidal)"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.camcut-group.com/en-us/softwares/mastercam/mastercam-add-ons/mastercam-multiaxis/",
+            "notes": "Multiaxis add-on: 3-/4-/5-axis with collision detection"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cam/src/kerf_cam/five_axis/",
+            "notes": "Constant-tilt 5-axis finish + 3+2 indexed; head-table/table-table/head-head machine kinematics with RTCP"
+          },
+          "name": "5-axis simultaneous + 3+2 indexed"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.mastercam.com/solutions/products/mill-turn/",
+            "notes": "Mill-Turn: single-turret to multi-spindle multi-axis lathes; sync manager"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cam/src/kerf_cam/turning_cycles.py",
+            "notes": "Turning roughing/finishing G71/G70 + G76 threading cycles"
+          },
+          "name": "Mill-turn / multi-task lathe"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.mastercam.com/solutions/products/mill-turn/",
+            "notes": "Vast adaptable post library tailored to each control"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cam/src/kerf_cam/five_axis/",
+            "notes": "LinuxCNC/Fanuc + Heidenhain iTNC (M128) + Siemens 840D (TRAORI/CYCLE800) posts"
+          },
+          "name": "Post-processor library (Fanuc/Heidenhain/Siemens)"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.mastercam.com/solutions/products/mill/",
+            "notes": "Control-resident and computer comp"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cam/src/kerf_cam/cutter_comp.py",
+            "notes": "G41/G42 activation + G40 cancel + software offset path"
+          },
+          "name": "Cutter radius compensation (G41/G42)"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.mastercam.com/solutions/products/wire/",
+            "notes": "Mastercam Wire — 2/4-axis wire paths"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-mold/src/kerf_mold/wire_edm.py",
+            "notes": "Wire-EDM 4-axis taper toolpath + G41/G42 G-code"
+          },
+          "name": "Wire EDM programming"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.mastercam.com/solutions/products/mill/",
+            "notes": "Material-aware feeds/speeds library"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/cuttingtool/tool_life.py",
+            "notes": "Taylor extended tool-life + Gilbert economic speed + Sandvik material ranges"
+          },
+          "name": "Feeds & speeds + tool-life"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.mastercam.com/solutions/products/mill/",
+            "notes": "True-shape nesting for routers / plasma"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/nesting/",
+            "notes": "Minkowski-NFP + IFP + bottom-left-fill nesting"
+          },
+          "name": "Nesting (sheet / plate part layout)"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.mastercam.com/solutions/products/mill-turn/",
+            "notes": "Full kinematic machine simulation; catches machine/fixture collisions"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py",
+            "notes": "OBB-SAT + BVH stock/tool clash detection; no full machine-component kinematic collision model"
+          },
+          "name": "Machine simulation (full machine-component collision)"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.mastercam.com/solutions/products/mill/",
+            "notes": "Verify: voxel material-removal simulation with gouge detection"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-cam/src/kerf_cam/worker.py",
+            "notes": "Lathe cycle simulation + toolpath preview; no voxel material-removal verify with gouge check"
+          },
+          "name": "Toolpath verify / material-removal backplot"
+        },
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "no",
+            "source": "https://www.mastercam.com/solutions/products/mill/",
+            "notes": "Proprietary; C-Hook / .NET API but commercial-licensed"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-sdk/src/kerf/",
+            "notes": "MIT open-core; full JSON-RPC LLM tool surface + kerf-sdk Python"
+          },
+          "name": "Open-source core / scripting API"
+        },
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "no",
+            "source": "https://www.mastercam.com/solutions/products/mill/",
+            "notes": "No LLM interface"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "src/components/ChatPanel.jsx",
+            "notes": "Describe the part + stock in plain language; Kerf generates toolpaths + G-code"
+          },
+          "name": "Chat-native / LLM-driven programming"
         }
       ]
     },

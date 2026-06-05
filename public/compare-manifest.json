@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T04:11:02.001Z",
+  "generatedAt": "2026-06-05T04:19:04.521Z",
   "items": [
     {
       "slug": "revit",
@@ -3360,6 +3360,199 @@
             "notes": "IPC-2221 trace ampacity calculator",
             "evidence": "packages/kerf-electronics/src/kerf_electronics/tracecurrent/ampacity.py"
           }
+        }
+      ]
+    },
+    {
+      "slug": "allegro",
+      "competitor": "Cadence Allegro X",
+      "category": "cad-electronic",
+      "left": "kerf",
+      "right": "allegro",
+      "hero_tagline": "High-end constraint-driven PCB design — compared honestly against MIT open-core EDA.",
+      "reviewed_at": "2026-06-05",
+      "features": [
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.cadence.com/en_US/home/tools/pcb-design-and-analysis/allegro-x-design-platform.html",
+            "notes": "Spreadsheet-based Constraint Manager; real-time DRC markers"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/tools/net_classes.py",
+            "notes": "Net classes + design-rule constraints engine"
+          },
+          "name": "Constraint-driven design rules (net classes, clearances)"
+        },
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.cadence.com/en_US/home/tools/pcb-design-and-analysis/allegro-x-design-platform.html",
+            "notes": "Interactive route engine with real-time DRC; push-shove"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/routing/push_shove.py",
+            "notes": "Push-shove interactive router + netlist DRC with violation markers"
+          },
+          "name": "Interactive routing + real-time DRC"
+        },
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.cadence.com/en_US/home/tools/pcb-design-and-analysis/allegro-x-design-platform.html",
+            "notes": "Integrated Sigrity X: impedance, coupling, crosstalk, reflection, eye"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/si_eye_wizard.py",
+            "notes": "Z0/Zdiff impedance + crosstalk + IBIS eye-diagram (Bergeron channel + PRBS)"
+          },
+          "name": "Signal integrity (impedance / crosstalk / eye / IBIS)"
+        },
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.cadence.com/en_US/home/tools/pcb-design-and-analysis/allegro-x-design-platform.html",
+            "notes": "Sigrity power integrity: IR drop, PDN impedance, power inductance"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/pdn_wizard.py",
+            "notes": "Frequency-domain PDN Z(ω) + target-Z + decoupling-cap optimiser"
+          },
+          "name": "Power integrity (PDN / IR-drop / decoupling)"
+        },
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.cadence.com/en_US/home/tools/pcb-design-and-analysis/allegro-x-design-platform.html",
+            "notes": "Layer stackup with impedance targets"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/stackup/impedance.py",
+            "notes": "Impedance-controlled stackup (microstrip/stripline/coplanar) solver"
+          },
+          "name": "Controlled-impedance stackup"
+        },
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.cadence.com/en_US/home/tools/pcb-design-and-analysis/allegro-x-design-platform.html",
+            "notes": "Rigid-flex with bend regions; 3D flex verification"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/flex/stackup.py",
+            "notes": "Rigid-flex / HDI stackup (buried/blind/micro-via) modelling"
+          },
+          "name": "Rigid-flex PCB design"
+        },
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.cadence.com/en_US/home/tools/pcb-design-and-analysis/allegro-x-design-platform.html",
+            "notes": "Interactive 3D canvas; STEP MCAD co-design; enclosure clearance"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/pcb_3d_clearance.py",
+            "notes": "Board STEP export + STEP component import + 3D clearance DRC"
+          },
+          "name": "3D canvas + MCAD co-design (STEP)"
+        },
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.cadence.com/en_US/home/tools/pcb-design-and-analysis/allegro-x-design-platform.html",
+            "notes": "Integrated DFM rules + real-time DRC"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/netlist_drc.py",
+            "notes": "Netlist DRC + ERC + DFM checklist (IPC-2221B presets)"
+          },
+          "name": "DRC / DFM checks"
+        },
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.cadence.com/en_US/home/tools/pcb-design-and-analysis/allegro-x-design-platform.html",
+            "notes": "Gerber, ODB++, IPC-2581 manufacturing output"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/fab/ipc2581.py",
+            "notes": "Gerber RS-274X + Excellon + ODB++ + IPC-2581 + IPC-D-356A netlist"
+          },
+          "name": "Fabrication output (Gerber / ODB++ / IPC-2581)"
+        },
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.cadence.com/en_US/home/tools/pcb-design-and-analysis/allegro-x-design-platform.html",
+            "notes": "System-level multi-board connectivity"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/multi_board/workspace.py",
+            "notes": "MB3D multi-board workspace + inter-board net mapping"
+          },
+          "name": "Multi-board / system design"
+        },
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.cadence.com/en_US/home/tools/pcb-design-and-analysis/allegro-x-design-platform.html",
+            "notes": "Spreadsheet-driven constraint authoring across the design"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/tools/net_classes.py",
+            "notes": "Constraint/net-class engine present; no spreadsheet constraint-authoring UI"
+          },
+          "name": "Constraint Manager spreadsheet UI"
+        },
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.cadence.com/en_US/home/resources/datasheets/allegro-x-advanced-package-designer-ds.html",
+            "notes": "Allegro X Advanced Package Designer for IC packages/substrates"
+          },
+          "kerf": {
+            "status": "no",
+            "evidence": "",
+            "notes": "No IC package / substrate (wire-bond / flip-chip) design tool"
+          },
+          "name": "IC package / substrate design (APD)"
+        },
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "no",
+            "source": "https://www.cadence.com/en_US/home/tools/pcb-design-and-analysis/allegro-x-design-platform.html",
+            "notes": "Proprietary; SKILL scripting but commercial-licensed"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-sdk/src/kerf/",
+            "notes": "MIT open-core; chat-native PCB design + JSON-RPC LLM tools + kerf-sdk"
+          },
+          "name": "Open-source core / chat-native"
         }
       ]
     },

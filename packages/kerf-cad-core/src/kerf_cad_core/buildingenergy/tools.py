@@ -1319,3 +1319,188 @@ async def run_ashrae901_envelope_compliance(ctx: ProjectCtx, args: bytes) -> str
     if result.get("ok"):
         return ok_payload(result)
     return json.dumps(result)
+
+
+# ---------------------------------------------------------------------------
+# Tool: be_export_energy_model
+# ---------------------------------------------------------------------------
+
+_export_energy_model_spec = ToolSpec(
+    name="be_export_energy_model",
+    description=(
+        "Export a building energy model to gbXML v0.37 or EnergyPlus IDF (v23.1).\n"
+        "\n"
+        "gbXML is the standard interchange format for passing building geometry and\n"
+        "thermal properties to energy simulation tools such as Trane TRACE 3D Plus,\n"
+        "eQUEST, HAP, IDA ICE, and OpenStudio.  EnergyPlus IDF is the native input\n"
+        "for the US-DOE EnergyPlus building simulation engine, which is the calculation\n"
+        "engine behind EnergyPlus, OpenStudio, and DesignBuilder.\n"
+        "\n"
+        "Geometry model: each zone is a rectangular box (square floor plan, vertical walls).\n"
+        "For detailed polygon geometry, use the gbXML import in your simulation tool and\n"
+        "replace the RectangularGeometry nodes with PolyLoop nodes.\n"
+        "\n"
+        "format:  'gbxml' (default) | 'idf'\n"
+        "\n"
+        "References:\n"
+        "  gbXML v0.37 — https://www.gbxml.org/schema_doc/4.0/GreenBuildingXML_Ver4.01.html\n"
+        "  ASHRAE 90.1-2022 — envelope U-value defaults by climate zone\n"
+        "  EnergyPlus 23.1 Input-Output Reference — §6.7 Zone, §18 ZoneHVAC:IdealLoads\n"
+        "Errors: {ok:false, reason} for invalid inputs.  Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "format": {
+                "type": "string",
+                "enum": ["gbxml", "idf"],
+                "description": "Output format.  'gbxml' for Green Building XML; 'idf' for EnergyPlus.",
+            },
+            "building_name": {
+                "type": "string",
+                "description": "Building name (used in export headers).  Default 'Kerf Building'.",
+            },
+            "climate_zone": {
+                "type": "string",
+                "description": (
+                    "ASHRAE climate zone string, e.g. '4A', '3C', '6B'.  "
+                    "Used in gbXML <ClimateZone> element.  Default '4A'."
+                ),
+            },
+            "zones": {
+                "type": "array",
+                "description": "List of thermal zones to include in the export.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "zone_id": {
+                            "type": "string",
+                            "description": "Unique zone identifier (no spaces).",
+                        },
+                        "name": {
+                            "type": "string",
+                            "description": "Human-readable zone name.",
+                        },
+                        "floor_area_m2": {
+                            "type": "number",
+                            "description": "Zone floor area (m²).",
+                        },
+                        "ceiling_height_m": {
+                            "type": "number",
+                            "description": "Floor-to-ceiling height (m).  Default 3.0.",
+                        },
+                        "wall_u_value": {
+                            "type": "number",
+                            "description": "Exterior opaque wall U-value (W/m²·K).  Default 0.35.",
+                        },
+                        "window_area_m2": {
+                            "type": "number",
+                            "description": "Total glazing area (m²).  Default 0.",
+                        },
+                        "window_u_value": {
+                            "type": "number",
+                            "description": "Window U-value (W/m²·K).  Default 1.8.",
+                        },
+                        "window_shgc": {
+                            "type": "number",
+                            "description": "Window solar heat gain coefficient (0–1).  Default 0.4.",
+                        },
+                        "roof_u_value": {
+                            "type": "number",
+                            "description": "Roof/ceiling U-value (W/m²·K).  Default 0.20.",
+                        },
+                        "infiltration_ach": {
+                            "type": "number",
+                            "description": "Infiltration (air changes per hour).  Default 0.5.",
+                        },
+                        "occupancy_people": {
+                            "type": "integer",
+                            "description": "Number of occupants.  Default 0.",
+                        },
+                        "lighting_w_m2": {
+                            "type": "number",
+                            "description": "Lighting power density (W/m²).  Default 10.",
+                        },
+                        "equipment_w_m2": {
+                            "type": "number",
+                            "description": "Equipment power density (W/m²).  Default 15.",
+                        },
+                        "setpoint_heating_c": {
+                            "type": "number",
+                            "description": "Heating setpoint (°C).  Default 21.",
+                        },
+                        "setpoint_cooling_c": {
+                            "type": "number",
+                            "description": "Cooling setpoint (°C).  Default 26.",
+                        },
+                        "latitude_deg": {
+                            "type": "number",
+                            "description": "Site latitude (degrees N).  Default 0.",
+                        },
+                        "longitude_deg": {
+                            "type": "number",
+                            "description": "Site longitude (degrees E).  Default 0.",
+                        },
+                        "elevation_m": {
+                            "type": "number",
+                            "description": "Site elevation (m ASL).  Default 0.",
+                        },
+                    },
+                    "required": ["zone_id", "floor_area_m2"],
+                },
+                "minItems": 1,
+            },
+        },
+        "required": ["zones"],
+    },
+)
+
+
+@register(_export_energy_model_spec, write=True)
+async def run_export_energy_model(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    zones_raw = a.get("zones")
+    if not zones_raw:
+        return json.dumps({"ok": False, "reason": "zones is required and must be non-empty"})
+
+    from kerf_cad_core.buildingenergy.gbxml_export import zones_to_model, export_gbxml, export_energyplus_idf
+
+    fmt = a.get("format", "gbxml").lower()
+    if fmt not in ("gbxml", "idf"):
+        return json.dumps({"ok": False, "reason": f"format must be 'gbxml' or 'idf', got '{fmt}'"})
+
+    try:
+        model = zones_to_model(
+            zones_raw,
+            building_name=a.get("building_name", "Kerf Building"),
+            climate_zone=a.get("climate_zone", "4A"),
+        )
+    except (ValueError, KeyError, TypeError) as exc:
+        return json.dumps({"ok": False, "reason": f"zone data error: {exc}"})
+
+    try:
+        if fmt == "gbxml":
+            content = export_gbxml(model)
+            filename = "building_energy.gbxml"
+            mime = "application/xml"
+        else:
+            content = export_energyplus_idf(model)
+            filename = "building_energy.idf"
+            mime = "text/plain"
+    except Exception as exc:
+        return err_payload(f"export failed: {exc}", "EXPORT_ERROR")
+
+    return ok_payload({
+        "format": fmt,
+        "filename": filename,
+        "mime_type": mime,
+        "n_zones": len(model.zones),
+        "building_name": model.name,
+        "climate_zone": model.climate_zone,
+        "content": content,
+        "byte_count": len(content.encode()),
+    })

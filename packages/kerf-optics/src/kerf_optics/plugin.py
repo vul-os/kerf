@@ -5,7 +5,9 @@ Registers:
   - LLM tools: optics_trace_ray, optics_lens_design
   - LLM tools: gaussian_beam_propagate, gaussian_beam_focus
   - LLM tools: optics_tolerancing, optics_mtf, optics_nonsequential_trace
+  - LLM tools: optics_lighting_simulation, optics_daylighting_simulation
   - Capability: optics.pop  (angular-spectrum + Fresnel/Fraunhofer scalar POP)
+  - Capability: optics.daylighting  (CIE S 011 sky models, Spencer sun position)
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ async def register(app: FastAPI, ctx):
         optics_sequential_trace_spec, run_optics_sequential_trace,
         optics_nest_tolerancing_spec, run_optics_nest_tolerancing,
         optics_lighting_simulation_spec, run_optics_lighting_simulation,
+        optics_daylighting_simulation_spec, run_optics_daylighting_simulation,
     )
     ctx.tools.register("optics_trace_ray", optics_trace_ray_spec, run_optics_trace_ray)
     ctx.tools.register("optics_lens_design", optics_lens_design_spec, run_optics_lens_design)
@@ -45,6 +48,11 @@ async def register(app: FastAPI, ctx):
         "optics_lighting_simulation",
         optics_lighting_simulation_spec,
         run_optics_lighting_simulation,
+    )
+    ctx.tools.register(
+        "optics_daylighting_simulation",
+        optics_daylighting_simulation_spec,
+        run_optics_daylighting_simulation,
     )
 
     from kerf_optics.gaussian_tools import (
@@ -86,7 +94,7 @@ async def register(app: FastAPI, ctx):
         "optics.paraxial", "optics.abcd", "optics.gaussian", "optics.pop",
         "optics.tolerancing", "optics.tolerancing.nest", "optics.mtf",
         "optics.nonsequential", "optics.zernike",
-        "optics.sequential_trace", "optics.lighting",
+        "optics.sequential_trace", "optics.lighting", "optics.daylighting",
     ]
 
     try:

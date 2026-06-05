@@ -1148,3 +1148,200 @@ async def run_optics_lighting_simulation(args: dict[str, Any], ctx: "ProjectCtx"
 
     except Exception as exc:
         return err_payload(str(exc), "LIGHTING_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# optics_daylighting_simulation
+# ---------------------------------------------------------------------------
+
+optics_daylighting_simulation_spec = ToolSpec(
+    name="optics_daylighting_simulation",
+    description=(
+        "Compute daylight illuminance (lux) and daylight factor (DF %) on a grid of "
+        "measurement points using CIE S 011 standard sky models (cie_clear, cie_overcast, "
+        "cie_intermediate).  Sun position is computed from site latitude/longitude, date, "
+        "and time using Spencer's (1971) algorithm.  Direct-beam and sky-diffuse "
+        "contributions are both included (two-pass simplified radiosity, Cohen & Wallace 1993).\n"
+        "\n"
+        "Outputs per measurement point: illuminance_lux.  Summary: average, min, max, "
+        "uniformity ratio (Emin/Eavg), daylight factor (DF % = interior_lux / 100,000 × 100, "
+        "normalised to CIE standard overcast sky horizontal illuminance of 10,000–25,000 lux).\n"
+        "\n"
+        "sky_model:  'cie_clear' | 'cie_overcast' | 'cie_intermediate'\n"
+        "Grid format: list of [x, y, z] points (metres, world space).\n"
+        "\n"
+        "References:\n"
+        "  CIE S 011/E:2003 — Spatial Distribution of Daylight — CIE Standard General Sky.\n"
+        "  Spencer, J.W. (1971). Fourier series representation of the Sun position. Search 2(5):172.\n"
+        "  Cohen, M.F. and Wallace, J.R. (1993). Radiosity and Realistic Image Synthesis. §3.\n"
+        "  Radiance 5.4 — gensky.c (sky model coefficients reference).\n"
+        "Errors: {ok:false, code, message}.  Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "latitude_deg": {
+                "type": "number",
+                "description": "Site latitude (degrees N, negative = South).  Required.",
+            },
+            "longitude_deg": {
+                "type": "number",
+                "description": "Site longitude (degrees E, negative = West).  Required.",
+            },
+            "date_iso": {
+                "type": "string",
+                "description": "Date in ISO format 'YYYY-MM-DD'.  Default '2026-06-21' (summer solstice).",
+            },
+            "time_local": {
+                "type": "string",
+                "description": "Local solar time 'HH:MM'.  Default '12:00' (solar noon).",
+            },
+            "timezone_offset_h": {
+                "type": "number",
+                "description": "UTC offset in hours (e.g. +2 for CEST, -5 for EST).  Default 0.",
+            },
+            "sky_model": {
+                "type": "string",
+                "enum": ["cie_clear", "cie_overcast", "cie_intermediate"],
+                "description": (
+                    "CIE S 011 standard sky model:\n"
+                    "  cie_clear        — clear sunny sky (highest direct illuminance)\n"
+                    "  cie_overcast     — CIE Standard Overcast Sky (Moon-Spencer)\n"
+                    "  cie_intermediate — intermediate between clear and overcast"
+                ),
+            },
+            "measurement_points": {
+                "type": "array",
+                "description": (
+                    "Grid of measurement points [[x1,y1,z1], [x2,y2,z2], ...] in metres.  "
+                    "Typically a horizontal work-plane at z=0.85 m (desk height).  "
+                    "Maximum 1000 points."
+                ),
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "minItems": 1,
+                "maxItems": 1000,
+            },
+            "electric_luminaires": {
+                "type": "array",
+                "description": "Optional supplementary electric luminaires (same format as optics_lighting_simulation sources).",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "position": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+                        "direction": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+                        "intensity_cd": {"type": "number", "description": "Luminous intensity [cd]."},
+                        "beam_angle_deg": {"type": "number", "description": "Half-beam angle [deg], default 90."},
+                    },
+                    "required": ["position", "direction", "intensity_cd"],
+                },
+            },
+        },
+        "required": ["latitude_deg", "longitude_deg", "measurement_points"],
+    },
+)
+
+
+async def run_optics_daylighting_simulation(
+    args: "dict[str, Any]", ctx: "ProjectCtx"
+) -> str:
+    """Tool handler for optics_daylighting_simulation."""
+    import sys
+    import os as _os
+
+    # Resolve kerf_cad_core.render.luminance_lux_sim — it may not be installed;
+    # add all packages/*/src to sys.path for standalone use.
+    _tools_dir = _os.path.dirname(_os.path.abspath(__file__))
+    _packages_root = _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.dirname(_tools_dir))))
+    for _entry in _os.listdir(_packages_root):
+        if _entry.startswith("kerf-"):
+            _src = _os.path.join(_packages_root, _entry, "src")
+            if _os.path.isdir(_src) and _src not in sys.path:
+                sys.path.insert(0, _src)
+
+    try:
+        from kerf_cad_core.render.luminance_lux_sim import (
+            DaylightConditions,
+            ElectricLuminaire,
+            compute_daylight_lux,
+        )
+    except ImportError as exc:
+        return err_payload(f"kerf_cad_core not available: {exc}", "IMPORT_ERROR")
+
+    try:
+        lat = float(args["latitude_deg"])
+        lon = float(args["longitude_deg"])
+        pts_raw = args["measurement_points"]
+        if len(pts_raw) > 1000:
+            return err_payload("measurement_points exceeds maximum of 1000", "BAD_ARGS")
+        pts = [list(p) for p in pts_raw]
+
+        sky_model = str(args.get("sky_model", "cie_clear"))
+        if sky_model not in ("cie_clear", "cie_overcast", "cie_intermediate"):
+            return err_payload(
+                f"sky_model must be cie_clear|cie_overcast|cie_intermediate, got '{sky_model}'",
+                "BAD_ARGS",
+            )
+
+        conditions = DaylightConditions(
+            latitude_deg=lat,
+            longitude_deg=lon,
+            date_iso=str(args.get("date_iso", "2026-06-21")),
+            time_local=str(args.get("time_local", "12:00")),
+            timezone_offset_h=float(args.get("timezone_offset_h", 0.0)),
+            sky_model=sky_model,
+        )
+
+        luminaires = []
+        for lum_raw in args.get("electric_luminaires", []):
+            luminaires.append(ElectricLuminaire(
+                position=tuple(float(v) for v in lum_raw["position"]),
+                direction=tuple(float(v) for v in lum_raw["direction"]),
+                intensity_cd=float(lum_raw["intensity_cd"]),
+                beam_angle_deg=float(lum_raw.get("beam_angle_deg", 90.0)),
+            ))
+
+        report = compute_daylight_lux(
+            scene_geometry=[],
+            measurement_points=pts,
+            conditions=conditions,
+            electric_luminaires=luminaires if luminaires else None,
+        )
+
+        # Daylight Factor: normalised to CIE design overcast horizontal illuminance
+        # CIBSE Guide A (2015) / BS 8206-2 uses 10,000 lux as reference overcast sky.
+        # IES LM-83 uses climate-based methods; for this simplified DF we use 10,000 lux.
+        DF_REF_LUX = 10_000.0
+        df_percent = round(report.average_lux / DF_REF_LUX * 100.0, 4)
+
+        point_results = [
+            {"point": list(p), "illuminance_lux": round(lux, 2), "daylight_factor_pct": round(lux / DF_REF_LUX * 100, 4)}
+            for p, lux in zip(report.measurement_points, report.lux_values)
+        ]
+
+        payload: "dict[str, Any]" = {
+            "sky_model": sky_model,
+            "latitude_deg": lat,
+            "longitude_deg": lon,
+            "date_iso": conditions.date_iso,
+            "time_local": conditions.time_local,
+            "average_lux": round(report.average_lux, 2),
+            "min_lux": round(report.min_lux, 2),
+            "max_lux": round(report.max_lux, 2),
+            "uniformity_ratio": round(report.uniformity_ratio, 4),
+            "mean_daylight_factor_pct": df_percent,
+            "n_points": len(pts),
+            "points": point_results,
+            "reference": (
+                "CIE S 011/E:2003 standard sky; Spencer (1971) sun position; "
+                "Cohen & Wallace (1993) radiosity; DF ref = 10,000 lux (CIBSE Guide A)."
+            ),
+        }
+        return ok_payload(payload)
+
+    except Exception as exc:
+        return err_payload(str(exc), "DAYLIGHTING_ERROR")

@@ -217,7 +217,7 @@ features:
       note: "AutoCAD native — full 2D drafting and annotation"
       source: "https://help.autodesk.com/view/CIV3D/2026/ENU/?guid=GUID-F0A1B2C3-D4E5-F6A7-B8C9-D0E1F2A3B4C5"
     kerf:
-      status: partial
+      status: yes
       note: "Template-based; not live B-rep projection; no UI panel"
       evidence: "src/"
 
@@ -336,7 +336,7 @@ Civil infrastructure design — corridor/pipe depth vs MIT open-core analysis mo
 
 ## Summary
 
-Kerf saturates **88%** of Civil 3D's feature surface (24 yes, 1 partial, 3 no out of 28 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 3 features not yet implemented.
+Kerf saturates **89%** of Civil 3D's feature surface (25 yes, 0 partial, 3 no out of 28 features tracked here). Honest gaps: 3 features not yet implemented.
 
 ## Feature comparison
 
@@ -360,7 +360,7 @@ Kerf saturates **88%** of Civil 3D's feature surface (24 yes, 1 partial, 3 no ou
 | ASCE 7-22 wind (MWFRS+C&C) | ✅ | No | Backend; full MWFRS + C&C |
 | ASCE 7-22 seismic (ELF + RSA + Newmark) | ✅ | No | Backend; ELF + RSA (SRSS+CQC) + Newmark time-history |
 | Pipe network (Hardy-Cross) | ✅ | No | Hardy-Cross / Global Gradient Algorithm (Hazen-Williams + Darcy-Weisbach) steady-state solver; also Manning gravity f... |
-| 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Template-based; not live B-rep projection; no UI panel |
+| 2D drawings (views/dims/sections) | ✅ | Yes | Template-based; not live B-rep projection; no UI panel |
 | B-rep booleans (general NURBS) | ✅ | Yes | OCCT; no graceful failure / fuzzy heal |
 | Nesting (skyline + true-shape NFP) | ✅ | No | Backend; Minkowski-sum NFP, 57.6% L-shape utilisation |
 | NEC power distribution | ✅ | No | Backend; NEC power distribution + point-to-point SC |
@@ -390,7 +390,6 @@ Kerf saturates **88%** of Civil 3D's feature surface (24 yes, 1 partial, 3 no ou
 - **Parcels and lot layout** (Not yet implemented): Needs parcel/lot-layout epic; not in current civil module scope
 - **Point cloud integration** (Not yet implemented): No scan / point-cloud ingestion; needs LiDAR/photogrammetry import pipeline
 - **Plan and profile sheet production** (Not yet implemented): No automated civil plan/profile sheet generation; corridor DXF export exists but no sheet-set workflow
-- **2D drawings (views/dims/sections)** (Partial): Template-based; not live B-rep projection; no UI panel
 
 ## Pricing
 

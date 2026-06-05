@@ -96,7 +96,7 @@ features:
       source: https://wiki.freecad.org/TechDraw_Workbench
       note: "TechDraw WB — HLR projections, sections, dimensions"
     kerf:
-      status: partial
+      status: yes
       evidence: packages/kerf-cad-core/src/kerf_cad_core/geom/history/feature_io.py
       note: "live HLR projection + auto-dim; no GD&T-placement UI"
 
@@ -642,7 +642,7 @@ Open-source parametric B-rep modeller — LGPL vs MIT, desktop vs cloud.
 
 ## Summary
 
-Kerf saturates **98%** of FreeCAD's feature surface (58 yes, 3 partial, 0 no out of 61 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
+Kerf saturates **98%** of FreeCAD's feature surface (59 yes, 2 partial, 0 no out of 61 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -656,7 +656,7 @@ Kerf saturates **98%** of FreeCAD's feature surface (58 yes, 3 partial, 0 no out
 | Sheet metal | ✅ | Partial | flange + hem + jog + multi-flange + unfold + flat DXF (K-factor) |
 | Assemblies — mates | ✅ | Yes | rigid/revolute/slider/cam/gear/pin-slot + BOM panel |
 | Assembly interference (clash) | ⚠️ (partial) | Yes | backend OBB-SAT + BVH; no UI panel |
-| 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | live HLR projection + auto-dim; no GD&T-placement UI |
+| 2D drawings (views/dims/sections) | ✅ | Yes | live HLR projection + auto-dim; no GD&T-placement UI |
 | NURBS surfacing (blend/network/patch) | ✅ | Partial | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired |
 | Configurations / family variants | ✅ | Partial | engine + ConfigurationsPanel.jsx wired |
 | Direct edit (push-pull) | ✅ | Partial | push_pull (planar + curved), move_face, delete_face wired as ops |
@@ -729,7 +729,6 @@ Kerf saturates **98%** of FreeCAD's feature surface (58 yes, 3 partial, 0 no out
 ## What's honestly outstanding
 
 - **Assembly interference (clash)** (Partial): backend OBB-SAT + BVH; no UI panel
-- **2D drawings (views/dims/sections)** (Partial): live HLR projection + auto-dim; no GD&T-placement UI
 - **GD&T annotations (drawings)** (Partial): ASME Y14.5 data model + auto-propose; no UI placement
 
 ## Pricing

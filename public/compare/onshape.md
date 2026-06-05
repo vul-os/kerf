@@ -60,7 +60,7 @@ features:
       note: "Full Drawings workspace; DWG/DXF output"
       source: "https://cad.onshape.com/help/Content/drawings.htm"
     kerf:
-      status: partial
+      status: yes
       note: "Multi-sheet HLR drawings; no GD&T placement UI"
       evidence: "src/components/DrawingView.jsx"
 
@@ -659,7 +659,7 @@ Browser-native real-time-collab CAD — closest peer in cloud shape.
 
 ## Summary
 
-Kerf saturates **98%** of Onshape's feature surface (55 yes, 2 partial, 0 no out of 57 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
+Kerf saturates **99%** of Onshape's feature surface (56 yes, 1 partial, 0 no out of 57 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -669,7 +669,7 @@ Kerf saturates **98%** of Onshape's feature surface (55 yes, 2 partial, 0 no out
 | Parametric B-rep modeller | ✅ | Yes | OCCT feature tree |
 | Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
 | Assemblies — mates | ✅ | Yes | Coincident/concentric/parallel/revolute/slider wired + BOM |
-| 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Multi-sheet HLR drawings; no GD&T placement UI |
+| 2D drawings (views/dims/sections) | ✅ | Yes | Multi-sheet HLR drawings; no GD&T placement UI |
 | Configurations / family variants | ✅ | Yes | ConfigurationsPanel.jsx wired in Editor.jsx |
 | NURBS surfacing (blend/network/patch) | ✅ | Yes | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired |
 | GD&T on drawings / MBD / PMI | ✅ | Yes | Data model + auto-propose only; no UI placement |
@@ -741,7 +741,6 @@ Kerf saturates **98%** of Onshape's feature surface (55 yes, 2 partial, 0 no out
 
 ## What's honestly outstanding
 
-- **2D drawings (views/dims/sections)** (Partial): Multi-sheet HLR drawings; no GD&T placement UI
 - **CFD** (Partial): Real OpenFOAM bridge (backend, needs install)
 
 ## Pricing

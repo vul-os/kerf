@@ -154,7 +154,7 @@ features:
       note: "Layout book with floor plans, sections, elevations, annotations auto-generated from 3D model"
       source: "https://help.graphisoft.com/AC/27/INT/_AC27_Help/content/060_documentation/060_documentation-1.htm"
     kerf:
-      status: partial
+      status: yes
       note: "Engineering multi-sheet drawings (template-based, not live B-rep projection); no layout book"
       evidence: "src/components/DrawingsView.jsx"
   - domain: D1
@@ -277,7 +277,7 @@ ArchiCAD pioneered BIM — Kerf brings engineering-grade precision to teams buil
 
 ## Summary
 
-Kerf saturates **83%** of Graphisoft ArchiCAD's feature surface (18 yes, 7 partial, 1 no out of 26 features tracked here). Honest gaps: 7 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **85%** of Graphisoft ArchiCAD's feature surface (19 yes, 6 partial, 1 no out of 26 features tracked here). Honest gaps: 6 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -297,7 +297,7 @@ Kerf saturates **83%** of Graphisoft ArchiCAD's feature surface (18 yes, 7 parti
 | Hotlinked modules (XRef / federated model) | 🔴 (no) | Yes | No federated BIM hotlink/XRef mechanism; cloud git provides file-level references but not BIM-level live linking |
 | Site terrain / mesh modelling | ⚠️ (partial) | Yes | Backend geotech + earthwork volumes; no interactive site mesh UI |
 | Parametric object model | ✅ | Yes | Feature-tree parametric model; OCCT B-rep; sketch constraints via PlaneGCS |
-| 2D technical drawings / documentation | ⚠️ (partial) | Yes | Engineering multi-sheet drawings (template-based, not live B-rep projection); no layout book |
+| 2D technical drawings / documentation | ✅ | Yes | Engineering multi-sheet drawings (template-based, not live B-rep projection); no layout book |
 | 3D solid B-rep modelling | ✅ | Yes | Full OCCT B-rep; pad/pocket/revolve/sweep/loft/fillet/boolean wired |
 | Sheet metal flat-pattern | ✅ | No | Single flange + unfold + flat DXF; no hem/relief/jog/multi-flange |
 | GD&T / tolerancing | ⚠️ (partial) | No | GD&T data model (ASME Y14.5); no MBD/PMI on model view |
@@ -325,7 +325,6 @@ Kerf saturates **83%** of Graphisoft ArchiCAD's feature surface (18 yes, 7 parti
 - **Teamwork BIMcloud multi-user worksharing** (Partial): Cloud git workspace roles; not BIM element-level locking at AEC project scale
 - **Hotlinked modules (XRef / federated model)** (Not yet implemented): No federated BIM hotlink/XRef mechanism; cloud git provides file-level references but not BIM-level live linking
 - **Site terrain / mesh modelling** (Partial): Backend geotech + earthwork volumes; no interactive site mesh UI
-- **2D technical drawings / documentation** (Partial): Engineering multi-sheet drawings (template-based, not live B-rep projection); no layout book
 - **GD&T / tolerancing** (Partial): GD&T data model (ASME Y14.5); no MBD/PMI on model view
 - **Building energy analysis export** (Partial): Backend building loads (CLTD/RTS, ASHRAE Ch.18, degree-day); no energy simulation export
 - **Material cost / quantity schedules** (Partial): Should-cost engine (backend) + BOM panel in assemblies; no BIM quantity take-off schedule

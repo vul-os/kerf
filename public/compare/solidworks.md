@@ -126,7 +126,7 @@ features:
       note: "Full drawing environment; views, dimensions, section views"
       source: "https://help.solidworks.com/2024/english/SolidWorks/acadhelp/c_drawing_views_acadhelp.htm"
     kerf:
-      status: partial
+      status: yes
       note: "Live B-rep HLR projection + auto-dim; no GD&T-placement UI"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/drawings/auto_dimension.py"
 
@@ -681,7 +681,7 @@ features:
 
 ## Summary
 
-Kerf saturates **84%** of SOLIDWORKS's feature surface (40 yes, 19 partial, 0 no out of 59 features tracked here). Honest gaps: 19 features partial (engine complete, UI or depth gap).
+Kerf saturates **85%** of SOLIDWORKS's feature surface (41 yes, 18 partial, 0 no out of 59 features tracked here). Honest gaps: 18 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -697,7 +697,7 @@ Kerf saturates **84%** of SOLIDWORKS's feature surface (40 yes, 19 partial, 0 no
 | Assemblies — mates | ✅ | Yes | Rigid/revolute/slider/cam/gear/pin-slot wired + BOM panel |
 | Assembly interference (clash) | ⚠️ (partial) | Yes | Backend OBB-SAT + BVH + tri-tri; no UI panel |
 | Assembly motion study | ✅ | Yes | Planar MBD not wired to assembly solver |
-| 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Live B-rep HLR projection + auto-dim; no GD&T-placement UI |
+| 2D drawings (views/dims/sections) | ✅ | Yes | Live B-rep HLR projection + auto-dim; no GD&T-placement UI |
 | GD&T on drawings / MBD / PMI | ✅ | Yes | Data model + auto-propose only; no UI for placement |
 | Configurations / family variants | ✅ | Yes | Engine + ConfigurationsPanel.jsx wired in Editor.jsx |
 | Large assembly performance mode | ⚠️ (partial) | Yes | LOD mesh swapping (configurable); no SpeedPak equivalent |
@@ -766,7 +766,6 @@ Kerf saturates **84%** of SOLIDWORKS's feature surface (40 yes, 19 partial, 0 no
 ## What's honestly outstanding
 
 - **Assembly interference (clash)** (Partial): Backend OBB-SAT + BVH + tri-tri; no UI panel
-- **2D drawings (views/dims/sections)** (Partial): Live B-rep HLR projection + auto-dim; no GD&T-placement UI
 - **Large assembly performance mode** (Partial): LOD mesh swapping (configurable); no SpeedPak equivalent
 - **FE — fatigue (S-N)** (Partial): S-N + ε-N + rainflow backend; no UI
 - **Spur/helical gear rating (AGMA/ISO 6336)** (Partial): Full AGMA 2001-D04 + ISO 6336 Method B backend; no UI

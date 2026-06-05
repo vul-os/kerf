@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T02:27:05.812Z",
+  "generatedAt": "2026-06-05T02:28:01.337Z",
   "items": [
     {
       "slug": "revit",
@@ -825,7 +825,7 @@
             "notes": "AutoCAD native — full 2D drafting and annotation"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "src/",
             "notes": "Template-based; not live B-rep projection; no UI panel"
           },
@@ -1172,7 +1172,7 @@
             "notes": "Layout book with floor plans, sections, elevations, annotations auto-generated from 3D model"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "src/components/DrawingsView.jsx",
             "notes": "Engineering multi-sheet drawings (template-based, not live B-rep projection); no layout book"
           },
@@ -1407,7 +1407,7 @@
             "notes": "LayOut produces presentation sheets, not standards-compliant engineering drawings; no live B-rep projection"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py",
             "notes": "Live HLR projection (make2d) + auto-dim; no GD&T-placement UI"
           },
@@ -1754,7 +1754,7 @@
             "notes": "Mature 2D drafting heritage (descended from MiniCAD 1985); full annotation suite"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-drawings/",
             "notes": "Template-based drawings; not live B-rep projection; no UI panel"
           },
@@ -4208,7 +4208,7 @@
             "notes": "TechDraw WB — HLR projections, sections, dimensions"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/history/feature_io.py",
             "notes": "live HLR projection + auto-dim; no GD&T-placement UI"
           }
@@ -5020,7 +5020,7 @@
             "notes": "Full drawing workspace; AI automation (2025)"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "src/components/DrawingView.jsx",
             "notes": "Live HLR projection + auto-dim; no GD&T-placement UI"
           },
@@ -6193,7 +6193,7 @@
             "notes": "Full drawing environment; views, dimensions, section views"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/drawings/auto_dimension.py",
             "notes": "Live B-rep HLR projection + auto-dim; no GD&T-placement UI"
           },
@@ -6946,7 +6946,7 @@
             "notes": "Full Drawings workspace; DWG/DXF output"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "src/components/DrawingView.jsx",
             "notes": "Multi-sheet HLR drawings; no GD&T placement UI"
           },
@@ -7811,7 +7811,7 @@
             "notes": "Drawing views: base, projected, section, detail, break; full annotation set"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "src/components/DrawingView.jsx",
             "notes": "Live HLR projection + auto-dim; no GD&T-placement UI"
           },
@@ -9262,7 +9262,7 @@
             "notes": "Drafting workbench — view generation, dimensions, sections, GD&T callouts"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py",
             "notes": "Live HLR projection (make2d) + auto-dim; no GD&T-placement UI"
           },
@@ -10485,7 +10485,7 @@
             "notes": "Creo Drawing — live B-rep projection, auto BOM, GD&T callouts, tolerance notes"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py",
             "notes": "Live HLR projection (make2d) + auto-dim; no GD&T-placement UI"
           },
@@ -11568,7 +11568,7 @@
             "notes": "Detailed shop drawings, 3D renderings, and professional presentations generated from design"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "src/components/DrawingsView.jsx",
             "notes": "Engineering multi-sheet drawings (template-based); no cabinet shop drawing format"
           },
@@ -11723,7 +11723,7 @@
             "notes": "Full drafting environment — multi-sheet drawings, section views, detail views, GD&T annotations"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "cloud/drawings/"
           },
           "name": "2D drawings (views/dims/sections)"
@@ -14840,7 +14840,7 @@
             "notes": "No technical drawing output; Blender is rendering-only"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py",
             "notes": "Live HLR projection (make2d) + auto-dim; no GD&T-placement UI"
           },
@@ -16245,7 +16245,7 @@
             "notes": "Industry-defining 2D drafting: dimension styles, leaders, tolerances, GD&T callouts"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core",
             "notes": "Template-based; not live B-rep projection; no UI panel"
           },

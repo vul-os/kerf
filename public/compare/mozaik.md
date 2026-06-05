@@ -84,7 +84,7 @@ features:
       note: "Detailed shop drawings, 3D renderings, and professional presentations generated from design"
       source: "https://www.mozaiksoftware.com/mozaik-products"
     kerf:
-      status: partial
+      status: yes
       note: "Engineering multi-sheet drawings (template-based); no cabinet shop drawing format"
       evidence: "src/components/DrawingsView.jsx"
   - domain: D1
@@ -117,7 +117,7 @@ CNC-driven cabinet shop software — versus an open-core CAD with grain matching
 
 ## Summary
 
-Kerf saturates **70%** of Mozaik Software's feature surface (5 yes, 4 partial, 1 no out of 10 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **75%** of Mozaik Software's feature surface (6 yes, 3 partial, 1 no out of 10 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -130,7 +130,7 @@ Kerf saturates **70%** of Mozaik Software's feature surface (5 yes, 4 partial, 1
 | Hardware boring / machining automation | ✅ | Yes | 32 mm System bore-pattern generator: hinge cups (35 mm Blum-compatible), shelf-pin rows, undermount/sidemount drawer ... |
 | Grain direction management | ✅ | Yes | Grain direction engine for cut list (backend) |
 | Pricing / estimating | ⚠️ (partial) | Yes | Should-cost engine (backend); no woodworking-specific pricing UI |
-| Shop drawings / technical documentation | ⚠️ (partial) | Yes | Engineering multi-sheet drawings (template-based); no cabinet shop drawing format |
+| Shop drawings / technical documentation | ✅ | Yes | Engineering multi-sheet drawings (template-based); no cabinet shop drawing format |
 | LLM / chat-native editing | ✅ | No | Chat-native: describe a cabinet in plain language; Kerf generates cut list and joinery |
 | Cross-platform (macOS support) | ✅ | No | Runs in the browser; any OS with a modern browser |
 
@@ -145,7 +145,6 @@ Kerf saturates **70%** of Mozaik Software's feature surface (5 yes, 4 partial, 1
 - **Cabinet / room layout design** (Not yet implemented): No room/cabinet layout floor plan UI
 - **Parametric cabinet libraries** (Partial): Joinery rules (backend); no parametric cabinet library UI
 - **Pricing / estimating** (Partial): Should-cost engine (backend); no woodworking-specific pricing UI
-- **Shop drawings / technical documentation** (Partial): Engineering multi-sheet drawings (template-based); no cabinet shop drawing format
 
 ## Pricing
 

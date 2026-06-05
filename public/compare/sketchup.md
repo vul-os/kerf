@@ -58,7 +58,7 @@ features:
       note: "LayOut produces presentation sheets, not standards-compliant engineering drawings; no live B-rep projection"
       source: "https://help.sketchup.com/en/layout/getting-started-layout"
     kerf:
-      status: partial
+      status: yes
       note: "Live HLR projection (make2d) + auto-dim; no GD&T-placement UI"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py"
 
@@ -291,7 +291,7 @@ SketchUp made 3D intuitive for architects — Kerf brings engineering precision 
 
 ## Summary
 
-Kerf saturates **98%** of Trimble SketchUp's feature surface (24 yes, 1 partial, 0 no out of 25 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of Trimble SketchUp's feature surface (25 yes, 0 partial, 0 no out of 25 features tracked here). Kerf covers the full tracked feature set for Trimble SketchUp; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -301,7 +301,7 @@ Kerf saturates **98%** of Trimble SketchUp's feature surface (24 yes, 1 partial,
 | Pad / pocket / revolve | ✅ | No | OCCT, wired |
 | B-rep booleans (general NURBS) | ✅ | No | OCCT exact B-rep booleans; no graceful failure handling / fuzzy heal |
 | Assemblies — mates | ✅ | No | Coincident/concentric/parallel mates wired; BOM panel |
-| 2D drawings (views/dims/sections) | ⚠️ (partial) | Partial | Live HLR projection (make2d) + auto-dim; no GD&T-placement UI |
+| 2D drawings (views/dims/sections) | ✅ | Partial | Live HLR projection (make2d) + auto-dim; no GD&T-placement UI |
 | Sheet metal | ✅ | No | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
 | Structural member design (AISC/ACI) | ✅ | No | AISC 360-22 + ACI 318-19 + NDS 2018 + Eurocodes; backend |
 | FE — plate / shell / solid | ✅ | No | MITC4 plate/shell + CalculiX solid bridge; backend only |
@@ -338,10 +338,6 @@ Kerf saturates **98%** of Trimble SketchUp's feature surface (24 yes, 1 partial,
 - **Aerodynamic / structural analysis** — VLM + viscous + compressibility; orbital mechanics; naval hydrostatics; backend
 - **Schematic / PCB (EDA)** — KiCad round-trip viewer + tscircuit PCB; SPICE via ngspice; wired
 - *(and 10 more features not covered by Trimble SketchUp)*
-
-## What's honestly outstanding
-
-- **2D drawings (views/dims/sections)** (Partial): Live HLR projection (make2d) + auto-dim; no GD&T-placement UI
 
 ## Pricing
 

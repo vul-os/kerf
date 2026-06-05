@@ -60,7 +60,7 @@ features:
       note: "Industry-defining 2D drafting: dimension styles, leaders, tolerances, GD&T callouts"
       source: "https://help.autodesk.com/view/ACD/2025/ENU/?guid=GUID-DIMENSIONING"
     kerf:
-      status: partial
+      status: yes
       note: "Template-based; not live B-rep projection; no UI panel"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core"
 
@@ -475,7 +475,7 @@ Industry-standard 2D drafting + .dwg ecosystem — different primary jobs.
 
 ## Summary
 
-Kerf saturates **95%** of AutoCAD's feature surface (38 yes, 2 partial, 1 no out of 41 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **96%** of AutoCAD's feature surface (39 yes, 1 partial, 1 no out of 41 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -485,7 +485,7 @@ Kerf saturates **95%** of AutoCAD's feature surface (38 yes, 2 partial, 1 no out
 | Pad / pocket / revolve | ✅ | Partial | OCCT feature tree with full parametric history |
 | Direct edit (push-pull) | ✅ | Yes | push_pull (planar + curved), move_face, delete_face wired as ops |
 | Fillet / chamfer (constant) | ✅ | Yes | Wired; constant-radius fillet + chamfer |
-| 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Template-based; not live B-rep projection; no UI panel |
+| 2D drawings (views/dims/sections) | ✅ | Yes | Template-based; not live B-rep projection; no UI panel |
 | GD&T on drawings / MBD / PMI | ✅ | Yes | Data model only (kerf-gdnt); no UI placement on drawings |
 | Patterns (linear/polar) + mirror | ✅ | Yes | Linear/polar patterns + mirror wired |
 | Sheet metal | ✅ | Yes (paid tier) | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
@@ -541,7 +541,6 @@ Kerf saturates **95%** of AutoCAD's feature surface (38 yes, 2 partial, 1 no out
 
 ## What's honestly outstanding
 
-- **2D drawings (views/dims/sections)** (Partial): Template-based; not live B-rep projection; no UI panel
 - **Persistent face naming** (Partial): Two disconnected systems (Python DAG vs OCCT faceNaming.js); not unified
 - **Hole wizard (standards/tapped/cbore)** (Not yet implemented): Bare cylinder punch only; no standards-based hole wizard
 

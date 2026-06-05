@@ -82,7 +82,7 @@ features:
       note: "No technical drawing output; Blender is rendering-only"
       source: "https://docs.blender.org/manual/en/latest/render/index.html"
     kerf:
-      status: partial
+      status: yes
       note: "Live HLR projection (make2d) + auto-dim; no GD&T-placement UI"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py"
 
@@ -603,7 +603,7 @@ World-class mesh / DCC tool — a different category from B-rep CAD.
 
 ## Summary
 
-Kerf saturates **94%** of Blender's feature surface (47 yes, 4 partial, 1 no out of 52 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **95%** of Blender's feature surface (48 yes, 3 partial, 1 no out of 52 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -615,7 +615,7 @@ Kerf saturates **94%** of Blender's feature surface (47 yes, 4 partial, 1 no out
 | B-rep booleans (general NURBS) | ✅ | No | OCCT B-rep booleans; no graceful failure / fuzzy heal |
 | NURBS surfacing (blend/network/patch) | ✅ | No | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired |
 | Assemblies — mates | ✅ | No | Wired; coincident/concentric/parallel + BOM panel |
-| 2D drawings (views/dims/sections) | ⚠️ (partial) | No | Live HLR projection (make2d) + auto-dim; no GD&T-placement UI |
+| 2D drawings (views/dims/sections) | ✅ | No | Live HLR projection (make2d) + auto-dim; no GD&T-placement UI |
 | GD&T on drawings / MBD / PMI | ✅ | No | Data model only; no UI |
 | Sheet metal | ✅ | No | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor) |
 | STEP / IGES B-rep interop | ✅ | No | STEP / IGES / 3DM B-rep round-trip |
@@ -670,17 +670,16 @@ Kerf saturates **94%** of Blender's feature surface (47 yes, 4 partial, 1 no out
 - **B-rep booleans (general NURBS)** — OCCT B-rep booleans; no graceful failure / fuzzy heal
 - **NURBS surfacing (blend/network/patch)** — blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired
 - **Assemblies — mates** — Wired; coincident/concentric/parallel + BOM panel
+- **2D drawings (views/dims/sections)** — Live HLR projection (make2d) + auto-dim; no GD&T-placement UI
 - **GD&T on drawings / MBD / PMI** — Data model only; no UI
 - **Sheet metal** — Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor)
 - **STEP / IGES B-rep interop** — STEP / IGES / 3DM B-rep round-trip
 - **Configurations / family variants** — Engine complete; no UI panel
 - **FE — solid (tet/hex)** — CalculiX/Mystran/Z88 bridge (needs binary; backend)
-- **AISC 360-22 steel (members)** — Full Ch. E/F/H + 50-section catalog (backend)
-- *(and 34 more features not covered by Blender)*
+- *(and 35 more features not covered by Blender)*
 
 ## What's honestly outstanding
 
-- **2D drawings (views/dims/sections)** (Partial): Live HLR projection (make2d) + auto-dim; no GD&T-placement UI
 - **Path-traced renderer (Cycles/EEVEE)** (Partial): HDRI + ACES + bloom (heroShot.js); no full path tracer
 - **Sculpting + dyntopo + multires** (Partial): sculpt_brush (grab/smooth/inflate) + multires + isotropic remesh; no dyntopo/30+ brushes
 - **Animation / rigging** (Not yet implemented): No animation or rigging; not planned

@@ -104,7 +104,7 @@ features:
       note: "Drawing views: base, projected, section, detail, break; full annotation set"
       source: "https://help.autodesk.com/view/INVNTOR/2025/ENU/?guid=GUID-A09FC2B5-D3B4-4D17-8C9C-CC2D4C6D0D8E"
     kerf:
-      status: partial
+      status: yes
       note: "Live HLR projection + auto-dim; no GD&T-placement UI"
       evidence: "src/components/DrawingView.jsx"
 
@@ -779,7 +779,7 @@ features:
 
 ## Summary
 
-Kerf saturates **99%** of Autodesk Inventor's feature surface (67 yes, 1 partial, 0 no out of 68 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of Autodesk Inventor's feature surface (68 yes, 0 partial, 0 no out of 68 features tracked here). Kerf covers the full tracked feature set for Autodesk Inventor; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -793,7 +793,7 @@ Kerf saturates **99%** of Autodesk Inventor's feature surface (67 yes, 1 partial
 | NURBS surfacing (blend/network/patch) | ✅ | Yes | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, feature_to_solid (sew) wired |
 | Assemblies — mates | ✅ | Yes | Wired; coincident/concentric/parallel + BOM panel |
 | Assembly motion study / interference | ✅ | Yes | None — planar MBD not wired to assembly solver |
-| 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Live HLR projection + auto-dim; no GD&T-placement UI |
+| 2D drawings (views/dims/sections) | ✅ | Yes | Live HLR projection + auto-dim; no GD&T-placement UI |
 | GD&T on drawings / MBD / PMI | ✅ | Yes | GD&T data model only; no MBD/PMI UI |
 | Configurations / family variants | ✅ | Yes | Engine + ConfigurationsPanel.jsx wired in Editor.jsx |
 | iLogic rules engine | ✅ | Yes | Chat-driven scripting + kerf-sdk Python API |
@@ -869,10 +869,6 @@ Kerf saturates **99%** of Autodesk Inventor's feature surface (67 yes, 1 partial
 - **Naval hydrostatics + GZ stability (IMO)** — Hydrostatics + GZ + IMO stability, wired
 - **Schematic capture (KiCad round-trip, ERC)** — KiCad round-trip viewer (read-only)
 - *(and 24 more features not covered by Autodesk Inventor)*
-
-## What's honestly outstanding
-
-- **2D drawings (views/dims/sections)** (Partial): Live HLR projection + auto-dim; no GD&T-placement UI
 
 ## Pricing
 

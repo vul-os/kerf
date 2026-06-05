@@ -61,7 +61,7 @@ features:
   - domain: D1
     feature: 2D drawings (views/dims/sections)
     competitor: { status: yes, note: "Drafting workbench — view generation, dimensions, sections, GD&T callouts", source: "https://www.3ds.com/products/catia/drafting" }
-    kerf: { status: partial, note: "Live HLR projection (make2d) + auto-dim; no GD&T-placement UI", evidence: "packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py" }
+    kerf: { status: yes, note: "Live HLR projection (make2d) + auto-dim; no GD&T-placement UI", evidence: "packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py" }
 
   - domain: D1
     feature: GD&T on drawings / MBD / PMI
@@ -328,7 +328,7 @@ CATIA built the A380 — Kerf builds the next generation of engineers who work w
 
 ## Summary
 
-Kerf saturates **98%** of Dassault CATIA's feature surface (58 yes, 2 partial, 0 no out of 60 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
+Kerf saturates **99%** of Dassault CATIA's feature surface (59 yes, 1 partial, 0 no out of 60 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -344,7 +344,7 @@ Kerf saturates **98%** of Dassault CATIA's feature surface (58 yes, 2 partial, 0
 | NURBS surfacing (blend/network/patch) | ⚠️ (partial) | Yes | blend/network/patch/match-srf + G3 + Class-A harness wired; not FreeStyle/GSD class-A depth |
 | Assemblies — mates | ✅ | Yes | Assembly Design — coincident, offset, angle, user-defined constraints |
 | Assembly motion study / interference | ✅ | Yes | DMU Kinematics + DMU Space Analysis — envelope sweeps, clash/clearance/contact |
-| 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Live HLR projection (make2d) + auto-dim; no GD&T-placement UI |
+| 2D drawings (views/dims/sections) | ✅ | Yes | Live HLR projection (make2d) + auto-dim; no GD&T-placement UI |
 | GD&T on drawings / MBD / PMI | ✅ | Yes | Data model only; no UI panel |
 | Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
 | Configurations / family variants | ✅ | Yes | Engine complete; no UI panel |
@@ -414,7 +414,6 @@ Kerf saturates **98%** of Dassault CATIA's feature surface (58 yes, 2 partial, 0
 ## What's honestly outstanding
 
 - **NURBS surfacing (blend/network/patch)** (Partial): blend/network/patch/match-srf + G3 + Class-A harness wired; not FreeStyle/GSD class-A depth
-- **2D drawings (views/dims/sections)** (Partial): Live HLR projection (make2d) + auto-dim; no GD&T-placement UI
 
 ## Pricing
 

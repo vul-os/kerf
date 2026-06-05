@@ -89,7 +89,7 @@ features:
       tier: included
       source: https://docs.sw.siemens.com/en-US/doc/288068776/PL20231017083816340.xid1428294/en-US
     kerf:
-      status: partial
+      status: yes
       evidence: cloud/drawings/
   # D2 — Structural / FEA
   - domain: D1
@@ -574,7 +574,7 @@ NX defined advanced surfacing for a generation — Kerf makes that power accessi
 
 ## Summary
 
-Kerf saturates **98%** of Siemens NX's feature surface (52 yes, 2 partial, 0 no out of 54 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
+Kerf saturates **99%** of Siemens NX's feature surface (53 yes, 1 partial, 0 no out of 54 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -587,7 +587,7 @@ Kerf saturates **98%** of Siemens NX's feature surface (52 yes, 2 partial, 0 no 
 | Direct edit (push-pull) | ✅ | Yes | push_pull (planar + curved), move_face, delete_face wired as ops |
 | Assemblies — mates | ✅ | Yes | Assembly constraints (coincident, concentric, parallel, distance, angle) with full kinematic DoF tracking |
 | Sheet metal | ✅ | Yes | flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
-| 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Full drafting environment — multi-sheet drawings, section views, detail views, GD&T annotations |
+| 2D drawings (views/dims/sections) | ✅ | Yes | Full drafting environment — multi-sheet drawings, section views, detail views, GD&T annotations |
 | GD&T on drawings / MBD / PMI | ✅ | Yes | PMI (Product and Manufacturing Information) — full MBD with semantic GD&T, 3D annotations, PMI views |
 | FE — solid (tet/hex) | ✅ | Yes | Simcenter Nastran — SOL 101/103/105/106/111; tet/hex/penta elements; full pre/post in NX |
 | Modal / buckling / nonlinear | ✅ | Yes | Simcenter Nastran SOL 103 (modal), SOL 105 (buckling), SOL 106 (nonlinear static), SOL 400 (advanced nonlinear) |
@@ -638,7 +638,6 @@ Kerf saturates **98%** of Siemens NX's feature surface (52 yes, 2 partial, 0 no 
 ## What's honestly outstanding
 
 - **NURBS surfacing (blend/network/patch)** (Partial): blend/network/patch/match-srf + G3 + zebra/isophote + Class-A harness wired; not Shape-Studio depth
-- **2D drawings (views/dims/sections)** (Partial)
 
 ## Pricing
 

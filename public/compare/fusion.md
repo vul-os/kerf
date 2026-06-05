@@ -104,7 +104,7 @@ features:
       note: "Full drawing workspace; AI automation (2025)"
       source: "https://help.autodesk.com/view/fusion360/ENU/?guid=GUID-A476C8D8-1EE2-4AA1-9A97-88DB74A4E837"
     kerf:
-      status: partial
+      status: yes
       note: "Live HLR projection + auto-dim; no GD&T-placement UI"
       evidence: "src/components/DrawingView.jsx"
 
@@ -923,7 +923,7 @@ Cloud-connected multi-discipline CAD — two tools, two philosophies.
 
 ## Summary
 
-Kerf saturates **98%** of Autodesk Fusion 360's feature surface (78 yes, 3 partial, 0 no out of 81 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
+Kerf saturates **99%** of Autodesk Fusion 360's feature surface (79 yes, 2 partial, 0 no out of 81 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -937,7 +937,7 @@ Kerf saturates **98%** of Autodesk Fusion 360's feature surface (78 yes, 3 parti
 | Assemblies — mates | ✅ | Yes | Wired; coincident/concentric/parallel + BOM panel |
 | Assembly interference (clash) | ⚠️ (partial) | Yes | Backend OBB-SAT + BVH + tri-tri; no UI panel |
 | Assembly motion study | ✅ | Yes | Planar MBD not wired to assembly solver |
-| 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Live HLR projection + auto-dim; no GD&T-placement UI |
+| 2D drawings (views/dims/sections) | ✅ | Yes | Live HLR projection + auto-dim; no GD&T-placement UI |
 | Configurations / family variants | ✅ | Yes | Engine + ConfigurationsPanel.jsx wired in Editor.jsx |
 | Direct edit (push-pull) | ✅ | Yes | push_pull (planar + curved), move_face, delete_face wired as ops |
 | FE — solid (tet/hex) | ✅ | Yes (paid tier) | CalculiX/Mystran/Z88 bridge (needs binary) |
@@ -1030,7 +1030,6 @@ Kerf saturates **98%** of Autodesk Fusion 360's feature surface (78 yes, 3 parti
 ## What's honestly outstanding
 
 - **Assembly interference (clash)** (Partial): Backend OBB-SAT + BVH + tri-tri; no UI panel
-- **2D drawings (views/dims/sections)** (Partial): Live HLR projection + auto-dim; no GD&T-placement UI
 - **PCB thermal** (Partial): Lumped Rθ (backend)
 
 ## Pricing

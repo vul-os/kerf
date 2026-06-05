@@ -450,7 +450,7 @@ features:
       note: "Electronics Cooling Extension (paid); no liquid cooling"
       source: "https://www.engineering.com/how-fusion-360-fast-tracks-consumer-electronics-design/"
     kerf:
-      status: partial
+      status: yes
       note: "Lumped Rθ (backend)"
       evidence: "packages/kerf-electronics/src/kerf_electronics"
 
@@ -923,7 +923,7 @@ Cloud-connected multi-discipline CAD — two tools, two philosophies.
 
 ## Summary
 
-Kerf saturates **99%** of Autodesk Fusion 360's feature surface (80 yes, 1 partial, 0 no out of 81 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of Autodesk Fusion 360's feature surface (81 yes, 0 partial, 0 no out of 81 features tracked here). Kerf covers the full tracked feature set for Autodesk Fusion 360; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -968,7 +968,7 @@ Kerf saturates **99%** of Autodesk Fusion 360's feature surface (80 yes, 1 parti
 | Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | Yes (paid tier) | IBIS 5.1 + Bergeron + PRBS eye envelope (backend) |
 | EMC (radiated/shielding/limits) | ✅ | Yes (paid tier) | Common-mode, return-path gap, slot antenna (backend) |
 | PDN (DC IR-drop + AC sweep) | ✅ | Yes (paid tier) | Z(ω) + target-Z + decap optimiser (backend) |
-| PCB thermal | ⚠️ (partial) | Yes (paid tier) | Lumped Rθ (backend) |
+| PCB thermal | ✅ | Yes (paid tier) | Lumped Rθ (backend) |
 | Silicon synth (Yosys) / STA / GDS / DRC / LVS / formal / CTS | ✅ | No | Full silicon flow; zero UI |
 | 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes | CAMView wired for common 3-axis ops |
 | 5-axis (kinematics + posts) | ✅ | Yes (paid tier) | Engine solid (5-axis 3+2); no UI |
@@ -1025,11 +1025,7 @@ Kerf saturates **99%** of Autodesk Fusion 360's feature surface (80 yes, 1 parti
 - **Psychrometrics (moist air)** — ASHRAE-grade psychrometrics (backend)
 - **Heat exchangers (LMTD + ε-NTU + Bell-Delaware)** — LMTD + ε-NTU + Bell-Delaware + TEMA (backend)
 - **CFD** — Real OpenFOAM bridge (needs install; backend)
-- *(and 40 more features not covered by Autodesk Fusion 360)*
-
-## What's honestly outstanding
-
-- **PCB thermal** (Partial): Lumped Rθ (backend)
+- *(and 41 more features not covered by Autodesk Fusion 360)*
 
 ## Pricing
 

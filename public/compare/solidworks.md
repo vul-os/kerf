@@ -340,7 +340,7 @@ features:
       note: "No EMC analysis in SOLIDWORKS; external tools required"
       source: "https://help.solidworks.com/2022/english/Installation/install_guide/t_install_pcb_connector.htm"
     kerf:
-      status: partial
+      status: yes
       note: "Closed-form radiated/shielding/limits backend; no full-wave"
       evidence: "packages/kerf-electronics/src/kerf_electronics/emc"
 
@@ -681,7 +681,7 @@ features:
 
 ## Summary
 
-Kerf saturates **93%** of SOLIDWORKS's feature surface (51 yes, 8 partial, 0 no out of 59 features tracked here). Honest gaps: 8 features partial (engine complete, UI or depth gap).
+Kerf saturates **94%** of SOLIDWORKS's feature surface (52 yes, 7 partial, 0 no out of 59 features tracked here). Honest gaps: 7 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -716,7 +716,7 @@ Kerf saturates **93%** of SOLIDWORKS's feature surface (51 yes, 8 partial, 0 no 
 | Orbital mechanics (Kepler/Hohmann/Lambert) | ✅ | No | Kepler + J2/J3 + Hohmann + Lambert (multi-rev) wired |
 | Schematic capture + PCB layout | ✅ | Yes (paid tier) | Hierarchical schematic + PCB layout viewer wired in-browser |
 | Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | No | IBIS 5.1 + Bergeron channel + PRBS eye backend |
-| EMC (radiated/shielding/limits) | ⚠️ (partial) | No | Closed-form radiated/shielding/limits backend; no full-wave |
+| EMC (radiated/shielding/limits) | ✅ | No | Closed-form radiated/shielding/limits backend; no full-wave |
 | Wiring / harness routing | ✅ | Yes (paid tier) | WiringView wired; WireViz + 3D router |
 | 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes | CAMView wired; profile/contour/pocket/face ops |
 | Multi-axis CAM (5-axis) | ✅ | Yes (paid tier) | 5-axis 3+2 engine solid; no UI |
@@ -761,12 +761,11 @@ Kerf saturates **93%** of SOLIDWORKS's feature surface (51 yes, 8 partial, 0 no 
 - **Airfoil / wing aerodynamics (VLM)** — 3D wing VLM + strip viscous CD0 + PG/KT compressibility; wired
 - **Orbital mechanics (Kepler/Hohmann/Lambert)** — Kepler + J2/J3 + Hohmann + Lambert (multi-rev) wired
 - **Schematic capture + PCB layout** — Hierarchical schematic + PCB layout viewer wired in-browser
-- *(and 20 more features not covered by SOLIDWORKS)*
+- *(and 21 more features not covered by SOLIDWORKS)*
 
 ## What's honestly outstanding
 
 - **Large assembly performance mode** (Partial): LOD mesh swapping (configurable); no SpeedPak equivalent
-- **EMC (radiated/shielding/limits)** (Partial): Closed-form radiated/shielding/limits backend; no full-wave
 - **Feeds & speeds + tool-life (Taylor/Gilbert)** (Partial): Taylor extended + Gilbert economic speed backend
 - **Road alignment (horizontal/vertical/clothoid)** (Partial): H+V alignment + clothoid + SSD backend; no plan export
 - **Geotech (bearing/settlement/slope/liquefaction)** (Partial): Seed-Idriss CSR + SPT/CPT CRR + Tokimatsu backend

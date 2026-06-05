@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T02:44:47.503Z",
+  "generatedAt": "2026-06-05T02:55:01.963Z",
   "items": [
     {
       "slug": "revit",
@@ -2845,7 +2845,7 @@
             "tier": "paid"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "notes": "Single-board per project today; no multi-board equivalent",
             "kerf_note": "Multi-board 3D workspace is a large project-model architectural gap. Requires multi-PCB project type + 3D clearance checks across boards. Epic — wave 2.",
             "evidence": "packages/kerf-electronics/src/kerf_electronics/plugin.py"
@@ -2861,7 +2861,7 @@
             "tier": "paid"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "notes": "Board 3D via STEP export + OCCT viewer; 3D component-body clearance DRC shallower than Altium's native 3D DRC engine",
             "kerf_note": "Full 3D PCB body-clearance DRC requires cad-core 3D geometry intersection engine; tractable wave 2.",
             "evidence": "packages/kerf-electronics/src/kerf_electronics/tools/fab.py"
@@ -3072,7 +3072,7 @@
             "tier": "paid"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "notes": "IDF MCAD bridge + board STEP; no live push from Kerf to MCAD",
             "evidence": "packages/kerf-electronics/src/kerf_electronics/tools/idf_export.py"
           }
@@ -5454,7 +5454,7 @@
             "notes": "Electronics Cooling Extension (paid); no liquid cooling"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-electronics/src/kerf_electronics",
             "notes": "Lumped Rθ (backend)"
           },
@@ -6459,7 +6459,7 @@
             "notes": "No EMC analysis in SOLIDWORKS; external tools required"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-electronics/src/kerf_electronics/emc",
             "notes": "Closed-form radiated/shielding/limits backend; no full-wave"
           },

@@ -126,6 +126,11 @@ async def register(app: FastAPI, ctx):
         "civil.pointcloud-pmf-ground",
         "civil.pointcloud-surface",
         "civil.plan-profile-sheets",
+        "civil.corridor-model",
+        "civil.corridor-daylight",
+        "civil.corridor-earthwork",
+        "civil.corridor-mass-haul",
+        "civil.corridor-strings",
     ]
 
     try:

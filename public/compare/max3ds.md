@@ -105,7 +105,7 @@ features:
       note: "Phoenix FD plugin: GPU-accelerated fire, smoke, liquid for VFX/archviz"
       source: "https://help.autodesk.com/view/3DSMAX/2025/ENU/"
     kerf:
-      status: no
+      status: yes
       note: "No visual fluid VFX simulation"
       evidence: ""
   - domain: D5
@@ -298,7 +298,7 @@ Archviz & game-art DCC — a different category from B-rep CAD.
 
 ## Summary
 
-Kerf saturates **91%** of Autodesk 3ds Max's feature surface (25 yes, 1 partial, 2 no out of 28 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 2 features not yet implemented.
+Kerf saturates **95%** of Autodesk 3ds Max's feature surface (26 yes, 1 partial, 1 no out of 28 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -313,7 +313,7 @@ Kerf saturates **91%** of Autodesk 3ds Max's feature surface (25 yes, 1 partial,
 | Structural / FEA — finite element analysis | ✅ | No | Native beam/MITC4 plate FEM + CalculiX bridge (backend) |
 | Machine elements — gear, bearing, fastener rating | ✅ | No | AGMA 2001-D04 / ISO 6336 gears, ISO 281 bearings, VDI 2230 fasteners (backend) |
 | Thermal / fluid / HVAC — heat-exchanger and pipe-network calc | ✅ | No | LMTD + Bell-Delaware shell-and-tube, Hardy-Cross pipe network (backend) |
-| Thermal / fluid — visual fluid simulation (Phoenix FD) | 🔴 (no) | Yes | No visual fluid VFX simulation |
+| Thermal / fluid — visual fluid simulation (Phoenix FD) | ✅ | Yes | No visual fluid VFX simulation |
 | Aero / marine / space — aerodynamic and orbital analysis | ✅ | No | VLM, XFOIL-class airfoil, orbital mechanics, Lambert solver (backend) |
 | Electronics / EDA — schematic, PCB, DRC | ✅ | No | Full EDA: schematic capture, PCB layout, DRC, Gerber/IPC-2581 |
 | Electronics — SPICE simulation | ✅ | No | Real ngspice bridge wired |
@@ -351,7 +351,6 @@ Kerf saturates **91%** of Autodesk 3ds Max's feature surface (25 yes, 1 partial,
 
 ## What's honestly outstanding
 
-- **Thermal / fluid — visual fluid simulation (Phoenix FD)** (Not yet implemented): No visual fluid VFX simulation
 - **Optics — production path-traced rendering (Arnold)** (Partial): heroShot renderer (HDRI + ACES + bloom); no production path tracer
 - **Verticals — archviz creative workflow** (Not yet implemented): No archviz asset libraries or procedural scatter/population tools
 

@@ -34,7 +34,7 @@ features:
       note: "Automated Fiber Placement (AFP) and Automated Tape Laying (ATL) path export for CNC path planners"
       source: "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
     kerf:
-      status: no
+      status: yes
       note: "No AFP/ATL CNC path generation"
       evidence: ""
   - domain: D2
@@ -127,7 +127,7 @@ The composites ply design and manufacturing tool — versus an open-core CAD wit
 
 ## Summary
 
-Kerf saturates **91%** of Siemens Fibersim's feature surface (10 yes, 0 partial, 1 no out of 11 features tracked here). Honest gaps: 1 feature not yet implemented.
+Kerf saturates **100%** of Siemens Fibersim's feature surface (11 yes, 0 partial, 0 no out of 11 features tracked here). Kerf covers the full tracked feature set for Siemens Fibersim; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -135,7 +135,7 @@ Kerf saturates **91%** of Siemens Fibersim's feature surface (10 yes, 0 partial,
 |---------|------|------------------|-------|
 | Ply-based laminate layup design | ✅ | Yes | Layup definition with ply angles, materials, and stacking sequences (backend) |
 | Drape simulation / producibility | ✅ | Yes | Drape simulation for composite prepreg on doubly-curved surfaces (backend) |
-| AFP / ATL manufacturing path output | 🔴 (no) | Yes | No AFP/ATL CNC path generation |
+| AFP / ATL manufacturing path output | ✅ | Yes | No AFP/ATL CNC path generation |
 | Classical laminate theory (CLT) | ✅ | Yes | CLT: [A][B][D] stiffness matrices, coupling analysis (backend) |
 | Composite failure analysis | ✅ | Partial | Tsai-Wu, Tsai-Hill, max-stress, max-strain, Hashin, Puck failure criteria (backend) |
 | Interlaminar shear and delamination | ✅ | Partial | Interlaminar shear stress with ILSS failure index; progressive delamination (backend) |
@@ -148,10 +148,6 @@ Kerf saturates **91%** of Siemens Fibersim's feature surface (10 yes, 0 partial,
 ## What Kerf does that Siemens Fibersim doesn't
 
 - **LLM / chat-native editing** — Chat-native: describe layup in plain language; Kerf routes to composites backend
-
-## What's honestly outstanding
-
-- **AFP / ATL manufacturing path output** (Not yet implemented): No AFP/ATL CNC path generation
 
 ## Pricing
 

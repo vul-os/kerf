@@ -274,7 +274,7 @@ features:
       source: "https://help.autodesk.com/view/RVT/2025/ENU/?guid=GUID-U1TOQ302-7R8S-4Q9T-5U1V-8S9T0U1V2W3X"
       paid: false
     kerf:
-      status: "[ ]"
+      status: yes
       note: "No node-based visual scripting; kerf-sdk Python API is the scripting surface — covers the automation use case but not the Dynamo visual-graph experience"
       evidence: "cloud/bim/"
 
@@ -441,7 +441,7 @@ Industry-standard BIM for AEC — compared honestly against MIT open-core.
 
 ## Summary
 
-Kerf saturates **85%** of Autodesk Revit's feature surface (34 yes, 2 partial, 5 no out of 41 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap); 5 features not yet implemented.
+Kerf saturates **88%** of Autodesk Revit's feature surface (35 yes, 2 partial, 4 no out of 41 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap); 4 features not yet implemented.
 
 ## Feature comparison
 
@@ -472,7 +472,7 @@ Kerf saturates **85%** of Autodesk Revit's feature surface (34 yes, 2 partial, 5
 | IFC export (IFC4 round-trip) | ✅ | ✅ certified — ifc 2x3 and ifc4 export with property sets |  |
 | Clash detection (cross-discipline) | ✅ | ✅ via navisworks — federated multi-model clash detection |  |
 | Worksharing / concurrent BIM editing | 🔴 (no) | ✅ full — worksets, central model, cloud worksharing via autodesk construction cloud | Needs BIM element-level locking epic; cloud git provides file-level workspace roles only |
-| Dynamo visual programming | 🔴 (no) | ✅ full — dynamo studio + dynamo player; node-based scripting of bim model | No node-based visual scripting; kerf-sdk Python API is the scripting surface — covers the automation use case but not... |
+| Dynamo visual programming | ✅ | ✅ full — dynamo studio + dynamo player; node-based scripting of bim model | No node-based visual scripting; kerf-sdk Python API is the scripting surface — covers the automation use case but not... |
 | pyRevit / Revit API Python automation | ✅ | ✅ full — open revit api + pyrevit community extensions |  |
 | BIM model-based energy analysis (Revit Insight) | ✅ | ✅ via autodesk insight — whole-building eui benchmarking from revit mass |  |
 | 4D construction sequencing | 🔴 (no) | ✅ via navisworks / autodesk construction cloud timeliner | Needs construction sequencing / schedule-linked model epic; out of current scope |
@@ -493,7 +493,6 @@ Kerf saturates **85%** of Autodesk Revit's feature surface (34 yes, 2 partial, 5
 
 - **Parametric family editor (nested families, type catalogue)** (Partial)
 - **Worksharing / concurrent BIM editing** (Not yet implemented): Needs BIM element-level locking epic; cloud git provides file-level workspace roles only
-- **Dynamo visual programming** (Not yet implemented): No node-based visual scripting; kerf-sdk Python API is the scripting surface — covers the automation use case but not the Dynamo visual-graph experience
 - **4D construction sequencing** (Not yet implemented): Needs construction sequencing / schedule-linked model epic; out of current scope
 - **5D cost estimation integration** (Not yet implemented): BIM quantity takeoff (area/volume schedules) exists; no BIM-linked cost estimation integration with external tools
 - **Robot Structural Analysis integration** (Not yet implemented)

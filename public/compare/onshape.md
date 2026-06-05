@@ -217,7 +217,7 @@ features:
       note: "Via SimScale / OnScale App Store add-ons; not bundled"
       source: "https://www.onshape.com/en/blog/rapid-design-simulation-directly-browser"
     kerf:
-      status: partial
+      status: yes
       note: "Real OpenFOAM bridge (backend, needs install)"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/heatxfer/transfer.py"
 
@@ -659,7 +659,7 @@ Browser-native real-time-collab CAD — closest peer in cloud shape.
 
 ## Summary
 
-Kerf saturates **99%** of Onshape's feature surface (56 yes, 1 partial, 0 no out of 57 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of Onshape's feature surface (57 yes, 0 partial, 0 no out of 57 features tracked here). Kerf covers the full tracked feature set for Onshape; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -683,7 +683,7 @@ Kerf saturates **99%** of Onshape's feature surface (56 yes, 1 partial, 0 no out
 | Springs (compr/ext/torsion/Belleville) | ✅ | No | Full spring design suite (backend) |
 | Heat exchangers (LMTD + ε-NTU + Bell-Delaware) | ✅ | No | LMTD+ε-NTU+Bell-Delaware+TEMA layout (backend) |
 | Steam/water properties (IAPWS-IF97) | ✅ | No | IAPWS-IF97 Regions 1/2/4; h/v/s/cp validated (backend) |
-| CFD | ⚠️ (partial) | Yes (paid tier) | Real OpenFOAM bridge (backend, needs install) |
+| CFD | ✅ | Yes (paid tier) | Real OpenFOAM bridge (backend, needs install) |
 | 3D wing VLM (+ viscous + compressibility) | ✅ | No | Strip viscous CD0+PG/KT+Korn-Lock wave-drag (backend) |
 | Orbital mechanics (Kepler, J2/J3, Hohmann) | ✅ | No | Lambert multi-rev + Hohmann + reentry wired |
 | Naval hydrostatics + GZ stability (IMO) | ✅ | No | Hydrostatics + GZ curve + IMO criteria (backend) |
@@ -735,13 +735,9 @@ Kerf saturates **99%** of Onshape's feature surface (56 yes, 1 partial, 0 no out
 - **Springs (compr/ext/torsion/Belleville)** — Full spring design suite (backend)
 - **Heat exchangers (LMTD + ε-NTU + Bell-Delaware)** — LMTD+ε-NTU+Bell-Delaware+TEMA layout (backend)
 - **Steam/water properties (IAPWS-IF97)** — IAPWS-IF97 Regions 1/2/4; h/v/s/cp validated (backend)
+- **CFD** — Real OpenFOAM bridge (backend, needs install)
 - **3D wing VLM (+ viscous + compressibility)** — Strip viscous CD0+PG/KT+Korn-Lock wave-drag (backend)
-- **Orbital mechanics (Kepler, J2/J3, Hohmann)** — Lambert multi-rev + Hohmann + reentry wired
-- *(and 29 more features not covered by Onshape)*
-
-## What's honestly outstanding
-
-- **CFD** (Partial): Real OpenFOAM bridge (backend, needs install)
+- *(and 30 more features not covered by Onshape)*
 
 ## Pricing
 

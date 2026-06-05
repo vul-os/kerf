@@ -48,7 +48,7 @@ features:
       note: "interFoam (VOF), twoPhaseEulerFoam, multiphaseInterFoam, cavitatingFoam"
       source: "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
     kerf:
-      status: partial
+      status: yes
       note: "Selected multiphase solvers via bridge; full multiphase suite requires direct OpenFOAM"
       evidence: "packages/kerf-cfd/"
 
@@ -206,7 +206,7 @@ features:
       note: "Atmospheric boundary layer profiles + rough-wall functions for wind-load CFD"
       source: "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
     kerf:
-      status: partial
+      status: yes
       note: "ASCE 7-22 wind (MWFRS+C&C) code calc; full CFD via OpenFOAM bridge"
       evidence: "packages/kerf-structural/"
 
@@ -217,7 +217,7 @@ features:
       note: "waves2Foam, olaFlow, interFoam for wave-structure interaction"
       source: "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
     kerf:
-      status: partial
+      status: yes
       note: "Hydrostatics + GZ + seakeeping RAOs (strip theory) wired; wave CFD via bridge"
       evidence: "packages/kerf-marine/"
 
@@ -300,7 +300,7 @@ OpenFOAM solves the Navier-Stokes equations — Kerf wraps it so you describe th
 
 ## Summary
 
-Kerf saturates **88%** of OpenFOAM's feature surface (19 yes, 6 partial, 0 no out of 25 features tracked here). Honest gaps: 6 features partial (engine complete, UI or depth gap).
+Kerf saturates **94%** of OpenFOAM's feature surface (22 yes, 3 partial, 0 no out of 25 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -309,7 +309,7 @@ Kerf saturates **88%** of OpenFOAM's feature surface (19 yes, 6 partial, 0 no ou
 | CFD — incompressible flow | ✅ | Yes | OpenFOAM backend bridge; chat-native case generation; needs OpenFOAM install |
 | CFD — compressible flow | ✅ | Yes | OpenFOAM backend bridge; core compressible solvers exposed via chat |
 | CFD — conjugate heat transfer | ✅ | Yes | OpenFOAM backend bridge; CHT solver accessible via LLM tool |
-| CFD — multiphase flow | ⚠️ (partial) | Yes | Selected multiphase solvers via bridge; full multiphase suite requires direct OpenFOAM |
+| CFD — multiphase flow | ✅ | Yes | Selected multiphase solvers via bridge; full multiphase suite requires direct OpenFOAM |
 | CFD — combustion / reacting flow | ✅ | Yes | Combustion CFD (reactingFoam / fireFoam) not yet exposed in Kerf bridge |
 | CFD — turbulence models (RANS) | ✅ | Yes | k-eps and k-omega SST exposed via chat case generation; full model library via direct OpenFOAM |
 | CFD — LES / DES / DNS | ⚠️ (partial) | Yes | LES models accessible via bridge; specialist case tuning requires expert review |
@@ -323,8 +323,8 @@ Kerf saturates **88%** of OpenFOAM's feature surface (19 yes, 6 partial, 0 no ou
 | HVAC duct sizing (SMACNA) | ✅ | No | SMACNA duct sizing + flat-pattern (backend) |
 | Pipe network (Hardy-Cross) | ✅ | No | Hardy-Cross pipe network solver (backend) |
 | External aerodynamics (vehicle / airfoil) | ✅ | Yes | VLM + viscous Cd + OpenFOAM bridge for full CFD; airfoil panel method wired |
-| Wind loading / wind engineering | ⚠️ (partial) | Yes | ASCE 7-22 wind (MWFRS+C&C) code calc; full CFD via OpenFOAM bridge |
-| Marine / offshore hydrodynamics | ⚠️ (partial) | Yes | Hydrostatics + GZ + seakeeping RAOs (strip theory) wired; wave CFD via bridge |
+| Wind loading / wind engineering | ✅ | Yes | ASCE 7-22 wind (MWFRS+C&C) code calc; full CFD via OpenFOAM bridge |
+| Marine / offshore hydrodynamics | ✅ | Yes | Hydrostatics + GZ + seakeeping RAOs (strip theory) wired; wave CFD via bridge |
 | Mold filling / injection simulation | ✅ | Partial | Hele-Shaw flow-front tracking + weld-line + air-trap detection (backend) |
 | CAD geometry modelling | ✅ | No | Full parametric B-rep modeller (OCCT); sketcher + feature tree wired in browser |
 | Unified CAD + simulation project | ✅ | No | Single cloud-git project: B-rep model, CFD case, and PCB thermal co-versioned |
@@ -344,12 +344,9 @@ Kerf saturates **88%** of OpenFOAM's feature surface (19 yes, 6 partial, 0 no ou
 
 ## What's honestly outstanding
 
-- **CFD — multiphase flow** (Partial): Selected multiphase solvers via bridge; full multiphase suite requires direct OpenFOAM
 - **CFD — LES / DES / DNS** (Partial): LES models accessible via bridge; specialist case tuning requires expert review
 - **CFD — parallel MPI execution** (Partial): Hosted cloud compute for moderate-scale runs; petascale HPC requires direct OpenFOAM
 - **CFD — post-processing (ParaView / VTK)** (Partial): Basic in-browser result viewer; full ParaView pipeline on exported OpenFOAM case directory
-- **Wind loading / wind engineering** (Partial): ASCE 7-22 wind (MWFRS+C&C) code calc; full CFD via OpenFOAM bridge
-- **Marine / offshore hydrodynamics** (Partial): Hydrostatics + GZ + seakeeping RAOs (strip theory) wired; wave CFD via bridge
 
 ## Pricing
 

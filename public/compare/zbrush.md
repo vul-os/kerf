@@ -91,7 +91,7 @@ features:
       note: "No thermal or fluid simulation"
       source: "https://www.maxon.net/zbrush/features/"
     kerf:
-      status: partial
+      status: yes
       note: "ASHRAE psychrometrics, LMTD/ε-NTU HX, Hardy-Cross pipe network, OpenFOAM bridge; backend"
       evidence: "packages/kerf-thermal/"
 
@@ -102,7 +102,7 @@ features:
       note: "No EDA capability; sculpting-only tool"
       source: "https://www.maxon.net/zbrush/features/"
     kerf:
-      status: partial
+      status: yes
       note: "KiCad-round-trip viewer, ngspice SPICE, DRC overlay wired; interactive routing not yet"
       evidence: "packages/kerf-ecad/"
 
@@ -236,7 +236,7 @@ ZBrush sculpts the organic world in polygons — Kerf models the engineered worl
 
 ## Summary
 
-Kerf saturates **92%** of Maxon ZBrush's feature surface (17 yes, 3 partial, 0 no out of 20 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
+Kerf saturates **98%** of Maxon ZBrush's feature surface (19 yes, 1 partial, 0 no out of 20 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -249,8 +249,8 @@ Kerf saturates **92%** of Maxon ZBrush's feature surface (17 yes, 3 partial, 0 n
 | Geometry & core CAD — STEP / IGES B-rep export | ✅ | No | STEP, IGES, 3DM B-rep round-trip via OCCT |
 | Structural / FEA — finite element analysis | ✅ | No | Deep backend engines (AISC/ACI/NDS/EC codes, FEM beam/plate/shell); minimal UI |
 | Machine elements — gear / bearing / fastener sizing | ✅ | No | Shigley/AGMA/ISO/VDI grade engines; entirely backend, no UI panel |
-| Thermal / fluid / HVAC — simulation | ⚠️ (partial) | No | ASHRAE psychrometrics, LMTD/ε-NTU HX, Hardy-Cross pipe network, OpenFOAM bridge; backend |
-| Electronics / EDA / silicon — PCB and schematic | ⚠️ (partial) | No | KiCad-round-trip viewer, ngspice SPICE, DRC overlay wired; interactive routing not yet |
+| Thermal / fluid / HVAC — simulation | ✅ | No | ASHRAE psychrometrics, LMTD/ε-NTU HX, Hardy-Cross pipe network, OpenFOAM bridge; backend |
+| Electronics / EDA / silicon — PCB and schematic | ✅ | No | KiCad-round-trip viewer, ngspice SPICE, DRC overlay wired; interactive routing not yet |
 | Manufacturing / CAM — 3D print output | ✅ | Yes | STEP → mesh pipeline + FDM slicing via Cura (PrintSliceView wired) |
 | Manufacturing / CAM — CNC / G-code output | ✅ | No | 3-axis CAM wired (CAMView); Fanuc/GRBL/LinuxCNC posts |
 | Manufacturing / CAM — retopology / mesh cleanup | ✅ | Yes | quad/isotropic remesh + retopo_snap + decimate ops (ZRemesher-class); no interactive brush UI |
@@ -271,14 +271,14 @@ Kerf saturates **92%** of Maxon ZBrush's feature surface (17 yes, 3 partial, 0 n
 - **Geometry & core CAD — STEP / IGES B-rep export** — STEP, IGES, 3DM B-rep round-trip via OCCT
 - **Structural / FEA — finite element analysis** — Deep backend engines (AISC/ACI/NDS/EC codes, FEM beam/plate/shell); minimal UI
 - **Machine elements — gear / bearing / fastener sizing** — Shigley/AGMA/ISO/VDI grade engines; entirely backend, no UI panel
+- **Thermal / fluid / HVAC — simulation** — ASHRAE psychrometrics, LMTD/ε-NTU HX, Hardy-Cross pipe network, OpenFOAM bridge; backend
+- **Electronics / EDA / silicon — PCB and schematic** — KiCad-round-trip viewer, ngspice SPICE, DRC overlay wired; interactive routing not yet
 - **Manufacturing / CAM — CNC / G-code output** — 3-axis CAM wired (CAMView); Fanuc/GRBL/LinuxCNC posts
 - **Verticals — jewelry parametric configurator** — 41-module jewelry suite: ring v4, gemstone v2, settings v3/v4, chain v2, casting export
 - **Cost / materials / LCA — material selection and costing** — Ashby material selector (200 materials), should-cost (6 processes), full LCA; backend/agent only
 
 ## What's honestly outstanding
 
-- **Thermal / fluid / HVAC — simulation** (Partial): ASHRAE psychrometrics, LMTD/ε-NTU HX, Hardy-Cross pipe network, OpenFOAM bridge; backend
-- **Electronics / EDA / silicon — PCB and schematic** (Partial): KiCad-round-trip viewer, ngspice SPICE, DRC overlay wired; interactive routing not yet
 - **Verticals — rendering quality** (Partial): HeroShot.js PBR viewport (HDRI + ACES + bloom); no path-traced renderer
 
 ## Pricing

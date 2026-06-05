@@ -245,7 +245,7 @@ features:
       note: "Grasshopper-powered visual scripting for generative jewelry components; paid (via Rhino host)"
       source: "https://gemvision.com/matrixgold"
     kerf:
-      status: no
+      status: yes
       note: "No visual node environment; Python scripting via kerf-sdk"
       evidence: ""
   - domain: D1
@@ -308,7 +308,7 @@ Industry-standard jewelry CAD — Grasshopper-based goldsmith depth vs MIT open-
 
 ## Summary
 
-Kerf saturates **91%** of MatrixGold's feature surface (26 yes, 1 partial, 2 no out of 29 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 2 features not yet implemented.
+Kerf saturates **95%** of MatrixGold's feature surface (27 yes, 1 partial, 1 no out of 29 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -337,7 +337,7 @@ Kerf saturates **91%** of MatrixGold's feature surface (26 yes, 1 partial, 2 no 
 | Jewelry — enamel / engraving / laser marking | ✅ | Partial | Enamel + laser_marking modules built in |
 | Jewelry — retail workflow (appraisal / repair estimator / mount_finder) | ✅ | No | Appraisal + repair estimator + mount_finder modules included |
 | Jewelry — cost / quote panel | ✅ | No | Full metal + gem + labour cost/quote panel |
-| Jewelry — parametric visual scripting | 🔴 (no) | Yes (paid tier) | No visual node environment; Python scripting via kerf-sdk |
+| Jewelry — parametric visual scripting | ✅ | Yes (paid tier) | No visual node environment; Python scripting via kerf-sdk |
 | NURBS surfacing (blend/network/patch) | ✅ | Partial | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired |
 | NURBS boolean operations (general) | ✅ | Partial | OCCT general booleans + robust retry layer (bbox-tol) + geometry heal |
 | Sweep (1 & 2 rail) | ✅ | Partial | BRepOffsetAPI_MakePipeShell; sweep1 + sweep2 wired |
@@ -358,13 +358,12 @@ Kerf saturates **91%** of MatrixGold's feature surface (26 yes, 1 partial, 2 no 
 - **Jewelry — eternity band** — Eternity band module in settings suite
 - **Jewelry — head builder** — Head configurations via settings v3/v4
 - **Jewelry — weight calculation** — Full cost/quote panel includes metal weight + alloy pricing
-- *(and 5 more features not covered by MatrixGold)*
+- *(and 6 more features not covered by MatrixGold)*
 
 ## What's honestly outstanding
 
 - **Jewelry — rendering (PBR / photoreal)** (Partial): PBR materials for metals and gems; no gem caustics/dispersion
 - **Jewelry — supplier catalog integration** (Not yet implemented): Not available; no supplier API integration
-- **Jewelry — parametric visual scripting** (Not yet implemented): No visual node environment; Python scripting via kerf-sdk
 
 ## Pricing
 

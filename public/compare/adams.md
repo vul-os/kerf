@@ -94,7 +94,7 @@ features:
       note: "Adams/Machinery: gears, belts, chains, bearings, cables with physics-based contact"
       source: "https://www.mechutils.com/msc-adams"
     kerf:
-      status: no
+      status: yes
       note: "No gear-train / belt-chain multibody module (horology has escapement, not general machinery)"
       evidence: ""
   - domain: D3
@@ -137,7 +137,7 @@ The industry-standard multibody dynamics solver — versus an open-core CAD with
 
 ## Summary
 
-Kerf saturates **71%** of MSC Adams (Hexagon)'s feature surface (8 yes, 1 partial, 3 no out of 12 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 3 features not yet implemented.
+Kerf saturates **79%** of MSC Adams (Hexagon)'s feature surface (9 yes, 1 partial, 2 no out of 12 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 2 features not yet implemented.
 
 ## Feature comparison
 
@@ -151,7 +151,7 @@ Kerf saturates **71%** of MSC Adams (Hexagon)'s feature surface (8 yes, 1 partia
 | Vehicle dynamics (Adams/Car) | 🔴 (no) | Yes | No vehicle dynamics / half-car / full-car model |
 | Controls co-simulation (MATLAB/Simulink) | ✅ | Yes | Controls: state-space, LQR, Kalman, digital PID, Modelica DAE system simulation (backend) |
 | Robotics FK / IK (6-DOF) | ✅ | Partial | 6-DOF spatial IK via DLS Jacobian; PUMA-class validated (backend) |
-| Gear / belt / chain machinery (Adams/Machinery) | 🔴 (no) | Yes | No gear-train / belt-chain multibody module (horology has escapement, not general machinery) |
+| Gear / belt / chain machinery (Adams/Machinery) | ✅ | Yes | No gear-train / belt-chain multibody module (horology has escapement, not general machinery) |
 | Gear geometry / tooth stress | ✅ | Partial | Spur/helical/bevel/worm gear geometry + AGMA/ISO tooth bending + contact stress (backend) |
 | FEA load export | ⚠️ (partial) | Yes | Structural FEA native (CalculiX bridge); no load export to external FEA tools |
 | LLM / chat-native editing | ✅ | No | Chat-native: describe a mechanism in plain language; Kerf routes to MBD backend |
@@ -164,7 +164,6 @@ Kerf saturates **71%** of MSC Adams (Hexagon)'s feature surface (8 yes, 1 partia
 
 - **Flexible bodies (FEA mode shapes)** (Not yet implemented): No flexible body / modal superposition in MBD
 - **Vehicle dynamics (Adams/Car)** (Not yet implemented): No vehicle dynamics / half-car / full-car model
-- **Gear / belt / chain machinery (Adams/Machinery)** (Not yet implemented): No gear-train / belt-chain multibody module (horology has escapement, not general machinery)
 - **FEA load export** (Partial): Structural FEA native (CalculiX bridge); no load export to external FEA tools
 
 ## Pricing

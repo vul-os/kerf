@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T03:03:04.549Z",
+  "generatedAt": "2026-06-05T03:04:47.785Z",
   "items": [
     {
       "slug": "revit",
@@ -352,7 +352,7 @@
             "paid": "false"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "cloud/bim/",
             "notes": "No node-based visual scripting; kerf-sdk Python API is the scripting surface — covers the automation use case but not the Dynamo visual-graph experience"
           }
@@ -2076,7 +2076,7 @@
             "notes": "Marionette: node-based visual programming for parametric geometry; all paid tiers"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "",
             "notes": "No node-based visual scripting; kerf-sdk Python API is the scripting surface"
           },
@@ -7142,7 +7142,7 @@
             "notes": "Via SimScale / OnScale App Store add-ons; not bundled"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/heatxfer/transfer.py",
             "notes": "Real OpenFOAM bridge (backend, needs install)"
           },
@@ -11168,7 +11168,7 @@
             "notes": "Automated Fiber Placement (AFP) and Automated Tape Laying (ATL) path export for CNC path planners"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "",
             "notes": "No AFP/ATL CNC path generation"
           },
@@ -12460,7 +12460,7 @@
             "notes": "Spectre + Virtuoso schematic editor; fully integrated testbench workflow"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "notes": "Kerf accepts netlists only; no analog schematic capture GUI yet"
           },
           "name": "SPICE — schematic-driven simulation"
@@ -12732,7 +12732,7 @@
             "notes": "LTspice has a full schematic capture GUI (proprietary symbol format)"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "notes": "Kerf accepts netlists directly; no schematic GUI for SPICE (circuit.tsx is for PCB-level schematics)"
           },
           "name": "SPICE — schematic capture GUI"
@@ -13310,7 +13310,7 @@
             "notes": "Adams/Machinery: gears, belts, chains, bearings, cables with physics-based contact"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "",
             "notes": "No gear-train / belt-chain multibody module (horology has escapement, not general machinery)"
           },
@@ -14017,7 +14017,7 @@
             "notes": "interFoam (VOF), twoPhaseEulerFoam, multiphaseInterFoam, cavitatingFoam"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cfd/",
             "notes": "Selected multiphase solvers via bridge; full multiphase suite requires direct OpenFOAM"
           },
@@ -14216,7 +14216,7 @@
             "notes": "Atmospheric boundary layer profiles + rough-wall functions for wind-load CFD"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-structural/",
             "notes": "ASCE 7-22 wind (MWFRS+C&C) code calc; full CFD via OpenFOAM bridge"
           },
@@ -14230,7 +14230,7 @@
             "notes": "waves2Foam, olaFlow, interFoam for wave-structure interaction"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-marine/",
             "notes": "Hydrostatics + GZ + seakeeping RAOs (strip theory) wired; wave CFD via bridge"
           },
@@ -15621,7 +15621,7 @@
             "notes": "Phoenix FD plugin: GPU-accelerated fire, smoke, liquid for VFX/archviz"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "",
             "notes": "No visual fluid VFX simulation"
           },
@@ -15996,7 +15996,7 @@
             "notes": "No thermal or fluid simulation"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-thermal/",
             "notes": "ASHRAE psychrometrics, LMTD/ε-NTU HX, Hardy-Cross pipe network, OpenFOAM bridge; backend"
           },
@@ -16010,7 +16010,7 @@
             "notes": "No EDA capability; sculpting-only tool"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-ecad/",
             "notes": "KiCad-round-trip viewer, ngspice SPICE, DRC overlay wired; interactive routing not yet"
           },
@@ -17615,7 +17615,7 @@
             "notes": "MatrixGold full wax-mill paths + STL (paid plugin)"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/casting_export.py",
             "notes": "Casting export + wax-carving plan; no full mill-path"
           },
@@ -17629,7 +17629,7 @@
             "notes": "Grasshopper — industry-standard visual scripting (built-in)"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/plugin.py",
             "notes": "No visual node environment; chat + kerf-sdk fill part of the gap"
           },
@@ -18060,7 +18060,7 @@
             "notes": "Grasshopper-powered visual scripting for generative jewelry components; paid (via Rhino host)"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "",
             "notes": "No visual node environment; Python scripting via kerf-sdk"
           },

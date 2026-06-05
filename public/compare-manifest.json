@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T04:20:03.916Z",
+  "generatedAt": "2026-06-05T04:37:18.184Z",
   "items": [
     {
       "slug": "revit",
@@ -3873,6 +3873,157 @@
             "notes": "MIT open-core; free locally with no layer or board-size restriction; hosted credits at cost"
           },
           "name": "License model"
+        }
+      ]
+    },
+    {
+      "slug": "multisim",
+      "competitor": "NI Multisim",
+      "category": "cad-electronic",
+      "left": "kerf",
+      "right": "multisim",
+      "hero_tagline": "Industry-standard SPICE circuit simulation — compared honestly against MIT open-core EDA.",
+      "reviewed_at": "2026-06-05",
+      "features": [
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ni.com/en/shop/electronic-test-instrumentation/application-software-for-electronic-test-and-instrumentation-category/what-is-multisim.html",
+            "notes": "Berkeley SPICE engine; transient, AC, Fourier, temperature sweeps"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/bridges/ngspice_bridge.py",
+            "notes": "Real ngspice bridge: transient/AC/DC/operating-point/Fourier analyses"
+          },
+          "name": "SPICE simulation (transient / AC / DC / Fourier / temperature)"
+        },
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ni.com/en/shop/electronic-test-instrumentation/application-software-for-electronic-test-and-instrumentation-category/what-is-multisim.html",
+            "notes": "Interactive schematic environment with on-the-fly editing"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/routes_spice.py",
+            "notes": "LTspice-equivalent schematic capture GUI + wire router; KiCad round-trip"
+          },
+          "name": "Interactive schematic capture"
+        },
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ni.com/en/shop/electronic-test-instrumentation/application-software-for-electronic-test-and-instrumentation-category/what-is-multisim.html",
+            "notes": "Manufacturer SPICE models from 55k component database"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/spice/bsim4_model.py",
+            "notes": "BSIM4 transistor model + multi-dialect netlist codegen"
+          },
+          "name": "Foundry-grade device models (BSIM4)"
+        },
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ni.com/en/shop/electronic-test-instrumentation/application-software-for-electronic-test-and-instrumentation-category/what-is-multisim.html",
+            "notes": "Worst-case + Monte Carlo analyses among 20 analysis types"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/sim_corner.py",
+            "notes": "PVT corner sweep (5P×3V×4T) + Monte-Carlo mismatch analysis"
+          },
+          "name": "PVT-corner + Monte-Carlo analysis"
+        },
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ni.com/en/shop/electronic-test-instrumentation/application-software-for-electronic-test-and-instrumentation-category/what-is-multisim.html",
+            "notes": "55,000+ manufacturer-verified components and models"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/tools/spice_lib.py",
+            "notes": "SPICE model library + Octopart/DigiKey/Mouser parts lookup; not a 55k pre-built model DB"
+          },
+          "name": "Component / model library"
+        },
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ni.com/en/shop/electronic-test-instrumentation/application-software-for-electronic-test-and-instrumentation-category/what-is-multisim.html",
+            "notes": "Virtual oscilloscope, multimeter, function generator, logic analyzer"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/ibis_import.py",
+            "notes": "Waveform viewer + eye-diagram; no drag-on virtual-instrument bench (scope/DMM/func-gen UI)"
+          },
+          "name": "Virtual instruments (scope / multimeter / function gen)"
+        },
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ni.com/en/shop/electronic-test-instrumentation/application-software-for-electronic-test-and-instrumentation-category/what-is-multisim.html",
+            "notes": "Measurement probes placed on wires for real-time readout"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/routes_spice.py",
+            "notes": "Node-voltage / branch-current results from analyses; no live interactive on-wire probe overlay"
+          },
+          "name": "Interactive probes (live voltage/current/freq)"
+        },
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ni.com/en/shop/electronic-test-instrumentation/application-software-for-electronic-test-and-instrumentation-category/what-is-multisim.html",
+            "notes": "Ultiboard PCB layout with forward/back annotation"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/routing/push_shove.py",
+            "notes": "Interactive PCB editor (push-shove) + schematic→layout; Gerber/ODB++/IPC-2581 fab"
+          },
+          "name": "PCB layout integration"
+        },
+        {
+          "domain": "D6",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.ni.com/en/shop/electronic-test-instrumentation/application-software-for-electronic-test-and-instrumentation-category/what-is-multisim.html",
+            "notes": "Power electronics / SMPS simulation models"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/power/",
+            "notes": "Buck/boost ripple, LDO dropout, EMI filter, MOSFET SOA, AC load-flow"
+          },
+          "name": "Power-electronics simulation"
+        },
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "no",
+            "source": "https://www.ni.com/en/shop/electronic-test-instrumentation/application-software-for-electronic-test-and-instrumentation-category/what-is-multisim.html",
+            "notes": "Proprietary subscription; no LLM interface"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-sdk/src/kerf/",
+            "notes": "MIT open-core; chat-native circuit design + JSON-RPC LLM tools + kerf-sdk"
+          },
+          "name": "Open-source core / chat-native"
         }
       ]
     },

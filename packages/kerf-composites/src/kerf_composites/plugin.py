@@ -4,7 +4,9 @@ kerf-composites plugin entry-point.
 Registers:
   - LLM tools: layup_analysis, composites_drape, composites_interlaminar,
                composites_thermal, composites_failure_depth,
-               composites_optimize_layup, composites_failure_check
+               composites_optimize_layup, composites_failure_check,
+               composites_weight_cost, composites_failure_envelope,
+               composites_afp_pathplan
 """
 
 from __future__ import annotations
@@ -23,6 +25,9 @@ async def register(app: FastAPI, ctx):
         composites_failure_depth_spec, run_composites_failure_depth,
         composites_optimize_layup_spec, run_composites_optimize_layup,
         composites_failure_check_spec, run_composites_failure_check,
+        composites_weight_cost_spec, run_composites_weight_cost,
+        composites_failure_envelope_spec, run_composites_failure_envelope,
+        composites_afp_pathplan_spec, run_composites_afp_pathplan,
     )
     ctx.tools.register("layup_analysis", layup_analysis_spec, run_layup_analysis)
     ctx.tools.register("composites_drape", composites_drape_spec, run_composites_drape)
@@ -36,6 +41,12 @@ async def register(app: FastAPI, ctx):
                        composites_optimize_layup_spec, run_composites_optimize_layup)
     ctx.tools.register("composites_failure_check",
                        composites_failure_check_spec, run_composites_failure_check)
+    ctx.tools.register("composites_weight_cost",
+                       composites_weight_cost_spec, run_composites_weight_cost)
+    ctx.tools.register("composites_failure_envelope",
+                       composites_failure_envelope_spec, run_composites_failure_envelope)
+    ctx.tools.register("composites_afp_pathplan",
+                       composites_afp_pathplan_spec, run_composites_afp_pathplan)
 
     provides = [
         "composites.layup",
@@ -46,6 +57,9 @@ async def register(app: FastAPI, ctx):
         "composites.thermal",
         "composites.failure_depth",
         "composites.layup_optimizer",
+        "composites.weight_cost",
+        "composites.failure_envelope",
+        "composites.afp_pathplan",
     ]
 
     try:

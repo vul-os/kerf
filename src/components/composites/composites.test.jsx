@@ -1,10 +1,11 @@
 /**
  * composites.test.jsx
  *
- * Vitest / RTL tests for the three composites manufacturing panels:
+ * Vitest / RTL tests for the four composites manufacturing panels:
  *   - LaminateStackup
  *   - AFPToolpathView
  *   - FiberOrientationContour
+ *   - LaminateFailureEnvelope
  *
  * Uses renderToStaticMarkup (react-dom/server) — no jsdom canvas needed.
  * API calls are stubbed via vi.stubGlobal('fetch', ...).
@@ -15,6 +16,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import LaminateStackup from './LaminateStackup.jsx'
 import AFPToolpathView from './AFPToolpathView.jsx'
 import FiberOrientationContour from './FiberOrientationContour.jsx'
+import LaminateFailureEnvelope from './LaminateFailureEnvelope.jsx'
 
 // ---------------------------------------------------------------------------
 // Shared mock plies fixture
@@ -292,5 +294,90 @@ describe('FiberOrientationContour', () => {
     expect(() => renderToStaticMarkup(<FiberOrientationContour />)).not.toThrow()
     const html = renderToStaticMarkup(<FiberOrientationContour />)
     expect(html).toContain('data-testid="fiber-orientation-contour"')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// LaminateFailureEnvelope tests
+// ---------------------------------------------------------------------------
+
+const ENVELOPE_PLIES = [
+  { angle: 0,   E1: 181, E2: 10.3, G12: 7.17, nu12: 0.28, thickness: 0.125,
+    Xt: 1500, Xc: 1500, Yt: 40, Yc: 246, S12: 68 },
+  { angle: 90,  E1: 181, E2: 10.3, G12: 7.17, nu12: 0.28, thickness: 0.125,
+    Xt: 1500, Xc: 1500, Yt: 40, Yc: 246, S12: 68 },
+  { angle: 0,   E1: 181, E2: 10.3, G12: 7.17, nu12: 0.28, thickness: 0.125,
+    Xt: 1500, Xc: 1500, Yt: 40, Yc: 246, S12: 68 },
+]
+
+const ENVELOPE_RESPONSE = {
+  envelope_points: [
+    { theta_deg: 0,   Nx_fail_N_per_mm: 500, Ny_fail_N_per_mm: 0,   lambda_crit: 500 },
+    { theta_deg: 90,  Nx_fail_N_per_mm: 0,   Ny_fail_N_per_mm: 200, lambda_crit: 200 },
+    { theta_deg: 180, Nx_fail_N_per_mm: -500, Ny_fail_N_per_mm: 0,  lambda_crit: 500 },
+    { theta_deg: 270, Nx_fail_N_per_mm: 0,   Ny_fail_N_per_mm: -200, lambda_crit: 200 },
+  ],
+  max_uniaxial_Nx_N_per_mm: 500,
+  max_uniaxial_Ny_N_per_mm: 200,
+  num_plies: 3,
+  n_angles: 4,
+}
+
+describe('LaminateFailureEnvelope', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', makeFetch(ENVELOPE_RESPONSE))
+    if (typeof HTMLCanvasElement !== 'undefined') {
+      HTMLCanvasElement.prototype.getContext = vi.fn(() => null)
+    }
+  })
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('mounts without throwing', () => {
+    expect(() => renderToStaticMarkup(<LaminateFailureEnvelope plies={ENVELOPE_PLIES} />)).not.toThrow()
+  })
+
+  it('renders the data-testid root', () => {
+    const html = renderToStaticMarkup(<LaminateFailureEnvelope plies={ENVELOPE_PLIES} />)
+    expect(html).toContain('data-testid="laminate-failure-envelope"')
+  })
+
+  it('renders the FPF title', () => {
+    const html = renderToStaticMarkup(<LaminateFailureEnvelope plies={ENVELOPE_PLIES} />)
+    expect(html).toMatch(/Failure Envelope/i)
+    expect(html).toMatch(/FPF/i)
+  })
+
+  it('renders the Run Envelope button', () => {
+    const html = renderToStaticMarkup(<LaminateFailureEnvelope plies={ENVELOPE_PLIES} />)
+    expect(html).toMatch(/Run Envelope/i)
+  })
+
+  it('renders operating point inputs (Nx, Ny)', () => {
+    const html = renderToStaticMarkup(<LaminateFailureEnvelope plies={ENVELOPE_PLIES} />)
+    expect(html).toMatch(/Operating Point/i)
+    expect(html).toMatch(/Nx/i)
+    expect(html).toMatch(/Ny/i)
+  })
+
+  it('renders the SVG envelope plot placeholder', () => {
+    const html = renderToStaticMarkup(<LaminateFailureEnvelope plies={ENVELOPE_PLIES} />)
+    expect(html).toMatch(/<svg\b/)
+  })
+
+  it('renders axis labels Nx and Ny', () => {
+    const html = renderToStaticMarkup(<LaminateFailureEnvelope plies={ENVELOPE_PLIES} />)
+    expect(html).toMatch(/N\/mm/)
+  })
+
+  it('renders parameters section with F12 control', () => {
+    const html = renderToStaticMarkup(<LaminateFailureEnvelope plies={ENVELOPE_PLIES} />)
+    expect(html).toMatch(/F12/)
+    expect(html).toMatch(/Parameters/i)
+  })
+
+  it('falls back to default plies when none provided', () => {
+    expect(() => renderToStaticMarkup(<LaminateFailureEnvelope />)).not.toThrow()
+    const html = renderToStaticMarkup(<LaminateFailureEnvelope />)
+    expect(html).toContain('data-testid="laminate-failure-envelope"')
   })
 })

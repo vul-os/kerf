@@ -124,6 +124,21 @@ Registers:
                 high; SPI LDR range 1–5 %; HONEST: mixing index is a
                 proxy — trial colour plaques + L*a*b* measurement required)
 
+# Wave 10D: injection fill simulation (Hele-Shaw + Cross-WLF)
+  - LLM tool:  mold_injection_fill_simulate
+               (Hieber-Shen 1980 J. Non-Newtonian Fluid Mech. 7, 1–32 +
+                Cross 1965 J. Colloid Sci. 20, 417–437 Cross-WLF viscosity:
+                1.5D Hele-Shaw fill simulation on N×N raster grid;
+                Dijkstra fast-marching fill-time; weld-line detection at
+                inter-gate boundaries; air-trap detection via converging-
+                front heuristic; pressure drop via Hele-Shaw channel formula;
+                HONEST: simplified 1.5D model — not a substitute for full
+                3D Moldflow / Moldex3D FEM simulation)
+  - LLM tool:  mold_cross_wlf_viscosity
+               (Cross 1965 J. Colloid Sci. 20, 417–437 + WLF temperature
+                shift: compute η(γ̇, T) for ABS/PC/PA66 polymer presets;
+                HONEST: isothermal thin-film approximation only)
+
 # Wave 10C: parting line + cavity-core split
   - LLM tool:  mold_detect_parting_line
                (Hayrettin et al. 2003 CAD 35 + Chen-Rosen 1999 JMSE 121:
@@ -548,6 +563,25 @@ async def register(app: FastAPI, ctx):
         run_mold_generate_wire_edm_gcode,
     )
 
+    # Register injection fill simulation tools
+    # (Hieber-Shen 1980 1.5D Hele-Shaw + Cross-WLF viscosity model)
+    from kerf_mold.injection_fill_tools import (
+        mold_injection_fill_spec,
+        run_mold_injection_fill_simulate,
+        mold_cross_wlf_viscosity_spec,
+        run_mold_cross_wlf_viscosity,
+    )
+    ctx.tools.register(
+        "mold_injection_fill_simulate",
+        mold_injection_fill_spec,
+        run_mold_injection_fill_simulate,
+    )
+    ctx.tools.register(
+        "mold_cross_wlf_viscosity",
+        mold_cross_wlf_viscosity_spec,
+        run_mold_cross_wlf_viscosity,
+    )
+
     provides = [
         "mold.moldability",
         "mold.parting_surface",
@@ -586,6 +620,8 @@ async def register(app: FastAPI, ctx):
         "mold.parting_line_detection",
         "mold.cavity_core_split",
         "mold.mold_complexity_estimate",
+        "mold.injection_fill_simulate",
+        "mold.cross_wlf_viscosity",
     ]
 
     try:

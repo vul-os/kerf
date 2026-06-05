@@ -22,12 +22,30 @@ async def register(app: FastAPI, ctx):
         optics_pop_propagate_spec, run_optics_pop_propagate,
         optics_tolerancing_spec, run_optics_tolerancing,
         optics_mtf_spec, run_optics_mtf,
+        optics_sequential_trace_spec, run_optics_sequential_trace,
+        optics_nest_tolerancing_spec, run_optics_nest_tolerancing,
+        optics_lighting_simulation_spec, run_optics_lighting_simulation,
     )
     ctx.tools.register("optics_trace_ray", optics_trace_ray_spec, run_optics_trace_ray)
     ctx.tools.register("optics_lens_design", optics_lens_design_spec, run_optics_lens_design)
     ctx.tools.register("optics_pop_propagate", optics_pop_propagate_spec, run_optics_pop_propagate)
     ctx.tools.register("optics_tolerancing", optics_tolerancing_spec, run_optics_tolerancing)
     ctx.tools.register("optics_mtf", optics_mtf_spec, run_optics_mtf)
+    ctx.tools.register(
+        "optics_sequential_trace",
+        optics_sequential_trace_spec,
+        run_optics_sequential_trace,
+    )
+    ctx.tools.register(
+        "optics_nest_tolerancing",
+        optics_nest_tolerancing_spec,
+        run_optics_nest_tolerancing,
+    )
+    ctx.tools.register(
+        "optics_lighting_simulation",
+        optics_lighting_simulation_spec,
+        run_optics_lighting_simulation,
+    )
 
     from kerf_optics.gaussian_tools import (
         gaussian_beam_propagate_spec, run_gaussian_beam_propagate,
@@ -66,8 +84,9 @@ async def register(app: FastAPI, ctx):
 
     provides = [
         "optics.paraxial", "optics.abcd", "optics.gaussian", "optics.pop",
-        "optics.tolerancing", "optics.mtf", "optics.nonsequential",
-        "optics.zernike",
+        "optics.tolerancing", "optics.tolerancing.nest", "optics.mtf",
+        "optics.nonsequential", "optics.zernike",
+        "optics.sequential_trace", "optics.lighting",
     ]
 
     try:

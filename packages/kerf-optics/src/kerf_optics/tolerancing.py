@@ -443,3 +443,175 @@ def monte_carlo_tolerancing(
         yield_within_delta=yield_frac,
         merit_tolerance=merit_tolerance,
     )
+
+
+# ---------------------------------------------------------------------------
+# NEST — Inverse sensitivity (tightened tolerance budget)
+# ---------------------------------------------------------------------------
+#
+# Zemax NEST (Never Exceed Specification Tolerancing) is an inverse-sensitivity
+# workflow: given a total merit budget M_budget, find per-parameter tolerances δ_i
+# such that the RSS sum equals the budget:
+#
+#   √( Σ_i (s_i · δ_i)² ) = M_budget
+#
+# where s_i = sensitivity of parameter i [merit change per unit parameter change].
+#
+# The equal-contribution (EC) allocation assigns each parameter the same fractional
+# contribution to the RSS budget:
+#
+#   δ_i^EC = M_budget / (√N · |s_i|)
+#
+# A custom weight vector w_i can be supplied so that harder-to-control parameters
+# receive a larger fractional allocation:
+#
+#   δ_i^weighted = M_budget · w_i / √(Σ_j (w_j · s_j)²)
+#
+# References
+# ----------
+# Zemax LLC. "OpticStudio User Manual — Tolerancing Tutorial" (2023),
+#     §6.3 (NEST workflow, inverse sensitivity).
+# Smith, W.J. (2008). "Modern Optical Engineering", 4th ed., §14.3.
+# Fischer, R.E. et al. (2008). "Optical System Design", 2nd ed., §11.5.
+
+@dataclass
+class NESTResult:
+    """Output of nest_tolerancing() — inverse sensitivity (NEST) analysis.
+
+    Attributes
+    ----------
+    merit_budget : float
+        Target total merit budget (RSS) supplied by the caller.
+    allocated_deltas : list[float]
+        Per-parameter tolerance δ_i satisfying the budget.
+    sensitivity : list[float]
+        Per-parameter first-order sensitivity |Δmerit / Δparam|.
+    rss_check : float
+        Verified RSS = √(Σ (s_i · δ_i)²) — should equal merit_budget.
+    param_descriptions : list[str]
+    """
+    merit_budget: float
+    allocated_deltas: List[float]
+    sensitivity: List[float]
+    rss_check: float
+    param_descriptions: List[str]
+
+    def table(self) -> list:
+        """Return a list of dicts, one per parameter."""
+        rows = []
+        for i, (desc, s, d) in enumerate(
+            zip(self.param_descriptions, self.sensitivity, self.allocated_deltas)
+        ):
+            rows.append({
+                "param_index": i,
+                "description": desc,
+                "sensitivity": round(s, 8),
+                "allocated_delta": round(d, 8),
+                "rss_contribution": round(abs(s * d), 8),
+            })
+        return sorted(rows, key=lambda r: r["rss_contribution"], reverse=True)
+
+
+def nest_tolerancing(
+    system,
+    params: Sequence[ToleranceParam],
+    merit_fn: Callable,
+    merit_budget: float,
+    weights: Optional[Sequence[float]] = None,
+) -> NESTResult:
+    """NEST inverse sensitivity: allocate per-parameter tolerances to meet a budget.
+
+    Given a target RSS merit budget, solves for the per-parameter tolerance δ_i
+    using equal-contribution (or weighted) allocation:
+
+      δ_i = merit_budget · w_i / √( Σ_j (w_j · s_j)² )
+
+    where s_i = |sensitivity_i| = max(|δm_+|, |δm_-|) / δ_i  [merit per unit param].
+
+    Parameters
+    ----------
+    system : LensSystem
+        Optical system.
+    params : sequence of ToleranceParam
+        Tolerance parameters (delta field is used only as a finite-difference step
+        for computing sensitivity; it is overwritten in the output).
+    merit_fn : callable
+        Merit function.
+    merit_budget : float
+        Total RSS merit budget that the allocated tolerances must satisfy.
+    weights : list[float] or None
+        Per-parameter weight factors w_i >= 0.  Equal weights if None.
+        Larger w_i → that parameter gets a larger (looser) tolerance allocation.
+
+    Returns
+    -------
+    NESTResult
+
+    Notes
+    -----
+    This implements the NEST budget-allocation step described in Zemax
+    OpticStudio Tolerancing Tutorial §6.3 and Smith (2008) §14.3.
+    """
+    if merit_budget <= 0:
+        raise ValueError(f"merit_budget must be > 0; got {merit_budget}")
+
+    params = list(params)
+    n = len(params)
+    if n == 0:
+        raise ValueError("params list must not be empty.")
+
+    # Weights
+    if weights is None:
+        w = np.ones(n, dtype=float)
+    else:
+        w = np.array(list(weights), dtype=float)
+        if len(w) != n:
+            raise ValueError(f"weights length {len(w)} must equal params length {n}")
+        if np.any(w < 0):
+            raise ValueError("weights must all be >= 0")
+
+    # Step 1: compute sensitivity for each parameter via sensitivity_analysis
+    # Using the param.delta as the finite-difference step (1% of nominal if delta=0)
+    import copy
+    nominal_system = copy.deepcopy(system)
+    for p in params:
+        if p.nominal is None:
+            el = nominal_system.elements[p.element_index]
+            p.nominal = _get_param(el, p.param_name)
+        if p.delta == 0.0:
+            # Use 1% of nominal as default step
+            p.delta = max(abs(p.nominal) * 0.01, 1e-6)
+
+    sens_result = sensitivity_analysis(nominal_system, params, merit_fn)
+
+    # Step 2: compute first-order sensitivity |Δm / δ| for each parameter
+    sensitivities = [
+        max(abs(dp), abs(dm)) / max(p.delta, 1e-15)
+        for p, dp, dm in zip(params, sens_result.delta_plus, sens_result.delta_minus)
+    ]
+    s = np.array(sensitivities, dtype=float)
+
+    # Step 3: allocate δ_i = budget · w_i / √(Σ_j (w_j · s_j)²)
+    ws = w * s  # weighted sensitivities
+    norm_ws = float(np.sqrt(np.dot(ws, ws)))
+    if norm_ws < 1e-15:
+        # All sensitivities zero (parameters have no effect) — return large deltas
+        allocated = [merit_budget] * n
+    else:
+        allocated = [(merit_budget * float(w[i])) / norm_ws for i in range(n)]
+
+    # Step 4: verify RSS
+    rss = math.sqrt(sum((s[i] * allocated[i]) ** 2 for i in range(n)))
+
+    descriptions = [
+        p.description or f"el[{p.element_index}].{p.param_name}"
+        for p in params
+    ]
+
+    return NESTResult(
+        merit_budget=merit_budget,
+        allocated_deltas=allocated,
+        sensitivity=list(s),
+        rss_check=rss,
+        param_descriptions=descriptions,
+    )

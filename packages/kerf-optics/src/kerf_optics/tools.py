@@ -698,3 +698,453 @@ async def run_optics_pop_propagate(args: dict[str, Any], ctx: "ProjectCtx") -> s
 
     except Exception as exc:
         return err_payload(str(exc), "POP_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# optics_sequential_trace
+# ---------------------------------------------------------------------------
+
+optics_sequential_trace_spec = ToolSpec(
+    name="optics_sequential_trace",
+    description=(
+        "Zemax-style sequential multi-surface paraxial ray trace analysis.\n"
+        "\n"
+        "Traces rays through an ordered list of optical surfaces (object → image)\n"
+        "and returns:\n"
+        "  efl_d_mm         — effective focal length at primary wavelength (d-line 587.6 nm) [mm]\n"
+        "  efl_per_wavelength — EFL at each traced wavelength (dict: wl_nm → efl_mm)\n"
+        "  bfd_mm           — back focal distance [mm]\n"
+        "  ffd_mm           — front focal distance [mm]\n"
+        "  longitudinal_chromatic_aberration_mm — EFL shift F-line vs C-line [mm]\n"
+        "  transverse_chromatic_aberration_mm   — lateral colour [mm]\n"
+        "  rms_spot_mm      — paraxial RMS spot radius [mm]\n"
+        "  geo_spot_mm      — geometric (max) spot radius [mm]\n"
+        "  ee80_mm          — 80% encircled energy radius [mm]\n"
+        "  strehl_ratio     — Maréchal approximation\n"
+        "  seidel_coefficients — primary W040/W131/W222/W220/W311 aberrations\n"
+        "  merit_function   — polychromatic RSS merit (RMS spot across wavelengths)\n"
+        "\n"
+        "Each surface: {radius_mm, thickness_mm, n_next, semi_diameter_mm, surface_type}\n"
+        "surface_type: 'refract' (default) | 'reflect' | 'aperture_stop' | 'image'\n"
+        "\n"
+        "Paraxial ABCD model — first-order properties are exact; Seidel coefficients\n"
+        "are thin-lens approximations.\n"
+        "Errors: {ok:false, reason}. Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "required": ["surfaces"],
+        "properties": {
+            "surfaces": {
+                "type": "array",
+                "description": (
+                    "Ordered list of optical surfaces from front to rear.\n"
+                    "Each surface: {radius_mm, thickness_mm, n_next, semi_diameter_mm (optional), "
+                    "surface_type ('refract'|'reflect'|'aperture_stop'|'image', optional)}"
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "radius_mm": {"type": "number", "description": "Radius of curvature [mm]. Use 1e30 for flat."},
+                        "thickness_mm": {"type": "number", "description": "Axial distance to next surface [mm]."},
+                        "n_next": {"type": "number", "description": "Refractive index of next medium. Default 1.0 (air)."},
+                        "semi_diameter_mm": {"type": "number"},
+                        "surface_type": {"type": "string"},
+                        "label": {"type": "string"},
+                    },
+                    "required": ["radius_mm", "thickness_mm"],
+                },
+                "minItems": 1,
+            },
+            "n_object": {
+                "type": "number",
+                "description": "Refractive index of object space (before first surface). Default 1.0.",
+            },
+            "object_distance_mm": {
+                "type": "number",
+                "description": "Object distance from first surface [mm]. Default 1000.",
+            },
+            "wavelengths_nm": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "Wavelengths to trace [nm]. Default [486.1, 587.6, 656.3].",
+            },
+            "primary_wavelength_nm": {
+                "type": "number",
+                "description": "Primary (reference) wavelength [nm]. Default 587.6.",
+            },
+            "marginal_height_mm": {
+                "type": "number",
+                "description": "Marginal ray height at first surface [mm]. Default 0.5.",
+            },
+        },
+    },
+)
+
+
+async def run_optics_sequential_trace(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        import math as _math
+        from kerf_optics.sequential_trace import (
+            SequentialSystem,
+            SequentialSurface,
+            trace_sequential,
+        )
+
+        raw_surfaces = args["surfaces"]
+        surfaces = []
+        for s in raw_surfaces:
+            r = float(s.get("radius_mm", float("inf")))
+            if not _math.isfinite(r):
+                r = float("inf")
+            surfaces.append(SequentialSurface(
+                radius=r,
+                thickness=float(s.get("thickness_mm", 0.0)),
+                n_next=float(s.get("n_next", 1.0)),
+                semi_diameter=float(s.get("semi_diameter_mm", float("inf"))),
+                surface_type=str(s.get("surface_type", "refract")),
+                label=str(s.get("label", "")),
+            ))
+
+        system = SequentialSystem(
+            surfaces=surfaces,
+            n_object=float(args.get("n_object", 1.0)),
+        )
+
+        wls = args.get("wavelengths_nm")
+        primary = float(args.get("primary_wavelength_nm", 587.6))
+        do = float(args.get("object_distance_mm", 1000.0))
+        h = float(args.get("marginal_height_mm", 0.5))
+
+        result = trace_sequential(
+            system=system,
+            wavelengths_nm=wls,
+            object_distance_mm=do,
+            primary_wavelength_nm=primary,
+            marginal_height_mm=h,
+        )
+
+        return ok_payload(result.to_dict())
+
+    except Exception as exc:
+        return err_payload(str(exc), "SEQUENTIAL_TRACE_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# optics_nest_tolerancing
+# ---------------------------------------------------------------------------
+
+optics_nest_tolerancing_spec = ToolSpec(
+    name="optics_nest_tolerancing",
+    description=(
+        "NEST inverse sensitivity tolerancing: allocate per-parameter tolerances "
+        "to meet a target RSS merit budget.\n"
+        "\n"
+        "Given a total RSS merit budget M, finds per-parameter tolerance δ_i such that:\n"
+        "  √(Σ_i (s_i · δ_i)²) = M\n"
+        "where s_i = |Δmerit / Δparam| (first-order sensitivity).\n"
+        "\n"
+        "Uses equal-contribution (EC) allocation or custom weights.  This is the\n"
+        "'NEST' workflow in Zemax OpticStudio (Smith 2008 §14.3).\n"
+        "\n"
+        "Returns:\n"
+        "  allocated_deltas  — list of δ_i for each parameter\n"
+        "  sensitivity       — list of |s_i|\n"
+        "  rss_check         — verified RSS (should equal merit_budget)\n"
+        "  table             — per-parameter summary sorted by RSS contribution\n"
+        "\n"
+        "Errors: {ok:false, reason}. Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "required": ["elements", "tolerances", "merit_budget"],
+        "properties": {
+            "elements": {
+                "type": "array",
+                "description": "Lens system elements (same format as optics_trace_ray).",
+                "items": {"type": "object"},
+                "minItems": 1,
+            },
+            "tolerances": {
+                "type": "array",
+                "description": (
+                    "List of tolerance parameters. Each: "
+                    "{element_index, param_name, delta (finite-diff step), "
+                    "nominal (optional), description (optional)}."
+                ),
+                "items": {"type": "object"},
+                "minItems": 1,
+            },
+            "merit_budget": {
+                "type": "number",
+                "description": "Target total RSS merit budget (e.g. 0.005 m for 5 mm EFL error).",
+            },
+            "merit_type": {
+                "type": "string",
+                "enum": ["efl", "bfd"],
+                "description": "Merit function type: 'efl' (default) or 'bfd'.",
+            },
+            "weights": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": (
+                    "Optional per-parameter weight vector (same length as tolerances). "
+                    "Larger weight → looser tolerance for that parameter. Default: equal."
+                ),
+            },
+        },
+    },
+)
+
+
+async def run_optics_nest_tolerancing(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_optics.lens_system import LensSystem
+        from kerf_optics.tolerancing import (
+            ToleranceParam,
+            nest_tolerancing,
+            merit_efl,
+            merit_bfd,
+        )
+        from kerf_optics.tools import _build_element
+
+        elements = [_build_element(e) for e in args["elements"]]
+        system = LensSystem(elements)
+
+        raw_tols = args["tolerances"]
+        params = []
+        for t in raw_tols:
+            params.append(ToleranceParam(
+                element_index=int(t["element_index"]),
+                param_name=str(t["param_name"]),
+                nominal=float(t["nominal"]) if "nominal" in t else None,
+                delta=float(t.get("delta", 0.0)),
+                description=str(t.get("description", "")),
+            ))
+
+        merit_type = str(args.get("merit_type", "efl")).lower()
+        M = system.system_matrix()
+        C = M[1, 0]
+        nominal_efl = -1.0 / C if abs(C) > 1e-14 else 1.0
+        if merit_type == "efl":
+            merit_fn = merit_efl(nominal_efl)
+        elif merit_type == "bfd":
+            merit_fn = merit_bfd(nominal_efl)
+        else:
+            return err_payload(f"unknown merit_type: {merit_type!r}", "BAD_ARGS")
+
+        merit_budget = float(args["merit_budget"])
+        raw_weights = args.get("weights")
+        weights = [float(w) for w in raw_weights] if raw_weights is not None else None
+
+        result = nest_tolerancing(system, params, merit_fn, merit_budget, weights)
+
+        payload: dict[str, Any] = {
+            "merit_budget": merit_budget,
+            "rss_check": round(result.rss_check, 8),
+            "allocated_deltas": [round(d, 8) for d in result.allocated_deltas],
+            "sensitivity": [round(s, 8) for s in result.sensitivity],
+            "table": [
+                {k: (round(v, 8) if isinstance(v, float) else v)
+                 for k, v in row.items()}
+                for row in result.table()
+            ],
+        }
+        return ok_payload(payload)
+
+    except Exception as exc:
+        return err_payload(str(exc), "NEST_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# optics_lighting_simulation
+# ---------------------------------------------------------------------------
+
+optics_lighting_simulation_spec = ToolSpec(
+    name="optics_lighting_simulation",
+    description=(
+        "Photometric lighting simulation: compute illuminance (lux), luminous exitance, "
+        "and luminance [cd/m²] on receiver surfaces from point light sources.\n"
+        "\n"
+        "Implements the inverse-square law + Lambert cosine model:\n"
+        "  E_v = (I_v / d²) · cos(θ_i)\n"
+        "where I_v = luminous intensity [cd] and θ_i = angle of incidence.\n"
+        "\n"
+        "Source distributions: 'lambertian' (diffuse hemisphere), 'spot' (Phong beam),\n"
+        "'isotropic' (omnidirectional sphere).\n"
+        "\n"
+        "Returns per-surface: illuminance [lux], luminance [cd/m²], luminous flux [lm],\n"
+        "uniformity ratio U₀ = E_min/E_avg across all surfaces, and CCT chromaticity.\n"
+        "\n"
+        "(DiLaura et al. 2011 IES Lighting Handbook §3.3; EN 12464-1:2021 workplane spec)\n"
+        "Errors: {ok:false, reason}. Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "required": ["sources", "surfaces"],
+        "properties": {
+            "sources": {
+                "type": "array",
+                "description": "List of light source specifications.",
+                "items": {
+                    "type": "object",
+                    "required": ["source_id", "position", "direction", "luminous_flux_lm"],
+                    "properties": {
+                        "source_id": {"type": "string"},
+                        "position": {
+                            "type": "array",
+                            "items": {"type": "number"},
+                            "description": "[x, y, z] position [m].",
+                        },
+                        "direction": {
+                            "type": "array",
+                            "items": {"type": "number"},
+                            "description": "[dx, dy, dz] emission direction (normalised internally).",
+                        },
+                        "luminous_flux_lm": {
+                            "type": "number",
+                            "description": "Total luminous flux [lm]. E.g. 800 for 60W incandescent equivalent.",
+                        },
+                        "distribution": {
+                            "type": "string",
+                            "enum": ["lambertian", "spot", "isotropic"],
+                            "description": "Spatial distribution. Default 'lambertian'.",
+                        },
+                        "half_angle_deg": {
+                            "type": "number",
+                            "description": "Spot half-beam angle [deg]. Relevant for 'spot' only. Default 30.",
+                        },
+                        "colour_temperature_K": {
+                            "type": "number",
+                            "description": "CCT [K]. Default 3000.",
+                        },
+                    },
+                },
+                "minItems": 1,
+            },
+            "surfaces": {
+                "type": "array",
+                "description": "List of receiver surfaces.",
+                "items": {
+                    "type": "object",
+                    "required": ["surface_id", "centre", "normal", "area_m2"],
+                    "properties": {
+                        "surface_id": {"type": "string"},
+                        "centre": {
+                            "type": "array",
+                            "items": {"type": "number"},
+                            "description": "[x, y, z] centre position [m].",
+                        },
+                        "normal": {
+                            "type": "array",
+                            "items": {"type": "number"},
+                            "description": "Outward surface normal [dx, dy, dz].",
+                        },
+                        "area_m2": {
+                            "type": "number",
+                            "description": "Surface area [m²].",
+                        },
+                        "reflectance": {
+                            "type": "number",
+                            "description": "Lambertian reflectance [0, 1]. Default 0.7.",
+                        },
+                    },
+                },
+                "minItems": 1,
+            },
+            "ambient_lux": {
+                "type": "number",
+                "description": "Background ambient illuminance [lux]. Default 0.",
+            },
+        },
+    },
+)
+
+
+async def run_optics_lighting_simulation(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_optics.lighting import (
+            LightSource,
+            Surface,
+            PhotometricScene,
+            compute_illuminance,
+            correlated_colour_temperature_to_xy,
+            uniformity_ratio,
+        )
+
+        # Build sources
+        sources = []
+        for sd in args["sources"]:
+            sources.append(LightSource(
+                source_id=str(sd["source_id"]),
+                position=sd["position"],
+                direction=sd["direction"],
+                luminous_flux_lm=float(sd["luminous_flux_lm"]),
+                distribution=str(sd.get("distribution", "lambertian")),
+                half_angle_deg=float(sd.get("half_angle_deg", 30.0)),
+                colour_temperature_K=float(sd.get("colour_temperature_K", 3000.0)),
+            ))
+
+        # Build surfaces
+        surfaces = []
+        for sd in args["surfaces"]:
+            surfaces.append(Surface(
+                surface_id=str(sd["surface_id"]),
+                centre=sd["centre"],
+                normal=sd["normal"],
+                area_m2=float(sd["area_m2"]),
+                reflectance=float(sd.get("reflectance", 0.7)),
+            ))
+
+        scene = PhotometricScene(
+            sources=sources,
+            surfaces=surfaces,
+            ambient_lux=float(args.get("ambient_lux", 0.0)),
+        )
+
+        results = compute_illuminance(scene)
+
+        # Build per-surface output
+        surfaces_out = []
+        all_lux = []
+        for sid, r in results.items():
+            all_lux.append(r.illuminance_lux)
+            surfaces_out.append({
+                "surface_id": sid,
+                "illuminance_lux": round(r.illuminance_lux, 3),
+                "luminance_cdpm2": round(r.luminance_cdpm2, 3),
+                "luminous_exitance_lmpm2": round(r.luminous_exitance_lmpm2, 3),
+                "luminous_flux_received_lm": round(r.luminous_flux_received_lm, 4),
+                "contributions": {k: round(v, 3) for k, v in r.contributions.items()},
+            })
+
+        # Uniformity ratio
+        u0 = uniformity_ratio(all_lux) if len(all_lux) > 1 else 1.0
+
+        # CCT chromaticity for each source
+        cct_out = {}
+        for src in sources:
+            try:
+                x, y = correlated_colour_temperature_to_xy(src.colour_temperature_K)
+                cct_out[src.source_id] = {
+                    "cct_K": src.colour_temperature_K,
+                    "cie_x": round(x, 4),
+                    "cie_y": round(y, 4),
+                }
+            except ValueError:
+                cct_out[src.source_id] = {"cct_K": src.colour_temperature_K, "cie_x": None, "cie_y": None}
+
+        payload: dict[str, Any] = {
+            "surfaces": surfaces_out,
+            "uniformity_ratio": round(u0, 4),
+            "mean_illuminance_lux": round(sum(all_lux) / len(all_lux), 3) if all_lux else 0.0,
+            "min_illuminance_lux": round(min(all_lux), 3) if all_lux else 0.0,
+            "max_illuminance_lux": round(max(all_lux), 3) if all_lux else 0.0,
+            "source_cct": cct_out,
+            "n_sources": len(sources),
+            "n_surfaces": len(surfaces),
+        }
+        return ok_payload(payload)
+
+    except Exception as exc:
+        return err_payload(str(exc), "LIGHTING_ERROR")

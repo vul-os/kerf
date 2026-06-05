@@ -499,9 +499,13 @@ class TestLLMToolRegistration:
 
     @pytest.fixture(autouse=True, scope="class")
     def _import_tool_module(self):
-        """Ensure the @register decorator has fired by importing the tools module."""
+        """Ensure the @register decorator has fired by importing the tools module.
+
+        The tool was consolidated from the deleted network_surface_tools module
+        into kerf_cad_core.geom.network_surface.
+        """
         import importlib
-        importlib.import_module("kerf_cad_core.geom.network_surface_tools")
+        importlib.import_module("kerf_cad_core.geom.network_surface")
 
     def test_tool_registered(self):
         from kerf_chat.tools.registry import Registry

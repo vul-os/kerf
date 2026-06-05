@@ -23,6 +23,9 @@ import importlib.util
 # ── minimal stubs so the module loads without the full Kerf runtime ───────────
 
 def _stub_module(name: str, **attrs) -> types.ModuleType:
+    if name in sys.modules:
+        # Real module already imported — don't clobber it; just return it.
+        return sys.modules[name]
     m = types.ModuleType(name)
     for k, v in attrs.items():
         setattr(m, k, v)

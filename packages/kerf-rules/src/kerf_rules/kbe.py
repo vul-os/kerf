@@ -91,18 +91,69 @@ logger = logging.getLogger(__name__)
 # State — the shared working memory the engine reads/writes
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# RuleSelection — part/SKU selection produced by a KBE rule
+# ---------------------------------------------------------------------------
+
+@dataclass
+class RuleSelection:
+    """
+    A part or SKU selection made by a KBE rule.
+
+    Attributes
+    ----------
+    rule_id    : str   — ID of the rule that produced this selection.
+    param_key  : str   — The derived parameter that drove the selection.
+    param_value: Any   — The value of that parameter.
+    sku        : str   — The selected part SKU.
+    provenance : str   — Human-readable rationale for the selection.
+    """
+    rule_id:     str
+    param_key:   str
+    param_value: Any
+    sku:         str
+    provenance:  str = ""
+
+
 @dataclass
 class KBEState:
     """
     Shared inference state.
 
-    params  — input parameters provided by the user/configurator.
-    derived — values set by KBE rules (accumulates during inference).
-    trace   — which rules fired (in order), for audit.
+    params     — input parameters provided by the user/configurator.
+    derived    — values set by KBE rules (accumulates during inference).
+    trace      — which rules fired (in order), for audit.
+    selections — part/SKU selections accumulated by rule select() callables.
+
+    Backwards-compat: exposes ``fired_rules``, ``fired``, and
+    ``conflicts_resolved`` properties so KBEState can be used wherever
+    InferenceResult was previously expected.
     """
-    params:  dict[str, Any] = field(default_factory=dict)
-    derived: dict[str, Any] = field(default_factory=dict)
-    trace:   list[str]      = field(default_factory=list)
+    params:     dict[str, Any]    = field(default_factory=dict)
+    derived:    dict[str, Any]    = field(default_factory=dict)
+    trace:      list[str]         = field(default_factory=list)
+    selections: list[RuleSelection] = field(default_factory=list)
+    _conflicts_resolved: int      = field(default=0, repr=False)
+
+    @property
+    def fired_rules(self) -> list[str]:
+        """Alias for ``trace`` — list of rule IDs that fired."""
+        return self.trace
+
+    @property
+    def fired(self) -> list[str]:
+        """Alias for ``trace`` (InferenceResult compat)."""
+        return self.trace
+
+    @property
+    def conflicts_resolved(self) -> int:
+        """Number of key conflicts resolved (InferenceResult compat)."""
+        return self._conflicts_resolved
+
+    @property
+    def state(self) -> "KBEState":
+        """Self-reference for InferenceResult compat."""
+        return self
 
     def get(self, key: str, default: Any = None) -> Any:
         """Unified lookup: derived first, then params."""
@@ -125,6 +176,17 @@ class KBERule:
     """
     A single KBE rule that DRIVES parametric design.
 
+    Accepts two calling conventions:
+
+    Classic (standards-library) convention:
+        KBERule(id, domain, description, provenance, confidence,
+                precondition, derivation)
+
+    Bridge/test convention (all keyword, defaults for optional fields):
+        KBERule(id, description, condition, derive,
+                domain="general", select=None,
+                confidence=0.9, provenance="")
+
     Parameters
     ----------
     id : str
@@ -134,42 +196,68 @@ class KBERule:
     description : str
         Human-readable summary of what the rule computes.
     provenance : str
-        Full citation — standard name, edition, section.
+        Full citation — standard name, edition, section.  Optional (defaults
+        to "" when using the bridge/test convention).
     confidence : float
-        0.0 .. 1.0.  Higher confidence wins conflicts.  Rules from primary
-        standards should use 0.9+; handbook approximations 0.7–0.89;
-        heuristics < 0.7.
-    precondition : Callable[[KBEState], bool]
-        Returns True when the rule should fire given the current state.
-    derivation : Callable[[KBEState], dict[str, Any]]
-        Computes and returns a dict of derived values.  Receives the
-        full state so it can read already-derived fields.
+        0.0 .. 1.0 (defaults to 0.9).
+    precondition : Callable[[KBEState], bool] | None
+        Classic precondition callable.  Alias: ``condition``.
+    derivation : Callable[[KBEState], dict[str, Any]] | None
+        Classic derivation callable.  Alias: ``derive``.
+    condition : Callable[[KBEState], bool] | None
+        Alias for ``precondition`` (bridge convention).
+    derive : Callable[[KBEState], dict[str, Any]] | None
+        Alias for ``derivation`` (bridge convention).
+    select : Callable[[KBEState], list[RuleSelection]] | None
+        Optional selection callable.  If provided, called after derivation
+        to produce part/SKU selections that are appended to ``state.selections``.
     """
     id:           str
-    domain:       str
-    description:  str
-    provenance:   str
-    confidence:   float
-    precondition: Callable[[KBEState], bool]
-    derivation:   Callable[[KBEState], dict[str, Any]]
+    domain:       str = "general"
+    description:  str = ""
+    provenance:   str = ""
+    confidence:   float = 0.9
+    precondition: Callable[[KBEState], bool] | None = None
+    derivation:   Callable[[KBEState], dict[str, Any]] | None = None
+    # Bridge/test API aliases
+    condition:    Callable[[KBEState], bool] | None = None
+    derive:       Callable[[KBEState], dict[str, Any]] | None = None
+    select:       Callable[[KBEState], list] | None = None
 
     def __post_init__(self) -> None:
+        # Normalise: bridge aliases → canonical fields
+        if self.condition is not None and self.precondition is None:
+            self.precondition = self.condition
+        if self.derive is not None and self.derivation is None:
+            self.derivation = self.derive
         if not (0.0 <= self.confidence <= 1.0):
             raise ValueError(f"KBERule {self.id}: confidence must be 0..1, got {self.confidence}")
-        if not self.provenance.strip():
-            raise ValueError(f"KBERule {self.id}: provenance must be non-empty")
+        if self.precondition is None:
+            raise ValueError(f"KBERule {self.id}: precondition/condition is required")
+        if self.derivation is None:
+            raise ValueError(f"KBERule {self.id}: derivation/derive is required")
 
     def fires(self, state: KBEState) -> bool:
         """Return True if the precondition is satisfied."""
         try:
-            return bool(self.precondition(state))
+            return bool(self.precondition(state))  # type: ignore[misc]
         except Exception as exc:
             logger.debug("KBERule %s precondition error: %s", self.id, exc)
             return False
 
     def apply(self, state: KBEState) -> dict[str, Any]:
         """Execute derivation and return the new key/value pairs."""
-        return self.derivation(state)
+        return self.derivation(state)  # type: ignore[misc]
+
+    def run_select(self, state: KBEState) -> list[RuleSelection]:
+        """Execute the select callable (if present) and return selections."""
+        if self.select is None:
+            return []
+        try:
+            return list(self.select(state))
+        except Exception as exc:
+            logger.debug("KBERule %s select error: %s", self.id, exc)
+            return []
 
 
 # ---------------------------------------------------------------------------
@@ -261,19 +349,32 @@ class KBEEngine:
         self.rules = list(rules)
         self.max_cycles = max_cycles
 
-    def run(self, state: KBEState) -> InferenceResult:
+    def run(self, state: KBEState | dict[str, Any]) -> KBEState:  # type: ignore[override]
         """
         Execute forward-chaining inference.
+
+        Parameters
+        ----------
+        state
+            A ``KBEState`` instance OR a plain dict of parameters (which will
+            be wrapped in a new ``KBEState``).  The bridge convention passes a
+            raw options dict; the engine handles both forms.
 
         Each cycle:
         1. Collect all rules whose precondition holds on the current state.
         2. Execute their derivations.
         3. Resolve conflicts (per-key, highest confidence wins).
         4. Merge winning updates into the state.
-        5. Repeat until stable (no new keys) or max_cycles exhausted.
+        5. Run select() callables to accumulate part selections.
+        6. Repeat until stable (no new keys) or max_cycles exhausted.
 
-        Returns InferenceResult with the final derived values.
+        Returns the final ``KBEState`` (params + derived + selections).
+        For backwards compatibility the state also exposes
+        ``state.fired_rules`` (alias for ``state.trace``).
         """
+        if isinstance(state, dict):
+            state = KBEState(params=dict(state))
+
         fired: list[str] = []
         conflicts_total = 0
 
@@ -314,11 +415,32 @@ class KBEEngine:
                     if cand.rule.id not in fired:
                         fired.append(cand.rule.id)
 
+        # Store conflict count on state for InferenceResult compat
+        state._conflicts_resolved = conflicts_total
+
+        # Collect part selections from all rules that support select()
+        for rule in self.rules:
+            sels = rule.run_select(state)
+            state.selections.extend(sels)
+
+        # Merge derived into params so bridge can read derived values via params
+        state.params.update(state.derived)
+
+        return state
+
+    def run_result(self, state: KBEState | dict[str, Any]) -> "InferenceResult":
+        """
+        Like ``run()`` but returns the legacy ``InferenceResult`` wrapper.
+        Preserved for callers that need the rich result object.
+        """
+        if isinstance(state, dict):
+            state = KBEState(params=dict(state))
+        final_state = self.run(state)
         return InferenceResult(
-            derived=dict(state.derived),
-            fired=fired,
-            conflicts_resolved=conflicts_total,
-            state=state,
+            derived=dict(final_state.derived),
+            fired=list(final_state.trace),
+            conflicts_resolved=0,
+            state=final_state,
         )
 
 
@@ -1153,4 +1275,4 @@ def apply_rules(
         rules = [r for r in rules if r.domain in domains]
     engine = KBEEngine(rules)
     state  = KBEState(params=dict(params))
-    return engine.run(state)
+    return engine.run_result(state)

@@ -255,6 +255,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.geom.network_surface",
     # GK-42/GK-P16: Gordon/Coons-Gordon network surface + skinning loft + guide-rail loft
     "kerf_cad_core.geom.network_srf",
+    # Geometry-nodes graph evaluator (Blender-parity node DAG) — DCC wave
+    "kerf_cad_core.geometry_nodes_tools",
     "kerf_cad_core.jewelry.production",
     "kerf_cad_core.jewelry.gem_studio",
     "kerf_cad_core.jewelry.gallery",

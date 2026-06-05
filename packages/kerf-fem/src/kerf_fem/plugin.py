@@ -6,7 +6,8 @@ Registers:
   - LLM tools       fem_run, fem_job_status  (via ctx.tools.register)
   - LLM tools       fem_acoustics, fem_electrostatics, fem_magnetostatics,
                     cfd_navier_stokes_steady, cfd_potential_cylinder,
-                    fem_propagate_uncertainty
+                    fem_propagate_uncertainty,
+                    fem_solid_static, fem_modal_beam, fem_linear_static_beam
                     (via import-triggered self-registration)
   - background worker for fem_jobs table     (via ctx.workers.register)
 
@@ -80,6 +81,16 @@ async def register(app: FastAPI, ctx):
     import kerf_fem.cfd_navier_stokes  # kerf-fem: 2-D projection NS solver — self-registers cfd_navier_stokes_steady
     import kerf_fem.cfd_potential  # kerf-fem: potential-flow cylinder — self-registers cfd_potential_cylinder
     from kerf_fem.coupled_variation import fem_propagate_uncertainty_spec, run_fem_propagate_uncertainty; ctx.tools.register("fem_propagate_uncertainty", fem_propagate_uncertainty_spec, run_fem_propagate_uncertainty)  # kerf-fem: probabilistic FEA (LHS + Karhunen-Loève)
+    # Solid FEM / modal beam / linear static beam — close backend-only gaps
+    try:
+        import kerf_fem.solid_fem_tools as _sft
+        for _name, _spec, _handler in _sft.TOOLS:
+            ctx.tools.register(_name, _spec, _handler)
+        provides.append("fem.solid-tet-hex")
+        provides.append("fem.modal-beam")
+        provides.append("fem.linear-static-beam")
+    except Exception as exc:
+        logger.warning("kerf-fem: solid_fem_tools failed to load: %s", exc)
     # Wave 12E: material plasticity (J2 / Drucker-Prager / Mohr-Coulomb / Hill anisotropic)
     try:
         import kerf_fem.plasticity.plasticity_tools as _pl

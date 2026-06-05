@@ -22,6 +22,7 @@ import BucklingPanel     from './BucklingPanel.jsx'
 import FatiguePanel      from './FatiguePanel.jsx'
 import VibrationPanel    from './VibrationPanel.jsx'
 import FEMSolverPanel    from './FEMSolverPanel.jsx'
+import SolidFEMPanel     from './SolidFEMPanel.jsx'
 
 const TABS = [
   { id: 'linear_static',    label: 'Linear Static', color: '#22d3ee' },
@@ -29,6 +30,7 @@ const TABS = [
   { id: 'buckling',         label: 'Buckling',       color: '#fbbf24' },
   { id: 'fatigue',          label: 'Fatigue',        color: '#f472b6' },
   { id: 'vibration',        label: 'Vibration',      color: '#34d399' },
+  { id: 'solid',            label: 'Solid FEM',      color: '#38bdf8' },
   { id: 'advanced',         label: 'Advanced FEM',   color: '#fb923c' },
 ]
 
@@ -107,6 +109,11 @@ export default function FEAView({ file, projectId }) {
         {activeTab === 'vibration' && (
           <div role="tabpanel" id="fea-panel-vibration" aria-labelledby="fea-tab-vibration">
             <VibrationPanel projectId={projectId} fileId={fileId} />
+          </div>
+        )}
+        {activeTab === 'solid' && (
+          <div role="tabpanel" id="fea-panel-solid" aria-labelledby="fea-tab-solid">
+            <SolidFEMPanel projectId={projectId} fileId={fileId} />
           </div>
         )}
         {activeTab === 'advanced' && (

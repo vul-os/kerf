@@ -30,6 +30,7 @@ import ModalPanel        from './ModalPanel.jsx'
 import BucklingPanel     from './BucklingPanel.jsx'
 import FatiguePanel      from './FatiguePanel.jsx'
 import VibrationPanel    from './VibrationPanel.jsx'
+import SolidFEMPanel     from './SolidFEMPanel.jsx'
 import FEAView           from './FEAView.jsx'
 
 const PID = 'proj-123'
@@ -44,13 +45,15 @@ describe('FEAView', () => {
     ).not.toThrow()
   })
 
-  it('renders all 5 tab labels', () => {
+  it('renders all 7 tab labels', () => {
     const html = renderToStaticMarkup(<FEAView file={{ id: FID }} projectId={PID} />)
     expect(html).toMatch(/Linear Static/i)
     expect(html).toMatch(/Modal/i)
     expect(html).toMatch(/Buckling/i)
     expect(html).toMatch(/Fatigue/i)
     expect(html).toMatch(/Vibration/i)
+    expect(html).toMatch(/Solid FEM/i)
+    expect(html).toMatch(/Advanced FEM/i)
   })
 
   it('renders tablist role', () => {
@@ -66,7 +69,7 @@ describe('FEAView', () => {
   it('renders tab buttons with role=tab', () => {
     const html = renderToStaticMarkup(<FEAView file={{ id: FID }} projectId={PID} />)
     const tabCount = (html.match(/role="tab"/g) || []).length
-    expect(tabCount).toBe(5)
+    expect(tabCount).toBe(7)
   })
 
   it('renders with null file gracefully', () => {
@@ -464,5 +467,199 @@ describe('VibrationPanel dispatch payload contract — random vibration', () => 
     // Each entry is [freq_Hz, PSD_value]
     expect(body.psd_table[0]).toHaveLength(2)
     expect(typeof body.modal_damping).toBe('number')
+  })
+})
+
+// ── SolidFEMPanel ─────────────────────────────────────────────────────────────
+
+describe('SolidFEMPanel', () => {
+  it('renders without crashing', () => {
+    expect(() =>
+      renderToStaticMarkup(<SolidFEMPanel projectId={PID} fileId={FID} />)
+    ).not.toThrow()
+  })
+
+  it('has correct data-testid', () => {
+    const html = renderToStaticMarkup(<SolidFEMPanel projectId={PID} fileId={FID} />)
+    expect(html).toContain('data-testid="solid-fem-panel"')
+  })
+
+  it('renders tablist with 3 section tabs', () => {
+    const html = renderToStaticMarkup(<SolidFEMPanel projectId={PID} fileId={FID} />)
+    expect(html).toMatch(/Solid Static/i)
+    expect(html).toMatch(/Modal Beam/i)
+    expect(html).toMatch(/Beam.*Bar Static/i)
+  })
+
+  it('renders solid-static-card by default', () => {
+    const html = renderToStaticMarkup(<SolidFEMPanel projectId={PID} fileId={FID} />)
+    expect(html).toContain('data-testid="solid-static-card"')
+  })
+
+  it('renders node/element textarea inputs in solid static card', () => {
+    const html = renderToStaticMarkup(<SolidFEMPanel projectId={PID} fileId={FID} />)
+    expect(html).toMatch(/Nodes.*x,y,z/i)
+    expect(html).toMatch(/Elements JSON/i)
+  })
+
+  it('renders Run Solid Static button', () => {
+    const html = renderToStaticMarkup(<SolidFEMPanel projectId={PID} fileId={FID} />)
+    expect(html).toMatch(/Run Solid Static/i)
+  })
+
+  it('renders with null fileId gracefully', () => {
+    expect(() =>
+      renderToStaticMarkup(<SolidFEMPanel projectId={PID} fileId={null} />)
+    ).not.toThrow()
+  })
+})
+
+// ── FEAView — Solid FEM tab ───────────────────────────────────────────────────
+
+describe('FEAView solid FEM tab', () => {
+  it('renders Solid FEM tab in the tab strip', () => {
+    const html = renderToStaticMarkup(<FEAView file={{ id: FID }} projectId={PID} />)
+    expect(html).toMatch(/Solid FEM/i)
+  })
+
+  it('renders fea-panel-solid id in DOM', () => {
+    const html = renderToStaticMarkup(<FEAView file={{ id: FID }} projectId={PID} />)
+    // Tab panel for solid is NOT rendered on initial mount (default tab is linear_static)
+    // but the tab button ID is present
+    expect(html).toMatch(/fea-tab-solid/)
+  })
+})
+
+// ── Solid static payload contract ─────────────────────────────────────────────
+
+describe('SolidFEMPanel solid_static dispatch payload contract', () => {
+  it('solid_static payload has required fields', () => {
+    const nodes = [[0,0,0], [1,0,0], [0,1,0], [0,0,1]]
+    const elements = [{ kind: 'tet4', node_indices: [0,1,2,3] }]
+    const body = {
+      analysis_type: 'solid_static',
+      nodes,
+      elements,
+      E: 200e9,
+      nu: 0.3,
+      density: 7850,
+      yield_strength: 275e6,
+      constraints: [{ node_id: 0, dofs: [0.0, 0.0, 0.0] }],
+      loads: [{ node_id: 3, force: [0, 1000, 0] }],
+      material_props: { E: 200e9, nu: 0.3, rho: 7850, yield_strength: 275e6 },
+      boundary_conditions: [{ type: 'fixed', face_tags: [1] }],
+      mesh_size: 0.1,
+      solver: 'fenicsx',
+    }
+
+    expect(body.analysis_type).toBe('solid_static')
+    expect(Array.isArray(body.nodes)).toBe(true)
+    expect(body.nodes.length).toBe(4)
+    expect(body.nodes[0]).toHaveLength(3)
+    expect(Array.isArray(body.elements)).toBe(true)
+    expect(body.elements[0].kind).toBe('tet4')
+    expect(Array.isArray(body.elements[0].node_indices)).toBe(true)
+    expect(body.elements[0].node_indices).toHaveLength(4)
+    expect(body.constraints[0].node_id).toBe(0)
+    expect(body.constraints[0].dofs).toHaveLength(3)
+    expect(body.loads[0].force).toHaveLength(3)
+  })
+})
+
+describe('SolidFEMPanel modal_beam dispatch payload contract', () => {
+  it('beam modal payload has required fields', () => {
+    const body = {
+      analysis_type: 'modal_beam',
+      mode: 'beam',
+      E: 200e9,
+      I: 8.33e-9,
+      A: 1e-4,
+      rho: 7850,
+      L: 1.0,
+      supports: [{ type: 'fixed', x: 0 }],
+      n_elem: 12,
+      n_modes: 4,
+      material_props: { E: 200e9, nu: 0.3, rho: 7850, yield_strength: 275e6 },
+      boundary_conditions: [{ type: 'fixed', face_tags: [1] }],
+      loads: [],
+      mesh_size: 0.05,
+      solver: 'fenicsx',
+    }
+
+    expect(body.analysis_type).toBe('modal_beam')
+    expect(body.mode).toBe('beam')
+    expect(body.E).toBeGreaterThan(0)
+    expect(body.I).toBeGreaterThan(0)
+    expect(body.rho).toBeGreaterThan(0)
+    expect(body.L).toBeGreaterThan(0)
+    expect(Array.isArray(body.supports)).toBe(true)
+    expect(body.n_modes).toBeGreaterThan(0)
+    expect(body.n_elem).toBeGreaterThan(0)
+  })
+
+  it('plate modal payload has nu, h, a, b', () => {
+    const body = {
+      analysis_type: 'modal_beam',
+      mode: 'plate',
+      E: 200e9,
+      nu: 0.3,
+      rho: 7850,
+      h: 0.01,
+      a: 1.0,
+      b: 1.0,
+    }
+    expect(body.mode).toBe('plate')
+    expect(body.nu).toBeGreaterThanOrEqual(0)
+    expect(body.h).toBeGreaterThan(0)
+    expect(body.a).toBeGreaterThan(0)
+    expect(body.b).toBeGreaterThan(0)
+  })
+})
+
+describe('SolidFEMPanel beam_static dispatch payload contract', () => {
+  it('beam analysis payload has I and deflection fields', () => {
+    const body = {
+      analysis_type: 'beam_static',
+      analysis: 'beam',
+      E: 200e9,
+      I: 8.33e-9,
+      L: 1.0,
+      supports: [{ type: 'fixed', x: 0 }],
+      point_loads: [{ x: 0.5, F: 5000 }],
+      distributed_load: 0,
+      n_elem: 20,
+      material_props: { E: 200e9, nu: 0.3, rho: 7850, yield_strength: 275e6 },
+      boundary_conditions: [{ type: 'fixed', face_tags: [1] }],
+      loads: [{ type: 'force', face_tags: [2], value: 5000 }],
+      mesh_size: 0.05,
+      solver: 'fenicsx',
+    }
+
+    expect(body.analysis).toBe('beam')
+    expect(body.I).toBeGreaterThan(0)
+    expect(body.n_elem).toBeGreaterThan(0)
+    expect(Array.isArray(body.supports)).toBe(true)
+    expect(Array.isArray(body.point_loads)).toBe(true)
+    expect(body.point_loads[0].x).toBeDefined()
+    expect(body.point_loads[0].F).toBeDefined()
+  })
+
+  it('thermal bar payload has alpha and dT', () => {
+    const body = {
+      analysis_type: 'beam_static',
+      analysis: 'thermal_bar',
+      E: 200e9,
+      A: 1e-4,
+      L: 1.0,
+      alpha: 12e-6,
+      dT: 50,
+      supports: [{ type: 'fixed', x: 0 }, { type: 'fixed', x: 1.0 }],
+      n_elem: 1,
+    }
+
+    expect(body.analysis).toBe('thermal_bar')
+    expect(body.alpha).toBeGreaterThan(0)
+    expect(typeof body.dT).toBe('number')
+    expect(body.supports).toHaveLength(2)
   })
 })

@@ -699,6 +699,13 @@ _TOOL_MODULES = [
     # controls_bode_sweep (Ogata §8), controls_nyquist_sweep (Nyquist 1932),
     # controls_tf_step_response (any-order TF → time/output arrays for plotting)
     "kerf_cad_core.controls.freq_tools",
+    # PERSISTENT-FACE-NAMING: stable face UUIDs across parametric edits
+    # (Kripac 1997; Han et al. 1999) — brep_assign_persistent_face_ids, brep_detect_face_id_breaks
+    "kerf_cad_core.afr.persistent_face_tools",
+    # HOLE-WIZARD: drill/counterbore/countersink/tapped from ISO 261 + ASME B1.1 tables
+    # (ISO 261:1998; ASME B18.3-2012; Machinery's Handbook 30e §6)
+    # brep_hole_wizard, brep_hole_wizard_list_standards
+    "kerf_cad_core.geom.hole_wizard_tools",
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

@@ -65,8 +65,8 @@ features:
       source: "https://www.clo3d.com/en/"
     kerf:
       status: partial
-      note: "CAESAR anthropometric body-form (13 ISO 8559-1 landmarks) + OBJ export; full cloth-on-avatar drape pending"
-      evidence: "packages/kerf-apparel/src/kerf_apparel/avatar.py"
+      note: "CAESAR body-form + garment-on-avatar mass-spring drape (cloth-vs-avatar collision + fit tension); no rigged/animated avatar or self-collision"
+      evidence: "packages/kerf-textiles/src/kerf_textiles/garment_drape.py"
   - domain: D13
     feature: "Fabric material library"
     competitor:
@@ -148,7 +148,7 @@ Kerf saturates **96%** of CLO Virtual Fashion CLO3D's feature surface (11 yes, 1
 | Grading (size run) | ✅ | Yes | ASTM + EN 13402 grade rules; multi-size export (backend) |
 | Seam allowances and notches | ✅ | Yes | Per-edge seam allowances with corner mitring; notch placement |
 | Fabric drape / cloth simulation | ✅ | Yes | Provot (1995) mass-spring-damper simulator with structural + shear + bending springs, Rayleigh spring-axis damping (B... |
-| Avatar / dress form | ⚠️ (partial) | Yes | CAESAR anthropometric body-form (13 ISO 8559-1 landmarks) + OBJ export; full cloth-on-avatar drape pending |
+| Avatar / dress form | ⚠️ (partial) | Yes | CAESAR body-form + garment-on-avatar mass-spring drape (cloth-vs-avatar collision + fit tension); no rigged/animated ... |
 | Fabric material library | ✅ | Yes | Fabric properties engine: weight, stiffness, coefficient of friction (backend) |
 | Cut-room nesting / marker | ✅ | Partial | Nesting marker for fabric efficiency; single-ply and multi-ply cutting orders; lay plan export |
 | e-textiles / smart garment design | ✅ | No | e-textiles module: conductive yarn routing, electrode placement, wearable circuit (backend) |
@@ -163,7 +163,7 @@ Kerf saturates **96%** of CLO Virtual Fashion CLO3D's feature surface (11 yes, 1
 
 ## What's honestly outstanding
 
-- **Avatar / dress form** (Partial): CAESAR anthropometric body-form (13 ISO 8559-1 landmarks) + OBJ export; full cloth-on-avatar drape pending
+- **Avatar / dress form** (Partial): CAESAR body-form + garment-on-avatar mass-spring drape (cloth-vs-avatar collision + fit tension); no rigged/animated avatar or self-collision
 
 ## Pricing
 

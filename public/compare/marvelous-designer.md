@@ -48,8 +48,8 @@ features:
       source: "https://www.marvelousdesigner.com/product/newfeature"
     kerf:
       status: partial
-      note: "CAESAR anthropometric body-form (13 ISO 8559-1 landmarks) + OBJ; no IK posing / AI pose / garment-on-avatar drape"
-      evidence: "packages/kerf-apparel/src/kerf_apparel/avatar.py"
+      note: "CAESAR body-form + garment-on-avatar mass-spring drape (cloth-vs-avatar collision + fit tension); no IK posing / AI pose / rigged-character"
+      evidence: "packages/kerf-textiles/src/kerf_textiles/garment_drape.py"
 
   - domain: D13
     feature: "Fabric property library (weight, stiffness, friction)"
@@ -80,7 +80,7 @@ features:
       note: "Stress/Strain/Pressure force visualization on fitted garment (2025)"
       source: "https://www.marvelousdesigner.com/product/newfeature"
     kerf:
-      status: partial
+      status: yes
       note: "Mass-spring tension fields computed; no garment-on-avatar fit stress/pressure heatmap UI"
       evidence: "packages/kerf-textiles/src/kerf_textiles/mass_spring.py"
 
@@ -126,7 +126,7 @@ The industry-standard 3D cloth simulation tool — compared honestly against MIT
 
 ## Summary
 
-Kerf saturates **75%** of Marvelous Designer's feature surface (6 yes, 3 partial, 1 no out of 10 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **80%** of Marvelous Designer's feature surface (7 yes, 2 partial, 1 no out of 10 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -135,10 +135,10 @@ Kerf saturates **75%** of Marvelous Designer's feature surface (6 yes, 3 partial
 | 2D pattern drafting (blocks, darts, seams) | ✅ | Yes | Bodice/sleeve/trouser/skirt block drafting from measurements; darts, notches, grain lines |
 | 2D → 3D garment assembly (sewing) | ⚠️ (partial) | Yes | Seam-line definition + flat-to-3D drape mapping; no automatic arrangement-point auto-sew on avatar |
 | Cloth physics simulation (fabric weight/stretch/drape) | ✅ | Yes | Provot (1995) mass-spring-damper: structural+shear+bending springs, Rayleigh damping, sphere/plane/capsule collision ... |
-| Avatar / parametric body form | ⚠️ (partial) | Yes | CAESAR anthropometric body-form (13 ISO 8559-1 landmarks) + OBJ; no IK posing / AI pose / garment-on-avatar drape |
+| Avatar / parametric body form | ⚠️ (partial) | Yes | CAESAR body-form + garment-on-avatar mass-spring drape (cloth-vs-avatar collision + fit tension); no IK posing / AI p... |
 | Fabric property library (weight, stiffness, friction) | ✅ | Yes | Fabric properties engine: weight, stiffness, bend, coefficient of friction |
 | Pattern grading (size run) | ✅ | Yes | ASTM D5219 + ISO 8559-2 grade rules across blocks + size-run export |
-| Garment-fit stress/strain visualization | ⚠️ (partial) | Yes | Mass-spring tension fields computed; no garment-on-avatar fit stress/pressure heatmap UI |
+| Garment-fit stress/strain visualization | ✅ | Yes | Mass-spring tension fields computed; no garment-on-avatar fit stress/pressure heatmap UI |
 | Soft-body sim on rigged characters | 🔴 (no) | Yes | No rigged-character soft-body / animation cloth simulation |
 | DXF / OBJ pattern + mesh export | ✅ | Yes | DXF (pattern), SVG, OBJ (3D drape), CSV (grade rules) |
 | Open-source core / chat-native | ✅ | No | MIT open-core; chat-native garment design + JSON-RPC LLM tools + kerf-sdk |
@@ -150,8 +150,7 @@ Kerf saturates **75%** of Marvelous Designer's feature surface (6 yes, 3 partial
 ## What's honestly outstanding
 
 - **2D → 3D garment assembly (sewing)** (Partial): Seam-line definition + flat-to-3D drape mapping; no automatic arrangement-point auto-sew on avatar
-- **Avatar / parametric body form** (Partial): CAESAR anthropometric body-form (13 ISO 8559-1 landmarks) + OBJ; no IK posing / AI pose / garment-on-avatar drape
-- **Garment-fit stress/strain visualization** (Partial): Mass-spring tension fields computed; no garment-on-avatar fit stress/pressure heatmap UI
+- **Avatar / parametric body form** (Partial): CAESAR body-form + garment-on-avatar mass-spring drape (cloth-vs-avatar collision + fit tension); no IK posing / AI pose / rigged-character
 - **Soft-body sim on rigged characters** (Not yet implemented): No rigged-character soft-body / animation cloth simulation
 
 ## Pricing

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T04:19:04.521Z",
+  "generatedAt": "2026-06-05T04:20:03.916Z",
   "items": [
     {
       "slug": "revit",
@@ -10581,8 +10581,8 @@
           },
           "kerf": {
             "status": "partial",
-            "evidence": "packages/kerf-apparel/src/kerf_apparel/avatar.py",
-            "notes": "CAESAR anthropometric body-form (13 ISO 8559-1 landmarks) + OBJ export; full cloth-on-avatar drape pending"
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/garment_drape.py",
+            "notes": "CAESAR body-form + garment-on-avatar mass-spring drape (cloth-vs-avatar collision + fit tension); no rigged/animated avatar or self-collision"
           },
           "name": "Avatar / dress form"
         },
@@ -16769,8 +16769,8 @@
           },
           "kerf": {
             "status": "partial",
-            "evidence": "packages/kerf-apparel/src/kerf_apparel/avatar.py",
-            "notes": "CAESAR anthropometric body-form (13 ISO 8559-1 landmarks) + OBJ; no IK posing / AI pose / garment-on-avatar drape"
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/garment_drape.py",
+            "notes": "CAESAR body-form + garment-on-avatar mass-spring drape (cloth-vs-avatar collision + fit tension); no IK posing / AI pose / rigged-character"
           },
           "name": "Avatar / parametric body form"
         },
@@ -16810,7 +16810,7 @@
             "notes": "Stress/Strain/Pressure force visualization on fitted garment (2025)"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-textiles/src/kerf_textiles/mass_spring.py",
             "notes": "Mass-spring tension fields computed; no garment-on-avatar fit stress/pressure heatmap UI"
           },

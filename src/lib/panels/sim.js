@@ -167,4 +167,17 @@ export default [
     load: () => import('./sim-wrappers/ContactResultWrapper.jsx'),
     label: 'FEM Contact (friction / gap / augmented-Lagrange)',
   },
+
+  // ── Plasma / gas-discharge (drift-diffusion) ─────────────────────────────
+  // 1-D DC glow-discharge: electron/ion density profiles, E-field, Paschen curve.
+  // Tool: plasma_discharge_simulate (kerf-cfd)
+  // Model: Hagelaar & Pitchford 2005 drift-diffusion; Townsend ionisation; Poisson self-field.
+  // NOTE: drift-diffusion fluid model only — not kinetic/PIC; DC only; single gas species.
+  {
+    id: 'plasma-discharge',
+    kinds: ['plasma_discharge', 'glow_discharge', 'gas_discharge', 'plasma_dd'],
+    exts: ['.plasma', '.glowdischarge', '.discharge'],
+    load: () => import('./sim-wrappers/PlasmaDischargeWrapper.jsx'),
+    label: 'Plasma / Gas Discharge (Drift-Diffusion)',
+  },
 ]

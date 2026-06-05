@@ -324,7 +324,7 @@ async def run_cfd_marine_wave_spectrum(params: dict, ctx: Any) -> str:
         omega = np.linspace(0.1, 4.0 * 2.0 * np.pi / Tp, n_freq)
         S = jonswap_spectrum(omega, Hs, Tp, gamma)
         d_omega = omega[1] - omega[0]
-        m0 = float(np.trapz(S, omega))
+        m0 = float(np.trapezoid(S, omega) if hasattr(np, 'trapezoid') else np.trapz(S, omega))
         Hs_computed = float(4.0 * np.sqrt(max(m0, 0.0)))
 
         return ok_payload({
@@ -399,3 +399,191 @@ async def run_cfd_marine_wave_force(params: dict, ctx: Any) -> str:
         return ok_payload(result)
     except Exception as exc:
         return err_payload(str(exc), "WAVE_FORCE_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# Tool: cfd_isentropic_flow
+# ---------------------------------------------------------------------------
+
+_isentropic_spec = ToolSpec(
+    name="cfd_isentropic_flow",
+    description=(
+        "Isentropic flow relations for a calorically perfect gas.\n"
+        "Returns stagnation-to-static ratios T0/T, p0/p, ρ0/ρ, "
+        "area ratio A/A*, and critical velocity ratio at the given Mach number.\n"
+        "Reference: Anderson (2003) §3.4 — NACA Report 1135 (1953).\n"
+        "DESIGN EXPLORATION ONLY."
+    ),
+    input_schema={
+        "type": "object",
+        "required": ["M"],
+        "properties": {
+            "M": {"type": "number", "description": "Mach number (≥ 0)."},
+            "gamma": {"type": "number", "default": 1.4,
+                      "description": "Heat-capacity ratio (1.4 for air)."},
+        },
+    },
+)
+
+
+@register(_isentropic_spec)
+async def run_cfd_isentropic_flow(params: dict, ctx: Any) -> str:
+    try:
+        from kerf_cfd.compressible.compressible_flow import isentropic_relations
+        M = float(params["M"])
+        gamma = float(params.get("gamma", 1.4))
+        if M < 0:
+            return err_payload("M must be >= 0", "BAD_ARGS")
+        return ok_payload(isentropic_relations(M, gamma))
+    except Exception as exc:
+        return err_payload(str(exc), "ISENTROPIC_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# Tool: cfd_oblique_shock
+# ---------------------------------------------------------------------------
+
+_oblique_spec = ToolSpec(
+    name="cfd_oblique_shock",
+    description=(
+        "Oblique shock wave analysis (θ-β-M relations).\n"
+        "Given upstream Mach M1 and deflection angle θ, solves for wave angle β "
+        "and downstream pressure/temperature/density ratios.\n"
+        "Raises an error if θ > θ_max (detached shock).\n"
+        "Reference: Anderson (2003) §4.7 — oblique shock relations.\n"
+        "DESIGN EXPLORATION ONLY."
+    ),
+    input_schema={
+        "type": "object",
+        "required": ["M1", "theta_deg"],
+        "properties": {
+            "M1": {"type": "number", "description": "Upstream Mach number (> 1)."},
+            "theta_deg": {"type": "number",
+                          "description": "Flow deflection angle θ [degrees]."},
+            "gamma": {"type": "number", "default": 1.4},
+            "weak_solution": {"type": "boolean", "default": True,
+                              "description": "True = weak (smaller β), False = strong shock."},
+        },
+    },
+)
+
+
+@register(_oblique_spec)
+async def run_cfd_oblique_shock(params: dict, ctx: Any) -> str:
+    try:
+        from kerf_cfd.compressible.compressible_flow import oblique_shock_relations
+        M1 = float(params["M1"])
+        theta = float(params["theta_deg"])
+        gamma = float(params.get("gamma", 1.4))
+        weak = bool(params.get("weak_solution", True))
+        return ok_payload(oblique_shock_relations(M1, theta, gamma, weak_solution=weak))
+    except Exception as exc:
+        return err_payload(str(exc), "OBLIQUE_SHOCK_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# Tool: cfd_prandtl_meyer
+# ---------------------------------------------------------------------------
+
+_pm_spec = ToolSpec(
+    name="cfd_prandtl_meyer",
+    description=(
+        "Prandtl-Meyer expansion fan — compute downstream Mach number after "
+        "a convex corner expansion.\n"
+        "ν(M₂) = ν(M₁) + θ, isentropic downstream conditions.\n"
+        "Reference: Anderson (2003) §9.6.\n"
+        "DESIGN EXPLORATION ONLY."
+    ),
+    input_schema={
+        "type": "object",
+        "required": ["M1", "theta_deg"],
+        "properties": {
+            "M1": {"type": "number", "description": "Upstream Mach number (≥ 1)."},
+            "theta_deg": {"type": "number",
+                          "description": "Expansion angle θ [degrees]."},
+            "gamma": {"type": "number", "default": 1.4},
+        },
+    },
+)
+
+
+@register(_pm_spec)
+async def run_cfd_prandtl_meyer(params: dict, ctx: Any) -> str:
+    try:
+        from kerf_cfd.compressible.compressible_flow import prandtl_meyer_expansion
+        M1 = float(params["M1"])
+        theta = float(params["theta_deg"])
+        gamma = float(params.get("gamma", 1.4))
+        return ok_payload(prandtl_meyer_expansion(M1, theta, gamma))
+    except Exception as exc:
+        return err_payload(str(exc), "PRANDTL_MEYER_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# Tool: cfd_vof_surface_tension
+# ---------------------------------------------------------------------------
+
+_vof_st_spec = ToolSpec(
+    name="cfd_vof_surface_tension",
+    description=(
+        "VOF surface-tension analysis: Weber number, Ohnesorge number, "
+        "and Young-Laplace pressure jump for a droplet/bubble.\n"
+        "Returns We, Oh, pressure jump Δp = σ·κ, and regime classification.\n"
+        "References: Brackbill (1992) CSF; Young-Laplace equation.\n"
+        "DESIGN EXPLORATION ONLY."
+    ),
+    input_schema={
+        "type": "object",
+        "required": ["U_m_s", "D_m", "rho_kg_m3"],
+        "properties": {
+            "U_m_s": {"type": "number", "description": "Characteristic velocity [m/s]."},
+            "D_m": {"type": "number", "description": "Drop/bubble diameter [m]."},
+            "rho_kg_m3": {"type": "number", "description": "Liquid density [kg/m³]."},
+            "mu_Pa_s": {"type": "number", "default": 1e-3,
+                        "description": "Dynamic viscosity [Pa·s]. Default 1e-3 (water)."},
+            "sigma_N_per_m": {"type": "number", "default": 0.072,
+                              "description": "Surface tension [N/m]. Default 0.072 (water-air 20°C)."},
+        },
+    },
+)
+
+
+@register(_vof_st_spec)
+async def run_cfd_vof_surface_tension(params: dict, ctx: Any) -> str:
+    try:
+        from kerf_cfd.multiphase.vof import weber_number, ohnesorge_number
+
+        U = float(params["U_m_s"])
+        D = float(params["D_m"])
+        rho = float(params["rho_kg_m3"])
+        mu = float(params.get("mu_Pa_s", 1e-3))
+        sigma = float(params.get("sigma_N_per_m", 0.072))
+
+        We = weber_number(rho, U, D, sigma)
+        Oh = ohnesorge_number(mu, rho, D, sigma)
+
+        # Young-Laplace pressure jump for sphere (2 principal curvatures)
+        kappa = 2.0 / D  # mean curvature of a sphere radius D/2
+        delta_p = sigma * kappa  # = 2σ/D
+
+        # Regime
+        if We < 1:
+            regime = "stable (surface tension dominant)"
+        elif We < 10:
+            regime = "oscillating (Weber transitional)"
+        else:
+            regime = "breakup likely (We > 10)"
+
+        return ok_payload({
+            "We": We,
+            "Oh": Oh,
+            "delta_p_Pa": delta_p,
+            "kappa_1_per_m": kappa,
+            "regime": regime,
+            "note": (
+                "We = ρU²D/σ (Weber 1931); Oh = μ/√(ρDσ) (Ohnesorge 1936); "
+                "Δp = 2σ/D (Young-Laplace). DESIGN EXPLORATION ONLY."
+            ),
+        })
+    except Exception as exc:
+        return err_payload(str(exc), "VOF_SURFACE_TENSION_ERROR")

@@ -6,6 +6,9 @@ Implements:
   - roe_flux:               Roe (1981) approximate Riemann solver
   - step_compressible:      One FVM pseudo-time step (Euler / NS)
   - normal_shock_relations: Rankine-Hugoniot jump conditions
+  - isentropic_relations:   Isentropic flow relations (stagnation properties)
+  - oblique_shock_relations: Oblique shock β–θ–M relations (Anderson 2003 §4)
+  - prandtl_meyer_expansion: Prandtl-Meyer expansion fan angle (Anderson §9)
 
 HONEST FLAG: Design-exploration accuracy only.  Simplified inviscid + first-order
 viscous terms.  Production compressible CFD uses density-based solvers in
@@ -25,6 +28,7 @@ Sutherland, W. (1893). "The viscosity of gases and molecular force." Phil. Mag. 
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -410,4 +414,278 @@ def normal_shock_relations(M_1: float, gamma: float = 1.4) -> dict:
         "rho2_rho1": float(rho2_rho1),
         "T2_T1": float(T2_T1),
         "M2": float(M2),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Isentropic flow relations
+# ---------------------------------------------------------------------------
+
+def isentropic_relations(M: float, gamma: float = 1.4) -> dict:
+    """
+    Isentropic flow stagnation-to-static ratios for a given Mach number.
+
+    Relations (calorically perfect gas, isentropic process):
+      T₀/T   = 1 + (γ-1)/2 · M²
+      p₀/p   = (T₀/T)^(γ/(γ-1))
+      ρ₀/ρ   = (T₀/T)^(1/(γ-1))
+      A/A*   = (1/M)·[(2/(γ+1))·(1 + (γ-1)/2·M²)]^((γ+1)/(2(γ-1)))
+
+    Parameters
+    ----------
+    M     : Mach number (≥ 0)
+    gamma : heat-capacity ratio (1.4 for air)
+
+    Returns
+    -------
+    dict with T0_T, p0_p, rho0_rho, A_Astar, critical_velocity_ratio
+
+    References
+    ----------
+    Anderson, J.D. (2003) "Modern Compressible Flow" 3rd ed., §3.4.
+    NACA Report 1135 (1953) — isentropic flow tables.
+    """
+    if M < 0.0:
+        raise ValueError(f"Mach number must be ≥ 0, got {M}")
+    g = gamma
+    t_ratio = 1.0 + (g - 1.0) / 2.0 * M ** 2
+    p_ratio = t_ratio ** (g / (g - 1.0))
+    rho_ratio = t_ratio ** (1.0 / (g - 1.0))
+
+    # Area ratio A/A* (Eq. 3.30, Anderson 2003)
+    if M > 0:
+        exponent = (g + 1.0) / (2.0 * (g - 1.0))
+        A_Astar = (1.0 / M) * ((2.0 / (g + 1.0)) * t_ratio) ** exponent
+    else:
+        A_Astar = float("inf")   # throat at M=0 is ill-defined
+
+    # Critical velocity ratio u/a* = M·√[(γ+1)/(2 + (γ-1)M²)]^½
+    # (normalised by critical sound speed a*)
+    vel_ratio = M * ((g + 1.0) / (2.0 + (g - 1.0) * M ** 2)) ** 0.5
+
+    return {
+        "M": float(M),
+        "gamma": float(gamma),
+        "T0_T": float(t_ratio),
+        "p0_p": float(p_ratio),
+        "rho0_rho": float(rho_ratio),
+        "A_Astar": float(A_Astar),
+        "critical_velocity_ratio": float(vel_ratio),
+        "note": "Anderson (2003) §3.4 — isentropic relations for calorically perfect gas.",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Oblique shock relations
+# ---------------------------------------------------------------------------
+
+def oblique_shock_relations(
+    M1: float,
+    theta_deg: float,
+    gamma: float = 1.4,
+    *,
+    weak_solution: bool = True,
+) -> dict:
+    """
+    Oblique shock wave β–θ–M relations.
+
+    Given upstream Mach number M₁ and flow deflection angle θ (deg),
+    solve for the wave angle β and downstream conditions.
+
+    Method: iterative solution of the θ-β-M relation
+      tan θ = 2 cot β · (M₁²sin²β - 1) / (M₁²(γ + cos 2β) + 2)
+    using bisection on β ∈ (β_min, β_max) for the weak solution.
+
+    Parameters
+    ----------
+    M1          : upstream Mach number (must be > 1)
+    theta_deg   : flow deflection angle θ [degrees] (0 ≤ θ ≤ θ_max)
+    gamma       : heat-capacity ratio (1.4 for air)
+    weak_solution : True → weak shock (smaller β), False → strong shock
+
+    Returns
+    -------
+    dict with wave_angle_deg, p2_p1, T2_T1, rho2_rho1, M2,
+             theta_max_deg, normal_M1_component
+
+    References
+    ----------
+    Anderson, J.D. (2003) "Modern Compressible Flow" 3rd ed., §4.7.
+    Liepmann, H.W., Roshko, A. (1957) "Elements of Gasdynamics" §4.14.
+    """
+    if M1 <= 1.0:
+        raise ValueError(f"Oblique shock requires M1 > 1, got {M1}")
+    if theta_deg < 0.0:
+        raise ValueError(f"Deflection angle theta must be ≥ 0°, got {theta_deg}")
+
+    g = gamma
+    theta_rad = math.radians(theta_deg)
+
+    # --- Find θ_max by sweeping β and finding the maximum θ ---
+    beta_min_rad = math.asin(1.0 / M1)   # Mach angle μ (minimum wave angle)
+    beta_max_rad = math.pi / 2.0          # normal shock
+
+    def _theta_of_beta(b: float) -> float:
+        """θ as a function of β for given M1 (Anderson 2003, Eq. 4.17)."""
+        sinb = math.sin(b)
+        cosb = math.cos(b)
+        M1n_sq = (M1 * sinb) ** 2
+        numer = 2.0 * (1.0 / math.tan(b)) * (M1n_sq - 1.0)
+        denom = M1 ** 2 * (g + math.cos(2.0 * b)) + 2.0
+        if abs(denom) < 1e-14:
+            return 0.0
+        return math.atan(numer / denom)
+
+    # Scan to find θ_max and the corresponding β
+    n_scan = 1000
+    betas = np.linspace(beta_min_rad + 1e-6, beta_max_rad - 1e-6, n_scan)
+    thetas = np.array([_theta_of_beta(b) for b in betas])
+    idx_max = int(np.argmax(thetas))
+    theta_max_deg = math.degrees(float(thetas[idx_max]))
+    beta_at_theta_max = float(betas[idx_max])
+
+    if theta_deg > theta_max_deg + 1e-3:
+        raise ValueError(
+            f"Deflection θ={theta_deg:.2f}° exceeds θ_max={theta_max_deg:.2f}° "
+            f"for M₁={M1:.3f} — no attached oblique shock solution."
+        )
+
+    # --- Bisect for β ---
+    if weak_solution:
+        # Weak shock: β between β_min and β_at_θ_max
+        b_lo = float(beta_min_rad + 1e-6)
+        b_hi = float(beta_at_theta_max)
+    else:
+        # Strong shock: β between β_at_θ_max and π/2
+        b_lo = float(beta_at_theta_max)
+        b_hi = float(beta_max_rad - 1e-6)
+
+    # Bisection
+    for _ in range(80):
+        b_mid = 0.5 * (b_lo + b_hi)
+        th_mid = _theta_of_beta(b_mid)
+        if th_mid < theta_rad:
+            if weak_solution:
+                b_lo = b_mid
+            else:
+                b_hi = b_mid
+        else:
+            if weak_solution:
+                b_hi = b_mid
+            else:
+                b_lo = b_mid
+
+    beta_rad = 0.5 * (b_lo + b_hi)
+    beta_deg = math.degrees(beta_rad)
+
+    # --- Downstream conditions using normal shock on M1n = M1·sin(β) ---
+    M1n = M1 * math.sin(beta_rad)
+    ns = normal_shock_relations(max(M1n, 1.0 + 1e-9), gamma)
+
+    # Downstream Mach number (Anderson 2003, Eq. 4.20)
+    M2n = ns["M2"]   # normal component
+    M2 = M2n / math.sin(beta_rad - theta_rad)
+
+    return {
+        "M1": float(M1),
+        "theta_deg": float(theta_deg),
+        "beta_deg": float(beta_deg),
+        "theta_max_deg": float(theta_max_deg),
+        "M1_normal_component": float(M1n),
+        "M2": float(M2),
+        "p2_p1": ns["p2_p1"],
+        "rho2_rho1": ns["rho2_rho1"],
+        "T2_T1": ns["T2_T1"],
+        "solution_type": "weak" if weak_solution else "strong",
+        "note": "Anderson (2003) §4.7 θ-β-M oblique shock relations.",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Prandtl-Meyer expansion fan
+# ---------------------------------------------------------------------------
+
+def prandtl_meyer_expansion(
+    M1: float,
+    theta_deg: float,
+    gamma: float = 1.4,
+) -> dict:
+    """
+    Prandtl-Meyer expansion fan — downstream Mach number after
+    a convex corner expansion.
+
+    The Prandtl-Meyer function ν(M) is:
+      ν(M) = √((γ+1)/(γ-1)) · arctan(√((γ-1)/(γ+1)·(M²-1)))
+             − arctan(√(M²-1))   [radians]
+
+    Expansion: ν(M₂) = ν(M₁) + θ,  solve for M₂ by bisection.
+
+    Parameters
+    ----------
+    M1        : upstream Mach number (must be ≥ 1)
+    theta_deg : expansion angle θ [degrees] (positive = expansion)
+    gamma     : heat-capacity ratio
+
+    Returns
+    -------
+    dict with M2, nu1_deg, nu2_deg, p2_p1, T2_T1, rho2_rho1
+
+    References
+    ----------
+    Anderson (2003) §9.6 — Prandtl-Meyer expansion.
+    """
+    if M1 < 1.0:
+        raise ValueError(f"Prandtl-Meyer requires M1 ≥ 1, got {M1}")
+    if theta_deg < 0.0:
+        raise ValueError(f"Expansion angle must be ≥ 0°, got {theta_deg}")
+
+    g = gamma
+
+    def _nu(M: float) -> float:
+        """Prandtl-Meyer function ν(M) in radians."""
+        if M < 1.0 + 1e-9:
+            return 0.0
+        a = math.sqrt((g + 1.0) / (g - 1.0))
+        b = math.sqrt((g - 1.0) / (g + 1.0) * (M ** 2 - 1.0))
+        return a * math.atan(b) - math.atan(math.sqrt(M ** 2 - 1.0))
+
+    nu1 = _nu(M1)
+    nu2 = nu1 + math.radians(theta_deg)
+
+    # Bisect for M2 such that ν(M2) = nu2
+    # Maximum ν = π/2·(√((γ+1)/(γ-1)) - 1) (M → ∞)
+    nu_max = (math.pi / 2.0) * (math.sqrt((g + 1.0) / (g - 1.0)) - 1.0)
+    if nu2 > nu_max:
+        raise ValueError(
+            f"Expansion ν₂={math.degrees(nu2):.2f}° exceeds ν_max={math.degrees(nu_max):.2f}°"
+        )
+
+    # Bisect
+    m_lo, m_hi = M1, 100.0
+    for _ in range(80):
+        m_mid = 0.5 * (m_lo + m_hi)
+        if _nu(m_mid) < nu2:
+            m_lo = m_mid
+        else:
+            m_hi = m_mid
+    M2 = 0.5 * (m_lo + m_hi)
+
+    # Isentropic ratios (expansion is isentropic)
+    # p/p0, T/T0 from M1 and M2
+    t1 = 1.0 + (g - 1.0) / 2.0 * M1 ** 2
+    t2 = 1.0 + (g - 1.0) / 2.0 * M2 ** 2
+    T2_T1 = t1 / t2
+    p2_p1 = (t1 / t2) ** (g / (g - 1.0))
+    rho2_rho1 = (t1 / t2) ** (1.0 / (g - 1.0))
+
+    return {
+        "M1": float(M1),
+        "theta_deg": float(theta_deg),
+        "M2": float(M2),
+        "nu1_deg": math.degrees(nu1),
+        "nu2_deg": math.degrees(nu2),
+        "T2_T1": float(T2_T1),
+        "p2_p1": float(p2_p1),
+        "rho2_rho1": float(rho2_rho1),
+        "note": "Anderson (2003) §9.6 — Prandtl-Meyer expansion (isentropic).",
     }

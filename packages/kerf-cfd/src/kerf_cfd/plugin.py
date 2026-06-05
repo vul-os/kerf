@@ -20,10 +20,15 @@ Registers:
   - LLM tool:  cfd_marine_resistance  (Holtrop-Mennen 1982 ship resistance)
   - LLM tool:  cfd_marine_wave_spectrum (JONSWAP/P-M wave spectrum, Hasselmann 1973)
   - LLM tool:  cfd_marine_wave_force  (Froude-Krylov + diffraction, Faltinsen 1990)
+  - LLM tool:  cfd_postprocess_results (field stats, y⁺, postProcessing summary)
+  - LLM tool:  cfd_extract_residuals   (parse simpleFoam/pimpleFoam log residuals)
+  - LLM tool:  cfd_probe_field         (probe scalar/vector fields at N points)
+  - LLM tool:  cfd_flow_setup          (internal/external flow BC + solver config)
 
 # Wave 9C: OpenFOAM combustion + Lagrangian + FSI
 # Wave 10C: snappyHexMesh-style mesher + wind engineering
 # Wave 12B: CFD advanced physics (compressible/conjugate-HT/multiphase/marine)
+# Wave parity: postprocessing + flow setup + isentropic/oblique shock + VOF surface tension
 """
 
 from __future__ import annotations
@@ -66,6 +71,9 @@ async def register(app: FastAPI, ctx):
     # Wave 12B: CFD advanced physics (compressible/conjugate-HT/multiphase/marine)
     import kerf_cfd.cfd_advanced_v3_tools  # noqa: F401 — triggers @register decorators
 
+    # Wave parity: postprocessing + flow setup tools
+    import kerf_cfd.cfd_postprocessing_tool  # noqa: F401 — triggers @register decorators
+
     # Wave 12B: Landscape + Quote-to-delivery + MicroFlo
     # IES MicroFlo-style room airflow: preview-grade RANS + Fanger 1972 PMV/PPD
     # References: Fanger (1972); ASHRAE 55-2020; ASHRAE 62.1-2022;
@@ -94,6 +102,12 @@ async def register(app: FastAPI, ctx):
         "cfd.vof_multiphase",
         "cfd.marine_hydrodynamics",
         "cfd.internal_airflow_microflo",
+        "cfd.postprocessing",
+        "cfd.flow_setup",
+        "cfd.isentropic_relations",
+        "cfd.oblique_shock",
+        "cfd.prandtl_meyer",
+        "cfd.vof_surface_tension",
     ]
 
     try:

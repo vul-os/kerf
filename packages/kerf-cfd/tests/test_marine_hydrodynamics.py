@@ -126,7 +126,8 @@ def test_jonswap_variance_approx_hs_squared_over_16():
     omega_p = 2.0 * math.pi / Tp
     omega = np.linspace(0.05, 5.0 * omega_p, 2000)
     S = jonswap_spectrum(omega, Hs, Tp, gamma=3.3)
-    m0 = float(np.trapz(S, omega))
+    _trapz = np.trapezoid if hasattr(np, 'trapezoid') else np.trapz
+    m0 = float(_trapz(S, omega))
     m0_expected = (Hs / 4.0) ** 2
     assert abs(m0 - m0_expected) / m0_expected < 0.25, (
         f"Variance m0={m0:.4f} deviates >25% from expected {m0_expected:.4f}"

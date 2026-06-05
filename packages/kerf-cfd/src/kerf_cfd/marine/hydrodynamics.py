@@ -383,12 +383,25 @@ def jonswap_spectrum(omega: np.ndarray, Hs: float, Tp: float, gamma: float = 3.3
     exponent = -0.5 * ((omega - omega_p) / (sigma * omega_p)) ** 2
     gamma_factor = gamma ** np.exp(exponent)
 
-    S = pm * gamma_factor
+    S_raw = pm * gamma_factor
 
-    # Normalise to enforce integral ≈ (Hs/4)² when integrated with caller's dω
-    # (the caller defines omega resolution, so we just return unnormalised S
-    #  — variance can be integrated outside)
-    return np.where(omega > 0, S, 0.0)
+    # Normalise so that ∫S(ω)dω = (Hs/4)² exactly.
+    # When gamma > 1 the JONSWAP peak-enhancement factor adds energy beyond
+    # the P-M base, so the integral of S_raw > m0_target.  We renormalise
+    # by computing the spectrum's own integral on a fine grid and rescaling
+    # (Hasselmann 1973, §4 — JONSWAP calibration).
+    # Use a fine grid from 0.01·ωp to 10·ωp for robust numerical integration.
+    _omega_fine = np.linspace(1e-3 * omega_p, 10.0 * omega_p, 4000)
+    _pm_fine = (alpha * _G ** 2 / _omega_fine ** 5) * np.exp(
+        -1.25 * (omega_p / _omega_fine) ** 4
+    )
+    _sigma_fine = np.where(_omega_fine <= omega_p, 0.07, 0.09)
+    _exp_fine = -0.5 * ((_omega_fine - omega_p) / (_sigma_fine * omega_p)) ** 2
+    _S_fine = _pm_fine * gamma ** np.exp(_exp_fine)
+    _m0_actual = float(np.trapezoid(_S_fine, _omega_fine) if hasattr(np, 'trapezoid') else np.trapz(_S_fine, _omega_fine))
+    scale = m0_target / max(_m0_actual, 1e-20)
+
+    return np.where(omega > 0, S_raw * scale, 0.0)
 
 
 # ---------------------------------------------------------------------------

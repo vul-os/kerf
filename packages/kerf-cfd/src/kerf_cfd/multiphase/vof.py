@@ -36,6 +36,7 @@ Rider, W.J., Kothe, D.B. (1998). "Reconstructing volume tracking."
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -297,3 +298,183 @@ def step_vof(
         mu_phase1=state.mu_phase1,
         mu_phase2=state.mu_phase2,
     )
+
+
+# ---------------------------------------------------------------------------
+# Surface tension — Continuum Surface Force (CSF) model
+# ---------------------------------------------------------------------------
+
+def interface_curvature_2d(
+    alpha: np.ndarray,
+    cell_centres: np.ndarray,
+) -> np.ndarray:
+    """
+    Estimate interface curvature κ from α gradients (2-D Cartesian grid).
+
+    Uses the Brackbill (1992) Continuum Surface Force (CSF) approach:
+      n̂ = ∇α / |∇α|                       (interface normal)
+      κ  = −∇·n̂                           (mean curvature)
+
+    Gradient computed by finite-difference stencil on the sorted cell centres.
+
+    Parameters
+    ----------
+    alpha        : (Ncells,) volume fraction [0, 1]
+    cell_centres : (Ncells, 2) cell centroid coordinates [m]
+
+    Returns
+    -------
+    kappa : (Ncells,) interface curvature [1/m].
+            Non-interface cells (α ≈ 0 or α ≈ 1) return 0.
+
+    References
+    ----------
+    Brackbill, J.U., Kothe, D.B., Zemach, C. (1992). "A continuum method for
+    modeling surface tension." J. Comput. Phys. 100(2), 335–354.
+    """
+    alpha = np.asarray(alpha, dtype=float)
+    centres = np.asarray(cell_centres, dtype=float)
+    ncells = len(alpha)
+    kappa = np.zeros(ncells)
+
+    if centres.ndim != 2 or centres.shape[1] < 2:
+        return kappa
+
+    # Identify interface cells: 0.01 < α < 0.99
+    intf = (alpha > 0.01) & (alpha < 0.99)
+
+    # For each interface cell estimate ∇α by nearest-4 neighbours
+    for i in range(ncells):
+        if not intf[i]:
+            continue
+        xi, yi = centres[i, 0], centres[i, 1]
+        dists = np.sqrt((centres[:, 0] - xi) ** 2 + (centres[:, 1] - yi) ** 2)
+        dists[i] = 1e20  # exclude self
+        nn_idx = np.argsort(dists)[:6]   # up to 6 neighbours
+
+        if len(nn_idx) < 2:
+            continue
+
+        # Weighted least-squares gradient ∇α
+        dx = centres[nn_idx, 0] - xi
+        dy = centres[nn_idx, 1] - yi
+        da = alpha[nn_idx] - alpha[i]
+        w = 1.0 / (dists[nn_idx] + 1e-12)
+
+        # WLS normal equations:  [A^T W A] g = A^T W b
+        A = np.column_stack([dx, dy])
+        W = np.diag(w)
+        AtWA = A.T @ W @ A
+        AtWb = A.T @ (W @ da)
+        try:
+            grad = np.linalg.solve(AtWA, AtWb)
+        except np.linalg.LinAlgError:
+            continue
+
+        # Curvature κ ≈ -∇·(∇α / |∇α|) — approximate as -div(n̂) on stencil
+        # For scalar field, κ ≈ (∂²α/∂x² + ∂²α/∂y²) / |∇α|³ (Brackbill 1992)
+        grad_mag = np.linalg.norm(grad)
+        if grad_mag < 1e-10:
+            continue
+
+        # Second derivatives from WLS (include x², y², xy terms)
+        A2 = np.column_stack([dx, dy, 0.5 * dx ** 2, 0.5 * dy ** 2, dx * dy])
+        AtWA2 = A2.T @ W @ A2
+        AtWb2 = A2.T @ (W @ da)
+        try:
+            coeffs = np.linalg.lstsq(AtWA2, AtWb2, rcond=None)[0]
+            d2alpha_dx2 = coeffs[2]
+            d2alpha_dy2 = coeffs[3]
+        except Exception:
+            d2alpha_dx2 = 0.0
+            d2alpha_dy2 = 0.0
+
+        # κ = −(d²α/dx² + d²α/dy²) / |∇α|  (Brackbill 1992 Eq. 14)
+        kappa[i] = -(d2alpha_dx2 + d2alpha_dy2) / (grad_mag + 1e-12)
+
+    return kappa
+
+
+def surface_tension_pressure_jump(
+    kappa: np.ndarray,
+    sigma_N_per_m: float = 0.072,
+) -> np.ndarray:
+    """
+    Young-Laplace pressure jump across the interface.
+
+    Δp = σ · κ   (Young-Laplace equation, 2-D: one principal curvature)
+    Δp = 2σ · κ  (3-D sphere: two equal principal curvatures)
+
+    This function returns the 2-D form (one curvature).  Multiply by 2 for
+    a spherical drop/bubble.
+
+    Parameters
+    ----------
+    kappa          : (Ncells,) interface curvature [1/m]
+    sigma_N_per_m  : surface tension coefficient [N/m]
+                     default 0.072 N/m (water-air at 20°C)
+
+    Returns
+    -------
+    dp_surface_tension : (Ncells,) pressure jump [Pa]
+
+    References
+    ----------
+    Young, T. (1805). Phil. Trans. R. Soc. 95, 65–87.
+    Laplace, P.S. (1806). Mécanique Céleste, Supplement.
+    Brackbill (1992) §2 — CSF pressure jump.
+    """
+    return sigma_N_per_m * np.asarray(kappa, dtype=float)
+
+
+def weber_number(
+    rho: float,
+    U: float,
+    L: float,
+    sigma: float,
+) -> float:
+    """
+    Weber number We = ρ U² L / σ.
+
+    Ratio of inertial to surface tension forces.
+    We < 1 → surface tension dominant (droplet stable).
+    We > 1 → inertia dominant (breakup possible).
+
+    Parameters
+    ----------
+    rho   : fluid density [kg/m³]
+    U     : characteristic velocity [m/s]
+    L     : characteristic length (drop diameter, jet diameter) [m]
+    sigma : surface tension [N/m]
+
+    Returns
+    -------
+    We : Weber number (dimensionless)
+
+    References
+    ----------
+    Weber, C. (1931). Z. Angew. Math. Mech. 11(2) — breakup of liquid jets.
+    Ashgriz, N. (2011). "Handbook of Atomization and Sprays." Springer. §2.
+    """
+    return rho * U ** 2 * L / max(sigma, 1e-20)
+
+
+def ohnesorge_number(
+    mu: float,
+    rho: float,
+    L: float,
+    sigma: float,
+) -> float:
+    """
+    Ohnesorge number Oh = μ / √(ρ L σ).
+
+    Compares viscous to inertial-capillary forces.
+    Oh << 1 → inviscid breakup regime.
+    Oh >> 1 → viscous dripping regime.
+
+    References
+    ----------
+    Ohnesorge, W. (1936). Z. Angew. Math. Mech. 16, 355–358.
+    """
+    denom = math.sqrt(max(rho * L * sigma, 1e-30))
+    return mu / denom

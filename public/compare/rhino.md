@@ -568,7 +568,7 @@ Kerf saturates **99%** of Rhino's feature surface (44 yes, 1 partial, 0 no out o
 | Casting / wax-mill export | ✅ | Yes (paid tier) | Casting export + wax-carving plan; no full mill-path |
 | Visual node scripting | ✅ | Yes | NodeGraphCanvas visual node environment + kerf-sdk |
 | BIM (walls/slabs/framing/stairs/IFC4) | ✅ | Partial | Revit-comparable BIM engine + IFC4 viewer |
-| Photoreal rendering (built-in) | ✅ | Yes | Cycles backend + browser path tracer; no caustics |
+| Photoreal rendering (built-in) | ✅ | Yes | In-process unidirectional Monte-Carlo CPU path tracer (BVH, Möller–Trumbore, multi-bounce GI, GGX/dielectric-Fresnel ... |
 | Photoreal rendering (advanced plugins) | ⚠️ (partial) | Yes (paid tier) | BYO Blender/Cycles; no V-Ray/Enscape integration |
 | Material selection (Ashby) | ✅ | No | 200 materials, 14 families, Pareto frontier (backend) |
 | LCA (full ISO 14040/44 4 phases) | ✅ | No | Full ISO 14040/44 LCA with multi-impact categories (backend) |

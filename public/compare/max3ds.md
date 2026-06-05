@@ -298,7 +298,7 @@ Archviz & game-art DCC — a different category from B-rep CAD.
 
 ## Summary
 
-Kerf saturates **95%** of Autodesk 3ds Max's feature surface (26 yes, 1 partial, 1 no out of 28 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **96%** of Autodesk 3ds Max's feature surface (27 yes, 0 partial, 1 no out of 28 features tracked here). Honest gaps: 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -325,7 +325,7 @@ Kerf saturates **95%** of Autodesk 3ds Max's feature surface (26 yes, 1 partial,
 | Electrical / energy — power distribution and PLC | ✅ | No | NEC power distribution, AC load-flow, IEC 61131-3 PLC (ST + live Ladder) |
 | Tolerancing / QA — GD&T and tolerance stackup | ✅ | No | ASME Y14.5 GD&T data model, 1D/3D tolerance stackup, SPC charts (backend) |
 | Optics — paraxial ABCD ray transfer | ✅ | No | Paraxial ABCD, Seidel aberrations, Gaussian beam propagation (backend) |
-| Optics — production path-traced rendering (Arnold) | ⚠️ (partial) | Yes | heroShot renderer (HDRI + ACES + bloom); no production path tracer |
+| Optics — production path-traced rendering (Arnold) | ✅ | Yes | In-process unidirectional Monte-Carlo CPU path tracer (BVH, Möller–Trumbore, multi-bounce GI, GGX/dielectric-Fresnel ... |
 | Acoustics — room acoustics and ISO 9613 | ✅ | No | ISO 9613 propagation, RT60, image-source room IR, SEA (backend) |
 | Verticals — jewelry design | ✅ | Partial | 41-module jewelry suite: ring v4, gemstones v2, settings v3/v4, chain v2 |
 | Verticals — BIM / architectural (IFC) | ✅ | Partial | Revit-comparable BIM engine: walls/slabs/framing/stairs + IFC4 export |
@@ -351,7 +351,6 @@ Kerf saturates **95%** of Autodesk 3ds Max's feature surface (26 yes, 1 partial,
 
 ## What's honestly outstanding
 
-- **Optics — production path-traced rendering (Arnold)** (Partial): heroShot renderer (HDRI + ACES + bloom); no production path tracer
 - **Verticals — archviz creative workflow** (Not yet implemented): No archviz asset libraries or procedural scatter/population tools
 
 ## Pricing

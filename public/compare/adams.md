@@ -137,7 +137,7 @@ The industry-standard multibody dynamics solver — versus an open-core CAD with
 
 ## Summary
 
-Kerf saturates **100%** of MSC Adams (Hexagon)'s feature surface (12 yes, 0 partial, 0 no out of 12 features tracked here).
+Kerf saturates **100%** of MSC Adams (Hexagon)'s feature surface (12 yes, 0 partial, 0 no out of 12 features tracked here). Kerf covers the full tracked feature set for MSC Adams (Hexagon); gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -153,7 +153,7 @@ Kerf saturates **100%** of MSC Adams (Hexagon)'s feature surface (12 yes, 0 part
 | Robotics FK / IK (6-DOF) | ✅ | Partial | 6-DOF spatial IK via DLS Jacobian; PUMA-class validated (backend) |
 | Gear / belt / chain machinery (Adams/Machinery) | ✅ | Yes | Litvin gear/belt machinery dynamics (kerf-mates machinery) |
 | Gear geometry / tooth stress | ✅ | Partial | Spur/helical/bevel/worm gear geometry + AGMA/ISO tooth bending + contact stress (backend) |
-| FEA load export | ✅ | Yes | Nastran FORCE/MOMENT/GRAV/SUBCASE + CalculiX *CLOAD/*DLOAD GRAV decks from MBD trajectory; LLM tool fea_export_load_cases |
+| FEA load export | ✅ | Yes | Exports MBD trajectory loads (joint reaction forces, moments, inertia-relief accelerations) to Nastran bulk-data (FOR... |
 | LLM / chat-native editing | ✅ | No | Chat-native: describe a mechanism in plain language; Kerf routes to MBD backend |
 
 ## What Kerf does that MSC Adams (Hexagon) doesn't

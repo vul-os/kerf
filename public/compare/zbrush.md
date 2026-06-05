@@ -236,7 +236,7 @@ ZBrush sculpts the organic world in polygons — Kerf models the engineered worl
 
 ## Summary
 
-Kerf saturates **98%** of Maxon ZBrush's feature surface (19 yes, 1 partial, 0 no out of 20 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of Maxon ZBrush's feature surface (20 yes, 0 partial, 0 no out of 20 features tracked here). Kerf covers the full tracked feature set for Maxon ZBrush; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -260,7 +260,7 @@ Kerf saturates **98%** of Maxon ZBrush's feature surface (19 yes, 1 partial, 0 n
 | Verticals — character / creature / film VFX | ✅ | Yes | Sculpt + dynamesh + auto-weight + LBS pose (sculpt_extended_tools) |
 | Verticals — texture / polypaint / displacement | ✅ | Yes | Polypaint stroke/bake + displacement bake |
 | Verticals — hard-surface modelling (ZModeler) | ✅ | Yes | Exact B-rep hard-surface via OCCT feature tree — dimensionally accurate |
-| Verticals — rendering quality | ⚠️ (partial) | Yes | HeroShot.js PBR viewport (HDRI + ACES + bloom); no path-traced renderer |
+| Verticals — rendering quality | ✅ | Yes | PBR viewport (HDRI + ACES + bloom) plus a genuine unidirectional Monte-Carlo CPU path tracer (BVH, multi-bounce GI, G... |
 | Cost / materials / LCA — material selection and costing | ✅ | No | Ashby material selector (200 materials), should-cost (6 processes), full LCA; backend/agent only |
 
 ## What Kerf does that Maxon ZBrush doesn't
@@ -276,10 +276,6 @@ Kerf saturates **98%** of Maxon ZBrush's feature surface (19 yes, 1 partial, 0 n
 - **Manufacturing / CAM — CNC / G-code output** — 3-axis CAM wired (CAMView); Fanuc/GRBL/LinuxCNC posts
 - **Verticals — jewelry parametric configurator** — 41-module jewelry suite: ring v4, gemstone v2, settings v3/v4, chain v2, casting export
 - **Cost / materials / LCA — material selection and costing** — Ashby material selector (200 materials), should-cost (6 processes), full LCA; backend/agent only
-
-## What's honestly outstanding
-
-- **Verticals — rendering quality** (Partial): HeroShot.js PBR viewport (HDRI + ACES + bloom); no path-traced renderer
 
 ## Pricing
 

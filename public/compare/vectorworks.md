@@ -352,7 +352,7 @@ Vectorworks spans architecture, landscape, and entertainment — Kerf spans mech
 
 ## Summary
 
-Kerf saturates **90%** of Vectorworks's feature surface (27 yes, 0 partial, 3 no out of 30 features tracked here). Honest gaps: 3 features not yet implemented.
+Kerf saturates **92%** of Vectorworks's feature surface (27 yes, 1 partial, 2 no out of 30 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 2 features not yet implemented.
 
 ## Feature comparison
 
@@ -371,7 +371,7 @@ Kerf saturates **90%** of Vectorworks's feature surface (27 yes, 0 partial, 3 no
 | Contour manipulation and slope analysis | ✅ | Yes (paid tier) | Marching-squares iso-contour extraction from DEM grid; grade_surface applies uniform planar grade; landscape_contours... |
 | Hardscape design and area calculation | ✅ | Yes (paid tier) | Paver pattern generator (running-bond/stack-bond/herringbone-45/basketweave) + material takeoff; retaining wall (Rank... |
 | Irrigation layout | ✅ | Yes (paid tier) | Irrigation zone scheduling (head spacing, zone flow demand, weekly run-time schedule, DU audit); ASABE/ICC 802-2014; ... |
-| Photorealistic rendering engine | 🔴 (no) | Yes | No integrated renderer; geometry exported to external tools |
+| Photorealistic rendering engine | ⚠️ (partial) | Yes | Integrated in-process Monte-Carlo CPU path tracer (BVH, multi-bounce GI, GGX/dielectric-Fresnel BSDFs, next-event est... |
 | Real-time OpenGL / GPU viewport | ✅ | Yes | Three.js WebGL viewport wired; PBR materials |
 | Lighting simulation (luminance / lux) | ✅ | Yes | Photonics backend exists (LED/photodiode); no lux/luminance scene simulation |
 | BIM walls / slabs / framing | ✅ | Yes (paid tier) | kerf-bim walls/slabs/framing engine wired via /compile-ifc |
@@ -407,7 +407,7 @@ Kerf saturates **90%** of Vectorworks's feature surface (27 yes, 0 partial, 3 no
 
 ## What's honestly outstanding
 
-- **Photorealistic rendering engine** (Not yet implemented): No integrated renderer; geometry exported to external tools
+- **Photorealistic rendering engine** (Partial): Integrated in-process Monte-Carlo CPU path tracer (BVH, multi-bounce GI, GGX/dielectric-Fresnel BSDFs, next-event estimation, ACES) + PBR viewport + Cycles GPU backend; no caustics / Cinema-4D-engine parity
 - **Entertainment / theatrical lighting plot** (Not yet implemented): No entertainment design domain
 - **Rigging geometry and load analysis (Braceworks)** (Not yet implemented): No rigging domain; structural beam/truss engines not adapted for entertainment
 

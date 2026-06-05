@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T06:21:34.970Z",
+  "generatedAt": "2026-06-05T15:46:58.803Z",
   "items": [
     {
       "slug": "revit",
@@ -1477,9 +1477,9 @@
             "notes": "Survey + drainage + utilities + roadway in one application"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-civil/src/kerf_civil/hydraulics_gravity.py",
-            "notes": "Drainage + water networks + roadway geometry; no dedicated dry-utility (power/comms) modeller"
+            "status": "yes",
+            "evidence": "packages/kerf-civil/src/kerf_civil/dry_utilities.py",
+            "notes": "Wet networks (gravity/pressure) + dry utilities: gas mains (Weymouth pressure-drop), electrical duct banks (NEC fill), telecom/fiber. Corridor separation checks (ASME B31.8, NEC Table 300.5, NFPA 54, AWWA M23) with 3-D proximity. LLM tools: civil_dry_utility_network_create, civil_dry_utility_clearance_check, civil_gas_pressure_drop, civil_elec_duct_fill."
           },
           "name": "Utilities / multi-discipline coordination"
         },
@@ -2238,9 +2238,9 @@
             "notes": "Renderworks (Cinema 4D engine): physically-based rendering, HDRI, caustics, global illumination"
           },
           "kerf": {
-            "status": "no",
-            "evidence": "",
-            "notes": "No integrated renderer; geometry exported to external tools"
+            "status": "partial",
+            "evidence": "packages/kerf-render/src/kerf_render/pathtracer.py",
+            "notes": "Integrated in-process Monte-Carlo CPU path tracer (BVH, multi-bounce GI, GGX/dielectric-Fresnel BSDFs, next-event estimation, ACES) + PBR viewport + Cycles GPU backend; no caustics / Cinema-4D-engine parity"
           },
           "name": "Photorealistic rendering engine"
         },
@@ -14535,9 +14535,9 @@
             "notes": "Adams exports MBD loads directly to ANSYS, Abaqus, Nastran, MSC Nastran for structural FEA"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-fem/src/",
-            "notes": "Structural FEA native (CalculiX bridge); no load export to external FEA tools"
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/fea_load_export.py",
+            "notes": "Exports MBD trajectory loads (joint reaction forces, moments, inertia-relief accelerations) to Nastran bulk-data (FORCE/MOMENT/GRAV/LOAD/SUBCASE) and CalculiX/Abaqus (*CLOAD/*DLOAD GRAV/*STEP) decks; picks critical load instants by peak resultant; LLM tool fea_export_load_cases + motion-studio download panel"
           },
           "name": "FEA load export"
         },
@@ -14784,9 +14784,9 @@
             "notes": "AM distortion / residual-stress process simulation"
           },
           "kerf": {
-            "status": "no",
-            "evidence": "",
-            "notes": "AM thermal-distortion process simulation not yet implemented"
+            "status": "partial",
+            "evidence": "packages/kerf-manufacturing/src/kerf_manufacturing/am_process_sim.py",
+            "notes": "Inherent-strain layer-activation distortion + residual stress (am_process_simulate tool); not full thermo-mechanical melt-pool — elastic quasi-static approximation only; Tet4 mesh, isotropic material"
           },
           "name": "Additive manufacturing process simulation"
         },
@@ -15240,9 +15240,9 @@
             "notes": "AC/DC + RF + Wave Optics modules; full E/M field FEM"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-electronics/src/kerf_electronics/routes_rf.py",
-            "notes": "openEMS FDTD RF bridge (PCB routes) + AC power load-flow; no general electrostatic/magnetostatic FEM"
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/em_field.py",
+            "notes": "P1 triangular FEM electrostatics (∇·(ε∇φ)=−ρ, Dirichlet + Neumann BCs, E-field, capacitance, energy) + magnetostatics (Az formulation, ∇×(μ⁻¹∇×A)=J, B-field, inductance, Lorentz force); scipy sparse solver; validated against parallel-plate capacitor and coaxial B-field analytic cases; plus openEMS FDTD RF bridge and AC load-flow"
           },
           "name": "Electromagnetics (electrostatics / magnetostatics / RF)"
         },
@@ -17106,9 +17106,9 @@
             "notes": "Cycles (GPU path tracer) + EEVEE (real-time PBR) — benchmark quality"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "src/components/HeroShot.jsx",
-            "notes": "HDRI + ACES + bloom (heroShot.js); no full path tracer"
+            "status": "yes",
+            "evidence": "packages/kerf-render/src/kerf_render/pathtracer.py",
+            "notes": "Unidirectional Monte-Carlo CPU path tracer: BVH + Möller–Trumbore, multi-bounce GI, cosine/GGX/dielectric-Fresnel BSDFs, next-event estimation, Russian-roulette, ACES tonemap, progressive accumulation. Plus rasterised HDRI+ACES viewport and Cycles backend."
           },
           "name": "Path-traced renderer (Cycles/EEVEE)"
         },
@@ -17579,9 +17579,9 @@
             "notes": "Arnold GPU/CPU path tracer built-in; V-Ray, Corona, Redshift via plugins"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "src/components/HeroShot/",
-            "notes": "heroShot renderer (HDRI + ACES + bloom); no production path tracer"
+            "status": "yes",
+            "evidence": "packages/kerf-render/src/kerf_render/pathtracer.py",
+            "notes": "In-process unidirectional Monte-Carlo CPU path tracer (BVH, Möller–Trumbore, multi-bounce GI, GGX/dielectric-Fresnel BSDFs, next-event estimation, Russian-roulette, ACES). Production GPU path via Cycles backend. Not Arnold-feature-parity."
           },
           "name": "Optics — production path-traced rendering (Arnold)"
         },
@@ -18091,9 +18091,9 @@
             "notes": "BPR renderer + KeyShot bridge; NPR rendering, ambient occlusion, fibres"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "src/components/heroShot.js",
-            "notes": "HeroShot.js PBR viewport (HDRI + ACES + bloom); no path-traced renderer"
+            "status": "yes",
+            "evidence": "packages/kerf-render/src/kerf_render/pathtracer.py",
+            "notes": "PBR viewport (HDRI + ACES + bloom) plus a genuine unidirectional Monte-Carlo CPU path tracer (BVH, multi-bounce GI, GGX/dielectric BSDFs, next-event estimation, Russian-roulette, ACES). Cycles GPU backend for production."
           },
           "name": "Verticals — rendering quality"
         },
@@ -19603,8 +19603,8 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-render/src/kerf_render/cycles_worker.py",
-            "notes": "Cycles backend + browser path tracer; no caustics"
+            "evidence": "packages/kerf-render/src/kerf_render/pathtracer.py",
+            "notes": "In-process unidirectional Monte-Carlo CPU path tracer (BVH, Möller–Trumbore, multi-bounce GI, GGX/dielectric-Fresnel BSDFs, next-event estimation, Russian-roulette, ACES) + Cycles GPU backend + browser path tracer; no caustics"
           },
           "name": "Photoreal rendering (built-in)"
         },
@@ -19880,8 +19880,8 @@
           },
           "kerf": {
             "status": "partial",
-            "evidence": "packages/kerf-jewelry/render/",
-            "notes": "PBR materials for metals and gems; no gem caustics/dispersion"
+            "evidence": "packages/kerf-render/src/kerf_render/pathtracer.py",
+            "notes": "Monte-Carlo CPU path tracer with GGX-metal + dielectric-Fresnel refraction BSDFs (handles metals + faceted gems) and multi-bounce GI; still no spectral dispersion or gem caustics"
           },
           "name": "Jewelry — rendering (PBR / photoreal)"
         },

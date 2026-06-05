@@ -328,7 +328,7 @@ Kerf saturates **95%** of MatrixGold's feature surface (27 yes, 1 partial, 1 no 
 | Jewelry — weight calculation | ✅ | Yes (paid tier) | Full cost/quote panel includes metal weight + alloy pricing |
 | Jewelry — casting / STL export | ✅ | Yes (paid tier) | Casting + STL production export |
 | Jewelry — wax-mill toolpaths | ✅ | Yes (paid tier) | Wax-carving plan module present; full mill-path generation not complete |
-| Jewelry — rendering (PBR / photoreal) | ⚠️ (partial) | Yes (paid tier) | PBR materials for metals and gems; no gem caustics/dispersion |
+| Jewelry — rendering (PBR / photoreal) | ⚠️ (partial) | Yes (paid tier) | Monte-Carlo CPU path tracer with GGX-metal + dielectric-Fresnel refraction BSDFs (handles metals + faceted gems) and ... |
 | Jewelry — findings library | ✅ | Yes (paid tier) | Findings modules present; no live supplier catalog integration |
 | Jewelry — supplier catalog integration | 🔴 (no) | Yes (paid tier) | Not available; no supplier API integration |
 | Jewelry — gem-cert output | ✅ | Partial | Gem-cert output built in |
@@ -362,7 +362,7 @@ Kerf saturates **95%** of MatrixGold's feature surface (27 yes, 1 partial, 1 no 
 
 ## What's honestly outstanding
 
-- **Jewelry — rendering (PBR / photoreal)** (Partial): PBR materials for metals and gems; no gem caustics/dispersion
+- **Jewelry — rendering (PBR / photoreal)** (Partial): Monte-Carlo CPU path tracer with GGX-metal + dielectric-Fresnel refraction BSDFs (handles metals + faceted gems) and multi-bounce GI; still no spectral dispersion or gem caustics
 - **Jewelry — supplier catalog integration** (Not yet implemented): Not available; no supplier API integration
 
 ## Pricing

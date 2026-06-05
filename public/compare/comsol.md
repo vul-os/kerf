@@ -126,7 +126,7 @@ General-purpose multiphysics simulation — compared honestly against MIT open-c
 
 ## Summary
 
-Kerf saturates **80%** of COMSOL Multiphysics's feature surface (7 yes, 2 partial, 1 no out of 10 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **85%** of COMSOL Multiphysics's feature surface (8 yes, 1 partial, 1 no out of 10 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -137,7 +137,7 @@ Kerf saturates **80%** of COMSOL Multiphysics's feature surface (7 yes, 2 partia
 | CFD (laminar / turbulent fluid flow) | ✅ | Yes | RANS k-ε / k-ω SST + VOF multiphase + compressible + combustion |
 | Acoustics | ✅ | Yes | ISO 9613 propagation + RT60 + mass-law TL + wave SEA + photon/spectral |
 | Multiphysics coupling (thermal-structural / FSI) | ✅ | Yes | Thermal-structural coupling + ALE fluid-structure interaction |
-| Electromagnetics (electrostatics / magnetostatics / RF) | ✅ | Yes | P1 triangular FEM electrostatics + magnetostatics (Az formulation) validated against analytic cases; scipy sparse solver; plus openEMS FDTD RF bridge and AC load-flow |
+| Electromagnetics (electrostatics / magnetostatics / RF) | ✅ | Yes | P1 triangular FEM electrostatics (∇·(ε∇φ)=−ρ, Dirichlet + Neumann BCs, E-field, capacitance, energy) + magnetostatics... |
 | Chemical / reacting flow | ⚠️ (partial) | Yes | Eddy-break-up combustion + reacting flow; no general multi-species reaction-kinetics solver |
 | Design optimization (topology / parametric) | ✅ | Yes | SIMP density-based topology optimization + Ashby multi-objective |
 | Plasma / electric discharge | 🔴 (no) | Yes | No plasma / gas-discharge (ionization transport) modelling |

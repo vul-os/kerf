@@ -137,7 +137,7 @@ Civil infrastructure & roadway design — compared honestly against MIT open-cor
 
 ## Summary
 
-Kerf saturates **100%** of Bentley OpenRoads Designer's feature surface (11 yes, 0 partial, 0 no out of 11 features tracked here).
+Kerf saturates **100%** of Bentley OpenRoads Designer's feature surface (11 yes, 0 partial, 0 no out of 11 features tracked here). Kerf covers the full tracked feature set for Bentley OpenRoads Designer; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -152,16 +152,12 @@ Kerf saturates **100%** of Bentley OpenRoads Designer's feature surface (11 yes,
 | Plan & profile sheet production | ✅ | Yes | Automated plan+profile sheet set (station grid, profile band, match lines; AASHTO/FHWA) |
 | Parcels / right-of-way / subdivision | ✅ | Yes | Parcel subdivision (Sutherland-Hodgman clip, ROW dedication, setback insets) |
 | Corridor modeling (templates / cross-sections) | ✅ | Yes | Alignment + profile + sheets shipped; no template-driven 3D corridor cross-section modeller |
-| Utilities / multi-discipline coordination | ✅ | Yes | Wet networks (gravity/pressure) + dry utilities: gas (Weymouth), electrical duct banks (NEC fill), telecom/fiber; corridor separation checks per ASME B31.8/NEC/NFPA 54 |
+| Utilities / multi-discipline coordination | ✅ | Yes | Wet networks (gravity/pressure) + dry utilities: gas mains (Weymouth pressure-drop), electrical duct banks (NEC fill)... |
 | Open-source core / chat-native | ✅ | No | MIT open-core; chat-native civil design + JSON-RPC LLM tools + kerf-sdk |
 
 ## What Kerf does that Bentley OpenRoads Designer doesn't
 
 - **Open-source core / chat-native** — MIT open-core; chat-native civil design + JSON-RPC LLM tools + kerf-sdk
-
-## What's honestly outstanding
-
-None — all tracked features are shipped.
 
 ## Pricing
 

@@ -603,7 +603,7 @@ World-class mesh / DCC tool — a different category from B-rep CAD.
 
 ## Summary
 
-Kerf saturates **99%** of Blender's feature surface (51 yes, 1 partial, 0 no out of 52 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of Blender's feature surface (52 yes, 0 partial, 0 no out of 52 features tracked here). Kerf covers the full tracked feature set for Blender; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -649,7 +649,7 @@ Kerf saturates **99%** of Blender's feature surface (51 yes, 1 partial, 0 no out
 | Solar PV (system + partial shading) | ✅ | No | Single-diode + bypass-diode IV + global MPPT (backend) |
 | Tolerance stackup — 1D (WC/RSS/MC) | ✅ | No | WC/RSS/Monte-Carlo (backend) |
 | Process capability (Cpk/Ppk) | ✅ | No | Cpk/Ppk + SPC charts (backend) |
-| Path-traced renderer (Cycles/EEVEE) | ⚠️ (partial) | Yes | HDRI + ACES + bloom (heroShot.js); no full path tracer |
+| Path-traced renderer (Cycles/EEVEE) | ✅ | Yes | Unidirectional Monte-Carlo CPU path tracer: BVH + Möller–Trumbore, multi-bounce GI, cosine/GGX/dielectric-Fresnel BSD... |
 | Paraxial ABCD ray transfer | ✅ | No | Paraxial ABCD ray transfer (backend) |
 | Acoustics (ISO 9613, RT60, weighting, mass-law TL) | ✅ | No | ISO 9613 + RT60 + SEA + image-source IR (backend) |
 | Sculpting + dyntopo + multires | ✅ | Yes | sculpt_brush (grab/smooth/inflate) + multires + isotropic remesh; no dyntopo/30+ brushes |
@@ -677,10 +677,6 @@ Kerf saturates **99%** of Blender's feature surface (51 yes, 1 partial, 0 no out
 - **Configurations / family variants** — Engine complete; no UI panel
 - **FE — solid (tet/hex)** — CalculiX/Mystran/Z88 bridge (needs binary; backend)
 - *(and 35 more features not covered by Blender)*
-
-## What's honestly outstanding
-
-- **Path-traced renderer (Cycles/EEVEE)** (Partial): HDRI + ACES + bloom (heroShot.js); no full path tracer
 
 ## Pricing
 

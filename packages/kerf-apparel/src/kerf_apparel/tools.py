@@ -732,3 +732,142 @@ async def run_grade_check(ctx: ProjectCtx, args: bytes) -> str:
         ],
         "iso_compliant": len(warnings) == 0,
     })
+
+
+# ------------------------------------------------------------------ #
+# garment_avatar_body_form                                             #
+# ------------------------------------------------------------------ #
+
+avatar_body_form_spec = ToolSpec(
+    name="garment_avatar_body_form",
+    description=(
+        "Generate a parametric dress-form / body-form for garment drape fitting. "
+        "Uses the CAESAR anthropometric study (Robinette et al. 2002) ellipsoidal "
+        "cross-section model: body is a stack of elliptical slices at 13 ISO 8559-1 "
+        "landmark heights, each ellipse solved from Ramanujan's perimeter formula "
+        "for the supplied girth measurements. "
+        "Returns: (1) landmark table (z_cm, girth_cm, semi-axes at each of 13 "
+        "CAESAR landmark heights), (2) vertex count + face count of the 3D mesh, "
+        "(3) full OBJ string for import into any 3D viewer. "
+        "Typical use: generate an avatar to drape garment patterns over, "
+        "check fit, or export to CLO-style workflow. "
+        "NOTE: This is a simplified ellipsoidal mannequin (no limbs, no pose "
+        "animation). Full 3D cloth-on-avatar simulation requires a solver beyond "
+        "this tool's scope."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "height_cm": {
+                "type": "number",
+                "description": "Total standing height in cm. Default 168 (ISO 8559-1 reference female).",
+            },
+            "bust_cm": {
+                "type": "number",
+                "description": "Bust girth at fullest point (cm). Default 92.",
+            },
+            "waist_cm": {
+                "type": "number",
+                "description": "Waist girth at natural waist (cm). Default 74.",
+            },
+            "hip_cm": {
+                "type": "number",
+                "description": "Hip girth at fullest point (cm). Default 96.",
+            },
+            "neck_cm": {
+                "type": "number",
+                "description": "Neck girth (cm). Optional; estimated if omitted.",
+            },
+            "knee_cm": {
+                "type": "number",
+                "description": "Knee girth (cm). Optional; estimated if omitted.",
+            },
+            "calf_cm": {
+                "type": "number",
+                "description": "Maximum calf girth (cm). Optional; estimated if omitted.",
+            },
+            "ankle_cm": {
+                "type": "number",
+                "description": "Ankle girth (cm). Optional; estimated if omitted.",
+            },
+            "sex": {
+                "type": "string",
+                "enum": ["female", "male", "unisex"],
+                "description": "Mannequin sex — affects front-back/lateral ratio. Default 'female'.",
+            },
+            "n_vertices_per_ring": {
+                "type": "integer",
+                "description": "Tessellation resolution around each cross-section ring. Default 32.",
+                "minimum": 8,
+                "maximum": 128,
+            },
+            "include_obj": {
+                "type": "boolean",
+                "description": "If true (default), include the full OBJ mesh string in the response.",
+            },
+        },
+        "required": [],
+    },
+)
+
+
+@register(avatar_body_form_spec, write=False)
+async def run_avatar_body_form(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    try:
+        from kerf_apparel.avatar import build_body_form, body_form_landmark_summary, body_form_to_obj
+
+        height_cm = float(a.get("height_cm", 168.0))
+        bust_cm   = float(a.get("bust_cm",   92.0))
+        waist_cm  = float(a.get("waist_cm",  74.0))
+        hip_cm    = float(a.get("hip_cm",    96.0))
+        neck_cm   = float(a["neck_cm"])   if "neck_cm"  in a else None
+        knee_cm   = float(a["knee_cm"])   if "knee_cm"  in a else None
+        calf_cm   = float(a["calf_cm"])   if "calf_cm"  in a else None
+        ankle_cm  = float(a["ankle_cm"])  if "ankle_cm" in a else None
+        sex       = str(a.get("sex", "female"))
+        n_vpr     = int(a.get("n_vertices_per_ring", 32))
+        include_obj = bool(a.get("include_obj", True))
+
+        bf = build_body_form(
+            height_cm=height_cm,
+            bust_cm=bust_cm,
+            waist_cm=waist_cm,
+            hip_cm=hip_cm,
+            neck_cm=neck_cm,
+            knee_cm=knee_cm,
+            calf_cm=calf_cm,
+            ankle_cm=ankle_cm,
+            sex=sex,
+            n_vertices_per_ring=n_vpr,
+        )
+
+        payload = {
+            "height_cm": height_cm,
+            "bust_cm": bust_cm,
+            "waist_cm": waist_cm,
+            "hip_cm": hip_cm,
+            "sex": sex,
+            "n_slices": bf.n_slices,
+            "n_vertices": int(bf.vertices.shape[0]),
+            "n_faces": int(bf.faces.shape[0]),
+            "landmarks": body_form_landmark_summary(bf),
+            "method": "CAESAR ellipsoidal cross-section (Robinette 2002) + Ramanujan 1914",
+            "note": (
+                "Simplified torso+leg mannequin: no arms, no head geometry, no pose. "
+                "Use the OBJ with a mass-spring drape solver for cloth-on-avatar fit preview."
+            ),
+        }
+        if include_obj:
+            payload["obj"] = body_form_to_obj(bf)
+
+        return ok_payload(payload)
+
+    except ValueError as e:
+        return err_payload(str(e), "BAD_ARGS")
+    except Exception as e:
+        return err_payload(f"avatar generation failed: {e}", "AVATAR_ERROR")

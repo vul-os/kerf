@@ -462,6 +462,140 @@ textiles_sustainability_spec = {
 }
 
 
+textiles_pattern_grade_spec = {
+    "name": "textiles_pattern_grade",
+    "description": (
+        "Grade a garment pattern block across a full size run using "
+        "ASTM D5219 + ISO 8559-2 industry grade rules. "
+        "Combines the kerf-textiles pattern workflow with the kerf-apparel "
+        "grading engine. Supported blocks: bodice_front, bodice_back, sleeve, "
+        "pants_front, pants_back. Supported specs: women_us, men_us, women_eu, men_eu. "
+        "Returns: bust girth at each size, bounding-box dimensions, and grade deltas (mm)."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "block": {
+                "type": "string",
+                "enum": ["bodice_front", "bodice_back", "sleeve", "pants_front", "pants_back"],
+                "description": "Which pattern block to grade.",
+            },
+            "base_size": {
+                "type": "string",
+                "description": "Starting size, e.g. 'M', 'L', '4', '36'.",
+            },
+            "size_run": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "Explicit size run, e.g. ['XS','S','M','L','XL']. "
+                    "If omitted, the full standard size run is used."
+                ),
+            },
+            "spec": {
+                "type": "string",
+                "enum": ["women_us", "men_us", "women_eu", "men_eu"],
+                "description": "Grading specification. Default women_us.",
+            },
+            "seam_allowance_cm": {
+                "type": "number",
+                "description": "If provided, add this seam allowance to all graded pieces.",
+            },
+        },
+        "required": ["block", "base_size"],
+    },
+}
+
+
+async def run_textiles_pattern_grade(params: dict[str, Any]) -> dict[str, Any]:
+    """Handler for the textiles_pattern_grade LLM tool."""
+    try:
+        from kerf_apparel.blocks import (
+            get_measurements, bodice_front, bodice_back, sleeve,
+            pants_front, pants_back,
+        )
+        from kerf_apparel.grading import (
+            grade_bodice, grade_sleeve, grade_pants,
+            bust_girth_from_piece, build_grading_table, apply_grading,
+        )
+        from kerf_apparel.seam_allowance import add_seam_allowance
+
+        block_name   = str(params.get("block", "")).strip()
+        base_size    = str(params.get("base_size", "")).strip()
+        spec         = str(params.get("spec", "women_us")).strip()
+        size_run_arg = params.get("size_run") or None
+        sa_cm        = params.get("seam_allowance_cm")
+        if sa_cm is not None:
+            sa_cm = float(sa_cm)
+
+        valid_blocks = ["bodice_front", "bodice_back", "sleeve", "pants_front", "pants_back"]
+        if block_name not in valid_blocks:
+            return {"ok": False, "error": f"block must be one of {valid_blocks}"}
+        if not base_size:
+            return {"ok": False, "error": "base_size is required"}
+
+        # Determine which grading function to use
+        if "bodice" in block_name:
+            graded_set = grade_bodice(base_size, size_run_arg)
+        elif block_name == "sleeve":
+            graded_set = grade_sleeve(base_size, size_run_arg)
+        else:
+            graded_set = grade_pants(base_size, size_run_arg)
+
+        # Build grading table for deltas
+        grading_table = build_grading_table(spec=spec)
+
+        result: dict[str, Any] = {}
+        for size in graded_set.size_run:
+            # Find the correct piece key based on block_name
+            if "front" in block_name:
+                key = f"{size}_front"
+            elif "back" in block_name:
+                key = f"{size}_back"
+            elif block_name == "sleeve":
+                key = f"{size}_sleeve"
+            else:
+                key = size
+            piece = graded_set.pieces.get(key) or graded_set.pieces.get(size)
+            if piece is None:
+                continue
+
+            if sa_cm and sa_cm > 0:
+                piece = add_seam_allowance(piece, sa_cm)
+
+            bb = piece.bounding_box()
+            # Compute grade deltas relative to base_size
+            try:
+                graded = apply_grading(piece, base_size, size, grading_table, spec=spec)
+                dx = graded.labels.get("grade_dx_mm", 0.0)
+                dy = graded.labels.get("grade_dy_mm", 0.0)
+            except Exception:
+                dx, dy = 0.0, 0.0
+
+            entry: dict[str, Any] = {
+                "width_cm":  round(bb[2] - bb[0], 2),
+                "height_cm": round(bb[3] - bb[1], 2),
+                "area_cm2":  round(piece.area(), 2),
+                "grade_dx_mm": round(dx, 2),
+                "grade_dy_mm": round(dy, 2),
+            }
+            if "bodice" in block_name or block_name == "sleeve":
+                entry["bust_girth_cm"] = round(bust_girth_from_piece(piece), 2)
+            result[size] = entry
+
+        return {
+            "ok": True,
+            "block": block_name,
+            "base_size": base_size,
+            "spec": spec,
+            "seam_allowance_cm": sa_cm,
+            "sizes": result,
+        }
+
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
 async def run_textiles_sustainability(params: dict) -> dict:
     """Handler for the textiles_sustainability LLM tool."""
     try:

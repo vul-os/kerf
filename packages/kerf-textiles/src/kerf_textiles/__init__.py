@@ -83,26 +83,30 @@ from kerf_textiles.mass_spring import (
     PlanePrimitive,
     solve_step,
 )
-from kerf_textiles.sublimation import (
-    unwrap_cylinder,
-    project_artwork,
-    add_bleed,
-    add_registration_marks,
-    render_panel_png,
-    CylinderPanel,
-    BleedResult,
-    RegMarkResult,
-    SubliResult,
-)
-from kerf_textiles.screen_print import (
-    separate_spot_colours,
-    render_separations,
-    render_separations_pdf,
-    SpotColour,
-    SeparationResult,
-    PrintReadySeparation,
-    ScreenPrintResult,
-)
+try:
+    from kerf_textiles.sublimation import (
+        unwrap_cylinder,
+        project_artwork,
+        add_bleed,
+        add_registration_marks,
+        render_panel_png,
+        CylinderPanel,
+        BleedResult,
+        RegMarkResult,
+        SubliResult,
+    )
+    from kerf_textiles.screen_print import (
+        separate_spot_colours,
+        render_separations,
+        render_separations_pdf,
+        SpotColour,
+        SeparationResult,
+        PrintReadySeparation,
+        ScreenPrintResult,
+    )
+except ImportError:
+    # Pillow is optional; sublimation + screen_print degrade gracefully
+    pass
 from kerf_textiles.etextiles import (
     ResistiveYarn,
     HeaterSegment,

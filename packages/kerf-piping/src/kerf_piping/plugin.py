@@ -22,6 +22,9 @@ async def register(app: FastAPI, ctx):
         piping_pipe_spec_check_spec, run_piping_pipe_spec_check,
         piping_min_wall_thickness_spec, run_piping_min_wall_thickness,
         piping_recommend_schedule_spec, run_piping_recommend_schedule,
+        piping_pressure_drop_spec, run_piping_pressure_drop,
+        piping_b16_fittings_spec, run_piping_b16_fittings,
+        piping_pipe_stress_spec, run_piping_pipe_stress,
     )
     ctx.tools.register(
         "piping_route_isometric",
@@ -53,25 +56,44 @@ async def register(app: FastAPI, ctx):
         piping_recommend_schedule_spec,
         run_piping_recommend_schedule,
     )
+    ctx.tools.register(
+        "piping_pressure_drop",
+        piping_pressure_drop_spec,
+        run_piping_pressure_drop,
+    )
+    ctx.tools.register(
+        "piping_b16_fittings",
+        piping_b16_fittings_spec,
+        run_piping_b16_fittings,
+    )
+    ctx.tools.register(
+        "piping_pipe_stress",
+        piping_pipe_stress_spec,
+        run_piping_pipe_stress,
+    )
 
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="piping",
-            version="0.1.0",
+            version="0.2.0",
             provides=[
                 "piping.pid", "piping.isometric", "piping.dxf",
                 "piping.b31_3", "piping.b31_1_wall_thickness",
+                "piping.pressure_drop", "piping.b16_catalogue",
+                "piping.b31_pipe_stress",
             ],
             depends=[],
         )
     except ImportError:
         return {
             "name": "piping",
-            "version": "0.1.0",
+            "version": "0.2.0",
             "provides": [
                 "piping.pid", "piping.isometric", "piping.dxf",
                 "piping.b31_3", "piping.b31_1_wall_thickness",
+                "piping.pressure_drop", "piping.b16_catalogue",
+                "piping.b31_pipe_stress",
             ],
             "depends": [],
         }

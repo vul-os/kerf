@@ -707,3 +707,383 @@ async def run_piping_recommend_schedule(args: dict[str, Any], ctx: "ProjectCtx")
 
     except Exception as exc:
         return err_payload(str(exc), "PIPING_SCHEDULE_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# piping_pressure_drop  (Darcy-Weisbach + Crane TP-410 K-factors)
+# ---------------------------------------------------------------------------
+
+piping_pressure_drop_spec = ToolSpec(
+    name="piping_pressure_drop",
+    description=(
+        "Calculate pipeline pressure drop for a multi-segment piping system "
+        "using Darcy-Weisbach friction losses (Colebrook-White friction factor) "
+        "and Crane TP-410 §3 K-factor fitting losses.  "
+        "Returns total ΔP, straight-pipe contribution, fitting contribution, "
+        "and per-segment / per-fitting breakdown.  "
+        "\n\nMethod: Darcy-Weisbach ΔP = f·(L/D)·ρV²/2  (ASME B31 / Crane TP-410 §1). "
+        "Friction factor from Colebrook-White iterative solver.  "
+        "Fluid options: 'water' (60°F), 'oil' (SG≈0.85), 'air' (68°F), 'steam' (212°F).  "
+        "\n\nFitting K keys: '90_elbow_welded', '45_elbow_welded', '90_elbow_threaded', "
+        "'tee_through', 'tee_branch', 'gate_valve_open', 'globe_valve', 'check_valve', "
+        "'ball_valve_open', 'butterfly_valve_open', 'angle_valve_open', "
+        "'reducer_sudden', 'expander_sudden'.  "
+        "\n\nDISCLAIMER: ASME B31 / Crane TP-410 methods — NOT certified compliance.  "
+        "Review by a licensed engineer required."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "segments": {
+                "type": "array",
+                "description": (
+                    "List of straight pipe segments.  Each segment is an object with: "
+                    "'diameter_in' (float, inside pipe diameter inches), "
+                    "'length_ft' (float, segment length feet), "
+                    "'roughness' (float, optional, wall roughness ft, default 0.00015), "
+                    "'fluid' (string, optional, fluid override)."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "diameter_in": {"type": "number"},
+                        "length_ft":   {"type": "number"},
+                        "roughness":   {"type": "number"},
+                        "fluid":       {"type": "string"},
+                    },
+                    "required": ["diameter_in", "length_ft"],
+                },
+            },
+            "fittings": {
+                "type": "array",
+                "description": (
+                    "List of fittings.  Each fitting is an object with: "
+                    "'fitting_kind' (string, Crane TP-410 fitting key), "
+                    "'diameter_in' (float, pipe diameter at fitting), "
+                    "'quantity' (int, optional, default 1), "
+                    "'beta' (float, optional, area ratio for reducer/expander)."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "fitting_kind": {"type": "string"},
+                        "diameter_in":  {"type": "number"},
+                        "quantity":     {"type": "integer"},
+                        "beta":         {"type": "number"},
+                    },
+                    "required": ["fitting_kind", "diameter_in"],
+                },
+            },
+            "flow_gpm": {
+                "type": "number",
+                "description": "Volumetric flow rate (US gallons per minute).",
+            },
+            "fluid": {
+                "type": "string",
+                "enum": ["water", "oil", "air", "steam"],
+                "description": "Default fluid for all segments. Default 'water'.",
+            },
+        },
+        "required": ["segments", "flow_gpm"],
+    },
+)
+
+
+async def run_piping_pressure_drop(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_piping.asme_pressure import compute_pipeline_pressure_drop
+
+        segments = args["segments"]
+        fittings = args.get("fittings", [])
+        flow_gpm = float(args["flow_gpm"])
+        fluid    = str(args.get("fluid", "water"))
+
+        result = compute_pipeline_pressure_drop(
+            segments=segments,
+            fittings=fittings,
+            flow_gpm=flow_gpm,
+            fluid=fluid,
+        )
+        payload: dict[str, Any] = {"ok": True, **result}
+        return ok_payload(payload)
+
+    except Exception as exc:
+        return err_payload(str(exc), "PIPING_PRESSURE_DROP_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# piping_b16_fittings  (ASME B16.9/B16.5 fitting catalogue + BOM)
+# ---------------------------------------------------------------------------
+
+piping_b16_fittings_spec = ToolSpec(
+    name="piping_b16_fittings",
+    description=(
+        "Return ASME B16.9 butt-weld fitting dimensions and ASME B16.5 flange "
+        "pressure-temperature ratings for a piping route.  Generates a fitting "
+        "bill of materials (BOM) with dimensions, weights, and standard references.  "
+        "\n\nASME B16.9-2018 fittings: 90° LR elbows, 90° SR elbows, 45° elbows, "
+        "equal tees, concentric reducers, caps.  "
+        "\n\nASME B16.5-2017 flanges: Class 150/300/600/900/1500/2500 pressure-"
+        "temperature ratings for Material Group 1.1 (carbon steel A105/A216 WCB).  "
+        "\n\nReturns: BOM list with center-to-face dimensions, overall lengths, "
+        "approximate weights, and flange rating (psi and bar).  "
+        "\n\nDISCLAIMER: Dimensional data from ASME B16.9/B16.5 — "
+        "NOT a replacement for the primary ASME standard."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "dn": {
+                "type": "integer",
+                "description": (
+                    "Nominal pipe diameter (DN, mm) for standard fittings.  "
+                    "E.g. 50, 100, 150, 200, 250, 300."
+                ),
+            },
+            "elbows_90lr": {
+                "type": "integer",
+                "description": "Number of 90° long-radius elbows (ASME B16.9). Default 0.",
+            },
+            "elbows_90sr": {
+                "type": "integer",
+                "description": "Number of 90° short-radius elbows (ASME B16.9). Default 0.",
+            },
+            "elbows_45": {
+                "type": "integer",
+                "description": "Number of 45° long-radius elbows (ASME B16.9). Default 0.",
+            },
+            "tees_equal": {
+                "type": "integer",
+                "description": "Number of equal tees (ASME B16.9). Default 0.",
+            },
+            "reducers": {
+                "type": "array",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "minItems": 2,
+                    "maxItems": 2,
+                },
+                "description": (
+                    "List of [dn_large, dn_small] reducer pairs.  "
+                    "E.g. [[200, 150], [150, 100]] for two reducers."
+                ),
+            },
+            "caps": {
+                "type": "integer",
+                "description": "Number of end caps (ASME B16.9). Default 0.",
+            },
+            "flange_class": {
+                "type": "integer",
+                "enum": [150, 300, 600, 900, 1500, 2500],
+                "description": (
+                    "ASME B16.5 flange class for rating lookup.  "
+                    "Omit to skip flange rating."
+                ),
+            },
+            "flanges": {
+                "type": "integer",
+                "description": "Number of flanges (ASME B16.5). Default 0.",
+            },
+            "temp_F": {
+                "type": "number",
+                "description": (
+                    "Design temperature (°F) for flange derating.  "
+                    "Default 100°F (ambient).  Range 100–800°F for Group 1.1."
+                ),
+            },
+        },
+        "required": ["dn"],
+    },
+)
+
+
+async def run_piping_b16_fittings(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_piping.b16_catalogue import select_fittings
+
+        dn            = int(args["dn"])
+        elbows_90lr   = int(args.get("elbows_90lr", 0))
+        elbows_90sr   = int(args.get("elbows_90sr", 0))
+        elbows_45     = int(args.get("elbows_45", 0))
+        tees_equal    = int(args.get("tees_equal", 0))
+        raw_reducers  = args.get("reducers", [])
+        reducers      = [tuple(r) for r in raw_reducers] if raw_reducers else None
+        caps          = int(args.get("caps", 0))
+        flange_class  = int(args["flange_class"]) if args.get("flange_class") else None
+        flanges       = int(args.get("flanges", 0))
+        temp_F        = float(args.get("temp_F", 100.0))
+
+        result = select_fittings(
+            dn=dn,
+            elbows_90lr=elbows_90lr,
+            elbows_90sr=elbows_90sr,
+            elbows_45=elbows_45,
+            tees_equal=tees_equal,
+            reducers=reducers,
+            caps=caps,
+            flange_class=flange_class,
+            flanges=flanges,
+            temp_F=temp_F,
+        )
+        payload: dict[str, Any] = {"ok": True, "dn": dn, **result}
+        return ok_payload(payload)
+
+    except Exception as exc:
+        return err_payload(str(exc), "PIPING_B16_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# piping_pipe_stress  (ASME B31.1 sustained + thermal + occasional)
+# ---------------------------------------------------------------------------
+
+piping_pipe_stress_spec = ToolSpec(
+    name="piping_pipe_stress",
+    description=(
+        "ASME B31.1 / B31.3 pipe stress check for straight pipe runs.  "
+        "Evaluates three load cases: sustained (pressure + dead weight), "
+        "thermal expansion (fully-restrained axial), and optional occasional "
+        "(wind / seismic).  "
+        "\n\nSustained (B31.1 §104.8.1):  S_L = P·D/(4t) + M_gravity/Z ≤ S_h  "
+        "\nThermal (fully restrained):     σ_th = E·α·ΔT  [reports force and stress] "
+        "\nOccasional (B31.1 §104.8.4):   S_L_occ = S_sustained + M_occ/Z ≤ 1.33·S_h  "
+        "\n\nMaterials: 'A106-B' (carbon steel), 'A53-B', 'A312-304', "
+        "'A312-316', 'A333-6'.  "
+        "\n\nDISCLAIMER: Simplified ASME B31 methods — NOT ASME stamp certified.  "
+        "Full piping flexibility analysis (CAESAR II-class 3D elastic FEA) required "
+        "for actual installation."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "od_in": {
+                "type": "number",
+                "description": "Pipe outside diameter (inches).",
+            },
+            "wall_in": {
+                "type": "number",
+                "description": "Nominal pipe wall thickness (inches).",
+            },
+            "pressure_psi": {
+                "type": "number",
+                "description": "Internal design gauge pressure (psi).",
+            },
+            "weight_lbf_per_ft": {
+                "type": "number",
+                "description": (
+                    "Distributed weight of pipe + fluid + insulation (lbf/ft).  "
+                    "Typical carbon steel 4\" Sch40 water-filled ≈ 15–20 lbf/ft."
+                ),
+            },
+            "span_ft": {
+                "type": "number",
+                "description": (
+                    "Support span length (feet) for gravity bending moment.  "
+                    "Typical steam: 15–20 ft; water: 12–18 ft per ASME B31.1 Table 121.5."
+                ),
+            },
+            "material": {
+                "type": "string",
+                "enum": ["A106-B", "A53-B", "A312-304", "A312-316", "A333-6"],
+                "description": "Material key for allowable stress lookup. Default 'A106-B'.",
+            },
+            "code": {
+                "type": "string",
+                "enum": ["B31.1", "B31.3"],
+                "description": "ASME piping code. Default 'B31.1'.",
+            },
+            "delta_T_F": {
+                "type": "number",
+                "description": (
+                    "Temperature change ΔT (°F) from ambient to operating temperature.  "
+                    "Used for thermal expansion force calculation.  Default 0 (no thermal)."
+                ),
+            },
+            "M_occasional_inlbf": {
+                "type": "number",
+                "description": (
+                    "Occasional load bending moment (in-lbf) from wind, seismic, etc.  "
+                    "Omit (or 0) to skip occasional load check."
+                ),
+            },
+            "joint_efficiency": {
+                "type": "number",
+                "description": (
+                    "Longitudinal weld joint efficiency E.  "
+                    "1.0 = seamless (default); 0.85 = ERW."
+                ),
+            },
+        },
+        "required": ["od_in", "wall_in", "pressure_psi", "weight_lbf_per_ft", "span_ft"],
+    },
+)
+
+
+async def run_piping_pipe_stress(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_piping.pipe_stress import (
+            sustained_stress, thermal_expansion_force, occasional_stress_check,
+            _pipe_section_modulus_in3,
+        )
+
+        od_in            = float(args["od_in"])
+        wall_in          = float(args["wall_in"])
+        pressure_psi     = float(args["pressure_psi"])
+        weight_lbf_ft    = float(args["weight_lbf_per_ft"])
+        span_ft          = float(args["span_ft"])
+        material         = str(args.get("material", "A106-B"))
+        code             = str(args.get("code", "B31.1"))
+        delta_T_F        = float(args.get("delta_T_F", 0.0))
+        M_occ            = float(args.get("M_occasional_inlbf", 0.0))
+        joint_eff        = float(args.get("joint_efficiency", 1.0))
+
+        # Sustained check
+        sus = sustained_stress(
+            od_in=od_in,
+            wall_in=wall_in,
+            pressure_psi=pressure_psi,
+            weight_lbf_per_ft=weight_lbf_ft,
+            span_ft=span_ft,
+            material=material,
+            code=code,
+            joint_efficiency=joint_eff,
+        )
+
+        # Thermal check
+        thermal = None
+        if delta_T_F != 0.0:
+            thermal = thermal_expansion_force(
+                od_in=od_in,
+                wall_in=wall_in,
+                delta_T_F=delta_T_F,
+                material=material,
+                code=code,
+            )
+
+        # Occasional check
+        occ = None
+        if M_occ > 0.0:
+            Z = _pipe_section_modulus_in3(od_in, wall_in)
+            from kerf_piping.pipe_stress import _SH_PSI
+            S_h = _SH_PSI.get(material, 17_500)
+            occ = occasional_stress_check(
+                S_sustained_psi=sus.calculated_psi,
+                M_occasional_inlbf=M_occ,
+                Z_in3=Z,
+                S_h_psi=S_h,
+            )
+
+        payload: dict[str, Any] = {
+            "ok": True,
+            "material": material,
+            "code": code,
+            "od_in": od_in,
+            "wall_in": wall_in,
+            "sustained": sus.as_dict(),
+            "thermal": thermal,
+            "occasional": occ.as_dict() if occ else None,
+        }
+        return ok_payload(payload)
+
+    except Exception as exc:
+        return err_payload(str(exc), "PIPING_STRESS_ERROR")

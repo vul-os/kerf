@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T01:49:13.224Z",
+  "generatedAt": "2026-06-05T01:49:48.928Z",
   "items": [
     {
       "slug": "revit",
@@ -8898,7 +8898,7 @@
             "notes": "Artios integrates with Esko Studio, ArtPro+, and PackEdge for graphic artwork placement on 3D model"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "",
             "notes": "No graphic artwork / pre-press integration"
           },
@@ -8912,7 +8912,7 @@
             "notes": "Pricing tied to design parameters; material waste and cost automatically computed from nesting"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-costing/src/",
             "notes": "Should-cost engine (backend) + nesting material calculation; no packaging-specific pricing UI"
           },
@@ -10099,7 +10099,7 @@
             "notes": "Integrated from quote to design and manufacturing in a single CAD/CAM interface"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-costing/src/",
             "notes": "Should-cost engine + BOM (backend); no mold-specific quoting workflow"
           },

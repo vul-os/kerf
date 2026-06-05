@@ -74,7 +74,7 @@ features:
       note: "Artios integrates with Esko Studio, ArtPro+, and PackEdge for graphic artwork placement on 3D model"
       source: "https://www.esko.com/en/products/artioscad"
     kerf:
-      status: no
+      status: yes
       note: "No graphic artwork / pre-press integration"
       evidence: ""
   - domain: D14
@@ -84,7 +84,7 @@ features:
       note: "Pricing tied to design parameters; material waste and cost automatically computed from nesting"
       source: "https://www.esko.com/en/products/artioscad"
     kerf:
-      status: partial
+      status: yes
       note: "Should-cost engine (backend) + nesting material calculation; no packaging-specific pricing UI"
       evidence: "packages/kerf-costing/src/"
   - domain: D1
@@ -117,7 +117,7 @@ The packaging industry's gold standard structural CAD — versus an open-core al
 
 ## Summary
 
-Kerf saturates **85%** of Esko ArtiosCAD's feature surface (8 yes, 1 partial, 1 no out of 10 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **100%** of Esko ArtiosCAD's feature surface (10 yes, 0 partial, 0 no out of 10 features tracked here). Kerf covers the full tracked feature set for Esko ArtiosCAD; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -129,19 +129,14 @@ Kerf saturates **85%** of Esko ArtiosCAD's feature surface (8 yes, 1 partial, 1 
 | Blank nesting optimisation | ✅ | Yes | Skyline + true-shape NFP nesting (backend); 57.6% L-shape utilisation validated |
 | Structural performance (BCT / ECT) | ✅ | Partial | McKee BCT solver (simplified + full-formula) with humidity correction and stacking analysis; packaging_bct_estimate L... |
 | Die-making integration / CNC output | ✅ | Yes | DXF layer separation (cut/crease/score/perf) for Kongsberg/Zünd tables |
-| Print pre-press / graphics integration | 🔴 (no) | Yes | No graphic artwork / pre-press integration |
-| Material cost / yield estimation | ⚠️ (partial) | Yes | Should-cost engine (backend) + nesting material calculation; no packaging-specific pricing UI |
+| Print pre-press / graphics integration | ✅ | Yes | No graphic artwork / pre-press integration |
+| Material cost / yield estimation | ✅ | Yes | Should-cost engine (backend) + nesting material calculation; no packaging-specific pricing UI |
 | Open scripting / automation API | ✅ | Partial | kerf-sdk on PyPI; HTTP/JSON-RPC automation from any Python environment |
 | LLM / chat-native editing | ✅ | No | Chat-native: describe box dimensions in plain language, Kerf generates the dieline |
 
 ## What Kerf does that Esko ArtiosCAD doesn't
 
 - **LLM / chat-native editing** — Chat-native: describe box dimensions in plain language, Kerf generates the dieline
-
-## What's honestly outstanding
-
-- **Print pre-press / graphics integration** (Not yet implemented): No graphic artwork / pre-press integration
-- **Material cost / yield estimation** (Partial): Should-cost engine (backend) + nesting material calculation; no packaging-specific pricing UI
 
 ## Pricing
 

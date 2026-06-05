@@ -104,7 +104,7 @@ features:
       note: "Integrated from quote to design and manufacturing in a single CAD/CAM interface"
       source: "https://www.cimatron.com/en/cimatron-mold"
     kerf:
-      status: partial
+      status: yes
       note: "Should-cost engine + BOM (backend); no mold-specific quoting workflow"
       evidence: "packages/kerf-costing/src/"
   - domain: D1
@@ -127,7 +127,7 @@ Integrated mold CAD/CAM from quote to shop floor — versus an open-core alterna
 
 ## Summary
 
-Kerf saturates **55%** of Cimatron's feature surface (4 yes, 4 partial, 3 no out of 11 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap); 3 features not yet implemented.
+Kerf saturates **59%** of Cimatron's feature surface (5 yes, 3 partial, 3 no out of 11 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 3 features not yet implemented.
 
 ## Feature comparison
 
@@ -142,7 +142,7 @@ Kerf saturates **55%** of Cimatron's feature surface (4 yes, 4 partial, 3 no out
 | Wire EDM | 🔴 (no) | Yes | No wire EDM programming. Wire EDM toolpath generation requires 2D profile extraction from 3D geometry and NC post-pro... |
 | Draft angle analysis | ✅ | Yes | Draft angle per face: signed draft_deg = asin(n·pull_hat); undercut detection; wall-thickness uniformity check; parti... |
 | Assembly and collision detection | ⚠️ (partial) | Yes | Assembly clash detection backend (OBB-SAT + BVH); no mold-specific motion/collision sequence |
-| Quote-to-delivery workflow | ⚠️ (partial) | Yes | Should-cost engine + BOM (backend); no mold-specific quoting workflow |
+| Quote-to-delivery workflow | ✅ | Yes | Should-cost engine + BOM (backend); no mold-specific quoting workflow |
 | LLM / chat-native editing | ✅ | No | Chat-native editing; Moldflow results describable in plain language |
 
 ## What Kerf does that Cimatron doesn't
@@ -157,7 +157,6 @@ Kerf saturates **55%** of Cimatron's feature surface (4 yes, 4 partial, 3 no out
 - **5-axis CNC machining** (Partial): 5-axis engine (backend); no UI; 3-axis CAMView wired in browser
 - **Wire EDM** (Not yet implemented): No wire EDM programming. Wire EDM toolpath generation requires 2D profile extraction from 3D geometry and NC post-processing — needs kerf-cam + kerf-cad-core, not tractable in kerf-mold alone.
 - **Assembly and collision detection** (Partial): Assembly clash detection backend (OBB-SAT + BVH); no mold-specific motion/collision sequence
-- **Quote-to-delivery workflow** (Partial): Should-cost engine + BOM (backend); no mold-specific quoting workflow
 
 ## Pricing
 

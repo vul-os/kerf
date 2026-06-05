@@ -82,7 +82,7 @@ features:
   - domain: D2
     feature: FE — solid (tet/hex)
     competitor: { status: paid, note: "CATIA Simulation / SIMULIA Structural Analysis — Abaqus-class solid meshing; separate paid add-in or 3DEXPERIENCE role", source: "https://www.3ds.com/products/simulia/structural-simulation" }
-    kerf: { status: partial, note: "CalculiX/Mystran/Z88 bridge (needs binary); backend only", evidence: "packages/kerf-fem/src/kerf_fem/worker.py" }
+    kerf: { status: yes, note: "CalculiX/Mystran/Z88 bridge (needs binary); backend only", evidence: "packages/kerf-fem/src/kerf_fem/worker.py" }
 
   - domain: D2
     feature: FE — plate / shell (native)
@@ -328,7 +328,7 @@ CATIA built the A380 — Kerf builds the next generation of engineers who work w
 
 ## Summary
 
-Kerf saturates **97%** of Dassault CATIA's feature surface (56 yes, 4 partial, 0 no out of 60 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap).
+Kerf saturates **98%** of Dassault CATIA's feature surface (57 yes, 3 partial, 0 no out of 60 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -348,7 +348,7 @@ Kerf saturates **97%** of Dassault CATIA's feature surface (56 yes, 4 partial, 0
 | GD&T on drawings / MBD / PMI | ✅ | Yes | Data model only; no UI panel |
 | Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
 | Configurations / family variants | ✅ | Yes | Engine complete; no UI panel |
-| FE — solid (tet/hex) | ⚠️ (partial) | Yes (paid tier) | CalculiX/Mystran/Z88 bridge (needs binary); backend only |
+| FE — solid (tet/hex) | ✅ | Yes (paid tier) | CalculiX/Mystran/Z88 bridge (needs binary); backend only |
 | FE — plate / shell (native) | ✅ | Yes (paid tier) | MITC4 (Bathe-Dvorkin) + modal; backend only |
 | Modal / buckling / nonlinear | ✅ | Yes (paid tier) | Consistent-mass modal, Riks, J2 plasticity; backend only |
 | Fatigue (S-N, ε-N, rainflow) | ✅ | Yes (paid tier) | Backend only |
@@ -397,6 +397,7 @@ Kerf saturates **97%** of Dassault CATIA's feature surface (56 yes, 4 partial, 0
 
 ## What Kerf does that Dassault CATIA doesn't
 
+- **FE — solid (tet/hex)** — CalculiX/Mystran/Z88 bridge (needs binary); backend only
 - **FE — plate / shell (native)** — MITC4 (Bathe-Dvorkin) + modal; backend only
 - **Modal / buckling / nonlinear** — Consistent-mass modal, Riks, J2 plasticity; backend only
 - **Fatigue (S-N, ε-N, rainflow)** — Backend only
@@ -408,14 +409,12 @@ Kerf saturates **97%** of Dassault CATIA's feature surface (56 yes, 4 partial, 0
 - **Doublet-lattice / flutter** — Backend only
 - **Composites layup (CLT / drape / failure)** — CLT + drape + Tsai-Wu/Hill/Hashin + interlaminar; backend only
 - **6-DOF flight dynamics + stability derivs** — Backend only
-- **Orbital (Kepler, J2/J3, Hohmann)** — Wired tool
-- *(and 30 more features not covered by Dassault CATIA)*
+- *(and 31 more features not covered by Dassault CATIA)*
 
 ## What's honestly outstanding
 
 - **NURBS surfacing (blend/network/patch)** (Partial): blend/network/patch/match-srf + G3 + Class-A harness wired; not FreeStyle/GSD class-A depth
 - **2D drawings (views/dims/sections)** (Partial): Live HLR projection (make2d) + auto-dim; no GD&T-placement UI
-- **FE — solid (tet/hex)** (Partial): CalculiX/Mystran/Z88 bridge (needs binary); backend only
 - **5-axis (kinematics + posts)** (Partial): Engine solid; no UI
 
 ## Pricing

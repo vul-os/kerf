@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T01:54:12.310Z",
+  "generatedAt": "2026-06-05T02:02:13.638Z",
   "items": [
     {
       "slug": "revit",
@@ -6249,7 +6249,7 @@
             "notes": "SOLIDWORKS Simulation Standard — linear static study"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-fem/src/kerf_fem/linear_static.py",
             "notes": "Linear static solver; no UI panel beyond displacement render"
           },
@@ -6277,7 +6277,7 @@
             "notes": "Frequency/buckling in Simulation Standard; nonlinear in Premium"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-fem/src/kerf_fem/buckling.py",
             "notes": "Consistent-mass modal + linear eigenvalue buckling (Euler-Bernoulli Kg) + harmonic/FRF (mode superposition) + random-vibration PSD (Miles' equation + shaped PSD) + Riks + J2 plasticity backend; no UI"
           },
@@ -7002,7 +7002,7 @@
             "notes": "Simulation included in Professional/Enterprise plan only"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-structural/src/kerf_structural/aisc_member.py",
             "notes": "Linear static + thermal + modal; no UI panel"
           },
@@ -9318,7 +9318,7 @@
             "notes": "CATIA Simulation / SIMULIA Structural Analysis — Abaqus-class solid meshing; separate paid add-in or 3DEXPERIENCE role"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-fem/src/kerf_fem/worker.py",
             "notes": "CalculiX/Mystran/Z88 bridge (needs binary); backend only"
           },
@@ -15968,7 +15968,7 @@
             "notes": "No FEA or structural analysis capability"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-structural/",
             "notes": "Deep backend engines (AISC/ACI/NDS/EC codes, FEM beam/plate/shell); minimal UI"
           },

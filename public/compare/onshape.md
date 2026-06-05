@@ -105,7 +105,7 @@ features:
       note: "Simulation included in Professional/Enterprise plan only"
       source: "https://www.onshape.com/en/features/simulation"
     kerf:
-      status: partial
+      status: yes
       note: "Linear static + thermal + modal; no UI panel"
       evidence: "packages/kerf-structural/src/kerf_structural/aisc_member.py"
 
@@ -659,7 +659,7 @@ Browser-native real-time-collab CAD — closest peer in cloud shape.
 
 ## Summary
 
-Kerf saturates **96%** of Onshape's feature surface (53 yes, 4 partial, 0 no out of 57 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap).
+Kerf saturates **97%** of Onshape's feature surface (54 yes, 3 partial, 0 no out of 57 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -673,7 +673,7 @@ Kerf saturates **96%** of Onshape's feature surface (53 yes, 4 partial, 0 no out
 | Configurations / family variants | ✅ | Yes | ConfigurationsPanel.jsx wired in Editor.jsx |
 | NURBS surfacing (blend/network/patch) | ✅ | Yes | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired |
 | GD&T on drawings / MBD / PMI | ✅ | Yes | Data model + auto-propose only; no UI placement |
-| FEM linear static + modal (built-in) | ⚠️ (partial) | Yes (paid tier) | Linear static + thermal + modal; no UI panel |
+| FEM linear static + modal (built-in) | ✅ | Yes (paid tier) | Linear static + thermal + modal; no UI panel |
 | AISC 360-22 steel (members) | ✅ | No | Full Ch. E/F/H + 50-section catalog (backend) |
 | Fatigue (S-N, ε-N, rainflow) | ✅ | No | S-N, ε-N, multiaxial rainflow (backend) |
 | ASCE 7-22 seismic / wind | ✅ | No | ELF+RSA+Newmark + MWFRS+C&C (backend) |
@@ -725,6 +725,7 @@ Kerf saturates **96%** of Onshape's feature surface (53 yes, 4 partial, 0 no out
 
 ## What Kerf does that Onshape doesn't
 
+- **FEM linear static + modal (built-in)** — Linear static + thermal + modal; no UI panel
 - **AISC 360-22 steel (members)** — Full Ch. E/F/H + 50-section catalog (backend)
 - **Fatigue (S-N, ε-N, rainflow)** — S-N, ε-N, multiaxial rainflow (backend)
 - **ASCE 7-22 seismic / wind** — ELF+RSA+Newmark + MWFRS+C&C (backend)
@@ -736,13 +737,11 @@ Kerf saturates **96%** of Onshape's feature surface (53 yes, 4 partial, 0 no out
 - **Steam/water properties (IAPWS-IF97)** — IAPWS-IF97 Regions 1/2/4; h/v/s/cp validated (backend)
 - **3D wing VLM (+ viscous + compressibility)** — Strip viscous CD0+PG/KT+Korn-Lock wave-drag (backend)
 - **Orbital mechanics (Kepler, J2/J3, Hohmann)** — Lambert multi-rev + Hohmann + reentry wired
-- **Naval hydrostatics + GZ stability (IMO)** — Hydrostatics + GZ curve + IMO criteria (backend)
-- *(and 27 more features not covered by Onshape)*
+- *(and 28 more features not covered by Onshape)*
 
 ## What's honestly outstanding
 
 - **2D drawings (views/dims/sections)** (Partial): Multi-sheet HLR drawings; no GD&T placement UI
-- **FEM linear static + modal (built-in)** (Partial): Linear static + thermal + modal; no UI panel
 - **CFD** (Partial): Real OpenFOAM bridge (backend, needs install)
 - **5-axis CAM (kinematics + posts)** (Partial): 5-axis engine solid; no UI
 

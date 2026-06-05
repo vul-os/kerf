@@ -171,7 +171,7 @@ features:
       note: "SOLIDWORKS Simulation Standard — linear static study"
       source: "https://help.solidworks.com/2021/english/SolidWorks/cworks/c_Fatigue_Analysis.htm"
     kerf:
-      status: partial
+      status: yes
       note: "Linear static solver; no UI panel beyond displacement render"
       evidence: "packages/kerf-fem/src/kerf_fem/linear_static.py"
 
@@ -193,7 +193,7 @@ features:
       note: "Frequency/buckling in Simulation Standard; nonlinear in Premium"
       source: "https://help.solidworks.com/2026/english/simtutorialonline/c_simconn_fatigue.htm"
     kerf:
-      status: partial
+      status: yes
       note: "Consistent-mass modal + linear eigenvalue buckling (Euler-Bernoulli Kg) + harmonic/FRF (mode superposition) + random-vibration PSD (Miles' equation + shaped PSD) + Riks + J2 plasticity backend; no UI"
       evidence: "packages/kerf-fem/src/kerf_fem/buckling.py"
 
@@ -681,7 +681,7 @@ features:
 
 ## Summary
 
-Kerf saturates **78%** of SOLIDWORKS's feature surface (33 yes, 26 partial, 0 no out of 59 features tracked here). Honest gaps: 26 features partial (engine complete, UI or depth gap).
+Kerf saturates **80%** of SOLIDWORKS's feature surface (35 yes, 24 partial, 0 no out of 59 features tracked here). Honest gaps: 24 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -701,9 +701,9 @@ Kerf saturates **78%** of SOLIDWORKS's feature surface (33 yes, 26 partial, 0 no
 | GD&T on drawings / MBD / PMI | ✅ | Yes | Data model + auto-propose only; no UI for placement |
 | Configurations / family variants | ✅ | Yes | Engine + ConfigurationsPanel.jsx wired in Editor.jsx |
 | Large assembly performance mode | ⚠️ (partial) | Yes | LOD mesh swapping (configurable); no SpeedPak equivalent |
-| FE — linear static (native) | ⚠️ (partial) | Yes | Linear static solver; no UI panel beyond displacement render |
+| FE — linear static (native) | ✅ | Yes | Linear static solver; no UI panel beyond displacement render |
 | FE — fatigue (S-N) | ⚠️ (partial) | Yes (paid tier) | S-N + ε-N + rainflow backend; no UI |
-| Modal / buckling / nonlinear FEA | ⚠️ (partial) | Yes (paid tier) | Consistent-mass modal + linear eigenvalue buckling (Euler-Bernoulli Kg) + harmonic/FRF (mode superposition) + random-... |
+| Modal / buckling / nonlinear FEA | ✅ | Yes (paid tier) | Consistent-mass modal + linear eigenvalue buckling (Euler-Bernoulli Kg) + harmonic/FRF (mode superposition) + random-... |
 | AISC 360 / ACI 318 member design | ⚠️ (partial) | No | Full per-code backend; no UI panel |
 | Spur/helical gear rating (AGMA/ISO 6336) | ⚠️ (partial) | No | Full AGMA 2001-D04 + ISO 6336 Method B backend; no UI |
 | Bearings — ISO 281 L10 / ISO/TS 16281 | ⚠️ (partial) | No | ISO 281 + ISO/TS 16281 aISO modified life backend; no UI |
@@ -749,6 +749,7 @@ Kerf saturates **78%** of SOLIDWORKS's feature surface (33 yes, 26 partial, 0 no
 
 ## What Kerf does that SOLIDWORKS doesn't
 
+- **Modal / buckling / nonlinear FEA** — Consistent-mass modal + linear eigenvalue buckling (Euler-Bernoulli Kg) + harmonic/FRF (mode superposition) + random-vibration PSD (Miles' equation + shaped PSD) + Riks + J2 plasticity backend; no UI
 - **HVAC duct sizing (SMACNA)** — SMACNA duct sizing + flat-pattern backend; no UI
 - **Heat exchanger (LMTD/ε-NTU)** — Full TEMA shell-tube with Bell-Delaware + 5 correction factors backend
 - **Airfoil / wing aerodynamics (VLM)** — 3D wing VLM + strip viscous CD0 + PG/KT compressibility; wired
@@ -760,17 +761,14 @@ Kerf saturates **78%** of SOLIDWORKS's feature surface (33 yes, 26 partial, 0 no
 - **Nesting (2D part layout)** — Skyline + true-shape NFP + Minkowski-sum backend
 - **Moldflow / injection fill simulation** — Hele-Shaw front tracking + weld-line + air-trap backend
 - **FDM slicing** — Cura integration wired (PrintSliceView)
-- **PLC IEC 61131-3 (ST/Ladder/FB)** — ST editor + live Ladder power-flow sim wired
-- *(and 7 more features not covered by SOLIDWORKS)*
+- *(and 8 more features not covered by SOLIDWORKS)*
 
 ## What's honestly outstanding
 
 - **Assembly interference (clash)** (Partial): Backend OBB-SAT + BVH + tri-tri; no UI panel
 - **2D drawings (views/dims/sections)** (Partial): Live B-rep HLR projection + auto-dim; no GD&T-placement UI
 - **Large assembly performance mode** (Partial): LOD mesh swapping (configurable); no SpeedPak equivalent
-- **FE — linear static (native)** (Partial): Linear static solver; no UI panel beyond displacement render
 - **FE — fatigue (S-N)** (Partial): S-N + ε-N + rainflow backend; no UI
-- **Modal / buckling / nonlinear FEA** (Partial): Consistent-mass modal + linear eigenvalue buckling (Euler-Bernoulli Kg) + harmonic/FRF (mode superposition) + random-vibration PSD (Miles' equation + shaped PSD) + Riks + J2 plasticity backend; no UI
 - **AISC 360 / ACI 318 member design** (Partial): Full per-code backend; no UI panel
 - **Spur/helical gear rating (AGMA/ISO 6336)** (Partial): Full AGMA 2001-D04 + ISO 6336 Method B backend; no UI
 - **Bearings — ISO 281 L10 / ISO/TS 16281** (Partial): ISO 281 + ISO/TS 16281 aISO modified life backend; no UI

@@ -27,19 +27,152 @@ from kerf_bim.grid import StructuralGrid, GridValidationError
 __all__ = [
     "ColumnMember",
     "BeamMember",
+    "BraceMember",
     "ConnectionNode",
     "RebarAttachment",
     "FramingLayout",
     "FramingValidationError",
     "make_column_at",
     "make_beam_between",
+    "make_brace_between",
     "make_frame_on_grid",
     "framing_to_ifc_dict",
+    "section_properties",
+    "SECTION_DATABASE",
 ]
 
 
 class FramingValidationError(ValueError):
     """Raised when framing geometry is invalid."""
+
+
+# ---------------------------------------------------------------------------
+# Section database (subset of AISC / BS 4-1 / AS/NZS 3678 sections)
+# ---------------------------------------------------------------------------
+#
+# Keys: section designation string.
+# Values: dict with area_mm2, I_xx_mm4, I_yy_mm4, Z_xx_mm3, depth_mm,
+#         flange_mm, web_mm, mass_kg_m.
+# Reference: AISC Steel Construction Manual, 16th Ed. (2023), Table 1-1.
+#            BS 4-1:2005 Universal Beams/Columns.
+
+SECTION_DATABASE: Dict[str, Dict[str, float]] = {
+    # AISC W-shapes (wide-flange columns and beams)
+    "W250x73":   {"area_mm2": 9320,  "depth_mm": 253, "flange_mm": 254,  "web_mm": 8.6,  "mass_kg_m": 73,  "I_xx_mm4": 1.13e8,  "I_yy_mm4": 3.88e7, "Z_xx_mm3": 8.93e5},
+    "W200x46":   {"area_mm2": 5890,  "depth_mm": 203, "flange_mm": 203,  "web_mm": 7.2,  "mass_kg_m": 46,  "I_xx_mm4": 4.56e7,  "I_yy_mm4": 1.55e7, "Z_xx_mm3": 4.49e5},
+    "W360x51":   {"area_mm2": 6450,  "depth_mm": 355, "flange_mm": 171,  "web_mm": 7.2,  "mass_kg_m": 51,  "I_xx_mm4": 1.41e8,  "I_yy_mm4": 1.44e7, "Z_xx_mm3": 7.94e5},
+    "W460x74":   {"area_mm2": 9490,  "depth_mm": 457, "flange_mm": 190,  "web_mm": 9.0,  "mass_kg_m": 74,  "I_xx_mm4": 3.33e8,  "I_yy_mm4": 2.18e7, "Z_xx_mm3": 1.46e6},
+    "W530x101":  {"area_mm2": 12900, "depth_mm": 533, "flange_mm": 210,  "web_mm": 10.9, "mass_kg_m": 101, "I_xx_mm4": 6.17e8,  "I_yy_mm4": 3.30e7, "Z_xx_mm3": 2.32e6},
+    # BS UC-shapes (universal columns)
+    "UC152x152x30": {"area_mm2": 3830,  "depth_mm": 158, "flange_mm": 152, "web_mm": 6.1,  "mass_kg_m": 30,  "I_xx_mm4": 1.75e7, "I_yy_mm4": 5.63e6, "Z_xx_mm3": 2.21e5},
+    "UC203x203x46": {"area_mm2": 5870,  "depth_mm": 203, "flange_mm": 203, "web_mm": 7.2,  "mass_kg_m": 46,  "I_xx_mm4": 4.56e7, "I_yy_mm4": 1.55e7, "Z_xx_mm3": 4.49e5},
+    "UC254x254x73": {"area_mm2": 9310,  "depth_mm": 254, "flange_mm": 254, "web_mm": 8.6,  "mass_kg_m": 73,  "I_xx_mm4": 1.14e8, "I_yy_mm4": 3.91e7, "Z_xx_mm3": 8.98e5},
+    "UC305x305x97": {"area_mm2": 12300, "depth_mm": 308, "flange_mm": 305, "web_mm": 9.9,  "mass_kg_m": 97,  "I_xx_mm4": 2.23e8, "I_yy_mm4": 7.29e7, "Z_xx_mm3": 1.45e6},
+    # BS UB-shapes (universal beams)
+    "UB203x133x25": {"area_mm2": 3210,  "depth_mm": 203, "flange_mm": 133, "web_mm": 5.8,  "mass_kg_m": 25,  "I_xx_mm4": 2.36e7, "I_yy_mm4": 3.10e6, "Z_xx_mm3": 2.33e5},
+    "UB305x165x46": {"area_mm2": 5870,  "depth_mm": 307, "flange_mm": 165, "web_mm": 6.7,  "mass_kg_m": 46,  "I_xx_mm4": 9.90e7, "I_yy_mm4": 7.60e6, "Z_xx_mm3": 6.44e5},
+    "UB406x178x60": {"area_mm2": 7600,  "depth_mm": 406, "flange_mm": 178, "web_mm": 7.9,  "mass_kg_m": 60,  "I_xx_mm4": 2.15e8, "I_yy_mm4": 1.21e7, "Z_xx_mm3": 1.06e6},
+    "UB533x210x82": {"area_mm2": 10500, "depth_mm": 528, "flange_mm": 209, "web_mm": 9.6,  "mass_kg_m": 82,  "I_xx_mm4": 4.75e8, "I_yy_mm4": 2.39e7, "Z_xx_mm3": 1.80e6},
+    # RHS / SHS (rectangular hollow sections) used for bracing
+    "RHS100x50x4":  {"area_mm2": 1080,  "depth_mm": 100, "flange_mm": 50,  "web_mm": 4.0,  "mass_kg_m": 8.49, "I_xx_mm4": 2.02e6,  "I_yy_mm4": 6.15e5, "Z_xx_mm3": 4.04e4},
+    "RHS150x100x6": {"area_mm2": 2820,  "depth_mm": 150, "flange_mm": 100, "web_mm": 6.0,  "mass_kg_m": 22.1, "I_xx_mm4": 9.01e6,  "I_yy_mm4": 4.58e6, "Z_xx_mm3": 1.20e5},
+    "SHS100x100x5": {"area_mm2": 1875,  "depth_mm": 100, "flange_mm": 100, "web_mm": 5.0,  "mass_kg_m": 14.7, "I_xx_mm4": 3.21e6,  "I_yy_mm4": 3.21e6, "Z_xx_mm3": 6.42e4},
+    # CHS (circular hollow sections)
+    "CHS76.1x4":    {"area_mm2": 899,   "depth_mm": 76,  "flange_mm": 76,  "web_mm": 4.0,  "mass_kg_m": 7.06, "I_xx_mm4": 6.64e5,  "I_yy_mm4": 6.64e5, "Z_xx_mm3": 1.75e4},
+    "CHS114.3x5":   {"area_mm2": 1720,  "depth_mm": 114, "flange_mm": 114, "web_mm": 5.0,  "mass_kg_m": 13.5, "I_xx_mm4": 3.15e6,  "I_yy_mm4": 3.15e6, "Z_xx_mm3": 5.51e4},
+    "CHS168.3x6":   {"area_mm2": 3060,  "depth_mm": 168, "flange_mm": 168, "web_mm": 6.0,  "mass_kg_m": 24.0, "I_xx_mm4": 1.21e7,  "I_yy_mm4": 1.21e7, "Z_xx_mm3": 1.44e5},
+    # Angle sections (L-shapes) used for cross-bracing
+    "L100x100x8":   {"area_mm2": 1546,  "depth_mm": 100, "flange_mm": 100, "web_mm": 8.0,  "mass_kg_m": 12.1, "I_xx_mm4": 1.77e6,  "I_yy_mm4": 1.77e6, "Z_xx_mm3": 2.53e4},
+    "L150x150x12":  {"area_mm2": 3496,  "depth_mm": 150, "flange_mm": 150, "web_mm": 12.0, "mass_kg_m": 27.4, "I_xx_mm4": 8.97e6,  "I_yy_mm4": 8.97e6, "Z_xx_mm3": 8.38e4},
+    # Concrete sections (rectangular)
+    "400x400":      {"area_mm2": 160000, "depth_mm": 400, "flange_mm": 400, "web_mm": 400,  "mass_kg_m": 384,  "I_xx_mm4": 2.13e9,  "I_yy_mm4": 2.13e9, "Z_xx_mm3": 1.07e7},
+    "500x500":      {"area_mm2": 250000, "depth_mm": 500, "flange_mm": 500, "web_mm": 500,  "mass_kg_m": 600,  "I_xx_mm4": 5.21e9,  "I_yy_mm4": 5.21e9, "Z_xx_mm3": 2.08e7},
+    "300x600":      {"area_mm2": 180000, "depth_mm": 600, "flange_mm": 300, "web_mm": 300,  "mass_kg_m": 432,  "I_xx_mm4": 5.40e9,  "I_yy_mm4": 1.35e9, "Z_xx_mm3": 1.80e7},
+}
+
+
+def section_properties(designation: str) -> Optional[Dict[str, float]]:
+    """Look up section properties from :data:`SECTION_DATABASE`.
+
+    Returns the properties dict, or ``None`` if the section is not in the
+    database.  Lookup is case-insensitive and ignores whitespace.
+
+    Parameters
+    ----------
+    designation : str
+        Section designation string, e.g. ``"W250x73"`` or ``"UC203x203x46"``.
+
+    Returns
+    -------
+    dict | None
+    """
+    key = designation.strip()
+    if key in SECTION_DATABASE:
+        return dict(SECTION_DATABASE[key])
+    # Case-insensitive fallback
+    key_lower = key.lower()
+    for k, v in SECTION_DATABASE.items():
+        if k.lower() == key_lower:
+            return dict(v)
+    return None
+
+
+# ---------------------------------------------------------------------------
+# BraceMember
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class BraceMember:
+    """A structural brace member (IFC4 IfcMember with PredefinedType BRACE).
+
+    Braces are diagonal members used for lateral stability in moment/braced
+    frames (X-bracing, K-bracing, V-bracing).
+
+    Reference: ISO 16739-1:2018 §IfcMember, §IfcMemberTypeEnum (.BRACE.);
+    AISC *Seismic Design Manual*, 3rd Ed. (2018).
+
+    Parameters
+    ----------
+    id : str  — unique member id
+    start_col, start_row : str  — grid intersection at I-end
+    end_col, end_row : str  — grid intersection at J-end
+    start_pt, end_pt : list[float]  — [x, y, z] mm
+    level : str  — level name
+    section : str  — section designation
+    material : str  — material id
+    brace_type : str  — "X" | "K" | "V" | "chevron" | "eccentric"
+    width_mm, depth_mm : float  — section dimensions in mm
+    """
+    id: str
+    start_col: str
+    start_row: str
+    end_col: str
+    end_row: str
+    start_pt: List[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
+    end_pt: List[float]   = field(default_factory=lambda: [7200.0, 3600.0, 0.0])
+    level: str = "L1"
+    section: str = "RHS150x100x6"
+    material: str = "steel_s355"
+    brace_type: str = "X"
+    width_mm: float = 150.0
+    depth_mm: float = 100.0
+
+    @property
+    def length_mm(self) -> float:
+        dx = self.end_pt[0] - self.start_pt[0]
+        dy = self.end_pt[1] - self.start_pt[1]
+        dz = self.end_pt[2] - self.start_pt[2]
+        return math.sqrt(dx * dx + dy * dy + dz * dz)
+
+    @property
+    def angle_deg(self) -> float:
+        """Angle of brace from horizontal (deg)."""
+        dx = self.end_pt[0] - self.start_pt[0]
+        dy = self.end_pt[1] - self.start_pt[1]
+        dz = self.end_pt[2] - self.start_pt[2]
+        horiz = math.sqrt(dx*dx + dy*dy)
+        return math.degrees(math.atan2(abs(dz), horiz))
 
 
 # ---------------------------------------------------------------------------
@@ -196,6 +329,8 @@ class FramingLayout:
         All :class:`ColumnMember` instances.
     beams:
         All :class:`BeamMember` instances.
+    braces:
+        All :class:`BraceMember` instances (optional diagonal bracing).
     connections:
         :class:`ConnectionNode` objects (auto-generated by
         :func:`make_frame_on_grid`).
@@ -204,6 +339,7 @@ class FramingLayout:
     grid: StructuralGrid
     columns: List[ColumnMember] = field(default_factory=list)
     beams: List[BeamMember] = field(default_factory=list)
+    braces: List["BraceMember"] = field(default_factory=list)
     connections: List[ConnectionNode] = field(default_factory=list)
 
 
@@ -282,6 +418,79 @@ def make_beam_between(
         level=level,
         section=section,
         material=material,
+        width_mm=width_mm,
+        depth_mm=depth_mm,
+    )
+
+
+def make_brace_between(
+    grid: StructuralGrid,
+    start_col: str, start_row: str,
+    end_col: str, end_row: str,
+    level: str = "L1",
+    start_z_mm: float = 0.0,
+    end_z_mm: float = 3600.0,
+    section: str = "RHS150x100x6",
+    material: str = "steel_s355",
+    brace_type: str = "X",
+    width_mm: float = 150.0,
+    depth_mm: float = 100.0,
+    brace_id: Optional[str] = None,
+) -> "BraceMember":
+    """Create a diagonal :class:`BraceMember` between two grid intersections.
+
+    Braces are modelled as IFC4 ``IfcMember`` with ``PredefinedType=.BRACE.``
+    (ISO 16739-1:2018 §IfcMemberTypeEnum).
+
+    Parameters
+    ----------
+    grid : StructuralGrid
+    start_col, start_row : str  — grid intersection at base of brace
+    end_col, end_row : str  — grid intersection at head of brace
+    level : str  — level name
+    start_z_mm : float  — Z elevation of start point (mm)
+    end_z_mm : float  — Z elevation of end point (mm)
+    section : str  — section designation (lookup in :data:`SECTION_DATABASE`)
+    material : str  — material id
+    brace_type : str  — "X" | "K" | "V" | "chevron" | "eccentric"
+    width_mm, depth_mm : float  — section dimensions
+    brace_id : str | None  — explicit id (auto-generated if None)
+
+    Returns
+    -------
+    BraceMember
+
+    Raises
+    ------
+    FramingValidationError
+        If grid axes are not found.
+    """
+    try:
+        sx, sy = grid.intersection(start_col, start_row)
+        ex, ey = grid.intersection(end_col, end_row)
+    except GridValidationError as exc:
+        raise FramingValidationError(str(exc)) from exc
+
+    bid = brace_id or f"BR-{start_col}{start_row}-{end_col}{end_row}"
+
+    # Look up section dimensions if available in database
+    _props = SECTION_DATABASE.get(section)
+    if _props:
+        width_mm = _props.get("flange_mm", width_mm)
+        depth_mm = _props.get("depth_mm", depth_mm)
+
+    return BraceMember(
+        id=bid,
+        start_col=start_col,
+        start_row=start_row,
+        end_col=end_col,
+        end_row=end_row,
+        start_pt=[sx, sy, start_z_mm],
+        end_pt=[ex, ey, end_z_mm],
+        level=level,
+        section=section,
+        material=material,
+        brace_type=brace_type,
         width_mm=width_mm,
         depth_mm=depth_mm,
     )
@@ -507,5 +716,17 @@ def framing_to_ifc_dict(layout: FramingLayout) -> dict:
                 "members":  list(conn.member_ids),
             }
             for conn in layout.connections
+        ],
+        "braces": [
+            {
+                "name":      br.id,
+                "level":     br.level,
+                "start":     list(br.start_pt),
+                "end":       list(br.end_pt),
+                "section":   br.section,
+                "material":  br.material,
+                "brace_type": br.brace_type,
+            }
+            for br in layout.braces
         ],
     }

@@ -3,7 +3,8 @@
 // Panel registry fragment for simulation / analysis domain panels.
 // Domain coverage:
 //   ENERGY    — BuildingEnergyExportPanel, HeatExchangerPanel,
-//               Hourly8760Panel, ThermoCyclePanel
+//               Hourly8760Panel, ThermoCyclePanel,
+//               ComplianceReportPanel (ASHRAE 90.1 Appendix G + LEED + Title 24)
 //   OPTICS    — DaylightingPanel, LightingSimPanel, SequentialTracePanel
 //   ACOUSTICS — AcousticsResultPanel
 //   SOLAR     — SolarPVPanel
@@ -42,6 +43,13 @@ export default [
     exts: ['.8760', '.8760sim'],
     load: () => import('./sim-wrappers/Hourly8760Wrapper.jsx'),
     label: '8760-Hour Building Energy',
+  },
+  {
+    id: 'compliance-report',
+    kinds: ['compliance_report', 'ashrae901_appendixg', 'energy_compliance'],
+    exts: ['.compliance', '.appendixg'],
+    load: () => import('./sim-wrappers/ComplianceReportWrapper.jsx'),
+    label: 'ASHRAE 90.1 Appendix G / LEED / Title 24 Compliance',
   },
   {
     id: 'thermo-cycle',

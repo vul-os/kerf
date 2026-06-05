@@ -71,9 +71,9 @@ features:
       source: https://www.carrier.com/commercial/en/us/software/hvac-system-design/hourly-analysis-program/
       note: "LEED EAp2 / EAc1 reports built-in"
     kerf:
-      status: partial
-      note: "Title 24 (16 CA zones) + LEED v4 EAp2 engine shipped; not commercial-certified compliance reporting"
-      evidence: packages/kerf-cad-core/src/kerf_cad_core/buildingenergy/hourly_8760.py
+      status: yes
+      note: "ASHRAE 90.1-2022 Appendix G baseline-vs-proposed PCI report (auto baseline system per Table G3.1.1 + envelope per Table 5.5); LEED v4.1 EAp2/EAc2 points; Title 24 TDV compliance — note: not government-certified/registered compliance software, results are engineering estimates"
+      evidence: packages/kerf-energy/src/kerf_energy/ashrae901_appendixg.py
 
   # IFC / BIM integration
   - name: "IFC / BIM geometry import"
@@ -105,7 +105,7 @@ Building energy analysis and HVAC system design — Carrier HAP vs MIT open-core
 
 ## Summary
 
-Kerf saturates **88%** of Carrier HAP (Hourly Analysis Program)'s feature surface (6 yes, 2 partial, 0 no out of 8 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
+Kerf saturates **94%** of Carrier HAP (Hourly Analysis Program)'s feature surface (7 yes, 1 partial, 0 no out of 8 features tracked here). Honest gaps: 1 feature partial (8760 engine complete, not DOE-2 commercial-validated).
 
 ## Feature comparison
 
@@ -116,7 +116,7 @@ Kerf saturates **88%** of Carrier HAP (Hourly Analysis Program)'s feature surfac
 | SMACNA duct sizing (velocity / equal-friction methods) | ✅ | Yes | ASHRAE velocity method + Darcy-Weisbach + SMACNA minor-loss coefficients |
 | Part-load efficiency curves (AHRI-certified) | ✅ | Yes | AHRI-certified part-load curves at 25/50/75/100% load — not normalised illustrative values |
 | Annual hourly energy simulation (8760-hour) | ⚠️ (partial) | Yes | 8760-hr ASHRAE hourly engine shipped + gbXML/IDF export; not Carrier-HAP DOE-2 commercial-validated |
-| ASHRAE 90.1 / LEED energy compliance reporting | ⚠️ (partial) | Yes | Title 24 (16 CA zones) + LEED v4 EAp2 engine shipped; not commercial-certified compliance reporting |
+| ASHRAE 90.1 / LEED energy compliance reporting | ✅ | Yes | ASHRAE 90.1-2022 Appendix G baseline-vs-proposed PCI report + LEED v4.1 EAp2/EAc2 + Title 24 TDV; note: not govt-certified compliance software |
 | IFC / BIM geometry import | ✅ | No | Full IFC Tier 1+2 import including MEP elements |
 | Open-source core / scripting API | ✅ | No | MIT-licensed Python plugin; full JSON-RPC LLM tool surface including hvac.equipment_select |
 
@@ -128,7 +128,6 @@ Kerf saturates **88%** of Carrier HAP (Hourly Analysis Program)'s feature surfac
 ## What's honestly outstanding
 
 - **Annual hourly energy simulation (8760-hour)** (Partial): 8760-hr ASHRAE hourly engine shipped + gbXML/IDF export; not Carrier-HAP DOE-2 commercial-validated
-- **ASHRAE 90.1 / LEED energy compliance reporting** (Partial): Title 24 (16 CA zones) + LEED v4 EAp2 engine shipped; not commercial-certified compliance reporting
 
 ## Pricing
 

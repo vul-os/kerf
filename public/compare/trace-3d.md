@@ -60,9 +60,9 @@ features:
       source: https://www.trane.com/commercial/north-america/us/en/products-systems/design-and-analysis-tools/analysis-tools/trace-3d-plus.html
       note: "ASHRAE 90.1 Appendix G baseline automation; LEED EAp2"
     kerf:
-      status: partial
-      note: "Title 24 (16 CA zones) + LEED v4 EAp2 + 8760-hr engine shipped; not ASHRAE 90.1 App-G commercial baseline automation"
-      evidence: packages/kerf-cad-core/src/kerf_cad_core/buildingenergy/hourly_8760.py
+      status: yes
+      note: "ASHRAE 90.1-2022 Appendix G baseline-vs-proposed PCI report (auto baseline system per Table G3.1.1; envelope per Table 5.5); LEED v4.1 EAp2 prerequisite + EAc2 points; California Title 24 TDV compliance (16 CZ) — note: not government-certified/registered compliance software, results are engineering estimates"
+      evidence: packages/kerf-energy/src/kerf_energy/ashrae901_appendixg.py
 
   # Revit / IFC integration
   - name: "Revit / IFC geometry import"
@@ -95,7 +95,7 @@ Commercial building energy analysis and HVAC design — TRACE 3D Plus vs MIT ope
 
 ## Summary
 
-Kerf saturates **93%** of Trane TRACE 3D Plus's feature surface (6 yes, 1 partial, 0 no out of 7 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of Trane TRACE 3D Plus's feature surface (7 yes, 0 partial, 0 no out of 7 features tracked here). All features shipped; see individual notes for engineering-estimate caveats.
 
 ## Feature comparison
 
@@ -105,7 +105,7 @@ Kerf saturates **93%** of Trane TRACE 3D Plus's feature surface (6 yes, 1 partia
 | AHRI-listed equipment catalogue | ✅ | Yes | 30 representative AHRI-listed models (6 categories, 5 per); real AHRI cert numbers + certified part-load curves from ... |
 | Part-load efficiency curves (AHRI-certified) | ✅ | Yes | AHRI-certified part-load values at 25/50/75/100% load — same source (ahridirectory.org) |
 | Duct and hydronic pipe sizing | ✅ | Yes | Velocity + equal-friction duct sizing; Darcy-Weisbach + SMACNA minor losses |
-| ASHRAE 90.1 / Title 24 compliance baseline modelling | ⚠️ (partial) | Yes | Title 24 (16 CA zones) + LEED v4 EAp2 + 8760-hr engine shipped; not ASHRAE 90.1 App-G commercial baseline automation |
+| ASHRAE 90.1 / Title 24 compliance baseline modelling | ✅ | Yes | ASHRAE 90.1-2022 Appendix G baseline-vs-proposed PCI + LEED v4.1 EAp2/EAc2 + Title 24 TDV (16 CA CZ); note: not govt-certified compliance software |
 | Revit / IFC geometry import | ✅ | Yes | Native IFC Tier 1+2 import; no gbXML reader yet |
 | Open-source / scripting API | ✅ | No | MIT-licensed Python plugin; JSON-RPC LLM tool surface; hvac.equipment_select |
 
@@ -115,7 +115,7 @@ Kerf saturates **93%** of Trane TRACE 3D Plus's feature surface (6 yes, 1 partia
 
 ## What's honestly outstanding
 
-- **ASHRAE 90.1 / Title 24 compliance baseline modelling** (Partial): Title 24 (16 CA zones) + LEED v4 EAp2 + 8760-hr engine shipped; not ASHRAE 90.1 App-G commercial baseline automation
+All 7 tracked features are now shipped. Individual caveats: ASHRAE 90.1 Appendix G and Title 24 results are engineering estimates — not government-certified compliance software. For permit-grade submissions use CEC-approved or GBCI-accepted tools with a certified energy modeller.
 
 ## Pricing
 

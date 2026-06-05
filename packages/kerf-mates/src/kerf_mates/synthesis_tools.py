@@ -1,11 +1,16 @@
 """
 LLM tools for mechanism synthesis — kerf-mates coverage sweep.
 
-Wires three tested-but-orphaned synthesis functions as LLM tools:
+Wires four synthesis functions as LLM tools:
 
   synthesise_four_bar_spec / run_synthesise_four_bar
       → kerf_mates.synthesis.fourbar.synthesise_four_bar
       Burmester 4-bar linkage synthesis from three coupler-curve precision points.
+
+  generate_coupler_curve_spec / run_generate_coupler_curve
+      → kerf_mates.synthesis.fourbar.generate_coupler_curve
+      Generate the coupler-curve point array for a synthesised 4-bar linkage.
+      Used by the MechanismSynthesisPanel to plot the coupler curve.
 
   synthesise_cam_spec / run_synthesise_cam
       → kerf_mates.synthesis.cam.synthesise_cam
@@ -100,6 +105,74 @@ async def run_synthesise_four_bar(ctx: ProjectCtx, args: bytes) -> str:
 
     if not result.get("ok"):
         return err_payload(result.get("reason", "synthesis failed"), "SYNTH_ERROR")
+    return ok_payload(result)
+
+
+# ---------------------------------------------------------------------------
+# generate_coupler_curve
+# ---------------------------------------------------------------------------
+
+generate_coupler_curve_spec = ToolSpec(
+    name="generate_coupler_curve",
+    description=(
+        "Generate the coupler-curve point array for a synthesised 4-bar linkage. "
+        "Given link lengths (r1, r2, r3, r4) and coupler-point offsets (px, py) "
+        "as returned by synthesise_four_bar, sweeps the crank through 360° and "
+        "returns the world-frame [x, y] positions of the coupler point. "
+        "Used to plot the coupler curve in the Mechanism Synthesis panel."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "r1": {"type": "number", "description": "Ground link length (mm)."},
+            "r2": {"type": "number", "description": "Crank length (mm)."},
+            "r3": {"type": "number", "description": "Coupler length (mm)."},
+            "r4": {"type": "number", "description": "Rocker/output link length (mm)."},
+            "px": {"type": "number", "description": "Coupler-point x-offset from crank-coupler pivot A (mm)."},
+            "py": {"type": "number", "description": "Coupler-point y-offset from crank-coupler pivot A (mm)."},
+            "n_points": {
+                "type": "integer",
+                "description": "Number of crank-angle samples (default 360).",
+            },
+            "branch": {
+                "type": "integer",
+                "enum": [1, -1],
+                "description": "Assembly branch: +1 or -1 (Freudenstein convention). Default 1.",
+            },
+        },
+        "required": ["r1", "r2", "r3", "r4", "px", "py"],
+    },
+)
+
+
+@register(generate_coupler_curve_spec, write=False)
+async def run_generate_coupler_curve(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    try:
+        r1 = float(a["r1"])
+        r2 = float(a["r2"])
+        r3 = float(a["r3"])
+        r4 = float(a["r4"])
+        px = float(a["px"])
+        py = float(a["py"])
+    except (KeyError, TypeError, ValueError) as e:
+        return err_payload(f"r1, r2, r3, r4, px, py must be numbers: {e}", "BAD_ARGS")
+
+    kwargs: dict[str, Any] = {}
+    if "n_points" in a:
+        kwargs["n_points"] = int(a["n_points"])
+    if "branch" in a:
+        kwargs["branch"] = int(a["branch"])
+
+    from kerf_mates.synthesis.fourbar import generate_coupler_curve
+    result = generate_coupler_curve(r1, r2, r3, r4, px, py, **kwargs)
+
+    if not result.get("ok"):
+        return err_payload(result.get("reason", "coupler curve failed"), "SYNTH_ERROR")
     return ok_payload(result)
 
 

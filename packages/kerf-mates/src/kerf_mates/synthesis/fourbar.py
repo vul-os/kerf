@@ -39,11 +39,22 @@ synthesise_four_bar(points, *, tol_mm=0.5, max_iters=2000) -> dict
         warnings      list[str]
         reason        str     (only when ok=False)
 
+Additional API
+--------------
+generate_coupler_curve(r1, r2, r3, r4, px, py, *, n_points=360) -> dict
+    Compute the coupler-curve point array for a synthesised linkage.
+    Returns dict with keys:
+        ok        bool
+        points    list of [x, y] mm  (one per assembled crank position)
+        n_points  int
+        reason    str  (only when ok=False)
+
 References
 ----------
 Burmester, L. (1888). Lehrbuch der Kinematik, Vol. 1.
 Sandor, G.N. & Erdman, A.G. (1984). Advanced Mechanism Design, Vol. 2.
 Norton, R.L. (2012). Design of Machinery, 5th ed., Ch. 5.
+Shigley, J.E. & Uicker, J.J. (1995). Theory of Machines and Mechanisms, 2nd ed.
 
 Author: imranparuk
 """
@@ -420,4 +431,99 @@ def synthesise_four_bar(
         "max_error_mm": round(max_err, 6),
         "grashof":      grashof,
         "warnings":     warnings_list,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Coupler curve generation
+# ---------------------------------------------------------------------------
+
+def generate_coupler_curve(
+    r1: float,
+    r2: float,
+    r3: float,
+    r4: float,
+    px: float,
+    py: float,
+    *,
+    n_points: int = 360,
+    branch: int = 1,
+) -> dict[str, Any]:
+    """
+    Generate the coupler-curve point array for a synthesised 4-bar linkage.
+
+    This is the inverse of the synthesis step: given link lengths and coupler-
+    point offsets returned by ``synthesise_four_bar``, sweep the crank through
+    one full revolution and collect the world-frame positions of the coupler
+    point.
+
+    Parameters
+    ----------
+    r1, r2, r3, r4 : float
+        Link lengths (mm) as returned by synthesise_four_bar.
+        r1 = ground link, r2 = crank, r3 = coupler, r4 = output/rocker.
+    px, py : float
+        Coupler-point offsets from the crank-coupler pivot A, in the
+        coupler body frame (mm).
+    n_points : int
+        Number of crank-angle samples (default 360 → 1° per step).
+    branch : int
+        Assembly branch (+1 or -1, Freudenstein convention).
+
+    Returns
+    -------
+    dict:
+        ok       bool
+        points   list[list[float]]  — [[x, y], ...] in mm; only assembled positions
+        n_points int   — number of points actually returned (may be < n_points
+                         if some crank angles are in locked configuration)
+        reason   str   — only present when ok=False
+
+    Notes
+    -----
+    The ground pivot O2 is at the origin; O4 at (r1, 0).
+    Points are sampled at equal crank-angle intervals: θ₂ = 2πk/n_points
+    for k = 0, …, n_points−1.
+    Locked configurations (discriminant < 0) are silently skipped.
+
+    References
+    ----------
+    Freudenstein, F. (1954). "An Analytical Approach to the Design of
+    Four-Link Mechanisms." Trans. ASME 76:483–492.
+    """
+    # Validate
+    for name, val in [("r1", r1), ("r2", r2), ("r3", r3), ("r4", r4)]:
+        try:
+            val = float(val)
+        except (TypeError, ValueError):
+            return _err(f"{name} must be a number, got {val!r}")
+        if not math.isfinite(val) or val <= 0:
+            return _err(f"{name} must be finite and > 0, got {val}")
+
+    try:
+        px, py = float(px), float(py)
+        n_points = max(2, int(n_points))
+    except (TypeError, ValueError) as e:
+        return _err(f"invalid parameter: {e}")
+
+    if branch not in (1, -1):
+        return _err(f"branch must be +1 or -1, got {branch!r}")
+
+    points: list[list[float]] = []
+    step = 2.0 * math.pi / n_points
+
+    for i in range(n_points):
+        theta2 = step * i
+        res = _four_bar_position_fast(r1, r2, r3, r4, theta2, branch)
+        if res is None:
+            continue
+        theta3, _ = res
+        cx, cy = _coupler_point_xy(r2, theta2, theta3, px, py)
+        if math.isfinite(cx) and math.isfinite(cy):
+            points.append([round(cx, 6), round(cy, 6)])
+
+    return {
+        "ok":      True,
+        "points":  points,
+        "n_points": len(points),
     }

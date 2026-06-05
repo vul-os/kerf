@@ -54,10 +54,12 @@ async def register(app: FastAPI, ctx):
 
     from kerf_mates.synthesis_tools import (
         synthesise_four_bar_spec, run_synthesise_four_bar,
+        generate_coupler_curve_spec, run_generate_coupler_curve,
         synthesise_cam_spec, run_synthesise_cam,
         synthesise_gear_train_spec, run_synthesise_gear_train,
     )
     ctx.tools.register("synthesise_four_bar", synthesise_four_bar_spec, run_synthesise_four_bar)
+    ctx.tools.register("generate_coupler_curve", generate_coupler_curve_spec, run_generate_coupler_curve)
     ctx.tools.register("synthesise_cam", synthesise_cam_spec, run_synthesise_cam)
     ctx.tools.register("synthesise_gear_train", synthesise_gear_train_spec, run_synthesise_gear_train)
 

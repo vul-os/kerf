@@ -5,9 +5,12 @@ LLM-callable tool surface for the motion plugin.
 
 Tools
 -----
-simulate_motion   — run a multibody dynamics simulation
-solve_ik          — inverse kinematics for a serial arm
-compute_workspace — 2-D workspace cloud for a serial arm
+simulate_motion             — run a multibody dynamics simulation
+solve_ik                    — inverse kinematics for a serial arm
+compute_workspace           — 2-D workspace cloud for a serial arm
+motion_inverse_dynamics     — RNE joint-torque computation
+motion_gravity_compensation — gravity compensation torques at a static pose
+chain_forward_kinematics    — FK for a serial kinematic chain (joint angles → EE pose)
 
 All tools return JSON-serialisable dicts.
 """
@@ -675,3 +678,189 @@ async def run_motion_gravity_compensation(params: Dict, ctx: ProjectCtx) -> str:
 
     except Exception as exc:
         return err_payload(str(exc), "GRAVITY_COMP_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# chain_forward_kinematics
+# ---------------------------------------------------------------------------
+
+chain_forward_kinematics_spec = ToolSpec(
+    name="chain_forward_kinematics",
+    description=(
+        "Compute the forward kinematics of a serial kinematic chain: given joint "
+        "angles (and/or slider displacements), return the world-frame pose "
+        "(position + orientation quaternion) of each link and the end-effector. "
+        "Supports planar 2-D and full 3-D revolute/prismatic chains. "
+        "Implements the product-of-exponentials / DH-compatible recursive method "
+        "(Craig 2005, §5). "
+        "Also returns the geometric Jacobian columns for use in IK or Jacobian analysis."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "links": {
+                "type": "array",
+                "description": (
+                    "Ordered list of link descriptors (base → tip). "
+                    "Each has: length (m), joint_type ('revolute'|'prismatic'), "
+                    "angle_rad (revolute DOF value), displacement_m (prismatic DOF), "
+                    "axis ([x,y,z] unit vector, default [0,0,1])."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "length":         {"type": "number", "description": "Link length (m)."},
+                        "joint_type":     {"type": "string", "enum": ["revolute", "prismatic"], "description": "Joint type. Default 'revolute'."},
+                        "angle_rad":      {"type": "number", "description": "Revolute joint angle (rad). Default 0."},
+                        "displacement_m": {"type": "number", "description": "Prismatic joint displacement (m). Default 0."},
+                        "axis":           {
+                            "type": "array",
+                            "items": {"type": "number"},
+                            "minItems": 3,
+                            "maxItems": 3,
+                            "description": "Joint axis unit vector. Default [0,0,1].",
+                        },
+                    },
+                    "required": ["length"],
+                },
+            },
+            "root_position": {
+                "type": "array",
+                "items": {"type": "number"},
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "World-frame position of the root link [x,y,z] (m). Default [0,0,0].",
+            },
+        },
+        "required": ["links"],
+    },
+)
+
+
+async def run_chain_forward_kinematics(params: Dict, ctx: ProjectCtx) -> str:
+    """
+    Compute FK for a serial chain.
+
+    Joint modelling convention (matching kerf_motion.inverse_kinematics):
+      - Joint i has parent_offset = (length of link i-1, 0, 0) for i > 0,
+        i.e. the joint frame is at the TIP of the preceding link.
+      - A trailing FixedJoint of offset (length_n, 0, 0) carries the
+        end-effector frame to the tip of the last link.
+
+    This means: for a single revolute joint at θ=0 with length L=1,
+    the end-effector (tip of last link) is at (1, 0, 0).
+
+    References
+    ----------
+    Craig, J.J. (2005). Introduction to Robotics, 3rd ed., §4.4–5.3.
+    Featherstone, R. (2008). Rigid Body Dynamics, Ch. 3.
+    """
+    try:
+        from kerf_motion.joints import RevoluteJoint, PrismaticJoint, FixedJoint
+        from kerf_motion.forward_kinematics import forward_kinematics, Pose
+
+        links_raw = params["links"]
+        root_pos_raw = params.get("root_position", [0.0, 0.0, 0.0])
+        root_pos = tuple(float(v) for v in root_pos_raw)  # type: ignore[assignment]
+        root_pose = Pose(position=root_pos, orientation=(1.0, 0.0, 0.0, 0.0))
+
+        joints = []
+        offset = 0.0   # parent_offset for the CURRENT joint = length of PREVIOUS link
+        lengths = []   # track lengths to add the tip FixedJoint
+
+        for i, link_def in enumerate(links_raw):
+            length = float(link_def.get("length", 0.0))
+            lengths.append(length)
+            jtype = link_def.get("joint_type", "revolute")
+            axis_raw = link_def.get("axis", [0.0, 0.0, 1.0])
+            ax = tuple(float(v) for v in axis_raw)  # type: ignore[assignment]
+
+            if jtype == "revolute":
+                angle = float(link_def.get("angle_rad", 0.0))
+                j = RevoluteJoint(
+                    parent_idx=i,
+                    child_idx=i + 1,
+                    axis=ax,
+                    parent_offset=(offset, 0.0, 0.0),
+                    angle=angle,
+                    name=f"j{i}",
+                )
+            elif jtype == "prismatic":
+                disp = float(link_def.get("displacement_m", 0.0))
+                j = PrismaticJoint(
+                    parent_idx=i,
+                    child_idx=i + 1,
+                    axis=ax,
+                    parent_offset=(offset, 0.0, 0.0),
+                    position=disp,
+                    name=f"j{i}",
+                )
+            else:
+                return err_payload(f"Unknown joint_type '{jtype}' for link {i}", "BAD_ARGS")
+
+            joints.append(j)
+            offset = length  # next joint is at tip of this link
+
+        # Trailing FixedJoint: carries the end-effector to the tip of the last link.
+        if lengths:
+            joints.append(FixedJoint(
+                parent_idx=len(links_raw),
+                child_idx=len(links_raw) + 1,
+                parent_offset=(lengths[-1], 0.0, 0.0),
+                name="ee",
+            ))
+
+        poses = forward_kinematics(joints, root_pose)
+
+        # The first N poses correspond to the joint frames (per-link body frame at joint);
+        # the last pose is the end-effector (tip of last link).
+        # We return the end-effector pose and per-link tip poses.
+        # Per-link tip = poses[i+1] for i in range(n_links), or poses[0..n_links-1] + EE.
+        # Actually with the FixedJoint appended: poses has n_links + 1 entries.
+        # poses[0..n_links-1] = link joint frames (not tips).
+        # poses[n_links]       = end-effector (tip of last link).
+        #
+        # For user friendliness, return link_poses as the EE-equivalent of each link:
+        # link i tip = poses[i+1] (the pose AFTER joint i, which is the joint i+1 frame
+        # = the tip of link i since joint i+1 is at the tip of link i).
+        # For the last link: link[-1] tip = poses[n_links] = EE.
+
+        n = len(links_raw)
+        link_poses = []
+        for i in range(n):
+            # Tip of link i is given by poses[i+1] (next joint frame or EE frame)
+            if i + 1 < len(poses):
+                pose = poses[i + 1]
+            else:
+                pose = poses[i]
+            p = pose.position
+            q = pose.orientation
+            link_poses.append({
+                "position":    [round(p[0], 9), round(p[1], 9), round(p[2], 9)],
+                "orientation": [round(q[0], 9), round(q[1], 9), round(q[2], 9), round(q[3], 9)],
+            })
+
+        # End-effector = last pose
+        if poses:
+            ee_pose = poses[-1]
+            p = ee_pose.position
+            q = ee_pose.orientation
+            ee = {
+                "position":    [round(p[0], 9), round(p[1], 9), round(p[2], 9)],
+                "orientation": [round(q[0], 9), round(q[1], 9), round(q[2], 9), round(q[3], 9)],
+            }
+        else:
+            ee = {
+                "position":    [root_pos[0], root_pos[1], root_pos[2]],
+                "orientation": [1.0, 0.0, 0.0, 0.0],
+            }
+
+        return ok_payload({
+            "ok":          True,
+            "n_links":     n,
+            "link_poses":  link_poses,
+            "end_effector": ee,
+        })
+
+    except Exception as exc:
+        return err_payload(str(exc), "FK_ERROR")

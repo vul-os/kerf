@@ -24,6 +24,7 @@ async def register(app: FastAPI, ctx):
         compute_workspace_spec, run_compute_workspace,
         motion_inverse_dynamics_spec, run_motion_inverse_dynamics,
         motion_gravity_compensation_spec, run_motion_gravity_compensation,
+        chain_forward_kinematics_spec, run_chain_forward_kinematics,
     )
     ctx.tools.register("simulate_motion", simulate_motion_spec, run_simulate_motion)
     ctx.tools.register("solve_ik", solve_ik_spec, run_solve_ik)
@@ -37,6 +38,11 @@ async def register(app: FastAPI, ctx):
         "motion_gravity_compensation",
         motion_gravity_compensation_spec,
         run_motion_gravity_compensation,
+    )
+    ctx.tools.register(
+        "chain_forward_kinematics",
+        chain_forward_kinematics_spec,
+        run_chain_forward_kinematics,
     )
 
     from kerf_motion.contact import (
@@ -86,6 +92,7 @@ async def register(app: FastAPI, ctx):
         "motion.contact-detection",
         "motion.assembly-motion-study",
         "motion.mbd-constraint-enforcement",
+        "motion.serial-chain-fk",
     ]
 
     try:

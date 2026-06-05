@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T05:47:30.365Z",
+  "generatedAt": "2026-06-05T06:04:10.445Z",
   "items": [
     {
       "slug": "revit",
@@ -11808,6 +11808,157 @@
             "notes": "Use+transport+EoL + multi-impact categories (ISO 14040/44; backend)"
           },
           "name": "LCA (full ISO 14040/44 4 phases)"
+        }
+      ]
+    },
+    {
+      "slug": "esprit",
+      "competitor": "ESPRIT (Hexagon)",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "esprit",
+      "hero_tagline": "Production CAM with factory-certified posts — compared honestly against MIT open-core.",
+      "reviewed_at": "2026-06-05",
+      "features": [
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://hexagon.com/products/esprit-edge",
+            "notes": "2-5 axis mills; high-speed roughing cycles"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cam/src/kerf_cam/routes.py",
+            "notes": "Profile/contour/pocket/face/drill + adaptive high-speed roughing"
+          },
+          "name": "2.5–5 axis milling toolpaths"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://hexagon.com/products/esprit-edge",
+            "notes": "High-speed 2.5/3/4/5-axis roughing; reduced cycle time + tool life"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cam/src/kerf_cam/adaptive.py",
+            "notes": "Iterative-offset adaptive clearing + 50% trochoid overlap"
+          },
+          "name": "High-speed adaptive roughing"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://hexagon.com/products/esprit-edge",
+            "notes": "2-22 axis lathes; multifunction mill-turn; integrated mill/turn/probe"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cam/src/kerf_cam/turning_cycles.py",
+            "notes": "Turning roughing/finishing G71/G70 + G76 threading cycles"
+          },
+          "name": "Turning / mill-turn (multi-axis lathe)"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://hexagon.com/products/esprit-edge",
+            "notes": "2-5 axis with machine-specific kinematics"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cam/src/kerf_cam/five_axis/",
+            "notes": "Constant-tilt 5-axis + 3+2 indexed; head-table/table-table/head-head kinematics with RTCP"
+          },
+          "name": "5-axis simultaneous + machine kinematics"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://hexagon.com/products/esprit-edge",
+            "notes": "2-5 axis wire EDM; machine-specific cutting conditions"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-mold/src/kerf_mold/wire_edm.py",
+            "notes": "Wire-EDM 4-axis taper toolpath + G41/G42 G-code"
+          },
+          "name": "Wire EDM programming"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://hexagon.com/products/esprit-edge",
+            "notes": "Digital-twin simulation of all machine-tool motion before cutting"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cam/src/kerf_cam/routes.py",
+            "notes": "Machine-component AABB collision check from 5-axis joint values"
+          },
+          "name": "Digital-twin machine simulation"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://hexagon.com/products/esprit-edge",
+            "notes": "Toolpath verification + simulation"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cam/src/kerf_cam/routes.py",
+            "notes": "Voxel/dexel material-removal verify (Van Hook 1986) + gouge detection"
+          },
+          "name": "Toolpath verify (material removal + gouge)"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://hexagon.com/products/esprit-edge",
+            "notes": "3,500+ OEM factory-certified post processors"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-cam/src/kerf_cam/five_axis/",
+            "notes": "LinuxCNC/Fanuc + Heidenhain iTNC + Siemens 840D posts; not a 3500-machine OEM-certified library"
+          },
+          "name": "Factory-certified post-processor library (3500+ machines)"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://hexagon.com/products/esprit-edge",
+            "notes": "Integrated probing operations in the program"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/cmm/inspect.py",
+            "notes": "CMM inspection path planning + GD&T eval; no in-cycle on-machine probing G-code"
+          },
+          "name": "On-machine probing"
+        },
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "no",
+            "source": "https://hexagon.com/products/esprit-edge",
+            "notes": "Proprietary commercial license; no LLM interface"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-sdk/src/kerf/",
+            "notes": "MIT open-core; chat-native CAM + JSON-RPC LLM tools + kerf-sdk"
+          },
+          "name": "Open-source core / chat-native"
         }
       ]
     },

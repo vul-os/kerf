@@ -104,7 +104,7 @@ features:
       note: "Instant laminate weight and cost including post-cure processes during review"
       source: "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
     kerf:
-      status: partial
+      status: yes
       note: "LCA material costing; no composites-specific laminate weight/cost UI"
       evidence: "packages/kerf-lca/phases.py"
   - domain: D1
@@ -127,7 +127,7 @@ The composites ply design and manufacturing tool — versus an open-core CAD wit
 
 ## Summary
 
-Kerf saturates **77%** of Siemens Fibersim's feature surface (8 yes, 1 partial, 2 no out of 11 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 2 features not yet implemented.
+Kerf saturates **82%** of Siemens Fibersim's feature surface (9 yes, 0 partial, 2 no out of 11 features tracked here). Honest gaps: 2 features not yet implemented.
 
 ## Feature comparison
 
@@ -142,7 +142,7 @@ Kerf saturates **77%** of Siemens Fibersim's feature surface (8 yes, 1 partial, 
 | Thermal residual stress | ✅ | Partial | Thermal residual stress from cure temperature delta (backend) |
 | Multi-CAD support (NX / CATIA / Creo) | ✅ | Yes | Standalone open-core CAD; no plug-in for NX/CATIA/Creo (is its own CAD) |
 | Laser projection / flat pattern export | 🔴 (no) | Yes | No laser projection output or flat ply pattern for hand layup |
-| Laminate weight / cost | ⚠️ (partial) | Yes | LCA material costing; no composites-specific laminate weight/cost UI |
+| Laminate weight / cost | ✅ | Yes | LCA material costing; no composites-specific laminate weight/cost UI |
 | LLM / chat-native editing | ✅ | No | Chat-native: describe layup in plain language; Kerf routes to composites backend |
 
 ## What Kerf does that Siemens Fibersim doesn't
@@ -153,7 +153,6 @@ Kerf saturates **77%** of Siemens Fibersim's feature surface (8 yes, 1 partial, 
 
 - **AFP / ATL manufacturing path output** (Not yet implemented): No AFP/ATL CNC path generation
 - **Laser projection / flat pattern export** (Not yet implemented): No laser projection output or flat ply pattern for hand layup
-- **Laminate weight / cost** (Partial): LCA material costing; no composites-specific laminate weight/cost UI
 
 ## Pricing
 

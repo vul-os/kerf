@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T01:51:17.736Z",
+  "generatedAt": "2026-06-05T01:52:23.711Z",
   "items": [
     {
       "slug": "revit",
@@ -11266,7 +11266,7 @@
             "notes": "Instant laminate weight and cost including post-cure processes during review"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-lca/phases.py",
             "notes": "LCA material costing; no composites-specific laminate weight/cost UI"
           },

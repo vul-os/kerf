@@ -96,6 +96,17 @@ async def register(app: FastAPI, ctx):
             "kerf-civil: failed to load tools_parcels_pointcloud_sheets: %s", _exc
         )
 
+    # Dry utilities: gas / electrical duct banks / telecom (2026-06-05)
+    try:
+        from kerf_civil.tools_dry_utilities import TOOLS as _dry_util_tools
+        for _tool_name, _tool_spec, _tool_handler in _dry_util_tools:
+            ctx.tools.register(_tool_name, _tool_spec, _tool_handler)
+    except Exception as _exc:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "kerf-civil: failed to load tools_dry_utilities: %s", _exc
+        )
+
     provides = [
         "civil.horizontal_alignment",
         "civil.vertical_alignment",
@@ -131,6 +142,10 @@ async def register(app: FastAPI, ctx):
         "civil.corridor-earthwork",
         "civil.corridor-mass-haul",
         "civil.corridor-strings",
+        "civil.dry-utilities-gas",
+        "civil.dry-utilities-electrical",
+        "civil.dry-utilities-telecom",
+        "civil.dry-utilities-clearance",
     ]
 
     try:

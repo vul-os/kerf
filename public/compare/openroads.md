@@ -113,9 +113,9 @@ features:
       note: "Survey + drainage + utilities + roadway in one application"
       source: "https://www.bentley.com/software/openroads-designer/"
     kerf:
-      status: partial
-      note: "Drainage + water networks + roadway geometry; no dedicated dry-utility (power/comms) modeller"
-      evidence: "packages/kerf-civil/src/kerf_civil/hydraulics_gravity.py"
+      status: yes
+      note: "Wet networks (gravity/pressure) + dry utilities: gas mains (Weymouth pressure-drop), electrical duct banks (NEC fill), telecom/fiber. Corridor separation checks (ASME B31.8, NEC Table 300.5, NFPA 54, AWWA M23) with 3-D proximity. LLM tools: civil_dry_utility_network_create, civil_dry_utility_clearance_check, civil_gas_pressure_drop, civil_elec_duct_fill."
+      evidence: "packages/kerf-civil/src/kerf_civil/dry_utilities.py"
 
   - domain: D1
     feature: "Open-source core / chat-native"
@@ -137,7 +137,7 @@ Civil infrastructure & roadway design — compared honestly against MIT open-cor
 
 ## Summary
 
-Kerf saturates **95%** of Bentley OpenRoads Designer's feature surface (10 yes, 1 partial, 0 no out of 11 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of Bentley OpenRoads Designer's feature surface (11 yes, 0 partial, 0 no out of 11 features tracked here).
 
 ## Feature comparison
 
@@ -152,7 +152,7 @@ Kerf saturates **95%** of Bentley OpenRoads Designer's feature surface (10 yes, 
 | Plan & profile sheet production | ✅ | Yes | Automated plan+profile sheet set (station grid, profile band, match lines; AASHTO/FHWA) |
 | Parcels / right-of-way / subdivision | ✅ | Yes | Parcel subdivision (Sutherland-Hodgman clip, ROW dedication, setback insets) |
 | Corridor modeling (templates / cross-sections) | ✅ | Yes | Alignment + profile + sheets shipped; no template-driven 3D corridor cross-section modeller |
-| Utilities / multi-discipline coordination | ⚠️ (partial) | Yes | Drainage + water networks + roadway geometry; no dedicated dry-utility (power/comms) modeller |
+| Utilities / multi-discipline coordination | ✅ | Yes | Wet networks (gravity/pressure) + dry utilities: gas (Weymouth), electrical duct banks (NEC fill), telecom/fiber; corridor separation checks per ASME B31.8/NEC/NFPA 54 |
 | Open-source core / chat-native | ✅ | No | MIT open-core; chat-native civil design + JSON-RPC LLM tools + kerf-sdk |
 
 ## What Kerf does that Bentley OpenRoads Designer doesn't
@@ -161,7 +161,7 @@ Kerf saturates **95%** of Bentley OpenRoads Designer's feature surface (10 yes, 
 
 ## What's honestly outstanding
 
-- **Utilities / multi-discipline coordination** (Partial): Drainage + water networks + roadway geometry; no dedicated dry-utility (power/comms) modeller
+None — all tracked features are shipped.
 
 ## Pricing
 

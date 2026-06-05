@@ -13,6 +13,15 @@
  */
 
 export default [
+  // ── Civil: Dry Utility Network ───────────────────────────────────────────
+  {
+    id: 'civil_dry_utility',
+    kinds: ['civil_dry_utility'],
+    exts: ['.dryutil'],
+    label: 'Dry Utility Network',
+    load: () => import('../../components/civil/DryUtilityNetworkPanel.jsx'),
+  },
+
   // ── Civil: Corridor ──────────────────────────────────────────────────────
   {
     id: 'civil_corridor',

@@ -9,6 +9,8 @@ Registers:
   - LLM tools: cfd_openfoam_export, cfd_openfoam_import  (T-101-C OpenFOAM bridge)
   - LLM tool:  cfd_mesh_unstructured  (3-D unstructured mesh generation)
   - LLM tool:  cfd_combustion_ebu     (Magnussen-Hjertager EBU non-premixed combustion)
+  - LLM tool:  cfd_reacting_flow_multispecies  (N-species finite-rate Arrhenius chemistry,
+                                                 1-D plug-flow reactor, Westbrook-Dryer 1981)
   - LLM tool:  cfd_lagrangian_track   (Lagrangian particle tracking, Schiller-Naumann drag)
   - LLM tool:  cfd_fsi_displace_mesh  (ALE dynamic mesh, Laplacian smoothing, GCL)
   - LLM tool:  cfd_snappy_hex_mesh   (Cartesian + snap hex mesher, Aftosmis 1998)
@@ -29,6 +31,7 @@ Registers:
 # Wave 10C: snappyHexMesh-style mesher + wind engineering
 # Wave 12B: CFD advanced physics (compressible/conjugate-HT/multiphase/marine)
 # Wave parity: postprocessing + flow setup + isentropic/oblique shock + VOF surface tension
+# Multi-species reacting flow: general finite-rate chemistry + 1-D plug-flow reactor
 """
 
 from __future__ import annotations
@@ -62,6 +65,9 @@ async def register(app: FastAPI, ctx):
         run_cfd_mesh_unstructured,
     )
 
+    # Multi-species finite-rate reacting flow (COMSOL compare: Chemical / reacting flow → yes)
+    import kerf_cfd.combustion.multispecies_tool  # noqa: F401 — registers cfd_reacting_flow_multispecies
+
     # Wave 9C: OpenFOAM combustion + Lagrangian + FSI
     import kerf_cfd.cfd_advanced_tools  # noqa: F401 — triggers @register decorators
 
@@ -93,6 +99,7 @@ async def register(app: FastAPI, ctx):
         "cfd.openfoam_bridge",
         "cfd.mesh_unstructured_3d",
         "cfd.combustion_ebu",
+        "cfd.multispecies_reacting_flow",
         "cfd.lagrangian_particles",
         "cfd.fsi_dynamic_mesh",
         "cfd.snappy_hex_mesh",

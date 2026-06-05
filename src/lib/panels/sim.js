@@ -134,6 +134,13 @@ export default [
     load: () => import('./sim-wrappers/CfdResultsWrapper.jsx'),
     label: 'CFD Results',
   },
+  {
+    id: 'reacting-flow',
+    kinds: ['reacting_flow', 'multispecies_reacting_flow', 'cfd_reacting'],
+    exts: ['.reactflow', '.reactingflow'],
+    load: () => import('./sim-wrappers/ReactingFlowWrapper.jsx'),
+    label: 'Reacting Flow (Multi-Species)',
+  },
 
   // ── Electromagnetics FEM ─────────────────────────────────────────────────
   {

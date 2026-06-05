@@ -80,9 +80,9 @@ features:
       note: "Chemical Reaction Engineering + CFD species transport"
       source: "https://www.comsol.com/products"
     kerf:
-      status: partial
-      note: "Eddy-break-up combustion + reacting flow; no general multi-species reaction-kinetics solver"
-      evidence: "packages/kerf-cfd/src/kerf_cfd/combustion/"
+      status: yes
+      note: "General N-species finite-rate Arrhenius chemistry: solves ∂(ρYk)/∂t + ∇·(ρuYk) = ∇·(ρDk∇Yk) + ωk for N species; user-supplied reaction mechanism (kf = A·T^b·exp(-Ea/RT)·∏[X]^order); 1-D plug-flow reactor to steady state; adiabatic flame temperature; fuel conversion; built-in CH4/H2 1-step (Westbrook-Dryer 1981) + generic A+B→C; mass-fraction closure enforced (ΣYk=1); energy release coupled via formation enthalpies (JANAF/NIST); plus existing Magnussen-Hjertager EBU turbulent combustion"
+      evidence: "packages/kerf-cfd/src/kerf_cfd/combustion/multispecies_reacting_flow.py"
 
   - domain: D2
     feature: "Design optimization (topology / parametric)"
@@ -126,7 +126,7 @@ General-purpose multiphysics simulation — compared honestly against MIT open-c
 
 ## Summary
 
-Kerf saturates **85%** of COMSOL Multiphysics's feature surface (8 yes, 1 partial, 1 no out of 10 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **90%** of COMSOL Multiphysics's feature surface (9 yes, 0 partial, 1 no out of 10 features tracked here). Honest gaps: 1 feature not yet implemented (plasma / electric discharge).
 
 ## Feature comparison
 
@@ -138,7 +138,7 @@ Kerf saturates **85%** of COMSOL Multiphysics's feature surface (8 yes, 1 partia
 | Acoustics | ✅ | Yes | ISO 9613 propagation + RT60 + mass-law TL + wave SEA + photon/spectral |
 | Multiphysics coupling (thermal-structural / FSI) | ✅ | Yes | Thermal-structural coupling + ALE fluid-structure interaction |
 | Electromagnetics (electrostatics / magnetostatics / RF) | ✅ | Yes | P1 triangular FEM electrostatics (∇·(ε∇φ)=−ρ, Dirichlet + Neumann BCs, E-field, capacitance, energy) + magnetostatics... |
-| Chemical / reacting flow | ⚠️ (partial) | Yes | Eddy-break-up combustion + reacting flow; no general multi-species reaction-kinetics solver |
+| Chemical / reacting flow | ✅ | Yes | General N-species finite-rate Arrhenius chemistry (∂(ρYk)/∂t + …= ωk); Westbrook-Dryer CH4/H2 1-step + custom mechanisms; 1-D plug-flow reactor; adiabatic Tad; ΣYk=1 closure; plus EBU turbulent combustion |
 | Design optimization (topology / parametric) | ✅ | Yes | SIMP density-based topology optimization + Ashby multi-objective |
 | Plasma / electric discharge | 🔴 (no) | Yes | No plasma / gas-discharge (ionization transport) modelling |
 | Open-source core / chat-native | ✅ | No | MIT open-core; chat-native multiphysics setup + JSON-RPC LLM tools + kerf-sdk |
@@ -149,7 +149,6 @@ Kerf saturates **85%** of COMSOL Multiphysics's feature surface (8 yes, 1 partia
 
 ## What's honestly outstanding
 
-- **Chemical / reacting flow** (Partial): Eddy-break-up combustion + reacting flow; no general multi-species reaction-kinetics solver
 - **Plasma / electric discharge** (Not yet implemented): No plasma / gas-discharge (ionization transport) modelling
 
 ## Pricing

@@ -1056,3 +1056,238 @@ async def run_garment_auto_arrange(params: dict[str, Any]) -> dict[str, Any]:
 
     except Exception as exc:
         return {"ok": False, "error": f"garment_auto_arrange failed: {exc}"}
+
+
+# ---------------------------------------------------------------------------
+# cloth_sim_on_rigged_character  — soft-body cloth on animated skeleton
+# ---------------------------------------------------------------------------
+
+cloth_sim_on_rigged_character_spec = {
+    "name": "cloth_sim_on_rigged_character",
+    "description": (
+        "Cloth simulation on a rigged (skeletal) avatar over a pose sequence.\n\n"
+        "Combines linear-blend skinning (LBS) deformation of a CAESAR body-form "
+        "avatar with a Provot (1995) mass-spring cloth solver. Per animation frame, "
+        "the avatar is posed via LBS from joint rotation keyframes, the cloth is "
+        "advanced against the deformed body mesh (Bridson 2003 collision), and "
+        "per-frame cloth vertex positions + fit-tension data are returned.\n\n"
+        "Pose sequence options:\n"
+        "  'arm_raise' — one arm raises to *max_angle_deg* and back (side: 'left'|'right').\n"
+        "  'squat'     — hips + knees flex to *max_angle_deg* and back.\n"
+        "  'custom'    — supply explicit keyframes as [{time, angles[31]}].\n"
+        "  (empty)     — static T-pose: equivalent to static drape over full sequence.\n\n"
+        "Returns: per-frame cloth positions (cm), per-frame fit tension, per-frame "
+        "energy (J), and per-frame max body penetration (cm).\n\n"
+        "Honest limitations: LBS only (no dual-quaternion, no corrective shapes); "
+        "cloth-to-cloth self-collision not implemented; kinematic body (cloth does "
+        "not push avatar); no friction; FK only (no IK, no mocap import)."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "pose_type": {
+                "type": "string",
+                "enum": ["arm_raise", "squat", "static", "custom"],
+                "description": (
+                    "Preset pose sequence type. 'static' = T-pose all frames. "
+                    "'custom' = supply keyframes list. Default 'arm_raise'."
+                ),
+            },
+            "pose_side": {
+                "type": "string",
+                "enum": ["left", "right"],
+                "description": "(arm_raise) Which arm to raise. Default 'left'.",
+            },
+            "max_angle_deg": {
+                "type": "number",
+                "description": "(arm_raise/squat) Maximum joint rotation in degrees. Default 90.",
+            },
+            "keyframes": {
+                "type": "array",
+                "description": (
+                    "(custom) List of keyframes: [{time: float, angles: [31 floats]}]. "
+                    "angles must have exactly 31 values (TOTAL_DOF of the rig)."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "time":   {"type": "number"},
+                        "angles": {"type": "array", "items": {"type": "number"}},
+                    },
+                    "required": ["time", "angles"],
+                },
+            },
+            "n_frames": {
+                "type": "integer",
+                "description": "Number of animation frames to simulate. Default 20.",
+                "minimum": 2,
+                "maximum": 120,
+            },
+            "height_cm":   {"type": "number", "description": "Avatar height (cm). Default 168."},
+            "bust_cm":     {"type": "number", "description": "Avatar bust girth (cm). Default 92."},
+            "waist_cm":    {"type": "number", "description": "Avatar waist girth (cm). Default 74."},
+            "hip_cm":      {"type": "number", "description": "Avatar hip girth (cm). Default 96."},
+            "sex": {
+                "type": "string",
+                "enum": ["female", "male", "unisex"],
+                "description": "Avatar sex. Default 'female'.",
+            },
+            "panel_width_cm":  {"type": "number", "description": "Flat panel width (cm). Default 40."},
+            "panel_height_cm": {"type": "number", "description": "Flat panel height (cm). Default 50."},
+            "panel_rows": {
+                "type": "integer", "minimum": 3, "maximum": 16,
+                "description": "Grid rows. Default 8.",
+            },
+            "panel_cols": {
+                "type": "integer", "minimum": 3, "maximum": 16,
+                "description": "Grid columns. Default 8.",
+            },
+            "target_region": {
+                "type": "string",
+                "enum": ["bust", "waist", "hip", "torso", "full_torso", "knee", "full"],
+                "description": "Body region for panel placement. Default 'torso'.",
+            },
+            "k_bend": {
+                "type": "number",
+                "description": "Bending stiffness (N/m). Higher = stiffer. Default 4.0.",
+            },
+            "static_settle_steps": {
+                "type": "integer",
+                "description": "Steps for initial static drape settle. Default 600.",
+                "minimum": 50, "maximum": 3000,
+            },
+            "sim_steps_per_frame": {
+                "type": "integer",
+                "description": "Cloth integration steps per animation frame. Default 5.",
+                "minimum": 1, "maximum": 30,
+            },
+        },
+        "required": [],
+    },
+}
+
+
+async def run_cloth_sim_on_rigged_character(params: dict[str, Any]) -> dict[str, Any]:
+    """Handler for the cloth_sim_on_rigged_character LLM tool."""
+    try:
+        from kerf_textiles.cloth_sim_on_rigged import cloth_sim_on_rigged_avatar
+        from kerf_textiles.rigged_avatar import (
+            arm_raise_sequence, squat_sequence, Keyframe, zero_pose,
+            TOTAL_DOF,
+        )
+        import numpy as np
+
+        pose_type = str(params.get("pose_type", "arm_raise")).strip()
+        n_frames  = int(params.get("n_frames", 20))
+        height_cm = float(params.get("height_cm", 168.0))
+        bust_cm   = float(params.get("bust_cm",   92.0))
+        waist_cm  = float(params.get("waist_cm",  74.0))
+        hip_cm    = float(params.get("hip_cm",    96.0))
+        sex       = str(params.get("sex",  "female"))
+        panel_w   = float(params.get("panel_width_cm",  40.0))
+        panel_h   = float(params.get("panel_height_cm", 50.0))
+        panel_rows = int(params.get("panel_rows", 8))
+        panel_cols = int(params.get("panel_cols", 8))
+        target    = str(params.get("target_region", "torso"))
+        k_bend    = float(params.get("k_bend", 4.0))
+        settle    = int(params.get("static_settle_steps", 600))
+        steps_pf  = int(params.get("sim_steps_per_frame", 5))
+        max_angle = float(params.get("max_angle_deg", 90.0))
+        side      = str(params.get("pose_side", "left"))
+
+        # Build keyframe sequence
+        if pose_type == "arm_raise":
+            keyframes = arm_raise_sequence(side=side, max_angle_deg=max_angle, n_frames=n_frames)
+        elif pose_type == "squat":
+            keyframes = squat_sequence(max_angle_deg=max_angle, n_frames=n_frames)
+        elif pose_type == "static":
+            keyframes = []
+        elif pose_type == "custom":
+            raw_kf = params.get("keyframes") or []
+            if not raw_kf:
+                return {"ok": False, "error": "pose_type='custom' requires at least one keyframe"}
+            keyframes = []
+            for kf in raw_kf:
+                angles = list(kf.get("angles", []))
+                if len(angles) != TOTAL_DOF:
+                    return {
+                        "ok": False,
+                        "error": (
+                            f"Each keyframe must have exactly {TOTAL_DOF} angles, "
+                            f"got {len(angles)}"
+                        ),
+                    }
+                keyframes.append(Keyframe(
+                    time=float(kf["time"]),
+                    angles=np.array(angles, dtype=np.float64),
+                ))
+        else:
+            return {"ok": False, "error": f"Unknown pose_type {pose_type!r}"}
+
+        result = cloth_sim_on_rigged_avatar(
+            keyframes=keyframes,
+            height_cm=height_cm,
+            bust_cm=bust_cm,
+            waist_cm=waist_cm,
+            hip_cm=hip_cm,
+            sex=sex,
+            panel_width_cm=panel_w,
+            panel_height_cm=panel_h,
+            panel_rows=panel_rows,
+            panel_cols=panel_cols,
+            target_region=target,
+            n_frames=n_frames,
+            static_settle_steps=settle,
+            k_bend=k_bend,
+            sim_steps_per_frame=steps_pf,
+        )
+
+        # Thin down output: return every-other frame positions to keep JSON small
+        stride = max(1, result.n_frames // 20)
+        sampled_frames = list(range(0, result.n_frames, stride))
+
+        frames_out = []
+        for fi in sampled_frames:
+            frames_out.append({
+                "frame": fi,
+                "cloth_positions_cm": [
+                    [round(float(v), 2) for v in row]
+                    for row in result.frame_verts[fi]
+                ],
+                "fit_tension": [round(float(t), 5) for t in result.frame_fit_tension[fi]],
+                "energy_j": round(float(result.frame_energy[fi]), 5),
+                "max_penetration_cm": round(float(result.max_penetration_per_frame[fi]), 4),
+            })
+
+        return {
+            "ok": True,
+            "pose_type": pose_type,
+            "n_frames": result.n_frames,
+            "n_sampled_frames": len(sampled_frames),
+            "n_cloth_particles": result.n_cloth_particles,
+            "n_body_verts": result.n_body_verts,
+            "cloth_rows": result.cloth_rows,
+            "cloth_cols": result.cloth_cols,
+            "converged_static": result.converged_static,
+            "energy_mean_j": round(float(result.frame_energy.mean()), 5),
+            "energy_max_j":  round(float(result.frame_energy.max()),  5),
+            "max_penetration_mean_cm": round(float(result.max_penetration_per_frame.mean()), 4),
+            "frames": frames_out,
+            "notes": result.notes,
+            "avatar": {
+                "height_cm": height_cm,
+                "bust_cm": bust_cm,
+                "waist_cm": waist_cm,
+                "hip_cm":  hip_cm,
+                "sex": sex,
+            },
+            "note": (
+                "Cloth on rigged character: LBS (Mohr & Gleicher 2003) + "
+                "Provot (1995) mass-spring + Bridson (2003) mesh-triangle collision. "
+                "Honest gaps: LBS only (no dual-quaternion), no self-collision, "
+                "kinematic body (cloth does not push avatar), FK-only animation."
+            ),
+        }
+
+    except Exception as exc:
+        return {"ok": False, "error": f"cloth_sim_on_rigged_character failed: {exc}"}

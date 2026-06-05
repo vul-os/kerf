@@ -77,6 +77,13 @@ export default [
     label: 'Garment Auto-Arrangement',
     load: () => import('../../components/GarmentAutoArrangePanel.jsx'),
   },
+  {
+    id: 'cloth_sim_rigged',
+    kinds: ['cloth_sim_rigged'],
+    exts: ['.clothrig'],
+    label: 'Cloth on Rigged Character',
+    load: () => import('../../components/ClothSimRiggedPanel.jsx'),
+  },
 
   // ── DENTAL ────────────────────────────────────────────────────────────────
 

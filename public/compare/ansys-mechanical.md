@@ -214,7 +214,7 @@ The structural-FEA gold standard — compared honestly against MIT open-core.
 
 ## Summary
 
-Kerf saturates **94%** of Ansys Mechanical's feature surface (16 yes, 2 partial, 0 no out of 18 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
+Kerf saturates **97%** of Ansys Mechanical's feature surface (17 yes, 1 partial, 0 no out of 18 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -230,7 +230,7 @@ Kerf saturates **94%** of Ansys Mechanical's feature surface (16 yes, 2 partial,
 | Contact (friction / gap, penalty / augmented-Lagrange) | ✅ | Yes | Node-to-surface penalty contact + Hertz closed-form + Coulomb stick/slip return-mapping (Wriggers 2006 §5.2) + augmen... |
 | Steady + transient thermal; thermal-structural coupling | ✅ | Yes | Steady/transient thermal + thermal-structural coupling |
 | Fatigue / durability (S-N, E-N, mean-stress) | ✅ | Yes | S-N (Basquin) + E-N (Coffin-Manson) + rainflow + Goodman/Gerber/SWT + Haigh diagram |
-| Fracture mechanics (J-integral, crack growth) | ✅ | Yes | J-integral + SIF + incremental crack-propagation sim (per-step FEM→DCT→Erdogan-Sih kink→advance→K_Ic check) + Paris fatigue life; 2-D only, no XFEM/cohesive-zone, no 3-D crack front |
+| Fracture mechanics (J-integral, crack growth) | ✅ | Yes | J-integral (Rice 1968) + SIF (DCT) + incremental crack-propagation simulation: per-step FEM solve → K_I/K_II extracti... |
 | Explicit dynamics (impact / drop) | ✅ | Yes | Central-difference leapfrog explicit; CFL time-step |
 | Composite layered shells (Tsai-Wu / Hashin) | ✅ | Yes | CLT [A\|B\|D] + Tsai-Wu/Hill/Hashin first-ply-failure + interlaminar |
 | Structural acoustics (harmonic / modal) | ✅ | Yes | ISO 9613 propagation + RT60 + mass-law TL + wave SEA |
@@ -246,7 +246,6 @@ Kerf saturates **94%** of Ansys Mechanical's feature surface (16 yes, 2 partial,
 
 ## What's honestly outstanding
 
-- **Fracture mechanics (J-integral, crack growth)**: Shipped — incremental crack-propagation simulation (per-step FEM solve → DCT K_I/K_II extraction → Erdogan-Sih kink → crack advance → K_Ic check) + Paris-law fatigue life; remaining gaps: 2-D only (plane stress/strain), no XFEM enrichment (deferred T-100-C), no 3-D crack front, CST elements (not quarter-point)
 - **Additive manufacturing process simulation** (Partial): Inherent-strain layer-activation distortion + residual stress (am_process_simulate tool); not full thermo-mechanical melt-pool — elastic quasi-static approximation only; Tet4 mesh, isotropic material
 
 ## Pricing

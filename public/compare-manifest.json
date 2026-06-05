@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T17:40:20.058Z",
+  "generatedAt": "2026-06-05T17:55:41.579Z",
   "items": [
     {
       "slug": "revit",
@@ -14714,9 +14714,9 @@
             "notes": "J-Integral (incl. nonlinear), SIFs, XFEM crack growth, multiple crack laws (2025 R2)"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-fem/src/kerf_fem/fracture/crack_growth.py",
-            "notes": "J-integral + SIF + Paris-law crack growth (da/dN) + Erdogan-Sih mixed-mode kink; geometry-factor SIFs, not full XFEM enrichment"
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/fracture/crack_growth_sim.py",
+            "notes": "J-integral (Rice 1968) + SIF (DCT) + incremental crack-propagation simulation: per-step FEM solve → K_I/K_II extraction (displacement-correlation) → Erdogan-Sih mixed-mode kink angle → crack-tip advance → unstable-fracture flag (K≥K_Ic); Paris-law fatigue life (N = ∑Δa/(C·K_eff^m)) integrated over full K history. Tool: fem_crack_growth_simulate. Gaps: 2-D only (plane stress/strain); CST elements (not quarter-point); no XFEM enrichment (Moës 1999, deferred T-100-C); no cohesive-zone element insertion; no 3-D crack front."
           },
           "name": "Fracture mechanics (J-integral, crack growth)"
         },
@@ -15743,9 +15743,9 @@
             "notes": "Native ParaView integration via foamToVTK; full field visualization, streamlines, iso-surfaces"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cfd/",
-            "notes": "Basic in-browser result viewer; full ParaView pipeline on exported OpenFOAM case directory"
+            "status": "yes",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/vtk_export.py, packages/kerf-cfd/src/kerf_cfd/vtk_tools.py",
+            "notes": "VTK/VTU export (legacy ASCII .vtk + XML .vtu, binary + ASCII) + server-side ParaView-style filters: slice, contour, streamline (RK4), volume integral, probe, derived (vorticity, Q-criterion, grad(p), Cp, divergence, strain rate); not an embedded ParaView GLView — filters run server-side in Python/NumPy; export to ParaView for full native pipeline"
           },
           "name": "CFD — post-processing (ParaView / VTK)"
         },
@@ -18879,9 +18879,9 @@
             "notes": "Integrated CFD for room airflow and stratification"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-fem/src/kerf_fem/cfd_navier_stokes.py",
-            "notes": "2-D projection Navier-Stokes shipped; full 3-D room CFD not yet wired"
+            "status": "yes",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/internal_airflow/room_cfd_3d.py",
+            "notes": "3-D incompressible RANS room-airflow solver: structured Cartesian grid, SIMPLE pressure-velocity coupling (Patankar 1980), algebraic mixing-length turbulence closure (Prandtl 1925), Boussinesq buoyancy (temperature-coupled), supply diffusers (ceiling/floor/wall), exhaust outflow BCs, internal heat sources (occupants/equipment). Comfort outputs: PMV/PPD (Fanger 1972 / ISO 7730:2005), draught rate (ISO 7730:2005 eq. A.9), mean age-of-air (Sandberg 1981 passive tracer), vertical temperature gradient, ventilation effectiveness. Frontend: plan/section velocity+temperature heatmaps + comfort table. Honest gaps: algebraic mixing-length only (no k-ε transport equations), steady-state only (no transient), coarse structured grid (~0.25 m default), no radiation model (MRT approximated from adjacent cells), single-zone, not validated against MicroFlo benchmark cases."
           }
         },
         {

@@ -105,7 +105,7 @@ Integrated building performance simulation — IES VE vs MIT open-core.
 
 ## Summary
 
-Kerf saturates **100%** of IES VE (Virtual Environment)'s feature surface (8 yes, 0 partial, 0 no out of 8 features tracked here).
+Kerf saturates **100%** of IES VE (Virtual Environment)'s feature surface (8 yes, 0 partial, 0 no out of 8 features tracked here). Kerf covers the full tracked feature set for IES VE (Virtual Environment); gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -115,14 +115,10 @@ Kerf saturates **100%** of IES VE (Virtual Environment)'s feature surface (8 yes
 | AHRI-listed equipment catalogue | ✅ | Yes | 30 representative AHRI-listed models (6 categories, 5 per); real AHRI cert numbers + certified part-load curves. OEM-... |
 | Part-load efficiency curves (AHRI-certified) | ✅ | Yes | AHRI-certified part-load curves at 25/50/75/100% load from directory listings |
 | Daylighting + solar radiation simulation | ✅ | Yes | Daylighting (CIE S 011 sky) + lux/luminance sim (luminance_lux_sim.py) |
-| CFD internal airflow (IESVE MicroFlo) | ✅ | Yes | 3-D RANS SIMPLE solver: mixing-length turbulence, Boussinesq buoyancy, PMV/PPD (Fanger 1972), draught rate (ISO 7730), age-of-air (Sandberg 1981). Gaps: algebraic mixing-length only (no k-ε transport), steady-state, coarse grid (~0.25 m), no radiation, not validated vs MicroFlo. |
+| CFD internal airflow (IESVE MicroFlo) | ✅ | Yes | 3-D incompressible RANS room-airflow solver: structured Cartesian grid, SIMPLE pressure-velocity coupling (Patankar 1... |
 | Full HVAC plant + air-side system modelling | ✅ | Yes | AHU air-side model: ASHRAE HOF 2021 psychrometrics, cooling coil (ADP/bypass-factor, sensible+latent), heating coil (... |
 | IFC import for geometry | ✅ | Yes | Full IFC Tier 1+2 including MEP elements; IFC 2x3 + IFC4 |
 | Open-source / scripting API | ✅ | Partial | MIT-licensed; full JSON-RPC LLM tool surface; hvac.equipment_select wired |
-
-## What's honestly outstanding
-
-All 8 tracked IES VE features are now fully covered. Remaining depth gaps relative to MicroFlo (not tracked as separate rows): transient simulation, full k-ε transport equations, radiation coupling, multi-zone network, MicroFlo benchmark validation.
 
 ## Pricing
 

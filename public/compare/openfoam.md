@@ -300,7 +300,7 @@ OpenFOAM solves the Navier-Stokes equations — Kerf wraps it so you describe th
 
 ## Summary
 
-Kerf saturates **94%** of OpenFOAM's feature surface (22 yes, 3 partial, 0 no out of 25 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
+Kerf saturates **96%** of OpenFOAM's feature surface (23 yes, 2 partial, 0 no out of 25 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -317,7 +317,7 @@ Kerf saturates **94%** of OpenFOAM's feature surface (22 yes, 3 partial, 0 no ou
 | CFD — Lagrangian particle tracking | ✅ | Yes | Lagrangian particle models not exposed in Kerf bridge |
 | CFD — dynamic mesh / FSI | ✅ | Yes | Dynamic mesh and FSI not yet exposed in Kerf bridge |
 | CFD — parallel MPI execution | ⚠️ (partial) | Yes | Hosted cloud compute for moderate-scale runs; petascale HPC requires direct OpenFOAM |
-| CFD — post-processing (ParaView / VTK) | ✅ | Yes | VTK/VTU export + server-side filters (slice, contour, streamline, integral, probe, derived); export to ParaView for native pipeline; filters run server-side not embedded ParaView GLView |
+| CFD — post-processing (ParaView / VTK) | ✅ | Yes | VTK/VTU export (legacy ASCII .vtk + XML .vtu, binary + ASCII) + server-side ParaView-style filters: slice, contour, s... |
 | Psychrometrics (moist air) | ✅ | No | ASHRAE-grade psychrometrics (backend) |
 | Heat exchanger sizing (LMTD / Bell-Delaware) | ✅ | No | LMTD + epsilon-NTU + Bell-Delaware + TEMA layout (backend) |
 | HVAC duct sizing (SMACNA) | ✅ | No | SMACNA duct sizing + flat-pattern (backend) |
@@ -346,7 +346,6 @@ Kerf saturates **94%** of OpenFOAM's feature surface (22 yes, 3 partial, 0 no ou
 
 - **CFD — LES / DES / DNS** (Partial): LES models accessible via bridge; specialist case tuning requires expert review
 - **CFD — parallel MPI execution** (Partial): Hosted cloud compute for moderate-scale runs; petascale HPC requires direct OpenFOAM
-- **CFD — post-processing (ParaView / VTK)** (Yes): VTK/VTU export + server-side ParaView-style filters (slice, contour, streamline, integral, probe, derived); export .vtu to open in ParaView for native pipeline
 
 ## Pricing
 

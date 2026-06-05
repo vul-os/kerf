@@ -292,6 +292,29 @@ async def register(app: FastAPI, ctx):
         run_cam_apply_cutter_comp,
     )
 
+    # Toolpath verify — dexel/Z-map material-removal simulation (Van Hook 1986)
+    from kerf_cam.verify import (
+        cam_verify_material_removal_spec,
+        run_cam_verify_material_removal,
+    )
+    ctx.tools.register(
+        "cam_verify_material_removal",
+        cam_verify_material_removal_spec,
+        run_cam_verify_material_removal,
+    )
+
+    # Machine simulation — AABB kinematic collision check
+    from kerf_cam.machine_sim import (
+        cam_machine_collision_check_spec,
+        run_cam_machine_collision_check,
+    )
+    if cam_machine_collision_check_spec is not None:
+        ctx.tools.register(
+            "cam_machine_collision_check",
+            cam_machine_collision_check_spec,
+            run_cam_machine_collision_check,
+        )
+
     # Capabilities depend on available deps
     provides = [
         "cam.2_5d",
@@ -318,6 +341,8 @@ async def register(app: FastAPI, ctx):
         "cam.turning-cycles-g71-g70-g76",
         "cam.cutter-comp-g41-g42",
         "cam.5axis-ui",
+        "cam.toolpath-verify",        # dexel material-removal simulation
+        "cam.machine-collision",      # AABB kinematic machine sim
     ]   # pure-Python ops always available
     if _OCL_AVAILABLE:
         provides += ["cam.parallel-3d", "cam.waterline", "cam.lathe"]

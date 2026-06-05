@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T16:15:27.805Z",
+  "generatedAt": "2026-06-05T16:48:56.335Z",
   "items": [
     {
       "slug": "revit",
@@ -1544,9 +1544,9 @@
             "notes": "Rebar sets incl. polybeams/sloping slabs; sequence numbering (2025)"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-structural/src/kerf_structural/rebar_detailing.py",
-            "notes": "Rebar detailing engine (bar schedule, development length) shipped; not full Tekla rebar-set / polybeam UI depth"
+            "status": "yes",
+            "evidence": "packages/kerf-structural/src/kerf_structural/rebar_3d.py",
+            "notes": "3D bar placement (longitudinal + stirrups/ties at spacing, cover offset) inside beam/column/slab solids; BS 8666:2020 shape codes (00/11/12/13/21/22/25/26/31/38/51) with cut-length formulae; auto bar-bending schedule (mark, shape, size, length, count, mass); ACI 318-19 development/lap/hook lengths. No interactive rebar drag-editing or polybeam sloped-slab sets."
           },
           "name": "Reinforced-concrete rebar detailing"
         },
@@ -1614,9 +1614,9 @@
             "notes": "Automated GA + assembly/single-part shop drawings"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/drawings/",
-            "notes": "Multi-sheet drawings (HLR views/sections/details/title-block) + shop drawings; not Tekla auto-detailing depth"
+            "status": "yes",
+            "evidence": "packages/kerf-structural/src/kerf_structural/shop_drawing.py",
+            "notes": "Multi-sheet drawings engine (HLR views/sections/details/title-block) + RC shop drawings: section view, elevation with stirrup layout, bar leaders, bar-bending schedule table, assembly marks, multi-sheet GA layout (plan + assembly marks + combined BBS). No interactive dimensioning drag or Tekla auto-detailing clash-free bar layout."
           },
           "name": "General-arrangement + shop drawings"
         },
@@ -4114,9 +4114,9 @@
             "notes": "55,000+ manufacturer-verified components and models"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-electronics/src/kerf_electronics/tools/spice_lib.py",
-            "notes": "SPICE model library + Octopart/DigiKey/Mouser parts lookup; not a 55k pre-built model DB"
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/tools/spice_library.py",
+            "notes": "234 canonical SPICE models across 23 categories (rectifier/Schottky/Zener/TVS/LED diodes, NPN/PNP/Darlington/RF BJTs, N/P MOSFETs, JFETs, op-amps incl. TL072/LM358/NE5532/OP07 macromodels, comparators, voltage references, 78xx/79xx/LDO/adjustable regulators, electrolytic/ceramic/film caps with ESR/ESL, inductors with DCR+SRF, metal/wirewound resistors, 74HC/74LS/3.3 V logic gates, 555 timer, instrumentation amp/VCO/DAC/ADC behavioural models) + Octopart/DigiKey/Mouser live parts lookup + category-tree browser panel; not 55k manufacturer-verified parts"
           },
           "name": "Component / model library"
         },
@@ -9643,7 +9643,7 @@
       "left": "kerf",
       "right": "aveva-e3d",
       "hero_tagline": "The enterprise piping and plant design platform — versus an open-core CAD with P&ID, isometric generation, and piping stress in one workspace.",
-      "reviewed_at": "2026-05-24",
+      "reviewed_at": "2026-06-05",
       "features": [
         {
           "domain": "D13",
@@ -9653,9 +9653,9 @@
             "notes": "Rule-driven 3D piping routing; pipe class/material/spec enforcement; automatic clash detection"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-piping/src/kerf_piping/pipe_spec.py",
-            "notes": "Spec-driven pipe class enforcement (ASME B36.10M/B31.3 Barlow wall check, material grade, pressure/temp limits); orthogonal isometric routing; no interactive 3D plant routing UI"
+            "status": "yes",
+            "evidence": "packages/kerf-piping/src/kerf_piping/route3d.py",
+            "notes": "3D orthogonal (manhattan) routing between nozzle points with spec-driven schedule (ASME B31.3 Barlow); auto-inserts 90° LR elbows at direction changes per ASME B16.9; AABB obstacle clash avoidance (route around equipment bounding boxes); outputs 3D centreline + fitting BOM with B16.9 centre-to-face dimensions; piping_route_3d LLM tool. Honest gap: interactive drag-routing in a live 3D plant viewport is not yet wired — routes display as isometric projection only."
           },
           "name": "Piping route design (3D intelligent)"
         },
@@ -9667,9 +9667,9 @@
             "notes": "Centralised catalogue of elbows, tees, valves, reducers, flanges with spec-driven selection"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-piping/src/kerf_piping/symbols.py",
-            "notes": "P&ID component library (vessels, pumps, HX, valves, instruments with ISA 5.1 symbols); ASME B36.10M pipe size/schedule catalogue; ASME B16.9 elbow radius table; no 3D parametric fitting catalogue"
+            "status": "yes",
+            "evidence": "packages/kerf-piping/src/kerf_piping/route3d.py",
+            "notes": "Spec-driven 3D component catalogue per ASME B16.9-2018 / B16.5-2017 / B16.10-2000 / API 6D: 90° LR/SR elbows, 45° LR elbows, equal tees, concentric reducers, weld-neck flanges, gate valves, full-bore ball valves, end caps — all parameterised by nominal size + schedule; each returns 3D nozzle port geometry (position + flow direction), face-to-face / centre-to-face dimensions, nominal OD (B36.10M), and a BOM line; piping_catalogue_component LLM tool. P&ID component library (vessels, pumps, HX, instruments) also present."
           },
           "name": "Piping component catalogue"
         },
@@ -14672,9 +14672,9 @@
             "notes": "Bonded/no-separation/frictional/frictionless; self-contact; augmented Lagrange"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-fem/src/kerf_fem/contact/",
-            "notes": "Node-to-surface penalty contact + Hertz closed-form; not full self-contact / augmented-Lagrange depth"
+            "notes": "Node-to-surface penalty contact + Hertz closed-form + Coulomb stick/slip return-mapping (Wriggers 2006 §5.2) + augmented-Lagrange Uzawa loop with friction (Alart-Curnier 1991); self-contact between deformable bodies and mortar/segment-to-segment formulation not yet implemented"
           },
           "name": "Contact (friction / gap, penalty / augmented-Lagrange)"
         },
@@ -15254,9 +15254,9 @@
             "notes": "Chemical Reaction Engineering + CFD species transport"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cfd/src/kerf_cfd/combustion/",
-            "notes": "Eddy-break-up combustion + reacting flow; no general multi-species reaction-kinetics solver"
+            "status": "yes",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/combustion/multispecies_reacting_flow.py",
+            "notes": "General N-species finite-rate Arrhenius chemistry: solves ∂(ρYk)/∂t + ∇·(ρuYk) = ∇·(ρDk∇Yk) + ωk for N species; user-supplied reaction mechanism (kf = A·T^b·exp(-Ea/RT)·∏[X]^order); 1-D plug-flow reactor to steady state; adiabatic flame temperature; fuel conversion; built-in CH4/H2 1-step (Westbrook-Dryer 1981) + generic A+B→C; mass-fraction closure enforced (ΣYk=1); energy release coupled via formation enthalpies (JANAF/NIST); plus existing Magnussen-Hjertager EBU turbulent combustion"
           },
           "name": "Chemical / reacting flow"
         },

@@ -214,7 +214,7 @@ The structural-FEA gold standard — compared honestly against MIT open-core.
 
 ## Summary
 
-Kerf saturates **89%** of Ansys Mechanical's feature surface (14 yes, 4 partial, 0 no out of 18 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap).
+Kerf saturates **92%** of Ansys Mechanical's feature surface (15 yes, 3 partial, 0 no out of 18 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -227,7 +227,7 @@ Kerf saturates **89%** of Ansys Mechanical's feature surface (14 yes, 4 partial,
 | Eigenvalue buckling | ✅ | Yes | Eigenvalue buckling solver |
 | Nonlinear — metal plasticity (J2) | ✅ | Yes | J2 plasticity + Total-Lagrangian large-strain + Riks arc-length |
 | Nonlinear — hyperelastic (rubber/elastomer) | ⚠️ (partial) | Yes | Neo-Hookean/Mooney-Rivlin/Ogden constitutive models + Cauchy stress + tangent (material-point); no full hyperelastic ... |
-| Contact (friction / gap, penalty / augmented-Lagrange) | ✅ | Yes | NTS penalty + Hertz + Coulomb stick/slip return-map + augmented-Lagrange Uzawa; no deformable self-contact / mortar |
+| Contact (friction / gap, penalty / augmented-Lagrange) | ✅ | Yes | Node-to-surface penalty contact + Hertz closed-form + Coulomb stick/slip return-mapping (Wriggers 2006 §5.2) + augmen... |
 | Steady + transient thermal; thermal-structural coupling | ✅ | Yes | Steady/transient thermal + thermal-structural coupling |
 | Fatigue / durability (S-N, E-N, mean-stress) | ✅ | Yes | S-N (Basquin) + E-N (Coffin-Manson) + rainflow + Goodman/Gerber/SWT + Haigh diagram |
 | Fracture mechanics (J-integral, crack growth) | ⚠️ (partial) | Yes | J-integral + SIF + Paris-law crack growth (da/dN) + Erdogan-Sih mixed-mode kink; geometry-factor SIFs, not full XFEM ... |

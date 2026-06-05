@@ -126,7 +126,7 @@ General-purpose multiphysics simulation — compared honestly against MIT open-c
 
 ## Summary
 
-Kerf saturates **90%** of COMSOL Multiphysics's feature surface (9 yes, 0 partial, 1 no out of 10 features tracked here). Honest gaps: 1 feature not yet implemented (plasma / electric discharge).
+Kerf saturates **90%** of COMSOL Multiphysics's feature surface (9 yes, 0 partial, 1 no out of 10 features tracked here). Honest gaps: 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -138,7 +138,7 @@ Kerf saturates **90%** of COMSOL Multiphysics's feature surface (9 yes, 0 partia
 | Acoustics | ✅ | Yes | ISO 9613 propagation + RT60 + mass-law TL + wave SEA + photon/spectral |
 | Multiphysics coupling (thermal-structural / FSI) | ✅ | Yes | Thermal-structural coupling + ALE fluid-structure interaction |
 | Electromagnetics (electrostatics / magnetostatics / RF) | ✅ | Yes | P1 triangular FEM electrostatics (∇·(ε∇φ)=−ρ, Dirichlet + Neumann BCs, E-field, capacitance, energy) + magnetostatics... |
-| Chemical / reacting flow | ✅ | Yes | General N-species finite-rate Arrhenius chemistry (∂(ρYk)/∂t + …= ωk); Westbrook-Dryer CH4/H2 1-step + custom mechanisms; 1-D plug-flow reactor; adiabatic Tad; ΣYk=1 closure; plus EBU turbulent combustion |
+| Chemical / reacting flow | ✅ | Yes | General N-species finite-rate Arrhenius chemistry: solves ∂(ρYk)/∂t + ∇·(ρuYk) = ∇·(ρDk∇Yk) + ωk for N species; user-... |
 | Design optimization (topology / parametric) | ✅ | Yes | SIMP density-based topology optimization + Ashby multi-objective |
 | Plasma / electric discharge | 🔴 (no) | Yes | No plasma / gas-discharge (ionization transport) modelling |
 | Open-source core / chat-native | ✅ | No | MIT open-core; chat-native multiphysics setup + JSON-RPC LLM tools + kerf-sdk |

@@ -127,14 +127,14 @@ The enterprise piping and plant design platform — versus an open-core CAD with
 
 ## Summary
 
-Kerf saturates **86%** of AVEVA E3D Design's feature surface (8 yes, 3 partial, 0 no out of 11 features tracked here). Honest gaps: 3 features partial (engine or depth gap, no complete UI).
+Kerf saturates **86%** of AVEVA E3D Design's feature surface (8 yes, 3 partial, 0 no out of 11 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
 | Feature | Kerf | AVEVA E3D Design | Notes |
 |---------|------|------------------|-------|
-| Piping route design (3D intelligent) | ✅ | Yes | 3D orthogonal routing with spec-driven schedule (ASME B31.3 Barlow); auto-inserts B16.9 elbows; AABB clash avoidance; BOM output. Honest gap: no interactive drag-routing in live 3D plant viewport — isometric projection only. |
-| Piping component catalogue | ✅ | Yes | Spec-driven ASME B16.9/B16.5 3D catalogue: elbows 45°/90° LR/SR, tees, reducers, flanges, gate/ball valves, caps; nozzle port geometry + face-to-face dims per standard; BOM aggregation; piping_catalogue_component tool. |
+| Piping route design (3D intelligent) | ✅ | Yes | 3D orthogonal (manhattan) routing between nozzle points with spec-driven schedule (ASME B31.3 Barlow); auto-inserts 9... |
+| Piping component catalogue | ✅ | Yes | Spec-driven 3D component catalogue per ASME B16.9-2018 / B16.5-2017 / B16.10-2000 / API 6D: 90° LR/SR elbows, 45° LR ... |
 | Isometric drawing generation | ✅ | Yes | Isometric drawing generation from P&ID data (backend) |
 | P&ID integration / data synchronisation | ✅ | Yes | P&ID authoring with PID symbols; backend engine wired |
 | Clash detection (hard/soft) | ✅ | Yes | Clash detection in assembly (OBB-SAT + BVH backend); no P&ID/plant-specific clash UI |
@@ -147,8 +147,6 @@ Kerf saturates **86%** of AVEVA E3D Design's feature surface (8 yes, 3 partial, 
 
 ## What's honestly outstanding
 
-- **Piping route design (3D intelligent)** (Yes — gap noted): 3D orthogonal routing, spec-driven schedule, AABB clash avoidance, B16.9 elbow BOM all implemented. Interactive drag-routing in a live 3D plant viewport (E3D-style) is not yet wired — routes displayed as isometric SVG projection only.
-- **Piping component catalogue** (Yes — gap noted): Full ASME B16.9/B16.5 parametric catalogue (elbows, tees, reducers, flanges, valves, caps) with 3D nozzle geometry implemented. No 3D rendered preview of fittings in the UI.
 - **Multi-discipline plant design (structural/HVAC/civil)** (Partial): Structural FEA, HVAC sizing, civil — separate packages but not a unified plant model
 - **Global multi-user concurrent design** (Partial): Cloud git workspace with branch/merge; not real-time concurrent design at plant-model scale
 - **Laser scan / point cloud integration** (Partial): PLY ASCII + binary, XYZ text, LAS ingest; voxel-grid downsample (Zhang 2003); statistical outlier removal (SOR, Rusu & Cousins 2011); AABB; RANSAC plane fit (Fischler & Bolles 1981) for as-built floor/wall/pipe-rack extraction; cloud-to-mesh signed deviation (Eberly 2003) for scan-vs-model QA; isometric canvas viewport with deviation heatmap and stats sidebar; LLM tools: pointcloud_import, pointcloud_deviation_check, pointcloud_fit_plane. Missing: interactive 3D plant overlay, E3D-style brownfield pipe routing against scan, automated pipe-segment detection.

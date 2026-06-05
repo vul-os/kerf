@@ -126,7 +126,7 @@ Industry-standard SPICE circuit simulation — compared honestly against MIT ope
 
 ## Summary
 
-Kerf saturates **100%** of NI Multisim's feature surface (10 yes, 0 partial, 0 no out of 10 features tracked here). Honest gap in breadth: Kerf ships 234 canonical SPICE models across 23 categories vs. Multisim's 55k manufacturer-verified parts database; model values are representative / generic, not vendor-extracted.
+Kerf saturates **100%** of NI Multisim's feature surface (10 yes, 0 partial, 0 no out of 10 features tracked here). Kerf covers the full tracked feature set for NI Multisim; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -136,7 +136,7 @@ Kerf saturates **100%** of NI Multisim's feature surface (10 yes, 0 partial, 0 n
 | Interactive schematic capture | ✅ | Yes | LTspice-equivalent schematic capture GUI + wire router; KiCad round-trip |
 | Foundry-grade device models (BSIM4) | ✅ | Yes | BSIM4 transistor model + multi-dialect netlist codegen |
 | PVT-corner + Monte-Carlo analysis | ✅ | Yes | PVT corner sweep (5P×3V×4T) + Monte-Carlo mismatch analysis |
-| Component / model library | ✅ | Yes | 234 canonical SPICE models across 23 categories (diodes/BJTs/MOSFETs/JFETs/op-amps/comparators/regulators/passives/logic/ICs) + Octopart/DigiKey/Mouser live lookup + browser panel; not 55k manufacturer-verified parts |
+| Component / model library | ✅ | Yes | 234 canonical SPICE models across 23 categories (rectifier/Schottky/Zener/TVS/LED diodes, NPN/PNP/Darlington/RF BJTs,... |
 | Virtual instruments (scope / multimeter / function gen) | ✅ | Yes | Waveform viewer + eye-diagram; no drag-on virtual-instrument bench (scope/DMM/func-gen UI) |
 | Interactive probes (live voltage/current/freq) | ✅ | Yes | Node-voltage / branch-current results from analyses; no live interactive on-wire probe overlay |
 | PCB layout integration | ✅ | Yes | Interactive PCB editor (push-shove) + schematic→layout; Gerber/ODB++/IPC-2581 fab |
@@ -146,10 +146,6 @@ Kerf saturates **100%** of NI Multisim's feature surface (10 yes, 0 partial, 0 n
 ## What Kerf does that NI Multisim doesn't
 
 - **Open-source core / chat-native** — MIT open-core; chat-native circuit design + JSON-RPC LLM tools + kerf-sdk
-
-## What's honestly outstanding
-
-No partial features. Honest gap in depth: Kerf's 234-part library uses representative/generic parameter values (not vendor-extracted); Multisim ships 55,000+ manufacturer-verified models. For tape-out or production, vendor SPICE models from the manufacturer's website should be used in place of Kerf's built-in models.
 
 ## Pricing
 

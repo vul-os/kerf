@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T02:10:13.491Z",
+  "generatedAt": "2026-06-05T02:12:41.142Z",
   "items": [
     {
       "slug": "revit",
@@ -11305,7 +11305,7 @@
             "notes": "3D NURB surface hull modelling; parametric hull form generation with interactive sketch tools"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/surfacing.py",
             "notes": "NURBS surfacing math complete; OCCT bindings unconfirmed at build; no hull-specific parametric UI"
           },
@@ -11431,7 +11431,7 @@
             "notes": "DGN, 3DM (Rhino), IGES, DXF interchange; integrates with MicroStation, Rhino, AutoCAD"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-imports/src/",
             "notes": "STEP export; limited IGES; no DGN/3DM exchange"
           },

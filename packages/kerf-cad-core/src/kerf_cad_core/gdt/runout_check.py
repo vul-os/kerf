@@ -752,6 +752,110 @@ try:
 
     _TOOL_REGISTERED = True
 
+    # -------------------------------------------------------------------------
+    # gdt_check_axial_runout — face (axial) runout per ASME Y14.5-2018 §12.5
+    # -------------------------------------------------------------------------
+
+    _gdt_check_axial_runout_spec = ToolSpec(
+        name="gdt_check_axial_runout",
+        description=(
+            "Check axial (face) runout tolerance compliance per ASME Y14.5-2018 "
+            "§12.5 / §13.3 axial component.\n"
+            "\n"
+            "Face runout measures the axial deviation (wobble / tilt / form error) "
+            "on a surface that is nominally perpendicular to the datum axis.  "
+            "The Full Indicator Movement (FIM) in the axial direction is:\n"
+            "\n"
+            "    axial_FIM = max(z_i) − min(z_i)\n"
+            "\n"
+            "Feature is compliant when axial_FIM ≤ tolerance_mm.\n"
+            "\n"
+            "Each measurement point requires:\n"
+            "  angular_position_deg  — angular position on the face (degrees)\n"
+            "  radial_position_mm    — radial distance from datum axis (mm, >= 0)\n"
+            "  axial_z_mm            — measured axial z-coordinate (mm)\n"
+            "\n"
+            "Returns {axial_fim_mm, z_max_mm, z_min_mm, fom, compliant, "
+            "n_points, datum_axis_id, honest_caveat}.\n"
+            "\n"
+            "fom = axial_fim / tolerance; fom < 1.0 = pass.\n"
+            "\n"
+            "HONEST FLAG: datum axis assumed ideal (perpendicular to the face "
+            "nominal plane). Chebyshev-optimal axis fit (ASME B89.3.1 / "
+            "ISO 12181-1 §4.3) is NOT performed."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "tolerance_mm": {
+                    "type": "number",
+                    "description": "Axial runout tolerance from the feature control frame (mm, > 0).",
+                },
+                "datum_axis_id": {
+                    "type": "string",
+                    "description": "Datum axis identifier in the FCF, e.g. 'A'. Default 'A'.",
+                },
+                "measurements": {
+                    "type": "array",
+                    "description": "List of axial face measurement points (>= 2 required).",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "angular_position_deg": {
+                                "type": "number",
+                                "description": "Angular position on the face in degrees [0, 360).",
+                            },
+                            "radial_position_mm": {
+                                "type": "number",
+                                "description": "Radial distance from datum axis (mm, >= 0).",
+                            },
+                            "axial_z_mm": {
+                                "type": "number",
+                                "description": "Measured axial z-coordinate (mm).",
+                            },
+                        },
+                        "required": ["angular_position_deg", "radial_position_mm", "axial_z_mm"],
+                    },
+                    "minItems": 2,
+                },
+            },
+            "required": ["tolerance_mm", "measurements"],
+        },
+    )
+
+    @register(_gdt_check_axial_runout_spec, write=False)
+    async def run_gdt_check_axial_runout(ctx: "ProjectCtx", args: bytes) -> str:
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+        tol_raw = a.get("tolerance_mm")
+        if tol_raw is None:
+            return err_payload("'tolerance_mm' is required", "BAD_ARGS")
+
+        raw_measurements = a.get("measurements")
+        if not isinstance(raw_measurements, list):
+            return err_payload("'measurements' must be an array", "BAD_ARGS")
+
+        try:
+            measurements = [AxialRunoutMeasurement.from_dict(m) for m in raw_measurements]
+        except (ValueError, KeyError, TypeError) as exc:
+            return err_payload(f"measurements parse error: {exc}", "BAD_ARGS")
+
+        datum_axis_id = str(a.get("datum_axis_id", "A")).strip().upper() or "A"
+
+        try:
+            report = check_axial_runout(
+                measurements=measurements,
+                tolerance_mm=tol_raw,
+                datum_axis_id=datum_axis_id,
+            )
+        except ValueError as exc:
+            return err_payload(str(exc), "BAD_ARGS")
+
+        return ok_payload(report.to_dict())
+
 except ImportError:
     # Registry not available (pure unit-test context or kerf_chat not installed).
     # InspectionPoint, RunoutCheckSpec, RunoutCheckReport, and check_runout()

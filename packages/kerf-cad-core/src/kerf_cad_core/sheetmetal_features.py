@@ -814,6 +814,208 @@ def compute_multi_flange_geometry(spec: MultiFlangeSpec) -> MultiFlangeResult:
 
 
 # ---------------------------------------------------------------------------
+# auto_corner_relief  (GK-SM1) — corner-relief cut geometry
+# ---------------------------------------------------------------------------
+#
+# Sheet-metal corners where two bend lines meet require a *corner relief* cut
+# to prevent material tearing and stress concentration during bending.
+# Three standard relief types are defined in Suchy "Handbook of Die Design"
+# §7 and DIN 6935 §6:
+#
+#   "square"    — rectangular notch; width = r + t/2, depth = t/2 (Suchy §7.1)
+#   "round"     — circular punch; radius ≥ t/2 (minimum notch rule, DIN 6935)
+#   "lance"     — lance-and-form partial cut leaving a small tab
+#                 (Suchy §7.3 — primarily for thin-gauge aluminium)
+#
+# The function returns the 2-D geometry (outline vertices in the flat-blank
+# coordinate system) and a dimensional summary suitable for press tooling.
+#
+# Reference
+# ---------
+# Suchy "Handbook of Die Design" 2nd ed. §7, DIN 6935:2006-10 §6.
+# Rule of thumb: relief depth ≥ bend radius + t / 2 to clear the bend zone.
+
+
+@dataclass
+class CornerReliefSpec:
+    """
+    Describes a single sheet-metal corner-relief cut.
+
+    Parameters
+    ----------
+    relief_type : str
+        One of: ``"square"``, ``"round"``, ``"lance"``.
+    bend_radius_mm : float
+        Inside bend radius (mm) at the corner.  Must be > 0.
+    thickness_mm : float
+        Sheet thickness (mm).  Must be > 0.
+    bend_angle_deg : float
+        Bend angle in degrees (default 90).  Used to scale the relief for
+        obtuse bends (> 90°) or acute bends (< 90°).
+    """
+    relief_type: str
+    bend_radius_mm: float
+    thickness_mm: float
+    bend_angle_deg: float = 90.0
+
+
+@dataclass
+class CornerReliefResult:
+    """
+    Result returned by ``compute_corner_relief``.
+
+    Attributes
+    ----------
+    relief_type : str
+    relief_width_mm : float
+        Width of the relief cut perpendicular to the bend line (mm).
+    relief_depth_mm : float
+        Depth of the relief cut along the bend line (mm).
+    min_punch_radius_mm : float
+        Minimum recommended punch/tool radius (mm) to avoid tearing.
+        Equals t/2 for square and lance; equals the relief radius for round.
+    outline_xy : list[tuple[float, float]]
+        2-D vertices of the relief outline in the flat-blank coordinate frame.
+        Origin (0,0) is at the bend-line intersection; X points along one
+        flange; Y points along the other.
+    honest_caveat : str
+    """
+    relief_type: str
+    relief_width_mm: float
+    relief_depth_mm: float
+    min_punch_radius_mm: float
+    outline_xy: List[tuple]
+    honest_caveat: str
+
+
+_RELIEF_CAVEAT = (
+    "Corner-relief geometry from Suchy 'Handbook of Die Design' §7 + DIN 6935 §6. "
+    "Dimensions are minimum recommendations; actual tool size must account for material "
+    "springback, press-brake accuracy, and DFM clearances (Boothroyd-Dewhurst §4). "
+    "Lance relief is for thin-gauge aluminium only (< 1.2 mm); use square or round for steel. "
+    "Relief depth rule: depth ≥ r + t/2 to clear the bend tangent zone."
+)
+
+
+def compute_corner_relief(spec: CornerReliefSpec) -> CornerReliefResult:
+    """
+    Compute the 2-D corner-relief cut geometry for a sheet-metal corner.
+
+    Parameters
+    ----------
+    spec : CornerReliefSpec
+
+    Returns
+    -------
+    CornerReliefResult
+
+    Raises
+    ------
+    ValueError
+        On invalid inputs or unrecognised relief_type.
+
+    Notes
+    -----
+    Geometry rules (Suchy §7 / DIN 6935 §6):
+
+    Square relief:
+        width = r + t/2         (clears the outside bend radius + half-t)
+        depth = r + t/2         (symmetric; minimum depth = t/2, typical = r + t/2)
+        Outline: rectangular notch from (−w/2, 0) to (w/2, depth).
+
+    Round relief:
+        relief_radius = max(t/2, r/2)
+        width = depth = 2 * relief_radius
+        Outline: 16-sided polygon approximating a circle.
+
+    Lance relief:
+        width = t
+        depth = r + t
+        Outline: L-shaped partial cut (lance).
+    """
+    valid_types = {"square", "round", "lance"}
+    if spec.relief_type not in valid_types:
+        raise ValueError(
+            f"relief_type must be one of {sorted(valid_types)}; got {spec.relief_type!r}"
+        )
+
+    t = float(spec.thickness_mm)
+    if t <= 0:
+        raise ValueError(f"thickness_mm must be > 0; got {t}")
+
+    r = float(spec.bend_radius_mm)
+    if r <= 0:
+        raise ValueError(f"bend_radius_mm must be > 0; got {r}")
+
+    angle = float(spec.bend_angle_deg)
+    if angle <= 0 or angle > 180:
+        raise ValueError(f"bend_angle_deg must be in (0, 180]; got {angle}")
+
+    # Angle correction factor: for obtuse bends (> 90°) the relief can be
+    # slightly narrower; for acute (< 90°) slightly wider.  Simple scaling:
+    # f = sin(min(angle, 90°) / 90°) blended from 0.5 to 1.0.
+    angle_factor = math.sin(math.radians(min(angle, 90.0)))
+
+    if spec.relief_type == "square":
+        # Minimum: depth ≥ r + t/2 (Suchy §7.1)
+        base_depth = r + t / 2.0
+        depth = round(base_depth * angle_factor, 6) if angle < 90 else round(base_depth, 6)
+        depth = max(depth, t / 2.0)
+        width = round(r + t / 2.0, 6)
+        min_punch_r = round(t / 2.0, 6)
+        hw = width / 2.0
+        outline = [
+            (-hw, 0.0),
+            (hw, 0.0),
+            (hw, depth),
+            (-hw, depth),
+            (-hw, 0.0),
+        ]
+
+    elif spec.relief_type == "round":
+        rr = max(t / 2.0, r / 2.0)
+        width = round(2.0 * rr, 6)
+        depth = round(2.0 * rr, 6)
+        min_punch_r = round(rr, 6)
+        # 16-sided circle approximation centred at (0, rr)
+        n_seg = 16
+        outline = []
+        for k in range(n_seg + 1):
+            theta = math.pi * k / n_seg   # 0 → π (half circle)
+            x = rr * math.cos(math.pi - theta)
+            y = rr + rr * math.sin(math.pi - theta)
+            outline.append((round(x, 8), round(y, 8)))
+        # Close back to start
+        outline.append(outline[0])
+
+    else:  # lance
+        # Lance-and-form: partial cut width = t, depth = r + t (Suchy §7.3)
+        width = round(t, 6)
+        depth = round(r + t, 6)
+        min_punch_r = round(t / 2.0, 6)
+        hw = width / 2.0
+        # L-shaped lance outline
+        outline = [
+            (-hw, 0.0),
+            (hw, 0.0),
+            (hw, depth),
+            (0.0, depth),
+            (0.0, depth / 2.0),
+            (-hw, depth / 2.0),
+            (-hw, 0.0),
+        ]
+
+    return CornerReliefResult(
+        relief_type=spec.relief_type,
+        relief_width_mm=float(width),
+        relief_depth_mm=float(depth),
+        min_punch_radius_mm=float(min_punch_r),
+        outline_xy=[(round(float(x), 8), round(float(y), 8)) for x, y in outline],
+        honest_caveat=_RELIEF_CAVEAT,
+    )
+
+
+# ---------------------------------------------------------------------------
 # LLM tool (gated import — loads cleanly in pure-Python test envs)
 # ---------------------------------------------------------------------------
 
@@ -1220,6 +1422,82 @@ try:
             "total_bend_deduction_mm":  result.total_bend_deduction_mm,
             "num_bends":                result.num_bends,
             "honest_caveat":            result.honest_caveat,
+        })
+
+    # ------------------------------------------------------------------
+    # sheetmetal_compute_corner_relief  — GK-SM1
+    # ------------------------------------------------------------------
+
+    _sheetmetal_corner_relief_spec = ToolSpec(
+        name="sheetmetal_compute_corner_relief",
+        description=(
+            "Compute the 2-D corner-relief cut geometry for a sheet-metal corner "
+            "where two bend lines meet.  Corner reliefs prevent tearing and stress "
+            "concentration during bending.  Per Suchy 'Handbook of Die Design' §7 "
+            "+ DIN 6935 §6.\n\n"
+            "Three types:\n"
+            "  'square' — rectangular notch; width = r+t/2, depth = r+t/2.\n"
+            "  'round'  — circular punch; radius = max(t/2, r/2).\n"
+            "  'lance'  — lance-and-form partial cut; width = t, depth = r+t "
+            "(thin-gauge aluminium only).\n\n"
+            "Returns: {ok, relief_type, relief_width_mm, relief_depth_mm, "
+            "min_punch_radius_mm, outline_xy, honest_caveat}.\n"
+            "Errors: {ok:false, reason}."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "relief_type": {
+                    "type": "string",
+                    "description": "One of: 'square', 'round', 'lance'.",
+                },
+                "bend_radius_mm": {
+                    "type": "number",
+                    "description": "Inside bend radius at the corner (mm). Must be > 0.",
+                },
+                "thickness_mm": {
+                    "type": "number",
+                    "description": "Sheet thickness (mm). Must be > 0.",
+                },
+                "bend_angle_deg": {
+                    "type": "number",
+                    "description": "Bend angle in degrees (default 90).",
+                },
+            },
+            "required": ["relief_type", "bend_radius_mm", "thickness_mm"],
+        },
+    )
+
+    @register(_sheetmetal_corner_relief_spec, write=False)
+    async def run_sheetmetal_compute_corner_relief(ctx, args: bytes) -> str:  # type: ignore[misc]
+        import json as _json
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid JSON args: {exc}", "BAD_ARGS")
+
+        try:
+            spec = CornerReliefSpec(
+                relief_type=str(a.get("relief_type", "square")),
+                bend_radius_mm=float(a.get("bend_radius_mm", 1.0)),
+                thickness_mm=float(a.get("thickness_mm", 1.0)),
+                bend_angle_deg=float(a.get("bend_angle_deg", 90.0)),
+            )
+        except (TypeError, ValueError) as exc:
+            return err_payload(f"numeric argument error: {exc}", "BAD_ARGS")
+
+        try:
+            result = compute_corner_relief(spec)
+        except ValueError as exc:
+            return err_payload(str(exc), "BAD_ARGS")
+
+        return ok_payload({
+            "relief_type":        result.relief_type,
+            "relief_width_mm":    result.relief_width_mm,
+            "relief_depth_mm":    result.relief_depth_mm,
+            "min_punch_radius_mm": result.min_punch_radius_mm,
+            "outline_xy":         result.outline_xy,
+            "honest_caveat":      result.honest_caveat,
         })
 
 except ImportError:

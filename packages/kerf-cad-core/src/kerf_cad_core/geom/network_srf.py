@@ -610,3 +610,276 @@ def loft_surface(
             stacklevel=2,
         )
         return network_srf(profiles, degree_u=degree_u)
+
+
+# ---------------------------------------------------------------------------
+# LLM tool registration (gated — graceful no-op when registry absent)
+# ---------------------------------------------------------------------------
+#
+# Registers:
+#   nurbs_gordon_network_surface  — True Gordon / Coons-Gordon surface
+#   nurbs_skinning_loft           — Skinning loft through profiles
+#   nurbs_loft_with_guides        — Loft with guide rail curves (Gordon)
+#
+# All tools accept serialised NURBS curve JSON (control_points + knots +
+# degree) and return a serialised NurbsSurface.
+
+try:
+    from kerf_chat.tools.registry import ToolSpec, err_payload, ok_payload, register  # type: ignore[import]
+    _NET_REGISTRY_AVAILABLE = True
+except ImportError:
+    _NET_REGISTRY_AVAILABLE = False
+
+
+def _deserialize_curve(d: dict) -> "NurbsCurve":
+    """Deserialise a dict {'control_points':..., 'knots':..., 'degree':...} to NurbsCurve."""
+    import numpy as _np
+    cp = _np.asarray(d["control_points"], dtype=float)
+    knots = _np.asarray(d["knots"], dtype=float)
+    degree = int(d["degree"])
+    return NurbsCurve(control_points=cp, knots=knots, degree=degree)
+
+
+def _serialize_surface(surf: "NurbsSurface") -> dict:
+    """Serialise a NurbsSurface to a JSON-safe dict."""
+    return {
+        "degree_u": int(surf.degree_u),
+        "degree_v": int(surf.degree_v),
+        "control_points": surf.control_points.tolist(),
+        "knots_u": surf.knots_u.tolist(),
+        "knots_v": surf.knots_v.tolist(),
+        "num_control_points_u": int(surf.num_control_points_u),
+        "num_control_points_v": int(surf.num_control_points_v),
+    }
+
+
+if _NET_REGISTRY_AVAILABLE:
+    import json as _json
+
+    # -----------------------------------------------------------------------
+    # nurbs_gordon_network_surface
+    # -----------------------------------------------------------------------
+    _gordon_spec = ToolSpec(
+        name="nurbs_gordon_network_surface",
+        description=(
+            "Build a true Gordon / Coons-Gordon network surface interpolating BOTH "
+            "families of input curves exactly.  The Gordon formula is:\n\n"
+            "  G(u,v) = Σ_i L_i(v)·c_i(u)  +  Σ_j M_j(u)·d_j(v)  "
+            "-  Σ_i Σ_j L_i(v)·M_j(u)·P_ij\n\n"
+            "where c_i are u-direction curves (profiles), d_j are v-direction curves "
+            "(guide rails), L_i / M_j are Lagrange basis polynomials, and P_ij are "
+            "the intersection points.\n\n"
+            "Requirements: every u-curve must physically cross every v-curve; mismatches "
+            "beyond 'tol' raise an error.  Use 'u_params' / 'v_params' to specify "
+            "non-uniform placement.  Reference: W. J. Gordon (1969), Piegl & Tiller §12.4.\n\n"
+            "Returns: {ok, surface} where surface is a serialised NurbsSurface "
+            "{degree_u, degree_v, control_points, knots_u, knots_v}.\n"
+            "Errors: {ok:false, reason}."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "u_curves": {
+                    "type": "array",
+                    "description": (
+                        "Profile curves running in the u-direction.  Each element is "
+                        "{control_points:[[x,y,z],...], knots:[...], degree:N}."
+                    ),
+                    "items": {"type": "object"},
+                },
+                "v_curves": {
+                    "type": "array",
+                    "description": (
+                        "Guide-rail curves running in the v-direction.  Each element is "
+                        "{control_points:[[x,y,z],...], knots:[...], degree:N}.  "
+                        "Must intersect all u_curves within tol."
+                    ),
+                    "items": {"type": "object"},
+                },
+                "u_params": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "description": (
+                        "u-parameter values where each v-curve lives (one per v-curve). "
+                        "Default: evenly spaced in [0,1]."
+                    ),
+                },
+                "v_params": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "description": (
+                        "v-parameter values where each u-curve lives (one per u-curve). "
+                        "Default: evenly spaced in [0,1]."
+                    ),
+                },
+                "tol": {
+                    "type": "number",
+                    "description": "Intersection agreement tolerance (default 1e-4).",
+                },
+                "grid_n": {
+                    "type": "integer",
+                    "description": "Evaluation grid size per direction (default 20).",
+                },
+            },
+            "required": ["u_curves", "v_curves"],
+        },
+    )
+
+    @register(_gordon_spec)
+    async def run_gordon_network_surface(ctx, args: bytes) -> str:
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+        try:
+            u_curves = [_deserialize_curve(c) for c in a.get("u_curves", [])]
+            v_curves = [_deserialize_curve(c) for c in a.get("v_curves", [])]
+            if not u_curves:
+                return err_payload("u_curves must be non-empty", "BAD_ARGS")
+            if not v_curves:
+                return err_payload("v_curves must be non-empty", "BAD_ARGS")
+            kwargs = {}
+            if "u_params" in a:
+                kwargs["u_params"] = a["u_params"]
+            if "v_params" in a:
+                kwargs["v_params"] = a["v_params"]
+            if "tol" in a:
+                kwargs["tol"] = float(a["tol"])
+            if "grid_n" in a:
+                kwargs["grid_n"] = int(a["grid_n"])
+            surf = gordon_network_srf(u_curves, v_curves, **kwargs)
+            return ok_payload({"ok": True, "surface": _serialize_surface(surf)})
+        except Exception as exc:
+            return err_payload(str(exc), "OP_FAILED")
+
+    # -----------------------------------------------------------------------
+    # nurbs_skinning_loft
+    # -----------------------------------------------------------------------
+    _skinning_spec = ToolSpec(
+        name="nurbs_skinning_loft",
+        description=(
+            "Loft (skin) through an ordered sequence of cross-section profile curves "
+            "to produce a NurbsSurface.  Uses the B-spline global interpolation method "
+            "of Piegl & Tiller §10.4.  The u-direction runs along each profile; the "
+            "v-direction sweeps through the profiles.\n\n"
+            "With 'ruled=true' the profiles are connected by linear (degree-1) "
+            "segments in the v-direction.  With 'degree_u' you can control the "
+            "interpolation degree along the profiles.\n\n"
+            "Returns: {ok, surface}  Errors: {ok:false, reason}."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "profiles": {
+                    "type": "array",
+                    "description": "Ordered profile curves [{control_points, knots, degree}, ...].",
+                    "items": {"type": "object"},
+                },
+                "degree_u": {
+                    "type": "integer",
+                    "description": "Degree in the profile direction (default 3).",
+                },
+                "ruled": {
+                    "type": "boolean",
+                    "description": "If true, use linear (ruled) blending between profiles.",
+                },
+            },
+            "required": ["profiles"],
+        },
+    )
+
+    @register(_skinning_spec)
+    async def run_skinning_loft(ctx, args: bytes) -> str:
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+        try:
+            profiles = [_deserialize_curve(c) for c in a.get("profiles", [])]
+            if len(profiles) < 2:
+                return err_payload("profiles must have at least 2 curves", "BAD_ARGS")
+            degree_u = int(a.get("degree_u", 3))
+            ruled = bool(a.get("ruled", False))
+            surf = loft_surface(profiles, ruled=ruled, degree_u=degree_u)
+            return ok_payload({"ok": True, "surface": _serialize_surface(surf)})
+        except Exception as exc:
+            return err_payload(str(exc), "OP_FAILED")
+
+    # -----------------------------------------------------------------------
+    # nurbs_loft_with_guides
+    # -----------------------------------------------------------------------
+    _loft_guide_spec = ToolSpec(
+        name="nurbs_loft_with_guides",
+        description=(
+            "Loft through profile curves constrained by guide-rail curves.  "
+            "Guide rails must intersect (or nearly intersect) every profile curve.  "
+            "When guides are provided the function uses the Gordon surface so the "
+            "result interpolates both families exactly.\n\n"
+            "If guide curves do not intersect profiles within tolerance, the function "
+            "issues a warning and degrades to a simple skinning loft.\n\n"
+            "Returns: {ok, surface, used_gordon} "
+            "Errors: {ok:false, reason}."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "profiles": {
+                    "type": "array",
+                    "description": "Profile (cross-section) curves [{control_points, knots, degree}, ...].",
+                    "items": {"type": "object"},
+                },
+                "guide_curves": {
+                    "type": "array",
+                    "description": "Guide-rail curves that constrain the loft.",
+                    "items": {"type": "object"},
+                },
+                "degree_u": {
+                    "type": "integer",
+                    "description": "Degree in the profile direction (default 3).",
+                },
+                "grid_n": {
+                    "type": "integer",
+                    "description": "Gordon surface evaluation grid size (default 20).",
+                },
+            },
+            "required": ["profiles", "guide_curves"],
+        },
+    )
+
+    @register(_loft_guide_spec)
+    async def run_loft_with_guides(ctx, args: bytes) -> str:
+        import warnings as _warnings
+
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+        try:
+            profiles = [_deserialize_curve(c) for c in a.get("profiles", [])]
+            guide_curves = [_deserialize_curve(c) for c in a.get("guide_curves", [])]
+            if len(profiles) < 2:
+                return err_payload("profiles must have at least 2 curves", "BAD_ARGS")
+            if not guide_curves:
+                return err_payload("guide_curves must be non-empty", "BAD_ARGS")
+            degree_u = int(a.get("degree_u", 3))
+            grid_n = int(a.get("grid_n", 20))
+
+            used_gordon = True
+            with _warnings.catch_warnings(record=True) as w:
+                _warnings.simplefilter("always")
+                surf = loft_surface(
+                    profiles,
+                    guide_curves=guide_curves,
+                    degree_u=degree_u,
+                    grid_n=grid_n,
+                )
+                if w:
+                    used_gordon = False
+
+            return ok_payload({
+                "ok": True,
+                "surface": _serialize_surface(surf),
+                "used_gordon": used_gordon,
+            })
+        except Exception as exc:
+            return err_payload(str(exc), "OP_FAILED")

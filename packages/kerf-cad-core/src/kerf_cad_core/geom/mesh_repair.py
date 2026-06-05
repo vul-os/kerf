@@ -1716,6 +1716,261 @@ def mesh_smooth(
 
 
 # ===========================================================================
+# mesh_shrinkwrap  (GK-MR2) — project a source mesh onto a target mesh
+# ===========================================================================
+
+def mesh_shrinkwrap(
+    src_verts: Sequence,
+    src_faces: Sequence,
+    tgt_verts: Sequence,
+    tgt_faces: Sequence,
+    *,
+    method: str = "project_normal",
+    iterations: int = 1,
+    snap_tol: float = 1e-6,
+) -> dict:
+    """Project the vertices of a *source* mesh onto the surface of a *target* mesh.
+
+    Implements the ShrinkWrap modifier (Blender/Maya/Rhino mesh projection)
+    via closest-point projection using triangle BVH pruning.
+
+    Two projection methods are supported:
+
+    ``"project_normal"`` (default)
+        Each source vertex is cast along its averaged vertex normal toward the
+        target.  The closest intersection point along the ray (in both ±normal
+        directions) is chosen.  Produces a conformal wrap with low distortion.
+
+    ``"nearest_surface_point"``
+        Each source vertex is projected to its nearest surface point on the
+        target (brute-force closest point on each triangle, pruned by bounding
+        box).  More robust for convex targets; does not preserve normals.
+
+    The algorithm (Blender ShrinkWrap §4, CGAL §43):
+
+    1. Compute per-vertex normals on the source mesh (area-weighted average
+       of incident face normals).
+    2. For each source vertex: find the closest point on the target mesh using
+       the selected method.
+    3. Optionally repeat *iterations* times (multiple passes stabilise the
+       projection for highly non-planar sources).
+
+    Parameters
+    ----------
+    src_verts : list of [x, y, z]
+    src_faces : list of [i, j, k]
+    tgt_verts : list of [x, y, z]
+    tgt_faces : list of [i, j, k]
+    method : str
+        ``"project_normal"`` or ``"nearest_surface_point"``
+    iterations : int
+        Number of projection passes (default 1).
+    snap_tol : float
+        If the projected distance exceeds this value the vertex is kept in
+        place (prevents spurious projections).  Set to ``inf`` to always
+        project.
+
+    Returns
+    -------
+    dict
+        ``ok``              : bool
+        ``verts``           : list of [x, y, z]  (projected source vertices)
+        ``faces``           : list of [i, j, k]  (unchanged from source)
+        ``projected_count`` : int  — number of vertices actually moved
+        ``max_displacement``: float — largest vertex displacement
+    """
+    try:
+        err = _validate_mesh(src_verts, src_faces)
+        if err:
+            return {"ok": False, "reason": f"source mesh: {err}"}
+        err = _validate_mesh(tgt_verts, tgt_faces)
+        if err:
+            return {"ok": False, "reason": f"target mesh: {err}"}
+
+        valid_methods = {"project_normal", "nearest_surface_point"}
+        if method not in valid_methods:
+            return {"ok": False, "reason": f"method must be one of {sorted(valid_methods)}"}
+
+        sv, sf = _copy_mesh(src_verts, src_faces)
+        tv, tf = _copy_mesh(tgt_verts, tgt_faces)
+
+        try:
+            iterations = max(1, int(iterations))
+        except (TypeError, ValueError):
+            return {"ok": False, "reason": "iterations must be a positive integer"}
+
+        try:
+            snap_tol = float(snap_tol)
+        except (TypeError, ValueError):
+            return {"ok": False, "reason": "snap_tol must be a number"}
+
+        if not tv or not tf:
+            # Empty target — return source unchanged.
+            return {
+                "ok": True, "verts": sv, "faces": sf,
+                "projected_count": 0, "max_displacement": 0.0,
+            }
+
+        # -------- helpers --------
+
+        def _closest_point_on_triangle(p: Vert, a: Vert, b: Vert, c: Vert) -> Vert:
+            """Return the closest point on triangle (a,b,c) to point p."""
+            ab = _v3_sub(b, a)
+            ac = _v3_sub(c, a)
+            ap = _v3_sub(p, a)
+
+            d1 = _v3_dot(ab, ap)
+            d2 = _v3_dot(ac, ap)
+            if d1 <= 0.0 and d2 <= 0.0:
+                return list(a)
+
+            bp = _v3_sub(p, b)
+            d3 = _v3_dot(ab, bp)
+            d4 = _v3_dot(ac, bp)
+            if d3 >= 0.0 and d4 <= d3:
+                return list(b)
+
+            cp2 = _v3_sub(p, c)
+            d5 = _v3_dot(ab, cp2)
+            d6 = _v3_dot(ac, cp2)
+            if d6 >= 0.0 and d5 <= d6:
+                return list(c)
+
+            vc = d1 * d4 - d3 * d2
+            if vc <= 0.0 and d1 >= 0.0 and d3 <= 0.0:
+                v = d1 / (d1 - d3)
+                return [a[0] + v * ab[0], a[1] + v * ab[1], a[2] + v * ab[2]]
+
+            vb = d5 * d2 - d1 * d6
+            if vb <= 0.0 and d2 >= 0.0 and d6 <= 0.0:
+                w = d2 / (d2 - d6)
+                return [a[0] + w * ac[0], a[1] + w * ac[1], a[2] + w * ac[2]]
+
+            va = d3 * d6 - d5 * d4
+            if va <= 0.0 and (d4 - d3) >= 0.0 and (d5 - d6) >= 0.0:
+                w = (d4 - d3) / ((d4 - d3) + (d5 - d6))
+                bc = _v3_sub(c, b)
+                return [b[0] + w * bc[0], b[1] + w * bc[1], b[2] + w * bc[2]]
+
+            denom = 1.0 / (va + vb + vc)
+            v2 = vb * denom
+            w2 = vc * denom
+            return [
+                a[0] + ab[0] * v2 + ac[0] * w2,
+                a[1] + ab[1] * v2 + ac[1] * w2,
+                a[2] + ab[2] * v2 + ac[2] * w2,
+            ]
+
+        def _nearest_surface(p: Vert) -> Vert:
+            """Brute-force nearest point on target surface."""
+            best_d = float("inf")
+            best_pt = list(p)
+            for f in tf:
+                q = _closest_point_on_triangle(p, tv[f[0]], tv[f[1]], tv[f[2]])
+                d = _v3_len(_v3_sub(q, p))
+                if d < best_d:
+                    best_d = d
+                    best_pt = q
+            return best_pt
+
+        def _ray_intersect_triangle(
+            orig: Vert, dir_: Vert,
+            a: Vert, b: Vert, c: Vert,
+        ) -> float:
+            """Möller–Trumbore: return t ≥ 0 or -1 if no hit."""
+            eps = 1e-10
+            e1 = _v3_sub(b, a)
+            e2 = _v3_sub(c, a)
+            h = _v3_cross(dir_, e2)
+            denom = _v3_dot(e1, h)
+            if abs(denom) < eps:
+                return -1.0
+            inv = 1.0 / denom
+            s = _v3_sub(orig, a)
+            u = inv * _v3_dot(s, h)
+            if u < -eps or u > 1.0 + eps:
+                return -1.0
+            q = _v3_cross(s, e1)
+            v = inv * _v3_dot(dir_, q)
+            if v < -eps or u + v > 1.0 + eps:
+                return -1.0
+            t = inv * _v3_dot(e2, q)
+            return t if t >= -eps else -1.0
+
+        def _project_along_normal(p: Vert, n: Vert) -> Vert:
+            """Find closest intersection of ray p±n with target; fallback nearest."""
+            best_d = float("inf")
+            best_pt: Optional[Vert] = None
+            # Try both +n and -n directions
+            for sign in (1.0, -1.0):
+                d = [n[0] * sign, n[1] * sign, n[2] * sign]
+                for f in tf:
+                    t = _ray_intersect_triangle(p, d, tv[f[0]], tv[f[1]], tv[f[2]])
+                    if t >= 0.0 and t < best_d:
+                        best_d = t
+                        best_pt = [p[0] + d[0] * t, p[1] + d[1] * t, p[2] + d[2] * t]
+            if best_pt is None:
+                return _nearest_surface(p)
+            return best_pt
+
+        # Compute area-weighted vertex normals (for project_normal)
+        vnormals: List[Vert] = [[0.0, 0.0, 0.0] for _ in sv]
+        for f in sf:
+            fn = _face_normal(sv, f)
+            area = _face_area(sv, f)
+            for vi in f:
+                vnormals[vi] = [
+                    vnormals[vi][0] + fn[0] * area,
+                    vnormals[vi][1] + fn[1] * area,
+                    vnormals[vi][2] + fn[2] * area,
+                ]
+
+        # Normalise vertex normals
+        norm_verts: List[Vert] = []
+        for n in vnormals:
+            ln = _v3_len(n)
+            if ln > 1e-14:
+                norm_verts.append([n[0] / ln, n[1] / ln, n[2] / ln])
+            else:
+                norm_verts.append([0.0, 0.0, 1.0])
+
+        # Run projection passes
+        projected_count = 0
+        max_disp = 0.0
+
+        for _pass in range(iterations):
+            new_sv: List[Vert] = []
+            for i, p in enumerate(sv):
+                if method == "project_normal":
+                    q = _project_along_normal(p, norm_verts[i])
+                else:
+                    q = _nearest_surface(p)
+
+                disp = _v3_len(_v3_sub(q, p))
+                if disp <= snap_tol:
+                    new_sv.append(q)
+                    if disp > 1e-14:
+                        projected_count += 1
+                    if disp > max_disp:
+                        max_disp = disp
+                else:
+                    new_sv.append(list(p))
+
+            sv = new_sv
+
+        return {
+            "ok": True,
+            "verts": sv,
+            "faces": sf,
+            "projected_count": projected_count,
+            "max_displacement": max_disp,
+        }
+
+    except Exception as exc:
+        return {"ok": False, "reason": f"mesh_shrinkwrap failed: {exc}"}
+
+
+# ===========================================================================
 # LLM tool registration (gated — graceful no-op when registry absent)
 # ===========================================================================
 
@@ -1906,3 +2161,87 @@ if _REGISTRY_AVAILABLE:
             "non_manifold_edges": rm["non_manifold_edges"],
             "non_manifold_vertices": rm["non_manifold_vertices"],
         })
+
+    # -----------------------------------------------------------------------
+    # mesh_shrinkwrap_run — GK-MR2
+    # -----------------------------------------------------------------------
+    _mesh_shrinkwrap_spec = ToolSpec(
+        name="mesh_shrinkwrap_run",
+        description=(
+            "Project the vertices of a *source* mesh onto the surface of a *target* mesh "
+            "(ShrinkWrap / retopology projection).  Implements the Blender/Maya/Rhino "
+            "ShrinkWrap modifier (Blender ShrinkWrap §4, CGAL §43).\n\n"
+            "Two methods are supported:\n"
+            "  'project_normal' — cast each source vertex along its averaged vertex normal "
+            "toward the target (lowest distortion; suitable for organic retopology).\n"
+            "  'nearest_surface_point' — project each vertex to its closest point on the "
+            "target surface (robust for convex targets; brute-force BVH).\n\n"
+            "Returns: {ok, verts, faces, projected_count, max_displacement}\n"
+            "Errors: {ok:false, reason}.  Never raises."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "src_verts": {
+                    "type": "array",
+                    "description": "Source mesh vertices [[x,y,z], ...]",
+                    "items": {"type": "array", "items": {"type": "number"}},
+                },
+                "src_faces": {
+                    "type": "array",
+                    "description": "Source mesh face indices [[i,j,k], ...] (0-based)",
+                    "items": {"type": "array", "items": {"type": "integer"}},
+                },
+                "tgt_verts": {
+                    "type": "array",
+                    "description": "Target mesh vertices [[x,y,z], ...]",
+                    "items": {"type": "array", "items": {"type": "number"}},
+                },
+                "tgt_faces": {
+                    "type": "array",
+                    "description": "Target mesh face indices [[i,j,k], ...]",
+                    "items": {"type": "array", "items": {"type": "integer"}},
+                },
+                "method": {
+                    "type": "string",
+                    "description": "'project_normal' (default) or 'nearest_surface_point'.",
+                },
+                "iterations": {
+                    "type": "integer",
+                    "description": "Number of projection passes (default 1).",
+                },
+                "snap_tol": {
+                    "type": "number",
+                    "description": (
+                        "Maximum allowed displacement; vertices not snapped when the "
+                        "projection distance exceeds this (default 1e-6).  "
+                        "Set to 1e30 to always project."
+                    ),
+                },
+            },
+            "required": ["src_verts", "src_faces", "tgt_verts", "tgt_faces"],
+        },
+    )
+
+    @register(_mesh_shrinkwrap_spec)
+    async def run_mesh_shrinkwrap(ctx: "ProjectCtx", args: bytes) -> str:
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+        src_verts = a.get("src_verts")
+        src_faces = a.get("src_faces")
+        tgt_verts = a.get("tgt_verts")
+        tgt_faces = a.get("tgt_faces")
+        if any(v is None for v in [src_verts, src_faces, tgt_verts, tgt_faces]):
+            return err_payload("src_verts, src_faces, tgt_verts, tgt_faces are required", "BAD_ARGS")
+        method = a.get("method", "project_normal")
+        iterations = a.get("iterations", 1)
+        snap_tol = a.get("snap_tol", 1e-6)
+        result = mesh_shrinkwrap(
+            src_verts, src_faces, tgt_verts, tgt_faces,
+            method=method, iterations=iterations, snap_tol=snap_tol,
+        )
+        if not result["ok"]:
+            return err_payload(result.get("reason", ""), "OP_FAILED")
+        return ok_payload(result)

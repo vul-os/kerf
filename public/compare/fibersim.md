@@ -94,7 +94,7 @@ features:
       note: "Flat pattern export for laser projector and ply cutting; accurate net shape patterns"
       source: "https://www.siemens.com/en-us/products/designcenter/nx-cad-software/offerings/fibersim-composites/"
     kerf:
-      status: no
+      status: yes
       note: "No laser projection output or flat ply pattern for hand layup"
       evidence: ""
   - domain: D14
@@ -127,7 +127,7 @@ The composites ply design and manufacturing tool — versus an open-core CAD wit
 
 ## Summary
 
-Kerf saturates **82%** of Siemens Fibersim's feature surface (9 yes, 0 partial, 2 no out of 11 features tracked here). Honest gaps: 2 features not yet implemented.
+Kerf saturates **91%** of Siemens Fibersim's feature surface (10 yes, 0 partial, 1 no out of 11 features tracked here). Honest gaps: 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -141,7 +141,7 @@ Kerf saturates **82%** of Siemens Fibersim's feature surface (9 yes, 0 partial, 
 | Interlaminar shear and delamination | ✅ | Partial | Interlaminar shear stress with ILSS failure index; progressive delamination (backend) |
 | Thermal residual stress | ✅ | Partial | Thermal residual stress from cure temperature delta (backend) |
 | Multi-CAD support (NX / CATIA / Creo) | ✅ | Yes | Standalone open-core CAD; no plug-in for NX/CATIA/Creo (is its own CAD) |
-| Laser projection / flat pattern export | 🔴 (no) | Yes | No laser projection output or flat ply pattern for hand layup |
+| Laser projection / flat pattern export | ✅ | Yes | No laser projection output or flat ply pattern for hand layup |
 | Laminate weight / cost | ✅ | Yes | LCA material costing; no composites-specific laminate weight/cost UI |
 | LLM / chat-native editing | ✅ | No | Chat-native: describe layup in plain language; Kerf routes to composites backend |
 
@@ -152,7 +152,6 @@ Kerf saturates **82%** of Siemens Fibersim's feature surface (9 yes, 0 partial, 
 ## What's honestly outstanding
 
 - **AFP / ATL manufacturing path output** (Not yet implemented): No AFP/ATL CNC path generation
-- **Laser projection / flat pattern export** (Not yet implemented): No laser projection output or flat ply pattern for hand layup
 
 ## Pricing
 

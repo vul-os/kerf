@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T01:52:23.711Z",
+  "generatedAt": "2026-06-05T01:52:46.964Z",
   "items": [
     {
       "slug": "revit",
@@ -11252,7 +11252,7 @@
             "notes": "Flat pattern export for laser projector and ply cutting; accurate net shape patterns"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "",
             "notes": "No laser projection output or flat ply pattern for hand layup"
           },

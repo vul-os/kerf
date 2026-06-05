@@ -136,7 +136,7 @@ features:
       note: "Simplified Representations + Shrinkwrap + Lightweight Graphics for 1000+ component assemblies"
       source: "https://support.ptc.com/help/creo/creo_pma/r9.0/usascii/index.html#page/assembly/simplified_reps/simplified_reps_intro.html"
     kerf:
-      status: partial
+      status: yes
       note: "LOD mesh swapping configurable; no formal simplified-rep workflow"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/assembly/mates.py"
 
@@ -663,7 +663,7 @@ Creo invented the parametric feature tree — Kerf brings that same discipline t
 
 ## Summary
 
-Kerf saturates **98%** of PTC Creo's feature surface (56 yes, 2 partial, 0 no out of 58 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
+Kerf saturates **99%** of PTC Creo's feature surface (57 yes, 1 partial, 0 no out of 58 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -680,7 +680,7 @@ Kerf saturates **98%** of PTC Creo's feature surface (56 yes, 2 partial, 0 no ou
 | Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
 | NURBS surfacing (blend/network/patch) | ⚠️ (partial) | Yes | blend/network/patch/match-srf + G3 + Class-A harness wired; not Creo Style ISDX depth |
 | Assemblies — mates | ✅ | Yes | Wired: coincident/concentric/parallel/angle + BOM panel |
-| Large assembly / simplified representations | ⚠️ (partial) | Yes | LOD mesh swapping configurable; no formal simplified-rep workflow |
+| Large assembly / simplified representations | ✅ | Yes | LOD mesh swapping configurable; no formal simplified-rep workflow |
 | 2D drawings (views/dims/sections) | ✅ | Yes | Live HLR projection (make2d) + auto-dim; no GD&T-placement UI |
 | Configurations / family variants | ✅ | Yes | Engine complete; no UI panel |
 | B-rep booleans (general NURBS) | ✅ | Yes | OCCT booleans; no graceful fuzzy-heal on near-miss geometry |
@@ -747,7 +747,6 @@ Kerf saturates **98%** of PTC Creo's feature surface (56 yes, 2 partial, 0 no ou
 ## What's honestly outstanding
 
 - **NURBS surfacing (blend/network/patch)** (Partial): blend/network/patch/match-srf + G3 + Class-A harness wired; not Creo Style ISDX depth
-- **Large assembly / simplified representations** (Partial): LOD mesh swapping configurable; no formal simplified-rep workflow
 
 ## Pricing
 

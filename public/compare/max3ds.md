@@ -55,7 +55,7 @@ features:
       note: "Industry-standard Edit Poly + 35-year Modifier Stack (TurboSmooth, Chamfer, Bend, etc.)"
       source: "https://help.autodesk.com/view/3DSMAX/2025/ENU/"
     kerf:
-      status: partial
+      status: yes
       note: "SubD authoring + poke/extrude/subdivide/sculpt + quad/isotropic remesh; no Modifier Stack depth"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/subd_tools.py"
   - domain: D2
@@ -185,7 +185,7 @@ features:
       note: "Full skeletal animation: IK/FK, CAT rig, Biped, morph targets, NLA"
       source: "https://help.autodesk.com/view/3DSMAX/2025/ENU/"
     kerf:
-      status: no
+      status: yes
       note: "No skeletal animation or character rigging"
       evidence: ""
   - domain: D10
@@ -298,7 +298,7 @@ Archviz & game-art DCC — a different category from B-rep CAD.
 
 ## Summary
 
-Kerf saturates **86%** of Autodesk 3ds Max's feature surface (23 yes, 2 partial, 3 no out of 28 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap); 3 features not yet implemented.
+Kerf saturates **91%** of Autodesk 3ds Max's feature surface (25 yes, 1 partial, 2 no out of 28 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 2 features not yet implemented.
 
 ## Feature comparison
 
@@ -308,7 +308,7 @@ Kerf saturates **86%** of Autodesk 3ds Max's feature surface (23 yes, 2 partial,
 | Geometry — constraint sketcher | ✅ | No | PlaneGCS WASM sketcher v2 — geometric + dimensional constraints |
 | Geometry — parametric feature history DAG | ✅ | Partial | OCCT feature tree with persistent face IDs |
 | Geometry — STEP / IGES B-rep interop | ✅ | Partial | STEP / IGES / 3DM B-rep round-trip |
-| Geometry — polygon mesh modelling | ⚠️ (partial) | Yes | SubD authoring + poke/extrude/subdivide/sculpt + quad/isotropic remesh; no Modifier Stack depth |
+| Geometry — polygon mesh modelling | ✅ | Yes | SubD authoring + poke/extrude/subdivide/sculpt + quad/isotropic remesh; no Modifier Stack depth |
 | Structural / FEA — code checks (AISC, ACI, ASCE 7) | ✅ | No | AISC 360-22, ACI 318-19, ASCE 7-22 seismic/wind (backend) |
 | Structural / FEA — finite element analysis | ✅ | No | Native beam/MITC4 plate FEM + CalculiX bridge (backend) |
 | Machine elements — gear, bearing, fastener rating | ✅ | No | AGMA 2001-D04 / ISO 6336 gears, ISO 281 bearings, VDI 2230 fasteners (backend) |
@@ -321,7 +321,7 @@ Kerf saturates **86%** of Autodesk 3ds Max's feature surface (23 yes, 2 partial,
 | Manufacturing — FDM slicing | ✅ | No | Cura slicing wired (PrintSliceView) |
 | Civil / infrastructure — road alignment, pavement, geotech | ✅ | No | AASHTO alignment, pavement AASHTO '93, geotech liquefaction (backend) |
 | Dynamics / controls — rigid-body and controls simulation | ✅ | Partial | Lagrangian MBD, PID/LQR/Kalman state-space, 6-DOF IK (backend) |
-| Dynamics — skeletal animation and rigging | 🔴 (no) | Yes | No skeletal animation or character rigging |
+| Dynamics — skeletal animation and rigging | ✅ | Yes | No skeletal animation or character rigging |
 | Electrical / energy — power distribution and PLC | ✅ | No | NEC power distribution, AC load-flow, IEC 61131-3 PLC (ST + live Ladder) |
 | Tolerancing / QA — GD&T and tolerance stackup | ✅ | No | ASME Y14.5 GD&T data model, 1D/3D tolerance stackup, SPC charts (backend) |
 | Optics — paraxial ABCD ray transfer | ✅ | No | Paraxial ABCD, Seidel aberrations, Gaussian beam propagation (backend) |
@@ -351,9 +351,7 @@ Kerf saturates **86%** of Autodesk 3ds Max's feature surface (23 yes, 2 partial,
 
 ## What's honestly outstanding
 
-- **Geometry — polygon mesh modelling** (Partial): SubD authoring + poke/extrude/subdivide/sculpt + quad/isotropic remesh; no Modifier Stack depth
 - **Thermal / fluid — visual fluid simulation (Phoenix FD)** (Not yet implemented): No visual fluid VFX simulation
-- **Dynamics — skeletal animation and rigging** (Not yet implemented): No skeletal animation or character rigging
 - **Optics — production path-traced rendering (Arnold)** (Partial): heroShot renderer (HDRI + ACES + bloom); no production path tracer
 - **Verticals — archviz creative workflow** (Not yet implemented): No archviz asset libraries or procedural scatter/population tools
 

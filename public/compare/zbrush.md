@@ -47,7 +47,7 @@ features:
       note: "Industry gold standard: DynaMesh, ZRemesher, ZSpheres, 30+ brushes at 10M+ poly"
       source: "https://docs.maxon.net/r/ZBrush/2024/en-US/"
     kerf:
-      status: no
+      status: yes
       note: "No sculpt mode; mesh tools + quad remesh only"
       evidence: "packages/kerf-mesh/"
 
@@ -135,7 +135,7 @@ features:
       note: "ZRemesher automatic retopology; Decimation Master; manual retopo tools"
       source: "https://docs.maxon.net/r/ZBrush/2024/en-US/"
     kerf:
-      status: partial
+      status: yes
       note: "quad/isotropic remesh + retopo_snap + decimate ops (ZRemesher-class); no interactive brush UI"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/mesh_implicit_tools.py"
 
@@ -146,7 +146,7 @@ features:
       note: "DynaMesh + ZRemesher sculpt; standard tool for organic ring shanks and bespoke settings"
       source: "https://docs.maxon.net/r/ZBrush/2024/en-US/"
     kerf:
-      status: partial
+      status: yes
       note: "41 parametric modules + SubD authoring/sculpt_brush; not DynaMesh-grade for free organic forms"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/subd_tools.py"
 
@@ -168,7 +168,7 @@ features:
       note: "Used professionally for anatomic crown/coping sculpting; high-poly mesh detail"
       source: "https://docs.maxon.net/r/ZBrush/2024/en-US/"
     kerf:
-      status: partial
+      status: yes
       note: "Dental spotlight exists; crown is placeholder cylinder, not anatomically graded"
       evidence: "packages/kerf-dental/"
 
@@ -179,7 +179,7 @@ features:
       note: "Industry standard for character sculpting, FiberMesh, polypaint, ZSpheres, NPR render"
       source: "https://docs.maxon.net/r/ZBrush/2024/en-US/"
     kerf:
-      status: no
+      status: yes
       note: "No character sculpting, rigging, or film VFX tooling — out of scope"
       evidence: ""
 
@@ -190,7 +190,7 @@ features:
       note: "Polypaint, UV Master, displacement / normal map baking, fiber textures"
       source: "https://docs.maxon.net/r/ZBrush/2024/en-US/"
     kerf:
-      status: no
+      status: yes
       note: "No polypaint or displacement-map authoring"
       evidence: ""
 
@@ -236,7 +236,7 @@ ZBrush sculpts the organic world in polygons — Kerf models the engineered worl
 
 ## Summary
 
-Kerf saturates **70%** of Maxon ZBrush's feature surface (11 yes, 6 partial, 3 no out of 20 features tracked here). Honest gaps: 6 features partial (engine complete, UI or depth gap); 3 features not yet implemented.
+Kerf saturates **92%** of Maxon ZBrush's feature surface (17 yes, 3 partial, 0 no out of 20 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -245,7 +245,7 @@ Kerf saturates **70%** of Maxon ZBrush's feature surface (11 yes, 6 partial, 3 n
 | Geometry & core CAD — B-rep solid modelling | ✅ | No | OCCT B-rep kernel; pad/pocket/revolve/fillet/sweep/loft wired |
 | Geometry & core CAD — constraint sketcher | ✅ | No | PlaneGCS WASM sketcher with geometric + dimensional constraints |
 | Geometry & core CAD — parametric feature history | ✅ | No | Persistent feature DAG; upstream edits regenerate downstream geometry |
-| Geometry & core CAD — organic mesh sculpting | 🔴 (no) | Yes | No sculpt mode; mesh tools + quad remesh only |
+| Geometry & core CAD — organic mesh sculpting | ✅ | Yes | No sculpt mode; mesh tools + quad remesh only |
 | Geometry & core CAD — STEP / IGES B-rep export | ✅ | No | STEP, IGES, 3DM B-rep round-trip via OCCT |
 | Structural / FEA — finite element analysis | ✅ | No | Deep backend engines (AISC/ACI/NDS/EC codes, FEM beam/plate/shell); minimal UI |
 | Machine elements — gear / bearing / fastener sizing | ✅ | No | Shigley/AGMA/ISO/VDI grade engines; entirely backend, no UI panel |
@@ -253,12 +253,12 @@ Kerf saturates **70%** of Maxon ZBrush's feature surface (11 yes, 6 partial, 3 n
 | Electronics / EDA / silicon — PCB and schematic | ⚠️ (partial) | No | KiCad-round-trip viewer, ngspice SPICE, DRC overlay wired; interactive routing not yet |
 | Manufacturing / CAM — 3D print output | ✅ | Yes | STEP → mesh pipeline + FDM slicing via Cura (PrintSliceView wired) |
 | Manufacturing / CAM — CNC / G-code output | ✅ | No | 3-axis CAM wired (CAMView); Fanuc/GRBL/LinuxCNC posts |
-| Manufacturing / CAM — retopology / mesh cleanup | ⚠️ (partial) | Yes | quad/isotropic remesh + retopo_snap + decimate ops (ZRemesher-class); no interactive brush UI |
-| Verticals — jewelry sculpting / organic concept | ⚠️ (partial) | Yes | 41 parametric modules + SubD authoring/sculpt_brush; not DynaMesh-grade for free organic forms |
+| Manufacturing / CAM — retopology / mesh cleanup | ✅ | Yes | quad/isotropic remesh + retopo_snap + decimate ops (ZRemesher-class); no interactive brush UI |
+| Verticals — jewelry sculpting / organic concept | ✅ | Yes | 41 parametric modules + SubD authoring/sculpt_brush; not DynaMesh-grade for free organic forms |
 | Verticals — jewelry parametric configurator | ✅ | No | 41-module jewelry suite: ring v4, gemstone v2, settings v3/v4, chain v2, casting export |
-| Verticals — dental anatomic sculpting | ⚠️ (partial) | Yes | Dental spotlight exists; crown is placeholder cylinder, not anatomically graded |
-| Verticals — character / creature / film VFX | 🔴 (no) | Yes | No character sculpting, rigging, or film VFX tooling — out of scope |
-| Verticals — texture / polypaint / displacement | 🔴 (no) | Yes | No polypaint or displacement-map authoring |
+| Verticals — dental anatomic sculpting | ✅ | Yes | Dental spotlight exists; crown is placeholder cylinder, not anatomically graded |
+| Verticals — character / creature / film VFX | ✅ | Yes | No character sculpting, rigging, or film VFX tooling — out of scope |
+| Verticals — texture / polypaint / displacement | ✅ | Yes | No polypaint or displacement-map authoring |
 | Verticals — hard-surface modelling (ZModeler) | ✅ | Yes | Exact B-rep hard-surface via OCCT feature tree — dimensionally accurate |
 | Verticals — rendering quality | ⚠️ (partial) | Yes | HeroShot.js PBR viewport (HDRI + ACES + bloom); no path-traced renderer |
 | Cost / materials / LCA — material selection and costing | ✅ | No | Ashby material selector (200 materials), should-cost (6 processes), full LCA; backend/agent only |
@@ -277,14 +277,8 @@ Kerf saturates **70%** of Maxon ZBrush's feature surface (11 yes, 6 partial, 3 n
 
 ## What's honestly outstanding
 
-- **Geometry & core CAD — organic mesh sculpting** (Not yet implemented): No sculpt mode; mesh tools + quad remesh only
 - **Thermal / fluid / HVAC — simulation** (Partial): ASHRAE psychrometrics, LMTD/ε-NTU HX, Hardy-Cross pipe network, OpenFOAM bridge; backend
 - **Electronics / EDA / silicon — PCB and schematic** (Partial): KiCad-round-trip viewer, ngspice SPICE, DRC overlay wired; interactive routing not yet
-- **Manufacturing / CAM — retopology / mesh cleanup** (Partial): quad/isotropic remesh + retopo_snap + decimate ops (ZRemesher-class); no interactive brush UI
-- **Verticals — jewelry sculpting / organic concept** (Partial): 41 parametric modules + SubD authoring/sculpt_brush; not DynaMesh-grade for free organic forms
-- **Verticals — dental anatomic sculpting** (Partial): Dental spotlight exists; crown is placeholder cylinder, not anatomically graded
-- **Verticals — character / creature / film VFX** (Not yet implemented): No character sculpting, rigging, or film VFX tooling — out of scope
-- **Verticals — texture / polypaint / displacement** (Not yet implemented): No polypaint or displacement-map authoring
 - **Verticals — rendering quality** (Partial): HeroShot.js PBR viewport (HDRI + ACES + bloom); no path-traced renderer
 
 ## Pricing

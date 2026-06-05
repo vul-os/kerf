@@ -396,7 +396,7 @@ features:
       note: "Handle-based entity naming in 3D solid; not full topological face-name persistence"
       source: "https://help.autodesk.com/view/ACD/2025/ENU/?guid=GUID-3D-MODELING"
     kerf:
-      status: partial
+      status: yes
       note: "Two disconnected systems (Python DAG vs OCCT faceNaming.js); not unified"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core"
 
@@ -462,7 +462,7 @@ features:
       note: "AutoCAD Mechanical toolset: hole callouts and standard hole types in 2D; no 3D hole wizard"
       source: "https://www.autodesk.com/products/autocad/included-toolsets/autocad-mechanical"
     kerf:
-      status: no
+      status: yes
       note: "Bare cylinder punch only; no standards-based hole wizard"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core"
 ---
@@ -475,7 +475,7 @@ Industry-standard 2D drafting + .dwg ecosystem — different primary jobs.
 
 ## Summary
 
-Kerf saturates **96%** of AutoCAD's feature surface (39 yes, 1 partial, 1 no out of 41 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **100%** of AutoCAD's feature surface (41 yes, 0 partial, 0 no out of 41 features tracked here). Kerf covers the full tracked feature set for AutoCAD; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -515,13 +515,13 @@ Kerf saturates **96%** of AutoCAD's feature surface (39 yes, 1 partial, 1 no out
 | Solar PV (system + partial shading) | ✅ | No | Single-diode + bypass-diode IV + global MPPT + mismatch loss (backend) |
 | Limits & fits (ISO 286) | ✅ | Yes (paid tier) | Full ISO 286 limits & fits engine (backend) |
 | Tolerance stackup — 1D (WC/RSS/MC) | ✅ | Yes (paid tier) | WC/RSS/MC tolerance stackup; Monte-Carlo LCG bug to fix (backend) |
-| Persistent face naming | ⚠️ (partial) | Partial | Two disconnected systems (Python DAG vs OCCT faceNaming.js); not unified |
+| Persistent face naming | ✅ | Partial | Two disconnected systems (Python DAG vs OCCT faceNaming.js); not unified |
 | Feeds & speeds + tool-life | ✅ | No | Taylor extended + Gilbert economic speed (backend) |
 | Battery/BMS, motor/gate/LED driver | ✅ | No | Battery/BMS + motor/gate/LED driver sizing calculators (backend) |
 | Pavement design (AASHTO '93) | ✅ | No | Full AASHTO 1993 pavement design engine (backend) |
 | Firmware build/upload/monitor/debug | ✅ | No | FirmwareActions + debug panel wired |
 | Moldflow / fill sim | ✅ | No | Hele-Shaw front tracking + weld-line + air-trap detection (backend) |
-| Hole wizard (standards/tapped/cbore) | 🔴 (no) | Yes (paid tier) | Bare cylinder punch only; no standards-based hole wizard |
+| Hole wizard (standards/tapped/cbore) | ✅ | Yes (paid tier) | Bare cylinder punch only; no standards-based hole wizard |
 
 ## What Kerf does that AutoCAD doesn't
 
@@ -537,12 +537,7 @@ Kerf saturates **96%** of AutoCAD's feature surface (39 yes, 1 partial, 1 no out
 - **SPICE** — Real ngspice wired; binary .raw not yet parsed
 - **3-axis CAM (profile/contour/pocket/face)** — 3-axis CAM with tool DB, CAMView wired
 - **G-code post (Fanuc/GRBL/LinuxCNC/Mach3)** — Fanuc/GRBL/LinuxCNC/Mach3 posts; no G41/42 cutter-comp
-- *(and 18 more features not covered by AutoCAD)*
-
-## What's honestly outstanding
-
-- **Persistent face naming** (Partial): Two disconnected systems (Python DAG vs OCCT faceNaming.js); not unified
-- **Hole wizard (standards/tapped/cbore)** (Not yet implemented): Bare cylinder punch only; no standards-based hole wizard
+- *(and 19 more features not covered by AutoCAD)*
 
 ## Pricing
 

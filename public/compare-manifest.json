@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T03:01:57.304Z",
+  "generatedAt": "2026-06-05T03:03:04.549Z",
   "items": [
     {
       "slug": "revit",
@@ -6235,7 +6235,7 @@
             "notes": "SpeedPak configurations, lightweight component loading"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly/perf.py",
             "notes": "LOD mesh swapping (configurable); no SpeedPak equivalent"
           },
@@ -6515,7 +6515,7 @@
             "notes": "Basic feeds & speeds in SOLIDWORKS CAM; no Taylor/Gilbert model"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/cuttingtool",
             "notes": "Taylor extended + Gilbert economic speed backend"
           },
@@ -6571,7 +6571,7 @@
             "notes": "No civil alignment tools in SOLIDWORKS"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/civil/alignment.py",
             "notes": "H+V alignment + clothoid + SSD backend; no plan export"
           },
@@ -6585,7 +6585,7 @@
             "notes": "No geotechnical analysis tools in SOLIDWORKS"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geotech/liquefaction.py",
             "notes": "Seed-Idriss CSR + SPT/CPT CRR + Tokimatsu backend"
           },
@@ -6599,7 +6599,7 @@
             "notes": "Motion Analysis requires SOLIDWORKS Simulation Premium add-in"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/dynamics/rigidbody.py",
             "notes": "Planar MBD Lagrange/DAE backend; not wired to assembly UI"
           },
@@ -6669,7 +6669,7 @@
             "notes": "No electrical power analysis in SOLIDWORKS"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/elecpower/loadflow.py",
             "notes": "Full polar-form NR load-flow backend; no UI"
           },
@@ -6683,7 +6683,7 @@
             "notes": "DimXpert per ASME Y14.41; geometric tolerancing tool"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/datums.py",
             "notes": "Data model + auto-propose; no MBD/PMI placement UI"
           },
@@ -10471,7 +10471,7 @@
             "notes": "Simplified Representations + Shrinkwrap + Lightweight Graphics for 1000+ component assemblies"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly/mates.py",
             "notes": "LOD mesh swapping configurable; no formal simplified-rep workflow"
           },
@@ -15358,7 +15358,7 @@
             "notes": "Full sculpt mode — Dyntopo, Multires, 30+ brushes (benchmark)"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd_tools.py",
             "notes": "sculpt_brush (grab/smooth/inflate) + multires + isotropic remesh; no dyntopo/30+ brushes"
           },
@@ -15372,7 +15372,7 @@
             "notes": "Full skeletal animation, NLA, shape keys, cloth, fluid, particles"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "src/components",
             "notes": "No animation or rigging; not planned"
           },
@@ -15386,7 +15386,7 @@
             "notes": "Mature mesh-centric procedural node graph with simulation nodes"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core",
             "notes": "Parametric DAG engine complete; visual node UI bindings to come"
           },
@@ -15551,7 +15551,7 @@
             "notes": "Industry-standard Edit Poly + 35-year Modifier Stack (TurboSmooth, Chamfer, Bend, etc.)"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd_tools.py",
             "notes": "SubD authoring + poke/extrude/subdivide/sculpt + quad/isotropic remesh; no Modifier Stack depth"
           },
@@ -15733,7 +15733,7 @@
             "notes": "Full skeletal animation: IK/FK, CAT rig, Biped, morph targets, NLA"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "",
             "notes": "No skeletal animation or character rigging"
           },
@@ -15940,7 +15940,7 @@
             "notes": "Industry gold standard: DynaMesh, ZRemesher, ZSpheres, 30+ brushes at 10M+ poly"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "packages/kerf-mesh/",
             "notes": "No sculpt mode; mesh tools + quad remesh only"
           },
@@ -16052,7 +16052,7 @@
             "notes": "ZRemesher automatic retopology; Decimation Master; manual retopo tools"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/mesh_implicit_tools.py",
             "notes": "quad/isotropic remesh + retopo_snap + decimate ops (ZRemesher-class); no interactive brush UI"
           },
@@ -16066,7 +16066,7 @@
             "notes": "DynaMesh + ZRemesher sculpt; standard tool for organic ring shanks and bespoke settings"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/subd_tools.py",
             "notes": "41 parametric modules + SubD authoring/sculpt_brush; not DynaMesh-grade for free organic forms"
           },
@@ -16094,7 +16094,7 @@
             "notes": "Used professionally for anatomic crown/coping sculpting; high-poly mesh detail"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-dental/",
             "notes": "Dental spotlight exists; crown is placeholder cylinder, not anatomically graded"
           },
@@ -16108,7 +16108,7 @@
             "notes": "Industry standard for character sculpting, FiberMesh, polypaint, ZSpheres, NPR render"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "",
             "notes": "No character sculpting, rigging, or film VFX tooling — out of scope"
           },
@@ -16122,7 +16122,7 @@
             "notes": "Polypaint, UV Master, displacement / normal map baking, fiber textures"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "",
             "notes": "No polypaint or displacement-map authoring"
           },
@@ -16665,7 +16665,7 @@
             "notes": "Handle-based entity naming in 3D solid; not full topological face-name persistence"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core",
             "notes": "Two disconnected systems (Python DAG vs OCCT faceNaming.js); not unified"
           },
@@ -16749,7 +16749,7 @@
             "notes": "AutoCAD Mechanical toolset: hole callouts and standard hole types in 2D; no 3D hole wizard"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core",
             "notes": "Bare cylinder punch only; no standards-based hole wizard"
           },

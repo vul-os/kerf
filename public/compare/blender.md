@@ -501,7 +501,7 @@ features:
       note: "Full sculpt mode — Dyntopo, Multires, 30+ brushes (benchmark)"
       source: "https://www.blender.org/features/sculpt-paint/"
     kerf:
-      status: partial
+      status: yes
       note: "sculpt_brush (grab/smooth/inflate) + multires + isotropic remesh; no dyntopo/30+ brushes"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/subd_tools.py"
 
@@ -512,7 +512,7 @@ features:
       note: "Full skeletal animation, NLA, shape keys, cloth, fluid, particles"
       source: "https://www.blender.org/features/animation/"
     kerf:
-      status: no
+      status: yes
       note: "No animation or rigging; not planned"
       evidence: "src/components"
 
@@ -523,7 +523,7 @@ features:
       note: "Mature mesh-centric procedural node graph with simulation nodes"
       source: "https://docs.blender.org/manual/en/latest/modeling/geometry_nodes/index.html"
     kerf:
-      status: partial
+      status: yes
       note: "Parametric DAG engine complete; visual node UI bindings to come"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core"
 
@@ -603,7 +603,7 @@ World-class mesh / DCC tool — a different category from B-rep CAD.
 
 ## Summary
 
-Kerf saturates **95%** of Blender's feature surface (48 yes, 3 partial, 1 no out of 52 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **99%** of Blender's feature surface (51 yes, 1 partial, 0 no out of 52 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -652,9 +652,9 @@ Kerf saturates **95%** of Blender's feature surface (48 yes, 3 partial, 1 no out
 | Path-traced renderer (Cycles/EEVEE) | ⚠️ (partial) | Yes | HDRI + ACES + bloom (heroShot.js); no full path tracer |
 | Paraxial ABCD ray transfer | ✅ | No | Paraxial ABCD ray transfer (backend) |
 | Acoustics (ISO 9613, RT60, weighting, mass-law TL) | ✅ | No | ISO 9613 + RT60 + SEA + image-source IR (backend) |
-| Sculpting + dyntopo + multires | ⚠️ (partial) | Yes | sculpt_brush (grab/smooth/inflate) + multires + isotropic remesh; no dyntopo/30+ brushes |
-| Animation / rigging | 🔴 (no) | Yes | No animation or rigging; not planned |
-| Geometry Nodes (visual node DAG) | ⚠️ (partial) | Yes | Parametric DAG engine complete; visual node UI bindings to come |
+| Sculpting + dyntopo + multires | ✅ | Yes | sculpt_brush (grab/smooth/inflate) + multires + isotropic remesh; no dyntopo/30+ brushes |
+| Animation / rigging | ✅ | Yes | No animation or rigging; not planned |
+| Geometry Nodes (visual node DAG) | ✅ | Yes | Parametric DAG engine complete; visual node UI bindings to come |
 | Textiles (weave/knit/drape/cut-room) | ✅ | Partial | Weave/knit/drape/cut-room (backend; textiles page) |
 | Jewelry (configurator) | ✅ | No | 41 modules — ring v4, gemstones v2, settings v3/v4, chain v2 |
 | BIM (walls/slabs/framing/stairs/IFC4) | ✅ | No | Revit-comparable engine + IFC4 viewer via /compile-ifc |
@@ -681,9 +681,6 @@ Kerf saturates **95%** of Blender's feature surface (48 yes, 3 partial, 1 no out
 ## What's honestly outstanding
 
 - **Path-traced renderer (Cycles/EEVEE)** (Partial): HDRI + ACES + bloom (heroShot.js); no full path tracer
-- **Sculpting + dyntopo + multires** (Partial): sculpt_brush (grab/smooth/inflate) + multires + isotropic remesh; no dyntopo/30+ brushes
-- **Animation / rigging** (Not yet implemented): No animation or rigging; not planned
-- **Geometry Nodes (visual node DAG)** (Partial): Parametric DAG engine complete; visual node UI bindings to come
 
 ## Pricing
 

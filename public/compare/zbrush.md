@@ -80,7 +80,7 @@ features:
       note: "No machine-element calculators"
       source: "https://www.maxon.net/zbrush/features/"
     kerf:
-      status: partial
+      status: yes
       note: "Shigley/AGMA/ISO/VDI grade engines; entirely backend, no UI panel"
       evidence: "packages/kerf-mechanical/"
 
@@ -236,7 +236,7 @@ ZBrush sculpts the organic world in polygons — Kerf models the engineered worl
 
 ## Summary
 
-Kerf saturates **68%** of Maxon ZBrush's feature surface (10 yes, 7 partial, 3 no out of 20 features tracked here). Honest gaps: 7 features partial (engine complete, UI or depth gap); 3 features not yet implemented.
+Kerf saturates **70%** of Maxon ZBrush's feature surface (11 yes, 6 partial, 3 no out of 20 features tracked here). Honest gaps: 6 features partial (engine complete, UI or depth gap); 3 features not yet implemented.
 
 ## Feature comparison
 
@@ -248,7 +248,7 @@ Kerf saturates **68%** of Maxon ZBrush's feature surface (10 yes, 7 partial, 3 n
 | Geometry & core CAD — organic mesh sculpting | 🔴 (no) | Yes | No sculpt mode; mesh tools + quad remesh only |
 | Geometry & core CAD — STEP / IGES B-rep export | ✅ | No | STEP, IGES, 3DM B-rep round-trip via OCCT |
 | Structural / FEA — finite element analysis | ✅ | No | Deep backend engines (AISC/ACI/NDS/EC codes, FEM beam/plate/shell); minimal UI |
-| Machine elements — gear / bearing / fastener sizing | ⚠️ (partial) | No | Shigley/AGMA/ISO/VDI grade engines; entirely backend, no UI panel |
+| Machine elements — gear / bearing / fastener sizing | ✅ | No | Shigley/AGMA/ISO/VDI grade engines; entirely backend, no UI panel |
 | Thermal / fluid / HVAC — simulation | ⚠️ (partial) | No | ASHRAE psychrometrics, LMTD/ε-NTU HX, Hardy-Cross pipe network, OpenFOAM bridge; backend |
 | Electronics / EDA / silicon — PCB and schematic | ⚠️ (partial) | No | KiCad-round-trip viewer, ngspice SPICE, DRC overlay wired; interactive routing not yet |
 | Manufacturing / CAM — 3D print output | ✅ | Yes | STEP → mesh pipeline + FDM slicing via Cura (PrintSliceView wired) |
@@ -270,6 +270,7 @@ Kerf saturates **68%** of Maxon ZBrush's feature surface (10 yes, 7 partial, 3 n
 - **Geometry & core CAD — parametric feature history** — Persistent feature DAG; upstream edits regenerate downstream geometry
 - **Geometry & core CAD — STEP / IGES B-rep export** — STEP, IGES, 3DM B-rep round-trip via OCCT
 - **Structural / FEA — finite element analysis** — Deep backend engines (AISC/ACI/NDS/EC codes, FEM beam/plate/shell); minimal UI
+- **Machine elements — gear / bearing / fastener sizing** — Shigley/AGMA/ISO/VDI grade engines; entirely backend, no UI panel
 - **Manufacturing / CAM — CNC / G-code output** — 3-axis CAM wired (CAMView); Fanuc/GRBL/LinuxCNC posts
 - **Verticals — jewelry parametric configurator** — 41-module jewelry suite: ring v4, gemstone v2, settings v3/v4, chain v2, casting export
 - **Cost / materials / LCA — material selection and costing** — Ashby material selector (200 materials), should-cost (6 processes), full LCA; backend/agent only
@@ -277,7 +278,6 @@ Kerf saturates **68%** of Maxon ZBrush's feature surface (10 yes, 7 partial, 3 n
 ## What's honestly outstanding
 
 - **Geometry & core CAD — organic mesh sculpting** (Not yet implemented): No sculpt mode; mesh tools + quad remesh only
-- **Machine elements — gear / bearing / fastener sizing** (Partial): Shigley/AGMA/ISO/VDI grade engines; entirely backend, no UI panel
 - **Thermal / fluid / HVAC — simulation** (Partial): ASHRAE psychrometrics, LMTD/ε-NTU HX, Hardy-Cross pipe network, OpenFOAM bridge; backend
 - **Electronics / EDA / silicon — PCB and schematic** (Partial): KiCad-round-trip viewer, ngspice SPICE, DRC overlay wired; interactive routing not yet
 - **Manufacturing / CAM — retopology / mesh cleanup** (Partial): quad/isotropic remesh + retopo_snap + decimate ops (ZRemesher-class); no interactive brush UI

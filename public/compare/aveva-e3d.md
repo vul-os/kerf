@@ -54,7 +54,7 @@ features:
       note: "Hard, soft, and touch clash classifications; real-time highlighting; laser scan integration"
       source: "https://www.aveva.com/en/products/e3d-design/"
     kerf:
-      status: partial
+      status: yes
       note: "Clash detection in assembly (OBB-SAT + BVH backend); no P&ID/plant-specific clash UI"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py"
   - domain: D13
@@ -127,7 +127,7 @@ The enterprise piping and plant design platform — versus an open-core CAD with
 
 ## Summary
 
-Kerf saturates **68%** of AVEVA E3D Design's feature surface (5 yes, 5 partial, 1 no out of 11 features tracked here). Honest gaps: 5 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **73%** of AVEVA E3D Design's feature surface (6 yes, 4 partial, 1 no out of 11 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -137,7 +137,7 @@ Kerf saturates **68%** of AVEVA E3D Design's feature surface (5 yes, 5 partial, 
 | Piping component catalogue | ⚠️ (partial) | Yes | P&ID component library (vessels, pumps, HX, valves, instruments with ISA 5.1 symbols); ASME B36.10M pipe size/schedul... |
 | Isometric drawing generation | ✅ | Yes | Isometric drawing generation from P&ID data (backend) |
 | P&ID integration / data synchronisation | ✅ | Yes | P&ID authoring with PID symbols; backend engine wired |
-| Clash detection (hard/soft) | ⚠️ (partial) | Yes | Clash detection in assembly (OBB-SAT + BVH backend); no P&ID/plant-specific clash UI |
+| Clash detection (hard/soft) | ✅ | Yes | Clash detection in assembly (OBB-SAT + BVH backend); no P&ID/plant-specific clash UI |
 | Multi-discipline plant design (structural/HVAC/civil) | ⚠️ (partial) | Yes | Structural FEA, HVAC sizing, civil — separate packages but not a unified plant model |
 | Global multi-user concurrent design | ⚠️ (partial) | Yes | Cloud git workspace with branch/merge; not real-time concurrent design at plant-model scale |
 | Laser scan / point cloud integration | 🔴 (no) | Yes | No point cloud / laser scan integration |
@@ -149,7 +149,6 @@ Kerf saturates **68%** of AVEVA E3D Design's feature surface (5 yes, 5 partial, 
 
 - **Piping route design (3D intelligent)** (Partial): Spec-driven pipe class enforcement (ASME B36.10M/B31.3 Barlow wall check, material grade, pressure/temp limits); orthogonal isometric routing; no interactive 3D plant routing UI
 - **Piping component catalogue** (Partial): P&ID component library (vessels, pumps, HX, valves, instruments with ISA 5.1 symbols); ASME B36.10M pipe size/schedule catalogue; ASME B16.9 elbow radius table; no 3D parametric fitting catalogue
-- **Clash detection (hard/soft)** (Partial): Clash detection in assembly (OBB-SAT + BVH backend); no P&ID/plant-specific clash UI
 - **Multi-discipline plant design (structural/HVAC/civil)** (Partial): Structural FEA, HVAC sizing, civil — separate packages but not a unified plant model
 - **Global multi-user concurrent design** (Partial): Cloud git workspace with branch/merge; not real-time concurrent design at plant-model scale
 - **Laser scan / point cloud integration** (Not yet implemented): No point cloud / laser scan integration

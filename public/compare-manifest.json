@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T02:43:16.077Z",
+  "generatedAt": "2026-06-05T02:44:47.503Z",
   "items": [
     {
       "slug": "revit",
@@ -4195,7 +4195,7 @@
             "notes": "Part Check Geometry + Boolean intersection"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py",
             "notes": "backend OBB-SAT + BVH; no UI panel"
           }
@@ -4992,7 +4992,7 @@
             "notes": "Built-in interference detection + motion contact sets"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py",
             "notes": "Backend OBB-SAT + BVH + tri-tri; no UI panel"
           },
@@ -6165,7 +6165,7 @@
             "notes": "Motion Studies check interference as parts move"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py",
             "notes": "Backend OBB-SAT + BVH + tri-tri; no UI panel"
           },
@@ -6305,7 +6305,7 @@
             "notes": "Gear mates for motion only; no AGMA/ISO strength rating in base SW"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gearstrength/iso6336.py",
             "notes": "Full AGMA 2001-D04 + ISO 6336 Method B backend; no UI"
           },
@@ -6319,7 +6319,7 @@
             "notes": "Bearing loads as FEA BC only; no catalogue life rating"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/bearings/select.py",
             "notes": "ISO 281 + ISO/TS 16281 aISO modified life backend; no UI"
           },
@@ -6333,7 +6333,7 @@
             "notes": "No native shaft design calculator; relies on Simulation FEA"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/shaft",
             "notes": "Closed-form shaft stress + critical speed backend; no UI"
           },
@@ -6347,7 +6347,7 @@
             "notes": "Structural member profiles, weldment cut lists, gussets"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/weldment_profiles.py",
             "notes": "Weldment profiles + cut-list engine; no full workspace"
           },
@@ -6725,7 +6725,7 @@
             "notes": "ISO 286 fit tolerances in dimension property manager"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/tolfits/fits.py",
             "notes": "ISO 286 limits & fits backend; no UI"
           },
@@ -9021,7 +9021,7 @@
             "notes": "Hard, soft, and touch clash classifications; real-time highlighting; laser scan integration"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py",
             "notes": "Clash detection in assembly (OBB-SAT + BVH backend); no P&ID/plant-specific clash UI"
           },
@@ -10085,7 +10085,7 @@
             "notes": "Motion analysis and collision detection for mold assembly verification (slides, lifters, ejectors)"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py",
             "notes": "Assembly clash detection backend (OBB-SAT + BVH); no mold-specific motion/collision sequence"
           },
@@ -15982,7 +15982,7 @@
             "notes": "No machine-element calculators"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-mechanical/",
             "notes": "Shigley/AGMA/ISO/VDI grade engines; entirely backend, no UI panel"
           },

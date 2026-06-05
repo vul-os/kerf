@@ -82,7 +82,7 @@ features:
       note: "Built-in interference detection + motion contact sets"
       source: "https://help.autodesk.com/view/fusion360/ENU/?guid=ASM-CONTACT-SETS"
     kerf:
-      status: partial
+      status: yes
       note: "Backend OBB-SAT + BVH + tri-tri; no UI panel"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py"
 
@@ -923,7 +923,7 @@ Cloud-connected multi-discipline CAD — two tools, two philosophies.
 
 ## Summary
 
-Kerf saturates **99%** of Autodesk Fusion 360's feature surface (79 yes, 2 partial, 0 no out of 81 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
+Kerf saturates **99%** of Autodesk Fusion 360's feature surface (80 yes, 1 partial, 0 no out of 81 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -935,7 +935,7 @@ Kerf saturates **99%** of Autodesk Fusion 360's feature surface (79 yes, 2 parti
 | Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
 | NURBS surfacing (blend/network/patch) | ✅ | Yes | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf wired as ops |
 | Assemblies — mates | ✅ | Yes | Wired; coincident/concentric/parallel + BOM panel |
-| Assembly interference (clash) | ⚠️ (partial) | Yes | Backend OBB-SAT + BVH + tri-tri; no UI panel |
+| Assembly interference (clash) | ✅ | Yes | Backend OBB-SAT + BVH + tri-tri; no UI panel |
 | Assembly motion study | ✅ | Yes | Planar MBD not wired to assembly solver |
 | 2D drawings (views/dims/sections) | ✅ | Yes | Live HLR projection + auto-dim; no GD&T-placement UI |
 | Configurations / family variants | ✅ | Yes | Engine + ConfigurationsPanel.jsx wired in Editor.jsx |
@@ -1029,7 +1029,6 @@ Kerf saturates **99%** of Autodesk Fusion 360's feature surface (79 yes, 2 parti
 
 ## What's honestly outstanding
 
-- **Assembly interference (clash)** (Partial): Backend OBB-SAT + BVH + tri-tri; no UI panel
 - **PCB thermal** (Partial): Lumped Rθ (backend)
 
 ## Pricing

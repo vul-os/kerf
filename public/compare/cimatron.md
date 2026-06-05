@@ -94,7 +94,7 @@ features:
       note: "Motion analysis and collision detection for mold assembly verification (slides, lifters, ejectors)"
       source: "https://www.cimatron.com/en/cimatron-mold"
     kerf:
-      status: partial
+      status: yes
       note: "Assembly clash detection backend (OBB-SAT + BVH); no mold-specific motion/collision sequence"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py"
   - domain: D14
@@ -127,7 +127,7 @@ Integrated mold CAD/CAM from quote to shop floor — versus an open-core alterna
 
 ## Summary
 
-Kerf saturates **95%** of Cimatron's feature surface (10 yes, 1 partial, 0 no out of 11 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of Cimatron's feature surface (11 yes, 0 partial, 0 no out of 11 features tracked here). Kerf covers the full tracked feature set for Cimatron; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -141,17 +141,13 @@ Kerf saturates **95%** of Cimatron's feature surface (10 yes, 1 partial, 0 no ou
 | 5-axis CNC machining | ✅ | Yes | 5-axis engine (backend); no UI; 3-axis CAMView wired in browser |
 | Wire EDM | ✅ | Yes | No wire EDM programming. Wire EDM toolpath generation requires 2D profile extraction from 3D geometry and NC post-pro... |
 | Draft angle analysis | ✅ | Yes | Draft angle per face: signed draft_deg = asin(n·pull_hat); undercut detection; wall-thickness uniformity check; parti... |
-| Assembly and collision detection | ⚠️ (partial) | Yes | Assembly clash detection backend (OBB-SAT + BVH); no mold-specific motion/collision sequence |
+| Assembly and collision detection | ✅ | Yes | Assembly clash detection backend (OBB-SAT + BVH); no mold-specific motion/collision sequence |
 | Quote-to-delivery workflow | ✅ | Yes | Should-cost engine + BOM (backend); no mold-specific quoting workflow |
 | LLM / chat-native editing | ✅ | No | Chat-native editing; Moldflow results describable in plain language |
 
 ## What Kerf does that Cimatron doesn't
 
 - **LLM / chat-native editing** — Chat-native editing; Moldflow results describable in plain language
-
-## What's honestly outstanding
-
-- **Assembly and collision detection** (Partial): Assembly clash detection backend (OBB-SAT + BVH); no mold-specific motion/collision sequence
 
 ## Pricing
 

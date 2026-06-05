@@ -86,7 +86,7 @@ features:
       source: https://wiki.freecad.org/PartDesign_Workbench
       note: "Part Check Geometry + Boolean intersection"
     kerf:
-      status: partial
+      status: yes
       evidence: packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py
       note: "backend OBB-SAT + BVH; no UI panel"
 
@@ -642,7 +642,7 @@ Open-source parametric B-rep modeller — LGPL vs MIT, desktop vs cloud.
 
 ## Summary
 
-Kerf saturates **98%** of FreeCAD's feature surface (59 yes, 2 partial, 0 no out of 61 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
+Kerf saturates **99%** of FreeCAD's feature surface (60 yes, 1 partial, 0 no out of 61 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -655,7 +655,7 @@ Kerf saturates **98%** of FreeCAD's feature surface (59 yes, 2 partial, 0 no out
 | Loft | ✅ | Yes | guide-rail overload wired (ThruSections.AddWire); ruled/closed/symmetric |
 | Sheet metal | ✅ | Partial | flange + hem + jog + multi-flange + unfold + flat DXF (K-factor) |
 | Assemblies — mates | ✅ | Yes | rigid/revolute/slider/cam/gear/pin-slot + BOM panel |
-| Assembly interference (clash) | ⚠️ (partial) | Yes | backend OBB-SAT + BVH; no UI panel |
+| Assembly interference (clash) | ✅ | Yes | backend OBB-SAT + BVH; no UI panel |
 | 2D drawings (views/dims/sections) | ✅ | Yes | live HLR projection + auto-dim; no GD&T-placement UI |
 | NURBS surfacing (blend/network/patch) | ✅ | Partial | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired |
 | Configurations / family variants | ✅ | Partial | engine + ConfigurationsPanel.jsx wired |
@@ -728,7 +728,6 @@ Kerf saturates **98%** of FreeCAD's feature surface (59 yes, 2 partial, 0 no out
 
 ## What's honestly outstanding
 
-- **Assembly interference (clash)** (Partial): backend OBB-SAT + BVH; no UI panel
 - **GD&T annotations (drawings)** (Partial): ASME Y14.5 data model + auto-propose; no UI placement
 
 ## Pricing

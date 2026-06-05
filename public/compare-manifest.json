@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T05:12:23.185Z",
+  "generatedAt": "2026-06-05T05:29:23.192Z",
   "items": [
     {
       "slug": "revit",
@@ -1331,6 +1331,171 @@
             "notes": "Chat-native: plain-language edits to feature tree and BIM model per turn"
           },
           "name": "LLM / chat-native editing"
+        }
+      ]
+    },
+    {
+      "slug": "openroads",
+      "competitor": "Bentley OpenRoads Designer",
+      "category": "bim",
+      "left": "kerf",
+      "right": "openroads",
+      "hero_tagline": "Civil infrastructure & roadway design — compared honestly against MIT open-core.",
+      "reviewed_at": "2026-06-05",
+      "features": [
+        {
+          "domain": "D14",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.bentley.com/software/openroads-designer/",
+            "notes": "Object-oriented coordinate geometry; intelligent alignment updates"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/civil/alignment_tools.py",
+            "notes": "Horizontal (line/arc/spiral-clothoid) + vertical (tangent/parabolic) alignment + station-at"
+          },
+          "name": "Horizontal + vertical alignment (clothoid transitions)"
+        },
+        {
+          "domain": "D14",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.bentley.com/software/openroads-designer/",
+            "notes": "DTM from LiDAR, survey; dynamic contours"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-civil/src/kerf_civil/tin.py",
+            "notes": "Dynamic TIN (Bowyer-Watson Delaunay) + breaklines/boundary + volume-between"
+          },
+          "name": "Digital terrain model (LiDAR / survey → DTM)"
+        },
+        {
+          "domain": "D14",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.bentley.com/software/openroads-designer/",
+            "notes": "LiDAR + survey data ingestion into terrain"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-civil/src/kerf_civil/pointcloud.py",
+            "notes": "LAS/XYZ/PLY ingest + voxel downsample + PMF ground classification → TIN"
+          },
+          "name": "Point cloud / survey import (LAS)"
+        },
+        {
+          "domain": "D14",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.bentley.com/software/openroads-designer/",
+            "notes": "Stormwater conveyance: inlets, pipes, detention; integrated hydraulics"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-civil/src/kerf_civil/hydraulics_gravity.py",
+            "notes": "Gravity pipe network (Manning HGL/EGL + structure headloss + topological solve, ASCE MOP 36)"
+          },
+          "name": "Drainage / storm sewer (inlets, pipes, HGL/EGL)"
+        },
+        {
+          "domain": "D14",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.bentley.com/software/openroads-designer/",
+            "notes": "Integrated water analysis tools"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-civil/src/kerf_civil/hydraulics_pressure.py",
+            "notes": "Hardy-Cross / Global-Gradient water network solve + minor losses + pumps"
+          },
+          "name": "Pressure / water distribution networks"
+        },
+        {
+          "domain": "D14",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.bentley.com/software/openroads-designer/",
+            "notes": "Automated superelevation per design standards"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-civil/src/kerf_civil/superelevation.py",
+            "notes": "Superelevation calculation per AASHTO method"
+          },
+          "name": "Superelevation"
+        },
+        {
+          "domain": "D14",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.bentley.com/software/openroads-designer/",
+            "notes": "Automated plan/profile sheet generation along corridors"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-civil/src/kerf_civil/sheets.py",
+            "notes": "Automated plan+profile sheet set (station grid, profile band, match lines; AASHTO/FHWA)"
+          },
+          "name": "Plan & profile sheet production"
+        },
+        {
+          "domain": "D14",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.bentley.com/software/openroads-designer/",
+            "notes": "Parcel and ROW geometry"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-civil/src/kerf_civil/parcels.py",
+            "notes": "Parcel subdivision (Sutherland-Hodgman clip, ROW dedication, setback insets)"
+          },
+          "name": "Parcels / right-of-way / subdivision"
+        },
+        {
+          "domain": "D14",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.bentley.com/software/openroads-designer/",
+            "notes": "Template-driven corridor with dynamic cross-sections along alignment"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/civil/alignment_tools.py",
+            "notes": "Alignment + profile + sheets shipped; no template-driven 3D corridor cross-section modeller"
+          },
+          "name": "Corridor modeling (templates / cross-sections)"
+        },
+        {
+          "domain": "D14",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.bentley.com/software/openroads-designer/",
+            "notes": "Survey + drainage + utilities + roadway in one application"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-civil/src/kerf_civil/hydraulics_gravity.py",
+            "notes": "Drainage + water networks + roadway geometry; no dedicated dry-utility (power/comms) modeller"
+          },
+          "name": "Utilities / multi-discipline coordination"
+        },
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "no",
+            "source": "https://www.bentley.com/software/openroads-designer/",
+            "notes": "Proprietary commercial license; no LLM interface"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-sdk/src/kerf/",
+            "notes": "MIT open-core; chat-native civil design + JSON-RPC LLM tools + kerf-sdk"
+          },
+          "name": "Open-source core / chat-native"
         }
       ]
     },

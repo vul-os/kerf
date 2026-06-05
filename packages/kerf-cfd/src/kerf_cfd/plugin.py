@@ -104,6 +104,26 @@ async def register(app: FastAPI, ctx):
     except Exception:
         pass  # internal_airflow optional — fail silently
 
+    # Wave 12D: 3-D room internal-airflow CFD (IES VE MicroFlo compare flip)
+    # Full 3-D incompressible RANS: SIMPLE pressure-velocity coupling,
+    # mixing-length turbulence closure, Boussinesq buoyancy (temperature-coupled),
+    # PMV/PPD (Fanger 1972), draught rate (ISO 7730:2005), mean age-of-air
+    # (Sandberg 1981), ventilation effectiveness.
+    # References: Patankar (1980); Fanger (1972); ISO 7730:2005; ASHRAE 55-2020;
+    #             ASHRAE 62.1-2022; Sandberg (1981); Prandtl (1925).
+    try:
+        from kerf_cfd.internal_airflow.room_cfd_tool import (
+            cfd_room_airflow_3d_spec,
+            run_cfd_room_airflow_3d,
+        )
+        ctx.tools.register(
+            "cfd_room_airflow_3d",
+            cfd_room_airflow_3d_spec,
+            run_cfd_room_airflow_3d,
+        )
+    except Exception:
+        pass  # room_cfd_3d optional — fail silently
+
     provides = [
         "cfd.simple_rans",
         "cfd.turbulence_model",
@@ -124,6 +144,11 @@ async def register(app: FastAPI, ctx):
         "cfd.vof_multiphase",
         "cfd.marine_hydrodynamics",
         "cfd.internal_airflow_microflo",
+        "cfd.room_airflow_3d",
+        "cfd.thermal_comfort_pmv_ppd",
+        "cfd.draught_rate_iso7730",
+        "cfd.mean_age_of_air",
+        "cfd.ventilation_effectiveness",
         "cfd.postprocessing",
         "cfd.flow_setup",
         "cfd.isentropic_relations",

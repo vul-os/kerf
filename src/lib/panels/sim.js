@@ -142,6 +142,19 @@ export default [
     load: () => import('./sim-wrappers/CfdResultsWrapper.jsx'),
     label: 'CFD Results',
   },
+  // 3-D Room Internal-Airflow CFD (IES VE MicroFlo-style)
+  // Tool: cfd_room_airflow_3d; SIMPLE RANS + mixing-length + Boussinesq buoyancy
+  // Comfort: PMV/PPD (Fanger 1972), Draught Rate (ISO 7730:2005), Age-of-Air (Sandberg 1981)
+  {
+    id: 'room-cfd-3d',
+    kinds: [
+      'room_cfd_3d', 'cfd_room_airflow', 'room_airflow_3d',
+      'cfd_microflo', 'microflo_result',
+    ],
+    exts: ['.roomcfd', '.roomairflow', '.microflo'],
+    load: () => import('./sim-wrappers/RoomCfdWrapper.jsx'),
+    label: 'Room Airflow CFD (3-D RANS + Comfort)',
+  },
   {
     id: 'reacting-flow',
     kinds: ['reacting_flow', 'multispecies_reacting_flow', 'cfd_reacting'],

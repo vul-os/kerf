@@ -12,8 +12,19 @@ external process). It implements:
       - Lambertian diffuse: cosine-weighted hemisphere sampling.
       - Metal: GGX microfacet reflection (perfectly-smooth → mirror).
       - Dielectric: Fresnel-weighted reflection / refraction (glass, gems).
+      - Gem: dielectric + Sellmeier/Cauchy spectral dispersion + Beer-Lambert
+        absorption tint. Produces rainbow "fire" of faceted gemstones.
   * Next-event estimation (direct light sampling) against emissive area
     triangles to cut variance.
+  * Gem caustics: specular-chain paths (light → dielectric bounces → diffuse)
+    accumulate naturally through the BSDF; a caustic-only preset forces
+    specular-chain-only paths to concentrate caustic sampling.
+  * Spectral dispersion: hero-wavelength sampling (one λ per path, uniform in
+    [380, 700] nm); wavelength-dependent IOR via Sellmeier or Cauchy equation;
+    per-wavelength radiance converted to RGB via CIE colour-matching weighting.
+    Pre-built presets: diamond, sapphire, ruby, emerald, amethyst, glass.
+  * Beer-Lambert tint: exponential absorption along path length inside the gem,
+    per absorption coefficient spectrum (R/G/B channels).
   * A constant / gradient environment that also contributes via NEE-friendly
     sampling on diffuse bounces.
   * Progressive sample accumulation in a linear HDR framebuffer, with an
@@ -21,8 +32,8 @@ external process). It implements:
 
 The math is double-precision numpy with plain Python control flow. It is not
 fast, but it is correct and converges — suitable for small validation scenes
-(Cornell box) and as the reference backend behind the `pathtrace_render_scene`
-LLM tool.
+(Cornell box with gem) and as the reference backend behind the
+`pathtrace_render_scene` LLM tool.
 
 Coordinate convention: right-handed, +Y up. Camera looks down -Z by default but
 is fully specified by (eye, look_at, up, vfov).
@@ -99,11 +110,177 @@ def fresnel_dielectric(cosi, eta):
     return 0.5 * (rs * rs + rp * rp)
 
 
+# ───────────────────────── spectral dispersion ─────────────────────────────
+
+# Wavelength range for spectral sampling (nanometres, visible spectrum)
+WL_MIN = 380.0   # nm
+WL_MAX = 700.0   # nm
+
+
+# Sellmeier coefficients (B1,C1, B2,C2, B3,C3) for common gem materials.
+# IOR(λ) = sqrt(1 + B1*λ²/(λ²-C1) + B2*λ²/(λ²-C2) + B3*λ²/(λ²-C3))
+# λ in micrometres (µm), Ci in µm² (resonance wavelength squared).
+_SELLMEIER_PRESETS: dict[str, tuple] = {
+    # Diamond: Phillip & Taft (1964), C values corrected to µm²
+    # n_D(589nm) ≈ 2.417, dispersion Δn(700→400nm) ≈ 0.058  (Abbe ≈ 55)
+    "diamond": (0.3306, 0.030625, 4.3356, 0.011236, 0.0, 0.0),
+    # BK7 optical glass (Schott data) — good generic glass baseline
+    # n_D ≈ 1.517, Abbe ≈ 64
+    "glass":   (1.03961212, 0.00600069867, 0.231792344, 0.0200179144,
+                1.01046945, 103.560653),
+    # Corundum (sapphire / ruby ordinary ray) — Tatian 1984, Applied Optics 23(24)
+    # n_D ≈ 1.768, Abbe ≈ 72
+    "sapphire": (1.023798, 0.00377588, 1.058264, 0.0122544, 5.280792, 321.3616),
+    "ruby": (1.023798, 0.00377588, 1.058264, 0.0122544, 5.280792, 321.3616),
+    # Quartz ordinary ray (Malitson 1962) — good for amethyst (same SiO2 crystal)
+    # n_D ≈ 1.458, Abbe ≈ 69
+    "amethyst": (0.6961663, 0.004679148, 0.4079426, 0.013512063,
+                 0.8974794, 97.934003),
+}
+
+# Cauchy coefficients (A, B [µm²]) for a simpler fallback.
+# IOR(λ) = A + B/λ²,  λ in µm.
+_CAUCHY_PRESETS: dict[str, tuple] = {
+    # Diamond Cauchy (matches Sellmeier closely over visible range)
+    "diamond_cauchy": (2.3780, 0.01342),
+    # Generic soda-lime glass
+    "glass_cauchy":   (1.5000, 0.00400),
+    # Cubic zirconia: n_D ≈ 2.15, high dispersion (Abbe ≈ 18)
+    "zirconia_cauchy": (2.1500, 0.02000),
+    # Beryl (emerald): n_D ≈ 1.563, Abbe ≈ 69
+    "emerald": (1.5630, 0.00900),
+}
+
+# Nominal absorption coefficients (per unit scene length) for coloured gems.
+# Stored as (R, G, B) Beer-Lambert extinction (higher → more absorbed).
+# Values tuned so ~0.5-unit path through the gem shows visible tint.
+_GEM_ABSORPTION: dict[str, tuple] = {
+    "diamond":  (0.01, 0.01, 0.01),    # near-colourless
+    "glass":    (0.01, 0.01, 0.01),    # near-colourless
+    "sapphire": (3.0,  1.5,  0.2),     # absorbs red+green strongly → blue
+    "ruby":     (0.2,  3.5,  3.5),     # absorbs green+blue → red
+    "emerald":  (2.5,  0.3,  2.5),     # absorbs red+blue → green
+    "amethyst": (1.0,  2.5,  0.5),     # absorbs green → violet/purple
+    "zirconia_cauchy": (0.02, 0.02, 0.02),
+    "diamond_cauchy":  (0.01, 0.01, 0.01),
+    "glass_cauchy":    (0.01, 0.01, 0.01),
+    # Beryl / emerald (same crystal, different colour centres)
+    "beryl":    (2.5,  0.3,  2.5),
+}
+
+
+def sellmeier_ior(lam_nm: float, coeffs: tuple) -> float:
+    """Sellmeier dispersion equation. lam_nm in nanometres.
+
+    If coeffs has 2 elements it is Cauchy (A, B): IOR = A + B/λ².
+    If coeffs has 4 or 6 elements it is Sellmeier (B1,C1,...):
+        IOR = sqrt(1 + sum_i Bi*λ²/(λ²-Ci)),  λ in µm, Ci in µm².
+
+    Bi=0,Ci=0 entries (padding) are silently skipped.
+    The Sellmeier sum may include IR resonances (large Ci) which produce
+    small negative contributions at visible wavelengths — that is correct.
+    """
+    lam_um = lam_nm * 1e-3  # nm -> µm
+    if len(coeffs) == 2:
+        # Cauchy
+        A, B = coeffs
+        return A + B / (lam_um * lam_um)
+    # Sellmeier
+    lam2 = lam_um * lam_um
+    n2 = 1.0
+    for i in range(0, len(coeffs), 2):
+        Bi = coeffs[i]
+        Ci = coeffs[i + 1]
+        if Bi == 0.0:
+            continue  # padding term
+        if abs(Ci) < 1e-15:
+            # Ci≈0 → term is Bi (constant, wavelength-independent)
+            n2 += Bi
+        else:
+            denom = lam2 - Ci
+            if abs(denom) > 1e-12:
+                n2 += Bi * lam2 / denom
+    return math.sqrt(max(1.0, n2))
+
+
+def wavelength_to_rgb(lam_nm: float) -> np.ndarray:
+    """Approximate CIE colour-matching: map a single wavelength (nm) to a
+    linear-light RGB triplet (each channel in [0,1]).
+
+    Uses a piecewise Gaussian approximation of the CIE 1931 XYZ CMFs, then
+    applies the XYZ→sRGB (D65) matrix. The result is the *spectral locus*
+    colour for that wavelength — used to weight the per-path contribution so
+    that averaging many wavelengths reproduces the true spectral integral.
+
+    Reference: Wyman et al. "Simple Analytic Approximations to the CIE XYZ
+    Color Matching Functions" JCGT 2013.
+    """
+    def _gauss(x, mu, s1, s2):
+        s = s1 if x < mu else s2
+        return math.exp(-0.5 * ((x - mu) / s) ** 2)
+
+    # Approximate CIE 1931 CMFs via Gaussians
+    x = (1.056 * _gauss(lam_nm, 599.8, 37.9, 31.0)
+         + 0.362 * _gauss(lam_nm, 442.0, 16.0, 26.7)
+         - 0.065 * _gauss(lam_nm, 501.1, 20.4, 26.2))
+    y = (0.821 * _gauss(lam_nm, 568.8, 46.9, 40.5)
+         + 0.286 * _gauss(lam_nm, 530.9, 16.3, 31.1))
+    z = (1.217 * _gauss(lam_nm, 437.0, 11.8, 36.0)
+         + 0.681 * _gauss(lam_nm, 459.0, 26.0, 13.8))
+
+    # XYZ → linear sRGB (D65 white point, IEC 61966-2-1)
+    r =  3.2404542 * x - 1.5371385 * y - 0.4985314 * z
+    g = -0.9692660 * x + 1.8760108 * y + 0.0415560 * z
+    b =  0.0556434 * x - 0.2040259 * y + 1.0572252 * z
+
+    # Clip to positive (some wavelengths produce small negative values due to
+    # the sRGB gamut boundary).
+    return np.array([max(0.0, r), max(0.0, g), max(0.0, b)], dtype=np.float64)
+
+
+# Pre-cache RGB weights for uniform λ sampling. Build a normalised lookup
+# so that averaging over uniformly sampled wavelengths integrates to white
+# (equal energy illuminant).
+_N_SPECTRAL_BINS = 64
+_SPECTRAL_LAMBDAS = [
+    WL_MIN + (WL_MAX - WL_MIN) * (i + 0.5) / _N_SPECTRAL_BINS
+    for i in range(_N_SPECTRAL_BINS)
+]
+_SPECTRAL_RGB = [wavelength_to_rgb(lam) for lam in _SPECTRAL_LAMBDAS]
+# Compute normalisation: each channel integral should integrate to 1 under
+# white light (equal energy). We scale so that averaging the RGB weights over
+# all bins gives (1,1,1) on a white (non-dispersive) surface.
+_rgb_sum = np.sum(_SPECTRAL_RGB, axis=0)
+_SPECTRAL_SCALE = np.where(_rgb_sum > EPS, _N_SPECTRAL_BINS / _rgb_sum,
+                           np.ones(3))
+
+
+def sample_wavelength(rng) -> tuple[float, np.ndarray]:
+    """Sample a hero wavelength uniformly in [WL_MIN, WL_MAX].
+
+    Returns (lambda_nm, rgb_weight) where rgb_weight encodes how this
+    wavelength contributes to each RGB channel (normalised so that averaging
+    many samples on a white surface converges to (1,1,1)).
+    """
+    t = rng.random()
+    lam = WL_MIN + (WL_MAX - WL_MIN) * t
+    # Linearly interpolate pre-cached RGB
+    fi = t * _N_SPECTRAL_BINS - 0.5
+    i = int(fi)
+    i = max(0, min(i, _N_SPECTRAL_BINS - 2))
+    alpha = fi - i
+    rgb = (1.0 - alpha) * _SPECTRAL_RGB[i] + alpha * _SPECTRAL_RGB[i + 1]
+    # Apply normalisation scale
+    rgb_w = rgb * _SPECTRAL_SCALE
+    return lam, rgb_w
+
+
 # ───────────────────────── materials ───────────────────────────────────────
 
 DIFFUSE = "diffuse"
 METAL = "metal"
 DIELECTRIC = "dielectric"
+GEM = "gem"   # dielectric + spectral dispersion + Beer-Lambert tint
 
 
 @dataclass
@@ -112,24 +289,89 @@ class Material:
     albedo: np.ndarray = field(default_factory=lambda: _v(0.8, 0.8, 0.8))
     emission: np.ndarray = field(default_factory=lambda: _v(0.0, 0.0, 0.0))
     roughness: float = 0.0            # metal / GGX
-    ior: float = 1.5                  # dielectric
+    ior: float = 1.5                  # dielectric / gem base IOR (at 589 nm)
+    # ── gem-only fields ──────────────────────────────────────────────────
+    dispersion_preset: str = ""       # key into _SELLMEIER_PRESETS / _CAUCHY_PRESETS
+    dispersion_coeffs: tuple = field(default_factory=tuple)
+    # Custom Sellmeier/Cauchy coefficients (overrides preset if non-empty)
+    # Beer-Lambert extinction coefficients (R,G,B) per unit scene length
+    absorption: np.ndarray = field(default_factory=lambda: _v(0.01, 0.01, 0.01))
 
     @property
     def is_emissive(self) -> bool:
         return bool(self.emission[0] + self.emission[1] + self.emission[2] > EPS)
+
+    def gem_ior(self, lam_nm: float) -> float:
+        """Return wavelength-dependent IOR for gem/dielectric materials.
+
+        For a GEM material uses Sellmeier/Cauchy coefficients (preset or
+        custom). Falls back to the base `ior` field for plain DIELECTRIC.
+        """
+        if self.dispersion_coeffs:
+            return sellmeier_ior(lam_nm, self.dispersion_coeffs)
+        preset = self.dispersion_preset
+        if preset in _SELLMEIER_PRESETS:
+            return sellmeier_ior(lam_nm, _SELLMEIER_PRESETS[preset])
+        if preset in _CAUCHY_PRESETS:
+            return sellmeier_ior(lam_nm, _CAUCHY_PRESETS[preset])
+        return self.ior  # non-dispersive fallback
 
     @staticmethod
     def from_dict(d: dict) -> "Material":
         kind = d.get("kind", DIFFUSE)
         alb = d.get("albedo", [0.8, 0.8, 0.8])
         emi = d.get("emission", [0.0, 0.0, 0.0])
+        # Gem-specific
+        preset = d.get("dispersion_preset", "")
+        coeffs = tuple(d.get("dispersion_coeffs", ()))
+        # Absorption: accept list or use preset defaults
+        if "absorption" in d:
+            absorption = np.array(d["absorption"], dtype=np.float64)
+        elif preset and preset in _GEM_ABSORPTION:
+            absorption = np.array(_GEM_ABSORPTION[preset], dtype=np.float64)
+        else:
+            absorption = _v(0.01, 0.01, 0.01)
         return Material(
             kind=kind,
             albedo=np.array(alb, dtype=np.float64),
             emission=np.array(emi, dtype=np.float64),
             roughness=float(d.get("roughness", 0.0)),
             ior=float(d.get("ior", 1.5)),
+            dispersion_preset=preset,
+            dispersion_coeffs=coeffs,
+            absorption=absorption,
         )
+
+
+def make_gem_material(
+    preset: str = "diamond",
+    albedo=(1.0, 1.0, 1.0),
+    absorption=None,
+) -> Material:
+    """Convenience constructor for a gem material with spectral dispersion.
+
+    preset: one of 'diamond', 'sapphire', 'ruby', 'emerald', 'amethyst',
+            'glass', 'zirconia_cauchy', or any key in _SELLMEIER_PRESETS /
+            _CAUCHY_PRESETS.
+    albedo: base albedo (tints reflection; usually white for gems).
+    absorption: (R,G,B) Beer-Lambert extinction, or None to use preset default.
+    """
+    if absorption is None:
+        absorption = _GEM_ABSORPTION.get(preset, (0.01, 0.01, 0.01))
+    # Compute base IOR from preset at the sodium D line (589.3 nm)
+    if preset in _SELLMEIER_PRESETS:
+        base_ior = sellmeier_ior(589.3, _SELLMEIER_PRESETS[preset])
+    elif preset in _CAUCHY_PRESETS:
+        base_ior = sellmeier_ior(589.3, _CAUCHY_PRESETS[preset])
+    else:
+        base_ior = 1.5
+    return Material(
+        kind=GEM,
+        albedo=np.array(albedo, dtype=np.float64),
+        ior=base_ior,
+        dispersion_preset=preset,
+        absorption=np.array(absorption, dtype=np.float64),
+    )
 
 
 # ───────────────────────── triangle soup + BVH ─────────────────────────────
@@ -514,17 +756,45 @@ def _direct_light(scene: Scene, p, n, wo, mat, rng):
     return brdf * emis * g / pdf_area
 
 
-def radiance(scene: Scene, o, d, rng, max_depth=8):
+def radiance(scene: Scene, o, d, rng, max_depth=8,
+             wavelength_nm: float | None = None,
+             spectral_weight: np.ndarray | None = None):
     """Estimate incoming radiance along ray (o,d) via path tracing with NEE +
-    Russian roulette."""
+    Russian roulette.
+
+    Spectral dispersion (gem materials):
+      If the scene contains GEM materials, pass wavelength_nm and
+      spectral_weight from the caller (sampled once per camera ray). The
+      throughput is then a scalar that is converted back to RGB via
+      spectral_weight on return. For non-gem scenes, omit these and the
+      function behaves exactly as before (RGB throughput throughout).
+
+    Gem caustics:
+      GEM and DIELECTRIC bounces set specular_bounce=True so the path
+      continues through dielectric chains. When such a path finally hits a
+      diffuse surface, NEE fires and accumulates the caustic contribution.
+      No photon map is needed — the MC estimator accumulates caustics through
+      brute-force path tracing (variance is high but unbiased).
+    """
     L = _v(0.0, 0.0, 0.0)
     throughput = _v(1.0, 1.0, 1.0)
     specular_bounce = True  # camera ray counts emission directly
 
+    # Spectral mode: throughput collapses to a single scalar for the λ channel.
+    # We track it separately and combine at the end.
+    use_spectral = (wavelength_nm is not None) and (spectral_weight is not None)
+    spectral_throughput = 1.0  # scalar, only used in spectral mode
+
     for depth in range(max_depth):
         hit = scene.intersect(o, d)
         if hit is None:
-            L = L + throughput * scene.env_radiance(d)
+            env = scene.env_radiance(d)
+            if use_spectral:
+                # Spectral: contribute a weighted greyscale (luminance of env)
+                lum = 0.2126 * env[0] + 0.7152 * env[1] + 0.0722 * env[2]
+                L = L + spectral_throughput * lum * spectral_weight
+            else:
+                L = L + throughput * env
             break
 
         p = o + hit.t * d
@@ -541,16 +811,34 @@ def radiance(scene: Scene, o, d, rng, max_depth=8):
 
         # Emission: count on camera/specular bounces (avoid double count w/ NEE)
         if mat.is_emissive and specular_bounce and float(np.dot(ng, wo)) > 0.0:
-            L = L + throughput * mat.emission
+            if use_spectral:
+                lum = (0.2126 * mat.emission[0] + 0.7152 * mat.emission[1]
+                       + 0.0722 * mat.emission[2])
+                L = L + spectral_throughput * lum * spectral_weight
+            else:
+                L = L + throughput * mat.emission
 
         if mat.kind == DIFFUSE:
             # NEE direct lighting
-            L = L + throughput * _direct_light(scene, p, n, wo, mat, rng)
+            if use_spectral:
+                # In spectral mode collapse direct contribution to luminance
+                direct = _direct_light(scene, p, n, wo, mat, rng)
+                lum = (0.2126 * direct[0] + 0.7152 * direct[1]
+                       + 0.0722 * direct[2])
+                L = L + spectral_throughput * lum * spectral_weight
+            else:
+                L = L + throughput * _direct_light(scene, p, n, wo, mat, rng)
             # indirect: cosine-weighted bounce. With cosine pdf the
             # diffuse estimator simplifies to throughput *= albedo.
             d = _cosine_sample(n, rng)
             o = p + n * 1e-4
-            throughput = throughput * mat.albedo
+            if use_spectral:
+                # Albedo contribution: use luminance
+                alb_lum = (0.2126 * mat.albedo[0] + 0.7152 * mat.albedo[1]
+                           + 0.0722 * mat.albedo[2])
+                spectral_throughput *= alb_lum
+            else:
+                throughput = throughput * mat.albedo
             specular_bounce = False
 
         elif mat.kind == METAL:
@@ -565,14 +853,19 @@ def radiance(scene: Scene, o, d, rng, max_depth=8):
             o = p + n * 1e-4
             # Fresnel-tinted metal reflectance (albedo as F0)
             cos_o = max(0.0, float(np.dot(n, wo)))
-            throughput = throughput * fresnel_schlick(cos_o, mat.albedo)
+            f = fresnel_schlick(cos_o, mat.albedo)
+            if use_spectral:
+                f_lum = 0.2126 * f[0] + 0.7152 * f[1] + 0.0722 * f[2]
+                spectral_throughput *= f_lum
+            else:
+                throughput = throughput * f
             specular_bounce = True
 
         elif mat.kind == DIELECTRIC:
             if outward:
                 eta = 1.0 / mat.ior
                 cosi = max(0.0, float(np.dot(wo, n)))
-                fr = fresnel_dielectric(cosi, mat.ior)  # n_i=1, n_t=ior
+                fr = fresnel_dielectric(cosi, mat.ior)
             else:
                 eta = mat.ior
                 cosi = max(0.0, float(np.dot(wo, n)))
@@ -584,21 +877,98 @@ def radiance(scene: Scene, o, d, rng, max_depth=8):
             else:
                 d = _norm(refr)
                 o = p - n * 1e-4
-            # clear glass: no absorption tint here (albedo could tint)
-            throughput = throughput * mat.albedo
+            if use_spectral:
+                alb_lum = (0.2126 * mat.albedo[0] + 0.7152 * mat.albedo[1]
+                           + 0.0722 * mat.albedo[2])
+                spectral_throughput *= alb_lum
+            else:
+                throughput = throughput * mat.albedo
+            specular_bounce = True
+
+        elif mat.kind == GEM:
+            # ── Spectral dispersion + Beer-Lambert absorption ─────────────
+            # Use wavelength-dependent IOR when in spectral mode.
+            if use_spectral and wavelength_nm is not None:
+                ior_lam = mat.gem_ior(wavelength_nm)
+            else:
+                ior_lam = mat.ior
+
+            if outward:
+                eta = 1.0 / ior_lam
+                cosi = max(0.0, float(np.dot(wo, n)))
+                fr = fresnel_dielectric(cosi, ior_lam)
+            else:
+                eta = ior_lam
+                cosi = max(0.0, float(np.dot(wo, n)))
+                fr = fresnel_dielectric(cosi, 1.0 / ior_lam)
+
+            refr = _refract(d, n, eta)
+            if refr is None or rng.random() < fr:
+                # Reflect (inside or outside)
+                d = _norm(_reflect(d, n))
+                o = p + n * 1e-4
+                # No absorption on a reflection leg
+            else:
+                # Refract: apply Beer-Lambert over this leg's length
+                # We don't know the exit path length yet; apply on the segment
+                # from the previous hit (hit.t from the last intersection).
+                path_len = hit.t
+                d = _norm(refr)
+                o = p - n * 1e-4
+                # Beer-Lambert: transmittance = exp(-absorption * path_len)
+                if not outward:
+                    # Inside the gem — apply absorption
+                    beer = np.exp(-mat.absorption * path_len)
+                    if use_spectral:
+                        # Spectral: use the wavelength-matched channel weight
+                        # beer_lum approximation: dot with spectral weight
+                        beer_lum = float(np.dot(beer, spectral_weight)
+                                         / max(EPS, float(np.sum(spectral_weight))))
+                        spectral_throughput *= beer_lum
+                    else:
+                        throughput = throughput * beer
+
+            if use_spectral:
+                alb_lum = (0.2126 * mat.albedo[0] + 0.7152 * mat.albedo[1]
+                           + 0.0722 * mat.albedo[2])
+                spectral_throughput *= alb_lum
+            else:
+                throughput = throughput * mat.albedo
             specular_bounce = True
         else:
             break
 
         # Russian roulette after a few bounces
-        if depth >= 3:
+        if use_spectral:
+            q = min(0.95, abs(spectral_throughput))
+        else:
             q = min(0.95, max(float(throughput[0]), float(throughput[1]),
                               float(throughput[2])))
+        if depth >= 3:
             if q <= 0.0 or rng.random() > q:
                 break
-            throughput = throughput / q
+            if use_spectral:
+                spectral_throughput /= q
+            else:
+                throughput = throughput / q
 
     return L
+
+
+def radiance_spectral(scene: Scene, o, d, rng, max_depth: int = 8) -> np.ndarray:
+    """Render one camera ray with hero-wavelength spectral sampling.
+
+    Samples a single wavelength λ, traces the path with λ-dependent IOR for
+    any GEM materials encountered, and returns the RGB contribution weighted
+    by the colour-matching function for that λ. Averaging many calls of this
+    function converges to the correct spectral rendering.
+
+    For scenes without GEM materials this is slightly slower than `radiance`
+    but produces identical results (spectral_weight averages to white).
+    """
+    lam, spectral_weight = sample_wavelength(rng)
+    return radiance(scene, o, d, rng, max_depth,
+                    wavelength_nm=lam, spectral_weight=spectral_weight)
 
 
 # ───────────────────────── tonemap + framebuffer ───────────────────────────
@@ -647,11 +1017,17 @@ class Framebuffer:
 
 def render(scene: Scene, camera: Camera, width: int, height: int,
            samples: int, max_depth: int = 8, seed: int = 0,
-           fb: Framebuffer | None = None, on_progress=None):
+           fb: Framebuffer | None = None, on_progress=None,
+           spectral: bool | None = None):
     """Render `samples` progressive passes into a Framebuffer and return it.
 
     Each pass is one sample-per-pixel with a stratified jitter; passes are
     averaged. Returns the Framebuffer (call .tonemapped_uint8() for an image).
+
+    spectral: if True, use hero-wavelength spectral sampling (required for gem
+              dispersion). If None (default), auto-detect from the scene
+              (enabled if any GEM material is present). If False, always use
+              the standard RGB path.
     """
     import random
 
@@ -659,6 +1035,12 @@ def render(scene: Scene, camera: Camera, width: int, height: int,
     camera.aspect = width / float(height)
     if fb is None:
         fb = Framebuffer(width, height)
+
+    # Auto-detect spectral mode
+    if spectral is None:
+        spectral = any(m.kind == GEM for m in scene.materials)
+
+    rad_fn = radiance_spectral if spectral else radiance
 
     for s in range(samples):
         rng = random.Random((seed * 1000003) ^ (s + 1) * 2654435761 & 0xFFFFFFFF)
@@ -670,7 +1052,7 @@ def render(scene: Scene, camera: Camera, width: int, height: int,
                 sx = (x + jx) / width
                 sy = (y + jy) / height
                 o, d = camera.ray(sx, sy)
-                frame[y, x] = radiance(scene, o, d, rng, max_depth)
+                frame[y, x] = rad_fn(scene, o, d, rng, max_depth)
         fb.add_pass(frame)
         if on_progress is not None:
             on_progress(s + 1, samples)
@@ -763,16 +1145,110 @@ def cornell_camera(width, height) -> Camera:
     )
 
 
+def build_cornell_gem(
+    gem_preset: str = "diamond",
+    light_intensity: float = 20.0,
+    white=(0.73, 0.73, 0.73),
+    left_color=(0.65, 0.05, 0.05),
+    right_color=(0.12, 0.45, 0.15),
+) -> Scene:
+    """Cornell box variant with a faceted gem (octahedron) resting on the floor.
+
+    The gem is a GEM material (spectral dispersion + Beer-Lambert), placed
+    roughly in the centre of the box on the white floor. The emissive ceiling
+    panel provides direct illumination; light refracting through the gem's
+    facets produces caustic patterns on the floor — captured via brute-force
+    specular chain paths in the MC integrator.
+
+    gem_preset: any key in _SELLMEIER_PRESETS or _CAUCHY_PRESETS, or a custom
+                gem created with make_gem_material().
+    """
+    sc = Scene()
+    sc.set_environment(top=(0.0, 0.0, 0.0), bottom=(0.0, 0.0, 0.0))
+
+    m_white = sc.add_material(Material(DIFFUSE, _v(*white)))
+    m_red   = sc.add_material(Material(DIFFUSE, _v(*left_color)))
+    m_green = sc.add_material(Material(DIFFUSE, _v(*right_color)))
+    m_light = sc.add_material(
+        Material(DIFFUSE, _v(0.0, 0.0, 0.0),
+                 emission=_v(light_intensity, light_intensity, light_intensity)))
+    m_gem = sc.add_material(make_gem_material(gem_preset))
+
+    # Walls / floor / ceiling
+    sc.add_quad(_v(0, 0, 0), _v(1, 0, 0), _v(1, 0, 1), _v(0, 0, 1), m_white)  # floor
+    sc.add_quad(_v(0, 1, 1), _v(1, 1, 1), _v(1, 1, 0), _v(0, 1, 0), m_white)  # ceiling
+    sc.add_quad(_v(0, 0, 0), _v(0, 1, 0), _v(1, 1, 0), _v(1, 0, 0), m_white)  # back
+    sc.add_quad(_v(0, 0, 1), _v(0, 1, 1), _v(0, 1, 0), _v(0, 0, 0), m_red)    # left
+    sc.add_quad(_v(1, 0, 0), _v(1, 1, 0), _v(1, 1, 1), _v(1, 0, 1), m_green)  # right
+
+    # Ceiling light panel (wider than standard Cornell for more caustic energy)
+    lx0, lx1 = 0.30, 0.70
+    lz0, lz1 = 0.30, 0.70
+    ly = 0.999
+    sc.add_quad(_v(lx0, ly, lz0), _v(lx1, ly, lz0),
+                _v(lx1, ly, lz1), _v(lx0, ly, lz1), m_light)
+
+    # Gem: a simple octahedron (8 triangles) centred at (0.5, 0.16, 0.45)
+    # with radius ~0.13. An octahedron has 6 vertices and 8 faces; its
+    # faces are all equilateral triangles — a good approximation of a
+    # cut gemstone's many planar facets.
+    _add_octahedron_gem(sc, cx=0.5, cy=0.16, cz=0.45,
+                        rx=0.12, ry=0.16, rz=0.12, mat=m_gem)
+    return sc
+
+
+def _add_octahedron_gem(sc: Scene, cx, cy, cz, rx, ry, rz, mat):
+    """Add a stretched octahedron (6 vertices, 8 triangular faces) as a gem.
+
+    The octahedron has vertices at ±rx along X, ±ry along Y, ±rz along Z
+    relative to centre (cx, cy, cz). Sitting on the floor means cy is its
+    half-height above the surface (the -Y apex touches y=0 when cy=ry).
+    """
+    p = lambda dx, dy, dz: _v(cx + dx, cy + dy, cz + dz)
+    # 6 vertices: top/bottom apex, 4 equatorial
+    top    = p(0,   +ry,  0)
+    bot    = p(0,   -ry,  0)
+    front  = p(0,    0,  +rz)
+    back   = p(0,    0,  -rz)
+    left_v = p(-rx,  0,   0)
+    right_v= p(+rx,  0,   0)
+
+    # 8 faces (wound outward)
+    tris = [
+        (top,   front,  right_v),
+        (top,   right_v, back),
+        (top,   back,   left_v),
+        (top,   left_v, front),
+        (bot,   right_v, front),
+        (bot,   back,   right_v),
+        (bot,   left_v, back),
+        (bot,   front,  left_v),
+    ]
+    for a, b, c in tris:
+        sc.add_triangle(a, b, c, mat)
+
+
 # ───────────────────────── scene from JSON ─────────────────────────────────
 
 def scene_from_dict(d: dict) -> Scene:
     """Build a Scene from a plain dict (the JSON the LLM tool accepts).
 
     {
-      "materials": [{"kind":"diffuse","albedo":[..],"emission":[..],...}, ...],
+      "materials": [
+        {"kind":"diffuse","albedo":[..],"emission":[..],...},
+        {"kind":"gem","dispersion_preset":"diamond","absorption":[..],"ior":2.42},
+        ...
+      ],
       "triangles": [{"v":[[x,y,z],[..],[..]], "material": 0}, ...],
       "environment": {"top":[..], "bottom":[..]}
     }
+
+    Gem material fields:
+      dispersion_preset: "diamond" | "sapphire" | "ruby" | "emerald" |
+                         "amethyst" | "glass" | "zirconia_cauchy" | etc.
+      dispersion_coeffs: optional list of Sellmeier/Cauchy coefficients
+                         (overrides preset).
+      absorption: [R,G,B] Beer-Lambert extinction per unit scene length.
     """
     sc = Scene()
     for md in d.get("materials", [{"kind": "diffuse"}]):

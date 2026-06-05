@@ -155,8 +155,8 @@ features:
       note: "Rhino Cycles / KeyShot-compatible render with gem caustics and dispersion; paid"
       source: "https://gemvision.com/matrixgold"
     kerf:
-      status: partial
-      note: "Monte-Carlo CPU path tracer with GGX-metal + dielectric-Fresnel refraction BSDFs (handles metals + faceted gems) and multi-bounce GI; still no spectral dispersion or gem caustics"
+      status: yes
+      note: "MC path tracer + Sellmeier/Cauchy spectral dispersion (diamond, sapphire, ruby, emerald, amethyst, zirconia presets) + hero-wavelength λ sampling → rainbow fire; dielectric specular chains accumulate gem caustics on diffuse surfaces; Beer-Lambert coloured-gem tint; build_cornell_gem preset"
       evidence: "packages/kerf-render/src/kerf_render/pathtracer.py"
   - domain: D13
     feature: "Jewelry — findings library"

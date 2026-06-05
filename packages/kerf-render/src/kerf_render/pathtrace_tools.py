@@ -35,18 +35,40 @@ pathtrace_render_scene_spec = ToolSpec(
         "(multi-bounce global illumination: BVH acceleration, Moller-Trumbore "
         "ray/triangle, cosine-importance + GGX + dielectric Fresnel BSDFs, "
         "next-event estimation, Russian-roulette termination, ACES tonemap). "
-        "Returns a base64-encoded PNG plus convergence stats. Use preset "
-        "'cornell' for a validation scene, or pass an inline 'scene' of "
-        "materials + triangles. Resolution and samples are capped for a single "
-        "synchronous call."
+        "Supports spectral gem dispersion (Sellmeier/Cauchy wavelength-dependent "
+        "IOR), gem caustics (dielectric specular chains hitting diffuse floors), "
+        "and Beer-Lambert coloured-gem tint. "
+        "Preset 'cornell' = classic Cornell box; 'cornell_gem' = Cornell box "
+        "with a faceted gem (diamond by default) producing caustics + dispersion. "
+        "Pass gem_preset to choose the gem type (diamond/sapphire/ruby/emerald/"
+        "amethyst/glass/zirconia_cauchy). "
+        "Or pass an inline 'scene' with materials of kind='gem' and "
+        "dispersion_preset/absorption fields. "
+        "Returns a base64-encoded PNG plus convergence stats."
     ),
     input_schema={
         "type": "object",
         "properties": {
             "preset": {
                 "type": "string",
-                "enum": ["cornell"],
-                "description": "Built-in scene. 'cornell' = Cornell box.",
+                "enum": ["cornell", "cornell_gem"],
+                "description": (
+                    "Built-in scene. 'cornell' = classic Cornell box. "
+                    "'cornell_gem' = Cornell box with a faceted gem (octahedron) "
+                    "that produces spectral dispersion + caustics on the floor."
+                ),
+            },
+            "gem_preset": {
+                "type": "string",
+                "enum": [
+                    "diamond", "sapphire", "ruby", "emerald", "amethyst",
+                    "glass", "zirconia_cauchy", "diamond_cauchy", "glass_cauchy",
+                ],
+                "description": (
+                    "Gem type for the 'cornell_gem' preset. Controls Sellmeier "
+                    "dispersion coefficients and Beer-Lambert absorption colour. "
+                    "Default: 'diamond'."
+                ),
             },
             "width": {"type": "integer", "description": f"Pixels, <= {MAX_DIM}."},
             "height": {"type": "integer", "description": f"Pixels, <= {MAX_DIM}."},
@@ -63,8 +85,10 @@ pathtrace_render_scene_spec = ToolSpec(
                 "type": "object",
                 "description": (
                     "Inline scene: {materials:[{kind,albedo,emission,roughness,"
-                    "ior}], triangles:[{v:[[x,y,z]x3],material}], quads:[...], "
-                    "environment:{top,bottom}}."
+                    "ior,dispersion_preset,dispersion_coeffs,absorption}], "
+                    "triangles:[{v:[[x,y,z]x3],material}], quads:[...], "
+                    "environment:{top,bottom}}. "
+                    "Use kind='gem' for spectral dispersion + Beer-Lambert tint."
                 ),
             },
             "camera": {
@@ -91,10 +115,14 @@ async def pathtrace_render_scene(ctx: ProjectCtx, args: bytes) -> str:
     seed = int(a.get("seed", 0))
 
     preset = a.get("preset")
+    gem_preset = a.get("gem_preset", "diamond")
     scene_dict = a.get("scene")
 
     if preset == "cornell" or (not scene_dict and not preset):
         scene = pt.build_cornell_box()
+        default_cam = pt.cornell_camera(width, height)
+    elif preset == "cornell_gem":
+        scene = pt.build_cornell_gem(gem_preset=gem_preset)
         default_cam = pt.cornell_camera(width, height)
     elif scene_dict:
         try:
@@ -116,6 +144,7 @@ async def pathtrace_render_scene(ctx: ProjectCtx, args: bytes) -> str:
     if not scene.tri_mat:
         return err_payload("scene has no triangles", "BAD_ARGS")
 
+    has_gems = any(m.kind == pt.GEM for m in scene.materials)
     fb = pt.render(scene, camera, width, height, samples,
                    max_depth=max_depth, seed=seed)
     img = fb.tonemapped_uint8()
@@ -138,6 +167,8 @@ async def pathtrace_render_scene(ctx: ProjectCtx, args: bytes) -> str:
         "peak_luminance": peak,
         "image_b64": png_b64,
         "engine": "kerf-cpu-pathtracer",
+        "spectral_dispersion": has_gems,
+        "gem_caustics": has_gems,
     })
 
 

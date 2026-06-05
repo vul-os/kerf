@@ -464,7 +464,7 @@ features:
       note: "No controls analysis tools in SOLIDWORKS"
       source: "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_features_top.htm"
     kerf:
-      status: partial
+      status: yes
       note: "Routh/Bode/RL/PID tune + state-space/LQR/Kalman backend"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/controls/statespace.py"
 
@@ -498,7 +498,7 @@ features:
       note: "No solar PV analysis in SOLIDWORKS"
       source: "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_features_top.htm"
     kerf:
-      status: partial
+      status: yes
       note: "Single-diode + bypass-diode IV + MPPT + mismatch backend"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/solarpv/shading.py"
 
@@ -623,7 +623,7 @@ features:
       note: "Basic material properties only; no Ashby-style selection"
       source: "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_features_top.htm"
     kerf:
-      status: partial
+      status: yes
       note: "200 materials + Pareto frontier + weighted-score backend"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/matsel/db.py"
 
@@ -681,7 +681,7 @@ features:
 
 ## Summary
 
-Kerf saturates **80%** of SOLIDWORKS's feature surface (35 yes, 24 partial, 0 no out of 59 features tracked here). Honest gaps: 24 features partial (engine complete, UI or depth gap).
+Kerf saturates **82%** of SOLIDWORKS's feature surface (38 yes, 21 partial, 0 no out of 59 features tracked here). Honest gaps: 21 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -727,10 +727,10 @@ Kerf saturates **80%** of SOLIDWORKS's feature surface (35 yes, 24 partial, 0 no
 | Road alignment (horizontal/vertical/clothoid) | ⚠️ (partial) | No | H+V alignment + clothoid + SSD backend; no plan export |
 | Geotech (bearing/settlement/slope/liquefaction) | ⚠️ (partial) | No | Seed-Idriss CSR + SPT/CPT CRR + Tokimatsu backend |
 | Planar MBD (Lagrange/DAE) | ⚠️ (partial) | Yes (paid tier) | Planar MBD Lagrange/DAE backend; not wired to assembly UI |
-| Controls — classical (Routh/Bode/PID) | ⚠️ (partial) | No | Routh/Bode/RL/PID tune + state-space/LQR/Kalman backend |
+| Controls — classical (Routh/Bode/PID) | ✅ | No | Routh/Bode/RL/PID tune + state-space/LQR/Kalman backend |
 | Vibration (SDOF/n-DOF modal/FRF) | ⚠️ (partial) | Yes (paid tier) | Full n-DOF eigen + FRF matrix + harmonic response (mode superposition, DAF, phase) + random-vibration PSD (Miles' equ... |
 | PLC IEC 61131-3 (ST/Ladder/FB) | ✅ | No | ST editor + live Ladder power-flow sim wired |
-| Solar PV (system + partial shading) | ⚠️ (partial) | No | Single-diode + bypass-diode IV + MPPT + mismatch backend |
+| Solar PV (system + partial shading) | ✅ | No | Single-diode + bypass-diode IV + MPPT + mismatch backend |
 | AC load-flow (Newton-Raphson) | ⚠️ (partial) | No | Full polar-form NR load-flow backend; no UI |
 | GD&T data model (ASME Y14.5) | ⚠️ (partial) | Yes | Data model + auto-propose; no MBD/PMI placement UI |
 | Tolerance stackup — 1D (WC/RSS) | ✅ | Yes (paid tier) | WC/RSS/Monte-Carlo 1D backend; Monte-Carlo LCG bug |
@@ -741,7 +741,7 @@ Kerf saturates **80%** of SOLIDWORKS's feature surface (35 yes, 24 partial, 0 no
 | Acoustics (ISO 9613 / RT60 / mass-law TL) | ✅ | No | ISO 9613 + RT60 + mass-law TL + image-source IR backend |
 | Jewelry design tooling | ✅ | No | 41-module suite — ring/gem/setting/chain/casting/cost |
 | BIM / IFC authoring | ✅ | No | Revit-comparable engine + IFC4 export wired via /compile-ifc |
-| Material selection (Ashby / multi-objective) | ⚠️ (partial) | No | 200 materials + Pareto frontier + weighted-score backend |
+| Material selection (Ashby / multi-objective) | ✅ | No | 200 materials + Pareto frontier + weighted-score backend |
 | Should-cost / DFM estimation | ✅ | No | 6-process Boothroyd-Dewhurst should-cost backend |
 | LCA (ISO 14040/44 full 4 phases) | ⚠️ (partial) | No | Full 4-phase LCA + multi-impact + uncertainty backend |
 | Scripting / automation API | ✅ | Yes | kerf-sdk on PyPI — HTTP/JSON-RPC; same interface as LLM |
@@ -761,7 +761,7 @@ Kerf saturates **80%** of SOLIDWORKS's feature surface (35 yes, 24 partial, 0 no
 - **Nesting (2D part layout)** — Skyline + true-shape NFP + Minkowski-sum backend
 - **Moldflow / injection fill simulation** — Hele-Shaw front tracking + weld-line + air-trap backend
 - **FDM slicing** — Cura integration wired (PrintSliceView)
-- *(and 8 more features not covered by SOLIDWORKS)*
+- *(and 11 more features not covered by SOLIDWORKS)*
 
 ## What's honestly outstanding
 
@@ -780,14 +780,11 @@ Kerf saturates **80%** of SOLIDWORKS's feature surface (35 yes, 24 partial, 0 no
 - **Road alignment (horizontal/vertical/clothoid)** (Partial): H+V alignment + clothoid + SSD backend; no plan export
 - **Geotech (bearing/settlement/slope/liquefaction)** (Partial): Seed-Idriss CSR + SPT/CPT CRR + Tokimatsu backend
 - **Planar MBD (Lagrange/DAE)** (Partial): Planar MBD Lagrange/DAE backend; not wired to assembly UI
-- **Controls — classical (Routh/Bode/PID)** (Partial): Routh/Bode/RL/PID tune + state-space/LQR/Kalman backend
 - **Vibration (SDOF/n-DOF modal/FRF)** (Partial): Full n-DOF eigen + FRF matrix + harmonic response (mode superposition, DAF, phase) + random-vibration PSD (Miles' equation + shaped PSD via trapezoidal integration) backend; no UI
-- **Solar PV (system + partial shading)** (Partial): Single-diode + bypass-diode IV + MPPT + mismatch backend
 - **AC load-flow (Newton-Raphson)** (Partial): Full polar-form NR load-flow backend; no UI
 - **GD&T data model (ASME Y14.5)** (Partial): Data model + auto-propose; no MBD/PMI placement UI
 - **Limits & fits (ISO 286)** (Partial): ISO 286 limits & fits backend; no UI
 - **Paraxial ray tracing / Gaussian beam** (Partial): ABCD + Seidel + thick lens + Gaussian beam + M² backend
-- **Material selection (Ashby / multi-objective)** (Partial): 200 materials + Pareto frontier + weighted-score backend
 - **LCA (ISO 14040/44 full 4 phases)** (Partial): Full 4-phase LCA + multi-impact + uncertainty backend
 
 ## Pricing

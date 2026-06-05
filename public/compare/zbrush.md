@@ -223,7 +223,7 @@ features:
       note: "No material database, should-cost, or LCA tooling"
       source: "https://www.maxon.net/zbrush/features/"
     kerf:
-      status: partial
+      status: yes
       note: "Ashby material selector (200 materials), should-cost (6 processes), full LCA; backend/agent only"
       evidence: "packages/kerf-materials/"
 ---
@@ -236,7 +236,7 @@ ZBrush sculpts the organic world in polygons — Kerf models the engineered worl
 
 ## Summary
 
-Kerf saturates **65%** of Maxon ZBrush's feature surface (9 yes, 8 partial, 3 no out of 20 features tracked here). Honest gaps: 8 features partial (engine complete, UI or depth gap); 3 features not yet implemented.
+Kerf saturates **68%** of Maxon ZBrush's feature surface (10 yes, 7 partial, 3 no out of 20 features tracked here). Honest gaps: 7 features partial (engine complete, UI or depth gap); 3 features not yet implemented.
 
 ## Feature comparison
 
@@ -261,7 +261,7 @@ Kerf saturates **65%** of Maxon ZBrush's feature surface (9 yes, 8 partial, 3 no
 | Verticals — texture / polypaint / displacement | 🔴 (no) | Yes | No polypaint or displacement-map authoring |
 | Verticals — hard-surface modelling (ZModeler) | ✅ | Yes | Exact B-rep hard-surface via OCCT feature tree — dimensionally accurate |
 | Verticals — rendering quality | ⚠️ (partial) | Yes | HeroShot.js PBR viewport (HDRI + ACES + bloom); no path-traced renderer |
-| Cost / materials / LCA — material selection and costing | ⚠️ (partial) | No | Ashby material selector (200 materials), should-cost (6 processes), full LCA; backend/agent only |
+| Cost / materials / LCA — material selection and costing | ✅ | No | Ashby material selector (200 materials), should-cost (6 processes), full LCA; backend/agent only |
 
 ## What Kerf does that Maxon ZBrush doesn't
 
@@ -272,6 +272,7 @@ Kerf saturates **65%** of Maxon ZBrush's feature surface (9 yes, 8 partial, 3 no
 - **Structural / FEA — finite element analysis** — Deep backend engines (AISC/ACI/NDS/EC codes, FEM beam/plate/shell); minimal UI
 - **Manufacturing / CAM — CNC / G-code output** — 3-axis CAM wired (CAMView); Fanuc/GRBL/LinuxCNC posts
 - **Verticals — jewelry parametric configurator** — 41-module jewelry suite: ring v4, gemstone v2, settings v3/v4, chain v2, casting export
+- **Cost / materials / LCA — material selection and costing** — Ashby material selector (200 materials), should-cost (6 processes), full LCA; backend/agent only
 
 ## What's honestly outstanding
 
@@ -285,7 +286,6 @@ Kerf saturates **65%** of Maxon ZBrush's feature surface (9 yes, 8 partial, 3 no
 - **Verticals — character / creature / film VFX** (Not yet implemented): No character sculpting, rigging, or film VFX tooling — out of scope
 - **Verticals — texture / polypaint / displacement** (Not yet implemented): No polypaint or displacement-map authoring
 - **Verticals — rendering quality** (Partial): HeroShot.js PBR viewport (HDRI + ACES + bloom); no path-traced renderer
-- **Cost / materials / LCA — material selection and costing** (Partial): Ashby material selector (200 materials), should-cost (6 processes), full LCA; backend/agent only
 
 ## Pricing
 

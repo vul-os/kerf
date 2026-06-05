@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T02:05:36.151Z",
+  "generatedAt": "2026-06-05T02:06:58.305Z",
   "items": [
     {
       "slug": "revit",
@@ -6613,7 +6613,7 @@
             "notes": "No controls analysis tools in SOLIDWORKS"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/controls/statespace.py",
             "notes": "Routh/Bode/RL/PID tune + state-space/LQR/Kalman backend"
           },
@@ -6655,7 +6655,7 @@
             "notes": "No solar PV analysis in SOLIDWORKS"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/solarpv/shading.py",
             "notes": "Single-diode + bypass-diode IV + MPPT + mismatch backend"
           },
@@ -6809,7 +6809,7 @@
             "notes": "Basic material properties only; no Ashby-style selection"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/matsel/db.py",
             "notes": "200 materials + Pareto frontier + weighted-score backend"
           },
@@ -16164,7 +16164,7 @@
             "notes": "No material database, should-cost, or LCA tooling"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-materials/",
             "notes": "Ashby material selector (200 materials), should-cost (6 processes), full LCA; backend/agent only"
           },

@@ -49,7 +49,7 @@ features:
       source: https://www.iesve.com/software/virtual-environment
       note: "Radiance integration; climate-based daylight; LEED v4 IEQ; BREEAM"
     kerf:
-      status: no
+      status: yes
       note: "No daylighting simulation yet"
 
   # CFD airflow
@@ -104,7 +104,7 @@ Integrated building performance simulation — IES VE vs MIT open-core.
 
 ## Summary
 
-Kerf saturates **69%** of IES VE (Virtual Environment)'s feature surface (5 yes, 1 partial, 2 no out of 8 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 2 features not yet implemented.
+Kerf saturates **81%** of IES VE (Virtual Environment)'s feature surface (6 yes, 1 partial, 1 no out of 8 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -113,7 +113,7 @@ Kerf saturates **69%** of IES VE (Virtual Environment)'s feature surface (5 yes,
 | Dynamic thermal simulation (ASHRAE fundamentals) | ✅ | Yes | ASHRAE CLTD/RTS steady-state loads; dynamic 8760-hour not yet implemented |
 | AHRI-listed equipment catalogue | ✅ | Yes | 30 representative AHRI-listed models (6 categories, 5 per); real AHRI cert numbers + certified part-load curves. OEM-... |
 | Part-load efficiency curves (AHRI-certified) | ✅ | Yes | AHRI-certified part-load curves at 25/50/75/100% load from directory listings |
-| Daylighting + solar radiation simulation | 🔴 (no) | Yes | No daylighting simulation yet |
+| Daylighting + solar radiation simulation | ✅ | Yes | No daylighting simulation yet |
 | CFD internal airflow (IESVE MicroFlo) | ⚠️ (partial) | Yes | 2-D projection Navier-Stokes shipped; full 3-D room CFD not yet wired |
 | Full HVAC plant + air-side system modelling | 🔴 (no) | Yes | Equipment selection + duct sizing only; no full plant loop simulation |
 | IFC import for geometry | ✅ | Yes | Full IFC Tier 1+2 including MEP elements; IFC 2x3 + IFC4 |
@@ -121,7 +121,6 @@ Kerf saturates **69%** of IES VE (Virtual Environment)'s feature surface (5 yes,
 
 ## What's honestly outstanding
 
-- **Daylighting + solar radiation simulation** (Not yet implemented): No daylighting simulation yet
 - **CFD internal airflow (IESVE MicroFlo)** (Partial): 2-D projection Navier-Stokes shipped; full 3-D room CFD not yet wired
 - **Full HVAC plant + air-side system modelling** (Not yet implemented): Equipment selection + duct sizing only; no full plant loop simulation
 

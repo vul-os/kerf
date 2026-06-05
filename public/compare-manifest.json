@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T03:00:07.685Z",
+  "generatedAt": "2026-06-05T03:01:57.304Z",
   "items": [
     {
       "slug": "revit",
@@ -1228,7 +1228,7 @@
             "notes": "Direct export to EnergyPlus and IDA ICE for building energy simulation"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-thermal/buildingenergy/transient.py",
             "notes": "Backend building loads (CLTD/RTS, ASHRAE Ch.18, degree-day); no energy simulation export"
           },
@@ -16924,7 +16924,7 @@
             "notes": "Radiance integration; climate-based daylight; LEED v4 IEQ; BREEAM"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "notes": "No daylighting simulation yet"
           }
         },

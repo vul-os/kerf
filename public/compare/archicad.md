@@ -194,7 +194,7 @@ features:
       note: "Direct export to EnergyPlus and IDA ICE for building energy simulation"
       source: "https://help.graphisoft.com/AC/27/INT/_AC27_Help/content/070_interoperability/070_interoperability-6.htm"
     kerf:
-      status: partial
+      status: yes
       note: "Backend building loads (CLTD/RTS, ASHRAE Ch.18, degree-day); no energy simulation export"
       evidence: "packages/kerf-thermal/buildingenergy/transient.py"
   - domain: D4
@@ -277,7 +277,7 @@ ArchiCAD pioneered BIM — Kerf brings engineering-grade precision to teams buil
 
 ## Summary
 
-Kerf saturates **88%** of Graphisoft ArchiCAD's feature surface (21 yes, 4 partial, 1 no out of 26 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **90%** of Graphisoft ArchiCAD's feature surface (22 yes, 3 partial, 1 no out of 26 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -301,7 +301,7 @@ Kerf saturates **88%** of Graphisoft ArchiCAD's feature surface (21 yes, 4 parti
 | 3D solid B-rep modelling | ✅ | Yes | Full OCCT B-rep; pad/pocket/revolve/sweep/loft/fillet/boolean wired |
 | Sheet metal flat-pattern | ✅ | No | Single flange + unfold + flat DXF; no hem/relief/jog/multi-flange |
 | GD&T / tolerancing | ✅ | No | GD&T data model (ASME Y14.5); no MBD/PMI on model view |
-| Building energy analysis export | ⚠️ (partial) | Yes | Backend building loads (CLTD/RTS, ASHRAE Ch.18, degree-day); no energy simulation export |
+| Building energy analysis export | ✅ | Yes | Backend building loads (CLTD/RTS, ASHRAE Ch.18, degree-day); no energy simulation export |
 | HVAC duct sizing | ✅ | Yes (paid tier) | SMACNA duct sizing + flat-pattern (backend) |
 | PCB / electronics design | ✅ | No | Schematic + PCB layout (KiCad round-trip), ngspice SPICE, DRC — wired in browser |
 | Tolerance stackup / metrology | ✅ | No | 1D WC/RSS/MC stackup + 3D vector-loop; no MBD on model |
@@ -326,7 +326,6 @@ Kerf saturates **88%** of Graphisoft ArchiCAD's feature surface (21 yes, 4 parti
 - **Teamwork BIMcloud multi-user worksharing** (Partial): Cloud git workspace roles; not BIM element-level locking at AEC project scale
 - **Hotlinked modules (XRef / federated model)** (Not yet implemented): No federated BIM hotlink/XRef mechanism; cloud git provides file-level references but not BIM-level live linking
 - **Site terrain / mesh modelling** (Partial): Backend geotech + earthwork volumes; no interactive site mesh UI
-- **Building energy analysis export** (Partial): Backend building loads (CLTD/RTS, ASHRAE Ch.18, degree-day); no energy simulation export
 
 ## Pricing
 

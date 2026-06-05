@@ -70,8 +70,9 @@ features:
       source: https://www.iesve.com/software/modules/apache-hvac
       note: "APACHE HVAC: full plant loop + air handling unit control sequences"
     kerf:
-      status: no
-      note: "Equipment selection + duct sizing only; no full plant loop simulation"
+      status: partial
+      note: "HVAC plant simulation (chiller/boiler/VAV) + AHRI catalogue shipped; not APACHE-HVAC full control-sequence depth"
+      evidence: packages/kerf-hvac/src/kerf_hvac/ahri_catalogue.py
 
   # IFC / BIM
   - name: "IFC import for geometry"
@@ -104,7 +105,7 @@ Integrated building performance simulation — IES VE vs MIT open-core.
 
 ## Summary
 
-Kerf saturates **81%** of IES VE (Virtual Environment)'s feature surface (6 yes, 1 partial, 1 no out of 8 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **88%** of IES VE (Virtual Environment)'s feature surface (6 yes, 2 partial, 0 no out of 8 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -115,14 +116,14 @@ Kerf saturates **81%** of IES VE (Virtual Environment)'s feature surface (6 yes,
 | Part-load efficiency curves (AHRI-certified) | ✅ | Yes | AHRI-certified part-load curves at 25/50/75/100% load from directory listings |
 | Daylighting + solar radiation simulation | ✅ | Yes | No daylighting simulation yet |
 | CFD internal airflow (IESVE MicroFlo) | ⚠️ (partial) | Yes | 2-D projection Navier-Stokes shipped; full 3-D room CFD not yet wired |
-| Full HVAC plant + air-side system modelling | 🔴 (no) | Yes | Equipment selection + duct sizing only; no full plant loop simulation |
+| Full HVAC plant + air-side system modelling | ⚠️ (partial) | Yes | HVAC plant simulation (chiller/boiler/VAV) + AHRI catalogue shipped; not APACHE-HVAC full control-sequence depth |
 | IFC import for geometry | ✅ | Yes | Full IFC Tier 1+2 including MEP elements; IFC 2x3 + IFC4 |
 | Open-source / scripting API | ✅ | Partial | MIT-licensed; full JSON-RPC LLM tool surface; hvac.equipment_select wired |
 
 ## What's honestly outstanding
 
 - **CFD internal airflow (IESVE MicroFlo)** (Partial): 2-D projection Navier-Stokes shipped; full 3-D room CFD not yet wired
-- **Full HVAC plant + air-side system modelling** (Not yet implemented): Equipment selection + duct sizing only; no full plant loop simulation
+- **Full HVAC plant + air-side system modelling** (Partial): HVAC plant simulation (chiller/boiler/VAV) + AHRI catalogue shipped; not APACHE-HVAC full control-sequence depth
 
 ## Pricing
 

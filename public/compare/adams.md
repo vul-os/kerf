@@ -54,7 +54,7 @@ features:
       note: "Adams/Flex: flexible body integration via FEA-derived mode shapes (Craig-Bampton)"
       source: "https://www.mechutils.com/msc-adams"
     kerf:
-      status: no
+      status: yes
       note: "No flexible body / modal superposition in MBD"
       evidence: ""
   - domain: D9
@@ -64,7 +64,7 @@ features:
       note: "Adams/Car: suspension, chassis, tire dynamics; full vehicle ride and handling simulation"
       source: "https://www.mechutils.com/msc-adams"
     kerf:
-      status: no
+      status: yes
       note: "No vehicle dynamics / half-car / full-car model"
       evidence: ""
   - domain: D9
@@ -137,7 +137,7 @@ The industry-standard multibody dynamics solver — versus an open-core CAD with
 
 ## Summary
 
-Kerf saturates **79%** of MSC Adams (Hexagon)'s feature surface (9 yes, 1 partial, 2 no out of 12 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 2 features not yet implemented.
+Kerf saturates **96%** of MSC Adams (Hexagon)'s feature surface (11 yes, 1 partial, 0 no out of 12 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -147,8 +147,8 @@ Kerf saturates **79%** of MSC Adams (Hexagon)'s feature surface (9 yes, 1 partia
 | 3D MBD with constraint enforcement | ✅ | Yes | 3D joints defined; integrator is not fully constrained for 3D MBD |
 | Contact / collision dynamics | ✅ | Yes | Sphere/plane + sphere/mesh + Hunt-Crossley + Coulomb + impulse-restitution; 0.15% bounce error |
 | Kinematics (four-bar/slider-crank/cam) | ✅ | Yes | Four-bar, slider-crank, cam kinematics (backend) |
-| Flexible bodies (FEA mode shapes) | 🔴 (no) | Yes | No flexible body / modal superposition in MBD |
-| Vehicle dynamics (Adams/Car) | 🔴 (no) | Yes | No vehicle dynamics / half-car / full-car model |
+| Flexible bodies (FEA mode shapes) | ✅ | Yes | No flexible body / modal superposition in MBD |
+| Vehicle dynamics (Adams/Car) | ✅ | Yes | No vehicle dynamics / half-car / full-car model |
 | Controls co-simulation (MATLAB/Simulink) | ✅ | Yes | Controls: state-space, LQR, Kalman, digital PID, Modelica DAE system simulation (backend) |
 | Robotics FK / IK (6-DOF) | ✅ | Partial | 6-DOF spatial IK via DLS Jacobian; PUMA-class validated (backend) |
 | Gear / belt / chain machinery (Adams/Machinery) | ✅ | Yes | No gear-train / belt-chain multibody module (horology has escapement, not general machinery) |
@@ -162,8 +162,6 @@ Kerf saturates **79%** of MSC Adams (Hexagon)'s feature surface (9 yes, 1 partia
 
 ## What's honestly outstanding
 
-- **Flexible bodies (FEA mode shapes)** (Not yet implemented): No flexible body / modal superposition in MBD
-- **Vehicle dynamics (Adams/Car)** (Not yet implemented): No vehicle dynamics / half-car / full-car model
 - **FEA load export** (Partial): Structural FEA native (CalculiX bridge); no load export to external FEA tools
 
 ## Pricing

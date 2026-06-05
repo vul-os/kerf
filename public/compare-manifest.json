@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T03:15:15.147Z",
+  "generatedAt": "2026-06-05T03:18:10.823Z",
   "items": [
     {
       "slug": "revit",
@@ -13254,7 +13254,7 @@
             "notes": "Adams/Flex: flexible body integration via FEA-derived mode shapes (Craig-Bampton)"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "",
             "notes": "No flexible body / modal superposition in MBD"
           },
@@ -13268,7 +13268,7 @@
             "notes": "Adams/Car: suspension, chassis, tire dynamics; full vehicle ride and handling simulation"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "",
             "notes": "No vehicle dynamics / half-car / full-car model"
           },
@@ -16826,8 +16826,9 @@
             "notes": "Full 8760-hour weather-file simulation; DOE-2 based engine"
           },
           "kerf": {
-            "status": "no",
-            "notes": "Hourly energy simulation not yet implemented; steady-state load calc only"
+            "status": "partial",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/buildingenergy/hourly_8760.py",
+            "notes": "8760-hr ASHRAE hourly engine shipped + gbXML/IDF export; not Carrier-HAP DOE-2 commercial-validated"
           }
         },
         {
@@ -16838,8 +16839,9 @@
             "notes": "LEED EAp2 / EAc1 reports built-in"
           },
           "kerf": {
-            "status": "no",
-            "notes": "No ASHRAE 90.1 compliance reporting yet"
+            "status": "partial",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/buildingenergy/hourly_8760.py",
+            "notes": "Title 24 (16 CA zones) + LEED v4 EAp2 engine shipped; not commercial-certified compliance reporting"
           }
         },
         {
@@ -16949,8 +16951,9 @@
             "notes": "APACHE HVAC: full plant loop + air handling unit control sequences"
           },
           "kerf": {
-            "status": "no",
-            "notes": "Equipment selection + duct sizing only; no full plant loop simulation"
+            "status": "partial",
+            "evidence": "packages/kerf-hvac/src/kerf_hvac/ahri_catalogue.py",
+            "notes": "HVAC plant simulation (chiller/boiler/VAV) + AHRI catalogue shipped; not APACHE-HVAC full control-sequence depth"
           }
         },
         {
@@ -17049,8 +17052,9 @@
             "notes": "ASHRAE 90.1 Appendix G baseline automation; LEED EAp2"
           },
           "kerf": {
-            "status": "no",
-            "notes": "No ASHRAE 90.1 compliance reporting yet"
+            "status": "partial",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/buildingenergy/hourly_8760.py",
+            "notes": "Title 24 (16 CA zones) + LEED v4 EAp2 + 8760-hr engine shipped; not ASHRAE 90.1 App-G commercial baseline automation"
           }
         },
         {

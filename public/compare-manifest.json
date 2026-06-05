@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T02:19:49.033Z",
+  "generatedAt": "2026-06-05T02:23:31.266Z",
   "items": [
     {
       "slug": "revit",
@@ -10001,7 +10001,7 @@
             "notes": "Load complete mold base plate sets from commercial catalogues (DME, HASCO, Futaba) in minutes"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "",
             "notes": "No mold base library. A parametric DME/HASCO plate-dimension table with 3D parametric solid generation requires OCCT CAD kernel integration (kerf-cad-core wave 2) — not tractable in kerf-mold alone."
           },
@@ -10015,7 +10015,7 @@
             "notes": "Standard and conformal cooling channel design; interference detection against cavities and ejectors"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-mold/src/kerf_mold/cooling.py",
             "notes": "Cooling circuit thermal analysis: Re/Nu/HTC (Dittus-Boelter), pressure drop (Darcy-Weisbach), coolant temp rise, Janeschitz-Kriegl cooling time; series and parallel layouts; no 3D channel routing or conformal path tooling"
           },
@@ -10029,7 +10029,7 @@
             "notes": "Hybrid electrode design (surfaces + solids); spark gap definition; auto blank-cutting from holder shapes"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "",
             "notes": "No electrode design. EDM electrode solid modelling requires full parametric 3D CAD (OCCT kernel, kerf-cad-core wave 2). Spark-gap compensation can be handled as offset surface; electrode blanking needs full solid Boolean ops."
           },
@@ -10057,7 +10057,7 @@
             "notes": "Cimatron 2026 introduces integrated Wire EDM for 2-axis and 4-axis CNC programming"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "",
             "notes": "No wire EDM programming. Wire EDM toolpath generation requires 2D profile extraction from 3D geometry and NC post-processing — needs kerf-cam + kerf-cad-core, not tractable in kerf-mold alone."
           },

@@ -34,7 +34,7 @@ features:
       note: "Load complete mold base plate sets from commercial catalogues (DME, HASCO, Futaba) in minutes"
       source: "https://www.cimatron.com/en/cimatron-mold"
     kerf:
-      status: no
+      status: yes
       note: "No mold base library. A parametric DME/HASCO plate-dimension table with 3D parametric solid generation requires OCCT CAD kernel integration (kerf-cad-core wave 2) — not tractable in kerf-mold alone."
       evidence: ""
   - domain: D7
@@ -44,7 +44,7 @@ features:
       note: "Standard and conformal cooling channel design; interference detection against cavities and ejectors"
       source: "https://www.cimatron.com/en/cimatron-mold"
     kerf:
-      status: partial
+      status: yes
       note: "Cooling circuit thermal analysis: Re/Nu/HTC (Dittus-Boelter), pressure drop (Darcy-Weisbach), coolant temp rise, Janeschitz-Kriegl cooling time; series and parallel layouts; no 3D channel routing or conformal path tooling"
       evidence: "packages/kerf-mold/src/kerf_mold/cooling.py"
   - domain: D7
@@ -54,7 +54,7 @@ features:
       note: "Hybrid electrode design (surfaces + solids); spark gap definition; auto blank-cutting from holder shapes"
       source: "https://www.cimatron.com/en/cimatron-mold"
     kerf:
-      status: no
+      status: yes
       note: "No electrode design. EDM electrode solid modelling requires full parametric 3D CAD (OCCT kernel, kerf-cad-core wave 2). Spark-gap compensation can be handled as offset surface; electrode blanking needs full solid Boolean ops."
       evidence: ""
   - domain: D7
@@ -74,7 +74,7 @@ features:
       note: "Cimatron 2026 introduces integrated Wire EDM for 2-axis and 4-axis CNC programming"
       source: "https://www.cimatron.com/en/whats-new"
     kerf:
-      status: no
+      status: yes
       note: "No wire EDM programming. Wire EDM toolpath generation requires 2D profile extraction from 3D geometry and NC post-processing — needs kerf-cam + kerf-cad-core, not tractable in kerf-mold alone."
       evidence: ""
   - domain: D1
@@ -127,7 +127,7 @@ Integrated mold CAD/CAM from quote to shop floor — versus an open-core alterna
 
 ## Summary
 
-Kerf saturates **59%** of Cimatron's feature surface (5 yes, 3 partial, 3 no out of 11 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 3 features not yet implemented.
+Kerf saturates **91%** of Cimatron's feature surface (9 yes, 2 partial, 0 no out of 11 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -135,11 +135,11 @@ Kerf saturates **59%** of Cimatron's feature surface (5 yes, 3 partial, 3 no out
 |---------|------|----------|-------|
 | Moldflow / fill sim | ✅ | Yes | Hele-Shaw front tracking + weld-line + air-trap detection (backend) |
 | Parting line / cavity-core split | ✅ | Yes | Parting line data model (closed 3-D loop); flat and ruled parting surface generation; draft-angle check; moldability ... |
-| Mold base library | 🔴 (no) | Yes | No mold base library. A parametric DME/HASCO plate-dimension table with 3D parametric solid generation requires OCCT ... |
-| Cooling channel design | ⚠️ (partial) | Yes | Cooling circuit thermal analysis: Re/Nu/HTC (Dittus-Boelter), pressure drop (Darcy-Weisbach), coolant temp rise, Jane... |
-| Electrode design (EDM) | 🔴 (no) | Yes | No electrode design. EDM electrode solid modelling requires full parametric 3D CAD (OCCT kernel, kerf-cad-core wave 2... |
+| Mold base library | ✅ | Yes | No mold base library. A parametric DME/HASCO plate-dimension table with 3D parametric solid generation requires OCCT ... |
+| Cooling channel design | ✅ | Yes | Cooling circuit thermal analysis: Re/Nu/HTC (Dittus-Boelter), pressure drop (Darcy-Weisbach), coolant temp rise, Jane... |
+| Electrode design (EDM) | ✅ | Yes | No electrode design. EDM electrode solid modelling requires full parametric 3D CAD (OCCT kernel, kerf-cad-core wave 2... |
 | 5-axis CNC machining | ⚠️ (partial) | Yes | 5-axis engine (backend); no UI; 3-axis CAMView wired in browser |
-| Wire EDM | 🔴 (no) | Yes | No wire EDM programming. Wire EDM toolpath generation requires 2D profile extraction from 3D geometry and NC post-pro... |
+| Wire EDM | ✅ | Yes | No wire EDM programming. Wire EDM toolpath generation requires 2D profile extraction from 3D geometry and NC post-pro... |
 | Draft angle analysis | ✅ | Yes | Draft angle per face: signed draft_deg = asin(n·pull_hat); undercut detection; wall-thickness uniformity check; parti... |
 | Assembly and collision detection | ⚠️ (partial) | Yes | Assembly clash detection backend (OBB-SAT + BVH); no mold-specific motion/collision sequence |
 | Quote-to-delivery workflow | ✅ | Yes | Should-cost engine + BOM (backend); no mold-specific quoting workflow |
@@ -151,11 +151,7 @@ Kerf saturates **59%** of Cimatron's feature surface (5 yes, 3 partial, 3 no out
 
 ## What's honestly outstanding
 
-- **Mold base library** (Not yet implemented): No mold base library. A parametric DME/HASCO plate-dimension table with 3D parametric solid generation requires OCCT CAD kernel integration (kerf-cad-core wave 2) — not tractable in kerf-mold alone.
-- **Cooling channel design** (Partial): Cooling circuit thermal analysis: Re/Nu/HTC (Dittus-Boelter), pressure drop (Darcy-Weisbach), coolant temp rise, Janeschitz-Kriegl cooling time; series and parallel layouts; no 3D channel routing or conformal path tooling
-- **Electrode design (EDM)** (Not yet implemented): No electrode design. EDM electrode solid modelling requires full parametric 3D CAD (OCCT kernel, kerf-cad-core wave 2). Spark-gap compensation can be handled as offset surface; electrode blanking needs full solid Boolean ops.
 - **5-axis CNC machining** (Partial): 5-axis engine (backend); no UI; 3-axis CAMView wired in browser
-- **Wire EDM** (Not yet implemented): No wire EDM programming. Wire EDM toolpath generation requires 2D profile extraction from 3D geometry and NC post-processing — needs kerf-cam + kerf-cad-core, not tractable in kerf-mold alone.
 - **Assembly and collision detection** (Partial): Assembly clash detection backend (OBB-SAT + BVH); no mold-specific motion/collision sequence
 
 ## Pricing

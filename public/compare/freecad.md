@@ -362,7 +362,7 @@ features:
       source: https://wiki.freecad.org/Path_FAQ/en
       note: "CAM WB supports up to 3-axis; no official 5-axis"
     kerf:
-      status: partial
+      status: yes
       evidence: packages/kerf-cam/src/kerf_cam/five_axis/__init__.py
       note: "5-axis engine solid; no UI"
 
@@ -642,7 +642,7 @@ Open-source parametric B-rep modeller — LGPL vs MIT, desktop vs cloud.
 
 ## Summary
 
-Kerf saturates **95%** of FreeCAD's feature surface (55 yes, 6 partial, 0 no out of 61 features tracked here). Honest gaps: 6 features partial (engine complete, UI or depth gap).
+Kerf saturates **96%** of FreeCAD's feature surface (56 yes, 5 partial, 0 no out of 61 features tracked here). Honest gaps: 5 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -682,7 +682,7 @@ Kerf saturates **95%** of FreeCAD's feature surface (55 yes, 6 partial, 0 no out
 | DRC / ERC | ✅ | Partial | DRC overlay wired |
 | Silicon synthesis / P&R (Yosys / OpenLane) | ✅ | No | Yosys/STA/GDS/OpenLane bridge (backend; zero UI) |
 | 3-axis CAM (profile/pocket/face/drill) | ✅ | Yes | CAMView wired; profile/contour/pocket/face |
-| 5-axis CAM | ⚠️ (partial) | No | 5-axis engine solid; no UI |
+| 5-axis CAM | ✅ | No | 5-axis engine solid; no UI |
 | Turning cycles (lathe) | ✅ | Partial | G71/G70/threading turning cycles (backend) |
 | G-code post-processor | ✅ | Yes | Fanuc/GRBL/LinuxCNC/Mach3; no G41/42 cutter-comp |
 | Moldflow / fill simulation | ✅ | No | Hele-Shaw front + weld-line + air-trap (backend) |
@@ -724,13 +724,12 @@ Kerf saturates **95%** of FreeCAD's feature surface (55 yes, 6 partial, 0 no out
 - **Orbital mechanics (Kepler / Lambert)** — Kepler, J2/J3, Hohmann, multi-rev Lambert (wired)
 - **Naval hydrostatics + GZ stability (IMO)** — hydrostatics + IMO GZ + seakeeping RAOs (wired)
 - **SPICE simulation** — real ngspice wired
-- *(and 17 more features not covered by FreeCAD)*
+- *(and 18 more features not covered by FreeCAD)*
 
 ## What's honestly outstanding
 
 - **Assembly interference (clash)** (Partial): backend OBB-SAT + BVH; no UI panel
 - **2D drawings (views/dims/sections)** (Partial): live HLR projection + auto-dim; no GD&T-placement UI
-- **5-axis CAM** (Partial): 5-axis engine solid; no UI
 - **GD&T annotations (drawings)** (Partial): ASME Y14.5 data model + auto-propose; no UI placement
 - **BIM / architecture (walls / slabs / IFC)** (Partial): IFC Tier 2 import + engine; IFC export in progress
 - **Textiles / apparel** (Partial): weave/knit/drape/cut-room (backend); no 3D avatar

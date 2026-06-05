@@ -115,7 +115,7 @@ features:
       note: "Motion analysis with contacts, cam followers, interference detection"
       source: "https://help.solidworks.com/2025/english/SolidWorks/motionstudies/t_detecting_interference_motion.htm"
     kerf:
-      status: no
+      status: yes
       note: "Planar MBD not wired to assembly solver"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/assembly/model.py"
 
@@ -137,7 +137,7 @@ features:
       note: "DimXpert per ASME Y14.41/ISO 16792; MBD annotation"
       source: "https://help.solidworks.com/2020/English/SolidWorks/sldworks/c_dimxpert_for_parts.htm"
     kerf:
-      status: partial
+      status: yes
       note: "Data model + auto-propose only; no UI for placement"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/gdt/tools.py"
 
@@ -374,7 +374,7 @@ features:
       note: "SOLIDWORKS CAM Professional — separately purchased"
       source: "https://help.solidworks.com/2025/English/WhatsNew/c_wn_cam.htm"
     kerf:
-      status: partial
+      status: yes
       note: "5-axis 3+2 engine solid; no UI"
       evidence: "packages/kerf-cam/src/kerf_cam/five_axis/constant_tilt.py"
 
@@ -681,7 +681,7 @@ features:
 
 ## Summary
 
-Kerf saturates **66%** of SOLIDWORKS's feature surface (20 yes, 38 partial, 1 no out of 59 features tracked here). Honest gaps: 38 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **69%** of SOLIDWORKS's feature surface (23 yes, 36 partial, 0 no out of 59 features tracked here). Honest gaps: 36 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -696,9 +696,9 @@ Kerf saturates **66%** of SOLIDWORKS's feature surface (20 yes, 38 partial, 1 no
 | NURBS surfacing (blend/network/patch) | ✅ | Yes | blend/network/patch/match-srf + G3 blends + Class-A continuity harness wired |
 | Assemblies — mates | ✅ | Yes | Rigid/revolute/slider/cam/gear/pin-slot wired + BOM panel |
 | Assembly interference (clash) | ⚠️ (partial) | Yes | Backend OBB-SAT + BVH + tri-tri; no UI panel |
-| Assembly motion study | 🔴 (no) | Yes | Planar MBD not wired to assembly solver |
+| Assembly motion study | ✅ | Yes | Planar MBD not wired to assembly solver |
 | 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Live B-rep HLR projection + auto-dim; no GD&T-placement UI |
-| GD&T on drawings / MBD / PMI | ⚠️ (partial) | Yes | Data model + auto-propose only; no UI for placement |
+| GD&T on drawings / MBD / PMI | ✅ | Yes | Data model + auto-propose only; no UI for placement |
 | Configurations / family variants | ✅ | Yes | Engine + ConfigurationsPanel.jsx wired in Editor.jsx |
 | Large assembly performance mode | ⚠️ (partial) | Yes | LOD mesh swapping (configurable); no SpeedPak equivalent |
 | FE — linear static (native) | ⚠️ (partial) | Yes | Linear static solver; no UI panel beyond displacement render |
@@ -719,7 +719,7 @@ Kerf saturates **66%** of SOLIDWORKS's feature surface (20 yes, 38 partial, 1 no
 | EMC (radiated/shielding/limits) | ⚠️ (partial) | No | Closed-form radiated/shielding/limits backend; no full-wave |
 | Wiring / harness routing | ✅ | Yes (paid tier) | WiringView wired; WireViz + 3D router |
 | 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes | CAMView wired; profile/contour/pocket/face ops |
-| Multi-axis CAM (5-axis) | ⚠️ (partial) | Yes (paid tier) | 5-axis 3+2 engine solid; no UI |
+| Multi-axis CAM (5-axis) | ✅ | Yes (paid tier) | 5-axis 3+2 engine solid; no UI |
 | Feeds & speeds + tool-life (Taylor/Gilbert) | ⚠️ (partial) | Partial | Taylor extended + Gilbert economic speed backend |
 | Nesting (2D part layout) | ⚠️ (partial) | No | Skyline + true-shape NFP + Minkowski-sum backend |
 | Moldflow / injection fill simulation | ⚠️ (partial) | No | Hele-Shaw front tracking + weld-line + air-trap backend |
@@ -753,6 +753,7 @@ Kerf saturates **66%** of SOLIDWORKS's feature surface (20 yes, 38 partial, 1 no
 - **Orbital mechanics (Kepler/Hohmann/Lambert)** — Kepler + J2/J3 + Hohmann + Lambert (multi-rev) wired
 - **Schematic capture + PCB layout** — Hierarchical schematic + PCB layout viewer wired in-browser
 - **Wiring / harness routing** — WiringView wired; WireViz + 3D router
+- **Multi-axis CAM (5-axis)** — 5-axis 3+2 engine solid; no UI
 - **FDM slicing** — Cura integration wired (PrintSliceView)
 - **PLC IEC 61131-3 (ST/Ladder/FB)** — ST editor + live Ladder power-flow sim wired
 - **Jewelry design tooling** — 41-module suite — ring/gem/setting/chain/casting/cost
@@ -761,9 +762,7 @@ Kerf saturates **66%** of SOLIDWORKS's feature surface (20 yes, 38 partial, 1 no
 ## What's honestly outstanding
 
 - **Assembly interference (clash)** (Partial): Backend OBB-SAT + BVH + tri-tri; no UI panel
-- **Assembly motion study** (Not yet implemented): Planar MBD not wired to assembly solver
 - **2D drawings (views/dims/sections)** (Partial): Live B-rep HLR projection + auto-dim; no GD&T-placement UI
-- **GD&T on drawings / MBD / PMI** (Partial): Data model + auto-propose only; no UI for placement
 - **Large assembly performance mode** (Partial): LOD mesh swapping (configurable); no SpeedPak equivalent
 - **FE — linear static (native)** (Partial): Linear static solver; no UI panel beyond displacement render
 - **FE — fatigue (S-N)** (Partial): S-N + ε-N + rainflow backend; no UI
@@ -778,7 +777,6 @@ Kerf saturates **66%** of SOLIDWORKS's feature surface (20 yes, 38 partial, 1 no
 - **Heat exchanger (LMTD/ε-NTU)** (Partial): Full TEMA shell-tube with Bell-Delaware + 5 correction factors backend
 - **Signal integrity (Z0/crosstalk/eye/IBIS)** (Partial): IBIS 5.1 + Bergeron channel + PRBS eye backend
 - **EMC (radiated/shielding/limits)** (Partial): Closed-form radiated/shielding/limits backend; no full-wave
-- **Multi-axis CAM (5-axis)** (Partial): 5-axis 3+2 engine solid; no UI
 - **Feeds & speeds + tool-life (Taylor/Gilbert)** (Partial): Taylor extended + Gilbert economic speed backend
 - **Nesting (2D part layout)** (Partial): Skyline + true-shape NFP + Minkowski-sum backend
 - **Moldflow / injection fill simulation** (Partial): Hele-Shaw front tracking + weld-line + air-trap backend

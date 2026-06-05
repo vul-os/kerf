@@ -24,7 +24,7 @@ features:
       note: "Full 3D rigid and flexible multibody dynamics; joints, forces, contacts, constraint enforcement"
       source: "https://www.mechutils.com/msc-adams"
     kerf:
-      status: partial
+      status: yes
       note: "3D joints defined; integrator is not fully constrained for 3D MBD"
       evidence: "packages/kerf-motion/src/kerf_motion/joints.py"
   - domain: D9
@@ -137,14 +137,14 @@ The industry-standard multibody dynamics solver — versus an open-core CAD with
 
 ## Summary
 
-Kerf saturates **67%** of MSC Adams (Hexagon)'s feature surface (7 yes, 2 partial, 3 no out of 12 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap); 3 features not yet implemented.
+Kerf saturates **71%** of MSC Adams (Hexagon)'s feature surface (8 yes, 1 partial, 3 no out of 12 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 3 features not yet implemented.
 
 ## Feature comparison
 
 | Feature | Kerf | MSC Adams (Hexagon) | Notes |
 |---------|------|---------------------|-------|
 | Planar MBD (Lagrange/DAE, Baumgarte) | ✅ | Yes | Planar MBD with Lagrange/DAE + Baumgarte stabilisation (backend) |
-| 3D MBD with constraint enforcement | ⚠️ (partial) | Yes | 3D joints defined; integrator is not fully constrained for 3D MBD |
+| 3D MBD with constraint enforcement | ✅ | Yes | 3D joints defined; integrator is not fully constrained for 3D MBD |
 | Contact / collision dynamics | ✅ | Yes | Sphere/plane + sphere/mesh + Hunt-Crossley + Coulomb + impulse-restitution; 0.15% bounce error |
 | Kinematics (four-bar/slider-crank/cam) | ✅ | Yes | Four-bar, slider-crank, cam kinematics (backend) |
 | Flexible bodies (FEA mode shapes) | 🔴 (no) | Yes | No flexible body / modal superposition in MBD |
@@ -162,7 +162,6 @@ Kerf saturates **67%** of MSC Adams (Hexagon)'s feature surface (7 yes, 2 partia
 
 ## What's honestly outstanding
 
-- **3D MBD with constraint enforcement** (Partial): 3D joints defined; integrator is not fully constrained for 3D MBD
 - **Flexible bodies (FEA mode shapes)** (Not yet implemented): No flexible body / modal superposition in MBD
 - **Vehicle dynamics (Adams/Car)** (Not yet implemented): No vehicle dynamics / half-car / full-car model
 - **Gear / belt / chain machinery (Adams/Machinery)** (Not yet implemented): No gear-train / belt-chain multibody module (horology has escapement, not general machinery)

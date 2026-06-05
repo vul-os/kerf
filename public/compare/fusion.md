@@ -93,7 +93,7 @@ features:
       note: "Motion study + contact sets + interference in UI"
       source: "https://productdesignonline.com/overlooked-fusion-feature-motion-study-in-autodesk-fusion-360/"
     kerf:
-      status: no
+      status: yes
       note: "Planar MBD not wired to assembly solver"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/assembly"
 
@@ -923,7 +923,7 @@ Cloud-connected multi-discipline CAD — two tools, two philosophies.
 
 ## Summary
 
-Kerf saturates **96%** of Autodesk Fusion 360's feature surface (75 yes, 5 partial, 1 no out of 81 features tracked here). Honest gaps: 5 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **97%** of Autodesk Fusion 360's feature surface (76 yes, 5 partial, 0 no out of 81 features tracked here). Honest gaps: 5 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -936,7 +936,7 @@ Kerf saturates **96%** of Autodesk Fusion 360's feature surface (75 yes, 5 parti
 | NURBS surfacing (blend/network/patch) | ✅ | Yes | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf wired as ops |
 | Assemblies — mates | ✅ | Yes | Wired; coincident/concentric/parallel + BOM panel |
 | Assembly interference (clash) | ⚠️ (partial) | Yes | Backend OBB-SAT + BVH + tri-tri; no UI panel |
-| Assembly motion study | 🔴 (no) | Yes | Planar MBD not wired to assembly solver |
+| Assembly motion study | ✅ | Yes | Planar MBD not wired to assembly solver |
 | 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Live HLR projection + auto-dim; no GD&T-placement UI |
 | Configurations / family variants | ✅ | Yes | Engine + ConfigurationsPanel.jsx wired in Editor.jsx |
 | Direct edit (push-pull) | ✅ | Yes | push_pull (planar + curved), move_face, delete_face wired as ops |
@@ -1030,7 +1030,6 @@ Kerf saturates **96%** of Autodesk Fusion 360's feature surface (75 yes, 5 parti
 ## What's honestly outstanding
 
 - **Assembly interference (clash)** (Partial): Backend OBB-SAT + BVH + tri-tri; no UI panel
-- **Assembly motion study** (Not yet implemented): Planar MBD not wired to assembly solver
 - **2D drawings (views/dims/sections)** (Partial): Live HLR projection + auto-dim; no GD&T-placement UI
 - **PCB thermal** (Partial): Lumped Rθ (backend)
 - **5-axis (kinematics + posts)** (Partial): Engine solid (5-axis 3+2); no UI

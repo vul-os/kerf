@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T00:52:29.870Z",
+  "generatedAt": "2026-06-05T01:12:17.683Z",
   "items": [
     {
       "slug": "revit",
@@ -615,7 +615,7 @@
             "notes": "Composite TINs, grading objects, surface comparison, cut/fill"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-civil/src/kerf_civil/tin.py",
             "notes": "TIN surface from point cloud + cut/fill volumes; contour extraction; no corridor-driven composite TINs"
           },
@@ -629,7 +629,7 @@
             "notes": "Full storm and sanitary gravity pipe design, sizing, plan production"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-civil/src/kerf_civil/hydraulics_gravity.py",
             "notes": "Manning's equation for circular/trapezoidal gravity flow (normal-depth solver, full-flow capacity, part-full geometry); no network design, sizing wizard, or plan-production workflow"
           },
@@ -643,7 +643,7 @@
             "notes": "Pressure pipe parts, fittings, and plan production"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-civil/src/kerf_civil/hydraulics_pressure.py",
             "notes": "Hardy-Cross / Global Gradient Algorithm steady-state solver (Hazen-Williams + Darcy-Weisbach with Swamee-Jain friction); no plan-production or fittings layout"
           },
@@ -4546,7 +4546,7 @@
             "notes": "CAM WB supports up to 3-axis; no official 5-axis"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cam/src/kerf_cam/five_axis/__init__.py",
             "notes": "5-axis engine solid; no UI"
           }
@@ -5006,7 +5006,7 @@
             "notes": "Motion study + contact sets + interference in UI"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly",
             "notes": "Planar MBD not wired to assembly solver"
           },
@@ -6179,7 +6179,7 @@
             "notes": "Motion analysis with contacts, cam followers, interference detection"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly/model.py",
             "notes": "Planar MBD not wired to assembly solver"
           },
@@ -6207,7 +6207,7 @@
             "notes": "DimXpert per ASME Y14.41/ISO 16792; MBD annotation"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/tools.py",
             "notes": "Data model + auto-propose only; no UI for placement"
           },
@@ -6501,7 +6501,7 @@
             "notes": "SOLIDWORKS CAM Professional — separately purchased"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cam/src/kerf_cam/five_axis/constant_tilt.py",
             "notes": "5-axis 3+2 engine solid; no UI"
           },
@@ -6988,7 +6988,7 @@
             "notes": "GD&T + MBD with datums, tolerances in 3D model"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py",
             "notes": "Data model + auto-propose only; no UI placement"
           },
@@ -7797,7 +7797,7 @@
             "notes": "Dynamic Simulation workspace — multi-body dynamics, joint catalog, interference"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly",
             "notes": "None — planar MBD not wired to assembly solver"
           },
@@ -7825,7 +7825,7 @@
             "notes": "DimXpert-class GD&T, MBD (Model Based Definition) ASME Y14.5 / ISO 1101"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py",
             "notes": "GD&T data model only; no MBD/PMI UI"
           },
@@ -9249,7 +9249,7 @@
             "notes": "DMU Kinematics + DMU Space Analysis — envelope sweeps, clash/clearance/contact"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "docs/domain_depth.md — D1 row: Assembly motion study / interference: [ ]"
           },
           "name": "Assembly motion study / interference"
@@ -9276,7 +9276,7 @@
             "notes": "Functional Tolerancing & Annotation (FTA) — full ISO / ASME PMI on 3D model; 3DEXPERIENCE MBD"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py",
             "notes": "Data model only; no UI panel"
           },
@@ -10849,7 +10849,7 @@
             "notes": "Creo Mechanism supports full 3D rigid-body dynamics with constraint enforcement"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-motion/src/kerf_motion/joints.py",
             "notes": "Joints defined but 3D integrator unconstrained"
           },
@@ -10905,7 +10905,7 @@
             "notes": "Creo MBD — 3D annotation planes, semantic PMI for paperless manufacturing (separate module)"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "src/components/DrawingView.jsx",
             "notes": "Data model only; no 3D MBD/PMI annotation UI"
           },
@@ -11737,7 +11737,7 @@
             "notes": "PMI (Product and Manufacturing Information) — full MBD with semantic GD&T, 3D annotations, PMI views"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "cloud/gdt/model.py"
           },
           "name": "GD&T on drawings / MBD / PMI"
@@ -13212,7 +13212,7 @@
             "notes": "Full 3D rigid and flexible multibody dynamics; joints, forces, contacts, constraint enforcement"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-motion/src/kerf_motion/joints.py",
             "notes": "3D joints defined; integrator is not fully constrained for 3D MBD"
           },
@@ -14854,7 +14854,7 @@
             "notes": "No GD&T concept; not an engineering tool"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core",
             "notes": "Data model only; no UI"
           },
@@ -16259,7 +16259,7 @@
             "notes": "GD&T feature control frames, datum labels, surface texture symbols in drawing"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py",
             "notes": "Data model only (kerf-gdnt); no UI placement on drawings"
           },

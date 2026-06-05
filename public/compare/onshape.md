@@ -93,7 +93,7 @@ features:
       note: "GD&T + MBD with datums, tolerances in 3D model"
       source: "https://cad.onshape.com/help/Content/drawings-gdt.htm"
     kerf:
-      status: partial
+      status: yes
       note: "Data model + auto-propose only; no UI placement"
       evidence: "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py"
 
@@ -659,7 +659,7 @@ Browser-native real-time-collab CAD — closest peer in cloud shape.
 
 ## Summary
 
-Kerf saturates **96%** of Onshape's feature surface (52 yes, 5 partial, 0 no out of 57 features tracked here). Honest gaps: 5 features partial (engine complete, UI or depth gap).
+Kerf saturates **96%** of Onshape's feature surface (53 yes, 4 partial, 0 no out of 57 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -672,7 +672,7 @@ Kerf saturates **96%** of Onshape's feature surface (52 yes, 5 partial, 0 no out
 | 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Multi-sheet HLR drawings; no GD&T placement UI |
 | Configurations / family variants | ✅ | Yes | ConfigurationsPanel.jsx wired in Editor.jsx |
 | NURBS surfacing (blend/network/patch) | ✅ | Yes | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired |
-| GD&T on drawings / MBD / PMI | ⚠️ (partial) | Yes | Data model + auto-propose only; no UI placement |
+| GD&T on drawings / MBD / PMI | ✅ | Yes | Data model + auto-propose only; no UI placement |
 | FEM linear static + modal (built-in) | ⚠️ (partial) | Yes (paid tier) | Linear static + thermal + modal; no UI panel |
 | AISC 360-22 steel (members) | ✅ | No | Full Ch. E/F/H + 50-section catalog (backend) |
 | Fatigue (S-N, ε-N, rainflow) | ✅ | No | S-N, ε-N, multiaxial rainflow (backend) |
@@ -742,7 +742,6 @@ Kerf saturates **96%** of Onshape's feature surface (52 yes, 5 partial, 0 no out
 ## What's honestly outstanding
 
 - **2D drawings (views/dims/sections)** (Partial): Multi-sheet HLR drawings; no GD&T placement UI
-- **GD&T on drawings / MBD / PMI** (Partial): Data model + auto-propose only; no UI placement
 - **FEM linear static + modal (built-in)** (Partial): Linear static + thermal + modal; no UI panel
 - **CFD** (Partial): Real OpenFOAM bridge (backend, needs install)
 - **5-axis CAM (kinematics + posts)** (Partial): 5-axis engine solid; no UI

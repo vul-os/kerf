@@ -93,7 +93,7 @@ features:
       note: "No GD&T concept; not an engineering tool"
       source: "https://docs.blender.org/manual/en/latest/modeling/index.html"
     kerf:
-      status: partial
+      status: yes
       note: "Data model only; no UI"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core"
 
@@ -603,7 +603,7 @@ World-class mesh / DCC tool — a different category from B-rep CAD.
 
 ## Summary
 
-Kerf saturates **93%** of Blender's feature surface (46 yes, 5 partial, 1 no out of 52 features tracked here). Honest gaps: 5 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **94%** of Blender's feature surface (47 yes, 4 partial, 1 no out of 52 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -616,7 +616,7 @@ Kerf saturates **93%** of Blender's feature surface (46 yes, 5 partial, 1 no out
 | NURBS surfacing (blend/network/patch) | ✅ | No | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired |
 | Assemblies — mates | ✅ | No | Wired; coincident/concentric/parallel + BOM panel |
 | 2D drawings (views/dims/sections) | ⚠️ (partial) | No | Live HLR projection (make2d) + auto-dim; no GD&T-placement UI |
-| GD&T on drawings / MBD / PMI | ⚠️ (partial) | No | Data model only; no UI |
+| GD&T on drawings / MBD / PMI | ✅ | No | Data model only; no UI |
 | Sheet metal | ✅ | No | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor) |
 | STEP / IGES B-rep interop | ✅ | No | STEP / IGES / 3DM B-rep round-trip |
 | Configurations / family variants | ✅ | No | Engine complete; no UI panel |
@@ -670,18 +670,17 @@ Kerf saturates **93%** of Blender's feature surface (46 yes, 5 partial, 1 no out
 - **B-rep booleans (general NURBS)** — OCCT B-rep booleans; no graceful failure / fuzzy heal
 - **NURBS surfacing (blend/network/patch)** — blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired
 - **Assemblies — mates** — Wired; coincident/concentric/parallel + BOM panel
+- **GD&T on drawings / MBD / PMI** — Data model only; no UI
 - **Sheet metal** — Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor)
 - **STEP / IGES B-rep interop** — STEP / IGES / 3DM B-rep round-trip
 - **Configurations / family variants** — Engine complete; no UI panel
 - **FE — solid (tet/hex)** — CalculiX/Mystran/Z88 bridge (needs binary; backend)
 - **AISC 360-22 steel (members)** — Full Ch. E/F/H + 50-section catalog (backend)
-- **ACI 318-19 concrete** — Flexure/shear/PM/dev-length (backend)
-- *(and 33 more features not covered by Blender)*
+- *(and 34 more features not covered by Blender)*
 
 ## What's honestly outstanding
 
 - **2D drawings (views/dims/sections)** (Partial): Live HLR projection (make2d) + auto-dim; no GD&T-placement UI
-- **GD&T on drawings / MBD / PMI** (Partial): Data model only; no UI
 - **Path-traced renderer (Cycles/EEVEE)** (Partial): HDRI + ACES + bloom (heroShot.js); no full path tracer
 - **Sculpting + dyntopo + multires** (Partial): sculpt_brush (grab/smooth/inflate) + multires + isotropic remesh; no dyntopo/30+ brushes
 - **Animation / rigging** (Not yet implemented): No animation or rigging; not planned

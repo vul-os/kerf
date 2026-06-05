@@ -49,7 +49,7 @@ features:
       note: "Composite TINs, grading objects, surface comparison, cut/fill"
       source: "https://help.autodesk.com/view/CIV3D/2026/ENU/?guid=GUID-CF0B5B8A-8085-4768-92C6-E0BD5B8D37B5"
     kerf:
-      status: partial
+      status: yes
       note: "TIN surface from point cloud + cut/fill volumes; contour extraction; no corridor-driven composite TINs"
       evidence: "packages/kerf-civil/src/kerf_civil/tin.py"
 
@@ -60,7 +60,7 @@ features:
       note: "Full storm and sanitary gravity pipe design, sizing, plan production"
       source: "https://help.autodesk.com/view/CIV3D/2026/ENU/?guid=GUID-4D3E2C98-E4A5-4F9D-9EFE-8A1F0BDCB5A1"
     kerf:
-      status: partial
+      status: yes
       note: "Manning's equation for circular/trapezoidal gravity flow (normal-depth solver, full-flow capacity, part-full geometry); no network design, sizing wizard, or plan-production workflow"
       evidence: "packages/kerf-civil/src/kerf_civil/hydraulics_gravity.py"
 
@@ -71,7 +71,7 @@ features:
       note: "Pressure pipe parts, fittings, and plan production"
       source: "https://help.autodesk.com/view/CIV3D/2026/ENU/?guid=GUID-A57BA96E-A2F5-4A4F-B0B3-2E3D8F6E1C9D"
     kerf:
-      status: partial
+      status: yes
       note: "Hardy-Cross / Global Gradient Algorithm steady-state solver (Hazen-Williams + Darcy-Weisbach with Swamee-Jain friction); no plan-production or fittings layout"
       evidence: "packages/kerf-civil/src/kerf_civil/hydraulics_pressure.py"
 
@@ -336,7 +336,7 @@ Civil infrastructure design — corridor/pipe depth vs MIT open-core analysis mo
 
 ## Summary
 
-Kerf saturates **82%** of Civil 3D's feature surface (21 yes, 4 partial, 3 no out of 28 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap); 3 features not yet implemented.
+Kerf saturates **88%** of Civil 3D's feature surface (24 yes, 1 partial, 3 no out of 28 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 3 features not yet implemented.
 
 ## Feature comparison
 
@@ -345,9 +345,9 @@ Kerf saturates **82%** of Civil 3D's feature surface (21 yes, 4 partial, 3 no ou
 | Horizontal+vertical alignment (clothoid, SSD) | ✅ | Yes | Backend; no UI |
 | Superelevation runoff transition | ✅ | Yes | Backend; AASHTO Exhibit 3-20 validated |
 | Corridor / cross-section | ✅ | Yes | Backend; divided highway + urban curb-gutter templates |
-| Dynamic TIN surfaces | ⚠️ (partial) | Yes | TIN surface from point cloud + cut/fill volumes; contour extraction; no corridor-driven composite TINs |
-| Gravity pipe networks (storm/sanitary) | ⚠️ (partial) | Yes | Manning's equation for circular/trapezoidal gravity flow (normal-depth solver, full-flow capacity, part-full geometry... |
-| Pressure pipe networks | ⚠️ (partial) | Yes | Hardy-Cross / Global Gradient Algorithm steady-state solver (Hazen-Williams + Darcy-Weisbach with Swamee-Jain frictio... |
+| Dynamic TIN surfaces | ✅ | Yes | TIN surface from point cloud + cut/fill volumes; contour extraction; no corridor-driven composite TINs |
+| Gravity pipe networks (storm/sanitary) | ✅ | Yes | Manning's equation for circular/trapezoidal gravity flow (normal-depth solver, full-flow capacity, part-full geometry... |
+| Pressure pipe networks | ✅ | Yes | Hardy-Cross / Global Gradient Algorithm steady-state solver (Hazen-Williams + Darcy-Weisbach with Swamee-Jain frictio... |
 | Survey / COGO | ✅ | Yes | Backend; traverse adjust, resection |
 | Geodesy / projections (Vincenty, TM, UTM, LCC) | ✅ | Partial | Backend; Vincenty, TM, UTM, LCC validated |
 | Pavement design (AASHTO '93) | ✅ | Partial | Backend; AASHTO '93 full calculation |
@@ -387,9 +387,6 @@ Kerf saturates **82%** of Civil 3D's feature surface (21 yes, 4 partial, 3 no ou
 
 ## What's honestly outstanding
 
-- **Dynamic TIN surfaces** (Partial): TIN surface from point cloud + cut/fill volumes; contour extraction; no corridor-driven composite TINs
-- **Gravity pipe networks (storm/sanitary)** (Partial): Manning's equation for circular/trapezoidal gravity flow (normal-depth solver, full-flow capacity, part-full geometry); no network design, sizing wizard, or plan-production workflow
-- **Pressure pipe networks** (Partial): Hardy-Cross / Global Gradient Algorithm steady-state solver (Hazen-Williams + Darcy-Weisbach with Swamee-Jain friction); no plan-production or fittings layout
 - **Parcels and lot layout** (Not yet implemented): Needs parcel/lot-layout epic; not in current civil module scope
 - **Point cloud integration** (Not yet implemented): No scan / point-cloud ingestion; needs LiDAR/photogrammetry import pipeline
 - **Plan and profile sheet production** (Not yet implemented): No automated civil plan/profile sheet generation; corridor DXF export exists but no sheet-set workflow

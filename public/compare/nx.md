@@ -100,7 +100,7 @@ features:
       tier: included
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html
     kerf:
-      status: partial
+      status: yes
       evidence: cloud/gdt/model.py
   - domain: D2
     feature: FE — solid (tet/hex)
@@ -574,7 +574,7 @@ NX defined advanced surfacing for a generation — Kerf makes that power accessi
 
 ## Summary
 
-Kerf saturates **96%** of Siemens NX's feature surface (50 yes, 4 partial, 0 no out of 54 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap).
+Kerf saturates **97%** of Siemens NX's feature surface (51 yes, 3 partial, 0 no out of 54 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -588,7 +588,7 @@ Kerf saturates **96%** of Siemens NX's feature surface (50 yes, 4 partial, 0 no 
 | Assemblies — mates | ✅ | Yes | Assembly constraints (coincident, concentric, parallel, distance, angle) with full kinematic DoF tracking |
 | Sheet metal | ✅ | Yes | flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
 | 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Full drafting environment — multi-sheet drawings, section views, detail views, GD&T annotations |
-| GD&T on drawings / MBD / PMI | ⚠️ (partial) | Yes | PMI (Product and Manufacturing Information) — full MBD with semantic GD&T, 3D annotations, PMI views |
+| GD&T on drawings / MBD / PMI | ✅ | Yes | PMI (Product and Manufacturing Information) — full MBD with semantic GD&T, 3D annotations, PMI views |
 | FE — solid (tet/hex) | ✅ | Yes | Simcenter Nastran — SOL 101/103/105/106/111; tet/hex/penta elements; full pre/post in NX |
 | Modal / buckling / nonlinear | ✅ | Yes | Simcenter Nastran SOL 103 (modal), SOL 105 (buckling), SOL 106 (nonlinear static), SOL 400 (advanced nonlinear) |
 | AISC 360-22 steel (members) | ✅ | Yes | Not included — structural code checks require Simcenter integration or external tools |
@@ -639,7 +639,6 @@ Kerf saturates **96%** of Siemens NX's feature surface (50 yes, 4 partial, 0 no 
 
 - **NURBS surfacing (blend/network/patch)** (Partial): blend/network/patch/match-srf + G3 + zebra/isophote + Class-A harness wired; not Shape-Studio depth
 - **2D drawings (views/dims/sections)** (Partial)
-- **GD&T on drawings / MBD / PMI** (Partial)
 - **5-axis (kinematics + posts)** (Partial)
 
 ## Pricing

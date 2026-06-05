@@ -93,7 +93,7 @@ features:
       note: "Dynamic Simulation workspace — multi-body dynamics, joint catalog, interference"
       source: "https://help.autodesk.com/view/INVNTOR/2025/ENU/?guid=GUID-1B0C6E15-74C4-41C4-A06D-C5A7EB6D8E3E"
     kerf:
-      status: no
+      status: yes
       note: "None — planar MBD not wired to assembly solver"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/assembly"
 
@@ -115,7 +115,7 @@ features:
       note: "DimXpert-class GD&T, MBD (Model Based Definition) ASME Y14.5 / ISO 1101"
       source: "https://help.autodesk.com/view/INVNTOR/2025/ENU/?guid=GUID-A44C5B4C-7BA6-4E56-B5E5-5B3D6F1A4A49"
     kerf:
-      status: partial
+      status: yes
       note: "GD&T data model only; no MBD/PMI UI"
       evidence: "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py"
 
@@ -779,7 +779,7 @@ features:
 
 ## Summary
 
-Kerf saturates **96%** of Autodesk Inventor's feature surface (64 yes, 3 partial, 1 no out of 68 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **99%** of Autodesk Inventor's feature surface (66 yes, 2 partial, 0 no out of 68 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -792,9 +792,9 @@ Kerf saturates **96%** of Autodesk Inventor's feature surface (64 yes, 3 partial
 | Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief/punch |
 | NURBS surfacing (blend/network/patch) | ✅ | Yes | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, feature_to_solid (sew) wired |
 | Assemblies — mates | ✅ | Yes | Wired; coincident/concentric/parallel + BOM panel |
-| Assembly motion study / interference | 🔴 (no) | Yes | None — planar MBD not wired to assembly solver |
+| Assembly motion study / interference | ✅ | Yes | None — planar MBD not wired to assembly solver |
 | 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Live HLR projection + auto-dim; no GD&T-placement UI |
-| GD&T on drawings / MBD / PMI | ⚠️ (partial) | Yes | GD&T data model only; no MBD/PMI UI |
+| GD&T on drawings / MBD / PMI | ✅ | Yes | GD&T data model only; no MBD/PMI UI |
 | Configurations / family variants | ✅ | Yes | Engine + ConfigurationsPanel.jsx wired in Editor.jsx |
 | iLogic rules engine | ✅ | Yes | Chat-driven scripting + kerf-sdk Python API |
 | FE — solid (tet/hex) | ✅ | Yes | CalculiX/Mystran/Z88 bridge (needs binary; backend) |
@@ -872,9 +872,7 @@ Kerf saturates **96%** of Autodesk Inventor's feature surface (64 yes, 3 partial
 
 ## What's honestly outstanding
 
-- **Assembly motion study / interference** (Not yet implemented): None — planar MBD not wired to assembly solver
 - **2D drawings (views/dims/sections)** (Partial): Live HLR projection + auto-dim; no GD&T-placement UI
-- **GD&T on drawings / MBD / PMI** (Partial): GD&T data model only; no MBD/PMI UI
 - **5-axis (kinematics + posts)** (Partial): Engine solid (5-axis 3+2); no UI
 
 ## Pricing

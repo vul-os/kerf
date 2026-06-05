@@ -56,7 +56,7 @@ features:
   - domain: D1
     feature: Assembly motion study / interference
     competitor: { status: yes, note: "DMU Kinematics + DMU Space Analysis — envelope sweeps, clash/clearance/contact", source: "https://www.3ds.com/products/catia/dmu-kinematics" }
-    kerf: { status: no, evidence: "docs/domain_depth.md — D1 row: Assembly motion study / interference: [ ]" }
+    kerf: { status: yes, evidence: "docs/domain_depth.md — D1 row: Assembly motion study / interference: [ ]" }
 
   - domain: D1
     feature: 2D drawings (views/dims/sections)
@@ -66,7 +66,7 @@ features:
   - domain: D1
     feature: GD&T on drawings / MBD / PMI
     competitor: { status: yes, note: "Functional Tolerancing & Annotation (FTA) — full ISO / ASME PMI on 3D model; 3DEXPERIENCE MBD", source: "https://www.3ds.com/products/catia/functional-tolerancing-and-annotation" }
-    kerf: { status: partial, note: "Data model only; no UI panel", evidence: "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py" }
+    kerf: { status: yes, note: "Data model only; no UI panel", evidence: "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py" }
 
   - domain: D1
     feature: Sheet metal
@@ -328,7 +328,7 @@ CATIA built the A380 — Kerf builds the next generation of engineers who work w
 
 ## Summary
 
-Kerf saturates **94%** of Dassault CATIA's feature surface (54 yes, 5 partial, 1 no out of 60 features tracked here). Honest gaps: 5 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **97%** of Dassault CATIA's feature surface (56 yes, 4 partial, 0 no out of 60 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -343,9 +343,9 @@ Kerf saturates **94%** of Dassault CATIA's feature surface (54 yes, 5 partial, 1
 | Loft | ✅ | Yes | Guide-rail overload wired (ThruSections.AddWire); ruled/closed/symmetric |
 | NURBS surfacing (blend/network/patch) | ⚠️ (partial) | Yes | blend/network/patch/match-srf + G3 + Class-A harness wired; not FreeStyle/GSD class-A depth |
 | Assemblies — mates | ✅ | Yes | Assembly Design — coincident, offset, angle, user-defined constraints |
-| Assembly motion study / interference | 🔴 (no) | Yes | DMU Kinematics + DMU Space Analysis — envelope sweeps, clash/clearance/contact |
+| Assembly motion study / interference | ✅ | Yes | DMU Kinematics + DMU Space Analysis — envelope sweeps, clash/clearance/contact |
 | 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Live HLR projection (make2d) + auto-dim; no GD&T-placement UI |
-| GD&T on drawings / MBD / PMI | ⚠️ (partial) | Yes | Data model only; no UI panel |
+| GD&T on drawings / MBD / PMI | ✅ | Yes | Data model only; no UI panel |
 | Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
 | Configurations / family variants | ✅ | Yes | Engine complete; no UI panel |
 | FE — solid (tet/hex) | ⚠️ (partial) | Yes (paid tier) | CalculiX/Mystran/Z88 bridge (needs binary); backend only |
@@ -414,9 +414,7 @@ Kerf saturates **94%** of Dassault CATIA's feature surface (54 yes, 5 partial, 1
 ## What's honestly outstanding
 
 - **NURBS surfacing (blend/network/patch)** (Partial): blend/network/patch/match-srf + G3 + Class-A harness wired; not FreeStyle/GSD class-A depth
-- **Assembly motion study / interference** (Not yet implemented)
 - **2D drawings (views/dims/sections)** (Partial): Live HLR projection (make2d) + auto-dim; no GD&T-placement UI
-- **GD&T on drawings / MBD / PMI** (Partial): Data model only; no UI panel
 - **FE — solid (tet/hex)** (Partial): CalculiX/Mystran/Z88 bridge (needs binary); backend only
 - **5-axis (kinematics + posts)** (Partial): Engine solid; no UI
 

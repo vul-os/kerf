@@ -82,6 +82,16 @@ async def register(app: FastAPI, ctx):
         run_assembly_mbd_constraint_enforce,
     )
 
+    # Viewer-ready per-frame timeline (used by AssemblyMotionStudioPanel)
+    from kerf_motion.trajectory_timeline import (
+        motion_frame_timeline_spec, run_motion_frame_timeline,
+    )
+    ctx.tools.register(
+        "motion_frame_timeline",
+        motion_frame_timeline_spec,
+        run_motion_frame_timeline,
+    )
+
     provides = [
         "motion.rigid-body-dynamics",
         "motion.rk4-integrator",
@@ -93,6 +103,7 @@ async def register(app: FastAPI, ctx):
         "motion.assembly-motion-study",
         "motion.mbd-constraint-enforcement",
         "motion.serial-chain-fk",
+        "motion.frame-timeline",
     ]
 
     try:

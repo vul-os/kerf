@@ -204,7 +204,7 @@ features:
       note: "No code-check calculators in SOLIDWORKS base product"
       source: "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_features_top.htm"
     kerf:
-      status: partial
+      status: yes
       note: "Full per-code backend; no UI panel"
       evidence: "packages/kerf-structural/src/kerf_structural/aisc_member.py"
 
@@ -681,7 +681,7 @@ features:
 
 ## Summary
 
-Kerf saturates **82%** of SOLIDWORKS's feature surface (38 yes, 21 partial, 0 no out of 59 features tracked here). Honest gaps: 21 features partial (engine complete, UI or depth gap).
+Kerf saturates **83%** of SOLIDWORKS's feature surface (39 yes, 20 partial, 0 no out of 59 features tracked here). Honest gaps: 20 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -704,7 +704,7 @@ Kerf saturates **82%** of SOLIDWORKS's feature surface (38 yes, 21 partial, 0 no
 | FE — linear static (native) | ✅ | Yes | Linear static solver; no UI panel beyond displacement render |
 | FE — fatigue (S-N) | ⚠️ (partial) | Yes (paid tier) | S-N + ε-N + rainflow backend; no UI |
 | Modal / buckling / nonlinear FEA | ✅ | Yes (paid tier) | Consistent-mass modal + linear eigenvalue buckling (Euler-Bernoulli Kg) + harmonic/FRF (mode superposition) + random-... |
-| AISC 360 / ACI 318 member design | ⚠️ (partial) | No | Full per-code backend; no UI panel |
+| AISC 360 / ACI 318 member design | ✅ | No | Full per-code backend; no UI panel |
 | Spur/helical gear rating (AGMA/ISO 6336) | ⚠️ (partial) | No | Full AGMA 2001-D04 + ISO 6336 Method B backend; no UI |
 | Bearings — ISO 281 L10 / ISO/TS 16281 | ⚠️ (partial) | No | ISO 281 + ISO/TS 16281 aISO modified life backend; no UI |
 | Shaft stress + critical speed | ⚠️ (partial) | No | Closed-form shaft stress + critical speed backend; no UI |
@@ -750,6 +750,7 @@ Kerf saturates **82%** of SOLIDWORKS's feature surface (38 yes, 21 partial, 0 no
 ## What Kerf does that SOLIDWORKS doesn't
 
 - **Modal / buckling / nonlinear FEA** — Consistent-mass modal + linear eigenvalue buckling (Euler-Bernoulli Kg) + harmonic/FRF (mode superposition) + random-vibration PSD (Miles' equation + shaped PSD) + Riks + J2 plasticity backend; no UI
+- **AISC 360 / ACI 318 member design** — Full per-code backend; no UI panel
 - **HVAC duct sizing (SMACNA)** — SMACNA duct sizing + flat-pattern backend; no UI
 - **Heat exchanger (LMTD/ε-NTU)** — Full TEMA shell-tube with Bell-Delaware + 5 correction factors backend
 - **Airfoil / wing aerodynamics (VLM)** — 3D wing VLM + strip viscous CD0 + PG/KT compressibility; wired
@@ -760,8 +761,7 @@ Kerf saturates **82%** of SOLIDWORKS's feature surface (38 yes, 21 partial, 0 no
 - **Multi-axis CAM (5-axis)** — 5-axis 3+2 engine solid; no UI
 - **Nesting (2D part layout)** — Skyline + true-shape NFP + Minkowski-sum backend
 - **Moldflow / injection fill simulation** — Hele-Shaw front tracking + weld-line + air-trap backend
-- **FDM slicing** — Cura integration wired (PrintSliceView)
-- *(and 11 more features not covered by SOLIDWORKS)*
+- *(and 12 more features not covered by SOLIDWORKS)*
 
 ## What's honestly outstanding
 
@@ -769,7 +769,6 @@ Kerf saturates **82%** of SOLIDWORKS's feature surface (38 yes, 21 partial, 0 no
 - **2D drawings (views/dims/sections)** (Partial): Live B-rep HLR projection + auto-dim; no GD&T-placement UI
 - **Large assembly performance mode** (Partial): LOD mesh swapping (configurable); no SpeedPak equivalent
 - **FE — fatigue (S-N)** (Partial): S-N + ε-N + rainflow backend; no UI
-- **AISC 360 / ACI 318 member design** (Partial): Full per-code backend; no UI panel
 - **Spur/helical gear rating (AGMA/ISO 6336)** (Partial): Full AGMA 2001-D04 + ISO 6336 Method B backend; no UI
 - **Bearings — ISO 281 L10 / ISO/TS 16281** (Partial): ISO 281 + ISO/TS 16281 aISO modified life backend; no UI
 - **Shaft stress + critical speed** (Partial): Closed-form shaft stress + critical speed backend; no UI

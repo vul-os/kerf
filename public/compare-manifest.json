@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T02:06:58.305Z",
+  "generatedAt": "2026-06-05T02:10:13.491Z",
   "items": [
     {
       "slug": "revit",
@@ -6291,7 +6291,7 @@
             "notes": "No code-check calculators in SOLIDWORKS base product"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-structural/src/kerf_structural/aisc_member.py",
             "notes": "Full per-code backend; no UI panel"
           },

@@ -23,6 +23,9 @@ async def register(app: FastAPI, ctx):
         landscape_wall_spec, run_landscape_retaining_wall,
         # irrigation schedule (coverage sweep 2026-05-25 — was in tools.py but unregistered)
         landscape_irrigation_spec, run_landscape_irrigation,
+        # sprinkler layout + zone flow demand (Head-to-head per Hunter/Rain Bird IDM)
+        landscape_layout_sprinkler_spec, run_landscape_layout_sprinkler,
+        landscape_flow_demand_spec, run_landscape_flow_demand,
         # plant species catalog with USDA zones + Dirr data
         landscape_lookup_plant_spec, run_landscape_lookup_plant,
         landscape_filter_plants_spec, run_landscape_filter_plants,
@@ -38,6 +41,16 @@ async def register(app: FastAPI, ctx):
         "landscape_irrigation_schedule",
         landscape_irrigation_spec,
         run_landscape_irrigation,
+    )
+    ctx.tools.register(
+        "landscape_layout_sprinkler",
+        landscape_layout_sprinkler_spec,
+        run_landscape_layout_sprinkler,
+    )
+    ctx.tools.register(
+        "landscape_flow_demand",
+        landscape_flow_demand_spec,
+        run_landscape_flow_demand,
     )
     ctx.tools.register(
         "landscape_lookup_plant",
@@ -56,7 +69,9 @@ async def register(app: FastAPI, ctx):
         "landscape.planting",
         "landscape.hardscape",
         "landscape.irrigation",
+        "landscape.irrigation_layout",
         "landscape.plant_catalog",
+        "landscape.plant_schedule",
     ]
 
     try:

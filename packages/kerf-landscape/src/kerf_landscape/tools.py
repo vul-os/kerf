@@ -641,3 +641,174 @@ async def run_landscape_flow_demand(ctx: ProjectCtx, args: bytes) -> str:
     if not result.get("ok"):
         return err_payload(result.get("reason", "failed"), "ERROR")
     return ok_payload(result)
+
+
+# ---------------------------------------------------------------------------
+# landscape_lookup_plant
+# ---------------------------------------------------------------------------
+
+_PLANT_DISCLAIMER = (
+    "NOT USDA certified — for design assistance only. "
+    "Data derived from Dirr MWLP 6th ed. (2009), USDA PHZM (2023), "
+    "Missouri Botanical Garden. Verify with local Extension Service."
+)
+
+landscape_lookup_plant_spec = ToolSpec(
+    name="landscape_lookup_plant",
+    description=(
+        "Look up a landscape plant species by common or scientific name. "
+        "Returns full design-specification attributes: mature dimensions, USDA zone "
+        "range, light/water requirements, bloom colour, deer resistance, and notes. "
+        "Data: Dirr Manual of Woody Landscape Plants 6th ed. (2009), USDA PHZM (2023). "
+        "NOT USDA certified — for design assistance only."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string",
+                "description": (
+                    "Common name (e.g. 'red maple') or scientific name "
+                    "(e.g. 'Acer rubrum').  Case-insensitive."
+                ),
+            },
+        },
+        "required": ["name"],
+    },
+)
+
+
+@register(landscape_lookup_plant_spec)
+async def run_landscape_lookup_plant(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    name = a.get("name")
+    if not name:
+        return err_payload("name is required", "BAD_ARGS")
+
+    from kerf_landscape.plant_catalog import lookup_plant
+
+    sp = lookup_plant(str(name))
+    if sp is None:
+        return err_payload(
+            f"No plant found for '{name}' — try the scientific or full common name.",
+            "NOT_FOUND",
+        )
+
+    result = {
+        "ok": True,
+        "scientific_name": sp.scientific_name,
+        "common_name": sp.common_name,
+        "kind": sp.kind,
+        "mature_height_m": sp.mature_height_m,
+        "mature_spread_m": sp.mature_spread_m,
+        "growth_rate_cm_per_year": sp.growth_rate_cm_per_year,
+        "usda_zones_min": sp.usda_zones_min,
+        "usda_zones_max": sp.usda_zones_max,
+        "light": sp.light,
+        "water": sp.water,
+        "soil_type": sp.soil_type,
+        "bloom_color": sp.bloom_color,
+        "deer_resistant": sp.deer_resistant,
+        "notes": sp.notes,
+        "regions": list(sp.regions),
+        "pollinator_value": sp.pollinator_value,
+        "disclaimer": _PLANT_DISCLAIMER,
+    }
+    return ok_payload(result)
+
+
+# ---------------------------------------------------------------------------
+# landscape_filter_plants
+# ---------------------------------------------------------------------------
+
+landscape_filter_plants_spec = ToolSpec(
+    name="landscape_filter_plants",
+    description=(
+        "Filter the native plant catalog by site conditions. "
+        "Returns species matching ALL supplied criteria (AND logic). "
+        "Filters: usda_zone (1-13), light (full_sun/partial_shade/shade), "
+        "water (low/medium/high), kind (deciduous_tree/evergreen/shrub/perennial/"
+        "grass/groundcover), deer_resistant (bool). "
+        "Data: Dirr MWLP 6th ed. (2009). NOT USDA certified."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "usda_zone": {
+                "type": "integer",
+                "description": "USDA hardiness zone (1-13). Only return species tolerant at this zone.",
+            },
+            "light": {
+                "type": "string",
+                "enum": ["full_sun", "partial_shade", "shade"],
+                "description": "Light requirement filter.",
+            },
+            "water": {
+                "type": "string",
+                "enum": ["low", "medium", "high"],
+                "description": "Water demand filter (once established).",
+            },
+            "kind": {
+                "type": "string",
+                "enum": ["deciduous_tree", "evergreen", "shrub", "perennial", "grass", "groundcover"],
+                "description": "Plant category filter.",
+            },
+            "deer_resistant": {
+                "type": "boolean",
+                "description": "If true, return only deer-resistant species.",
+            },
+        },
+    },
+)
+
+
+@register(landscape_filter_plants_spec)
+async def run_landscape_filter_plants(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as e:
+        return err_payload(f"invalid args: {e}", "BAD_ARGS")
+
+    from kerf_landscape.plant_catalog import filter_plants
+
+    usda_zone = int(a["usda_zone"]) if a.get("usda_zone") is not None else None
+    light = str(a["light"]) if a.get("light") else None
+    water = str(a["water"]) if a.get("water") else None
+    kind = str(a["kind"]) if a.get("kind") else None
+    deer_resistant = bool(a["deer_resistant"]) if a.get("deer_resistant") is not None else None
+
+    plants = filter_plants(
+        usda_zone=usda_zone,
+        light=light,
+        water=water,
+        kind=kind,
+        deer_resistant=deer_resistant,
+    )
+
+    result = {
+        "ok": True,
+        "count": len(plants),
+        "plants": [
+            {
+                "scientific_name": sp.scientific_name,
+                "common_name": sp.common_name,
+                "kind": sp.kind,
+                "mature_height_m": sp.mature_height_m,
+                "mature_spread_m": sp.mature_spread_m,
+                "usda_zones_min": sp.usda_zones_min,
+                "usda_zones_max": sp.usda_zones_max,
+                "light": sp.light,
+                "water": sp.water,
+                "bloom_color": sp.bloom_color,
+                "deer_resistant": sp.deer_resistant,
+                "pollinator_value": sp.pollinator_value,
+            }
+            for sp in plants
+        ],
+        "disclaimer": _PLANT_DISCLAIMER,
+    }
+    return ok_payload(result)

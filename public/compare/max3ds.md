@@ -298,7 +298,7 @@ Archviz & game-art DCC — a different category from B-rep CAD.
 
 ## Summary
 
-Kerf saturates **100%** of Autodesk 3ds Max's feature surface (28 yes, 0 partial, 0 no out of 28 features tracked here).
+Kerf saturates **100%** of Autodesk 3ds Max's feature surface (28 yes, 0 partial, 0 no out of 28 features tracked here). Kerf covers the full tracked feature set for Autodesk 3ds Max; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -329,7 +329,7 @@ Kerf saturates **100%** of Autodesk 3ds Max's feature surface (28 yes, 0 partial
 | Acoustics — room acoustics and ISO 9613 | ✅ | No | ISO 9613 propagation, RT60, image-source room IR, SEA (backend) |
 | Verticals — jewelry design | ✅ | Partial | 41-module jewelry suite: ring v4, gemstones v2, settings v3/v4, chain v2 |
 | Verticals — BIM / architectural (IFC) | ✅ | Partial | Revit-comparable BIM engine: walls/slabs/framing/stairs + IFC4 export |
-| Verticals — archviz creative workflow | ✅ | Yes | Poisson-disk/grid scatter + proxy asset catalogue (trees/shrubs/people/cars/furniture); note: proxy assets, not a photoreal marketplace like Forest Pack/RailClone |
+| Verticals — archviz creative workflow | ✅ | Yes | Procedural Poisson-disk/grid scatter (density, seed, jitter, slope/altitude masks, exclusion zones, collision avoidan... |
 | Cost / materials — should-cost and LCA | ✅ | No | Should-cost (Boothroyd-Dewhurst 6 processes), full ISO 14040/44 LCA (backend) |
 | Cost / materials — material selection (Ashby) | ✅ | No | 200-material Ashby selector (14 families) + Pareto frontier (backend) |
 

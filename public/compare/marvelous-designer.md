@@ -126,7 +126,7 @@ The industry-standard 3D cloth simulation tool — compared honestly against MIT
 
 ## Summary
 
-Kerf saturates **90%** of Marvelous Designer's feature surface (8 yes, 2 partial, 0 no out of 10 features tracked here). Honest gaps: 2 features partial (engines complete, depth or method gaps remain).
+Kerf saturates **90%** of Marvelous Designer's feature surface (8 yes, 2 partial, 0 no out of 10 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -139,7 +139,7 @@ Kerf saturates **90%** of Marvelous Designer's feature surface (8 yes, 2 partial
 | Fabric property library (weight, stiffness, friction) | ✅ | Yes | Fabric properties engine: weight, stiffness, bend, coefficient of friction |
 | Pattern grading (size run) | ✅ | Yes | ASTM D5219 + ISO 8559-2 grade rules across blocks + size-run export |
 | Garment-fit stress/strain visualization | ✅ | Yes | Mass-spring tension fields computed; no garment-on-avatar fit stress/pressure heatmap UI |
-| Soft-body sim on rigged characters | ⚠️ (partial) | Yes | LBS rig (17 joints) + FK pose sequence + per-frame mass-spring cloth on deformed body; gaps: LBS only, no IK/mocap, no self-collision |
+| Soft-body sim on rigged characters | ⚠️ (partial) | Yes | cloth_sim_on_rigged_character: LBS skeletal rig (17 joints — spine/shoulders/elbows/hips/knees) + Gaussian envelope s... |
 | DXF / OBJ pattern + mesh export | ✅ | Yes | DXF (pattern), SVG, OBJ (3D drape), CSV (grade rules) |
 | Open-source core / chat-native | ✅ | No | MIT open-core; chat-native garment design + JSON-RPC LLM tools + kerf-sdk |
 
@@ -149,8 +149,8 @@ Kerf saturates **90%** of Marvelous Designer's feature surface (8 yes, 2 partial
 
 ## What's honestly outstanding
 
-- **Avatar / parametric body form** (Partial): CAESAR body-form (ISO 8559-1 landmarks, ellipsoidal cross-sections) + multi-panel auto-arrangement (garment_auto_arrange) + mass-spring drape with mesh-triangle collision (Bridson 2003) + per-vertex fit-tension heatmap. Honest gaps: no IK joint posing, no AI pose generator, no inter-panel self-collision.
-- **Soft-body sim on rigged characters** (Partial): LBS skeletal rig (17 joints) + Gaussian envelope skinning + FK pose sequences (keyframes → linear interpolation) + per-frame Provot mass-spring cloth on Bridson-collided deformed body. Honest gaps: linear-blend skinning only (no dual-quaternion, no corrective shapes); FK only (no IK, no mocap); no cloth-to-cloth self-collision; kinematic body; no GPU.
+- **Avatar / parametric body form** (Partial): CAESAR body-form (ISO 8559-1 landmarks, ellipsoidal cross-sections) + multi-panel auto-arrangement (garment_auto_arrange) + mass-spring drape with mesh-triangle collision (Bridson 2003) + per-vertex fit-tension heatmap. Honest gaps: no IK joint posing, no AI pose generator, no rigged/animated character, no inter-panel self-collision.
+- **Soft-body sim on rigged characters** (Partial): cloth_sim_on_rigged_character: LBS skeletal rig (17 joints — spine/shoulders/elbows/hips/knees) + Gaussian envelope skinning weights on CAESAR body-form mesh; pose avatar by joint rotations (FK only); supports pose sequences (keyframes → linear interpolation); per-frame Provot (1995) mass-spring cloth solver against the deformed body collider (Bridson 2003 mesh-triangle collision). Honest gaps: linear-blend skinning only (no dual-quaternion, no corrective blend shapes); FK animation only (no IK, no mocap); no cloth-to-cloth self-collision; kinematic body (cloth does not push back on character); no GPU acceleration.
 
 ## Pricing
 

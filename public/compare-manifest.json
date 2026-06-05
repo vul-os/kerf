@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T17:25:31.217Z",
+  "generatedAt": "2026-06-05T17:40:20.058Z",
   "items": [
     {
       "slug": "revit",
@@ -15282,9 +15282,9 @@
             "notes": "Plasma + Electric Discharge modules (arcs/sparks/coronas, v6.3)"
           },
           "kerf": {
-            "status": "no",
-            "evidence": "",
-            "notes": "No plasma / gas-discharge (ionization transport) modelling"
+            "status": "partial",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/plasma/drift_diffusion.py",
+            "notes": "1-D DC glow-discharge drift-diffusion fluid model (Hagelaar & Pitchford 2005): coupled electron + ion continuity with drift (μE) + diffusion (D∇n) + Townsend ionisation source (α|μ_e E|n_e); Poisson equation for self-consistent E-field (∇·(εE)=q(n_i−n_e)); Scharfetter-Gummel SG flux; Paschen breakdown curve. Tool: plasma_discharge_simulate (gas, pressure, gap, voltage → density profiles, field, current, V_bd). HONEST LIMITATIONS: drift-diffusion fluid model only — not kinetic/PIC; local-field approximation (no electron energy equation); single gas species; no photoionisation, metastable kinetics, attachment, or recombination; DC only (no RF/ICP/DBD); not validated against COMSOL Plasma module outputs; design-exploration accuracy only."
           },
           "name": "Plasma / electric discharge"
         },
@@ -17635,9 +17635,9 @@
             "notes": "Purpose-built archviz: Chaos Cosmos assets, Forest Pack, RailClone, material libraries"
           },
           "kerf": {
-            "status": "no",
-            "evidence": "",
-            "notes": "No archviz asset libraries or procedural scatter/population tools"
+            "status": "yes",
+            "evidence": "packages/kerf-render/src/kerf_render/archviz_scatter.py;packages/kerf-render/src/kerf_render/archviz_assets.py",
+            "notes": "Procedural Poisson-disk/grid scatter (density, seed, jitter, slope/altitude masks, exclusion zones, collision avoidance) + built-in proxy asset catalogue (trees/shrubs/people/cars/furniture); note: proxy/placeholder assets + scatter engine, not a photoreal asset marketplace like Forest Pack/RailClone/Chaos Cosmos"
           },
           "name": "Verticals — archviz creative workflow"
         },
@@ -17786,9 +17786,9 @@
             "notes": "Soft-body simulation on unrigged 3D characters (2025.1)"
           },
           "kerf": {
-            "status": "no",
-            "evidence": "",
-            "notes": "No rigged-character soft-body / animation cloth simulation"
+            "status": "partial",
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/cloth_sim_on_rigged.py",
+            "notes": "cloth_sim_on_rigged_character: LBS skeletal rig (17 joints — spine/shoulders/elbows/hips/knees) + Gaussian envelope skinning weights on CAESAR body-form mesh; pose avatar by joint rotations (FK only); supports pose sequences (keyframes → linear interpolation); per-frame Provot (1995) mass-spring cloth solver against the deformed body collider (Bridson 2003 mesh-triangle collision). Honest gaps: linear-blend skinning only (no dual-quaternion, no corrective blend shapes); FK animation only (no IK, no mocap); no cloth-to-cloth self-collision; kinematic body (cloth does not push back on character); no GPU acceleration."
           },
           "name": "Soft-body sim on rigged characters"
         },
@@ -18892,9 +18892,9 @@
             "notes": "APACHE HVAC: full plant loop + air handling unit control sequences"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-hvac/src/kerf_hvac/ahri_catalogue.py",
-            "notes": "HVAC plant simulation (chiller/boiler/VAV) + AHRI catalogue shipped; not APACHE-HVAC full control-sequence depth"
+            "status": "yes",
+            "evidence": "packages/kerf-hvac/src/kerf_hvac/airside.py",
+            "notes": "AHU air-side model: ASHRAE HOF 2021 psychrometrics, cooling coil (ADP/bypass-factor, sensible+latent), heating coil (effectiveness-NTU), supply/return fans (ΔP·Q/η), economizer (dry-bulb + enthalpy free-cooling), VAV terminal boxes (load-proportional flow modulation), duct static pressure; coupled to chiller/boiler plant. Gaps: no detailed multi-branch duct-network solver; no transient control sequences (APACHE-HVAC depth)."
           }
         },
         {

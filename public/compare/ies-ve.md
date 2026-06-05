@@ -105,7 +105,7 @@ Integrated building performance simulation — IES VE vs MIT open-core.
 
 ## Summary
 
-Kerf saturates **94%** of IES VE (Virtual Environment)'s feature surface (7 yes, 1 partial, 0 no out of 8 features tracked here). Honest gaps: 1 feature partial (3-D room CFD not wired).
+Kerf saturates **94%** of IES VE (Virtual Environment)'s feature surface (7 yes, 1 partial, 0 no out of 8 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -116,9 +116,9 @@ Kerf saturates **94%** of IES VE (Virtual Environment)'s feature surface (7 yes,
 | Part-load efficiency curves (AHRI-certified) | ✅ | Yes | AHRI-certified part-load curves at 25/50/75/100% load from directory listings |
 | Daylighting + solar radiation simulation | ✅ | Yes | Daylighting (CIE S 011 sky) + lux/luminance sim (luminance_lux_sim.py) |
 | CFD internal airflow (IESVE MicroFlo) | ⚠️ (partial) | Yes | 2-D projection Navier-Stokes shipped; full 3-D room CFD not yet wired |
-| Full HVAC plant + air-side system modelling | ✅ | Yes | AHU air-side model: ASHRAE HOF 2021 psychrometrics, cooling coil (ADP/bypass-factor, sensible+latent), heating coil (effectiveness-NTU), supply/return fans (ΔP·Q/η), economizer (dry-bulb + enthalpy free-cooling), VAV terminal boxes, duct static pressure; coupled to chiller/boiler plant. Gaps: no multi-branch duct-network solver; no transient control sequences. |
+| Full HVAC plant + air-side system modelling | ✅ | Yes | AHU air-side model: ASHRAE HOF 2021 psychrometrics, cooling coil (ADP/bypass-factor, sensible+latent), heating coil (... |
 | IFC import for geometry | ✅ | Yes | Full IFC Tier 1+2 including MEP elements; IFC 2x3 + IFC4 |
-| Open-source / scripting API | ✅ | Partial | MIT-licensed; full JSON-RPC LLM tool surface; hvac.airside_system_model wired |
+| Open-source / scripting API | ✅ | Partial | MIT-licensed; full JSON-RPC LLM tool surface; hvac.equipment_select wired |
 
 ## What's honestly outstanding
 

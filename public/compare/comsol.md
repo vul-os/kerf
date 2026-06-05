@@ -126,7 +126,7 @@ General-purpose multiphysics simulation — compared honestly against MIT open-c
 
 ## Summary
 
-Kerf saturates **90%** of COMSOL Multiphysics's feature surface (9 yes, 1 partial, 0 no out of 10 features tracked here). Honest gaps: 1 feature partially implemented (plasma / gas-discharge: drift-diffusion fluid model only, not kinetic/PIC).
+Kerf saturates **95%** of COMSOL Multiphysics's feature surface (9 yes, 1 partial, 0 no out of 10 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -140,7 +140,7 @@ Kerf saturates **90%** of COMSOL Multiphysics's feature surface (9 yes, 1 partia
 | Electromagnetics (electrostatics / magnetostatics / RF) | ✅ | Yes | P1 triangular FEM electrostatics (∇·(ε∇φ)=−ρ, Dirichlet + Neumann BCs, E-field, capacitance, energy) + magnetostatics... |
 | Chemical / reacting flow | ✅ | Yes | General N-species finite-rate Arrhenius chemistry: solves ∂(ρYk)/∂t + ∇·(ρuYk) = ∇·(ρDk∇Yk) + ωk for N species; user-... |
 | Design optimization (topology / parametric) | ✅ | Yes | SIMP density-based topology optimization + Ashby multi-objective |
-| Plasma / electric discharge | 🟡 (partial) | Yes | 1-D DC glow-discharge drift-diffusion fluid model (Hagelaar & Pitchford 2005): coupled e⁻/ion continuity + Townsend ionisation + Poisson self-consistent field; Paschen breakdown curve; tool: plasma_discharge_simulate. LIMITATIONS: drift-diffusion only (not kinetic/PIC); local-field approx; DC only; single gas species; not validated vs COMSOL Plasma module |
+| Plasma / electric discharge | ⚠️ (partial) | Yes | 1-D DC glow-discharge drift-diffusion fluid model (Hagelaar & Pitchford 2005): coupled electron + ion continuity with... |
 | Open-source core / chat-native | ✅ | No | MIT open-core; chat-native multiphysics setup + JSON-RPC LLM tools + kerf-sdk |
 
 ## What Kerf does that COMSOL Multiphysics doesn't
@@ -149,7 +149,7 @@ Kerf saturates **90%** of COMSOL Multiphysics's feature surface (9 yes, 1 partia
 
 ## What's honestly outstanding
 
-- **Plasma / electric discharge** (Partial — drift-diffusion fluid model only): 1-D DC glow-discharge solver implemented (Townsend ionisation + Poisson field + Paschen curve). Missing vs COMSOL Plasma module: kinetic/PIC particle methods; electron energy equation self-consistency; RF/ICP/DBD modes; photoionisation; multi-species chemistry; 2-D/3-D geometry; arc/corona/spark modes. Use for design-exploration trend analysis only.
+- **Plasma / electric discharge** (Partial): 1-D DC glow-discharge drift-diffusion fluid model (Hagelaar & Pitchford 2005): coupled electron + ion continuity with drift (μE) + diffusion (D∇n) + Townsend ionisation source (α|μ_e E|n_e); Poisson equation for self-consistent E-field (∇·(εE)=q(n_i−n_e)); Scharfetter-Gummel SG flux; Paschen breakdown curve. Tool: plasma_discharge_simulate (gas, pressure, gap, voltage → density profiles, field, current, V_bd). HONEST LIMITATIONS: drift-diffusion fluid model only — not kinetic/PIC; local-field approximation (no electron energy equation); single gas species; no photoionisation, metastable kinetics, attachment, or recombination; DC only (no RF/ICP/DBD); not validated against COMSOL Plasma module outputs; design-exploration accuracy only.
 
 ## Pricing
 

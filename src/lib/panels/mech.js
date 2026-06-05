@@ -6,6 +6,7 @@
 // Panels wired here:
 //   StructuralMemberPanel  — AISC 360-22 + ACI 318-19 member design
 //   SeismicRSAPanel        — ASCE 7-22 RSA + Newmark-β time history
+//   RebarDetailPanel       — BS 8666:2020 3D rebar placement + bending schedule + shop drawing
 //   BearingLifePanel       — ISO 281 / ISO/TS 16281 bearing life
 //   GearRatingPanel        — AGMA 2001-D04 / ISO 6336 gear rating
 //   ShaftStressPanel       — ASME B106.1M shaft stress + critical speed
@@ -30,6 +31,13 @@ export default [
     exts: ['.seismic'],
     load: () => import('../../components/structural/SeismicRSAPanel.jsx'),
     label: 'Seismic RSA',
+  },
+  {
+    id: 'rebar_detail',
+    kinds: ['rebar_detail', 'rc_rebar', 'rebar_schedule'],
+    exts: ['.rebar', '.bbs'],
+    load: () => import('../../components/structural/RebarDetailPanel.jsx'),
+    label: 'RC Rebar Detailing (BS 8666)',
   },
   {
     id: 'bearing_life',

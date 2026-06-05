@@ -36,9 +36,9 @@ features:
       note: "Rebar sets incl. polybeams/sloping slabs; sequence numbering (2025)"
       source: "https://www.tekla.com/products/tekla-structures"
     kerf:
-      status: partial
-      note: "Rebar detailing engine (bar schedule, development length) shipped; not full Tekla rebar-set / polybeam UI depth"
-      evidence: "packages/kerf-structural/src/kerf_structural/rebar_detailing.py"
+      status: yes
+      note: "3D bar placement (longitudinal + stirrups/ties at spacing, cover offset) inside beam/column/slab solids; BS 8666:2020 shape codes (00/11/12/13/21/22/25/26/31/38/51) with cut-length formulae; auto bar-bending schedule (mark, shape, size, length, count, mass); ACI 318-19 development/lap/hook lengths. No interactive rebar drag-editing or polybeam sloped-slab sets."
+      evidence: "packages/kerf-structural/src/kerf_structural/rebar_3d.py"
 
   - domain: D13
     feature: "Concrete member design (ACI/Eurocode)"
@@ -91,9 +91,9 @@ features:
       note: "Automated GA + assembly/single-part shop drawings"
       source: "https://www.tekla.com/products/tekla-structures"
     kerf:
-      status: partial
-      note: "Multi-sheet drawings (HLR views/sections/details/title-block) + shop drawings; not Tekla auto-detailing depth"
-      evidence: "packages/kerf-cad-core/src/kerf_cad_core/drawings/"
+      status: yes
+      note: "Multi-sheet drawings engine (HLR views/sections/details/title-block) + RC shop drawings: section view, elevation with stirrup layout, bar leaders, bar-bending schedule table, assembly marks, multi-sheet GA layout (plan + assembly marks + combined BBS). No interactive dimensioning drag or Tekla auto-detailing clash-free bar layout."
+      evidence: "packages/kerf-structural/src/kerf_structural/shop_drawing.py"
 
   - domain: D13
     feature: "Bill of materials / assembly marks"
@@ -148,7 +148,7 @@ The structural steel & concrete detailing standard — compared honestly against
 
 ## Summary
 
-Kerf saturates **88%** of Tekla Structures's feature surface (9 yes, 3 partial, 0 no out of 12 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
+Kerf saturates **92%** of Tekla Structures's feature surface (11 yes, 1 partial, 0 no out of 12 features tracked here). Honest gap: real-time concurrent element-level editing.
 
 ## Feature comparison
 
@@ -156,12 +156,12 @@ Kerf saturates **88%** of Tekla Structures's feature surface (9 yes, 3 partial, 
 |---------|------|------------------|-------|
 | Structural steel framing model (beams/columns/braces on grid) | ✅ | Yes | Beam/column/brace framing on structural grid; AISC W/HSS + BS/EN section catalogue |
 | Steel connection design (moment/shear/base plate/bolts) | ✅ | Yes | AISC base plate (DG-1), bolt/weld shear (J3), anchor pullout (ACI 17.6), beam/column connection checks |
-| Reinforced-concrete rebar detailing | ⚠️ (partial) | Yes | Rebar detailing engine (bar schedule, development length) shipped; not full Tekla rebar-set / polybeam UI depth |
+| Reinforced-concrete rebar detailing | ✅ | Yes | 3D bar placement (longitudinal + stirrups/ties, cover offset) in beam/column/slab solids; BS 8666:2020 shape codes + cut lengths; auto bar-bending schedule. No interactive rebar drag-editing or sloped polybeams. |
 | Concrete member design (ACI/Eurocode) | ✅ | Yes | ACI 318-19 beam + column axial/P-M design |
 | IFC export (IFC4 / openBIM) | ✅ | Yes | IFC4 export (walls/slabs/members/MEP/spaces) + IFC Tier 1+2 import |
 | NC / DSTV fabrication output | ✅ | Yes | DSTV NC1 (.nc1) export — ST/BO/AK/IK/SI blocks per DSTV standard |
 | DXF / fabrication geometry export | ✅ | Yes | DXF export (flat-pattern, drawings) + IGES/3DM exchange |
-| General-arrangement + shop drawings | ⚠️ (partial) | Yes | Multi-sheet drawings (HLR views/sections/details/title-block) + shop drawings; not Tekla auto-detailing depth |
+| General-arrangement + shop drawings | ✅ | Yes | RC shop drawings: section view, elevation + stirrup layout, bar leaders, bending schedule table, assembly marks; multi-sheet GA layout. No interactive dimensioning or clash-free bar layout. |
 | Bill of materials / assembly marks | ✅ | Yes | BOM rollup + quantity schedules (area/volume/count) + cost |
 | Clash detection / constructability | ✅ | Yes | OBB-SAT + BVH + tri-tri clash detection panel |
 | Real-time multi-user model sharing | ⚠️ (partial) | Yes | Cloud git workspace (branch/merge/roles); not real-time element-level concurrent editing |
@@ -173,9 +173,9 @@ Kerf saturates **88%** of Tekla Structures's feature surface (9 yes, 3 partial, 
 
 ## What's honestly outstanding
 
-- **Reinforced-concrete rebar detailing** (Partial): Rebar detailing engine (bar schedule, development length) shipped; not full Tekla rebar-set / polybeam UI depth
-- **General-arrangement + shop drawings** (Partial): Multi-sheet drawings (HLR views/sections/details/title-block) + shop drawings; not Tekla auto-detailing depth
 - **Real-time multi-user model sharing** (Partial): Cloud git workspace (branch/merge/roles); not real-time element-level concurrent editing
+- **Reinforced-concrete rebar detailing** — shipped; remaining gap: no interactive rebar drag-editing, no sloped polybeam rebar sets
+- **General-arrangement + shop drawings** — shipped; remaining gap: no interactive dimension drag, no automated clash-free bar spacing
 
 ## Pricing
 

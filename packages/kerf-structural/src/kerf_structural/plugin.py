@@ -78,6 +78,16 @@ async def register(app: FastAPI, ctx):
     from kerf_structural.dstv_nc1_tool import dstv_nc1_spec, run_dstv_nc1
     ctx.tools.register("steel_export_dstv_nc1", dstv_nc1_spec, run_dstv_nc1)
 
+    # 3D rebar detailing + bending schedule + shop/GA drawings
+    from kerf_structural.rebar_3d_tools import (
+        rebar_detail_member_spec, run_rebar_detail_member,
+        rebar_bending_schedule_spec, run_rebar_bending_schedule,
+        shop_drawing_generate_spec, run_shop_drawing_generate,
+    )
+    ctx.tools.register("rebar_detail_member",    rebar_detail_member_spec,    run_rebar_detail_member)
+    ctx.tools.register("rebar_bending_schedule", rebar_bending_schedule_spec, run_rebar_bending_schedule)
+    ctx.tools.register("shop_drawing_generate",  shop_drawing_generate_spec,  run_shop_drawing_generate)
+
     provides = [
         "structural.rc-beam",
         "structural.steel-beam",
@@ -96,6 +106,9 @@ async def register(app: FastAPI, ctx):
         "structural.aci-column-axial",
         "structural.aci-column-pm",
         "structural.dstv-nc1-export",
+        "structural.rebar-3d-placement",
+        "structural.bending-schedule",
+        "structural.shop-drawing",
     ]
 
     try:

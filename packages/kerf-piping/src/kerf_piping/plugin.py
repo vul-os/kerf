@@ -4,7 +4,9 @@ kerf-piping plugin entry-point.
 Registers:
   - LLM tools: piping_route_isometric, piping_import_pid, piping_export_svg,
                piping_pipe_spec_check, piping_min_wall_thickness,
-               piping_recommend_schedule
+               piping_recommend_schedule, piping_pressure_drop,
+               piping_b16_fittings, piping_pipe_stress,
+               piping_route_3d, piping_catalogue_component
 """
 
 from __future__ import annotations
@@ -25,6 +27,8 @@ async def register(app: FastAPI, ctx):
         piping_pressure_drop_spec, run_piping_pressure_drop,
         piping_b16_fittings_spec, run_piping_b16_fittings,
         piping_pipe_stress_spec, run_piping_pipe_stress,
+        piping_route_3d_spec, run_piping_route_3d,
+        piping_catalogue_component_spec, run_piping_catalogue_component,
     )
     ctx.tools.register(
         "piping_route_isometric",
@@ -71,29 +75,41 @@ async def register(app: FastAPI, ctx):
         piping_pipe_stress_spec,
         run_piping_pipe_stress,
     )
+    ctx.tools.register(
+        "piping_route_3d",
+        piping_route_3d_spec,
+        run_piping_route_3d,
+    )
+    ctx.tools.register(
+        "piping_catalogue_component",
+        piping_catalogue_component_spec,
+        run_piping_catalogue_component,
+    )
 
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="piping",
-            version="0.2.0",
+            version="0.3.0",
             provides=[
                 "piping.pid", "piping.isometric", "piping.dxf",
                 "piping.b31_3", "piping.b31_1_wall_thickness",
                 "piping.pressure_drop", "piping.b16_catalogue",
                 "piping.b31_pipe_stress",
+                "piping.route_3d", "piping.catalogue_3d",
             ],
             depends=[],
         )
     except ImportError:
         return {
             "name": "piping",
-            "version": "0.2.0",
+            "version": "0.3.0",
             "provides": [
                 "piping.pid", "piping.isometric", "piping.dxf",
                 "piping.b31_3", "piping.b31_1_wall_thickness",
                 "piping.pressure_drop", "piping.b16_catalogue",
                 "piping.b31_pipe_stress",
+                "piping.route_3d", "piping.catalogue_3d",
             ],
             "depends": [],
         }

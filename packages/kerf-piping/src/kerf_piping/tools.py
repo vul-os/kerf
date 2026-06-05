@@ -1087,3 +1087,280 @@ async def run_piping_pipe_stress(args: dict[str, Any], ctx: "ProjectCtx") -> str
 
     except Exception as exc:
         return err_payload(str(exc), "PIPING_STRESS_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# piping_route_3d  — 3D intelligent piping route with AABB clash avoidance
+# ---------------------------------------------------------------------------
+
+piping_route_3d_spec = ToolSpec(
+    name="piping_route_3d",
+    description=(
+        "Route a pipe in 3D between two nozzle/connection points using "
+        "orthogonal (manhattan) segments.  Inserts 90° LR elbows at direction "
+        "changes per ASME B16.9.  Supports spec-driven schedule selection "
+        "(ASME B31.3 Barlow) and basic AABB obstacle clash avoidance.  "
+        "Returns: 3D centreline waypoints, fitting counts, elbow centre-to-face "
+        "dimension (ASME B16.9), total pipe length, and a fitting BOM.  "
+        "\n\nAll positions in metres.  "
+        "\n\nPipe spec presets: 'CS-A' (A106-B, Sch40, 10 barg), "
+        "'CS-HH' (A106-B, Sch80, 40 barg), 'SS-316L' (A312-316L, Sch40, 10 barg).  "
+        "\n\nDISCLAIMER: Routing is orthogonal only (no diagonal segments).  "
+        "Interactive drag-routing and 3D plant model integration require the Kerf "
+        "plant UI (not yet wired in production).  Clash avoidance is AABB-only.  "
+        "For certified installation review by a licensed engineer is required."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "start": {
+                "type": "array",
+                "items": {"type": "number"},
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "[x, y, z] start nozzle position (metres).",
+            },
+            "end": {
+                "type": "array",
+                "items": {"type": "number"},
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "[x, y, z] end nozzle position (metres).",
+            },
+            "dn": {
+                "type": "integer",
+                "description": (
+                    "Nominal pipe diameter DN (mm).  "
+                    "E.g. 25, 50, 80, 100, 150, 200, 250, 300.  Default 50."
+                ),
+            },
+            "schedule": {
+                "type": "string",
+                "description": (
+                    "Pipe schedule code.  E.g. '40', '80', 'STD', 'XS', '160'.  "
+                    "Ignored if pipe_spec is provided (spec drives schedule)."
+                ),
+            },
+            "pipe_spec": {
+                "type": "string",
+                "enum": ["CS-A", "CS-HH", "SS-316L", "API-X52"],
+                "description": (
+                    "Preset pipe class.  Drives schedule via ASME B31.3 Barlow.  "
+                    "CS-A = A106-B Sch40 10barg; CS-HH = A106-B Sch80 40barg; "
+                    "SS-316L = A312-316L Sch40 10barg; API-X52 = X52 STD 70barg."
+                ),
+            },
+            "obstacles": {
+                "type": "array",
+                "description": (
+                    "List of AABB obstacles to route around.  "
+                    "Each obstacle: {'min': [x,y,z], 'max': [x,y,z], 'label': '...'}"
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "min": {
+                            "type": "array",
+                            "items": {"type": "number"},
+                            "minItems": 3,
+                            "maxItems": 3,
+                        },
+                        "max": {
+                            "type": "array",
+                            "items": {"type": "number"},
+                            "minItems": 3,
+                            "maxItems": 3,
+                        },
+                        "label": {"type": "string"},
+                    },
+                    "required": ["min", "max"],
+                },
+            },
+            "clearance_m": {
+                "type": "number",
+                "description": (
+                    "Minimum clearance around obstacles (metres).  Default 0.3."
+                ),
+            },
+            "prefer_axis": {
+                "type": "string",
+                "enum": ["Z", "X", "Y"],
+                "description": (
+                    "Which axis to travel first.  "
+                    "'Z' = vertical first (typical piping convention).  Default 'Z'."
+                ),
+            },
+        },
+        "required": ["start", "end"],
+    },
+)
+
+
+async def run_piping_route_3d(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_piping.pid import Point3
+        from kerf_piping.route3d import route_3d, AABB
+        from kerf_piping.pipe_spec import (
+            standard_class_cs_a, standard_class_cs_hh,
+            standard_class_ss_316l, standard_class_api_x52,
+        )
+
+        start_raw = args["start"]
+        end_raw   = args["end"]
+        dn        = int(args.get("dn", 50))
+        sched_str = str(args.get("schedule", "40"))
+        spec_key  = args.get("pipe_spec")
+        prefer    = str(args.get("prefer_axis", "Z"))
+        clearance = float(args.get("clearance_m", 0.3))
+
+        start = Point3(*[float(v) for v in start_raw])
+        end   = Point3(*[float(v) for v in end_raw])
+
+        # Resolve spec
+        spec = None
+        if spec_key:
+            spec_map = {
+                "CS-A":   standard_class_cs_a,
+                "CS-HH":  standard_class_cs_hh,
+                "SS-316L": standard_class_ss_316l,
+                "API-X52": standard_class_api_x52,
+            }
+            builder = spec_map.get(spec_key)
+            if builder:
+                spec = builder()
+
+        # Parse obstacles
+        obs_raw = args.get("obstacles", [])
+        obstacles = []
+        for ob in obs_raw:
+            obstacles.append(AABB(
+                min_pt=tuple(float(v) for v in ob["min"]),
+                max_pt=tuple(float(v) for v in ob["max"]),
+                label=str(ob.get("label", "")),
+            ))
+
+        result = route_3d(
+            start, end,
+            dn=dn,
+            spec=spec,
+            schedule=sched_str if not spec else None,
+            obstacles=obstacles,
+            clearance_m=clearance,
+            prefer_axis=prefer,
+        )
+
+        payload = result.as_dict()
+        payload["ok"] = True
+        return ok_payload(payload)
+
+    except Exception as exc:
+        return err_payload(str(exc), "PIPING_ROUTE_3D_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# piping_catalogue_component  — ASME B16.9/B16.5 3D component catalogue
+# ---------------------------------------------------------------------------
+
+piping_catalogue_component_spec = ToolSpec(
+    name="piping_catalogue_component",
+    description=(
+        "Look up a 3D piping component from the spec-driven ASME catalogue.  "
+        "Returns: face geometry (nozzle positions + flow directions), "
+        "face-to-face / centre-to-face dimensions per ASME B16.9 or B16.5, "
+        "nominal OD, and a BOM line.  "
+        "\n\nComponent types: "
+        "'elbow_90_lr' (ASME B16.9 90° LR), "
+        "'elbow_90_sr' (ASME B16.9 90° SR), "
+        "'elbow_45_lr' (ASME B16.9 45° LR), "
+        "'tee_equal' (ASME B16.9 equal tee), "
+        "'reducer_concentric' (ASME B16.9 concentric reducer), "
+        "'flange_weldneck' (ASME B16.5 weld-neck flange), "
+        "'valve_gate' (gate valve, ASME B16.10), "
+        "'valve_ball' (full-bore ball valve, API 6D), "
+        "'cap' (ASME B16.9 end cap).  "
+        "\n\nCommon DN values: 15, 20, 25, 32, 40, 50, 65, 80, 100, 150, 200, "
+        "250, 300.  "
+        "\n\nDISCLAIMER: Dimensional data from ASME B16.9-2018, B16.5-2017, "
+        "B16.10-2000, API 6D-2021 — NOT a replacement for the primary standards.  "
+        "For procurement and fabrication verify against the current ASME publication."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "component_type": {
+                "type": "string",
+                "enum": [
+                    "elbow_90_lr",
+                    "elbow_90_sr",
+                    "elbow_45_lr",
+                    "tee_equal",
+                    "reducer_concentric",
+                    "flange_weldneck",
+                    "valve_gate",
+                    "valve_ball",
+                    "cap",
+                ],
+                "description": "Component type identifier.",
+            },
+            "dn": {
+                "type": "integer",
+                "description": (
+                    "Nominal pipe diameter DN (mm).  "
+                    "E.g. 25, 50, 80, 100, 150, 200."
+                ),
+            },
+            "schedule": {
+                "type": "string",
+                "description": "Pipe schedule (e.g. '40', '80', 'STD').  Default '40'.",
+            },
+            "dn_branch": {
+                "type": "integer",
+                "description": (
+                    "Branch / small-end DN (mm) for reducers or reducing tees.  "
+                    "Required for 'reducer_concentric'."
+                ),
+            },
+            "flange_class": {
+                "type": "integer",
+                "enum": [150, 300, 600, 900, 1500, 2500],
+                "description": (
+                    "ASME B16.5 flange class for 'flange_weldneck'.  Default 150."
+                ),
+            },
+            "quantity": {
+                "type": "integer",
+                "description": "Quantity for BOM aggregation.  Default 1.",
+            },
+        },
+        "required": ["component_type", "dn"],
+    },
+)
+
+
+async def run_piping_catalogue_component(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_piping.route3d import catalogue_component
+
+        comp_type   = str(args["component_type"])
+        dn          = int(args["dn"])
+        schedule    = str(args.get("schedule", "40"))
+        dn_branch   = int(args["dn_branch"]) if args.get("dn_branch") else None
+        flange_cls  = int(args["flange_class"]) if args.get("flange_class") else None
+        quantity    = int(args.get("quantity", 1))
+
+        comp = catalogue_component(
+            comp_type, dn,
+            schedule=schedule,
+            dn_branch=dn_branch,
+            flange_class=flange_cls,
+        )
+
+        payload = {
+            "ok": True,
+            **comp.as_dict(),
+            "bom_line": comp.bom_line(quantity),
+        }
+        return ok_payload(payload)
+
+    except Exception as exc:
+        return err_payload(str(exc), "PIPING_CATALOGUE_ERROR")

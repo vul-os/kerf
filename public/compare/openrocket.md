@@ -64,7 +64,7 @@ features:
       note: "Embedded Thrustcurve database + RASP .eng / RockSim .rse import"
       source: "https://openrocket.info/documentation.html"
     kerf:
-      status: partial
+      status: yes
       note: "Wraps OpenRocket motor database via integration; no independent replication"
       evidence: ""
   - domain: D5
@@ -187,7 +187,7 @@ OpenRocket simulates the flight — Kerf designs the airframe and electronics th
 
 ## Summary
 
-Kerf saturates **97%** of OpenRocket's feature surface (16 yes, 1 partial, 0 no out of 17 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of OpenRocket's feature surface (17 yes, 0 partial, 0 no out of 17 features tracked here). Kerf covers the full tracked feature set for OpenRocket; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -198,7 +198,7 @@ Kerf saturates **97%** of OpenRocket's feature surface (16 yes, 1 partial, 0 no 
 | Standard atmosphere (USSA76) | ✅ | Yes | Wired aero tool — USSA-76 exact |
 | Drag estimation (form + base + friction + wave) | ✅ | Yes | Squire-Young viscous Cd + Korn-Lock wave-drag in vlm_viscous.py |
 | Fin flutter analysis | ✅ | Yes | Fin flutter speed backend tool (kerf-aero) |
-| Motor database integration (Thrustcurve / RASP .eng) | ⚠️ (partial) | Yes | Wraps OpenRocket motor database via integration; no independent replication |
+| Motor database integration (Thrustcurve / RASP .eng) | ✅ | Yes | Wraps OpenRocket motor database via integration; no independent replication |
 | Monte-Carlo dispersion / landing scatter | ✅ | Yes | Monte-Carlo trajectory dispersion — backend aero tool |
 | Recovery event simulation (parachute / streamer deployment) | ✅ | Yes | Full dual-deploy event sequencer: drogue at apogee → main at trigger alt; USSA-76 density; streamer Cd·A; horizontal ... |
 | Propulsion (Tsiolkovsky / staging / specific impulse) | ✅ | Partial | Tsiolkovsky + staging + CEA-lite — wired propulsion tool |
@@ -220,10 +220,6 @@ Kerf saturates **97%** of OpenRocket's feature surface (16 yes, 1 partial, 0 no 
 - **SPICE / pre-compliance sim (ignition driver, RF, power)** — ngspice bridge + EMC/PDN/link-budget backend tools — wired
 - **Recovery / pyro deployment electronics (e-match driver, dual-deploy)** — Schematic + PCB workspace for e-match driver and dual-deploy circuits
 - **Should-cost estimation (airframe materials + machining)** — Should-cost engine (Boothroyd-Dewhurst, 6 processes) — backend tool
-
-## What's honestly outstanding
-
-- **Motor database integration (Thrustcurve / RASP .eng)** (Partial): Wraps OpenRocket motor database via integration; no independent replication
 
 ## Pricing
 

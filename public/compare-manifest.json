@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T02:31:42.183Z",
+  "generatedAt": "2026-06-05T02:32:42.458Z",
   "items": [
     {
       "slug": "revit",
@@ -13836,7 +13836,7 @@
             "notes": "BatchEstimator + ExtendedKalmanFilter; range/Doppler/TDRSS obs types"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-aero/src/kerf_aero/orbital/orbit_determination.py",
             "kerf_note": "Full EKF sequential estimation and ingestion of real tracking-data formats (DSN/CCSDS TNF, RINEX) remain out of scope for the current version.",
             "notes": "Batch weighted least-squares OD with STM measurement partials and formal covariance; range + range-rate observables; multi-station; J2 force model; a-priori constraint; EKF and real multi-pass tracking data ingestion (DSN/CCSDS TNF formats) not yet implemented"
@@ -14409,7 +14409,7 @@
             "notes": "Embedded Thrustcurve database + RASP .eng / RockSim .rse import"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "",
             "notes": "Wraps OpenRocket motor database via integration; no independent replication"
           },

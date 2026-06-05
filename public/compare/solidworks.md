@@ -283,7 +283,7 @@ features:
       note: "No thermal calc tools in base; Flow Simulation is CFD only"
       source: "https://help.solidworks.com/2025/English/SolidWorks/floxpress/r_what_do_flow_simulation.htm"
     kerf:
-      status: partial
+      status: yes
       note: "Full TEMA shell-tube with Bell-Delaware + 5 correction factors backend"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/heatxfer/shell_tube_bell.py"
 
@@ -681,7 +681,7 @@ features:
 
 ## Summary
 
-Kerf saturates **77%** of SOLIDWORKS's feature surface (32 yes, 27 partial, 0 no out of 59 features tracked here). Honest gaps: 27 features partial (engine complete, UI or depth gap).
+Kerf saturates **78%** of SOLIDWORKS's feature surface (33 yes, 26 partial, 0 no out of 59 features tracked here). Honest gaps: 26 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -711,7 +711,7 @@ Kerf saturates **77%** of SOLIDWORKS's feature surface (32 yes, 27 partial, 0 no
 | Weldments structural framework | ⚠️ (partial) | Yes | Weldment profiles + cut-list engine; no full workspace |
 | CFD (internal/external flow) | ⚠️ (partial) | Yes (paid tier) | Real OpenFOAM bridge backend (needs install); no UI |
 | HVAC duct sizing (SMACNA) | ✅ | No | SMACNA duct sizing + flat-pattern backend; no UI |
-| Heat exchanger (LMTD/ε-NTU) | ⚠️ (partial) | No | Full TEMA shell-tube with Bell-Delaware + 5 correction factors backend |
+| Heat exchanger (LMTD/ε-NTU) | ✅ | No | Full TEMA shell-tube with Bell-Delaware + 5 correction factors backend |
 | Airfoil / wing aerodynamics (VLM) | ✅ | No | 3D wing VLM + strip viscous CD0 + PG/KT compressibility; wired |
 | Orbital mechanics (Kepler/Hohmann/Lambert) | ✅ | No | Kepler + J2/J3 + Hohmann + Lambert (multi-rev) wired |
 | Schematic capture + PCB layout | ✅ | Yes (paid tier) | Hierarchical schematic + PCB layout viewer wired in-browser |
@@ -750,6 +750,7 @@ Kerf saturates **77%** of SOLIDWORKS's feature surface (32 yes, 27 partial, 0 no
 ## What Kerf does that SOLIDWORKS doesn't
 
 - **HVAC duct sizing (SMACNA)** — SMACNA duct sizing + flat-pattern backend; no UI
+- **Heat exchanger (LMTD/ε-NTU)** — Full TEMA shell-tube with Bell-Delaware + 5 correction factors backend
 - **Airfoil / wing aerodynamics (VLM)** — 3D wing VLM + strip viscous CD0 + PG/KT compressibility; wired
 - **Orbital mechanics (Kepler/Hohmann/Lambert)** — Kepler + J2/J3 + Hohmann + Lambert (multi-rev) wired
 - **Schematic capture + PCB layout** — Hierarchical schematic + PCB layout viewer wired in-browser
@@ -760,8 +761,7 @@ Kerf saturates **77%** of SOLIDWORKS's feature surface (32 yes, 27 partial, 0 no
 - **Moldflow / injection fill simulation** — Hele-Shaw front tracking + weld-line + air-trap backend
 - **FDM slicing** — Cura integration wired (PrintSliceView)
 - **PLC IEC 61131-3 (ST/Ladder/FB)** — ST editor + live Ladder power-flow sim wired
-- **Tolerance stackup — 1D (WC/RSS)** — WC/RSS/Monte-Carlo 1D backend; Monte-Carlo LCG bug
-- *(and 6 more features not covered by SOLIDWORKS)*
+- *(and 7 more features not covered by SOLIDWORKS)*
 
 ## What's honestly outstanding
 
@@ -777,7 +777,6 @@ Kerf saturates **77%** of SOLIDWORKS's feature surface (32 yes, 27 partial, 0 no
 - **Shaft stress + critical speed** (Partial): Closed-form shaft stress + critical speed backend; no UI
 - **Weldments structural framework** (Partial): Weldment profiles + cut-list engine; no full workspace
 - **CFD (internal/external flow)** (Partial): Real OpenFOAM bridge backend (needs install); no UI
-- **Heat exchanger (LMTD/ε-NTU)** (Partial): Full TEMA shell-tube with Bell-Delaware + 5 correction factors backend
 - **EMC (radiated/shielding/limits)** (Partial): Closed-form radiated/shielding/limits backend; no full-wave
 - **Feeds & speeds + tool-life (Taylor/Gilbert)** (Partial): Taylor extended + Gilbert economic speed backend
 - **Road alignment (horizontal/vertical/clothoid)** (Partial): H+V alignment + clothoid + SSD backend; no plan export

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T01:47:59.621Z",
+  "generatedAt": "2026-06-05T01:49:13.224Z",
   "items": [
     {
       "slug": "revit",
@@ -6389,7 +6389,7 @@
             "notes": "No thermal calc tools in base; Flow Simulation is CFD only"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/heatxfer/shell_tube_bell.py",
             "notes": "Full TEMA shell-tube with Bell-Delaware + 5 correction factors backend"
           },

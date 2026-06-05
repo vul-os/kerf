@@ -113,6 +113,8 @@ def _register_tools(ctx, provides: list) -> None:
         "kerf_imports.pads_reader",
         "kerf_imports.geda_reader",
         "kerf_imports.allegro_reader",
+        "kerf_imports.iges_reader",
+        "kerf_imports.iges_writer",
     ]
 
     for module_path in tool_modules:

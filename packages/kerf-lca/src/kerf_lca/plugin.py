@@ -31,6 +31,13 @@ async def register(app: FastAPI, ctx):
         ("kerf_lca.tools.multi_impact",       "multi_impact_spec",                 "run_multi_impact"),
         ("kerf_lca.tools.embodied_carbon",    "lca_lookup_material_spec",          "run_lca_lookup_material"),
         ("kerf_lca.tools.embodied_carbon",    "lca_compute_embodied_carbon_spec",  "run_lca_compute_embodied_carbon"),
+        # ISO 14044 §4.5 uncertainty analysis
+        ("kerf_lca.tools.lca_uncertainty",    "lca_impact_uncertainty_bounds_spec", "run_lca_impact_uncertainty_bounds"),
+        ("kerf_lca.tools.lca_uncertainty",    "lca_monte_carlo_uncertainty_spec",   "run_lca_monte_carlo_uncertainty"),
+        # EN 15978 Module D EoL circularity
+        ("kerf_lca.tools.eol_circularity",   "module_d_credit_spec",              "run_lca_module_d_credit"),
+        ("kerf_lca.tools.eol_circularity",   "circularity_index_spec",            "run_lca_circularity_index"),
+        ("kerf_lca.tools.eol_circularity",   "full_lifecycle_spec",               "run_lca_full_lifecycle"),
     ]
 
     for module_path, spec_name, handler_name in _tool_modules:
@@ -47,10 +54,11 @@ async def register(app: FastAPI, ctx):
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="lca",
-            version="0.2.0",
+            version="0.3.0",
             provides=[
                 "lca.report", "lca.lifecycle", "lca.multi_impact",
                 "lca.lookup_material", "lca.compute_embodied_carbon",
+                "lca.uncertainty", "lca.eol_circularity",
             ],
             depends=[],
         )
@@ -61,6 +69,7 @@ async def register(app: FastAPI, ctx):
             "provides": [
                 "lca.report", "lca.lifecycle", "lca.multi_impact",
                 "lca.lookup_material", "lca.compute_embodied_carbon",
+                "lca.uncertainty", "lca.eol_circularity",
             ],
             "depends": [],
         }

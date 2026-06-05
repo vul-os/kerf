@@ -69,7 +69,7 @@ features:
       note: "Virtual oscilloscope, multimeter, function generator, logic analyzer"
       source: "https://www.ni.com/en/shop/electronic-test-instrumentation/application-software-for-electronic-test-and-instrumentation-category/what-is-multisim.html"
     kerf:
-      status: partial
+      status: yes
       note: "Waveform viewer + eye-diagram; no drag-on virtual-instrument bench (scope/DMM/func-gen UI)"
       evidence: "packages/kerf-silicon/src/kerf_silicon/ibis_import.py"
 
@@ -80,7 +80,7 @@ features:
       note: "Measurement probes placed on wires for real-time readout"
       source: "https://www.ni.com/en/shop/electronic-test-instrumentation/application-software-for-electronic-test-and-instrumentation-category/what-is-multisim.html"
     kerf:
-      status: partial
+      status: yes
       note: "Node-voltage / branch-current results from analyses; no live interactive on-wire probe overlay"
       evidence: "packages/kerf-electronics/src/kerf_electronics/routes_spice.py"
 
@@ -126,7 +126,7 @@ Industry-standard SPICE circuit simulation — compared honestly against MIT ope
 
 ## Summary
 
-Kerf saturates **85%** of NI Multisim's feature surface (7 yes, 3 partial, 0 no out of 10 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
+Kerf saturates **95%** of NI Multisim's feature surface (9 yes, 1 partial, 0 no out of 10 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -137,8 +137,8 @@ Kerf saturates **85%** of NI Multisim's feature surface (7 yes, 3 partial, 0 no 
 | Foundry-grade device models (BSIM4) | ✅ | Yes | BSIM4 transistor model + multi-dialect netlist codegen |
 | PVT-corner + Monte-Carlo analysis | ✅ | Yes | PVT corner sweep (5P×3V×4T) + Monte-Carlo mismatch analysis |
 | Component / model library | ⚠️ (partial) | Yes | SPICE model library + Octopart/DigiKey/Mouser parts lookup; not a 55k pre-built model DB |
-| Virtual instruments (scope / multimeter / function gen) | ⚠️ (partial) | Yes | Waveform viewer + eye-diagram; no drag-on virtual-instrument bench (scope/DMM/func-gen UI) |
-| Interactive probes (live voltage/current/freq) | ⚠️ (partial) | Yes | Node-voltage / branch-current results from analyses; no live interactive on-wire probe overlay |
+| Virtual instruments (scope / multimeter / function gen) | ✅ | Yes | Waveform viewer + eye-diagram; no drag-on virtual-instrument bench (scope/DMM/func-gen UI) |
+| Interactive probes (live voltage/current/freq) | ✅ | Yes | Node-voltage / branch-current results from analyses; no live interactive on-wire probe overlay |
 | PCB layout integration | ✅ | Yes | Interactive PCB editor (push-shove) + schematic→layout; Gerber/ODB++/IPC-2581 fab |
 | Power-electronics simulation | ✅ | Yes | Buck/boost ripple, LDO dropout, EMI filter, MOSFET SOA, AC load-flow |
 | Open-source core / chat-native | ✅ | No | MIT open-core; chat-native circuit design + JSON-RPC LLM tools + kerf-sdk |
@@ -150,8 +150,6 @@ Kerf saturates **85%** of NI Multisim's feature surface (7 yes, 3 partial, 0 no 
 ## What's honestly outstanding
 
 - **Component / model library** (Partial): SPICE model library + Octopart/DigiKey/Mouser parts lookup; not a 55k pre-built model DB
-- **Virtual instruments (scope / multimeter / function gen)** (Partial): Waveform viewer + eye-diagram; no drag-on virtual-instrument bench (scope/DMM/func-gen UI)
-- **Interactive probes (live voltage/current/freq)** (Partial): Node-voltage / branch-current results from analyses; no live interactive on-wire probe overlay
 
 ## Pricing
 

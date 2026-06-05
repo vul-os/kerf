@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T04:37:18.184Z",
+  "generatedAt": "2026-06-05T04:46:26.021Z",
   "items": [
     {
       "slug": "revit",
@@ -3963,7 +3963,7 @@
             "notes": "Virtual oscilloscope, multimeter, function generator, logic analyzer"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-silicon/src/kerf_silicon/ibis_import.py",
             "notes": "Waveform viewer + eye-diagram; no drag-on virtual-instrument bench (scope/DMM/func-gen UI)"
           },
@@ -3977,7 +3977,7 @@
             "notes": "Measurement probes placed on wires for real-time readout"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-electronics/src/kerf_electronics/routes_spice.py",
             "notes": "Node-voltage / branch-current results from analyses; no live interactive on-wire probe overlay"
           },

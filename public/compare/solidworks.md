@@ -681,7 +681,7 @@ features:
 
 ## Summary
 
-Kerf saturates **100%** of SOLIDWORKS's feature surface (59 yes, 0 partial, 0 no out of 59 features tracked here). Kerf covers the full tracked feature set for SOLIDWORKS; gaps may exist in workflow depth, ecosystem maturity, and community support.
+Kerf saturates **66%** of SOLIDWORKS's feature surface (20 yes, 38 partial, 1 no out of 59 features tracked here). Honest gaps: 38 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -695,73 +695,110 @@ Kerf saturates **100%** of SOLIDWORKS's feature surface (59 yes, 0 partial, 0 no
 | Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF + bend table; no auto corner-relief |
 | NURBS surfacing (blend/network/patch) | ✅ | Yes | blend/network/patch/match-srf + G3 blends + Class-A continuity harness wired |
 | Assemblies — mates | ✅ | Yes | Rigid/revolute/slider/cam/gear/pin-slot wired + BOM panel |
-| Assembly interference (clash) | ✅ | Yes | Wave 10 reference implementation. |
-| Assembly motion study | ✅ | Yes | Wave 9: assembly motion study and interference detection. |
-| 2D drawings (views/dims/sections) | ✅ | Yes | Wave 10 reference implementation. |
-| GD&T on drawings / MBD / PMI | ✅ | Yes | Wave 10 reference implementation. |
+| Assembly interference (clash) | ⚠️ (partial) | Yes | Backend OBB-SAT + BVH + tri-tri; no UI panel |
+| Assembly motion study | 🔴 (no) | Yes | Planar MBD not wired to assembly solver |
+| 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Live B-rep HLR projection + auto-dim; no GD&T-placement UI |
+| GD&T on drawings / MBD / PMI | ⚠️ (partial) | Yes | Data model + auto-propose only; no UI for placement |
 | Configurations / family variants | ✅ | Yes | Engine + ConfigurationsPanel.jsx wired in Editor.jsx |
-| Large assembly performance mode | ✅ | Yes | Wave 10 reference implementation. |
-| FE — linear static (native) | ✅ | Yes | Wave 10 reference implementation. |
-| FE — fatigue (S-N) | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
-| Modal / buckling / nonlinear FEA | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
-| AISC 360 / ACI 318 member design | ✅ | No | Wave 10 reference implementation. |
-| Spur/helical gear rating (AGMA/ISO 6336) | ✅ | No | Wave 10 reference implementation. |
-| Bearings — ISO 281 L10 / ISO/TS 16281 | ✅ | No | Wave 10 reference implementation. |
-| Shaft stress + critical speed | ✅ | No | Wave 10 reference implementation. |
-| Weldments structural framework | ✅ | Yes | Wave 10 reference implementation. |
-| CFD (internal/external flow) | ✅ | Yes (paid tier) | Wave 11A flip pass — shipped backend module. |
-| HVAC duct sizing (SMACNA) | ✅ | No | Wave 10 reference implementation. |
-| Heat exchanger (LMTD/ε-NTU) | ✅ | No | Wave 10 reference implementation. |
+| Large assembly performance mode | ⚠️ (partial) | Yes | LOD mesh swapping (configurable); no SpeedPak equivalent |
+| FE — linear static (native) | ⚠️ (partial) | Yes | Linear static solver; no UI panel beyond displacement render |
+| FE — fatigue (S-N) | ⚠️ (partial) | Yes (paid tier) | S-N + ε-N + rainflow backend; no UI |
+| Modal / buckling / nonlinear FEA | ⚠️ (partial) | Yes (paid tier) | Consistent-mass modal + linear eigenvalue buckling (Euler-Bernoulli Kg) + harmonic/FRF (mode superposition) + random-... |
+| AISC 360 / ACI 318 member design | ⚠️ (partial) | No | Full per-code backend; no UI panel |
+| Spur/helical gear rating (AGMA/ISO 6336) | ⚠️ (partial) | No | Full AGMA 2001-D04 + ISO 6336 Method B backend; no UI |
+| Bearings — ISO 281 L10 / ISO/TS 16281 | ⚠️ (partial) | No | ISO 281 + ISO/TS 16281 aISO modified life backend; no UI |
+| Shaft stress + critical speed | ⚠️ (partial) | No | Closed-form shaft stress + critical speed backend; no UI |
+| Weldments structural framework | ⚠️ (partial) | Yes | Weldment profiles + cut-list engine; no full workspace |
+| CFD (internal/external flow) | ⚠️ (partial) | Yes (paid tier) | Real OpenFOAM bridge backend (needs install); no UI |
+| HVAC duct sizing (SMACNA) | ⚠️ (partial) | No | SMACNA duct sizing + flat-pattern backend; no UI |
+| Heat exchanger (LMTD/ε-NTU) | ⚠️ (partial) | No | Full TEMA shell-tube with Bell-Delaware + 5 correction factors backend |
 | Airfoil / wing aerodynamics (VLM) | ✅ | No | 3D wing VLM + strip viscous CD0 + PG/KT compressibility; wired |
 | Orbital mechanics (Kepler/Hohmann/Lambert) | ✅ | No | Kepler + J2/J3 + Hohmann + Lambert (multi-rev) wired |
 | Schematic capture + PCB layout | ✅ | Yes (paid tier) | Hierarchical schematic + PCB layout viewer wired in-browser |
-| Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | No | Wave 10B reference implementation. |
-| EMC (radiated/shielding/limits) | ✅ | No | Wave 10B reference implementation. |
+| Signal integrity (Z0/crosstalk/eye/IBIS) | ⚠️ (partial) | No | IBIS 5.1 + Bergeron channel + PRBS eye backend |
+| EMC (radiated/shielding/limits) | ⚠️ (partial) | No | Closed-form radiated/shielding/limits backend; no full-wave |
 | Wiring / harness routing | ✅ | Yes (paid tier) | WiringView wired; WireViz + 3D router |
 | 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes | CAMView wired; profile/contour/pocket/face ops |
-| Multi-axis CAM (5-axis) | ✅ | Yes (paid tier) | Wave 10B reference implementation. |
-| Feeds & speeds + tool-life (Taylor/Gilbert) | ✅ | Partial | Wave 10B reference implementation. |
-| Nesting (2D part layout) | ✅ | No | Wave 10B reference implementation. |
-| Moldflow / injection fill simulation | ✅ | No | Wave 12B build implementation. |
+| Multi-axis CAM (5-axis) | ⚠️ (partial) | Yes (paid tier) | 5-axis 3+2 engine solid; no UI |
+| Feeds & speeds + tool-life (Taylor/Gilbert) | ⚠️ (partial) | Partial | Taylor extended + Gilbert economic speed backend |
+| Nesting (2D part layout) | ⚠️ (partial) | No | Skyline + true-shape NFP + Minkowski-sum backend |
+| Moldflow / injection fill simulation | ⚠️ (partial) | No | Hele-Shaw front tracking + weld-line + air-trap backend |
 | FDM slicing | ✅ | No | Cura integration wired (PrintSliceView) |
-| Road alignment (horizontal/vertical/clothoid) | ✅ | No | Wave 10B reference implementation. |
-| Geotech (bearing/settlement/slope/liquefaction) | ✅ | No | Wave 10B reference implementation. |
-| Planar MBD (Lagrange/DAE) | ✅ | Yes (paid tier) | Wave 10B reference implementation. |
-| Controls — classical (Routh/Bode/PID) | ✅ | No | Wave 11B build implementation. |
-| Vibration (SDOF/n-DOF modal/FRF) | ✅ | Yes (paid tier) | Wave 10B reference implementation. |
+| Road alignment (horizontal/vertical/clothoid) | ⚠️ (partial) | No | H+V alignment + clothoid + SSD backend; no plan export |
+| Geotech (bearing/settlement/slope/liquefaction) | ⚠️ (partial) | No | Seed-Idriss CSR + SPT/CPT CRR + Tokimatsu backend |
+| Planar MBD (Lagrange/DAE) | ⚠️ (partial) | Yes (paid tier) | Planar MBD Lagrange/DAE backend; not wired to assembly UI |
+| Controls — classical (Routh/Bode/PID) | ⚠️ (partial) | No | Routh/Bode/RL/PID tune + state-space/LQR/Kalman backend |
+| Vibration (SDOF/n-DOF modal/FRF) | ⚠️ (partial) | Yes (paid tier) | Full n-DOF eigen + FRF matrix + harmonic response (mode superposition, DAF, phase) + random-vibration PSD (Miles' equ... |
 | PLC IEC 61131-3 (ST/Ladder/FB) | ✅ | No | ST editor + live Ladder power-flow sim wired |
-| Solar PV (system + partial shading) | ✅ | No | Wave 11A flip pass — shipped backend module. |
-| AC load-flow (Newton-Raphson) | ✅ | No | Wave 11B build implementation. |
-| GD&T data model (ASME Y14.5) | ✅ | Yes | Wave 11A flip pass — shipped backend module. |
-| Tolerance stackup — 1D (WC/RSS) | ✅ | Yes (paid tier) | Wave 11A flip pass — shipped backend module. |
-| Tolerance stackup — 3D vector loop | ✅ | Yes (paid tier) | Wave 11A flip pass — shipped backend module. |
-| Limits & fits (ISO 286) | ✅ | Yes | Wave 11A flip pass — shipped backend module. |
-| SPC control charts (Shewhart/CUSUM/EWMA) | ✅ | No | Wave 11A flip pass — shipped backend module. |
-| Paraxial ray tracing / Gaussian beam | ✅ | No | Wave 11A flip pass — shipped backend module. |
-| Acoustics (ISO 9613 / RT60 / mass-law TL) | ✅ | No | Wave 11A flip pass — shipped backend module. |
+| Solar PV (system + partial shading) | ⚠️ (partial) | No | Single-diode + bypass-diode IV + MPPT + mismatch backend |
+| AC load-flow (Newton-Raphson) | ⚠️ (partial) | No | Full polar-form NR load-flow backend; no UI |
+| GD&T data model (ASME Y14.5) | ⚠️ (partial) | Yes | Data model + auto-propose; no MBD/PMI placement UI |
+| Tolerance stackup — 1D (WC/RSS) | ⚠️ (partial) | Yes (paid tier) | WC/RSS/Monte-Carlo 1D backend; Monte-Carlo LCG bug |
+| Tolerance stackup — 3D vector loop | ⚠️ (partial) | Yes (paid tier) | 6-DOF vector loop + sensitivity Jacobian backend |
+| Limits & fits (ISO 286) | ⚠️ (partial) | Yes | ISO 286 limits & fits backend; no UI |
+| SPC control charts (Shewhart/CUSUM/EWMA) | ⚠️ (partial) | No | Shewhart/CUSUM/EWMA + Nelson/WECO rules backend |
+| Paraxial ray tracing / Gaussian beam | ⚠️ (partial) | No | ABCD + Seidel + thick lens + Gaussian beam + M² backend |
+| Acoustics (ISO 9613 / RT60 / mass-law TL) | ⚠️ (partial) | No | ISO 9613 + RT60 + mass-law TL + image-source IR backend |
 | Jewelry design tooling | ✅ | No | 41-module suite — ring/gem/setting/chain/casting/cost |
 | BIM / IFC authoring | ✅ | No | Revit-comparable engine + IFC4 export wired via /compile-ifc |
-| Material selection (Ashby / multi-objective) | ✅ | No | Wave 12B build implementation. |
-| Should-cost / DFM estimation | ✅ | No | Wave 11A flip pass — shipped backend module. |
-| LCA (ISO 14040/44 full 4 phases) | ✅ | No | Wave 11A flip pass — shipped backend module. |
+| Material selection (Ashby / multi-objective) | ⚠️ (partial) | No | 200 materials + Pareto frontier + weighted-score backend |
+| Should-cost / DFM estimation | ⚠️ (partial) | No | 6-process Boothroyd-Dewhurst should-cost backend |
+| LCA (ISO 14040/44 full 4 phases) | ⚠️ (partial) | No | Full 4-phase LCA + multi-impact + uncertainty backend |
 | Scripting / automation API | ✅ | Yes | kerf-sdk on PyPI — HTTP/JSON-RPC; same interface as LLM |
 | Standard parts library (ISO/DIN fasteners, bearings, profiles) | ✅ | Yes | kerf-partsgen: 5 ISO/DIN generators; kerf-parts KiCad+BOLTS+FreeCAD pipeline; real STEP/JSCAD geometry in CircuitEdit... |
 
 ## What Kerf does that SOLIDWORKS doesn't
 
-- **FE — fatigue (S-N)** — Wave 10 reference implementation.
-- **Modal / buckling / nonlinear FEA** — Wave 10 reference implementation.
-- **AISC 360 / ACI 318 member design** — Wave 10 reference implementation.
-- **Spur/helical gear rating (AGMA/ISO 6336)** — Wave 10 reference implementation.
-- **Bearings — ISO 281 L10 / ISO/TS 16281** — Wave 10 reference implementation.
-- **Shaft stress + critical speed** — Wave 10 reference implementation.
-- **CFD (internal/external flow)** — Wave 11A flip pass — shipped backend module.
-- **HVAC duct sizing (SMACNA)** — Wave 10 reference implementation.
-- **Heat exchanger (LMTD/ε-NTU)** — Wave 10 reference implementation.
 - **Airfoil / wing aerodynamics (VLM)** — 3D wing VLM + strip viscous CD0 + PG/KT compressibility; wired
 - **Orbital mechanics (Kepler/Hohmann/Lambert)** — Kepler + J2/J3 + Hohmann + Lambert (multi-rev) wired
 - **Schematic capture + PCB layout** — Hierarchical schematic + PCB layout viewer wired in-browser
-- *(and 25 more features not covered by SOLIDWORKS)*
+- **Wiring / harness routing** — WiringView wired; WireViz + 3D router
+- **FDM slicing** — Cura integration wired (PrintSliceView)
+- **PLC IEC 61131-3 (ST/Ladder/FB)** — ST editor + live Ladder power-flow sim wired
+- **Jewelry design tooling** — 41-module suite — ring/gem/setting/chain/casting/cost
+- **BIM / IFC authoring** — Revit-comparable engine + IFC4 export wired via /compile-ifc
+
+## What's honestly outstanding
+
+- **Assembly interference (clash)** (Partial): Backend OBB-SAT + BVH + tri-tri; no UI panel
+- **Assembly motion study** (Not yet implemented): Planar MBD not wired to assembly solver
+- **2D drawings (views/dims/sections)** (Partial): Live B-rep HLR projection + auto-dim; no GD&T-placement UI
+- **GD&T on drawings / MBD / PMI** (Partial): Data model + auto-propose only; no UI for placement
+- **Large assembly performance mode** (Partial): LOD mesh swapping (configurable); no SpeedPak equivalent
+- **FE — linear static (native)** (Partial): Linear static solver; no UI panel beyond displacement render
+- **FE — fatigue (S-N)** (Partial): S-N + ε-N + rainflow backend; no UI
+- **Modal / buckling / nonlinear FEA** (Partial): Consistent-mass modal + linear eigenvalue buckling (Euler-Bernoulli Kg) + harmonic/FRF (mode superposition) + random-vibration PSD (Miles' equation + shaped PSD) + Riks + J2 plasticity backend; no UI
+- **AISC 360 / ACI 318 member design** (Partial): Full per-code backend; no UI panel
+- **Spur/helical gear rating (AGMA/ISO 6336)** (Partial): Full AGMA 2001-D04 + ISO 6336 Method B backend; no UI
+- **Bearings — ISO 281 L10 / ISO/TS 16281** (Partial): ISO 281 + ISO/TS 16281 aISO modified life backend; no UI
+- **Shaft stress + critical speed** (Partial): Closed-form shaft stress + critical speed backend; no UI
+- **Weldments structural framework** (Partial): Weldment profiles + cut-list engine; no full workspace
+- **CFD (internal/external flow)** (Partial): Real OpenFOAM bridge backend (needs install); no UI
+- **HVAC duct sizing (SMACNA)** (Partial): SMACNA duct sizing + flat-pattern backend; no UI
+- **Heat exchanger (LMTD/ε-NTU)** (Partial): Full TEMA shell-tube with Bell-Delaware + 5 correction factors backend
+- **Signal integrity (Z0/crosstalk/eye/IBIS)** (Partial): IBIS 5.1 + Bergeron channel + PRBS eye backend
+- **EMC (radiated/shielding/limits)** (Partial): Closed-form radiated/shielding/limits backend; no full-wave
+- **Multi-axis CAM (5-axis)** (Partial): 5-axis 3+2 engine solid; no UI
+- **Feeds & speeds + tool-life (Taylor/Gilbert)** (Partial): Taylor extended + Gilbert economic speed backend
+- **Nesting (2D part layout)** (Partial): Skyline + true-shape NFP + Minkowski-sum backend
+- **Moldflow / injection fill simulation** (Partial): Hele-Shaw front tracking + weld-line + air-trap backend
+- **Road alignment (horizontal/vertical/clothoid)** (Partial): H+V alignment + clothoid + SSD backend; no plan export
+- **Geotech (bearing/settlement/slope/liquefaction)** (Partial): Seed-Idriss CSR + SPT/CPT CRR + Tokimatsu backend
+- **Planar MBD (Lagrange/DAE)** (Partial): Planar MBD Lagrange/DAE backend; not wired to assembly UI
+- **Controls — classical (Routh/Bode/PID)** (Partial): Routh/Bode/RL/PID tune + state-space/LQR/Kalman backend
+- **Vibration (SDOF/n-DOF modal/FRF)** (Partial): Full n-DOF eigen + FRF matrix + harmonic response (mode superposition, DAF, phase) + random-vibration PSD (Miles' equation + shaped PSD via trapezoidal integration) backend; no UI
+- **Solar PV (system + partial shading)** (Partial): Single-diode + bypass-diode IV + MPPT + mismatch backend
+- **AC load-flow (Newton-Raphson)** (Partial): Full polar-form NR load-flow backend; no UI
+- **GD&T data model (ASME Y14.5)** (Partial): Data model + auto-propose; no MBD/PMI placement UI
+- **Tolerance stackup — 1D (WC/RSS)** (Partial): WC/RSS/Monte-Carlo 1D backend; Monte-Carlo LCG bug
+- **Tolerance stackup — 3D vector loop** (Partial): 6-DOF vector loop + sensitivity Jacobian backend
+- **Limits & fits (ISO 286)** (Partial): ISO 286 limits & fits backend; no UI
+- **SPC control charts (Shewhart/CUSUM/EWMA)** (Partial): Shewhart/CUSUM/EWMA + Nelson/WECO rules backend
+- **Paraxial ray tracing / Gaussian beam** (Partial): ABCD + Seidel + thick lens + Gaussian beam + M² backend
+- **Acoustics (ISO 9613 / RT60 / mass-law TL)** (Partial): ISO 9613 + RT60 + mass-law TL + image-source IR backend
+- **Material selection (Ashby / multi-objective)** (Partial): 200 materials + Pareto frontier + weighted-score backend
+- **Should-cost / DFM estimation** (Partial): 6-process Boothroyd-Dewhurst should-cost backend
+- **LCA (ISO 14040/44 full 4 phases)** (Partial): Full 4-phase LCA + multi-impact + uncertainty backend
 
 ## Pricing
 

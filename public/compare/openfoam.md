@@ -300,31 +300,31 @@ OpenFOAM solves the Navier-Stokes equations — Kerf wraps it so you describe th
 
 ## Summary
 
-Kerf saturates **94%** of OpenFOAM's feature surface (22 yes, 3 partial, 0 no out of 25 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
+Kerf saturates **66%** of OpenFOAM's feature surface (11 yes, 11 partial, 3 no out of 25 features tracked here). Honest gaps: 11 features partial (engine complete, UI or depth gap); 3 features not yet implemented.
 
 ## Feature comparison
 
 | Feature | Kerf | OpenFOAM | Notes |
 |---------|------|----------|-------|
-| CFD — incompressible flow | ✅ | Yes | Wave 10 reference implementation. |
-| CFD — compressible flow | ✅ | Yes | Wave 12B build implementation. |
-| CFD — conjugate heat transfer | ✅ | Yes | Wave 12B build implementation. |
-| CFD — multiphase flow | ✅ | Yes | Wave 12B build implementation. |
-| CFD — combustion / reacting flow | ✅ | Yes | Wave 9: EBU combustion + reacting flow module. |
-| CFD — turbulence models (RANS) | ✅ | Yes | Wave 10 reference implementation. |
-| CFD — LES / DES / DNS | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
-| CFD — mesh generation (snappyHexMesh) | ✅ | Yes | Wave 10C build implementation. |
-| CFD — Lagrangian particle tracking | ✅ | Yes | Wave 9: Lagrangian particle tracking module. |
-| CFD — dynamic mesh / FSI | ✅ | Yes | Wave 9: ALE dynamic mesh / FSI module. |
-| CFD — parallel MPI execution | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
-| CFD — post-processing (ParaView / VTK) | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
+| CFD — incompressible flow | ⚠️ (partial) | Yes | OpenFOAM backend bridge; chat-native case generation; needs OpenFOAM install |
+| CFD — compressible flow | ⚠️ (partial) | Yes | OpenFOAM backend bridge; core compressible solvers exposed via chat |
+| CFD — conjugate heat transfer | ⚠️ (partial) | Yes | OpenFOAM backend bridge; CHT solver accessible via LLM tool |
+| CFD — multiphase flow | ⚠️ (partial) | Yes | Selected multiphase solvers via bridge; full multiphase suite requires direct OpenFOAM |
+| CFD — combustion / reacting flow | 🔴 (no) | Yes | Combustion CFD (reactingFoam / fireFoam) not yet exposed in Kerf bridge |
+| CFD — turbulence models (RANS) | ⚠️ (partial) | Yes | k-eps and k-omega SST exposed via chat case generation; full model library via direct OpenFOAM |
+| CFD — LES / DES / DNS | ⚠️ (partial) | Yes | LES models accessible via bridge; specialist case tuning requires expert review |
+| CFD — mesh generation (snappyHexMesh) | ⚠️ (partial) | Yes | snappyHexMesh dict generated via chat from Kerf STL export; no GUI mesh editor |
+| CFD — Lagrangian particle tracking | 🔴 (no) | Yes | Lagrangian particle models not exposed in Kerf bridge |
+| CFD — dynamic mesh / FSI | 🔴 (no) | Yes | Dynamic mesh and FSI not yet exposed in Kerf bridge |
+| CFD — parallel MPI execution | ⚠️ (partial) | Yes | Hosted cloud compute for moderate-scale runs; petascale HPC requires direct OpenFOAM |
+| CFD — post-processing (ParaView / VTK) | ⚠️ (partial) | Yes | Basic in-browser result viewer; full ParaView pipeline on exported OpenFOAM case directory |
 | Psychrometrics (moist air) | ✅ | No | ASHRAE-grade psychrometrics (backend) |
 | Heat exchanger sizing (LMTD / Bell-Delaware) | ✅ | No | LMTD + epsilon-NTU + Bell-Delaware + TEMA layout (backend) |
 | HVAC duct sizing (SMACNA) | ✅ | No | SMACNA duct sizing + flat-pattern (backend) |
 | Pipe network (Hardy-Cross) | ✅ | No | Hardy-Cross pipe network solver (backend) |
 | External aerodynamics (vehicle / airfoil) | ✅ | Yes | VLM + viscous Cd + OpenFOAM bridge for full CFD; airfoil panel method wired |
-| Wind loading / wind engineering | ✅ | Yes | Wave 10B reference implementation. |
-| Marine / offshore hydrodynamics | ✅ | Yes | Wave 12B build implementation. |
+| Wind loading / wind engineering | ⚠️ (partial) | Yes | ASCE 7-22 wind (MWFRS+C&C) code calc; full CFD via OpenFOAM bridge |
+| Marine / offshore hydrodynamics | ⚠️ (partial) | Yes | Hydrostatics + GZ + seakeeping RAOs (strip theory) wired; wave CFD via bridge |
 | Mold filling / injection simulation | ✅ | Partial | Hele-Shaw flow-front tracking + weld-line + air-trap detection (backend) |
 | CAD geometry modelling | ✅ | No | Full parametric B-rep modeller (OCCT); sketcher + feature tree wired in browser |
 | Unified CAD + simulation project | ✅ | No | Single cloud-git project: B-rep model, CFD case, and PCB thermal co-versioned |
@@ -344,9 +344,20 @@ Kerf saturates **94%** of OpenFOAM's feature surface (22 yes, 3 partial, 0 no ou
 
 ## What's honestly outstanding
 
-- **CFD — LES / DES / DNS** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
-- **CFD — parallel MPI execution** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
-- **CFD — post-processing (ParaView / VTK)** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
+- **CFD — incompressible flow** (Partial): OpenFOAM backend bridge; chat-native case generation; needs OpenFOAM install
+- **CFD — compressible flow** (Partial): OpenFOAM backend bridge; core compressible solvers exposed via chat
+- **CFD — conjugate heat transfer** (Partial): OpenFOAM backend bridge; CHT solver accessible via LLM tool
+- **CFD — multiphase flow** (Partial): Selected multiphase solvers via bridge; full multiphase suite requires direct OpenFOAM
+- **CFD — combustion / reacting flow** (Not yet implemented): Combustion CFD (reactingFoam / fireFoam) not yet exposed in Kerf bridge
+- **CFD — turbulence models (RANS)** (Partial): k-eps and k-omega SST exposed via chat case generation; full model library via direct OpenFOAM
+- **CFD — LES / DES / DNS** (Partial): LES models accessible via bridge; specialist case tuning requires expert review
+- **CFD — mesh generation (snappyHexMesh)** (Partial): snappyHexMesh dict generated via chat from Kerf STL export; no GUI mesh editor
+- **CFD — Lagrangian particle tracking** (Not yet implemented): Lagrangian particle models not exposed in Kerf bridge
+- **CFD — dynamic mesh / FSI** (Not yet implemented): Dynamic mesh and FSI not yet exposed in Kerf bridge
+- **CFD — parallel MPI execution** (Partial): Hosted cloud compute for moderate-scale runs; petascale HPC requires direct OpenFOAM
+- **CFD — post-processing (ParaView / VTK)** (Partial): Basic in-browser result viewer; full ParaView pipeline on exported OpenFOAM case directory
+- **Wind loading / wind engineering** (Partial): ASCE 7-22 wind (MWFRS+C&C) code calc; full CFD via OpenFOAM bridge
+- **Marine / offshore hydrodynamics** (Partial): Hydrostatics + GZ + seakeeping RAOs (strip theory) wired; wave CFD via bridge
 
 ## Pricing
 

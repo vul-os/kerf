@@ -118,26 +118,37 @@ The dental lab CAD platform — versus an open-core CAD with DICOM ingest, surgi
 
 ## Summary
 
-Kerf saturates **100%** of 3Shape Dental System's feature surface (10 yes, 0 partial, 0 no out of 10 features tracked here). Kerf covers the full tracked feature set for 3Shape Dental System; gaps may exist in workflow depth, ecosystem maturity, and community support.
+Kerf saturates **60%** of 3Shape Dental System's feature surface (2 yes, 8 partial, 0 no out of 10 features tracked here). Honest gaps: 8 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
 | Feature | Kerf | 3Shape Dental System | Notes |
 |---------|------|----------------------|-------|
-| Dental (crown/surgical guide/DICOM) | ✅ | Yes | Wave 10B reference implementation. |
-| Crown and bridge design | ✅ | Yes | Wave 11B build implementation. |
-| Implant planning | ✅ | Yes | Wave 11B build implementation. |
-| Surgical guide design | ✅ | Yes | Wave 11B build implementation. |
+| Dental (crown/surgical guide/DICOM) | ⚠️ (partial) | Yes | Anatomic crown (swept margin polygon + cusp ridges, n_cusps=2-4), surgical guide, DICOM ingest, parametric full dentu... |
+| Crown and bridge design | ⚠️ (partial) | Yes | CrownSculptingPanel: anatomic preset picker (incisor/canine/premolar/molar), cusp height/angle sliders, occlusion-con... |
+| Implant planning | ⚠️ (partial) | Yes | ImplantLibrary: filterable catalogue (Straumann, Nobel Biocare, Zimmer, MIS; diameter 3.3-4.8 mm; length 8-13 mm), cl... |
+| Surgical guide design | ⚠️ (partial) | Yes | SurgicalGuide: CBCT/point-cloud import (CSV/JSON xyz), implant pose editor (position + axis per implant), drill sleev... |
 | DICOM / CBCT ingest | ✅ | Yes | DICOM ingest module for CBCT processing (backend) |
-| Removable partial denture (RPD) / full denture | ✅ | Yes | Wave 11B build implementation. |
-| AI-powered design automation | ✅ | Yes | Wave 11B build implementation. |
-| Intraoral scanner integration | ✅ | Yes | Wave 11B build implementation. |
-| Lab management / manufacturing output | ✅ | Yes | Wave 11B build implementation. |
+| Removable partial denture (RPD) / full denture | ⚠️ (partial) | Yes | Parametric full denture base (horseshoe arch, buccal flange, tooth socket positions) and RPD major connector (lingual... |
+| AI-powered design automation | ⚠️ (partial) | Yes | LLM-routed dental tool calls; no pre-trained dental restoration AI model |
+| Intraoral scanner integration | ⚠️ (partial) | Yes | Multi-scan ICP registration (point-to-point + point-to-plane, Besl-McKay/Chen-Medioni) + signed per-vertex deviation ... |
+| Lab management / manufacturing output | ⚠️ (partial) | Yes | Binary and ASCII STL export for dental meshes (crown, full denture, RPD) via stl_export.py; normal computation from v... |
 | LLM / chat-native editing | ✅ | No | Chat-native: describe a restoration in plain language; Kerf routes to dental backend |
 
 ## What Kerf does that 3Shape Dental System doesn't
 
 - **LLM / chat-native editing** — Chat-native: describe a restoration in plain language; Kerf routes to dental backend
+
+## What's honestly outstanding
+
+- **Dental (crown/surgical guide/DICOM)** (Partial): Anatomic crown (swept margin polygon + cusp ridges, n_cusps=2-4), surgical guide, DICOM ingest, parametric full denture + RPD, binary/ASCII STL export (backend tools). No AI design proposals, no implant library, no virtual articulator.
+- **Crown and bridge design** (Partial): CrownSculptingPanel: anatomic preset picker (incisor/canine/premolar/molar), cusp height/angle sliders, occlusion-contact SVG overlay, Run dispatches dental_crown_design. Backend: design_crown_anatomic (swept margin polygon + raised-cosine cusp ridges, n_cusps=2-4). No virtual articulator, no bridge pontic.
+- **Implant planning** (Partial): ImplantLibrary: filterable catalogue (Straumann, Nobel Biocare, Zimmer, MIS; diameter 3.3-4.8 mm; length 8-13 mm), click-to-place sends fixture dims to dental_surgical_guide backend. Representative geometry — not a certified clinical implant library.
+- **Surgical guide design** (Partial): SurgicalGuide: CBCT/point-cloud import (CSV/JSON xyz), implant pose editor (position + axis per implant), drill sleeve setup, SVG guide preview; dispatches dental_surgical_guide. Backend: place_surgical_guide returns validate_body-clean cylinder sleeves + angular accuracy.
+- **Removable partial denture (RPD) / full denture** (Partial): Parametric full denture base (horseshoe arch, buccal flange, tooth socket positions) and RPD major connector (lingual bar / palatal plate) via design_full_denture() / design_rpd(). Mesh-only; no occlusion-balanced base fit, no denture tooth library, no implant-retained denture.
+- **AI-powered design automation** (Partial): LLM-routed dental tool calls; no pre-trained dental restoration AI model
+- **Intraoral scanner integration** (Partial): Multi-scan ICP registration (point-to-point + point-to-plane, Besl-McKay/Chen-Medioni) + signed per-vertex deviation map shipped.
+- **Lab management / manufacturing output** (Partial): Binary and ASCII STL export for dental meshes (crown, full denture, RPD) via stl_export.py; normal computation from vertex cross-product; dental_stl_export LLM tool. No dental mill post processor (G-code, Sirona/Roland CAM paths).
 
 ## Pricing
 

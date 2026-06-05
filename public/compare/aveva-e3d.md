@@ -127,23 +127,32 @@ The enterprise piping and plant design platform — versus an open-core CAD with
 
 ## Summary
 
-Kerf saturates **100%** of AVEVA E3D Design's feature surface (11 yes, 0 partial, 0 no out of 11 features tracked here). Kerf covers the full tracked feature set for AVEVA E3D Design; gaps may exist in workflow depth, ecosystem maturity, and community support.
+Kerf saturates **68%** of AVEVA E3D Design's feature surface (5 yes, 5 partial, 1 no out of 11 features tracked here). Honest gaps: 5 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
 | Feature | Kerf | AVEVA E3D Design | Notes |
 |---------|------|------------------|-------|
-| Piping route design (3D intelligent) | ✅ | Yes | Wave 10 reference implementation. |
-| Piping component catalogue | ✅ | Yes | Wave 12B build implementation. |
+| Piping route design (3D intelligent) | ⚠️ (partial) | Yes | Spec-driven pipe class enforcement (ASME B36.10M/B31.3 Barlow wall check, material grade, pressure/temp limits); orth... |
+| Piping component catalogue | ⚠️ (partial) | Yes | P&ID component library (vessels, pumps, HX, valves, instruments with ISA 5.1 symbols); ASME B36.10M pipe size/schedul... |
 | Isometric drawing generation | ✅ | Yes | Isometric drawing generation from P&ID data (backend) |
 | P&ID integration / data synchronisation | ✅ | Yes | P&ID authoring with PID symbols; backend engine wired |
-| Clash detection (hard/soft) | ✅ | Yes | Wave 10 reference implementation. |
-| Multi-discipline plant design (structural/HVAC/civil) | ✅ | Yes | Wave 12B build implementation. |
-| Global multi-user concurrent design | ✅ | Yes | Wave 12B build implementation. |
-| Laser scan / point cloud integration | ✅ | Yes | Wave 9A: LAS/LAS 1.4 reader + E57 reader; point cloud import. |
+| Clash detection (hard/soft) | ⚠️ (partial) | Yes | Clash detection in assembly (OBB-SAT + BVH backend); no P&ID/plant-specific clash UI |
+| Multi-discipline plant design (structural/HVAC/civil) | ⚠️ (partial) | Yes | Structural FEA, HVAC sizing, civil — separate packages but not a unified plant model |
+| Global multi-user concurrent design | ⚠️ (partial) | Yes | Cloud git workspace with branch/merge; not real-time concurrent design at plant-model scale |
+| Laser scan / point cloud integration | 🔴 (no) | Yes | No point cloud / laser scan integration |
 | HVAC duct sizing | ✅ | Yes | SMACNA duct sizing + flat-pattern (backend) |
 | Piping stress / structural FEA | ✅ | Partial | Full structural FEA: 1D beam, ASME VIII pressure vessels, API 650 tanks (backend) |
 | LLM / industrial AI assistant | ✅ | Partial | Chat-native: plain-language design edits; full LLM tool routing for all backend engines |
+
+## What's honestly outstanding
+
+- **Piping route design (3D intelligent)** (Partial): Spec-driven pipe class enforcement (ASME B36.10M/B31.3 Barlow wall check, material grade, pressure/temp limits); orthogonal isometric routing; no interactive 3D plant routing UI
+- **Piping component catalogue** (Partial): P&ID component library (vessels, pumps, HX, valves, instruments with ISA 5.1 symbols); ASME B36.10M pipe size/schedule catalogue; ASME B16.9 elbow radius table; no 3D parametric fitting catalogue
+- **Clash detection (hard/soft)** (Partial): Clash detection in assembly (OBB-SAT + BVH backend); no P&ID/plant-specific clash UI
+- **Multi-discipline plant design (structural/HVAC/civil)** (Partial): Structural FEA, HVAC sizing, civil — separate packages but not a unified plant model
+- **Global multi-user concurrent design** (Partial): Cloud git workspace with branch/merge; not real-time concurrent design at plant-model scale
+- **Laser scan / point cloud integration** (Not yet implemented): No point cloud / laser scan integration
 
 ## Pricing
 

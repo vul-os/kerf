@@ -328,7 +328,7 @@ CATIA built the A380 — Kerf builds the next generation of engineers who work w
 
 ## Summary
 
-Kerf saturates **100%** of Dassault CATIA's feature surface (60 yes, 0 partial, 0 no out of 60 features tracked here). Kerf covers the full tracked feature set for Dassault CATIA; gaps may exist in workflow depth, ecosystem maturity, and community support.
+Kerf saturates **94%** of Dassault CATIA's feature surface (54 yes, 5 partial, 1 no out of 60 features tracked here). Honest gaps: 5 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -341,14 +341,14 @@ Kerf saturates **100%** of Dassault CATIA's feature surface (60 yes, 0 partial, 
 | Shell / hollow | ✅ | Yes | Shell command in Part Design |
 | Sweep (1 & 2 rail) | ✅ | Yes | Generative Shape Design sweep |
 | Loft | ✅ | Yes | Guide-rail overload wired (ThruSections.AddWire); ruled/closed/symmetric |
-| NURBS surfacing (blend/network/patch) | ✅ | Yes | Wave 10 reference implementation. |
+| NURBS surfacing (blend/network/patch) | ⚠️ (partial) | Yes | blend/network/patch/match-srf + G3 + Class-A harness wired; not FreeStyle/GSD class-A depth |
 | Assemblies — mates | ✅ | Yes | Assembly Design — coincident, offset, angle, user-defined constraints |
-| Assembly motion study / interference | ✅ | Yes | Wave 9: assembly motion study and interference detection. |
-| 2D drawings (views/dims/sections) | ✅ | Yes | Wave 10 reference implementation. |
-| GD&T on drawings / MBD / PMI | ✅ | Yes | Wave 10 reference implementation. |
+| Assembly motion study / interference | 🔴 (no) | Yes | DMU Kinematics + DMU Space Analysis — envelope sweeps, clash/clearance/contact |
+| 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Live HLR projection (make2d) + auto-dim; no GD&T-placement UI |
+| GD&T on drawings / MBD / PMI | ⚠️ (partial) | Yes | Data model only; no UI panel |
 | Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
 | Configurations / family variants | ✅ | Yes | Engine complete; no UI panel |
-| FE — solid (tet/hex) | ✅ | Yes (paid tier) | Wave 11B build implementation. |
+| FE — solid (tet/hex) | ⚠️ (partial) | Yes (paid tier) | CalculiX/Mystran/Z88 bridge (needs binary); backend only |
 | FE — plate / shell (native) | ✅ | Yes (paid tier) | MITC4 (Bathe-Dvorkin) + modal; backend only |
 | Modal / buckling / nonlinear | ✅ | Yes (paid tier) | Consistent-mass modal, Riks, J2 plasticity; backend only |
 | Fatigue (S-N, ε-N, rainflow) | ✅ | Yes (paid tier) | Backend only |
@@ -369,7 +369,7 @@ Kerf saturates **100%** of Dassault CATIA's feature surface (60 yes, 0 partial, 
 | Silicon synth (Yosys) / STA / GDS / DRC / LVS | ✅ | No | Deep; zero UI |
 | Analog PVT-corner sim | ✅ | No | 60 corners (5P×3V×4T) + MC; backend only |
 | 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes (paid tier) | CAMView wired |
-| 5-axis (kinematics + posts) | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| 5-axis (kinematics + posts) | ⚠️ (partial) | Yes (paid tier) | Engine solid; no UI |
 | Adaptive / trochoidal clearing | ✅ | Yes (paid tier) | Iterative offset + 50% trochoid overlap; backend only |
 | Feeds & speeds + tool-life | ✅ | No | Taylor extended + Gilbert economic speed; backend only |
 | Moldflow / fill sim | ✅ | Yes (paid tier) | Hele-Shaw front tracking + weld-line + air-trap; backend only |
@@ -397,7 +397,6 @@ Kerf saturates **100%** of Dassault CATIA's feature surface (60 yes, 0 partial, 
 
 ## What Kerf does that Dassault CATIA doesn't
 
-- **FE — solid (tet/hex)** — Wave 11B build implementation.
 - **FE — plate / shell (native)** — MITC4 (Bathe-Dvorkin) + modal; backend only
 - **Modal / buckling / nonlinear** — Consistent-mass modal, Riks, J2 plasticity; backend only
 - **Fatigue (S-N, ε-N, rainflow)** — Backend only
@@ -409,7 +408,17 @@ Kerf saturates **100%** of Dassault CATIA's feature surface (60 yes, 0 partial, 
 - **Doublet-lattice / flutter** — Backend only
 - **Composites layup (CLT / drape / failure)** — CLT + drape + Tsai-Wu/Hill/Hashin + interlaminar; backend only
 - **6-DOF flight dynamics + stability derivs** — Backend only
-- *(and 32 more features not covered by Dassault CATIA)*
+- **Orbital (Kepler, J2/J3, Hohmann)** — Wired tool
+- *(and 30 more features not covered by Dassault CATIA)*
+
+## What's honestly outstanding
+
+- **NURBS surfacing (blend/network/patch)** (Partial): blend/network/patch/match-srf + G3 + Class-A harness wired; not FreeStyle/GSD class-A depth
+- **Assembly motion study / interference** (Not yet implemented)
+- **2D drawings (views/dims/sections)** (Partial): Live HLR projection (make2d) + auto-dim; no GD&T-placement UI
+- **GD&T on drawings / MBD / PMI** (Partial): Data model only; no UI panel
+- **FE — solid (tet/hex)** (Partial): CalculiX/Mystran/Z88 bridge (needs binary); backend only
+- **5-axis (kinematics + posts)** (Partial): Engine solid; no UI
 
 ## Pricing
 

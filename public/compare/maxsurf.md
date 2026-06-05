@@ -128,22 +128,22 @@ Integrated naval architecture hull design and stability platform — versus an o
 
 ## Summary
 
-Kerf saturates **95%** of Bentley Maxsurf's feature surface (10 yes, 1 partial, 0 no out of 11 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **86%** of Bentley Maxsurf's feature surface (8 yes, 3 partial, 0 no out of 11 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
 | Feature | Kerf | Bentley Maxsurf | Notes |
 |---------|------|-----------------|-------|
-| Hull form modelling (NURBS) | ✅ | Yes | Wave 10 reference implementation. |
+| Hull form modelling (NURBS) | ⚠️ (partial) | Yes | NURBS surfacing math complete; OCCT bindings unconfirmed at build; no hull-specific parametric UI |
 | Hydrostatics (intact) | ✅ | Yes | Hydrostatics: displacement, BM, GM, trim, freeboard (backend) |
 | Intact and damage stability (IMO) | ✅ | Yes | Intact stability (GZ curve, IMO criteria) and damage stability (backend) |
 | Resistance prediction | ✅ | Yes | Holtrop-Mennen resistance prediction (backend) |
 | Seakeeping / motions | ✅ | Yes | Seakeeping: heave/pitch/roll RAOs + added mass + damping (backend) |
 | Structural analysis (scantlings) — ISO 12215-5 | ✅ | Yes | Full ISO 12215-5:2008 scantlings: design categories A–D; dynamic acceleration nCG; bottom / side / deck design pressu... |
-| Structural analysis (scantlings) — Lloyd's / DNV / BV / ABS rules | ⚠️ (partial) | Yes | Wave 10 — comprehensive evidence flip; commercial-vendor parity honest-flagged. |
+| Structural analysis (scantlings) — Lloyd's / DNV / BV / ABS rules | ⚠️ (partial) | Yes | Not yet implemented. These are large proprietary class-society rule trees (vessels > 24 m). ISO 12215-5 covers the op... |
 | Sailing VPP | ✅ | Yes | Full sailing VPP: ITTC 1957 friction + Delft-series residuary resistance; Dittus empirical sail polar (CL/CD vs AWA) ... |
 | Section / body-plan curves | ✅ | Yes | Hull section curve extraction (backend) |
-| DXF / IGES / 3DM file exchange | ✅ | Yes | Wave 10 reference implementation. |
+| DXF / IGES / 3DM file exchange | ⚠️ (partial) | Yes | STEP export; limited IGES; no DGN/3DM exchange |
 | LLM / chat-native editing | ✅ | No | Chat-native: describe vessel parameters; Kerf runs hydrostatics and stability |
 
 ## What Kerf does that Bentley Maxsurf doesn't
@@ -152,7 +152,9 @@ Kerf saturates **95%** of Bentley Maxsurf's feature surface (10 yes, 1 partial, 
 
 ## What's honestly outstanding
 
-- **Structural analysis (scantlings) — Lloyd's / DNV / BV / ABS rules** (Partial): Wave 10 — comprehensive evidence flip; commercial-vendor parity honest-flagged.
+- **Hull form modelling (NURBS)** (Partial): NURBS surfacing math complete; OCCT bindings unconfirmed at build; no hull-specific parametric UI
+- **Structural analysis (scantlings) — Lloyd's / DNV / BV / ABS rules** (Partial): Not yet implemented. These are large proprietary class-society rule trees (vessels > 24 m). ISO 12215-5 covers the open-standard tractable core for small craft.
+- **DXF / IGES / 3DM file exchange** (Partial): STEP export; limited IGES; no DGN/3DM exchange
 
 ## Pricing
 

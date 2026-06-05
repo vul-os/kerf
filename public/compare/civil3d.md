@@ -336,7 +336,7 @@ Civil infrastructure design — corridor/pipe depth vs MIT open-core analysis mo
 
 ## Summary
 
-Kerf saturates **100%** of Civil 3D's feature surface (28 yes, 0 partial, 0 no out of 28 features tracked here). Kerf covers the full tracked feature set for Civil 3D; gaps may exist in workflow depth, ecosystem maturity, and community support.
+Kerf saturates **82%** of Civil 3D's feature surface (21 yes, 4 partial, 3 no out of 28 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap); 3 features not yet implemented.
 
 ## Feature comparison
 
@@ -345,22 +345,22 @@ Kerf saturates **100%** of Civil 3D's feature surface (28 yes, 0 partial, 0 no o
 | Horizontal+vertical alignment (clothoid, SSD) | ✅ | Yes | Backend; no UI |
 | Superelevation runoff transition | ✅ | Yes | Backend; AASHTO Exhibit 3-20 validated |
 | Corridor / cross-section | ✅ | Yes | Backend; divided highway + urban curb-gutter templates |
-| Dynamic TIN surfaces | ✅ | Yes | Wave 11B build implementation. |
-| Gravity pipe networks (storm/sanitary) | ✅ | Yes | Wave 11B build implementation. |
-| Pressure pipe networks | ✅ | Yes | Wave 11B build implementation. |
+| Dynamic TIN surfaces | ⚠️ (partial) | Yes | TIN surface from point cloud + cut/fill volumes; contour extraction; no corridor-driven composite TINs |
+| Gravity pipe networks (storm/sanitary) | ⚠️ (partial) | Yes | Manning's equation for circular/trapezoidal gravity flow (normal-depth solver, full-flow capacity, part-full geometry... |
+| Pressure pipe networks | ⚠️ (partial) | Yes | Hardy-Cross / Global Gradient Algorithm steady-state solver (Hazen-Williams + Darcy-Weisbach with Swamee-Jain frictio... |
 | Survey / COGO | ✅ | Yes | Backend; traverse adjust, resection |
 | Geodesy / projections (Vincenty, TM, UTM, LCC) | ✅ | Partial | Backend; Vincenty, TM, UTM, LCC validated |
 | Pavement design (AASHTO '93) | ✅ | Partial | Backend; AASHTO '93 full calculation |
 | Geotech (bearing/settlement/slope/pile/liquefaction) | ✅ | No | Backend; Seed-Idriss CSR + SPT/CPT CRR validated |
 | Hydrology (rational/SCS/TR-55) | ✅ | Partial | Rational method (ASCE/EWRI 77-17) + TR-55 runoff + HDS-5 culvert inlet-control (unsubmerged/submerged, concrete box +... |
 | Spillway / dam / railway / earthworks | ✅ | Partial | Backend; spillway, dam, railway, earthworks modules |
-| Parcels and lot layout | ✅ | Yes | Wave 9A: parcel subdivision engine (lot layout, area tables). |
-| Point cloud integration | ✅ | Yes | Wave 9A: LAS/E57 readers supply civil3d-equivalent point cloud import. |
-| Plan and profile sheet production | ✅ | Yes | Wave 9A: plan-and-profile sheet generator. |
+| Parcels and lot layout | 🔴 (no) | Yes | Needs parcel/lot-layout epic; not in current civil module scope |
+| Point cloud integration | 🔴 (no) | Yes | No scan / point-cloud ingestion; needs LiDAR/photogrammetry import pipeline |
+| Plan and profile sheet production | 🔴 (no) | Yes | No automated civil plan/profile sheet generation; corridor DXF export exists but no sheet-set workflow |
 | ASCE 7-22 wind (MWFRS+C&C) | ✅ | No | Backend; full MWFRS + C&C |
 | ASCE 7-22 seismic (ELF + RSA + Newmark) | ✅ | No | Backend; ELF + RSA (SRSS+CQC) + Newmark time-history |
 | Pipe network (Hardy-Cross) | ✅ | No | Hardy-Cross / Global Gradient Algorithm (Hazen-Williams + Darcy-Weisbach) steady-state solver; also Manning gravity f... |
-| 2D drawings (views/dims/sections) | ✅ | Yes | AutoCAD native — full 2D drafting and annotation |
+| 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Template-based; not live B-rep projection; no UI panel |
 | B-rep booleans (general NURBS) | ✅ | Yes | OCCT; no graceful failure / fuzzy heal |
 | Nesting (skyline + true-shape NFP) | ✅ | No | Backend; Minkowski-sum NFP, 57.6% L-shape utilisation |
 | NEC power distribution | ✅ | No | Backend; NEC power distribution + point-to-point SC |
@@ -384,6 +384,16 @@ Kerf saturates **100%** of Civil 3D's feature surface (28 yes, 0 partial, 0 no o
 - **Schematic capture (KiCad round-trip, ERC)** — Viewer wired (read-only)
 - **Controls — classical (Routh/Bode/RL/PID tune)** — Backend; classical control design tools
 - **Process capability (Cpk/Ppk)** — Backend
+
+## What's honestly outstanding
+
+- **Dynamic TIN surfaces** (Partial): TIN surface from point cloud + cut/fill volumes; contour extraction; no corridor-driven composite TINs
+- **Gravity pipe networks (storm/sanitary)** (Partial): Manning's equation for circular/trapezoidal gravity flow (normal-depth solver, full-flow capacity, part-full geometry); no network design, sizing wizard, or plan-production workflow
+- **Pressure pipe networks** (Partial): Hardy-Cross / Global Gradient Algorithm steady-state solver (Hazen-Williams + Darcy-Weisbach with Swamee-Jain friction); no plan-production or fittings layout
+- **Parcels and lot layout** (Not yet implemented): Needs parcel/lot-layout epic; not in current civil module scope
+- **Point cloud integration** (Not yet implemented): No scan / point-cloud ingestion; needs LiDAR/photogrammetry import pipeline
+- **Plan and profile sheet production** (Not yet implemented): No automated civil plan/profile sheet generation; corridor DXF export exists but no sheet-set workflow
+- **2D drawings (views/dims/sections)** (Partial): Template-based; not live B-rep projection; no UI panel
 
 ## Pricing
 

@@ -603,7 +603,7 @@ World-class mesh / DCC tool — a different category from B-rep CAD.
 
 ## Summary
 
-Kerf saturates **99%** of Blender's feature surface (51 yes, 1 partial, 0 no out of 52 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **93%** of Blender's feature surface (46 yes, 5 partial, 1 no out of 52 features tracked here). Honest gaps: 5 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -615,8 +615,8 @@ Kerf saturates **99%** of Blender's feature surface (51 yes, 1 partial, 0 no out
 | B-rep booleans (general NURBS) | ✅ | No | OCCT B-rep booleans; no graceful failure / fuzzy heal |
 | NURBS surfacing (blend/network/patch) | ✅ | No | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired |
 | Assemblies — mates | ✅ | No | Wired; coincident/concentric/parallel + BOM panel |
-| 2D drawings (views/dims/sections) | ✅ | No | Wave 10 reference implementation. |
-| GD&T on drawings / MBD / PMI | ✅ | No | Wave 10 reference implementation. |
+| 2D drawings (views/dims/sections) | ⚠️ (partial) | No | Live HLR projection (make2d) + auto-dim; no GD&T-placement UI |
+| GD&T on drawings / MBD / PMI | ⚠️ (partial) | No | Data model only; no UI |
 | Sheet metal | ✅ | No | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor) |
 | STEP / IGES B-rep interop | ✅ | No | STEP / IGES / 3DM B-rep round-trip |
 | Configurations / family variants | ✅ | No | Engine complete; no UI panel |
@@ -649,12 +649,12 @@ Kerf saturates **99%** of Blender's feature surface (51 yes, 1 partial, 0 no out
 | Solar PV (system + partial shading) | ✅ | No | Single-diode + bypass-diode IV + global MPPT (backend) |
 | Tolerance stackup — 1D (WC/RSS/MC) | ✅ | No | WC/RSS/Monte-Carlo (backend) |
 | Process capability (Cpk/Ppk) | ✅ | No | Cpk/Ppk + SPC charts (backend) |
-| Path-traced renderer (Cycles/EEVEE) | ⚠️ (partial) | Yes | Wave 10 — comprehensive evidence flip; commercial-vendor parity honest-flagged. |
+| Path-traced renderer (Cycles/EEVEE) | ⚠️ (partial) | Yes | HDRI + ACES + bloom (heroShot.js); no full path tracer |
 | Paraxial ABCD ray transfer | ✅ | No | Paraxial ABCD ray transfer (backend) |
 | Acoustics (ISO 9613, RT60, weighting, mass-law TL) | ✅ | No | ISO 9613 + RT60 + SEA + image-source IR (backend) |
-| Sculpting + dyntopo + multires | ✅ | Yes | Wave 10 reference implementation. |
-| Animation / rigging | ✅ | Yes | Wave 9C: keyframe FCurves + armature poser + IK solvers. |
-| Geometry Nodes (visual node DAG) | ✅ | Yes | Wave 10 reference implementation. |
+| Sculpting + dyntopo + multires | ⚠️ (partial) | Yes | sculpt_brush (grab/smooth/inflate) + multires + isotropic remesh; no dyntopo/30+ brushes |
+| Animation / rigging | 🔴 (no) | Yes | No animation or rigging; not planned |
+| Geometry Nodes (visual node DAG) | ⚠️ (partial) | Yes | Parametric DAG engine complete; visual node UI bindings to come |
 | Textiles (weave/knit/drape/cut-room) | ✅ | Partial | Weave/knit/drape/cut-room (backend; textiles page) |
 | Jewelry (configurator) | ✅ | No | 41 modules — ring v4, gemstones v2, settings v3/v4, chain v2 |
 | BIM (walls/slabs/framing/stairs/IFC4) | ✅ | No | Revit-comparable engine + IFC4 viewer via /compile-ifc |
@@ -670,17 +670,22 @@ Kerf saturates **99%** of Blender's feature surface (51 yes, 1 partial, 0 no out
 - **B-rep booleans (general NURBS)** — OCCT B-rep booleans; no graceful failure / fuzzy heal
 - **NURBS surfacing (blend/network/patch)** — blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired
 - **Assemblies — mates** — Wired; coincident/concentric/parallel + BOM panel
-- **2D drawings (views/dims/sections)** — Wave 10 reference implementation.
-- **GD&T on drawings / MBD / PMI** — Wave 10 reference implementation.
 - **Sheet metal** — Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor)
 - **STEP / IGES B-rep interop** — STEP / IGES / 3DM B-rep round-trip
 - **Configurations / family variants** — Engine complete; no UI panel
 - **FE — solid (tet/hex)** — CalculiX/Mystran/Z88 bridge (needs binary; backend)
-- *(and 35 more features not covered by Blender)*
+- **AISC 360-22 steel (members)** — Full Ch. E/F/H + 50-section catalog (backend)
+- **ACI 318-19 concrete** — Flexure/shear/PM/dev-length (backend)
+- *(and 33 more features not covered by Blender)*
 
 ## What's honestly outstanding
 
-- **Path-traced renderer (Cycles/EEVEE)** (Partial): Wave 10 — comprehensive evidence flip; commercial-vendor parity honest-flagged.
+- **2D drawings (views/dims/sections)** (Partial): Live HLR projection (make2d) + auto-dim; no GD&T-placement UI
+- **GD&T on drawings / MBD / PMI** (Partial): Data model only; no UI
+- **Path-traced renderer (Cycles/EEVEE)** (Partial): HDRI + ACES + bloom (heroShot.js); no full path tracer
+- **Sculpting + dyntopo + multires** (Partial): sculpt_brush (grab/smooth/inflate) + multires + isotropic remesh; no dyntopo/30+ brushes
+- **Animation / rigging** (Not yet implemented): No animation or rigging; not planned
+- **Geometry Nodes (visual node DAG)** (Partial): Parametric DAG engine complete; visual node UI bindings to come
 
 ## Pricing
 

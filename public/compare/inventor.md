@@ -779,7 +779,7 @@ features:
 
 ## Summary
 
-Kerf saturates **100%** of Autodesk Inventor's feature surface (68 yes, 0 partial, 0 no out of 68 features tracked here). Kerf covers the full tracked feature set for Autodesk Inventor; gaps may exist in workflow depth, ecosystem maturity, and community support.
+Kerf saturates **96%** of Autodesk Inventor's feature surface (64 yes, 3 partial, 1 no out of 68 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -792,9 +792,9 @@ Kerf saturates **100%** of Autodesk Inventor's feature surface (68 yes, 0 partia
 | Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief/punch |
 | NURBS surfacing (blend/network/patch) | ✅ | Yes | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, feature_to_solid (sew) wired |
 | Assemblies — mates | ✅ | Yes | Wired; coincident/concentric/parallel + BOM panel |
-| Assembly motion study / interference | ✅ | Yes | Wave 9: assembly motion study and interference detection. |
-| 2D drawings (views/dims/sections) | ✅ | Yes | Wave 10 reference implementation. |
-| GD&T on drawings / MBD / PMI | ✅ | Yes | Wave 10 reference implementation. |
+| Assembly motion study / interference | 🔴 (no) | Yes | None — planar MBD not wired to assembly solver |
+| 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Live HLR projection + auto-dim; no GD&T-placement UI |
+| GD&T on drawings / MBD / PMI | ⚠️ (partial) | Yes | GD&T data model only; no MBD/PMI UI |
 | Configurations / family variants | ✅ | Yes | Engine + ConfigurationsPanel.jsx wired in Editor.jsx |
 | iLogic rules engine | ✅ | Yes | Chat-driven scripting + kerf-sdk Python API |
 | FE — solid (tet/hex) | ✅ | Yes | CalculiX/Mystran/Z88 bridge (needs binary; backend) |
@@ -823,7 +823,7 @@ Kerf saturates **100%** of Autodesk Inventor's feature surface (68 yes, 0 partia
 | Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | No | IBIS 5.1 + Bergeron + PRBS eye envelope (backend) |
 | Wiring/harness (WireViz + 3D router) | ✅ | Yes | WireViz runner + harness3d; WiringView wired |
 | 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes (paid tier) | CAMView wired for common 3-axis ops |
-| 5-axis (kinematics + posts) | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| 5-axis (kinematics + posts) | ⚠️ (partial) | Yes (paid tier) | Engine solid (5-axis 3+2); no UI |
 | G-code post (Fanuc/GRBL/LinuxCNC/Mach3) | ✅ | Yes | Fanuc/GRBL/LinuxCNC/Mach3 posts; no G41/42 cutter-comp |
 | Feeds & speeds + tool-life | ✅ | Yes | Taylor extended + Gilbert economic speed (backend) |
 | Moldflow / fill sim | ✅ | Yes | Hele-Shaw front tracking + weld-line + air-trap (backend) |
@@ -868,7 +868,14 @@ Kerf saturates **100%** of Autodesk Inventor's feature surface (68 yes, 0 partia
 - **Orbital (Kepler, J2/J3, Hohmann)** — Kepler + J2/J3 + Hohmann + Lambert, wired
 - **Naval hydrostatics + GZ stability (IMO)** — Hydrostatics + GZ + IMO stability, wired
 - **Schematic capture (KiCad round-trip, ERC)** — KiCad round-trip viewer (read-only)
-- *(and 24 more features not covered by Autodesk Inventor)*
+- *(and 23 more features not covered by Autodesk Inventor)*
+
+## What's honestly outstanding
+
+- **Assembly motion study / interference** (Not yet implemented): None — planar MBD not wired to assembly solver
+- **2D drawings (views/dims/sections)** (Partial): Live HLR projection + auto-dim; no GD&T-placement UI
+- **GD&T on drawings / MBD / PMI** (Partial): GD&T data model only; no MBD/PMI UI
+- **5-axis (kinematics + posts)** (Partial): Engine solid (5-axis 3+2); no UI
 
 ## Pricing
 

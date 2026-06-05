@@ -130,21 +130,21 @@ The gold standard for optical design and tolerancing — versus an open-core CAD
 
 ## Summary
 
-Kerf saturates **95%** of Ansys Zemax OpticStudio's feature surface (10 yes, 1 partial, 0 no out of 11 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **73%** of Ansys Zemax OpticStudio's feature surface (7 yes, 2 partial, 2 no out of 11 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap); 2 features not yet implemented.
 
 ## Feature comparison
 
 | Feature | Kerf | Ansys Zemax OpticStudio | Notes |
 |---------|------|-------------------------|-------|
 | Paraxial ABCD ray transfer | ✅ | Yes | Paraxial ABCD ray transfer matrix (backend) |
-| Sequential ray tracing (lens design) | ✅ | Yes | Wave 10B reference implementation. |
+| Sequential ray tracing (lens design) | ⚠️ (partial) | Yes | Sequential ray tracing via ray_transfer.py + lens_system.py (backend); no merit function optimiser |
 | Seidel / Zernike aberration analysis | ✅ | Yes | Seidel aberrations S1-S5 (corrected 2026-05-24); no Zernike decomposition |
 | Non-sequential ray tracing (stray light) | ✅ | Yes | Non-sequential ray tracing + Fresnel-split + ghost detection (backend); 0.01% ghost fraction |
 | Gaussian beam propagation | ✅ | Yes | Complex-q + ABCD + M² + fibre coupling; HeNe zR=4.96m validated (backend) |
-| Tolerancing (NEST / Monte Carlo) | ⚠️ (partial) | Yes | Wave 10B — cross-domain evidence map; commercial parity honest-flagged. |
-| Multiphysics STOP analysis (thermal + structural) | ✅ | Yes | Wave 9 reference implementation. |
+| Tolerancing (NEST / Monte Carlo) | ⚠️ (partial) | Yes | Sensitivity (OAT: ±Δ per parameter, RSS budget) + Monte Carlo (uniform/normal, configurable n_trials, yield) via tole... |
+| Multiphysics STOP analysis (thermal + structural) | 🔴 (no) | Yes | No structural-thermal-optical performance (STOP) multiphysics coupling. |
 | Wave optics / diffraction / polarisation | ✅ | Yes | Scalar physical-optics propagation (POP): angular-spectrum method (Goodman §3.10, exact near-field), Fresnel transfer... |
-| Metalens design | ✅ | Yes | Wave 9 reference implementation. |
+| Metalens design | 🔴 (no) | Yes | No metalens / diffractive optical element design. |
 | Acoustics (ISO 9613, RT60, room acoustics) | ✅ | No | ISO 9613, RT60, weighting, mass-law TL, image-source IR, Schroeder RT60, SEA (backend) |
 | LLM / chat-native editing | ✅ | No | Chat-native: describe optical system in plain language; Kerf routes to ray trace backend |
 
@@ -155,7 +155,10 @@ Kerf saturates **95%** of Ansys Zemax OpticStudio's feature surface (10 yes, 1 p
 
 ## What's honestly outstanding
 
-- **Tolerancing (NEST / Monte Carlo)** (Partial): Wave 10B — cross-domain evidence map; commercial parity honest-flagged.
+- **Sequential ray tracing (lens design)** (Partial): Sequential ray tracing via ray_transfer.py + lens_system.py (backend); no merit function optimiser
+- **Tolerancing (NEST / Monte Carlo)** (Partial): Sensitivity (OAT: ±Δ per parameter, RSS budget) + Monte Carlo (uniform/normal, configurable n_trials, yield) via tolerancing.py; merit functions: EFL deviation, BFD deviation. No inverse sensitivity, no NEST compound tolerancing workflow.
+- **Multiphysics STOP analysis (thermal + structural)** (Not yet implemented): No structural-thermal-optical performance (STOP) multiphysics coupling.
+- **Metalens design** (Not yet implemented): No metalens / diffractive optical element design.
 
 ## Pricing
 

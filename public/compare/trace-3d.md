@@ -94,7 +94,7 @@ Commercial building energy analysis and HVAC design — TRACE 3D Plus vs MIT ope
 
 ## Summary
 
-Kerf saturates **93%** of Trane TRACE 3D Plus's feature surface (6 yes, 1 partial, 0 no out of 7 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **86%** of Trane TRACE 3D Plus's feature surface (6 yes, 0 partial, 1 no out of 7 features tracked here). Honest gaps: 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -104,7 +104,7 @@ Kerf saturates **93%** of Trane TRACE 3D Plus's feature surface (6 yes, 1 partia
 | AHRI-listed equipment catalogue | ✅ | Yes | 30 representative AHRI-listed models (6 categories, 5 per); real AHRI cert numbers + certified part-load curves from ... |
 | Part-load efficiency curves (AHRI-certified) | ✅ | Yes | AHRI-certified part-load values at 25/50/75/100% load — same source (ahridirectory.org) |
 | Duct and hydronic pipe sizing | ✅ | Yes | Velocity + equal-friction duct sizing; Darcy-Weisbach + SMACNA minor losses |
-| ASHRAE 90.1 / Title 24 compliance baseline modelling | ⚠️ (partial) | Yes | Wave 9 — honest implementation; commercial-grade accuracy honest-flagged. |
+| ASHRAE 90.1 / Title 24 compliance baseline modelling | 🔴 (no) | Yes | No ASHRAE 90.1 compliance reporting yet |
 | Revit / IFC geometry import | ✅ | Yes | Native IFC Tier 1+2 import; no gbXML reader yet |
 | Open-source / scripting API | ✅ | No | MIT-licensed Python plugin; JSON-RPC LLM tool surface; hvac.equipment_select |
 
@@ -114,7 +114,7 @@ Kerf saturates **93%** of Trane TRACE 3D Plus's feature surface (6 yes, 1 partia
 
 ## What's honestly outstanding
 
-- **ASHRAE 90.1 / Title 24 compliance baseline modelling** (Partial): Wave 9 — honest implementation; commercial-grade accuracy honest-flagged.
+- **ASHRAE 90.1 / Title 24 compliance baseline modelling** (Not yet implemented): No ASHRAE 90.1 compliance reporting yet
 
 ## Pricing
 

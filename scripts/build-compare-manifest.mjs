@@ -177,6 +177,7 @@ function collectDeeperBlock(lines, start, parentIndent) {
 }
 
 function parseScalar(v) {
+  if (v.startsWith('{') && v.endsWith('}')) return parseInlineMap(v)
   if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
     return v.slice(1, -1)
   }
@@ -184,6 +185,106 @@ function parseScalar(v) {
   if (/^-?\d*\.\d+$/.test(v)) return parseFloat(v)
   // Schema status values use 'yes'/'no' as strings; do NOT cast to boolean.
   return v
+}
+
+// Inline-flow map: `{ status: yes, note: "text, with comma", source: "url" }`.
+// Splits on top-level commas only (commas inside quotes are preserved), then on
+// the first `: ` of each entry. Used by catia.md's one-line feature rows.
+function parseInlineMap(v) {
+  const inner = v.slice(1, -1).trim()
+  const out = {}
+  let quote = ''
+  let buf = ''
+  const entries = []
+  for (const ch of inner) {
+    if (quote) {
+      if (ch === quote) quote = ''
+      buf += ch
+    } else if (ch === '"' || ch === "'") {
+      quote = ch
+      buf += ch
+    } else if (ch === ',') {
+      entries.push(buf)
+      buf = ''
+    } else {
+      buf += ch
+    }
+  }
+  if (buf.trim()) entries.push(buf)
+  for (const e of entries) {
+    const m = e.match(/^\s*([A-Za-z_][\w-]*)\s*:\s*(.*)$/)
+    if (m) out[m[1]] = parseScalar(m[2].trim())
+  }
+  return out
+}
+
+// ---------------------------------------------------------------------------
+// Normalize
+//
+// MD sources drifted into mixed notations over many authoring waves:
+//   status: checkbox `[x]`/`[~]`/`[ ]`  AND  word `yes`/`partial`/`no`
+//   feature key:      `name:`           OR   `feature:`
+//   note key:         `notes:`          OR   `note:`
+// The renderer + downstream counters expect a single canonical shape, so we
+// normalize here at build time. Keeping this in the build (not the MD) means
+// `node scripts/build-compare-manifest.mjs` is reproducible regardless of which
+// notation a given vendor file happens to use.
+// ---------------------------------------------------------------------------
+
+function normalizeStatus(v) {
+  if (v == null) return v
+  let s = String(v).trim().replace(/^["']|["']$/g, '').trim()
+  // tokens sometimes carry a trailing annotation, e.g. `[x] (backend)` or
+  // `shipped — no UI`. Keep the leading checkbox/word; the annotation is noise
+  // for status purposes (it belongs in the note).
+  const head = s.match(/^\[[x~?\s]\]/)
+  s = head ? head[0] : s.split(/[\s(—-]/)[0]
+  switch (s.toLowerCase()) {
+    case '[x]':
+    case 'yes':
+    case 'done':
+    case 'wired':
+    case 'shipped':
+      return 'yes'
+    case '[~]':
+    case '[?]':
+    case 'partial':
+    case 'wip':
+      return 'partial'
+    case '[ ]':
+    case '[]':
+    case 'no':
+    case 'planned':
+      return 'no'
+    default:
+      return s
+  }
+}
+
+// normalizeStatusToken: kerf statuses must reduce to yes/partial/no (enforced by
+// the build guard). Competitor statuses are frequently prose ("✅ Full — …") and
+// are preserved verbatim — only the note-key alias is applied.
+function normalizeSide(side, normalizeStatusToken) {
+  if (!side || typeof side !== 'object') return side
+  const out = { ...side }
+  if (normalizeStatusToken && 'status' in out) out.status = normalizeStatus(out.status)
+  // canonical note key is `notes`
+  if (out.note != null && out.notes == null) {
+    out.notes = out.note
+    delete out.note
+  }
+  return out
+}
+
+function normalizeFeature(f) {
+  if (!f || typeof f !== 'object') return f
+  const out = { ...f }
+  // canonical feature-label key is `name`
+  if (out.name == null && out.feature != null) out.name = out.feature
+  if ('feature' in out && out.name === out.feature) delete out.feature
+  if (out.competitor) out.competitor = normalizeSide(out.competitor, false)
+  if (out.kerf) out.kerf = normalizeSide(out.kerf, true)
+  return out
 }
 
 // ---------------------------------------------------------------------------
@@ -230,7 +331,7 @@ if (existsSync(compareDir)) {
     if (typeof fm.order === 'number') item.order = fm.order
     if (fm.reviewed_at) item.reviewed_at = String(fm.reviewed_at)
     if (Array.isArray(fm.features) && fm.features.length > 0) {
-      item.features = fm.features
+      item.features = fm.features.map(normalizeFeature)
     }
     items.push(item)
   }
@@ -255,6 +356,32 @@ const totalFeatures = outputItems.reduce(
   (sum, it) => sum + (Array.isArray(it.features) ? it.features.length : 0),
   0,
 )
+
+// Guard: every parsed status must normalize to a canonical token. A leftover
+// like `[x]`, an object, or a stray `evidence: …` string means a source file
+// drifted into a format the parser mishandled — fail loudly rather than ship a
+// corrupted manifest (the SPA renders these verbatim).
+const CANON = new Set(['yes', 'partial', 'no'])
+const badStatuses = []
+for (const it of outputItems) {
+  for (const f of it.features ?? []) {
+    for (const side of ['competitor', 'kerf']) {
+      const s = f[side] && typeof f[side] === 'object' ? f[side].status : f[side]
+      // competitor status is sometimes descriptive prose; only enforce kerf.
+      if (side === 'kerf' && !CANON.has(s)) {
+        badStatuses.push(`${it.slug} / ${f.name ?? f.feature ?? '?'} → kerf.status=${JSON.stringify(s)}`)
+      }
+    }
+  }
+}
+if (badStatuses.length > 0) {
+  console.error(
+    `build-compare-manifest: ${badStatuses.length} non-canonical kerf status(es) — source file format drift:\n  ` +
+      badStatuses.slice(0, 20).join('\n  ') +
+      (badStatuses.length > 20 ? `\n  …and ${badStatuses.length - 20} more` : ''),
+  )
+  process.exit(1)
+}
 
 const payload = {
   version: 2,

@@ -475,7 +475,7 @@ Industry-standard 2D drafting + .dwg ecosystem — different primary jobs.
 
 ## Summary
 
-Kerf saturates **100%** of AutoCAD's feature surface (41 yes, 0 partial, 0 no out of 41 features tracked here). Kerf covers the full tracked feature set for AutoCAD; gaps may exist in workflow depth, ecosystem maturity, and community support.
+Kerf saturates **94%** of AutoCAD's feature surface (37 yes, 3 partial, 1 no out of 41 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -485,8 +485,8 @@ Kerf saturates **100%** of AutoCAD's feature surface (41 yes, 0 partial, 0 no ou
 | Pad / pocket / revolve | ✅ | Partial | OCCT feature tree with full parametric history |
 | Direct edit (push-pull) | ✅ | Yes | push_pull (planar + curved), move_face, delete_face wired as ops |
 | Fillet / chamfer (constant) | ✅ | Yes | Wired; constant-radius fillet + chamfer |
-| 2D drawings (views/dims/sections) | ✅ | Yes | Wave 10 reference implementation. |
-| GD&T on drawings / MBD / PMI | ✅ | Yes | Wave 10 reference implementation. |
+| 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Template-based; not live B-rep projection; no UI panel |
+| GD&T on drawings / MBD / PMI | ⚠️ (partial) | Yes | Data model only (kerf-gdnt); no UI placement on drawings |
 | Patterns (linear/polar) + mirror | ✅ | Yes | Linear/polar patterns + mirror wired |
 | Sheet metal | ✅ | Yes (paid tier) | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
 | Assemblies — mates | ✅ | No | Wired; coincident/concentric/parallel + BOM panel |
@@ -515,13 +515,13 @@ Kerf saturates **100%** of AutoCAD's feature surface (41 yes, 0 partial, 0 no ou
 | Solar PV (system + partial shading) | ✅ | No | Single-diode + bypass-diode IV + global MPPT + mismatch loss (backend) |
 | Limits & fits (ISO 286) | ✅ | Yes (paid tier) | Full ISO 286 limits & fits engine (backend) |
 | Tolerance stackup — 1D (WC/RSS/MC) | ✅ | Yes (paid tier) | WC/RSS/MC tolerance stackup; Monte-Carlo LCG bug to fix (backend) |
-| Persistent face naming | ✅ | Partial | Wave 11B build implementation. |
+| Persistent face naming | ⚠️ (partial) | Partial | Two disconnected systems (Python DAG vs OCCT faceNaming.js); not unified |
 | Feeds & speeds + tool-life | ✅ | No | Taylor extended + Gilbert economic speed (backend) |
 | Battery/BMS, motor/gate/LED driver | ✅ | No | Battery/BMS + motor/gate/LED driver sizing calculators (backend) |
 | Pavement design (AASHTO '93) | ✅ | No | Full AASHTO 1993 pavement design engine (backend) |
 | Firmware build/upload/monitor/debug | ✅ | No | FirmwareActions + debug panel wired |
 | Moldflow / fill sim | ✅ | No | Hele-Shaw front tracking + weld-line + air-trap detection (backend) |
-| Hole wizard (standards/tapped/cbore) | ✅ | Yes (paid tier) | Wave 9: hole_feature.py + feature_hole_pattern_from_sketch.py (tapped/cbore/standards) |
+| Hole wizard (standards/tapped/cbore) | 🔴 (no) | Yes (paid tier) | Bare cylinder punch only; no standards-based hole wizard |
 
 ## What Kerf does that AutoCAD doesn't
 
@@ -537,7 +537,14 @@ Kerf saturates **100%** of AutoCAD's feature surface (41 yes, 0 partial, 0 no ou
 - **SPICE** — Real ngspice wired; binary .raw not yet parsed
 - **3-axis CAM (profile/contour/pocket/face)** — 3-axis CAM with tool DB, CAMView wired
 - **G-code post (Fanuc/GRBL/LinuxCNC/Mach3)** — Fanuc/GRBL/LinuxCNC/Mach3 posts; no G41/42 cutter-comp
-- *(and 19 more features not covered by AutoCAD)*
+- *(and 18 more features not covered by AutoCAD)*
+
+## What's honestly outstanding
+
+- **2D drawings (views/dims/sections)** (Partial): Template-based; not live B-rep projection; no UI panel
+- **GD&T on drawings / MBD / PMI** (Partial): Data model only (kerf-gdnt); no UI placement on drawings
+- **Persistent face naming** (Partial): Two disconnected systems (Python DAG vs OCCT faceNaming.js); not unified
+- **Hole wizard (standards/tapped/cbore)** (Not yet implemented): Bare cylinder punch only; no standards-based hole wizard
 
 ## Pricing
 

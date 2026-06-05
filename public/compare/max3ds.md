@@ -298,7 +298,7 @@ Archviz & game-art DCC — a different category from B-rep CAD.
 
 ## Summary
 
-Kerf saturates **98%** of Autodesk 3ds Max's feature surface (27 yes, 1 partial, 0 no out of 28 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **86%** of Autodesk 3ds Max's feature surface (23 yes, 2 partial, 3 no out of 28 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap); 3 features not yet implemented.
 
 ## Feature comparison
 
@@ -308,12 +308,12 @@ Kerf saturates **98%** of Autodesk 3ds Max's feature surface (27 yes, 1 partial,
 | Geometry — constraint sketcher | ✅ | No | PlaneGCS WASM sketcher v2 — geometric + dimensional constraints |
 | Geometry — parametric feature history DAG | ✅ | Partial | OCCT feature tree with persistent face IDs |
 | Geometry — STEP / IGES B-rep interop | ✅ | Partial | STEP / IGES / 3DM B-rep round-trip |
-| Geometry — polygon mesh modelling | ✅ | Yes | Wave 12A flip — existing module covers feature. |
+| Geometry — polygon mesh modelling | ⚠️ (partial) | Yes | SubD authoring + poke/extrude/subdivide/sculpt + quad/isotropic remesh; no Modifier Stack depth |
 | Structural / FEA — code checks (AISC, ACI, ASCE 7) | ✅ | No | AISC 360-22, ACI 318-19, ASCE 7-22 seismic/wind (backend) |
 | Structural / FEA — finite element analysis | ✅ | No | Native beam/MITC4 plate FEM + CalculiX bridge (backend) |
 | Machine elements — gear, bearing, fastener rating | ✅ | No | AGMA 2001-D04 / ISO 6336 gears, ISO 281 bearings, VDI 2230 fasteners (backend) |
 | Thermal / fluid / HVAC — heat-exchanger and pipe-network calc | ✅ | No | LMTD + Bell-Delaware shell-and-tube, Hardy-Cross pipe network (backend) |
-| Thermal / fluid — visual fluid simulation (Phoenix FD) | ✅ | Yes | Wave 9C: Phoenix FD-equivalent visual fluid simulation. |
+| Thermal / fluid — visual fluid simulation (Phoenix FD) | 🔴 (no) | Yes | No visual fluid VFX simulation |
 | Aero / marine / space — aerodynamic and orbital analysis | ✅ | No | VLM, XFOIL-class airfoil, orbital mechanics, Lambert solver (backend) |
 | Electronics / EDA — schematic, PCB, DRC | ✅ | No | Full EDA: schematic capture, PCB layout, DRC, Gerber/IPC-2581 |
 | Electronics — SPICE simulation | ✅ | No | Real ngspice bridge wired |
@@ -321,7 +321,7 @@ Kerf saturates **98%** of Autodesk 3ds Max's feature surface (27 yes, 1 partial,
 | Manufacturing — FDM slicing | ✅ | No | Cura slicing wired (PrintSliceView) |
 | Civil / infrastructure — road alignment, pavement, geotech | ✅ | No | AASHTO alignment, pavement AASHTO '93, geotech liquefaction (backend) |
 | Dynamics / controls — rigid-body and controls simulation | ✅ | Partial | Lagrangian MBD, PID/LQR/Kalman state-space, 6-DOF IK (backend) |
-| Dynamics — skeletal animation and rigging | ✅ | Yes | Wave 9C: armature-based skeletal animation (shared with Blender module). |
+| Dynamics — skeletal animation and rigging | 🔴 (no) | Yes | No skeletal animation or character rigging |
 | Electrical / energy — power distribution and PLC | ✅ | No | NEC power distribution, AC load-flow, IEC 61131-3 PLC (ST + live Ladder) |
 | Tolerancing / QA — GD&T and tolerance stackup | ✅ | No | ASME Y14.5 GD&T data model, 1D/3D tolerance stackup, SPC charts (backend) |
 | Optics — paraxial ABCD ray transfer | ✅ | No | Paraxial ABCD, Seidel aberrations, Gaussian beam propagation (backend) |
@@ -329,7 +329,7 @@ Kerf saturates **98%** of Autodesk 3ds Max's feature surface (27 yes, 1 partial,
 | Acoustics — room acoustics and ISO 9613 | ✅ | No | ISO 9613 propagation, RT60, image-source room IR, SEA (backend) |
 | Verticals — jewelry design | ✅ | Partial | 41-module jewelry suite: ring v4, gemstones v2, settings v3/v4, chain v2 |
 | Verticals — BIM / architectural (IFC) | ✅ | Partial | Revit-comparable BIM engine: walls/slabs/framing/stairs + IFC4 export |
-| Verticals — archviz creative workflow | ✅ | Yes | Wave 9 reference implementation. |
+| Verticals — archviz creative workflow | 🔴 (no) | Yes | No archviz asset libraries or procedural scatter/population tools |
 | Cost / materials — should-cost and LCA | ✅ | No | Should-cost (Boothroyd-Dewhurst 6 processes), full ISO 14040/44 LCA (backend) |
 | Cost / materials — material selection (Ashby) | ✅ | No | 200-material Ashby selector (14 families) + Pareto frontier (backend) |
 
@@ -351,7 +351,11 @@ Kerf saturates **98%** of Autodesk 3ds Max's feature surface (27 yes, 1 partial,
 
 ## What's honestly outstanding
 
+- **Geometry — polygon mesh modelling** (Partial): SubD authoring + poke/extrude/subdivide/sculpt + quad/isotropic remesh; no Modifier Stack depth
+- **Thermal / fluid — visual fluid simulation (Phoenix FD)** (Not yet implemented): No visual fluid VFX simulation
+- **Dynamics — skeletal animation and rigging** (Not yet implemented): No skeletal animation or character rigging
 - **Optics — production path-traced rendering (Arnold)** (Partial): heroShot renderer (HDRI + ACES + bloom); no production path tracer
+- **Verticals — archviz creative workflow** (Not yet implemented): No archviz asset libraries or procedural scatter/population tools
 
 ## Pricing
 

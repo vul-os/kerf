@@ -259,7 +259,7 @@ Eagle democratised PCB design for a generation of makers — its successor lives
 
 ## Summary
 
-Kerf saturates **100%** of Autodesk Eagle's feature surface (22 yes, 0 partial, 0 no out of 22 features tracked here). Kerf covers the full tracked feature set for Autodesk Eagle; gaps may exist in workflow depth, ecosystem maturity, and community support.
+Kerf saturates **98%** of Autodesk Eagle's feature surface (21 yes, 1 partial, 0 no out of 22 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -267,7 +267,7 @@ Kerf saturates **100%** of Autodesk Eagle's feature surface (22 yes, 0 partial, 
 |---------|------|----------------|-------|
 | Schematic capture (KiCad round-trip, ERC) | ✅ | Yes (paid tier) | Viewer wired (read-only); KiCad round-trip; ERC overlay |
 | PCB layout (tscircuit, KiCad round-trip) | ✅ | Yes (paid tier) | Viewer wired (read-only); tscircuit + KiCad round-trip |
-| Interactive PCB editing (route/place) | ✅ | Yes (paid tier) | Wave 11A flip pass — shipped backend module. |
+| Interactive PCB editing (route/place) | ⚠️ (partial) | Yes (paid tier) | View-only; no cursor editing |
 | Autoroute (FreeRouting) | ✅ | Yes (paid tier) | FreeRouting v1.9.0 integrated; SHA-256 pinned; DSN→SES round-trip |
 | DRC / ERC | ✅ | Yes (paid tier) | DRC overlay wired; ERC on schematic viewer |
 | SPICE simulation | ✅ | Yes (paid tier) | Real ngspice wired; binary .raw parsing not yet surfaced |
@@ -292,7 +292,6 @@ Kerf saturates **100%** of Autodesk Eagle's feature surface (22 yes, 0 partial, 
 
 - **Schematic capture (KiCad round-trip, ERC)** — Viewer wired (read-only); KiCad round-trip; ERC overlay
 - **PCB layout (tscircuit, KiCad round-trip)** — Viewer wired (read-only); tscircuit + KiCad round-trip
-- **Interactive PCB editing (route/place)** — Wave 11A flip pass — shipped backend module.
 - **Autoroute (FreeRouting)** — FreeRouting v1.9.0 integrated; SHA-256 pinned; DSN→SES round-trip
 - **DRC / ERC** — DRC overlay wired; ERC on schematic viewer
 - **SPICE simulation** — Real ngspice wired; binary .raw parsing not yet surfaced
@@ -302,7 +301,12 @@ Kerf saturates **100%** of Autodesk Eagle's feature surface (22 yes, 0 partial, 
 - **Antenna / link budget** — Antenna and link budget calculators; backend
 - **Battery/BMS, motor/gate/LED driver sizing** — Sizing calculators for battery/BMS, motor drivers, gate drivers, LED drivers; backend
 - **Gerber RS-274X output** — Gerber 274X + Excellon NC drill export
-- *(and 9 more features not covered by Autodesk Eagle)*
+- **IPC-2581 output** — IPC-2581 export supported
+- *(and 8 more features not covered by Autodesk Eagle)*
+
+## What's honestly outstanding
+
+- **Interactive PCB editing (route/place)** (Partial): View-only; no cursor editing
 
 ## Pricing
 

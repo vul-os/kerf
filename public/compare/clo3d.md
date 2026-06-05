@@ -137,7 +137,7 @@ features:
 
 ## Summary
 
-Kerf saturates **100%** of CLO Virtual Fashion CLO3D's feature surface (12 yes, 0 partial, 0 no out of 12 features tracked here). Kerf covers the full tracked feature set for CLO Virtual Fashion CLO3D; gaps may exist in workflow depth, ecosystem maturity, and community support.
+Kerf saturates **88%** of CLO Virtual Fashion CLO3D's feature surface (10 yes, 1 partial, 1 no out of 12 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -148,18 +148,22 @@ Kerf saturates **100%** of CLO Virtual Fashion CLO3D's feature surface (12 yes, 
 | Grading (size run) | ✅ | Yes | ASTM + EN 13402 grade rules; multi-size export (backend) |
 | Seam allowances and notches | ✅ | Yes | Per-edge seam allowances with corner mitring; notch placement |
 | Fabric drape / cloth simulation | ✅ | Yes | Provot (1995) mass-spring-damper simulator with structural + shear + bending springs, Rayleigh spring-axis damping (B... |
-| Avatar / dress form | ✅ | Yes | Wave 9B: avatar / dress-form parametric body model. |
+| Avatar / dress form | 🔴 (no) | Yes | No avatar/dress form; no garment-on-body visualisation |
 | Fabric material library | ✅ | Yes | Fabric properties engine: weight, stiffness, coefficient of friction (backend) |
 | Cut-room nesting / marker | ✅ | Partial | Nesting marker for fabric efficiency; single-ply and multi-ply cutting orders; lay plan export |
-| e-textiles / smart garment design | ✅ | No | Wave 11B build implementation. |
+| e-textiles / smart garment design | ⚠️ (partial) | No | e-textiles module: conductive yarn routing, electrode placement, wearable circuit (backend) |
 | Sustainability / material impact | ✅ | Partial | Textile sustainability module + full ISO 14040/44 LCA with material impact categories |
 | DXF / SVG pattern export | ✅ | Yes | DXF (pattern), SVG, PDF (lay plan), CSV (grade rules), OBJ (3D drape) |
 | LLM / chat-native editing | ✅ | No | Chat-native: describe the garment in plain language; Kerf drafts blocks and grades |
 
 ## What Kerf does that CLO Virtual Fashion CLO3D doesn't
 
-- **e-textiles / smart garment design** — Wave 11B build implementation.
 - **LLM / chat-native editing** — Chat-native: describe the garment in plain language; Kerf drafts blocks and grades
+
+## What's honestly outstanding
+
+- **Avatar / dress form** (Not yet implemented): No avatar/dress form; no garment-on-body visualisation
+- **e-textiles / smart garment design** (Partial): e-textiles module: conductive yarn routing, electrode placement, wearable circuit (backend)
 
 ## Pricing
 

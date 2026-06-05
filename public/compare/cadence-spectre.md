@@ -102,7 +102,7 @@ Spectre is the industry-standard commercial SPICE for tapeout — Kerf targets o
 
 ## Summary
 
-Kerf saturates **94%** of Cadence Spectre's feature surface (7 yes, 1 partial, 0 no out of 8 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **75%** of Cadence Spectre's feature surface (6 yes, 0 partial, 2 no out of 8 features tracked here). Honest gaps: 2 features not yet implemented.
 
 ## Feature comparison
 
@@ -111,9 +111,9 @@ Kerf saturates **94%** of Cadence Spectre's feature surface (7 yes, 1 partial, 0
 | SPICE — transient simulation | ✅ | Yes | Transient via ngspice bridge; sufficient for sky130-scale netlists |
 | SPICE — PVT corner sweep (automated) | ✅ | Yes | 60-corner PVT sweep automated via silicon_pvt_sweep (sky130 model); Monte-Carlo mismatch included |
 | SPICE — Monte-Carlo mismatch | ✅ | Yes | Pelgrom A_VT = 4 mV·µm model for sky130; production-sign-off accuracy requires foundry MC deck (not yet integrated) |
-| SPICE — commercial foundry PDK sign-off accuracy | ⚠️ (partial) | Yes | Reference implementation; not foundry-PDK accurate per honest caveats in module. |
+| SPICE — commercial foundry PDK sign-off accuracy | 🔴 (no) | Yes | Kerf uses ngspice with open PDK models (sky130). Commercial foundry sign-off (TSMC, GF) requires Spectre + licensed P... |
 | SPICE — waveform viewer | ✅ | Yes | WaveformViewer.jsx: multi-trace SVG, zoom/pan/cursor measurement, .spice.waveform file kind |
-| SPICE — schematic-driven simulation | ✅ | Yes | Wave 9: multi-dialect netlist codegen from schematic capture. |
+| SPICE — schematic-driven simulation | 🔴 (no) | Yes | Kerf accepts netlists only; no analog schematic capture GUI yet |
 | SPICE — license cost | ✅ | No | Kerf is MIT open-core; ngspice backend is free/open-source; cloud execution priced on credits at cost |
 | SPICE — chat-native / LLM-driven flow | ✅ | No | All silicon tools reachable via plain-language prompts |
 
@@ -124,7 +124,8 @@ Kerf saturates **94%** of Cadence Spectre's feature surface (7 yes, 1 partial, 0
 
 ## What's honestly outstanding
 
-- **SPICE — commercial foundry PDK sign-off accuracy** (Partial): Reference implementation; not foundry-PDK accurate per honest caveats in module.
+- **SPICE — commercial foundry PDK sign-off accuracy** (Not yet implemented): Kerf uses ngspice with open PDK models (sky130). Commercial foundry sign-off (TSMC, GF) requires Spectre + licensed PDK — out of scope for the MIT open-core.
+- **SPICE — schematic-driven simulation** (Not yet implemented): Kerf accepts netlists only; no analog schematic capture GUI yet
 
 ## Pricing
 

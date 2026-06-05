@@ -103,7 +103,7 @@ HSPICE is the gold-standard sign-off SPICE — Kerf targets open-PDK workflows w
 
 ## Summary
 
-Kerf saturates **94%** of Synopsys HSPICE's feature surface (7 yes, 1 partial, 0 no out of 8 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **88%** of Synopsys HSPICE's feature surface (7 yes, 0 partial, 1 no out of 8 features tracked here). Honest gaps: 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -112,7 +112,7 @@ Kerf saturates **94%** of Synopsys HSPICE's feature surface (7 yes, 1 partial, 0
 | SPICE — transient simulation | ✅ | Yes | Transient via ngspice bridge; suitable for sky130/open-PDK scale netlists |
 | SPICE — PVT corner sweep | ✅ | Yes | 60-corner automated sweep (5P × 3V × 4T) with Monte-Carlo via silicon_pvt_sweep |
 | SPICE — Monte-Carlo mismatch | ✅ | Yes | Pelgrom model (A_VT = 4 mV·µm, sky130) Monte-Carlo; not a foundry-certified MC deck |
-| SPICE — commercial foundry sign-off accuracy | ⚠️ (partial) | Yes | Reference implementation; not foundry-PDK accurate per honest caveats in module. |
+| SPICE — commercial foundry sign-off accuracy | 🔴 (no) | Yes | Kerf uses ngspice + open PDK models. Commercial foundry sign-off (Intel, IBM) requires HSPICE + licensed PDK — outsid... |
 | SPICE — waveform viewer | ✅ | Yes | WaveformViewer.jsx: multi-trace SVG, zoom/pan, dual cursors (A/B), ΔT measurement |
 | SPICE — license cost | ✅ | No | Kerf is MIT open-core; ngspice backend is free; cloud execution priced at cost |
 | SPICE — chat-native / LLM-driven flow | ✅ | No | All silicon SPICE tools reachable via plain-language prompts |
@@ -125,7 +125,7 @@ Kerf saturates **94%** of Synopsys HSPICE's feature surface (7 yes, 1 partial, 0
 
 ## What's honestly outstanding
 
-- **SPICE — commercial foundry sign-off accuracy** (Partial): Reference implementation; not foundry-PDK accurate per honest caveats in module.
+- **SPICE — commercial foundry sign-off accuracy** (Not yet implemented): Kerf uses ngspice + open PDK models. Commercial foundry sign-off (Intel, IBM) requires HSPICE + licensed PDK — outside the scope of the MIT open-core.
 
 ## Pricing
 

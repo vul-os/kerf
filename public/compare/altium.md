@@ -483,7 +483,7 @@ Industrial-grade PCB design — Situs router vs MIT open-core EDA.
 
 ## Summary
 
-Kerf saturates **100%** of Altium Designer's feature surface (38 yes, 0 partial, 0 no out of 38 features tracked here). Kerf covers the full tracked feature set for Altium Designer; gaps may exist in workflow depth, ecosystem maturity, and community support.
+Kerf saturates **91%** of Altium Designer's feature surface (33 yes, 3 partial, 2 no out of 38 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 2 features not yet implemented.
 
 ## Feature comparison
 
@@ -495,8 +495,8 @@ Kerf saturates **100%** of Altium Designer's feature surface (38 yes, 0 partial,
 | ERC depth | ✅ | Yes | ERC + IPC-2221B presets |
 | Component library management | ✅ | Yes | Library management + BOM/distributor integration |
 | Design variants / BOM variants | ✅ | Yes | BOM variants engine |
-| Interactive PCB editing (route/place) | ✅ | Yes | Wave 9 reference implementation. |
-| Push-and-shove router (Situs engine) | ✅ | Yes | Wave 10 reference implementation. |
+| Interactive PCB editing (route/place) | 🔴 (no) | Yes | View-only; no cursor interactive editing today |
+| Push-and-shove router (Situs engine) | ⚠️ (partial) | Yes | Shove router engine present; less mature than Situs |
 | Autoroute (FreeRouting) | ✅ | Yes | FreeRouting v1.9.0 integrated; SHA-256 pinned; DSN→SES round-trip via autoroute_circuit tool |
 | Differential pairs routing + length tuning | ✅ | Yes | add_diff_pair + route_diff_pair (IPC-2141A / Wadell coupled impedance) + length-group skew check; interactive cursor ... |
 | Net classes and design rules | ✅ | Yes | Net-class system + rule presets |
@@ -504,8 +504,8 @@ Kerf saturates **100%** of Altium Designer's feature surface (38 yes, 0 partial,
 | HDI stack-up (buried/blind/micro-via) | ✅ | Yes | Buried/blind/micro-via types; microstrip/embedded-microstrip/stripline/CPWG/differential impedance; trace-width-for-Z... |
 | Impedance-controlled stack-up | ✅ | Yes | Impedance calculator integrated with stack-up |
 | Rigid-flex PCB stack-up | ✅ | Yes | Flex stack-up modelling |
-| Multi-board design (MB3D workspace) | ✅ | Yes | Wave 10C build implementation. |
-| 3D PCB editor (STEP import, clearance) | ✅ | Yes | Wave 10 reference implementation. |
+| Multi-board design (MB3D workspace) | 🔴 (no) | Yes | Single-board per project today; no multi-board equivalent |
+| 3D PCB editor (STEP import, clearance) | ⚠️ (partial) | Yes | Board 3D via STEP export + OCCT viewer; 3D component-body clearance DRC shallower than Altium's native 3D DRC engine |
 | Via stitching / copper pour / teardrops | ✅ | Yes | Via stitching + copper pour tooling |
 | Panelisation | ✅ | Yes | Panelize built in |
 | SPICE simulation (mixed-signal) | ✅ | Yes | Real ngspice wired; binary .raw not yet parsed |
@@ -519,7 +519,7 @@ Kerf saturates **100%** of Altium Designer's feature surface (38 yes, 0 partial,
 | ODB++ output | ✅ | Yes | ODB++ export in-box |
 | IPC-2581 output | ✅ | Yes | IPC-2581 in-box |
 | IPC-D-356A netlist output | ✅ | Yes | IPC-D-356A in-box |
-| IDF MCAD bridge | ✅ | Yes | Wave 10 reference implementation. |
+| IDF MCAD bridge | ⚠️ (partial) | Yes | IDF MCAD bridge + board STEP; no live push from Kerf to MCAD |
 | PCB layer tools (flip/mirror/layer mapping) | ✅ | Yes | Layer tools wired |
 | Test point management | ✅ | Yes | Test-point placement and reporting |
 | Silicon synth (Yosys) / STA / GDS / formal | ✅ | No | Yosys synth + STA + GDS + DRC + LVS + formal — deep, zero UI (backend) |
@@ -531,6 +531,14 @@ Kerf saturates **100%** of Altium Designer's feature surface (38 yes, 0 partial,
 ## What Kerf does that Altium Designer doesn't
 
 - **Silicon synth (Yosys) / STA / GDS / formal** — Yosys synth + STA + GDS + DRC + LVS + formal — deep, zero UI (backend)
+
+## What's honestly outstanding
+
+- **Interactive PCB editing (route/place)** (Not yet implemented): View-only; no cursor interactive editing today
+- **Push-and-shove router (Situs engine)** (Partial): Shove router engine present; less mature than Situs
+- **Multi-board design (MB3D workspace)** (Not yet implemented): Single-board per project today; no multi-board equivalent
+- **3D PCB editor (STEP import, clearance)** (Partial): Board 3D via STEP export + OCCT viewer; 3D component-body clearance DRC shallower than Altium's native 3D DRC engine
+- **IDF MCAD bridge** (Partial): IDF MCAD bridge + board STEP; no live push from Kerf to MCAD
 
 ## Pricing
 

@@ -127,7 +127,7 @@ The composites ply design and manufacturing tool — versus an open-core CAD wit
 
 ## Summary
 
-Kerf saturates **95%** of Siemens Fibersim's feature surface (10 yes, 1 partial, 0 no out of 11 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **77%** of Siemens Fibersim's feature surface (8 yes, 1 partial, 2 no out of 11 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 2 features not yet implemented.
 
 ## Feature comparison
 
@@ -135,13 +135,13 @@ Kerf saturates **95%** of Siemens Fibersim's feature surface (10 yes, 1 partial,
 |---------|------|------------------|-------|
 | Ply-based laminate layup design | ✅ | Yes | Layup definition with ply angles, materials, and stacking sequences (backend) |
 | Drape simulation / producibility | ✅ | Yes | Drape simulation for composite prepreg on doubly-curved surfaces (backend) |
-| AFP / ATL manufacturing path output | ✅ | Yes | Wave 9 reference implementation. |
+| AFP / ATL manufacturing path output | 🔴 (no) | Yes | No AFP/ATL CNC path generation |
 | Classical laminate theory (CLT) | ✅ | Yes | CLT: [A][B][D] stiffness matrices, coupling analysis (backend) |
 | Composite failure analysis | ✅ | Partial | Tsai-Wu, Tsai-Hill, max-stress, max-strain, Hashin, Puck failure criteria (backend) |
 | Interlaminar shear and delamination | ✅ | Partial | Interlaminar shear stress with ILSS failure index; progressive delamination (backend) |
 | Thermal residual stress | ✅ | Partial | Thermal residual stress from cure temperature delta (backend) |
 | Multi-CAD support (NX / CATIA / Creo) | ✅ | Yes | Standalone open-core CAD; no plug-in for NX/CATIA/Creo (is its own CAD) |
-| Laser projection / flat pattern export | ✅ | Yes | Wave 9 reference implementation. |
+| Laser projection / flat pattern export | 🔴 (no) | Yes | No laser projection output or flat ply pattern for hand layup |
 | Laminate weight / cost | ⚠️ (partial) | Yes | LCA material costing; no composites-specific laminate weight/cost UI |
 | LLM / chat-native editing | ✅ | No | Chat-native: describe layup in plain language; Kerf routes to composites backend |
 
@@ -151,6 +151,8 @@ Kerf saturates **95%** of Siemens Fibersim's feature surface (10 yes, 1 partial,
 
 ## What's honestly outstanding
 
+- **AFP / ATL manufacturing path output** (Not yet implemented): No AFP/ATL CNC path generation
+- **Laser projection / flat pattern export** (Not yet implemented): No laser projection output or flat ply pattern for hand layup
 - **Laminate weight / cost** (Partial): LCA material costing; no composites-specific laminate weight/cost UI
 
 ## Pricing

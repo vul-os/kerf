@@ -642,7 +642,7 @@ Open-source parametric B-rep modeller — LGPL vs MIT, desktop vs cloud.
 
 ## Summary
 
-Kerf saturates **100%** of FreeCAD's feature surface (61 yes, 0 partial, 0 no out of 61 features tracked here). Kerf covers the full tracked feature set for FreeCAD; gaps may exist in workflow depth, ecosystem maturity, and community support.
+Kerf saturates **95%** of FreeCAD's feature surface (55 yes, 6 partial, 0 no out of 61 features tracked here). Honest gaps: 6 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -655,8 +655,8 @@ Kerf saturates **100%** of FreeCAD's feature surface (61 yes, 0 partial, 0 no ou
 | Loft | ✅ | Yes | guide-rail overload wired (ThruSections.AddWire); ruled/closed/symmetric |
 | Sheet metal | ✅ | Partial | flange + hem + jog + multi-flange + unfold + flat DXF (K-factor) |
 | Assemblies — mates | ✅ | Yes | rigid/revolute/slider/cam/gear/pin-slot + BOM panel |
-| Assembly interference (clash) | ✅ | Yes | Part Check Geometry + Boolean intersection |
-| 2D drawings (views/dims/sections) | ✅ | Yes | TechDraw WB — HLR projections, sections, dimensions |
+| Assembly interference (clash) | ⚠️ (partial) | Yes | backend OBB-SAT + BVH; no UI panel |
+| 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | live HLR projection + auto-dim; no GD&T-placement UI |
 | NURBS surfacing (blend/network/patch) | ✅ | Partial | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired |
 | Configurations / family variants | ✅ | Partial | engine + ConfigurationsPanel.jsx wired |
 | Direct edit (push-pull) | ✅ | Partial | push_pull (planar + curved), move_face, delete_face wired as ops |
@@ -682,7 +682,7 @@ Kerf saturates **100%** of FreeCAD's feature surface (61 yes, 0 partial, 0 no ou
 | DRC / ERC | ✅ | Partial | DRC overlay wired |
 | Silicon synthesis / P&R (Yosys / OpenLane) | ✅ | No | Yosys/STA/GDS/OpenLane bridge (backend; zero UI) |
 | 3-axis CAM (profile/pocket/face/drill) | ✅ | Yes | CAMView wired; profile/contour/pocket/face |
-| 5-axis CAM | ✅ | No | CAM WB supports up to 3-axis; no official 5-axis |
+| 5-axis CAM | ⚠️ (partial) | No | 5-axis engine solid; no UI |
 | Turning cycles (lathe) | ✅ | Partial | G71/G70/threading turning cycles (backend) |
 | G-code post-processor | ✅ | Yes | Fanuc/GRBL/LinuxCNC/Mach3; no G41/42 cutter-comp |
 | Moldflow / fill simulation | ✅ | No | Hele-Shaw front + weld-line + air-trap (backend) |
@@ -698,14 +698,14 @@ Kerf saturates **100%** of FreeCAD's feature surface (61 yes, 0 partial, 0 no ou
 | Firmware build / upload / monitor | ✅ | No | FirmwareActions + debug panel wired |
 | Solar PV (system + partial shading + MPPT) | ✅ | No | single-diode + bypass-diode IV + global MPPT (backend) |
 | Wiring / harness (WireViz + 3D router) | ✅ | No | WiringView + 3D harness router wired |
-| GD&T annotations (drawings) | ✅ | Partial | TechDraw — GD&T symbols, surface finish, ISO/ASME style |
+| GD&T annotations (drawings) | ⚠️ (partial) | Partial | ASME Y14.5 data model + auto-propose; no UI placement |
 | Tolerance stackup (1D WC/RSS/MC + 3D) | ✅ | No | WC/RSS/MC + 3D vector loop + Jacobian (backend) |
 | Process capability (Cpk / SPC charts) | ✅ | No | Cpk/Ppk + Shewhart/CUSUM/EWMA SPC (backend) |
 | Optical ray tracing (paraxial + non-sequential) | ✅ | Partial | paraxial ABCD + Seidel + NSC + Gaussian beam (backend) |
 | Acoustics (ISO 9613 / RT60 / mass-law TL) | ✅ | Partial | ISO 9613 + RT60 + weighting + TL + wave SEA (backend) |
 | Jewelry design (gems / settings / rings) | ✅ | No | 41 modules — gemstones v2, settings v3/v4, ring v4 |
-| BIM / architecture (walls / slabs / IFC) | ✅ | Yes | BIM WB (merged Arch) — full IFC import/export, walls/slabs |
-| Textiles / apparel | ✅ | No | Wave 11B build implementation. |
+| BIM / architecture (walls / slabs / IFC) | ⚠️ (partial) | Yes | IFC Tier 2 import + engine; IFC export in progress |
+| Textiles / apparel | ⚠️ (partial) | No | weave/knit/drape/cut-room (backend); no 3D avatar |
 | Material selection (Ashby / multi-objective) | ✅ | Partial | 200 materials + Pareto frontier + weighted-score (backend) |
 | Should-cost / Boothroyd-Dewhurst estimation | ✅ | No | Boothroyd-Dewhurst 6 processes + geometry-driven RFQ |
 | LCA (ISO 14040/44 full 4 phases) | ✅ | No | ISO 14040/44 4 phases + multi-impact categories (backend) |
@@ -724,7 +724,16 @@ Kerf saturates **100%** of FreeCAD's feature surface (61 yes, 0 partial, 0 no ou
 - **Orbital mechanics (Kepler / Lambert)** — Kepler, J2/J3, Hohmann, multi-rev Lambert (wired)
 - **Naval hydrostatics + GZ stability (IMO)** — hydrostatics + IMO GZ + seakeeping RAOs (wired)
 - **SPICE simulation** — real ngspice wired
-- *(and 19 more features not covered by FreeCAD)*
+- *(and 17 more features not covered by FreeCAD)*
+
+## What's honestly outstanding
+
+- **Assembly interference (clash)** (Partial): backend OBB-SAT + BVH; no UI panel
+- **2D drawings (views/dims/sections)** (Partial): live HLR projection + auto-dim; no GD&T-placement UI
+- **5-axis CAM** (Partial): 5-axis engine solid; no UI
+- **GD&T annotations (drawings)** (Partial): ASME Y14.5 data model + auto-propose; no UI placement
+- **BIM / architecture (walls / slabs / IFC)** (Partial): IFC Tier 2 import + engine; IFC export in progress
+- **Textiles / apparel** (Partial): weave/knit/drape/cut-room (backend); no 3D avatar
 
 ## Pricing
 

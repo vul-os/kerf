@@ -659,7 +659,7 @@ Browser-native real-time-collab CAD — closest peer in cloud shape.
 
 ## Summary
 
-Kerf saturates **100%** of Onshape's feature surface (57 yes, 0 partial, 0 no out of 57 features tracked here). Kerf covers the full tracked feature set for Onshape; gaps may exist in workflow depth, ecosystem maturity, and community support.
+Kerf saturates **96%** of Onshape's feature surface (52 yes, 5 partial, 0 no out of 57 features tracked here). Honest gaps: 5 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -669,11 +669,11 @@ Kerf saturates **100%** of Onshape's feature surface (57 yes, 0 partial, 0 no ou
 | Parametric B-rep modeller | ✅ | Yes | OCCT feature tree |
 | Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
 | Assemblies — mates | ✅ | Yes | Coincident/concentric/parallel/revolute/slider wired + BOM |
-| 2D drawings (views/dims/sections) | ✅ | Yes | Wave 10 reference implementation. |
+| 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Multi-sheet HLR drawings; no GD&T placement UI |
 | Configurations / family variants | ✅ | Yes | ConfigurationsPanel.jsx wired in Editor.jsx |
 | NURBS surfacing (blend/network/patch) | ✅ | Yes | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf, G3 blends wired |
-| GD&T on drawings / MBD / PMI | ✅ | Yes | Wave 10 reference implementation. |
-| FEM linear static + modal (built-in) | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| GD&T on drawings / MBD / PMI | ⚠️ (partial) | Yes | Data model + auto-propose only; no UI placement |
+| FEM linear static + modal (built-in) | ⚠️ (partial) | Yes (paid tier) | Linear static + thermal + modal; no UI panel |
 | AISC 360-22 steel (members) | ✅ | No | Full Ch. E/F/H + 50-section catalog (backend) |
 | Fatigue (S-N, ε-N, rainflow) | ✅ | No | S-N, ε-N, multiaxial rainflow (backend) |
 | ASCE 7-22 seismic / wind | ✅ | No | ELF+RSA+Newmark + MWFRS+C&C (backend) |
@@ -683,7 +683,7 @@ Kerf saturates **100%** of Onshape's feature surface (57 yes, 0 partial, 0 no ou
 | Springs (compr/ext/torsion/Belleville) | ✅ | No | Full spring design suite (backend) |
 | Heat exchangers (LMTD + ε-NTU + Bell-Delaware) | ✅ | No | LMTD+ε-NTU+Bell-Delaware+TEMA layout (backend) |
 | Steam/water properties (IAPWS-IF97) | ✅ | No | IAPWS-IF97 Regions 1/2/4; h/v/s/cp validated (backend) |
-| CFD | ✅ | Yes (paid tier) | Wave 12A flip — existing module covers feature. |
+| CFD | ⚠️ (partial) | Yes (paid tier) | Real OpenFOAM bridge (backend, needs install) |
 | 3D wing VLM (+ viscous + compressibility) | ✅ | No | Strip viscous CD0+PG/KT+Korn-Lock wave-drag (backend) |
 | Orbital mechanics (Kepler, J2/J3, Hohmann) | ✅ | No | Lambert multi-rev + Hohmann + reentry wired |
 | Naval hydrostatics + GZ stability (IMO) | ✅ | No | Hydrostatics + GZ curve + IMO criteria (backend) |
@@ -693,7 +693,7 @@ Kerf saturates **100%** of Onshape's feature surface (57 yes, 0 partial, 0 no ou
 | Silicon synth (Yosys) / STA / GDS / DRC / LVS | ✅ | No | Yosys/OpenLane bridge; deep but zero UI (backend) |
 | Analog PVT corner simulation | ✅ | No | 60 corners (5P×3V×4T)+MC per corner (backend) |
 | 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes (paid tier) | CAMView wired; Fanuc/GRBL/LinuxCNC posts |
-| 5-axis CAM (kinematics + posts) | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| 5-axis CAM (kinematics + posts) | ⚠️ (partial) | Yes (paid tier) | 5-axis engine solid; no UI |
 | Feeds & speeds + tool-life | ✅ | Partial | Taylor extended + Gilbert economic speed (backend) |
 | Moldflow / fill simulation | ✅ | No | Hele-Shaw front tracking+weld-line+air-trap (backend) |
 | Nesting (skyline + true-shape NFP) | ✅ | No | Minkowski-sum NFP+IFP+bottom-left fill (backend) |
@@ -725,7 +725,6 @@ Kerf saturates **100%** of Onshape's feature surface (57 yes, 0 partial, 0 no ou
 
 ## What Kerf does that Onshape doesn't
 
-- **FEM linear static + modal (built-in)** — Wave 10 reference implementation.
 - **AISC 360-22 steel (members)** — Full Ch. E/F/H + 50-section catalog (backend)
 - **Fatigue (S-N, ε-N, rainflow)** — S-N, ε-N, multiaxial rainflow (backend)
 - **ASCE 7-22 seismic / wind** — ELF+RSA+Newmark + MWFRS+C&C (backend)
@@ -735,9 +734,18 @@ Kerf saturates **100%** of Onshape's feature surface (57 yes, 0 partial, 0 no ou
 - **Springs (compr/ext/torsion/Belleville)** — Full spring design suite (backend)
 - **Heat exchangers (LMTD + ε-NTU + Bell-Delaware)** — LMTD+ε-NTU+Bell-Delaware+TEMA layout (backend)
 - **Steam/water properties (IAPWS-IF97)** — IAPWS-IF97 Regions 1/2/4; h/v/s/cp validated (backend)
-- **CFD** — Wave 12A flip — existing module covers feature.
 - **3D wing VLM (+ viscous + compressibility)** — Strip viscous CD0+PG/KT+Korn-Lock wave-drag (backend)
-- *(and 30 more features not covered by Onshape)*
+- **Orbital mechanics (Kepler, J2/J3, Hohmann)** — Lambert multi-rev + Hohmann + reentry wired
+- **Naval hydrostatics + GZ stability (IMO)** — Hydrostatics + GZ curve + IMO criteria (backend)
+- *(and 27 more features not covered by Onshape)*
+
+## What's honestly outstanding
+
+- **2D drawings (views/dims/sections)** (Partial): Multi-sheet HLR drawings; no GD&T placement UI
+- **GD&T on drawings / MBD / PMI** (Partial): Data model + auto-propose only; no UI placement
+- **FEM linear static + modal (built-in)** (Partial): Linear static + thermal + modal; no UI panel
+- **CFD** (Partial): Real OpenFOAM bridge (backend, needs install)
+- **5-axis CAM (kinematics + posts)** (Partial): 5-axis engine solid; no UI
 
 ## Pricing
 

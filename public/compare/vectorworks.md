@@ -352,7 +352,7 @@ Vectorworks spans architecture, landscape, and entertainment — Kerf spans mech
 
 ## Summary
 
-Kerf saturates **100%** of Vectorworks's feature surface (30 yes, 0 partial, 0 no out of 30 features tracked here). Kerf covers the full tracked feature set for Vectorworks; gaps may exist in workflow depth, ecosystem maturity, and community support.
+Kerf saturates **78%** of Vectorworks's feature surface (22 yes, 3 partial, 5 no out of 30 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 5 features not yet implemented.
 
 ## Feature comparison
 
@@ -360,38 +360,38 @@ Kerf saturates **100%** of Vectorworks's feature surface (30 yes, 0 partial, 0 n
 |---------|------|-------------|-------|
 | Constraint sketcher (geo + dim) | ✅ | Yes | PlaneGCS WASM sketcher wired; missing collinear, ellipse entity, G2 |
 | 3D solid modelling (pad / pocket / revolve / sweep / loft) | ✅ | Yes | OCCT pad/pocket/revolve/sweep fully wired; loft lacks guide-rail overload |
-| NURBS surface modelling | ✅ | Yes | Native NURBS curves and surfaces including subdivision; Vectorworks Designer tier |
-| 2D technical drawings (views / dimensions / sections) | ✅ | Yes | Mature 2D drafting heritage (descended from MiniCAD 1985); full annotation suite |
+| NURBS surface modelling | ⚠️ (partial) | Yes | OCCT NURBS math complete; browser WASM bindings unconfirmed at build |
+| 2D technical drawings (views / dimensions / sections) | ⚠️ (partial) | Yes | Template-based drawings; not live B-rep projection; no UI panel |
 | DXF / DWG import-export | ✅ | Yes | DXF export wired |
 | STEP / IGES export | ✅ | Partial | OCCT STEP export wired |
 | Symbol / component library | ✅ | Yes | Parts library + BOM panel wired; community library early-stage |
-| Flat-pattern / sheet-metal unfold | ✅ | No | Flange + hem (open/closed/teardrop/rolled) + jog + multi-flange + unfold + flat DXF (K-factor, DIN 6935); no auto cor... |
+| Flat-pattern / sheet-metal unfold | ✅ | No | Single flange + unfold + flat DXF wired; no hem/relief/jog/multi-flange |
 | CNC / CAM toolpath output | ✅ | No | 3-axis CAM wired in CAMView; profile/contour/pocket/face ops |
 | Site grading and earthworks (DTM) | ✅ | Yes (paid tier) | Contour extraction (marching squares), cut/fill volumes (prismatic), planar grade application; landscape_contours + l... |
 | Contour manipulation and slope analysis | ✅ | Yes (paid tier) | Marching-squares iso-contour extraction from DEM grid; grade_surface applies uniform planar grade; landscape_contours... |
 | Hardscape design and area calculation | ✅ | Yes (paid tier) | Paver pattern generator (running-bond/stack-bond/herringbone-45/basketweave) + material takeoff; retaining wall (Rank... |
 | Irrigation layout | ✅ | Yes (paid tier) | Irrigation zone scheduling (head spacing, zone flow demand, weekly run-time schedule, DU audit); ASABE/ICC 802-2014; ... |
-| Photorealistic rendering engine | ✅ | Yes | Wave 9C: arch-viz photorealistic render pipeline. |
+| Photorealistic rendering engine | 🔴 (no) | Yes | No integrated renderer; geometry exported to external tools |
 | Real-time OpenGL / GPU viewport | ✅ | Yes | Three.js WebGL viewport wired; PBR materials |
-| Lighting simulation (luminance / lux) | ✅ | Yes | Wave 9C: luminance/lux simulation engine. |
+| Lighting simulation (luminance / lux) | 🔴 (no) | Yes | Photonics backend exists (LED/photodiode); no lux/luminance scene simulation |
 | BIM walls / slabs / framing | ✅ | Yes (paid tier) | kerf-bim walls/slabs/framing engine wired via /compile-ifc |
 | BIM stairs and railings | ✅ | Yes (paid tier) | kerf-bim stair geometry engine included |
 | IFC4 export / import (open BIM round-trip) | ✅ | Yes (paid tier) | IFC4 engine + viewer via /compile-ifc; BIMView null-feed visual QA pending |
-| Space / room objects and area schedule | ✅ | Yes (paid tier) | Vectorworks Architect: Space objects with automatic area/occupancy scheduling; Architect tier |
+| Space / room objects and area schedule | ⚠️ (partial) | Yes (paid tier) | Interior space-planning engine exists (backend only); no UI route |
 | Door and window parametric objects | ✅ | Yes (paid tier) | kerf-bim door/window parametric objects included |
 | Curtain wall / storefront | ✅ | Yes (paid tier) | Parametric curtain wall: u/v panel grid (count/spacing/mixed), square/round mullion profiles, glass/solid/opening pan... |
 | Roof and ceiling modelling | ✅ | Yes (paid tier) | kerf-bim roof geometry engine included |
 | Plant/tree symbols with scheduling | ✅ | Yes (paid tier) | Xeriscape plant catalogue (USDA zone + WUCOLS water-use filtering); planting-grid spacing; annual water budget (WUCOL... |
-| Entertainment / theatrical lighting plot | ✅ | Yes (paid tier) | Wave 9C: theatrical lighting plot for entertainment/stage design. |
-| Rigging geometry and load analysis (Braceworks) | ✅ | Yes (paid tier) | Wave 9B: Braceworks-equivalent rigging geometry and structural load analysis. |
-| Visual scripting (Marionette) | ✅ | Yes | Wave 9B: Marionette visual scripting engine. |
+| Entertainment / theatrical lighting plot | 🔴 (no) | Yes (paid tier) | No entertainment design domain |
+| Rigging geometry and load analysis (Braceworks) | 🔴 (no) | Yes (paid tier) | No rigging domain; structural beam/truss engines not adapted for entertainment |
+| Visual scripting (Marionette) | 🔴 (no) | Yes | No node-based visual scripting; kerf-sdk Python API is the scripting surface |
 | Python scripting API | ✅ | Yes | kerf-sdk on PyPI; HTTP/JSON-RPC; runs on user's machine |
 | BIM quantity takeoff / materials schedule | ✅ | Yes (paid tier) | BOM panel wired; geometry-driven material quantity from assemblies |
 | Should-cost estimation | ✅ | No | Should-cost engine (6 processes, Boothroyd-Dewhurst) — backend only |
 
 ## What Kerf does that Vectorworks doesn't
 
-- **Flat-pattern / sheet-metal unfold** — Flange + hem (open/closed/teardrop/rolled) + jog + multi-flange + unfold + flat DXF (K-factor, DIN 6935); no auto corner-relief
+- **Flat-pattern / sheet-metal unfold** — Single flange + unfold + flat DXF wired; no hem/relief/jog/multi-flange
 - **CNC / CAM toolpath output** — 3-axis CAM wired in CAMView; profile/contour/pocket/face ops
 - **Site grading and earthworks (DTM)** — Contour extraction (marching squares), cut/fill volumes (prismatic), planar grade application; landscape_contours + landscape_cut_fill tools
 - **Contour manipulation and slope analysis** — Marching-squares iso-contour extraction from DEM grid; grade_surface applies uniform planar grade; landscape_contours tool
@@ -400,10 +400,21 @@ Kerf saturates **100%** of Vectorworks's feature surface (30 yes, 0 partial, 0 n
 - **BIM walls / slabs / framing** — kerf-bim walls/slabs/framing engine wired via /compile-ifc
 - **BIM stairs and railings** — kerf-bim stair geometry engine included
 - **IFC4 export / import (open BIM round-trip)** — IFC4 engine + viewer via /compile-ifc; BIMView null-feed visual QA pending
-- **Space / room objects and area schedule** — Vectorworks Architect: Space objects with automatic area/occupancy scheduling; Architect tier
 - **Door and window parametric objects** — kerf-bim door/window parametric objects included
 - **Curtain wall / storefront** — Parametric curtain wall: u/v panel grid (count/spacing/mixed), square/round mullion profiles, glass/solid/opening panels, B-rep mullion+panel solids
-- *(and 6 more features not covered by Vectorworks)*
+- **Roof and ceiling modelling** — kerf-bim roof geometry engine included
+- *(and 3 more features not covered by Vectorworks)*
+
+## What's honestly outstanding
+
+- **NURBS surface modelling** (Partial): OCCT NURBS math complete; browser WASM bindings unconfirmed at build
+- **2D technical drawings (views / dimensions / sections)** (Partial): Template-based drawings; not live B-rep projection; no UI panel
+- **Photorealistic rendering engine** (Not yet implemented): No integrated renderer; geometry exported to external tools
+- **Lighting simulation (luminance / lux)** (Not yet implemented): Photonics backend exists (LED/photodiode); no lux/luminance scene simulation
+- **Space / room objects and area schedule** (Partial): Interior space-planning engine exists (backend only); no UI route
+- **Entertainment / theatrical lighting plot** (Not yet implemented): No entertainment design domain
+- **Rigging geometry and load analysis (Braceworks)** (Not yet implemented): No rigging domain; structural beam/truss engines not adapted for entertainment
+- **Visual scripting (Marionette)** (Not yet implemented): No node-based visual scripting; kerf-sdk Python API is the scripting surface
 
 ## Pricing
 

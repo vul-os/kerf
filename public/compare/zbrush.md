@@ -236,7 +236,7 @@ ZBrush sculpts the organic world in polygons — Kerf models the engineered worl
 
 ## Summary
 
-Kerf saturates **100%** of Maxon ZBrush's feature surface (20 yes, 0 partial, 0 no out of 20 features tracked here). Kerf covers the full tracked feature set for Maxon ZBrush; gaps may exist in workflow depth, ecosystem maturity, and community support.
+Kerf saturates **62%** of Maxon ZBrush's feature surface (8 yes, 9 partial, 3 no out of 20 features tracked here). Honest gaps: 9 features partial (engine complete, UI or depth gap); 3 features not yet implemented.
 
 ## Feature comparison
 
@@ -245,23 +245,23 @@ Kerf saturates **100%** of Maxon ZBrush's feature surface (20 yes, 0 partial, 0 
 | Geometry & core CAD — B-rep solid modelling | ✅ | No | OCCT B-rep kernel; pad/pocket/revolve/fillet/sweep/loft wired |
 | Geometry & core CAD — constraint sketcher | ✅ | No | PlaneGCS WASM sketcher with geometric + dimensional constraints |
 | Geometry & core CAD — parametric feature history | ✅ | No | Persistent feature DAG; upstream edits regenerate downstream geometry |
-| Geometry & core CAD — organic mesh sculpting | ✅ | Yes | Wave 9C: DynaMesh-equivalent adaptive mesh + sculpt brushes. |
+| Geometry & core CAD — organic mesh sculpting | 🔴 (no) | Yes | No sculpt mode; mesh tools + quad remesh only |
 | Geometry & core CAD — STEP / IGES B-rep export | ✅ | No | STEP, IGES, 3DM B-rep round-trip via OCCT |
-| Structural / FEA — finite element analysis | ✅ | No | Wave 10B reference implementation. |
-| Machine elements — gear / bearing / fastener sizing | ✅ | No | Wave 10B reference implementation. |
-| Thermal / fluid / HVAC — simulation | ✅ | No | Wave 10B reference implementation. |
-| Electronics / EDA / silicon — PCB and schematic | ✅ | No | Wave 10B reference implementation. |
+| Structural / FEA — finite element analysis | ⚠️ (partial) | No | Deep backend engines (AISC/ACI/NDS/EC codes, FEM beam/plate/shell); minimal UI |
+| Machine elements — gear / bearing / fastener sizing | ⚠️ (partial) | No | Shigley/AGMA/ISO/VDI grade engines; entirely backend, no UI panel |
+| Thermal / fluid / HVAC — simulation | ⚠️ (partial) | No | ASHRAE psychrometrics, LMTD/ε-NTU HX, Hardy-Cross pipe network, OpenFOAM bridge; backend |
+| Electronics / EDA / silicon — PCB and schematic | ⚠️ (partial) | No | KiCad-round-trip viewer, ngspice SPICE, DRC overlay wired; interactive routing not yet |
 | Manufacturing / CAM — 3D print output | ✅ | Yes | STEP → mesh pipeline + FDM slicing via Cura (PrintSliceView wired) |
 | Manufacturing / CAM — CNC / G-code output | ✅ | No | 3-axis CAM wired (CAMView); Fanuc/GRBL/LinuxCNC posts |
-| Manufacturing / CAM — retopology / mesh cleanup | ✅ | Yes | Wave 10B reference implementation. |
-| Verticals — jewelry sculpting / organic concept | ✅ | Yes | Wave 10B reference implementation. |
+| Manufacturing / CAM — retopology / mesh cleanup | ⚠️ (partial) | Yes | quad/isotropic remesh + retopo_snap + decimate ops (ZRemesher-class); no interactive brush UI |
+| Verticals — jewelry sculpting / organic concept | ⚠️ (partial) | Yes | 41 parametric modules + SubD authoring/sculpt_brush; not DynaMesh-grade for free organic forms |
 | Verticals — jewelry parametric configurator | ✅ | No | 41-module jewelry suite: ring v4, gemstone v2, settings v3/v4, chain v2, casting export |
-| Verticals — dental anatomic sculpting | ✅ | Yes | Wave 10B reference implementation. |
-| Verticals — character / creature / film VFX | ✅ | Yes | Wave 9C: character / creature / film VFX rigging module. |
-| Verticals — texture / polypaint / displacement | ✅ | Yes | Wave 9C: polypaint vertex-colour painting + HD displacement bake. |
+| Verticals — dental anatomic sculpting | ⚠️ (partial) | Yes | Dental spotlight exists; crown is placeholder cylinder, not anatomically graded |
+| Verticals — character / creature / film VFX | 🔴 (no) | Yes | No character sculpting, rigging, or film VFX tooling — out of scope |
+| Verticals — texture / polypaint / displacement | 🔴 (no) | Yes | No polypaint or displacement-map authoring |
 | Verticals — hard-surface modelling (ZModeler) | ✅ | Yes | Exact B-rep hard-surface via OCCT feature tree — dimensionally accurate |
-| Verticals — rendering quality | ✅ | Yes | Wave 10B reference implementation. |
-| Cost / materials / LCA — material selection and costing | ✅ | No | Wave 10B reference implementation. |
+| Verticals — rendering quality | ⚠️ (partial) | Yes | HeroShot.js PBR viewport (HDRI + ACES + bloom); no path-traced renderer |
+| Cost / materials / LCA — material selection and costing | ⚠️ (partial) | No | Ashby material selector (200 materials), should-cost (6 processes), full LCA; backend/agent only |
 
 ## What Kerf does that Maxon ZBrush doesn't
 
@@ -269,13 +269,23 @@ Kerf saturates **100%** of Maxon ZBrush's feature surface (20 yes, 0 partial, 0 
 - **Geometry & core CAD — constraint sketcher** — PlaneGCS WASM sketcher with geometric + dimensional constraints
 - **Geometry & core CAD — parametric feature history** — Persistent feature DAG; upstream edits regenerate downstream geometry
 - **Geometry & core CAD — STEP / IGES B-rep export** — STEP, IGES, 3DM B-rep round-trip via OCCT
-- **Structural / FEA — finite element analysis** — Wave 10B reference implementation.
-- **Machine elements — gear / bearing / fastener sizing** — Wave 10B reference implementation.
-- **Thermal / fluid / HVAC — simulation** — Wave 10B reference implementation.
-- **Electronics / EDA / silicon — PCB and schematic** — Wave 10B reference implementation.
 - **Manufacturing / CAM — CNC / G-code output** — 3-axis CAM wired (CAMView); Fanuc/GRBL/LinuxCNC posts
 - **Verticals — jewelry parametric configurator** — 41-module jewelry suite: ring v4, gemstone v2, settings v3/v4, chain v2, casting export
-- **Cost / materials / LCA — material selection and costing** — Wave 10B reference implementation.
+
+## What's honestly outstanding
+
+- **Geometry & core CAD — organic mesh sculpting** (Not yet implemented): No sculpt mode; mesh tools + quad remesh only
+- **Structural / FEA — finite element analysis** (Partial): Deep backend engines (AISC/ACI/NDS/EC codes, FEM beam/plate/shell); minimal UI
+- **Machine elements — gear / bearing / fastener sizing** (Partial): Shigley/AGMA/ISO/VDI grade engines; entirely backend, no UI panel
+- **Thermal / fluid / HVAC — simulation** (Partial): ASHRAE psychrometrics, LMTD/ε-NTU HX, Hardy-Cross pipe network, OpenFOAM bridge; backend
+- **Electronics / EDA / silicon — PCB and schematic** (Partial): KiCad-round-trip viewer, ngspice SPICE, DRC overlay wired; interactive routing not yet
+- **Manufacturing / CAM — retopology / mesh cleanup** (Partial): quad/isotropic remesh + retopo_snap + decimate ops (ZRemesher-class); no interactive brush UI
+- **Verticals — jewelry sculpting / organic concept** (Partial): 41 parametric modules + SubD authoring/sculpt_brush; not DynaMesh-grade for free organic forms
+- **Verticals — dental anatomic sculpting** (Partial): Dental spotlight exists; crown is placeholder cylinder, not anatomically graded
+- **Verticals — character / creature / film VFX** (Not yet implemented): No character sculpting, rigging, or film VFX tooling — out of scope
+- **Verticals — texture / polypaint / displacement** (Not yet implemented): No polypaint or displacement-map authoring
+- **Verticals — rendering quality** (Partial): HeroShot.js PBR viewport (HDRI + ACES + bloom); no path-traced renderer
+- **Cost / materials / LCA — material selection and costing** (Partial): Ashby material selector (200 materials), should-cost (6 processes), full LCA; backend/agent only
 
 ## Pricing
 

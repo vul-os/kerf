@@ -522,7 +522,7 @@ NURBS & jewelry CAD — class-leading kernel vs MIT open-core.
 
 ## Summary
 
-Kerf saturates **99%** of Rhino's feature surface (44 yes, 1 partial, 0 no out of 45 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **92%** of Rhino's feature surface (39 yes, 5 partial, 1 no out of 45 features tracked here). Honest gaps: 5 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -534,7 +534,7 @@ Kerf saturates **99%** of Rhino's feature surface (44 yes, 1 partial, 0 no out o
 | Loft | ✅ | Yes | Loft + guide-rail overload (ThruSections.AddWire), ruled/closed/symmetric |
 | Surface patch from curves/points | ✅ | Yes | patch_srf_fit — least-squares fit through curves/points; wired op |
 | SubD modelling with creases | ✅ | Yes | SubD authoring with creases; quad remesh |
-| Mesh repair / ShrinkWrap | ✅ | Yes | Wave 10 reference implementation. |
+| Mesh repair / ShrinkWrap | ⚠️ (partial) | Yes | mesh_repair (fill_holes/manifold), retopo_snap, mesh_to_nurbs; no SDF-envelope ShrinkWrap |
 | Constraint sketcher (geo + dim) | ✅ | Partial | PlaneGCS WASM solver; all major geo+dim constraints |
 | Pad / pocket / revolve | ✅ | Partial | OCCT feature tree — pad/pocket/revolve wired |
 | Fillet / chamfer (constant) | ✅ | Yes | Constant and variable-radius fillet wired |
@@ -552,11 +552,11 @@ Kerf saturates **99%** of Rhino's feature surface (44 yes, 1 partial, 0 no out o
 | Bearings — ISO 281 L10 | ✅ | No | ISO 281 + ISO/TS 16281 aISO modified life (backend) |
 | Naval hydrostatics + GZ stability (IMO) | ✅ | No | Naval hydrostatics + GZ + IMO stability wired |
 | 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes (paid tier) | 3-axis CAM; CAMView wired in UI |
-| 5-axis (kinematics + posts) | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| 5-axis (kinematics + posts) | ⚠️ (partial) | Yes (paid tier) | 5-axis 3+2 engine solid; no UI panel |
 | G-code post (Fanuc/GRBL/LinuxCNC) | ✅ | Yes (paid tier) | Fanuc/GRBL/LinuxCNC/Mach3 post; no G41/42 cutter-comp |
 | Nesting (skyline + true-shape NFP) | ✅ | Yes (paid tier) | Minkowski NFP + bottom-left fill; 57.6% L-shape util |
 | Moldflow / fill sim | ✅ | No | Hele-Shaw front + weld-line + air-trap detection (backend) |
-| Landscape (drainage/grading/planting) | ✅ | Yes (paid tier) | Wave 12B build implementation. |
+| Landscape (drainage/grading/planting) | ⚠️ (partial) | Yes (paid tier) | Grading + drainage + planting engines (backend only) |
 | Paraxial ABCD ray transfer | ✅ | No | Paraxial ABCD ray transfer (backend) |
 | Gaussian beam propagation (M², q-param) | ✅ | No | Complex-q + ABCD + M² + fibre coupling (backend) |
 | Non-sequential ray tracing (stray light) | ✅ | No | Fresnel-split traversal + ghost detection (backend) |
@@ -565,11 +565,11 @@ Kerf saturates **99%** of Rhino's feature surface (44 yes, 1 partial, 0 no out o
 | Gemstones / cuts | ✅ | Yes (paid tier) | Gemstones v2 — 30 cuts |
 | Settings / pavé / channel | ✅ | Yes (paid tier) | Settings v3/v4 + gem-seat v2 + pavé wizard |
 | Chain / findings | ✅ | Yes (paid tier) | Chain v2 + findings + decorative modules |
-| Casting / wax-mill export | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
-| Visual node scripting | ✅ | Yes | Wave 9A: visual node scripting frontend component. |
+| Casting / wax-mill export | ⚠️ (partial) | Yes (paid tier) | Casting export + wax-carving plan; no full mill-path |
+| Visual node scripting | 🔴 (no) | Yes | No visual node environment; chat + kerf-sdk fill part of the gap |
 | BIM (walls/slabs/framing/stairs/IFC4) | ✅ | Partial | Revit-comparable BIM engine + IFC4 viewer |
 | Photoreal rendering (built-in) | ✅ | Yes | Cycles backend + browser path tracer; no caustics |
-| Photoreal rendering (advanced plugins) | ⚠️ (partial) | Yes (paid tier) | Wave 10 — comprehensive evidence flip; commercial-vendor parity honest-flagged. |
+| Photoreal rendering (advanced plugins) | ⚠️ (partial) | Yes (paid tier) | BYO Blender/Cycles; no V-Ray/Enscape integration |
 | Material selection (Ashby) | ✅ | No | 200 materials, 14 families, Pareto frontier (backend) |
 | LCA (full ISO 14040/44 4 phases) | ✅ | No | Full ISO 14040/44 LCA with multi-impact categories (backend) |
 | Should-cost (6 processes, Boothroyd-Dewhurst) | ✅ | No | 6 processes, Boothroyd-Dewhurst method (backend) |
@@ -584,15 +584,20 @@ Kerf saturates **99%** of Rhino's feature surface (44 yes, 1 partial, 0 no out o
 - **Bearings — ISO 281 L10** — ISO 281 + ISO/TS 16281 aISO modified life (backend)
 - **Naval hydrostatics + GZ stability (IMO)** — Naval hydrostatics + GZ + IMO stability wired
 - **3-axis CAM (profile/contour/pocket/face)** — 3-axis CAM; CAMView wired in UI
-- **5-axis (kinematics + posts)** — Wave 10 reference implementation.
 - **G-code post (Fanuc/GRBL/LinuxCNC)** — Fanuc/GRBL/LinuxCNC/Mach3 post; no G41/42 cutter-comp
 - **Nesting (skyline + true-shape NFP)** — Minkowski NFP + bottom-left fill; 57.6% L-shape util
 - **Moldflow / fill sim** — Hele-Shaw front + weld-line + air-trap detection (backend)
-- *(and 13 more features not covered by Rhino)*
+- **Paraxial ABCD ray transfer** — Paraxial ABCD ray transfer (backend)
+- *(and 10 more features not covered by Rhino)*
 
 ## What's honestly outstanding
 
-- **Photoreal rendering (advanced plugins)** (Partial): Wave 10 — comprehensive evidence flip; commercial-vendor parity honest-flagged.
+- **Mesh repair / ShrinkWrap** (Partial): mesh_repair (fill_holes/manifold), retopo_snap, mesh_to_nurbs; no SDF-envelope ShrinkWrap
+- **5-axis (kinematics + posts)** (Partial): 5-axis 3+2 engine solid; no UI panel
+- **Landscape (drainage/grading/planting)** (Partial): Grading + drainage + planting engines (backend only)
+- **Casting / wax-mill export** (Partial): Casting export + wax-carving plan; no full mill-path
+- **Visual node scripting** (Not yet implemented): No visual node environment; chat + kerf-sdk fill part of the gap
+- **Photoreal rendering (advanced plugins)** (Partial): BYO Blender/Cycles; no V-Ray/Enscape integration
 
 ## Pricing
 

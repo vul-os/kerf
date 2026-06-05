@@ -259,7 +259,7 @@ EasyEDA lowered the JLCPCB barrier to zero — Kerf raises the ceiling with in-b
 
 ## Summary
 
-Kerf saturates **100%** of EasyEDA's feature surface (22 yes, 0 partial, 0 no out of 22 features tracked here). Kerf covers the full tracked feature set for EasyEDA; gaps may exist in workflow depth, ecosystem maturity, and community support.
+Kerf saturates **95%** of EasyEDA's feature surface (21 yes, 0 partial, 1 no out of 22 features tracked here). Honest gaps: 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -267,7 +267,7 @@ Kerf saturates **100%** of EasyEDA's feature surface (22 yes, 0 partial, 0 no ou
 |---------|------|---------|-------|
 | Schematic capture (KiCad round-trip, ERC) | ✅ | Yes | Hierarchical schematic + ERC + IPC-2221B presets |
 | PCB layout (tscircuit, KiCad round-trip) | ✅ | Yes | tscircuit PCB layout + KiCad round-trip |
-| Interactive PCB editing (route/place) | ✅ | Yes | Wave 9A: interactive PCB route/place editor. |
+| Interactive PCB editing (route/place) | 🔴 (no) | Yes | View-only; no cursor editing today |
 | Autoroute (FreeRouting) | ✅ | Yes (paid tier) | FreeRouting v1.9.0 integrated; SHA-256 pinned; DSN→SES round-trip |
 | SPICE | ✅ | Yes | Real ngspice + model library; binary .raw parsing pending |
 | Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | Yes (paid tier) | IBIS 5.1 + Bergeron channel + PRBS eye envelope (backend) |
@@ -303,6 +303,10 @@ Kerf saturates **100%** of EasyEDA's feature surface (22 yes, 0 partial, 0 no ou
 - **IPC-2581 output** — IPC-2581 export in-box
 - **ODB++ output** — ODB++ export in-box
 - *(and 2 more features not covered by EasyEDA)*
+
+## What's honestly outstanding
+
+- **Interactive PCB editing (route/place)** (Not yet implemented): View-only; no cursor editing today
 
 ## Pricing
 

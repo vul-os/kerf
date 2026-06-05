@@ -923,7 +923,7 @@ Cloud-connected multi-discipline CAD — two tools, two philosophies.
 
 ## Summary
 
-Kerf saturates **100%** of Autodesk Fusion 360's feature surface (81 yes, 0 partial, 0 no out of 81 features tracked here). Kerf covers the full tracked feature set for Autodesk Fusion 360; gaps may exist in workflow depth, ecosystem maturity, and community support.
+Kerf saturates **96%** of Autodesk Fusion 360's feature surface (75 yes, 5 partial, 1 no out of 81 features tracked here). Honest gaps: 5 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -935,9 +935,9 @@ Kerf saturates **100%** of Autodesk Fusion 360's feature surface (81 yes, 0 part
 | Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
 | NURBS surfacing (blend/network/patch) | ✅ | Yes | blend_srf, network_srf (Gordon), patch_srf_fit, match_srf wired as ops |
 | Assemblies — mates | ✅ | Yes | Wired; coincident/concentric/parallel + BOM panel |
-| Assembly interference (clash) | ✅ | Yes | Wave 10 reference implementation. |
-| Assembly motion study | ✅ | Yes | Wave 9: assembly motion study and interference detection. |
-| 2D drawings (views/dims/sections) | ✅ | Yes | Wave 10 reference implementation. |
+| Assembly interference (clash) | ⚠️ (partial) | Yes | Backend OBB-SAT + BVH + tri-tri; no UI panel |
+| Assembly motion study | 🔴 (no) | Yes | Planar MBD not wired to assembly solver |
+| 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Live HLR projection + auto-dim; no GD&T-placement UI |
 | Configurations / family variants | ✅ | Yes | Engine + ConfigurationsPanel.jsx wired in Editor.jsx |
 | Direct edit (push-pull) | ✅ | Yes | push_pull (planar + curved), move_face, delete_face wired as ops |
 | FE — solid (tet/hex) | ✅ | Yes (paid tier) | CalculiX/Mystran/Z88 bridge (needs binary) |
@@ -968,10 +968,10 @@ Kerf saturates **100%** of Autodesk Fusion 360's feature surface (81 yes, 0 part
 | Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | Yes (paid tier) | IBIS 5.1 + Bergeron + PRBS eye envelope (backend) |
 | EMC (radiated/shielding/limits) | ✅ | Yes (paid tier) | Common-mode, return-path gap, slot antenna (backend) |
 | PDN (DC IR-drop + AC sweep) | ✅ | Yes (paid tier) | Z(ω) + target-Z + decap optimiser (backend) |
-| PCB thermal | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| PCB thermal | ⚠️ (partial) | Yes (paid tier) | Lumped Rθ (backend) |
 | Silicon synth (Yosys) / STA / GDS / DRC / LVS / formal / CTS | ✅ | No | Full silicon flow; zero UI |
 | 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes | CAMView wired for common 3-axis ops |
-| 5-axis (kinematics + posts) | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| 5-axis (kinematics + posts) | ⚠️ (partial) | Yes (paid tier) | Engine solid (5-axis 3+2); no UI |
 | Turning cycles (G71/G70/threading) | ✅ | Yes | G71/G70/threading cycles (backend) |
 | G-code post (Fanuc/GRBL/LinuxCNC/Mach3) | ✅ | Yes | Fanuc/GRBL/LinuxCNC/Mach3 posts; no G41/42 cutter-comp |
 | Feeds & speeds + tool-life | ✅ | Yes | Taylor extended + Gilbert economic speed (backend) |
@@ -1004,7 +1004,7 @@ Kerf saturates **100%** of Autodesk Fusion 360's feature surface (81 yes, 0 part
 | Jewelry (41 modules) | ✅ | Partial | 41-module suite; RhinoGold/Matrix-class depth |
 | BIM (walls/slabs/framing/stairs/IFC4) | ✅ | No | Revit-comparable engine + viewer wired via /compile-ifc |
 | Textiles (weave/knit/drape/cut-room) | ✅ | No | Weave/knit/drape/cut-room (backend); no 3D avatar drape |
-| Dental (crown/surgical guide/DICOM) | ✅ | Partial | Wave 10B reference implementation. |
+| Dental (crown/surgical guide/DICOM) | ⚠️ (partial) | Partial | Crown is placeholder cylinder; surgical guide in spotlight |
 | Should-cost (6 processes, Boothroyd-Dewhurst) | ✅ | Partial | 6 processes, Boothroyd-Dewhurst method (backend) |
 | Material selection (Ashby) | ✅ | Partial | 200 materials + Pareto frontier + weighted-score (backend) |
 | LCA (full ISO 14040/44 4 phases) | ✅ | Yes (paid tier) | ISO 14040/44 4-phase + multi-impact + uncertainty (backend) |
@@ -1025,7 +1025,16 @@ Kerf saturates **100%** of Autodesk Fusion 360's feature surface (81 yes, 0 part
 - **Psychrometrics (moist air)** — ASHRAE-grade psychrometrics (backend)
 - **Heat exchangers (LMTD + ε-NTU + Bell-Delaware)** — LMTD + ε-NTU + Bell-Delaware + TEMA (backend)
 - **CFD** — Real OpenFOAM bridge (needs install; backend)
-- *(and 41 more features not covered by Autodesk Fusion 360)*
+- *(and 39 more features not covered by Autodesk Fusion 360)*
+
+## What's honestly outstanding
+
+- **Assembly interference (clash)** (Partial): Backend OBB-SAT + BVH + tri-tri; no UI panel
+- **Assembly motion study** (Not yet implemented): Planar MBD not wired to assembly solver
+- **2D drawings (views/dims/sections)** (Partial): Live HLR projection + auto-dim; no GD&T-placement UI
+- **PCB thermal** (Partial): Lumped Rθ (backend)
+- **5-axis (kinematics + posts)** (Partial): Engine solid (5-axis 3+2); no UI
+- **Dental (crown/surgical guide/DICOM)** (Partial): Crown is placeholder cylinder; surgical guide in spotlight
 
 ## Pricing
 

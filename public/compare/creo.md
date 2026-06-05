@@ -663,7 +663,7 @@ Creo invented the parametric feature tree — Kerf brings that same discipline t
 
 ## Summary
 
-Kerf saturates **100%** of PTC Creo's feature surface (58 yes, 0 partial, 0 no out of 58 features tracked here). Kerf covers the full tracked feature set for PTC Creo; gaps may exist in workflow depth, ecosystem maturity, and community support.
+Kerf saturates **95%** of PTC Creo's feature surface (52 yes, 6 partial, 0 no out of 58 features tracked here). Honest gaps: 6 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -678,10 +678,10 @@ Kerf saturates **100%** of PTC Creo's feature surface (58 yes, 0 partial, 0 no o
 | Loft | ✅ | Yes | Guide-rail overload wired (ThruSections.AddWire); ruled/closed/symmetric |
 | Patterns (linear/polar) + mirror | ✅ | Yes | Linear/polar pattern + mirror wired |
 | Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
-| NURBS surfacing (blend/network/patch) | ✅ | Yes | Wave 10 reference implementation. |
+| NURBS surfacing (blend/network/patch) | ⚠️ (partial) | Yes | blend/network/patch/match-srf + G3 + Class-A harness wired; not Creo Style ISDX depth |
 | Assemblies — mates | ✅ | Yes | Wired: coincident/concentric/parallel/angle + BOM panel |
-| Large assembly / simplified representations | ✅ | Yes | Wave 10B reference implementation. |
-| 2D drawings (views/dims/sections) | ✅ | Yes | Wave 10 reference implementation. |
+| Large assembly / simplified representations | ⚠️ (partial) | Yes | LOD mesh swapping configurable; no formal simplified-rep workflow |
+| 2D drawings (views/dims/sections) | ⚠️ (partial) | Yes | Live HLR projection (make2d) + auto-dim; no GD&T-placement UI |
 | Configurations / family variants | ✅ | Yes | Engine complete; no UI panel |
 | B-rep booleans (general NURBS) | ✅ | Yes | OCCT booleans; no graceful fuzzy-heal on near-miss geometry |
 | FE — solid (tet/hex) | ✅ | Yes (paid tier) | CalculiX/Mystran/Z88 bridge (needs binary; backend) |
@@ -697,7 +697,7 @@ Kerf saturates **100%** of PTC Creo's feature surface (58 yes, 0 partial, 0 no o
 | Springs (compr/ext/torsion/Belleville) | ✅ | No | Compression/extension/torsion/Belleville (backend) |
 | Shaft (stress + critical speed) | ✅ | No | Closed-form stress + critical speed (backend) |
 | 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes (paid tier) | 3-axis CAM + tool DB wired in CAMView |
-| 5-axis (kinematics + posts) | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| 5-axis (kinematics + posts) | ⚠️ (partial) | Yes (paid tier) | 5-axis engine solid; no UI; kinematics + posts (backend) |
 | Turning cycles (G71/G70/threading) | ✅ | Yes (paid tier) | G71/G70 roughing + threading cycles (backend) |
 | Feeds & speeds + tool-life | ✅ | Yes (paid tier) | Taylor extended (vcT^n·f^a·dp^b=C) + Gilbert economic speed (backend) |
 | Adaptive / trochoidal clearing | ✅ | Yes (paid tier) | Iterative offset + 50% trochoid overlap; engagement on target (backend) |
@@ -707,11 +707,11 @@ Kerf saturates **100%** of PTC Creo's feature surface (58 yes, 0 partial, 0 no o
 | FDM slicing (Cura) | ✅ | No | Cura slicer wired via PrintSliceView |
 | Kinematics (four-bar/slider-crank/cam) | ✅ | Yes | Planar four-bar/slider-crank/cam kinematics (backend) |
 | Planar MBD (Lagrange/DAE, Baumgarte) | ✅ | Yes | Lagrange/DAE + Baumgarte stabilisation (backend) |
-| 3D MBD with constraint enforcement | ✅ | Yes | Wave 10B reference implementation. |
+| 3D MBD with constraint enforcement | ⚠️ (partial) | Yes | Joints defined but 3D integrator unconstrained |
 | Controls — classical (Routh/Bode/RL/PID tune) | ✅ | No | Routh/Bode/root-locus/PID auto-tune (backend) |
 | Controls — state-space / LQR / Kalman | ✅ | No | Ackermann + LQR (CARE) + Luenberger observer (backend) |
 | GD&T data model (ASME Y14.5) | ✅ | Yes | ASME Y14.5 datum + tolerance framework (backend; no MBD UI) |
-| GD&T on drawings / MBD / PMI | ✅ | Yes (paid tier) | Wave 10 reference implementation. |
+| GD&T on drawings / MBD / PMI | ⚠️ (partial) | Yes (paid tier) | Data model only; no 3D MBD/PMI annotation UI |
 | Tolerance stackup — 1D (WC/RSS/MC) | ✅ | Yes (paid tier) | WC/RSS/Monte-Carlo stackup (backend; MC LCG bug known) |
 | Tolerance stackup — 3D vector loop | ✅ | Yes (paid tier) | 6-DOF vector loop + sensitivity Jacobian (backend) |
 | Limits & fits (ISO 286) | ✅ | Partial | Full ISO 286 H/h system calculator (backend) |
@@ -740,9 +740,18 @@ Kerf saturates **100%** of PTC Creo's feature surface (58 yes, 0 partial, 0 no o
 - **Springs (compr/ext/torsion/Belleville)** — Compression/extension/torsion/Belleville (backend)
 - **Shaft (stress + critical speed)** — Closed-form stress + critical speed (backend)
 - **3-axis CAM (profile/contour/pocket/face)** — 3-axis CAM + tool DB wired in CAMView
-- **5-axis (kinematics + posts)** — Wave 10 reference implementation.
 - **Turning cycles (G71/G70/threading)** — G71/G70 roughing + threading cycles (backend)
-- *(and 22 more features not covered by PTC Creo)*
+- **Feeds & speeds + tool-life** — Taylor extended (vcT^n·f^a·dp^b=C) + Gilbert economic speed (backend)
+- *(and 20 more features not covered by PTC Creo)*
+
+## What's honestly outstanding
+
+- **NURBS surfacing (blend/network/patch)** (Partial): blend/network/patch/match-srf + G3 + Class-A harness wired; not Creo Style ISDX depth
+- **Large assembly / simplified representations** (Partial): LOD mesh swapping configurable; no formal simplified-rep workflow
+- **2D drawings (views/dims/sections)** (Partial): Live HLR projection (make2d) + auto-dim; no GD&T-placement UI
+- **5-axis (kinematics + posts)** (Partial): 5-axis engine solid; no UI; kinematics + posts (backend)
+- **3D MBD with constraint enforcement** (Partial): Joints defined but 3D integrator unconstrained
+- **GD&T on drawings / MBD / PMI** (Partial): Data model only; no 3D MBD/PMI annotation UI
 
 ## Pricing
 

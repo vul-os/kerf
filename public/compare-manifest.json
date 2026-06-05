@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T02:29:50.259Z",
+  "generatedAt": "2026-06-05T02:31:42.183Z",
   "items": [
     {
       "slug": "revit",
@@ -6837,7 +6837,7 @@
             "notes": "No LCA tools in SOLIDWORKS; SimaPro/GaBi required externally"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-lca/src/kerf_lca",
             "notes": "Full 4-phase LCA + multi-impact + uncertainty backend"
           },

@@ -645,7 +645,7 @@ features:
       note: "No LCA tools in SOLIDWORKS; SimaPro/GaBi required externally"
       source: "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_features_top.htm"
     kerf:
-      status: partial
+      status: yes
       note: "Full 4-phase LCA + multi-impact + uncertainty backend"
       evidence: "packages/kerf-lca/src/kerf_lca"
 
@@ -681,7 +681,7 @@ features:
 
 ## Summary
 
-Kerf saturates **85%** of SOLIDWORKS's feature surface (41 yes, 18 partial, 0 no out of 59 features tracked here). Honest gaps: 18 features partial (engine complete, UI or depth gap).
+Kerf saturates **86%** of SOLIDWORKS's feature surface (42 yes, 17 partial, 0 no out of 59 features tracked here). Honest gaps: 17 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -743,7 +743,7 @@ Kerf saturates **85%** of SOLIDWORKS's feature surface (41 yes, 18 partial, 0 no
 | BIM / IFC authoring | ✅ | No | Revit-comparable engine + IFC4 export wired via /compile-ifc |
 | Material selection (Ashby / multi-objective) | ✅ | No | 200 materials + Pareto frontier + weighted-score backend |
 | Should-cost / DFM estimation | ✅ | No | 6-process Boothroyd-Dewhurst should-cost backend |
-| LCA (ISO 14040/44 full 4 phases) | ⚠️ (partial) | No | Full 4-phase LCA + multi-impact + uncertainty backend |
+| LCA (ISO 14040/44 full 4 phases) | ✅ | No | Full 4-phase LCA + multi-impact + uncertainty backend |
 | Scripting / automation API | ✅ | Yes | kerf-sdk on PyPI — HTTP/JSON-RPC; same interface as LLM |
 | Standard parts library (ISO/DIN fasteners, bearings, profiles) | ✅ | Yes | kerf-partsgen: 5 ISO/DIN generators; kerf-parts KiCad+BOLTS+FreeCAD pipeline; real STEP/JSCAD geometry in CircuitEdit... |
 
@@ -761,7 +761,7 @@ Kerf saturates **85%** of SOLIDWORKS's feature surface (41 yes, 18 partial, 0 no
 - **Wiring / harness routing** — WiringView wired; WireViz + 3D router
 - **Multi-axis CAM (5-axis)** — 5-axis 3+2 engine solid; no UI
 - **Nesting (2D part layout)** — Skyline + true-shape NFP + Minkowski-sum backend
-- *(and 13 more features not covered by SOLIDWORKS)*
+- *(and 14 more features not covered by SOLIDWORKS)*
 
 ## What's honestly outstanding
 
@@ -782,7 +782,6 @@ Kerf saturates **85%** of SOLIDWORKS's feature surface (41 yes, 18 partial, 0 no
 - **GD&T data model (ASME Y14.5)** (Partial): Data model + auto-propose; no MBD/PMI placement UI
 - **Limits & fits (ISO 286)** (Partial): ISO 286 limits & fits backend; no UI
 - **Paraxial ray tracing / Gaussian beam** (Partial): ABCD + Seidel + thick lens + Gaussian beam + M² backend
-- **LCA (ISO 14040/44 full 4 phases)** (Partial): Full 4-phase LCA + multi-impact + uncertainty backend
 
 ## Pricing
 

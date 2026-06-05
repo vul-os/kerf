@@ -3320,3 +3320,246 @@ async def run_plm_rollup_cost_multi_currency(ctx, args: bytes) -> str:
         "unresolved_currencies": report.unresolved_currencies,
         "honest_caveat": report.honest_caveat,
     })
+
+
+# ---------------------------------------------------------------------------
+# plm_quote_to_delivery — ISA-95 quote-to-delivery workflow tracker
+# ---------------------------------------------------------------------------
+
+plm_quote_to_delivery_spec = ToolSpec(
+    name="plm_quote_to_delivery",
+    description=(
+        "Quote-to-delivery workflow tracker for mold-making / injection-mold jobs.\n\n"
+        "Follows ANSI/ISA-95.01 §5.3 work-order lifecycle states:\n"
+        "  QUOTED → QUOTE_ACCEPTED → DESIGN → MOLD_MAKING → SAMPLING\n"
+        "  → PRODUCTION ↔ QC_HOLD → SHIPPED → DELIVERED → INVOICED\n\n"
+        "Operations:\n"
+        "  'transition'    — advance a job to a new status (returns updated JobOrder)\n"
+        "  'status_report' — aggregate metrics across multiple jobs\n"
+        "  'on_time_rate'  — compute on-time delivery KPI (APICS OM 14e Ch 16 §16.4)\n\n"
+        "Honest: this is a pure-Python in-memory state machine. No persistence — "
+        "the caller must maintain job state across calls."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "operation": {
+                "type": "string",
+                "enum": ["transition", "status_report", "on_time_rate"],
+                "description": "Which operation to perform.",
+            },
+            "job": {
+                "type": "object",
+                "description": (
+                    "For 'transition': the current JobOrder as a dict with keys:\n"
+                    "  job_id, customer_id, quote_id, quoted_amount_usd,\n"
+                    "  promised_delivery_iso, current_status, history (list of milestones)\n"
+                    "Each milestone: {status, timestamp_iso, actor, notes}"
+                ),
+                "properties": {
+                    "job_id":               {"type": "string"},
+                    "customer_id":          {"type": "string"},
+                    "quote_id":             {"type": "string"},
+                    "quoted_amount_usd":    {"type": "number"},
+                    "promised_delivery_iso":{"type": "string"},
+                    "current_status":       {"type": "string"},
+                    "history": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "status":        {"type": "string"},
+                                "timestamp_iso": {"type": "string"},
+                                "actor":         {"type": "string"},
+                                "notes":         {"type": "string"},
+                            },
+                            "required": ["status", "timestamp_iso", "actor"],
+                        },
+                    },
+                },
+            },
+            "new_status": {
+                "type": "string",
+                "description": "Target status for 'transition' operation.",
+                "enum": [
+                    "quoted", "quote_accepted", "design", "mold_making",
+                    "sampling", "production", "qc_hold", "shipped",
+                    "delivered", "invoiced",
+                ],
+            },
+            "actor": {
+                "type": "string",
+                "description": "User or role triggering the transition.",
+            },
+            "notes": {
+                "type": "string",
+                "description": "Optional remarks for the transition milestone.",
+            },
+            "timestamp_iso": {
+                "type": "string",
+                "description": "Override transition timestamp (ISO-8601 UTC).",
+            },
+            "jobs": {
+                "type": "array",
+                "description": "For 'status_report' / 'on_time_rate': list of JobOrder dicts.",
+                "items": {"type": "object"},
+            },
+        },
+        "required": ["operation"],
+    },
+)
+
+
+def _parse_job_order(raw: dict):
+    """Parse a raw dict into a JobOrder; raises ValueError on missing fields."""
+    from kerf_plm.quote_to_delivery import JobOrder, JobMilestone, JobStatus
+
+    required = ["job_id", "customer_id", "quote_id", "quoted_amount_usd",
+                "promised_delivery_iso", "current_status"]
+    for field_name in required:
+        if field_name not in raw:
+            raise ValueError(f"Missing required field: {field_name!r}")
+
+    history = []
+    for i, m in enumerate(raw.get("history", [])):
+        if not isinstance(m, dict):
+            raise ValueError(f"history[{i}] must be a dict")
+        try:
+            status = JobStatus(str(m["status"]))
+        except (KeyError, ValueError) as exc:
+            raise ValueError(f"history[{i}].status invalid: {exc}") from exc
+        history.append(JobMilestone(
+            status=status,
+            timestamp_iso=str(m.get("timestamp_iso", "")),
+            actor=str(m.get("actor", "unknown")),
+            notes=str(m.get("notes", "")),
+        ))
+
+    try:
+        current_status = JobStatus(str(raw["current_status"]))
+    except ValueError as exc:
+        raise ValueError(f"current_status invalid: {exc}") from exc
+
+    return JobOrder(
+        job_id=str(raw["job_id"]),
+        customer_id=str(raw["customer_id"]),
+        quote_id=str(raw["quote_id"]),
+        quoted_amount_usd=float(raw["quoted_amount_usd"]),
+        promised_delivery_iso=str(raw["promised_delivery_iso"]),
+        current_status=current_status,
+        history=history,
+        days_in_status=int(raw.get("days_in_status", 0)),
+        is_overdue=bool(raw.get("is_overdue", False)),
+    )
+
+
+def _job_to_dict(job) -> dict:
+    """Serialize a JobOrder to a JSON-serialisable dict."""
+    return {
+        "job_id": job.job_id,
+        "customer_id": job.customer_id,
+        "quote_id": job.quote_id,
+        "quoted_amount_usd": job.quoted_amount_usd,
+        "promised_delivery_iso": job.promised_delivery_iso,
+        "current_status": job.current_status.value,
+        "days_in_status": job.days_in_status,
+        "is_overdue": job.is_overdue,
+        "history": [
+            {
+                "status": m.status.value,
+                "timestamp_iso": m.timestamp_iso,
+                "actor": m.actor,
+                "notes": m.notes,
+            }
+            for m in job.history
+        ],
+    }
+
+
+async def run_plm_quote_to_delivery(ctx, args: bytes) -> str:
+    """
+    ISA-95 quote-to-delivery workflow tool dispatcher.
+
+    Reference: ANSI/ISA-95.01 §5.3 work-order lifecycle;
+               APICS Operations Management 14e Ch 16 shop-floor KPIs.
+    """
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid JSON args: {exc}", "BAD_ARGS")
+
+    operation = str(a.get("operation", "")).strip()
+
+    if operation == "transition":
+        raw_job = a.get("job")
+        if not isinstance(raw_job, dict):
+            return err_payload("'job' must be a dict for 'transition' operation", "BAD_ARGS")
+        new_status_str = str(a.get("new_status", "")).strip()
+        if not new_status_str:
+            return err_payload("'new_status' is required for 'transition' operation", "BAD_ARGS")
+        actor = str(a.get("actor", "unknown"))
+        notes = str(a.get("notes", ""))
+        timestamp_iso = a.get("timestamp_iso") or None
+
+        try:
+            from kerf_plm.quote_to_delivery import JobStatus, transition_status
+            job = _parse_job_order(raw_job)
+            try:
+                new_status = JobStatus(new_status_str)
+            except ValueError:
+                return err_payload(
+                    f"Unknown status {new_status_str!r}. Valid: "
+                    + str([s.value for s in JobStatus]),
+                    "BAD_ARGS",
+                )
+            updated = transition_status(
+                job, new_status, actor=actor, notes=notes,
+                timestamp_iso=timestamp_iso,
+            )
+            return ok_payload({
+                "ok": True,
+                "job": _job_to_dict(updated),
+            })
+        except ValueError as exc:
+            return err_payload(str(exc), "INVALID_TRANSITION")
+        except Exception as exc:
+            return err_payload(str(exc), "TRANSITION_ERROR")
+
+    elif operation == "status_report":
+        raw_jobs = a.get("jobs")
+        if not isinstance(raw_jobs, list):
+            return err_payload("'jobs' must be a list for 'status_report' operation", "BAD_ARGS")
+        try:
+            from kerf_plm.quote_to_delivery import status_report
+            jobs = []
+            for i, rj in enumerate(raw_jobs):
+                if not isinstance(rj, dict):
+                    return err_payload(f"jobs[{i}] must be a dict", "BAD_ARGS")
+                jobs.append(_parse_job_order(rj))
+            report = status_report(jobs)
+            return ok_payload({"ok": True, **report})
+        except Exception as exc:
+            return err_payload(str(exc), "REPORT_ERROR")
+
+    elif operation == "on_time_rate":
+        raw_jobs = a.get("jobs")
+        if not isinstance(raw_jobs, list):
+            return err_payload("'jobs' must be a list for 'on_time_rate' operation", "BAD_ARGS")
+        try:
+            from kerf_plm.quote_to_delivery import on_time_delivery_rate
+            jobs = []
+            for i, rj in enumerate(raw_jobs):
+                if not isinstance(rj, dict):
+                    return err_payload(f"jobs[{i}] must be a dict", "BAD_ARGS")
+                jobs.append(_parse_job_order(rj))
+            rate = on_time_delivery_rate(jobs)
+            return ok_payload({"ok": True, "on_time_delivery_rate": round(rate, 4)})
+        except Exception as exc:
+            return err_payload(str(exc), "RATE_ERROR")
+
+    else:
+        valid_ops = ["transition", "status_report", "on_time_rate"]
+        return err_payload(
+            f"Unknown operation {operation!r}. Valid: {valid_ops}",
+            "BAD_ARGS",
+        )

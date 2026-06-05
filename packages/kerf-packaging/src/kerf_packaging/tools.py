@@ -335,3 +335,322 @@ async def run_packaging_bct_estimate(args: dict[str, Any], ctx: "ProjectCtx") ->
         return ok_payload(bct_to_dict(result))
     except Exception as exc:
         return err_payload(str(exc), "BCT_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# packaging_prepress_check — ISO 15930-1 / ISO 12647-2 pre-press validation
+# ---------------------------------------------------------------------------
+
+packaging_prepress_check_spec = ToolSpec(
+    name="packaging_prepress_check",
+    description=(
+        "Validate a packaging pre-press job against ISO 12647-2 / ISO 15930-1 "
+        "structural rules: bleed ≥ 3 mm, safety zone clear, registration marks, "
+        "PDF/X-1a structural compliance check, and plate count estimate.\n\n"
+        "References: ISO 15930-1:2001 (PDF/X-1a), ISO 12647-2:2013, GRACoL 2013. "
+        "Honest: PDF/X-1a check is structural only — commercial preflight "
+        "(Enfocus Pitstop, Apago PDF Appraiser) is required before submitting to press."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "trim_box": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "[x_min, y_min, x_max, y_max] in mm — the intended cut line.",
+            },
+            "bleed_mm": {
+                "type": "number",
+                "description": "Bleed extension beyond trim in mm (ISO 12647-2 minimum 3 mm). Default 3.0.",
+            },
+            "safety_zone_mm": {
+                "type": "number",
+                "description": "Safety zone inside trim in mm (default 4.0 mm).",
+            },
+            "registration_marks": {
+                "type": "array",
+                "description": (
+                    "List of registration mark dicts: "
+                    "{position: [x, y], kind: 'cross'|'circle'|'corner_bracket', color_layers: [...]}"
+                ),
+            },
+            "spot_colors": {
+                "type": "array",
+                "description": (
+                    "List of spot-colour dicts: "
+                    "{layer_id: str, color_name: str, coverage_pct: 0–100, overprint: bool}"
+                ),
+            },
+            "finishing": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Finishing processes: 'varnish_gloss', 'varnish_matte', 'foil_stamp', 'emboss', 'deboss', 'die_cut'.",
+            },
+            "artwork_bbox": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "[x_min, y_min, x_max, y_max] of critical artwork in mm.",
+            },
+        },
+        "required": ["trim_box"],
+    },
+)
+
+
+async def run_packaging_prepress_check(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_cad_core.packaging.pre_press_tools import _tool_prepress_check
+        result = _tool_prepress_check(
+            trim_box=args["trim_box"],
+            bleed_mm=float(args.get("bleed_mm", 3.0)),
+            safety_zone_mm=float(args.get("safety_zone_mm", 4.0)),
+            registration_marks=args.get("registration_marks"),
+            spot_colors=args.get("spot_colors"),
+            finishing=args.get("finishing"),
+            artwork_bbox=args.get("artwork_bbox"),
+        )
+        return ok_payload(result)
+    except ImportError:
+        return err_payload(
+            "kerf_cad_core.packaging.pre_press_tools not available. "
+            "Install kerf-cad-core to use pre-press tools.",
+            "UNAVAILABLE",
+        )
+    except Exception as exc:
+        return err_payload(str(exc), "PREPRESS_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# packaging_prepress_gen_marks — auto-place registration marks
+# ---------------------------------------------------------------------------
+
+packaging_prepress_gen_marks_spec = ToolSpec(
+    name="packaging_prepress_gen_marks",
+    description=(
+        "Auto-place 4 corner registration marks in the slug area outside the trim box, "
+        "ready for CMYK press registration (ArtiosCAD / Esko convention).\n\n"
+        "Reference: ISO 12647-2:2013 §7.4 — mark placement in bleed/slug area."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "trim_box": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "[x_min, y_min, x_max, y_max] in mm.",
+            },
+            "bleed_mm": {"type": "number", "description": "Bleed extension mm (default 3.0)."},
+            "kind": {
+                "type": "string",
+                "enum": ["cross", "circle", "corner_bracket"],
+                "description": "Mark geometry. Default 'corner_bracket'.",
+            },
+            "color_layers": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Ink separations for marks. Default ['cyan','magenta','yellow','black'].",
+            },
+            "offset_mm": {"type": "number", "description": "Additional offset from bleed edge (default 5.0 mm)."},
+        },
+        "required": ["trim_box"],
+    },
+)
+
+
+async def run_packaging_prepress_gen_marks(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_cad_core.packaging.pre_press_tools import _tool_prepress_gen_marks
+        result = _tool_prepress_gen_marks(
+            trim_box=args["trim_box"],
+            bleed_mm=float(args.get("bleed_mm", 3.0)),
+            kind=str(args.get("kind", "corner_bracket")),
+            color_layers=args.get("color_layers"),
+            offset_mm=float(args.get("offset_mm", 5.0)),
+        )
+        return ok_payload(result)
+    except ImportError:
+        return err_payload("kerf_cad_core.packaging.pre_press_tools not available.", "UNAVAILABLE")
+    except Exception as exc:
+        return err_payload(str(exc), "GENMARKS_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# packaging_prepress_export_pdf_x1a — minimal ISO 15930-1 PDF/X-1a skeleton
+# ---------------------------------------------------------------------------
+
+packaging_prepress_export_pdf_x1a_spec = ToolSpec(
+    name="packaging_prepress_export_pdf_x1a",
+    description=(
+        "Generate a minimal PDF/X-1a:2001 skeleton (ISO 15930-1 §6) for a packaging job.\n\n"
+        "Returns structural metadata and PDF size. "
+        "Honest: skeleton only — not press-ready without Enfocus Pitstop post-processing. "
+        "Spot-colour names and TrimBox/BleedBox are embedded per ISO 15930-1 §6.3/§6.4."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "trim_box": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "[x_min, y_min, x_max, y_max] in mm.",
+            },
+            "bleed_mm": {"type": "number", "description": "Bleed in mm (default 3.0)."},
+            "spot_colors": {
+                "type": "array",
+                "description": "Spot-colour layers: [{layer_id, color_name, coverage_pct, overprint}].",
+            },
+            "finishing": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Finishing processes.",
+            },
+            "artwork_svg": {
+                "type": "string",
+                "description": "SVG artwork (embedded as metadata comment; not rasterised).",
+            },
+        },
+        "required": ["trim_box"],
+    },
+)
+
+
+async def run_packaging_prepress_export_pdf_x1a(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_cad_core.packaging.pre_press_tools import _tool_prepress_export_pdf_x1a
+        result = _tool_prepress_export_pdf_x1a(
+            trim_box=args["trim_box"],
+            bleed_mm=float(args.get("bleed_mm", 3.0)),
+            spot_colors=args.get("spot_colors"),
+            finishing=args.get("finishing"),
+            artwork_svg=str(args.get("artwork_svg", "")),
+        )
+        return ok_payload(result)
+    except ImportError:
+        return err_payload("kerf_cad_core.packaging.pre_press_tools not available.", "UNAVAILABLE")
+    except Exception as exc:
+        return err_payload(str(exc), "EXPORT_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# packaging_material_yield — sheet yield + material cost (PMMI handbook)
+# ---------------------------------------------------------------------------
+
+packaging_material_yield_spec = ToolSpec(
+    name="packaging_material_yield",
+    description=(
+        "Compute sheet yield (parts/sheet), waste percentage, and total material cost "
+        "for a packaging job.\n\n"
+        "Algorithm: parts_per_sheet = floor(sheet_area × nesting_efficiency / bbox_area); "
+        "total_cost = sheets_per_job × sheet_weight_kg × cost_per_kg.\n\n"
+        "Reference: PMMI / FBA Cost of Converting Handbook (2019) §7 'Yield coefficient'. "
+        "Honest: uses bounding-box area × efficiency; true NFP nesting gives higher yield "
+        "for non-rectangular outlines. Cost excludes ink, plates, die, and converting "
+        "labour (add ~40–80%). See PMMI handbook §5."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "box_outline": {
+                "type": "array",
+                "description": (
+                    "Ordered vertices of the unfolded (flat) box blank in mm: "
+                    "[[x1,y1], [x2,y2], ...]"
+                ),
+                "items": {"type": "array", "items": {"type": "number"}},
+            },
+            "material_name": {
+                "type": "string",
+                "description": "Substrate identifier: e.g. 'sbs_320gsm', 'corrugated_B-flute_5mm'.",
+            },
+            "cost_per_kg": {
+                "type": "number",
+                "description": "Substrate cost per kg (USD). Typical: SBS ≈ 1.60, corrugated ≈ 1.00.",
+            },
+            "sheet_width_mm": {
+                "type": "number",
+                "description": "Press sheet width (mm).",
+            },
+            "sheet_height_mm": {
+                "type": "number",
+                "description": "Press sheet height (mm).",
+            },
+            "sheet_weight_gsm": {
+                "type": "number",
+                "description": "Substrate grammage (g/m²). SBS 320: 320; B-flute combined: ~750.",
+            },
+            "job_quantity": {
+                "type": "integer",
+                "description": "Number of finished boxes to produce.",
+            },
+            "nesting_efficiency_pct": {
+                "type": "number",
+                "description": "Nesting efficiency as %. PMMI §7.2 reports 70–80% for rectangular blanks. Default 75%.",
+            },
+            "job_id": {
+                "type": "string",
+                "description": "Optional job identifier.",
+            },
+        },
+        "required": ["box_outline", "cost_per_kg", "sheet_width_mm", "sheet_height_mm",
+                     "sheet_weight_gsm", "job_quantity"],
+    },
+)
+
+
+async def run_packaging_material_yield(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_cad_core.packaging.material_yield import (
+            MaterialCostSpec, compute_material_yield, material_cost_per_part,
+        )
+
+        outline_raw = args.get("box_outline", [])
+        if not outline_raw or len(outline_raw) < 2:
+            return err_payload("box_outline must have at least 2 vertices", "BAD_ARGS")
+
+        outline: list[tuple[float, float]] = []
+        for i, pt in enumerate(outline_raw):
+            try:
+                outline.append((float(pt[0]), float(pt[1])))
+            except (TypeError, IndexError, ValueError) as exc:
+                return err_payload(f"box_outline[{i}] invalid: {exc}", "BAD_ARGS")
+
+        material = MaterialCostSpec(
+            material_name=str(args.get("material_name", "unknown")),
+            cost_per_kg=float(args["cost_per_kg"]),
+            sheet_size_mm=(float(args["sheet_width_mm"]), float(args["sheet_height_mm"])),
+            sheet_weight_gsm=float(args["sheet_weight_gsm"]),
+        )
+
+        job_qty = int(args["job_quantity"])
+        efficiency = float(args.get("nesting_efficiency_pct", 75.0))
+        job_id = str(args.get("job_id", "job_001"))
+
+        report = compute_material_yield(
+            box_unfolded_outline=outline,
+            material=material,
+            job_quantity=job_qty,
+            nesting_efficiency_pct=efficiency,
+            job_id=job_id,
+        )
+        cpp = material_cost_per_part(report, job_qty)
+
+        return ok_payload({
+            "job_id": report.job_id,
+            "parts_per_sheet": report.parts_per_sheet,
+            "sheets_per_job": report.sheets_per_job,
+            "material_used_kg": round(report.material_used_kg, 4),
+            "waste_pct": round(report.waste_pct, 2),
+            "total_material_cost": round(report.total_material_cost, 4),
+            "material_cost_per_part": round(cpp, 6),
+            "honest_caveat": report.honest_caveat,
+        })
+    except ImportError:
+        return err_payload(
+            "kerf_cad_core.packaging.material_yield not available. "
+            "Install kerf-cad-core to use material yield tools.",
+            "UNAVAILABLE",
+        )
+    except ValueError as exc:
+        return err_payload(str(exc), "BAD_ARGS")
+    except Exception as exc:
+        return err_payload(str(exc), "YIELD_ERROR")

@@ -269,29 +269,34 @@ async def register(app: FastAPI, ctx):
     except Exception:
         pass  # multi-currency-cost-rollup tool optional — fail silently if symbol missing.
 
-    # Wave 12B: Landscape + Quote-to-delivery + MicroFlo
-    # Cimatron quote-to-delivery workflow (ISA-95 + APICS OM 14e Ch 16)
+    # Quote-to-delivery workflow tracker (ANSI/ISA-95 + APICS OM 14e Ch 16)
     # JobOrder state machine: QUOTED → QUOTE_ACCEPTED → DESIGN → MOLD_MAKING
     # → SAMPLING → PRODUCTION ↔ QC_HOLD → SHIPPED → DELIVERED → INVOICED
     try:
-        from kerf_plm.quote_to_delivery import (  # noqa: F401
-            JobOrder, JobStatus, transition_status, status_report, on_time_delivery_rate,
+        from kerf_plm.tools import (
+            plm_quote_to_delivery_spec,
+            run_plm_quote_to_delivery,
+        )
+        ctx.tools.register(
+            "plm_quote_to_delivery",
+            plm_quote_to_delivery_spec,
+            run_plm_quote_to_delivery,
         )
     except Exception:
-        pass  # quote_to_delivery optional — fail silently if symbols missing
+        pass  # quote-to-delivery tool optional — fail silently if symbol missing
 
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
             name="plm",
             version="0.1.0",
-            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.sysml-traceability", "plm.xmi-export", "plm.where-used", "plm.document-version-diff", "plm.multi-cavity-effectivity", "plm.part-numbering-schema", "plm.change-notification-distribution", "plm.bom-cost-rollup", "plm.component-whereused", "plm.ecn-impact-analysis", "plm.bom-maturity-check", "plm.change-log-export", "plm.part-obsolescence-check", "plm.variant-config", "plm.bom-compare-diff", "plm.multi-currency-cost-rollup"],
+            provides=["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.sysml-traceability", "plm.xmi-export", "plm.where-used", "plm.document-version-diff", "plm.multi-cavity-effectivity", "plm.part-numbering-schema", "plm.change-notification-distribution", "plm.bom-cost-rollup", "plm.component-whereused", "plm.ecn-impact-analysis", "plm.bom-maturity-check", "plm.change-log-export", "plm.part-obsolescence-check", "plm.variant-config", "plm.bom-compare-diff", "plm.multi-currency-cost-rollup", "plm.quote-to-delivery"],
             depends=[],
         )
     except ImportError:
         return {
             "name": "plm",
             "version": "0.1.0",
-            "provides": ["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.multi-cavity-effectivity", "plm.part-numbering-schema", "plm.change-notification-distribution", "plm.bom-cost-rollup", "plm.component-whereused", "plm.ecn-impact-analysis", "plm.bom-maturity-check", "plm.change-log-export", "plm.part-obsolescence-check", "plm.variant-config", "plm.bom-compare-diff", "plm.multi-currency-cost-rollup"],
+            "provides": ["plm.configurator", "plm.effectivity-bom", "plm.change-management", "plm.kbe-bridge", "plm.multi-cavity-effectivity", "plm.part-numbering-schema", "plm.change-notification-distribution", "plm.bom-cost-rollup", "plm.component-whereused", "plm.ecn-impact-analysis", "plm.bom-maturity-check", "plm.change-log-export", "plm.part-obsolescence-check", "plm.variant-config", "plm.bom-compare-diff", "plm.multi-currency-cost-rollup", "plm.quote-to-delivery"],
             "depends": [],
         }

@@ -48,6 +48,14 @@ def _register_tools(ctx, provides: list) -> None:
         run_packaging_fold_preview,
         packaging_bct_estimate_spec,
         run_packaging_bct_estimate,
+        packaging_prepress_check_spec,
+        run_packaging_prepress_check,
+        packaging_prepress_gen_marks_spec,
+        run_packaging_prepress_gen_marks,
+        packaging_prepress_export_pdf_x1a_spec,
+        run_packaging_prepress_export_pdf_x1a,
+        packaging_material_yield_spec,
+        run_packaging_material_yield,
     )
 
     tool_entries = [
@@ -59,6 +67,16 @@ def _register_tools(ctx, provides: list) -> None:
          "packaging.fold-preview"),
         (packaging_bct_estimate_spec, run_packaging_bct_estimate,
          "packaging.bct-estimate"),
+        # Pre-press / graphics integration (ISO 15930-1 PDF/X-1a + ISO 12647-2)
+        (packaging_prepress_check_spec, run_packaging_prepress_check,
+         "packaging.prepress-check"),
+        (packaging_prepress_gen_marks_spec, run_packaging_prepress_gen_marks,
+         "packaging.prepress-gen-marks"),
+        (packaging_prepress_export_pdf_x1a_spec, run_packaging_prepress_export_pdf_x1a,
+         "packaging.prepress-export-pdf-x1a"),
+        # Material yield + cost estimation (PMMI handbook §7)
+        (packaging_material_yield_spec, run_packaging_material_yield,
+         "packaging.material-yield"),
     ]
 
     for spec, handler, capability in tool_entries:

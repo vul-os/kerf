@@ -47,4 +47,6 @@ from kerf_plm._tools_module import (  # noqa: F401
     run_plm_compare_boms,
     plm_rollup_cost_multi_currency_spec,
     run_plm_rollup_cost_multi_currency,
+    plm_quote_to_delivery_spec,
+    run_plm_quote_to_delivery,
 )

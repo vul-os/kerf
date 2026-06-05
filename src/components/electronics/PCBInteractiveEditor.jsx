@@ -15,6 +15,9 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Toolbar from './pcb-editor/Toolbar.jsx'
 import Canvas from './pcb-editor/Canvas.jsx'
+import DrcErcPanel from './DrcErcPanel.jsx'
+import SIPanel from './SIPanel.jsx'
+import SiliconSynthPanel from './SiliconSynthPanel.jsx'
 
 // ─── Mock fixture ─────────────────────────────────────────────────────────────
 
@@ -156,6 +159,11 @@ export default function PCBInteractiveEditor() {
   const [pushedTraceIds, setPushedTraceIds] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+
+  // ── Panel visibility state ─────────────────────────────────────────────────
+  const [showDrcPanel, setShowDrcPanel]         = useState(false)
+  const [showSIPanel, setShowSIPanel]           = useState(false)
+  const [showSiliconPanel, setShowSiliconPanel] = useState(false)
 
   // ── Tune-Length mode state ─────────────────────────────────────────────────
   const [tuneNetA, setTuneNetA] = useState('')
@@ -419,7 +427,7 @@ export default function PCBInteractiveEditor() {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full bg-[#0f172a] text-white font-mono">
+    <div className="flex flex-col h-full bg-[#0f172a] text-white font-mono relative">
       {/* Toolbar */}
       <Toolbar
         tool={tool}
@@ -431,6 +439,9 @@ export default function PCBInteractiveEditor() {
         canRedo={boardState.future.length > 0}
         onUndo={() => dispatch({ type: 'UNDO' })}
         onRedo={() => dispatch({ type: 'REDO' })}
+        onToggleDrcPanel={() => setShowDrcPanel((v) => !v)}
+        onToggleSIPanel={() => setShowSIPanel((v) => !v)}
+        onToggleSiliconPanel={() => setShowSiliconPanel((v) => !v)}
       />
 
       {/* Status bar */}
@@ -489,6 +500,39 @@ export default function PCBInteractiveEditor() {
           >
             Deselect
           </button>
+        </div>
+      )}
+
+      {/* ── Floating overlay panels ───────────────────────────────────────── */}
+      {(showDrcPanel || showSIPanel || showSiliconPanel) && (
+        <div
+          data-testid="panel-overlay"
+          className="absolute inset-0 pointer-events-none z-20 flex items-start justify-end p-4 gap-3 flex-wrap"
+          style={{ top: 0, right: 0 }}
+        >
+          {showDrcPanel && (
+            <div className="pointer-events-auto">
+              <DrcErcPanel
+                circuitJson={[
+                  ...boardState.pads.map((p) => ({ type: 'pcb_smtpad', ...p })),
+                  ...boardState.traces.map((t) => ({ type: 'pcb_trace', ...t })),
+                  ...boardState.keepouts.map((k) => ({ type: 'pcb_keepout', ...k })),
+                ]}
+                onClose={() => setShowDrcPanel(false)}
+                onMarkerClick={null}
+              />
+            </div>
+          )}
+          {showSIPanel && (
+            <div className="pointer-events-auto">
+              <SIPanel onClose={() => setShowSIPanel(false)} />
+            </div>
+          )}
+          {showSiliconPanel && (
+            <div className="pointer-events-auto">
+              <SiliconSynthPanel onClose={() => setShowSiliconPanel(false)} />
+            </div>
+          )}
         </div>
       )}
 

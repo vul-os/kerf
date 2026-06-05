@@ -12,7 +12,7 @@
 //   onUndo        — () => void
 //   onRedo        — () => void
 
-import { MousePointer2, Route, Zap, Trash2, Layers, CheckCircle2, XCircle, Undo2, Redo2, Loader, Ruler } from 'lucide-react'
+import { MousePointer2, Route, Zap, Trash2, Layers, CheckCircle2, XCircle, Undo2, Redo2, Loader, Ruler, Activity, Cpu, ShieldAlert } from 'lucide-react'
 
 const TOOLS = [
   { id: 'select',     label: 'Select',      Icon: MousePointer2 },
@@ -39,6 +39,9 @@ export default function Toolbar({
   canRedo,
   onUndo,
   onRedo,
+  onToggleDrcPanel,
+  onToggleSIPanel,
+  onToggleSiliconPanel,
 }) {
   return (
     <div className="flex items-center gap-2 px-3 py-2 bg-[#1a1a2e] border-b border-white/10 text-sm select-none flex-wrap">
@@ -112,6 +115,45 @@ export default function Toolbar({
             <XCircle size={13} className="text-red-400" />
             <span className="text-red-400">DRC Fail</span>
           </>
+        )}
+      </div>
+
+      <div className="w-px h-5 bg-white/10" />
+
+      {/* Panel toggles — DRC/ERC, SI, Silicon */}
+      <div className="flex items-center gap-1 bg-black/30 rounded-lg p-1">
+        {onToggleDrcPanel && (
+          <button
+            data-testid="btn-toggle-drc-panel"
+            onClick={onToggleDrcPanel}
+            title="DRC / ERC results panel"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <ShieldAlert size={13} />
+            <span className="hidden sm:inline">DRC/ERC</span>
+          </button>
+        )}
+        {onToggleSIPanel && (
+          <button
+            data-testid="btn-toggle-si-panel"
+            onClick={onToggleSIPanel}
+            title="Signal Integrity panel (Z0 / crosstalk / IBIS eye)"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <Activity size={13} />
+            <span className="hidden sm:inline">SI</span>
+          </button>
+        )}
+        {onToggleSiliconPanel && (
+          <button
+            data-testid="btn-toggle-silicon-panel"
+            onClick={onToggleSiliconPanel}
+            title="Silicon synthesis / P&R (Yosys + OpenLane)"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <Cpu size={13} />
+            <span className="hidden sm:inline">Synth</span>
+          </button>
         )}
       </div>
 

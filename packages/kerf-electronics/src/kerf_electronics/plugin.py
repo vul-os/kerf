@@ -242,6 +242,9 @@ def _register_tools(ctx, provides: list) -> None:
         # electronics_tune_diff_pair_lengths: symmetric diff-pair matching (Hall & Heck 2009 §3.6)
         # Reference: IPC-2141A §6 + Wittwer 2012 DesignCon
         "kerf_electronics.routing.diffpair_tuner_tools",
+        # IBIS 5.x channel simulator — si_ibis_parse + si_ibis_channel_response
+        # Bergeron bounce-diagram model; PRBS-7 eye envelope (Hall & Heck 2009 §4)
+        "kerf_electronics.tools.si_ibis",
     ]
 
     for module_path in tool_modules:

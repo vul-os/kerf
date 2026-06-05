@@ -84,6 +84,7 @@ async def register(app: FastAPI, ctx):
     import kerf_fem.cfd_navier_stokes  # kerf-fem: 2-D projection NS solver — self-registers cfd_navier_stokes_steady
     import kerf_fem.cfd_potential  # kerf-fem: potential-flow cylinder — self-registers cfd_potential_cylinder
     from kerf_fem.coupled_variation import fem_propagate_uncertainty_spec, run_fem_propagate_uncertainty; ctx.tools.register("fem_propagate_uncertainty", fem_propagate_uncertainty_spec, run_fem_propagate_uncertainty)  # kerf-fem: probabilistic FEA (LHS + Karhunen-Loève)
+    from kerf_fem.fea_load_export import fea_export_load_cases_spec, run_fea_export_load_cases; ctx.tools.register("fea_export_load_cases", fea_export_load_cases_spec, run_fea_export_load_cases)  # kerf-fem: MBD→FEA load-case export (Nastran/CalculiX)
     # Solid FEM / modal beam / linear static beam — close backend-only gaps
     try:
         import kerf_fem.solid_fem_tools as _sft
@@ -181,6 +182,7 @@ async def register(app: FastAPI, ctx):
         "fem.buckling", "fem.harmonic-response", "fem.random-vibration",
         "fem.probabilistic",  # LHS + Karhunen-Loève uncertainty propagation
         "fem.fatigue-sn", "fem.fatigue-haigh", "fem.frf-sweep",
+        "fem.fea-load-export",  # MBD→FEA load-case export (Nastran/CalculiX)
     ]
     if _DOLFINX_AVAILABLE:
         provides.append("fem.linear-static")

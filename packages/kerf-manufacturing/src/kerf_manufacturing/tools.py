@@ -449,8 +449,11 @@ async def run_manufacturing_cycle_time(params: dict, ctx: "ProjectCtx") -> str:
 # TOOLS list consumed by plugin
 # ---------------------------------------------------------------------------
 
+from kerf_manufacturing.am_tool import AM_TOOLS  # noqa: E402
+
 TOOLS = [
     ("manufacturing_moldflow", manufacturing_moldflow_spec, run_manufacturing_moldflow),
     ("manufacturing_optimize_feed", manufacturing_optimize_feed_spec, run_manufacturing_optimize_feed),
     ("manufacturing_cycle_time", manufacturing_cycle_time_spec, run_manufacturing_cycle_time),
+    *AM_TOOLS,
 ]

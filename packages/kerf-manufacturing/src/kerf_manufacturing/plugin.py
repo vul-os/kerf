@@ -5,6 +5,7 @@ Registers:
   - LLM tools: manufacturing_moldflow (Hele-Shaw injection-moulding fill simulation)
   - LLM tools: manufacturing_optimize_feed (CAM feed-rate optimizer — Altintas 2012)
   - LLM tools: manufacturing_cycle_time (CNC cycle time estimator)
+  - LLM tools: am_process_simulate (inherent-strain AM distortion + residual stress)
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ async def register(app=None, ctx=None):
                 ctx.tools.register(tool_name, tool_spec, tool_handler)
         provides.append("manufacturing.moldflow")
         provides.append("manufacturing.feed_rate")
+        provides.append("manufacturing.am_process_sim")
     except Exception as exc:
         logger.warning("kerf-manufacturing: failed to load tools: %s", exc)
 

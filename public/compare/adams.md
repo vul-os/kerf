@@ -114,9 +114,9 @@ features:
       note: "Adams exports MBD loads directly to ANSYS, Abaqus, Nastran, MSC Nastran for structural FEA"
       source: "https://www.mechutils.com/msc-adams"
     kerf:
-      status: partial
-      note: "Structural FEA native (CalculiX bridge); no load export to external FEA tools"
-      evidence: "packages/kerf-fem/src/"
+      status: yes
+      note: "Exports MBD trajectory loads (joint reaction forces, moments, inertia-relief accelerations) to Nastran bulk-data (FORCE/MOMENT/GRAV/LOAD/SUBCASE) and CalculiX/Abaqus (*CLOAD/*DLOAD GRAV/*STEP) decks; picks critical load instants by peak resultant; LLM tool fea_export_load_cases + motion-studio download panel"
+      evidence: "packages/kerf-fem/src/kerf_fem/fea_load_export.py"
   - domain: D1
     feature: "LLM / chat-native editing"
     competitor:
@@ -137,7 +137,7 @@ The industry-standard multibody dynamics solver — versus an open-core CAD with
 
 ## Summary
 
-Kerf saturates **96%** of MSC Adams (Hexagon)'s feature surface (11 yes, 1 partial, 0 no out of 12 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of MSC Adams (Hexagon)'s feature surface (12 yes, 0 partial, 0 no out of 12 features tracked here).
 
 ## Feature comparison
 
@@ -153,16 +153,12 @@ Kerf saturates **96%** of MSC Adams (Hexagon)'s feature surface (11 yes, 1 parti
 | Robotics FK / IK (6-DOF) | ✅ | Partial | 6-DOF spatial IK via DLS Jacobian; PUMA-class validated (backend) |
 | Gear / belt / chain machinery (Adams/Machinery) | ✅ | Yes | Litvin gear/belt machinery dynamics (kerf-mates machinery) |
 | Gear geometry / tooth stress | ✅ | Partial | Spur/helical/bevel/worm gear geometry + AGMA/ISO tooth bending + contact stress (backend) |
-| FEA load export | ⚠️ (partial) | Yes | Structural FEA native (CalculiX bridge); no load export to external FEA tools |
+| FEA load export | ✅ | Yes | Nastran FORCE/MOMENT/GRAV/SUBCASE + CalculiX *CLOAD/*DLOAD GRAV decks from MBD trajectory; LLM tool fea_export_load_cases |
 | LLM / chat-native editing | ✅ | No | Chat-native: describe a mechanism in plain language; Kerf routes to MBD backend |
 
 ## What Kerf does that MSC Adams (Hexagon) doesn't
 
 - **LLM / chat-native editing** — Chat-native: describe a mechanism in plain language; Kerf routes to MBD backend
-
-## What's honestly outstanding
-
-- **FEA load export** (Partial): Structural FEA native (CalculiX bridge); no load export to external FEA tools
 
 ## Pricing
 

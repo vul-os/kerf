@@ -179,9 +179,9 @@ features:
       note: "AM distortion / residual-stress process simulation"
       source: "https://www.ansys.com/products/structures/ansys-mechanical"
     kerf:
-      status: no
-      note: "AM thermal-distortion process simulation not yet implemented"
-      evidence: ""
+      status: partial
+      note: "Inherent-strain layer-activation distortion + residual stress (am_process_simulate tool); not full thermo-mechanical melt-pool — elastic quasi-static approximation only; Tet4 mesh, isotropic material"
+      evidence: "packages/kerf-manufacturing/src/kerf_manufacturing/am_process_sim.py"
 
   - domain: D1
     feature: "Open-source core / scripting API"
@@ -214,7 +214,7 @@ The structural-FEA gold standard — compared honestly against MIT open-core.
 
 ## Summary
 
-Kerf saturates **86%** of Ansys Mechanical's feature surface (14 yes, 3 partial, 1 no out of 18 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **89%** of Ansys Mechanical's feature surface (14 yes, 4 partial, 0 no out of 18 features tracked here). Honest gaps: 4 features partial (engine complete, depth or coverage gap); 0 features not implemented.
 
 ## Feature comparison
 
@@ -235,7 +235,7 @@ Kerf saturates **86%** of Ansys Mechanical's feature surface (14 yes, 3 partial,
 | Composite layered shells (Tsai-Wu / Hashin) | ✅ | Yes | CLT [A\|B\|D] + Tsai-Wu/Hill/Hashin first-ply-failure + interlaminar |
 | Structural acoustics (harmonic / modal) | ✅ | Yes | ISO 9613 propagation + RT60 + mass-law TL + wave SEA |
 | Topology optimization | ✅ | Yes | SIMP density-based topology optimization |
-| Additive manufacturing process simulation | 🔴 (no) | Yes | AM thermal-distortion process simulation not yet implemented |
+| Additive manufacturing process simulation | ⚠️ (partial) | Yes | Inherent-strain layer-activation distortion + residual stress (am_process_simulate); not full thermo-mechanical melt-pool |
 | Open-source core / scripting API | ✅ | No | MIT open-core; full JSON-RPC LLM tool surface + kerf-sdk Python |
 | Chat-native / LLM-driven setup | ✅ | No | Describe the load case in plain language; Kerf sets up and solves |
 
@@ -249,7 +249,7 @@ Kerf saturates **86%** of Ansys Mechanical's feature surface (14 yes, 3 partial,
 - **Nonlinear — hyperelastic (rubber/elastomer)** (Partial): Neo-Hookean/Mooney-Rivlin/Ogden constitutive models + Cauchy stress + tangent (material-point); no full hyperelastic FEM block solver yet
 - **Contact (friction / gap, penalty / augmented-Lagrange)** (Partial): Node-to-surface penalty contact + Hertz closed-form; not full self-contact / augmented-Lagrange depth
 - **Fracture mechanics (J-integral, crack growth)** (Partial): J-integral + SIF + Paris-law crack growth (da/dN) + Erdogan-Sih mixed-mode kink; geometry-factor SIFs, not full XFEM enrichment
-- **Additive manufacturing process simulation** (Not yet implemented): AM thermal-distortion process simulation not yet implemented
+- **Additive manufacturing process simulation** (Partial): Inherent-strain layer-activation quasi-static elastic model (am_process_simulate); anisotropic ε* calibratable; outputs distortion field + residual von-Mises; not a full thermo-mechanical melt-pool simulation
 
 ## Pricing
 

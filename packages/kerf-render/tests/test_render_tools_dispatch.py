@@ -35,3 +35,20 @@ def test_tools_list_entries_shape():
         assert isinstance(name, str) and name
         assert hasattr(spec, "name") and spec.name == name
         assert callable(handler)
+
+
+def test_pathtrace_tool_module_registered_in_plugin():
+    """The CPU path tracer's TOOLS module must be wired into the plugin's
+    _TOOL_MODULES list so its tool actually gets registered."""
+    from kerf_render import plugin
+    assert "kerf_render.pathtrace_tools" in plugin._TOOL_MODULES
+
+
+def test_pathtrace_tools_list():
+    from kerf_render import pathtrace_tools as m
+    assert hasattr(m, "TOOLS")
+    names = {t[0] for t in m.TOOLS}
+    assert "pathtrace_render_scene" in names
+    for name, spec, handler in m.TOOLS:
+        assert spec.name == name
+        assert callable(handler)

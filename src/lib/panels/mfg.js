@@ -64,6 +64,18 @@ export default [
     })),
   },
 
+  // ── Additive manufacturing process simulation ────────────────────────────
+
+  {
+    id: 'am_process_sim',
+    kinds: ['am_process_sim', 'am_distortion', 'am_residual_stress'],
+    exts: ['.am_result'],
+    label: 'AM Process Simulation',
+    load: () => import('../../components/AMProcessSimPanel.jsx').then(m => ({
+      default: contentToField(m.default, 'parsedContent'),
+    })),
+  },
+
   // ── Packaging ────────────────────────────────────────────────────────────
 
   {

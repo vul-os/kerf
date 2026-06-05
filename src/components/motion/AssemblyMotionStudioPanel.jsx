@@ -48,6 +48,7 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
+  Download,
   Loader2,
   Pause,
   Play,
@@ -557,6 +558,12 @@ export default function AssemblyMotionStudioPanel({
 
   const [activeTab, setActiveTab] = useState('setup')   // 'setup' | 'results' | 'traces'
 
+  // ── FEA load export ──────────────────────────────────────────────────────
+  const [feaFormat, setFeaFormat] = useState('nastran')   // 'nastran' | 'calculix'
+  const [feaCritical, setFeaCritical] = useState(3)       // n_critical instants
+  const [feaBusy, setFeaBusy] = useState(false)
+  const [feaError, setFeaError] = useState(null)
+
   // ── Viewport ──────────────────────────────────────────────────────────
   const mountRef = useRef(null)
   const applyPoses = useMotionViewport(mountRef, timeline?.body_names ?? [])
@@ -656,6 +663,88 @@ export default function AssemblyMotionStudioPanel({
       setRunning(false)
     }
   }, [joints, driver, sim, running, applyPoses]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── FEA export handler ────────────────────────────────────────────────
+  const handleFeaExport = useCallback(async () => {
+    if (!timeline || feaBusy) return
+    setFeaBusy(true)
+    setFeaError(null)
+
+    // Build per-step force records from timeline body poses.
+    // Positions serve as application-point IDs; body accelerations are
+    // estimated via finite-difference of velocity for inertia-relief GRAV cards.
+    const times = (timeline.t ?? []).slice()
+
+    const forces_per_step = times.map((_, fi) => {
+      const frame = timeline.frames?.[fi]
+      if (!frame) return []
+      return (frame.poses ?? []).map((pose) => ({
+        point_id: pose.body_name ?? `body_${fi}`,
+        force: [0.0, 0.0, 0.0],
+        moment: [0.0, 0.0, 0.0],
+      }))
+    })
+
+    // Finite-difference body acceleration from velocity snapshots
+    const accelerations_per_step = times.map((_, fi) => {
+      if (fi === 0 || !timeline.frames) return [0.0, 0.0, 0.0]
+      const cur = timeline.frames[fi]?.poses?.[0]?.velocity
+      const prev = timeline.frames[fi - 1]?.poses?.[0]?.velocity
+      if (!cur || !prev) return [0.0, 0.0, 0.0]
+      const dt_ = (times[fi] - times[fi - 1]) || 0.01
+      return [
+        (cur[0] - prev[0]) / dt_,
+        (cur[1] - prev[1]) / dt_,
+        (cur[2] - prev[2]) / dt_,
+      ]
+    })
+
+    try {
+      const token = useAuth.getState().accessToken
+      const headers = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+
+      const payload = {
+        tool: 'fea_export_load_cases',
+        args: {
+          format: feaFormat,
+          times,
+          forces_per_step,
+          accelerations_per_step,
+          n_critical: feaCritical,
+          title: 'Kerf Motion Study — FEA Load Export',
+        },
+      }
+
+      const res = await fetch(`${API_URL}/api/tools/call`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const text = await res.text()
+        throw new Error(`fea_export_load_cases failed (${res.status}): ${text}`)
+      }
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+
+      const inner = data.result ?? data
+      const deck = inner?.deck ?? ''
+      const ext = feaFormat === 'nastran' ? 'bdf' : 'inp'
+      const filename = `kerf_load_export.${ext}`
+      const blob = new Blob([deck], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setFeaError(err.message || 'FEA export failed')
+    } finally {
+      setFeaBusy(false)
+    }
+  }, [timeline, feaFormat, feaCritical, feaBusy]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Derived display values ─────────────────────────────────────────────
   const tAtFrame = timeline?.t?.[frameIdx] ?? 0
@@ -952,6 +1041,66 @@ export default function AssemblyMotionStudioPanel({
                 </div>
               )}
             </div>
+
+            {/* ── FEA Load Export ───────────────────────────────────── */}
+            <div
+              className="border border-ink-700 rounded bg-ink-900/60 px-3 py-2"
+              data-testid="fea-export-panel"
+            >
+              <h3 className="text-[10px] text-ink-500 uppercase tracking-wider mb-2 font-medium flex items-center gap-1.5">
+                <Download size={10} />
+                FEA Load Export
+              </h3>
+              <div className="flex flex-wrap gap-2 mb-2 text-[11px]">
+                <label className="flex items-center gap-1.5">
+                  <span className="text-ink-500">Format</span>
+                  <select
+                    value={feaFormat}
+                    onChange={(e) => setFeaFormat(e.target.value)}
+                    className="bg-ink-950 border border-ink-800 rounded px-1.5 py-0.5 text-[11px] text-ink-100"
+                    data-testid="fea-format-select"
+                  >
+                    <option value="nastran">Nastran (.bdf)</option>
+                    <option value="calculix">CalculiX/Abaqus (.inp)</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-1.5">
+                  <span className="text-ink-500">Critical instants</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={feaCritical}
+                    onChange={(e) => setFeaCritical(Math.max(1, parseInt(e.target.value) || 3))}
+                    className="w-12 bg-ink-950 border border-ink-800 rounded px-1.5 py-0.5 text-[11px] text-ink-100 font-mono"
+                    data-testid="fea-critical-input"
+                  />
+                </label>
+              </div>
+              {feaError && (
+                <div className="flex items-start gap-1.5 rounded bg-red-950/60 border border-red-800/60 px-2 py-1 text-[10px] text-red-300 mb-2">
+                  <AlertTriangle size={10} className="shrink-0 mt-0.5" />
+                  <span>{feaError}</span>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={handleFeaExport}
+                disabled={feaBusy}
+                className="flex items-center gap-1.5 rounded bg-ink-800 hover:bg-ink-700 disabled:opacity-50 disabled:cursor-not-allowed text-ink-100 text-[11px] font-medium py-1 px-2.5 transition-colors"
+                data-testid="fea-export-btn"
+              >
+                {feaBusy
+                  ? <><Loader2 size={10} className="animate-spin" />Exporting…</>
+                  : <><Download size={10} />Export load deck</>
+                }
+              </button>
+              <p className="text-[10px] text-ink-600 mt-1.5">
+                Exports up to {feaCritical} critical load instants (peak resultant) from the
+                computed trajectory as {feaFormat === 'nastran' ? 'Nastran FORCE/MOMENT/GRAV cards' : 'CalculiX *CLOAD/*DLOAD GRAV blocks'}.
+              </p>
+            </div>
+
           </>)}
         </>)}
 

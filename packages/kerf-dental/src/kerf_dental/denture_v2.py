@@ -71,19 +71,31 @@ class DentureSpec:
         """
         Determine Kennedy classification from missing tooth pattern.
 
-        Kennedy Class I: bilateral free-end saddles (posterior teeth missing)
-        Kennedy Class II: unilateral free-end saddle
-        Kennedy Class III: unilateral bounded saddle (teeth present distally)
+        Kennedy Class I: bilateral free-end saddles (posterior teeth missing on both sides)
+        Kennedy Class II: unilateral free-end saddle (posterior on one side)
+        Kennedy Class III: unilateral bounded saddle (bounded by teeth on both sides)
         Kennedy Class IV: anterior bounded saddle crossing midline
 
-        Reference: McCracken's Ch 2; Kennedy E (1925).
+        Applegate Rules (1954) govern application of Kennedy classification:
+        1. Classify after all teeth are extracted that are to be extracted.
+        2. If third molar is to be replaced, it does not determine the class.
+        3. If third molar is present and not to be replaced, it is considered an abutment.
+        4. If second molar is absent and not to be replaced, it does not determine the class.
+        5. The most posterior missing area determines the classification.
+        6. Edentulous areas other than the classification are called modifications.
+        7. The extent of the modification is not considered, only the number.
+        8. Class IV has no modifications (the anterior crossing eliminates this possibility).
+
+        Reference: McCracken's Ch 2; Kennedy E (1925) Dental Cosmos 67:1-9;
+                   Applegate OC (1954). J Prosthet Dent 4(3):350-7.
         """
         if not self.teeth_to_replace or self.type == "complete":
             return "complete"
 
-        # Get FDI quadrant + tooth position numbers
-        quads = set(t.fdi[0] for t in self.teeth_to_replace)
+        # Apply Applegate Rule 5: most posterior missing area determines class.
+        # Sort missing teeth by FDI position to find most posterior.
         tooth_nums = [(int(t.fdi[0]), int(t.fdi[1])) for t in self.teeth_to_replace]
+        quads = set(t.fdi[0] for t in self.teeth_to_replace)
 
         # Check for posterior missing (tooth positions 6,7,8 = molar/2nd molar/3rd)
         has_posterior_missing = any(n >= 6 for _, n in tooth_nums)
@@ -91,6 +103,8 @@ class DentureSpec:
         has_anterior = any(1 <= n <= 3 for _, n in tooth_nums)
         crosses_midline = len(set(int(t.fdi[0]) for t in self.teeth_to_replace)) >= 2
 
+        # Applegate Rule 8: Class IV cannot have modifications.
+        # Applegate Rule 5: most posterior determines class.
         if has_anterior and crosses_midline and not has_posterior_missing:
             return "Class IV"
         elif has_posterior_missing and has_bilateral:
@@ -99,6 +113,39 @@ class DentureSpec:
             return "Class II"
         else:
             return "Class III"
+
+    @property
+    def applegate_modification_count(self) -> int:
+        """
+        Count edentulous areas other than the primary Kennedy class (Applegate Rule 6).
+
+        Modifications are additional edentulous areas not represented by the
+        primary Kennedy classification. Class IV has no modifications (Applegate Rule 8).
+
+        Reference: Applegate OC (1954) J Prosthet Dent 4(3):350-7.
+        """
+        if self.kennedy_class == "complete" or self.kennedy_class == "Class IV":
+            return 0
+        if len(self.teeth_to_replace) <= 1:
+            return 0
+
+        # Group teeth by quadrant to find distinct edentulous areas
+        from itertools import groupby
+        # Sort by (quadrant, tooth_pos) to group adjacent missing teeth
+        sorted_teeth = sorted(
+            [(int(t.fdi[0]), int(t.fdi[1])) for t in self.teeth_to_replace]
+        )
+        # Count distinct gaps (groups of consecutive teeth in same quadrant)
+        n_areas = 1
+        for i in range(1, len(sorted_teeth)):
+            prev_q, prev_n = sorted_teeth[i - 1]
+            curr_q, curr_n = sorted_teeth[i]
+            # New area if: different quadrant, or same quadrant but non-consecutive
+            if curr_q != prev_q or curr_n != prev_n + 1:
+                n_areas += 1
+
+        # The primary class accounts for 1 area; rest are modifications
+        return max(0, n_areas - 1)
 
 
 @dataclass

@@ -228,11 +228,15 @@ class TestDesignCrown:
         result = design_crown(spec)
         assert result.margin_fit_um > 0.0
 
-    def test_margin_fit_equals_cement_gap_in_um(self):
-        """margin_fit_um should equal cement_gap_mm * 1000."""
+    def test_margin_fit_includes_machining_tolerance(self):
+        """margin_fit_um = cement_gap_um + machining_tolerance/2 (ISO 4049 model).
+
+        Zirconia machining tol = 20 µm → margin_fit = 40 + 10 = 50 µm.
+        """
         spec = _make_spec(19)
         result = design_crown(spec)
-        assert result.margin_fit_um == pytest.approx(spec.cement_gap_mm * 1000.0, abs=1.0)
+        # cement_gap 40 µm + zirconia machining tol/2 = 10 µm → 50 µm
+        assert result.margin_fit_um == pytest.approx(50.0, abs=1.0)
 
     def test_occlusal_contacts_from_spec(self):
         spec = _make_spec(19)

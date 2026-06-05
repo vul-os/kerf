@@ -1047,3 +1047,366 @@ async def run_dental_lab_case_report(args: dict, ctx: "ProjectCtx") -> str:
         return ok_payload(report)
     except Exception as exc:
         return err_payload(str(exc), "LAB_CASE_REPORT_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# Wave 11C: 3shape parity deepening — new LLM tools
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# dental_implant_spacing_check — Tarnow/Grunder safety margins
+# ---------------------------------------------------------------------------
+
+dental_implant_spacing_check_spec = ToolSpec(
+    name="dental_implant_spacing_check",
+    description=(
+        "Check inter-implant and implant-to-tooth spacing against clinical safety rules. "
+        "Tarnow 2000: implant-to-implant surface ≥ 3 mm (crestal bone preservation). "
+        "Grunder 2005: implant-to-adjacent-tooth surface ≥ 1.5 mm (papilla preservation). "
+        "Returns violation list, min distances, and ok/fail per rule. "
+        "NOT FDA-cleared medical device."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "implant_positions": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+                "description": "Crestal platform positions (x,y,z) in mm for each implant.",
+                "minItems": 1,
+            },
+            "implant_diameters_mm": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "Implant body diameters (mm), one per position.",
+                "minItems": 1,
+            },
+            "adjacent_tooth_positions": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+                "description": "Root surface positions of adjacent natural teeth (mm). Optional.",
+            },
+        },
+        "required": ["implant_positions", "implant_diameters_mm"],
+    },
+)
+
+
+async def run_dental_implant_spacing_check(args: dict, ctx: "ProjectCtx") -> str:
+    try:
+        import numpy as np
+        from kerf_dental.implant_plan_v2 import check_tarnow_grunder_spacing
+
+        positions = [np.array(p, dtype=float) for p in args["implant_positions"]]
+        diameters = [float(d) for d in args["implant_diameters_mm"]]
+        adj_teeth = None
+        if args.get("adjacent_tooth_positions"):
+            adj_teeth = [np.array(p, dtype=float) for p in args["adjacent_tooth_positions"]]
+
+        result = check_tarnow_grunder_spacing(positions, diameters, adj_teeth)
+        return ok_payload(result)
+    except Exception as exc:
+        return err_payload(str(exc), "IMPLANT_SPACING_CHECK_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# dental_drill_sequence — step-by-step drill protocol
+# ---------------------------------------------------------------------------
+
+dental_drill_sequence_spec = ToolSpec(
+    name="dental_drill_sequence",
+    description=(
+        "Return step-by-step drill sequence for a given implant brand and diameter. "
+        "Brands: Straumann BLT (IFU-002-en), NobelActive (GPR100), Astra EV (D3753). "
+        "Returns list of drill steps with drill name, diameter, speed (rpm), and max torque (Ncm). "
+        "NOT FDA-cleared medical device — verify with IFU before clinical use."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "brand": {
+                "type": "string",
+                "description": "'Straumann BLT' | 'NobelActive' | 'Astra EV'. Default 'Straumann BLT'.",
+            },
+            "diameter_mm": {
+                "type": "number",
+                "description": "Implant body diameter (mm). Typical 3.3–5.0 mm.",
+            },
+        },
+        "required": ["diameter_mm"],
+    },
+)
+
+
+async def run_dental_drill_sequence(args: dict, ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_dental.implant_plan_v2 import get_drill_sequence
+
+        brand = str(args.get("brand", "Straumann BLT"))
+        diameter_mm = float(args["diameter_mm"])
+        seq = get_drill_sequence(brand, diameter_mm)
+        return ok_payload({
+            "brand": brand,
+            "diameter_mm": diameter_mm,
+            "steps": seq,
+            "step_count": len(seq),
+            "disclaimer": "Verify against manufacturer IFU before clinical use — NOT FDA-cleared.",
+        })
+    except Exception as exc:
+        return err_payload(str(exc), "DRILL_SEQUENCE_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# dental_denture_design_v2 — Kennedy classification + Applegate rules
+# ---------------------------------------------------------------------------
+
+dental_denture_design_v2_spec = ToolSpec(
+    name="dental_denture_design_v2",
+    description=(
+        "Design RPD or complete denture with Kennedy classification (Applegate rules 1954). "
+        "Kennedy Class I–IV determined from missing tooth pattern. "
+        "Modification count follows Applegate Rules 6-8. "
+        "Returns base mesh, clasp meshes, Kennedy class, modification count. "
+        "Reference: McCracken 13th ed.; Applegate (1954) J Prosthet Dent 4(3):350-7. "
+        "NOT FDA-cleared medical device."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "arch": {
+                "type": "string",
+                "enum": ["mandibular", "maxillary"],
+                "description": "Jaw arch.",
+            },
+            "type": {
+                "type": "string",
+                "enum": ["partial", "complete"],
+                "description": "Denture type.",
+            },
+            "teeth_to_replace_fdi": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "FDI tooth codes to replace (e.g. ['36','37','46','47']).",
+                "minItems": 1,
+            },
+            "abutment_teeth_fdi": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "FDI codes of abutment teeth for clasp placement. Optional (auto-assigned if empty).",
+            },
+            "clasp_type": {
+                "type": "string",
+                "enum": ["circumferential", "I_bar", "T_bar"],
+                "description": "RPD clasp design. Default 'circumferential'.",
+            },
+        },
+        "required": ["arch", "type", "teeth_to_replace_fdi"],
+    },
+)
+
+
+async def run_dental_denture_design_v2(args: dict, ctx: "ProjectCtx") -> str:
+    try:
+        import math
+        import numpy as np
+        from kerf_dental.crown_bridge import ToothNumber
+        from kerf_dental.denture_v2 import DentureSpec, design_denture
+
+        arch = str(args["arch"])
+        denture_type = str(args["type"])
+        teeth = [ToothNumber.from_fdi(fdi) for fdi in args["teeth_to_replace_fdi"]]
+        abutments = [ToothNumber.from_fdi(fdi) for fdi in args.get("abutment_teeth_fdi", [])]
+        clasp_type = str(args.get("clasp_type", "circumferential"))
+
+        spec = DentureSpec(
+            arch=arch,
+            type=denture_type,
+            teeth_to_replace=teeth,
+            abutment_teeth=abutments,
+            clasp_type=clasp_type,
+        )
+
+        # Build a simple dummy arch mesh for the API call
+        n = 24
+        angles = np.linspace(math.pi, 0, n)
+        a, b = (40.0, 35.0) if arch == "maxillary" else (33.0, 25.0)
+        verts = np.column_stack([a * np.cos(angles), b * np.sin(angles), np.zeros(n)])
+        tris = np.array([[i, (i+1)%n, (i+2)%n] for i in range(n-2)])
+        arch_mesh = (verts, tris)
+
+        result = design_denture(spec, arch_mesh, arch_mesh)
+
+        return ok_payload({
+            "kennedy_class": spec.kennedy_class,
+            "modification_count": spec.applegate_modification_count,
+            "arch": arch,
+            "type": denture_type,
+            "clasp_type": clasp_type,
+            "teeth_replaced": len(teeth),
+            "clasp_count": len(result.clasps),
+            "base_vertices": len(result.base_mesh[0]),
+            "base_triangles": len(result.base_mesh[1]),
+            "tooth_meshes": len(result.teeth),
+            "occlusal_contacts": len(result.occlusal_contacts),
+            "bite_height_mm": round(result.bite_height_mm, 2),
+            "honest_caveat": result.honest_caveat,
+        })
+    except Exception as exc:
+        return err_payload(str(exc), "DENTURE_DESIGN_V2_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# dental_intraoral_scan_process — STL ingestion + landmark detection
+# ---------------------------------------------------------------------------
+
+dental_intraoral_scan_process_spec = ToolSpec(
+    name="dental_intraoral_scan_process",
+    description=(
+        "Process an intraoral scan: load STL from bytes (base64-encoded), "
+        "remove artifacts, and detect 5 arch landmarks "
+        "(midline, 2 first molars, 2 canines). "
+        "Supports Trios 3/4/5, Itero Element, Medit i700 (all output binary STL). "
+        "Returns vertex/triangle count + landmark coordinates. "
+        "NOT FDA-cleared medical device."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "stl_b64": {
+                "type": "string",
+                "description": "Base64-encoded binary STL file content.",
+            },
+            "scanner_brand": {
+                "type": "string",
+                "description": "Scanner model. Default 'unknown'.",
+            },
+            "arch": {
+                "type": "string",
+                "enum": ["maxillary", "mandibular", "bite"],
+                "description": "Which arch. Default 'maxillary'.",
+            },
+            "remove_artifacts": {
+                "type": "boolean",
+                "description": "Run artifact removal (keep largest connected component). Default true.",
+            },
+            "detect_landmarks": {
+                "type": "boolean",
+                "description": "Detect arch landmarks (midline, molars, canines). Default true.",
+            },
+        },
+        "required": ["stl_b64"],
+    },
+)
+
+
+async def run_dental_intraoral_scan_process(args: dict, ctx: "ProjectCtx") -> str:
+    try:
+        import base64
+        from kerf_dental.intraoral_scan import (
+            load_intraoral_stl_from_bytes,
+            detect_arch_landmarks,
+            remove_artifacts,
+        )
+
+        raw = base64.b64decode(args["stl_b64"])
+        scanner_brand = str(args.get("scanner_brand", "unknown"))
+        arch = str(args.get("arch", "maxillary"))
+
+        scan = load_intraoral_stl_from_bytes(raw, scanner_brand=scanner_brand, arch=arch)
+
+        if args.get("remove_artifacts", True):
+            scan = remove_artifacts(scan)
+
+        landmarks = None
+        if args.get("detect_landmarks", True) and scan.vertex_count >= 10:
+            landmarks = detect_arch_landmarks(scan)
+
+        return ok_payload({
+            "vertex_count": scan.vertex_count,
+            "triangle_count": scan.triangle_count,
+            "scanner_brand": scan.scanner_brand,
+            "arch": scan.arch,
+            "capture_date": scan.capture_date_iso,
+            "bounding_box": {"min": list(scan.bounding_box[0]), "max": list(scan.bounding_box[1])},
+            "landmarks": landmarks,
+        })
+    except Exception as exc:
+        return err_payload(str(exc), "INTRAORAL_SCAN_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# dental_lab_stl_export — milling-ready STL export from case design
+# ---------------------------------------------------------------------------
+
+dental_lab_stl_export_spec = ToolSpec(
+    name="dental_lab_stl_export",
+    description=(
+        "Export dental design meshes to milling-ready binary STL. "
+        "Accepts vertices+faces JSON arrays. Returns base64-encoded binary STL. "
+        "Use after dental_crown_bridge_design, dental_denture_design_v2, "
+        "or dental_surgical_guide for lab output. "
+        "Reference: Roland DWX series milling unit STL input requirements."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "vertices": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+                "description": "Vertex array [[x,y,z], ...] in mm.",
+                "minItems": 3,
+            },
+            "faces": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": "integer"}, "minItems": 3, "maxItems": 3},
+                "description": "Face index array [[i,j,k], ...].",
+                "minItems": 1,
+            },
+            "component_name": {
+                "type": "string",
+                "description": "Label for this mesh component (e.g. 'crown_tooth19'). Default 'kerf_dental'.",
+            },
+        },
+        "required": ["vertices", "faces"],
+    },
+)
+
+
+async def run_dental_lab_stl_export(args: dict, ctx: "ProjectCtx") -> str:
+    try:
+        import base64
+        import struct
+        import numpy as np
+
+        verts = np.array(args["vertices"], dtype=np.float32)
+        tris = np.array(args["faces"], dtype=int)
+        name = str(args.get("component_name", "kerf_dental"))
+
+        # Build binary STL
+        buf = bytearray()
+        buf += name.encode("utf-8")[:80].ljust(80, b"\x00")
+        buf += struct.pack("<I", len(tris))
+        for tri in tris:
+            v0, v1, v2 = verts[tri[0]], verts[tri[1]], verts[tri[2]]
+            n = np.cross(v1 - v0, v2 - v0).astype(np.float32)
+            n_len = float(np.linalg.norm(n))
+            if n_len > 1e-30:
+                n /= n_len
+            buf += struct.pack("<fff", *n)
+            buf += struct.pack("<fff", *v0)
+            buf += struct.pack("<fff", *v1)
+            buf += struct.pack("<fff", *v2)
+            buf += struct.pack("<H", 0)
+
+        stl_bytes = bytes(buf)
+        stl_b64 = base64.b64encode(stl_bytes).decode("ascii")
+
+        return ok_payload({
+            "stl_b64": stl_b64,
+            "triangles_written": len(tris),
+            "file_size_bytes": len(stl_bytes),
+            "component_name": name,
+            "format": "binary_stl",
+        })
+    except Exception as exc:
+        return err_payload(str(exc), "LAB_STL_EXPORT_ERROR")

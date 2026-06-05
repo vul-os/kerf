@@ -1,6 +1,7 @@
 """
 kerf_dental.implant_plan_v2 — Extended implant planning with brand specs,
-prosthetic-driven placement, and primary stability estimation.
+prosthetic-driven placement, primary stability estimation,
+Tarnow/Grunder inter-implant spacing, and drill sequence.
 
 References
 ----------
@@ -8,6 +9,15 @@ References
 - ITI Treatment Guide Vol 1 (Bone Augmentation Procedures).
 - Turkyilmaz I et al. (2007). "The relationship between insertion torque and
   ISQ values for Straumann Bone-Level implants." Clin Implant Dent 9:S9-14.
+- Tarnow DP, Cho SC, Wallace SS (2000). "The effect of inter-implant distance
+  on the height of inter-implant bone crest." J Periodontol 71(4):546-9.
+  RULE: implant-to-implant ≥ 3 mm (crestal bone preservation).
+- Grunder U et al. (2005). "Influence of the 3-D bone-to-implant relationship
+  on esthetics." Int J Periodontics Restorative Dent 25(2):113-9.
+  RULE: implant-to-tooth ≥ 1.5 mm (papilla preservation at adjacent tooth).
+- Straumann Bone Level Tapered (BLT) Surgical Protocol, IFU-002-en.
+- Nobel Biocare NobelActive Surgical Protocol, GPR100.
+- Astra Tech EV Implant System, Surgical Procedure, D3753 Rev.03.
 
 DISCLAIMER
 ----------
@@ -116,6 +126,203 @@ class ImplantPlan:
         "Clinical outcome depends on surgical technique, bone morphology, "
         "and patient factors. NOT FDA-cleared or CE-marked as a medical device."
     )
+
+
+# ---------------------------------------------------------------------------
+# Drill sequence catalogue
+# ---------------------------------------------------------------------------
+
+#: Straumann BLT drill sequence per IFU-002-en.
+#: Steps: pilot(Ø2.2) → twist(Ø2.8 / Ø3.5 / Ø4.2) → profile drill → countersink
+_DRILL_SEQUENCE: dict[str, dict[float, list[dict]]] = {
+    "Straumann BLT": {
+        3.3: [
+            {"step": 1, "drill": "Pilot drill 2.2 mm", "diameter_mm": 2.2, "speed_rpm": 800, "torque_ncm": 35},
+            {"step": 2, "drill": "Twist drill 2.8 mm", "diameter_mm": 2.8, "speed_rpm": 600, "torque_ncm": 35},
+            {"step": 3, "drill": "Profile drill 3.3 mm", "diameter_mm": 3.3, "speed_rpm": 400, "torque_ncm": 35},
+        ],
+        4.1: [
+            {"step": 1, "drill": "Pilot drill 2.2 mm", "diameter_mm": 2.2, "speed_rpm": 800, "torque_ncm": 35},
+            {"step": 2, "drill": "Twist drill 2.8 mm", "diameter_mm": 2.8, "speed_rpm": 600, "torque_ncm": 35},
+            {"step": 3, "drill": "Twist drill 3.5 mm", "diameter_mm": 3.5, "speed_rpm": 400, "torque_ncm": 35},
+            {"step": 4, "drill": "Profile drill 4.1 mm", "diameter_mm": 4.1, "speed_rpm": 300, "torque_ncm": 35},
+        ],
+        4.8: [
+            {"step": 1, "drill": "Pilot drill 2.2 mm", "diameter_mm": 2.2, "speed_rpm": 800, "torque_ncm": 35},
+            {"step": 2, "drill": "Twist drill 2.8 mm", "diameter_mm": 2.8, "speed_rpm": 600, "torque_ncm": 35},
+            {"step": 3, "drill": "Twist drill 3.5 mm", "diameter_mm": 3.5, "speed_rpm": 400, "torque_ncm": 35},
+            {"step": 4, "drill": "Twist drill 4.2 mm", "diameter_mm": 4.2, "speed_rpm": 300, "torque_ncm": 35},
+            {"step": 5, "drill": "Profile drill 4.8 mm", "diameter_mm": 4.8, "speed_rpm": 250, "torque_ncm": 35},
+        ],
+    },
+    "NobelActive": {
+        3.5: [
+            {"step": 1, "drill": "Pilot drill 2.0 mm", "diameter_mm": 2.0, "speed_rpm": 800, "torque_ncm": 45},
+            {"step": 2, "drill": "Twist drill 3.0 mm", "diameter_mm": 3.0, "speed_rpm": 500, "torque_ncm": 45},
+            {"step": 3, "drill": "Countersink 3.5 mm", "diameter_mm": 3.5, "speed_rpm": 300, "torque_ncm": 45},
+        ],
+        4.3: [
+            {"step": 1, "drill": "Pilot drill 2.0 mm", "diameter_mm": 2.0, "speed_rpm": 800, "torque_ncm": 45},
+            {"step": 2, "drill": "Twist drill 3.0 mm", "diameter_mm": 3.0, "speed_rpm": 500, "torque_ncm": 45},
+            {"step": 3, "drill": "Twist drill 3.5 mm", "diameter_mm": 3.5, "speed_rpm": 400, "torque_ncm": 45},
+            {"step": 4, "drill": "Countersink 4.3 mm", "diameter_mm": 4.3, "speed_rpm": 250, "torque_ncm": 45},
+        ],
+        5.0: [
+            {"step": 1, "drill": "Pilot drill 2.0 mm", "diameter_mm": 2.0, "speed_rpm": 800, "torque_ncm": 45},
+            {"step": 2, "drill": "Twist drill 3.0 mm", "diameter_mm": 3.0, "speed_rpm": 500, "torque_ncm": 45},
+            {"step": 3, "drill": "Twist drill 3.5 mm", "diameter_mm": 3.5, "speed_rpm": 400, "torque_ncm": 45},
+            {"step": 4, "drill": "Twist drill 4.3 mm", "diameter_mm": 4.3, "speed_rpm": 300, "torque_ncm": 45},
+            {"step": 5, "drill": "Countersink 5.0 mm", "diameter_mm": 5.0, "speed_rpm": 200, "torque_ncm": 45},
+        ],
+    },
+    "Astra EV": {
+        3.5: [
+            {"step": 1, "drill": "Pilot 2.0 mm", "diameter_mm": 2.0, "speed_rpm": 1200, "torque_ncm": 45},
+            {"step": 2, "drill": "Drill 3.0 mm EV", "diameter_mm": 3.0, "speed_rpm": 800, "torque_ncm": 45},
+            {"step": 3, "drill": "Drill 3.5 mm EV", "diameter_mm": 3.5, "speed_rpm": 400, "torque_ncm": 45},
+        ],
+        4.0: [
+            {"step": 1, "drill": "Pilot 2.0 mm", "diameter_mm": 2.0, "speed_rpm": 1200, "torque_ncm": 45},
+            {"step": 2, "drill": "Drill 3.0 mm EV", "diameter_mm": 3.0, "speed_rpm": 800, "torque_ncm": 45},
+            {"step": 3, "drill": "Drill 3.5 mm EV", "diameter_mm": 3.5, "speed_rpm": 500, "torque_ncm": 45},
+            {"step": 4, "drill": "Drill 4.0 mm EV", "diameter_mm": 4.0, "speed_rpm": 300, "torque_ncm": 45},
+        ],
+        4.5: [
+            {"step": 1, "drill": "Pilot 2.0 mm", "diameter_mm": 2.0, "speed_rpm": 1200, "torque_ncm": 45},
+            {"step": 2, "drill": "Drill 3.0 mm EV", "diameter_mm": 3.0, "speed_rpm": 800, "torque_ncm": 45},
+            {"step": 3, "drill": "Drill 3.5 mm EV", "diameter_mm": 3.5, "speed_rpm": 500, "torque_ncm": 45},
+            {"step": 4, "drill": "Drill 4.0 mm EV", "diameter_mm": 4.0, "speed_rpm": 350, "torque_ncm": 45},
+            {"step": 5, "drill": "Drill 4.5 mm EV", "diameter_mm": 4.5, "speed_rpm": 250, "torque_ncm": 45},
+        ],
+    },
+}
+
+
+def get_drill_sequence(brand: str, diameter_mm: float) -> list[dict]:
+    """
+    Return step-by-step drill sequence for a brand + implant diameter.
+
+    References
+    ----------
+    - Straumann BLT IFU-002-en (drilling speeds 300–800 rpm, 35 Ncm limit).
+    - NobelActive Surgical Protocol GPR100 (aggressive thread, 45 Ncm).
+    - Astra EV IFU D3753 Rev.03 (OsseoSpeed geometry, 45 Ncm).
+
+    Parameters
+    ----------
+    brand : str  'Straumann BLT' | 'NobelActive' | 'Astra EV'
+    diameter_mm : float  implant body diameter
+
+    Returns
+    -------
+    list of step dicts: {step, drill, diameter_mm, speed_rpm, torque_ncm}
+
+    If exact diameter not found, returns the nearest available sequence.
+    """
+    brand_seq = _DRILL_SEQUENCE.get(brand)
+    if not brand_seq:
+        brand_seq = _DRILL_SEQUENCE["Straumann BLT"]
+
+    # Find closest matching diameter
+    available = sorted(brand_seq.keys())
+    chosen = min(available, key=lambda d: abs(d - diameter_mm))
+    return list(brand_seq[chosen])
+
+
+# ---------------------------------------------------------------------------
+# Tarnow / Grunder inter-implant spacing checker
+# ---------------------------------------------------------------------------
+
+def check_tarnow_grunder_spacing(
+    implant_positions: list[np.ndarray],
+    implant_diameters_mm: list[float],
+    adjacent_tooth_positions: Optional[list[np.ndarray]] = None,
+) -> dict:
+    """
+    Verify Tarnow (2000) and Grunder (2005) spacing rules.
+
+    Tarnow Rule: implant-to-implant ≥ 3 mm (crestal bone preservation).
+    Grunder Rule: implant-to-adjacent-tooth ≥ 1.5 mm (papilla preservation).
+
+    Both distances measured at the crestal level (implant platform).
+
+    Parameters
+    ----------
+    implant_positions : list of (3,) arrays — crestal platform positions (mm).
+    implant_diameters_mm : list of float — implant body diameters (mm).
+    adjacent_tooth_positions : list of (3,) arrays — root surfaces of adjacent teeth (mm).
+
+    Returns
+    -------
+    dict with keys:
+        tarnow_violations : list[dict] — pairs violating 3 mm rule
+        grunder_violations : list[dict] — implant-tooth pairs < 1.5 mm
+        tarnow_ok : bool
+        grunder_ok : bool
+        min_implant_to_implant_mm : float
+        min_implant_to_tooth_mm : float | None
+
+    Reference: Tarnow DP et al. (2000) J Periodontol 71(4):546-9.
+               Grunder U et al. (2005) Int J Periodontics Restorative Dent 25(2):113-9.
+    """
+    TARNOW_MIN_MM = 3.0   # inter-implant surface-to-surface
+    GRUNDER_MIN_MM = 1.5  # implant-to-tooth
+
+    positions = [np.asarray(p, dtype=float) for p in implant_positions]
+    n = len(positions)
+
+    tarnow_violations = []
+    min_imp_to_imp = float("inf")
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            # Surface-to-surface = centre-to-centre − (r_i + r_j)
+            r_i = implant_diameters_mm[i] / 2.0
+            r_j = implant_diameters_mm[j] / 2.0
+            centre_dist = float(np.linalg.norm(positions[i] - positions[j]))
+            surface_dist = centre_dist - r_i - r_j
+            min_imp_to_imp = min(min_imp_to_imp, surface_dist)
+            if surface_dist < TARNOW_MIN_MM:
+                tarnow_violations.append({
+                    "implant_i": i,
+                    "implant_j": j,
+                    "surface_to_surface_mm": round(surface_dist, 3),
+                    "minimum_required_mm": TARNOW_MIN_MM,
+                    "deficit_mm": round(TARNOW_MIN_MM - surface_dist, 3),
+                    "rule": "Tarnow 2000 — inter-implant ≥ 3 mm",
+                })
+
+    grunder_violations = []
+    min_imp_to_tooth = None
+
+    if adjacent_tooth_positions:
+        tooth_pts = [np.asarray(t, dtype=float) for t in adjacent_tooth_positions]
+        min_imp_to_tooth = float("inf")
+        for i, (pos, diam) in enumerate(zip(positions, implant_diameters_mm)):
+            r_i = diam / 2.0
+            for ti, tp in enumerate(tooth_pts):
+                centre_dist = float(np.linalg.norm(pos - tp))
+                surface_dist = centre_dist - r_i
+                min_imp_to_tooth = min(min_imp_to_tooth, surface_dist)
+                if surface_dist < GRUNDER_MIN_MM:
+                    grunder_violations.append({
+                        "implant_i": i,
+                        "tooth_j": ti,
+                        "surface_to_tooth_mm": round(surface_dist, 3),
+                        "minimum_required_mm": GRUNDER_MIN_MM,
+                        "deficit_mm": round(GRUNDER_MIN_MM - surface_dist, 3),
+                        "rule": "Grunder 2005 — implant-to-tooth ≥ 1.5 mm",
+                    })
+
+    return {
+        "tarnow_violations": tarnow_violations,
+        "grunder_violations": grunder_violations,
+        "tarnow_ok": len(tarnow_violations) == 0,
+        "grunder_ok": len(grunder_violations) == 0,
+        "min_implant_to_implant_mm": round(min_imp_to_imp, 3) if n > 1 else None,
+        "min_implant_to_tooth_mm": round(min_imp_to_tooth, 3) if min_imp_to_tooth is not None else None,
+        "disclaimer": "Tarnow 2000 + Grunder 2005 guidelines — NOT FDA-cleared.",
+    }
 
 
 # ---------------------------------------------------------------------------

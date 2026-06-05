@@ -37,6 +37,12 @@ async def register(app: FastAPI, ctx):
         dental_crown_bridge_design_spec, run_dental_crown_bridge_design,
         dental_implant_plan_v2_spec, run_dental_implant_plan_v2,
         dental_lab_case_report_spec, run_dental_lab_case_report,
+        # Wave 11C: 3shape parity deepening
+        dental_implant_spacing_check_spec, run_dental_implant_spacing_check,
+        dental_drill_sequence_spec, run_dental_drill_sequence,
+        dental_denture_design_v2_spec, run_dental_denture_design_v2,
+        dental_intraoral_scan_process_spec, run_dental_intraoral_scan_process,
+        dental_lab_stl_export_spec, run_dental_lab_stl_export,
     )
     ctx.tools.register("dental_crown_design", dental_crown_design_spec, run_dental_crown_design)
     ctx.tools.register("dental_surgical_guide", dental_surgical_guide_spec, run_dental_surgical_guide)
@@ -51,13 +57,23 @@ async def register(app: FastAPI, ctx):
     ctx.tools.register("dental_crown_bridge_design", dental_crown_bridge_design_spec, run_dental_crown_bridge_design)
     ctx.tools.register("dental_implant_plan_v2", dental_implant_plan_v2_spec, run_dental_implant_plan_v2)
     ctx.tools.register("dental_lab_case_report", dental_lab_case_report_spec, run_dental_lab_case_report)
+    # Wave 11C: 3shape parity deepening
+    ctx.tools.register("dental_implant_spacing_check", dental_implant_spacing_check_spec, run_dental_implant_spacing_check)
+    ctx.tools.register("dental_drill_sequence", dental_drill_sequence_spec, run_dental_drill_sequence)
+    ctx.tools.register("dental_denture_design_v2", dental_denture_design_v2_spec, run_dental_denture_design_v2)
+    ctx.tools.register("dental_intraoral_scan_process", dental_intraoral_scan_process_spec, run_dental_intraoral_scan_process)
+    ctx.tools.register("dental_lab_stl_export", dental_lab_stl_export_spec, run_dental_lab_stl_export)
 
     provides = ["dental.crown", "dental.guide", "dental.denture", "dental.stl",
                 "dental.registration", "dental.deviation", "dental.implant_planning",
                 # Wave 11B
                 "dental.crown_bridge", "dental.implant_plan_v2", "dental.surgical_guide",
                 "dental.denture_v2", "dental.intraoral_scan", "dental.lab_workflow",
-                "dental.ai_automation"]
+                "dental.ai_automation",
+                # Wave 11C deepening
+                "dental.implant_spacing_check", "dental.drill_sequence",
+                "dental.denture_v2_kennedy", "dental.intraoral_scan_process",
+                "dental.lab_stl_export"]
     if _PYDICOM_AVAILABLE:
         provides.append("dental.dicom")
 

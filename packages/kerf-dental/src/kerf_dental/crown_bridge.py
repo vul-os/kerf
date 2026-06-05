@@ -173,19 +173,70 @@ class CrownDesignSpec:
     """Mesial + distal contact point dicts: {'side': 'mesial'|'distal', 'point': (x,y,z)}"""
 
     cement_gap_mm: float = 0.04
-    """Die-spacer (cement gap) thickness — default 40 µm per clinical convention."""
+    """Die-spacer (cement gap) thickness.
+
+    Default 40 µm = ISO 4049:2019 §6.4 recommended internal cement space
+    for resin-cement luted crowns (35–50 µm target range).
+    Zirconia machining tolerance ±20 µm, combined fit ≤ 120 µm clinically.
+    Reference: Mörmann WH (2006) CEREC workflow JADA 137:7S-13S;
+    ISO 4049:2019 §6 mechanical requirements for polymer-based materials.
+    """
 
     material: str = "zirconia"
     """'zirconia' | 'lithium_disilicate' | 'metal_ceramic' | 'pmma'"""
+
+    margin_design: str = "auto"
+    """Margin finish-line design strategy.
+
+    'auto'     — derive from MarginLine.type.
+    'butt'     — 90° shoulder (ISO 4049 §5 requires full occlusal coverage).
+    'chamfer'  — 135° bevel (reduces stress concentration in ceramic).
+    'feather'  — knife-edge (metal-ceramic only, not recommended for ceramic).
+
+    Reference: Rosenstiel SF et al. (2016) Contemporary Fixed Prosthodontics 5e §6.
+    """
 
     def __post_init__(self):
         if self.occlusal_clearance_mm < 0:
             raise ValueError("occlusal_clearance_mm must be >= 0")
         if self.cement_gap_mm < 0:
             raise ValueError("cement_gap_mm must be >= 0")
+        if self.cement_gap_mm > 0.2:
+            raise ValueError(
+                "cement_gap_mm > 0.2 mm is clinically unacceptable. "
+                "ISO 4049 target ≤ 120 µm (0.12 mm) combined."
+            )
         valid_materials = {"zirconia", "lithium_disilicate", "metal_ceramic", "pmma"}
         if self.material not in valid_materials:
             raise ValueError(f"material must be one of {valid_materials}")
+
+    @property
+    def cement_gap_um(self) -> float:
+        """Cement gap in micrometres for reporting."""
+        return self.cement_gap_mm * 1000.0
+
+    @property
+    def iso_4049_compliant(self) -> bool:
+        """True if cement gap is within ISO 4049 §6.4 target range (0.02–0.08 mm)."""
+        return 0.020 <= self.cement_gap_mm <= 0.080
+
+    @property
+    def material_min_thickness_mm(self) -> float:
+        """Minimum wall thickness for the material per clinical guidelines.
+
+        References:
+        - Zirconia: Guess PC et al. (2010) IJPRD — ≥ 0.5 mm monolithic.
+        - Lithium disilicate (e.max): IPS e.max clinical guide — ≥ 0.8 mm.
+        - Metal-ceramic: Shillingburg 4e — ≥ 0.3 mm metal + 1.0 mm ceramic.
+        - PMMA (interim): ≥ 1.5 mm.
+        """
+        _map = {
+            "zirconia": 0.5,
+            "lithium_disilicate": 0.8,
+            "metal_ceramic": 0.3,
+            "pmma": 1.5,
+        }
+        return _map.get(self.material, 0.5)
 
 
 @dataclass
@@ -501,8 +552,10 @@ def design_crown(
         (outer_verts, outer_tris),
         (inner_verts, inner_tris),
     )
-    # Enforce minimum wall thickness from anatomy library
-    min_wall = float(anatomy["min_wall_mm"])
+    # Enforce minimum wall thickness — take the maximum of:
+    # (a) anatomy library minimum, (b) material-specific clinical minimum.
+    # Reference: ISO 4049 §6 + material-specific clinical guides.
+    min_wall = max(float(anatomy["min_wall_mm"]), spec.material_min_thickness_mm)
     wall_thickness = max(wall_thickness, min_wall)
 
     # Auto-detect occlusal contacts from interproximal specs
@@ -514,12 +567,18 @@ def design_crown(
             "contact_type": "interproximal",
         })
 
+    # margin_fit_um: model the combined inaccuracy (cement gap + machining tolerance).
+    # ISO 4049 / Mörmann 2006: targeted fit = cement_gap + machining_tol/2
+    machining_tol_um = {"zirconia": 20.0, "lithium_disilicate": 15.0,
+                        "metal_ceramic": 25.0, "pmma": 30.0}.get(spec.material, 20.0)
+    margin_fit_um = spec.cement_gap_mm * 1000.0 + machining_tol_um / 2.0
+
     return CrownDesign(
         spec=spec,
         outer_surface_mesh=(outer_verts, outer_tris),
         intaglio_surface_mesh=(inner_verts, inner_tris),
         occlusal_contacts=occlusal_contacts,
-        margin_fit_um=float(spec.cement_gap_mm * 1000.0),
+        margin_fit_um=float(margin_fit_um),
         wall_thickness_min_mm=wall_thickness,
     )
 

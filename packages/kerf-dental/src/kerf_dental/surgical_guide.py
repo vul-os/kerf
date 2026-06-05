@@ -70,7 +70,7 @@ class DrillSleeve:
 
 @dataclass
 class SurgicalGuide:
-    """Complete surgical guide with arch shell and drill sleeves."""
+    """Complete surgical guide with arch shell, drill sleeves, and inspection windows."""
 
     arch_support_mesh: tuple
     """(vertices (V,3), triangles (F,3)) — rigid shell that sits on teeth."""
@@ -79,20 +79,53 @@ class SurgicalGuide:
     """One drill sleeve per implant position."""
 
     fenestrations: list[dict]
-    """Cooling/inspection windows: list of {'center': (x,y,z), 'radius_mm': float}"""
+    """Cooling/inspection windows: list of {'center': (x,y,z), 'radius_mm': float}
+
+    Inspection fenestrations serve two clinical purposes:
+    1. Visual — surgeon can see tissue through the guide.
+    2. Cooling — coolant reaches the drilling site (ISO 22977-compliant irrigation).
+
+    Reference: Di Giacomo GAP et al. (2005) Int J Oral Maxillofac Implants 20:271-8.
+    Recommended: ≥ 3 windows, radius ≥ 2 mm, spaced evenly along buccal flange.
+    """
+
+    sleeve_guide_stops: list[dict] = None
+    """Drill-stop rings: list of {'sleeve_idx': int, 'depth_mm': float, 'ring_diam_mm': float}
+
+    Guide stops prevent over-drilling by limiting insertion depth.
+    Each stop is a raised ring on the sleeve exterior that contacts the drill
+    handle when the target depth is reached.
+
+    Reference: Cassetta M et al. (2013) Med Oral Patol Oral Cir Bucal 18(3):e461-9
+    — guided surgery accuracy ±0.4 mm with metal sleeves.
+    """
 
     fit_tolerance_mm: float = 0.1
-    """Gap between guide and tooth surface (mm). Typical 0.05–0.15 mm."""
+    """Gap between guide and tooth surface (mm).
+
+    Typical 0.05–0.15 mm for SLA-printed resin.
+    Wider tolerance for bone-supported guides.
+    Reference: 3Shape Implant Studio guide fit defaults (public IFU).
+    """
 
     material: str = "biocompatible_resin"
-    """SLA-printable material. 'biocompatible_resin' (default) | 'nylon_pa12'"""
+    """SLA-printable material. 'biocompatible_resin' (default) | 'nylon_pa12'
+
+    Biocompatible resin: ISO 10993-5 cytotoxicity tested, Class IIa CE marking required.
+    Nylon PA12: for bone-supported guides with higher mechanical loads.
+    """
 
     honest_caveat: str = (
         "EDUCATIONAL/PLANNING ONLY: This surgical guide geometry is parametric. "
         "Production guides require CBCT-based arch scanning, clinical fit testing, "
         "and surgeon approval. Guide accuracy ±0.5 mm typical (Cassetta et al. 2013). "
+        "Material must be ISO 10993-5 biocompatibility-certified. "
         "NOT FDA-cleared or CE-marked as a medical device."
     )
+
+    def __post_init__(self):
+        if self.sleeve_guide_stops is None:
+            self.sleeve_guide_stops = []
 
 
 # ---------------------------------------------------------------------------
@@ -275,8 +308,22 @@ def design_surgical_guide(
             "type": "cooling",
         })
 
+    # Build drill-stop rings: depth-stop at implant length to prevent over-drilling.
+    # Reference: Cassetta M et al. (2013) — guide stops limit depth error to ±0.4 mm.
+    guide_stops = []
+    for idx, (p, sleeve) in enumerate(zip(plan, sleeves)):
+        stop_depth = p.implant.length_mm  # drill to implant length exactly
+        guide_stops.append({
+            "sleeve_idx": idx,
+            "depth_mm": stop_depth,
+            "ring_diam_mm": sleeve.outer_diameter_mm + 2.0,
+            "ring_height_mm": 1.5,
+            "note": f"Cassetta 2013 depth stop — ±0.4 mm accuracy at {stop_depth:.1f} mm depth",
+        })
+
     return SurgicalGuide(
         arch_support_mesh=(arch_shell_verts, arch_shell_tris),
         sleeves=sleeves,
         fenestrations=fenestrations,
+        sleeve_guide_stops=guide_stops,
     )

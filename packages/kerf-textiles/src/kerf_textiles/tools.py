@@ -634,3 +634,182 @@ async def run_textiles_sustainability(params: dict) -> dict:
         }
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# garment_drape_on_avatar  — cloth-on-body drape simulation
+# ---------------------------------------------------------------------------
+
+garment_drape_on_avatar_spec = {
+    "name": "garment_drape_on_avatar",
+    "description": (
+        "Drape a flat garment panel onto a parametric CAESAR body-form avatar "
+        "using a mass-spring cloth solver with mesh-triangle collision (Bridson 2003). "
+        "Returns the 3D draped mesh (vertex positions), per-vertex fit tension "
+        "(heatmap: positive=tight, negative=bunched), penetration status, and "
+        "simulation convergence.\n\n"
+        "Workflow:\n"
+        "  1. Build a CAESAR ellipsoidal body-form from supplied measurements.\n"
+        "  2. Auto-position the flat garment panel near the target body region.\n"
+        "  3. Settle under gravity with avatar mesh collision response.\n"
+        "  4. Return draped 3D geometry + per-vertex fit tension.\n\n"
+        "Target regions: 'bust', 'waist', 'hip', 'torso' (waist→bust), "
+        "'full_torso' (hip→bust), 'knee', 'full'.\n"
+        "Typical use: fit-check a bodice front panel on a standard size-M avatar."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "height_cm": {
+                "type": "number",
+                "description": "Avatar height in cm. Default 168 (ISO 8559-1 reference).",
+            },
+            "bust_cm": {
+                "type": "number",
+                "description": "Avatar bust girth (cm). Default 92.",
+            },
+            "waist_cm": {
+                "type": "number",
+                "description": "Avatar waist girth (cm). Default 74.",
+            },
+            "hip_cm": {
+                "type": "number",
+                "description": "Avatar hip girth (cm). Default 96.",
+            },
+            "sex": {
+                "type": "string",
+                "enum": ["female", "male", "unisex"],
+                "description": "Avatar sex (affects cross-section ratio). Default 'female'.",
+            },
+            "panel_width_cm": {
+                "type": "number",
+                "description": "Flat panel width in cm. Default 40.",
+            },
+            "panel_height_cm": {
+                "type": "number",
+                "description": "Flat panel height in cm. Default 50.",
+            },
+            "panel_rows": {
+                "type": "integer",
+                "description": "Grid rows (more = finer simulation). Default 10.",
+                "minimum": 3,
+                "maximum": 24,
+            },
+            "panel_cols": {
+                "type": "integer",
+                "description": "Grid columns. Default 10.",
+                "minimum": 3,
+                "maximum": 24,
+            },
+            "target_region": {
+                "type": "string",
+                "enum": ["bust", "waist", "hip", "torso", "full_torso", "knee", "full"],
+                "description": "Body region to drape on. Default 'torso'.",
+            },
+            "k_bend": {
+                "type": "number",
+                "description": "Bending stiffness N/m — higher = stiffer fabric. Default 4.0.",
+            },
+            "steps": {
+                "type": "integer",
+                "description": "Maximum simulation steps. Default 1500.",
+                "minimum": 50,
+                "maximum": 5000,
+            },
+            "pin_top_edge": {
+                "type": "boolean",
+                "description": "Pin the top row (simulates garment on hanger). Default true.",
+            },
+        },
+        "required": [],
+    },
+}
+
+
+async def run_garment_drape_on_avatar(params: dict[str, Any]) -> dict[str, Any]:
+    """Handler for the garment_drape_on_avatar LLM tool."""
+    try:
+        from kerf_textiles.garment_drape import drape_garment_on_standard_avatar
+
+        _VALID_REGIONS = {"bust", "waist", "hip", "torso", "full_torso", "knee", "full"}
+
+        height_cm = float(params.get("height_cm", 168.0))
+        bust_cm   = float(params.get("bust_cm",   92.0))
+        waist_cm  = float(params.get("waist_cm",  74.0))
+        hip_cm    = float(params.get("hip_cm",    96.0))
+        sex       = str(params.get("sex", "female"))
+        panel_w   = float(params.get("panel_width_cm",  40.0))
+        panel_h   = float(params.get("panel_height_cm", 50.0))
+        panel_rows = int(params.get("panel_rows", 10))
+        panel_cols = int(params.get("panel_cols", 10))
+        target    = str(params.get("target_region", "torso"))
+        k_bend    = float(params.get("k_bend", 4.0))
+        steps     = int(params.get("steps", 1500))
+        pin_top   = bool(params.get("pin_top_edge", True))
+
+        if target not in _VALID_REGIONS:
+            return {
+                "ok": False,
+                "error": f"target_region must be one of {sorted(_VALID_REGIONS)}, got {target!r}",
+            }
+        if height_cm <= 0 or bust_cm <= 0 or waist_cm <= 0 or hip_cm <= 0:
+            return {"ok": False, "error": "height_cm, bust_cm, waist_cm, hip_cm must be positive"}
+        if panel_rows < 3 or panel_cols < 3:
+            return {"ok": False, "error": "panel_rows and panel_cols must be >= 3"}
+
+        result = drape_garment_on_standard_avatar(
+            panel_width_cm=panel_w,
+            panel_height_cm=panel_h,
+            panel_rows=panel_rows,
+            panel_cols=panel_cols,
+            target_region=target,
+            height_cm=height_cm,
+            bust_cm=bust_cm,
+            waist_cm=waist_cm,
+            hip_cm=hip_cm,
+            sex=sex,
+            steps=steps,
+            k_bend=k_bend,
+            pin_top_edge=pin_top,
+        )
+
+        import numpy as np
+        tension = result.fit_tension
+        verts = result.vertices_3d
+
+        return {
+            "ok": True,
+            "target_region": result.target_region,
+            "n_particles": int(len(result.mesh.positions)),
+            "panel_rows": result.mesh.rows,
+            "panel_cols": result.mesh.cols,
+            "converged": result.converged,
+            "steps_taken": result.steps_taken,
+            "max_penetration_cm": round(float(result.max_penetration_cm), 4),
+            "no_deep_penetration": result.no_deep_penetration,
+            "symmetry_error_cm": round(float(result.symmetry_error_cm), 4),
+            "fit_tension_mean":  round(float(np.mean(tension)), 5),
+            "fit_tension_max":   round(float(np.max(tension)), 5),
+            "fit_tension_min":   round(float(np.min(tension)), 5),
+            "fit_tension_rms":   round(float(np.sqrt(np.mean(tension ** 2))), 5),
+            # Per-vertex data (rounded for JSON size)
+            "fit_tension": [round(float(t), 5) for t in tension],
+            "vertices_3d": [[round(float(v), 3) for v in row] for row in verts],
+            "avatar": {
+                "height_cm": height_cm,
+                "bust_cm": bust_cm,
+                "waist_cm": waist_cm,
+                "hip_cm": hip_cm,
+                "sex": sex,
+            },
+            "note": (
+                "fit_tension > 0: fabric stretched (tight region); "
+                "fit_tension < 0: fabric compressed (bunched). "
+                "Vertices are in cm. Simulation: Provot 1995 + Bridson 2003 collision."
+            ),
+        }
+
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    except Exception as exc:
+        return {"ok": False, "error": f"drape simulation failed: {exc}"}

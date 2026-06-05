@@ -15,6 +15,14 @@ Tools exposed
 
 ``microfluidics_mixer``
     Generate serpentine or herringbone mixer geometry.
+
+``microfluidics_droplet``
+    Predict droplet size and generation frequency for T-junction and
+    flow-focusing geometries (Garstecki 2006, van Steijn 2010, Anna 2003).
+
+``microfluidics_rayleigh_plateau``
+    Compute Rayleigh-Plateau instability breakup wavelength, e-folding
+    time, and expected droplet diameter for a liquid thread (Rayleigh 1878).
 """
 
 from __future__ import annotations
@@ -50,6 +58,13 @@ from kerf_microfluidics.channel_optimizer import (
     pressure_drop_trapezoidal,
     pressure_drop_semicircular,
     reynolds_number,
+)
+from kerf_microfluidics.droplets import (
+    t_junction_droplet_size,
+    flow_focusing_droplet_size,
+    rayleigh_plateau_breakup,
+    capillary_number,
+    weber_number,
 )
 
 
@@ -537,6 +552,184 @@ async def run_microfluidics_optimize_channel(args: dict, ctx: ProjectCtx) -> str
                 "Bruus 2008 + Nguyen-Wereley 2002 published methods — "
                 "NOT certified for safety-critical use."
             ),
+        })
+
+    except (KeyError, ValueError) as exc:
+        return err_payload(str(exc), "BAD_ARGS")
+    except Exception as exc:
+        return err_payload(str(exc), "INTERNAL")
+
+
+# ---------------------------------------------------------------------------
+# microfluidics_droplet
+# ---------------------------------------------------------------------------
+
+microfluidics_droplet_spec = ToolSpec(
+    name="microfluidics_droplet",
+    description=(
+        "Predict droplet size, volume, and generation frequency for a T-junction "
+        "or flow-focusing geometry.  Uses Garstecki 2006 / van Steijn 2010 "
+        "(squeezing/dripping regime) for T-junctions and Anna 2003 for flow-focusing.  "
+        "Returns droplet_length_um (T-junction) or droplet_diameter_um (flow-focusing), "
+        "droplet_volume_pl, generation_frequency_hz, capillary_number, and regime.  "
+        "NOT certified — for design exploration only."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "geometry": {
+                "type": "string",
+                "enum": ["t_junction", "flow_focusing"],
+                "description": "Droplet-generation geometry.",
+            },
+            "q_continuous_ul_min": {
+                "type": "number",
+                "description": "Continuous-phase flow rate [µL/min].",
+            },
+            "q_dispersed_ul_min": {
+                "type": "number",
+                "description": "Dispersed-phase (droplet) flow rate [µL/min].",
+            },
+            "channel_width_um": {
+                "type": "number",
+                "description": "Main outlet channel width [µm].",
+            },
+            "channel_height_um": {
+                "type": "number",
+                "description": "Channel height [µm].",
+            },
+            "dispersed_width_um": {
+                "type": "number",
+                "description": "Dispersed-phase inlet arm width [µm] (T-junction only; defaults to channel_width_um).",
+            },
+            "orifice_width_um": {
+                "type": "number",
+                "description": "Orifice width [µm] (flow-focusing only; defaults to channel_width_um).",
+            },
+            "viscosity_continuous_pa_s": {
+                "type": "number",
+                "description": "Continuous-phase dynamic viscosity [Pa·s]. Default 1e-3 (water).",
+            },
+            "surface_tension_n_per_m": {
+                "type": "number",
+                "description": "Interfacial tension gamma [N/m]. Default 0.04 (water-oil PDMS).",
+            },
+        },
+        "required": ["geometry", "q_continuous_ul_min", "q_dispersed_ul_min",
+                     "channel_width_um", "channel_height_um"],
+    },
+)
+
+
+async def run_microfluidics_droplet(args: dict, ctx: ProjectCtx) -> str:
+    try:
+        geo = args["geometry"]
+        q_c = float(args["q_continuous_ul_min"])
+        q_d = float(args["q_dispersed_ul_min"])
+        w_c = float(args["channel_width_um"]) * 1e-6
+        h = float(args["channel_height_um"]) * 1e-6
+        mu = float(args.get("viscosity_continuous_pa_s", 1e-3))
+        gamma = float(args.get("surface_tension_n_per_m", 0.04))
+
+        if geo == "t_junction":
+            w_d_um = args.get("dispersed_width_um", args["channel_width_um"])
+            w_d = float(w_d_um) * 1e-6
+            result = t_junction_droplet_size(
+                q_continuous_ul_min=q_c,
+                q_dispersed_ul_min=q_d,
+                channel_width_m=w_c,
+                channel_height_m=h,
+                dispersed_channel_width_m=w_d,
+                viscosity_continuous_pa_s=mu,
+                surface_tension_n_per_m=gamma,
+            )
+            return ok_payload({
+                "droplet_length_um": result.droplet_length_m * 1e6,
+                "droplet_volume_pl": result.droplet_volume_m3 * 1e15,
+                "generation_frequency_hz": result.generation_frequency_hz,
+                "spacing_um": result.spacing_m * 1e6,
+                "capillary_number": result.capillary_number,
+                "regime": result.regime,
+                "model": result.model,
+                "disclaimer": "Garstecki 2006 / van Steijn 2010 -- NOT certified.",
+            })
+        elif geo == "flow_focusing":
+            w_or_um = args.get("orifice_width_um", args["channel_width_um"])
+            w_or = float(w_or_um) * 1e-6
+            result = flow_focusing_droplet_size(
+                q_continuous_ul_min=q_c,
+                q_dispersed_ul_min=q_d,
+                orifice_width_m=w_or,
+                orifice_height_m=h,
+                viscosity_continuous_pa_s=mu,
+                surface_tension_n_per_m=gamma,
+            )
+            return ok_payload({
+                "droplet_diameter_um": result.droplet_diameter_m * 1e6,
+                "droplet_volume_pl": result.droplet_volume_m3 * 1e15,
+                "generation_frequency_hz": result.generation_frequency_hz,
+                "capillary_number": result.capillary_number,
+                "model": result.model,
+                "disclaimer": "Anna 2003 -- NOT certified.",
+            })
+        else:
+            return err_payload(f"Unknown geometry: {geo}", "BAD_ARGS")
+
+    except (KeyError, ValueError) as exc:
+        return err_payload(str(exc), "BAD_ARGS")
+    except Exception as exc:
+        return err_payload(str(exc), "INTERNAL")
+
+
+# ---------------------------------------------------------------------------
+# microfluidics_rayleigh_plateau
+# ---------------------------------------------------------------------------
+
+microfluidics_rayleigh_plateau_spec = ToolSpec(
+    name="microfluidics_rayleigh_plateau",
+    description=(
+        "Compute Rayleigh-Plateau instability parameters for a liquid thread.  "
+        "Returns the most unstable wavelength (lambda_max approx 9.02 r0), the e-folding "
+        "breakup time (inviscid, Rayleigh 1878), and the expected droplet diameter "
+        "from volume conservation.  Applicable to jetting-regime emulsification "
+        "and inkjet-nozzle design.  NOT certified."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "thread_radius_um": {
+                "type": "number",
+                "description": "Thread/jet radius r0 [um].",
+            },
+            "density_kg_m3": {
+                "type": "number",
+                "description": "Liquid density rho [kg/m3]. Default 1000 (water).",
+            },
+            "surface_tension_n_per_m": {
+                "type": "number",
+                "description": "Surface tension gamma [N/m]. Default 0.072 (water-air).",
+            },
+        },
+        "required": ["thread_radius_um"],
+    },
+)
+
+
+async def run_microfluidics_rayleigh_plateau(args: dict, ctx: ProjectCtx) -> str:
+    try:
+        r0 = float(args["thread_radius_um"]) * 1e-6
+        rho = float(args.get("density_kg_m3", 1000.0))
+        gamma = float(args.get("surface_tension_n_per_m", 0.072))
+
+        result = rayleigh_plateau_breakup(r0, rho, gamma)
+
+        return ok_payload({
+            "most_unstable_wavelength_um": result.most_unstable_wavelength_m * 1e6,
+            "breakup_time_us": result.breakup_time_s * 1e6,
+            "droplet_diameter_um": result.droplet_diameter_m * 1e6,
+            "thread_radius_um": result.thread_radius_m * 1e6,
+            "model": "Rayleigh 1878 Proc London Math Soc 10:4 (inviscid)",
+            "disclaimer": "Inviscid model -- NOT certified for device design.",
         })
 
     except (KeyError, ValueError) as exc:

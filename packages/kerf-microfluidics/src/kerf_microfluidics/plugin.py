@@ -46,6 +46,10 @@ async def register(app: FastAPI, ctx):
         run_microfluidics_pressure_drop,
         microfluidics_optimize_channel_spec,
         run_microfluidics_optimize_channel,
+        microfluidics_droplet_spec,
+        run_microfluidics_droplet,
+        microfluidics_rayleigh_plateau_spec,
+        run_microfluidics_rayleigh_plateau,
     )
 
     ctx.tools.register(
@@ -78,6 +82,16 @@ async def register(app: FastAPI, ctx):
         microfluidics_optimize_channel_spec,
         run_microfluidics_optimize_channel,
     )
+    ctx.tools.register(
+        "microfluidics_droplet",
+        microfluidics_droplet_spec,
+        run_microfluidics_droplet,
+    )
+    ctx.tools.register(
+        "microfluidics_rayleigh_plateau",
+        microfluidics_rayleigh_plateau_spec,
+        run_microfluidics_rayleigh_plateau,
+    )
 
     provides = [
         "microfluidics.channels",
@@ -85,6 +99,8 @@ async def register(app: FastAPI, ctx):
         "microfluidics.mixers",
         "microfluidics.mems",
         "microfluidics.channel_optimizer",
+        "microfluidics.droplets",
+        "microfluidics.rayleigh_plateau",
     ]
 
     try:

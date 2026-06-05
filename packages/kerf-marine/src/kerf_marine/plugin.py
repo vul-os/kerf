@@ -20,6 +20,7 @@ async def register(app: FastAPI, ctx):
         marine_box_barge_spec, run_marine_box_barge,
         marine_stability_gz_spec, run_marine_stability_gz,
         marine_scantlings_spec, run_marine_scantlings,
+        marine_scantling_check_spec, run_marine_scantling_check,
         marine_vpp_spec, run_marine_vpp,
         marine_seakeeping_rao_spec, run_marine_seakeeping_rao,
         marine_seakeeping_stats_spec, run_marine_seakeeping_stats,
@@ -63,6 +64,11 @@ async def register(app: FastAPI, ctx):
         run_marine_scantlings,
     )
     ctx.tools.register(
+        "marine_scantling_check",
+        marine_scantling_check_spec,
+        run_marine_scantling_check,
+    )
+    ctx.tools.register(
         "marine_vpp",
         marine_vpp_spec,
         run_marine_vpp,
@@ -104,8 +110,8 @@ async def register(app: FastAPI, ctx):
             name="marine",
             version="0.1.0",
             provides=["marine.hydrostatics", "marine.stability", "marine.sections",
-                      "marine.resistance", "marine.scantlings", "marine.vpp",
-                      "marine.seakeeping", "marine.hull_fairness",
+                      "marine.resistance", "marine.scantlings", "marine.scantling_check",
+                      "marine.vpp", "marine.seakeeping", "marine.hull_fairness",
                       "marine.hull_form", "marine.hull_exchange"],
             depends=[],
         )
@@ -114,8 +120,8 @@ async def register(app: FastAPI, ctx):
             "name": "marine",
             "version": "0.1.0",
             "provides": ["marine.hydrostatics", "marine.stability", "marine.sections",
-                         "marine.resistance", "marine.scantlings", "marine.vpp",
-                         "marine.seakeeping", "marine.hull_fairness",
+                         "marine.resistance", "marine.scantlings", "marine.scantling_check",
+                         "marine.vpp", "marine.seakeeping", "marine.hull_fairness",
                          "marine.hull_form", "marine.hull_exchange"],
             "depends": [],
         }

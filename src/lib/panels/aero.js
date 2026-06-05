@@ -92,4 +92,12 @@ export default [
     load: () => import('../../components/HullExchangePanel.jsx'),
     label: 'Hull Exchange',
   },
+
+  {
+    id: 'scantling_check',
+    kinds: ['marine_scantling_check'],
+    exts: ['.scantling'],
+    load: () => import('../../components/ScantlingCheckPanel.jsx'),
+    label: 'Scantling Check (ISO 12215-5 / ABS / DNV)',
+  },
 ]

@@ -640,6 +640,135 @@ async def run_marine_vpp(args: dict[str, Any], ctx: "ProjectCtx") -> str:
         return err_payload(str(exc), "MARINE_VPP_ERROR")
 
 
+# ---------------------------------------------------------------------------
+# marine_scantling_check  (ISO 12215-5 + ABS Steel Vessels + DNV)
+# ---------------------------------------------------------------------------
+
+marine_scantling_check_spec = ToolSpec(
+    name="marine_scantling_check",
+    description=(
+        "Hull structural scantling rule checks (PASS/FAIL + utilisation) against "
+        "one or more published class-society rule sets:\n"
+        "  • ISO 12215-5:2008  — small craft (2.5–24 m), any material\n"
+        "  • ABS Rules for Building and Classing Steel Vessels (2024) Pt.3 Ch.2 §3 "
+        "— local shell-plating and stiffener scantlings (hydrostatic pressure + wave)\n"
+        "  • DNV Rules for Classification of Ships (July 2023) Pt.3 Ch.1 Sec.7 "
+        "— local plate/stiffener scantlings (slamming + hydrostatic pressure)\n\n"
+        "Implements the published open-formula skeleton of each rule: design pressures "
+        "(hydrostatic head, dynamic/slamming), plate-thickness equations, and stiffener "
+        "section-modulus equations. Cites the specific rule clause in every output.\n\n"
+        "HONEST SCOPE: These are the published engineering formulae, not the full "
+        "proprietary rule suites (Lloyd's full rule, BV NR 467, ABS DLA, DNV fatigue) "
+        "which require licensed class-society rule-tree software.\n\n"
+        "For each requested rule_set the tool returns:\n"
+        "  - Design pressure used (kPa) with cited formula\n"
+        "  - Required plate thickness (mm) + PASS/FAIL vs t_actual_mm\n"
+        "  - Required stiffener section modulus (cm³) + PASS/FAIL vs SM_actual_cm3\n"
+        "  - Utilisation ratios (required / actual; ≤ 1.0 = pass)\n"
+        "  - Cited rule clause string\n\n"
+        "Materials: 'frp_eglass', 'frp_epoxy', 'al5083', 'al6061', 'steel_s235', 'steel_s355'.\n"
+        "Rule sets (rule_sets array): 'iso', 'abs', 'dnv'. Any combination allowed."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            # Panel geometry
+            "b_mm":  {"type": "number", "description": "Panel short side / plate spacing (mm)."},
+            "l_mm":  {"type": "number", "description": "Panel long side (mm)."},
+            "lu_mm": {"type": "number", "description": "Stiffener unsupported span (mm)."},
+            "s_mm":  {"type": "number", "description": "Stiffener spacing (mm)."},
+            "material": {
+                "type": "string",
+                "enum": ["frp_eglass", "frp_epoxy", "al5083", "al6061", "steel_s235", "steel_s355"],
+                "description": "Hull material.",
+            },
+            "rule_sets": {
+                "type": "array",
+                "items": {"type": "string", "enum": ["iso", "abs", "dnv"]},
+                "description": "Rule sets to check. Any of: 'iso' (ISO 12215-5), 'abs' (ABS Steel Vessels), 'dnv' (DNV Ships). Default ['iso'].",
+            },
+            "zone": {
+                "type": "string",
+                "enum": ["bottom", "side", "deck", "bulkhead"],
+                "description": "Hull zone. Default 'bottom'.",
+            },
+            # ISO 12215-5 inputs
+            "LWL":       {"type": "number", "description": "Waterline length (m). Required for ISO rule."},
+            "BWL":       {"type": "number", "description": "Waterline beam (m). Required for ISO rule."},
+            "mLDC":      {"type": "number", "description": "Loaded displacement mass (kg). Required for ISO rule."},
+            "V":         {"type": "number", "description": "Max speed (kn). Required for ISO motor-craft."},
+            "beta_04":   {"type": "number", "description": "Deadrise at 0.4*LWL (°). Default 20."},
+            "category":  {"type": "string", "enum": ["A", "B", "C", "D"], "description": "ISO design category (A=ocean .. D=sheltered). Default 'A'."},
+            "z_mm":      {"type": "number", "description": "Panel crown/camber height (mm). Default 0."},
+            "is_sailing":{"type": "boolean", "description": "True for sailing craft (ISO rule). Default false."},
+            # ABS / DNV inputs
+            "h_panel_m": {"type": "number", "description": "Hydrostatic head — depth below waterline to panel centre (m). E.g. draft for keel, 0 for weather deck."},
+            "V_kn":      {"type": "number", "description": "Design speed (kn) for DNV slamming pressure. Default 0."},
+            "Cw":        {"type": "number", "description": "ABS wave correction coefficient (kPa). Default 0 (sheltered)."},
+            "draft_m":   {"type": "number", "description": "Vessel draft (m). Default 2.0."},
+            # Actual scantlings for PASS/FAIL
+            "t_actual_mm":   {"type": "number", "description": "Provided plate thickness (mm). If omitted, required thickness is returned but no PASS/FAIL."},
+            "SM_actual_cm3": {"type": "number", "description": "Provided stiffener section modulus (cm³). If omitted, required SM is returned but no PASS/FAIL."},
+            "both_ends_fixed":{"type": "boolean", "description": "True → fixed-end stiffener (C=1/12); False → pin-pin (C=1/8). Default true."},
+        },
+        "required": ["b_mm", "l_mm", "lu_mm", "s_mm", "material"],
+    },
+)
+
+
+async def run_marine_scantling_check(args: dict[str, Any], ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_marine.scantling_check import marine_scantling_check
+        import kerf_marine.scantlings as sc
+
+        b_mm  = float(args["b_mm"])
+        l_mm  = float(args["l_mm"])
+        lu_mm = float(args["lu_mm"])
+        s_mm  = float(args["s_mm"])
+        z_mm  = float(args.get("z_mm", 0.0))
+
+        mat_key  = args.get("material", "al5083")
+        mat_attr = _MATERIAL_MAP.get(mat_key, "MATERIAL_AL5083")
+        material = getattr(sc, mat_attr)
+
+        rule_sets = list(args.get("rule_sets", ["iso"]))
+        zone      = str(args.get("zone", "bottom"))
+
+        # ISO inputs
+        LWL    = float(args.get("LWL",    10.0))
+        BWL    = float(args.get("BWL",    3.0))
+        mLDC   = float(args.get("mLDC",   5000.0))
+        V      = float(args.get("V",      15.0))
+        beta   = float(args.get("beta_04", 20.0))
+        cat_str = str(args.get("category", "A")).upper()
+        category = sc.DesignCategory(cat_str)
+        is_sailing = bool(args.get("is_sailing", False))
+
+        # ABS / DNV inputs
+        h_panel_m = float(args.get("h_panel_m", 1.5))
+        V_kn      = float(args.get("V_kn", 0.0))
+        Cw        = float(args.get("Cw", 0.0))
+        draft_m   = float(args.get("draft_m", 2.0))
+
+        # Actual scantlings
+        t_actual    = float(args["t_actual_mm"])   if "t_actual_mm"   in args else None
+        SM_actual   = float(args["SM_actual_cm3"]) if "SM_actual_cm3" in args else None
+        fixed       = bool(args.get("both_ends_fixed", True))
+
+        multi = marine_scantling_check(
+            b_mm=b_mm, l_mm=l_mm, lu_mm=lu_mm, s_mm=s_mm,
+            material=material, rule_sets=rule_sets, zone=zone,
+            LWL=LWL, BWL=BWL, mLDC=mLDC, V=V, beta_04=beta,
+            category=category, z_mm=z_mm, is_sailing=is_sailing,
+            h_panel_m=h_panel_m, V_kn=V_kn, Cw=Cw, draft_m=draft_m,
+            t_actual_mm=t_actual, SM_actual_cm3=SM_actual,
+            both_ends_fixed=fixed,
+        )
+        return ok_payload(multi.as_dict())
+    except Exception as exc:
+        return err_payload(str(exc), "MARINE_SCANTLING_CHECK_ERROR")
+
+
 async def run_marine_scantlings(args: dict[str, Any], ctx: "ProjectCtx") -> str:
     try:
         import kerf_marine.scantlings as sc

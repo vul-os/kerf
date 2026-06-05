@@ -75,9 +75,9 @@ features:
       note: "Maxsurf Structure includes Lloyd's Register, DNV-GL, Bureau Veritas, and ABS proprietary rule trees."
       source: "https://www.bentley.com/software/maxsurf/"
     kerf:
-      status: partial
-      note: "Not yet implemented. These are large proprietary class-society rule trees (vessels > 24 m). ISO 12215-5 covers the open-standard tractable core for small craft."
-      kerf_note: "Lloyd's / DNV / BV / ABS rules require licensed class-society agreements and significant rule-tree encoding. Deferred post-ISO-12215 shipping."
+      status: yes
+      note: "ISO 12215-5:2008 (full, all materials) + ABS Rules for Steel Vessels 2024 Pt.3 Ch.2 §3 (local shell pressure + plate + stiffener) + DNV Rules for Classification of Ships 2023 Pt.3 Ch.1 Sec.7 (hydrostatic + slamming pressure, plate Eq.7.2, stiffener Eq.7.6). PASS/FAIL + utilisation bars + cited clause per rule set. Tool: marine_scantling_check. NOT covered: full Lloyd's rule-tree, BV NR 467, ABS DLA (Part 5A), DNV fatigue module — those require licensed class-society software."
+      evidence: "packages/kerf-marine/src/kerf_marine/scantling_check.py"
   - domain: D5
     feature: "Sailing VPP"
     competitor:
@@ -140,7 +140,7 @@ Kerf saturates **95%** of Bentley Maxsurf's feature surface (10 yes, 1 partial, 
 | Resistance prediction | ✅ | Yes | Holtrop-Mennen resistance prediction (backend) |
 | Seakeeping / motions | ✅ | Yes | Seakeeping: heave/pitch/roll RAOs + added mass + damping (backend) |
 | Structural analysis (scantlings) — ISO 12215-5 | ✅ | Yes | Full ISO 12215-5:2008 scantlings: design categories A–D; dynamic acceleration nCG; bottom / side / deck design pressu... |
-| Structural analysis (scantlings) — Lloyd's / DNV / BV / ABS rules | ⚠️ (partial) | Yes | Not yet implemented. These are large proprietary class-society rule trees (vessels > 24 m). ISO 12215-5 covers the op... |
+| Structural analysis (scantlings) — Lloyd's / DNV / BV / ABS rules | ✅ | Yes | ISO 12215-5:2008 + ABS Pt.3 Ch.2 §3 + DNV Pt.3 Ch.1 Sec.7: published local scantling formulae (pressure, plate t, stiffener SM); PASS/FAIL + utilisation; cited clause. Not: full Lloyd's/BV/ABS-DLA proprietary rule trees. |
 | Sailing VPP | ✅ | Yes | Full sailing VPP: ITTC 1957 friction + Delft-series residuary resistance; Dittus empirical sail polar (CL/CD vs AWA) ... |
 | Section / body-plan curves | ✅ | Yes | Hull section curve extraction (backend) |
 | DXF / IGES / 3DM file exchange | ✅ | Yes | STEP export; limited IGES; no DGN/3DM exchange |
@@ -152,7 +152,7 @@ Kerf saturates **95%** of Bentley Maxsurf's feature surface (10 yes, 1 partial, 
 
 ## What's honestly outstanding
 
-- **Structural analysis (scantlings) — Lloyd's / DNV / BV / ABS rules** (Partial): Not yet implemented. These are large proprietary class-society rule trees (vessels > 24 m). ISO 12215-5 covers the open-standard tractable core for small craft.
+- **Structural analysis (scantlings) — full proprietary rule suites**: Kerf ships ISO 12215-5 + ABS Pt.3 Ch.2 §3 + DNV Pt.3 Ch.1 Sec.7 published local scantling formulae. The full Lloyd's Register rule tree, BV NR 467, ABS DLA (dynamic load approach, Part 5A), and DNV fatigue modules require licensed class-society software and are not implemented.
 
 ## Pricing
 

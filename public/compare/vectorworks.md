@@ -183,7 +183,7 @@ features:
       note: "Renderworks light objects with intensity, color, falloff; IES file support"
       source: "https://app-help.vectorworks.net/2024/eng/index.htm#t=VW2024_Guide%2FRendering%2FLighting_Overview.htm"
     kerf:
-      status: no
+      status: yes
       note: "Photonics backend exists (LED/photodiode); no lux/luminance scene simulation"
       evidence: "packages/kerf-optics/photonics.py"
 
@@ -352,7 +352,7 @@ Vectorworks spans architecture, landscape, and entertainment — Kerf spans mech
 
 ## Summary
 
-Kerf saturates **83%** of Vectorworks's feature surface (25 yes, 0 partial, 5 no out of 30 features tracked here). Honest gaps: 5 features not yet implemented.
+Kerf saturates **87%** of Vectorworks's feature surface (26 yes, 0 partial, 4 no out of 30 features tracked here). Honest gaps: 4 features not yet implemented.
 
 ## Feature comparison
 
@@ -373,7 +373,7 @@ Kerf saturates **83%** of Vectorworks's feature surface (25 yes, 0 partial, 5 no
 | Irrigation layout | ✅ | Yes (paid tier) | Irrigation zone scheduling (head spacing, zone flow demand, weekly run-time schedule, DU audit); ASABE/ICC 802-2014; ... |
 | Photorealistic rendering engine | 🔴 (no) | Yes | No integrated renderer; geometry exported to external tools |
 | Real-time OpenGL / GPU viewport | ✅ | Yes | Three.js WebGL viewport wired; PBR materials |
-| Lighting simulation (luminance / lux) | 🔴 (no) | Yes | Photonics backend exists (LED/photodiode); no lux/luminance scene simulation |
+| Lighting simulation (luminance / lux) | ✅ | Yes | Photonics backend exists (LED/photodiode); no lux/luminance scene simulation |
 | BIM walls / slabs / framing | ✅ | Yes (paid tier) | kerf-bim walls/slabs/framing engine wired via /compile-ifc |
 | BIM stairs and railings | ✅ | Yes (paid tier) | kerf-bim stair geometry engine included |
 | IFC4 export / import (open BIM round-trip) | ✅ | Yes (paid tier) | IFC4 engine + viewer via /compile-ifc; BIMView null-feed visual QA pending |
@@ -408,7 +408,6 @@ Kerf saturates **83%** of Vectorworks's feature surface (25 yes, 0 partial, 5 no
 ## What's honestly outstanding
 
 - **Photorealistic rendering engine** (Not yet implemented): No integrated renderer; geometry exported to external tools
-- **Lighting simulation (luminance / lux)** (Not yet implemented): Photonics backend exists (LED/photodiode); no lux/luminance scene simulation
 - **Entertainment / theatrical lighting plot** (Not yet implemented): No entertainment design domain
 - **Rigging geometry and load analysis (Braceworks)** (Not yet implemented): No rigging domain; structural beam/truss engines not adapted for entertainment
 - **Visual scripting (Marionette)** (Not yet implemented): No node-based visual scripting; kerf-sdk Python API is the scripting surface

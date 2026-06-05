@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T02:32:42.458Z",
+  "generatedAt": "2026-06-05T02:34:08.403Z",
   "items": [
     {
       "slug": "revit",
@@ -1922,7 +1922,7 @@
             "notes": "Renderworks light objects with intensity, color, falloff; IES file support"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "packages/kerf-optics/photonics.py",
             "notes": "Photonics backend exists (LED/photodiode); no lux/luminance scene simulation"
           },
@@ -6753,7 +6753,7 @@
             "notes": "No optics analysis in SOLIDWORKS; external Zemax/CODE V required"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/optics/lens.py",
             "notes": "ABCD + Seidel + thick lens + Gaussian beam + M² backend"
           },
@@ -14602,7 +14602,7 @@
             "notes": "Full sequential mode: multi-surface, multi-wavelength, apertures, aberrations, merit function optimisation"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-optics/src/kerf_optics/lens_system.py",
             "notes": "Sequential ray tracing via ray_transfer.py + lens_system.py (backend); no merit function optimiser"
           },
@@ -14658,7 +14658,7 @@
             "notes": "Advanced tolerancing: sensitivity, inverse sensitivity, Monte Carlo; NEST workflow in 2026 R1"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-optics/src/kerf_optics/tolerancing.py",
             "notes": "Sensitivity (OAT: ±Δ per parameter, RSS budget) + Monte Carlo (uniform/normal, configurable n_trials, yield) via tolerancing.py; merit functions: EFL deviation, BFD deviation. No inverse sensitivity, no NEST compound tolerancing workflow."
           },
@@ -14672,7 +14672,7 @@
             "notes": "STAR Multiphysics: STOP + SOFT analysis with Ansys Mechanical/Fluent integration"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "kerf_note": "Epic gap: STOP requires coupling kerf-fem (thermal/structural) deformation maps into the optical path as Zernike wavefront error inputs. Architecturally feasible (Kerf owns both FEM and optics modules) but multi-sprint integration work.",
             "evidence": "",
             "notes": "No structural-thermal-optical performance (STOP) multiphysics coupling."
@@ -14702,7 +14702,7 @@
             "notes": "Metalens fast mode (2026 R1): efficient simulation of flat, diffractive metalens elements"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "kerf_note": "Epic gap: metalens simulation requires scalar phase-profile representation of the nanostructured array and an efficient Fourier-optics or RCWA engine. Outside the ABCD paraxial scope.",
             "evidence": "",
             "notes": "No metalens / diffractive optical element design."

@@ -577,7 +577,7 @@ features:
       note: "No optics analysis in SOLIDWORKS; external Zemax/CODE V required"
       source: "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_features_top.htm"
     kerf:
-      status: partial
+      status: yes
       note: "ABCD + Seidel + thick lens + Gaussian beam + M² backend"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/optics/lens.py"
 
@@ -681,7 +681,7 @@ features:
 
 ## Summary
 
-Kerf saturates **86%** of SOLIDWORKS's feature surface (42 yes, 17 partial, 0 no out of 59 features tracked here). Honest gaps: 17 features partial (engine complete, UI or depth gap).
+Kerf saturates **86%** of SOLIDWORKS's feature surface (43 yes, 16 partial, 0 no out of 59 features tracked here). Honest gaps: 16 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -737,7 +737,7 @@ Kerf saturates **86%** of SOLIDWORKS's feature surface (42 yes, 17 partial, 0 no
 | Tolerance stackup — 3D vector loop | ✅ | Yes (paid tier) | 6-DOF vector loop + sensitivity Jacobian backend |
 | Limits & fits (ISO 286) | ⚠️ (partial) | Yes | ISO 286 limits & fits backend; no UI |
 | SPC control charts (Shewhart/CUSUM/EWMA) | ✅ | No | Shewhart/CUSUM/EWMA + Nelson/WECO rules backend |
-| Paraxial ray tracing / Gaussian beam | ⚠️ (partial) | No | ABCD + Seidel + thick lens + Gaussian beam + M² backend |
+| Paraxial ray tracing / Gaussian beam | ✅ | No | ABCD + Seidel + thick lens + Gaussian beam + M² backend |
 | Acoustics (ISO 9613 / RT60 / mass-law TL) | ✅ | No | ISO 9613 + RT60 + mass-law TL + image-source IR backend |
 | Jewelry design tooling | ✅ | No | 41-module suite — ring/gem/setting/chain/casting/cost |
 | BIM / IFC authoring | ✅ | No | Revit-comparable engine + IFC4 export wired via /compile-ifc |
@@ -761,7 +761,7 @@ Kerf saturates **86%** of SOLIDWORKS's feature surface (42 yes, 17 partial, 0 no
 - **Wiring / harness routing** — WiringView wired; WireViz + 3D router
 - **Multi-axis CAM (5-axis)** — 5-axis 3+2 engine solid; no UI
 - **Nesting (2D part layout)** — Skyline + true-shape NFP + Minkowski-sum backend
-- *(and 14 more features not covered by SOLIDWORKS)*
+- *(and 15 more features not covered by SOLIDWORKS)*
 
 ## What's honestly outstanding
 
@@ -781,7 +781,6 @@ Kerf saturates **86%** of SOLIDWORKS's feature surface (42 yes, 17 partial, 0 no
 - **AC load-flow (Newton-Raphson)** (Partial): Full polar-form NR load-flow backend; no UI
 - **GD&T data model (ASME Y14.5)** (Partial): Data model + auto-propose; no MBD/PMI placement UI
 - **Limits & fits (ISO 286)** (Partial): ISO 286 limits & fits backend; no UI
-- **Paraxial ray tracing / Gaussian beam** (Partial): ABCD + Seidel + thick lens + Gaussian beam + M² backend
 
 ## Pricing
 

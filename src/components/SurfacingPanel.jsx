@@ -542,8 +542,10 @@ function LoftWithGuidesTool() {
 
 const TABS = ['Gordon', 'Skinning', 'Guide Rails']
 
-export default function SurfacingPanel() {
-  const [tab, setTab] = useState('Gordon')
+export default function SurfacingPanel({ content } = {}) {
+  // content prop: JSON string optionally carrying persisted tab selection.
+  const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
+  const [tab, setTab] = useState(_parsed.tab || 'Gordon')
 
   return (
     <div style={s.root}>

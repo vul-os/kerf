@@ -706,8 +706,12 @@ const TABS = [
   { id: 'rebar', label: 'Rebar Detailing',             icon: Ruler },
 ]
 
-export default function StructuralMemberPanel() {
-  const [tab, setTab] = useState('steel')
+export default function StructuralMemberPanel({ content } = {}) {
+  // content prop: JSON string optionally carrying persisted tab selection.
+  // Parsed defensively — any parse error leaves defaults intact.
+  const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
+
+  const [tab, setTab] = useState(_parsed.tab || 'steel')
 
   return (
     <div style={s.root}>

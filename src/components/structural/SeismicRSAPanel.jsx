@@ -623,8 +623,11 @@ const TABS = [
   { id: 'newmark',  label: 'Newmark Time-History', icon: Activity },
 ]
 
-export default function SeismicRSAPanel() {
-  const [tab, setTab] = useState('spectrum')
+export default function SeismicRSAPanel({ content } = {}) {
+  // content prop: JSON string optionally carrying persisted tab selection.
+  const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
+
+  const [tab, setTab] = useState(_parsed.tab || 'spectrum')
 
   return (
     <div style={s.root}>

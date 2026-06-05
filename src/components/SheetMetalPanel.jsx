@@ -579,8 +579,10 @@ function MultiFlangeCalc() {
 
 const TABS = ['Flat Pattern', 'Corner Relief', 'Multi-Flange']
 
-export default function SheetMetalPanel() {
-  const [tab, setTab] = useState('Flat Pattern')
+export default function SheetMetalPanel({ content } = {}) {
+  // content prop: JSON string optionally carrying persisted tab selection.
+  const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
+  const [tab, setTab] = useState(_parsed.tab || 'Flat Pattern')
 
   return (
     <div style={s.root}>

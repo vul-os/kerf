@@ -598,8 +598,10 @@ function BooleanTool() {
 
 const TABS = ['Repair', 'Diagnostics', 'ShrinkWrap', 'Boolean']
 
-export default function MeshRepairPanel() {
-  const [tab, setTab] = useState('Repair')
+export default function MeshRepairPanel({ content } = {}) {
+  // content prop: JSON string optionally carrying persisted tab selection.
+  const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
+  const [tab, setTab] = useState(_parsed.tab || 'Repair')
 
   return (
     <div style={s.root}>

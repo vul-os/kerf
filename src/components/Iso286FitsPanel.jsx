@@ -415,9 +415,11 @@ const MODES = [
   ['press', 'Press Fit (Lamé)'],
 ]
 
-export default function Iso286FitsPanel({ onToast }) {
-  const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState('fit')
+export default function Iso286FitsPanel({ onToast, content } = {}) {
+  // content prop: JSON string optionally pre-seeding mode/open state.
+  const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
+  const [open, setOpen] = useState(_parsed.open ?? false)
+  const [mode, setMode] = useState(_parsed.mode || 'fit')
 
   return (
     <div className="border-t border-ink-800 flex-shrink-0" data-testid="iso286-fits-panel">

@@ -383,9 +383,11 @@ const MODES = [
   ['life', 'Service Life'],
 ]
 
-export default function GearRatingPanel({ onToast }) {
-  const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState('power')
+export default function GearRatingPanel({ onToast, content } = {}) {
+  // content prop: JSON string optionally pre-seeding mode/open state.
+  const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
+  const [open, setOpen] = useState(_parsed.open ?? false)
+  const [mode, setMode] = useState(_parsed.mode || 'power')
 
   return (
     <div className="border-t border-ink-800 flex-shrink-0" data-testid="gear-rating-panel">

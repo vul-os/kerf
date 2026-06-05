@@ -607,8 +607,10 @@ const TABS = [
   { id: 'gear',    label: 'Gear-train', icon: <Cog size={11} /> },
 ]
 
-export default function MechanismSynthesisPanel() {
-  const [activeTab, setActiveTab] = useState('fourbar')
+export default function MechanismSynthesisPanel({ content } = {}) {
+  // content prop: JSON string optionally carrying persisted tab selection.
+  const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
+  const [activeTab, setActiveTab] = useState(_parsed.tab || 'fourbar')
 
   return (
     <div style={s.root} data-testid="mechanism-synthesis-panel">

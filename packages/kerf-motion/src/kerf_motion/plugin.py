@@ -60,6 +60,22 @@ async def register(app: FastAPI, ctx):
         run_motion_collision_check,
     )
 
+    # Assembly motion study: MBD solver wired to assembly model + interference sweep
+    from kerf_motion.assembly_motion_study import (
+        assembly_motion_study_spec, run_assembly_motion_study,
+        assembly_mbd_constraint_spec, run_assembly_mbd_constraint_enforce,
+    )
+    ctx.tools.register(
+        "assembly_run_motion_study",
+        assembly_motion_study_spec,
+        run_assembly_motion_study,
+    )
+    ctx.tools.register(
+        "assembly_mbd_constraint_enforce",
+        assembly_mbd_constraint_spec,
+        run_assembly_mbd_constraint_enforce,
+    )
+
     provides = [
         "motion.rigid-body-dynamics",
         "motion.rk4-integrator",
@@ -68,6 +84,8 @@ async def register(app: FastAPI, ctx):
         "motion.inverse-dynamics",
         "motion.workspace-analysis",
         "motion.contact-detection",
+        "motion.assembly-motion-study",
+        "motion.mbd-constraint-enforcement",
     ]
 
     try:

@@ -37,6 +37,16 @@ from kerf_aero.propulsion.staging import (
     stage_mass_ratio,
     gravity_loss_estimate,
 )
+from kerf_aero.propulsion.motor_database import (
+    ThrustcurveMotor,
+    ThrustCurvePoint,
+    parse_eng,
+    list_motors,
+    get_motor,
+    classify_impulse,
+    MOTOR_CATALOGUE,
+    IMPULSE_CLASS_BOUNDS,
+)
 
 __all__ = [
     # rocket_eq
@@ -61,6 +71,15 @@ __all__ = [
     "optimal_delta_v_split",
     "stage_mass_ratio",
     "gravity_loss_estimate",
+    # motor_database
+    "ThrustcurveMotor",
+    "ThrustCurvePoint",
+    "parse_eng",
+    "list_motors",
+    "get_motor",
+    "classify_impulse",
+    "MOTOR_CATALOGUE",
+    "IMPULSE_CLASS_BOUNDS",
 ]
 
 __version__ = "0.1.0"

@@ -101,6 +101,28 @@ except ImportError:
     G0 = 9.80665
 
 try:
+    from kerf_aero.propulsion.motor_database import (
+        parse_eng as _parse_eng,
+        list_motors as _list_motors,
+        get_motor as _get_motor,
+        MOTOR_CATALOGUE as _MOTOR_CATALOGUE,
+        classify_impulse as _classify_impulse,
+    )
+    _MOTOR_DB_OK = True
+except ImportError:
+    _MOTOR_DB_OK = False
+
+try:
+    from kerf_aero.orbital.orbit_determination import (
+        ekf_orbit_determination as _ekf_od,
+        EKFResult as _EKFResult,
+        Observation as _OD_Observation,
+    )
+    _EKF_OK = True
+except ImportError:
+    _EKF_OK = False
+
+try:
     from kerf_aero.propulsion.cea_lite import cea_lite as _cea_lite
     _CEA_OK = True
 except ImportError:
@@ -2735,3 +2757,299 @@ AEROSPACE_TOOLS: list[dict[str, Any]] = [
         ),
     },
 ]
+
+# Tool 16 and 17 registry entries appended after function definitions below.
+
+
+# ---------------------------------------------------------------------------
+# Tool 16: aero_ekf_orbit_determination
+# ---------------------------------------------------------------------------
+
+def aero_ekf_orbit_determination(
+    observations: list[dict],
+    x0: list[float],
+    P0_diag: list[float] | None = None,
+    include_j2: bool = False,
+    q_pos_km: float = 0.0,
+    q_vel_km_s: float = 0.0,
+) -> dict:
+    """
+    Extended Kalman Filter (EKF) sequential orbit determination.
+
+    Processes tracking observations one-at-a-time (forward in time), producing
+    a running posterior state and covariance estimate.  More suitable than batch
+    LS for real-time applications or long arcs with process noise.
+
+    Algorithm: Tapley, Schutz & Born (2004) §4.7; Joseph-form covariance update
+    (Bierman 1977 §IV.6) for numerical stability.
+
+    Input schema
+    ------------
+    observations : list of dicts — same schema as aero_orbit_determination:
+        t           float   — time since epoch [s], must be >= 0, ascending
+        obs_type    str     — 'range', 'range_rate', or 'both'
+        y           list    — observed values [km] or [km/s] or [km, km/s]
+        sigma       list    — 1-sigma measurement noise (same shape as y)
+        station_eci list[3] — ground station ECI position [km]
+    x0 : list[6]
+        Initial state estimate at t=0 [r_x, r_y, r_z (km), v_x, v_y, v_z (km/s)].
+    P0_diag : list[6] or None
+        Initial covariance diagonal [km², km², km², (km/s)², (km/s)², (km/s)²].
+        Default: [1.0, 1.0, 1.0, 1e-4, 1e-4, 1e-4] (1 km position, 10 m/s velocity).
+    include_j2 : bool
+        Include J2 oblateness in propagation dynamics (default False).
+    q_pos_km : float
+        Process-noise std-dev on position [km] per observation interval (default 0).
+    q_vel_km_s : float
+        Process-noise std-dev on velocity [km/s] per observation interval (default 0).
+
+    Returns
+    -------
+    dict:
+        ok                  : bool
+        state_final         : list[6]   — posterior state [r(3) km, v(3) km/s]
+        covariance_diag     : list[6]   — diagonal of final posterior covariance
+        rms_innovation      : float     — normalised innovation RMS (≈1 if filter consistent)
+        n_observations      : int       — total number of scalar observations processed
+        position_norm_km    : float     — ||r_final|| [km]
+        state_history_sample: list      — posterior states at every 10th epoch (for plotting)
+        warnings            : list[str]
+
+    Raises
+    ------
+    ValueError: if observations are empty or inputs are invalid.
+    """
+    if not _EKF_OK:
+        return {"ok": False, "error": "EKF orbit determination module not available"}
+
+    try:
+        import numpy as np
+    except ImportError:
+        return {"ok": False, "error": "numpy not available"}
+
+    if not observations:
+        raise ValueError("observations must be a non-empty list")
+    if len(x0) != 6:
+        raise ValueError(f"x0 must be length 6, got {len(x0)}")
+
+    # Default initial covariance: 1 km position, 10 m/s velocity (formal)
+    _default_P0_diag = [1.0, 1.0, 1.0, 1e-4, 1e-4, 1e-4]
+    if P0_diag is None:
+        P0_diag = _default_P0_diag
+    if len(P0_diag) != 6:
+        raise ValueError(f"P0_diag must be length 6, got {len(P0_diag)}")
+
+    P0 = np.diag(P0_diag)
+
+    # Parse observations
+    obs_list = []
+    for i, od in enumerate(observations):
+        try:
+            t = float(od["t"])
+            obs_type = str(od["obs_type"])
+            y = np.asarray(od["y"], dtype=float)
+            sigma = np.asarray(od["sigma"], dtype=float)
+            sta = np.asarray(od["station_eci"], dtype=float)
+            obs_list.append(_OD_Observation(t=t, obs_type=obs_type, y=y, sigma=sigma, station_eci=sta))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(f"observations[{i}]: {exc}") from exc
+
+    try:
+        result = _ekf_od(
+            obs_list,
+            np.asarray(x0, dtype=float),
+            P0,
+            include_j2=include_j2,
+            q_pos_km=q_pos_km,
+            q_vel_km_s=q_vel_km_s,
+        )
+    except Exception as exc:
+        return {"ok": False, "error": str(exc), "n_observations": len(obs_list)}
+
+    warnings: list[str] = []
+    if result.rms_innovation > 5.0:
+        warnings.append(
+            f"Innovation RMS = {result.rms_innovation:.2f} > 5; filter may be inconsistent."
+        )
+
+    x_final = result.state_final.tolist()
+    cov_diag = np.diag(result.covariance_final).tolist()
+    pos_norm = float(np.linalg.norm(result.state_final[:3]))
+
+    # Down-sample state history for response size
+    step = max(1, len(result.state_history) // 10)
+    state_sample = [
+        [round(float(v), 4) for v in result.state_history[i]]
+        for i in range(0, len(result.state_history), step)
+    ]
+
+    return {
+        "ok": True,
+        "state_final": [round(float(v), 6) for v in x_final],
+        "covariance_diag": [round(float(v), 8) for v in cov_diag],
+        "rms_innovation": round(float(result.rms_innovation), 6),
+        "n_observations": result.n_observations,
+        "position_norm_km": round(pos_norm, 4),
+        "state_history_sample": state_sample,
+        "warnings": warnings,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Tool 17: aero_motor_database
+# ---------------------------------------------------------------------------
+
+def aero_motor_database(
+    operation: str = "list",
+    name: str | None = None,
+    impulse_class: str | None = None,
+    manufacturer: str | None = None,
+    diameter_mm: float | None = None,
+    eng_text: str | None = None,
+    total_impulse_ns: float | None = None,
+) -> dict:
+    """
+    Amateur/hobby rocket motor database (Thrustcurve / RASP .eng format).
+
+    Operations
+    ----------
+    operation : str — one of:
+        'list'       — list/filter motors from the built-in catalogue
+        'get'        — get a specific motor by name (full thrust-curve data)
+        'parse_eng'  — parse a RASP .eng format string into motor data
+        'classify'   — classify a total impulse [N·s] into NAR/TRA class letter
+
+    Parameters (context-dependent)
+    --------------------------------
+    name : str — motor name for 'get' operation (e.g. 'A8', 'G79', 'K711').
+    impulse_class : str — NAR/TRA class letter for 'list' filter (e.g. 'G', 'H', 'K').
+    manufacturer : str — manufacturer substring for 'list' filter (e.g. 'Aerotech').
+    diameter_mm : float — motor diameter [mm] for 'list' filter (±1 mm tolerance).
+    eng_text : str — raw RASP .eng file content for 'parse_eng' operation.
+    total_impulse_ns : float — total impulse [N·s] for 'classify' operation.
+
+    RASP .eng Format (for 'parse_eng')
+    -----------------------------------
+    ; Comment line
+    <Name> <Diam_mm> <Len_mm> <Delays> <PropMass_g> <TotMass_g> <Manufacturer>
+    <time_s> <thrust_N>
+    ...
+    <time_s> 0.0       ; burnout
+
+    Returns
+    -------
+    dict with operation-specific payload:
+        'list'      → {'motors': [{name, manufacturer, class, Isp, ...}, ...]}
+        'get'       → {'motor': {full motor data + thrust_curve list}}
+        'parse_eng' → {'motors': [parsed motor data]}
+        'classify'  → {'class': 'G', 'total_impulse_ns': 87.5}
+
+    Raises
+    ------
+    ValueError: if operation is unknown or required parameters are missing.
+
+    References
+    ----------
+    NAR Standards & Testing Committee impulse classification.
+    Thrustcurve.org RASP .eng file format.
+    Sutton & Biblarz "Rocket Propulsion Elements" 9th ed. §11.
+    """
+    if not _MOTOR_DB_OK:
+        return {"ok": False, "error": "motor_database module not available"}
+
+    op = operation.lower().strip()
+
+    if op == "list":
+        try:
+            motors = _list_motors(
+                impulse_class=impulse_class,
+                manufacturer=manufacturer,
+                diameter_mm=diameter_mm,
+            )
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+        return {
+            "ok": True,
+            "n_motors": len(motors),
+            "motors": [m.to_dict() for m in motors],
+        }
+
+    elif op == "get":
+        if not name:
+            raise ValueError("'name' parameter required for operation='get'")
+        try:
+            motor = _get_motor(name)
+        except KeyError as exc:
+            return {"ok": False, "error": str(exc)}
+        d = motor.to_dict()
+        d["thrust_curve"] = [
+            {"time_s": pt.time_s, "thrust_n": pt.thrust_n}
+            for pt in motor.thrust_curve
+        ]
+        return {"ok": True, "motor": d}
+
+    elif op == "parse_eng":
+        if not eng_text:
+            raise ValueError("'eng_text' parameter required for operation='parse_eng'")
+        try:
+            motors = _parse_eng(eng_text)
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+        result_motors = []
+        for m in motors:
+            d = m.to_dict()
+            d["thrust_curve"] = [
+                {"time_s": pt.time_s, "thrust_n": pt.thrust_n}
+                for pt in m.thrust_curve
+            ]
+            result_motors.append(d)
+        return {"ok": True, "n_motors": len(motors), "motors": result_motors}
+
+    elif op == "classify":
+        if total_impulse_ns is None:
+            raise ValueError("'total_impulse_ns' parameter required for operation='classify'")
+        cls = _classify_impulse(float(total_impulse_ns))
+        return {
+            "ok": True,
+            "total_impulse_ns": total_impulse_ns,
+            "impulse_class": cls,
+        }
+
+    else:
+        raise ValueError(
+            f"Unknown operation '{operation}'. "
+            "Valid: 'list', 'get', 'parse_eng', 'classify'."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Append tool 16 + 17 into AEROSPACE_TOOLS registry (defined after functions)
+# ---------------------------------------------------------------------------
+
+AEROSPACE_TOOLS.extend([
+    {
+        "name": "aero_ekf_orbit_determination",
+        "fn": aero_ekf_orbit_determination,
+        "description": (
+            "Extended Kalman Filter (EKF) sequential orbit determination from tracking observations "
+            "(range and/or range-rate). Processes observations one-at-a-time in forward time order. "
+            "Returns posterior state, covariance, innovation RMS, and full state/covariance history. "
+            "Implements Tapley, Schutz & Born (2004) §4.7 with Joseph-form covariance update "
+            "(Bierman 1977 §IV.6) for numerical stability. "
+            "Complements aero_orbit_determination (batch LS) for sequential/real-time use cases."
+        ),
+    },
+    {
+        "name": "aero_motor_database",
+        "fn": aero_motor_database,
+        "description": (
+            "Amateur/hobby rocket motor database (Thrustcurve / RASP .eng format). "
+            "Operations: 'list' — filter motors by class/manufacturer/diameter; "
+            "'get' — retrieve a named motor with full thrust-curve data; "
+            "'parse_eng' — parse a raw RASP .eng string and return motor data; "
+            "'classify' — classify a total impulse [N·s] to NAR/TRA letter class (A–O). "
+            "Built-in catalogue: 14 motors (Estes A8–D12, Aerotech E15–M1297, Cesaroni J285–L1720). "
+            "Ref: NAR Standards & Testing; Thrustcurve.org; Sutton & Biblarz RPE 9th ed. §11."
+        ),
+    },
+])

@@ -548,15 +548,18 @@ def batch_least_squares_od(
         # Symmetrize (remove anti-symmetric numerical noise from STM products)
         Lambda_full = 0.5 * (Lambda_full + Lambda_full.T)
 
-        # Eigendecomposition and clip.
-        # Λ = Σ H̃ᵀ W H̃ is theoretically PSD; negative eigenvalues are
-        # numerical noise from STM chain products.  We zero-clip them (set to 0)
-        # to obtain the Moore-Penrose pseudo-inverse, which gives zero correction
-        # in unobservable directions (Tapley et al. 2004, §4.3.3).
-        eigvals_arr, eigvecs = np.linalg.eigh(Lambda_full)
-        # Keep only positive eigenvalues (invert them); zero-clip negatives.
-        inv_eigvals = np.where(eigvals_arr > 0, 1.0 / eigvals_arr, 0.0)
-        Lambda_inv = eigvecs @ np.diag(inv_eigvals) @ eigvecs.T
+        # Solve via Moore-Penrose pseudo-inverse (SVD-based, rcond auto).
+        #
+        # Λ = Σ H̃ᵀ W H̃ is theoretically PSD by construction but floating-point
+        # accumulation in long STM chain products can produce tiny negative
+        # eigenvalues (|λ_min| ≪ λ_max).  np.linalg.pinv uses SVD with a relative
+        # threshold (rcond = machine-epsilon × max_singular) which correctly:
+        #   (a) inverts well-conditioned directions (observable subspace);
+        #   (b) returns zero correction in genuinely unobservable directions;
+        #   (c) is unaffected by the sign of numerical-noise eigenvalues.
+        # This is the recommended approach (Tapley et al. 2004, §4.3.3;
+        # Bierman 1977 "Factorization Methods for Discrete Sequential Estimation").
+        Lambda_inv = np.linalg.pinv(Lambda_full)
         dx = Lambda_inv @ b_full
 
         # Step-size limiter: cap position correction at 50 km and velocity
@@ -610,14 +613,12 @@ def batch_least_squares_od(
     sigma_0 = math.sqrt(chi2_sum / dof)
     rms_residual = math.sqrt(chi2_sum / n_obs_total) if n_obs_total > 0 else 0.0
 
-    # Formal covariance: P = Λ_full⁻¹ using same eigenvalue-clip as solve.
-    # Poorly-observed directions have large (but finite) formal variance.
-    Lambda_cov = 0.5 * (Lambda_full + Lambda_full.T)
+    # Formal covariance: P = Λ_full⁻¹ using the same pinv as the solve step.
+    # Lambda_inv was computed in the last iteration and is reused here.
+    # Symmetrize to remove residual numerical anti-symmetric noise.
     try:
-        # Lambda_inv is already computed in the last iteration's solve step.
-        # Use it directly as the covariance (same eigenvalue decomposition).
         cov = Lambda_inv.copy()
-        cov = 0.5 * (cov + cov.T)  # symmetrize numerical noise
+        cov = 0.5 * (cov + cov.T)
     except (NameError, np.linalg.LinAlgError):
         cov = np.full((6, 6), np.nan)
 
@@ -734,3 +735,290 @@ def generate_synthetic_observations(
         t_prev = t_i
 
     return obs_list
+
+
+# ---------------------------------------------------------------------------
+# Extended Kalman Filter (EKF) Orbit Determination
+# ---------------------------------------------------------------------------
+#
+# Algorithm: Tapley, Schutz & Born (2004), §4.7 "Extended Kalman Filter".
+# The sequential estimator processes observations one at a time in forward time
+# order, maintaining a running mean state estimate x̂ and covariance P.
+#
+# For each observation epoch t_i:
+#
+#   1. Time-update (propagation):
+#          x̄_i  = f(x̂_{i-1}, t_{i-1}, t_i)   via RK4 + STM
+#          P̄_i  = Φ_i P̂_{i-1} Φ_iᵀ + Q_i
+#      where Φ_i = Φ(t_i, t_{i-1}) and Q_i is optional process-noise.
+#
+#   2. Observation-update (measurement):
+#          ỹ_i  = y_i - h(x̄_i)               (innovation / residual)
+#          H_i  = ∂h/∂x |_{x̄_i}              (1×6 or 2×6 Jacobian)
+#          S_i  = H_i P̄_i H_iᵀ + R_i         (innovation covariance)
+#          K_i  = P̄_i H_iᵀ S_i⁻¹             (Kalman gain, 6×p)
+#          x̂_i  = x̄_i + K_i ỹ_i             (posterior state)
+#          P̂_i  = (I - K_i H_i) P̄_i          (Joseph form: numerically stable)
+#              = (I-KH) P̄ (I-KH)ᵀ + K R Kᵀ
+#
+# The Joseph / symmetric form of the covariance update prevents round-off
+# errors from making P̂ asymmetric or indefinite (Tapley §4.7.4;
+# Bierman 1977 §IV.6).
+#
+# Process noise Q: optional, isotropic on position uncertainty:
+#          Q_i = q_pos_km² · I₃ (position subspace only)
+# This handles unmodelled accelerations (drag, SRP) over long propagation arcs.
+#
+# References
+# ----------
+# Tapley, Schutz & Born (2004), §4.7 "Extended Kalman Filter".
+# Bierman, G. J. (1977). *Factorization Methods for Discrete Sequential
+#     Estimation*. Academic Press. §IV.6 (Joseph form).
+# Montenbruck & Gill (2000), §8.3 "Sequential Estimation".
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class EKFResult:
+    """Result of an Extended Kalman Filter orbit determination pass.
+
+    Attributes
+    ----------
+    state_final : NDArray, shape (6,)
+        Posterior state estimate at the epoch of the last observation.
+    covariance_final : NDArray, shape (6, 6)
+        Posterior covariance P̂ at the epoch of the last observation.
+    state_history : list[NDArray]
+        Posterior states x̂_i after each observation update, shape (6,) each.
+    covariance_history : list[NDArray]
+        Posterior covariances P̂_i after each observation update, (6,6) each.
+    innovations : list[NDArray]
+        Pre-fit innovations ỹ_i = y_i - h(x̄_i) at each epoch.
+    innovation_sigmas : list[NDArray]
+        Innovation standard deviations sqrt(diag(S_i)) at each epoch.
+    rms_innovation : float
+        RMS of normalised innovations ỹ_i / sqrt(S_i_diag), averaged over all obs.
+    n_observations : int
+        Total number of scalar observations processed.
+    """
+
+    state_final: NDArray
+    covariance_final: NDArray
+    state_history: list[NDArray]
+    covariance_history: list[NDArray]
+    innovations: list[NDArray]
+    innovation_sigmas: list[NDArray]
+    rms_innovation: float
+    n_observations: int
+
+
+def ekf_orbit_determination(
+    observations: list["Observation"],
+    x0: NDArray,
+    P0: NDArray,
+    *,
+    mu: float = MU_EARTH,
+    include_j2: bool = False,
+    j2: float = J2,
+    r_earth: float = R_EARTH,
+    q_pos_km: float = 0.0,
+    q_vel_km_s: float = 0.0,
+) -> EKFResult:
+    """Sequential Extended Kalman Filter orbit determination.
+
+    Processes tracking observations sequentially (forward in time), producing
+    a posterior state and covariance after each measurement.  More suitable
+    than batch LS for real-time or near-real-time applications and for long
+    arcs with slowly varying process noise.
+
+    Algorithm
+    ---------
+    Implements Tapley, Schutz & Born (2004) §4.7 EKF with the Joseph-form
+    covariance update (Bierman 1977 §IV.6) for numerical stability:
+
+        P̂ = (I − K H) P̄ (I − K H)ᵀ + K R Kᵀ
+
+    Parameters
+    ----------
+    observations : list[Observation]
+        Tracking data sorted by time (ascending).  Each must have t ≥ 0.
+    x0 : NDArray, shape (6,)
+        Initial state estimate at t = 0 [r(3) km; v(3) km/s].
+    P0 : NDArray, shape (6, 6)
+        Initial covariance matrix.  Typically set to formal uncertainty
+        of the a priori state; must be symmetric positive-definite.
+    mu : float
+        Gravitational parameter [km³/s²].
+    include_j2 : bool
+        Include J2 oblateness in the propagation dynamics.
+    j2, r_earth : float
+        J2 coefficient and Earth radius [km].
+    q_pos_km : float
+        Optional process-noise standard deviation on position [km] per
+        observation interval.  Set > 0 to account for unmodelled forces
+        (drag, SRP) on long arcs.  Added as Q = diag(q²_pos, q²_pos, q²_pos,
+        q²_vel, q²_vel, q²_vel) to P̄ at each time-update step.
+    q_vel_km_s : float
+        Optional process-noise standard deviation on velocity [km/s] per
+        observation interval.
+
+    Returns
+    -------
+    EKFResult
+        Full filter history, final posterior state and covariance, and
+        innovation statistics for filter health monitoring.
+
+    Raises
+    ------
+    ValueError
+        If observations are not time-ordered or inputs are invalid.
+
+    Notes
+    -----
+    - For arc lengths > 1 orbit pass, J2 should be enabled for accuracy.
+    - The Joseph-form update is unconditionally stable but ~4× more expensive
+      than the standard form.  For 6-state OD this overhead is negligible.
+    - Consider the UDU factored filter (Bierman 1977) for very long arcs or
+      many observations where positivity of P can be marginal.
+
+    References
+    ----------
+    Tapley, Schutz & Born (2004), §4.7.
+    Bierman (1977), §IV.6 Joseph form.
+    """
+    observations = list(observations)
+    if not observations:
+        raise ValueError("At least one observation is required for EKF OD")
+
+    x0 = np.asarray(x0, dtype=float).copy()
+    if x0.shape != (6,):
+        raise ValueError(f"x0 must be shape (6,), got {x0.shape}")
+
+    P0 = np.asarray(P0, dtype=float).copy()
+    if P0.shape != (6, 6):
+        raise ValueError(f"P0 must be shape (6, 6), got {P0.shape}")
+
+    # Validate time ordering
+    for k in range(1, len(observations)):
+        if observations[k].t < observations[k - 1].t:
+            raise ValueError(
+                f"Observations must be time-ordered: obs[{k}].t="
+                f"{observations[k].t:.3f} < obs[{k-1}].t={observations[k-1].t:.3f}"
+            )
+
+    # Process noise matrix (isotropic on position + velocity, per step)
+    Q_step = np.diag([
+        q_pos_km ** 2,
+        q_pos_km ** 2,
+        q_pos_km ** 2,
+        q_vel_km_s ** 2,
+        q_vel_km_s ** 2,
+        q_vel_km_s ** 2,
+    ])
+
+    # Identity matrix reused in Joseph form
+    I6 = np.eye(6)
+
+    # Running state and covariance estimates
+    x_hat = x0.copy()
+    P_hat = P0.copy()
+    t_prev = 0.0
+
+    # Storage for filter history
+    state_history: list[NDArray] = []
+    cov_history: list[NDArray] = []
+    innovations: list[NDArray] = []
+    innov_sigmas: list[NDArray] = []
+    norm_innov_sq_sum = 0.0
+    n_scalar_obs = 0
+
+    for obs in observations:
+        # ------------------------------------------------------------------
+        # Step 1: Time-update (prediction step)
+        #         Propagate x̂ and P from t_prev to t_i via STM.
+        # ------------------------------------------------------------------
+        dt = obs.t - t_prev
+
+        if dt > 0.0:
+            stm_res = propagate_stm(
+                x_hat[:3], x_hat[3:6], dt,
+                mu=mu, include_j2=include_j2, j2=j2, r_earth=r_earth,
+            )
+            x_bar = stm_res.state_final          # predicted state
+            Phi = stm_res.stm                    # STM Φ(t_i, t_{i-1})
+
+            # Prior covariance: P̄ = Φ P̂ Φᵀ + Q
+            P_bar = Phi @ P_hat @ Phi.T + Q_step
+
+            # Enforce symmetry (prevents drift from repeated matrix products)
+            P_bar = 0.5 * (P_bar + P_bar.T)
+        else:
+            # Same epoch — no propagation needed
+            x_bar = x_hat.copy()
+            P_bar = P_hat.copy()
+
+        # ------------------------------------------------------------------
+        # Step 2: Observation-update (correction step)
+        # ------------------------------------------------------------------
+
+        # Predicted observation and innovation (pre-fit residual)
+        y_pred = _predict_observation(x_bar, obs)
+        innov = obs.y - y_pred          # ỹ = y - h(x̄)
+
+        # Measurement Jacobian H (p × 6)
+        H = _observation_partials(x_bar, obs)
+
+        # Measurement noise covariance R = diag(σ²)
+        R = np.diag(obs.sigma ** 2)
+
+        # Innovation covariance S = H P̄ Hᵀ + R  (p × p)
+        S = H @ P_bar @ H.T + R
+
+        # Kalman gain K = P̄ Hᵀ S⁻¹  (6 × p)
+        # Use pseudoinverse for S (normally small and well-conditioned)
+        S_inv = np.linalg.pinv(S)
+        K = P_bar @ H.T @ S_inv
+
+        # Posterior state: x̂ = x̄ + K ỹ
+        x_hat = x_bar + K @ innov
+
+        # Joseph-form covariance update (Tapley §4.7.4; Bierman §IV.6):
+        #   P̂ = (I - KH) P̄ (I - KH)ᵀ + K R Kᵀ
+        # Numerically superior to simple P̂ = (I-KH)P̄ which loses symmetry
+        # and positivity under finite-precision arithmetic.
+        IKH = I6 - K @ H
+        P_hat = IKH @ P_bar @ IKH.T + K @ R @ K.T
+
+        # Enforce symmetry
+        P_hat = 0.5 * (P_hat + P_hat.T)
+
+        # ------------------------------------------------------------------
+        # Innovation statistics (for filter health monitoring)
+        # ------------------------------------------------------------------
+        innov_sigma = np.sqrt(np.maximum(np.diag(S), 0.0))
+        norm_sq = float(innov @ S_inv @ innov)
+        norm_innov_sq_sum += norm_sq
+        n_scalar_obs += len(obs.y)
+
+        # Record history
+        state_history.append(x_hat.copy())
+        cov_history.append(P_hat.copy())
+        innovations.append(innov.copy())
+        innov_sigmas.append(innov_sigma)
+
+        t_prev = obs.t
+
+    rms_innovation = (
+        math.sqrt(norm_innov_sq_sum / n_scalar_obs) if n_scalar_obs > 0 else 0.0
+    )
+
+    return EKFResult(
+        state_final=x_hat,
+        covariance_final=P_hat,
+        state_history=state_history,
+        covariance_history=cov_history,
+        innovations=innovations,
+        innovation_sigmas=innov_sigmas,
+        rms_innovation=rms_innovation,
+        n_observations=n_scalar_obs,
+    )

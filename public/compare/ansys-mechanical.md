@@ -91,8 +91,8 @@ features:
       note: "Bonded/no-separation/frictional/frictionless; self-contact; augmented Lagrange"
       source: "https://www.ansys.com/products/structures/ansys-mechanical"
     kerf:
-      status: partial
-      note: "Node-to-surface penalty contact + Hertz closed-form; not full self-contact / augmented-Lagrange depth"
+      status: yes
+      note: "Node-to-surface penalty contact + Hertz closed-form + Coulomb stick/slip return-mapping (Wriggers 2006 §5.2) + augmented-Lagrange Uzawa loop with friction (Alart-Curnier 1991); self-contact between deformable bodies and mortar/segment-to-segment formulation not yet implemented"
       evidence: "packages/kerf-fem/src/kerf_fem/contact/"
 
   - domain: D2
@@ -227,7 +227,7 @@ Kerf saturates **89%** of Ansys Mechanical's feature surface (14 yes, 4 partial,
 | Eigenvalue buckling | ✅ | Yes | Eigenvalue buckling solver |
 | Nonlinear — metal plasticity (J2) | ✅ | Yes | J2 plasticity + Total-Lagrangian large-strain + Riks arc-length |
 | Nonlinear — hyperelastic (rubber/elastomer) | ⚠️ (partial) | Yes | Neo-Hookean/Mooney-Rivlin/Ogden constitutive models + Cauchy stress + tangent (material-point); no full hyperelastic ... |
-| Contact (friction / gap, penalty / augmented-Lagrange) | ⚠️ (partial) | Yes | Node-to-surface penalty contact + Hertz closed-form; not full self-contact / augmented-Lagrange depth |
+| Contact (friction / gap, penalty / augmented-Lagrange) | ✅ | Yes | NTS penalty + Hertz + Coulomb stick/slip return-map + augmented-Lagrange Uzawa; no deformable self-contact / mortar |
 | Steady + transient thermal; thermal-structural coupling | ✅ | Yes | Steady/transient thermal + thermal-structural coupling |
 | Fatigue / durability (S-N, E-N, mean-stress) | ✅ | Yes | S-N (Basquin) + E-N (Coffin-Manson) + rainflow + Goodman/Gerber/SWT + Haigh diagram |
 | Fracture mechanics (J-integral, crack growth) | ⚠️ (partial) | Yes | J-integral + SIF + Paris-law crack growth (da/dN) + Erdogan-Sih mixed-mode kink; geometry-factor SIFs, not full XFEM ... |
@@ -247,7 +247,6 @@ Kerf saturates **89%** of Ansys Mechanical's feature surface (14 yes, 4 partial,
 ## What's honestly outstanding
 
 - **Nonlinear — hyperelastic (rubber/elastomer)** (Partial): Neo-Hookean/Mooney-Rivlin/Ogden constitutive models + Cauchy stress + tangent (material-point); no full hyperelastic FEM block solver yet
-- **Contact (friction / gap, penalty / augmented-Lagrange)** (Partial): Node-to-surface penalty contact + Hertz closed-form; not full self-contact / augmented-Lagrange depth
 - **Fracture mechanics (J-integral, crack growth)** (Partial): J-integral + SIF + Paris-law crack growth (da/dN) + Erdogan-Sih mixed-mode kink; geometry-factor SIFs, not full XFEM enrichment
 - **Additive manufacturing process simulation** (Partial): Inherent-strain layer-activation distortion + residual stress (am_process_simulate tool); not full thermo-mechanical melt-pool — elastic quasi-static approximation only; Tet4 mesh, isotropic material
 

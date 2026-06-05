@@ -143,4 +143,13 @@ export default [
     load: () => import('./sim-wrappers/EMFieldWrapper.jsx'),
     label: 'EM Field (Electrostatics / Magnetostatics)',
   },
+
+  // ── FEM Contact (friction + augmented-Lagrange) ──────────────────────────
+  {
+    id: 'contact-result',
+    kinds: ['contact_result', 'fem_contact', 'contact_friction'],
+    exts: ['.contactresult', '.contact'],
+    load: () => import('./sim-wrappers/ContactResultWrapper.jsx'),
+    label: 'FEM Contact (friction / gap / augmented-Lagrange)',
+  },
 ]

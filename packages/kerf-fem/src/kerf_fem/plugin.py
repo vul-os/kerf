@@ -122,13 +122,15 @@ async def register(app: FastAPI, ctx):
         provides.append("fem.composite-failure")
     except Exception as exc:
         logger.warning("kerf-fem: composite tools failed to load: %s", exc)
-    # Wave 12E: contact mechanics + fracture
+    # Wave 12E+12F: contact mechanics (Hertz + penalty + augmented-Lagrange + friction)
     try:
         import kerf_fem.contact.contact_tools as _ct
         for name, spec, handler in _ct.TOOLS:
             ctx.tools.register(name, spec, handler)
         provides.append("fem.contact-hertzian")
         provides.append("fem.contact-penalty")
+        provides.append("fem.contact-friction")          # Coulomb stick/slip return-map
+        provides.append("fem.contact-auglag")            # augmented-Lagrange Uzawa
     except Exception as exc:
         logger.warning("kerf-fem: contact tools failed to load: %s", exc)
     try:

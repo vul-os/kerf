@@ -80,9 +80,9 @@ features:
       note: "Mooney-Rivlin, Ogden, Yeoh hyperelastic models"
       source: "https://www.ansys.com/products/structures/ansys-mechanical"
     kerf:
-      status: partial
-      note: "Neo-Hookean/Mooney-Rivlin/Ogden constitutive models + Cauchy stress + tangent (material-point); no full hyperelastic FEM block solver yet"
-      evidence: "packages/kerf-fem/src/kerf_fem/hyperelastic/models.py"
+      status: yes
+      note: "Total-Lagrangian Newton-Raphson FEM with Neo-Hookean / Mooney-Rivlin / Ogden (N=1..3) constitutive models; H8 element with B-bar volumetric-locking suppression; Crisfield arc-length continuation; validated against analytic incompressible solutions (uniaxial σ=μ(λ²-1/λ), simple shear σ₁₂=μγ, equi-biaxial); fem_hyperelastic_solve tool. Remaining gaps: no viscoelastic relaxation, no Mullins stress-softening, no Yeoh/Arruda-Boyce models."
+      evidence: "packages/kerf-fem/src/kerf_fem/nonlinear_hyperelastic.py"
 
   - domain: D2
     feature: "Contact (friction / gap, penalty / augmented-Lagrange)"
@@ -226,7 +226,7 @@ Kerf saturates **92%** of Ansys Mechanical's feature surface (15 yes, 3 partial,
 | Random vibration (PSD) + response spectrum | ✅ | Yes | Random-vibration PSD response; SRSS/CQC response-spectrum analysis |
 | Eigenvalue buckling | ✅ | Yes | Eigenvalue buckling solver |
 | Nonlinear — metal plasticity (J2) | ✅ | Yes | J2 plasticity + Total-Lagrangian large-strain + Riks arc-length |
-| Nonlinear — hyperelastic (rubber/elastomer) | ⚠️ (partial) | Yes | Neo-Hookean/Mooney-Rivlin/Ogden constitutive models + Cauchy stress + tangent (material-point); no full hyperelastic ... |
+| Nonlinear — hyperelastic (rubber/elastomer) | ✅ | Yes | Total-Lagrangian NR FEM + Neo-Hookean/Mooney-Rivlin/Ogden (N=1..3); H8 B-bar; arc-length; validated analytic; fem_hyperelastic_solve |
 | Contact (friction / gap, penalty / augmented-Lagrange) | ✅ | Yes | Node-to-surface penalty contact + Hertz closed-form + Coulomb stick/slip return-mapping (Wriggers 2006 §5.2) + augmen... |
 | Steady + transient thermal; thermal-structural coupling | ✅ | Yes | Steady/transient thermal + thermal-structural coupling |
 | Fatigue / durability (S-N, E-N, mean-stress) | ✅ | Yes | S-N (Basquin) + E-N (Coffin-Manson) + rainflow + Goodman/Gerber/SWT + Haigh diagram |
@@ -246,7 +246,6 @@ Kerf saturates **92%** of Ansys Mechanical's feature surface (15 yes, 3 partial,
 
 ## What's honestly outstanding
 
-- **Nonlinear — hyperelastic (rubber/elastomer)** (Partial): Neo-Hookean/Mooney-Rivlin/Ogden constitutive models + Cauchy stress + tangent (material-point); no full hyperelastic FEM block solver yet
 - **Fracture mechanics (J-integral, crack growth)** (Partial): J-integral + SIF + Paris-law crack growth (da/dN) + Erdogan-Sih mixed-mode kink; geometry-factor SIFs, not full XFEM enrichment
 - **Additive manufacturing process simulation** (Partial): Inherent-strain layer-activation distortion + residual stress (am_process_simulate tool); not full thermo-mechanical melt-pool — elastic quasi-static approximation only; Tet4 mesh, isotropic material
 

@@ -4,18 +4,19 @@
 // Each entry: { id, kinds, exts, load: () => import('…'), label }
 //
 // Panels wired here:
-//   StructuralMemberPanel  — AISC 360-22 + ACI 318-19 member design
-//   SeismicRSAPanel        — ASCE 7-22 RSA + Newmark-β time history
-//   RebarDetailPanel       — BS 8666:2020 3D rebar placement + bending schedule + shop drawing
-//   BearingLifePanel       — ISO 281 / ISO/TS 16281 bearing life
-//   GearRatingPanel        — AGMA 2001-D04 / ISO 6336 gear rating
-//   ShaftStressPanel       — ASME B106.1M shaft stress + critical speed
-//   Iso286FitsPanel        — ISO 286 limits & fits + Lamé press-fit
-//   WeldmentFramePanel     — Structural weldment framework generator
-//   MechanismSynthesisPanel — Four-bar, cam-follower, gear-train synthesis
-//   SurfacingPanel         — NURBS Gordon/skinning/guide-rail surfacing
-//   MeshRepairPanel        — Mesh repair, diagnostics, shrinkwrap, boolean
-//   SheetMetalPanel        — Flat pattern, corner relief, multi-flange
+//   StructuralMemberPanel     — AISC 360-22 + ACI 318-19 member design
+//   SeismicRSAPanel           — ASCE 7-22 RSA + Newmark-β time history
+//   RebarDetailPanel          — BS 8666:2020 3D rebar placement + bending schedule + shop drawing
+//   BearingLifePanel          — ISO 281 / ISO/TS 16281 bearing life
+//   GearRatingPanel           — AGMA 2001-D04 / ISO 6336 gear rating
+//   ShaftStressPanel          — ASME B106.1M shaft stress + critical speed
+//   Iso286FitsPanel           — ISO 286 limits & fits + Lamé press-fit
+//   WeldmentFramePanel        — Structural weldment framework generator
+//   MechanismSynthesisPanel   — Four-bar, cam-follower, gear-train synthesis
+//   SurfacingPanel            — NURBS Gordon/skinning/guide-rail surfacing
+//   MeshRepairPanel           — Mesh repair, diagnostics, shrinkwrap, boolean
+//   SheetMetalPanel           — Flat pattern, corner relief, multi-flange
+//   HyperelasticSolverPanel   — Nonlinear hyperelastic FEM (NH/MR/Ogden, TL-NR)
 
 export default [
   {
@@ -101,5 +102,12 @@ export default [
     exts: ['.sheetmetal'],
     load: () => import('../../components/SheetMetalPanel.jsx'),
     label: 'Sheet Metal',
+  },
+  {
+    id: 'hyperelastic_fem',
+    kinds: ['hyperelastic_fem', 'rubber_fem', 'elastomer_fem'],
+    exts: ['.hyperelastic', '.rubber'],
+    load: () => import('../../components/fea/HyperelasticSolverPanel.jsx'),
+    label: 'Hyperelastic FEM (Neo-Hookean / MR / Ogden)',
   },
 ]

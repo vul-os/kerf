@@ -161,6 +161,14 @@ async def register(app: FastAPI, ctx):
         provides.append("fem.hyperelastic-ogden")
     except Exception as exc:
         logger.warning("kerf-fem: hyperelastic tools failed to load: %s", exc)
+    # Nonlinear hyperelastic FEM solver (Total-Lagrangian NR + arc-length)
+    try:
+        import kerf_fem.nonlinear_hyperelastic as _nhe
+        for name, spec, handler in _nhe.TOOLS:
+            ctx.tools.register(name, spec, handler)
+        provides.append("fem.hyperelastic-nonlinear-fem")  # large-deformation TL solver
+    except Exception as exc:
+        logger.warning("kerf-fem: nonlinear_hyperelastic failed to load: %s", exc)
 
     # Register background worker
     from kerf_fem.worker import FEMWorker

@@ -3,19 +3,23 @@ kerf_fem.fracture — Fracture mechanics sub-package.
 
 Wave 12E: contact mechanics + fracture (J-integral / cohesive zone)
 Wave FEM-gaps: Paris-law crack growth + Erdogan-Sih kink angle
+Wave FEM-crack-sim: Incremental crack-propagation simulation on 2-D FEM mesh
 
 Modules
 -------
-j_integral         — J-integral (Rice 1968) path-independent contour integral
-stress_intensity   — K_I, K_II, K_III from displacement field; ASTM E399
-cohesive_zone      — Cohesive zone models (bilinear, exponential, PPR)
-crack_growth       — Paris-law da/dN integrator; Erdogan-Sih mixed-mode kink angle
-fracture_tools     — LLM tool wrappers (auto-registers on import)
-crack_growth_tools — LLM tool wrapper for fem_crack_growth
+j_integral              — J-integral (Rice 1968) path-independent contour integral
+stress_intensity        — K_I, K_II, K_III from displacement field; ASTM E399
+cohesive_zone           — Cohesive zone models (bilinear, exponential, PPR)
+crack_growth            — Paris-law da/dN integrator; Erdogan-Sih mixed-mode kink angle
+crack_growth_sim        — Incremental crack-propagation on 2-D FEM mesh (CST + DCT)
+fracture_tools          — LLM tool wrappers (auto-registers on import)
+crack_growth_tools      — LLM tool wrapper for fem_crack_growth
+crack_growth_sim_tools  — LLM tool wrapper for fem_crack_growth_simulate
 
 SIMPLIFICATION NOTICE
 ---------------------
 This package implements 2-D (plane stress/strain) fracture mechanics.
+Incremental simulation uses CST elements + displacement-correlation DCT.
 Paris-law crack growth uses geometry-factor SIF (not XFEM enrichment).
 Full XFEM (Moës-Dolbow-Belytschko 1999) is deferred to T-100-C.
 """

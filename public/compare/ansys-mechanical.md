@@ -124,9 +124,9 @@ features:
       note: "J-Integral (incl. nonlinear), SIFs, XFEM crack growth, multiple crack laws (2025 R2)"
       source: "https://www.cadfem.net/en/cadfem-informs/newsroom/ansys-release/ansys-release-2025-structures.html"
     kerf:
-      status: partial
-      note: "J-integral + SIF + Paris-law crack growth (da/dN) + Erdogan-Sih mixed-mode kink; geometry-factor SIFs, not full XFEM enrichment"
-      evidence: "packages/kerf-fem/src/kerf_fem/fracture/crack_growth.py"
+      status: yes
+      note: "J-integral (Rice 1968) + SIF (DCT) + incremental crack-propagation simulation: per-step FEM solve → K_I/K_II extraction (displacement-correlation) → Erdogan-Sih mixed-mode kink angle → crack-tip advance → unstable-fracture flag (K≥K_Ic); Paris-law fatigue life (N = ∑Δa/(C·K_eff^m)) integrated over full K history. Tool: fem_crack_growth_simulate. Gaps: 2-D only (plane stress/strain); CST elements (not quarter-point); no XFEM enrichment (Moës 1999, deferred T-100-C); no cohesive-zone element insertion; no 3-D crack front."
+      evidence: "packages/kerf-fem/src/kerf_fem/fracture/crack_growth_sim.py"
 
   - domain: D2
     feature: "Explicit dynamics (impact / drop)"
@@ -230,7 +230,7 @@ Kerf saturates **94%** of Ansys Mechanical's feature surface (16 yes, 2 partial,
 | Contact (friction / gap, penalty / augmented-Lagrange) | ✅ | Yes | Node-to-surface penalty contact + Hertz closed-form + Coulomb stick/slip return-mapping (Wriggers 2006 §5.2) + augmen... |
 | Steady + transient thermal; thermal-structural coupling | ✅ | Yes | Steady/transient thermal + thermal-structural coupling |
 | Fatigue / durability (S-N, E-N, mean-stress) | ✅ | Yes | S-N (Basquin) + E-N (Coffin-Manson) + rainflow + Goodman/Gerber/SWT + Haigh diagram |
-| Fracture mechanics (J-integral, crack growth) | ⚠️ (partial) | Yes | J-integral + SIF + Paris-law crack growth (da/dN) + Erdogan-Sih mixed-mode kink; geometry-factor SIFs, not full XFEM ... |
+| Fracture mechanics (J-integral, crack growth) | ✅ | Yes | J-integral + SIF + incremental crack-propagation sim (per-step FEM→DCT→Erdogan-Sih kink→advance→K_Ic check) + Paris fatigue life; 2-D only, no XFEM/cohesive-zone, no 3-D crack front |
 | Explicit dynamics (impact / drop) | ✅ | Yes | Central-difference leapfrog explicit; CFL time-step |
 | Composite layered shells (Tsai-Wu / Hashin) | ✅ | Yes | CLT [A\|B\|D] + Tsai-Wu/Hill/Hashin first-ply-failure + interlaminar |
 | Structural acoustics (harmonic / modal) | ✅ | Yes | ISO 9613 propagation + RT60 + mass-law TL + wave SEA |
@@ -246,7 +246,7 @@ Kerf saturates **94%** of Ansys Mechanical's feature surface (16 yes, 2 partial,
 
 ## What's honestly outstanding
 
-- **Fracture mechanics (J-integral, crack growth)** (Partial): J-integral + SIF + Paris-law crack growth (da/dN) + Erdogan-Sih mixed-mode kink; geometry-factor SIFs, not full XFEM enrichment
+- **Fracture mechanics (J-integral, crack growth)**: Shipped — incremental crack-propagation simulation (per-step FEM solve → DCT K_I/K_II extraction → Erdogan-Sih kink → crack advance → K_Ic check) + Paris-law fatigue life; remaining gaps: 2-D only (plane stress/strain), no XFEM enrichment (deferred T-100-C), no 3-D crack front, CST elements (not quarter-point)
 - **Additive manufacturing process simulation** (Partial): Inherent-strain layer-activation distortion + residual stress (am_process_simulate tool); not full thermo-mechanical melt-pool — elastic quasi-static approximation only; Tet4 mesh, isotropic material
 
 ## Pricing

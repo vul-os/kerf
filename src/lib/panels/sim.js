@@ -181,6 +181,19 @@ export default [
     label: 'FEM Contact (friction / gap / augmented-Lagrange)',
   },
 
+  // ── Fracture mechanics / crack propagation ──────────────────────────────
+  // Incremental 2-D crack propagation: CST FEM + DCT SIF + Erdogan-Sih + Paris law.
+  // Tool: fem_crack_growth_simulate (kerf-fem)
+  // Shows: crack path over body, K_I/K_II vs crack length, fatigue life N.
+  // Caveats: 2-D only; CST elements; no XFEM enrichment; no 3-D crack front.
+  {
+    id: 'crack-growth-sim',
+    kinds: ['crack_growth_sim', 'fem_crack_growth', 'fracture_sim', 'crack_propagation'],
+    exts: ['.crackgrowth', '.crackprop', '.fracture'],
+    load: () => import('./sim-wrappers/CrackGrowthWrapper.jsx'),
+    label: 'Crack Propagation (FEM / Paris / Erdogan-Sih)',
+  },
+
   // ── Plasma / gas-discharge (drift-diffusion) ─────────────────────────────
   // 1-D DC glow-discharge: electron/ion density profiles, E-field, Paschen curve.
   // Tool: plasma_discharge_simulate (kerf-cfd)

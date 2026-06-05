@@ -151,6 +151,14 @@ async def register(app: FastAPI, ctx):
         provides.append("fem.fracture-mixed-mode-kink")
     except Exception as exc:
         logger.warning("kerf-fem: crack_growth_tools failed to load: %s", exc)
+    # Incremental crack-propagation simulation (CST FEM + DCT + Erdogan-Sih + Paris)
+    try:
+        import kerf_fem.fracture.crack_growth_sim_tools as _cgst
+        for name, spec, handler in _cgst.TOOLS:
+            ctx.tools.register(name, spec, handler)
+        provides.append("fem.fracture-crack-propagation-sim")  # incremental 2-D crack growth
+    except Exception as exc:
+        logger.warning("kerf-fem: crack_growth_sim_tools failed to load: %s", exc)
     # FEM-gaps: hyperelastic materials (Neo-Hookean, Mooney-Rivlin, Ogden)
     try:
         import kerf_fem.hyperelastic.hyperelastic_tools as _ht

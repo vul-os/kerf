@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T04:46:26.021Z",
+  "generatedAt": "2026-06-05T04:54:26.180Z",
   "items": [
     {
       "slug": "revit",
@@ -13087,6 +13087,171 @@
             "evidence": "cloud/cost/should_cost.py"
           },
           "name": "Should-cost (6 processes, Boothroyd-Dewhurst)"
+        }
+      ]
+    },
+    {
+      "slug": "shapr3d",
+      "competitor": "Shapr3D",
+      "category": "cad-mechanical",
+      "left": "kerf",
+      "right": "shapr3d",
+      "hero_tagline": "Direct + history-based modeling on iPad/desktop — compared honestly against MIT open-core.",
+      "reviewed_at": "2026-06-05",
+      "features": [
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "yes",
+            "source": "https://support.shapr3d.com/hc/en-us/articles/13444210101788",
+            "notes": "Fully/under-defined sketches; dimensional + geometric constraints (5.590)"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/sketch.py",
+            "notes": "PlaneGCS WASM constraint sketcher (geometric + dimensional)"
+          },
+          "name": "Constraint sketcher (geometric + dimensional)"
+        },
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.shapr3d.com/product/3d-modeling",
+            "notes": "Extrude (to-geometry), revolve, sweep, loft (start/end continuity)"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/feature_loft.py",
+            "notes": "OCCT pad/pocket/revolve/sweep/loft (guide-rail, ruled/closed/symmetric)"
+          },
+          "name": "3D solid modeling (extrude/pocket/revolve/sweep/loft)"
+        },
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "yes",
+            "source": "https://support.shapr3d.com/hc/en-us/articles/13444210101788",
+            "notes": "Fillet with Y-shape blends, tangent edges, overflow, G1/G2 continuity"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/fillet_solid.py",
+            "notes": "Edge fillet + variable chamfer + G1/G2/G3 surface blend chains"
+          },
+          "name": "Fillet / chamfer (variable, continuity blends)"
+        },
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "yes",
+            "source": "https://support.shapr3d.com/hc/en-us/articles/14030415438748",
+            "notes": "Core experience: select + move/offset faces/edges; edit imported geometry"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/direct_edit.py",
+            "notes": "push_pull (planar + curved) + move_face + offset_face + delete_face direct-edit ops"
+          },
+          "name": "Direct modeling (move/offset face & edge)"
+        },
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.shapr3d.com/content-library/shapr3d-history-based-parametric-modeling",
+            "notes": "History-Based Parametric Modeling (out of beta 5.590, Apr 2024)"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/history/persistent_naming.py",
+            "notes": "Parametric history DAG with persistent face naming (Kripac 1997) for stable replay"
+          },
+          "name": "History-based parametric (feature tree + design intent)"
+        },
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "yes",
+            "source": "https://support.shapr3d.com/hc/en-us/articles/18763796906396",
+            "notes": "Parametric design with variables and expressions"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/sketch.py",
+            "notes": "Global parameters / equations (.equations, mathjs) drive dimensions"
+          },
+          "name": "Variables + expressions (parametric dimensions)"
+        },
+        {
+          "domain": "D8",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.shapr3d.com/product/3d-modeling",
+            "notes": "Import STEP, IGES, SLDPRT and other native formats"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/io/step_reader.py",
+            "notes": "STEP (AP203/214/242) + IGES 5.3 import"
+          },
+          "name": "STEP / IGES neutral import"
+        },
+        {
+          "domain": "D8",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.shapr3d.com/product/3d-modeling",
+            "notes": "Export X_T, STEP, STL, 3MF, DWG/DXF"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/io/step_writer.py",
+            "notes": "STEP + STL + 3MF + DXF export"
+          },
+          "name": "STEP / STL / 3MF export"
+        },
+        {
+          "domain": "D8",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.shapr3d.com/product/3d-modeling",
+            "notes": "Native Parasolid X_T export for downstream CAD"
+          },
+          "kerf": {
+            "status": "no",
+            "evidence": "",
+            "notes": "No Parasolid X_T export (requires licensed Parasolid kernel); STEP/IGES are the neutral path"
+          },
+          "name": "Parasolid (X_T) export"
+        },
+        {
+          "domain": "D11",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.shapr3d.com/product/3d-modeling",
+            "notes": "DWG/DXF 2D documentation export"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/drawings/",
+            "notes": "HLR drawing sheets (views/sections/details/title-block) + DXF"
+          },
+          "name": "2D drawings from 3D model"
+        },
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "no",
+            "source": "https://www.shapr3d.com/product/3d-modeling",
+            "notes": "Proprietary subscription; no LLM interface"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-sdk/src/kerf/",
+            "notes": "MIT open-core; chat-native modeling + JSON-RPC LLM tools + kerf-sdk"
+          },
+          "name": "Open-source core / chat-native"
         }
       ]
     },

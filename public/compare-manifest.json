@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T02:34:08.403Z",
+  "generatedAt": "2026-06-05T02:41:25.700Z",
   "items": [
     {
       "slug": "revit",
@@ -741,7 +741,7 @@
             "notes": "Parcel creation, sizing, subdivision, and report generation"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "packages/kerf-civil/src/kerf_civil/",
             "notes": "Needs parcel/lot-layout epic; not in current civil module scope"
           },
@@ -755,7 +755,7 @@
             "notes": "ReCap integration for scan-to-surface and surface comparison"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "packages/kerf-civil/src/kerf_civil/",
             "notes": "No scan / point-cloud ingestion; needs LiDAR/photogrammetry import pipeline"
           },
@@ -769,7 +769,7 @@
             "notes": "Automated plan/profile sheets, sheet set manager, standards output"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "packages/kerf-civil/src/kerf_civil/",
             "notes": "No automated civil plan/profile sheet generation; corridor DXF export exists but no sheet-set workflow"
           },

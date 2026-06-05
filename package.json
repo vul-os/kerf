@@ -54,6 +54,7 @@
     "three": "^0.160.0",
     "three-mesh-bvh": "^0.9.9",
     "tscircuit": "^0.0.1736",
+    "uplot": "^1.6.31",
     "zustand": "^5.0.2"
   },
   "devDependencies": {

@@ -11,6 +11,8 @@ Exposes the following tools to the Claude / kerf-chat tool registry:
   gdt_worst_case_stack      — 1D worst-case (arithmetic) tolerance stack-up
   gdt_rss_stack             — 1D RSS (root-sum-square) statistical stack-up
   gdt_monte_carlo_stack     — 1D Monte-Carlo tolerance stack-up + yield
+  gdt_validate_frame        — validate a canonical FCF string (ASME Y14.5-2018)
+  gdt_parse_frame           — parse a canonical FCF string into an FCF dict
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ except ImportError:
 
 from kerf_gdnt.symbols import ALL_SYMBOLS, ALL_MODIFIERS
 from kerf_gdnt.feature_control_frame import DatumReference, FeatureControlFrame
+from kerf_gdnt.validator import validate_frame, parse_canonical_frame
 from kerf_gdnt.inspection_report import (
     InspectionRow,
     InspectionReport,
@@ -828,3 +831,147 @@ def run_gdt_warn_datum_precedence(params: dict, ctx: Any) -> str:
         return ok_payload(report.to_dict())
     except Exception as exc:
         return err_payload(str(exc), "DATUM_PRECEDENCE_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# gdt_validate_frame
+# ---------------------------------------------------------------------------
+
+gdt_validate_frame_spec = ToolSpec(
+    name="gdt_validate_frame",
+    description=(
+        "Validate a canonical GD&T feature control frame string against "
+        "ASME Y14.5-2018 structural rules.\n"
+        "\n"
+        "Accepts a canonical FCF string in the form produced by "
+        "gdt_parse_frame, e.g. '[position][dia:0.05][M][A][B][C]' or the "
+        "pipe-delimited shorthand '⌖|⌀0.5|A|B|C'.\n"
+        "\n"
+        "Returns:\n"
+        "  valid          — boolean: True when no structural errors found\n"
+        "  violations     — list of human-readable error strings (empty when valid)\n"
+        "  warnings       — list of non-fatal advisory strings\n"
+        "  canonical_string — round-trip-safe canonical form of the frame\n"
+        "\n"
+        "Checks: symbol code, positive tolerance, modifier applicability "
+        "(MMC/LMC on size features only, tangent-plane on orientation only), "
+        "datum count (max 3), duplicate datums, orientation/location/runout "
+        "require datums, form tolerances prohibit datums, projected-zone "
+        "only on position.  Per ASME Y14.5-2018.\n"
+        "\n"
+        "HONEST FLAG: structural/well-formedness only.  Semantic rules "
+        "(datum exists in model, IT-grade magnitude, surface texture "
+        "compatibility) require model context not provided here."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "fcf_string": {
+                "type": "string",
+                "description": (
+                    "Canonical or shorthand FCF string.  Accepts:\n"
+                    "  • canonical form: '[symbol_code][tol][mod?][A?][B?][C?]'\n"
+                    "  • pipe shorthand: 'symbol_code|tol|mod?|A|B|C'\n"
+                    "  • Unicode shorthand: '⌖|⌀0.5|A|B|C'\n"
+                    "Example: '[position][dia:0.05][M][A][B][C]'"
+                ),
+            },
+        },
+        "required": ["fcf_string"],
+    },
+)
+
+
+def run_gdt_validate_frame(params: dict, ctx: Any) -> str:
+    """Validate a canonical FCF string; return structured validation result."""
+    fcf_string = params.get("fcf_string", "").strip()
+    if not fcf_string:
+        return err_payload("fcf_string is required", "BAD_ARGS")
+
+    try:
+        frame = parse_canonical_frame(fcf_string)
+    except ValueError as exc:
+        return ok_payload({
+            "valid": False,
+            "violations": [f"Parse error: {exc}"],
+            "warnings": [],
+            "canonical_string": None,
+        })
+
+    try:
+        result = validate_frame(frame)
+    except Exception as exc:
+        return err_payload(str(exc), "VALIDATE_ERROR")
+
+    from kerf_gdnt.validator import canonical_frame_string
+    violations = [str(e) for e in result.errors]
+    return ok_payload({
+        "valid": result.valid,
+        "violations": violations,
+        "warnings": result.warnings,
+        "canonical_string": canonical_frame_string(frame),
+    })
+
+
+# ---------------------------------------------------------------------------
+# gdt_parse_frame
+# ---------------------------------------------------------------------------
+
+gdt_parse_frame_spec = ToolSpec(
+    name="gdt_parse_frame",
+    description=(
+        "Parse a canonical GD&T feature control frame string into a structured "
+        "FCF dictionary (symbol, tolerance, modifiers, datums).\n"
+        "\n"
+        "Accepts canonical form '[symbol_code][dia:tol][mod?][A?][B?][C?]' "
+        "or a simple shorthand 'symbol_code|tol|A|B|C'.\n"
+        "\n"
+        "Returns a dict with:\n"
+        "  symbol_code        — GD&T symbol code string (e.g. 'position')\n"
+        "  tolerance_value    — numeric tolerance value (float)\n"
+        "  diameter_zone      — boolean: True when ⌀ zone applies\n"
+        "  tolerance_modifier — modifier code or null ('M'/'L'/'S'/'F'/'P'/'T')\n"
+        "  datum_refs         — list of {label, modifier?} dicts\n"
+        "  canonical_string   — round-trip canonical form\n"
+        "\n"
+        "Returns {ok:false, reason} when the string cannot be parsed."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "fcf_string": {
+                "type": "string",
+                "description": (
+                    "FCF string to parse.  Accepts canonical form or shorthand.\n"
+                    "Example: '[perpendicularity][0.1][A]' or 'flatness|0.05'"
+                ),
+            },
+        },
+        "required": ["fcf_string"],
+    },
+)
+
+
+def run_gdt_parse_frame(params: dict, ctx: Any) -> str:
+    """Parse a canonical FCF string into a structured FCF dict."""
+    fcf_string = params.get("fcf_string", "").strip()
+    if not fcf_string:
+        return err_payload("fcf_string is required", "BAD_ARGS")
+
+    try:
+        frame = parse_canonical_frame(fcf_string)
+    except ValueError as exc:
+        return err_payload(str(exc), "PARSE_ERROR")
+
+    from kerf_gdnt.validator import canonical_frame_string
+    return ok_payload({
+        "symbol_code": frame.symbol_code,
+        "tolerance_value": frame.tolerance_value,
+        "diameter_zone": frame.diameter_zone,
+        "tolerance_modifier": frame.tolerance_modifier,
+        "datum_refs": [
+            {"label": dr.label, "modifier": dr.modifier}
+            for dr in frame.datum_refs
+        ],
+        "canonical_string": canonical_frame_string(frame),
+    })

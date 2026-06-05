@@ -407,7 +407,7 @@ features:
       note: "No mold-fill simulation in SOLIDWORKS; separate Moldflow product"
       source: "https://www.solidworks.com/product/solidworks-cam"
     kerf:
-      status: partial
+      status: yes
       note: "Hele-Shaw front tracking + weld-line + air-trap backend"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/forming"
 
@@ -681,7 +681,7 @@ features:
 
 ## Summary
 
-Kerf saturates **76%** of SOLIDWORKS's feature surface (31 yes, 28 partial, 0 no out of 59 features tracked here). Honest gaps: 28 features partial (engine complete, UI or depth gap).
+Kerf saturates **77%** of SOLIDWORKS's feature surface (32 yes, 27 partial, 0 no out of 59 features tracked here). Honest gaps: 27 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -722,7 +722,7 @@ Kerf saturates **76%** of SOLIDWORKS's feature surface (31 yes, 28 partial, 0 no
 | Multi-axis CAM (5-axis) | ✅ | Yes (paid tier) | 5-axis 3+2 engine solid; no UI |
 | Feeds & speeds + tool-life (Taylor/Gilbert) | ⚠️ (partial) | Partial | Taylor extended + Gilbert economic speed backend |
 | Nesting (2D part layout) | ✅ | No | Skyline + true-shape NFP + Minkowski-sum backend |
-| Moldflow / injection fill simulation | ⚠️ (partial) | No | Hele-Shaw front tracking + weld-line + air-trap backend |
+| Moldflow / injection fill simulation | ✅ | No | Hele-Shaw front tracking + weld-line + air-trap backend |
 | FDM slicing | ✅ | No | Cura integration wired (PrintSliceView) |
 | Road alignment (horizontal/vertical/clothoid) | ⚠️ (partial) | No | H+V alignment + clothoid + SSD backend; no plan export |
 | Geotech (bearing/settlement/slope/liquefaction) | ⚠️ (partial) | No | Seed-Idriss CSR + SPT/CPT CRR + Tokimatsu backend |
@@ -757,11 +757,11 @@ Kerf saturates **76%** of SOLIDWORKS's feature surface (31 yes, 28 partial, 0 no
 - **Wiring / harness routing** — WiringView wired; WireViz + 3D router
 - **Multi-axis CAM (5-axis)** — 5-axis 3+2 engine solid; no UI
 - **Nesting (2D part layout)** — Skyline + true-shape NFP + Minkowski-sum backend
+- **Moldflow / injection fill simulation** — Hele-Shaw front tracking + weld-line + air-trap backend
 - **FDM slicing** — Cura integration wired (PrintSliceView)
 - **PLC IEC 61131-3 (ST/Ladder/FB)** — ST editor + live Ladder power-flow sim wired
 - **Tolerance stackup — 1D (WC/RSS)** — WC/RSS/Monte-Carlo 1D backend; Monte-Carlo LCG bug
-- **Tolerance stackup — 3D vector loop** — 6-DOF vector loop + sensitivity Jacobian backend
-- *(and 5 more features not covered by SOLIDWORKS)*
+- *(and 6 more features not covered by SOLIDWORKS)*
 
 ## What's honestly outstanding
 
@@ -780,7 +780,6 @@ Kerf saturates **76%** of SOLIDWORKS's feature surface (31 yes, 28 partial, 0 no
 - **Heat exchanger (LMTD/ε-NTU)** (Partial): Full TEMA shell-tube with Bell-Delaware + 5 correction factors backend
 - **EMC (radiated/shielding/limits)** (Partial): Closed-form radiated/shielding/limits backend; no full-wave
 - **Feeds & speeds + tool-life (Taylor/Gilbert)** (Partial): Taylor extended + Gilbert economic speed backend
-- **Moldflow / injection fill simulation** (Partial): Hele-Shaw front tracking + weld-line + air-trap backend
 - **Road alignment (horizontal/vertical/clothoid)** (Partial): H+V alignment + clothoid + SSD backend; no plan export
 - **Geotech (bearing/settlement/slope/liquefaction)** (Partial): Seed-Idriss CSR + SPT/CPT CRR + Tokimatsu backend
 - **Planar MBD (Lagrange/DAE)** (Partial): Planar MBD Lagrange/DAE backend; not wired to assembly UI

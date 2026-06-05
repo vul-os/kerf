@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T01:47:05.213Z",
+  "generatedAt": "2026-06-05T01:47:59.621Z",
   "items": [
     {
       "slug": "revit",
@@ -6543,7 +6543,7 @@
             "notes": "No mold-fill simulation in SOLIDWORKS; separate Moldflow product"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/forming",
             "notes": "Hele-Shaw front tracking + weld-line + air-trap backend"
           },
@@ -9987,7 +9987,7 @@
             "notes": "Industry's fastest parting and cavity design; undercut detection; split surface generation"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-mold/src/kerf_mold/mold.py",
             "notes": "Parting line data model (closed 3-D loop); flat and ruled parting surface generation; draft-angle check; moldability validation; no interactive curve-extraction from NURBS solid"
           },

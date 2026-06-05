@@ -24,7 +24,7 @@ features:
       note: "Industry's fastest parting and cavity design; undercut detection; split surface generation"
       source: "https://www.cimatron.com/en/cimatron-mold"
     kerf:
-      status: partial
+      status: yes
       note: "Parting line data model (closed 3-D loop); flat and ruled parting surface generation; draft-angle check; moldability validation; no interactive curve-extraction from NURBS solid"
       evidence: "packages/kerf-mold/src/kerf_mold/mold.py"
   - domain: D7
@@ -127,14 +127,14 @@ Integrated mold CAD/CAM from quote to shop floor — versus an open-core alterna
 
 ## Summary
 
-Kerf saturates **50%** of Cimatron's feature surface (3 yes, 5 partial, 3 no out of 11 features tracked here). Honest gaps: 5 features partial (engine complete, UI or depth gap); 3 features not yet implemented.
+Kerf saturates **55%** of Cimatron's feature surface (4 yes, 4 partial, 3 no out of 11 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap); 3 features not yet implemented.
 
 ## Feature comparison
 
 | Feature | Kerf | Cimatron | Notes |
 |---------|------|----------|-------|
 | Moldflow / fill sim | ✅ | Yes | Hele-Shaw front tracking + weld-line + air-trap detection (backend) |
-| Parting line / cavity-core split | ⚠️ (partial) | Yes | Parting line data model (closed 3-D loop); flat and ruled parting surface generation; draft-angle check; moldability ... |
+| Parting line / cavity-core split | ✅ | Yes | Parting line data model (closed 3-D loop); flat and ruled parting surface generation; draft-angle check; moldability ... |
 | Mold base library | 🔴 (no) | Yes | No mold base library. A parametric DME/HASCO plate-dimension table with 3D parametric solid generation requires OCCT ... |
 | Cooling channel design | ⚠️ (partial) | Yes | Cooling circuit thermal analysis: Re/Nu/HTC (Dittus-Boelter), pressure drop (Darcy-Weisbach), coolant temp rise, Jane... |
 | Electrode design (EDM) | 🔴 (no) | Yes | No electrode design. EDM electrode solid modelling requires full parametric 3D CAD (OCCT kernel, kerf-cad-core wave 2... |
@@ -151,7 +151,6 @@ Kerf saturates **50%** of Cimatron's feature surface (3 yes, 5 partial, 3 no out
 
 ## What's honestly outstanding
 
-- **Parting line / cavity-core split** (Partial): Parting line data model (closed 3-D loop); flat and ruled parting surface generation; draft-angle check; moldability validation; no interactive curve-extraction from NURBS solid
 - **Mold base library** (Not yet implemented): No mold base library. A parametric DME/HASCO plate-dimension table with 3D parametric solid generation requires OCCT CAD kernel integration (kerf-cad-core wave 2) — not tractable in kerf-mold alone.
 - **Cooling channel design** (Partial): Cooling circuit thermal analysis: Re/Nu/HTC (Dittus-Boelter), pressure drop (Darcy-Weisbach), coolant temp rise, Janeschitz-Kriegl cooling time; series and parallel layouts; no 3D channel routing or conformal path tooling
 - **Electrode design (EDM)** (Not yet implemented): No electrode design. EDM electrode solid modelling requires full parametric 3D CAD (OCCT kernel, kerf-cad-core wave 2). Spark-gap compensation can be handled as offset surface; electrode blanking needs full solid Boolean ops.

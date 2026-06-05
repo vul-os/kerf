@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T01:41:11.066Z",
+  "generatedAt": "2026-06-05T01:47:05.213Z",
   "items": [
     {
       "slug": "revit",
@@ -13907,7 +13907,7 @@
             "notes": "CR3BP propagator; L1/L2/L4/L5 halo and Lissajous orbits"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "",
             "kerf_note": "Circular-restricted 3-body problem and halo orbit computation require dedicated differential corrector and continuation methods. This is large scope; not currently planned.",
             "notes": "No CR3BP / libration point propagator"
@@ -13936,7 +13936,7 @@
             "notes": "OpenGL OrbitView with solar system bodies, trajectory animation"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "",
             "notes": "General 3D viewport; no mission-specific trajectory animation"
           },

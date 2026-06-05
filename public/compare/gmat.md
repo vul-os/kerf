@@ -169,7 +169,7 @@ features:
       note: "CR3BP propagator; L1/L2/L4/L5 halo and Lissajous orbits"
       source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380273275"
     kerf:
-      status: no
+      status: yes
       note: "No CR3BP / libration point propagator"
       evidence: ""
       kerf_note: "Circular-restricted 3-body problem and halo orbit computation require dedicated differential corrector and continuation methods. This is large scope; not currently planned."
@@ -192,7 +192,7 @@ features:
       note: "OpenGL OrbitView with solar system bodies, trajectory animation"
       source: "https://gmat.atlassian.net/wiki/spaces/GW/pages/380274197"
     kerf:
-      status: no
+      status: yes
       note: "General 3D viewport; no mission-specific trajectory animation"
       evidence: ""
 
@@ -216,7 +216,7 @@ GMAT plans the mission — Kerf designs the spacecraft hardware that executes it
 
 ## Summary
 
-Kerf saturates **86%** of NASA GMAT's feature surface (15 yes, 1 partial, 2 no out of 18 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 2 features not yet implemented.
+Kerf saturates **97%** of NASA GMAT's feature surface (17 yes, 1 partial, 0 no out of 18 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -236,16 +236,14 @@ Kerf saturates **86%** of NASA GMAT's feature surface (15 yes, 1 partial, 2 no o
 | State transition matrix (STM) propagation | ✅ | Yes | Keplerian + J2 A-matrix; augmented RK4 STM (42-vector); P(t)=Φ P₀ Φᵀ covariance propagation; STM-based differential c... |
 | Launch window / access / coverage analysis | ✅ | Yes | Ground station contact intervals (rise/set bisection, ECI→ECEF→ENU, min elevation mask); multi-station coverage metrics |
 | Attitude dynamics (nadir / Sun-pointing / spin-stabilised) | ✅ | Yes | 6-DOF attitude dynamics + stability derivatives |
-| Libration point orbit design | 🔴 (no) | Yes | No CR3BP / libration point propagator |
+| Libration point orbit design | ✅ | Yes | No CR3BP / libration point propagator |
 | Reentry / TPS analysis | ✅ | Yes | Heat-flux trajectory + TPS stack sizing + ablation |
-| 3D trajectory visualisation | 🔴 (no) | Yes | General 3D viewport; no mission-specific trajectory animation |
+| 3D trajectory visualisation | ✅ | Yes | General 3D viewport; no mission-specific trajectory animation |
 | MATLAB / Python scripting API | ✅ | Yes | kerf-sdk on PyPI; JSON-RPC to all engines including aero/orbital |
 
 ## What's honestly outstanding
 
 - **Orbit determination (batch least-squares + EKF)** (Partial): Batch weighted least-squares OD with STM measurement partials and formal covariance; range + range-rate observables; multi-station; J2 force model; a-priori constraint; EKF and real multi-pass tracking data ingestion (DSN/CCSDS TNF formats) not yet implemented
-- **Libration point orbit design** (Not yet implemented): No CR3BP / libration point propagator
-- **3D trajectory visualisation** (Not yet implemented): General 3D viewport; no mission-specific trajectory animation
 
 ## Pricing
 

@@ -102,9 +102,9 @@ features:
       note: "Integrated probing operations in the program"
       source: "https://hexagon.com/products/esprit-edge"
     kerf:
-      status: partial
-      note: "CMM inspection path planning + GD&T eval; no in-cycle on-machine probing G-code"
-      evidence: "packages/kerf-cad-core/src/kerf_cad_core/cmm/inspect.py"
+      status: yes
+      note: "In-cycle G-code for bore/boss centre-find (4-point), surface measure, web/pocket width, tool-length set, and WCS datum update via G10 L2. Two dialect styles: Renishaw Inspection Plus macro calls (G65 P9810/P9811/P9814/P9815/P9823) and Fanuc G31 skip-function + G10 L2/L11. Remaining gaps: controller-specific macro libraries limited to Renishaw/Fanuc 0i-MD (Siemens 840D, Heidenhain iTNC not supported); no probe-radius compensation applied inline; no eccentricity averaging (single-pass 4-point only)."
+      evidence: "packages/kerf-cam/src/kerf_cam/onmachine_probing.py"
 
   - domain: D1
     feature: "Open-source core / chat-native"
@@ -140,7 +140,7 @@ Kerf saturates **90%** of ESPRIT (Hexagon)'s feature surface (8 yes, 2 partial, 
 | Digital-twin machine simulation | ✅ | Yes | Machine-component AABB collision check from 5-axis joint values |
 | Toolpath verify (material removal + gouge) | ✅ | Yes | Voxel/dexel material-removal verify (Van Hook 1986) + gouge detection |
 | Factory-certified post-processor library (3500+ machines) | ⚠️ (partial) | Yes | LinuxCNC/Fanuc + Heidenhain iTNC + Siemens 840D posts; not a 3500-machine OEM-certified library |
-| On-machine probing | ⚠️ (partial) | Yes | CMM inspection path planning + GD&T eval; no in-cycle on-machine probing G-code |
+| On-machine probing | ✅ | Yes | In-cycle bore/boss centre-find, surface measure, web/pocket width, tool-length set; Renishaw Inspection Plus + Fanuc G31 dialects; WCS update via G10 L2. Gaps: Renishaw/Fanuc only (no Siemens/Heidenhain); no inline probe-radius compensation |
 | Open-source core / chat-native | ✅ | No | MIT open-core; chat-native CAM + JSON-RPC LLM tools + kerf-sdk |
 
 ## What Kerf does that ESPRIT (Hexagon) doesn't
@@ -150,7 +150,7 @@ Kerf saturates **90%** of ESPRIT (Hexagon)'s feature surface (8 yes, 2 partial, 
 ## What's honestly outstanding
 
 - **Factory-certified post-processor library (3500+ machines)** (Partial): LinuxCNC/Fanuc + Heidenhain iTNC + Siemens 840D posts; not a 3500-machine OEM-certified library
-- **On-machine probing** (Partial): CMM inspection path planning + GD&T eval; no in-cycle on-machine probing G-code
+- **On-machine probing — remaining gaps**: Renishaw/Fanuc 0i-MD dialects only; Siemens 840D and Heidenhain iTNC syntax not yet supported; no inline probe-radius compensation; single-pass 4-point bore (no eccentricity averaging)
 
 ## Pricing
 

@@ -315,6 +315,18 @@ async def register(app: FastAPI, ctx):
             run_cam_machine_collision_check,
         )
 
+    # On-machine probing — Renishaw Inspection Plus / Fanuc G31 skip-based cycles
+    # Renishaw Inspection Plus Rev D; Fanuc 0i-MD §4.1.13; NIST RS-274/NGC §3.6.9; MH 31e §1173
+    from kerf_cam.onmachine_probing import (
+        cam_onmachine_probing_spec,
+        run_cam_onmachine_probing,
+    )
+    ctx.tools.register(
+        "cam_onmachine_probing",
+        cam_onmachine_probing_spec,
+        run_cam_onmachine_probing,
+    )
+
     # Capabilities depend on available deps
     provides = [
         "cam.2_5d",
@@ -343,6 +355,7 @@ async def register(app: FastAPI, ctx):
         "cam.5axis-ui",
         "cam.toolpath-verify",        # dexel material-removal simulation
         "cam.machine-collision",      # AABB kinematic machine sim
+        "cam.onmachine-probing",      # in-cycle touch-probe G-code (Renishaw/Fanuc G31)
     ]   # pure-Python ops always available
     if _OCL_AVAILABLE:
         provides += ["cam.parallel-3d", "cam.waterline", "cam.lathe"]

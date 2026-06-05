@@ -32,6 +32,16 @@ export default [
     })),
   },
 
+  {
+    id: 'cam_probing',
+    kinds: ['cam_probing', 'cam_onmachine_probe'],
+    exts: ['.probe_plan'],
+    label: 'On-Machine Probing',
+    load: () => import('../../components/CAMProbingPanel.jsx').then(m => ({
+      default: withContentPassthrough(m.default),
+    })),
+  },
+
   // ── Mold / injection ─────────────────────────────────────────────────────
 
   {

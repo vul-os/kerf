@@ -39,11 +39,16 @@ const POLLINATOR_DOT = {
 }
 
 export default function PlantSchedulePanel({
-  plants = [],
-  usdaZone = 6,
+  content,
+  plants: plants_prop = [],
+  usdaZone: usdaZone_prop = 6,
   className = '',
   onDispatch,
 }) {
+  // Accept a `content` string (JSON) from the panel registry.
+  const _p = (() => { if (!content) return {}; try { return JSON.parse(content) } catch { return {} } })()
+  const plants   = _p.plants   ?? plants_prop
+  const usdaZone = _p.usdaZone ?? usdaZone_prop
   const [loading, setLoading] = useState(false)
   const [activeAction, setActiveAction] = useState(null)
   const [schedule, setSchedule] = useState(null)  // filtered catalog results

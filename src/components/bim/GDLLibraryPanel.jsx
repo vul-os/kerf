@@ -160,9 +160,12 @@ function evalGDLObject(obj, overrides = {}) {
 // Main panel
 // ---------------------------------------------------------------------------
 
-export default function GDLLibraryPanel({ onToast }) {
+export default function GDLLibraryPanel({ content, onToast }) {
+  // Accept a `content` string (JSON) from the panel registry.
+  // content.selectedId can pre-select an object; otherwise the browser opens at default.
+  const _cp = (() => { if (!content) return {}; try { return JSON.parse(content) } catch { return {} } })()
   const [filter, setFilter] = useState('All')
-  const [selectedId, setSelectedId] = useState(null)
+  const [selectedId, setSelectedId] = useState(_cp.selectedId ?? null)
   const [overrides, setOverrides] = useState({})
   const [evaluated, setEvaluated] = useState(null)
   const [showScript, setShowScript] = useState(false)

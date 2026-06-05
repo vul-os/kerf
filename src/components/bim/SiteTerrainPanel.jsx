@@ -184,9 +184,12 @@ let _nextPointId = 100
 // Main panel
 // ---------------------------------------------------------------------------
 
-export default function SiteTerrainPanel({ projectId, onToast }) {
-  const [points, setPoints] = useState(DEMO_POINTS)
-  const [proposedPoints, setProposedPoints] = useState(DEMO_PROPOSED)
+export default function SiteTerrainPanel({ content, projectId, onToast }) {
+  // Accept a `content` string (JSON) from the panel registry.
+  // content.points and content.proposedPoints can seed survey data.
+  const _cp = (() => { if (!content) return {}; try { return JSON.parse(content) } catch { return {} } })()
+  const [points, setPoints] = useState(_cp.points ?? DEMO_POINTS)
+  const [proposedPoints, setProposedPoints] = useState(_cp.proposedPoints ?? DEMO_PROPOSED)
   const [interval, setInterval] = useState(0.5)
   const [expanded, setExpanded] = useState(true)
   const [activeTab, setActiveTab] = useState('terrain')

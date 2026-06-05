@@ -52,15 +52,22 @@ const KIND_STROKE = {
 // ---------------------------------------------------------------------------
 
 export default function InteriorSpacePanel({
-  room = { name: 'Room', width_mm: 6000, depth_mm: 5000, ceiling_height_mm: 2700 },
-  items = [],
-  circPaths = [],
-  finishes = {},
+  content,
+  room: room_prop = { name: 'Room', width_mm: 6000, depth_mm: 5000, ceiling_height_mm: 2700 },
+  items: items_prop = [],
+  circPaths: circPaths_prop = [],
+  finishes: finishes_prop = {},
   svgWidth = 560,
   svgHeight = 420,
   className = '',
   onDispatch,
 }) {
+  // Accept a `content` string (JSON) from the panel registry.
+  const _p = (() => { if (!content) return {}; try { return JSON.parse(content) } catch { return {} } })()
+  const room      = _p.room      ?? room_prop
+  const items     = _p.items     ?? items_prop
+  const circPaths = _p.circPaths ?? circPaths_prop
+  const finishes  = _p.finishes  ?? finishes_prop
   const [loading, setLoading] = useState(false)
   const [activeAction, setActiveAction] = useState(null)
   const [auditResult, setAuditResult] = useState(null)

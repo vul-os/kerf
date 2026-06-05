@@ -139,8 +139,11 @@ let _nextElId = 20
 // Main panel
 // ---------------------------------------------------------------------------
 
-export default function CostEstimationPanel({ projectId, onToast }) {
-  const [elements, setElements] = useState(DEMO_ELEMENTS)
+export default function CostEstimationPanel({ content, projectId, onToast }) {
+  // Accept a `content` string (JSON) from the panel registry; content.elements
+  // can seed the initial element list.
+  const _cp = (() => { if (!content) return {}; try { return JSON.parse(content) } catch { return {} } })()
+  const [elements, setElements] = useState(_cp.elements ?? DEMO_ELEMENTS)
   const [rollup, setRollup] = useState(null)
   const [loading, setLoading] = useState(false)
   const [expanded, setExpanded] = useState(true)

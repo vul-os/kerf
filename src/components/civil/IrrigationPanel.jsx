@@ -69,16 +69,24 @@ function arcPath(cx, cy, r, arcDeg) {
 // ---------------------------------------------------------------------------
 
 export default function IrrigationPanel({
-  width_ft = 60,
-  length_ft = 40,
-  sprinklerKind = 'Hunter_PGP',
-  pattern = 'square',
-  zoneCount = 4,
+  content,
+  width_ft: width_ft_prop = 60,
+  length_ft: length_ft_prop = 40,
+  sprinklerKind: sprinklerKind_prop = 'Hunter_PGP',
+  pattern: pattern_prop = 'square',
+  zoneCount: zoneCount_prop = 4,
   svgWidth = 560,
   svgHeight = 360,
   className = '',
   onDispatch,
 }) {
+  // Accept a `content` string (JSON) from the panel registry.
+  const _p = (() => { if (!content) return {}; try { return JSON.parse(content) } catch { return {} } })()
+  const width_ft     = _p.width_ft     ?? width_ft_prop
+  const length_ft    = _p.length_ft    ?? length_ft_prop
+  const sprinklerKind = _p.sprinklerKind ?? sprinklerKind_prop
+  const pattern      = _p.pattern      ?? pattern_prop
+  const zoneCount    = _p.zoneCount    ?? zoneCount_prop
   const [loading, setLoading] = useState(false)
   const [positions, setPositions] = useState(null)
   const [sprinklerMeta, setSprinklerMeta] = useState(null)

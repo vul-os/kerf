@@ -175,8 +175,12 @@ function TaskEditor({ tasks, onChange }) {
 // Main panel
 // ---------------------------------------------------------------------------
 
-export default function ConstructionSequencingPanel({ projectId, onToast }) {
-  const [tasks, setTasks] = useState(DEMO_TASKS)
+export default function ConstructionSequencingPanel({ content, projectId, onToast }) {
+  // Accept a `content` string (JSON) from the panel registry; merge over defaults.
+  // Currently the panel is self-contained (DEMO_TASKS); content can seed
+  // an initial tasks list via content.tasks if provided.
+  const _contentParsed = (() => { if (!content) return {}; try { return JSON.parse(content) } catch { return {} } })()
+  const [tasks, setTasks] = useState(_contentParsed.tasks ?? DEMO_TASKS)
   const [queryDate, setQueryDate] = useState(today())
   const [timeline, setTimeline] = useState(null)
   const [criticalPath, setCriticalPath] = useState([])

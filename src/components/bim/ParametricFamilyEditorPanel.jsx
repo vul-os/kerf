@@ -108,8 +108,11 @@ let _nextParamId = 0, _nextFormulaId = 0
 // Main panel
 // ---------------------------------------------------------------------------
 
-export default function ParametricFamilyEditorPanel({ onToast }) {
-  const [family, setFamily] = useState(DEMO_FAMILY)
+export default function ParametricFamilyEditorPanel({ content, onToast }) {
+  // Accept a `content` string (JSON) from the panel registry.
+  // content.family can seed the initial family definition.
+  const _cp = (() => { if (!content) return {}; try { return JSON.parse(content) } catch { return {} } })()
+  const [family, setFamily] = useState(_cp.family ?? DEMO_FAMILY)
   const [nestedFamilies, setNestedFamilies] = useState(DEMO_NESTED)
   const [catalogue, setCatalogue] = useState(DEMO_CATALOGUE)
   const [selectedTypeId, setSelectedTypeId] = useState(null)

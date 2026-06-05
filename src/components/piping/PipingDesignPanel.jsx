@@ -709,7 +709,9 @@ const TABS = [
   { id: 'fittings',  label: 'B16 Fittings',  Icon: Package  },
 ]
 
-export default function PipingDesignPanel() {
+export default function PipingDesignPanel({ content }) { // eslint-disable-line no-unused-vars
+  // content is accepted for registry compatibility (JSON string); this panel
+  // is fully self-contained so content is currently not applied to state.
   const { accessToken } = useAuth()
   const [activeTab, setActiveTab] = useState('pressure')
 

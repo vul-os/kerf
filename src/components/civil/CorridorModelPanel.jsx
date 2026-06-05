@@ -335,15 +335,27 @@ function MassHaulChart({ massHaul }) {
 // ---------------------------------------------------------------------------
 
 export default function CorridorModelPanel({
-  crossSections: initialXS,
-  massHaul: initialMH,
-  earthwork: initialEW,
-  alignmentLength = 200.0,
+  content,
+  crossSections: initialXSProp,
+  massHaul: initialMHProp,
+  earthwork: initialEWProp,
+  alignmentLength: alignmentLengthProp = 200.0,
   width = 640,
   height = 400,
   className = '',
   onDispatch,
 }) {
+  // Accept a `content` string (JSON) passed by the panel registry; parse it
+  // and merge over the component's own prop defaults.  Existing direct-prop
+  // usage continues to work unchanged.
+  const _parsed = (() => {
+    if (!content) return {}
+    try { return JSON.parse(content) } catch { return {} }
+  })()
+  const initialXS = _parsed.crossSections ?? initialXSProp
+  const initialMH = _parsed.massHaul ?? initialMHProp
+  const initialEW = _parsed.earthwork ?? initialEWProp
+  const alignmentLength = _parsed.alignmentLength ?? alignmentLengthProp
   const [crossSections, setCrossSections] = useState(initialXS || null)
   const [massHaul, setMassHaul]           = useState(initialMH || null)
   const [earthwork, setEarthwork]         = useState(initialEW || null)

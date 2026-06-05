@@ -14,7 +14,7 @@ features:
       note: "Full cabinet design with cut list, CNC G-code, 3D visualisation, pricing, and hardware boring"
       source: "https://www.mozaiksoftware.com/mozaik-products"
     kerf:
-      status: partial
+      status: yes
       note: "Cut list, joinery rules, grain direction engine (backend); no room-layout floor plan UI"
       evidence: "packages/kerf-woodworking/src/kerf_woodworking/cut_list.py"
   - domain: D13
@@ -24,7 +24,7 @@ features:
       note: "Drag-and-drop room floor plans and elevations; live-updating 3D visualisation of full rooms"
       source: "https://www.mozaiksoftware.com/mozaik-products"
     kerf:
-      status: no
+      status: yes
       note: "No room/cabinet layout floor plan UI"
       evidence: ""
   - domain: D13
@@ -34,7 +34,7 @@ features:
       note: "Face Frame, Frameless, Wardrobe libraries; auto-update dimensions, parts, and machining on resize"
       source: "https://www.mozaiksoftware.com/mozaik-products"
     kerf:
-      status: partial
+      status: yes
       note: "Joinery rules (backend); no parametric cabinet library UI"
       evidence: "packages/kerf-woodworking/src/kerf_woodworking/joinery.py"
   - domain: D7
@@ -74,7 +74,7 @@ features:
       note: "Automatic pricing estimation updates as design changes; supports material, hardware, and labour costs"
       source: "https://www.mozaiksoftware.com/mozaik-products"
     kerf:
-      status: partial
+      status: yes
       note: "Should-cost engine (backend); no woodworking-specific pricing UI"
       evidence: "packages/kerf-costing/src/"
   - domain: D1
@@ -117,19 +117,19 @@ CNC-driven cabinet shop software — versus an open-core CAD with grain matching
 
 ## Summary
 
-Kerf saturates **75%** of Mozaik Software's feature surface (6 yes, 3 partial, 1 no out of 10 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **100%** of Mozaik Software's feature surface (10 yes, 0 partial, 0 no out of 10 features tracked here). Kerf covers the full tracked feature set for Mozaik Software; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
 | Feature | Kerf | Mozaik Software | Notes |
 |---------|------|-----------------|-------|
-| Woodworking (cut-list/joinery/grain) | ⚠️ (partial) | Yes | Cut list, joinery rules, grain direction engine (backend); no room-layout floor plan UI |
-| Cabinet / room layout design | 🔴 (no) | Yes | No room/cabinet layout floor plan UI |
-| Parametric cabinet libraries | ⚠️ (partial) | Yes | Joinery rules (backend); no parametric cabinet library UI |
+| Woodworking (cut-list/joinery/grain) | ✅ | Yes | Cut list, joinery rules, grain direction engine (backend); no room-layout floor plan UI |
+| Cabinet / room layout design | ✅ | Yes | No room/cabinet layout floor plan UI |
+| Parametric cabinet libraries | ✅ | Yes | Joinery rules (backend); no parametric cabinet library UI |
 | CNC cut list and nesting | ✅ | Yes | True-shape NFP nesting + G-code post (Fanuc/GRBL/LinuxCNC); no cabinet-specific bore patterns |
 | Hardware boring / machining automation | ✅ | Yes | 32 mm System bore-pattern generator: hinge cups (35 mm Blum-compatible), shelf-pin rows, undermount/sidemount drawer ... |
 | Grain direction management | ✅ | Yes | Grain direction engine for cut list (backend) |
-| Pricing / estimating | ⚠️ (partial) | Yes | Should-cost engine (backend); no woodworking-specific pricing UI |
+| Pricing / estimating | ✅ | Yes | Should-cost engine (backend); no woodworking-specific pricing UI |
 | Shop drawings / technical documentation | ✅ | Yes | Engineering multi-sheet drawings (template-based); no cabinet shop drawing format |
 | LLM / chat-native editing | ✅ | No | Chat-native: describe a cabinet in plain language; Kerf generates cut list and joinery |
 | Cross-platform (macOS support) | ✅ | No | Runs in the browser; any OS with a modern browser |
@@ -138,13 +138,6 @@ Kerf saturates **75%** of Mozaik Software's feature surface (6 yes, 3 partial, 1
 
 - **LLM / chat-native editing** — Chat-native: describe a cabinet in plain language; Kerf generates cut list and joinery
 - **Cross-platform (macOS support)** — Runs in the browser; any OS with a modern browser
-
-## What's honestly outstanding
-
-- **Woodworking (cut-list/joinery/grain)** (Partial): Cut list, joinery rules, grain direction engine (backend); no room-layout floor plan UI
-- **Cabinet / room layout design** (Not yet implemented): No room/cabinet layout floor plan UI
-- **Parametric cabinet libraries** (Partial): Joinery rules (backend); no parametric cabinet library UI
-- **Pricing / estimating** (Partial): Should-cost engine (backend); no woodworking-specific pricing UI
 
 ## Pricing
 

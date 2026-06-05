@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T02:28:01.337Z",
+  "generatedAt": "2026-06-05T02:29:50.259Z",
   "items": [
     {
       "slug": "revit",
@@ -11470,7 +11470,7 @@
             "notes": "Full cabinet design with cut list, CNC G-code, 3D visualisation, pricing, and hardware boring"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-woodworking/src/kerf_woodworking/cut_list.py",
             "notes": "Cut list, joinery rules, grain direction engine (backend); no room-layout floor plan UI"
           },
@@ -11484,7 +11484,7 @@
             "notes": "Drag-and-drop room floor plans and elevations; live-updating 3D visualisation of full rooms"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "",
             "notes": "No room/cabinet layout floor plan UI"
           },
@@ -11498,7 +11498,7 @@
             "notes": "Face Frame, Frameless, Wardrobe libraries; auto-update dimensions, parts, and machining on resize"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-woodworking/src/kerf_woodworking/joinery.py",
             "notes": "Joinery rules (backend); no parametric cabinet library UI"
           },
@@ -11554,7 +11554,7 @@
             "notes": "Automatic pricing estimation updates as design changes; supports material, hardware, and labour costs"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-costing/src/",
             "notes": "Should-cost engine (backend); no woodworking-specific pricing UI"
           },

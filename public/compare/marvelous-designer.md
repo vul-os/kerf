@@ -126,16 +126,16 @@ The industry-standard 3D cloth simulation tool — compared honestly against MIT
 
 ## Summary
 
-Kerf saturates **90%** of Marvelous Designer's feature surface (8 yes, 1 partial, 1 no out of 10 features tracked here). Honest gaps: 1 feature partial (avatar has no IK posing / AI pose / rigged character); 1 feature not yet implemented.
+Kerf saturates **85%** of Marvelous Designer's feature surface (8 yes, 1 partial, 1 no out of 10 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
 | Feature | Kerf | Marvelous Designer | Notes |
 |---------|------|--------------------|-------|
 | 2D pattern drafting (blocks, darts, seams) | ✅ | Yes | Bodice/sleeve/trouser/skirt block drafting from measurements; darts, notches, grain lines |
-| 2D → 3D garment assembly (sewing) | ✅ | Yes | garment_auto_arrange: label-driven zone classification auto-positions each 2D panel around the avatar + seam pre-attraction + mass-spring drape (Bridson 2003). Seams are pre-sim nudges; no mid-sim spring seam constraints or inter-panel collision. |
+| 2D → 3D garment assembly (sewing) | ✅ | Yes | garment_auto_arrange: label-driven zone classification (front/back/sleeve/skirt/leg) auto-positions each 2D panel aro... |
 | Cloth physics simulation (fabric weight/stretch/drape) | ✅ | Yes | Provot (1995) mass-spring-damper: structural+shear+bending springs, Rayleigh damping, sphere/plane/capsule collision ... |
-| Avatar / parametric body form | ⚠️ (partial) | Yes | CAESAR body-form + multi-panel auto-arrangement + mass-spring drape + fit-tension heatmap; no IK posing / AI pose / rigged-character |
+| Avatar / parametric body form | ⚠️ (partial) | Yes | CAESAR body-form (ISO 8559-1 landmarks, ellipsoidal cross-sections) + multi-panel auto-arrangement (garment_auto_arra... |
 | Fabric property library (weight, stiffness, friction) | ✅ | Yes | Fabric properties engine: weight, stiffness, bend, coefficient of friction |
 | Pattern grading (size run) | ✅ | Yes | ASTM D5219 + ISO 8559-2 grade rules across blocks + size-run export |
 | Garment-fit stress/strain visualization | ✅ | Yes | Mass-spring tension fields computed; no garment-on-avatar fit stress/pressure heatmap UI |
@@ -149,7 +149,7 @@ Kerf saturates **90%** of Marvelous Designer's feature surface (8 yes, 1 partial
 
 ## What's honestly outstanding
 
-- **Avatar / parametric body form** (Partial): CAESAR body-form + multi-panel auto-arrangement + mass-spring drape; no IK posing / AI pose / rigged-character / inter-panel self-collision
+- **Avatar / parametric body form** (Partial): CAESAR body-form (ISO 8559-1 landmarks, ellipsoidal cross-sections) + multi-panel auto-arrangement (garment_auto_arrange) + mass-spring drape with mesh-triangle collision (Bridson 2003) + per-vertex fit-tension heatmap. Honest gaps: no IK joint posing, no AI pose generator, no rigged/animated character, no inter-panel self-collision.
 - **Soft-body sim on rigged characters** (Not yet implemented): No rigged-character soft-body / animation cloth simulation
 
 ## Pricing

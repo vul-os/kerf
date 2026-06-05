@@ -352,7 +352,7 @@ Vectorworks spans architecture, landscape, and entertainment — Kerf spans mech
 
 ## Summary
 
-Kerf saturates **92%** of Vectorworks's feature surface (27 yes, 1 partial, 2 no out of 30 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 2 features not yet implemented.
+Kerf saturates **98%** of Vectorworks's feature surface (29 yes, 1 partial, 0 no out of 30 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -382,8 +382,8 @@ Kerf saturates **92%** of Vectorworks's feature surface (27 yes, 1 partial, 2 no
 | Curtain wall / storefront | ✅ | Yes (paid tier) | Parametric curtain wall: u/v panel grid (count/spacing/mixed), square/round mullion profiles, glass/solid/opening pan... |
 | Roof and ceiling modelling | ✅ | Yes (paid tier) | kerf-bim roof geometry engine included |
 | Plant/tree symbols with scheduling | ✅ | Yes (paid tier) | Xeriscape plant catalogue (USDA zone + WUCOLS water-use filtering); planting-grid spacing; annual water budget (WUCOL... |
-| Entertainment / theatrical lighting plot | ✅ | Yes (paid tier) | Fixture instances, DMX patch with conflict detection, circuit schedule, patch sheet + magic-sheet export; LLM tools lighting_plot_patch + lighting_dmx_check |
-| Rigging geometry and load analysis (Braceworks) | ✅ | Yes (paid tier) | Hoist reaction solver (influence-line), WLL overload flags, bridle leg tension T=W/(2cosθ), ESTA E1.6 angle warning; LLM tool rigging_load_analysis |
+| Entertainment / theatrical lighting plot | ✅ | Yes (paid tier) | kerf-entertainment: fixture instances (type/position/focus/channel/dimmer/gel), DMX universe patch with conflict dete... |
+| Rigging geometry and load analysis (Braceworks) | ✅ | Yes (paid tier) | kerf-entertainment rigging engine: simply-supported truss span analysis (influence-line superposition for n hoists), ... |
 | Visual scripting (Marionette) | ✅ | Yes | NodeGraphCanvas node editor + Marionette engine (marionette.py) |
 | Python scripting API | ✅ | Yes | kerf-sdk on PyPI; HTTP/JSON-RPC; runs on user's machine |
 | BIM quantity takeoff / materials schedule | ✅ | Yes (paid tier) | BOM panel wired; geometry-driven material quantity from assemblies |
@@ -403,7 +403,7 @@ Kerf saturates **92%** of Vectorworks's feature surface (27 yes, 1 partial, 2 no
 - **Space / room objects and area schedule** — Interior space-planning engine exists (backend only); no UI route
 - **Door and window parametric objects** — kerf-bim door/window parametric objects included
 - **Curtain wall / storefront** — Parametric curtain wall: u/v panel grid (count/spacing/mixed), square/round mullion profiles, glass/solid/opening panels, B-rep mullion+panel solids
-- *(and 4 more features not covered by Vectorworks)*
+- *(and 6 more features not covered by Vectorworks)*
 
 ## What's honestly outstanding
 

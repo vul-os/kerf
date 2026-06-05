@@ -159,7 +159,7 @@ High-end constraint-driven PCB design — compared honestly against MIT open-cor
 
 ## Summary
 
-Kerf saturates **100%** of Cadence Allegro X's feature surface tracked here (13 yes, 0 partial, 0 no out of 13 features). IC package / substrate design and the Constraint Manager spreadsheet UI are both now implemented.
+Kerf saturates **100%** of Cadence Allegro X's feature surface (13 yes, 0 partial, 0 no out of 13 features tracked here). Kerf covers the full tracked feature set for Cadence Allegro X; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -175,17 +175,13 @@ Kerf saturates **100%** of Cadence Allegro X's feature surface tracked here (13 
 | DRC / DFM checks | ✅ | Yes | Netlist DRC + ERC + DFM checklist (IPC-2221B presets) |
 | Fabrication output (Gerber / ODB++ / IPC-2581) | ✅ | Yes | Gerber RS-274X + Excellon + ODB++ + IPC-2581 + IPC-D-356A netlist |
 | Multi-board / system design | ✅ | Yes | MB3D multi-board workspace + inter-board net mapping |
-| Constraint Manager spreadsheet UI | ✅ | Yes | Editable spreadsheet grid (rows=net-classes+net overrides, cols=trace width/clearance/impedance/via type/length-match group); cell-level validation; loads/writes existing constraint engine |
-| IC package / substrate design (APD) | ✅ | Yes | Wire-bond + flip-chip package model (die, substrate, bumps/wires, BGA ball grid, net map); DRC (IPC-7094A §3, IPC-SM-785 §6, JEDEC JEP95); SVG substrate viewer |
+| Constraint Manager spreadsheet UI | ✅ | Yes | Editable spreadsheet grid (rows=net-classes+net overrides, cols=trace width/clearance/impedance/via type/length-match... |
+| IC package / substrate design (APD) | ✅ | Yes | Wire-bond and flip-chip package data model (die, substrate, bond wires/bumps, BGA ball grid, net map die-pad→ball); D... |
 | Open-source core / chat-native | ✅ | No | MIT open-core; chat-native PCB design + JSON-RPC LLM tools + kerf-sdk |
 
 ## What Kerf does that Cadence Allegro X doesn't
 
 - **Open-source core / chat-native** — MIT open-core; chat-native PCB design + JSON-RPC LLM tools + kerf-sdk
-
-## What's honestly outstanding
-
-No features outstanding for the tracked set — all 13 are now implemented.
 
 ## Pricing
 

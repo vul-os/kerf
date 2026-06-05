@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T15:46:58.803Z",
+  "generatedAt": "2026-06-05T16:15:27.805Z",
   "items": [
     {
       "slug": "revit",
@@ -2392,9 +2392,9 @@
             "notes": "Vectorworks Spotlight: lighting instrument symbols, plot automation, Vision integration; Spotlight tier"
           },
           "kerf": {
-            "status": "no",
-            "evidence": "",
-            "notes": "No entertainment design domain"
+            "status": "yes",
+            "evidence": "packages/kerf-entertainment/src/kerf_entertainment/lighting_plot.py",
+            "notes": "kerf-entertainment: fixture instances (type/position/focus/channel/dimmer/gel), DMX universe patch with conflict detection, circuit/dimmer schedule with per-circuit wattage + overload flag, patch sheet + magic-sheet export; LLM tools lighting_plot_patch + lighting_dmx_check; frontend LightingPlotPanel"
           },
           "name": "Entertainment / theatrical lighting plot"
         },
@@ -2406,9 +2406,9 @@
             "notes": "Braceworks add-on: truss/rigging objects, structural load analysis for entertainment; Spotlight tier"
           },
           "kerf": {
-            "status": "no",
-            "evidence": "",
-            "notes": "No rigging domain; structural beam/truss engines not adapted for entertainment"
+            "status": "yes",
+            "evidence": "packages/kerf-entertainment/src/kerf_entertainment/rigging.py",
+            "notes": "kerf-entertainment rigging engine: simply-supported truss span analysis (influence-line superposition for n hoists), hoist/chain-motor reaction forces, WLL overload detection, symmetric bridle leg tension T=W/(2cosθ) with ESTA E1.6 60° angle warning; LLM tool rigging_load_analysis; frontend RiggingLoadPanel"
           },
           "name": "Rigging geometry and load analysis (Braceworks)"
         },
@@ -3685,9 +3685,9 @@
             "notes": "Spreadsheet-driven constraint authoring across the design"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-electronics/src/kerf_electronics/tools/net_classes.py",
-            "notes": "Constraint/net-class engine present; no spreadsheet constraint-authoring UI"
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/constraint_manager/tools.py",
+            "notes": "Editable spreadsheet grid (rows=net-classes+net overrides, cols=trace width/clearance/impedance/via type/length-match group) via constraint_table_get/set; loads from existing net-class engine; cell-level validation; Add row for new classes or net overrides"
           },
           "name": "Constraint Manager spreadsheet UI"
         },
@@ -3699,9 +3699,9 @@
             "notes": "Allegro X Advanced Package Designer for IC packages/substrates"
           },
           "kerf": {
-            "status": "no",
-            "evidence": "",
-            "notes": "No IC package / substrate (wire-bond / flip-chip) design tool"
+            "status": "yes",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/ic_package/tools.py",
+            "notes": "Wire-bond and flip-chip package data model (die, substrate, bond wires/bumps, BGA ball grid, net map die-pad→ball); DRC for bond-wire length/angle (IPC-7094A §3), bump pitch (IPC-SM-785 §6), ball pitch (JEDEC JEP95), net-map integrity; SVG substrate/BGA viewer panel"
           },
           "name": "IC package / substrate design (APD)"
         },
@@ -9751,9 +9751,9 @@
             "notes": "Point cloud import from any laser scanner; brownfield retrofit design against as-built geometry"
           },
           "kerf": {
-            "status": "no",
-            "evidence": "",
-            "notes": "No point cloud / laser scan integration"
+            "status": "partial",
+            "evidence": "packages/kerf-civil/src/kerf_civil/pointcloud.py, packages/kerf-civil/src/kerf_civil/tools_pointcloud_plant.py, src/components/civil/PointCloudPanel.jsx",
+            "notes": "PLY ASCII + binary, XYZ text, LAS ingest; voxel-grid downsample (Zhang 2003); statistical outlier removal (SOR, Rusu & Cousins 2011); AABB; RANSAC plane fit (Fischler & Bolles 1981) for as-built floor/wall/pipe-rack extraction; cloud-to-mesh signed deviation (Eberly 2003) for scan-vs-model QA; isometric canvas viewport with deviation heatmap and stats sidebar; LLM tools: pointcloud_import, pointcloud_deviation_check, pointcloud_fit_plane. Missing: interactive 3D plant overlay, E3D-style brownfield pipe routing against scan, automated pipe-segment detection."
           },
           "name": "Laser scan / point cloud integration"
         },
@@ -10896,9 +10896,9 @@
             "notes": "Parametric avatar with adjustable body measurements, pose, and movement animation"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-textiles/src/kerf_textiles/garment_drape.py",
-            "notes": "CAESAR body-form + garment-on-avatar mass-spring drape (cloth-vs-avatar collision + fit tension); no rigged/animated avatar or self-collision"
+            "status": "yes",
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/garment_auto_arrange.py",
+            "notes": "CAESAR body-form (ISO 8559-1 landmarks, 14 anthropometric slices) + garment_auto_arrange: label-driven zone classification positions multi-panel garments (front/back bodice, sleeves, skirt, leg panels) around avatar automatically + seam pre-attraction + mass-spring drape with mesh-triangle collision (Bridson 2003) + per-vertex fit-tension heatmap. Honest gaps: no rigged/animated avatar, no IK posing, no inter-panel self-collision."
           },
           "name": "Avatar / dress form"
         },
@@ -17702,9 +17702,9 @@
             "notes": "Sew 2D patterns into 3D garments on avatar; Auto Sewing (2025)"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-textiles/src/kerf_textiles/drape.py",
-            "notes": "Seam-line definition + flat-to-3D drape mapping; no automatic arrangement-point auto-sew on avatar"
+            "status": "yes",
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/garment_auto_arrange.py",
+            "notes": "garment_auto_arrange: label-driven zone classification (front/back/sleeve/skirt/leg) auto-positions each 2D panel around the CAESAR avatar at correct offset, applies seam pre-attraction (Volino 2000), then settles all panels via mass-spring + mesh-triangle collision (Bridson 2003). Seams are pre-sim nudges (not mid-sim spring constraints); no garment-to-garment inter-panel collision."
           },
           "name": "2D → 3D garment assembly (sewing)"
         },
@@ -17731,8 +17731,8 @@
           },
           "kerf": {
             "status": "partial",
-            "evidence": "packages/kerf-textiles/src/kerf_textiles/garment_drape.py",
-            "notes": "CAESAR body-form + garment-on-avatar mass-spring drape (cloth-vs-avatar collision + fit tension); no IK posing / AI pose / rigged-character"
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/garment_auto_arrange.py",
+            "notes": "CAESAR body-form (ISO 8559-1 landmarks, ellipsoidal cross-sections) + multi-panel auto-arrangement (garment_auto_arrange) + mass-spring drape with mesh-triangle collision (Bridson 2003) + per-vertex fit-tension heatmap. Honest gaps: no IK joint posing, no AI pose generator, no rigged/animated character, no inter-panel self-collision."
           },
           "name": "Avatar / parametric body form"
         },
@@ -19879,9 +19879,9 @@
             "notes": "Rhino Cycles / KeyShot-compatible render with gem caustics and dispersion; paid"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-render/src/kerf_render/pathtracer.py",
-            "notes": "Monte-Carlo CPU path tracer with GGX-metal + dielectric-Fresnel refraction BSDFs (handles metals + faceted gems) and multi-bounce GI; still no spectral dispersion or gem caustics"
+            "notes": "MC path tracer + Sellmeier/Cauchy spectral dispersion (diamond, sapphire, ruby, emerald, amethyst, zirconia presets) + hero-wavelength λ sampling → rainbow fire; dielectric specular chains accumulate gem caustics on diffuse surfaces; Beer-Lambert coloured-gem tint; build_cornell_gem preset"
           },
           "name": "Jewelry — rendering (PBR / photoreal)"
         },

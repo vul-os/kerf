@@ -133,11 +133,11 @@ features:
 
 3D garment simulation for fashion studios — versus an open-core CAD that adds grading, cut-room automation, and engineering precision.
 
-*Last reviewed: 2026-06-05*
+*Last reviewed: 2026-05-24*
 
 ## Summary
 
-Kerf saturates **100%** of CLO Virtual Fashion CLO3D's feature surface (12 yes, 0 partial, 0 no out of 12 features tracked here). Honest gaps remaining within fully-shipped features: no rigged/animated avatar, no IK posing, no inter-panel self-collision.
+Kerf saturates **100%** of CLO Virtual Fashion CLO3D's feature surface (12 yes, 0 partial, 0 no out of 12 features tracked here). Kerf covers the full tracked feature set for CLO Virtual Fashion CLO3D; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -148,7 +148,7 @@ Kerf saturates **100%** of CLO Virtual Fashion CLO3D's feature surface (12 yes, 
 | Grading (size run) | ✅ | Yes | ASTM + EN 13402 grade rules; multi-size export (backend) |
 | Seam allowances and notches | ✅ | Yes | Per-edge seam allowances with corner mitring; notch placement |
 | Fabric drape / cloth simulation | ✅ | Yes | Provot (1995) mass-spring-damper simulator with structural + shear + bending springs, Rayleigh spring-axis damping (B... |
-| Avatar / dress form | ✅ | Yes | CAESAR body-form + garment_auto_arrange: label-driven zone classification auto-positions multi-panel garments (front/back bodice, sleeves, skirt, legs) around avatar + seam pre-attraction + mass-spring drape + fit-tension heatmap. No rigged/animated avatar or inter-panel self-collision. |
+| Avatar / dress form | ✅ | Yes | CAESAR body-form (ISO 8559-1 landmarks, 14 anthropometric slices) + garment_auto_arrange: label-driven zone classific... |
 | Fabric material library | ✅ | Yes | Fabric properties engine: weight, stiffness, coefficient of friction (backend) |
 | Cut-room nesting / marker | ✅ | Partial | Nesting marker for fabric efficiency; single-ply and multi-ply cutting orders; lay plan export |
 | e-textiles / smart garment design | ✅ | No | e-textiles module: conductive yarn routing, electrode placement, wearable circuit (backend) |
@@ -160,10 +160,6 @@ Kerf saturates **100%** of CLO Virtual Fashion CLO3D's feature surface (12 yes, 
 
 - **e-textiles / smart garment design** — e-textiles module: conductive yarn routing, electrode placement, wearable circuit (backend)
 - **LLM / chat-native editing** — Chat-native: describe the garment in plain language; Kerf drafts blocks and grades
-
-## What's honestly outstanding
-
-No partial features. Remaining depth gaps within shipped features: no rigged/animated avatar, no IK joint posing, no inter-panel cloth self-collision (each panel settles independently on avatar surface).
 
 ## Pricing
 

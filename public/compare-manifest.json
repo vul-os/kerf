@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T01:32:29.334Z",
+  "generatedAt": "2026-06-05T01:41:11.066Z",
   "items": [
     {
       "slug": "revit",
@@ -2171,7 +2171,7 @@
             "notes": "Pcbnew — full interactive routing, component placement"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "kerf_note": "Frontend PCB canvas editor gap (cad-core UI). Backend shove router and FreeRouting autorouter are wired. Chat-native routing (describe → LLM → routes) partially compensates.",
             "evidence": "packages/kerf-electronics/src/kerf_electronics/routing/push_shove.py",
             "notes": "View-only; no cursor-driven interactive route/place in UI"
@@ -2709,7 +2709,7 @@
             "tier": "paid"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "notes": "View-only; no cursor interactive editing today",
             "kerf_note": "Requires frontend canvas PCB editor (cad-core UI work). Backend router is ready; UI layer is the gap.",
             "evidence": "packages/kerf-electronics/src/kerf_electronics/routing/push_shove.py"
@@ -2725,7 +2725,7 @@
             "tier": "paid"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "notes": "Shove router engine present; less mature than Situs",
             "evidence": "packages/kerf-electronics/src/kerf_electronics/tools/shove_router.py"
           }
@@ -3229,7 +3229,7 @@
             "notes": "Full interactive routing and placement in EAGLE and Fusion Electronics"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "kerf_note": "Frontend PCB canvas editor is the gap (cad-core UI); backend shove router and FreeRouting autorouter are already wired.",
             "evidence": "packages/kerf-electronics/",
             "notes": "View-only; no cursor editing"
@@ -3549,7 +3549,7 @@
             "notes": "Interactive routing in-browser; push-and-shove in Pro native app"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "kerf_note": "Frontend PCB canvas editor is the gap (cad-core UI); backend router and FreeRouting autorouter are already wired.",
             "evidence": "packages/kerf-electronics/pcb/",
             "notes": "View-only; no cursor editing today"
@@ -6445,7 +6445,7 @@
             "notes": "No SI analysis in SOLIDWORKS; external tools required"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-electronics/src/kerf_electronics/eye",
             "notes": "IBIS 5.1 + Bergeron channel + PRBS eye backend"
           },

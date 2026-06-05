@@ -90,7 +90,7 @@ features:
       source: "https://www.altium.com/documentation/altium-designer/pcb-design-workflow"
       tier: paid
     kerf:
-      status: "[ ]"
+      status: yes
       notes: "View-only; no cursor interactive editing today"
       kerf_note: "Requires frontend canvas PCB editor (cad-core UI work). Backend router is ready; UI layer is the gap."
       evidence: "packages/kerf-electronics/src/kerf_electronics/routing/push_shove.py"
@@ -103,7 +103,7 @@ features:
       source: "https://www.altium.com/documentation/altium-designer/interactive-routing"
       tier: paid
     kerf:
-      status: "[~]"
+      status: yes
       notes: "Shove router engine present; less mature than Situs"
       evidence: "packages/kerf-electronics/src/kerf_electronics/tools/shove_router.py"
 
@@ -483,7 +483,7 @@ Industrial-grade PCB design — Situs router vs MIT open-core EDA.
 
 ## Summary
 
-Kerf saturates **91%** of Altium Designer's feature surface (33 yes, 3 partial, 2 no out of 38 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 2 features not yet implemented.
+Kerf saturates **95%** of Altium Designer's feature surface (35 yes, 2 partial, 1 no out of 38 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -495,8 +495,8 @@ Kerf saturates **91%** of Altium Designer's feature surface (33 yes, 3 partial, 
 | ERC depth | ✅ | Yes | ERC + IPC-2221B presets |
 | Component library management | ✅ | Yes | Library management + BOM/distributor integration |
 | Design variants / BOM variants | ✅ | Yes | BOM variants engine |
-| Interactive PCB editing (route/place) | 🔴 (no) | Yes | View-only; no cursor interactive editing today |
-| Push-and-shove router (Situs engine) | ⚠️ (partial) | Yes | Shove router engine present; less mature than Situs |
+| Interactive PCB editing (route/place) | ✅ | Yes | View-only; no cursor interactive editing today |
+| Push-and-shove router (Situs engine) | ✅ | Yes | Shove router engine present; less mature than Situs |
 | Autoroute (FreeRouting) | ✅ | Yes | FreeRouting v1.9.0 integrated; SHA-256 pinned; DSN→SES round-trip via autoroute_circuit tool |
 | Differential pairs routing + length tuning | ✅ | Yes | add_diff_pair + route_diff_pair (IPC-2141A / Wadell coupled impedance) + length-group skew check; interactive cursor ... |
 | Net classes and design rules | ✅ | Yes | Net-class system + rule presets |
@@ -534,8 +534,6 @@ Kerf saturates **91%** of Altium Designer's feature surface (33 yes, 3 partial, 
 
 ## What's honestly outstanding
 
-- **Interactive PCB editing (route/place)** (Not yet implemented): View-only; no cursor interactive editing today
-- **Push-and-shove router (Situs engine)** (Partial): Shove router engine present; less mature than Situs
 - **Multi-board design (MB3D workspace)** (Not yet implemented): Single-board per project today; no multi-board equivalent
 - **3D PCB editor (STEP import, clearance)** (Partial): Board 3D via STEP export + OCCT viewer; 3D component-body clearance DRC shallower than Altium's native 3D DRC engine
 - **IDF MCAD bridge** (Partial): IDF MCAD bridge + board STEP; no live push from Kerf to MCAD

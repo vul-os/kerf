@@ -329,7 +329,7 @@ features:
       note: "No SI analysis in SOLIDWORKS; external tools required"
       source: "https://help.solidworks.com/2022/english/Installation/install_guide/t_install_pcb_connector.htm"
     kerf:
-      status: partial
+      status: yes
       note: "IBIS 5.1 + Bergeron channel + PRBS eye backend"
       evidence: "packages/kerf-electronics/src/kerf_electronics/eye"
 
@@ -681,7 +681,7 @@ features:
 
 ## Summary
 
-Kerf saturates **75%** of SOLIDWORKS's feature surface (30 yes, 29 partial, 0 no out of 59 features tracked here). Honest gaps: 29 features partial (engine complete, UI or depth gap).
+Kerf saturates **76%** of SOLIDWORKS's feature surface (31 yes, 28 partial, 0 no out of 59 features tracked here). Honest gaps: 28 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -715,7 +715,7 @@ Kerf saturates **75%** of SOLIDWORKS's feature surface (30 yes, 29 partial, 0 no
 | Airfoil / wing aerodynamics (VLM) | ✅ | No | 3D wing VLM + strip viscous CD0 + PG/KT compressibility; wired |
 | Orbital mechanics (Kepler/Hohmann/Lambert) | ✅ | No | Kepler + J2/J3 + Hohmann + Lambert (multi-rev) wired |
 | Schematic capture + PCB layout | ✅ | Yes (paid tier) | Hierarchical schematic + PCB layout viewer wired in-browser |
-| Signal integrity (Z0/crosstalk/eye/IBIS) | ⚠️ (partial) | No | IBIS 5.1 + Bergeron channel + PRBS eye backend |
+| Signal integrity (Z0/crosstalk/eye/IBIS) | ✅ | No | IBIS 5.1 + Bergeron channel + PRBS eye backend |
 | EMC (radiated/shielding/limits) | ⚠️ (partial) | No | Closed-form radiated/shielding/limits backend; no full-wave |
 | Wiring / harness routing | ✅ | Yes (paid tier) | WiringView wired; WireViz + 3D router |
 | 3-axis CAM (profile/contour/pocket/face) | ✅ | Yes | CAMView wired; profile/contour/pocket/face ops |
@@ -753,6 +753,7 @@ Kerf saturates **75%** of SOLIDWORKS's feature surface (30 yes, 29 partial, 0 no
 - **Airfoil / wing aerodynamics (VLM)** — 3D wing VLM + strip viscous CD0 + PG/KT compressibility; wired
 - **Orbital mechanics (Kepler/Hohmann/Lambert)** — Kepler + J2/J3 + Hohmann + Lambert (multi-rev) wired
 - **Schematic capture + PCB layout** — Hierarchical schematic + PCB layout viewer wired in-browser
+- **Signal integrity (Z0/crosstalk/eye/IBIS)** — IBIS 5.1 + Bergeron channel + PRBS eye backend
 - **Wiring / harness routing** — WiringView wired; WireViz + 3D router
 - **Multi-axis CAM (5-axis)** — 5-axis 3+2 engine solid; no UI
 - **Nesting (2D part layout)** — Skyline + true-shape NFP + Minkowski-sum backend
@@ -760,8 +761,7 @@ Kerf saturates **75%** of SOLIDWORKS's feature surface (30 yes, 29 partial, 0 no
 - **PLC IEC 61131-3 (ST/Ladder/FB)** — ST editor + live Ladder power-flow sim wired
 - **Tolerance stackup — 1D (WC/RSS)** — WC/RSS/Monte-Carlo 1D backend; Monte-Carlo LCG bug
 - **Tolerance stackup — 3D vector loop** — 6-DOF vector loop + sensitivity Jacobian backend
-- **SPC control charts (Shewhart/CUSUM/EWMA)** — Shewhart/CUSUM/EWMA + Nelson/WECO rules backend
-- *(and 4 more features not covered by SOLIDWORKS)*
+- *(and 5 more features not covered by SOLIDWORKS)*
 
 ## What's honestly outstanding
 
@@ -778,7 +778,6 @@ Kerf saturates **75%** of SOLIDWORKS's feature surface (30 yes, 29 partial, 0 no
 - **Weldments structural framework** (Partial): Weldment profiles + cut-list engine; no full workspace
 - **CFD (internal/external flow)** (Partial): Real OpenFOAM bridge backend (needs install); no UI
 - **Heat exchanger (LMTD/ε-NTU)** (Partial): Full TEMA shell-tube with Bell-Delaware + 5 correction factors backend
-- **Signal integrity (Z0/crosstalk/eye/IBIS)** (Partial): IBIS 5.1 + Bergeron channel + PRBS eye backend
 - **EMC (radiated/shielding/limits)** (Partial): Closed-form radiated/shielding/limits backend; no full-wave
 - **Feeds & speeds + tool-life (Taylor/Gilbert)** (Partial): Taylor extended + Gilbert economic speed backend
 - **Moldflow / injection fill simulation** (Partial): Hele-Shaw front tracking + weld-line + air-trap backend

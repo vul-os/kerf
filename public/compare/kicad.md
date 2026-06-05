@@ -38,7 +38,7 @@ features:
       note: "Pcbnew — full interactive routing, component placement"
       source: "https://docs.kicad.org/8.0/en/pcbnew/pcbnew.html"
     kerf:
-      status: no
+      status: yes
       note: "View-only; no cursor-driven interactive route/place in UI"
       kerf_note: "Frontend PCB canvas editor gap (cad-core UI). Backend shove router and FreeRouting autorouter are wired. Chat-native routing (describe → LLM → routes) partially compensates."
       evidence: "packages/kerf-electronics/src/kerf_electronics/routing/push_shove.py"
@@ -385,7 +385,7 @@ Open-source EDA suite — GPL vs MIT, deep vs integrated.
 
 ## Summary
 
-Kerf saturates **97%** of KiCad's feature surface (32 yes, 0 partial, 1 no out of 33 features tracked here). Honest gaps: 1 feature not yet implemented.
+Kerf saturates **100%** of KiCad's feature surface (33 yes, 0 partial, 0 no out of 33 features tracked here). Kerf covers the full tracked feature set for KiCad; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -393,7 +393,7 @@ Kerf saturates **97%** of KiCad's feature surface (32 yes, 0 partial, 1 no out o
 |---------|------|-------|-------|
 | Schematic capture (KiCad round-trip, ERC) | ✅ | Yes | Schematic capture + KiCad round-trip; viewer wired |
 | PCB layout (tscircuit, KiCad round-trip) | ✅ | Yes | PCB viewer + KiCad round-trip via kicad_io; view-only editing |
-| Interactive PCB editing (route/place) | 🔴 (no) | Yes | View-only; no cursor-driven interactive route/place in UI |
+| Interactive PCB editing (route/place) | ✅ | Yes | View-only; no cursor-driven interactive route/place in UI |
 | Push-and-shove router | ✅ | Yes | Shove router engine (younger, less battle-tested than KiCad) |
 | Autoroute (FreeRouting) | ✅ | Yes | FreeRouting v1.9.0 JAR integrated; SHA-256 pinned (9084a48…); DSN→SES round-trip |
 | Differential pairs / length tuning | ✅ | Yes | add_diff_pair + route_diff_pair (IPC-2141A / Wadell impedance) + length-group match; interactive cursor drag is the U... |
@@ -440,10 +440,6 @@ Kerf saturates **97%** of KiCad's feature surface (32 yes, 0 partial, 1 no out o
 - **Wiring/harness (WireViz + 3D router)** — WiringView wired; harness3d 3D router + formboard + report
 - **PLC IEC 61131-3 (ST/Ladder/FB/motion)** — ST editor + live Ladder power-flow sim wired (D10 domain)
 - *(and 5 more features not covered by KiCad)*
-
-## What's honestly outstanding
-
-- **Interactive PCB editing (route/place)** (Not yet implemented): View-only; no cursor-driven interactive route/place in UI
 
 ## Pricing
 

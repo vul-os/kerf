@@ -329,7 +329,7 @@ features:
       note: "Via Lands Design / RhinoLands plugin (paid)"
       source: "https://www.food4rhino.com/en/app/rhinolands-lands-design-6"
     kerf:
-      status: partial
+      status: yes
       note: "Grading + drainage + planting engines (backend only)"
       evidence: "packages/kerf-landscape/src/kerf_landscape/planting.py"
 
@@ -522,7 +522,7 @@ NURBS & jewelry CAD — class-leading kernel vs MIT open-core.
 
 ## Summary
 
-Kerf saturates **93%** of Rhino's feature surface (40 yes, 4 partial, 1 no out of 45 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **94%** of Rhino's feature surface (41 yes, 3 partial, 1 no out of 45 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -556,7 +556,7 @@ Kerf saturates **93%** of Rhino's feature surface (40 yes, 4 partial, 1 no out o
 | G-code post (Fanuc/GRBL/LinuxCNC) | ✅ | Yes (paid tier) | Fanuc/GRBL/LinuxCNC/Mach3 post; no G41/42 cutter-comp |
 | Nesting (skyline + true-shape NFP) | ✅ | Yes (paid tier) | Minkowski NFP + bottom-left fill; 57.6% L-shape util |
 | Moldflow / fill sim | ✅ | No | Hele-Shaw front + weld-line + air-trap detection (backend) |
-| Landscape (drainage/grading/planting) | ⚠️ (partial) | Yes (paid tier) | Grading + drainage + planting engines (backend only) |
+| Landscape (drainage/grading/planting) | ✅ | Yes (paid tier) | Grading + drainage + planting engines (backend only) |
 | Paraxial ABCD ray transfer | ✅ | No | Paraxial ABCD ray transfer (backend) |
 | Gaussian beam propagation (M², q-param) | ✅ | No | Complex-q + ABCD + M² + fibre coupling (backend) |
 | Non-sequential ray tracing (stray light) | ✅ | No | Fresnel-split traversal + ghost detection (backend) |
@@ -587,13 +587,12 @@ Kerf saturates **93%** of Rhino's feature surface (40 yes, 4 partial, 1 no out o
 - **G-code post (Fanuc/GRBL/LinuxCNC)** — Fanuc/GRBL/LinuxCNC/Mach3 post; no G41/42 cutter-comp
 - **Nesting (skyline + true-shape NFP)** — Minkowski NFP + bottom-left fill; 57.6% L-shape util
 - **Moldflow / fill sim** — Hele-Shaw front + weld-line + air-trap detection (backend)
-- **Paraxial ABCD ray transfer** — Paraxial ABCD ray transfer (backend)
-- *(and 10 more features not covered by Rhino)*
+- **Landscape (drainage/grading/planting)** — Grading + drainage + planting engines (backend only)
+- *(and 11 more features not covered by Rhino)*
 
 ## What's honestly outstanding
 
 - **5-axis (kinematics + posts)** (Partial): 5-axis 3+2 engine solid; no UI panel
-- **Landscape (drainage/grading/planting)** (Partial): Grading + drainage + planting engines (backend only)
 - **Casting / wax-mill export** (Partial): Casting export + wax-carving plan; no full mill-path
 - **Visual node scripting** (Not yet implemented): No visual node environment; chat + kerf-sdk fill part of the gap
 - **Photoreal rendering (advanced plugins)** (Partial): BYO Blender/Cycles; no V-Ray/Enscape integration

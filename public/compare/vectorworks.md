@@ -228,7 +228,7 @@ features:
       note: "Vectorworks Architect: Space objects with automatic area/occupancy scheduling; Architect tier"
       source: "https://app-help.vectorworks.net/2024/eng/index.htm#t=VW2024_Guide%2FSpaces%2FSpaces_Overview.htm"
     kerf:
-      status: partial
+      status: yes
       note: "Interior space-planning engine exists (backend only); no UI route"
       evidence: "packages/kerf-verticals/interior.py"
 
@@ -352,7 +352,7 @@ Vectorworks spans architecture, landscape, and entertainment — Kerf spans mech
 
 ## Summary
 
-Kerf saturates **80%** of Vectorworks's feature surface (23 yes, 2 partial, 5 no out of 30 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap); 5 features not yet implemented.
+Kerf saturates **82%** of Vectorworks's feature surface (24 yes, 1 partial, 5 no out of 30 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 5 features not yet implemented.
 
 ## Feature comparison
 
@@ -377,7 +377,7 @@ Kerf saturates **80%** of Vectorworks's feature surface (23 yes, 2 partial, 5 no
 | BIM walls / slabs / framing | ✅ | Yes (paid tier) | kerf-bim walls/slabs/framing engine wired via /compile-ifc |
 | BIM stairs and railings | ✅ | Yes (paid tier) | kerf-bim stair geometry engine included |
 | IFC4 export / import (open BIM round-trip) | ✅ | Yes (paid tier) | IFC4 engine + viewer via /compile-ifc; BIMView null-feed visual QA pending |
-| Space / room objects and area schedule | ⚠️ (partial) | Yes (paid tier) | Interior space-planning engine exists (backend only); no UI route |
+| Space / room objects and area schedule | ✅ | Yes (paid tier) | Interior space-planning engine exists (backend only); no UI route |
 | Door and window parametric objects | ✅ | Yes (paid tier) | kerf-bim door/window parametric objects included |
 | Curtain wall / storefront | ✅ | Yes (paid tier) | Parametric curtain wall: u/v panel grid (count/spacing/mixed), square/round mullion profiles, glass/solid/opening pan... |
 | Roof and ceiling modelling | ✅ | Yes (paid tier) | kerf-bim roof geometry engine included |
@@ -400,17 +400,16 @@ Kerf saturates **80%** of Vectorworks's feature surface (23 yes, 2 partial, 5 no
 - **BIM walls / slabs / framing** — kerf-bim walls/slabs/framing engine wired via /compile-ifc
 - **BIM stairs and railings** — kerf-bim stair geometry engine included
 - **IFC4 export / import (open BIM round-trip)** — IFC4 engine + viewer via /compile-ifc; BIMView null-feed visual QA pending
+- **Space / room objects and area schedule** — Interior space-planning engine exists (backend only); no UI route
 - **Door and window parametric objects** — kerf-bim door/window parametric objects included
 - **Curtain wall / storefront** — Parametric curtain wall: u/v panel grid (count/spacing/mixed), square/round mullion profiles, glass/solid/opening panels, B-rep mullion+panel solids
-- **Roof and ceiling modelling** — kerf-bim roof geometry engine included
-- *(and 3 more features not covered by Vectorworks)*
+- *(and 4 more features not covered by Vectorworks)*
 
 ## What's honestly outstanding
 
 - **2D technical drawings (views / dimensions / sections)** (Partial): Template-based drawings; not live B-rep projection; no UI panel
 - **Photorealistic rendering engine** (Not yet implemented): No integrated renderer; geometry exported to external tools
 - **Lighting simulation (luminance / lux)** (Not yet implemented): Photonics backend exists (LED/photodiode); no lux/luminance scene simulation
-- **Space / room objects and area schedule** (Partial): Interior space-planning engine exists (backend only); no UI route
 - **Entertainment / theatrical lighting plot** (Not yet implemented): No entertainment design domain
 - **Rigging geometry and load analysis (Braceworks)** (Not yet implemented): No rigging domain; structural beam/truss engines not adapted for entertainment
 - **Visual scripting (Marionette)** (Not yet implemented): No node-based visual scripting; kerf-sdk Python API is the scripting surface

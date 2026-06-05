@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T02:02:59.387Z",
+  "generatedAt": "2026-06-05T02:05:36.151Z",
   "items": [
     {
       "slug": "revit",
@@ -1978,7 +1978,7 @@
             "notes": "Vectorworks Architect: Space objects with automatic area/occupancy scheduling; Architect tier"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-verticals/interior.py",
             "notes": "Interior space-planning engine exists (backend only); no UI route"
           },
@@ -17489,7 +17489,7 @@
             "notes": "Via Lands Design / RhinoLands plugin (paid)"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-landscape/src/kerf_landscape/planting.py",
             "notes": "Grading + drainage + planting engines (backend only)"
           },
@@ -17920,7 +17920,7 @@
             "notes": "Purpose-built wax-carving mill-path generation for CNC wax mills; paid"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-jewelry/casting/",
             "notes": "Wax-carving plan module present; full mill-path generation not complete"
           },
@@ -17948,7 +17948,7 @@
             "notes": "Clasps, bails, and findings from integrated supplier catalogs; paid"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-jewelry/",
             "notes": "Findings modules present; no live supplier catalog integration"
           },

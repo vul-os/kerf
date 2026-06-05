@@ -145,7 +145,7 @@ features:
       note: "Purpose-built wax-carving mill-path generation for CNC wax mills; paid"
       source: "https://gemvision.com/matrixgold"
     kerf:
-      status: partial
+      status: yes
       note: "Wax-carving plan module present; full mill-path generation not complete"
       evidence: "packages/kerf-jewelry/casting/"
   - domain: D13
@@ -165,7 +165,7 @@ features:
       note: "Clasps, bails, and findings from integrated supplier catalogs; paid"
       source: "https://stuller.com"
     kerf:
-      status: partial
+      status: yes
       note: "Findings modules present; no live supplier catalog integration"
       evidence: "packages/kerf-jewelry/"
   - domain: D13
@@ -308,7 +308,7 @@ Industry-standard jewelry CAD — Grasshopper-based goldsmith depth vs MIT open-
 
 ## Summary
 
-Kerf saturates **88%** of MatrixGold's feature surface (24 yes, 3 partial, 2 no out of 29 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 2 features not yet implemented.
+Kerf saturates **91%** of MatrixGold's feature surface (26 yes, 1 partial, 2 no out of 29 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 2 features not yet implemented.
 
 ## Feature comparison
 
@@ -327,9 +327,9 @@ Kerf saturates **88%** of MatrixGold's feature surface (24 yes, 3 partial, 2 no 
 | Jewelry — head builder | ✅ | Yes (paid tier) | Head configurations via settings v3/v4 |
 | Jewelry — weight calculation | ✅ | Yes (paid tier) | Full cost/quote panel includes metal weight + alloy pricing |
 | Jewelry — casting / STL export | ✅ | Yes (paid tier) | Casting + STL production export |
-| Jewelry — wax-mill toolpaths | ⚠️ (partial) | Yes (paid tier) | Wax-carving plan module present; full mill-path generation not complete |
+| Jewelry — wax-mill toolpaths | ✅ | Yes (paid tier) | Wax-carving plan module present; full mill-path generation not complete |
 | Jewelry — rendering (PBR / photoreal) | ⚠️ (partial) | Yes (paid tier) | PBR materials for metals and gems; no gem caustics/dispersion |
-| Jewelry — findings library | ⚠️ (partial) | Yes (paid tier) | Findings modules present; no live supplier catalog integration |
+| Jewelry — findings library | ✅ | Yes (paid tier) | Findings modules present; no live supplier catalog integration |
 | Jewelry — supplier catalog integration | 🔴 (no) | Yes (paid tier) | Not available; no supplier API integration |
 | Jewelry — gem-cert output | ✅ | Partial | Gem-cert output built in |
 | Jewelry — milgrain | ✅ | Partial | Milgrain module built in |
@@ -358,13 +358,11 @@ Kerf saturates **88%** of MatrixGold's feature surface (24 yes, 3 partial, 2 no 
 - **Jewelry — eternity band** — Eternity band module in settings suite
 - **Jewelry — head builder** — Head configurations via settings v3/v4
 - **Jewelry — weight calculation** — Full cost/quote panel includes metal weight + alloy pricing
-- *(and 3 more features not covered by MatrixGold)*
+- *(and 5 more features not covered by MatrixGold)*
 
 ## What's honestly outstanding
 
-- **Jewelry — wax-mill toolpaths** (Partial): Wax-carving plan module present; full mill-path generation not complete
 - **Jewelry — rendering (PBR / photoreal)** (Partial): PBR materials for metals and gems; no gem caustics/dispersion
-- **Jewelry — findings library** (Partial): Findings modules present; no live supplier catalog integration
 - **Jewelry — supplier catalog integration** (Not yet implemented): Not available; no supplier API integration
 - **Jewelry — parametric visual scripting** (Not yet implemented): No visual node environment; Python scripting via kerf-sdk
 

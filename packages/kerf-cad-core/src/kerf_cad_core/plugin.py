@@ -613,6 +613,21 @@ _TOOL_MODULES = [
     # Wave 8: B-rep HLR drawing projection (Appel 1967 QI + Markosian 1997 silhouette)
     # LLM tool: brep_to_2d_hlr
     "kerf_cad_core.drawings.tools",
+    # 2D drawings — 6-view orthographic + iso sheet (ISO 128-30 / ASME Y14.3)
+    # LLM tool: drawing_auto_views
+    "kerf_cad_core.drawings.projections",
+    # 2D drawings — measurement chain extraction + inspection report
+    # LLM tools: drawing_measurement_chain, drawing_inspection_report
+    "kerf_cad_core.drawings.measurement_chain",
+    # 2D drawings — section views (cutting plane + hatch) + detail views (magnified crop)
+    # LLM tools: drawing_section_view, drawing_detail_view, drawing_title_block
+    "kerf_cad_core.drawings.section_view",
+    # 2D drawings — oblique projection (cabinet/cavalier; Bertoline §11.5)
+    # LLM tool: drawing_oblique_projection
+    "kerf_cad_core.geom.oblique_projection",
+    # 2D drawings — silhouette + visible edge projection (NURBS / mesh)
+    # LLM tool: drawing_silhouette_projection
+    "kerf_cad_core.geom.nurbs_projection",
     # Wave 8: SDF CSG + Marching Cubes polygonizer (Lorensen-Cline 1987 / Quilez 2008)
     # LLM tool: sdf_polygonize
     "kerf_cad_core.sdf.tools",

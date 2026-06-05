@@ -14,6 +14,28 @@ export { Kerf, KerfError } from "./client.js";
 export type { RpcError, RpcResponse } from "./client.js";
 export { loadToken, loadUrl, DEFAULT_URL } from "./auth.js";
 
+// DSTV NC1 steel-fabrication export (client-side writer + panel helpers)
+export {
+  fmtNum,
+  writeNC1,
+  parseNC1Header,
+  createDefaultPanelState,
+  runClientExport,
+  downloadNC1,
+  VALID_FACES,
+  FACE_LABELS,
+} from "./dstv_nc1.js";
+export type {
+  FaceId,
+  NC1Hole,
+  NC1ContourPoint,
+  NC1Contour,
+  NC1Stamp,
+  NC1MemberSpec,
+  NC1Header,
+  DSTVExportPanelState,
+} from "./dstv_nc1.js";
+
 import { loadToken, loadUrl } from "./auth.js";
 import { Kerf } from "./client.js";
 

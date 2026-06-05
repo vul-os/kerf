@@ -10,7 +10,8 @@ Registers:
                 structural_cfs_web_crippling,
                 structural_masonry_flexure, structural_masonry_shear,
                 structural_masonry_axial,
-                structural_aci_column_axial, structural_aci_column_pm
+                structural_aci_column_axial, structural_aci_column_pm,
+                steel_export_dstv_nc1
 """
 
 from __future__ import annotations
@@ -73,6 +74,10 @@ async def register(app: FastAPI, ctx):
     ctx.tools.register("structural_aci_column_axial", aci_column_axial_spec, run_aci_column_axial)
     ctx.tools.register("structural_aci_column_pm",    aci_column_pm_spec,    run_aci_column_pm)
 
+    # DSTV NC1 steel-fabrication NC file export
+    from kerf_structural.dstv_nc1_tool import dstv_nc1_spec, run_dstv_nc1
+    ctx.tools.register("steel_export_dstv_nc1", dstv_nc1_spec, run_dstv_nc1)
+
     provides = [
         "structural.rc-beam",
         "structural.steel-beam",
@@ -90,6 +95,7 @@ async def register(app: FastAPI, ctx):
         "structural.masonry-axial",
         "structural.aci-column-axial",
         "structural.aci-column-pm",
+        "structural.dstv-nc1-export",
     ]
 
     try:

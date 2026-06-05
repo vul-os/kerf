@@ -83,8 +83,13 @@ cam_run_spec = ToolSpec(
             },
             "kinematic_family": {
                 "type": "string",
-                "enum": ["head_table"],
-                "description": "Machine kinematic family (default 'head_table': A-around-X, B-around-Y)",
+                "enum": ["head_table", "table_table", "head_head"],
+                "description": (
+                    "Machine kinematic family. "
+                    "'head_table' (default): A-around-X (table), B-around-Y (head) — e.g. Hermle C400, DMU 50. "
+                    "'table_table': A-tilt + C-rotary both on table (trunnion) — e.g. Mazak Variaxis. "
+                    "'head_head': A-nod + C-spin both on spindle head — e.g. Fidia K211."
+                ),
             },
             "use_tcp": {
                 "type": "boolean",
@@ -92,8 +97,14 @@ cam_run_spec = ToolSpec(
             },
             "post_processor_5x": {
                 "type": "string",
-                "enum": ["linuxcnc", "fanuc"],
-                "description": "Post-processor for 5-axis G-code (default 'linuxcnc')",
+                "enum": ["linuxcnc", "fanuc", "heidenhain", "siemens"],
+                "description": (
+                    "Post-processor for 5-axis G-code. "
+                    "'linuxcnc' (default): G-code with ; comments + % tape markers. "
+                    "'fanuc': N-number sequence + G43.4 RTCP (Fanuc 30i/31i). "
+                    "'heidenhain': Heidenhain dialogue (iTNC 530/TNC 640), M128 TCPM, PLANE SPATIAL for 3+2. "
+                    "'siemens': Siemens 840D sl, TRAORI for simultaneous, CYCLE800 for 3+2."
+                ),
             },
             "tool_id": {
                 "type": "string",

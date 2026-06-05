@@ -351,7 +351,8 @@ def test_unknown_post_raises():
 # ---------------------------------------------------------------------------
 
 def test_unsupported_kinematic_raises():
-    opts = PostOpts(machine_kinematic="table_table")
+    # table_table and head_head are now supported; use a truly unknown kinematic
+    opts = PostOpts(machine_kinematic="parallel_arms")
     with pytest.raises(NotImplementedError):
         emit_gcode_constant_tilt([_tilt_x(15.0)], "linuxcnc", opts)
 

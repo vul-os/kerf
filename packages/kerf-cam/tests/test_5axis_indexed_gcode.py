@@ -386,8 +386,9 @@ class TestErrors:
             emit_gcode_indexed_3_2(pts, post="mach3")
 
     def test_unsupported_kinematic_raises(self):
+        # table_table and head_head are now supported; use a truly unknown kinematic
         pts = _row_xy(3)
-        opts = PostOpts(machine_kinematic="table_table")
+        opts = PostOpts(machine_kinematic="parallel_arms")
         with pytest.raises(NotImplementedError):
             emit_gcode_indexed_3_2(pts, post="linuxcnc", opts=opts)
 

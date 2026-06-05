@@ -187,10 +187,11 @@ def emit_gcode_constant_tilt(
     # Apply tool defaults before resolving feeds.
     opts.apply_tool_defaults()
 
-    if opts.machine_kinematic not in ("head_table",):
+    _SUPPORTED_KINEMATICS = ("head_table", "table_table", "head_head")
+    if opts.machine_kinematic not in _SUPPORTED_KINEMATICS:
         raise NotImplementedError(
             f"machine_kinematic={opts.machine_kinematic!r} is not yet supported. "
-            "Only 'head_table' (A-around-X, B-around-Y) is implemented in v0.2."
+            f"Supported: {_SUPPORTED_KINEMATICS}"
         )
 
     post = post.lower().strip()
@@ -198,10 +199,27 @@ def emit_gcode_constant_tilt(
         from kerf_cam.five_axis.posts.linuxcnc_5x import emit as _emit
     elif post == "fanuc":
         from kerf_cam.five_axis.posts.fanuc_5x import emit as _emit
+    elif post in ("heidenhain", "heidenhain_tnc", "tnc640", "tnc530"):
+        from kerf_cam.five_axis.posts.heidenhain_5x import emit as _emit
+    elif post in ("siemens", "siemens_840d", "840d", "sinumerik"):
+        from kerf_cam.five_axis.posts.siemens_5x import emit as _emit
     else:
-        raise ValueError(f"Unknown post-processor {post!r}. Choose 'linuxcnc' or 'fanuc'.")
+        raise ValueError(
+            f"Unknown post-processor {post!r}. "
+            "Choose 'linuxcnc', 'fanuc', 'heidenhain', or 'siemens'."
+        )
 
-    # Compute A/B per point with continuous unwrap.
+    # Compute A/B per point using kinematics IK + continuous unwrap.
+    from kerf_cam.five_axis.kinematics import MachineConfig, inverse_kinematics
+
+    kin_config = MachineConfig(
+        kinematic=opts.machine_kinematic,
+        # Wide travel limits for angle computation — machine-specific limits
+        # should be enforced by the operator or a separate validation step.
+        a_min_deg=-360.0, a_max_deg=360.0,
+        b_min_deg=-360.0, b_max_deg=360.0,
+    )
+
     ab_pairs: list[tuple[float, float]] = []
     prev_a = 0.0
     singularity_warned = False
@@ -210,14 +228,30 @@ def emit_gcode_constant_tilt(
         i, j, k = float(pt.get("i", 0.0)), float(pt.get("j", 0.0)), float(pt.get("k", 1.0))
 
         near_singularity = abs(k) >= _SINGULARITY_COS
-        a_raw, b_deg = _axis_to_ab(i, j, k)
 
-        if near_singularity:
-            a_deg = prev_a          # hold A
-            if not singularity_warned:
-                singularity_warned = True
+        if opts.machine_kinematic == "head_table":
+            # Use the fast analytical path already in this module for head_table.
+            a_raw, b_deg = _axis_to_ab(i, j, k)
+            if near_singularity:
+                a_deg = prev_a          # hold A
+                if not singularity_warned:
+                    singularity_warned = True
+            else:
+                a_deg = _unwrap_angle(prev_a, a_raw)
         else:
-            a_deg = _unwrap_angle(prev_a, a_raw)
+            # table_table or head_head — use kinematics IK.
+            try:
+                a_deg_raw, b_deg = inverse_kinematics(i, j, k, kin_config)
+            except ValueError:
+                # IK failure (zero vector, etc.) — hold previous values.
+                a_deg_raw = prev_a
+                b_deg = ab_pairs[-1][1] if ab_pairs else 0.0
+            if near_singularity:
+                a_deg = prev_a
+                if not singularity_warned:
+                    singularity_warned = True
+            else:
+                a_deg = _unwrap_angle(prev_a, a_deg_raw)
 
         ab_pairs.append((a_deg, b_deg))
         prev_a = a_deg
@@ -225,7 +259,7 @@ def emit_gcode_constant_tilt(
     warnings: list[str] = []
     if singularity_warned:
         warnings.append(
-            "; WARNING: near-singularity detected (B≈0, tool nearly vertical). "
+            "; WARNING: near-singularity detected (tool nearly vertical). "
             "A angle held at previous value at affected points."
         )
 

@@ -59,12 +59,14 @@ const OPERATION_DEFAULTS = {
 // Map UI 5-axis strategy + axisMode → backend operation string + extra fields.
 // The backend cam_run tool (registered in kerf_cam/plugin.py) dispatches on
 // operation: '5axis_finish' for continuous and '3plus2' for indexed.
-export function fiveAxisBackendArgs(axisMode, strategy, tiltAxis, tiltAngle, leadDeg, driveFaceId, useTcp) {
+export function fiveAxisBackendArgs(axisMode, strategy, tiltAxis, tiltAngle, leadDeg, driveFaceId, useTcp, machineKinematic) {
   const driveId = driveFaceId !== '' && driveFaceId != null ? parseInt(driveFaceId, 10) : undefined
+  const kin = machineKinematic || 'head_table'
   if (axisMode === '5axis_indexed' || strategy === 'indexed_rough') {
     const args = {
       operation: '3plus2',
       indexed_op: 'face',
+      kinematic_family: kin,
     }
     if (driveId != null && !Number.isNaN(driveId)) args.drive_face_id = driveId
     return args
@@ -75,7 +77,7 @@ export function fiveAxisBackendArgs(axisMode, strategy, tiltAxis, tiltAngle, lea
   const args = {
     operation: '5axis_finish',
     tilt_deg: tilt,
-    kinematic_family: 'head_table',
+    kinematic_family: kin,
   }
   const lead = parseFloat(leadDeg)
   if (!Number.isNaN(lead) && lead !== 0) args.lead_deg = lead
@@ -136,7 +138,8 @@ export default function CAMView({ file, projectId, viewRef }) {
   const [driveFaceId, setDriveFaceId] = useState('')     // zero-based face index for drive surface
   const [useTcp, setUseTcp] = useState(false)            // G43.4 TCP mode in 5x G-code
   const [fiveAxisStrategy, setFiveAxisStrategy] = useState('contour_tilted')
-  const [post5x, setPost5x] = useState('linuxcnc')       // linuxcnc | fanuc
+  const [post5x, setPost5x] = useState('linuxcnc')       // linuxcnc | fanuc | heidenhain | siemens
+  const [machineKinematic, setMachineKinematic] = useState('head_table') // head_table | table_table | head_head
 
   const [running, setRunning] = useState(false)
   const [jobStatus, setJobStatus] = useState(null)
@@ -273,7 +276,7 @@ export default function CAMView({ file, projectId, viewRef }) {
       }
     } else {
       // 5-axis: derive backend operation + extra fields from UI state
-      const extraFields = fiveAxisBackendArgs(axisMode, fiveAxisStrategy, tiltAxis, tiltAngle, leadDeg, driveFaceId, useTcp)
+      const extraFields = fiveAxisBackendArgs(axisMode, fiveAxisStrategy, tiltAxis, tiltAngle, leadDeg, driveFaceId, useTcp, machineKinematic)
       body = {
         ...baseBody,
         ...extraFields,
@@ -690,6 +693,22 @@ export default function CAMView({ file, projectId, viewRef }) {
               </div>
             )}
 
+            {/* Machine kinematic */}
+            <div style={styles.row}>
+              <label style={styles.label}>Machine type</label>
+              <select
+                value={machineKinematic}
+                onChange={e => setMachineKinematic(e.target.value)}
+                style={styles.select}
+                disabled={running}
+                data-testid="machine-kinematic-select"
+              >
+                <option value="head_table">Head-table (A/B)</option>
+                <option value="table_table">Table-table (A/C trunnion)</option>
+                <option value="head_head">Head-head (A/C fork)</option>
+              </select>
+            </div>
+
             {/* Post-processor */}
             <div style={styles.row}>
               <label style={styles.label}>Post (5x)</label>
@@ -701,7 +720,9 @@ export default function CAMView({ file, projectId, viewRef }) {
                 data-testid="post5x-select"
               >
                 <option value="linuxcnc">LinuxCNC</option>
-                <option value="fanuc">Fanuc</option>
+                <option value="fanuc">Fanuc (G43.4)</option>
+                <option value="heidenhain">Heidenhain iTNC/TNC (M128)</option>
+                <option value="siemens">Siemens 840D (TRAORI)</option>
               </select>
             </div>
 

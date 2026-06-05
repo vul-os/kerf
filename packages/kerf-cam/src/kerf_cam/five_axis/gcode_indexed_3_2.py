@@ -114,10 +114,11 @@ def emit_gcode_indexed_3_2(
 
     opts.apply_tool_defaults()
 
-    if opts.machine_kinematic not in ("head_table",):
+    _SUPPORTED_KINEMATICS = ("head_table", "table_table", "head_head")
+    if opts.machine_kinematic not in _SUPPORTED_KINEMATICS:
         raise NotImplementedError(
             f"machine_kinematic={opts.machine_kinematic!r} is not yet supported. "
-            "Only 'head_table' (A-around-X, B-around-Y) is implemented in v0.2."
+            f"Supported: {_SUPPORTED_KINEMATICS}"
         )
 
     post = post.lower().strip()
@@ -125,8 +126,15 @@ def emit_gcode_indexed_3_2(
         from kerf_cam.five_axis.posts.linuxcnc_5x import emit_indexed_3_2 as _emit
     elif post == "fanuc":
         from kerf_cam.five_axis.posts.fanuc_5x import emit_indexed_3_2 as _emit
+    elif post in ("heidenhain", "heidenhain_tnc", "tnc640", "tnc530"):
+        from kerf_cam.five_axis.posts.heidenhain_5x import emit_indexed_3_2 as _emit
+    elif post in ("siemens", "siemens_840d", "840d", "sinumerik"):
+        from kerf_cam.five_axis.posts.siemens_5x import emit_indexed_3_2 as _emit
     else:
-        raise ValueError(f"Unknown post-processor {post!r}. Choose 'linuxcnc' or 'fanuc'.")
+        raise ValueError(
+            f"Unknown post-processor {post!r}. "
+            "Choose 'linuxcnc', 'fanuc', 'heidenhain', or 'siemens'."
+        )
 
     # Extract the single orientation (A, B) from the first CL point.
     a_deg, b_deg = _orientation_from_cl_points(cl_points)

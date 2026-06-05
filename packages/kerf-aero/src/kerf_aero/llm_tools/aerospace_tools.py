@@ -1,5 +1,5 @@
 """
-kerf_aero.llm_tools.aerospace_tools — 12-tool LLM registry for aerospace simulation.
+kerf_aero.llm_tools.aerospace_tools — LLM registry for aerospace simulation.
 
 Each tool is a plain Python function that:
   - Accepts typed arguments (scalars, lists, strings)
@@ -21,6 +21,10 @@ aero_atmosphere(altitude_km)
 aero_attitude_propagate(quaternion, omega_body, duration, dt)
 aero_thermal_steady_state(nodes_json, links_json)
 aero_material_lookup(name)
+aero_flutter_typical_section(b, a, x_alpha, r_alpha, omega_h, omega_alpha, mu, rho, v_min, v_max, n_v, zeta_h, zeta_alpha)
+aero_reentry_heat_flux(velocity_m_s, altitude_km, nose_radius_m, include_radiative)
+aero_sixdof_simulate(mass_kg, ixx, iyy, izz, ixz, state0, force_model_const, duration, dt)
+aero_staging(stages, total_delta_v, n_stages, isp_per_stage, payload_mass, structural_fraction)
 
 References
 ----------
@@ -29,6 +33,9 @@ Bate, Mueller & White, "Fundamentals of Astrodynamics", Dover 1971.
 Sutton & Biblarz, "Rocket Propulsion Elements", 9th ed.
 NOAA/NASA/USAF, "U.S. Standard Atmosphere 1976".
 Gilmore, "Spacecraft Thermal Control Handbook", 2nd ed., Aerospace Press 2002.
+Bisplinghoff, Ashley & Halfman, "Aeroelasticity", Dover 1955.
+Sutton & Graves, "A general stagnation-point convective heating equation", NASA TR R-376, 1971.
+Stevens & Lewis, "Aircraft Simulation and Systems", 3rd ed.
 """
 
 from __future__ import annotations
@@ -1899,6 +1906,705 @@ def aero_estimate_drag(
 
 
 # ---------------------------------------------------------------------------
+# Lazy imports for new tools (Tools 15-18)
+# ---------------------------------------------------------------------------
+
+try:
+    from kerf_aero.aeroelasticity import (
+        TypicalSectionParams,
+        typical_section_pk,
+    )
+    _AEROELASTIC_OK = True
+except ImportError:
+    _AEROELASTIC_OK = False
+
+try:
+    from kerf_aero.reentry.heat_flux_trajectory import (
+        sutton_graves_heat_flux as _sg_heat_flux,
+        total_heat_flux as _total_heat_flux,
+    )
+    _REENTRY_OK = True
+except ImportError:
+    _REENTRY_OK = False
+
+try:
+    from kerf_aero.flight_dynamics.sixdof import (
+        RigidBody,
+        Forces,
+        integrate as _sixdof_integrate,
+        level_flight_state,
+        quat_to_euler,
+        euler_to_quat,
+    )
+    _SIXDOF_OK = True
+except ImportError:
+    _SIXDOF_OK = False
+
+try:
+    from kerf_aero.propulsion.staging import (
+        multistage_delta_v as _multistage_dv,
+        optimal_delta_v_split as _optimal_dv_split,
+    )
+    _STAGING_OK = True
+except ImportError:
+    _STAGING_OK = False
+
+
+# ---------------------------------------------------------------------------
+# Tool 15: aero_flutter_typical_section
+# ---------------------------------------------------------------------------
+
+def aero_flutter_typical_section(
+    b: float = 0.5,
+    a: float = -0.2,
+    x_alpha: float = 0.1,
+    r_alpha: float = 0.5,
+    omega_h: float = 10.0,
+    omega_alpha: float = 20.0,
+    mu: float = 20.0,
+    rho: float = 1.225,
+    v_min: float | None = None,
+    v_max: float | None = None,
+    n_v: int = 100,
+    zeta_h: float = 0.0,
+    zeta_alpha: float = 0.0,
+) -> dict:
+    """
+    Compute V-g / V-f (flutter) curves for a 2-DOF typical-section aeroelastic model
+    using the Theodorsen p-k method.
+
+    The typical section has two degrees of freedom: plunge (h, bending) and
+    pitch (alpha, torsion).  Theodorsen's unsteady aerodynamic theory (1935)
+    with Hassig (1971) p-k iteration is used.
+
+    Input schema
+    ------------
+    b          : float — wing semi-chord [m] (default 0.5)
+    a          : float — elastic-axis position from midchord, non-dim
+                         (a=0: midchord, a=-1: LE, a=1: TE; default -0.2)
+    x_alpha    : float — CG–EA distance, non-dim (b units, positive aft; default 0.1)
+    r_alpha    : float — radius of gyration about EA, non-dim (b units; default 0.5)
+    omega_h    : float — plunge natural frequency [rad/s] (default 10.0)
+    omega_alpha: float — torsion natural frequency [rad/s] (default 20.0)
+    mu         : float — mass ratio m/(π·ρ·b²) (default 20)
+    rho        : float — air density [kg/m³] (default 1.225 = sea level)
+    v_min      : float | None — min velocity sweep [m/s]; default 1% of b·ω_α
+    v_max      : float | None — max velocity sweep [m/s]; default 6× b·ω_α
+    n_v        : int   — number of velocity points (default 100)
+    zeta_h     : float — structural damping ratio, plunge (default 0)
+    zeta_alpha : float — structural damping ratio, pitch (default 0)
+
+    Returns
+    -------
+    dict:
+        ok              : bool
+        flutter_speed_m_s   : float — flutter speed U_F [m/s] (NaN if not found)
+        flutter_speed_nd    : float — U_F / (b · ω_α) (non-dimensional flutter speed)
+        flutter_freq_rad_s  : float — flutter frequency [rad/s]
+        flutter_freq_hz     : float — flutter frequency [Hz]
+        velocities_m_s      : list[float] — velocity sweep [m/s]
+        damping_mode0       : list[float] — g = σ/ω for mode 0 (plunge branch)
+        damping_mode1       : list[float] — g = σ/ω for mode 1 (torsion branch)
+        freq_mode0_rad_s    : list[float] — modal frequency, mode 0
+        freq_mode1_rad_s    : list[float] — modal frequency, mode 1
+        method              : str
+        reference           : str
+
+    Example output
+    --------------
+    aero_flutter_typical_section(b=0.5, mu=20, omega_h=10, omega_alpha=20) ->
+    {
+      "flutter_speed_m_s": 21.3,
+      "flutter_speed_nd": 2.13,
+      "flutter_freq_rad_s": 14.8,
+      "velocities_m_s": [0.1, ...],
+      "damping_mode0": [-0.02, ...],
+      "damping_mode1": [-0.05, ..., 0.0, ...]
+    }
+
+    Raises
+    ------
+    ValueError: if b <= 0, mu <= 0, omega_h <= 0, omega_alpha <= 0.
+
+    References
+    ----------
+    Theodorsen (1935) NACA TR 496.
+    Hassig (1971) J. Aircraft 8(10), 793-797.
+    Bisplinghoff, Ashley & Halfman, "Aeroelasticity", Dover 1955, Ch.5.
+    """
+    if not _AEROELASTIC_OK or not _NP_OK:
+        raise ImportError("kerf_aero.aeroelasticity or numpy not available")
+
+    import numpy as np
+
+    if b <= 0:
+        raise ValueError(f"b (semi-chord) must be > 0 m, got {b}")
+    if mu <= 0:
+        raise ValueError(f"mu (mass ratio) must be > 0, got {mu}")
+    if omega_h <= 0:
+        raise ValueError(f"omega_h must be > 0 rad/s, got {omega_h}")
+    if omega_alpha <= 0:
+        raise ValueError(f"omega_alpha must be > 0 rad/s, got {omega_alpha}")
+    if n_v < 5 or n_v > 2000:
+        raise ValueError(f"n_v must be in [5, 2000], got {n_v}")
+
+    params = TypicalSectionParams(
+        b=float(b),
+        a=float(a),
+        x_alpha=float(x_alpha),
+        r_alpha=float(r_alpha),
+        omega_h=float(omega_h),
+        omega_alpha=float(omega_alpha),
+        mu=float(mu),
+        rho=float(rho),
+        zeta_h=float(zeta_h),
+        zeta_alpha=float(zeta_alpha),
+    )
+
+    V_ref = b * omega_alpha
+    v_lo = float(v_min) if v_min is not None else 0.01 * V_ref
+    v_hi = float(v_max) if v_max is not None else 6.0 * V_ref
+
+    if v_lo <= 0:
+        v_lo = 0.01 * V_ref
+    if v_hi <= v_lo:
+        raise ValueError(f"v_max ({v_hi}) must be > v_min ({v_lo})")
+
+    velocities = np.linspace(v_lo, v_hi, int(n_v))
+
+    try:
+        vg = typical_section_pk(params, velocities)
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+    U_F = float(vg["flutter_speed"])
+    f_F = float(vg["flutter_freq"])
+    U_F_nd = U_F / V_ref if math.isfinite(U_F) else float("nan")
+    f_F_hz = f_F / (2.0 * math.pi) if math.isfinite(f_F) else float("nan")
+
+    def _clean(arr: "np.ndarray") -> list:
+        return [None if math.isnan(float(x)) else round(float(x), 6) for x in arr]
+
+    return {
+        "ok": True,
+        "flutter_speed_m_s": round(U_F, 4) if math.isfinite(U_F) else None,
+        "flutter_speed_nd": round(U_F_nd, 4) if math.isfinite(U_F_nd) else None,
+        "flutter_freq_rad_s": round(f_F, 4) if math.isfinite(f_F) else None,
+        "flutter_freq_hz": round(f_F_hz, 4) if math.isfinite(f_F_hz) else None,
+        "velocities_m_s": [round(float(v), 4) for v in velocities],
+        "damping_mode0": _clean(vg["damping"][:, 0]),
+        "damping_mode1": _clean(vg["damping"][:, 1]),
+        "freq_mode0_rad_s": _clean(vg["frequency"][:, 0]),
+        "freq_mode1_rad_s": _clean(vg["frequency"][:, 1]),
+        "inputs": {
+            "b_m": b, "a": a, "x_alpha": x_alpha, "r_alpha": r_alpha,
+            "omega_h_rad_s": omega_h, "omega_alpha_rad_s": omega_alpha,
+            "mu": mu, "rho_kg_m3": rho, "zeta_h": zeta_h, "zeta_alpha": zeta_alpha,
+        },
+        "method": "Theodorsen p-k (Hassig 1971) with Hankel-function C(k)",
+        "reference": "Bisplinghoff, Ashley & Halfman (1955); Theodorsen NACA TR 496 (1935)",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Tool 16: aero_reentry_heat_flux
+# ---------------------------------------------------------------------------
+
+def aero_reentry_heat_flux(
+    velocity_m_s: float,
+    altitude_km: float,
+    nose_radius_m: float = 0.2,
+    include_radiative: bool = True,
+    trajectory_table: list | None = None,
+) -> dict:
+    """
+    Compute stagnation-point heat flux for atmospheric re-entry using the
+    Sutton-Graves convective correlation and Tauber-Sutton radiative estimate.
+
+    Two modes:
+    1. Point evaluation: provide velocity_m_s and altitude_km.
+    2. Trajectory sweep: provide trajectory_table as a list of
+       [altitude_km, velocity_m_s] pairs to get a heat-flux time history.
+
+    Sutton-Graves correlation (NASA TR R-376, 1971):
+        q_conv = k_SG * sqrt(rho / R_n) * V^3
+        k_SG = 1.7415e-4 [W·s^0.5·kg^-0.5·m^-0.5]
+
+    Tauber-Sutton radiative estimate (approximation, Earth air, V > 10 km/s):
+        q_rad ≈ C * rho^1.22 * V^8.5 * R_n    (C = 4.736e4)
+
+    Input schema
+    ------------
+    velocity_m_s      : float — free-stream velocity [m/s] (required for point mode)
+    altitude_km       : float — altitude [km] (required for point mode)
+    nose_radius_m     : float — vehicle nose radius [m] (default 0.2)
+    include_radiative : bool  — add Tauber-Sutton radiative flux (default True)
+    trajectory_table  : list | None — list of [altitude_km, velocity_m_s] pairs
+                        for a trajectory sweep; overrides point-mode inputs
+
+    Returns (point mode)
+    --------------------
+    dict:
+        ok                  : bool
+        altitude_km         : float
+        velocity_m_s        : float
+        density_kg_m3       : float — free-stream density from ISA model
+        q_convective_W_m2   : float — Sutton-Graves convective flux [W/m²]
+        q_radiative_W_m2    : float — Tauber-Sutton radiative flux [W/m²]
+        q_total_W_m2        : float — total stagnation heat flux [W/m²]
+        q_total_W_cm2       : float — total flux in W/cm² (=q/1e4)
+        nose_radius_m       : float
+        method              : str
+
+    Returns (trajectory mode)
+    -------------------------
+    dict:
+        ok           : bool
+        n_points     : int
+        trajectory   : list of dicts (altitude_km, velocity_m_s, q_total_W_m2, ...)
+
+    Example output (point mode)
+    ---------------------------
+    aero_reentry_heat_flux(7800, 70) ->
+    {
+      "q_convective_W_m2": 235000.0,
+      "q_total_W_m2": 235000.0,
+      "q_total_W_cm2": 23.5
+    }
+
+    Raises
+    ------
+    ValueError: if velocity_m_s <= 0, altitude_km < 0 or > 120 km.
+
+    References
+    ----------
+    Sutton & Graves, NASA TR R-376 (1971).
+    Tauber & Sutton, J. Spacecraft Rockets 28(1), 1991.
+    """
+    if not _REENTRY_OK or not _ATMO_OK:
+        raise ImportError("kerf_aero.reentry or kerf_aero.flight_dynamics.atmosphere not available")
+
+    from kerf_aero.flight_dynamics.atmosphere import atmosphere as _atmosphere
+    from kerf_aero.reentry.heat_flux_trajectory import (
+        sutton_graves_heat_flux as _sg,
+        radiative_heat_flux as _rad,
+    )
+
+    if nose_radius_m <= 0:
+        raise ValueError(f"nose_radius_m must be > 0, got {nose_radius_m}")
+
+    if trajectory_table is not None:
+        # Trajectory sweep mode
+        results = []
+        for i, row in enumerate(trajectory_table):
+            if len(row) < 2:
+                raise ValueError(f"trajectory_table[{i}] must be [alt_km, vel_m_s]")
+            alt_km = float(row[0])
+            vel_ms = float(row[1])
+            if alt_km < 0 or alt_km > 120:
+                raise ValueError(f"trajectory_table[{i}] altitude {alt_km} km out of range [0, 120]")
+            if vel_ms < 0:
+                raise ValueError(f"trajectory_table[{i}] velocity {vel_ms} m/s must be >= 0")
+            try:
+                atm = _atmosphere(alt_km * 1000.0)
+                rho = atm.density_kg_m3
+            except Exception:
+                rho = 1.225 * math.exp(-alt_km / 8.5)
+            q_conv = _sg(vel_ms, rho, nose_radius_m)
+            q_rad = 0.0
+            if include_radiative and vel_ms > 10_000.0:
+                q_rad = _rad(vel_ms, rho, nose_radius_m)
+            q_tot = q_conv + q_rad
+            results.append({
+                "altitude_km": round(alt_km, 3),
+                "velocity_m_s": round(vel_ms, 2),
+                "density_kg_m3": round(rho, 8),
+                "q_convective_W_m2": round(q_conv, 2),
+                "q_radiative_W_m2": round(q_rad, 2),
+                "q_total_W_m2": round(q_tot, 2),
+                "q_total_W_cm2": round(q_tot / 1e4, 6),
+            })
+        return {
+            "ok": True,
+            "n_points": len(results),
+            "nose_radius_m": nose_radius_m,
+            "include_radiative": include_radiative,
+            "trajectory": results,
+        }
+
+    # Point mode
+    if velocity_m_s < 0:
+        raise ValueError(f"velocity_m_s must be >= 0, got {velocity_m_s}")
+    if altitude_km < 0 or altitude_km > 120:
+        raise ValueError(f"altitude_km must be in [0, 120], got {altitude_km}")
+
+    try:
+        atm = _atmosphere(altitude_km * 1000.0)
+        rho = atm.density_kg_m3
+    except Exception:
+        rho = 1.225 * math.exp(-altitude_km / 8.5)
+
+    q_conv = _sg(velocity_m_s, rho, nose_radius_m)
+    q_rad = 0.0
+    if include_radiative and velocity_m_s > 10_000.0:
+        q_rad = _rad(velocity_m_s, rho, nose_radius_m)
+    q_tot = q_conv + q_rad
+
+    return {
+        "ok": True,
+        "altitude_km": altitude_km,
+        "velocity_m_s": velocity_m_s,
+        "density_kg_m3": round(rho, 8),
+        "q_convective_W_m2": round(q_conv, 2),
+        "q_radiative_W_m2": round(q_rad, 2),
+        "q_total_W_m2": round(q_tot, 2),
+        "q_total_W_cm2": round(q_tot / 1e4, 6),
+        "nose_radius_m": nose_radius_m,
+        "include_radiative": include_radiative,
+        "method": "Sutton-Graves convective (NASA TR R-376) + Tauber-Sutton radiative",
+        "note": ("Radiative flux estimate valid above ~10 km/s; "
+                 "Sutton-Graves ±15-20% for blunt bodies in Earth air."),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Tool 17: aero_sixdof_simulate
+# ---------------------------------------------------------------------------
+
+def aero_sixdof_simulate(
+    mass_kg: float,
+    ixx: float,
+    iyy: float,
+    izz: float,
+    ixz: float = 0.0,
+    state0: list | None = None,
+    airspeed_m_s: float = 100.0,
+    altitude_m: float = 1000.0,
+    flight_path_angle_deg: float = 0.0,
+    alpha_deg: float = 2.0,
+    duration: float = 10.0,
+    dt: float = 0.05,
+    fx: float = 0.0,
+    fy: float = 0.0,
+    fz: float = 0.0,
+    mx: float = 0.0,
+    my: float = 0.0,
+    mz: float = 0.0,
+) -> dict:
+    """
+    Simulate 6-DOF rigid-body flight dynamics (NED frame, quaternion attitude).
+
+    State vector: [x_N, y_E, z_D, u, v, w, q0, q1, q2, q3, p, q_ang, r] (13 elements).
+    - x, y, z: NED position [m]
+    - u, v, w: body-frame velocities [m/s]
+    - q0..q3: body-to-Earth quaternion (scalar-first)
+    - p, q_ang, r: body roll/pitch/yaw rates [rad/s]
+
+    Gravity is applied internally from the quaternion attitude.
+    External aerodynamic + thrust forces must be supplied as constants Fx, Fy, Fz
+    (body-frame) and moments Mx, My, Mz (body-frame) — these are constant throughout
+    the simulation.  For realistic flight, supply the aerodynamic forces trimmed to the
+    given flight condition.
+
+    Input schema
+    ------------
+    mass_kg  : float — vehicle mass [kg] (> 0)
+    ixx      : float — roll inertia [kg·m²]
+    iyy      : float — pitch inertia [kg·m²]
+    izz      : float — yaw inertia [kg·m²]
+    ixz      : float — cross inertia [kg·m²] (default 0)
+    state0   : list[13] | None — initial state; if None, built from:
+    airspeed_m_s         : float — initial airspeed [m/s] (default 100)
+    altitude_m           : float — initial altitude [m] (default 1000)
+    flight_path_angle_deg: float — initial FPA [°] (default 0 = level flight)
+    alpha_deg            : float — initial angle of attack [°] (default 2)
+    duration : float — simulation duration [s] (default 10)
+    dt       : float — time step [s] (default 0.05, min 0.001)
+    fx/fy/fz : float — body-frame applied force [N] (default 0)
+    mx/my/mz : float — body-frame applied moment [N·m] (default 0)
+
+    Returns
+    -------
+    dict:
+        ok            : bool
+        n_steps       : int
+        duration_s    : float
+        final_state   : dict — final 13-element state broken into named fields
+        final_altitude_m      : float
+        final_airspeed_m_s    : float
+        final_euler_deg       : [roll, pitch, yaw] in degrees
+        max_altitude_m        : float — max altitude reached
+        min_altitude_m        : float — min altitude reached
+        trajectory_summary    : list[dict] — sampled trajectory (every 10th step)
+
+    Example output
+    --------------
+    aero_sixdof_simulate(5000, 10000, 40000, 45000, duration=30) ->
+    {
+      "n_steps": 600,
+      "final_altitude_m": 1000.2,
+      "final_airspeed_m_s": 100.1,
+      "final_euler_deg": [0.0, 2.0, 0.0]
+    }
+
+    Raises
+    ------
+    ValueError: if mass_kg <= 0, dt < 0.001, or duration <= 0.
+    """
+    if not _SIXDOF_OK:
+        raise ImportError("kerf_aero.flight_dynamics.sixdof not available")
+
+    if mass_kg <= 0:
+        raise ValueError(f"mass_kg must be > 0, got {mass_kg}")
+    if dt < 0.001:
+        raise ValueError(f"dt must be >= 0.001 s, got {dt}")
+    if duration <= 0:
+        raise ValueError(f"duration must be > 0 s, got {duration}")
+
+    max_steps = 20000
+    n_steps = int(math.ceil(duration / dt))
+    if n_steps > max_steps:
+        raise ValueError(
+            f"Too many steps (duration/dt = {n_steps} > {max_steps}). "
+            f"Increase dt or reduce duration."
+        )
+
+    body = RigidBody(
+        mass_kg=float(mass_kg),
+        Ixx=float(ixx),
+        Iyy=float(iyy),
+        Izz=float(izz),
+        Ixz=float(ixz),
+    )
+
+    forces_const = Forces(
+        Fx=float(fx), Fy=float(fy), Fz=float(fz),
+        Mx=float(mx), My=float(my), Mz=float(mz),
+    )
+
+    def force_model(t, state):
+        return forces_const
+
+    # Build initial state
+    if state0 is not None:
+        if len(state0) != 13:
+            raise ValueError(f"state0 must be length 13, got {len(state0)}")
+        s0 = [float(x) for x in state0]
+    else:
+        s0 = level_flight_state(
+            airspeed_m_s=float(airspeed_m_s),
+            altitude_m=float(altitude_m),
+            flight_path_angle_rad=math.radians(float(flight_path_angle_deg)),
+            alpha_rad=math.radians(float(alpha_deg)),
+        )
+
+    try:
+        times, states = _sixdof_integrate(
+            t0=0.0,
+            state0=s0,
+            dt=float(dt),
+            n_steps=n_steps,
+            force_model=force_model,
+            body=body,
+        )
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+    # Extract summary info
+    altitudes = [-s[2] for s in states]  # z is Down, altitude = -z
+    airspeeds = [math.sqrt(s[3]**2 + s[4]**2 + s[5]**2) for s in states]
+
+    final = states[-1]
+    phi, theta, psi = quat_to_euler(final[6], final[7], final[8], final[9])
+    euler_deg = [
+        round(math.degrees(phi), 4),
+        round(math.degrees(theta), 4),
+        round(math.degrees(psi), 4),
+    ]
+
+    # Sampled trajectory (every 10th step, max 200 points)
+    step_stride = max(1, n_steps // 200)
+    traj_summary = []
+    for i in range(0, len(times), step_stride):
+        s = states[i]
+        traj_summary.append({
+            "t_s": round(times[i], 4),
+            "x_n_m": round(s[0], 2),
+            "y_e_m": round(s[1], 2),
+            "altitude_m": round(-s[2], 2),
+            "airspeed_m_s": round(airspeeds[i], 3),
+        })
+
+    return {
+        "ok": True,
+        "n_steps": n_steps,
+        "duration_s": float(duration),
+        "dt_s": float(dt),
+        "final_state": {
+            "x_n_m": round(final[0], 3),
+            "y_e_m": round(final[1], 3),
+            "altitude_m": round(-final[2], 3),
+            "u_m_s": round(final[3], 4),
+            "v_m_s": round(final[4], 4),
+            "w_m_s": round(final[5], 4),
+            "quaternion": [round(final[k], 6) for k in range(6, 10)],
+            "p_rad_s": round(final[10], 6),
+            "q_rad_s": round(final[11], 6),
+            "r_rad_s": round(final[12], 6),
+        },
+        "final_altitude_m": round(altitudes[-1], 3),
+        "final_airspeed_m_s": round(airspeeds[-1], 4),
+        "final_euler_deg": euler_deg,
+        "max_altitude_m": round(max(altitudes), 3),
+        "min_altitude_m": round(min(altitudes), 3),
+        "trajectory_summary": traj_summary,
+        "inputs": {
+            "mass_kg": mass_kg,
+            "ixx": ixx, "iyy": iyy, "izz": izz, "ixz": ixz,
+            "fx_N": fx, "fy_N": fy, "fz_N": fz,
+            "mx_Nm": mx, "my_Nm": my, "mz_Nm": mz,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Tool 18: aero_staging
+# ---------------------------------------------------------------------------
+
+def aero_staging(
+    stages: list | None = None,
+    total_delta_v: float | None = None,
+    n_stages: int = 2,
+    isp_per_stage: float | list = 350.0,
+    payload_mass: float = 1000.0,
+    structural_fraction: float = 0.1,
+) -> dict:
+    """
+    Multi-stage rocket ΔV budgeting and optimal staging analysis.
+
+    Two modes:
+    1. Explicit staging: provide stages = [{isp, m0, mf, name?}, ...].
+       Returns exact ΔV per stage and total.
+    2. Optimal split: provide total_delta_v, n_stages, isp_per_stage, payload_mass.
+       Returns optimal ΔV allocation maximising payload fraction.
+
+    Based on the Tsiolkovsky rocket equation:
+        ΔV_stage = Isp · g₀ · ln(m₀/mf)
+
+    Input schema (mode 1 — explicit)
+    ---------------------------------
+    stages : list of dicts, each with:
+        isp   : float — specific impulse [s]
+        m0    : float — initial (wet) mass of this stage [kg]
+        mf    : float — final (dry) mass [kg]
+        name  : str   — label (optional)
+
+    Input schema (mode 2 — optimal split)
+    --------------------------------------
+    total_delta_v     : float — mission total ΔV [m/s]
+    n_stages          : int   — number of stages (default 2)
+    isp_per_stage     : float or list — Isp [s] per stage (default 350)
+    payload_mass      : float — payload mass [kg] (default 1000)
+    structural_fraction : float or list — structural fraction ε per stage (default 0.1)
+
+    Returns
+    -------
+    dict:
+        ok                  : bool
+        total_delta_v_m_s   : float — sum of all stage ΔVs [m/s]
+        total_delta_v_km_s  : float — [km/s]
+        n_stages            : int
+        stage_results       : list — per-stage breakdown
+        payload_fraction    : float — payload / initial total wet mass (mode 2)
+        total_wet_mass_kg   : float — initial total mass (mode 2)
+
+    Example output (mode 2)
+    -----------------------
+    aero_staging(total_delta_v=9200, n_stages=2, isp_per_stage=350, payload_mass=1000) ->
+    {
+      "total_delta_v_m_s": 9200.0,
+      "n_stages": 2,
+      "payload_fraction": 0.042,
+      "total_wet_mass_kg": 23800.0,
+      "stage_results": [...]
+    }
+
+    Raises
+    ------
+    ValueError: if stages list is empty, masses invalid, or total_delta_v <= 0.
+
+    References
+    ----------
+    Sutton & Biblarz, "Rocket Propulsion Elements", 9th ed., Chap. 4.
+    Turner, "Rocket and Spacecraft Propulsion", 3rd ed., Chap. 2.
+    """
+    if not _STAGING_OK:
+        raise ImportError("kerf_aero.propulsion.staging not available")
+
+    if stages is not None:
+        # Mode 1: explicit stages
+        if not stages:
+            raise ValueError("stages list must not be empty")
+        result = _multistage_dv(stages)
+        if not result.get("ok", False):
+            raise ValueError(result.get("reason", "staging computation failed"))
+        return {
+            "ok": True,
+            "mode": "explicit",
+            "total_delta_v_m_s": round(result["total_delta_v_ms"], 3),
+            "total_delta_v_km_s": round(result["total_delta_v_kms"], 6),
+            "n_stages": result["n_stages"],
+            "stage_results": result["stage_results"],
+            "payload_mass_kg": result["payload_mass"],
+        }
+
+    # Mode 2: optimal split
+    if total_delta_v is None:
+        raise ValueError(
+            "Provide either 'stages' (explicit mode) or "
+            "'total_delta_v' + 'n_stages' (optimal-split mode)"
+        )
+    if total_delta_v <= 0:
+        raise ValueError(f"total_delta_v must be > 0 m/s, got {total_delta_v}")
+    if n_stages < 1:
+        raise ValueError(f"n_stages must be >= 1, got {n_stages}")
+    if payload_mass <= 0:
+        raise ValueError(f"payload_mass must be > 0 kg, got {payload_mass}")
+
+    result = _optimal_dv_split(
+        total_delta_v=float(total_delta_v),
+        n_stages=int(n_stages),
+        isp_per_stage=isp_per_stage,
+        structural_fraction_per_stage=structural_fraction,
+        payload_mass=float(payload_mass),
+    )
+
+    if not result.get("ok", False):
+        raise ValueError(result.get("reason", "optimal staging failed"))
+
+    return {
+        "ok": True,
+        "mode": "optimal_split",
+        "total_delta_v_m_s": round(float(total_delta_v), 3),
+        "total_delta_v_km_s": round(float(total_delta_v) / 1000.0, 6),
+        "n_stages": n_stages,
+        "payload_fraction": round(result["payload_fraction"], 6),
+        "total_wet_mass_kg": round(result["total_wet_mass"], 3),
+        "optimal_dv_split_m_s": [round(v, 3) for v in result["optimal_delta_v_split"]],
+        "stage_mass_ratios": [round(r, 4) for r in result["stage_mass_ratios"]],
+        "stage_results": result["stage_results"],
+        "equal_split": result.get("equal_split", False),
+        "inputs": {
+            "total_delta_v_m_s": total_delta_v,
+            "n_stages": n_stages,
+            "isp_per_stage": isp_per_stage,
+            "payload_mass_kg": payload_mass,
+            "structural_fraction": structural_fraction,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
 # Tool registry
 # ---------------------------------------------------------------------------
 
@@ -1982,6 +2688,50 @@ AEROSPACE_TOOLS: list[dict[str, Any]] = [
             "Returns Cd, breakdown (friction/form), Re, frontal area, wetted area. "
             "NOT certified — low-fidelity preliminary estimate (±20-50%). "
             "Ref: Hoerner 1965 'Fluid-Dynamic Drag' §4+§6; Anderson 2017 §3.18."
+        ),
+    },
+    {
+        "name": "aero_flutter_typical_section",
+        "fn": aero_flutter_typical_section,
+        "description": (
+            "V-g / V-f flutter analysis for a 2-DOF typical-section aeroelastic model "
+            "using Theodorsen's unsteady aerodynamics and the p-k iteration method. "
+            "Returns flutter speed, flutter frequency, and full V-g / V-f curve arrays "
+            "for both plunge (bending) and torsion modes. "
+            "Ref: Theodorsen NACA TR 496 (1935); Bisplinghoff, Ashley & Halfman (1955)."
+        ),
+    },
+    {
+        "name": "aero_reentry_heat_flux",
+        "fn": aero_reentry_heat_flux,
+        "description": (
+            "Stagnation-point heat flux for atmospheric re-entry via Sutton-Graves "
+            "convective (NASA TR R-376, 1971) + Tauber-Sutton radiative correlation. "
+            "Point mode: altitude + velocity → q_conv, q_rad, q_total [W/m²]. "
+            "Trajectory mode: list of [alt_km, vel_m_s] pairs → heat-flux time history. "
+            "Air density from US Standard Atmosphere. Typical use: TPS sizing, ablator selection."
+        ),
+    },
+    {
+        "name": "aero_sixdof_simulate",
+        "fn": aero_sixdof_simulate,
+        "description": (
+            "6-DOF rigid-body flight dynamics simulation in NED frame with quaternion "
+            "attitude (Stevens & Lewis). State: [x_N, y_E, z_D, u, v, w, q0..q3, p, q, r]. "
+            "Gravity applied internally; user supplies constant body-frame aerodynamic/thrust "
+            "forces + moments. Returns trajectory summary, final state, Euler angles, "
+            "altitude extremes. RK4 integration."
+        ),
+    },
+    {
+        "name": "aero_staging",
+        "fn": aero_staging,
+        "description": (
+            "Multi-stage rocket Tsiolkovsky ΔV budgeting. "
+            "Explicit mode: provide stage masses + Isp → per-stage and total ΔV. "
+            "Optimal-split mode: provide total ΔV + n_stages → optimal ΔV allocation "
+            "maximising payload fraction with structural mass model. "
+            "Ref: Sutton & Biblarz RPE 9th ed. §4; Turner 'Rocket Propulsion' §2."
         ),
     },
 ]

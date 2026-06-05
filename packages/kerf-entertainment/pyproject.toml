@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kerf-entertainment"
+version = "0.1.0"
+license = { text = "MIT" }
+classifiers = ["License :: OSI Approved :: MIT License"]
+description = "Theatrical / entertainment design: lighting plot + DMX patch + rigging load analysis"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "kerf-cad-core",
+]
+
+[project.entry-points."kerf.plugins"]
+entertainment = "kerf_entertainment.plugin:register"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kerf_entertainment"]

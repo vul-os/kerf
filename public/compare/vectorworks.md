@@ -283,9 +283,9 @@ features:
       note: "Vectorworks Spotlight: lighting instrument symbols, plot automation, Vision integration; Spotlight tier"
       source: "https://app-help.vectorworks.net/2024/eng/index.htm#t=VW2024_Guide%2FSpotlight%2FSpotlight_Overview.htm"
     kerf:
-      status: no
-      note: "No entertainment design domain"
-      evidence: ""
+      status: yes
+      note: "kerf-entertainment: fixture instances (type/position/focus/channel/dimmer/gel), DMX universe patch with conflict detection, circuit/dimmer schedule with per-circuit wattage + overload flag, patch sheet + magic-sheet export; LLM tools lighting_plot_patch + lighting_dmx_check; frontend LightingPlotPanel"
+      evidence: "packages/kerf-entertainment/src/kerf_entertainment/lighting_plot.py"
 
   - domain: D13
     feature: "Rigging geometry and load analysis (Braceworks)"
@@ -294,9 +294,9 @@ features:
       note: "Braceworks add-on: truss/rigging objects, structural load analysis for entertainment; Spotlight tier"
       source: "https://www.vectorworks.net/braceworks"
     kerf:
-      status: no
-      note: "No rigging domain; structural beam/truss engines not adapted for entertainment"
-      evidence: ""
+      status: yes
+      note: "kerf-entertainment rigging engine: simply-supported truss span analysis (influence-line superposition for n hoists), hoist/chain-motor reaction forces, WLL overload detection, symmetric bridle leg tension T=W/(2cosθ) with ESTA E1.6 60° angle warning; LLM tool rigging_load_analysis; frontend RiggingLoadPanel"
+      evidence: "packages/kerf-entertainment/src/kerf_entertainment/rigging.py"
 
   - domain: D13
     feature: "Visual scripting (Marionette)"
@@ -382,8 +382,8 @@ Kerf saturates **92%** of Vectorworks's feature surface (27 yes, 1 partial, 2 no
 | Curtain wall / storefront | ✅ | Yes (paid tier) | Parametric curtain wall: u/v panel grid (count/spacing/mixed), square/round mullion profiles, glass/solid/opening pan... |
 | Roof and ceiling modelling | ✅ | Yes (paid tier) | kerf-bim roof geometry engine included |
 | Plant/tree symbols with scheduling | ✅ | Yes (paid tier) | Xeriscape plant catalogue (USDA zone + WUCOLS water-use filtering); planting-grid spacing; annual water budget (WUCOL... |
-| Entertainment / theatrical lighting plot | 🔴 (no) | Yes (paid tier) | No entertainment design domain |
-| Rigging geometry and load analysis (Braceworks) | 🔴 (no) | Yes (paid tier) | No rigging domain; structural beam/truss engines not adapted for entertainment |
+| Entertainment / theatrical lighting plot | ✅ | Yes (paid tier) | Fixture instances, DMX patch with conflict detection, circuit schedule, patch sheet + magic-sheet export; LLM tools lighting_plot_patch + lighting_dmx_check |
+| Rigging geometry and load analysis (Braceworks) | ✅ | Yes (paid tier) | Hoist reaction solver (influence-line), WLL overload flags, bridle leg tension T=W/(2cosθ), ESTA E1.6 angle warning; LLM tool rigging_load_analysis |
 | Visual scripting (Marionette) | ✅ | Yes | NodeGraphCanvas node editor + Marionette engine (marionette.py) |
 | Python scripting API | ✅ | Yes | kerf-sdk on PyPI; HTTP/JSON-RPC; runs on user's machine |
 | BIM quantity takeoff / materials schedule | ✅ | Yes (paid tier) | BOM panel wired; geometry-driven material quantity from assemblies |
@@ -408,8 +408,6 @@ Kerf saturates **92%** of Vectorworks's feature surface (27 yes, 1 partial, 2 no
 ## What's honestly outstanding
 
 - **Photorealistic rendering engine** (Partial): Integrated in-process Monte-Carlo CPU path tracer (BVH, multi-bounce GI, GGX/dielectric-Fresnel BSDFs, next-event estimation, ACES) + PBR viewport + Cycles GPU backend; no caustics / Cinema-4D-engine parity
-- **Entertainment / theatrical lighting plot** (Not yet implemented): No entertainment design domain
-- **Rigging geometry and load analysis (Braceworks)** (Not yet implemented): No rigging domain; structural beam/truss engines not adapted for entertainment
 
 ## Pricing
 

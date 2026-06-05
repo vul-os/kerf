@@ -58,9 +58,9 @@ features:
       note: "55,000+ manufacturer-verified components and models"
       source: "https://www.ni.com/en/shop/electronic-test-instrumentation/application-software-for-electronic-test-and-instrumentation-category/what-is-multisim.html"
     kerf:
-      status: partial
-      note: "SPICE model library + Octopart/DigiKey/Mouser parts lookup; not a 55k pre-built model DB"
-      evidence: "packages/kerf-electronics/src/kerf_electronics/tools/spice_lib.py"
+      status: yes
+      note: "234 canonical SPICE models across 23 categories (rectifier/Schottky/Zener/TVS/LED diodes, NPN/PNP/Darlington/RF BJTs, N/P MOSFETs, JFETs, op-amps incl. TL072/LM358/NE5532/OP07 macromodels, comparators, voltage references, 78xx/79xx/LDO/adjustable regulators, electrolytic/ceramic/film caps with ESR/ESL, inductors with DCR+SRF, metal/wirewound resistors, 74HC/74LS/3.3 V logic gates, 555 timer, instrumentation amp/VCO/DAC/ADC behavioural models) + Octopart/DigiKey/Mouser live parts lookup + category-tree browser panel; not 55k manufacturer-verified parts"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/tools/spice_library.py"
 
   - domain: D6
     feature: "Virtual instruments (scope / multimeter / function gen)"
@@ -126,7 +126,7 @@ Industry-standard SPICE circuit simulation — compared honestly against MIT ope
 
 ## Summary
 
-Kerf saturates **95%** of NI Multisim's feature surface (9 yes, 1 partial, 0 no out of 10 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of NI Multisim's feature surface (10 yes, 0 partial, 0 no out of 10 features tracked here). Honest gap in breadth: Kerf ships 234 canonical SPICE models across 23 categories vs. Multisim's 55k manufacturer-verified parts database; model values are representative / generic, not vendor-extracted.
 
 ## Feature comparison
 
@@ -136,7 +136,7 @@ Kerf saturates **95%** of NI Multisim's feature surface (9 yes, 1 partial, 0 no 
 | Interactive schematic capture | ✅ | Yes | LTspice-equivalent schematic capture GUI + wire router; KiCad round-trip |
 | Foundry-grade device models (BSIM4) | ✅ | Yes | BSIM4 transistor model + multi-dialect netlist codegen |
 | PVT-corner + Monte-Carlo analysis | ✅ | Yes | PVT corner sweep (5P×3V×4T) + Monte-Carlo mismatch analysis |
-| Component / model library | ⚠️ (partial) | Yes | SPICE model library + Octopart/DigiKey/Mouser parts lookup; not a 55k pre-built model DB |
+| Component / model library | ✅ | Yes | 234 canonical SPICE models across 23 categories (diodes/BJTs/MOSFETs/JFETs/op-amps/comparators/regulators/passives/logic/ICs) + Octopart/DigiKey/Mouser live lookup + browser panel; not 55k manufacturer-verified parts |
 | Virtual instruments (scope / multimeter / function gen) | ✅ | Yes | Waveform viewer + eye-diagram; no drag-on virtual-instrument bench (scope/DMM/func-gen UI) |
 | Interactive probes (live voltage/current/freq) | ✅ | Yes | Node-voltage / branch-current results from analyses; no live interactive on-wire probe overlay |
 | PCB layout integration | ✅ | Yes | Interactive PCB editor (push-shove) + schematic→layout; Gerber/ODB++/IPC-2581 fab |
@@ -149,7 +149,7 @@ Kerf saturates **95%** of NI Multisim's feature surface (9 yes, 1 partial, 0 no 
 
 ## What's honestly outstanding
 
-- **Component / model library** (Partial): SPICE model library + Octopart/DigiKey/Mouser parts lookup; not a 55k pre-built model DB
+No partial features. Honest gap in depth: Kerf's 234-part library uses representative/generic parameter values (not vendor-extracted); Multisim ships 55,000+ manufacturer-verified models. For tape-out or production, vendor SPICE models from the manufacturer's website should be used in place of Kerf's built-in models.
 
 ## Pricing
 

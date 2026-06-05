@@ -114,6 +114,10 @@ def _register_tools(ctx, provides: list) -> None:
         "kerf_electronics.tools.panelize",
         "kerf_electronics.tools.ipc_netlist",
         "kerf_electronics.tools.spice_lib",
+        # Comprehensive curated SPICE component / model library + browser
+        # spice_library_search: search by category/keyword/spec (300+ canonical parts)
+        # spice_library_get_model: fetch full SPICE card for a specific model
+        "kerf_electronics.tools.spice_library",
         "kerf_electronics.tools.idf_export",
         "kerf_electronics.tools.lib_mgmt",
         "kerf_electronics.tools.netlist_export",

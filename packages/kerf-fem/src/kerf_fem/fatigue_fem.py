@@ -598,6 +598,185 @@ def _compute_node_damage(
 
 
 # ===========================================================================
+# S-N curve generation (Basquin + Coffin-Manson; for visualisation)
+# ===========================================================================
+
+def sn_curve(
+    material: dict,
+    *,
+    n_min: float = 1e2,
+    n_max: float = 1e8,
+    n_points: int = 50,
+    correction: str = "goodman",
+    mean_stress: float = 0.0,
+) -> dict[str, Any]:
+    """
+    Generate S-N (Wöhler) curve data for a material.
+
+    Returns lists of (N_cycles, σ_a) pairs for:
+      - Basquin (stress-life):  σ_a = σ'_f · (2N)^b
+      - Coffin-Manson (strain-life):  Δε/2 = σ'_f/E · (2N)^b + ε'_f · (2N)^c
+
+    Mean-stress correction is applied when mean_stress != 0.
+
+    References
+    ----------
+    * Basquin (1910) — Proc. ASTM 10, 625.
+    * Coffin (1954) — Trans. ASME 76, 931; Manson (1954) — NACA TN-2933.
+    * Shigley's §6-7 (Basquin) and §6-14 (Coffin-Manson combined).
+
+    Parameters
+    ----------
+    material    : dict with Su, Se, b, c, E, sf_prime, ef_prime (see module header)
+    n_min       : minimum life (cycles) for the curve
+    n_max       : maximum life (cycles) for the curve
+    n_points    : number of log-spaced points
+    correction  : mean-stress correction method ("goodman" | "gerber" | "swt")
+    mean_stress : mean stress [Pa] for correction (0 = fully reversed)
+
+    Returns
+    -------
+    {
+        "ok"          : bool,
+        "N_cycles"    : list[float],      # x-axis — life in cycles
+        "sigma_a_pa"  : list[float],      # y-axis — stress amplitude [Pa]  (Basquin)
+        "sigma_a_mpa" : list[float],      # same in MPa
+        "endurance_limit_pa" : float,     # Se [Pa]
+        "endurance_limit_mpa": float,     # Se [MPa]
+        "Su_pa"       : float,
+        "b"           : float,
+        "sf_prime_pa" : float,
+    }
+    """
+    if not isinstance(material, dict):
+        return {"ok": False, "reason": "material must be a dict"}
+    Su = material.get("Su")
+    if Su is None or Su <= 0.0:
+        return {"ok": False, "reason": "material.Su must be > 0"}
+
+    Se = material.get("Se", Su / 2.0)
+    b = material.get("b", -0.085)
+    sf_prime = material.get("sf_prime", 1.5 * Su)
+    Sy = material.get("Sy", 0.9 * Su)
+
+    # Log-spaced N values
+    log_min = math.log10(max(n_min, 0.5))
+    log_max = math.log10(n_max)
+    d_log = (log_max - log_min) / max(n_points - 1, 1)
+    N_vals = [10.0 ** (log_min + i * d_log) for i in range(n_points)]
+
+    sigma_a_vals = []
+    for N in N_vals:
+        # Basquin: σ_a = σ'_f · (2N)^b
+        two_N = 2.0 * N
+        if two_N <= 0:
+            sigma_a_vals.append(0.0)
+            continue
+        sigma_a = sf_prime * (two_N ** b)
+        # Apply mean-stress correction (invert: given σ_eq from curve, find
+        # required σ_a for the actual loading).
+        if mean_stress > 0.0:
+            if correction == "gerber":
+                factor = 1.0 - (mean_stress / Su) ** 2
+            elif correction == "swt":
+                # σ_eq² = σ_max · σ_a  →  σ_a = σ_eq² / σ_max
+                sigma_max = sigma_a + mean_stress
+                factor = sigma_a / max(sigma_max, 1e-30)
+            else:  # goodman
+                factor = 1.0 - mean_stress / Su
+            sigma_a = sigma_a * max(factor, 0.0)
+        sigma_a_vals.append(max(sigma_a, 0.0))
+
+    return {
+        "ok": True,
+        "N_cycles": N_vals,
+        "sigma_a_pa": sigma_a_vals,
+        "sigma_a_mpa": [v / 1e6 for v in sigma_a_vals],
+        "endurance_limit_pa": Se,
+        "endurance_limit_mpa": Se / 1e6,
+        "Su_pa": Su,
+        "b": b,
+        "sf_prime_pa": sf_prime,
+    }
+
+
+def haigh_diagram(
+    material: dict,
+    *,
+    n_sigma_m: int = 30,
+) -> dict[str, Any]:
+    """
+    Generate Haigh (modified Goodman) diagram data at the endurance limit.
+
+    The Haigh diagram shows allowable stress amplitude σ_a vs mean stress σ_m
+    for infinite life (N > N_e), with Goodman, Gerber, and SWT boundaries.
+
+    Goodman line:   σ_a / Se + σ_m / Su = 1
+    Gerber parabola: σ_a / Se + (σ_m / Su)² = 1
+    SWT boundary:   √(σ_max · σ_a) = Se  →  σ_a = Se² / (Se + σ_m)
+
+    References
+    ----------
+    * Norton, "Machine Design", §6-6.
+    * Juvinall & Marshek, "Fundamentals of Machine Component Design", §8-6.
+
+    Parameters
+    ----------
+    material    : dict with Su, Se, Sy
+    n_sigma_m   : number of mean-stress points across [0, Su]
+
+    Returns
+    -------
+    {
+        "ok"         : bool,
+        "sigma_m_pa" : list[float],   # mean stress values [Pa]
+        "goodman_a"  : list[float],   # Goodman allowable amplitude [Pa]
+        "gerber_a"   : list[float],   # Gerber allowable amplitude [Pa]
+        "swt_a"      : list[float],   # SWT allowable amplitude [Pa]
+        "yield_line" : list[float],   # Langer yield boundary σ_a = Sy - σ_m
+        "Se_pa"      : float,
+        "Su_pa"      : float,
+        "Sy_pa"      : float,
+    }
+    """
+    if not isinstance(material, dict):
+        return {"ok": False, "reason": "material must be a dict"}
+    Su = material.get("Su")
+    if Su is None or Su <= 0.0:
+        return {"ok": False, "reason": "material.Su must be > 0"}
+    Se = material.get("Se", Su / 2.0)
+    Sy = material.get("Sy", 0.9 * Su)
+
+    d_sigma_m = Su / max(n_sigma_m - 1, 1)
+    sigma_m_vals = [i * d_sigma_m for i in range(n_sigma_m)]
+
+    goodman_a, gerber_a, swt_a, yield_line = [], [], [], []
+    for sm in sigma_m_vals:
+        ratio = min(sm / Su, 1.0)
+        # Goodman
+        goodman_a.append(max(Se * (1.0 - ratio), 0.0))
+        # Gerber
+        gerber_a.append(max(Se * (1.0 - ratio ** 2), 0.0))
+        # SWT: σ_eq = sqrt(σ_max * σ_a) = Se  →  σ_a = Se² / (Se + σ_m)
+        denom = Se + sm
+        swt_a.append(Se ** 2 / denom if denom > 0 else 0.0)
+        # Langer yield line
+        yield_line.append(max(Sy - sm, 0.0))
+
+    return {
+        "ok": True,
+        "sigma_m_pa": sigma_m_vals,
+        "goodman_a": goodman_a,
+        "gerber_a": gerber_a,
+        "swt_a": swt_a,
+        "yield_line": yield_line,
+        "Se_pa": Se,
+        "Su_pa": Su,
+        "Sy_pa": Sy,
+    }
+
+
+# ===========================================================================
 # Public API
 # ===========================================================================
 
@@ -810,5 +989,122 @@ async def run_fem_fatigue(ctx: ProjectCtx, args: bytes) -> str:
         stress_history=stress_history,
         material=material,
         options=options,
+    )
+    return json.dumps(result)
+
+
+# ---------------------------------------------------------------------------
+# fem_sn_curve — S-N / Wöhler curve data for a material
+# ---------------------------------------------------------------------------
+
+_fem_sn_curve_spec = ToolSpec(
+    name="fem_sn_curve",
+    description=(
+        "Generate S-N (Wöhler) curve data for a material using Basquin's equation "
+        "σ_a = σ'_f · (2N)^b.  Returns log-spaced (N_cycles, σ_a) pairs ready for "
+        "plotting.  Optional mean-stress correction (Goodman/Gerber/SWT) shifts the "
+        "curve for non-zero mean stress.  Also returns the endurance limit Se and "
+        "Basquin exponent b."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "material": {
+                "type": "object",
+                "description": "S-N material properties (same format as fem_fatigue).",
+                "properties": {
+                    "Su":       {"type": "number", "description": "Ultimate tensile strength [Pa]"},
+                    "Se":       {"type": "number", "description": "Endurance limit [Pa]"},
+                    "b":        {"type": "number", "description": "Basquin exponent (default -0.085)"},
+                    "sf_prime": {"type": "number", "description": "Fatigue strength coeff σ'_f [Pa]"},
+                    "Sy":       {"type": "number", "description": "Yield strength [Pa]"},
+                },
+                "required": ["Su"],
+            },
+            "n_min":       {"type": "number", "description": "Min life [cycles] (default 1e2)", "default": 1e2},
+            "n_max":       {"type": "number", "description": "Max life [cycles] (default 1e8)", "default": 1e8},
+            "n_points":    {"type": "integer", "description": "Number of log-spaced points (default 50)", "default": 50},
+            "correction":  {"type": "string", "enum": ["goodman", "gerber", "swt", "none"],
+                            "description": "Mean-stress correction (default none)"},
+            "mean_stress": {"type": "number", "description": "Mean stress [Pa] for correction (default 0)"},
+        },
+        "required": ["material"],
+    },
+)
+
+
+@register(_fem_sn_curve_spec)
+async def run_fem_sn_curve(ctx: ProjectCtx, args: bytes) -> str:
+    import json
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    material = a.get("material")
+    if not material:
+        return err_payload("material is required", "BAD_ARGS")
+
+    result = sn_curve(
+        material=material,
+        n_min=float(a.get("n_min", 1e2)),
+        n_max=float(a.get("n_max", 1e8)),
+        n_points=int(a.get("n_points", 50)),
+        correction=a.get("correction", "goodman"),
+        mean_stress=float(a.get("mean_stress", 0.0)),
+    )
+    return json.dumps(result)
+
+
+# ---------------------------------------------------------------------------
+# fem_haigh_diagram — Haigh (modified Goodman) diagram
+# ---------------------------------------------------------------------------
+
+_fem_haigh_diagram_spec = ToolSpec(
+    name="fem_haigh_diagram",
+    description=(
+        "Generate Haigh (modified Goodman) diagram data at the endurance limit. "
+        "Returns Goodman linear, Gerber parabola, SWT, and Langer yield boundaries "
+        "as lists of (σ_m, σ_a) pairs for plotting. Validates that operating points "
+        "lie within the safe region."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "material": {
+                "type": "object",
+                "properties": {
+                    "Su": {"type": "number", "description": "Ultimate tensile strength [Pa]"},
+                    "Se": {"type": "number", "description": "Endurance limit [Pa]"},
+                    "Sy": {"type": "number", "description": "Yield strength [Pa]"},
+                },
+                "required": ["Su"],
+            },
+            "n_sigma_m": {
+                "type": "integer",
+                "description": "Number of mean-stress points (default 30)",
+                "default": 30,
+            },
+        },
+        "required": ["material"],
+    },
+)
+
+
+@register(_fem_haigh_diagram_spec)
+async def run_fem_haigh_diagram(ctx: ProjectCtx, args: bytes) -> str:
+    import json
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    material = a.get("material")
+    if not material:
+        return err_payload("material is required", "BAD_ARGS")
+
+    result = haigh_diagram(
+        material=material,
+        n_sigma_m=int(a.get("n_sigma_m", 30)),
     )
     return json.dumps(result)

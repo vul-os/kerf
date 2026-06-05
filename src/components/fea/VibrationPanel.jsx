@@ -1,9 +1,12 @@
 // VibrationPanel.jsx — FEA Harmonic / Random Vibration panel.
 //
 // Harmonic / PSD-input selector + Run + frequency-response plot.
+// Enhanced: dual-axis FRF magnitude + phase plot, mode table with frequencies
+//           and DAF, resonance marker, and SDOF analytical overlay.
 //
 // Maps to:
 //   fem_harmonic_response — steady-state harmonic response via mode superposition
+//   fem_frf_sweep         — direct FRF sweep from modal properties (new)
 //   fem_random_vibration_psd — random vibration RMS response to shaped PSD
 //
 // Dispatches POST /api/projects/{pid}/files/{fid}/fem with
@@ -31,12 +34,36 @@ const PSD_PROFILES = [
     table: [[20,0.026],[50,0.16],[800,0.16],[2000,0.026]] },
 ]
 
+// ---------------------------------------------------------------------------
+// SDOF analytical DAF for preview — no fetch needed
+// DAF = 1 / sqrt((1 - r²)² + (2ζr)²)   (Inman §3.4)
+// ---------------------------------------------------------------------------
+function sdofDaf(r, zeta) {
+  const den = Math.sqrt(Math.pow(1 - r * r, 2) + Math.pow(2 * zeta * r, 2))
+  return den < 1e-30 ? Infinity : 1 / den
+}
+
+function sdofPhaseDeg(r, zeta) {
+  return (Math.atan2(2 * zeta * r, 1 - r * r) * 180) / Math.PI
+}
+
+// Generate SDOF preview FRF
+function generateSDOFPreview(fn, zeta, fMin, fMax, nPts = 120) {
+  const d = (fMax - fMin) / (nPts - 1)
+  return Array.from({ length: nPts }, (_, i) => {
+    const f = fMin + i * d
+    const r = f / fn
+    return { f, daf: sdofDaf(r, zeta), phase: sdofPhaseDeg(r, zeta) }
+  })
+}
+
 export default function VibrationPanel({ projectId, fileId }) {
   const [mode, setMode]           = useState('harmonic')
   const [zeta, setZeta]           = useState('0.02')   // damping ratio
   const [fMin, setFMin]           = useState('1')
   const [fMax, setFMax]           = useState('2000')
   const [nPts, setNPts]           = useState('200')
+  const [fnPreview, setFnPreview] = useState('100')     // preview natural frequency [Hz]
   const [psdProfile, setPsdProfile] = useState('mil_std_810g')
   const [running, setRunning]     = useState(false)
   const [status, setStatus]       = useState(null)
@@ -101,15 +128,27 @@ export default function VibrationPanel({ projectId, fileId }) {
   const result    = status?.result && typeof status.result === 'object' ? status.result : null
   const jobStatus = status?.status
 
-  // Harmonic response data
-  const freqAxis  = Array.isArray(result?.frequencies)       ? result.frequencies       : []
-  const ampArray  = Array.isArray(result?.amplitudes)        ? result.amplitudes         :
+  // Harmonic response data (supports both legacy and new field names)
+  const freqAxis  = Array.isArray(result?.frequencies_hz)     ? result.frequencies_hz    :
+    Array.isArray(result?.frequencies)         ? result.frequencies         : []
+  const ampArray  = Array.isArray(result?.amplitude)          ? result.amplitude          :
+    Array.isArray(result?.amplitudes)          ? result.amplitudes          :
     Array.isArray(result?.freq_response?.amplitude) ? result.freq_response.amplitude : []
+  const phaseArray = Array.isArray(result?.phase_deg)         ? result.phase_deg          : []
+  const modeTable  = Array.isArray(result?.mode_table)        ? result.mode_table         :
+    Array.isArray(result?.frequencies_hz) && result?.DAF_analytical ? null : null
 
   // Random vibration data
   const rmsResp     = result?.rms_response     ?? result?.grms       ?? null
   const miles_grms  = result?.miles_grms       ?? null
   const sigmaResp   = result?.sigma_3_response ?? result?.sigma_3     ?? null
+
+  // SDOF preview curve
+  const fn    = parseFloat(fnPreview) || 100
+  const zetaV = parseFloat(zeta) || 0.02
+  const f0    = parseFloat(fMin) || 1
+  const f1    = parseFloat(fMax) || 2000
+  const previewPts = generateSDOFPreview(fn, zetaV, f0, f1, 120)
 
   return (
     <div style={s.root} data-testid="vibration-panel">
@@ -119,6 +158,16 @@ export default function VibrationPanel({ projectId, fileId }) {
         {jobStatus && jobStatus !== 'not_found' && (
           <span style={badgeStyle(jobStatus)}>{jobStatus}</span>
         )}
+      </div>
+
+      {/* SDOF FRF Preview */}
+      <div style={s.section}>
+        <div style={s.sectionTitle}>FRF Preview — SDOF analytical</div>
+        <FrfDualPlot freqs={previewPts.map(p => p.f)} magnitudes={previewPts.map(p => p.daf)}
+          phases={previewPts.map(p => p.phase)} resonantHz={fn} isPreview />
+        <div style={{ fontSize: 10, color: '#4b5563' }}>
+          DAF = 1/√((1−r²)²+(2ζr)²) | fn = {fn} Hz | ζ = {zetaV} | DAF_peak = {(1 / (2 * zetaV)).toFixed(1)}
+        </div>
       </div>
 
       <div style={s.section}>
@@ -133,6 +182,13 @@ export default function VibrationPanel({ projectId, fileId }) {
           <input type="number" value={zeta} step="0.005" min="0.001" max="0.5"
             onChange={e => setZeta(e.target.value)} style={s.input} disabled={running} />
         </div>
+        {mode === 'harmonic' && (
+          <div style={s.row}>
+            <label style={s.label}>Preview fn (Hz)</label>
+            <input type="number" value={fnPreview} min="0.1" step="10"
+              onChange={e => setFnPreview(e.target.value)} style={s.input} disabled={running} />
+          </div>
+        )}
         <div style={s.row}>
           <label style={s.label}>f_min (Hz)</label>
           <input type="number" value={fMin} min="0.01"
@@ -206,14 +262,35 @@ export default function VibrationPanel({ projectId, fileId }) {
             </table>
           )}
 
-          {/* FRF / frequency sweep plot */}
+          {/* Dual FRF magnitude + phase plot */}
           {(freqAxis.length > 0 || ampArray.length > 0) && (
-            <FrfPlot freqs={freqAxis} amplitudes={ampArray} />
+            <FrfDualPlot
+              freqs={freqAxis}
+              magnitudes={ampArray}
+              phases={phaseArray}
+              resonantHz={result?.resonant_peak_hz ?? null}
+            />
           )}
 
-          {/* Modal frequencies in result */}
-          {Array.isArray(result.frequencies) && result.frequencies.length > 0 &&
-            mode === 'harmonic' && (
+          {/* Mode table */}
+          {modeTable && modeTable.length > 0 && (
+            <ModeTable modes={modeTable} />
+          )}
+
+          {/* Resonant frequency summary */}
+          {result?.resonant_peak_hz != null && (
+            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+              Resonant peak: <span style={{ color: '#34d399', fontWeight: 600 }}>
+                {Number(result.resonant_peak_hz).toFixed(2)} Hz
+              </span>
+              {result.resonant_amplitude != null && (
+                <span style={{ color: '#6b7280' }}>{' '}|U| = {Number(result.resonant_amplitude).toExponential(3)}</span>
+              )}
+            </div>
+          )}
+
+          {/* Modal frequencies from result (legacy field) */}
+          {Array.isArray(result.frequencies) && result.frequencies.length > 0 && mode === 'harmonic' && (
             <div style={{ marginTop: 8 }}>
               <div style={s.sectionTitle}>Natural Frequencies</div>
               <table style={s.table}>
@@ -247,37 +324,122 @@ export default function VibrationPanel({ projectId, fileId }) {
   )
 }
 
-// SVG frequency response plot.
-function FrfPlot({ freqs, amplitudes }) {
-  const W = 240, H = 60
+// ---------------------------------------------------------------------------
+// Dual FRF plot: magnitude (top) + phase (bottom)
+// ---------------------------------------------------------------------------
+function FrfDualPlot({ freqs, magnitudes, phases, resonantHz, isPreview }) {
+  const W = 240, H_mag = 50, H_phase = 30, PAD = { l: 6, r: 6, t: 4, b: 4 }
 
-  // Use amplitudes array if available; otherwise use freqs as a spectrum proxy
-  const data = amplitudes.length > 0 ? amplitudes : freqs
+  const data = magnitudes && magnitudes.length > 0 ? magnitudes : []
   if (!data.length) return null
 
-  const maxA  = Math.max(...data.map(Math.abs)) || 1
-  const step  = W / (data.length - 1 || 1)
-  const pts   = data.map((v, i) =>
-    `${(i * step).toFixed(1)},${(H - 4 - (Math.abs(v) / maxA) * (H - 8)).toFixed(1)}`
-  ).join(' ')
+  const maxMag = Math.max(...data.map(Math.abs)) || 1
+  const innerW = W - PAD.l - PAD.r
+  const step   = innerW / (data.length - 1 || 1)
 
-  const fLabel = freqs.length > 0
+  function xPx(i) { return PAD.l + i * step }
+  function magYPx(v) { return PAD.t + (1 - Math.abs(v) / maxMag) * (H_mag - PAD.t - PAD.b) }
+  function phaseYPx(v) {
+    // Map [-180, 180] → [0, H_phase]
+    return PAD.t + (1 - (v + 180) / 360) * (H_phase - PAD.t - PAD.b)
+  }
+
+  const magPts = data.map((v, i) => `${xPx(i).toFixed(1)},${magYPx(v).toFixed(1)}`).join(' ')
+  const phasePts = phases && phases.length === data.length
+    ? phases.map((v, i) => `${xPx(i).toFixed(1)},${phaseYPx(v).toFixed(1)}`).join(' ')
+    : null
+
+  // Resonant peak marker
+  let resonantXPx = null
+  if (resonantHz != null && freqs && freqs.length > 0) {
+    const f0 = freqs[0], f1 = freqs[freqs.length - 1]
+    if (f1 > f0) {
+      const norm = (resonantHz - f0) / (f1 - f0)
+      resonantXPx = PAD.l + norm * innerW
+    }
+  }
+
+  const fLabel = freqs && freqs.length > 0
     ? `${Number(freqs[0]).toFixed(0)}–${Number(freqs[freqs.length - 1]).toFixed(0)} Hz`
     : ''
+  const color = isPreview ? '#6ee7b7' : '#34d399'
 
   return (
-    <div aria-label="Frequency response plot">
-      <div style={{ ...s.sectionTitle, marginBottom: 4 }}>
-        Frequency response{fLabel ? ` (${fLabel})` : ''}
+    <div aria-label={isPreview ? 'SDOF FRF preview' : 'Frequency response plot'}>
+      <div style={{ ...s.sectionTitle, marginBottom: 3 }}>
+        {isPreview ? 'SDOF FRF preview' : `Frequency response${fLabel ? ` (${fLabel})` : ''}`}
       </div>
-      <svg width={W} height={H} style={{ display: 'block', background: '#1f2937', borderRadius: 4 }}>
-        <polyline points={pts} fill="none" stroke="#34d399" strokeWidth="1.5" />
+
+      {/* Magnitude */}
+      <svg width={W} height={H_mag} style={{ display: 'block', background: '#1f2937', borderRadius: '4px 4px 0 0' }}>
+        {resonantXPx != null && (
+          <line x1={resonantXPx} y1={PAD.t} x2={resonantXPx} y2={H_mag - PAD.b}
+            stroke="#fbbf24" strokeWidth="1" strokeDasharray="3 2" opacity="0.7" />
+        )}
+        <polyline points={magPts} fill="none" stroke={color} strokeWidth="1.5" />
+        <text x={W - 4} y={PAD.t + 9} fontSize="7" fill="#6b7280" textAnchor="end">|H|</text>
       </svg>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#6b7280', marginTop: 2 }}>
-        <span>f_min</span>
-        <span>Amplitude</span>
-        <span>f_max</span>
-      </div>
+
+      {/* Phase */}
+      {phasePts && (
+        <svg width={W} height={H_phase}
+          style={{ display: 'block', background: '#161f2f', borderRadius: '0 0 4px 4px', borderTop: '1px solid #374151' }}>
+          {resonantXPx != null && (
+            <line x1={resonantXPx} y1={0} x2={resonantXPx} y2={H_phase}
+              stroke="#fbbf24" strokeWidth="1" strokeDasharray="3 2" opacity="0.7" />
+          )}
+          {/* 0° reference */}
+          <line x1={PAD.l} y1={H_phase / 2} x2={W - PAD.r} y2={H_phase / 2}
+            stroke="#374151" strokeWidth="0.5" />
+          <polyline points={phasePts} fill="none" stroke="#a78bfa" strokeWidth="1" />
+          <text x={W - 4} y={H_phase - 2} fontSize="7" fill="#6b7280" textAnchor="end">Phase°</text>
+        </svg>
+      )}
+
+      {fLabel && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#6b7280', marginTop: 2 }}>
+          <span>{freqs && freqs.length > 0 ? `${Number(freqs[0]).toFixed(0)} Hz` : 'f_min'}</span>
+          {resonantHz != null && (
+            <span style={{ color: '#fbbf24' }}>▲ {Number(resonantHz).toFixed(1)} Hz</span>
+          )}
+          <span>{freqs && freqs.length > 0 ? `${Number(freqs[freqs.length - 1]).toFixed(0)} Hz` : 'f_max'}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Mode table (fn, ζ, DAF at resonance)
+// ---------------------------------------------------------------------------
+function ModeTable({ modes }) {
+  return (
+    <div aria-label="Mode table">
+      <div style={{ ...s.sectionTitle, marginBottom: 4 }}>Mode Table</div>
+      <table style={s.table}>
+        <thead>
+          <tr>
+            <th style={{ ...s.td, color: '#9ca3af', textAlign: 'left', fontSize: 10 }}>Mode</th>
+            <th style={{ ...s.td, color: '#9ca3af', textAlign: 'right', fontSize: 10 }}>fn (Hz)</th>
+            <th style={{ ...s.td, color: '#9ca3af', textAlign: 'right', fontSize: 10 }}>ζ</th>
+            <th style={{ ...s.td, color: '#9ca3af', textAlign: 'right', fontSize: 10 }}>DAF_peak</th>
+          </tr>
+        </thead>
+        <tbody>
+          {modes.map((m, i) => (
+            <tr key={i}>
+              <td style={s.td}>{m.mode ?? i + 1}</td>
+              <td style={{ ...s.td, ...s.mono }}>{Number(m.fn_hz ?? m.frequency_hz ?? 0).toFixed(2)}</td>
+              <td style={{ ...s.td, ...s.mono }}>{Number(m.zeta ?? 0).toFixed(4)}</td>
+              <td style={{ ...s.td, ...s.mono }}>
+                {isFinite(m.DAF_at_resonance)
+                  ? Number(m.DAF_at_resonance).toFixed(1)
+                  : '∞'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

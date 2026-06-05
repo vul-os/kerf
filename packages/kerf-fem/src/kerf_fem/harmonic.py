@@ -52,6 +52,12 @@ from __future__ import annotations
 import math
 from typing import Any
 
+try:
+    from kerf_chat.tools.registry import ToolSpec, err_payload, ok_payload, register
+    from kerf_core.utils.context import ProjectCtx
+except ImportError:
+    from kerf_fem._compat import ToolSpec, err_payload, ok_payload, register, ProjectCtx
+
 
 # ---------------------------------------------------------------------------
 # SDOF helpers
@@ -301,6 +307,128 @@ def harmonic_response(
     }
 
 
+def frf_sweep(
+    fn_hz: list[float],
+    zeta: list[float],
+    participation: list[float],
+    freq_range: dict[str, Any],
+) -> dict[str, Any]:
+    """
+    Direct-frequency FRF sweep for an n-DOF system given natural frequencies,
+    modal damping ratios, and modal participation factors.
+
+    This is a simplified form of harmonic_response for the common case where
+    mode shapes are pre-condensed to scalar participation factors (typical for
+    seismic / base-excitation problems or when only the scalar FRF at a single
+    measurement point is required).
+
+    H(ω) = Σ_i  Γ_i / (ω_i² − ω² + 2 i ζ_i ω_i ω)
+
+    where Γ_i is the (real) modal participation factor for mode i.
+
+    References
+    ----------
+    * Ewins, "Modal Testing: Theory, Practice and Application", §2.1.3.
+    * Craig & Kurdila, "Fundamentals of Structural Dynamics" §8.4.
+
+    Parameters
+    ----------
+    fn_hz         : natural frequencies [Hz], length n_modes
+    zeta          : modal damping ratios, length n_modes
+    participation : modal participation factors Γ_i (unitless or physical units)
+    freq_range    : {"f_min", "f_max", "n_pts"}
+
+    Returns
+    -------
+    {
+      ok               : bool,
+      frequencies_hz   : list[float],
+      magnitude        : list[float],   — |H(ω)|
+      phase_deg        : list[float],   — ∠H(ω) in degrees
+      resonant_peak_hz : float,
+      resonant_magnitude: float,
+      mode_table       : list[{mode, fn_hz, zeta, participation, DAF_at_resonance}]
+    }
+    """
+    if not fn_hz:
+        return {"ok": False, "reason": "fn_hz must be non-empty"}
+    if len(fn_hz) != len(zeta):
+        return {"ok": False, "reason": "fn_hz and zeta must have the same length"}
+    if len(fn_hz) != len(participation):
+        return {"ok": False, "reason": "fn_hz and participation must have the same length"}
+    for z in zeta:
+        if z < 0.0:
+            return {"ok": False, "reason": "damping ratios must be non-negative"}
+    for f in fn_hz:
+        if f <= 0.0:
+            return {"ok": False, "reason": "natural frequencies must be positive"}
+
+    f_min = float(freq_range.get("f_min", 0.0))
+    f_max = float(freq_range.get("f_max", 1.0))
+    n_pts = int(freq_range.get("n_pts", 200))
+
+    if f_min < 0:
+        return {"ok": False, "reason": "f_min must be >= 0"}
+    if f_max <= f_min:
+        return {"ok": False, "reason": "f_max must be > f_min"}
+    if n_pts < 2:
+        return {"ok": False, "reason": "n_pts must be >= 2"}
+
+    omega_n = [2.0 * math.pi * f for f in fn_hz]
+    n_modes = len(fn_hz)
+
+    df = (f_max - f_min) / (n_pts - 1)
+    freqs = [f_min + k * df for k in range(n_pts)]
+    magnitudes = []
+    phases = []
+
+    for f in freqs:
+        omega = 2.0 * math.pi * f
+        H = (0.0, 0.0)
+        for i in range(n_modes):
+            wn = omega_n[i]
+            real_denom = wn * wn - omega * omega
+            imag_denom = 2.0 * zeta[i] * wn * omega
+            denom_sq = real_denom * real_denom + imag_denom * imag_denom
+            if denom_sq < 1e-300:
+                Hi = (math.inf, 0.0)
+            else:
+                # H_i = Γ_i / (ω_i² - ω² + 2iζω_iω)
+                Hi = (
+                    participation[i] * real_denom / denom_sq,
+                    -participation[i] * imag_denom / denom_sq,
+                )
+            H = _cadd(H, Hi)
+        magnitudes.append(_cabs(H))
+        phases.append(math.degrees(math.atan2(H[1], H[0])))
+
+    peak_mag = max(magnitudes) if magnitudes else 0.0
+    peak_idx = magnitudes.index(peak_mag) if magnitudes else 0
+    peak_freq = freqs[peak_idx]
+
+    # Build mode table for UI display
+    mode_table = []
+    for i in range(n_modes):
+        daf_res = 1.0 / (2.0 * zeta[i]) if zeta[i] > 0 else math.inf
+        mode_table.append({
+            "mode": i + 1,
+            "fn_hz": fn_hz[i],
+            "zeta": zeta[i],
+            "participation": participation[i],
+            "DAF_at_resonance": daf_res,
+        })
+
+    return {
+        "ok": True,
+        "frequencies_hz": freqs,
+        "magnitude": magnitudes,
+        "phase_deg": phases,
+        "resonant_peak_hz": peak_freq,
+        "resonant_magnitude": peak_mag,
+        "mode_table": mode_table,
+    }
+
+
 def sdof_harmonic_response(
     fn: float,
     zeta: float,
@@ -355,3 +483,85 @@ def sdof_harmonic_response(
         "DAF": daf_vals,
         "U_static": U_static,
     }
+
+
+# ===========================================================================
+# LLM tool: fem_frf_sweep — direct FRF sweep from modal properties
+# ===========================================================================
+
+_fem_frf_sweep_spec = ToolSpec(
+    name="fem_frf_sweep",
+    description=(
+        "Compute the frequency response function (FRF) H(ω) for an n-DOF system "
+        "given natural frequencies, modal damping ratios, and scalar modal participation "
+        "factors.  Uses mode superposition: H(ω) = Σ Γ_i / (ω_i² − ω² + 2iζ_i ω_i ω). "
+        "Returns magnitude |H|, phase ∠H, resonant peak location, and a mode table. "
+        "Reference: Ewins, Modal Testing (2000) §2.1.3; Craig & Kurdila §8.4."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "fn_hz": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "Natural frequencies [Hz], one per mode",
+            },
+            "zeta": {
+                "description": "Modal damping ratios (scalar for all modes, or list per mode)",
+                "oneOf": [
+                    {"type": "number"},
+                    {"type": "array", "items": {"type": "number"}},
+                ],
+            },
+            "participation": {
+                "type": "array",
+                "items": {"type": "number"},
+                "description": "Modal participation factors Γ_i (one per mode)",
+            },
+            "freq_range": {
+                "type": "object",
+                "properties": {
+                    "f_min": {"type": "number", "description": "Start frequency [Hz]"},
+                    "f_max": {"type": "number", "description": "End frequency [Hz]"},
+                    "n_pts": {"type": "integer", "description": "Sweep points (default 200)"},
+                },
+                "required": ["f_min", "f_max"],
+            },
+        },
+        "required": ["fn_hz", "zeta", "participation", "freq_range"],
+    },
+)
+
+
+@register(_fem_frf_sweep_spec)
+async def run_fem_frf_sweep(ctx: ProjectCtx, args: bytes) -> str:
+    import json
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+    fn_hz = a.get("fn_hz")
+    zeta_raw = a.get("zeta")
+    participation = a.get("participation")
+    freq_range = a.get("freq_range")
+
+    for key, val in [("fn_hz", fn_hz), ("zeta", zeta_raw),
+                     ("participation", participation), ("freq_range", freq_range)]:
+        if val is None:
+            return err_payload(f"{key} is required", "BAD_ARGS")
+
+    n_modes = len(fn_hz)
+    # Normalise zeta to list
+    if isinstance(zeta_raw, (int, float)):
+        zeta = [float(zeta_raw)] * n_modes
+    else:
+        zeta = [float(z) for z in zeta_raw]
+
+    result = frf_sweep(
+        fn_hz=[float(f) for f in fn_hz],
+        zeta=zeta,
+        participation=[float(p) for p in participation],
+        freq_range=freq_range,
+    )
+    return json.dumps(result)

@@ -74,6 +74,9 @@ async def register(app: FastAPI, ctx):
     from kerf_fem.nonlinear import _fem_nonlinear_spec, run_fem_nonlinear; ctx.tools.register("fem_nonlinear", _fem_nonlinear_spec, run_fem_nonlinear)
     from kerf_fem.nonlinear_static import _fem_nonlinear_static_spec, run_fem_nonlinear_static; ctx.tools.register("fem_nonlinear_static", _fem_nonlinear_static_spec, run_fem_nonlinear_static)  # kerf-fem: 3-D NL static, TL, J2 plasticity, arc-length
     from kerf_fem.fatigue_fem import _fem_fatigue_spec, run_fem_fatigue; ctx.tools.register("fem_fatigue", _fem_fatigue_spec, run_fem_fatigue)  # kerf-fem: fatigue & durability
+    from kerf_fem.fatigue_fem import _fem_sn_curve_spec, run_fem_sn_curve; ctx.tools.register("fem_sn_curve", _fem_sn_curve_spec, run_fem_sn_curve)  # kerf-fem: S-N / Wöhler curve data
+    from kerf_fem.fatigue_fem import _fem_haigh_diagram_spec, run_fem_haigh_diagram; ctx.tools.register("fem_haigh_diagram", _fem_haigh_diagram_spec, run_fem_haigh_diagram)  # kerf-fem: Haigh modified-Goodman diagram
+    from kerf_fem.harmonic import _fem_frf_sweep_spec, run_fem_frf_sweep; ctx.tools.register("fem_frf_sweep", _fem_frf_sweep_spec, run_fem_frf_sweep)  # kerf-fem: direct FRF sweep from modal properties
     from kerf_fem.plate import _fem_plate_static_spec, run_fem_plate_static_solve; ctx.tools.register("fem_plate_static_solve", _fem_plate_static_spec, run_fem_plate_static_solve)  # kerf-fem: MITC4 plate/shell
     import kerf_fem.em_highfreq  # kerf-fem: high-frequency EM (waveguide, S-params, FDTD) — self-registers fem_em_highfreq tool on import
     import kerf_fem.acoustics_fem  # kerf-fem: acoustics FEM (cavity modes, BEM radiation) — self-registers fem_acoustics
@@ -158,6 +161,7 @@ async def register(app: FastAPI, ctx):
         "fem.cfd-navier-stokes", "fem.cfd-potential",
         "fem.buckling", "fem.harmonic-response", "fem.random-vibration",
         "fem.probabilistic",  # LHS + Karhunen-Loève uncertainty propagation
+        "fem.fatigue-sn", "fem.fatigue-haigh", "fem.frf-sweep",
     ]
     if _DOLFINX_AVAILABLE:
         provides.append("fem.linear-static")

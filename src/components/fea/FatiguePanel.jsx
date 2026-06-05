@@ -1,8 +1,12 @@
 // FatiguePanel.jsx — FEA Fatigue & Durability panel.
 //
 // Material S-N curve picker + load-history input + Run + life contour viewer.
+// Enhanced: S-N curve (Wöhler) SVG visualization, Haigh diagram, and
+//           damage/life contour with mean-stress correction display.
 //
-// Maps to fem_fatigue (S-N, ε-N, rainflow, Goodman/Gerber/SWT, Miner's rule).
+// Maps to fem_fatigue (S-N, ε-N, rainflow, Goodman/Gerber/SWT, Miner's rule),
+//         fem_sn_curve (Basquin S-N curve data),
+//         fem_haigh_diagram (Goodman/Gerber/SWT/Langer boundaries).
 // Dispatches POST /api/projects/{pid}/files/{fid}/fem with
 // analysis_type:"fatigue".
 //
@@ -36,6 +40,36 @@ const DAMAGE_PARAMS = [
 
 const DEFAULT_HISTORY = '-200,400,-200,350,-100,300,0,300,-100,200'
 
+// ---------------------------------------------------------------------------
+// S-N curve generator (pure JS, Basquin equation — no fetch required)
+// σ_a = sf_prime · (2N)^b  (Shigley §6-7)
+// ---------------------------------------------------------------------------
+function generateSNCurve(mat, nPoints = 40) {
+  const { sf_prime, b, Se, Su } = mat
+  const sfp = sf_prime || 1.5 * Su
+  const logMin = 2, logMax = 8
+  const pts = []
+  for (let i = 0; i < nPoints; i++) {
+    const logN = logMin + (i / (nPoints - 1)) * (logMax - logMin)
+    const N = Math.pow(10, logN)
+    const sigma_a = sfp * Math.pow(2 * N, b)
+    pts.push({ N, sigma_a_mpa: sigma_a / 1e6 })
+  }
+  return pts
+}
+
+// Goodman boundary at endurance limit: σ_a / Se + σ_m / Su = 1
+function generateHaighGoodman(mat, nPts = 40) {
+  const { Su, Se } = mat
+  const pts = []
+  for (let i = 0; i < nPts; i++) {
+    const sigma_m = (i / (nPts - 1)) * Su
+    const sigma_a = Math.max(Se * (1 - sigma_m / Su), 0)
+    pts.push({ sigma_m_mpa: sigma_m / 1e6, sigma_a_mpa: sigma_a / 1e6 })
+  }
+  return pts
+}
+
 export default function FatiguePanel({ projectId, fileId }) {
   const [preset, setPreset]         = useState('steel_1045')
   const [correction, setCorrection] = useState('goodman')
@@ -45,6 +79,7 @@ export default function FatiguePanel({ projectId, fileId }) {
   const [running, setRunning]       = useState(false)
   const [status, setStatus]         = useState(null)
   const [error, setError]           = useState(null)
+  const [showHaigh, setShowHaigh]   = useState(false)
   const pollRef = useRef(null)
 
   function stopPoll() {
@@ -125,6 +160,10 @@ export default function FatiguePanel({ projectId, fileId }) {
   const dmgMap        = result?.damage_map   ? Object.values(result.damage_map) : []
   const lifeMap       = result?.life_map     ? Object.values(result.life_map)   : []
 
+  const mat = SN_PRESETS[preset]
+  const snCurvePts = generateSNCurve(mat)
+  const haighPts   = generateHaighGoodman(mat)
+
   return (
     <div style={s.root} data-testid="fatigue-panel">
       <div style={s.header}>
@@ -133,6 +172,28 @@ export default function FatiguePanel({ projectId, fileId }) {
         {jobStatus && jobStatus !== 'not_found' && (
           <span style={badgeStyle(jobStatus)}>{jobStatus}</span>
         )}
+      </div>
+
+      {/* S-N Curve Visualisation */}
+      <div style={s.section}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={s.sectionTitle}>S-N Curve (Wöhler) — {mat.label}</div>
+          <button
+            onClick={() => setShowHaigh(h => !h)}
+            style={{
+              marginLeft: 'auto', fontSize: 10, background: 'none', border: '1px solid #374151',
+              borderRadius: 3, color: '#9ca3af', padding: '1px 6px', cursor: 'pointer',
+            }}
+          >
+            {showHaigh ? 'S-N' : 'Haigh'}
+          </button>
+        </div>
+        {showHaigh
+          ? <HaighDiagramPlot pts={haighPts} mat={mat} />
+          : <SNcurvePlot pts={snCurvePts} mat={mat} />}
+        <div style={{ fontSize: 10, color: '#4b5563', marginTop: 2 }}>
+          Basquin: σ_a = σ&#x2019;_f·(2N)^b | b = {mat.b} | Se = {(mat.Se / 1e6).toFixed(0)} MPa | Su = {(mat.Su / 1e6).toFixed(0)} MPa
+        </div>
       </div>
 
       <div style={s.section}>
@@ -178,9 +239,11 @@ export default function FatiguePanel({ projectId, fileId }) {
             }}
             aria-label="Load history values"
           />
-          <div style={{ fontSize: 10, color: '#6b7280' }}>
-            {parseHistory().length} values — min/max: {Math.min(...parseHistory()).toFixed(0)} / {Math.max(...parseHistory()).toFixed(0)} N
-          </div>
+          {parseHistory().length > 0 && (
+            <div style={{ fontSize: 10, color: '#6b7280' }}>
+              {parseHistory().length} values — min/max: {Math.min(...parseHistory()).toFixed(0)} / {Math.max(...parseHistory()).toFixed(0)} N
+            </div>
+          )}
         </div>
       </div>
 
@@ -220,7 +283,15 @@ export default function FatiguePanel({ projectId, fileId }) {
               {safetyFactor != null && (
                 <tr>
                   <td style={s.td}>Safety factor</td>
-                  <td style={{ ...s.td, ...s.mono }}>{Number(safetyFactor).toFixed(2)}</td>
+                  <td style={{ ...s.td, ...s.mono, color: Number(safetyFactor) >= 1 ? '#34d399' : '#f87171' }}>
+                    {isFinite(Number(safetyFactor)) ? Number(safetyFactor).toFixed(2) : '∞'}
+                  </td>
+                </tr>
+              )}
+              {result.min_life_node != null && (
+                <tr>
+                  <td style={s.td}>Critical node</td>
+                  <td style={{ ...s.td, ...s.mono }}>{result.min_life_node}</td>
                 </tr>
               )}
               {result.max_vonmises_stress != null && (
@@ -232,9 +303,16 @@ export default function FatiguePanel({ projectId, fileId }) {
             </tbody>
           </table>
 
+          {/* Life / damage contour bars */}
           {(dmgMap.length > 0 || lifeMap.length > 0) && (
             <LifeContourBar data={lifeMap.length > 0 ? lifeMap : dmgMap} isLife={lifeMap.length > 0} />
           )}
+
+          {/* Multiaxial proportionality summary */}
+          {result.multiaxial_flags && Object.keys(result.multiaxial_flags).length > 0 && (
+            <MultiaxialSummary flags={result.multiaxial_flags} />
+          )}
+
           {dmgMap.length === 0 && lifeMap.length === 0 && (
             <LoadHistoryPlot values={parseHistory()} />
           )}
@@ -257,7 +335,186 @@ export default function FatiguePanel({ projectId, fileId }) {
   )
 }
 
-// Horizontal bar showing life or damage distribution across nodes.
+// ---------------------------------------------------------------------------
+// S-N curve SVG plot (log-log scale)
+// ---------------------------------------------------------------------------
+function SNcurvePlot({ pts, mat }) {
+  const W = 240, H = 70, PAD = { l: 30, r: 8, t: 6, b: 18 }
+  const inner = { w: W - PAD.l - PAD.r, h: H - PAD.t - PAD.b }
+
+  if (!pts || pts.length < 2) return null
+
+  const logNMin = Math.log10(pts[0].N)
+  const logNMax = Math.log10(pts[pts.length - 1].N)
+  const sigmaMin = Math.max(0.1, Math.min(...pts.map(p => p.sigma_a_mpa)))
+  const sigmaMax = Math.max(...pts.map(p => p.sigma_a_mpa))
+  const logSMin = Math.log10(sigmaMin)
+  const logSMax = Math.log10(sigmaMax)
+
+  function xPx(N) {
+    return PAD.l + ((Math.log10(N) - logNMin) / (logNMax - logNMin)) * inner.w
+  }
+  function yPx(sigma_mpa) {
+    const logS = Math.log10(Math.max(sigma_mpa, 0.1))
+    return PAD.t + (1 - (logS - logSMin) / (logSMax - logSMin)) * inner.h
+  }
+
+  const curvePts = pts.map(p => `${xPx(p.N).toFixed(1)},${yPx(p.sigma_a_mpa).toFixed(1)}`).join(' ')
+
+  // Endurance limit line
+  const Se_mpa = mat.Se / 1e6
+  const seY = yPx(Se_mpa)
+
+  // X-axis tick marks at 10^2, 10^4, 10^6, 10^8
+  const xTicks = [2, 4, 6, 8].filter(e => e >= logNMin && e <= logNMax)
+
+  return (
+    <svg
+      width={W} height={H}
+      style={{ display: 'block', background: '#1f2937', borderRadius: 4 }}
+      aria-label="S-N curve"
+      role="img"
+    >
+      {/* Grid lines */}
+      {xTicks.map(e => {
+        const x = xPx(Math.pow(10, e))
+        return <line key={e} x1={x} y1={PAD.t} x2={x} y2={H - PAD.b} stroke="#374151" strokeWidth="0.5" />
+      })}
+
+      {/* Endurance limit */}
+      {Se_mpa > sigmaMin && Se_mpa < sigmaMax && (
+        <>
+          <line x1={PAD.l} y1={seY} x2={W - PAD.r} y2={seY}
+            stroke="#6ee7b7" strokeWidth="1" strokeDasharray="4 2" />
+          <text x={W - PAD.r - 2} y={seY - 2} fontSize="8" fill="#6ee7b7" textAnchor="end">Se</text>
+        </>
+      )}
+
+      {/* S-N curve */}
+      <polyline points={curvePts} fill="none" stroke="#f472b6" strokeWidth="1.5" />
+
+      {/* Axis labels */}
+      {xTicks.map(e => {
+        const x = xPx(Math.pow(10, e))
+        return (
+          <text key={e} x={x} y={H - 3} fontSize="7" fill="#6b7280" textAnchor="middle">
+            10^{e}
+          </text>
+        )
+      })}
+      <text x={PAD.l - 2} y={H - PAD.b} fontSize="7" fill="#6b7280" textAnchor="end" transform={`rotate(-90, ${PAD.l - 2}, ${H / 2})`}
+        style={{ transformOrigin: `${PAD.l - 2}px ${H / 2}px` }}>
+      </text>
+      <text x={W / 2} y={H - 2} fontSize="7" fill="#6b7280" textAnchor="middle">N (cycles)</text>
+      <text x={PAD.l + 2} y={PAD.t + 8} fontSize="7" fill="#9ca3af">σ_a (MPa)</text>
+    </svg>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Haigh (Goodman) diagram SVG
+// ---------------------------------------------------------------------------
+function HaighDiagramPlot({ pts, mat }) {
+  const W = 240, H = 70, PAD = { l: 28, r: 8, t: 6, b: 18 }
+  const inner = { w: W - PAD.l - PAD.r, h: H - PAD.t - PAD.b }
+
+  if (!pts || pts.length < 2) return null
+
+  const Su_mpa = mat.Su / 1e6
+  const Se_mpa = mat.Se / 1e6
+  const Sy_mpa = mat.Sy / 1e6
+
+  function xPx(sigma_m) {
+    return PAD.l + (sigma_m / Su_mpa) * inner.w
+  }
+  function yPx(sigma_a) {
+    return PAD.t + (1 - sigma_a / Se_mpa) * inner.h
+  }
+
+  // Goodman line
+  const goodmanPts = pts.map(p => `${xPx(p.sigma_m_mpa).toFixed(1)},${yPx(p.sigma_a_mpa).toFixed(1)}`).join(' ')
+
+  // Gerber parabola: σ_a = Se * (1 - (σ_m/Su)^2)
+  const gerberPts = pts.map(p => {
+    const r = p.sigma_m_mpa / Su_mpa
+    const a = Math.max(Se_mpa * (1 - r * r), 0)
+    return `${xPx(p.sigma_m_mpa).toFixed(1)},${yPx(a).toFixed(1)}`
+  }).join(' ')
+
+  // Langer yield line: σ_a = Sy - σ_m
+  const langerPts = pts
+    .filter(p => Sy_mpa - p.sigma_m_mpa >= 0)
+    .map(p => `${xPx(p.sigma_m_mpa).toFixed(1)},${yPx(Math.max(Sy_mpa - p.sigma_m_mpa, 0)).toFixed(1)}`)
+    .join(' ')
+
+  const xTicks = [0, 0.25, 0.5, 0.75, 1.0]
+
+  return (
+    <svg
+      width={W} height={H}
+      style={{ display: 'block', background: '#1f2937', borderRadius: 4 }}
+      aria-label="Haigh diagram"
+      role="img"
+    >
+      {/* Grid */}
+      {xTicks.map(r => {
+        const x = PAD.l + r * inner.w
+        return <line key={r} x1={x} y1={PAD.t} x2={x} y2={H - PAD.b} stroke="#374151" strokeWidth="0.5" />
+      })}
+
+      {/* Gerber (less conservative) */}
+      <polyline points={gerberPts} fill="none" stroke="#fb923c" strokeWidth="1" strokeDasharray="4 2" />
+      {/* Langer yield */}
+      <polyline points={langerPts} fill="none" stroke="#a78bfa" strokeWidth="1" strokeDasharray="2 2" />
+      {/* Goodman */}
+      <polyline points={goodmanPts} fill="none" stroke="#f472b6" strokeWidth="1.5" />
+
+      {/* Legend */}
+      <line x1={W - 70} y1={PAD.t + 5} x2={W - 55} y2={PAD.t + 5} stroke="#f472b6" strokeWidth="1.5" />
+      <text x={W - 53} y={PAD.t + 8} fontSize="7" fill="#f472b6">Goodman</text>
+      <line x1={W - 70} y1={PAD.t + 14} x2={W - 55} y2={PAD.t + 14} stroke="#fb923c" strokeWidth="1" strokeDasharray="4 2" />
+      <text x={W - 53} y={PAD.t + 17} fontSize="7" fill="#fb923c">Gerber</text>
+      <line x1={W - 70} y1={PAD.t + 23} x2={W - 55} y2={PAD.t + 23} stroke="#a78bfa" strokeWidth="1" strokeDasharray="2 2" />
+      <text x={W - 53} y={PAD.t + 26} fontSize="7" fill="#a78bfa">Yield</text>
+
+      {/* Axis labels */}
+      {xTicks.slice(1).map(r => {
+        const x = PAD.l + r * inner.w
+        return (
+          <text key={r} x={x} y={H - 3} fontSize="7" fill="#6b7280" textAnchor="middle">
+            {(r * Su_mpa).toFixed(0)}
+          </text>
+        )
+      })}
+      <text x={W / 2} y={H - 2} fontSize="7" fill="#6b7280" textAnchor="middle">σ_m (MPa)</text>
+      <text x={PAD.l + 2} y={PAD.t + 8} fontSize="7" fill="#9ca3af">σ_a</text>
+    </svg>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Multiaxial proportionality summary badge row
+// ---------------------------------------------------------------------------
+function MultiaxialSummary({ flags }) {
+  const entries = Object.entries(flags)
+  const npCount = entries.filter(([, v]) => v === 'non_proportional').length
+  const total   = entries.length
+  if (total === 0) return null
+  return (
+    <div style={{ fontSize: 11, color: '#9ca3af', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      <span>Multiaxial:</span>
+      <span style={{ color: npCount === 0 ? '#34d399' : '#fbbf24' }}>
+        {npCount === 0
+          ? 'All proportional'
+          : `${npCount}/${total} non-proportional`}
+      </span>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Life / damage contour bar chart
+// ---------------------------------------------------------------------------
 function LifeContourBar({ data, isLife }) {
   const N = Math.min(data.length, 30)
   const slice = data.slice(0, N)
@@ -269,7 +526,6 @@ function LifeContourBar({ data, isLife }) {
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 40 }}>
         {slice.map((v, i) => {
-          // For life: higher = greener (longer life). For damage: higher = redder.
           const norm = Math.abs(v) / max
           const r = isLife ? Math.round((1 - norm) * 200) : Math.round(norm * 220)
           const g = isLife ? Math.round(norm * 200) : Math.round((1 - norm) * 80)
@@ -287,7 +543,9 @@ function LifeContourBar({ data, isLife }) {
   )
 }
 
-// Simple load history plot.
+// ---------------------------------------------------------------------------
+// Simple load history plot
+// ---------------------------------------------------------------------------
 function LoadHistoryPlot({ values }) {
   const W = 240, H = 50
   if (!values.length) return null

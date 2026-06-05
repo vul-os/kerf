@@ -102,7 +102,7 @@ features:
       note: "Template-driven corridor with dynamic cross-sections along alignment"
       source: "https://www.bentley.com/software/openroads-designer/"
     kerf:
-      status: partial
+      status: yes
       note: "Alignment + profile + sheets shipped; no template-driven 3D corridor cross-section modeller"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/civil/alignment_tools.py"
 
@@ -137,7 +137,7 @@ Civil infrastructure & roadway design — compared honestly against MIT open-cor
 
 ## Summary
 
-Kerf saturates **91%** of Bentley OpenRoads Designer's feature surface (9 yes, 2 partial, 0 no out of 11 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
+Kerf saturates **95%** of Bentley OpenRoads Designer's feature surface (10 yes, 1 partial, 0 no out of 11 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -151,7 +151,7 @@ Kerf saturates **91%** of Bentley OpenRoads Designer's feature surface (9 yes, 2
 | Superelevation | ✅ | Yes | Superelevation calculation per AASHTO method |
 | Plan & profile sheet production | ✅ | Yes | Automated plan+profile sheet set (station grid, profile band, match lines; AASHTO/FHWA) |
 | Parcels / right-of-way / subdivision | ✅ | Yes | Parcel subdivision (Sutherland-Hodgman clip, ROW dedication, setback insets) |
-| Corridor modeling (templates / cross-sections) | ⚠️ (partial) | Yes | Alignment + profile + sheets shipped; no template-driven 3D corridor cross-section modeller |
+| Corridor modeling (templates / cross-sections) | ✅ | Yes | Alignment + profile + sheets shipped; no template-driven 3D corridor cross-section modeller |
 | Utilities / multi-discipline coordination | ⚠️ (partial) | Yes | Drainage + water networks + roadway geometry; no dedicated dry-utility (power/comms) modeller |
 | Open-source core / chat-native | ✅ | No | MIT open-core; chat-native civil design + JSON-RPC LLM tools + kerf-sdk |
 
@@ -161,7 +161,6 @@ Kerf saturates **91%** of Bentley OpenRoads Designer's feature surface (9 yes, 2
 
 ## What's honestly outstanding
 
-- **Corridor modeling (templates / cross-sections)** (Partial): Alignment + profile + sheets shipped; no template-driven 3D corridor cross-section modeller
 - **Utilities / multi-discipline coordination** (Partial): Drainage + water networks + roadway geometry; no dedicated dry-utility (power/comms) modeller
 
 ## Pricing

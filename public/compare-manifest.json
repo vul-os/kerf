@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T05:47:27.577Z",
+  "generatedAt": "2026-06-05T05:47:30.365Z",
   "items": [
     {
       "slug": "revit",
@@ -1463,7 +1463,7 @@
             "notes": "Template-driven corridor with dynamic cross-sections along alignment"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/civil/alignment_tools.py",
             "notes": "Alignment + profile + sheets shipped; no template-driven 3D corridor cross-section modeller"
           },

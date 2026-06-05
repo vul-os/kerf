@@ -258,6 +258,15 @@ def _register_tools(ctx, provides: list) -> None:
         #   multimeter (DC/AC/RMS) + function-gen (sine/square/triangle stimulus)
         # eda_probe_nodes: per-node V / per-branch I overlay for schematic probes
         "kerf_electronics.virtual_instruments.tools",
+        # IC package / substrate design (APD parity)
+        # ic_package_create: define die + substrate + bond wires/bumps + BGA pin map + net map
+        # ic_package_drc: DRC — wire length/angle (IPC-7094A §3), bump pitch (IPC-SM-785 §6),
+        #   ball pitch (JEDEC JEP95), net-map integrity
+        "kerf_electronics.ic_package.tools",
+        # Constraint Manager spreadsheet UI — tabular get/set over net-class engine
+        # constraint_table_get: flat row/col table (net-classes + per-net overrides)
+        # constraint_table_set: validated cell edits → updated circuit_json + table
+        "kerf_electronics.constraint_manager.tools",
     ]
 
     for module_path in tool_modules:

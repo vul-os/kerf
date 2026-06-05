@@ -124,9 +124,9 @@ features:
       note: "Spreadsheet-driven constraint authoring across the design"
       source: "https://www.cadence.com/en_US/home/tools/pcb-design-and-analysis/allegro-x-design-platform.html"
     kerf:
-      status: partial
-      note: "Constraint/net-class engine present; no spreadsheet constraint-authoring UI"
-      evidence: "packages/kerf-electronics/src/kerf_electronics/tools/net_classes.py"
+      status: yes
+      note: "Editable spreadsheet grid (rows=net-classes+net overrides, cols=trace width/clearance/impedance/via type/length-match group) via constraint_table_get/set; loads from existing net-class engine; cell-level validation; Add row for new classes or net overrides"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/constraint_manager/tools.py"
 
   - domain: D6
     feature: "IC package / substrate design (APD)"
@@ -135,9 +135,9 @@ features:
       note: "Allegro X Advanced Package Designer for IC packages/substrates"
       source: "https://www.cadence.com/en_US/home/resources/datasheets/allegro-x-advanced-package-designer-ds.html"
     kerf:
-      status: no
-      note: "No IC package / substrate (wire-bond / flip-chip) design tool"
-      evidence: ""
+      status: yes
+      note: "Wire-bond and flip-chip package data model (die, substrate, bond wires/bumps, BGA ball grid, net map die-pad→ball); DRC for bond-wire length/angle (IPC-7094A §3), bump pitch (IPC-SM-785 §6), ball pitch (JEDEC JEP95), net-map integrity; SVG substrate/BGA viewer panel"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/ic_package/tools.py"
 
   - domain: D1
     feature: "Open-source core / chat-native"
@@ -159,7 +159,7 @@ High-end constraint-driven PCB design — compared honestly against MIT open-cor
 
 ## Summary
 
-Kerf saturates **88%** of Cadence Allegro X's feature surface (11 yes, 1 partial, 1 no out of 13 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **100%** of Cadence Allegro X's feature surface tracked here (13 yes, 0 partial, 0 no out of 13 features). IC package / substrate design and the Constraint Manager spreadsheet UI are both now implemented.
 
 ## Feature comparison
 
@@ -175,8 +175,8 @@ Kerf saturates **88%** of Cadence Allegro X's feature surface (11 yes, 1 partial
 | DRC / DFM checks | ✅ | Yes | Netlist DRC + ERC + DFM checklist (IPC-2221B presets) |
 | Fabrication output (Gerber / ODB++ / IPC-2581) | ✅ | Yes | Gerber RS-274X + Excellon + ODB++ + IPC-2581 + IPC-D-356A netlist |
 | Multi-board / system design | ✅ | Yes | MB3D multi-board workspace + inter-board net mapping |
-| Constraint Manager spreadsheet UI | ⚠️ (partial) | Yes | Constraint/net-class engine present; no spreadsheet constraint-authoring UI |
-| IC package / substrate design (APD) | 🔴 (no) | Yes | No IC package / substrate (wire-bond / flip-chip) design tool |
+| Constraint Manager spreadsheet UI | ✅ | Yes | Editable spreadsheet grid (rows=net-classes+net overrides, cols=trace width/clearance/impedance/via type/length-match group); cell-level validation; loads/writes existing constraint engine |
+| IC package / substrate design (APD) | ✅ | Yes | Wire-bond + flip-chip package model (die, substrate, bumps/wires, BGA ball grid, net map); DRC (IPC-7094A §3, IPC-SM-785 §6, JEDEC JEP95); SVG substrate viewer |
 | Open-source core / chat-native | ✅ | No | MIT open-core; chat-native PCB design + JSON-RPC LLM tools + kerf-sdk |
 
 ## What Kerf does that Cadence Allegro X doesn't
@@ -185,8 +185,7 @@ Kerf saturates **88%** of Cadence Allegro X's feature surface (11 yes, 1 partial
 
 ## What's honestly outstanding
 
-- **Constraint Manager spreadsheet UI** (Partial): Constraint/net-class engine present; no spreadsheet constraint-authoring UI
-- **IC package / substrate design (APD)** (Not yet implemented): No IC package / substrate (wire-bond / flip-chip) design tool
+No features outstanding for the tracked set — all 13 are now implemented.
 
 ## Pricing
 

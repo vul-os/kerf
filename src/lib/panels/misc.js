@@ -96,4 +96,22 @@ export default [
     load: () => import('./misc-wrappers/WiringViewWrapper.jsx'),
     label: 'Wiring Diagram',
   },
+
+  // ── Electronics: IC Package / Substrate Designer (APD parity) ─────────────
+  {
+    id: 'ic_package',
+    kinds: ['ic_package', 'ic_substrate', 'bga_package', 'wire_bond_package'],
+    exts: ['.icpkg', '.icsubstrate'],
+    load: () => import('./misc-wrappers/ICPackageWrapper.jsx'),
+    label: 'IC Package Designer',
+  },
+
+  // ── Electronics: Constraint Manager Spreadsheet UI (Allegro parity) ───────
+  {
+    id: 'constraint_manager',
+    kinds: ['constraint_manager', 'pcb_constraints', 'net_class_table'],
+    exts: ['.constraints', '.cmgr'],
+    load: () => import('./misc-wrappers/ConstraintManagerWrapper.jsx'),
+    label: 'Constraint Manager',
+  },
 ]

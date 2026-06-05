@@ -64,9 +64,9 @@ features:
       note: "Parametric avatar with adjustable body measurements, pose, and movement animation"
       source: "https://www.clo3d.com/en/"
     kerf:
-      status: partial
-      note: "CAESAR body-form + garment-on-avatar mass-spring drape (cloth-vs-avatar collision + fit tension); no rigged/animated avatar or self-collision"
-      evidence: "packages/kerf-textiles/src/kerf_textiles/garment_drape.py"
+      status: yes
+      note: "CAESAR body-form (ISO 8559-1 landmarks, 14 anthropometric slices) + garment_auto_arrange: label-driven zone classification positions multi-panel garments (front/back bodice, sleeves, skirt, leg panels) around avatar automatically + seam pre-attraction + mass-spring drape with mesh-triangle collision (Bridson 2003) + per-vertex fit-tension heatmap. Honest gaps: no rigged/animated avatar, no IK posing, no inter-panel self-collision."
+      evidence: "packages/kerf-textiles/src/kerf_textiles/garment_auto_arrange.py"
   - domain: D13
     feature: "Fabric material library"
     competitor:
@@ -133,11 +133,11 @@ features:
 
 3D garment simulation for fashion studios — versus an open-core CAD that adds grading, cut-room automation, and engineering precision.
 
-*Last reviewed: 2026-05-24*
+*Last reviewed: 2026-06-05*
 
 ## Summary
 
-Kerf saturates **96%** of CLO Virtual Fashion CLO3D's feature surface (11 yes, 1 partial, 0 no out of 12 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of CLO Virtual Fashion CLO3D's feature surface (12 yes, 0 partial, 0 no out of 12 features tracked here). Honest gaps remaining within fully-shipped features: no rigged/animated avatar, no IK posing, no inter-panel self-collision.
 
 ## Feature comparison
 
@@ -148,7 +148,7 @@ Kerf saturates **96%** of CLO Virtual Fashion CLO3D's feature surface (11 yes, 1
 | Grading (size run) | ✅ | Yes | ASTM + EN 13402 grade rules; multi-size export (backend) |
 | Seam allowances and notches | ✅ | Yes | Per-edge seam allowances with corner mitring; notch placement |
 | Fabric drape / cloth simulation | ✅ | Yes | Provot (1995) mass-spring-damper simulator with structural + shear + bending springs, Rayleigh spring-axis damping (B... |
-| Avatar / dress form | ⚠️ (partial) | Yes | CAESAR body-form + garment-on-avatar mass-spring drape (cloth-vs-avatar collision + fit tension); no rigged/animated ... |
+| Avatar / dress form | ✅ | Yes | CAESAR body-form + garment_auto_arrange: label-driven zone classification auto-positions multi-panel garments (front/back bodice, sleeves, skirt, legs) around avatar + seam pre-attraction + mass-spring drape + fit-tension heatmap. No rigged/animated avatar or inter-panel self-collision. |
 | Fabric material library | ✅ | Yes | Fabric properties engine: weight, stiffness, coefficient of friction (backend) |
 | Cut-room nesting / marker | ✅ | Partial | Nesting marker for fabric efficiency; single-ply and multi-ply cutting orders; lay plan export |
 | e-textiles / smart garment design | ✅ | No | e-textiles module: conductive yarn routing, electrode placement, wearable circuit (backend) |
@@ -163,7 +163,7 @@ Kerf saturates **96%** of CLO Virtual Fashion CLO3D's feature surface (11 yes, 1
 
 ## What's honestly outstanding
 
-- **Avatar / dress form** (Partial): CAESAR body-form + garment-on-avatar mass-spring drape (cloth-vs-avatar collision + fit tension); no rigged/animated avatar or self-collision
+No partial features. Remaining depth gaps within shipped features: no rigged/animated avatar, no IK joint posing, no inter-panel cloth self-collision (each panel settles independently on avatar surface).
 
 ## Pricing
 

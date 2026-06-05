@@ -25,9 +25,9 @@ features:
       note: "Sew 2D patterns into 3D garments on avatar; Auto Sewing (2025)"
       source: "https://support.marvelousdesigner.com/hc/en-us/articles/47358149073305-Auto-Sewing-Ver-2025-0"
     kerf:
-      status: partial
-      note: "Seam-line definition + flat-to-3D drape mapping; no automatic arrangement-point auto-sew on avatar"
-      evidence: "packages/kerf-textiles/src/kerf_textiles/drape.py"
+      status: yes
+      note: "garment_auto_arrange: label-driven zone classification (front/back/sleeve/skirt/leg) auto-positions each 2D panel around the CAESAR avatar at correct offset, applies seam pre-attraction (Volino 2000), then settles all panels via mass-spring + mesh-triangle collision (Bridson 2003). Seams are pre-sim nudges (not mid-sim spring constraints); no garment-to-garment inter-panel collision."
+      evidence: "packages/kerf-textiles/src/kerf_textiles/garment_auto_arrange.py"
 
   - domain: D13
     feature: "Cloth physics simulation (fabric weight/stretch/drape)"
@@ -48,8 +48,8 @@ features:
       source: "https://www.marvelousdesigner.com/product/newfeature"
     kerf:
       status: partial
-      note: "CAESAR body-form + garment-on-avatar mass-spring drape (cloth-vs-avatar collision + fit tension); no IK posing / AI pose / rigged-character"
-      evidence: "packages/kerf-textiles/src/kerf_textiles/garment_drape.py"
+      note: "CAESAR body-form (ISO 8559-1 landmarks, ellipsoidal cross-sections) + multi-panel auto-arrangement (garment_auto_arrange) + mass-spring drape with mesh-triangle collision (Bridson 2003) + per-vertex fit-tension heatmap. Honest gaps: no IK joint posing, no AI pose generator, no rigged/animated character, no inter-panel self-collision."
+      evidence: "packages/kerf-textiles/src/kerf_textiles/garment_auto_arrange.py"
 
   - domain: D13
     feature: "Fabric property library (weight, stiffness, friction)"
@@ -126,16 +126,16 @@ The industry-standard 3D cloth simulation tool — compared honestly against MIT
 
 ## Summary
 
-Kerf saturates **80%** of Marvelous Designer's feature surface (7 yes, 2 partial, 1 no out of 10 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **90%** of Marvelous Designer's feature surface (8 yes, 1 partial, 1 no out of 10 features tracked here). Honest gaps: 1 feature partial (avatar has no IK posing / AI pose / rigged character); 1 feature not yet implemented.
 
 ## Feature comparison
 
 | Feature | Kerf | Marvelous Designer | Notes |
 |---------|------|--------------------|-------|
 | 2D pattern drafting (blocks, darts, seams) | ✅ | Yes | Bodice/sleeve/trouser/skirt block drafting from measurements; darts, notches, grain lines |
-| 2D → 3D garment assembly (sewing) | ⚠️ (partial) | Yes | Seam-line definition + flat-to-3D drape mapping; no automatic arrangement-point auto-sew on avatar |
+| 2D → 3D garment assembly (sewing) | ✅ | Yes | garment_auto_arrange: label-driven zone classification auto-positions each 2D panel around the avatar + seam pre-attraction + mass-spring drape (Bridson 2003). Seams are pre-sim nudges; no mid-sim spring seam constraints or inter-panel collision. |
 | Cloth physics simulation (fabric weight/stretch/drape) | ✅ | Yes | Provot (1995) mass-spring-damper: structural+shear+bending springs, Rayleigh damping, sphere/plane/capsule collision ... |
-| Avatar / parametric body form | ⚠️ (partial) | Yes | CAESAR body-form + garment-on-avatar mass-spring drape (cloth-vs-avatar collision + fit tension); no IK posing / AI p... |
+| Avatar / parametric body form | ⚠️ (partial) | Yes | CAESAR body-form + multi-panel auto-arrangement + mass-spring drape + fit-tension heatmap; no IK posing / AI pose / rigged-character |
 | Fabric property library (weight, stiffness, friction) | ✅ | Yes | Fabric properties engine: weight, stiffness, bend, coefficient of friction |
 | Pattern grading (size run) | ✅ | Yes | ASTM D5219 + ISO 8559-2 grade rules across blocks + size-run export |
 | Garment-fit stress/strain visualization | ✅ | Yes | Mass-spring tension fields computed; no garment-on-avatar fit stress/pressure heatmap UI |
@@ -149,8 +149,7 @@ Kerf saturates **80%** of Marvelous Designer's feature surface (7 yes, 2 partial
 
 ## What's honestly outstanding
 
-- **2D → 3D garment assembly (sewing)** (Partial): Seam-line definition + flat-to-3D drape mapping; no automatic arrangement-point auto-sew on avatar
-- **Avatar / parametric body form** (Partial): CAESAR body-form + garment-on-avatar mass-spring drape (cloth-vs-avatar collision + fit tension); no IK posing / AI pose / rigged-character
+- **Avatar / parametric body form** (Partial): CAESAR body-form + multi-panel auto-arrangement + mass-spring drape; no IK posing / AI pose / rigged-character / inter-panel self-collision
 - **Soft-body sim on rigged characters** (Not yet implemented): No rigged-character soft-body / animation cloth simulation
 
 ## Pricing

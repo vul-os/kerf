@@ -42,6 +42,10 @@ async def register(app: FastAPI, ctx):
     ctx.tools.register("garment_drape_on_avatar",
                        garment_drape_on_avatar_spec, run_garment_drape_on_avatar)
 
+    from kerf_textiles.tools import garment_auto_arrange_spec, run_garment_auto_arrange
+    ctx.tools.register("garment_auto_arrange",
+                       garment_auto_arrange_spec, run_garment_auto_arrange)
+
     try:
         from kerf_core.plugin import PluginManifest
         return PluginManifest(
@@ -51,6 +55,7 @@ async def register(app: FastAPI, ctx):
                 "textiles.weave", "textiles.knit", "textiles.draft", "textiles.drape",
                 "textiles.cut_room", "textiles.etextiles", "textiles.sustainability",
                 "textiles.pattern_grade", "textiles.garment_drape_on_avatar",
+                "textiles.garment_auto_arrange",
             ],
             depends=[],
         )
@@ -62,6 +67,7 @@ async def register(app: FastAPI, ctx):
                 "textiles.weave", "textiles.knit", "textiles.draft", "textiles.drape",
                 "textiles.cut_room", "textiles.etextiles", "textiles.sustainability",
                 "textiles.pattern_grade", "textiles.garment_drape_on_avatar",
+                "textiles.garment_auto_arrange",
             ],
             "depends": [],
         }

@@ -813,3 +813,246 @@ async def run_garment_drape_on_avatar(params: dict[str, Any]) -> dict[str, Any]:
         return {"ok": False, "error": str(exc)}
     except Exception as exc:
         return {"ok": False, "error": f"drape simulation failed: {exc}"}
+
+
+# ---------------------------------------------------------------------------
+# garment_auto_arrange  — multi-panel auto-arrangement + drape
+# ---------------------------------------------------------------------------
+
+garment_auto_arrange_spec = {
+    "name": "garment_auto_arrange",
+    "description": (
+        "Automatically position multiple 2D garment panels around a parametric "
+        "CAESAR body-form avatar and drape them using mass-spring cloth simulation "
+        "(Bridson 2003 collision). Eliminates manual panel placement.\n\n"
+        "Workflow:\n"
+        "  1. Classify each panel by label to a body zone (front_torso, back_torso,\n"
+        "     left_sleeve, right_sleeve, skirt_front, skirt_back, left_leg_front,\n"
+        "     right_leg_front, etc.).\n"
+        "  2. Auto-position each panel around the avatar at the correct zone "
+        "centroid + clearance offset — panels start OUTSIDE the body.\n"
+        "  3. Apply seam pre-attraction: move stitched panel edges toward each "
+        "other (simulating the Sew step).\n"
+        "  4. Drape each panel under gravity with avatar mesh-collision response.\n"
+        "  5. Return per-panel 3D transforms, initial positions, draped positions, "
+        "fit-tension heatmap, penetration status, and seam proximity flags.\n\n"
+        "Panel label keywords for zone classification:\n"
+        "  front / bodice_front / front_bodice  -> front_torso\n"
+        "  back  / bodice_back  / back_bodice   -> back_torso\n"
+        "  left_sleeve / lsleeve / sleeve       -> left_sleeve\n"
+        "  right_sleeve / rsleeve               -> right_sleeve\n"
+        "  skirt_front / skirt                  -> skirt_front\n"
+        "  skirt_back                           -> skirt_back\n"
+        "  left_leg / pant_left / trouser_left  -> left_leg_front\n"
+        "  right_leg / pant_right / trouser_right -> right_leg_front\n"
+        "  collar / cuff / neckband             -> front_torso\n\n"
+        "Seam edge keywords: 'top', 'bottom', 'left', 'right'."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "panels": {
+                "type": "array",
+                "description": (
+                    "List of 2D garment panels. Each: "
+                    "{label: str, width_cm: float, height_cm: float, "
+                    "rows?: int (default 8), cols?: int (default 8)}."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "label": {"type": "string"},
+                        "width_cm": {"type": "number"},
+                        "height_cm": {"type": "number"},
+                        "rows": {"type": "integer", "minimum": 3, "maximum": 16},
+                        "cols": {"type": "integer", "minimum": 3, "maximum": 16},
+                    },
+                    "required": ["label", "width_cm", "height_cm"],
+                },
+            },
+            "seams": {
+                "type": "array",
+                "description": (
+                    "List of seam/stitch definitions. Each: "
+                    "{panel_a: str, edge_a: str, panel_b: str, edge_b: str}. "
+                    "edge values: 'top', 'bottom', 'left', 'right'."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "panel_a": {"type": "string"},
+                        "edge_a": {"type": "string", "enum": ["top", "bottom", "left", "right"]},
+                        "panel_b": {"type": "string"},
+                        "edge_b": {"type": "string", "enum": ["top", "bottom", "left", "right"]},
+                    },
+                    "required": ["panel_a", "edge_a", "panel_b", "edge_b"],
+                },
+            },
+            "height_cm": {
+                "type": "number",
+                "description": "Avatar height in cm. Default 168.",
+            },
+            "bust_cm": {
+                "type": "number",
+                "description": "Avatar bust girth (cm). Default 92.",
+            },
+            "waist_cm": {
+                "type": "number",
+                "description": "Avatar waist girth (cm). Default 74.",
+            },
+            "hip_cm": {
+                "type": "number",
+                "description": "Avatar hip girth (cm). Default 96.",
+            },
+            "sex": {
+                "type": "string",
+                "enum": ["female", "male", "unisex"],
+                "description": "Avatar sex. Default 'female'.",
+            },
+            "offset_cm": {
+                "type": "number",
+                "description": "Clearance offset (cm) from body surface. Default 5.",
+            },
+            "seam_attract_blend": {
+                "type": "number",
+                "description": (
+                    "How far each seam edge moves toward the other before drape "
+                    "(0=no attraction, 0.5=meet at midpoint). Default 0.4."
+                ),
+            },
+            "drape_steps": {
+                "type": "integer",
+                "description": "Max drape simulation steps per panel. Default 800.",
+                "minimum": 50,
+                "maximum": 3000,
+            },
+            "k_bend": {
+                "type": "number",
+                "description": "Bending stiffness (N/m). Higher = stiffer fabric. Default 4.",
+            },
+            "pin_top_edge": {
+                "type": "boolean",
+                "description": "Pin top row of each panel (garment on hanger). Default true.",
+            },
+        },
+        "required": ["panels"],
+    },
+}
+
+
+async def run_garment_auto_arrange(params: dict[str, Any]) -> dict[str, Any]:
+    """Handler for the garment_auto_arrange LLM tool."""
+    try:
+        from kerf_textiles.garment_auto_arrange import (
+            GarmentPanel, SeamDefinition,
+            garment_auto_arrange_on_standard_avatar,
+        )
+        import numpy as np
+
+        # Parse panels
+        raw_panels = params.get("panels", [])
+        if not raw_panels:
+            return {"ok": False, "error": "panels list is required and must not be empty"}
+
+        panels = []
+        for p in raw_panels:
+            panels.append(GarmentPanel(
+                label=str(p["label"]),
+                width_cm=float(p["width_cm"]),
+                height_cm=float(p["height_cm"]),
+                rows=int(p.get("rows", 8)),
+                cols=int(p.get("cols", 8)),
+            ))
+
+        # Parse seams
+        raw_seams = params.get("seams", []) or []
+        seams = []
+        for s in raw_seams:
+            seams.append(SeamDefinition(
+                panel_a=str(s["panel_a"]),
+                edge_a=str(s["edge_a"]),
+                panel_b=str(s["panel_b"]),
+                edge_b=str(s["edge_b"]),
+            ))
+
+        # Avatar params
+        height_cm = float(params.get("height_cm", 168.0))
+        bust_cm   = float(params.get("bust_cm",   92.0))
+        waist_cm  = float(params.get("waist_cm",  74.0))
+        hip_cm    = float(params.get("hip_cm",    96.0))
+        sex       = str(params.get("sex", "female"))
+        offset_cm = float(params.get("offset_cm", 5.0))
+        seam_blend = float(params.get("seam_attract_blend", 0.4))
+        drape_steps = int(params.get("drape_steps", 800))
+        k_bend    = float(params.get("k_bend", 4.0))
+        pin_top   = bool(params.get("pin_top_edge", True))
+
+        result = garment_auto_arrange_on_standard_avatar(
+            panels=panels,
+            seams=seams,
+            height_cm=height_cm,
+            bust_cm=bust_cm,
+            waist_cm=waist_cm,
+            hip_cm=hip_cm,
+            sex=sex,
+            offset_cm=offset_cm,
+            seam_attract_blend=seam_blend,
+            drape_steps=drape_steps,
+            k_bend=k_bend,
+            pin_top_edge=pin_top,
+        )
+
+        # Serialise per-panel output
+        panels_out = []
+        for ap in result.panels:
+            panels_out.append({
+                "label": ap.label,
+                "zone": ap.zone,
+                "translation_cm": [round(float(v), 2) for v in ap.translation_cm],
+                "rotation_euler_deg": [round(float(v), 1) for v in ap.rotation_euler_deg],
+                "rows": ap.rows,
+                "cols": ap.cols,
+                "n_particles": ap.rows * ap.cols,
+                "no_deep_penetration": ap.no_deep_penetration,
+                "max_penetration_cm": round(ap.max_penetration_cm, 4),
+                "drape_converged": ap.drape_converged,
+                "drape_steps_taken": ap.drape_steps_taken,
+                "fit_tension_mean": round(float(np.mean(ap.fit_tension)), 5),
+                "fit_tension_max":  round(float(np.max(ap.fit_tension)), 5),
+                "n_energy_samples": len(ap.energy_history),
+                # Include draped positions (rounded for JSON size)
+                "draped_positions_cm": [
+                    [round(float(v), 2) for v in row]
+                    for row in ap.draped_positions_cm
+                ],
+                # Initial positions (arranged, before drape)
+                "initial_positions_cm": [
+                    [round(float(v), 2) for v in row]
+                    for row in ap.initial_positions_cm
+                ],
+            })
+
+        return {
+            "ok": True,
+            "n_panels": len(result.panels),
+            "n_seams": len(result.seam_proximity_met),
+            "seam_proximity_met": result.seam_proximity_met,
+            "avatar": {
+                "height_cm": result.avatar_height_cm,
+                "bust_cm": result.bust_cm,
+                "waist_cm": result.waist_cm,
+                "hip_cm": result.hip_cm,
+                "n_verts": result.n_avatar_verts,
+                "n_faces": result.n_avatar_faces,
+            },
+            "panels": panels_out,
+            "note": (
+                "Panels auto-arranged around CAESAR body-form avatar by zone classification "
+                "of panel labels. Drape: Provot (1995) mass-spring + Bridson (2003) "
+                "mesh-triangle collision. fit_tension > 0 = stretched (tight); "
+                "< 0 = compressed (bunched). Positions in cm."
+            ),
+        }
+
+    except Exception as exc:
+        return {"ok": False, "error": f"garment_auto_arrange failed: {exc}"}

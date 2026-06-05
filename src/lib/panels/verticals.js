@@ -7,11 +7,12 @@
 // File-kind → panel mapping:
 //
 //   TEXTILES
-//     apparel_grade        → ApparelGradingPanel      (.apgrade)
-//     textiles_weaveknit   → TextilesWeaveKnitPanel   (.weaveknit)
-//     textiles_etextiles   → ETextilesPanel            (.etextiles)
-//     garment_avatar       → GarmentAvatarPanel        (.avatar)
-//     garment_drape        → GarmentDrapePanel         (.drape)
+//     apparel_grade          → ApparelGradingPanel        (.apgrade)
+//     textiles_weaveknit     → TextilesWeaveKnitPanel     (.weaveknit)
+//     textiles_etextiles     → ETextilesPanel              (.etextiles)
+//     garment_avatar         → GarmentAvatarPanel          (.avatar)
+//     garment_drape          → GarmentDrapePanel           (.drape)
+//     garment_auto_arrange   → GarmentAutoArrangePanel     (.autoarrange)
 //
 //   DENTAL
 //     dental_crown_bridge  → CrownBridgePanel          (.dentalcrown)
@@ -68,6 +69,13 @@ export default [
     exts: ['.drape'],
     label: 'Garment Drape',
     load: () => import('../../components/GarmentDrapePanel.jsx'),
+  },
+  {
+    id: 'garment_auto_arrange',
+    kinds: ['garment_auto_arrange'],
+    exts: ['.autoarrange'],
+    label: 'Garment Auto-Arrangement',
+    load: () => import('../../components/GarmentAutoArrangePanel.jsx'),
   },
 
   // ── DENTAL ────────────────────────────────────────────────────────────────

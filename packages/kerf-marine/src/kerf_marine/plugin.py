@@ -31,6 +31,12 @@ async def register(app: FastAPI, ctx):
         marine_hull_fairness_audit_spec, run_marine_hull_fairness_audit,
         marine_fair_hull_spec, run_marine_fair_hull,
     )
+    from kerf_marine.hull_form import (
+        marine_hull_form_spec, run_marine_hull_form,
+    )
+    from kerf_marine.hull_exchange import (
+        marine_hull_exchange_spec, run_marine_hull_exchange,
+    )
     ctx.tools.register(
         "marine_hydrostatics",
         marine_hydrostatics_spec,
@@ -81,6 +87,16 @@ async def register(app: FastAPI, ctx):
         marine_fair_hull_spec,
         run_marine_fair_hull,
     )
+    ctx.tools.register(
+        "marine_hull_form",
+        marine_hull_form_spec,
+        run_marine_hull_form,
+    )
+    ctx.tools.register(
+        "marine_hull_exchange",
+        marine_hull_exchange_spec,
+        run_marine_hull_exchange,
+    )
 
     try:
         from kerf_core.plugin import PluginManifest
@@ -89,7 +105,8 @@ async def register(app: FastAPI, ctx):
             version="0.1.0",
             provides=["marine.hydrostatics", "marine.stability", "marine.sections",
                       "marine.resistance", "marine.scantlings", "marine.vpp",
-                      "marine.seakeeping", "marine.hull_fairness"],
+                      "marine.seakeeping", "marine.hull_fairness",
+                      "marine.hull_form", "marine.hull_exchange"],
             depends=[],
         )
     except ImportError:
@@ -98,6 +115,7 @@ async def register(app: FastAPI, ctx):
             "version": "0.1.0",
             "provides": ["marine.hydrostatics", "marine.stability", "marine.sections",
                          "marine.resistance", "marine.scantlings", "marine.vpp",
-                         "marine.seakeeping", "marine.hull_fairness"],
+                         "marine.seakeeping", "marine.hull_fairness",
+                         "marine.hull_form", "marine.hull_exchange"],
             "depends": [],
         }

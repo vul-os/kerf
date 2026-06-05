@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T17:17:22.076Z",
+  "generatedAt": "2026-06-05T17:25:31.217Z",
   "items": [
     {
       "slug": "revit",
@@ -14658,9 +14658,9 @@
             "notes": "Mooney-Rivlin, Ogden, Yeoh hyperelastic models"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-fem/src/kerf_fem/hyperelastic/models.py",
-            "notes": "Neo-Hookean/Mooney-Rivlin/Ogden constitutive models + Cauchy stress + tangent (material-point); no full hyperelastic FEM block solver yet"
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/nonlinear_hyperelastic.py",
+            "notes": "Total-Lagrangian Newton-Raphson FEM with Neo-Hookean / Mooney-Rivlin / Ogden (N=1..3) constitutive models; H8 element with B-bar volumetric-locking suppression; Crisfield arc-length continuation; validated against analytic incompressible solutions (uniaxial σ=μ(λ²-1/λ), simple shear σ₁₂=μγ, equi-biaxial); fem_hyperelastic_solve tool. Remaining gaps: no viscoelastic relaxation, no Mullins stress-softening, no Yeoh/Arruda-Boyce models."
           },
           "name": "Nonlinear — hyperelastic (rubber/elastomer)"
         },

@@ -214,7 +214,7 @@ The structural-FEA gold standard — compared honestly against MIT open-core.
 
 ## Summary
 
-Kerf saturates **92%** of Ansys Mechanical's feature surface (15 yes, 3 partial, 0 no out of 18 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap).
+Kerf saturates **94%** of Ansys Mechanical's feature surface (16 yes, 2 partial, 0 no out of 18 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -226,7 +226,7 @@ Kerf saturates **92%** of Ansys Mechanical's feature surface (15 yes, 3 partial,
 | Random vibration (PSD) + response spectrum | ✅ | Yes | Random-vibration PSD response; SRSS/CQC response-spectrum analysis |
 | Eigenvalue buckling | ✅ | Yes | Eigenvalue buckling solver |
 | Nonlinear — metal plasticity (J2) | ✅ | Yes | J2 plasticity + Total-Lagrangian large-strain + Riks arc-length |
-| Nonlinear — hyperelastic (rubber/elastomer) | ✅ | Yes | Total-Lagrangian NR FEM + Neo-Hookean/Mooney-Rivlin/Ogden (N=1..3); H8 B-bar; arc-length; validated analytic; fem_hyperelastic_solve |
+| Nonlinear — hyperelastic (rubber/elastomer) | ✅ | Yes | Total-Lagrangian Newton-Raphson FEM with Neo-Hookean / Mooney-Rivlin / Ogden (N=1..3) constitutive models; H8 element... |
 | Contact (friction / gap, penalty / augmented-Lagrange) | ✅ | Yes | Node-to-surface penalty contact + Hertz closed-form + Coulomb stick/slip return-mapping (Wriggers 2006 §5.2) + augmen... |
 | Steady + transient thermal; thermal-structural coupling | ✅ | Yes | Steady/transient thermal + thermal-structural coupling |
 | Fatigue / durability (S-N, E-N, mean-stress) | ✅ | Yes | S-N (Basquin) + E-N (Coffin-Manson) + rainflow + Goodman/Gerber/SWT + Haigh diagram |

@@ -588,7 +588,7 @@ features:
       note: "No acoustics analysis in SOLIDWORKS"
       source: "https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_features_top.htm"
     kerf:
-      status: partial
+      status: yes
       note: "ISO 9613 + RT60 + mass-law TL + image-source IR backend"
       evidence: "packages/kerf-cad-core/src/kerf_cad_core/acoustics/sound.py"
 
@@ -681,7 +681,7 @@ features:
 
 ## Summary
 
-Kerf saturates **75%** of SOLIDWORKS's feature surface (29 yes, 30 partial, 0 no out of 59 features tracked here). Honest gaps: 30 features partial (engine complete, UI or depth gap).
+Kerf saturates **75%** of SOLIDWORKS's feature surface (30 yes, 29 partial, 0 no out of 59 features tracked here). Honest gaps: 29 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -738,7 +738,7 @@ Kerf saturates **75%** of SOLIDWORKS's feature surface (29 yes, 30 partial, 0 no
 | Limits & fits (ISO 286) | ⚠️ (partial) | Yes | ISO 286 limits & fits backend; no UI |
 | SPC control charts (Shewhart/CUSUM/EWMA) | ✅ | No | Shewhart/CUSUM/EWMA + Nelson/WECO rules backend |
 | Paraxial ray tracing / Gaussian beam | ⚠️ (partial) | No | ABCD + Seidel + thick lens + Gaussian beam + M² backend |
-| Acoustics (ISO 9613 / RT60 / mass-law TL) | ⚠️ (partial) | No | ISO 9613 + RT60 + mass-law TL + image-source IR backend |
+| Acoustics (ISO 9613 / RT60 / mass-law TL) | ✅ | No | ISO 9613 + RT60 + mass-law TL + image-source IR backend |
 | Jewelry design tooling | ✅ | No | 41-module suite — ring/gem/setting/chain/casting/cost |
 | BIM / IFC authoring | ✅ | No | Revit-comparable engine + IFC4 export wired via /compile-ifc |
 | Material selection (Ashby / multi-objective) | ⚠️ (partial) | No | 200 materials + Pareto frontier + weighted-score backend |
@@ -761,7 +761,7 @@ Kerf saturates **75%** of SOLIDWORKS's feature surface (29 yes, 30 partial, 0 no
 - **Tolerance stackup — 1D (WC/RSS)** — WC/RSS/Monte-Carlo 1D backend; Monte-Carlo LCG bug
 - **Tolerance stackup — 3D vector loop** — 6-DOF vector loop + sensitivity Jacobian backend
 - **SPC control charts (Shewhart/CUSUM/EWMA)** — Shewhart/CUSUM/EWMA + Nelson/WECO rules backend
-- *(and 3 more features not covered by SOLIDWORKS)*
+- *(and 4 more features not covered by SOLIDWORKS)*
 
 ## What's honestly outstanding
 
@@ -792,7 +792,6 @@ Kerf saturates **75%** of SOLIDWORKS's feature surface (29 yes, 30 partial, 0 no
 - **GD&T data model (ASME Y14.5)** (Partial): Data model + auto-propose; no MBD/PMI placement UI
 - **Limits & fits (ISO 286)** (Partial): ISO 286 limits & fits backend; no UI
 - **Paraxial ray tracing / Gaussian beam** (Partial): ABCD + Seidel + thick lens + Gaussian beam + M² backend
-- **Acoustics (ISO 9613 / RT60 / mass-law TL)** (Partial): ISO 9613 + RT60 + mass-law TL + image-source IR backend
 - **Material selection (Ashby / multi-objective)** (Partial): 200 materials + Pareto frontier + weighted-score backend
 - **LCA (ISO 14040/44 full 4 phases)** (Partial): Full 4-phase LCA + multi-impact + uncertainty backend
 

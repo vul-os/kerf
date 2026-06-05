@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T01:28:18.298Z",
+  "generatedAt": "2026-06-05T01:32:29.334Z",
   "items": [
     {
       "slug": "revit",
@@ -6767,7 +6767,7 @@
             "notes": "No acoustics analysis in SOLIDWORKS"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/acoustics/sound.py",
             "notes": "ISO 9613 + RT60 + mass-law TL + image-source IR backend"
           },

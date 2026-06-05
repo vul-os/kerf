@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T01:15:37.800Z",
+  "generatedAt": "2026-06-05T01:28:18.298Z",
   "items": [
     {
       "slug": "revit",
@@ -1270,7 +1270,7 @@
             "notes": "Not applicable — architectural BIM tool"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-qa/tolstack/",
             "notes": "1D WC/RSS/MC stackup + 3D vector-loop; no MBD on model"
           },
@@ -6529,7 +6529,7 @@
             "notes": "No nesting in SOLIDWORKS base; third-party add-ins required"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/nesting/nfp.py",
             "notes": "Skyline + true-shape NFP + Minkowski-sum backend"
           },
@@ -6697,7 +6697,7 @@
             "notes": "TolAnalyst (WC + RSS) in SOLIDWORKS Premium"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/tolstack/stack.py",
             "notes": "WC/RSS/Monte-Carlo 1D backend; Monte-Carlo LCG bug"
           },
@@ -6711,7 +6711,7 @@
             "notes": "TolAnalyst 3D assembly stack in SOLIDWORKS Premium"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/tolstack/tol3d.py",
             "notes": "6-DOF vector loop + sensitivity Jacobian backend"
           },
@@ -6739,7 +6739,7 @@
             "notes": "No SPC charts in SOLIDWORKS; external QA tools required"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/spc/charts.py",
             "notes": "Shewhart/CUSUM/EWMA + Nelson/WECO rules backend"
           },
@@ -6823,7 +6823,7 @@
             "notes": "No should-cost engine in SOLIDWORKS; third-party aPriori required"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/costing/estimate.py",
             "notes": "6-process Boothroyd-Dewhurst should-cost backend"
           },

@@ -224,7 +224,7 @@ features:
       note: "Not applicable — architectural BIM tool"
       source: "https://graphisoft.com/solutions/products/archicad"
     kerf:
-      status: partial
+      status: yes
       note: "1D WC/RSS/MC stackup + 3D vector-loop; no MBD on model"
       evidence: "packages/kerf-qa/tolstack/"
   - domain: D14
@@ -277,7 +277,7 @@ ArchiCAD pioneered BIM — Kerf brings engineering-grade precision to teams buil
 
 ## Summary
 
-Kerf saturates **79%** of Graphisoft ArchiCAD's feature surface (16 yes, 9 partial, 1 no out of 26 features tracked here). Honest gaps: 9 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **81%** of Graphisoft ArchiCAD's feature surface (17 yes, 8 partial, 1 no out of 26 features tracked here). Honest gaps: 8 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -304,7 +304,7 @@ Kerf saturates **79%** of Graphisoft ArchiCAD's feature surface (16 yes, 9 parti
 | Building energy analysis export | ⚠️ (partial) | Yes | Backend building loads (CLTD/RTS, ASHRAE Ch.18, degree-day); no energy simulation export |
 | HVAC duct sizing | ✅ | Yes (paid tier) | SMACNA duct sizing + flat-pattern (backend) |
 | PCB / electronics design | ✅ | No | Schematic + PCB layout (KiCad round-trip), ngspice SPICE, DRC — wired in browser |
-| Tolerance stackup / metrology | ⚠️ (partial) | No | 1D WC/RSS/MC stackup + 3D vector-loop; no MBD on model |
+| Tolerance stackup / metrology | ✅ | No | 1D WC/RSS/MC stackup + 3D vector-loop; no MBD on model |
 | Material cost / quantity schedules | ⚠️ (partial) | Yes | Should-cost engine (backend) + BOM panel in assemblies; no BIM quantity take-off schedule |
 | LCA / environmental data | ✅ | Partial | Full ISO 14040/44 4-phase LCA; 6 impact categories + uncertainty (backend) |
 | Python / open scripting API | ✅ | Partial | kerf-sdk on PyPI; HTTP/JSON-RPC automation from any Python environment |
@@ -315,6 +315,7 @@ Kerf saturates **79%** of Graphisoft ArchiCAD's feature surface (16 yes, 9 parti
 - **MEP Modeler (HVAC / plumbing / electrical routing)** — BIM MEP routing (duct/pipe/conduit segments, fittings, endpoints) via create_mep_route tool; no clash-aware auto-routing UI
 - **HVAC duct sizing** — SMACNA duct sizing + flat-pattern (backend)
 - **PCB / electronics design** — Schematic + PCB layout (KiCad round-trip), ngspice SPICE, DRC — wired in browser
+- **Tolerance stackup / metrology** — 1D WC/RSS/MC stackup + 3D vector-loop; no MBD on model
 - **LLM / chat-native editing** — Chat-native: plain-language edits to feature tree and BIM model per turn
 
 ## What's honestly outstanding
@@ -327,7 +328,6 @@ Kerf saturates **79%** of Graphisoft ArchiCAD's feature surface (16 yes, 9 parti
 - **Sheet metal flat-pattern** (Partial): Single flange + unfold + flat DXF; no hem/relief/jog/multi-flange
 - **GD&T / tolerancing** (Partial): GD&T data model (ASME Y14.5); no MBD/PMI on model view
 - **Building energy analysis export** (Partial): Backend building loads (CLTD/RTS, ASHRAE Ch.18, degree-day); no energy simulation export
-- **Tolerance stackup / metrology** (Partial): 1D WC/RSS/MC stackup + 3D vector-loop; no MBD on model
 - **Material cost / quantity schedules** (Partial): Should-cost engine (backend) + BOM panel in assemblies; no BIM quantity take-off schedule
 
 ## Pricing

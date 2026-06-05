@@ -31,6 +31,7 @@ export const AXIS_MODES = {
   '3axis':         '3-axis',
   '5axis_indexed': '5-axis indexed (3+2)',
   '5axis_cont':    '5-axis continuous',
+  'lathe':         'Lathe (turning)',
 }
 
 const OPERATIONS = ['face', 'contour', 'pocket', 'drill', 'profile']
@@ -117,6 +118,16 @@ export default function CAMView({ file, projectId, viewRef }) {
   const [feedRate, setFeedRate] = useState('1000')
   const [spindleSpeed, setSpindleSpeed] = useState('10000')
   const [coolant, setCoolant] = useState(true)
+
+  // ── Lathe / turning cycle fields ────────────────────────────────────────────
+  const [latheCycleType, setLatheCycleType] = useState('G71_G70')  // G71_G70 | G76_thread
+  const [latheStockDiamMm, setLatheStockDiamMm] = useState('50.0') // stock OD mm (diameter)
+  const [latheFinalDiamMm, setLatheFinalDiamMm] = useState('40.0') // final OD mm (diameter)
+  const [latheDocMm, setLatheDocMm] = useState('2.0')    // depth of cut per pass (radial)
+  const [latheWorkLengthMm, setLatheWorkLengthMm] = useState('80.0') // workpiece axial length
+  const [latheThreadPitchMm, setLatheThreadPitchMm] = useState('1.5') // G76 thread pitch
+  const [latheThreadDepthMm, setLatheThreadDepthMm] = useState('0.92') // G76 thread depth (radial)
+  const [latheCssMMin, setLatheCssMMin] = useState('180') // constant surface speed m/min
 
   // ── 5-axis fields ───────────────────────────────────────────────────────────
   const [tiltAxis, setTiltAxis] = useState('B')          // A / B / C
@@ -242,6 +253,24 @@ export default function CAMView({ file, projectId, viewRef }) {
     let body
     if (axisMode === '3axis') {
       body = { ...baseBody, operation }
+    } else if (axisMode === 'lathe') {
+      // Lathe turning cycles: convert diameter inputs to radius for the backend
+      body = {
+        ...baseBody,
+        operation: 'lathe',
+        spindle_axis: 'z',
+        // extra turning-cycle params (passed as input_spec extensions)
+        lathe_cycle_type: latheCycleType,
+        stock_diameter_mm: parseFloat(latheStockDiamMm) || 50.0,
+        final_diameter_mm: parseFloat(latheFinalDiamMm) || 40.0,
+        roughing_doc_mm: parseFloat(latheDocMm) || 2.0,
+        work_length_mm: parseFloat(latheWorkLengthMm) || 80.0,
+        css_m_per_min: parseFloat(latheCssMMin) || 180.0,
+        ...(latheCycleType === 'G76_thread' && {
+          thread_pitch_mm: parseFloat(latheThreadPitchMm) || 1.5,
+          thread_depth_mm: parseFloat(latheThreadDepthMm) || 0.92,
+        }),
+      }
     } else {
       // 5-axis: derive backend operation + extra fields from UI state
       const extraFields = fiveAxisBackendArgs(axisMode, fiveAxisStrategy, tiltAxis, tiltAngle, leadDeg, driveFaceId, useTcp)
@@ -292,7 +321,8 @@ export default function CAMView({ file, projectId, viewRef }) {
   const st = jobStatus?.status
   const canDownload = st === 'done' && (result?.gcode_b64 || jobStatus?.output_key)
 
-  const is5Axis = axisMode !== '3axis'
+  const is5Axis = axisMode === '5axis_indexed' || axisMode === '5axis_cont'
+  const isLathe = axisMode === 'lathe'
 
   return (
     <div style={styles.root}>
@@ -425,6 +455,135 @@ export default function CAMView({ file, projectId, viewRef }) {
           <input type="checkbox" checked={coolant} onChange={e => setCoolant(e.target.checked)} disabled={running} style={{ accentColor: '#a78bfa' }} />
           <span style={{ color: '#9ca3af', fontSize: 12, marginLeft: 4 }}>{coolant ? 'Flood' : 'Off'}</span>
         </div>
+
+        {/* ── Lathe / turning cycle controls ──────────────────────────────────── */}
+        {isLathe && (
+          <div data-testid="lathe-controls" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4, padding: '8px 0 4px', borderTop: '1px solid #1f2937' }}>
+            <div style={{ ...styles.sectionTitle, marginBottom: 2 }}>Turning Cycle Settings</div>
+
+            {/* Cycle type */}
+            <div style={styles.row}>
+              <label style={styles.label}>Cycle</label>
+              <select
+                value={latheCycleType}
+                onChange={e => setLatheCycleType(e.target.value)}
+                style={styles.select}
+                disabled={running}
+                data-testid="lathe-cycle-type"
+              >
+                <option value="G71_G70">G71 rough + G70 finish</option>
+                <option value="G76_thread">G76 threading</option>
+              </select>
+            </div>
+
+            {/* Stock diameter */}
+            <div style={styles.row}>
+              <label style={styles.label}>Stock OD (mm)</label>
+              <input
+                type="number"
+                value={latheStockDiamMm}
+                onChange={e => setLatheStockDiamMm(e.target.value)}
+                style={styles.input}
+                step="1"
+                min="0.1"
+                disabled={running}
+                data-testid="lathe-stock-diam-input"
+              />
+            </div>
+
+            {/* Final diameter */}
+            <div style={styles.row}>
+              <label style={styles.label}>Final OD (mm)</label>
+              <input
+                type="number"
+                value={latheFinalDiamMm}
+                onChange={e => setLatheFinalDiamMm(e.target.value)}
+                style={styles.input}
+                step="1"
+                min="0.1"
+                disabled={running}
+                data-testid="lathe-final-diam-input"
+              />
+            </div>
+
+            {/* Depth of cut */}
+            <div style={styles.row}>
+              <label style={styles.label}>DOC/pass (mm)</label>
+              <input
+                type="number"
+                value={latheDocMm}
+                onChange={e => setLatheDocMm(e.target.value)}
+                style={styles.input}
+                step="0.5"
+                min="0.1"
+                disabled={running}
+                data-testid="lathe-doc-input"
+              />
+            </div>
+
+            {/* Workpiece length */}
+            <div style={styles.row}>
+              <label style={styles.label}>Length (mm)</label>
+              <input
+                type="number"
+                value={latheWorkLengthMm}
+                onChange={e => setLatheWorkLengthMm(e.target.value)}
+                style={styles.input}
+                step="5"
+                min="1"
+                disabled={running}
+                data-testid="lathe-work-length-input"
+              />
+            </div>
+
+            {/* Constant surface speed */}
+            <div style={styles.row}>
+              <label style={styles.label}>CSS (m/min)</label>
+              <input
+                type="number"
+                value={latheCssMMin}
+                onChange={e => setLatheCssMMin(e.target.value)}
+                style={styles.input}
+                step="10"
+                min="10"
+                disabled={running}
+                data-testid="lathe-css-input"
+              />
+            </div>
+
+            {/* G76 threading params (only for threading cycle) */}
+            {latheCycleType === 'G76_thread' && (
+              <>
+                <div style={styles.row}>
+                  <label style={styles.label}>Thread pitch (mm)</label>
+                  <input
+                    type="number"
+                    value={latheThreadPitchMm}
+                    onChange={e => setLatheThreadPitchMm(e.target.value)}
+                    style={styles.input}
+                    step="0.25"
+                    min="0.1"
+                    disabled={running}
+                    data-testid="lathe-thread-pitch-input"
+                  />
+                </div>
+                <div style={styles.row}>
+                  <label style={styles.label}>Thread depth (mm)</label>
+                  <input
+                    type="number"
+                    value={latheThreadDepthMm}
+                    onChange={e => setLatheThreadDepthMm(e.target.value)}
+                    style={styles.input}
+                    step="0.1"
+                    min="0.05"
+                    disabled={running}
+                    data-testid="lathe-thread-depth-input"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {/* ── 5-axis controls (only when in a 5-axis mode) ───────────────────── */}
         {is5Axis && (

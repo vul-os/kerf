@@ -147,4 +147,30 @@ describe('CAMView source structure', () => {
   it('SpindleVectorPreview renders an SVG with aria-label', () => {
     expect(camViewSrc).toMatch(/aria-label=\{.*Spindle axis/)
   })
+
+  it('exports a "lathe" key in AXIS_MODES', () => {
+    expect(camViewSrc).toMatch(/['"]lathe['"]/)
+  })
+
+  it('contains data-testid="lathe-controls"', () => {
+    expect(camViewSrc).toMatch(/data-testid="lathe-controls"/)
+  })
+
+  it('contains data-testid="lathe-cycle-type"', () => {
+    expect(camViewSrc).toMatch(/data-testid="lathe-cycle-type"/)
+  })
+
+  it('contains data-testid="lathe-stock-diam-input"', () => {
+    expect(camViewSrc).toMatch(/data-testid="lathe-stock-diam-input"/)
+  })
+
+  it('lathe mode dispatches operation="lathe" to the backend', () => {
+    expect(camViewSrc).toMatch(/operation.*lathe/)
+  })
+
+  it('AXIS_MODES has four entries: 3axis, 5axis_indexed, 5axis_cont, lathe', async () => {
+    const { AXIS_MODES } = await import('./CAMView.jsx')
+    expect(Object.keys(AXIS_MODES)).toHaveLength(4)
+    expect(Object.keys(AXIS_MODES)).toContain('lathe')
+  })
 })

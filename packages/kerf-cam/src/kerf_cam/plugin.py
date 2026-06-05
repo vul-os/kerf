@@ -270,6 +270,28 @@ async def register(app: FastAPI, ctx):
         run_cam_validate_chip_load,
     )
 
+    # G71/G70/G76 lathe turning cycles — Fanuc 0i-TF §14; ISO 6983-1; MH 31e §1148
+    from kerf_cam.turning_cycles import (
+        cam_generate_turning_cycles_spec,
+        run_cam_generate_turning_cycles,
+    )
+    ctx.tools.register(
+        "cam_generate_turning_cycles",
+        cam_generate_turning_cycles_spec,
+        run_cam_generate_turning_cycles,
+    )
+
+    # G41/G42 cutter-radius compensation — NIST RS-274/NGC §3.7; Fanuc 0i-MC §12.1
+    from kerf_cam.cutter_comp import (
+        cam_apply_cutter_comp_spec,
+        run_cam_apply_cutter_comp,
+    )
+    ctx.tools.register(
+        "cam_apply_cutter_comp",
+        cam_apply_cutter_comp_spec,
+        run_cam_apply_cutter_comp,
+    )
+
     # Capabilities depend on available deps
     provides = [
         "cam.2_5d",
@@ -293,6 +315,9 @@ async def register(app: FastAPI, ctx):
         "cam.arc-linearize",
         "cam.dry-machining-check",
         "cam.chip-load-validate",
+        "cam.turning-cycles-g71-g70-g76",
+        "cam.cutter-comp-g41-g42",
+        "cam.5axis-ui",
     ]   # pure-Python ops always available
     if _OCL_AVAILABLE:
         provides += ["cam.parallel-3d", "cam.waterline", "cam.lathe"]

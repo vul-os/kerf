@@ -178,9 +178,9 @@ async def run_cam(req: CAMRequest):
     for op in operations:
         op_type = op.type.lower()
         if op_type in ("5axis", "5axis_finish"):
-            return _run_5axis_finish_route(op)
+            return _run_5axis_finish_route(op, step_bytes)
         if op_type == "3plus2":
-            return _run_3plus2_route(op)
+            return _run_3plus2_route(op, step_bytes)
 
     # Gate opencamlib — return pending sentinel when engine is absent, matching
     # the pattern used by kerf-fem and kerf-topo (no fabricated output).
@@ -302,46 +302,255 @@ async def run_5axis(req: FiveAxisRequest):
     }
 
 
-def _run_5axis_finish_route(op: CAMOperation) -> dict:
+def _run_5axis_finish_route(op: CAMOperation, step_bytes: bytes) -> dict:
     """Handle a 5axis_finish operation from run_cam.
 
-    Requires a brep_path / drive_face_id to be set on op or falls back to
-    a clear error.  When the STEP path is not available in the op (it was
-    pre-decoded via step_b64 in run_cam), we return a structured error
-    directing the caller to POST /run-5axis with precomputed CL points.
+    Runs the full STEP→drive-face→CL→G-code pipeline:
+      1. Write STEP bytes to a temp file.
+      2. Call run_constant_tilt() to produce CL points (requires pythonOCC).
+      3. Emit G-code via emit_gcode_constant_tilt().
+
+    Falls back to an error when pythonOCC is not installed (OCC required for
+    surface extraction).
     """
-    from kerf_cam.five_axis.gcode_constant_tilt import emit_gcode_constant_tilt, PostOpts
+    if not _occ_available:
+        return {
+            "output_key": "gcode",
+            "gcode_b64": base64.b64encode(b"").decode(),
+            "toolpath_length": 0.0,
+            "estimated_time": 0.0,
+            "warnings": [],
+            "errors": [
+                "5axis_finish requires pythonOCC for surface extraction. "
+                "Install: conda install -c conda-forge pythonocc-core. "
+                "Alternatively, supply precomputed CL points via POST /run-5axis."
+            ],
+        }
 
-    # run_cam doesn't thread stl_path through the stub check, so we
-    # return a helpful error explaining the direct route.
-    return {
-        "output_key": "gcode",
-        "gcode_b64": base64.b64encode(b"").decode(),
-        "toolpath_length": 0.0,
-        "estimated_time": 0.0,
-        "warnings": [],
-        "errors": [
-            "5axis_finish via /run-cam requires the STEP→CL pipeline (T3). "
-            "Use POST /run-5axis with precomputed CL points from kerf_cam.five_axis.constant_tilt.run_constant_tilt(), "
-            "or pass step_b64 + drive_face_id/tilt_deg in a future worker update."
-        ],
-    }
+    try:
+        from kerf_cam.five_axis.constant_tilt import run_constant_tilt
+        from kerf_cam.five_axis.gcode_constant_tilt import emit_gcode_constant_tilt, PostOpts
+    except ImportError as e:
+        return {
+            "output_key": "gcode",
+            "gcode_b64": base64.b64encode(b"").decode(),
+            "toolpath_length": 0.0,
+            "estimated_time": 0.0,
+            "warnings": [],
+            "errors": [f"5axis_finish import error: {e}"],
+        }
+
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            step_path = Path(tmpdir) / "input.step"
+            step_path.write_bytes(step_bytes)
+
+            tilt = float(op.tilt_deg) if op.tilt_deg is not None else 15.0
+            drive_face_id = int(op.drive_face_id) if op.drive_face_id is not None else 0
+            ball_radius = op.tool_diameter / 2.0 if op.tool_diameter else 1.5
+            step_over = op.step_over if op.step_over else 1.0
+
+            result = run_constant_tilt({
+                "brep_path": str(step_path),
+                "drive_face_id": drive_face_id,
+                "tilt_deg": tilt,
+                "step_over_mm": step_over,
+                "ball_radius_mm": ball_radius,
+                "lead_deg": float(op.lead_deg) if op.lead_deg else 0.0,
+            })
+
+            cl_pts = result.get("cl_points", [])
+            warnings = result.get("warnings", [])
+
+            if not cl_pts:
+                return {
+                    "output_key": "gcode",
+                    "gcode_b64": base64.b64encode(b"").decode(),
+                    "toolpath_length": 0.0,
+                    "estimated_time": 0.0,
+                    "warnings": warnings,
+                    "errors": ["5axis_finish produced no CL points — check drive_face_id and geometry."],
+                }
+
+            post = (op.post_processor_5x or "linuxcnc").lower()
+            opts = PostOpts(
+                tool_number=1,
+                feed_rapid_mm_min=5000.0,
+                feed_cut_mm_min=float(op.feed_rate) if op.feed_rate else 1000.0,
+                spindle_rpm=int(op.spindle_rpm) if op.spindle_rpm else 12000,
+                use_tcp=bool(op.use_tcp) if op.use_tcp is not None else False,
+                machine_kinematic=op.kinematic_family or "head_table",
+                coolant=op.coolant or "flood",
+            )
+            gcode = emit_gcode_constant_tilt(cl_pts, post, opts)
+            gcode_b64 = base64.b64encode(gcode.encode()).decode()
+
+            # Rough toolpath length: sum of CL-point spacings
+            toolpath_length = sum(
+                math.sqrt(
+                    (cl_pts[i]["x"] - cl_pts[i - 1]["x"]) ** 2 +
+                    (cl_pts[i]["y"] - cl_pts[i - 1]["y"]) ** 2 +
+                    (cl_pts[i]["z"] - cl_pts[i - 1]["z"]) ** 2
+                )
+                for i in range(1, len(cl_pts))
+            )
+            feed = opts.feed_cut_mm_min or 1000.0
+            estimated_time = (toolpath_length / feed * 60.0) if feed > 0 else 0.0
+
+            return {
+                "output_key": "gcode",
+                "gcode_b64": gcode_b64,
+                "toolpath_length": round(toolpath_length, 3),
+                "estimated_time": round(estimated_time, 3),
+                "warnings": warnings,
+                "errors": [],
+            }
+    except Exception as e:
+        return {
+            "output_key": "gcode",
+            "gcode_b64": base64.b64encode(b"").decode(),
+            "toolpath_length": 0.0,
+            "estimated_time": 0.0,
+            "warnings": [],
+            "errors": [f"5axis_finish error: {e}"],
+        }
 
 
-def _run_3plus2_route(op: CAMOperation) -> dict:
-    """Handle a 3plus2 operation from run_cam (T4 wiring)."""
-    return {
-        "output_key": "gcode",
-        "gcode_b64": base64.b64encode(b"").decode(),
-        "toolpath_length": 0.0,
-        "estimated_time": 0.0,
-        "warnings": [],
-        "errors": [
-            "3plus2 via /run-cam requires the STL rotation pipeline (T4). "
-            "Use POST /run-5axis with precomputed CL points from kerf_cam.five_axis.indexed_3_2.run_3_2_indexed(), "
-            "or pass stl_path + drive_face_normal in a future worker update."
-        ],
-    }
+def _run_3plus2_route(op: CAMOperation, step_bytes: bytes) -> dict:
+    """Handle a 3plus2 operation from run_cam (T4 wiring).
+
+    Runs the full STEP→drive-face-normal→CL→indexed-G-code pipeline:
+      1. Extract drive-face normal from the STEP geometry (requires pythonOCC).
+      2. Produce synthetic CL points in the rotated frame.
+      3. Emit 3+2 indexed G-code via emit_gcode_indexed_3_2().
+    """
+    if not _occ_available:
+        return {
+            "output_key": "gcode",
+            "gcode_b64": base64.b64encode(b"").decode(),
+            "toolpath_length": 0.0,
+            "estimated_time": 0.0,
+            "warnings": [],
+            "errors": [
+                "3plus2 requires pythonOCC for drive-face extraction. "
+                "Install: conda install -c conda-forge pythonocc-core. "
+                "Alternatively, supply precomputed CL points via POST /run-5axis with mode='3plus2'."
+            ],
+        }
+
+    try:
+        from kerf_cam.five_axis.drive_face import extract_drive_face, uv_iso_curves, surface_normal_at
+        from kerf_cam.five_axis.gcode_indexed_3_2 import emit_gcode_indexed_3_2
+        from kerf_cam.five_axis.gcode_constant_tilt import PostOpts
+    except ImportError as e:
+        return {
+            "output_key": "gcode",
+            "gcode_b64": base64.b64encode(b"").decode(),
+            "toolpath_length": 0.0,
+            "estimated_time": 0.0,
+            "warnings": [],
+            "errors": [f"3plus2 import error: {e}"],
+        }
+
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            step_path = Path(tmpdir) / "input.step"
+            step_path.write_bytes(step_bytes)
+
+            drive_face_id = int(op.drive_face_id) if op.drive_face_id is not None else 0
+            step_over = op.step_over if op.step_over else 2.0
+
+            # Extract drive face and sample UV iso-curves for CL points.
+            from OCC.Core.BRep import BRep_Tool as _BRep_Tool
+            from OCC.Core.BRepTools import BRepTools as _BRepTools
+            face = extract_drive_face(str(step_path), drive_face_id)
+            surf = _BRep_Tool.Surface(face)
+            u_min, u_max, v_min, v_max = _BRepTools.UVBounds(face)
+            u_mid = (u_min + u_max) / 2.0
+            v_mid = (v_min + v_max) / 2.0
+
+            # Get the face normal at center for the 3+2 orientation.
+            normal_result = surface_normal_at(face, u_mid, v_mid)
+            if normal_result is None:
+                normal = (0.0, 0.0, 1.0)  # fallback: vertical
+            else:
+                _, normal = normal_result
+
+            # Build a grid of CL points across the face UV domain.
+            n_u = max(2, int((u_max - u_min) / max(step_over / 1000.0, 1e-9)))
+            n_v = max(2, int((v_max - v_min) / max(step_over / 1000.0, 1e-9)))
+            # Cap to avoid huge output
+            n_u = min(n_u, 20)
+            n_v = min(n_v, 20)
+
+            cl_pts = []
+            for iu in range(n_u + 1):
+                u = u_min + iu * (u_max - u_min) / n_u
+                for iv in range(n_v + 1):
+                    v = v_min + iv * (v_max - v_min) / n_v
+                    try:
+                        pt = surf.Value(u, v)
+                        cl_pts.append({
+                            "x": pt.X(),
+                            "y": pt.Y(),
+                            "z": pt.Z(),
+                            "i": normal[0],
+                            "j": normal[1],
+                            "k": normal[2],
+                        })
+                    except Exception:
+                        pass
+
+            if not cl_pts:
+                return {
+                    "output_key": "gcode",
+                    "gcode_b64": base64.b64encode(b"").decode(),
+                    "toolpath_length": 0.0,
+                    "estimated_time": 0.0,
+                    "warnings": [],
+                    "errors": ["3plus2 produced no CL points — check drive_face_id and geometry."],
+                }
+
+            post = (op.post_processor_5x or "linuxcnc").lower()
+            opts = PostOpts(
+                tool_number=1,
+                feed_rapid_mm_min=5000.0,
+                feed_cut_mm_min=float(op.feed_rate) if op.feed_rate else 1000.0,
+                spindle_rpm=int(op.spindle_rpm) if op.spindle_rpm else 10000,
+                machine_kinematic=op.kinematic_family or "head_table",
+                coolant=op.coolant or "flood",
+            )
+            gcode = emit_gcode_indexed_3_2(cl_pts, post, opts)
+            gcode_b64 = base64.b64encode(gcode.encode()).decode()
+
+            toolpath_length = sum(
+                math.sqrt(
+                    (cl_pts[i]["x"] - cl_pts[i - 1]["x"]) ** 2 +
+                    (cl_pts[i]["y"] - cl_pts[i - 1]["y"]) ** 2 +
+                    (cl_pts[i]["z"] - cl_pts[i - 1]["z"]) ** 2
+                )
+                for i in range(1, len(cl_pts))
+            )
+            feed = opts.feed_cut_mm_min or 1000.0
+            estimated_time = (toolpath_length / feed * 60.0) if feed > 0 else 0.0
+
+            return {
+                "output_key": "gcode",
+                "gcode_b64": gcode_b64,
+                "toolpath_length": round(toolpath_length, 3),
+                "estimated_time": round(estimated_time, 3),
+                "warnings": [],
+                "errors": [],
+            }
+    except Exception as e:
+        return {
+            "output_key": "gcode",
+            "gcode_b64": base64.b64encode(b"").decode(),
+            "toolpath_length": 0.0,
+            "estimated_time": 0.0,
+            "warnings": [],
+            "errors": [f"3plus2 error: {e}"],
+        }
 
 
 def _emit_5axis_gcode(

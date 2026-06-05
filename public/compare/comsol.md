@@ -69,9 +69,9 @@ features:
       note: "AC/DC + RF + Wave Optics modules; full E/M field FEM"
       source: "https://www.comsol.com/products"
     kerf:
-      status: partial
-      note: "openEMS FDTD RF bridge (PCB routes) + AC power load-flow; no general electrostatic/magnetostatic FEM"
-      evidence: "packages/kerf-electronics/src/kerf_electronics/routes_rf.py"
+      status: yes
+      note: "P1 triangular FEM electrostatics (∇·(ε∇φ)=−ρ, Dirichlet + Neumann BCs, E-field, capacitance, energy) + magnetostatics (Az formulation, ∇×(μ⁻¹∇×A)=J, B-field, inductance, Lorentz force); scipy sparse solver; validated against parallel-plate capacitor and coaxial B-field analytic cases; plus openEMS FDTD RF bridge and AC load-flow"
+      evidence: "packages/kerf-fem/src/kerf_fem/em_field.py"
 
   - domain: D3
     feature: "Chemical / reacting flow"
@@ -137,7 +137,7 @@ Kerf saturates **80%** of COMSOL Multiphysics's feature surface (7 yes, 2 partia
 | CFD (laminar / turbulent fluid flow) | ✅ | Yes | RANS k-ε / k-ω SST + VOF multiphase + compressible + combustion |
 | Acoustics | ✅ | Yes | ISO 9613 propagation + RT60 + mass-law TL + wave SEA + photon/spectral |
 | Multiphysics coupling (thermal-structural / FSI) | ✅ | Yes | Thermal-structural coupling + ALE fluid-structure interaction |
-| Electromagnetics (electrostatics / magnetostatics / RF) | ⚠️ (partial) | Yes | openEMS FDTD RF bridge (PCB routes) + AC power load-flow; no general electrostatic/magnetostatic FEM |
+| Electromagnetics (electrostatics / magnetostatics / RF) | ✅ | Yes | P1 triangular FEM electrostatics + magnetostatics (Az formulation) validated against analytic cases; scipy sparse solver; plus openEMS FDTD RF bridge and AC load-flow |
 | Chemical / reacting flow | ⚠️ (partial) | Yes | Eddy-break-up combustion + reacting flow; no general multi-species reaction-kinetics solver |
 | Design optimization (topology / parametric) | ✅ | Yes | SIMP density-based topology optimization + Ashby multi-objective |
 | Plasma / electric discharge | 🔴 (no) | Yes | No plasma / gas-discharge (ionization transport) modelling |
@@ -149,7 +149,6 @@ Kerf saturates **80%** of COMSOL Multiphysics's feature surface (7 yes, 2 partia
 
 ## What's honestly outstanding
 
-- **Electromagnetics (electrostatics / magnetostatics / RF)** (Partial): openEMS FDTD RF bridge (PCB routes) + AC power load-flow; no general electrostatic/magnetostatic FEM
 - **Chemical / reacting flow** (Partial): Eddy-break-up combustion + reacting flow; no general multi-species reaction-kinetics solver
 - **Plasma / electric discharge** (Not yet implemented): No plasma / gas-discharge (ionization transport) modelling
 

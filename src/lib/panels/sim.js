@@ -134,4 +134,13 @@ export default [
     load: () => import('./sim-wrappers/CfdResultsWrapper.jsx'),
     label: 'CFD Results',
   },
+
+  // ── Electromagnetics FEM ─────────────────────────────────────────────────
+  {
+    id: 'em-field',
+    kinds: ['em_field', 'em_electrostatics', 'em_magnetostatics', 'fem_em'],
+    exts: ['.emresult', '.emfield'],
+    load: () => import('./sim-wrappers/EMFieldWrapper.jsx'),
+    label: 'EM Field (Electrostatics / Magnetostatics)',
+  },
 ]

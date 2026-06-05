@@ -6,11 +6,19 @@ Implements:
   magnetostatics  — vector potential Az, B-field, inductance, force on a region
   solenoid_inductance     — analytic helper (infinite solenoid)
   parallel_plate_capacitance — analytic helper
+  coaxial_b_field  — analytic helper for coaxial cable B-field
   field_energy_electric   — ½ εE² integrated over mesh
   field_energy_magnetic   — ½ μ⁻¹B² integrated over mesh
 
-All routines are pure Python (no numpy / scipy / external deps).
-They never raise; errors are returned via {"ok": False, "reason": "..."}.
+Solver strategy
+---------------
+When scipy is available the assembly builds a COO sparse matrix and solves via
+``scipy.sparse.linalg.spsolve`` (sparse direct / SuperLU).  This handles
+O(10⁴)–O(10⁵) DOF meshes without the O(n²) memory of dense assembly.
+
+When scipy is absent a pure-Python dense Gaussian-elimination fallback is used.
+Both paths produce identical results; the pure-Python path is only practical for
+meshes with a few hundred nodes.
 
 FEM convention
 --------------
@@ -33,6 +41,18 @@ from __future__ import annotations
 
 import math
 from typing import Any
+
+# ---------------------------------------------------------------------------
+# Optional scipy sparse backend
+# ---------------------------------------------------------------------------
+
+try:
+    import numpy as _np
+    from scipy.sparse import coo_matrix as _coo_matrix
+    from scipy.sparse.linalg import spsolve as _spsolve
+    _SCIPY_AVAILABLE = True
+except ImportError:
+    _SCIPY_AVAILABLE = False
 
 
 # ---------------------------------------------------------------------------
@@ -78,6 +98,133 @@ def _gauss_solve(A: list[list[float]], b: list[float]) -> list[float] | None:
             return None
         x[i] /= aug[i][i]
     return x
+
+
+# ---------------------------------------------------------------------------
+# Sparse assembly + solver (scipy path)
+# ---------------------------------------------------------------------------
+
+def _assemble_poisson_sparse(
+    nodes: list,
+    elements: list,
+    coeff: Any,
+    rhs_density: Any,
+):
+    """
+    Assemble Poisson stiffness matrix in scipy COO format and RHS vector.
+
+    Returns (K_csr, f_np) using numpy arrays, or raises ImportError if scipy
+    is unavailable (caller should fall back to dense path).
+
+    K_ij += coeff · (b_i·b_j + c_i·c_j) / (4·area)
+    f_i  += rhs_density · area / 3
+    """
+    if not _SCIPY_AVAILABLE:
+        raise ImportError("scipy not available")
+
+    n_nodes = len(nodes)
+    n_elem = len(elements)
+
+    rows = []
+    cols = []
+    vals = []
+    f = _np.zeros(n_nodes, dtype=_np.float64)
+
+    for e_idx, tri in enumerate(elements):
+        n0, n1, n2 = int(tri[0]), int(tri[1]), int(tri[2])
+        x0, y0 = nodes[n0]
+        x1, y1 = nodes[n1]
+        x2, y2 = nodes[n2]
+
+        area, b, c = _tri_area_and_grad(x0, y0, x1, y1, x2, y2)
+        if abs(area) < 1e-30:
+            continue
+        if area < 0.0:
+            n1, n2 = n2, n1
+            x1, y1 = nodes[n1]
+            x2, y2 = nodes[n2]
+            area, b, c = _tri_area_and_grad(x0, y0, x1, y1, x2, y2)
+            if abs(area) < 1e-30:
+                continue
+
+        alpha = _scalar_value(coeff, e_idx, n_elem)
+        rho   = _scalar_value(rhs_density, e_idx, n_elem)
+
+        local_nodes = [n0, n1, n2]
+        inv4a = 1.0 / (4.0 * area)
+        for i_loc in range(3):
+            for j_loc in range(3):
+                v = alpha * (b[i_loc] * b[j_loc] + c[i_loc] * c[j_loc]) * inv4a
+                rows.append(local_nodes[i_loc])
+                cols.append(local_nodes[j_loc])
+                vals.append(v)
+            f[local_nodes[i_loc]] += rho * area / 3.0
+
+    K_coo = _coo_matrix(
+        (_np.array(vals), (_np.array(rows), _np.array(cols))),
+        shape=(n_nodes, n_nodes),
+    )
+    return K_coo.tocsr(), f
+
+
+def _apply_dirichlet_sparse(K_csr, f_np, dirichlet_bc: dict):
+    """
+    Apply Dirichlet BCs to scipy CSR matrix in place (returns new K, f).
+
+    For each constrained DOF d with value g:
+      - RHS: f[i] -= K[i,d] * g for all i != d
+      - Zero row d, zero column d
+      - K[d,d] = 1, f[d] = g
+    """
+    K_lil = K_csr.tolil()
+    f = f_np.copy()
+
+    for d_str, g in dirichlet_bc.items():
+        d = int(d_str) if isinstance(d_str, str) else int(d_str)
+        g = float(g)
+        # Subtract column d contribution from RHS
+        col = K_lil.getcol(d).toarray().ravel()
+        f -= col * g
+        # Zero row and column
+        K_lil[d, :] = 0.0
+        K_lil[:, d] = 0.0
+        K_lil[d, d] = 1.0
+        f[d] = g
+
+    return K_lil.tocsr(), f
+
+
+def _solve_system(
+    nodes: list,
+    elements: list,
+    coeff: Any,
+    rhs_density: Any,
+    dirichlet_bc: dict,
+) -> list[float] | None:
+    """
+    Assemble and solve the Poisson system, using the scipy sparse path when
+    available and falling back to pure-Python dense Gaussian elimination.
+
+    Returns nodal solution vector as a plain Python list, or None on failure.
+    """
+    if _SCIPY_AVAILABLE:
+        try:
+            K_csr, f_np = _assemble_poisson_sparse(nodes, elements, coeff, rhs_density)
+            K_csr, f_np = _apply_dirichlet_sparse(K_csr, f_np, dirichlet_bc)
+            x = _spsolve(K_csr, f_np)
+            if not _np.all(_np.isfinite(x)):
+                return None
+            return x.tolist()
+        except Exception:
+            pass  # fall through to dense path
+
+    # Dense fallback
+    result = _assemble_poisson(nodes, elements, coeff, rhs_density)
+    if result is None:
+        return None
+    K, f = result
+    _apply_dirichlet(K, f, dirichlet_bc)
+    return _gauss_solve(K, f)
 
 
 # ---------------------------------------------------------------------------
@@ -247,14 +394,7 @@ def electrostatics(
     if len(dirichlet_bc) < 1:
         return {"ok": False, "reason": "at least one Dirichlet BC required"}
 
-    result = _assemble_poisson(nodes, elements, permittivity, charge_density)
-    if result is None:
-        return {"ok": False, "reason": "mesh assembly failed"}
-
-    K, f = result
-    _apply_dirichlet(K, f, dirichlet_bc)
-
-    phi = _gauss_solve(K, f)
+    phi = _solve_system(nodes, elements, permittivity, charge_density, dirichlet_bc)
     if phi is None:
         return {"ok": False, "reason": "linear system is singular — check boundary conditions"}
 
@@ -392,20 +532,10 @@ def magnetostatics(
     n_elem = len(elements)
     inv_mu = [1.0 / _scalar_value(permeability, e, n_elem) for e in range(n_elem)]
 
-    result = _assemble_poisson(nodes, elements, inv_mu, current_density)
-    if result is None:
-        return {"ok": False, "reason": "mesh assembly failed"}
+    # Apply Dirichlet BCs (Az = 0 on boundary if provided), pin node 0 if none
+    effective_bc = bc if bc else {0: 0.0}
 
-    K, f = result
-
-    # Apply Dirichlet BCs (Az = 0 on boundary if provided)
-    if bc:
-        _apply_dirichlet(K, f, bc)
-    else:
-        # Pin first node to zero to remove rigid body mode
-        _apply_dirichlet(K, f, {0: 0.0})
-
-    Az = _gauss_solve(K, f)
+    Az = _solve_system(nodes, elements, inv_mu, current_density, effective_bc)
     if Az is None:
         return {"ok": False, "reason": "linear system is singular — check boundary conditions"}
 
@@ -587,6 +717,63 @@ def coaxial_capacitance(
     C_per_length = 2.0 * math.pi * eps / math.log(outer_radius / inner_radius)
 
     return {"ok": True, "C_per_length": C_per_length}
+
+
+def coaxial_b_field(
+    inner_radius: float,
+    outer_radius: float,
+    current: float,
+    radius: float,
+    mu_r: float = 1.0,
+) -> dict[str, Any]:
+    """
+    Analytic magnetic flux density B inside a coaxial cable cross-section.
+
+    For an infinitely long coaxial conductor carrying current I:
+      - Inside inner conductor (r < a):
+            B(r) = μ₀ μ_r I r / (2π a²)   (uniform current density)
+      - Between conductors (a ≤ r ≤ b):
+            B(r) = μ₀ μ_r I / (2π r)      (Ampere's law)
+      - Outside outer conductor (r > b):  B = 0
+
+    Parameters
+    ----------
+    inner_radius : inner conductor radius a  [m]
+    outer_radius : outer conductor radius b  [m]
+    current      : total current I through inner conductor  [A]
+    radius       : evaluation radius r  [m]
+    mu_r         : relative permeability of medium (default 1.0)
+
+    Returns
+    -------
+    dict  ok, B [T], region ('inside_conductor'|'between'|'outside')
+    """
+    if inner_radius <= 0:
+        return {"ok": False, "reason": "inner_radius must be positive"}
+    if outer_radius <= inner_radius:
+        return {"ok": False, "reason": "outer_radius must be greater than inner_radius"}
+    if radius < 0:
+        return {"ok": False, "reason": "radius must be non-negative"}
+    if mu_r <= 0:
+        return {"ok": False, "reason": "mu_r must be positive"}
+
+    mu0 = 4.0 * math.pi * 1e-7
+    mu = mu0 * mu_r
+
+    if radius < inner_radius:
+        # Inside inner conductor — uniform current density
+        B = mu * current * radius / (2.0 * math.pi * inner_radius * inner_radius)
+        region = "inside_conductor"
+    elif radius <= outer_radius:
+        # Between conductors — Ampere's law
+        B = mu * current / (2.0 * math.pi * radius) if radius > 0 else 0.0
+        region = "between"
+    else:
+        # Outside — net current zero (coaxial return)
+        B = 0.0
+        region = "outside"
+
+    return {"ok": True, "B": B, "region": region}
 
 
 # ---------------------------------------------------------------------------

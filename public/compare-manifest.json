@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T03:57:53.450Z",
+  "generatedAt": "2026-06-05T04:00:31.563Z",
   "items": [
     {
       "slug": "revit",
@@ -1331,6 +1331,185 @@
             "notes": "Chat-native: plain-language edits to feature tree and BIM model per turn"
           },
           "name": "LLM / chat-native editing"
+        }
+      ]
+    },
+    {
+      "slug": "tekla",
+      "competitor": "Tekla Structures",
+      "category": "bim",
+      "left": "kerf",
+      "right": "tekla",
+      "hero_tagline": "The structural steel & concrete detailing standard — compared honestly against MIT open-core.",
+      "reviewed_at": "2026-06-05",
+      "features": [
+        {
+          "domain": "D13",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.tekla.com/products/tekla-structures",
+            "notes": "Parametric steel framing on grids; full section catalogue"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-bim/src/kerf_bim/framing.py",
+            "notes": "Beam/column/brace framing on structural grid; AISC W/HSS + BS/EN section catalogue"
+          },
+          "name": "Structural steel framing model (beams/columns/braces on grid)"
+        },
+        {
+          "domain": "D13",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.tekla.com/products/tekla-structures",
+            "notes": "Parametric connection components; auto-design + check"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/steelconn/",
+            "notes": "AISC base plate (DG-1), bolt/weld shear (J3), anchor pullout (ACI 17.6), beam/column connection checks"
+          },
+          "name": "Steel connection design (moment/shear/base plate/bolts)"
+        },
+        {
+          "domain": "D13",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.tekla.com/products/tekla-structures",
+            "notes": "Rebar sets incl. polybeams/sloping slabs; sequence numbering (2025)"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-structural/src/kerf_structural/rebar_detailing.py",
+            "notes": "Rebar detailing engine (bar schedule, development length) shipped; not full Tekla rebar-set / polybeam UI depth"
+          },
+          "name": "Reinforced-concrete rebar detailing"
+        },
+        {
+          "domain": "D13",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.tekla.com/products/tekla-structures",
+            "notes": "Cast-in-place + precast concrete elements"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-structural/src/kerf_structural/aci_column.py",
+            "notes": "ACI 318-19 beam + column axial/P-M design"
+          },
+          "name": "Concrete member design (ACI/Eurocode)"
+        },
+        {
+          "domain": "D13",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.tekla.com/products/tekla-structures",
+            "notes": "IFC + TrimBIM exchange; IFC compliant"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-bim/src/kerf_bim/export_ifc/",
+            "notes": "IFC4 export (walls/slabs/members/MEP/spaces) + IFC Tier 1+2 import"
+          },
+          "name": "IFC export (IFC4 / openBIM)"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.tekla.com/products/tekla-structures",
+            "notes": "NC (DSTV) for steel fabrication machines"
+          },
+          "kerf": {
+            "status": "no",
+            "evidence": "",
+            "notes": "No DSTV NC1 fabrication export for steel CNC machines yet"
+          },
+          "name": "NC / DSTV fabrication output"
+        },
+        {
+          "domain": "D5",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.tekla.com/products/tekla-structures",
+            "notes": "DXF / IFC export for fabrication"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-imports/src/kerf_imports/",
+            "notes": "DXF export (flat-pattern, drawings) + IGES/3DM exchange"
+          },
+          "name": "DXF / fabrication geometry export"
+        },
+        {
+          "domain": "D11",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.tekla.com/products/tekla-structures",
+            "notes": "Automated GA + assembly/single-part shop drawings"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/drawings/",
+            "notes": "Multi-sheet drawings (HLR views/sections/details/title-block) + shop drawings; not Tekla auto-detailing depth"
+          },
+          "name": "General-arrangement + shop drawings"
+        },
+        {
+          "domain": "D13",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.tekla.com/products/tekla-structures",
+            "notes": "Auto part/assembly marks + reports"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-costing/src/",
+            "notes": "BOM rollup + quantity schedules (area/volume/count) + cost"
+          },
+          "name": "Bill of materials / assembly marks"
+        },
+        {
+          "domain": "D13",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.tekla.com/products/tekla-structures",
+            "notes": "Interference check across disciplines"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py",
+            "notes": "OBB-SAT + BVH + tri-tri clash detection panel"
+          },
+          "name": "Clash detection / constructability"
+        },
+        {
+          "domain": "D13",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.tekla.com/products/tekla-structures",
+            "notes": "Tekla Model Sharing — concurrent multi-user model"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-cloud/",
+            "notes": "Cloud git workspace (branch/merge/roles); not real-time element-level concurrent editing"
+          },
+          "name": "Real-time multi-user model sharing"
+        },
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "no",
+            "source": "https://www.tekla.com/products/tekla-structures",
+            "notes": "Proprietary; Tekla Open API (.NET) but commercial-licensed"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-sdk/src/kerf/",
+            "notes": "MIT open-core; chat-native + JSON-RPC LLM tools + kerf-sdk"
+          },
+          "name": "Open-source core / chat-native"
         }
       ]
     },
@@ -16334,6 +16513,157 @@
             "notes": "200-material Ashby selector (14 families) + Pareto frontier (backend)"
           },
           "name": "Cost / materials — material selection (Ashby)"
+        }
+      ]
+    },
+    {
+      "slug": "marvelous-designer",
+      "competitor": "Marvelous Designer",
+      "category": "dcc",
+      "left": "kerf",
+      "right": "marvelous-designer",
+      "hero_tagline": "The industry-standard 3D cloth simulation tool — compared honestly against MIT open-core.",
+      "reviewed_at": "2026-06-05",
+      "features": [
+        {
+          "domain": "D13",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.marvelousdesigner.com/product/newfeature",
+            "notes": "2D pattern window; draw pattern parts; arrange on avatar"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/draft.py",
+            "notes": "Bodice/sleeve/trouser/skirt block drafting from measurements; darts, notches, grain lines"
+          },
+          "name": "2D pattern drafting (blocks, darts, seams)"
+        },
+        {
+          "domain": "D13",
+          "competitor": {
+            "status": "yes",
+            "source": "https://support.marvelousdesigner.com/hc/en-us/articles/47358149073305-Auto-Sewing-Ver-2025-0",
+            "notes": "Sew 2D patterns into 3D garments on avatar; Auto Sewing (2025)"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/drape.py",
+            "notes": "Seam-line definition + flat-to-3D drape mapping; no automatic arrangement-point auto-sew on avatar"
+          },
+          "name": "2D → 3D garment assembly (sewing)"
+        },
+        {
+          "domain": "D13",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.marvelousdesigner.com/product/newfeature",
+            "notes": "Advanced physics engine: weight, elasticity, stretch, gravity; folds/wrinkles"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/mass_spring.py",
+            "notes": "Provot (1995) mass-spring-damper: structural+shear+bending springs, Rayleigh damping, sphere/plane/capsule collision (Bridson 2003)"
+          },
+          "name": "Cloth physics simulation (fabric weight/stretch/drape)"
+        },
+        {
+          "domain": "D13",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.marvelousdesigner.com/product/newfeature",
+            "notes": "Parametric avatars; IK joint posing; AI Pose Generator (2025.1)"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-apparel/src/kerf_apparel/avatar.py",
+            "notes": "CAESAR anthropometric body-form (13 ISO 8559-1 landmarks) + OBJ; no IK posing / AI pose / garment-on-avatar drape"
+          },
+          "name": "Avatar / parametric body form"
+        },
+        {
+          "domain": "D13",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.marvelousdesigner.com/product/newfeature",
+            "notes": "23+ fabric presets with physical properties"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/materials.py",
+            "notes": "Fabric properties engine: weight, stiffness, bend, coefficient of friction"
+          },
+          "name": "Fabric property library (weight, stiffness, friction)"
+        },
+        {
+          "domain": "D13",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.marvelousdesigner.com/product/newfeature",
+            "notes": "Grade rules across size runs"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-apparel/src/kerf_apparel/grading.py",
+            "notes": "ASTM D5219 + ISO 8559-2 grade rules across blocks + size-run export"
+          },
+          "name": "Pattern grading (size run)"
+        },
+        {
+          "domain": "D13",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.marvelousdesigner.com/product/newfeature",
+            "notes": "Stress/Strain/Pressure force visualization on fitted garment (2025)"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/mass_spring.py",
+            "notes": "Mass-spring tension fields computed; no garment-on-avatar fit stress/pressure heatmap UI"
+          },
+          "name": "Garment-fit stress/strain visualization"
+        },
+        {
+          "domain": "D13",
+          "competitor": {
+            "status": "yes",
+            "source": "https://support.marvelousdesigner.com/hc/en-us/articles/47358120307353-Marvelous-Designer-2025-0-2025-1-2025-2-New-Feature-List",
+            "notes": "Soft-body simulation on unrigged 3D characters (2025.1)"
+          },
+          "kerf": {
+            "status": "no",
+            "evidence": "",
+            "notes": "No rigged-character soft-body / animation cloth simulation"
+          },
+          "name": "Soft-body sim on rigged characters"
+        },
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.marvelousdesigner.com/product/newfeature",
+            "notes": "DXF, OBJ, Alembic, glTF export"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/export.py",
+            "notes": "DXF (pattern), SVG, OBJ (3D drape), CSV (grade rules)"
+          },
+          "name": "DXF / OBJ pattern + mesh export"
+        },
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "no",
+            "source": "https://www.marvelousdesigner.com/product/newfeature",
+            "notes": "Proprietary subscription; Python API but commercial-licensed"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-sdk/src/kerf/",
+            "notes": "MIT open-core; chat-native garment design + JSON-RPC LLM tools + kerf-sdk"
+          },
+          "name": "Open-source core / chat-native"
         }
       ]
     },

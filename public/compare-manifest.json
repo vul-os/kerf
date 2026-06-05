@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T06:04:10.445Z",
+  "generatedAt": "2026-06-05T06:21:34.970Z",
   "items": [
     {
       "slug": "revit",
@@ -1588,7 +1588,7 @@
           "kerf": {
             "status": "yes",
             "evidence": "",
-            "notes": "No DSTV NC1 fabrication export for steel CNC machines yet"
+            "notes": "DSTV NC1 (.nc1) export — ST/BO/AK/IK/SI blocks per DSTV standard"
           },
           "name": "NC / DSTV fabrication output"
         },

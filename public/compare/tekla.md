@@ -70,7 +70,7 @@ features:
       source: "https://www.tekla.com/products/tekla-structures"
     kerf:
       status: yes
-      note: "No DSTV NC1 fabrication export for steel CNC machines yet"
+      note: "DSTV NC1 (.nc1) export — ST/BO/AK/IK/SI blocks per DSTV standard"
       evidence: ""
 
   - domain: D5
@@ -159,7 +159,7 @@ Kerf saturates **88%** of Tekla Structures's feature surface (9 yes, 3 partial, 
 | Reinforced-concrete rebar detailing | ⚠️ (partial) | Yes | Rebar detailing engine (bar schedule, development length) shipped; not full Tekla rebar-set / polybeam UI depth |
 | Concrete member design (ACI/Eurocode) | ✅ | Yes | ACI 318-19 beam + column axial/P-M design |
 | IFC export (IFC4 / openBIM) | ✅ | Yes | IFC4 export (walls/slabs/members/MEP/spaces) + IFC Tier 1+2 import |
-| NC / DSTV fabrication output | ✅ | Yes | No DSTV NC1 fabrication export for steel CNC machines yet |
+| NC / DSTV fabrication output | ✅ | Yes | DSTV NC1 (.nc1) export — ST/BO/AK/IK/SI blocks per DSTV standard |
 | DXF / fabrication geometry export | ✅ | Yes | DXF export (flat-pattern, drawings) + IGES/3DM exchange |
 | General-arrangement + shop drawings | ⚠️ (partial) | Yes | Multi-sheet drawings (HLR views/sections/details/title-block) + shop drawings; not Tekla auto-detailing depth |
 | Bill of materials / assembly marks | ✅ | Yes | BOM rollup + quantity schedules (area/volume/count) + cost |

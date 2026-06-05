@@ -2,19 +2,22 @@
 kerf_fem.fracture — Fracture mechanics sub-package.
 
 Wave 12E: contact mechanics + fracture (J-integral / cohesive zone)
+Wave FEM-gaps: Paris-law crack growth + Erdogan-Sih kink angle
 
 Modules
 -------
 j_integral         — J-integral (Rice 1968) path-independent contour integral
 stress_intensity   — K_I, K_II, K_III from displacement field; ASTM E399
 cohesive_zone      — Cohesive zone models (bilinear, exponential, PPR)
+crack_growth       — Paris-law da/dN integrator; Erdogan-Sih mixed-mode kink angle
 fracture_tools     — LLM tool wrappers (auto-registers on import)
+crack_growth_tools — LLM tool wrapper for fem_crack_growth
 
 SIMPLIFICATION NOTICE
 ---------------------
 This package implements 2-D (plane stress/strain) fracture mechanics.
-Production 3-D crack-front analysis (curved fronts, dynamic fracture,
-XFEM enrichment) is beyond the scope of this pure-Python module.
+Paris-law crack growth uses geometry-factor SIF (not XFEM enrichment).
+Full XFEM (Moës-Dolbow-Belytschko 1999) is deferred to T-100-C.
 """
 
 from kerf_fem.fracture.j_integral import (
@@ -35,6 +38,17 @@ from kerf_fem.fracture.cohesive_zone import (
     park_paulino_roesler,
     cohesive_fracture_energy,
 )
+from kerf_fem.fracture.crack_growth import (
+    ParisLawParams,
+    CrackGrowthResult,
+    integrate_paris_law,
+    paris_analytic_flat,
+    paris_analytic_sent,
+    sif_range_sent,
+    sif_range_central_crack,
+    kink_angle_erdogan_sih,
+    effective_sif_mixed_mode,
+)
 
 __all__ = [
     "JIntegralContour",
@@ -49,4 +63,13 @@ __all__ = [
     "traction_separation_exponential",
     "park_paulino_roesler",
     "cohesive_fracture_energy",
+    "ParisLawParams",
+    "CrackGrowthResult",
+    "integrate_paris_law",
+    "paris_analytic_flat",
+    "paris_analytic_sent",
+    "sif_range_sent",
+    "sif_range_central_crack",
+    "kink_angle_erdogan_sih",
+    "effective_sif_mixed_mode",
 ]

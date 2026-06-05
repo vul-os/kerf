@@ -139,6 +139,25 @@ async def register(app: FastAPI, ctx):
         provides.append("fem.fracture-cohesive-zone")
     except Exception as exc:
         logger.warning("kerf-fem: fracture tools failed to load: %s", exc)
+    # FEM-gaps: Paris-law crack growth + Erdogan-Sih kink angle
+    try:
+        import kerf_fem.fracture.crack_growth_tools as _cgt
+        for name, spec, handler in _cgt.TOOLS:
+            ctx.tools.register(name, spec, handler)
+        provides.append("fem.fracture-paris-law")
+        provides.append("fem.fracture-mixed-mode-kink")
+    except Exception as exc:
+        logger.warning("kerf-fem: crack_growth_tools failed to load: %s", exc)
+    # FEM-gaps: hyperelastic materials (Neo-Hookean, Mooney-Rivlin, Ogden)
+    try:
+        import kerf_fem.hyperelastic.hyperelastic_tools as _ht
+        for name, spec, handler in _ht.TOOLS:
+            ctx.tools.register(name, spec, handler)
+        provides.append("fem.hyperelastic-neo-hookean")
+        provides.append("fem.hyperelastic-mooney-rivlin")
+        provides.append("fem.hyperelastic-ogden")
+    except Exception as exc:
+        logger.warning("kerf-fem: hyperelastic tools failed to load: %s", exc)
 
     # Register background worker
     from kerf_fem.worker import FEMWorker

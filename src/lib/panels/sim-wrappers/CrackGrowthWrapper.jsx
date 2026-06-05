@@ -237,9 +237,9 @@ function CrackGrowthPanel({
       {/* Summary row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px' }}>
         {[
-          { label: 'Fatigue life N', value: N_fatigue_cycles > 0 ? `${N_fatigue_cycles.toExponential(2)}`, unit: 'cycles' : '—' },
-          { label: 'K_I (max)', value: maxKI > 0 ? `${(maxKI / 1e6).toFixed(1)}`, unit: 'MPa√m' : '—' },
-          { label: 'Handbook K_I (a₀)', value: K_handbook_initial_pa_sqrt_m != null ? `${(K_handbook_initial_pa_sqrt_m / 1e6).toFixed(1)}`, unit: 'MPa√m' : '—' },
+          { label: 'Fatigue life N', value: N_fatigue_cycles > 0 ? `${N_fatigue_cycles.toExponential(2)}` : '—', unit: 'cycles' },
+          { label: 'K_I (max)', value: maxKI > 0 ? `${(maxKI / 1e6).toFixed(1)}` : '—', unit: 'MPa√m' },
+          { label: 'Handbook K_I (a₀)', value: K_handbook_initial_pa_sqrt_m != null ? `${(K_handbook_initial_pa_sqrt_m / 1e6).toFixed(1)}` : '—', unit: 'MPa√m' },
         ].map(({ label, value, unit }) => (
           <div key={label} style={{
             background: '#f8fafc', border: '1px solid #e2e8f0',

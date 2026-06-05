@@ -155,6 +155,16 @@ export default [
     load: () => import('./sim-wrappers/RoomCfdWrapper.jsx'),
     label: 'Room Airflow CFD (3-D RANS + Comfort)',
   },
+  // CFD post-processing: VTK/VTU export + ParaView-style filters
+  // Tools: cfd_export_vtk, cfd_postprocess_filter
+  // Filters: slice | contour | streamline | integral | probe | derived
+  {
+    id: 'cfd-postprocess',
+    kinds: ['cfd_postprocess', 'cfd_vtk', 'cfd_paraview', 'cfd_filter'],
+    exts: ['.vtu', '.vtk', '.cfdpost'],
+    load: () => import('./sim-wrappers/CfdPostProcessWrapper.jsx'),
+    label: 'CFD Post-Processing (VTK / ParaView)',
+  },
   {
     id: 'reacting-flow',
     kinds: ['reacting_flow', 'multispecies_reacting_flow', 'cfd_reacting'],

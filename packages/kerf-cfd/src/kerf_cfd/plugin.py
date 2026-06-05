@@ -29,6 +29,11 @@ Registers:
   - LLM tool:  plasma_discharge_simulate  (1-D DC glow-discharge drift-diffusion solver;
                                             Townsend ionisation + Poisson self-consistent field;
                                             Paschen breakdown curve; Hagelaar & Pitchford 2005)
+  - LLM tool:  cfd_export_vtk          (VTK/VTU export — legacy ASCII .vtk + XML .vtu;
+                                         ParaView-openable with point/cell data arrays)
+  - LLM tool:  cfd_postprocess_filter  (ParaView-style server-side filters:
+                                         slice | contour | streamline | integral |
+                                         probe | derived — vorticity/Q/grad/Cp)
 
 # Wave 9C: OpenFOAM combustion + Lagrangian + FSI
 # Wave 10C: snappyHexMesh-style mesher + wind engineering
@@ -36,6 +41,7 @@ Registers:
 # Wave parity: postprocessing + flow setup + isentropic/oblique shock + VOF surface tension
 # Multi-species reacting flow: general finite-rate chemistry + 1-D plug-flow reactor
 # Wave plasma: 1-D drift-diffusion glow-discharge (ionisation transport, COMSOL compare flip)
+# VTK/ParaView: VTK/VTU export + server-side ParaView-style filters
 """
 
 from __future__ import annotations
@@ -83,6 +89,9 @@ async def register(app: FastAPI, ctx):
 
     # Wave parity: postprocessing + flow setup tools
     import kerf_cfd.cfd_postprocessing_tool  # noqa: F401 — triggers @register decorators
+
+    # VTK/ParaView export + server-side post-processing filters
+    import kerf_cfd.vtk_tools  # noqa: F401 — registers cfd_export_vtk, cfd_postprocess_filter
 
     # Wave plasma: 1-D drift-diffusion glow-discharge solver (Townsend + Poisson)
     from kerf_cfd.plasma.plasma_tool import (
@@ -158,6 +167,8 @@ async def register(app: FastAPI, ctx):
         "plasma.drift_diffusion",
         "plasma.glow_discharge",
         "plasma.paschen_curve",
+        "cfd.vtk_export",
+        "cfd.vtk_paraview_filters",
     ]
 
     try:

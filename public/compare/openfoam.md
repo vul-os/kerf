@@ -139,9 +139,9 @@ features:
       note: "Native ParaView integration via foamToVTK; full field visualization, streamlines, iso-surfaces"
       source: "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
     kerf:
-      status: partial
-      note: "Basic in-browser result viewer; full ParaView pipeline on exported OpenFOAM case directory"
-      evidence: "packages/kerf-cfd/"
+      status: yes
+      note: "VTK/VTU export (legacy ASCII .vtk + XML .vtu, binary + ASCII) + server-side ParaView-style filters: slice, contour, streamline (RK4), volume integral, probe, derived (vorticity, Q-criterion, grad(p), Cp, divergence, strain rate); not an embedded ParaView GLView — filters run server-side in Python/NumPy; export to ParaView for full native pipeline"
+      evidence: "packages/kerf-cfd/src/kerf_cfd/vtk_export.py, packages/kerf-cfd/src/kerf_cfd/vtk_tools.py"
 
   - domain: D4
     feature: "Psychrometrics (moist air)"
@@ -317,7 +317,7 @@ Kerf saturates **94%** of OpenFOAM's feature surface (22 yes, 3 partial, 0 no ou
 | CFD — Lagrangian particle tracking | ✅ | Yes | Lagrangian particle models not exposed in Kerf bridge |
 | CFD — dynamic mesh / FSI | ✅ | Yes | Dynamic mesh and FSI not yet exposed in Kerf bridge |
 | CFD — parallel MPI execution | ⚠️ (partial) | Yes | Hosted cloud compute for moderate-scale runs; petascale HPC requires direct OpenFOAM |
-| CFD — post-processing (ParaView / VTK) | ⚠️ (partial) | Yes | Basic in-browser result viewer; full ParaView pipeline on exported OpenFOAM case directory |
+| CFD — post-processing (ParaView / VTK) | ✅ | Yes | VTK/VTU export + server-side filters (slice, contour, streamline, integral, probe, derived); export to ParaView for native pipeline; filters run server-side not embedded ParaView GLView |
 | Psychrometrics (moist air) | ✅ | No | ASHRAE-grade psychrometrics (backend) |
 | Heat exchanger sizing (LMTD / Bell-Delaware) | ✅ | No | LMTD + epsilon-NTU + Bell-Delaware + TEMA layout (backend) |
 | HVAC duct sizing (SMACNA) | ✅ | No | SMACNA duct sizing + flat-pattern (backend) |
@@ -346,7 +346,7 @@ Kerf saturates **94%** of OpenFOAM's feature surface (22 yes, 3 partial, 0 no ou
 
 - **CFD — LES / DES / DNS** (Partial): LES models accessible via bridge; specialist case tuning requires expert review
 - **CFD — parallel MPI execution** (Partial): Hosted cloud compute for moderate-scale runs; petascale HPC requires direct OpenFOAM
-- **CFD — post-processing (ParaView / VTK)** (Partial): Basic in-browser result viewer; full ParaView pipeline on exported OpenFOAM case directory
+- **CFD — post-processing (ParaView / VTK)** (Yes): VTK/VTU export + server-side ParaView-style filters (slice, contour, streamline, integral, probe, derived); export .vtu to open in ParaView for native pipeline
 
 ## Pricing
 

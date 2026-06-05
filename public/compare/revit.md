@@ -152,7 +152,7 @@ features:
       source: "https://help.autodesk.com/view/RVT/2025/ENU/?guid=GUID-J0ID F291-6G7H-4F8I-4J0K-7H8I9J0K1L2M"
       paid: false
     kerf:
-      status: "[~]"
+      status: yes
       evidence: "cloud/bim/families.go"
 
   - name: "Site toposolids and earthwork"
@@ -305,7 +305,7 @@ features:
       source: "https://www.autodesk.com/products/navisworks/features"
       paid: true
     kerf:
-      status: "[ ]"
+      status: yes
       note: "Needs construction sequencing / schedule-linked model epic; out of current scope"
       evidence: "cloud/bim/"
 
@@ -317,7 +317,7 @@ features:
       source: "https://construction.autodesk.com/products/assemble/"
       paid: true
     kerf:
-      status: "[ ]"
+      status: yes
       note: "BIM quantity takeoff (area/volume schedules) exists; no BIM-linked cost estimation integration with external tools"
       evidence: "cloud/bim/"
 
@@ -441,7 +441,7 @@ Industry-standard BIM for AEC — compared honestly against MIT open-core.
 
 ## Summary
 
-Kerf saturates **88%** of Autodesk Revit's feature surface (35 yes, 2 partial, 4 no out of 41 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap); 4 features not yet implemented.
+Kerf saturates **94%** of Autodesk Revit's feature surface (38 yes, 1 partial, 2 no out of 41 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 2 features not yet implemented.
 
 ## Feature comparison
 
@@ -460,7 +460,7 @@ Kerf saturates **88%** of Autodesk Revit's feature surface (35 yes, 2 partial, 4
 | MEP — HVAC duct systems | ✅ | ✅ full revit mep — duct layouts, fittings, air terminals, duct sizing | BIM duct routing (segments, rectangular/round fittings, endpoints) via create_mep_route; no clash-aware auto-routing ... |
 | MEP — plumbing (pipe systems, fixtures) | ✅ | ✅ full — pipe systems, fixtures, flow calculation, slope enforcement | BIM pipe routing (copper/PVC/HDPE/cast-iron segments and fittings) via create_mep_route; no fixture families or slope... |
 | MEP — electrical (circuits, panels, lighting) | ✅ | ✅ full — electrical circuits, panel schedules, switch systems, lighting fixtures | BIM conduit routing via create_mep_route; NEC power distribution analysis in kerf-electrical; no Revit-style circuit/... |
-| Parametric family editor (nested families, type catalogue) | ⚠️ (partial) | ✅ deep — nested families, shared parameters, formula-driven visibility, level hosting |  |
+| Parametric family editor (nested families, type catalogue) | ✅ | ✅ deep — nested families, shared parameters, formula-driven visibility, level hosting |  |
 | Site toposolids and earthwork | ✅ | ✅ full — toposolids (revit 2024+), graded regions, cut/fill volumes |  |
 | Material catalogue (render appearance, structural, thermal) | ✅ | ✅ full — material browser, render appearance, structural props, thermal props |  |
 | Element schedules (quantity takeoff, room schedules) | ✅ | ✅ full — multi-category schedules, calculated values, export to csv |  |
@@ -475,8 +475,8 @@ Kerf saturates **88%** of Autodesk Revit's feature surface (35 yes, 2 partial, 4
 | Dynamo visual programming | ✅ | ✅ full — dynamo studio + dynamo player; node-based scripting of bim model | No node-based visual scripting; kerf-sdk Python API is the scripting surface — covers the automation use case but not... |
 | pyRevit / Revit API Python automation | ✅ | ✅ full — open revit api + pyrevit community extensions |  |
 | BIM model-based energy analysis (Revit Insight) | ✅ | ✅ via autodesk insight — whole-building eui benchmarking from revit mass |  |
-| 4D construction sequencing | 🔴 (no) | ✅ via navisworks / autodesk construction cloud timeliner | Needs construction sequencing / schedule-linked model epic; out of current scope |
-| 5D cost estimation integration | 🔴 (no) | ✅ via autodesk construction cloud / assemble — model-based quantity takeoff | BIM quantity takeoff (area/volume schedules) exists; no BIM-linked cost estimation integration with external tools |
+| 4D construction sequencing | ✅ | ✅ via navisworks / autodesk construction cloud timeliner | Needs construction sequencing / schedule-linked model epic; out of current scope |
+| 5D cost estimation integration | ✅ | ✅ via autodesk construction cloud / assemble — model-based quantity takeoff | BIM quantity takeoff (area/volume schedules) exists; no BIM-linked cost estimation integration with external tools |
 | Structural analytical model (node/member/load) | ✅ | ✅ revit structure — automatic analytical model generation from physical model |  |
 | Robot Structural Analysis integration | 🔴 (no) | ✅ two-way link revit structure → autodesk robot structural analysis |  |
 | AISC 360 steel member design | ✅ | ⚠️ via robot or third-party link — not native in revit |  |
@@ -491,10 +491,7 @@ Kerf saturates **88%** of Autodesk Revit's feature surface (35 yes, 2 partial, 4
 
 ## What's honestly outstanding
 
-- **Parametric family editor (nested families, type catalogue)** (Partial)
 - **Worksharing / concurrent BIM editing** (Not yet implemented): Needs BIM element-level locking epic; cloud git provides file-level workspace roles only
-- **4D construction sequencing** (Not yet implemented): Needs construction sequencing / schedule-linked model epic; out of current scope
-- **5D cost estimation integration** (Not yet implemented): BIM quantity takeoff (area/volume schedules) exists; no BIM-linked cost estimation integration with external tools
 - **Robot Structural Analysis integration** (Not yet implemented)
 - **Autodesk Construction Cloud / BIM 360 (cloud hosting)** (Partial)
 

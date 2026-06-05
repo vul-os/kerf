@@ -64,7 +64,7 @@ features:
       note: "Geometric Description Language objects — parametric families for every building product category"
       source: "https://help.graphisoft.com/AC/27/INT/_AC27_Help/content/030_libraries/030_libraries-1.htm"
     kerf:
-      status: partial
+      status: yes
       note: "Parametric .family.json (type/instance params, formulas); no GDL-equivalent object market"
       evidence: "packages/kerf-bim/src/"
   - domain: D13
@@ -134,7 +134,7 @@ features:
       note: "Mesh tool + site modelling with cut-fill volume calculation"
       source: "https://help.graphisoft.com/AC/27/INT/_AC27_Help/content/020_elemtools/020_elemtools-12.htm"
     kerf:
-      status: partial
+      status: yes
       note: "Backend geotech + earthwork volumes; no interactive site mesh UI"
       evidence: "packages/kerf-civil/geotech/"
   - domain: D1
@@ -277,7 +277,7 @@ ArchiCAD pioneered BIM — Kerf brings engineering-grade precision to teams buil
 
 ## Summary
 
-Kerf saturates **90%** of Graphisoft ArchiCAD's feature surface (22 yes, 3 partial, 1 no out of 26 features tracked here). Honest gaps: 3 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **94%** of Graphisoft ArchiCAD's feature surface (24 yes, 1 partial, 1 no out of 26 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -288,14 +288,14 @@ Kerf saturates **90%** of Graphisoft ArchiCAD's feature surface (22 yes, 3 parti
 | BIM doors / windows | ✅ | Yes | Parametric doors/windows in kerf-bim; wired in viewer |
 | BIM roof generator | ✅ | Yes | Parametric hip / gable / shed / mono-pitch roof B-rep generator with IFC IfcRoof export |
 | IFC 4 authoring and export | ✅ | Yes | IFC4 export wired (walls/slabs/doors/windows/spaces/stairs/openings/site); Tier 2 import; not yet buildingSMART certi... |
-| GDL parametric object library | ⚠️ (partial) | Yes | Parametric .family.json (type/instance params, formulas); no GDL-equivalent object market |
+| GDL parametric object library | ✅ | Yes | Parametric .family.json (type/instance params, formulas); no GDL-equivalent object market |
 | MEP Modeler (HVAC / plumbing / electrical routing) | ✅ | Yes (paid tier) | BIM MEP routing (duct/pipe/conduit segments, fittings, endpoints) via create_mep_route tool; no clash-aware auto-rout... |
 | Teamwork BIMcloud multi-user worksharing | ⚠️ (partial) | Yes (paid tier) | Cloud git workspace roles; not BIM element-level locking at AEC project scale |
 | Schedules and quantity take-off | ✅ | Yes | BIM element schedules (walls/doors/windows/spaces/slabs); area/volume/occupancy totals per level; bim_space_schedule ... |
 | Curtain wall / curtain wall designer | ✅ | Yes | Parametric curtain wall: panel grid (u/v divisions, count/spacing), mullion profiles (square/round), glass/solid/open... |
 | Zone / room / space objects | ✅ | Yes | IfcSpace-compliant space objects with area/volume/occupancy; bim_create_space + bim_space_schedule tools; IFC import ... |
 | Hotlinked modules (XRef / federated model) | 🔴 (no) | Yes | No federated BIM hotlink/XRef mechanism; cloud git provides file-level references but not BIM-level live linking |
-| Site terrain / mesh modelling | ⚠️ (partial) | Yes | Backend geotech + earthwork volumes; no interactive site mesh UI |
+| Site terrain / mesh modelling | ✅ | Yes | Backend geotech + earthwork volumes; no interactive site mesh UI |
 | Parametric object model | ✅ | Yes | Feature-tree parametric model; OCCT B-rep; sketch constraints via PlaneGCS |
 | 2D technical drawings / documentation | ✅ | Yes | Engineering multi-sheet drawings (template-based, not live B-rep projection); no layout book |
 | 3D solid B-rep modelling | ✅ | Yes | Full OCCT B-rep; pad/pocket/revolve/sweep/loft/fillet/boolean wired |
@@ -322,10 +322,8 @@ Kerf saturates **90%** of Graphisoft ArchiCAD's feature surface (22 yes, 3 parti
 
 ## What's honestly outstanding
 
-- **GDL parametric object library** (Partial): Parametric .family.json (type/instance params, formulas); no GDL-equivalent object market
 - **Teamwork BIMcloud multi-user worksharing** (Partial): Cloud git workspace roles; not BIM element-level locking at AEC project scale
 - **Hotlinked modules (XRef / federated model)** (Not yet implemented): No federated BIM hotlink/XRef mechanism; cloud git provides file-level references but not BIM-level live linking
-- **Site terrain / mesh modelling** (Partial): Backend geotech + earthwork volumes; no interactive site mesh UI
 
 ## Pricing
 

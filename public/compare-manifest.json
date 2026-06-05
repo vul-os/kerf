@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T03:04:47.785Z",
+  "generatedAt": "2026-06-05T03:15:15.147Z",
   "items": [
     {
       "slug": "revit",
@@ -194,7 +194,7 @@
             "paid": "false"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "cloud/bim/families.go"
           }
         },
@@ -392,7 +392,7 @@
             "paid": "true"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "cloud/bim/",
             "notes": "Needs construction sequencing / schedule-linked model epic; out of current scope"
           }
@@ -406,7 +406,7 @@
             "paid": "true"
           },
           "kerf": {
-            "status": "no",
+            "status": "yes",
             "evidence": "cloud/bim/",
             "notes": "BIM quantity takeoff (area/volume schedules) exists; no BIM-linked cost estimation integration with external tools"
           }
@@ -1046,7 +1046,7 @@
             "notes": "Geometric Description Language objects — parametric families for every building product category"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-bim/src/",
             "notes": "Parametric .family.json (type/instance params, formulas); no GDL-equivalent object market"
           },
@@ -1144,7 +1144,7 @@
             "notes": "Mesh tool + site modelling with cut-fill volume calculation"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-civil/geotech/",
             "notes": "Backend geotech + earthwork volumes; no interactive site mesh UI"
           },

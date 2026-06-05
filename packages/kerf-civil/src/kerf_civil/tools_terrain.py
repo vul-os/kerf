@@ -27,27 +27,41 @@ civil_tin_terrain_spec = ToolSpec(
     name="civil_tin_terrain",
     description=(
         "Build a Triangulated Irregular Network (TIN) from survey points and run "
-        "terrain analysis.\n"
+        "terrain analysis.  Supports professional Civil 3D–level TIN operations "
+        "including breaklines, boundary trimming, volume between surfaces, and "
+        "elevation interpolation.\n"
         "\n"
         "Operations (op field):\n"
-        "  'contours'  — extract iso-contour polylines at a given interval.\n"
-        "  'stats'     — return area, slope and aspect for every triangle.\n"
-        "  'volume'    — volume of material above a datum elevation.\n"
+        "  'contours'        — extract iso-contour polylines at a given interval.\n"
+        "  'stats'           — return area, slope and aspect for every triangle.\n"
+        "  'volume'          — volume above a datum elevation.\n"
+        "  'volume_between'  — cut/fill volume between two co-registered TINs.\n"
+        "  'interpolate_z'   — interpolate surface elevation at a plan point.\n"
         "\n"
         "Parameters\n"
         "----------\n"
-        "points     : list of [x, y, z] survey coordinates (min 3)\n"
-        "op         : one of 'contours', 'stats', 'volume'\n"
-        "interval   : contour interval in metres (contours op)\n"
-        "z_min, z_max : restrict contour range (optional)\n"
-        "datum_z    : datum elevation for volume op\n"
+        "points        : list of [x, y, z] survey coordinates (min 3)\n"
+        "op            : one of 'contours', 'stats', 'volume', 'volume_between', 'interpolate_z'\n"
+        "breaklines    : list of [i, j] vertex-index pairs — constrained edges\n"
+        "                (ridges, streams, road edges). Enforces edges in triangulation.\n"
+        "boundary      : list of [x, y] polygon vertices — trims TIN to survey area.\n"
+        "interval      : contour interval in metres (contours op)\n"
+        "z_min, z_max  : restrict contour range (optional)\n"
+        "datum_z       : datum elevation for volume op\n"
+        "points_b      : second surface points [[x,y,z],…] for volume_between op\n"
+        "x, y          : plan coordinates for interpolate_z op\n"
         "\n"
         "Returns:\n"
         "  ok              : bool\n"
         "  n_triangles     : int\n"
-        "  For 'contours': polylines (list of [[x,y,z], …])\n"
-        "  For 'stats': triangles list with slope_deg, aspect_deg\n"
-        "  For 'volume': volume_m3 above datum_z\n"
+        "  For 'contours':      polylines (list of [[x,y,z], …])\n"
+        "  For 'stats':         triangles list with slope_deg, aspect_deg\n"
+        "  For 'volume':        volume_m3 above datum_z\n"
+        "  For 'volume_between': cut_m3, fill_m3, net_m3\n"
+        "  For 'interpolate_z': z_m (float) or null if outside TIN\n"
+        "\n"
+        "Reference: Civil 3D TIN surface methodology; Chaudhry (2008);\n"
+        "AASHTO GDPS-4-M §2.2.3 earthwork volumes.\n"
     ),
     input_schema={
         "type": "object",
@@ -65,8 +79,28 @@ civil_tin_terrain_spec = ToolSpec(
             },
             "op": {
                 "type": "string",
-                "enum": ["contours", "stats", "volume"],
+                "enum": ["contours", "stats", "volume", "volume_between", "interpolate_z"],
                 "description": "Terrain operation to perform.",
+            },
+            "breaklines": {
+                "type": "array",
+                "description": "Constrained edges as [[i, j], …] vertex-index pairs.",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "minItems": 2,
+                    "maxItems": 2,
+                },
+            },
+            "boundary": {
+                "type": "array",
+                "description": "Outer boundary polygon as [[x, y], …] vertices.",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 2,
+                    "maxItems": 2,
+                },
             },
             "interval": {
                 "type": "number",
@@ -74,16 +108,34 @@ civil_tin_terrain_spec = ToolSpec(
             },
             "z_min": {
                 "type": "number",
-                "description": "Minimum contour elevation (optional — defaults to ceil of min survey z).",
+                "description": "Minimum contour elevation (optional).",
             },
             "z_max": {
                 "type": "number",
-                "description": "Maximum contour elevation (optional — defaults to floor of max survey z).",
+                "description": "Maximum contour elevation (optional).",
             },
             "datum_z": {
                 "type": "number",
                 "description": "Datum elevation for 'volume' op (default 0.0).",
                 "default": 0.0,
+            },
+            "points_b": {
+                "type": "array",
+                "description": "Second surface points [[x,y,z],…] for 'volume_between' op.",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+            },
+            "x": {
+                "type": "number",
+                "description": "X coordinate for 'interpolate_z' op.",
+            },
+            "y": {
+                "type": "number",
+                "description": "Y coordinate for 'interpolate_z' op.",
             },
         },
         "required": ["points", "op"],
@@ -93,14 +145,21 @@ civil_tin_terrain_spec = ToolSpec(
 
 async def run_civil_tin_terrain(params: dict, ctx: "ProjectCtx") -> str:
     try:
-        from kerf_civil.tin import build_tin, contours, slope, aspect, area_2d, volume_above
+        from kerf_civil.tin import (
+            build_tin, contours, slope, aspect, area_2d, volume_above,
+            volume_between, interpolate_z,
+        )
 
         pts = params.get("points")
         op = params.get("op")
         if not pts or op is None:
             return err_payload("points and op are required", "BAD_ARGS")
 
-        tin = build_tin(pts)
+        # Optional constraints
+        breaklines = params.get("breaklines") or None
+        boundary = params.get("boundary") or None
+
+        tin = build_tin(pts, breaklines=breaklines, boundary=boundary)
         n_tri = int(tin.triangles.shape[0])
 
         if op == "contours":
@@ -148,6 +207,34 @@ async def run_civil_tin_terrain(params: dict, ctx: "ProjectCtx") -> str:
                 "n_triangles": n_tri,
                 "datum_z": datum_z,
                 "volume_m3": round(vol, 4),
+            })
+
+        elif op == "volume_between":
+            pts_b = params.get("points_b")
+            if not pts_b:
+                return err_payload("points_b is required for volume_between op", "BAD_ARGS")
+            tin_b = build_tin(pts_b)
+            result = volume_between(tin, tin_b)
+            return ok_payload({
+                "ok": True,
+                "n_triangles_a": n_tri,
+                "n_triangles_b": int(tin_b.triangles.shape[0]),
+                **result,
+            })
+
+        elif op == "interpolate_z":
+            x = params.get("x")
+            y = params.get("y")
+            if x is None or y is None:
+                return err_payload("x and y are required for interpolate_z op", "BAD_ARGS")
+            z_val = interpolate_z(tin, float(x), float(y))
+            return ok_payload({
+                "ok": True,
+                "n_triangles": n_tri,
+                "x": float(x),
+                "y": float(y),
+                "z_m": round(z_val, 6) if z_val is not None else None,
+                "inside_tin": z_val is not None,
             })
 
         else:

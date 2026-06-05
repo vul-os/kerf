@@ -45,10 +45,39 @@ Two-loop network (Hardy Cross example):
     Nodes: 4 nodes (1 reservoir + 3 demand nodes), 5 pipes
     Mass balance at each demand node closes within 1 × 10⁻³ m³/s.
 
+Minor loss coefficients
+-----------------------
+Minor losses (fittings, bends, valves) are modelled as an equivalent-length
+addition to each pipe, converted from the loss-coefficient K_m:
+
+    h_minor = K_m * V² / (2g)  where V = Q/A
+    equivalent length: L_eq = K_m * d / f  (Darcy-Weisbach)
+
+For Hazen-Williams mode, we add an equivalent HW resistance term:
+    r_minor = K_m / (2g * A²)  such that h = r_minor * Q²
+
+Reference: Mays (2011) §10.4, "Minor Losses in Pipe Systems".
+
+Pump heads
+----------
+Pumps are modelled as negative-resistance elements (head sources).
+A pump adds a fixed head H_p at its installation node:
+
+    H_node_ds = H_node_us + H_p  (positive H_p = head added)
+
+This is the Fixed Operating Point (FOP) model (Rossman 2000, §3.1.5).
+For variable-speed pumps, H_p should be interpolated from the pump curve.
+
 Public API
 ----------
 solve_network(nodes, reservoirs, pipes,
               formula='HW', max_iter=200, tol=1e-6) -> NetworkResult
+
+minor_loss_coeff(fitting) -> float
+    Return K_m for standard pipe fittings (ASHRAE 2009 Table 3).
+
+pressure_residual(result, nodes, pipes) -> dict
+    Compute head-loss residuals per pipe: h_actual - h_computed.
 """
 from __future__ import annotations
 
@@ -85,6 +114,12 @@ class Pipe:
     length_m: float
     diameter_m: float
     roughness: float            # HW: C; DW: ε (m)
+    # Minor loss coefficient K_m (dimensionless, sum of all fittings)
+    # h_minor = K_m * V²/(2g) — see Mays (2011) §10.4
+    minor_loss_K: float = 0.0
+    # Pump head added at node_a (m). Positive = pump adds energy.
+    # Modelled as a fixed operating point (EPANET 2 §3.1.5).
+    pump_head_m: float = 0.0
 
 
 @dataclass
@@ -109,6 +144,44 @@ _HW_EXP = 1.852     # Hazen-Williams exponent
 def _hw_resistance(length: float, diameter: float, C: float) -> float:
     """Hazen-Williams resistance coefficient r such that h_L = r * Q^1.852."""
     return 10.67 * length / (C ** _HW_EXP * diameter ** 4.871)
+
+
+def _minor_loss_hw_resistance(K_m: float, diameter: float) -> float:
+    """
+    Equivalent HW-form resistance for minor losses.
+
+    Minor loss: h_m = K_m * V²/(2g) = K_m * Q² / (2g * A²)
+    We express this as r_m * Q^1.852 ≈ r_m * Q^2 (since Q^1.852 ≈ Q^2 for
+    typical pipe velocities 0.5–3 m/s).  For accuracy, we retain the
+    Hazen-Williams exponent and return the resistance at a reference flow.
+
+    Simplified conservative approach: add equivalent pipe length
+        L_eq = K_m * d / f_typ  (f_typ = 0.02 typical Darcy-Weisbach factor)
+    then compute HW resistance from L_eq.
+
+    Reference: Mays (2011) §10.4, equivalent-length method.
+    """
+    f_typ = 0.02
+    L_eq = K_m * diameter / f_typ
+    # Use typical HW C=120 for the minor-loss equivalent segment
+    return 10.67 * L_eq / (120.0 ** _HW_EXP * diameter ** 4.871)
+
+
+def _minor_loss_dh_dQ(K_m: float, diameter: float, Q: float) -> tuple[float, float]:
+    """
+    DW-form minor loss h_m and d(h_m)/dQ.
+
+        h_m = K_m * Q² / (2g * A²)   (positive for |Q|, signed)
+        dh/dQ = K_m * 2|Q| / (2g * A²) = K_m * |Q| / (g * A²)
+
+    Reference: Mays (2011) §10.4.
+    """
+    A = math.pi * (diameter / 2.0) ** 2
+    coef = K_m / (2.0 * _G * A ** 2)
+    absQ = max(abs(Q), 1e-30)
+    h_m = math.copysign(coef * absQ ** 2, Q)
+    dh_m = 2.0 * coef * absQ
+    return h_m, dh_m
 
 
 def _hw_headloss(Q: float, r: float) -> float:
@@ -199,12 +272,20 @@ def solve_network(
     Q = [1e-3] * nk
 
     def conductance(k: int, q: float) -> float:
-        """Linearised pipe conductance g_k = 1 / (dh/dQ).  Always > 0."""
+        """Linearised pipe conductance g_k = 1 / (dh/dQ).  Always > 0.
+        Includes minor loss contribution (Mays 2011 §10.4)."""
         p = pipes[k]
         if formula == "HW":
             dh = _hw_dh_dQ(q, hw_r[k])
+            # Add minor loss dh/dQ if K_m > 0
+            if p.minor_loss_K > 0:
+                _, dh_m = _minor_loss_dh_dQ(p.minor_loss_K, p.diameter_m, q)
+                dh += dh_m
         else:
             _, dh = _dw_headloss_and_dhdQ(q, p.length_m, p.diameter_m, p.roughness)
+            if p.minor_loss_K > 0:
+                _, dh_m = _minor_loss_dh_dQ(p.minor_loss_K, p.diameter_m, q)
+                dh += dh_m
         return 1.0 / max(dh, 1e-30)
 
     converged = False
@@ -229,19 +310,30 @@ def solve_network(
             b_free = ib < np
 
             gk = g[k]
+            # Pump head contribution: pump at pipe (a→b) with H_pump reduces the
+            # effective head difference driving flow:
+            # Q_k = g_k * (H_a - H_b + H_pump)
+            # In GGA assembly: pump_head acts as an offset on the known-head side.
+            # Ref: Rossman (2000) EPANET 2 §3.1.5 Fixed Operating Point pump model.
+            H_pump = pipe.pump_head_m
+
             if a_free and b_free:
                 A[ia][ia] += gk
                 A[ib][ib] += gk
                 A[ia][ib] -= gk
                 A[ib][ia] -= gk
+                # Pump head term: adds gk*H_pump to b[ia] and -gk*H_pump to b[ib]
+                if H_pump != 0.0:
+                    b[ia] -= gk * H_pump   # pump raises node_b → reduces h driving a
+                    b[ib] += gk * H_pump   # node_b sees higher effective source
             elif a_free:
-                # node_b = reservoir
+                # node_b = reservoir with effective head = res_head + H_pump_in
                 A[ia][ia] += gk
-                b[ia] += gk * res_heads[ib - np]
+                b[ia] += gk * (res_heads[ib - np] + H_pump)
             elif b_free:
-                # node_a = reservoir
+                # node_a = reservoir; pump adds H_pump to effective head at a
                 A[ib][ib] += gk
-                b[ib] += gk * res_heads[ia - np]
+                b[ib] += gk * (res_heads[ia - np] + H_pump)
             # both fixed: skip
 
         # Incorporate demands (flow withdrawn from node)
@@ -253,15 +345,15 @@ def solve_network(
         if H_new is None:
             break  # singular matrix
 
-        # Update pipe flows: Q_k = g_k * (H_a - H_b)
-        # This is the linearised flow that exactly satisfies mass balance.
+        # Update pipe flows: Q_k = g_k * (H_a - H_b + H_pump)
+        # H_pump shifts the effective head-driving term for pump links.
         Q_new = []
         for k, pipe in enumerate(pipes):
             ia = all_idx[pipe.node_a]
             ib = all_idx[pipe.node_b]
             ha = H_new[ia] if ia < np else res_heads[ia - np]
             hb = H_new[ib] if ib < np else res_heads[ib - np]
-            Q_new.append(g[k] * (ha - hb))
+            Q_new.append(g[k] * (ha - hb + pipe.pump_head_m))
 
         residual = max(abs(Q_new[k] - Q[k]) for k in range(nk))
         Q = Q_new
@@ -327,6 +419,120 @@ def _gaussian_solve(A: list[list[float]], b: list[float]) -> list[float] | None:
 # ---------------------------------------------------------------------------
 # Mass-balance check
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Minor loss coefficient catalogue
+# ---------------------------------------------------------------------------
+
+# Standard fitting K_m values (ASHRAE Fundamentals 2009, Table 3; also
+# Mays 2011 §10.4; Streeter & Wylie 1985 Appendix A).
+_FITTING_K: dict[str, float] = {
+    "elbow_90_std":        0.75,   # 90° standard elbow
+    "elbow_90_long_rad":   0.45,   # 90° long-radius elbow
+    "elbow_45":            0.35,   # 45° elbow
+    "tee_straight":        0.30,   # tee — flow runs straight through
+    "tee_branch":          1.50,   # tee — flow diverts into branch
+    "gate_valve_full":     0.20,   # gate valve fully open
+    "gate_valve_half":     5.60,   # gate valve half open
+    "butterfly_valve":     0.45,   # butterfly valve fully open
+    "check_valve":         2.50,   # swing check valve
+    "ball_valve":          0.05,   # ball valve fully open
+    "globe_valve":         10.0,   # globe valve fully open
+    "reducer_gradual":     0.10,   # gradual reducer (7.5° half-angle)
+    "reducer_sudden":      0.50,   # sudden contraction (sharp-edged)
+    "expansion_sudden":    1.00,   # sudden expansion
+    "entrance_sharp":      0.50,   # sharp-edged pipe entrance
+    "entrance_projecting": 0.80,   # projecting pipe entrance
+    "entrance_rounded":    0.04,   # well-rounded entrance
+    "exit":                1.00,   # pipe exit (submerged)
+}
+
+
+def minor_loss_coeff(fitting: str) -> float:
+    """
+    Return the dimensionless minor-loss coefficient K_m for a named fitting.
+
+    h_minor = K_m * V² / (2g)
+
+    Parameters
+    ----------
+    fitting : str
+        One of: elbow_90_std, elbow_90_long_rad, elbow_45, tee_straight,
+        tee_branch, gate_valve_full, gate_valve_half, butterfly_valve,
+        check_valve, ball_valve, globe_valve, reducer_gradual,
+        reducer_sudden, expansion_sudden, entrance_sharp,
+        entrance_projecting, entrance_rounded, exit.
+
+    Returns
+    -------
+    float — K_m (dimensionless)
+
+    Raises
+    ------
+    ValueError if fitting not in catalogue.
+
+    Reference:
+    ASHRAE (2009) Fundamentals Handbook, Chapter 3, Table 3.
+    Mays (2011) Water Resources Engineering, 2nd Ed., §10.4.
+    """
+    key = fitting.strip().lower()
+    if key not in _FITTING_K:
+        valid = ", ".join(sorted(_FITTING_K.keys()))
+        raise ValueError(f"fitting {fitting!r} not in catalogue. Valid: {valid}")
+    return _FITTING_K[key]
+
+
+def pressure_residual(
+    nodes: list[Node],
+    pipes: list[Pipe],
+    result: NetworkResult,
+    formula: str = "HW",
+) -> dict[str, float]:
+    """
+    Compute head-loss residuals per pipe: h_actual − h_computed.
+
+    For a fully converged solution, all residuals should be ≈ 0.
+    A large residual indicates numerical error or a disconnected network.
+
+    Parameters
+    ----------
+    nodes   : demand nodes (for head lookup)
+    pipes   : pipe list
+    result  : NetworkResult from solve_network()
+    formula : 'HW' or 'DW'
+
+    Returns
+    -------
+    dict {pipe_id: residual_m}
+
+    Reference: EPANET 2 Users Manual §3.4, "Checking Results".
+    """
+    heads = result.nodal_heads_m
+    residuals: dict[str, float] = {}
+
+    for pipe in pipes:
+        ha = heads.get(pipe.node_a, 0.0)
+        hb = heads.get(pipe.node_b, 0.0)
+        Q  = result.pipe_flows_m3s[pipe.id]
+        h_actual = ha - hb
+
+        if formula == "HW":
+            r = _hw_resistance(pipe.length_m, pipe.diameter_m, pipe.roughness)
+            h_computed = _hw_headloss(Q, r)
+            if pipe.minor_loss_K > 0:
+                h_m, _ = _minor_loss_dh_dQ(pipe.minor_loss_K, pipe.diameter_m, Q)
+                h_computed += h_m
+        else:
+            h_computed, _ = _dw_headloss_and_dhdQ(Q, pipe.length_m, pipe.diameter_m, pipe.roughness)
+            if pipe.minor_loss_K > 0:
+                h_m, _ = _minor_loss_dh_dQ(pipe.minor_loss_K, pipe.diameter_m, Q)
+                h_computed += h_m
+
+        h_computed += pipe.pump_head_m  # pump head is a head gain (reduces drop)
+        residuals[pipe.id] = round(h_actual - h_computed, 8)
+
+    return residuals
+
 
 def check_mass_balance(
     nodes: list[Node],

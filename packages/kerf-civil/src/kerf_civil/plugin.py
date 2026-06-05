@@ -4,7 +4,12 @@ kerf-civil plugin entry-point.
 Registers:
   - LLM tools: civil_horizontal_alignment, civil_vertical_alignment,
                civil_corridor_sections, civil_earthwork_volume,
-               civil_tin_terrain, civil_crs_transform
+               civil_tin_terrain, civil_crs_transform,
+               civil_water_network_solve, civil_sewer_manning_capacity,
+               civil_storm_rational, civil_culvert_capacity,
+               civil_drainage_rational_method, civil_time_of_concentration,
+               civil_gravity_sewer_profile, civil_gravity_network_solve,
+               civil_landxml_import, civil_landxml_export
 """
 
 from __future__ import annotations
@@ -89,10 +94,19 @@ async def register(app: FastAPI, ctx):
         "civil.corridor-volume",
         "civil.corridor-ifc",
         "civil.tin-terrain",
+        "civil.tin-breaklines",
+        "civil.tin-boundary",
+        "civil.tin-volume-between",
+        "civil.tin-interpolate-z",
         "civil.crs-transform",
         "civil.landxml",
         "civil.hydraulics-pressure",
+        "civil.hydraulics-pressure-minor-losses",
+        "civil.hydraulics-pressure-pump-fop",
+        "civil.hydraulics-pressure-residuals",
         "civil.hydraulics-gravity",
+        "civil.hydraulics-gravity-hgl-egl",
+        "civil.hydraulics-gravity-network",
         "civil.storm",
         "civil.drainage-rational-hec22",
     ]

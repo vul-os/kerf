@@ -139,17 +139,21 @@ civil_water_network_solve_spec = ToolSpec(
         "Inputs:\n"
         "  nodes       : [{id, elevation_m, demand_m3s}, …]\n"
         "  reservoirs  : [{id, head_m}, …]  (fixed-head sources)\n"
-        "  pipes       : [{id, node_a, node_b, length_m, diameter_m, roughness}, …]\n"
+        "  pipes       : [{id, node_a, node_b, length_m, diameter_m, roughness,\n"
+        "                   minor_loss_K?, pump_head_m?}, …]\n"
         "               roughness = C (HW) or ε in metres (DW)\n"
+        "               minor_loss_K : sum of fitting K coefficients (ASHRAE 2009 Table 3)\n"
+        "               pump_head_m  : pump head gain (m) at node_a (EPANET FOP model)\n"
         "\n"
         "Returns:\n"
-        "  ok                 : bool\n"
-        "  pipe_flows_m3s     : {pipe_id: flow}  (positive = node_a → node_b)\n"
-        "  nodal_heads_m      : {node_id: head}\n"
-        "  nodal_pressures_m  : {node_id: head - elevation}\n"
-        "  converged          : bool\n"
-        "  iterations         : int\n"
-        "  residual           : float\n"
+        "  ok                        : bool\n"
+        "  pipe_flows_m3s            : {pipe_id: flow}  (positive = node_a → node_b)\n"
+        "  nodal_heads_m             : {node_id: head}\n"
+        "  nodal_pressures_m         : {node_id: head - elevation}\n"
+        "  converged                 : bool\n"
+        "  iterations                : int\n"
+        "  residual                  : float\n"
+        "  pipe_head_loss_residuals  : {pipe_id: h_actual - h_computed}  (quality check)\n"
     ),
     input_schema={
         "type": "object",
@@ -209,7 +213,8 @@ civil_water_network_solve_spec = ToolSpec(
 async def run_civil_water_network_solve(params: dict, ctx: "ProjectCtx") -> str:
     try:
         from kerf_civil.hydraulics_pressure import (
-            Node, Reservoir, Pipe, solve_network, check_mass_balance
+            Node, Reservoir, Pipe, solve_network, check_mass_balance,
+            pressure_residual,
         )
 
         nodes = [
@@ -232,6 +237,8 @@ async def run_civil_water_network_solve(params: dict, ctx: "ProjectCtx") -> str:
                 length_m=float(p["length_m"]),
                 diameter_m=float(p["diameter_m"]),
                 roughness=float(p["roughness"]),
+                minor_loss_K=float(p.get("minor_loss_K", 0.0)),
+                pump_head_m=float(p.get("pump_head_m", 0.0)),
             )
             for p in params.get("pipes", [])
         ]
@@ -244,6 +251,8 @@ async def run_civil_water_network_solve(params: dict, ctx: "ProjectCtx") -> str:
                                max_iter=max_iter, tol=tol)
 
         balance = check_mass_balance(nodes, reservoirs, pipes, result)
+        formula = params.get("formula", "HW")
+        pipe_residuals = pressure_residual(nodes, pipes, result, formula=formula)
 
         return ok_payload({
             "ok": True,
@@ -254,6 +263,7 @@ async def run_civil_water_network_solve(params: dict, ctx: "ProjectCtx") -> str:
             "iterations": result.iterations,
             "residual": result.residual,
             "mass_balance": {k: round(v, 8) for k, v in balance.items()},
+            "pipe_head_loss_residuals": {k: round(v, 8) for k, v in pipe_residuals.items()},
         })
     except Exception as exc:
         return err_payload(str(exc), "CIVIL_WATER_NETWORK_ERROR")
@@ -740,6 +750,227 @@ async def run_civil_time_of_concentration(params: dict, ctx: "ProjectCtx") -> st
 
 
 # ---------------------------------------------------------------------------
+# Tool: civil_minor_loss_coeff  (fitting K_m catalogue)
+# ---------------------------------------------------------------------------
+
+civil_minor_loss_coeff_spec = ToolSpec(
+    name="civil_minor_loss_coeff",
+    description=(
+        "Look up the dimensionless minor-loss coefficient K_m for a standard pipe "
+        "fitting or valve.\n"
+        "\n"
+        "    h_minor = K_m · V² / (2g)\n"
+        "\n"
+        "Supported fittings (ASHRAE 2009 Table 3 / Mays 2011 §10.4):\n"
+        "  elbow_90_std, elbow_90_long_rad, elbow_45\n"
+        "  tee_straight, tee_branch\n"
+        "  gate_valve_full, gate_valve_half, butterfly_valve, check_valve,\n"
+        "  ball_valve, globe_valve\n"
+        "  reducer_gradual, reducer_sudden, expansion_sudden\n"
+        "  entrance_sharp, entrance_projecting, entrance_rounded, exit\n"
+        "\n"
+        "Pass the sum of K_m values from all fittings in a pipe as "
+        "'minor_loss_K' to civil_water_network_solve.\n"
+        "\n"
+        "Returns:\n"
+        "  ok      : bool\n"
+        "  fitting : str — normalised fitting name\n"
+        "  K_m     : float — minor loss coefficient\n"
+        "\n"
+        "Reference: ASHRAE (2009) Fundamentals Handbook, Chapter 3, Table 3;\n"
+        "Mays (2011) Water Resources Engineering, 2nd Ed., §10.4.\n"
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "fitting": {
+                "type": "string",
+                "description": (
+                    "Fitting name.  One of: elbow_90_std, elbow_90_long_rad, elbow_45, "
+                    "tee_straight, tee_branch, gate_valve_full, gate_valve_half, "
+                    "butterfly_valve, check_valve, ball_valve, globe_valve, "
+                    "reducer_gradual, reducer_sudden, expansion_sudden, entrance_sharp, "
+                    "entrance_projecting, entrance_rounded, exit."
+                ),
+            },
+        },
+        "required": ["fitting"],
+    },
+)
+
+
+async def run_civil_minor_loss_coeff(params: dict, ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_civil.hydraulics_pressure import minor_loss_coeff
+        fitting = params["fitting"]
+        K_m = minor_loss_coeff(fitting)
+        return ok_payload({"ok": True, "fitting": fitting.strip().lower(), "K_m": K_m})
+    except Exception as exc:
+        return err_payload(str(exc), "CIVIL_MINOR_LOSS_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# Tool: civil_gravity_sewer_profile  (HGL/EGL + critical depth per pipe)
+# ---------------------------------------------------------------------------
+
+civil_gravity_sewer_profile_spec = ToolSpec(
+    name="civil_gravity_sewer_profile",
+    description=(
+        "Compute the Hydraulic Grade Line (HGL) and Energy Grade Line (EGL) profile "
+        "for a gravity sewer or storm-drain pipe run.\n"
+        "\n"
+        "For each pipe the tool computes:\n"
+        "  • Normal depth (Manning's equation)\n"
+        "  • Critical depth and Froude number\n"
+        "  • HGL and EGL at upstream and downstream pipe ends\n"
+        "  • Flow regime (subcritical / supercritical / full)\n"
+        "  • Capacity check (OK / UNDER-CAPACITY / SURCHARGE)\n"
+        "\n"
+        "Pipe input fields:\n"
+        "  id           : str   — pipe identifier\n"
+        "  length_m     : float — pipe length (m)\n"
+        "  diameter_m   : float — inside diameter (m)\n"
+        "  manning_n    : float — Manning's roughness (e.g. 0.013 concrete)\n"
+        "  invert_us_m  : float — upstream invert elevation (m)\n"
+        "  invert_ds_m  : float — downstream invert elevation (m)\n"
+        "  Q_m3s        : float — design discharge (m³/s) [optional; overrides global Q]\n"
+        "\n"
+        "Returns per-pipe:\n"
+        "  y_normal_m, y_critical_m, froude, velocity_m_s, y_over_d\n"
+        "  HGL_us_m, HGL_ds_m, EGL_us_m, EGL_ds_m\n"
+        "  regime, capacity_check, Q_full_m3s\n"
+        "\n"
+        "Reference: Chaudhry (2008) §7.2; ASCE MOP 36 §6.3.\n"
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "pipes": {
+                "type": "array",
+                "description": "List of pipe segment dicts.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id":          {"type": "string"},
+                        "length_m":    {"type": "number"},
+                        "diameter_m":  {"type": "number"},
+                        "manning_n":   {"type": "number"},
+                        "invert_us_m": {"type": "number"},
+                        "invert_ds_m": {"type": "number"},
+                        "Q_m3s":       {"type": "number"},
+                    },
+                    "required": ["id", "length_m", "diameter_m", "manning_n",
+                                 "invert_us_m", "invert_ds_m"],
+                },
+            },
+            "Q_m3s": {
+                "type": "number",
+                "description": "Default design discharge (m³/s) applied to all pipes unless overridden.",
+                "default": 0.1,
+            },
+        },
+        "required": ["pipes"],
+    },
+)
+
+
+async def run_civil_gravity_sewer_profile(params: dict, ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_civil.hydraulics_gravity import hgl_egl_profile
+
+        pipes = params.get("pipes", [])
+        Q = float(params.get("Q_m3s", 0.1))
+
+        if not pipes:
+            return err_payload("pipes list is empty", "BAD_ARGS")
+
+        profile = hgl_egl_profile(pipes, Q)
+
+        return ok_payload({
+            "ok": True,
+            "pipes": profile,
+            "n_pipes": len(profile),
+        })
+    except Exception as exc:
+        return err_payload(str(exc), "CIVIL_GRAVITY_PROFILE_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# Tool: civil_gravity_network_solve  (tree-topology sewer network)
+# ---------------------------------------------------------------------------
+
+civil_gravity_network_solve_spec = ToolSpec(
+    name="civil_gravity_network_solve",
+    description=(
+        "Route design flows through a branching (tree-topology) gravity sewer or "
+        "storm-drain network and compute the HGL/EGL profile for every pipe.\n"
+        "\n"
+        "Follows ASCE MOP 36 §7.1–7.3 sequential routing:\n"
+        "  1. Topological sort from headwaters to outfall.\n"
+        "  2. Accumulate lateral inflows at each node.\n"
+        "  3. Compute Manning normal depth, HGL, EGL, Froude per pipe.\n"
+        "\n"
+        "Pipe input fields:\n"
+        "  id, length_m, diameter_m, manning_n, invert_us_m, invert_ds_m\n"
+        "  node_from    : str   — upstream node ID\n"
+        "  node_to      : str   — downstream node ID\n"
+        "  Q_lateral    : float — lateral inflow at node_from (m³/s, default 0)\n"
+        "\n"
+        "Returns:\n"
+        "  ok       : bool\n"
+        "  pipes    : list[dict]  — per-pipe HGL/EGL results\n"
+        "  node_Q   : dict        — accumulated flow at each network node\n"
+        "  warnings : list[str]   — surcharge / under-capacity advisories\n"
+        "\n"
+        "Reference: ASCE MOP 36 §7; AASHTO GDPS-4-M §4.2.\n"
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "pipes": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id":          {"type": "string"},
+                        "length_m":    {"type": "number"},
+                        "diameter_m":  {"type": "number"},
+                        "manning_n":   {"type": "number"},
+                        "invert_us_m": {"type": "number"},
+                        "invert_ds_m": {"type": "number"},
+                        "node_from":   {"type": "string"},
+                        "node_to":     {"type": "string"},
+                        "Q_lateral":   {"type": "number"},
+                    },
+                    "required": ["id", "length_m", "diameter_m", "manning_n",
+                                 "invert_us_m", "invert_ds_m", "node_from", "node_to"],
+                },
+            },
+        },
+        "required": ["pipes"],
+    },
+)
+
+
+async def run_civil_gravity_network_solve(params: dict, ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_civil.hydraulics_gravity import gravity_network_solve
+
+        pipes = params.get("pipes", [])
+        if not pipes:
+            return err_payload("pipes list is empty", "BAD_ARGS")
+
+        result = gravity_network_solve(pipes)
+
+        if not result.get("ok"):
+            return err_payload(result.get("reason", "Network solve failed"), "CIVIL_GRAVITY_NET_ERROR")
+
+        return ok_payload(result)
+    except Exception as exc:
+        return err_payload(str(exc), "CIVIL_GRAVITY_NETWORK_ERROR")
+
+
+# ---------------------------------------------------------------------------
 # TOOLS list consumed by plugin.py
 # ---------------------------------------------------------------------------
 
@@ -752,4 +983,7 @@ TOOLS = [
     ("civil_culvert_capacity",              civil_culvert_capacity_spec,              run_civil_culvert_capacity),
     ("civil_drainage_rational_method",      civil_drainage_rational_method_spec,      run_civil_drainage_rational_method),
     ("civil_time_of_concentration",         civil_time_of_concentration_spec,         run_civil_time_of_concentration),
+    ("civil_minor_loss_coeff",              civil_minor_loss_coeff_spec,              run_civil_minor_loss_coeff),
+    ("civil_gravity_sewer_profile",         civil_gravity_sewer_profile_spec,         run_civil_gravity_sewer_profile),
+    ("civil_gravity_network_solve",         civil_gravity_network_solve_spec,         run_civil_gravity_network_solve),
 ]

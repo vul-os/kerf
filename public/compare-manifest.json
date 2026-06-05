@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T05:29:23.192Z",
+  "generatedAt": "2026-06-05T05:47:27.577Z",
   "items": [
     {
       "slug": "revit",
@@ -14999,6 +14999,157 @@
             "notes": "6-process Boothroyd-Dewhurst should-cost"
           },
           "name": "Should-cost (6 processes, Boothroyd-Dewhurst)"
+        }
+      ]
+    },
+    {
+      "slug": "comsol",
+      "competitor": "COMSOL Multiphysics",
+      "category": "cad-sim",
+      "left": "kerf",
+      "right": "comsol",
+      "hero_tagline": "General-purpose multiphysics simulation — compared honestly against MIT open-core.",
+      "reviewed_at": "2026-06-05",
+      "features": [
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.comsol.com/products",
+            "notes": "Structural Mechanics Module: stress, strain, vibration, buckling, fatigue"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/plasticity/",
+            "notes": "Linear/modal/buckling/harmonic + J2 plasticity + hyperelastic + fatigue (S-N/E-N)"
+          },
+          "name": "Structural mechanics (linear/nonlinear/buckling/vibration/fatigue)"
+        },
+        {
+          "domain": "D3",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.comsol.com/products",
+            "notes": "Heat Transfer Module integrated across disciplines"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/thermal.py",
+            "notes": "Steady/transient thermal FEM + conjugate heat transfer"
+          },
+          "name": "Heat transfer (conduction/convection/CHT)"
+        },
+        {
+          "domain": "D3",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.comsol.com/products",
+            "notes": "CFD Module for fluid-flow simulation"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/k_omega_sst.py",
+            "notes": "RANS k-ε / k-ω SST + VOF multiphase + compressible + combustion"
+          },
+          "name": "CFD (laminar / turbulent fluid flow)"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.comsol.com/release/5.5/acoustics-module",
+            "notes": "Acoustics Module: electroacoustics, ultrasound, room acoustics"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/acoustics/",
+            "notes": "ISO 9613 propagation + RT60 + mass-law TL + wave SEA + photon/spectral"
+          },
+          "name": "Acoustics"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.comsol.com/",
+            "notes": "Bidirectional multiphysics couplings across modules"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-fem/src/kerf_fem/multiphysics/thermal_structural.py",
+            "notes": "Thermal-structural coupling + ALE fluid-structure interaction"
+          },
+          "name": "Multiphysics coupling (thermal-structural / FSI)"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.comsol.com/products",
+            "notes": "AC/DC + RF + Wave Optics modules; full E/M field FEM"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/routes_rf.py",
+            "notes": "openEMS FDTD RF bridge (PCB routes) + AC power load-flow; no general electrostatic/magnetostatic FEM"
+          },
+          "name": "Electromagnetics (electrostatics / magnetostatics / RF)"
+        },
+        {
+          "domain": "D3",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.comsol.com/products",
+            "notes": "Chemical Reaction Engineering + CFD species transport"
+          },
+          "kerf": {
+            "status": "partial",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/combustion/",
+            "notes": "Eddy-break-up combustion + reacting flow; no general multi-species reaction-kinetics solver"
+          },
+          "name": "Chemical / reacting flow"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.comsol.com/products",
+            "notes": "Optimization Module: topology + parameter optimization"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/topology/",
+            "notes": "SIMP density-based topology optimization + Ashby multi-objective"
+          },
+          "name": "Design optimization (topology / parametric)"
+        },
+        {
+          "domain": "D2",
+          "competitor": {
+            "status": "yes",
+            "source": "https://www.comsol.com/products",
+            "notes": "Plasma + Electric Discharge modules (arcs/sparks/coronas, v6.3)"
+          },
+          "kerf": {
+            "status": "no",
+            "evidence": "",
+            "notes": "No plasma / gas-discharge (ionization transport) modelling"
+          },
+          "name": "Plasma / electric discharge"
+        },
+        {
+          "domain": "D1",
+          "competitor": {
+            "status": "no",
+            "source": "https://www.comsol.com/",
+            "notes": "Proprietary commercial license; no LLM interface"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-sdk/src/kerf/",
+            "notes": "MIT open-core; chat-native multiphysics setup + JSON-RPC LLM tools + kerf-sdk"
+          },
+          "name": "Open-source core / chat-native"
         }
       ]
     },

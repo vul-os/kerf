@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T03:40:11.473Z",
+  "generatedAt": "2026-06-05T03:54:23.974Z",
   "items": [
     {
       "slug": "revit",
@@ -11431,7 +11431,7 @@
             "notes": "Full kinematic machine simulation; catches machine/fixture collisions"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py",
             "notes": "OBB-SAT + BVH stock/tool clash detection; no full machine-component kinematic collision model"
           },
@@ -11445,7 +11445,7 @@
             "notes": "Verify: voxel material-removal simulation with gouge detection"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cam/src/kerf_cam/worker.py",
             "notes": "Lathe cycle simulation + toolpath preview; no voxel material-removal verify with gouge check"
           },

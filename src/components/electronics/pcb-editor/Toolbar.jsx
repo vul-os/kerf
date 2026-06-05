@@ -12,7 +12,7 @@
 //   onUndo        — () => void
 //   onRedo        — () => void
 
-import { MousePointer2, Route, Zap, Trash2, Layers, CheckCircle2, XCircle, Undo2, Redo2, Loader, Ruler, Activity, Cpu, ShieldAlert } from 'lucide-react'
+import { MousePointer2, Route, Zap, Trash2, Layers, CheckCircle2, XCircle, Undo2, Redo2, Loader, Ruler, Activity, Cpu, ShieldAlert, Box, Layers3, Thermometer } from 'lucide-react'
 
 const TOOLS = [
   { id: 'select',     label: 'Select',      Icon: MousePointer2 },
@@ -42,6 +42,10 @@ export default function Toolbar({
   onToggleDrcPanel,
   onToggleSIPanel,
   onToggleSiliconPanel,
+  onToggleMultiBoardPanel,
+  onTogglePCB3DPanel,
+  onToggleEMCPanel,
+  onTogglePCBThermalPanel,
 }) {
   return (
     <div className="flex items-center gap-2 px-3 py-2 bg-[#1a1a2e] border-b border-white/10 text-sm select-none flex-wrap">
@@ -153,6 +157,50 @@ export default function Toolbar({
           >
             <Cpu size={13} />
             <span className="hidden sm:inline">Synth</span>
+          </button>
+        )}
+        {onToggleMultiBoardPanel && (
+          <button
+            data-testid="btn-toggle-multiboard-panel"
+            onClick={onToggleMultiBoardPanel}
+            title="Multi-board workspace (Altium MB3D)"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <Box size={13} />
+            <span className="hidden sm:inline">MB3D</span>
+          </button>
+        )}
+        {onTogglePCB3DPanel && (
+          <button
+            data-testid="btn-toggle-pcb3d-panel"
+            onClick={onTogglePCB3DPanel}
+            title="3D PCB editor — STEP import + clearance DRC"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <Layers3 size={13} />
+            <span className="hidden sm:inline">3D</span>
+          </button>
+        )}
+        {onToggleEMCPanel && (
+          <button
+            data-testid="btn-toggle-emc-panel"
+            onClick={onToggleEMCPanel}
+            title="EMC pre-compliance (radiated / shielding / FCC + CISPR limits)"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <Zap size={13} />
+            <span className="hidden sm:inline">EMC</span>
+          </button>
+        )}
+        {onTogglePCBThermalPanel && (
+          <button
+            data-testid="btn-toggle-thermal-panel"
+            onClick={onTogglePCBThermalPanel}
+            title="PCB thermal analysis — 2D FD hotspot map + via recommendations"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <Thermometer size={13} />
+            <span className="hidden sm:inline">Thermal</span>
           </button>
         )}
       </div>

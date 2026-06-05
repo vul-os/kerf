@@ -245,6 +245,14 @@ def _register_tools(ctx, provides: list) -> None:
         # IBIS 5.x channel simulator — si_ibis_parse + si_ibis_channel_response
         # Bergeron bounce-diagram model; PRBS-7 eye envelope (Hall & Heck 2009 §4)
         "kerf_electronics.tools.si_ibis",
+        # 3D PCB clearance DRC + STEP component body import
+        # pcb_3d_clearance_check: AABB body-to-body clearance (Altium §7.4 + IPC-7351B §4.5)
+        # pcb_step_import_body: STEP AP214/AP242 component body bbox extraction
+        "kerf_electronics.pcb_3d_clearance",
+        # IDF 3.0 MCAD bridge — import side + round-trip validation
+        # import_idf_board: parse .emn → board outline + holes + placements
+        # validate_idf_roundtrip: export→reimport consistency check (Altium MCAD CoDesigner §6)
+        "kerf_electronics.idf_roundtrip",
     ]
 
     for module_path in tool_modules:

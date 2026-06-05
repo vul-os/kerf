@@ -18,6 +18,10 @@ import Canvas from './pcb-editor/Canvas.jsx'
 import DrcErcPanel from './DrcErcPanel.jsx'
 import SIPanel from './SIPanel.jsx'
 import SiliconSynthPanel from './SiliconSynthPanel.jsx'
+import MultiBoardPanel from './MultiBoardPanel.jsx'
+import PCB3DPanel from './PCB3DPanel.jsx'
+import EMCPanel from './EMCPanel.jsx'
+import PCBThermalPanel from './PCBThermalPanel.jsx'
 
 // ─── Mock fixture ─────────────────────────────────────────────────────────────
 
@@ -161,9 +165,13 @@ export default function PCBInteractiveEditor() {
   const [error, setError] = useState(null)
 
   // ── Panel visibility state ─────────────────────────────────────────────────
-  const [showDrcPanel, setShowDrcPanel]         = useState(false)
-  const [showSIPanel, setShowSIPanel]           = useState(false)
-  const [showSiliconPanel, setShowSiliconPanel] = useState(false)
+  const [showDrcPanel, setShowDrcPanel]               = useState(false)
+  const [showSIPanel, setShowSIPanel]                 = useState(false)
+  const [showSiliconPanel, setShowSiliconPanel]       = useState(false)
+  const [showMultiBoardPanel, setShowMultiBoardPanel] = useState(false)
+  const [showPCB3DPanel, setShowPCB3DPanel]           = useState(false)
+  const [showEMCPanel, setShowEMCPanel]               = useState(false)
+  const [showPCBThermalPanel, setShowPCBThermalPanel] = useState(false)
 
   // ── Tune-Length mode state ─────────────────────────────────────────────────
   const [tuneNetA, setTuneNetA] = useState('')
@@ -442,6 +450,10 @@ export default function PCBInteractiveEditor() {
         onToggleDrcPanel={() => setShowDrcPanel((v) => !v)}
         onToggleSIPanel={() => setShowSIPanel((v) => !v)}
         onToggleSiliconPanel={() => setShowSiliconPanel((v) => !v)}
+        onToggleMultiBoardPanel={() => setShowMultiBoardPanel((v) => !v)}
+        onTogglePCB3DPanel={() => setShowPCB3DPanel((v) => !v)}
+        onToggleEMCPanel={() => setShowEMCPanel((v) => !v)}
+        onTogglePCBThermalPanel={() => setShowPCBThermalPanel((v) => !v)}
       />
 
       {/* Status bar */}
@@ -504,7 +516,7 @@ export default function PCBInteractiveEditor() {
       )}
 
       {/* ── Floating overlay panels ───────────────────────────────────────── */}
-      {(showDrcPanel || showSIPanel || showSiliconPanel) && (
+      {(showDrcPanel || showSIPanel || showSiliconPanel || showMultiBoardPanel || showPCB3DPanel || showEMCPanel || showPCBThermalPanel) && (
         <div
           data-testid="panel-overlay"
           className="absolute inset-0 pointer-events-none z-20 flex items-start justify-end p-4 gap-3 flex-wrap"
@@ -531,6 +543,32 @@ export default function PCBInteractiveEditor() {
           {showSiliconPanel && (
             <div className="pointer-events-auto">
               <SiliconSynthPanel onClose={() => setShowSiliconPanel(false)} />
+            </div>
+          )}
+          {showMultiBoardPanel && (
+            <div className="pointer-events-auto">
+              <MultiBoardPanel onClose={() => setShowMultiBoardPanel(false)} />
+            </div>
+          )}
+          {showPCB3DPanel && (
+            <div className="pointer-events-auto">
+              <PCB3DPanel
+                circuitJson={[
+                  ...boardState.pads.map((p) => ({ type: 'pcb_smtpad', ...p })),
+                  ...boardState.traces.map((t) => ({ type: 'pcb_trace', ...t })),
+                ]}
+                onClose={() => setShowPCB3DPanel(false)}
+              />
+            </div>
+          )}
+          {showEMCPanel && (
+            <div className="pointer-events-auto">
+              <EMCPanel onClose={() => setShowEMCPanel(false)} />
+            </div>
+          )}
+          {showPCBThermalPanel && (
+            <div className="pointer-events-auto">
+              <PCBThermalPanel onClose={() => setShowPCBThermalPanel(false)} />
             </div>
           )}
         </div>

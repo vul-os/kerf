@@ -118,7 +118,11 @@ function LineChart({ times, values, yLabel, yUnit, color = '#60a5fa' }) {
 // SixDOFPanel
 // ---------------------------------------------------------------------------
 
-export default function SixDOFPanel({ result, loading, error }) {
+export default function SixDOFPanel({ result, loading, error, content }) {
+  // Backward-compatible content string: JSON.parse it and merge into result.
+  if (content != null && result == null) {
+    try { result = JSON.parse(content) } catch { /* ignore */ }
+  }
   const data = useMemo(() => {
     if (!result || !result.ok) return null
     return result

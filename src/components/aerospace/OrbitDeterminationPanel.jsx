@@ -228,13 +228,23 @@ const DEMO_EKF = {
 // ---------------------------------------------------------------------------
 
 export default function OrbitDeterminationPanel({
-  mode = 'both',
-  batchResult = null,
-  ekfResult = null,
+  mode: modeProp = 'both',
+  batchResult: batchResultProp = null,
+  ekfResult: ekfResultProp = null,
   onRunBatch = null,
   onRunEkf = null,
-  loading = false,
+  loading: loadingProp = false,
+  content,
 }) {
+  // Backward-compatible content string: JSON.parse it and merge over prop defaults.
+  let _parsed = null
+  if (content != null) {
+    try { _parsed = JSON.parse(content) } catch { /* ignore */ }
+  }
+  const mode = (_parsed && _parsed.mode) ? _parsed.mode : modeProp
+  const batchResult = (_parsed && _parsed.batchResult !== undefined) ? _parsed.batchResult : batchResultProp
+  const ekfResult = (_parsed && _parsed.ekfResult !== undefined) ? _parsed.ekfResult : ekfResultProp
+  const loading = (_parsed && _parsed.loading !== undefined) ? _parsed.loading : loadingProp
   const [showDemo, setShowDemo] = useState(false)
 
   const batch = batchResult ?? (showDemo ? DEMO_BATCH : null)

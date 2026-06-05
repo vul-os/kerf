@@ -322,13 +322,22 @@ function FilterBar({ onFilter }) {
 // ---------------------------------------------------------------------------
 
 export default function MotorSelectPanel({
-  motors = null,
-  selectedMotor = null,
+  motors: motorsProp = null,
+  selectedMotor: selectedMotorProp = null,
   onFilter = null,
   onSelect = null,
   onParseEng = null,
-  loading = false,
+  loading: loadingProp = false,
+  content,
 }) {
+  // Backward-compatible content string: JSON.parse it and merge over prop defaults.
+  let _parsed = null
+  if (content != null) {
+    try { _parsed = JSON.parse(content) } catch { /* ignore */ }
+  }
+  const motors = (_parsed && _parsed.motors !== undefined) ? _parsed.motors : motorsProp
+  const selectedMotor = (_parsed && _parsed.selectedMotor !== undefined) ? _parsed.selectedMotor : selectedMotorProp
+  const loading = (_parsed && _parsed.loading !== undefined) ? _parsed.loading : loadingProp
   const [showEng, setShowEng]     = useState(false)
   const [localSel, setLocalSel]   = useState(null)
   const [showDemo, setShowDemo]   = useState(false)

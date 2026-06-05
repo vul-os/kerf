@@ -99,7 +99,11 @@ function StageTable({ stages }) {
 // StagingPanel
 // ---------------------------------------------------------------------------
 
-export default function StagingPanel({ result, loading, error }) {
+export default function StagingPanel({ result, loading, error, content }) {
+  // Backward-compatible content string: JSON.parse it and merge into result.
+  if (content != null && result == null) {
+    try { result = JSON.parse(content) } catch { /* ignore */ }
+  }
   const data = useMemo(() => {
     if (!result || !result.ok) return null
     return result

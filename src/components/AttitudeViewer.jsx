@@ -132,11 +132,18 @@ function buildAxes(THREE, length = 18) {
  * @param {string} [className]
  */
 export default function AttitudeViewer({
-  quaternion = { w: 1, x: 0, y: 0, z: 0 },
+  quaternion: quaternionProp = { w: 1, x: 0, y: 0, z: 0 },
   width = 320,
   height = 320,
   className = '',
+  content,
 }) {
+  // Backward-compatible content string: JSON.parse it and merge over prop defaults.
+  let _parsed = null
+  if (content != null) {
+    try { _parsed = JSON.parse(content) } catch { /* ignore */ }
+  }
+  const quaternion = (_parsed && _parsed.quaternion) ? _parsed.quaternion : quaternionProp
   const canvasRef = useRef(null)
   // We store mutable scene state in a ref so the animation loop always reads
   // the latest quaternion prop without re-running the heavy setup effect.

@@ -201,7 +201,15 @@ function ExportResult({ result, format }) {
 // Main panel
 // ---------------------------------------------------------------------------
 
-export default function HullExchangePanel({ hullForm }) {
+export default function HullExchangePanel({ hullForm: hullFormProp, content }) {
+  // Backward-compatible content string: JSON.parse it and merge into hullForm.
+  let _parsed = null
+  if (content != null) {
+    try { _parsed = JSON.parse(content) } catch { /* ignore */ }
+  }
+  const hullForm = (_parsed && _parsed.sections) ? _parsed
+    : (_parsed && _parsed.hullForm) ? _parsed.hullForm
+    : hullFormProp
   const [format, setFormat] = useState('dxf')
   const [useSplines, setUseSplines] = useState(true)
   const [results, setResults] = useState({})

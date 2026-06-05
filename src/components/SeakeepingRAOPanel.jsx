@@ -143,7 +143,15 @@ function RAOChart({ omegas, heaveAmps, pitchAmps, rollAmps, mode = 'heave_pitch'
 // SeakeepingRAOPanel
 // ---------------------------------------------------------------------------
 
-export default function SeakeepingRAOPanel({ result, statsResult, loading, error }) {
+export default function SeakeepingRAOPanel({ result, statsResult, loading, error, content }) {
+  // Backward-compatible content string: JSON.parse it and merge into result/statsResult.
+  if (content != null && result == null) {
+    try {
+      const parsed = JSON.parse(content)
+      result = parsed.result ?? parsed
+      statsResult = parsed.statsResult ?? statsResult
+    } catch { /* ignore */ }
+  }
   const data = useMemo(() => {
     if (!result) return null
     // May come wrapped or unwrapped

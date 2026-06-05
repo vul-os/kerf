@@ -268,8 +268,17 @@ const DEFAULT_PARAMS = {
   n_buttocks: 5,
 }
 
-export default function HullFormPanel({ onHullReady }) {
-  const [params, setParams] = useState(DEFAULT_PARAMS)
+export default function HullFormPanel({ onHullReady, initialParams, content }) {
+  // Backward-compatible content string: JSON.parse it and merge initial params.
+  let _parsedParams = null
+  if (content != null) {
+    try {
+      const _p = JSON.parse(content)
+      if (_p && typeof _p === 'object' && !Array.isArray(_p)) _parsedParams = _p
+    } catch { /* ignore */ }
+  }
+  const _initParams = initialParams ?? _parsedParams ?? null
+  const [params, setParams] = useState(_initParams ? { ...DEFAULT_PARAMS, ..._initParams } : DEFAULT_PARAMS)
   const [hull, setHull] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)

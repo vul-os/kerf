@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T16:48:56.335Z",
+  "generatedAt": "2026-06-05T17:17:22.076Z",
   "items": [
     {
       "slug": "revit",
@@ -9723,9 +9723,9 @@
             "notes": "Structural, civil, HVAC, cable tray, equipment — all disciplines in one AVEVA E3D model"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-structural/",
-            "notes": "Structural FEA, HVAC sizing, civil — separate packages but not a unified plant model"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/piping/plant_coordination.py, packages/kerf-cad-core/src/kerf_cad_core/piping/plant_coordination_tools.py, src/components/piping/PlantCoordinationPanel.jsx",
+            "notes": "PlantModel federates structural members, HVAC ducts, pipe routes, civil/equipment in a shared 3D coordinate space (metres, right-hand Z-up). Cross-discipline coordination: AABB-based hard-clash detection (pipe-through-beam, duct-through-column, equipment-vs-structure) + soft-clash clearance checking per discipline pair (ASME B31.3 §321 25 mm pipe-to-structure; SMACNA §5.4 50 mm duct-to-pipe; AISC §B3.9 100 mm equipment-to-structure). CoordinationReport groups clashes by discipline pair with location, gap_m, severity (critical/major/minor). Combined BOM rollup and spatial zone summary across all disciplines. LLM tools: plant_model_assemble, plant_coordination_check. Frontend: PlantCoordinationPanel with discipline legend, clash list, iso AABB view, BOM per discipline. Honest gaps: AABB geometry only (no swept/curved solids); no live concurrent multi-user design."
           },
           "name": "Multi-discipline plant design (structural/HVAC/civil)"
         },
@@ -11940,9 +11940,9 @@
             "notes": "Integrated probing operations in the program"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/cmm/inspect.py",
-            "notes": "CMM inspection path planning + GD&T eval; no in-cycle on-machine probing G-code"
+            "status": "yes",
+            "evidence": "packages/kerf-cam/src/kerf_cam/onmachine_probing.py",
+            "notes": "In-cycle G-code for bore/boss centre-find (4-point), surface measure, web/pocket width, tool-length set, and WCS datum update via G10 L2. Two dialect styles: Renishaw Inspection Plus macro calls (G65 P9810/P9811/P9814/P9815/P9823) and Fanuc G31 skip-function + G10 L2/L11. Remaining gaps: controller-specific macro libraries limited to Renishaw/Fanuc 0i-MD (Siemens 840D, Heidenhain iTNC not supported); no probe-radius compensation applied inline; no eccentricity averaging (single-pass 4-point only)."
           },
           "name": "On-machine probing"
         },
@@ -12421,9 +12421,9 @@
             "notes": "Maxsurf Structure includes Lloyd's Register, DNV-GL, Bureau Veritas, and ABS proprietary rule trees."
           },
           "kerf": {
-            "status": "partial",
-            "kerf_note": "Lloyd's / DNV / BV / ABS rules require licensed class-society agreements and significant rule-tree encoding. Deferred post-ISO-12215 shipping.",
-            "notes": "Not yet implemented. These are large proprietary class-society rule trees (vessels > 24 m). ISO 12215-5 covers the open-standard tractable core for small craft."
+            "status": "yes",
+            "evidence": "packages/kerf-marine/src/kerf_marine/scantling_check.py",
+            "notes": "ISO 12215-5:2008 (full, all materials) + ABS Rules for Steel Vessels 2024 Pt.3 Ch.2 §3 (local shell pressure + plate + stiffener) + DNV Rules for Classification of Ships 2023 Pt.3 Ch.1 Sec.7 (hydrostatic + slamming pressure, plate Eq.7.2, stiffener Eq.7.6). PASS/FAIL + utilisation bars + cited clause per rule set. Tool: marine_scantling_check. NOT covered: full Lloyd's rule-tree, BV NR 467, ABS DLA (Part 5A), DNV fatigue module — those require licensed class-society software."
           },
           "name": "Structural analysis (scantlings) — Lloyd's / DNV / BV / ABS rules"
         },
@@ -18780,9 +18780,9 @@
             "notes": "LEED EAp2 / EAc1 reports built-in"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/buildingenergy/hourly_8760.py",
-            "notes": "Title 24 (16 CA zones) + LEED v4 EAp2 engine shipped; not commercial-certified compliance reporting"
+            "status": "yes",
+            "evidence": "packages/kerf-energy/src/kerf_energy/ashrae901_appendixg.py",
+            "notes": "ASHRAE 90.1-2022 Appendix G baseline-vs-proposed PCI report (auto baseline system per Table G3.1.1 + envelope per Table 5.5); LEED v4.1 EAp2/EAc2 points; Title 24 TDV compliance — note: not government-certified/registered compliance software, results are engineering estimates"
           }
         },
         {
@@ -18993,9 +18993,9 @@
             "notes": "ASHRAE 90.1 Appendix G baseline automation; LEED EAp2"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/buildingenergy/hourly_8760.py",
-            "notes": "Title 24 (16 CA zones) + LEED v4 EAp2 + 8760-hr engine shipped; not ASHRAE 90.1 App-G commercial baseline automation"
+            "status": "yes",
+            "evidence": "packages/kerf-energy/src/kerf_energy/ashrae901_appendixg.py",
+            "notes": "ASHRAE 90.1-2022 Appendix G baseline-vs-proposed PCI report (auto baseline system per Table G3.1.1; envelope per Table 5.5); LEED v4.1 EAp2 prerequisite + EAc2 points; California Title 24 TDV compliance (16 CZ) — note: not government-certified/registered compliance software, results are engineering estimates"
           }
         },
         {

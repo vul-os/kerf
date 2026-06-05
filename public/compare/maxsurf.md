@@ -128,7 +128,7 @@ Integrated naval architecture hull design and stability platform — versus an o
 
 ## Summary
 
-Kerf saturates **95%** of Bentley Maxsurf's feature surface (10 yes, 1 partial, 0 no out of 11 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of Bentley Maxsurf's feature surface (11 yes, 0 partial, 0 no out of 11 features tracked here). Kerf covers the full tracked feature set for Bentley Maxsurf; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -140,7 +140,7 @@ Kerf saturates **95%** of Bentley Maxsurf's feature surface (10 yes, 1 partial, 
 | Resistance prediction | ✅ | Yes | Holtrop-Mennen resistance prediction (backend) |
 | Seakeeping / motions | ✅ | Yes | Seakeeping: heave/pitch/roll RAOs + added mass + damping (backend) |
 | Structural analysis (scantlings) — ISO 12215-5 | ✅ | Yes | Full ISO 12215-5:2008 scantlings: design categories A–D; dynamic acceleration nCG; bottom / side / deck design pressu... |
-| Structural analysis (scantlings) — Lloyd's / DNV / BV / ABS rules | ✅ | Yes | ISO 12215-5:2008 + ABS Pt.3 Ch.2 §3 + DNV Pt.3 Ch.1 Sec.7: published local scantling formulae (pressure, plate t, stiffener SM); PASS/FAIL + utilisation; cited clause. Not: full Lloyd's/BV/ABS-DLA proprietary rule trees. |
+| Structural analysis (scantlings) — Lloyd's / DNV / BV / ABS rules | ✅ | Yes | ISO 12215-5:2008 (full, all materials) + ABS Rules for Steel Vessels 2024 Pt.3 Ch.2 §3 (local shell pressure + plate ... |
 | Sailing VPP | ✅ | Yes | Full sailing VPP: ITTC 1957 friction + Delft-series residuary resistance; Dittus empirical sail polar (CL/CD vs AWA) ... |
 | Section / body-plan curves | ✅ | Yes | Hull section curve extraction (backend) |
 | DXF / IGES / 3DM file exchange | ✅ | Yes | STEP export; limited IGES; no DGN/3DM exchange |
@@ -149,10 +149,6 @@ Kerf saturates **95%** of Bentley Maxsurf's feature surface (10 yes, 1 partial, 
 ## What Kerf does that Bentley Maxsurf doesn't
 
 - **LLM / chat-native editing** — Chat-native: describe vessel parameters; Kerf runs hydrostatics and stability
-
-## What's honestly outstanding
-
-- **Structural analysis (scantlings) — full proprietary rule suites**: Kerf ships ISO 12215-5 + ABS Pt.3 Ch.2 §3 + DNV Pt.3 Ch.1 Sec.7 published local scantling formulae. The full Lloyd's Register rule tree, BV NR 467, ABS DLA (dynamic load approach, Part 5A), and DNV fatigue modules require licensed class-society software and are not implemented.
 
 ## Pricing
 

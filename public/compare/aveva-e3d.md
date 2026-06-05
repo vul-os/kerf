@@ -138,7 +138,7 @@ Kerf saturates **91%** of AVEVA E3D Design's feature surface (9 yes, 2 partial, 
 | Isometric drawing generation | ✅ | Yes | Isometric drawing generation from P&ID data (backend) |
 | P&ID integration / data synchronisation | ✅ | Yes | P&ID authoring with PID symbols; backend engine wired |
 | Clash detection (hard/soft) | ✅ | Yes | Clash detection in assembly (OBB-SAT + BVH backend); no P&ID/plant-specific clash UI |
-| Multi-discipline plant design (structural/HVAC/civil) | ✅ | Yes | PlantModel federates structural/HVAC/piping/civil/equipment in shared 3D coordinate space; AABB hard+soft clash detection per discipline-pair clearance rules (ASME B31.3/SMACNA/AISC); coordination report grouped by pair; combined BOM rollup; LLM tools: plant_model_assemble, plant_coordination_check. Gap: AABB geometry only; no live concurrent multi-user design. |
+| Multi-discipline plant design (structural/HVAC/civil) | ✅ | Yes | PlantModel federates structural members, HVAC ducts, pipe routes, civil/equipment in a shared 3D coordinate space (me... |
 | Global multi-user concurrent design | ⚠️ (partial) | Yes | Cloud git workspace with branch/merge; not real-time concurrent design at plant-model scale |
 | Laser scan / point cloud integration | ⚠️ (partial) | Yes | PLY ASCII + binary, XYZ text, LAS ingest; voxel-grid downsample (Zhang 2003); statistical outlier removal (SOR, Rusu ... |
 | HVAC duct sizing | ✅ | Yes | SMACNA duct sizing + flat-pattern (backend) |

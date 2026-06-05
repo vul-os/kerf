@@ -95,7 +95,7 @@ Commercial building energy analysis and HVAC design — TRACE 3D Plus vs MIT ope
 
 ## Summary
 
-Kerf saturates **100%** of Trane TRACE 3D Plus's feature surface (7 yes, 0 partial, 0 no out of 7 features tracked here). All features shipped; see individual notes for engineering-estimate caveats.
+Kerf saturates **100%** of Trane TRACE 3D Plus's feature surface (7 yes, 0 partial, 0 no out of 7 features tracked here). Kerf covers the full tracked feature set for Trane TRACE 3D Plus; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -105,17 +105,13 @@ Kerf saturates **100%** of Trane TRACE 3D Plus's feature surface (7 yes, 0 parti
 | AHRI-listed equipment catalogue | ✅ | Yes | 30 representative AHRI-listed models (6 categories, 5 per); real AHRI cert numbers + certified part-load curves from ... |
 | Part-load efficiency curves (AHRI-certified) | ✅ | Yes | AHRI-certified part-load values at 25/50/75/100% load — same source (ahridirectory.org) |
 | Duct and hydronic pipe sizing | ✅ | Yes | Velocity + equal-friction duct sizing; Darcy-Weisbach + SMACNA minor losses |
-| ASHRAE 90.1 / Title 24 compliance baseline modelling | ✅ | Yes | ASHRAE 90.1-2022 Appendix G baseline-vs-proposed PCI + LEED v4.1 EAp2/EAc2 + Title 24 TDV (16 CA CZ); note: not govt-certified compliance software |
+| ASHRAE 90.1 / Title 24 compliance baseline modelling | ✅ | Yes | ASHRAE 90.1-2022 Appendix G baseline-vs-proposed PCI report (auto baseline system per Table G3.1.1; envelope per Tabl... |
 | Revit / IFC geometry import | ✅ | Yes | Native IFC Tier 1+2 import; no gbXML reader yet |
 | Open-source / scripting API | ✅ | No | MIT-licensed Python plugin; JSON-RPC LLM tool surface; hvac.equipment_select |
 
 ## What Kerf does that Trane TRACE 3D Plus doesn't
 
 - **Open-source / scripting API** — MIT-licensed Python plugin; JSON-RPC LLM tool surface; hvac.equipment_select
-
-## What's honestly outstanding
-
-All 7 tracked features are now shipped. Individual caveats: ASHRAE 90.1 Appendix G and Title 24 results are engineering estimates — not government-certified compliance software. For permit-grade submissions use CEC-approved or GBCI-accepted tools with a certified energy modeller.
 
 ## Pricing
 

@@ -126,7 +126,7 @@ Production CAM with factory-certified posts — compared honestly against MIT op
 
 ## Summary
 
-Kerf saturates **90%** of ESPRIT (Hexagon)'s feature surface (8 yes, 2 partial, 0 no out of 10 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
+Kerf saturates **95%** of ESPRIT (Hexagon)'s feature surface (9 yes, 1 partial, 0 no out of 10 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -140,7 +140,7 @@ Kerf saturates **90%** of ESPRIT (Hexagon)'s feature surface (8 yes, 2 partial, 
 | Digital-twin machine simulation | ✅ | Yes | Machine-component AABB collision check from 5-axis joint values |
 | Toolpath verify (material removal + gouge) | ✅ | Yes | Voxel/dexel material-removal verify (Van Hook 1986) + gouge detection |
 | Factory-certified post-processor library (3500+ machines) | ⚠️ (partial) | Yes | LinuxCNC/Fanuc + Heidenhain iTNC + Siemens 840D posts; not a 3500-machine OEM-certified library |
-| On-machine probing | ✅ | Yes | In-cycle bore/boss centre-find, surface measure, web/pocket width, tool-length set; Renishaw Inspection Plus + Fanuc G31 dialects; WCS update via G10 L2. Gaps: Renishaw/Fanuc only (no Siemens/Heidenhain); no inline probe-radius compensation |
+| On-machine probing | ✅ | Yes | In-cycle G-code for bore/boss centre-find (4-point), surface measure, web/pocket width, tool-length set, and WCS datu... |
 | Open-source core / chat-native | ✅ | No | MIT open-core; chat-native CAM + JSON-RPC LLM tools + kerf-sdk |
 
 ## What Kerf does that ESPRIT (Hexagon) doesn't
@@ -150,7 +150,6 @@ Kerf saturates **90%** of ESPRIT (Hexagon)'s feature surface (8 yes, 2 partial, 
 ## What's honestly outstanding
 
 - **Factory-certified post-processor library (3500+ machines)** (Partial): LinuxCNC/Fanuc + Heidenhain iTNC + Siemens 840D posts; not a 3500-machine OEM-certified library
-- **On-machine probing — remaining gaps**: Renishaw/Fanuc 0i-MD dialects only; Siemens 840D and Heidenhain iTNC syntax not yet supported; no inline probe-radius compensation; single-pass 4-point bore (no eccentricity averaging)
 
 ## Pricing
 

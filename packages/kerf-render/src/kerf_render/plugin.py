@@ -57,6 +57,7 @@ async def register(app: "FastAPI", ctx):
 _TOOL_MODULES = [
     "kerf_render.tools",
     "kerf_render.pathtrace_tools",
+    "kerf_render.archviz_tools",
 ]
 
 
@@ -73,3 +74,4 @@ def _register_tools(ctx, provides: list) -> None:
             logger.warning("kerf-render: failed to load tools from %s: %s",
                            mod_name, exc)
     provides.append("render.pathtrace")
+    provides.append("render.archviz")

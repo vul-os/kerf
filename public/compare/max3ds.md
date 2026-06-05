@@ -265,9 +265,9 @@ features:
       note: "Purpose-built archviz: Chaos Cosmos assets, Forest Pack, RailClone, material libraries"
       source: "https://www.autodesk.com/products/3ds-max/"
     kerf:
-      status: no
-      note: "No archviz asset libraries or procedural scatter/population tools"
-      evidence: ""
+      status: yes
+      note: "Procedural Poisson-disk/grid scatter (density, seed, jitter, slope/altitude masks, exclusion zones, collision avoidance) + built-in proxy asset catalogue (trees/shrubs/people/cars/furniture); note: proxy/placeholder assets + scatter engine, not a photoreal asset marketplace like Forest Pack/RailClone/Chaos Cosmos"
+      evidence: "packages/kerf-render/src/kerf_render/archviz_scatter.py;packages/kerf-render/src/kerf_render/archviz_assets.py"
   - domain: D14
     feature: "Cost / materials — should-cost and LCA"
     competitor:
@@ -298,7 +298,7 @@ Archviz & game-art DCC — a different category from B-rep CAD.
 
 ## Summary
 
-Kerf saturates **96%** of Autodesk 3ds Max's feature surface (27 yes, 0 partial, 1 no out of 28 features tracked here). Honest gaps: 1 feature not yet implemented.
+Kerf saturates **100%** of Autodesk 3ds Max's feature surface (28 yes, 0 partial, 0 no out of 28 features tracked here).
 
 ## Feature comparison
 
@@ -329,7 +329,7 @@ Kerf saturates **96%** of Autodesk 3ds Max's feature surface (27 yes, 0 partial,
 | Acoustics — room acoustics and ISO 9613 | ✅ | No | ISO 9613 propagation, RT60, image-source room IR, SEA (backend) |
 | Verticals — jewelry design | ✅ | Partial | 41-module jewelry suite: ring v4, gemstones v2, settings v3/v4, chain v2 |
 | Verticals — BIM / architectural (IFC) | ✅ | Partial | Revit-comparable BIM engine: walls/slabs/framing/stairs + IFC4 export |
-| Verticals — archviz creative workflow | 🔴 (no) | Yes | No archviz asset libraries or procedural scatter/population tools |
+| Verticals — archviz creative workflow | ✅ | Yes | Poisson-disk/grid scatter + proxy asset catalogue (trees/shrubs/people/cars/furniture); note: proxy assets, not a photoreal marketplace like Forest Pack/RailClone |
 | Cost / materials — should-cost and LCA | ✅ | No | Should-cost (Boothroyd-Dewhurst 6 processes), full ISO 14040/44 LCA (backend) |
 | Cost / materials — material selection (Ashby) | ✅ | No | 200-material Ashby selector (14 families) + Pareto frontier (backend) |
 
@@ -348,10 +348,6 @@ Kerf saturates **96%** of Autodesk 3ds Max's feature surface (27 yes, 0 partial,
 - **Manufacturing — FDM slicing** — Cura slicing wired (PrintSliceView)
 - **Civil / infrastructure — road alignment, pavement, geotech** — AASHTO alignment, pavement AASHTO '93, geotech liquefaction (backend)
 - *(and 6 more features not covered by Autodesk 3ds Max)*
-
-## What's honestly outstanding
-
-- **Verticals — archviz creative workflow** (Not yet implemented): No archviz asset libraries or procedural scatter/population tools
 
 ## Pricing
 

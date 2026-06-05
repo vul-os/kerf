@@ -54,6 +54,7 @@ def _register_tools(ctx, provides: list) -> None:
         "hvac.fitting_loss",
         "hvac.flat_pattern",
         "hvac.equipment_select",
+        "hvac.airside_system_model",
     ]:
         if cap not in provides:
             provides.append(cap)

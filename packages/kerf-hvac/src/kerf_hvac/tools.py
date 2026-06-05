@@ -8,6 +8,9 @@ Registers the following tools:
   - hvac.elbow_flat_pattern         — Generate elbow flat-pattern dimensions.
   - hvac.equal_friction_sizing      — ASHRAE §35 equal-friction single-segment sizing.
   - hvac.size_duct_run              — ASHRAE §35 equal-friction multi-segment run sizing.
+  - hvac.airside_system_model       — Full AHU air-side system model: psychrometrics,
+                                      cooling/heating coils, economizer, VAV boxes, fans,
+                                      coupled to water-side chiller/boiler plant.
 """
 
 from __future__ import annotations
@@ -569,6 +572,291 @@ def handle_size_duct_run(args: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# hvac.airside_system_model
+# ---------------------------------------------------------------------------
+
+_airside_system_spec = ToolSpec(
+    name="hvac.airside_system_model",
+    description=(
+        "Full AHU (Air Handling Unit) air-side system model with proper psychrometrics. "
+        "Models: supply/return fans (ΔP·Q/η), cooling coil (sensible+latent, ADP/bypass-factor), "
+        "heating coil (effectiveness-NTU), economizer (OA mixing for free cooling), "
+        "VAV terminal boxes (airflow modulation per zone load), duct static pressure. "
+        "Couples air-side coil loads to water-side plant (chiller COP, boiler efficiency). "
+        "Returns psychrometric state points (T_db, W, h, RH, T_dp, T_wb), coil loads, "
+        "fan power, VAV airflows, free-cooling hours indicator, and energy balance. "
+        "DISCLAIMER: Steady-state single-design-point model; ASHRAE fundamentals. NOT ASHRAE certified."
+    ),
+    input_schema={
+        "type": "object",
+        "required": ["outdoor_air", "return_air", "zones"],
+        "properties": {
+            "outdoor_air": {
+                "type": "object",
+                "description": "Outdoor air conditions.",
+                "required": ["T_db_C"],
+                "properties": {
+                    "T_db_C": {"type": "number", "description": "Dry-bulb temperature, °C."},
+                    "rh_fraction": {"type": "number", "description": "Relative humidity 0–1 (default 0.55)."},
+                    "W_kg_kgda": {"type": "number", "description": "Humidity ratio kg_w/kg_da (alternative to rh_fraction)."},
+                },
+            },
+            "return_air": {
+                "type": "object",
+                "description": "Return air conditions (from zones).",
+                "required": ["T_db_C"],
+                "properties": {
+                    "T_db_C": {"type": "number", "description": "Dry-bulb temperature, °C."},
+                    "rh_fraction": {"type": "number", "description": "Relative humidity 0–1 (default 0.50)."},
+                    "W_kg_kgda": {"type": "number", "description": "Humidity ratio kg_w/kg_da (alternative to rh_fraction)."},
+                },
+            },
+            "zones": {
+                "type": "array",
+                "description": "List of VAV-served zones.",
+                "items": {
+                    "type": "object",
+                    "required": ["name", "design_flow_m3s", "zone_load_W"],
+                    "properties": {
+                        "name": {"type": "string", "description": "Zone name."},
+                        "design_flow_m3s": {"type": "number", "description": "Design airflow to zone, m³/s."},
+                        "zone_load_W": {"type": "number", "description": "Zone sensible cooling load, W (+ve = cooling required)."},
+                        "zone_T_setpoint_C": {"type": "number", "description": "Zone thermostat setpoint, °C (default 22)."},
+                        "zone_T_current_C": {"type": "number", "description": "Current zone temperature, °C (default = setpoint + 2)."},
+                        "min_flow_fraction": {"type": "number", "description": "VAV minimum airflow fraction 0–1 (default 0.25)."},
+                    },
+                },
+            },
+            "ahu": {
+                "type": "object",
+                "description": "AHU configuration overrides.",
+                "properties": {
+                    "name": {"type": "string", "description": "AHU identifier (default 'AHU-1')."},
+                    "supply_airflow_m3s": {"type": "number", "description": "Design supply airflow, m³/s. Auto-computed from zones if omitted."},
+                    "min_oa_fraction": {"type": "number", "description": "Minimum OA fraction (default 0.15)."},
+                    "economizer_setpoint_C": {"type": "number", "description": "Economizer dry-bulb lockout temp, °C (default 18)."},
+                    "enable_economizer": {"type": "boolean", "description": "Enable economizer (default true)."},
+                    "chw_supply_T_C": {"type": "number", "description": "Chilled-water supply temp, °C (default 7)."},
+                    "chw_return_T_C": {"type": "number", "description": "Chilled-water return temp, °C (default 12)."},
+                    "cooling_coil_bypass_factor": {"type": "number", "description": "Coil bypass factor BF 0–1 (default 0.10)."},
+                    "hw_supply_T_C": {"type": "number", "description": "Hot-water supply temp, °C (default 60)."},
+                    "supply_fan_efficiency": {"type": "number", "description": "Supply fan mechanical efficiency (default 0.70)."},
+                    "duct_equivalent_length_m": {"type": "number", "description": "System duct equivalent length, m (default 100)."},
+                },
+            },
+            "plant": {
+                "type": "object",
+                "description": "Water-side plant parameters.",
+                "properties": {
+                    "chiller_cop": {"type": "number", "description": "Chiller COP at design conditions (default 5.5)."},
+                    "boiler_efficiency": {"type": "number", "description": "Boiler thermal efficiency (default 0.92)."},
+                    "has_chiller": {"type": "boolean", "description": "AHU served by chiller (default true)."},
+                    "has_boiler": {"type": "boolean", "description": "AHU served by boiler (default true)."},
+                },
+            },
+        },
+    },
+)
+
+
+@register(_airside_system_spec)
+def handle_airside_system_model(args: dict) -> str:
+    try:
+        from kerf_hvac.airside import (
+            AirState, AHUConfig, VAVZone, PlantCoupling, simulate_ahu_system,
+        )
+
+        # -- Parse outdoor air --
+        oa_raw = args["outdoor_air"]
+        T_oa = float(oa_raw["T_db_C"])
+        if "W_kg_kgda" in oa_raw:
+            oa_state = AirState(T_db_C=T_oa, W=float(oa_raw["W_kg_kgda"]))
+        else:
+            rh_oa = float(oa_raw.get("rh_fraction", 0.55))
+            oa_state = AirState.from_T_rh(T_oa, rh_oa)
+
+        # -- Parse return air --
+        ra_raw = args["return_air"]
+        T_ra = float(ra_raw["T_db_C"])
+        if "W_kg_kgda" in ra_raw:
+            ra_state = AirState(T_db_C=T_ra, W=float(ra_raw["W_kg_kgda"]))
+        else:
+            rh_ra = float(ra_raw.get("rh_fraction", 0.50))
+            ra_state = AirState.from_T_rh(T_ra, rh_ra)
+
+        # -- Parse zones --
+        zones_raw = args.get("zones", [])
+        if not isinstance(zones_raw, list) or len(zones_raw) == 0:
+            return err_payload("zones must be a non-empty list", "BAD_ARGS")
+
+        zones: list[VAVZone] = []
+        for zr in zones_raw:
+            name = str(zr["name"])
+            q_design = float(zr["design_flow_m3s"])
+            load_W = float(zr["zone_load_W"])
+            T_set = float(zr.get("zone_T_setpoint_C", 22.0))
+            T_cur = float(zr.get("zone_T_current_C", T_set + 2.0))
+            min_frac = float(zr.get("min_flow_fraction", 0.25))
+            zones.append(VAVZone(
+                name=name,
+                design_flow_m3s=q_design,
+                min_flow_fraction=min_frac,
+                zone_load_W=load_W,
+                zone_T_setpoint_C=T_set,
+                zone_T_current_C=T_cur,
+            ))
+
+        # -- Parse AHU config --
+        ahu_raw = args.get("ahu", {})
+        total_design_flow = sum(z.design_flow_m3s for z in zones)
+        ahu = AHUConfig(
+            name=str(ahu_raw.get("name", "AHU-1")),
+            supply_airflow_m3s=float(ahu_raw.get("supply_airflow_m3s", total_design_flow)),
+            min_oa_fraction=float(ahu_raw.get("min_oa_fraction", 0.15)),
+            economizer_setpoint_C=float(ahu_raw.get("economizer_setpoint_C", 18.0)),
+            enable_economizer=bool(ahu_raw.get("enable_economizer", True)),
+            enable_enthalpy_economizer=bool(ahu_raw.get("enable_enthalpy_economizer", True)),
+            chw_supply_T_C=float(ahu_raw.get("chw_supply_T_C", 7.0)),
+            chw_return_T_C=float(ahu_raw.get("chw_return_T_C", 12.0)),
+            cooling_coil_bypass_factor=float(ahu_raw.get("cooling_coil_bypass_factor", 0.10)),
+            hw_supply_T_C=float(ahu_raw.get("hw_supply_T_C", 60.0)),
+            hw_return_T_C=float(ahu_raw.get("hw_return_T_C", 45.0)),
+            heating_coil_effectiveness=float(ahu_raw.get("heating_coil_effectiveness", 0.80)),
+            supply_fan_efficiency=float(ahu_raw.get("supply_fan_efficiency", 0.70)),
+            supply_fan_motor_efficiency=float(ahu_raw.get("supply_fan_motor_efficiency", 0.92)),
+            return_fan_efficiency=float(ahu_raw.get("return_fan_efficiency", 0.65)),
+            return_fan_motor_efficiency=float(ahu_raw.get("return_fan_motor_efficiency", 0.90)),
+            duct_equivalent_length_m=float(ahu_raw.get("duct_equivalent_length_m", 100.0)),
+            duct_velocity_m_s=float(ahu_raw.get("duct_velocity_m_s", 5.0)),
+            num_elbows=int(ahu_raw.get("num_elbows", 4)),
+            duct_static_safety=float(ahu_raw.get("duct_static_safety", 1.15)),
+        )
+
+        # -- Parse plant coupling --
+        plant_raw = args.get("plant", {})
+        plant = PlantCoupling(
+            chiller_cop=float(plant_raw.get("chiller_cop", 5.5)),
+            boiler_efficiency=float(plant_raw.get("boiler_efficiency", 0.92)),
+            has_chiller=bool(plant_raw.get("has_chiller", True)),
+            has_boiler=bool(plant_raw.get("has_boiler", True)),
+        )
+
+        # -- Simulate --
+        result = simulate_ahu_system(
+            ahu=ahu,
+            outdoor_air_state=oa_state,
+            return_air_state=ra_state,
+            zones=zones,
+            plant=plant,
+        )
+
+        # -- Serialise --
+        out = {
+            "ahu_name": ahu.name,
+
+            # Psychrometric state points
+            "state_points": {
+                "outdoor_air": result.outdoor_air.to_dict(),
+                "return_air": result.return_air.to_dict(),
+                "mixed_air": result.mixed_air.to_dict(),
+                "post_cooling_coil": result.post_cooling_coil.to_dict(),
+                "supply_air": result.supply_air.to_dict(),
+            },
+
+            # Economizer
+            "economizer": {
+                "oa_fraction": round(result.oa_fraction, 3),
+                "free_cooling_active": result.free_cooling,
+                "free_cooling_load_W": round(result.free_cooling_load_W, 1),
+                "oa_description": (
+                    "Full economizer free cooling (100% OA)"
+                    if result.free_cooling else
+                    f"Minimum OA ({round(result.oa_fraction*100,1)}%)"
+                ),
+            },
+
+            # Cooling coil
+            "cooling_coil": {
+                "Q_total_W": round(result.cooling_coil_Q_total_W, 1),
+                "Q_total_kW": round(result.cooling_coil_Q_total_W / 1000, 3),
+                "Q_sensible_W": round(result.cooling_coil_Q_sensible_W, 1),
+                "Q_latent_W": round(result.cooling_coil_Q_latent_W, 1),
+                "SHR": round(
+                    result.cooling_coil_Q_sensible_W / result.cooling_coil_Q_total_W, 3
+                ) if result.cooling_coil_Q_total_W > 0 else 1.0,
+                "ADP_C": round(result.cooling_coil_ADP_C, 2),
+                "bypass_factor": round(result.cooling_coil_bypass_factor, 3),
+                "effectiveness": round(result.cooling_coil_effectiveness, 3),
+                "condensate_kg_s": round(result.condensate_kg_s, 6),
+                "condensate_L_hr": round(result.condensate_kg_s * 3600, 2),
+            },
+
+            # Heating coil
+            "heating_coil": {
+                "Q_W": round(result.heating_coil_Q_W, 1),
+                "Q_kW": round(result.heating_coil_Q_W / 1000, 3),
+                "active": result.heating_coil_Q_W > 0,
+            },
+
+            # Fans
+            "supply_fan": {
+                "flow_m3s": round(result.supply_fan_flow_m3s, 4),
+                "static_pressure_pa": round(result.supply_fan_static_pa, 1),
+                "shaft_power_W": round(result.supply_fan_power_W, 1),
+                "motor_power_W": round(result.supply_fan_motor_power_W, 1),
+                "temp_rise_C": round(result.supply_fan_temp_rise_C, 3),
+            },
+            "return_fan": {
+                "flow_m3s": round(result.return_fan_flow_m3s, 4),
+                "static_pressure_pa": round(result.return_fan_static_pa, 1),
+                "motor_power_W": round(result.return_fan_motor_power_W, 1),
+            },
+            "total_fan_power_W": round(result.total_fan_power_W, 1),
+            "total_fan_power_kW": round(result.total_fan_power_W / 1000, 3),
+
+            # VAV zones
+            "vav_zones": [
+                {
+                    "zone": zr.zone_name,
+                    "supply_flow_m3s": round(zr.supply_flow_m3s, 4),
+                    "supply_T_C": round(zr.supply_T_C, 2),
+                    "zone_load_met_W": round(zr.zone_load_met_W, 1),
+                    "fraction_of_design": round(zr.fraction_of_design, 3),
+                    "damper_position_pct": round(zr.damper_position * 100, 1),
+                    "unmet_load_W": round(zr.unmet_load_W, 1),
+                }
+                for zr in result.zone_results
+            ],
+            "total_zone_flow_m3s": round(result.total_zone_flow_m3s, 4),
+            "total_zone_load_met_W": round(result.total_zone_load_met_W, 1),
+
+            # Plant coupling
+            "plant": {
+                "chiller_load_W": round(result.chiller_load_W, 1),
+                "chiller_load_kW": round(result.chiller_load_W / 1000, 3),
+                "chiller_power_W": round(result.chiller_power_W, 1),
+                "chiller_power_kW": round(result.chiller_power_W / 1000, 3),
+                "boiler_load_W": round(result.boiler_load_W, 1),
+                "boiler_fuel_W": round(result.boiler_fuel_W, 1),
+                "total_system_power_kW": round(result.total_system_power_W / 1000, 3),
+            },
+
+            # Duct system
+            "duct_system": {
+                "static_pressure_pa": round(result.duct_static_pressure_pa, 1),
+            },
+
+            # Energy balance
+            "energy_balance_W": round(result.energy_balance_W, 1),
+        }
+
+        return ok_payload(out)
+
+    except (KeyError, ValueError, TypeError) as exc:
+        return err_payload(str(exc), "BAD_ARGS")
+
+
+# ---------------------------------------------------------------------------
 # TOOLS list (for plugin registration)
 # ---------------------------------------------------------------------------
 
@@ -580,4 +868,5 @@ TOOLS = [
     ("hvac.elbow_flat_pattern", _elbow_pattern_spec, handle_elbow_flat_pattern),
     ("hvac.equal_friction_sizing", _equal_friction_sizing_spec, handle_equal_friction_sizing),
     ("hvac.size_duct_run", _size_duct_run_spec, handle_size_duct_run),
+    ("hvac.airside_system_model", _airside_system_spec, handle_airside_system_model),
 ]

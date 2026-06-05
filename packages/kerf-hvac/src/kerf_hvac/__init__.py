@@ -1,4 +1,4 @@
-"""kerf-hvac: HVAC duct fabrication plugin for Kerf.
+"""kerf-hvac: HVAC duct fabrication + air-side system modelling plugin for Kerf.
 
 Provides:
 - DuctSystem data model (rectangular, round, oval ducts; elbow/reducer/tee/cap/flex fittings)
@@ -6,6 +6,8 @@ Provides:
 - ASHRAE §35 equal-friction duct sizing optimizer
 - Sheet-metal flat-pattern generation for rectangular elbow and reducer
 - Darcy-Weisbach pressure drop + ASHRAE minor-loss coefficients
+- Air-side AHU system model: psychrometrics, cooling/heating coils, economizer,
+  VAV terminal boxes, supply/return fans, duct static pressure, plant coupling
 - LLM tool surface
 """
 
@@ -32,8 +34,24 @@ from kerf_hvac.duct_sizing_optimizer import (
     compute_duct_cost,
     SizedSegment,
 )
+from kerf_hvac.airside import (
+    AirState,
+    AHUConfig,
+    VAVZone,
+    PlantCoupling,
+    simulate_ahu_system,
+    cooling_coil,
+    heating_coil,
+    fan_power,
+    economizer_control,
+    vav_box,
+    humidity_ratio_from_rh,
+    enthalpy_kj_kg,
+    saturation_pressure_pa,
+)
 
 __all__ = [
+    # Duct system
     "DuctShape",
     "DuctSection",
     "Fitting",
@@ -52,4 +70,18 @@ __all__ = [
     "size_duct_run",
     "compute_duct_cost",
     "SizedSegment",
+    # Air-side system
+    "AirState",
+    "AHUConfig",
+    "VAVZone",
+    "PlantCoupling",
+    "simulate_ahu_system",
+    "cooling_coil",
+    "heating_coil",
+    "fan_power",
+    "economizer_control",
+    "vav_box",
+    "humidity_ratio_from_rh",
+    "enthalpy_kj_kg",
+    "saturation_pressure_pa",
 ]

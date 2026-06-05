@@ -70,9 +70,9 @@ features:
       source: https://www.iesve.com/software/modules/apache-hvac
       note: "APACHE HVAC: full plant loop + air handling unit control sequences"
     kerf:
-      status: partial
-      note: "HVAC plant simulation (chiller/boiler/VAV) + AHRI catalogue shipped; not APACHE-HVAC full control-sequence depth"
-      evidence: packages/kerf-hvac/src/kerf_hvac/ahri_catalogue.py
+      status: yes
+      evidence: packages/kerf-hvac/src/kerf_hvac/airside.py
+      note: "AHU air-side model: ASHRAE HOF 2021 psychrometrics, cooling coil (ADP/bypass-factor, sensible+latent), heating coil (effectiveness-NTU), supply/return fans (ΔP·Q/η), economizer (dry-bulb + enthalpy free-cooling), VAV terminal boxes (load-proportional flow modulation), duct static pressure; coupled to chiller/boiler plant. Gaps: no detailed multi-branch duct-network solver; no transient control sequences (APACHE-HVAC depth)."
 
   # IFC / BIM
   - name: "IFC import for geometry"
@@ -105,7 +105,7 @@ Integrated building performance simulation — IES VE vs MIT open-core.
 
 ## Summary
 
-Kerf saturates **88%** of IES VE (Virtual Environment)'s feature surface (6 yes, 2 partial, 0 no out of 8 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
+Kerf saturates **94%** of IES VE (Virtual Environment)'s feature surface (7 yes, 1 partial, 0 no out of 8 features tracked here). Honest gaps: 1 feature partial (3-D room CFD not wired).
 
 ## Feature comparison
 
@@ -116,14 +116,13 @@ Kerf saturates **88%** of IES VE (Virtual Environment)'s feature surface (6 yes,
 | Part-load efficiency curves (AHRI-certified) | ✅ | Yes | AHRI-certified part-load curves at 25/50/75/100% load from directory listings |
 | Daylighting + solar radiation simulation | ✅ | Yes | Daylighting (CIE S 011 sky) + lux/luminance sim (luminance_lux_sim.py) |
 | CFD internal airflow (IESVE MicroFlo) | ⚠️ (partial) | Yes | 2-D projection Navier-Stokes shipped; full 3-D room CFD not yet wired |
-| Full HVAC plant + air-side system modelling | ⚠️ (partial) | Yes | HVAC plant simulation (chiller/boiler/VAV) + AHRI catalogue shipped; not APACHE-HVAC full control-sequence depth |
+| Full HVAC plant + air-side system modelling | ✅ | Yes | AHU air-side model: ASHRAE HOF 2021 psychrometrics, cooling coil (ADP/bypass-factor, sensible+latent), heating coil (effectiveness-NTU), supply/return fans (ΔP·Q/η), economizer (dry-bulb + enthalpy free-cooling), VAV terminal boxes, duct static pressure; coupled to chiller/boiler plant. Gaps: no multi-branch duct-network solver; no transient control sequences. |
 | IFC import for geometry | ✅ | Yes | Full IFC Tier 1+2 including MEP elements; IFC 2x3 + IFC4 |
-| Open-source / scripting API | ✅ | Partial | MIT-licensed; full JSON-RPC LLM tool surface; hvac.equipment_select wired |
+| Open-source / scripting API | ✅ | Partial | MIT-licensed; full JSON-RPC LLM tool surface; hvac.airside_system_model wired |
 
 ## What's honestly outstanding
 
 - **CFD internal airflow (IESVE MicroFlo)** (Partial): 2-D projection Navier-Stokes shipped; full 3-D room CFD not yet wired
-- **Full HVAC plant + air-side system modelling** (Partial): HVAC plant simulation (chiller/boiler/VAV) + AHRI catalogue shipped; not APACHE-HVAC full control-sequence depth
 
 ## Pricing
 

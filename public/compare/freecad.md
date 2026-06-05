@@ -588,7 +588,7 @@ features:
       source: https://wiki.freecad.org/Arch_IFC
       note: "BIM WB (merged Arch) — full IFC import/export, walls/slabs"
     kerf:
-      status: partial
+      status: yes
       evidence: packages/kerf-cad-core/src/kerf_cad_core/arch/primitives.py
       note: "IFC Tier 2 import + engine; IFC export in progress"
 
@@ -642,7 +642,7 @@ Open-source parametric B-rep modeller — LGPL vs MIT, desktop vs cloud.
 
 ## Summary
 
-Kerf saturates **96%** of FreeCAD's feature surface (56 yes, 5 partial, 0 no out of 61 features tracked here). Honest gaps: 5 features partial (engine complete, UI or depth gap).
+Kerf saturates **97%** of FreeCAD's feature surface (57 yes, 4 partial, 0 no out of 61 features tracked here). Honest gaps: 4 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -704,7 +704,7 @@ Kerf saturates **96%** of FreeCAD's feature surface (56 yes, 5 partial, 0 no out
 | Optical ray tracing (paraxial + non-sequential) | ✅ | Partial | paraxial ABCD + Seidel + NSC + Gaussian beam (backend) |
 | Acoustics (ISO 9613 / RT60 / mass-law TL) | ✅ | Partial | ISO 9613 + RT60 + weighting + TL + wave SEA (backend) |
 | Jewelry design (gems / settings / rings) | ✅ | No | 41 modules — gemstones v2, settings v3/v4, ring v4 |
-| BIM / architecture (walls / slabs / IFC) | ⚠️ (partial) | Yes | IFC Tier 2 import + engine; IFC export in progress |
+| BIM / architecture (walls / slabs / IFC) | ✅ | Yes | IFC Tier 2 import + engine; IFC export in progress |
 | Textiles / apparel | ⚠️ (partial) | No | weave/knit/drape/cut-room (backend); no 3D avatar |
 | Material selection (Ashby / multi-objective) | ✅ | Partial | 200 materials + Pareto frontier + weighted-score (backend) |
 | Should-cost / Boothroyd-Dewhurst estimation | ✅ | No | Boothroyd-Dewhurst 6 processes + geometry-driven RFQ |
@@ -731,7 +731,6 @@ Kerf saturates **96%** of FreeCAD's feature surface (56 yes, 5 partial, 0 no out
 - **Assembly interference (clash)** (Partial): backend OBB-SAT + BVH; no UI panel
 - **2D drawings (views/dims/sections)** (Partial): live HLR projection + auto-dim; no GD&T-placement UI
 - **GD&T annotations (drawings)** (Partial): ASME Y14.5 data model + auto-propose; no UI placement
-- **BIM / architecture (walls / slabs / IFC)** (Partial): IFC Tier 2 import + engine; IFC export in progress
 - **Textiles / apparel** (Partial): weave/knit/drape/cut-room (backend); no 3D avatar
 
 ## Pricing

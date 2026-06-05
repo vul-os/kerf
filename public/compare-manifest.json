@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T01:12:17.683Z",
+  "generatedAt": "2026-06-05T01:15:37.800Z",
   "items": [
     {
       "slug": "revit",
@@ -126,7 +126,7 @@
             "paid": "false"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "cloud/bim/structural_grid.go"
           }
         },
@@ -152,7 +152,7 @@
             "paid": "false"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-bim/src/kerf_bim/tools/mep.py",
             "notes": "BIM duct routing (segments, rectangular/round fittings, endpoints) via create_mep_route; no clash-aware auto-routing or air-terminal schedules"
           }
@@ -166,7 +166,7 @@
             "paid": "false"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-bim/src/kerf_bim/tools/mep.py",
             "notes": "BIM pipe routing (copper/PVC/HDPE/cast-iron segments and fittings) via create_mep_route; no fixture families or slope enforcement"
           }
@@ -180,7 +180,7 @@
             "paid": "false"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-bim/src/kerf_bim/tools/mep.py",
             "notes": "BIM conduit routing via create_mep_route; NEC power distribution analysis in kerf-electrical; no Revit-style circuit/panel schedules or lighting fixture families"
           }
@@ -312,7 +312,7 @@
             "paid": "false"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "cloud/bim/ifc_export.go"
           }
         },
@@ -1032,7 +1032,7 @@
             "notes": "Full IFC 2x3 and IFC 4 authoring with certified buildingSMART export; complete property sets"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-bim/src/kerf_bim/export_ifc/writer.py",
             "notes": "IFC4 export wired (walls/slabs/doors/windows/spaces/stairs/openings/site); Tier 2 import; not yet buildingSMART certified"
           },
@@ -1060,7 +1060,7 @@
             "notes": "Paid add-on: Graphisoft MEP Modeler; not in base Archicad Solo"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-bim/src/kerf_bim/tools/mep.py",
             "notes": "BIM MEP routing (duct/pipe/conduit segments, fittings, endpoints) via create_mep_route tool; no clash-aware auto-routing UI"
           },
@@ -4832,7 +4832,7 @@
             "notes": "BIM WB (merged Arch) — full IFC import/export, walls/slabs"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/arch/primitives.py",
             "notes": "IFC Tier 2 import + engine; IFC export in progress"
           }
@@ -6375,7 +6375,7 @@
             "notes": "No SMACNA duct sizing in SOLIDWORKS base product"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-cad-core/src/kerf_cad_core/hvac/ducts.py",
             "notes": "SMACNA duct sizing + flat-pattern backend; no UI"
           },

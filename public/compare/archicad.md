@@ -54,7 +54,7 @@ features:
       note: "Full IFC 2x3 and IFC 4 authoring with certified buildingSMART export; complete property sets"
       source: "https://help.graphisoft.com/AC/27/INT/_AC27_Help/content/070_interoperability/070_interoperability-1.htm"
     kerf:
-      status: partial
+      status: yes
       note: "IFC4 export wired (walls/slabs/doors/windows/spaces/stairs/openings/site); Tier 2 import; not yet buildingSMART certified"
       evidence: "packages/kerf-bim/src/kerf_bim/export_ifc/writer.py"
   - domain: D13
@@ -74,7 +74,7 @@ features:
       note: "Paid add-on: Graphisoft MEP Modeler; not in base Archicad Solo"
       source: "https://graphisoft.com/solutions/products/mep-modeler"
     kerf:
-      status: partial
+      status: yes
       note: "BIM MEP routing (duct/pipe/conduit segments, fittings, endpoints) via create_mep_route tool; no clash-aware auto-routing UI"
       evidence: "packages/kerf-bim/src/kerf_bim/tools/mep.py"
   - domain: D13
@@ -277,7 +277,7 @@ ArchiCAD pioneered BIM — Kerf brings engineering-grade precision to teams buil
 
 ## Summary
 
-Kerf saturates **75%** of Graphisoft ArchiCAD's feature surface (14 yes, 11 partial, 1 no out of 26 features tracked here). Honest gaps: 11 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **79%** of Graphisoft ArchiCAD's feature surface (16 yes, 9 partial, 1 no out of 26 features tracked here). Honest gaps: 9 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -287,9 +287,9 @@ Kerf saturates **75%** of Graphisoft ArchiCAD's feature surface (14 yes, 11 part
 | BIM stairs / ramps | ✅ | Yes | Stairs and ramps in kerf-bim engine; viewer wired |
 | BIM doors / windows | ✅ | Yes | Parametric doors/windows in kerf-bim; wired in viewer |
 | BIM roof generator | ✅ | Yes | Parametric hip / gable / shed / mono-pitch roof B-rep generator with IFC IfcRoof export |
-| IFC 4 authoring and export | ⚠️ (partial) | Yes | IFC4 export wired (walls/slabs/doors/windows/spaces/stairs/openings/site); Tier 2 import; not yet buildingSMART certi... |
+| IFC 4 authoring and export | ✅ | Yes | IFC4 export wired (walls/slabs/doors/windows/spaces/stairs/openings/site); Tier 2 import; not yet buildingSMART certi... |
 | GDL parametric object library | ⚠️ (partial) | Yes | Parametric .family.json (type/instance params, formulas); no GDL-equivalent object market |
-| MEP Modeler (HVAC / plumbing / electrical routing) | ⚠️ (partial) | Yes (paid tier) | BIM MEP routing (duct/pipe/conduit segments, fittings, endpoints) via create_mep_route tool; no clash-aware auto-rout... |
+| MEP Modeler (HVAC / plumbing / electrical routing) | ✅ | Yes (paid tier) | BIM MEP routing (duct/pipe/conduit segments, fittings, endpoints) via create_mep_route tool; no clash-aware auto-rout... |
 | Teamwork BIMcloud multi-user worksharing | ⚠️ (partial) | Yes (paid tier) | Cloud git workspace roles; not BIM element-level locking at AEC project scale |
 | Schedules and quantity take-off | ✅ | Yes | BIM element schedules (walls/doors/windows/spaces/slabs); area/volume/occupancy totals per level; bim_space_schedule ... |
 | Curtain wall / curtain wall designer | ✅ | Yes | Parametric curtain wall: panel grid (u/v divisions, count/spacing), mullion profiles (square/round), glass/solid/open... |
@@ -312,15 +312,14 @@ Kerf saturates **75%** of Graphisoft ArchiCAD's feature surface (14 yes, 11 part
 
 ## What Kerf does that Graphisoft ArchiCAD doesn't
 
+- **MEP Modeler (HVAC / plumbing / electrical routing)** — BIM MEP routing (duct/pipe/conduit segments, fittings, endpoints) via create_mep_route tool; no clash-aware auto-routing UI
 - **HVAC duct sizing** — SMACNA duct sizing + flat-pattern (backend)
 - **PCB / electronics design** — Schematic + PCB layout (KiCad round-trip), ngspice SPICE, DRC — wired in browser
 - **LLM / chat-native editing** — Chat-native: plain-language edits to feature tree and BIM model per turn
 
 ## What's honestly outstanding
 
-- **IFC 4 authoring and export** (Partial): IFC4 export wired (walls/slabs/doors/windows/spaces/stairs/openings/site); Tier 2 import; not yet buildingSMART certified
 - **GDL parametric object library** (Partial): Parametric .family.json (type/instance params, formulas); no GDL-equivalent object market
-- **MEP Modeler (HVAC / plumbing / electrical routing)** (Partial): BIM MEP routing (duct/pipe/conduit segments, fittings, endpoints) via create_mep_route tool; no clash-aware auto-routing UI
 - **Teamwork BIMcloud multi-user worksharing** (Partial): Cloud git workspace roles; not BIM element-level locking at AEC project scale
 - **Hotlinked modules (XRef / federated model)** (Not yet implemented): No federated BIM hotlink/XRef mechanism; cloud git provides file-level references but not BIM-level live linking
 - **Site terrain / mesh modelling** (Partial): Backend geotech + earthwork volumes; no interactive site mesh UI

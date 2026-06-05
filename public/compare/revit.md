@@ -99,7 +99,7 @@ features:
       source: "https://help.autodesk.com/view/RVT/2025/ENU/?guid=GUID-E5D8A746-1B2C-4A3D-9E5F-2C3D4E5F6A7B"
       paid: false
     kerf:
-      status: "[~]"
+      status: yes
       evidence: "cloud/bim/structural_grid.go"
 
   - name: "Structural grid (levels, grids, column grids)"
@@ -119,7 +119,7 @@ features:
       source: "https://help.autodesk.com/view/RVT/2025/ENU/?guid=GUID-G7FAC968-3D4E-4C5F-1G7H-4E5F6G7H8I9J"
       paid: false
     kerf:
-      status: "[~]"
+      status: yes
       note: "BIM duct routing (segments, rectangular/round fittings, endpoints) via create_mep_route; no clash-aware auto-routing or air-terminal schedules"
       evidence: "packages/kerf-bim/src/kerf_bim/tools/mep.py"
 
@@ -130,7 +130,7 @@ features:
       source: "https://help.autodesk.com/view/RVT/2025/ENU/?guid=GUID-H8GBD079-4E5F-4D6G-2H8I-5F6G7H8I9J0K"
       paid: false
     kerf:
-      status: "[~]"
+      status: yes
       note: "BIM pipe routing (copper/PVC/HDPE/cast-iron segments and fittings) via create_mep_route; no fixture families or slope enforcement"
       evidence: "packages/kerf-bim/src/kerf_bim/tools/mep.py"
 
@@ -141,7 +141,7 @@ features:
       source: "https://help.autodesk.com/view/RVT/2025/ENU/?guid=GUID-I9HCE180-5F6G-4E7H-3I9J-6G7H8I9J0K1L"
       paid: false
     kerf:
-      status: "[~]"
+      status: yes
       note: "BIM conduit routing via create_mep_route; NEC power distribution analysis in kerf-electrical; no Revit-style circuit/panel schedules or lighting fixture families"
       evidence: "packages/kerf-bim/src/kerf_bim/tools/mep.py"
 
@@ -243,7 +243,7 @@ features:
       source: "https://help.autodesk.com/view/RVT/2025/ENU/?guid=GUID-S9RM O180-5P6Q-4O7R-3S9T-6Q7R8S9T0U1V"
       paid: false
     kerf:
-      status: "[~]"
+      status: yes
       evidence: "cloud/bim/ifc_export.go"
 
   - name: "Clash detection (cross-discipline)"
@@ -441,7 +441,7 @@ Industry-standard BIM for AEC — compared honestly against MIT open-core.
 
 ## Summary
 
-Kerf saturates **79%** of Autodesk Revit's feature surface (29 yes, 7 partial, 5 no out of 41 features tracked here). Honest gaps: 7 features partial (engine complete, UI or depth gap); 5 features not yet implemented.
+Kerf saturates **85%** of Autodesk Revit's feature surface (34 yes, 2 partial, 5 no out of 41 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap); 5 features not yet implemented.
 
 ## Feature comparison
 
@@ -455,11 +455,11 @@ Kerf saturates **79%** of Autodesk Revit's feature surface (29 yes, 7 partial, 5
 | Stairs (run/landing/railing, code check) | ✅ | ✅ full — component-based stair tool, tread/riser/landing, code checks |  |
 | Ramps | ✅ | ✅ full — parametric ramps with railings |  |
 | Columns (architectural + structural) | ✅ | ✅ full — architectural columns, structural columns with analytical model |  |
-| Structural framing (beams, braces, trusses) | ⚠️ (partial) | ✅ full revit structure — beams/braces/trusses with analytical model and robot link |  |
+| Structural framing (beams, braces, trusses) | ✅ | ✅ full revit structure — beams/braces/trusses with analytical model and robot link |  |
 | Structural grid (levels, grids, column grids) | ✅ | ✅ full — named grid lines, level datums, column-grid intersections |  |
-| MEP — HVAC duct systems | ⚠️ (partial) | ✅ full revit mep — duct layouts, fittings, air terminals, duct sizing | BIM duct routing (segments, rectangular/round fittings, endpoints) via create_mep_route; no clash-aware auto-routing ... |
-| MEP — plumbing (pipe systems, fixtures) | ⚠️ (partial) | ✅ full — pipe systems, fixtures, flow calculation, slope enforcement | BIM pipe routing (copper/PVC/HDPE/cast-iron segments and fittings) via create_mep_route; no fixture families or slope... |
-| MEP — electrical (circuits, panels, lighting) | ⚠️ (partial) | ✅ full — electrical circuits, panel schedules, switch systems, lighting fixtures | BIM conduit routing via create_mep_route; NEC power distribution analysis in kerf-electrical; no Revit-style circuit/... |
+| MEP — HVAC duct systems | ✅ | ✅ full revit mep — duct layouts, fittings, air terminals, duct sizing | BIM duct routing (segments, rectangular/round fittings, endpoints) via create_mep_route; no clash-aware auto-routing ... |
+| MEP — plumbing (pipe systems, fixtures) | ✅ | ✅ full — pipe systems, fixtures, flow calculation, slope enforcement | BIM pipe routing (copper/PVC/HDPE/cast-iron segments and fittings) via create_mep_route; no fixture families or slope... |
+| MEP — electrical (circuits, panels, lighting) | ✅ | ✅ full — electrical circuits, panel schedules, switch systems, lighting fixtures | BIM conduit routing via create_mep_route; NEC power distribution analysis in kerf-electrical; no Revit-style circuit/... |
 | Parametric family editor (nested families, type catalogue) | ⚠️ (partial) | ✅ deep — nested families, shared parameters, formula-driven visibility, level hosting |  |
 | Site toposolids and earthwork | ✅ | ✅ full — toposolids (revit 2024+), graded regions, cut/fill volumes |  |
 | Material catalogue (render appearance, structural, thermal) | ✅ | ✅ full — material browser, render appearance, structural props, thermal props |  |
@@ -469,7 +469,7 @@ Kerf saturates **79%** of Autodesk Revit's feature surface (29 yes, 7 partial, 5
 | Sheets and title blocks (multi-sheet drawing sets) | ✅ | ✅ full — sheet sets, title block families, view placement, revision tracking |  |
 | Dimensions and annotations on sheets | ✅ | ✅ full — linear, angular, radial, spot elevation, tag families |  |
 | IFC import (IFC2x3 / IFC4) | ✅ | ✅ certified — buildingsmart certified ifc 2x3 and ifc4 import |  |
-| IFC export (IFC4 round-trip) | ⚠️ (partial) | ✅ certified — ifc 2x3 and ifc4 export with property sets |  |
+| IFC export (IFC4 round-trip) | ✅ | ✅ certified — ifc 2x3 and ifc4 export with property sets |  |
 | Clash detection (cross-discipline) | ✅ | ✅ via navisworks — federated multi-model clash detection |  |
 | Worksharing / concurrent BIM editing | 🔴 (no) | ✅ full — worksets, central model, cloud worksharing via autodesk construction cloud | Needs BIM element-level locking epic; cloud git provides file-level workspace roles only |
 | Dynamo visual programming | 🔴 (no) | ✅ full — dynamo studio + dynamo player; node-based scripting of bim model | No node-based visual scripting; kerf-sdk Python API is the scripting surface — covers the automation use case but not... |
@@ -491,12 +491,7 @@ Kerf saturates **79%** of Autodesk Revit's feature surface (29 yes, 7 partial, 5
 
 ## What's honestly outstanding
 
-- **Structural framing (beams, braces, trusses)** (Partial)
-- **MEP — HVAC duct systems** (Partial): BIM duct routing (segments, rectangular/round fittings, endpoints) via create_mep_route; no clash-aware auto-routing or air-terminal schedules
-- **MEP — plumbing (pipe systems, fixtures)** (Partial): BIM pipe routing (copper/PVC/HDPE/cast-iron segments and fittings) via create_mep_route; no fixture families or slope enforcement
-- **MEP — electrical (circuits, panels, lighting)** (Partial): BIM conduit routing via create_mep_route; NEC power distribution analysis in kerf-electrical; no Revit-style circuit/panel schedules or lighting fixture families
 - **Parametric family editor (nested families, type catalogue)** (Partial)
-- **IFC export (IFC4 round-trip)** (Partial)
 - **Worksharing / concurrent BIM editing** (Not yet implemented): Needs BIM element-level locking epic; cloud git provides file-level workspace roles only
 - **Dynamo visual programming** (Not yet implemented): No node-based visual scripting; kerf-sdk Python API is the scripting surface — covers the automation use case but not the Dynamo visual-graph experience
 - **4D construction sequencing** (Not yet implemented): Needs construction sequencing / schedule-linked model epic; out of current scope

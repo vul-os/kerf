@@ -680,6 +680,10 @@ _TOOL_MODULES = [
     # compute_drainage_network (D8/D-infinity; Tarboton 1997) +
     # design_planting_plan (USDA Hardiness Zone + ASLA SITES v2)
     "kerf_cad_core.civil.landscape",
+    # Controls frequency-domain: full Bode/Nyquist sweep + TF step-response array
+    # controls_bode_sweep (Ogata §8), controls_nyquist_sweep (Nyquist 1932),
+    # controls_tf_step_response (any-order TF → time/output arrays for plotting)
+    "kerf_cad_core.controls.freq_tools",
 ]
 # NOTE: optics_compute_sagitta_arrow_chart is registered via kerf_cad_core.optics.tools
 # (already in _TOOL_MODULES above at line 128); sagitta_arrow_chart module is imported

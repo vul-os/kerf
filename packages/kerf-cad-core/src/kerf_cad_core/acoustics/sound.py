@@ -1369,3 +1369,321 @@ def lp_from_lw(lw_db: float, r_m: float, Q: float = 1.0) -> dict:
         Q       : directivity used
     """
     return point_source_attenuation(lw_db, r_m, Q)
+
+
+# ---------------------------------------------------------------------------
+# 9. ISO 9613-2:1996 Outdoor Sound Propagation
+# ---------------------------------------------------------------------------
+#
+# Full attenuation model for outdoor propagation from a point source:
+#
+#   Lp = Lw + Dc - A
+#
+# where the total attenuation A (dB) is:
+#   A = A_div + A_atm + A_gr + A_bar + A_misc
+#
+# A_div  — geometric divergence (always computed)
+# A_atm  — atmospheric absorption (ISO 9613-1 Eq. 5)
+# A_gr   — ground effect (ISO 9613-2 §7.3)
+# A_bar  — barrier diffraction (ISO 9613-2 §7.4, Maekawa method)
+# A_misc — miscellaneous: foliage, housing, industrial (not implemented here)
+#
+# References
+# ----------
+# ISO 9613-2:1996 "Acoustics — Attenuation of sound during propagation
+#     outdoors — Part 2: General method of calculation"
+# ISO 9613-1:1993 "Part 1: Calculation of the absorption of sound by the
+#     atmosphere"
+# Maekawa, Z. (1968) "Noise reduction by screens", Appl. Acoust., 1, 157-173.
+# Delany & Bazley (1970) — ground impedance factor (simplified here to
+#     hard/soft ground categories per ISO 9613-2 §7.3.2).
+
+# Octave-band atmospheric absorption coefficients α (dB/km)
+# from ISO 9613-1:1993, Table 1 (10°C, 70% RH, 101.325 kPa).
+# Keys are octave-band centre frequencies in Hz.
+_ISO9613_1_ALPHA_dB_PER_KM: dict[int, float] = {
+    63:   0.1,
+    125:  0.4,
+    250:  1.0,
+    500:  1.9,
+    1000: 3.7,
+    2000: 9.7,
+    4000: 32.8,
+    8000: 117.0,
+}
+
+
+def iso9613_outdoor_spl(
+    Lw: float,
+    source_h: float,
+    receiver_h: float,
+    horizontal_dist: float,
+    Q: float = 2.0,
+    ground_type: str = "hard",
+    barrier_h: float = 0.0,
+    barrier_dist_source: float | None = None,
+    freq_hz: float = 500.0,
+) -> dict:
+    """
+    Outdoor sound propagation per ISO 9613-2:1996.
+
+    Computes:
+        Lp = Lw + Dc - A_div - A_atm - A_gr - A_bar   (dB)
+
+    where Dc = 10·log₁₀(Q) is the directivity correction already folded
+    into A_div (ISO 9613-2 Eq. 4):
+        A_div = 20·log₁₀(r) + 11 - 10·log₁₀(Q)
+
+    Parameters
+    ----------
+    Lw : float
+        Sound power level (dB re 1 pW).
+    source_h : float
+        Source height above ground (m). Must be >= 0.
+    receiver_h : float
+        Receiver height above ground (m). Must be >= 0.
+    horizontal_dist : float
+        Horizontal (plan) distance from source to receiver (m). Must be > 0.
+    Q : float
+        Directivity factor (default 2 = hemispherical, source on hard ground).
+        Q=1 free-field, Q=2 ground-mounted, Q=4 wall+ground corner.
+    ground_type : str
+        'hard' (G=0: concrete, asphalt, water) or
+        'soft' (G=1: grass, soil, forest floor).
+        Per ISO 9613-2 §7.3.2.
+    barrier_h : float
+        Barrier (screen) height above ground (m).  0 = no barrier.
+    barrier_dist_source : float or None
+        Horizontal distance from source to barrier (m).
+        Required when barrier_h > 0.  Must satisfy 0 < d_bs < horizontal_dist.
+    freq_hz : float
+        Octave-band centre frequency for atmospheric absorption and
+        ground-effect correction (Hz, default 500).
+
+    Returns
+    -------
+    dict
+        ok               : True
+        lp_db            : SPL at receiver (dB)
+        A_div_db         : geometric divergence (dB)
+        A_atm_db         : atmospheric absorption (dB)
+        A_gr_db          : ground effect attenuation (dB)
+        A_bar_db         : barrier insertion loss (dB)
+        A_total_db       : A_div + A_atm + A_gr + A_bar (dB)
+        Lw_db            : sound power level used (dB)
+        slant_dist_m     : slant propagation distance (m)
+        freq_hz          : frequency used (Hz)
+        ground_type      : ground type used
+
+    Errors
+    ------
+    {ok: False, reason: "..."} — never raises.
+
+    Notes
+    -----
+    Ground effect A_gr applies the simplified ISO 9613-2 §7.3.2 formula:
+        A_gr = 4.8 - (2hm / d) × (17 + 300/d)   dB   (soft ground, G=1)
+        A_gr = 0                                  dB   (hard ground, G=0)
+    where hm = mean height of propagation path above ground,
+          d  = slant distance.
+    The ground correction is clamped to [-3, +10] dB (ISO §7.3.2).
+
+    Barrier insertion loss follows Maekawa (1968):
+        A_bar = 10·log₁₀(3 + 20·N)  for N >= 0
+        A_bar = 0                    for N < 0  (receiver in illuminated zone)
+    where N = 2·delta/lambda is the Fresnel number and delta is the
+    path-length difference.
+    """
+    # ------ Input validation ------
+    try:
+        Lw_f = float(Lw)
+        hs = float(source_h)
+        hr = float(receiver_h)
+        d_h = float(horizontal_dist)
+        Q_f = float(Q)
+        bh = float(barrier_h)
+        f_hz = float(freq_hz)
+    except (TypeError, ValueError) as exc:
+        return _err(f"non-numeric input: {exc}")
+
+    if not math.isfinite(Lw_f):
+        return _err("Lw must be finite")
+    err = _guard_positive("horizontal_dist", d_h)
+    if err:
+        return _err(err)
+    err = _guard_positive("Q", Q_f)
+    if err:
+        return _err(err)
+    err = _guard_positive("freq_hz", f_hz)
+    if err:
+        return _err(err)
+    if hs < 0:
+        return _err("source_h must be >= 0")
+    if hr < 0:
+        return _err("receiver_h must be >= 0")
+    if bh < 0:
+        return _err("barrier_h must be >= 0")
+
+    g_type = str(ground_type).strip().lower()
+    if g_type not in ("hard", "soft"):
+        return _err(f"ground_type must be 'hard' or 'soft', got {ground_type!r}")
+
+    # ------ 1. Geometric divergence ------
+    # Slant distance r_s = sqrt(d_h^2 + (hs - hr)^2)
+    dz = hs - hr
+    r_s = math.sqrt(d_h * d_h + dz * dz)
+    # ISO 9613-2 §7.1 Eq. 4: A_div = 20·log₁₀(r) + 11 - 10·log₁₀(Q)
+    A_div = 20.0 * math.log10(r_s) + 11.0 - 10.0 * math.log10(Q_f)
+
+    # ------ 2. Atmospheric absorption (ISO 9613-1:1993 §7) ------
+    # Nearest standard octave-band centre frequency
+    std_bands = sorted(_ISO9613_1_ALPHA_dB_PER_KM.keys())
+    nearest_f = min(std_bands, key=lambda b: abs(b - f_hz))
+    alpha_dB_km = _ISO9613_1_ALPHA_dB_PER_KM[nearest_f]
+    A_atm = alpha_dB_km * r_s / 1000.0   # convert km⁻¹ → per metre
+
+    # ------ 3. Ground effect (ISO 9613-2 §7.3.2) ------
+    A_gr = 0.0
+    if g_type == "soft":
+        # Mean propagation height above ground
+        hm = (hs + hr) / 2.0
+        # ISO 9613-2 Eq. 10: A_gr = 4.8 - (2hm/d)*(17 + 300/d)
+        if r_s > 0:
+            A_gr_raw = 4.8 - (2.0 * hm / r_s) * (17.0 + 300.0 / r_s)
+            # Clamp per ISO 9613-2 §7.3.2
+            A_gr = max(-3.0, min(10.0, A_gr_raw))
+    # hard ground: A_gr = 0 (reflected energy compensates for ground absorption)
+
+    # ------ 4. Barrier insertion loss (Maekawa 1968 via ISO 9613-2 §7.4) ------
+    A_bar = 0.0
+    if bh > 0.0:
+        if barrier_dist_source is None:
+            return _err("barrier_dist_source is required when barrier_h > 0")
+        try:
+            dbs = float(barrier_dist_source)
+        except (TypeError, ValueError) as exc:
+            return _err(f"barrier_dist_source must be a number: {exc}")
+        if dbs <= 0 or dbs >= d_h:
+            return _err(
+                "barrier_dist_source must satisfy 0 < barrier_dist_source < horizontal_dist"
+            )
+        dbr = d_h - dbs   # horizontal distance from barrier to receiver
+
+        # Source-to-barrier-top: d1 = sqrt(dbs^2 + (bh - hs)^2)
+        # Barrier-top-to-receiver: d2 = sqrt(dbr^2 + (bh - hr)^2)
+        d1 = math.sqrt(dbs * dbs + (bh - hs) ** 2)
+        d2 = math.sqrt(dbr * dbr + (bh - hr) ** 2)
+        d_direct = r_s   # direct slant distance (computed above)
+
+        # Path-length difference delta = d1 + d2 - d_direct
+        delta = d1 + d2 - d_direct
+
+        # Wavelength at the given frequency (c = 340 m/s)
+        lam = 340.0 / f_hz
+        # Fresnel number N = 2*delta/lambda
+        N_fresnel = 2.0 * delta / lam
+
+        # Maekawa (1968) insertion loss (dB)
+        if N_fresnel >= 0:
+            A_bar = 10.0 * math.log10(3.0 + 20.0 * N_fresnel)
+        # negative N: receiver in the shadow-free illuminated zone → no barrier effect
+
+    # ------ 5. Combine ------
+    A_total = A_div + A_atm + A_gr + A_bar
+    lp = Lw_f - A_total
+
+    return {
+        "ok": True,
+        "lp_db": lp,
+        "A_div_db": A_div,
+        "A_atm_db": A_atm,
+        "A_gr_db": A_gr,
+        "A_bar_db": A_bar,
+        "A_total_db": A_total,
+        "Lw_db": Lw_f,
+        "slant_dist_m": r_s,
+        "freq_hz": f_hz,
+        "ground_type": g_type,
+    }
+
+
+def iso9613_outdoor_octave_bands(
+    Lw_bands: dict,
+    source_h: float,
+    receiver_h: float,
+    horizontal_dist: float,
+    Q: float = 2.0,
+    ground_type: str = "hard",
+    barrier_h: float = 0.0,
+    barrier_dist_source: float | None = None,
+) -> dict:
+    """
+    ISO 9613-2 outdoor propagation across all standard octave bands (63–8000 Hz).
+
+    Calls iso9613_outdoor_spl for each band in Lw_bands and sums the
+    received levels logarithmically to give the overall and A-weighted SPL.
+
+    Parameters
+    ----------
+    Lw_bands : dict
+        {freq_hz: Lw_dB} for each octave band of interest.
+        Standard bands: 63, 125, 250, 500, 1000, 2000, 4000, 8000.
+    All other parameters: same as iso9613_outdoor_spl.
+
+    Returns
+    -------
+    dict
+        ok             : True
+        per_band       : list of per-band result dicts (from iso9613_outdoor_spl)
+        Lp_total_db    : logarithmic sum of all band Lp values (dB)
+        LpA_total_db   : A-weighted total SPL dB(A)
+    """
+    if not isinstance(Lw_bands, dict) or len(Lw_bands) == 0:
+        return _err("Lw_bands must be a non-empty dict {freq_hz: Lw_dB}")
+
+    per_band = []
+    Lp_list = []
+    LpA_list = []
+
+    for freq_raw, Lw_val in Lw_bands.items():
+        try:
+            f = float(freq_raw)
+        except (TypeError, ValueError):
+            return _err(f"invalid frequency key in Lw_bands: {freq_raw!r}")
+
+        band_result = iso9613_outdoor_spl(
+            Lw=Lw_val,
+            source_h=source_h,
+            receiver_h=receiver_h,
+            horizontal_dist=horizontal_dist,
+            Q=Q,
+            ground_type=ground_type,
+            barrier_h=barrier_h,
+            barrier_dist_source=barrier_dist_source,
+            freq_hz=f,
+        )
+        if not band_result["ok"]:
+            return band_result   # propagate first error
+
+        per_band.append({**band_result, "freq_hz_input": f})
+
+        lp_b = band_result["lp_db"]
+        Lp_list.append(lp_b)
+
+        # A-weighting correction for this band
+        aw = a_weighting_offset(f)
+        if aw["ok"]:
+            LpA_list.append(lp_b + aw["offset_db"])
+        else:
+            LpA_list.append(lp_b)  # fallback: no weighting
+
+    # Logarithmic sum of all band Lp
+    Lp_total = _to_db(sum(_to_linear(v) for v in Lp_list))
+    LpA_total = _to_db(sum(_to_linear(v) for v in LpA_list))
+
+    return {
+        "ok": True,
+        "per_band": per_band,
+        "Lp_total_db": Lp_total,
+        "LpA_total_db": LpA_total,
+    }

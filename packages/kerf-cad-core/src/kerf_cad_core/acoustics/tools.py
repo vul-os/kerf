@@ -72,6 +72,8 @@ from kerf_cad_core.acoustics.sound import (
     duct_regen_spl,
     lw_from_lp,
     lp_from_lw,
+    iso9613_outdoor_spl,
+    iso9613_outdoor_octave_bands,
 )
 
 
@@ -1297,4 +1299,199 @@ async def run_acoustics_lp_from_lw(ctx: ProjectCtx, args: bytes) -> str:
         kwargs["Q"] = a["Q"]
 
     result = lp_from_lw(a["lw_db"], a["r_m"], **kwargs)
+    return ok_payload(result) if result["ok"] else json.dumps(result)
+
+
+# ---------------------------------------------------------------------------
+# Tool: acoustics_iso9613_outdoor
+# ---------------------------------------------------------------------------
+
+_iso9613_outdoor_spec = ToolSpec(
+    name="acoustics_iso9613_outdoor",
+    description=(
+        "Outdoor sound propagation per ISO 9613-2:1996 — the industry-standard "
+        "method for environmental noise impact assessments.\n"
+        "\n"
+        "Computes Lp = Lw + Dc − (A_div + A_atm + A_gr + A_bar) where:\n"
+        "  A_div  — geometric divergence (spherical spreading)\n"
+        "  A_atm  — atmospheric absorption (ISO 9613-1:1993 coefficients)\n"
+        "  A_gr   — ground effect (hard G=0 or soft G=1, §7.3.2)\n"
+        "  A_bar  — barrier diffraction (Maekawa 1968, §7.4)\n"
+        "\n"
+        "Use acoustics_iso9613_octave_bands for multi-band A-weighted assessment.\n"
+        "\n"
+        "Errors: {ok:false, reason}.  Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "Lw": {
+                "type": "number",
+                "description": "Sound power level of source (dB re 1 pW).",
+            },
+            "source_h": {
+                "type": "number",
+                "description": "Source height above ground (m). Must be >= 0.",
+            },
+            "receiver_h": {
+                "type": "number",
+                "description": "Receiver height above ground (m). Must be >= 0.",
+            },
+            "horizontal_dist": {
+                "type": "number",
+                "description": "Horizontal distance source-to-receiver (m). Must be > 0.",
+            },
+            "Q": {
+                "type": "number",
+                "description": (
+                    "Directivity factor (default 2 = hemispherical/ground-mounted). "
+                    "Q=1 free-field, Q=2 hard ground, Q=4 wall+ground corner."
+                ),
+            },
+            "ground_type": {
+                "type": "string",
+                "enum": ["hard", "soft"],
+                "description": (
+                    "'hard' (G=0: concrete, asphalt, water) or "
+                    "'soft' (G=1: grass, soil, forest floor). Default 'hard'."
+                ),
+            },
+            "barrier_h": {
+                "type": "number",
+                "description": "Noise barrier height above ground (m). 0 = no barrier (default).",
+            },
+            "barrier_dist_source": {
+                "type": "number",
+                "description": (
+                    "Horizontal distance from source to barrier (m). "
+                    "Required when barrier_h > 0."
+                ),
+            },
+            "freq_hz": {
+                "type": "number",
+                "description": (
+                    "Octave-band centre frequency for atm. absorption + ground effect (Hz). "
+                    "Standard bands: 63, 125, 250, 500, 1000, 2000, 4000, 8000. Default 500."
+                ),
+            },
+        },
+        "required": ["Lw", "source_h", "receiver_h", "horizontal_dist"],
+    },
+)
+
+
+@register(_iso9613_outdoor_spec, write=False)
+async def run_acoustics_iso9613_outdoor(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    for field_name in ("Lw", "source_h", "receiver_h", "horizontal_dist"):
+        if a.get(field_name) is None:
+            return json.dumps({"ok": False, "reason": f"{field_name} is required"})
+
+    kwargs: dict = {}
+    for opt in ("Q", "ground_type", "barrier_h", "barrier_dist_source", "freq_hz"):
+        if opt in a:
+            kwargs[opt] = a[opt]
+
+    result = iso9613_outdoor_spl(
+        Lw=a["Lw"],
+        source_h=a["source_h"],
+        receiver_h=a["receiver_h"],
+        horizontal_dist=a["horizontal_dist"],
+        **kwargs,
+    )
+    return ok_payload(result) if result["ok"] else json.dumps(result)
+
+
+# ---------------------------------------------------------------------------
+# Tool: acoustics_iso9613_octave_bands
+# ---------------------------------------------------------------------------
+
+_iso9613_octave_spec = ToolSpec(
+    name="acoustics_iso9613_octave_bands",
+    description=(
+        "ISO 9613-2:1996 outdoor propagation across all standard octave bands "
+        "(63–8000 Hz) with A-weighted total SPL.\n"
+        "\n"
+        "Provide the octave-band sound power levels of the source as Lw_bands "
+        "dict {freq_hz: Lw_dB}.  The function applies geometric divergence, "
+        "atmospheric absorption, ground effect, and optional barrier diffraction "
+        "to each band independently, then combines results to give both the "
+        "un-weighted total Lp and the A-weighted dB(A) total.\n"
+        "\n"
+        "Errors: {ok:false, reason}.  Never raises."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "Lw_bands": {
+                "type": "object",
+                "description": (
+                    "Octave-band sound power levels of the source: "
+                    "{freq_hz: Lw_dB}.  Standard bands: 63, 125, 250, 500, "
+                    "1000, 2000, 4000, 8000 Hz."
+                ),
+                "additionalProperties": {"type": "number"},
+            },
+            "source_h": {
+                "type": "number",
+                "description": "Source height above ground (m).",
+            },
+            "receiver_h": {
+                "type": "number",
+                "description": "Receiver height above ground (m).",
+            },
+            "horizontal_dist": {
+                "type": "number",
+                "description": "Horizontal distance source-to-receiver (m). Must be > 0.",
+            },
+            "Q": {
+                "type": "number",
+                "description": "Directivity factor (default 2).",
+            },
+            "ground_type": {
+                "type": "string",
+                "enum": ["hard", "soft"],
+                "description": "'hard' (default) or 'soft'.",
+            },
+            "barrier_h": {
+                "type": "number",
+                "description": "Barrier height above ground (m). 0 = no barrier.",
+            },
+            "barrier_dist_source": {
+                "type": "number",
+                "description": "Distance from source to barrier (m). Required when barrier_h > 0.",
+            },
+        },
+        "required": ["Lw_bands", "source_h", "receiver_h", "horizontal_dist"],
+    },
+)
+
+
+@register(_iso9613_octave_spec, write=False)
+async def run_acoustics_iso9613_octave_bands(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    for field_name in ("Lw_bands", "source_h", "receiver_h", "horizontal_dist"):
+        if a.get(field_name) is None:
+            return json.dumps({"ok": False, "reason": f"{field_name} is required"})
+
+    kwargs: dict = {}
+    for opt in ("Q", "ground_type", "barrier_h", "barrier_dist_source"):
+        if opt in a:
+            kwargs[opt] = a[opt]
+
+    result = iso9613_outdoor_octave_bands(
+        Lw_bands=a["Lw_bands"],
+        source_h=a["source_h"],
+        receiver_h=a["receiver_h"],
+        horizontal_dist=a["horizontal_dist"],
+        **kwargs,
+    )
     return ok_payload(result) if result["ok"] else json.dumps(result)

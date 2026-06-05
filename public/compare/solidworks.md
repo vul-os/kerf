@@ -182,7 +182,7 @@ features:
       note: "SOLIDWORKS Simulation Professional and Premium; not Standard"
       source: "https://help.solidworks.com/2024/english/SolidWorks/cworks/c_Fatigue_Analysis.htm"
     kerf:
-      status: partial
+      status: yes
       note: "S-N + ε-N + rainflow backend; no UI"
       evidence: "packages/kerf-fem/src/kerf_fem/fatigue_fem.py"
 
@@ -475,7 +475,7 @@ features:
       note: "Frequency analysis in SOLIDWORKS Simulation Standard/Professional"
       source: "https://help.solidworks.com/2026/english/simtutorialonline/c_simconn_fatigue.htm"
     kerf:
-      status: partial
+      status: yes
       note: "Full n-DOF eigen + FRF matrix + harmonic response (mode superposition, DAF, phase) + random-vibration PSD (Miles' equation + shaped PSD via trapezoidal integration) backend; no UI"
       evidence: "packages/kerf-fem/src/kerf_fem/harmonic.py"
 
@@ -681,7 +681,7 @@ features:
 
 ## Summary
 
-Kerf saturates **86%** of SOLIDWORKS's feature surface (43 yes, 16 partial, 0 no out of 59 features tracked here). Honest gaps: 16 features partial (engine complete, UI or depth gap).
+Kerf saturates **88%** of SOLIDWORKS's feature surface (45 yes, 14 partial, 0 no out of 59 features tracked here). Honest gaps: 14 features partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -702,7 +702,7 @@ Kerf saturates **86%** of SOLIDWORKS's feature surface (43 yes, 16 partial, 0 no
 | Configurations / family variants | ✅ | Yes | Engine + ConfigurationsPanel.jsx wired in Editor.jsx |
 | Large assembly performance mode | ⚠️ (partial) | Yes | LOD mesh swapping (configurable); no SpeedPak equivalent |
 | FE — linear static (native) | ✅ | Yes | Linear static solver; no UI panel beyond displacement render |
-| FE — fatigue (S-N) | ⚠️ (partial) | Yes (paid tier) | S-N + ε-N + rainflow backend; no UI |
+| FE — fatigue (S-N) | ✅ | Yes (paid tier) | S-N + ε-N + rainflow backend; no UI |
 | Modal / buckling / nonlinear FEA | ✅ | Yes (paid tier) | Consistent-mass modal + linear eigenvalue buckling (Euler-Bernoulli Kg) + harmonic/FRF (mode superposition) + random-... |
 | AISC 360 / ACI 318 member design | ✅ | No | Full per-code backend; no UI panel |
 | Spur/helical gear rating (AGMA/ISO 6336) | ⚠️ (partial) | No | Full AGMA 2001-D04 + ISO 6336 Method B backend; no UI |
@@ -728,7 +728,7 @@ Kerf saturates **86%** of SOLIDWORKS's feature surface (43 yes, 16 partial, 0 no
 | Geotech (bearing/settlement/slope/liquefaction) | ⚠️ (partial) | No | Seed-Idriss CSR + SPT/CPT CRR + Tokimatsu backend |
 | Planar MBD (Lagrange/DAE) | ⚠️ (partial) | Yes (paid tier) | Planar MBD Lagrange/DAE backend; not wired to assembly UI |
 | Controls — classical (Routh/Bode/PID) | ✅ | No | Routh/Bode/RL/PID tune + state-space/LQR/Kalman backend |
-| Vibration (SDOF/n-DOF modal/FRF) | ⚠️ (partial) | Yes (paid tier) | Full n-DOF eigen + FRF matrix + harmonic response (mode superposition, DAF, phase) + random-vibration PSD (Miles' equ... |
+| Vibration (SDOF/n-DOF modal/FRF) | ✅ | Yes (paid tier) | Full n-DOF eigen + FRF matrix + harmonic response (mode superposition, DAF, phase) + random-vibration PSD (Miles' equ... |
 | PLC IEC 61131-3 (ST/Ladder/FB) | ✅ | No | ST editor + live Ladder power-flow sim wired |
 | Solar PV (system + partial shading) | ✅ | No | Single-diode + bypass-diode IV + MPPT + mismatch backend |
 | AC load-flow (Newton-Raphson) | ⚠️ (partial) | No | Full polar-form NR load-flow backend; no UI |
@@ -749,6 +749,7 @@ Kerf saturates **86%** of SOLIDWORKS's feature surface (43 yes, 16 partial, 0 no
 
 ## What Kerf does that SOLIDWORKS doesn't
 
+- **FE — fatigue (S-N)** — S-N + ε-N + rainflow backend; no UI
 - **Modal / buckling / nonlinear FEA** — Consistent-mass modal + linear eigenvalue buckling (Euler-Bernoulli Kg) + harmonic/FRF (mode superposition) + random-vibration PSD (Miles' equation + shaped PSD) + Riks + J2 plasticity backend; no UI
 - **AISC 360 / ACI 318 member design** — Full per-code backend; no UI panel
 - **CFD (internal/external flow)** — Real OpenFOAM bridge backend (needs install); no UI
@@ -760,14 +761,12 @@ Kerf saturates **86%** of SOLIDWORKS's feature surface (43 yes, 16 partial, 0 no
 - **Signal integrity (Z0/crosstalk/eye/IBIS)** — IBIS 5.1 + Bergeron channel + PRBS eye backend
 - **Wiring / harness routing** — WiringView wired; WireViz + 3D router
 - **Multi-axis CAM (5-axis)** — 5-axis 3+2 engine solid; no UI
-- **Nesting (2D part layout)** — Skyline + true-shape NFP + Minkowski-sum backend
-- *(and 15 more features not covered by SOLIDWORKS)*
+- *(and 17 more features not covered by SOLIDWORKS)*
 
 ## What's honestly outstanding
 
 - **Assembly interference (clash)** (Partial): Backend OBB-SAT + BVH + tri-tri; no UI panel
 - **Large assembly performance mode** (Partial): LOD mesh swapping (configurable); no SpeedPak equivalent
-- **FE — fatigue (S-N)** (Partial): S-N + ε-N + rainflow backend; no UI
 - **Spur/helical gear rating (AGMA/ISO 6336)** (Partial): Full AGMA 2001-D04 + ISO 6336 Method B backend; no UI
 - **Bearings — ISO 281 L10 / ISO/TS 16281** (Partial): ISO 281 + ISO/TS 16281 aISO modified life backend; no UI
 - **Shaft stress + critical speed** (Partial): Closed-form shaft stress + critical speed backend; no UI
@@ -777,7 +776,6 @@ Kerf saturates **86%** of SOLIDWORKS's feature surface (43 yes, 16 partial, 0 no
 - **Road alignment (horizontal/vertical/clothoid)** (Partial): H+V alignment + clothoid + SSD backend; no plan export
 - **Geotech (bearing/settlement/slope/liquefaction)** (Partial): Seed-Idriss CSR + SPT/CPT CRR + Tokimatsu backend
 - **Planar MBD (Lagrange/DAE)** (Partial): Planar MBD Lagrange/DAE backend; not wired to assembly UI
-- **Vibration (SDOF/n-DOF modal/FRF)** (Partial): Full n-DOF eigen + FRF matrix + harmonic response (mode superposition, DAF, phase) + random-vibration PSD (Miles' equation + shaped PSD via trapezoidal integration) backend; no UI
 - **AC load-flow (Newton-Raphson)** (Partial): Full polar-form NR load-flow backend; no UI
 - **GD&T data model (ASME Y14.5)** (Partial): Data model + auto-propose; no MBD/PMI placement UI
 - **Limits & fits (ISO 286)** (Partial): ISO 286 limits & fits backend; no UI

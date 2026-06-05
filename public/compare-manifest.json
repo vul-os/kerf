@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T02:41:25.700Z",
+  "generatedAt": "2026-06-05T02:43:16.077Z",
   "items": [
     {
       "slug": "revit",
@@ -6263,7 +6263,7 @@
             "notes": "SOLIDWORKS Simulation Professional and Premium; not Standard"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-fem/src/kerf_fem/fatigue_fem.py",
             "notes": "S-N + ε-N + rainflow backend; no UI"
           },
@@ -6627,7 +6627,7 @@
             "notes": "Frequency analysis in SOLIDWORKS Simulation Standard/Professional"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-fem/src/kerf_fem/harmonic.py",
             "notes": "Full n-DOF eigen + FRF matrix + harmonic response (mode superposition, DAF, phase) + random-vibration PSD (Miles' equation + shaped PSD via trapezoidal integration) backend; no UI"
           },

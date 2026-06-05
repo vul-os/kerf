@@ -44,8 +44,10 @@ function callTool(tool, args, accessToken) {
   }).then((r) => r.json().catch(() => ({})))
 }
 
-export default function ImplantPlanningPanel({ projectId }) {
+export default function ImplantPlanningPanel({ projectId, content }) {
   const { accessToken } = useAuth()
+  // Parse content string (from panelRegistry) to seed defaults
+  const _defaults = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
 
   const [brand, setBrand]   = useState('Straumann BLT')
   const [diam, setDiam]     = useState(4.1)

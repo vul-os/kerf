@@ -73,8 +73,10 @@ function classifyKennedy(selectedFdi, arch, type) {
   return 'Class III'
 }
 
-export default function RPDDenturePanel({ projectId }) {
+export default function RPDDenturePanel({ projectId, content }) {
   const { accessToken } = useAuth()
+  // Parse content string (from panelRegistry) to seed defaults
+  const _defaults = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
 
   const [arch, setArch]               = useState('mandibular')
   const [type, setType]               = useState('partial')

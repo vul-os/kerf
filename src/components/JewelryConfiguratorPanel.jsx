@@ -765,7 +765,10 @@ const TABS = [
   { key: 'setting', label: 'Setting',     icon: Settings2 },
 ]
 
-export default function JewelryConfiguratorPanel({ onClose }) {
+export default function JewelryConfiguratorPanel({ onClose, content }) {
+  // Parse content string (from panelRegistry) to seed defaults (not yet used but accepted for compat)
+  // eslint-disable-next-line no-unused-vars
+  const _defaults = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
   const [activeTab, setActiveTab] = useState('gem')
 
   return (

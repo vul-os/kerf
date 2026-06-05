@@ -48,8 +48,10 @@ const TOOTH_PRESETS = [
   { label: 'LR4 (44)', universal: 28, fdi: '44', type: 'premolar', md: 7, bl: 8 },
 ]
 
-export default function CrownBridgePanel({ projectId }) {
+export default function CrownBridgePanel({ projectId, content }) {
   const { accessToken } = useAuth()
+  // Parse content string (from panelRegistry) to seed defaults
+  const _defaults = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
 
   const [toothPreset, setToothPreset] = useState(TOOTH_PRESETS[4]) // LL6 molar default
   const [marginType, setMarginType]   = useState('chamfer')

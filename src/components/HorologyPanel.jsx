@@ -516,7 +516,10 @@ const TABS = [
   { id: 'tooth', label: 'Tooth', Icon: Calculator },
 ]
 
-export default function HorologyPanel({ className = '' }) {
+export default function HorologyPanel({ className = '', content }) {
+  // Parse content string (from panelRegistry) to seed defaults (not yet used but accepted for compat)
+  // eslint-disable-next-line no-unused-vars
+  const _defaults = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
   const [activeTab, setActiveTab] = useState('train')
 
   return (

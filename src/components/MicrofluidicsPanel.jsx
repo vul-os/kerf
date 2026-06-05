@@ -468,7 +468,10 @@ const TABS = [
   { id: 'rayleigh', label: 'Jet / Thread', Icon: Calculator },
 ]
 
-export default function MicrofluidicsPanel({ className = '' }) {
+export default function MicrofluidicsPanel({ className = '', content }) {
+  // Parse content string (from panelRegistry) to seed defaults (not yet used but accepted for compat)
+  // eslint-disable-next-line no-unused-vars
+  const _defaults = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
   const [activeTab, setActiveTab] = useState('channel')
 
   return (

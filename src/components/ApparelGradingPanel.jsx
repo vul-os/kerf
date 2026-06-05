@@ -223,8 +223,15 @@ function SingleGradeView({ data }) {
  * @param {Object|string|null} props.result  — grading tool output
  * @param {string} [props.className]
  */
-export default function ApparelGradingPanel({ result = null, className = '' }) {
-  const parsed = useMemo(() => parseGradingResult(result), [result])
+export default function ApparelGradingPanel({ result = null, content, className = '' }) {
+  // content prop (from panelRegistry) is a JSON string; parse and use as result
+  const effectiveResult = useMemo(() => {
+    if (content != null) {
+      try { return { ...JSON.parse(content), ...((result != null && typeof result === 'object') ? result : {}) } } catch { return result }
+    }
+    return result
+  }, [result, content])
+  const parsed = useMemo(() => parseGradingResult(effectiveResult), [effectiveResult])
 
   if (parsed.kind === 'empty') {
     return (

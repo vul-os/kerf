@@ -51,8 +51,10 @@ function readFileAsBase64(file) {
   })
 }
 
-export default function IntraoralScanLabPanel({ projectId }) {
+export default function IntraoralScanLabPanel({ projectId, content }) {
   const { accessToken } = useAuth()
+  // Parse content string (from panelRegistry) to seed defaults
+  const _defaults = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
   const fileInputRef = useRef(null)
   const labFileRef = useRef(null)
 

@@ -203,8 +203,15 @@ function TensionLegend({ scale }) {
  * @param {Object|string|null} props.result  — garment_drape_on_avatar output
  * @param {string} [props.className]
  */
-export default function GarmentDrapePanel({ result = null, className = '' }) {
-  const parsed = useMemo(() => parseDrapeResult(result), [result])
+export default function GarmentDrapePanel({ result = null, content, className = '' }) {
+  // content prop (from panelRegistry) is a JSON string; parse and use as result
+  const effectiveResult = useMemo(() => {
+    if (content != null) {
+      try { return JSON.parse(content) } catch { return result }
+    }
+    return result
+  }, [result, content])
+  const parsed = useMemo(() => parseDrapeResult(effectiveResult), [effectiveResult])
 
   if (parsed.kind === 'empty') {
     return (

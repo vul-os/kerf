@@ -598,7 +598,10 @@ const TABS = [
   { key: 'probes',       label: 'Probes',       icon: Crosshair },
 ]
 
-export default function VirtualInstrumentBench({ onClose, waveforms }) {
+export default function VirtualInstrumentBench({ onClose, waveforms, content }) {
+  // Parse content string (from panelRegistry) to seed defaults (not yet used but accepted for compat)
+  // eslint-disable-next-line no-unused-vars
+  const _defaults = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
   const [tab, setTab] = useState('oscilloscope')
 
   return (

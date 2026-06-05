@@ -180,6 +180,17 @@ Registers:
                 compensation, G01/G02/G03 interpolation, M50/M51 wire feed,
                 4-axis taper XY+UV; HONEST: one pass, no skim cuts,
                 taper is radial approximation)
+  - LLM tool:  mold_design_cooling_channel_layout
+               (Menges 2001 §6.5 + Xu et al. 2001 PES 41(7):
+                conventional (gun-drilled) straight channel grid layout
+                at parting-plane-parallel Z levels; conformal channel loop
+                following cavity-surface contour at 1.8×D offset (Xu 2001);
+                bore diameter auto-selected from block area (Menges Table 6.4);
+                pitch = 3.5×D standard; clearance = 2×D from cavity surface;
+                HONEST: heuristic positions — verify interference via
+                mold_verify_cooling_channels; thermal performance via
+                mold_compute_cooling_pressure_drop; AM conformal contour is
+                rectangular approximation)
 """
 from __future__ import annotations
 
@@ -563,6 +574,18 @@ async def register(app: FastAPI, ctx):
         run_mold_generate_wire_edm_gcode,
     )
 
+    # Register cooling channel layout / routing design tool
+    # (Menges 2001 §6.5 + Xu et al. 2001 PES 41(7) + Tang et al. 1998)
+    from kerf_mold.cooling_channel_layout_tool import (
+        mold_design_cooling_channel_layout_spec,
+        run_mold_design_cooling_channel_layout,
+    )
+    ctx.tools.register(
+        "mold_design_cooling_channel_layout",
+        mold_design_cooling_channel_layout_spec,
+        run_mold_design_cooling_channel_layout,
+    )
+
     # Register injection fill simulation tools
     # (Hieber-Shen 1980 1.5D Hele-Shaw + Cross-WLF viscosity model)
     from kerf_mold.injection_fill_tools import (
@@ -622,6 +645,7 @@ async def register(app: FastAPI, ctx):
         "mold.mold_complexity_estimate",
         "mold.injection_fill_simulate",
         "mold.cross_wlf_viscosity",
+        "mold.cooling_channel_layout",
     ]
 
     try:

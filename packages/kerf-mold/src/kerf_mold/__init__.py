@@ -209,6 +209,18 @@ from kerf_mold.wire_edm import (
     rectangular_profile,
     circular_profile,
 )
+from kerf_mold.cooling_channel_layout import (
+    MoldBlockSpec,
+    CoolingChannelRoute,
+    CoolingLayoutReport,
+    design_cooling_channel_layout,
+    BORE_DIAMETER_DEFAULT_MM,
+    BORE_DIAMETER_MIN_MM,
+    BORE_DIAMETER_MAX_MM,
+    PITCH_FACTOR_STANDARD,
+    WALL_CLEARANCE_FACTOR_STANDARD,
+    CONFORMAL_OFFSET_FACTOR,
+)
 
 __all__ = [
     # mold.py
@@ -388,4 +400,15 @@ __all__ = [
     "generate_wire_edm_gcode",
     "rectangular_profile",
     "circular_profile",
+    # cooling_channel_layout.py — Wave 9C
+    "MoldBlockSpec",
+    "CoolingChannelRoute",
+    "CoolingLayoutReport",
+    "design_cooling_channel_layout",
+    "BORE_DIAMETER_DEFAULT_MM",
+    "BORE_DIAMETER_MIN_MM",
+    "BORE_DIAMETER_MAX_MM",
+    "PITCH_FACTOR_STANDARD",
+    "WALL_CLEARANCE_FACTOR_STANDARD",
+    "CONFORMAL_OFFSET_FACTOR",
 ]

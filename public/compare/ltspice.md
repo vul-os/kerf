@@ -137,7 +137,7 @@ LTspice is the free SPICE standard for analog designers — Kerf wraps it in a c
 
 ## Summary
 
-Kerf saturates **100%** of LTspice's feature surface (11 yes, 0 partial, 0 no out of 11 features tracked here). Kerf covers the full tracked feature set for LTspice; gaps may exist in workflow depth, ecosystem maturity, and community support.
+Kerf saturates **95%** of LTspice's feature surface (10 yes, 1 partial, 0 no out of 11 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -150,7 +150,7 @@ Kerf saturates **100%** of LTspice's feature surface (11 yes, 0 partial, 0 no ou
 | SPICE — Monte-Carlo mismatch | ✅ | Partial | Pelgrom model Monte-Carlo (A_VT = 4 mV·µm) per corner; 50 samples/corner default, configurable |
 | SPICE — waveform viewer (interactive) | ✅ | Yes | WaveformViewer.jsx: multi-trace SVG plot, zoom/scroll, dual cursors (A/B), ΔT/ΔY measurement, per-trace toggle; .spic... |
 | SPICE — netlist editor with syntax highlighting | ✅ | Yes | SpiceRunPanel.jsx netlist textarea + Monaco SPICE syntax mode (.cir / .spice.net files) |
-| SPICE — schematic capture GUI | ⚠️ | Yes | Kerf accepts netlists directly via SpiceRunPanel; no dedicated schematic-capture GUI for SPICE (PCB-level schematic editor is separate) |
+| SPICE — schematic capture GUI | ⚠️ (partial) | Yes | Kerf accepts netlists directly via SpiceRunPanel; no dedicated schematic-capture GUI for SPICE (PCB-level schematic e... |
 | SPICE — chat-native / LLM-driven flow | ✅ | No | All silicon tools reachable via plain-language prompts; LLM translates to tool calls, backed by doc-search |
 | SPICE — open-source / free | ✅ | Yes | Kerf is MIT open-core; the ngspice backend is GPL-licensed (user installs ngspice) |
 | SPICE — sky130 / open PDK model support | ✅ | Partial | PVT sweep models derived from sky130 BSIM4 corner data; ngspice bridge accepts sky130 PDK SPICE decks |
@@ -158,6 +158,10 @@ Kerf saturates **100%** of LTspice's feature surface (11 yes, 0 partial, 0 no ou
 ## What Kerf does that LTspice doesn't
 
 - **SPICE — chat-native / LLM-driven flow** — All silicon tools reachable via plain-language prompts; LLM translates to tool calls, backed by doc-search
+
+## What's honestly outstanding
+
+- **SPICE — schematic capture GUI** (Partial): Kerf accepts netlists directly via SpiceRunPanel; no dedicated schematic-capture GUI for SPICE (PCB-level schematic editor is separate)
 
 ## Pricing
 

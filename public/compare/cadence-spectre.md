@@ -103,7 +103,7 @@ Spectre is the industry-standard commercial SPICE for tapeout — Kerf targets o
 
 ## Summary
 
-Kerf saturates **88%** of Cadence Spectre's feature surface (7 yes, 0 partial, 1 no out of 8 features tracked here). Honest gaps: 1 feature not yet implemented.
+Kerf saturates **81%** of Cadence Spectre's feature surface (6 yes, 1 partial, 1 no out of 8 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -114,7 +114,7 @@ Kerf saturates **88%** of Cadence Spectre's feature surface (7 yes, 0 partial, 1
 | SPICE — Monte-Carlo mismatch | ✅ | Yes | Pelgrom A_VT = 4 mV·µm model for sky130; production-sign-off accuracy requires foundry MC deck (not yet integrated) |
 | SPICE — commercial foundry PDK sign-off accuracy | 🔴 (no) | Yes | Kerf uses ngspice with open PDK models (sky130). Commercial foundry sign-off (TSMC, GF) requires Spectre + licensed P... |
 | SPICE — waveform viewer | ✅ | Yes | WaveformViewer.jsx: multi-trace SVG, zoom/pan/cursor measurement, .spice.waveform file kind |
-| SPICE — schematic-driven simulation | ✅ | Yes | Kerf accepts netlists only; no analog schematic capture GUI yet |
+| SPICE — schematic-driven simulation | ⚠️ (partial) | Yes | Kerf accepts netlists via SpiceRunPanel; no analog schematic capture GUI — netlist-driven workflow only |
 | SPICE — license cost | ✅ | No | Kerf is MIT open-core; ngspice backend is free/open-source; cloud execution priced on credits at cost |
 | SPICE — chat-native / LLM-driven flow | ✅ | No | All silicon tools reachable via plain-language prompts |
 
@@ -126,6 +126,7 @@ Kerf saturates **88%** of Cadence Spectre's feature surface (7 yes, 0 partial, 1
 ## What's honestly outstanding
 
 - **SPICE — commercial foundry PDK sign-off accuracy** (Not yet implemented): Kerf uses ngspice with open PDK models (sky130). Commercial foundry sign-off (TSMC, GF) requires Spectre + licensed PDK — out of scope for the MIT open-core.
+- **SPICE — schematic-driven simulation** (Partial): Kerf accepts netlists via SpiceRunPanel; no analog schematic capture GUI — netlist-driven workflow only
 
 ## Pricing
 

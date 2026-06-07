@@ -106,7 +106,7 @@ features:
     kerf:
       status: yes
       note: "LCA material costing; no composites-specific laminate weight/cost UI"
-      evidence: "packages/kerf-lca/phases.py"
+      evidence: "packages/kerf-lca/src/kerf_lca/phases.py"
   - domain: D1
     feature: "LLM / chat-native editing"
     competitor:

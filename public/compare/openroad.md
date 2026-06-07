@@ -249,14 +249,14 @@ Kerf saturates **100%** of OpenROAD's feature surface (19 yes, 0 partial, 0 no o
 | Silicon — analog PVT-corner simulation | ✅ | No | 60 PVT corners (5P×3V×4T) + Monte-Carlo mismatch per corner; Pelgrom-matched (backend) |
 | Silicon — formal verification | ✅ | No | Formal verification via Yosys formal flow in kerf-silicon bridge (backend) |
 | Silicon — chat-native / LLM-driven flow | ✅ | No | All OpenROAD steps reachable via plain-language prompts and kerf-sdk Python; doc-search prevents API hallucination |
-| Silicon — managed cloud execution | ✅ | No | Kerf hosted environment provides cloud compute for OpenROAD runs |
+| Silicon — managed cloud execution | ✅ | No | Kerf hosted environment provides cloud compute for OpenROAD runs (cloud backend is proprietary / gitignored) |
 
 ## What Kerf does that OpenROAD doesn't
 
 - **Silicon — analog PVT-corner simulation** — 60 PVT corners (5P×3V×4T) + Monte-Carlo mismatch per corner; Pelgrom-matched (backend)
 - **Silicon — formal verification** — Formal verification via Yosys formal flow in kerf-silicon bridge (backend)
 - **Silicon — chat-native / LLM-driven flow** — All OpenROAD steps reachable via plain-language prompts and kerf-sdk Python; doc-search prevents API hallucination
-- **Silicon — managed cloud execution** — Kerf hosted environment provides cloud compute for OpenROAD runs
+- **Silicon — managed cloud execution** — Kerf hosted environment provides cloud compute for OpenROAD runs (cloud backend is proprietary / gitignored)
 
 ## Pricing
 

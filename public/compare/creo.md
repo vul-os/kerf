@@ -551,7 +551,7 @@ features:
     kerf:
       status: yes
       note: "Deep 41-module jewelry suite — ring/gem/setting/chain/casting; UI wired"
-      evidence: "src/components/JewelryView.jsx"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/"
 
   - domain: D13
     feature: "BIM (walls/slabs/framing/stairs/IFC4)"

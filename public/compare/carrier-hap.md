@@ -82,7 +82,7 @@ features:
       note: "HAP is standalone; no native IFC import"
     kerf:
       status: yes
-      evidence: packages/kerf-bim/src/kerf_bim/ifc_import.py
+      evidence: packages/kerf-bim/src/kerf_bim/import_ifc/
       note: "Full IFC Tier 1+2 import including MEP elements"
 
   # Open-source / API

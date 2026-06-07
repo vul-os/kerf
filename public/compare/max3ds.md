@@ -267,7 +267,7 @@ features:
     kerf:
       status: yes
       note: "Procedural Poisson-disk/grid scatter (density, seed, jitter, slope/altitude masks, exclusion zones, collision avoidance) + built-in proxy asset catalogue (trees/shrubs/people/cars/furniture); note: proxy/placeholder assets + scatter engine, not a photoreal asset marketplace like Forest Pack/RailClone/Chaos Cosmos"
-      evidence: "packages/kerf-render/src/kerf_render/archviz_scatter.py;packages/kerf-render/src/kerf_render/archviz_assets.py"
+      evidence: "packages/kerf-render/src/kerf_render/archviz_scatter.py"
   - domain: D14
     feature: "Cost / materials — should-cost and LCA"
     competitor:

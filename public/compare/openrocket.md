@@ -209,7 +209,7 @@ Kerf saturates **100%** of OpenRocket's feature surface (17 yes, 0 partial, 0 no
 | Avionics PCB design (altimeter, GPS, deployment) | ✅ | No | Full PCB workspace with KiCad round-trip — wired UI |
 | SPICE / pre-compliance sim (ignition driver, RF, power) | ✅ | No | ngspice bridge + EMC/PDN/link-budget backend tools — wired |
 | Recovery / pyro deployment electronics (e-match driver, dual-deploy) | ✅ | No | Schematic + PCB workspace for e-match driver and dual-deploy circuits |
-| Should-cost estimation (airframe materials + machining) | ✅ | No | Should-cost engine (Boothroyd-Dewhurst, 6 processes) — backend tool |
+| Should-cost estimation (airframe materials + machining) | ✅ | No | Should-cost engine (Boothroyd-Dewhurst tolerance-cost curves) — backend tool |
 
 ## What Kerf does that OpenRocket doesn't
 
@@ -219,7 +219,7 @@ Kerf saturates **100%** of OpenRocket's feature surface (17 yes, 0 partial, 0 no
 - **Avionics PCB design (altimeter, GPS, deployment)** — Full PCB workspace with KiCad round-trip — wired UI
 - **SPICE / pre-compliance sim (ignition driver, RF, power)** — ngspice bridge + EMC/PDN/link-budget backend tools — wired
 - **Recovery / pyro deployment electronics (e-match driver, dual-deploy)** — Schematic + PCB workspace for e-match driver and dual-deploy circuits
-- **Should-cost estimation (airframe materials + machining)** — Should-cost engine (Boothroyd-Dewhurst, 6 processes) — backend tool
+- **Should-cost estimation (airframe materials + machining)** — Should-cost engine (Boothroyd-Dewhurst tolerance-cost curves) — backend tool
 
 ## Pricing
 

@@ -72,7 +72,7 @@ features:
       note: "Revit gbXML export → TRACE 3D import workflow"
     kerf:
       status: yes
-      evidence: packages/kerf-bim/src/kerf_bim/ifc_import.py
+      evidence: packages/kerf-bim/src/kerf_bim/import_ifc/
       note: "Native IFC Tier 1+2 import; no gbXML reader yet"
 
   # Open API / scripting

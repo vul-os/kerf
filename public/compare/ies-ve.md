@@ -82,7 +82,7 @@ features:
       note: "IFC 2x3 and IFC4 import for building geometry"
     kerf:
       status: yes
-      evidence: packages/kerf-bim/src/kerf_bim/ifc_import.py
+      evidence: packages/kerf-bim/src/kerf_bim/import_ifc/
       note: "Full IFC Tier 1+2 including MEP elements; IFC 2x3 + IFC4"
 
   # Open API

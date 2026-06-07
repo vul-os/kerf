@@ -251,7 +251,7 @@ features:
     kerf:
       status: yes
       note: "Minkowski-sum NFP + IFP + bottom-left fill; 57.6% L-shape util (backend)"
-      evidence: "packages/kerf-manufacturing/src/kerf_manufacturing/nesting"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/nesting/"
 
   # D8 — Civil / infrastructure / geo
   - domain: D8

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-07T19:38:32.666Z",
+  "generatedAt": "2026-06-07T20:18:45.331Z",
   "items": [
     {
       "slug": "revit",
@@ -21,7 +21,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/walls.go"
+            "evidence": "packages/kerf-bim/src/kerf_bim/walls.py"
           }
         },
         {
@@ -48,7 +48,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/elements.go"
+            "evidence": "packages/kerf-bim/src/kerf_bim/openings.py"
           }
         },
         {
@@ -61,7 +61,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/elements.go"
+            "evidence": "packages/kerf-bim/src/kerf_bim/slabs.py"
           }
         },
         {
@@ -88,7 +88,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/elements.go"
+            "evidence": "packages/kerf-bim/src/kerf_bim/stairs.py"
           }
         },
         {
@@ -101,7 +101,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/elements.go"
+            "evidence": "packages/kerf-bim/src/kerf_bim/walls.py"
           }
         },
         {
@@ -114,7 +114,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/elements.go"
+            "evidence": "packages/kerf-bim/src/kerf_bim/framing.py"
           }
         },
         {
@@ -127,7 +127,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/structural_grid.go"
+            "evidence": "packages/kerf-bim/src/kerf_bim/grid.py"
           }
         },
         {
@@ -140,7 +140,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/structural_grid.go"
+            "evidence": "packages/kerf-bim/src/kerf_bim/grid.py"
           }
         },
         {
@@ -195,7 +195,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/families.go"
+            "evidence": "packages/kerf-bim/src/kerf_bim/family_editor.py"
           }
         },
         {
@@ -208,7 +208,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/site.go"
+            "evidence": "packages/kerf-bim/src/kerf_bim/site.py"
           }
         },
         {
@@ -221,7 +221,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/materials.go"
+            "evidence": "packages/kerf-bim/src/kerf_bim/materials.py"
           }
         },
         {
@@ -234,7 +234,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/schedules.go"
+            "evidence": "packages/kerf-bim/src/kerf_bim/tools/schedule.py"
           }
         },
         {
@@ -261,7 +261,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/viewer.go"
+            "evidence": "packages/kerf-bim/src/kerf_bim/tools/view.py"
           }
         },
         {
@@ -274,7 +274,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/drawings/"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/drawings/"
           }
         },
         {
@@ -287,7 +287,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/drawings/"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/drawings/"
           }
         },
         {
@@ -300,7 +300,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/ifc_import.go"
+            "evidence": "packages/kerf-bim/src/kerf_bim/import_ifc/"
           }
         },
         {
@@ -313,7 +313,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/ifc_export.go"
+            "evidence": "packages/kerf-bim/src/kerf_bim/export_ifc/"
           }
         },
         {
@@ -326,7 +326,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/clash.go"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py"
           }
         },
         {
@@ -353,7 +353,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/",
+            "evidence": "packages/kerf-bim/src/kerf_bim/",
             "notes": "NodeGraphCanvas visual node editor + kerf-sdk Python scripting"
           }
         },
@@ -367,7 +367,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-sdk/"
+            "evidence": "packages/kerf-sdk/src/kerf/"
           }
         },
         {
@@ -380,7 +380,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-civil/buildingenergy/"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/buildingenergy/"
           }
         },
         {
@@ -393,7 +393,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/",
+            "evidence": "packages/kerf-bim/src/kerf_bim/",
             "notes": "Needs construction sequencing / schedule-linked model epic; out of current scope"
           }
         },
@@ -407,7 +407,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/",
+            "evidence": "packages/kerf-bim/src/kerf_bim/",
             "notes": "BIM quantity takeoff (area/volume schedules) exists; no BIM-linked cost estimation integration with external tools"
           }
         },
@@ -421,7 +421,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-structural/aisc_member.py"
+            "evidence": "packages/kerf-structural/src/kerf_structural/aisc_member.py"
           }
         },
         {
@@ -434,7 +434,7 @@
           },
           "kerf": {
             "status": "no",
-            "evidence": "kerf-structural/"
+            "evidence": "packages/kerf-structural/src/kerf_structural/"
           }
         },
         {
@@ -447,7 +447,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-structural/aisc_member.py"
+            "evidence": "packages/kerf-structural/src/kerf_structural/aisc_member.py"
           }
         },
         {
@@ -460,7 +460,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-structural/aci318.py"
+            "evidence": "packages/kerf-structural/src/kerf_structural/aci_column.py"
           }
         },
         {
@@ -473,7 +473,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-structural/seismic/rsa.py"
+            "evidence": "packages/kerf-structural/src/kerf_structural/load_combinations.py"
           }
         },
         {
@@ -486,7 +486,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-fem/plate.py"
+            "evidence": "packages/kerf-fem/src/kerf_fem/plate.py"
           }
         },
         {
@@ -499,7 +499,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-civil/superelevation.py"
+            "evidence": "packages/kerf-civil/src/kerf_civil/superelevation.py"
           }
         },
         {
@@ -512,7 +512,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-civil/geotech/"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geotech/"
           }
         },
         {
@@ -525,7 +525,7 @@
           },
           "kerf": {
             "status": "partial",
-            "evidence": "cloud/projects/"
+            "evidence": "packages/kerf-cloud/src/kerf_cloud/"
           }
         },
         {
@@ -551,7 +551,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/agent/"
+            "evidence": "packages/kerf-chat/src/kerf_chat/"
           }
         }
       ]
@@ -574,7 +574,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-civil/superelevation.py",
+            "evidence": "packages/kerf-civil/src/kerf_civil/superelevation.py",
             "notes": "Backend; no UI"
           },
           "name": "Horizontal+vertical alignment (clothoid, SSD)"
@@ -588,7 +588,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-civil/superelevation.py",
+            "evidence": "packages/kerf-civil/src/kerf_civil/superelevation.py",
             "notes": "Backend; AASHTO Exhibit 3-20 validated"
           },
           "name": "Superelevation runoff transition"
@@ -700,7 +700,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-civil/geotech/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geotech",
             "notes": "Backend; Seed-Idriss CSR + SPT/CPT CRR validated"
           },
           "name": "Geotech (bearing/settlement/slope/pile/liquefaction)"
@@ -798,7 +798,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-structural/seismic/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/seismic",
             "notes": "Backend; ELF + RSA (SRSS+CQC) + Newmark time-history"
           },
           "name": "ASCE 7-22 seismic (ELF + RSA + Newmark)"
@@ -840,7 +840,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-occt/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/brep",
             "notes": "OCCT; no graceful failure / fuzzy heal"
           },
           "name": "B-rep booleans (general NURBS)"
@@ -854,7 +854,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cam/nesting/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/nesting",
             "notes": "Backend; Minkowski-sum NFP, 57.6% L-shape utilisation"
           },
           "name": "Nesting (skyline + true-shape NFP)"
@@ -868,7 +868,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electrical/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/elecpower",
             "notes": "Backend; NEC power distribution + point-to-point SC"
           },
           "name": "NEC power distribution"
@@ -882,7 +882,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cost/",
+            "evidence": "packages/kerf-costing/src/kerf_costing",
             "notes": "Backend; 6 processes, Boothroyd-Dewhurst method"
           },
           "name": "Should-cost (6 processes, Boothroyd-Dewhurst)"
@@ -896,7 +896,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-matsel/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/matsel",
             "notes": "Backend; 200 materials, Pareto frontier, weighted-score"
           },
           "name": "Material selection (Ashby)"
@@ -938,7 +938,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-controls/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/controls",
             "notes": "Backend; classical control design tools"
           },
           "name": "Controls — classical (Routh/Bode/RL/PID tune)"
@@ -952,7 +952,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-qa/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/spc",
             "notes": "Backend"
           },
           "name": "Process capability (Cpk/Ppk)"
@@ -977,7 +977,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-bim/src/bim.py",
+            "evidence": "packages/kerf-bim/src/kerf_bim/tools/bim.py",
             "notes": "kerf-bim walls/slabs/framing wired; parametric engine + IFC viewer"
           },
           "name": "BIM walls / slabs / framing"
@@ -991,7 +991,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-bim/src/bim.py",
+            "evidence": "packages/kerf-bim/src/kerf_bim/tools/bim.py",
             "notes": "Stairs and ramps in kerf-bim engine; viewer wired"
           },
           "name": "BIM stairs / ramps"
@@ -1005,7 +1005,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-bim/src/bim.py",
+            "evidence": "packages/kerf-bim/src/kerf_bim/tools/bim.py",
             "notes": "Parametric doors/windows in kerf-bim; wired in viewer"
           },
           "name": "BIM doors / windows"
@@ -1145,7 +1145,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-civil/geotech/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geotech",
             "notes": "Backend geotech + earthwork volumes; no interactive site mesh UI"
           },
           "name": "Site terrain / mesh modelling"
@@ -1173,7 +1173,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/DrawingsView.jsx",
+            "evidence": "src/components/DrawingView.jsx",
             "notes": "Engineering multi-sheet drawings (template-based, not live B-rep projection); no layout book"
           },
           "name": "2D technical drawings / documentation"
@@ -1187,7 +1187,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-core/src/occt/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/brep",
             "notes": "Full OCCT B-rep; pad/pocket/revolve/sweep/loft/fillet/boolean wired"
           },
           "name": "3D solid B-rep modelling"
@@ -1201,7 +1201,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-core/src/sheetmetal.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/sheetmetal_features.py",
             "notes": "Single flange + unfold + flat DXF; no hem/relief/jog/multi-flange"
           },
           "name": "Sheet metal flat-pattern"
@@ -1215,7 +1215,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-core/src/gdandt.py",
+            "evidence": "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py",
             "notes": "GD&T data model (ASME Y14.5); no MBD/PMI on model view"
           },
           "name": "GD&T / tolerancing"
@@ -1229,7 +1229,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-thermal/buildingenergy/transient.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/buildingenergy/transient.py",
             "notes": "Backend building loads (CLTD/RTS, ASHRAE Ch.18, degree-day); no energy simulation export"
           },
           "name": "Building energy analysis export"
@@ -1243,7 +1243,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-thermal/hvac/duct.py",
+            "evidence": "packages/kerf-hvac/src/kerf_hvac/duct.py",
             "notes": "SMACNA duct sizing + flat-pattern (backend)"
           },
           "name": "HVAC duct sizing"
@@ -1271,7 +1271,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-qa/tolstack/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/tolstack",
             "notes": "1D WC/RSS/MC stackup + 3D vector-loop; no MBD on model"
           },
           "name": "Tolerance stackup / metrology"
@@ -1299,7 +1299,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-lca/phases.py",
+            "evidence": "packages/kerf-lca/src/kerf_lca/phases.py",
             "notes": "Full ISO 14040/44 4-phase LCA; 6 impact categories + uncertainty (backend)"
           },
           "name": "LCA / environmental data"
@@ -1696,7 +1696,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cad-core/src/sketcher/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/sketch.py",
             "notes": "PlaneGCS WASM; missing collinear, ellipse entity, G2"
           },
           "name": "Constraint sketcher (geo + dim)"
@@ -1710,7 +1710,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cad-core/src/features/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/solid_features.py",
             "notes": "OCCT, wired"
           },
           "name": "Pad / pocket / revolve"
@@ -1724,7 +1724,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cad-core/src/occt/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/boolean.py",
             "notes": "OCCT exact B-rep booleans; no graceful failure handling / fuzzy heal"
           },
           "name": "B-rep booleans (general NURBS)"
@@ -1738,7 +1738,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cad-core/src/assembly/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly/mates.py",
             "notes": "Coincident/concentric/parallel mates wired; BOM panel"
           },
           "name": "Assemblies — mates"
@@ -1780,7 +1780,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-structural/",
+            "evidence": "packages/kerf-structural/",
             "notes": "AISC 360-22 + ACI 318-19 + NDS 2018 + Eurocodes; backend"
           },
           "name": "Structural member design (AISC/ACI)"
@@ -1794,7 +1794,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-fem/",
+            "evidence": "packages/kerf-fem/",
             "notes": "MITC4 plate/shell + CalculiX solid bridge; backend only"
           },
           "name": "FE — plate / shell / solid"
@@ -1808,7 +1808,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-mechanical/gearstrength/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gearstrength/",
             "notes": "AGMA 2001-D04 + ISO 6336 Method B; backend"
           },
           "name": "Gear rating (AGMA / ISO 6336)"
@@ -1822,7 +1822,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-mechanical/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/bearings/",
             "notes": "ISO 281 + ISO/TS 16281 bearings, VDI 2230 fasteners, shaft stress; backend"
           },
           "name": "Shaft / bearing / fastener sizing"
@@ -1836,7 +1836,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-thermal/",
+            "evidence": "packages/kerf-hvac/",
             "notes": "Psychrometrics, LMTD/ε-NTU heat exchangers, SMACNA duct sizing, building loads; backend"
           },
           "name": "Thermal / HVAC analysis"
@@ -1850,7 +1850,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-aero/",
+            "evidence": "packages/kerf-aero/",
             "notes": "VLM + viscous + compressibility; orbital mechanics; naval hydrostatics; backend"
           },
           "name": "Aerodynamic / structural analysis"
@@ -1864,7 +1864,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-ecad/",
+            "evidence": "packages/kerf-electronics/",
             "notes": "KiCad round-trip viewer + tscircuit PCB; SPICE via ngspice; wired"
           },
           "name": "Schematic / PCB (EDA)"
@@ -1878,7 +1878,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-ecad/spice/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/spice/",
             "notes": "Real ngspice wired; binary .raw not yet parsed"
           },
           "name": "SPICE simulation"
@@ -1906,7 +1906,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cam/slicing/",
+            "evidence": "packages/kerf-slicing/src/kerf_slicing/cura_runner.py",
             "notes": "Cura bridge wired (PrintSliceView)"
           },
           "name": "FDM slicing"
@@ -1920,7 +1920,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-civil/",
+            "evidence": "packages/kerf-civil/",
             "notes": "Alignment, pavement, geotech, hydrology, geodesy; backend"
           },
           "name": "Civil / geo analysis"
@@ -1934,7 +1934,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-motion/",
+            "evidence": "packages/kerf-motion/",
             "notes": "Planar MBD, 6-DOF IK, SDOF/n-DOF vibration, LQR/Kalman; backend"
           },
           "name": "Dynamics / motion / controls"
@@ -1962,7 +1962,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-energy/solarpv/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/solarpv/",
             "notes": "Single-diode + bypass-diode IV + global MPPT + mismatch loss; backend"
           },
           "name": "Solar PV system analysis"
@@ -1976,7 +1976,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-qa/tolstack/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/tolstack/",
             "notes": "ASME Y14.5 data model; 1D WC/RSS/MC + 3D vector loop; backend"
           },
           "name": "Tolerance stackup / GD&T"
@@ -1990,7 +1990,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-optics/",
+            "evidence": "packages/kerf-optics/",
             "notes": "Paraxial ABCD + Seidel + non-sequential RT; ISO 9613 + RT60 acoustics; backend"
           },
           "name": "Optics / acoustics analysis"
@@ -2018,7 +2018,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/",
             "notes": "41 jewelry modules; full configurator UI — RhinoGold/Matrix-class"
           },
           "name": "Jewelry design"
@@ -2032,7 +2032,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "kerf-cost/",
+            "evidence": "packages/kerf-costing/",
             "notes": "Boothroyd-Dewhurst should-cost; Ashby material selection (200 materials); ISO 14040/44 LCA; backend"
           },
           "name": "Should-cost / material selection / LCA"
@@ -2057,7 +2057,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-sketcher/planegcs_wasm/",
+            "evidence": "public/planegcs.wasm",
             "notes": "PlaneGCS WASM sketcher wired; missing collinear, ellipse entity, G2"
           },
           "name": "Constraint sketcher (geo + dim)"
@@ -2071,7 +2071,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-occt/bindings/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/",
             "notes": "OCCT pad/pocket/revolve/sweep fully wired; loft lacks guide-rail overload"
           },
           "name": "3D solid modelling (pad / pocket / revolve / sweep / loft)"
@@ -2085,7 +2085,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-occt/nurbs/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/nurbs.py",
             "notes": "OCCT NURBS math complete; browser WASM bindings unconfirmed at build"
           },
           "name": "NURBS surface modelling"
@@ -2099,7 +2099,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-drawings/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/drawings/",
             "notes": "Template-based drawings; not live B-rep projection; no UI panel"
           },
           "name": "2D technical drawings (views / dimensions / sections)"
@@ -2113,7 +2113,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-export/dxf.ts",
+            "evidence": "packages/kerf-imports/src/kerf_imports/dxf_writer.py",
             "notes": "DXF export wired"
           },
           "name": "DXF / DWG import-export"
@@ -2127,7 +2127,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-export/step.ts",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/io/step_writer.py",
             "notes": "OCCT STEP export wired"
           },
           "name": "STEP / IGES export"
@@ -2141,7 +2141,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/LibraryPanel.jsx",
+            "evidence": "src/components/LibraryPicker.jsx",
             "notes": "Parts library + BOM panel wired; community library early-stage"
           },
           "name": "Symbol / component library"
@@ -2155,7 +2155,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-sheetmetal/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/sheet_metal.py",
             "notes": "Single flange + unfold + flat DXF wired; no hem/relief/jog/multi-flange"
           },
           "name": "Flat-pattern / sheet-metal unfold"
@@ -2253,7 +2253,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/Viewport3D.jsx",
+            "evidence": "src/components/CfdViewport.jsx",
             "notes": "Three.js WebGL viewport wired; PBR materials"
           },
           "name": "Real-time OpenGL / GPU viewport"
@@ -2267,7 +2267,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-optics/photonics.py",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/photonics/",
             "notes": "Photonics backend exists (LED/photodiode); no lux/luminance scene simulation"
           },
           "name": "Lighting simulation (luminance / lux)"
@@ -2295,7 +2295,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-bim/stairs.py",
+            "evidence": "packages/kerf-bim/src/kerf_bim/stairs.py",
             "notes": "kerf-bim stair geometry engine included"
           },
           "name": "BIM stairs and railings"
@@ -2309,7 +2309,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-bim/ifc4.py",
+            "evidence": "packages/kerf-bim/src/kerf_bim/export_ifc/writer.py",
             "notes": "IFC4 engine + viewer via /compile-ifc; BIMView null-feed visual QA pending"
           },
           "name": "IFC4 export / import (open BIM round-trip)"
@@ -2323,7 +2323,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-verticals/interior.py",
+            "evidence": "packages/kerf-interior/src/kerf_interior/space_planning.py",
             "notes": "Interior space-planning engine exists (backend only); no UI route"
           },
           "name": "Space / room objects and area schedule"
@@ -2421,7 +2421,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/visualscript/marionette.py",
             "notes": "NodeGraphCanvas node editor + Marionette engine (marionette.py)"
           },
           "name": "Visual scripting (Marionette)"
@@ -2463,7 +2463,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cost/",
+            "evidence": "packages/kerf-costing/",
             "notes": "Should-cost engine (6 processes, Boothroyd-Dewhurst) — backend only"
           },
           "name": "Should-cost estimation"
@@ -2797,7 +2797,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/src/kerf_silicon/analog/pvt.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py",
             "notes": "60-corner (5P×3V×4T) + MC Pelgrom mismatch (backend)"
           },
           "name": "Analog PVT-corner sim"
@@ -3824,7 +3824,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/si/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/si",
             "notes": "IBIS 5.1 parser + Bergeron channel + PRBS eye envelope; backend"
           },
           "name": "Signal integrity (Z0/crosstalk/eye/IBIS)"
@@ -3838,7 +3838,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/emc/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/emc",
             "notes": "Closed-form EMC analysis (radiated/shielding/limits); no full-wave; backend"
           },
           "name": "EMC (radiated/shielding/limits)"
@@ -3852,7 +3852,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/pdn/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/pdn",
             "notes": "Frequency-domain Z(omega) + target-Z + decap optimiser; backend"
           },
           "name": "PDN (DC IR-drop + AC sweep)"
@@ -3992,7 +3992,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/silicon/",
+            "evidence": "packages/kerf-silicon/",
             "notes": "Yosys synth + STA + GDS + DRC + LVS + formal + CTS; backend, zero UI"
           },
           "name": "Silicon synthesis (Yosys) / STA / GDS"
@@ -4006,7 +4006,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/silicon/",
+            "evidence": "packages/kerf-silicon/",
             "notes": "OpenLane P&R integration; backend, needs install"
           },
           "name": "Silicon P&R (OpenLane)"
@@ -4020,7 +4020,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/silicon/analog/pvt.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py",
             "notes": "60 corners (5P x 3V x 4T) + Monte-Carlo per corner; Pelgrom sigma matched; backend"
           },
           "name": "Analog PVT-corner simulation"
@@ -4210,7 +4210,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/schematic/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/schematic/",
             "notes": "Hierarchical schematic + ERC + IPC-2221B presets"
           },
           "name": "Schematic capture (KiCad round-trip, ERC)"
@@ -4224,7 +4224,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/pcb/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/routing/",
             "notes": "tscircuit PCB layout + KiCad round-trip"
           },
           "name": "PCB layout (tscircuit, KiCad round-trip)"
@@ -4239,7 +4239,7 @@
           "kerf": {
             "status": "yes",
             "kerf_note": "Frontend PCB canvas editor is the gap (cad-core UI); backend router and FreeRouting autorouter are already wired.",
-            "evidence": "packages/kerf-electronics/pcb/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/routing/",
             "notes": "View-only; no cursor editing today"
           },
           "name": "Interactive PCB editing (route/place)"
@@ -4267,7 +4267,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/spice/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/spice/",
             "notes": "Real ngspice + model library; binary .raw parsing pending"
           },
           "name": "SPICE"
@@ -4281,7 +4281,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/si/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/si/",
             "notes": "IBIS 5.1 + Bergeron channel + PRBS eye envelope (backend)"
           },
           "name": "Signal integrity (Z0/crosstalk/eye/IBIS)"
@@ -4295,7 +4295,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/emc/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/emc/",
             "notes": "Closed-form EMC/EMI common-mode, return-path gap, slot antenna (backend)"
           },
           "name": "EMC (radiated/shielding/limits)"
@@ -4309,7 +4309,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/pdn/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/pdn/",
             "notes": "Frequency-domain Z(ω) + target-Z + decap optimiser (backend)"
           },
           "name": "PDN (DC IR-drop + AC sweep)"
@@ -4323,7 +4323,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/thermal/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/thermal/",
             "notes": "Lumped Rθ thermal model (backend)"
           },
           "name": "PCB thermal"
@@ -4337,7 +4337,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/drc/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/drc.py",
             "notes": "DRC overlay wired + IPC-2221B presets"
           },
           "name": "DRC / ERC"
@@ -4351,7 +4351,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/drivers/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/battery/",
             "notes": "Battery/BMS, motor, gate driver, LED driver sizing calculators (backend)"
           },
           "name": "Battery/BMS, motor/gate/LED driver"
@@ -4365,7 +4365,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/rf/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/antenna/",
             "notes": "Antenna and link budget analysis (backend)"
           },
           "name": "Antenna / link budget"
@@ -4379,7 +4379,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/silicon/",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/bridges/yosys_bridge.py",
             "notes": "Deep silicon backend; zero UI (backend only)"
           },
           "name": "Silicon synth (Yosys) / STA / GDS / DRC / LVS / formal / CTS"
@@ -4393,7 +4393,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/silicon/",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/openlane/",
             "notes": "OpenLane bridge (needs install, backend only)"
           },
           "name": "Silicon P&R (OpenLane)"
@@ -4407,7 +4407,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/silicon/analog/pvt.py",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/spice/corner_analysis.py",
             "notes": "60 corners (5P×3V×4T) + MC per corner; Pelgrom σ matched (backend)"
           },
           "name": "Analog PVT-corner sim"
@@ -4421,7 +4421,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/export/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/fab/",
             "notes": "Gerber RS-274X + Excellon NC drill"
           },
           "name": "Gerber / Excellon output"
@@ -4435,7 +4435,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/export/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/fab/",
             "notes": "IPC-2581 export in-box"
           },
           "name": "IPC-2581 output"
@@ -4449,7 +4449,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/export/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/fab/",
             "notes": "ODB++ export in-box"
           },
           "name": "ODB++ output"
@@ -4463,7 +4463,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/panelize/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/tools/panelize.py",
             "notes": "Panelise built in"
           },
           "name": "Panelisation"
@@ -4477,7 +4477,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/export/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/fab/",
             "notes": "Gerber export → manual JLCPCB upload"
           },
           "name": "JLCPCB / fab ordering integration"
@@ -4491,7 +4491,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/library/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/tools/lib_mgmt.py",
             "notes": "Growing library; not LCSC-depth"
           },
           "name": "Component library (LCSC-backed)"
@@ -4505,7 +4505,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/mcad/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/idf_roundtrip.py",
             "notes": "Co-resident OCCT B-rep + IDF + STEP export; board outline = mechanical geometry"
           },
           "name": "MCAD/ECAD integration (co-resident)"
@@ -4558,7 +4558,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/FirmwareActions",
+            "evidence": "src/components/FirmwareActions.jsx",
             "notes": "FirmwareActions + debug panel wired; build/upload/monitor/debug in-browser"
           },
           "name": "Firmware build/upload/monitor/debug"
@@ -4572,7 +4572,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/WiringView",
+            "evidence": "src/components/WiringView.jsx",
             "notes": "WiringView with WireViz + 3D harness router wired"
           },
           "name": "Wiring/harness (WireViz + 3D router)"
@@ -4586,7 +4586,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electrical/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/elecpower/distribution.py",
             "notes": "NEC power distribution + point-to-point short-circuit (backend)"
           },
           "name": "NEC power distribution + point-to-point SC"
@@ -4600,7 +4600,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electrical/loadflow.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/elecpower/loadflow.py",
             "notes": "Full polar-form Newton-Raphson load-flow; 3+5-bus validated (backend)"
           },
           "name": "AC load-flow (Ybus / Newton-Raphson)"
@@ -4628,7 +4628,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electrical/solarpv/shading.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/solarpv/shading.py",
             "notes": "Single-diode + bypass-diode IV + global MPPT + mismatch loss + partial shading (backend)"
           },
           "name": "Solar PV (system + partial shading)"
@@ -4642,7 +4642,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electrical/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/elecpower/protection.py",
             "notes": "IEEE C37.112 U1-U5 TCC + IEEE 1584-2018 arc-flash incident energy (backend)"
           },
           "name": "Protection coordination (TCC) / arc-flash"
@@ -4656,7 +4656,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/SchematicView",
+            "evidence": "src/components/SchematicView.jsx",
             "notes": "Schematic capture + ERC wired; KiCad round-trip import/export"
           },
           "name": "Schematic capture (KiCad round-trip, ERC)"
@@ -4670,7 +4670,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/PCBView",
+            "evidence": "src/components/PCBView.jsx",
             "notes": "PCB layout viewer wired (KiCad round-trip + tscircuit); DRC overlay included"
           },
           "name": "PCB layout (tscircuit, KiCad round-trip)"
@@ -4684,7 +4684,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-emc/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/emc/",
             "notes": "emc_wizard: FCC §15.109 + CISPR 32 closed-form radiated/conducted limits (backend)"
           },
           "name": "EMC (radiated/shielding/limits)"
@@ -4698,7 +4698,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-si/pdn/ac_impedance.py",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/pdn/ac_impedance.py",
             "notes": "pdn_wizard: Z(ω) target-Z, DC IR-drop, decap optimiser (backend)"
           },
           "name": "PDN (DC IR-drop + AC sweep)"
@@ -4712,7 +4712,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-controls/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/controls/",
             "notes": "Classical controls: Routh stability, Bode, root locus, PID auto-tune (backend)"
           },
           "name": "Controls — classical (Routh/Bode/RL/PID tune)"
@@ -4726,7 +4726,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-controls/statespace.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/controls/statespace.py",
             "notes": "State-space, LQR (CARE), Luenberger observer, discrete ZOH c2d (backend)"
           },
           "name": "Controls — state-space / LQR / Kalman"
@@ -4740,7 +4740,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/CADView",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/brep/",
             "notes": "Full OCCT B-rep, constraint sketcher, sheet metal, assemblies — all in-browser"
           },
           "name": "Parametric solid modelling (B-rep)"
@@ -4754,7 +4754,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/CAMView",
+            "evidence": "src/components/CAMView.jsx",
             "notes": "G-code post for Fanuc, GRBL, LinuxCNC, Mach3; 3-axis toolpaths wired in CAMView"
           },
           "name": "G-code post (Fanuc/GRBL/LinuxCNC/Mach3)"
@@ -4768,7 +4768,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/BOMView",
+            "evidence": "src/components/BOMPanel.jsx",
             "notes": "BOM management + real-time distributor pricing (Octopart/Mouser/Digi-Key) in-browser"
           },
           "name": "BOM + distributor pricing"
@@ -8542,7 +8542,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-sdk/src/kerf_sdk",
+            "evidence": "packages/kerf-sdk/src/kerf",
             "notes": "Chat-driven scripting + kerf-sdk Python API"
           },
           "name": "iLogic rules engine"
@@ -9256,7 +9256,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/JewelryView.jsx",
+            "evidence": "src/components/JewelryConfiguratorPanel.jsx",
             "notes": "Deep — full configurator UI; RhinoGold/Matrix-class"
           },
           "name": "Jewelry (41 modules)"
@@ -9545,7 +9545,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-manufacturing/src/kerf_manufacturing/nesting/nfp.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/nesting/nfp.py",
             "notes": "Skyline + true-shape NFP nesting (backend); 57.6% L-shape utilisation validated"
           },
           "name": "Blank nesting optimisation"
@@ -9587,7 +9587,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/packaging/pre_press.py",
             "notes": "ISO 15930-1 PDF/X-1a export + registration marks + bleed/safety check"
           },
           "name": "Print pre-press / graphics integration"
@@ -9738,7 +9738,7 @@
           },
           "kerf": {
             "status": "partial",
-            "evidence": "cloud/git/",
+            "evidence": "packages/kerf-core/src/kerf_core/storage/git_storer.py",
             "notes": "Cloud git workspace with branch/merge; not real-time concurrent design at plant-model scale"
           },
           "name": "Global multi-user concurrent design"
@@ -11678,7 +11678,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/JewelryView.jsx",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/",
             "notes": "Deep 41-module jewelry suite — ring/gem/setting/chain/casting; UI wired"
           },
           "name": "Jewelry (41 modules)"
@@ -12106,7 +12106,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-lca/phases.py",
+            "evidence": "packages/kerf-lca/src/kerf_lca/phases.py",
             "notes": "LCA material costing; no composites-specific laminate weight/cost UI"
           },
           "name": "Laminate weight / cost"
@@ -12517,7 +12517,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/woodworking/cabinet_room_layout.py",
             "notes": "Cabinet room layout (CabinetPlacement) + cut-list generation"
           },
           "name": "Cabinet / room layout design"
@@ -12545,7 +12545,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-manufacturing/src/kerf_manufacturing/nesting/nfp.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/nesting/nfp.py",
             "notes": "True-shape NFP nesting + G-code post (Fanuc/GRBL/LinuxCNC); no cabinet-specific bore patterns"
           },
           "name": "CNC cut list and nesting"
@@ -12601,7 +12601,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/DrawingsView.jsx",
+            "evidence": "src/components/DrawingView.jsx",
             "notes": "Engineering multi-sheet drawings (template-based); no cabinet shop drawing format"
           },
           "name": "Shop drawings / technical documentation"
@@ -12655,7 +12655,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/lib/planeGCS/"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/sketch_solver.py"
           },
           "name": "Constraint sketcher (geo + dim)"
         },
@@ -12669,7 +12669,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/occt/features/extrude.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/solid_features.py"
           },
           "name": "Pad / pocket / revolve"
         },
@@ -12683,7 +12683,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/occt/features/fillet.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/edge_blend.py"
           },
           "name": "Variable-radius fillet"
         },
@@ -12727,7 +12727,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/assembly/mates.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/assembly/mates.py"
           },
           "name": "Assemblies — mates"
         },
@@ -12756,7 +12756,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/drawings/"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/drawings/"
           },
           "name": "2D drawings (views/dims/sections)"
         },
@@ -12770,7 +12770,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/gdt/model.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/tolerances.py"
           },
           "name": "GD&T on drawings / MBD / PMI"
         },
@@ -12784,7 +12784,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/fem/solid_bridge.py"
+            "evidence": "packages/kerf-fem/src/kerf_fem/solid_tet.py"
           },
           "name": "FE — solid (tet/hex)"
         },
@@ -12798,7 +12798,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/fem/modal.py"
+            "evidence": "packages/kerf-fem/src/kerf_fem/modal.py"
           },
           "name": "Modal / buckling / nonlinear"
         },
@@ -12812,7 +12812,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/structural/aisc_member.py"
+            "evidence": "packages/kerf-structural/src/kerf_structural/aisc_member.py"
           },
           "name": "AISC 360-22 steel (members)"
         },
@@ -12826,7 +12826,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/structural/fatigue.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/fatigue/life.py"
           },
           "name": "Fatigue (S-N, ε-N, rainflow)"
         },
@@ -12840,7 +12840,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/machine/gearstrength/agma.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gearstrength/rating.py"
           },
           "name": "Spur/helical gear rating (AGMA 2001-D04)"
         },
@@ -12854,7 +12854,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/machine/bearings/select.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/bearings/select.py"
           },
           "name": "Bearings — ISO 281 L10"
         },
@@ -12868,7 +12868,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/machine/shaft.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/shaft/calc.py"
           },
           "name": "Shaft (stress + critical speed)"
         },
@@ -12882,7 +12882,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/thermal/cycles.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/thermocycle/cycles.py"
           },
           "name": "Thermo cycles (Rankine/Brayton/Otto)"
         },
@@ -12896,7 +12896,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/cfd/openfoam_bridge.py"
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/openfoam_bridge.py"
           },
           "name": "CFD"
         },
@@ -12910,7 +12910,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/thermal/heatxfer/shell_tube_bell.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/heatxfer/shell_tube_bell.py"
           },
           "name": "Heat exchangers (LMTD + ε-NTU + Bell-Delaware)"
         },
@@ -12924,7 +12924,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/aero/vlm_viscous.py"
+            "evidence": "packages/kerf-aero/src/kerf_aero/vlm_viscous.py"
           },
           "name": "3D wing VLM (+ viscous + compressibility)"
         },
@@ -12938,7 +12938,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/space/orbital.py"
+            "evidence": "packages/kerf-aero/src/kerf_aero/orbital/kepler.py"
           },
           "name": "Orbital (Kepler, J2/J3, Hohmann)"
         },
@@ -12952,7 +12952,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/aero/turbomachinery.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/turbo/stage.py"
           },
           "name": "Turbomachinery / wind-turbine BEM"
         },
@@ -12966,7 +12966,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/marine/hydrostatics.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/navalarch/hydrostatics.py"
           },
           "name": "Naval hydrostatics + GZ stability (IMO)"
         },
@@ -13008,7 +13008,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/ecad/spice/ngspice_bridge.py"
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/spice/netlist_codegen.py"
           },
           "name": "SPICE"
         },
@@ -13022,7 +13022,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/ecad/si/ibis_channel.py"
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/si/ibis_channel.py"
           },
           "name": "Signal integrity (Z0/crosstalk/eye/IBIS)"
         },
@@ -13036,7 +13036,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/silicon/synth/yosys_bridge.py"
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/bridges/yosys_bridge.py"
           },
           "name": "Silicon synth (Yosys) / STA / GDS / DRC / LVS / formal / CTS"
         },
@@ -13064,7 +13064,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/cam/fiveaxis.py"
+            "evidence": "packages/kerf-cam/src/kerf_cam/five_axis"
           },
           "name": "5-axis (kinematics + posts)"
         },
@@ -13078,7 +13078,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/cam/adaptive.py"
+            "evidence": "packages/kerf-cam/src/kerf_cam/adaptive.py"
           },
           "name": "Adaptive / trochoidal clearing"
         },
@@ -13092,7 +13092,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/manufacturing/moldflow/flow_front.py"
+            "evidence": "packages/kerf-manufacturing/src/kerf_manufacturing/moldflow/flow_front.py"
           },
           "name": "Moldflow / fill sim"
         },
@@ -13106,7 +13106,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/manufacturing/cuttingtool/tool_life.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/cuttingtool/tool_life.py"
           },
           "name": "Feeds & speeds + tool-life"
         },
@@ -13120,7 +13120,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/manufacturing/nesting/nfp.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/nesting/nfp.py"
           },
           "name": "Nesting (skyline + true-shape NFP)"
         },
@@ -13148,7 +13148,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/civil/alignment.py"
+            "evidence": "packages/kerf-civil/src/kerf_civil/horizontal_alignment.py"
           },
           "name": "Horizontal+vertical alignment (clothoid, SSD)"
         },
@@ -13162,7 +13162,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/civil/geotech/liquefaction.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geotech/liquefaction.py"
           },
           "name": "Geotech (bearing/settlement/slope/pile/liquefaction)"
         },
@@ -13176,7 +13176,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/dynamics/mbd.py"
+            "evidence": "packages/kerf-mates/src/kerf_mates/mbd/mbd_tools.py"
           },
           "name": "Planar MBD (Lagrange/DAE, Baumgarte)"
         },
@@ -13190,7 +13190,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/dynamics/vibration/mdof.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/vibration/mdof.py"
           },
           "name": "Vibration n-DOF modal / FRF"
         },
@@ -13204,7 +13204,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/dynamics/controls/statespace.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/controls/statespace_tools.py"
           },
           "name": "Controls — state-space / LQR / Kalman"
         },
@@ -13232,7 +13232,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/electrical/elecpower/loadflow.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/elecpower/loadflow.py"
           },
           "name": "AC load-flow (Ybus / Newton-Raphson)"
         },
@@ -13246,7 +13246,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/PLCEditor.jsx"
+            "evidence": "src/components/PLCView.jsx"
           },
           "name": "PLC IEC 61131-3 (ST/Ladder/FB/motion)"
         },
@@ -13260,7 +13260,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/gdt/model.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gdt/tolerances.py"
           },
           "name": "GD&T data model (ASME Y14.5)"
         },
@@ -13274,7 +13274,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/qa/tolstack/stackup.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/tolstack/stack.py"
           },
           "name": "Tolerance stackup — 1D (WC/RSS/MC)"
         },
@@ -13288,7 +13288,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/qa/tolstack/tol3d.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/tolstack/tol3d.py"
           },
           "name": "Tolerance stackup — 3D vector loop"
         },
@@ -13302,7 +13302,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/qa/spc/capability.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/spc/charts.py"
           },
           "name": "Process capability (Cpk/Ppk)"
         },
@@ -13316,7 +13316,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/acoustics/iso9613.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/acoustics/sound.py"
           },
           "name": "Acoustics (ISO 9613, RT60, weighting, mass-law TL)"
         },
@@ -13330,7 +13330,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/optics/paraxial.py"
+            "evidence": "packages/kerf-optics/src/kerf_optics/ray_transfer.py"
           },
           "name": "Paraxial ABCD ray transfer"
         },
@@ -13344,7 +13344,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/bim/ifc_compiler.py"
+            "evidence": "packages/kerf-bim/src/kerf_bim/export_ifc/"
           },
           "name": "BIM (walls/slabs/framing/stairs/IFC4)"
         },
@@ -13358,7 +13358,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/jewelry/"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/"
           },
           "name": "Jewelry (41 modules)"
         },
@@ -13372,7 +13372,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/materials/matsel/multi_objective.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/matsel/multi_objective.py"
           },
           "name": "Material selection (Ashby)"
         },
@@ -13386,7 +13386,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/lca/phases.py"
+            "evidence": "packages/kerf-lca/src/kerf_lca/phases.py"
           },
           "name": "LCA (full ISO 14040/44 4 phases)"
         },
@@ -13400,7 +13400,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/cost/should_cost.py"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/costing/estimate.py"
           },
           "name": "Should-cost (6 processes, Boothroyd-Dewhurst)"
         }
@@ -13589,7 +13589,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/bridges/ngspice_bridge.py",
             "notes": "Transient via ngspice bridge; sufficient for sky130-scale netlists"
           },
           "name": "SPICE — transient simulation"
@@ -13603,7 +13603,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-silicon/analog/pvt.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py",
             "notes": "60-corner PVT sweep automated via silicon_pvt_sweep (sky130 model); Monte-Carlo mismatch included"
           },
           "name": "SPICE — PVT corner sweep (automated)"
@@ -13617,7 +13617,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-silicon/analog/pvt.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py",
             "notes": "Pelgrom A_VT = 4 mV·µm model for sky130; production-sign-off accuracy requires foundry MC deck (not yet integrated)"
           },
           "name": "SPICE — Monte-Carlo mismatch"
@@ -13657,8 +13657,9 @@
             "notes": "Spectre + Virtuoso schematic editor; fully integrated testbench workflow"
           },
           "kerf": {
-            "status": "yes",
-            "notes": "Kerf accepts netlists only; no analog schematic capture GUI yet"
+            "status": "partial",
+            "evidence": "src/components/silicon/SpiceRunPanel.jsx",
+            "notes": "Kerf accepts netlists via SpiceRunPanel; no analog schematic capture GUI — netlist-driven workflow only"
           },
           "name": "SPICE — schematic-driven simulation"
         },
@@ -13710,7 +13711,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/bridges/ngspice_bridge.py",
             "notes": "Transient via ngspice bridge; suitable for sky130/open-PDK scale netlists"
           },
           "name": "SPICE — transient simulation"
@@ -13724,7 +13725,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-silicon/analog/pvt.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py",
             "notes": "60-corner automated sweep (5P × 3V × 4T) with Monte-Carlo via silicon_pvt_sweep"
           },
           "name": "SPICE — PVT corner sweep"
@@ -13738,7 +13739,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-silicon/analog/pvt.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py",
             "notes": "Pelgrom model (A_VT = 4 mV·µm, sky130) Monte-Carlo; not a foundry-certified MC deck"
           },
           "name": "SPICE — Monte-Carlo mismatch"
@@ -13807,7 +13808,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-silicon/analog/pvt.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py",
             "notes": "PVT sweep models are sky130-calibrated; ngspice bridge accepts sky130 PDK decks natively"
           },
           "name": "SPICE — open PDK / sky130 workflow"
@@ -13832,7 +13833,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/bridges/ngspice_bridge.py",
             "notes": "Transient via ngspice bridge; .TRAN directive injected automatically; waveforms returned as .spice.waveform JSON"
           },
           "name": "SPICE — transient simulation"
@@ -13846,7 +13847,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/bridges/ngspice_bridge.py",
             "notes": "AC analysis via ngspice bridge (.AC directive)"
           },
           "name": "SPICE — AC small-signal analysis"
@@ -13860,7 +13861,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/bridges/ngspice_bridge.py",
             "notes": "DC sweep via ngspice bridge"
           },
           "name": "SPICE — DC operating-point / sweep"
@@ -13874,7 +13875,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-silicon/analog/pvt.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py",
             "notes": "60-corner PVT sweep (5P × 3V × 4T) with Monte-Carlo mismatch via silicon_pvt_sweep tool; Pelgrom-matched sky130 model"
           },
           "name": "SPICE — PVT corner sweep (60 corners)"
@@ -13888,7 +13889,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-silicon/analog/pvt.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py",
             "notes": "Pelgrom model Monte-Carlo (A_VT = 4 mV·µm) per corner; 50 samples/corner default, configurable"
           },
           "name": "SPICE — Monte-Carlo mismatch"
@@ -13929,8 +13930,9 @@
             "notes": "LTspice has a full schematic capture GUI (proprietary symbol format)"
           },
           "kerf": {
-            "status": "yes",
-            "notes": "Kerf accepts netlists directly; no schematic GUI for SPICE (circuit.tsx is for PCB-level schematics)"
+            "status": "partial",
+            "evidence": "src/components/silicon/SpiceRunPanel.jsx",
+            "notes": "Kerf accepts netlists directly via SpiceRunPanel; no dedicated schematic-capture GUI for SPICE (PCB-level schematic editor is separate)"
           },
           "name": "SPICE — schematic capture GUI"
         },
@@ -13971,7 +13973,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-silicon/analog/pvt.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py",
             "notes": "PVT sweep models derived from sky130 BSIM4 corner data; ngspice bridge accepts sky130 PDK SPICE decks"
           },
           "name": "SPICE — sky130 / open PDK model support"
@@ -13996,7 +13998,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/bridges/ngspice_bridge.py",
             "notes": "Kerf wraps ngspice -b in a subprocess bridge; .TRAN injected automatically; result serialised to .spice.waveform JSON"
           },
           "name": "SPICE — transient simulation"
@@ -14010,7 +14012,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-silicon/bridges/ngspice_bridge.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/bridges/ngspice_bridge.py",
             "notes": "AC analysis via ngspice bridge"
           },
           "name": "SPICE — AC analysis"
@@ -14024,7 +14026,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-silicon/analog/pvt.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py",
             "notes": "60-corner automated PVT sweep (5P × 3V × 4T) with Monte-Carlo; silicon_pvt_sweep tool"
           },
           "name": "SPICE — PVT corner sweep"
@@ -14038,7 +14040,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-silicon/analog/pvt.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py",
             "notes": "Pelgrom model Monte-Carlo built into PVT sweep; 50 samples/corner default"
           },
           "name": "SPICE — Monte-Carlo mismatch"
@@ -14329,7 +14331,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-silicon/analog/pvt.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py",
             "notes": "60 PVT corners (5P×3V×4T) + Monte-Carlo mismatch per corner; Pelgrom-matched (backend)"
           },
           "name": "Silicon — analog PVT-corner simulation"
@@ -14371,8 +14373,8 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "cloud/",
-            "notes": "Kerf hosted environment provides cloud compute for OpenROAD runs"
+            "evidence": "packages/kerf-workers/src/kerf_workers/compute_backend.py",
+            "notes": "Kerf hosted environment provides cloud compute for OpenROAD runs (cloud backend is proprietary / gitignored)"
           },
           "name": "Silicon — managed cloud execution"
         }
@@ -14880,7 +14882,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-fem/src/kerf_fem/beam.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/beam/analysis.py",
             "notes": "Hermite beam native; validated vs Roark"
           },
           "name": "FE — 1D beam / 2D truss (native)"
@@ -14908,7 +14910,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-structural/src/kerf_structural/concrete.py",
+            "evidence": "packages/kerf-structural/src/kerf_structural/rc_beam.py",
             "notes": "flexure/shear/PM/dev-length"
           },
           "name": "ACI 318-19 concrete"
@@ -14922,7 +14924,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-structural/src/kerf_structural/eurocode.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/struct/eurocode3.py",
             "notes": "EC2 concrete + EC3 steel + EC5 timber + EC8 seismic"
           },
           "name": "Eurocode design (EC2/3/5/8)"
@@ -14936,7 +14938,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-structural/src/kerf_structural/seismic/rsa.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/seismic/rsa.py",
             "notes": "ELF + RSA (SRSS+CQC) + Newmark time-history"
           },
           "name": "ASCE 7-22 seismic"
@@ -14950,7 +14952,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-structural/src/kerf_structural/wind.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/windload/asce7.py",
             "notes": "MWFRS + C&C per ASCE 7-22"
           },
           "name": "ASCE 7-22 wind (MWFRS+C&C)"
@@ -14964,7 +14966,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-structural/src/kerf_structural/fatigue.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/fatigue/life.py",
             "notes": "S-N, ε-N, rainflow counting, Miner's rule"
           },
           "name": "Fatigue (S-N, ε-N, rainflow)"
@@ -14978,7 +14980,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-structural/src/kerf_structural/pressure_vessel.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/pressvessel/shell.py",
             "notes": "ASME VIII Div 1 thickness + nozzle + wind/seismic"
           },
           "name": "ASME VIII pressure vessel"
@@ -14992,7 +14994,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-structural/src/kerf_structural/frame.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/struct/frame.py",
             "notes": "2D+3D beam-column + ASCE 7 combos + story drift"
           },
           "name": "Frame stiffness assembly (2D/3D)"
@@ -15006,7 +15008,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-structural/src/kerf_structural/api650.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/tank/api650.py",
             "notes": "API 650 incl. seismic annex E"
           },
           "name": "API 650 tank"
@@ -15020,7 +15022,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-structural/src/kerf_structural/timber.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/timber/design.py",
             "notes": "full NDS 2018 adjustment factors"
           },
           "name": "NDS 2018 timber"
@@ -15034,7 +15036,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-structural/src/kerf_structural/connections.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/steelconn/connections.py",
             "notes": "bolts/welds/base-plate, LRFD+ASD"
           },
           "name": "AISC steel connections"
@@ -15048,7 +15050,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/Sketcher.jsx",
+            "evidence": "src/components/SketchView.jsx",
             "notes": "PlaneGCS WASM; geo + dim constraints"
           },
           "name": "Constraint sketcher (geo + dim)"
@@ -15062,7 +15064,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-occt/src/occt_bridge.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/boolean.py",
             "notes": "OCCT B-rep booleans"
           },
           "name": "B-rep booleans (general NURBS)"
@@ -15076,7 +15078,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/AssemblyView.jsx",
+            "evidence": "src/components/AssemblyEditor.jsx",
             "notes": "coincident/concentric/parallel/+BOM panel"
           },
           "name": "Assemblies — mates"
@@ -15118,7 +15120,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-thermal/src/kerf_thermal/cycles.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/thermocycle/",
             "notes": "Rankine/Brayton/Otto/Diesel cycle analysis"
           },
           "name": "Thermo cycles (Rankine/Brayton/Otto)"
@@ -15132,7 +15134,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-matsel/src/kerf_matsel/multi_objective.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/matsel/multi_objective.py",
             "notes": "200 materials, 14 families, Pareto frontier"
           },
           "name": "Material selection (Ashby)"
@@ -15146,7 +15148,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cost/src/kerf_cost/should_cost.py",
+            "evidence": "packages/kerf-costing/src/kerf_costing/tools.py",
             "notes": "6-process Boothroyd-Dewhurst should-cost"
           },
           "name": "Should-cost (6 processes, Boothroyd-Dewhurst)"
@@ -15772,7 +15774,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-hvac/heatxfer/",
+            "evidence": "packages/kerf-hvac/src/kerf_hvac/sizing.py",
             "notes": "LMTD + epsilon-NTU + Bell-Delaware + TEMA layout (backend)"
           },
           "name": "Heat exchanger sizing (LMTD / Bell-Delaware)"
@@ -15856,7 +15858,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-mfg/moldflow/",
+            "evidence": "packages/kerf-manufacturing/src/kerf_manufacturing/moldflow",
             "notes": "Hele-Shaw flow-front tracking + weld-line + air-trap detection (backend)"
           },
           "name": "Mold filling / injection simulation"
@@ -15870,7 +15872,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/ModellingWorkspace/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/brep",
             "notes": "Full parametric B-rep modeller (OCCT); sketcher + feature tree wired in browser"
           },
           "name": "CAD geometry modelling"
@@ -15951,8 +15953,8 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/dynamics/six_dof.py",
-            "notes": "kerf_cad_core/dynamics/six_dof.py — backend LLM tool"
+            "evidence": "packages/kerf-aero/src/kerf_aero/flight_dynamics/sixdof.py",
+            "notes": "6-DOF integrator in kerf-aero flight_dynamics — backend LLM tool"
           },
           "name": "6-DOF flight dynamics + stability derivs"
         },
@@ -15979,7 +15981,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-aero/src/kerf_aero/atmosphere.py",
+            "evidence": "packages/kerf-aero/src/kerf_aero/flight_dynamics/atmosphere.py",
             "notes": "Wired aero tool — USSA-76 exact"
           },
           "name": "Standard atmosphere (USSA76)"
@@ -16021,7 +16023,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "",
+            "evidence": "packages/kerf-aero/src/kerf_aero/propulsion/motor_database.py",
             "notes": "Wraps OpenRocket motor database via integration; no independent replication"
           },
           "name": "Motor database integration (Thrustcurve / RASP .eng)"
@@ -16063,7 +16065,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-aero/src/kerf_aero/propulsion.py",
+            "evidence": "packages/kerf-aero/src/kerf_aero/propulsion",
             "notes": "Tsiolkovsky + staging + CEA-lite — wired propulsion tool"
           },
           "name": "Propulsion (Tsiolkovsky / staging / specific impulse)"
@@ -16077,7 +16079,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "",
+            "evidence": "packages/kerf-aero/src/kerf_aero/flight_dynamics",
             "notes": "OpenRocket integration produces same CSV/KML output via chat interface"
           },
           "name": "Trajectory export (CSV / KML)"
@@ -16091,7 +16093,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-aero/src/kerf_aero/orbital.py",
+            "evidence": "packages/kerf-aero/src/kerf_aero/orbital",
             "notes": "Kepler + J2/J3 + Hohmann + Lambert solver — wired aero tools"
           },
           "name": "Orbital mechanics (Kepler, J2/J3, Hohmann)"
@@ -16105,7 +16107,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/occt_bridge.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/brep",
             "notes": "Full OCCT B-rep with wall thickness, material, mass — wired UI"
           },
           "name": "Airframe 3D B-rep CAD (nose cone, body tube, fins)"
@@ -16119,7 +16121,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/BOMView.jsx",
+            "evidence": "src/components/BOMPanel.jsx",
             "notes": "Kerf BOM panel with distributor pricing — wired UI"
           },
           "name": "Assembly BOM (airframe + avionics)"
@@ -16147,7 +16149,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-eda/src/kerf_eda/spice_bridge.py",
+            "evidence": "packages/kerf-silicon/src/kerf_silicon/bridges/ngspice_bridge.py",
             "notes": "ngspice bridge + EMC/PDN/link-budget backend tools — wired"
           },
           "name": "SPICE / pre-compliance sim (ignition driver, RF, power)"
@@ -16175,8 +16177,8 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-manufacturing/src/kerf_manufacturing/should_cost.py",
-            "notes": "Should-cost engine (Boothroyd-Dewhurst, 6 processes) — backend tool"
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/costing/tolerance_cost.py",
+            "notes": "Should-cost engine (Boothroyd-Dewhurst tolerance-cost curves) — backend tool"
           },
           "name": "Should-cost estimation (airframe materials + machining)"
         }
@@ -16687,7 +16689,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/configs",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/family/",
             "notes": "Engine complete; no UI panel"
           },
           "name": "Configurations / family variants"
@@ -16883,7 +16885,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/src/kerf_electronics/spice_bridge.py",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/spice/",
             "notes": "Real ngspice, wired; binary .raw not parsed"
           },
           "name": "SPICE"
@@ -16925,7 +16927,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cam/src/kerf_cam/gcode_post.py",
+            "evidence": "packages/kerf-cam/src/kerf_cam/posts/fanuc_3x.py",
             "notes": "Fanuc/GRBL/LinuxCNC/Mach3; no G41/42 cutter-comp"
           },
           "name": "G-code post (Fanuc/GRBL/LinuxCNC/Mach3)"
@@ -16953,7 +16955,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cam/src/kerf_cam/moldflow/flow_front.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/procsim/moldflow.py",
             "notes": "Hele-Shaw front tracking + weld-line + air-trap (backend)"
           },
           "name": "Moldflow / fill sim"
@@ -16967,7 +16969,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cam/src/kerf_cam/nesting/nfp.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/nesting/nfp.py",
             "notes": "Minkowski-sum NFP + IFP + bottom-left fill (backend)"
           },
           "name": "Nesting (skyline + true-shape NFP)"
@@ -16981,7 +16983,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-civil/src/kerf_civil/alignment.py",
+            "evidence": "packages/kerf-civil/src/kerf_civil/horizontal_alignment.py",
             "notes": "Clothoid + SSD + corridor templates (backend)"
           },
           "name": "Horizontal+vertical alignment (clothoid, SSD)"
@@ -16995,7 +16997,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-civil/src/kerf_civil/geotech/liquefaction.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geotech/liquefaction.py",
             "notes": "Full geotech suite + Seed-Idriss liquefaction (backend)"
           },
           "name": "Geotech (bearing/settlement/slope/pile/liquefaction)"
@@ -17009,7 +17011,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-motion/src/kerf_motion/mbd_2d.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/mbd/solver.py",
             "notes": "Lagrange/DAE + Baumgarte stabilisation (backend)"
           },
           "name": "Planar MBD (Lagrange/DAE, Baumgarte)"
@@ -17023,7 +17025,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-motion/src/kerf_motion/controls/pid.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/controls/pid_tuning.py",
             "notes": "Routh/Bode/root-locus/PID (backend)"
           },
           "name": "Controls — classical (Routh/Bode/RL/PID tune)"
@@ -17037,7 +17039,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-motion/src/kerf_motion/controls/statespace.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/controls/statespace.py",
             "notes": "Ackermann + LQR (CARE) + Luenberger (backend)"
           },
           "name": "Controls — state-space / LQR / Kalman"
@@ -17051,7 +17053,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/PLCEditorPanel.jsx",
+            "evidence": "src/components/PLCView.jsx",
             "notes": "ST editor + live Ladder power-flow sim, wired"
           },
           "name": "PLC IEC 61131-3 (ST/Ladder/FB/motion)"
@@ -17065,7 +17067,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electronics/src/kerf_electronics/solarpv/shading.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/solarpv/shading.py",
             "notes": "Single-diode + bypass-diode IV + global MPPT (backend)"
           },
           "name": "Solar PV (system + partial shading)"
@@ -17121,7 +17123,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-optics/src/kerf_optics/abcd.py",
+            "evidence": "packages/kerf-optics/src/kerf_optics/ray_transfer.py",
             "notes": "Paraxial ABCD ray transfer (backend)"
           },
           "name": "Paraxial ABCD ray transfer"
@@ -17135,7 +17137,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-optics/src/kerf_optics/acoustics/wave.py",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/acoustics/wave.py",
             "notes": "ISO 9613 + RT60 + SEA + image-source IR (backend)"
           },
           "name": "Acoustics (ISO 9613, RT60, weighting, mass-law TL)"
@@ -17191,7 +17193,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/textiles",
+            "evidence": "packages/kerf-textiles/src/kerf_textiles/",
             "notes": "Weave/knit/drape/cut-room (backend; textiles page)"
           },
           "name": "Textiles (weave/knit/drape/cut-room)"
@@ -17205,7 +17207,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/src/kerf_jewelry",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/",
             "notes": "41 modules — ring v4, gemstones v2, settings v3/v4, chain v2"
           },
           "name": "Jewelry (configurator)"
@@ -17286,7 +17288,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-occt/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/brep/",
             "notes": "OCCT B-rep kernel — exact rational geometry"
           },
           "name": "Geometry — B-rep solid kernel"
@@ -17300,7 +17302,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/Sketcher/",
+            "evidence": "src/components/SketchView.jsx",
             "notes": "PlaneGCS WASM sketcher v2 — geometric + dimensional constraints"
           },
           "name": "Geometry — constraint sketcher"
@@ -17314,7 +17316,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-occt/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/",
             "notes": "OCCT feature tree with persistent face IDs"
           },
           "name": "Geometry — parametric feature history DAG"
@@ -17328,7 +17330,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-occt/io/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/io/",
             "notes": "STEP / IGES / 3DM B-rep round-trip"
           },
           "name": "Geometry — STEP / IGES B-rep interop"
@@ -17384,7 +17386,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-mechanical/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gearstrength/",
             "notes": "AGMA 2001-D04 / ISO 6336 gears, ISO 281 bearings, VDI 2230 fasteners (backend)"
           },
           "name": "Machine elements — gear, bearing, fastener rating"
@@ -17398,7 +17400,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-thermal/",
+            "evidence": "packages/kerf-hvac/",
             "notes": "LMTD + Bell-Delaware shell-and-tube, Hardy-Cross pipe network (backend)"
           },
           "name": "Thermal / fluid / HVAC — heat-exchanger and pipe-network calc"
@@ -17412,7 +17414,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/fluid/visual_fluid.py",
             "notes": "Visual fluid simulation (Phoenix-FD-equivalent) + CFD suite"
           },
           "name": "Thermal / fluid — visual fluid simulation (Phoenix FD)"
@@ -17440,7 +17442,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-ecad/",
+            "evidence": "packages/kerf-electronics/",
             "notes": "Full EDA: schematic capture, PCB layout, DRC, Gerber/IPC-2581"
           },
           "name": "Electronics / EDA — schematic, PCB, DRC"
@@ -17454,7 +17456,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-spice/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics/spice/",
             "notes": "Real ngspice bridge wired"
           },
           "name": "Electronics — SPICE simulation"
@@ -17482,7 +17484,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/PrintSliceView/",
+            "evidence": "src/components/PrintSliceView.jsx",
             "notes": "Cura slicing wired (PrintSliceView)"
           },
           "name": "Manufacturing — FDM slicing"
@@ -17510,7 +17512,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-dynamics/",
+            "evidence": "packages/kerf-motion/",
             "notes": "Lagrangian MBD, PID/LQR/Kalman state-space, 6-DOF IK (backend)"
           },
           "name": "Dynamics / controls — rigid-body and controls simulation"
@@ -17524,7 +17526,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "",
+            "evidence": "src/components/dcc/AnimationTimelinePanel.jsx",
             "notes": "Armature poser + CCD/FABRIK IK + keyframe animation"
           },
           "name": "Dynamics — skeletal animation and rigging"
@@ -17538,7 +17540,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-electrical/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/elecpower/",
             "notes": "NEC power distribution, AC load-flow, IEC 61131-3 PLC (ST + live Ladder)"
           },
           "name": "Electrical / energy — power distribution and PLC"
@@ -17552,7 +17554,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-tolerancing/",
+            "evidence": "packages/kerf-gdnt/",
             "notes": "ASME Y14.5 GD&T data model, 1D/3D tolerance stackup, SPC charts (backend)"
           },
           "name": "Tolerancing / QA — GD&T and tolerance stackup"
@@ -17594,7 +17596,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-acoustics/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/acoustics/",
             "notes": "ISO 9613 propagation, RT60, image-source room IR, SEA (backend)"
           },
           "name": "Acoustics — room acoustics and ISO 9613"
@@ -17608,7 +17610,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "src/components/jewelry/",
+            "evidence": "src/components/JewelryConfiguratorPanel.jsx",
             "notes": "41-module jewelry suite: ring v4, gemstones v2, settings v3/v4, chain v2"
           },
           "name": "Verticals — jewelry design"
@@ -17636,7 +17638,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-render/src/kerf_render/archviz_scatter.py;packages/kerf-render/src/kerf_render/archviz_assets.py",
+            "evidence": "packages/kerf-render/src/kerf_render/archviz_scatter.py",
             "notes": "Procedural Poisson-disk/grid scatter (density, seed, jitter, slope/altitude masks, exclusion zones, collision avoidance) + built-in proxy asset catalogue (trees/shrubs/people/cars/furniture); note: proxy/placeholder assets + scatter engine, not a photoreal asset marketplace like Forest Pack/RailClone/Chaos Cosmos"
           },
           "name": "Verticals — archviz creative workflow"
@@ -17664,7 +17666,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-matsel/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/matsel/",
             "notes": "200-material Ashby selector (14 families) + Pareto frontier (backend)"
           },
           "name": "Cost / materials — material selection (Ashby)"
@@ -17840,7 +17842,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-occt/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/brep",
             "notes": "OCCT B-rep kernel; pad/pocket/revolve/fillet/sweep/loft wired"
           },
           "name": "Geometry & core CAD — B-rep solid modelling"
@@ -17854,7 +17856,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-sketcher/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/sketch.py",
             "notes": "PlaneGCS WASM sketcher with geometric + dimensional constraints"
           },
           "name": "Geometry & core CAD — constraint sketcher"
@@ -17868,7 +17870,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-modeller/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core",
             "notes": "Persistent feature DAG; upstream edits regenerate downstream geometry"
           },
           "name": "Geometry & core CAD — parametric feature history"
@@ -17882,7 +17884,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-mesh/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/mesh_sculpt_brushes.py",
             "notes": "Sculpt brushes (grab/smooth/inflate/crease/pinch) + dynamesh remesh"
           },
           "name": "Geometry & core CAD — organic mesh sculpting"
@@ -17896,7 +17898,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-io/",
+            "evidence": "packages/kerf-imports/",
             "notes": "STEP, IGES, 3DM B-rep round-trip via OCCT"
           },
           "name": "Geometry & core CAD — STEP / IGES B-rep export"
@@ -17924,7 +17926,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-mechanical/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/gearstrength",
             "notes": "Shigley/AGMA/ISO/VDI grade engines; entirely backend, no UI panel"
           },
           "name": "Machine elements — gear / bearing / fastener sizing"
@@ -17938,7 +17940,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-thermal/",
+            "evidence": "packages/kerf-hvac/",
             "notes": "ASHRAE psychrometrics, LMTD/ε-NTU HX, Hardy-Cross pipe network, OpenFOAM bridge; backend"
           },
           "name": "Thermal / fluid / HVAC — simulation"
@@ -17952,7 +17954,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-ecad/",
+            "evidence": "packages/kerf-electronics/src/kerf_electronics",
             "notes": "KiCad-round-trip viewer, ngspice SPICE, DRC overlay wired; interactive routing not yet"
           },
           "name": "Electronics / EDA / silicon — PCB and schematic"
@@ -18022,7 +18024,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry",
             "notes": "41-module jewelry suite: ring v4, gemstone v2, settings v3/v4, chain v2, casting export"
           },
           "name": "Verticals — jewelry parametric configurator"
@@ -18050,7 +18052,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/sculpt/sculpt_extended_tools.py",
             "notes": "Sculpt + dynamesh + auto-weight + LBS pose (sculpt_extended_tools)"
           },
           "name": "Verticals — character / creature / film VFX"
@@ -18064,7 +18066,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/sculpt/polypaint.py",
             "notes": "Polypaint stroke/bake + displacement bake"
           },
           "name": "Verticals — texture / polypaint / displacement"
@@ -18078,7 +18080,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-occt/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/brep",
             "notes": "Exact B-rep hard-surface via OCCT feature tree — dimensionally accurate"
           },
           "name": "Verticals — hard-surface modelling (ZModeler)"
@@ -18106,7 +18108,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-materials/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/matsel",
             "notes": "Ashby material selector (200 materials), should-cost (6 processes), full LCA; backend/agent only"
           },
           "name": "Cost / materials / LCA — material selection and costing"
@@ -18425,7 +18427,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-manufacturing/src/kerf_manufacturing/nesting",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/nesting/",
             "notes": "Minkowski-sum NFP + IFP + bottom-left fill; 57.6% L-shape util (backend)"
           },
           "name": "Nesting (skyline + true-shape NFP)"
@@ -18793,7 +18795,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-bim/src/kerf_bim/ifc_import.py",
+            "evidence": "packages/kerf-bim/src/kerf_bim/import_ifc/",
             "notes": "Full IFC Tier 1+2 import including MEP elements"
           }
         },
@@ -18906,7 +18908,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-bim/src/kerf_bim/ifc_import.py",
+            "evidence": "packages/kerf-bim/src/kerf_bim/import_ifc/",
             "notes": "Full IFC Tier 1+2 including MEP elements; IFC 2x3 + IFC4"
           }
         },
@@ -19007,7 +19009,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-bim/src/kerf_bim/ifc_import.py",
+            "evidence": "packages/kerf-bim/src/kerf_bim/import_ifc/",
             "notes": "Native IFC Tier 1+2 import; no gbXML reader yet"
           }
         },
@@ -19684,7 +19686,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/gemstones/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/gemstones.py",
             "notes": "Gemstones v2 — 30 cuts"
           },
           "name": "Jewelry — gem catalog"
@@ -19698,7 +19700,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/ring/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/ring.py",
             "notes": "Ring v4 — 13+ profiles + 31 templates"
           },
           "name": "Jewelry — ring builder (profiles + styles)"
@@ -19712,7 +19714,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/settings/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/settings.py",
             "notes": "Settings v3/v4 — prong style included"
           },
           "name": "Jewelry — prong setting"
@@ -19726,7 +19728,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/settings/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/settings.py",
             "notes": "Settings v3/v4 — bezel style included"
           },
           "name": "Jewelry — bezel setting"
@@ -19740,7 +19742,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/settings/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/settings.py",
             "notes": "Settings v3/v4 — pavé style included"
           },
           "name": "Jewelry — pavé setting"
@@ -19754,7 +19756,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/settings/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/settings.py",
             "notes": "Settings v3/v4 — channel style included"
           },
           "name": "Jewelry — channel setting"
@@ -19768,7 +19770,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/settings/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/settings.py",
             "notes": "Settings v3/v4 — halo style included"
           },
           "name": "Jewelry — halo setting"
@@ -19782,7 +19784,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/gem_seat/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/gem_seat.py",
             "notes": "Gem-seat v2 automated seat generation"
           },
           "name": "Jewelry — gem seat generation"
@@ -19796,7 +19798,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/chain/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/chain.py",
             "notes": "Chain v2"
           },
           "name": "Jewelry — chain / bracelet builder"
@@ -19810,7 +19812,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/settings/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/settings.py",
             "notes": "Eternity band module in settings suite"
           },
           "name": "Jewelry — eternity band"
@@ -19824,7 +19826,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/settings/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/settings.py",
             "notes": "Head configurations via settings v3/v4"
           },
           "name": "Jewelry — head builder"
@@ -19838,7 +19840,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/cost/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/metal_cost.py",
             "notes": "Full cost/quote panel includes metal weight + alloy pricing"
           },
           "name": "Jewelry — weight calculation"
@@ -19852,7 +19854,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/casting/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/casting_export.py",
             "notes": "Casting + STL production export"
           },
           "name": "Jewelry — casting / STL export"
@@ -19866,7 +19868,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/casting/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/casting_export.py",
             "notes": "Wax-carving plan module present; full mill-path generation not complete"
           },
           "name": "Jewelry — wax-mill toolpaths"
@@ -19894,7 +19896,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/findings.py",
             "notes": "Findings modules present; no live supplier catalog integration"
           },
           "name": "Jewelry — findings library"
@@ -19922,7 +19924,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/gem_cert/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/gem_cert.py",
             "notes": "Gem-cert output built in"
           },
           "name": "Jewelry — gem-cert output"
@@ -19936,7 +19938,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/decorative.py",
             "notes": "Milgrain module built in"
           },
           "name": "Jewelry — milgrain"
@@ -19950,7 +19952,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/filigree_advanced.py",
             "notes": "Filigree and granulation modules built in"
           },
           "name": "Jewelry — filigree / granulation"
@@ -19964,7 +19966,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/enamel.py",
             "notes": "Enamel + laser_marking modules built in"
           },
           "name": "Jewelry — enamel / engraving / laser marking"
@@ -19978,7 +19980,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/appraisal.py",
             "notes": "Appraisal + repair estimator + mount_finder modules included"
           },
           "name": "Jewelry — retail workflow (appraisal / repair estimator / mount_finder)"
@@ -19992,7 +19994,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "packages/kerf-jewelry/cost/",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/jewelry/metal_cost.py",
             "notes": "Full metal + gem + labour cost/quote panel"
           },
           "name": "Jewelry — cost / quote panel"
@@ -20006,7 +20008,7 @@
           },
           "kerf": {
             "status": "yes",
-            "evidence": "",
+            "evidence": "packages/kerf-sdk/src/kerf/",
             "notes": "NodeGraphCanvas node editor + Marionette + kerf-sdk Python"
           },
           "name": "Jewelry — parametric visual scripting"

@@ -76,7 +76,7 @@ features:
     kerf:
       status: partial
       note: "Cloud git workspace with branch/merge; not real-time concurrent design at plant-model scale"
-      evidence: "cloud/git/"
+      evidence: "packages/kerf-core/src/kerf_core/storage/git_storer.py"
   - domain: D13
     feature: "Laser scan / point cloud integration"
     competitor:

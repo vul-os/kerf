@@ -450,10 +450,12 @@ async def run_manufacturing_cycle_time(params: dict, ctx: "ProjectCtx") -> str:
 # ---------------------------------------------------------------------------
 
 from kerf_manufacturing.am_tool import AM_TOOLS  # noqa: E402
+from kerf_manufacturing.am_thermo_tool import AM_THERMO_TOOLS  # noqa: E402
 
 TOOLS = [
     ("manufacturing_moldflow", manufacturing_moldflow_spec, run_manufacturing_moldflow),
     ("manufacturing_optimize_feed", manufacturing_optimize_feed_spec, run_manufacturing_optimize_feed),
     ("manufacturing_cycle_time", manufacturing_cycle_time_spec, run_manufacturing_cycle_time),
     *AM_TOOLS,
+    *AM_THERMO_TOOLS,
 ]

@@ -1,46 +1,46 @@
 /**
  * AMProcessSimPanel.jsx — Additive Manufacturing Process Simulation result viewer.
  *
- * Renders the output of the `am_process_simulate` LLM tool:
- *   - Distortion field visualised as a color-coded bar (gradient from 0 → max deviation)
- *   - Max deviation and residual von-Mises stress readouts
- *   - Layer-by-layer distortion growth sparkline
- *   - Recoater interference and support-region flags
- *   - Warning list
+ * Renders output from BOTH AM simulation tools:
+ *   1. `am_process_simulate`          — inherent-strain quasi-static ISM
+ *   2. `am_thermomechanical_simulate` — coupled transient thermo-mechanical
  *
- * Input (parsedContent JSON from tool output):
- *   {
- *     "ok": true,
- *     "n_layers": 4,
- *     "n_nodes": 45,
- *     "n_elems": 80,
- *     "max_deviation_mm": 0.312,
- *     "max_von_mises_mpa": 287.4,
- *     "layer_max_disp_mm": [0.0, 0.04, 0.12, 0.31],
- *     "recoater_interference": false,
- *     "support_elem_count": 10,
- *     "distortion_field": [[...], ...],      // (N, 3) in metres
- *     "residual_stress_mpa": [[...], ...],   // (M, 6) in MPa
- *     "warnings": ["..."],
- *     "disclaimer": "..."
- *   }
+ * Auto-detects which tool produced the result from the presence of
+ * `layer_peak_temp_k` (thermo-mechanical) vs its absence (ISM).
+ *
+ * ISM fields (am_process_simulate):
+ *   { ok, n_layers, n_nodes, n_elems, max_deviation_mm, max_von_mises_mpa,
+ *     layer_max_disp_mm, recoater_interference, support_elem_count,
+ *     distortion_field, residual_stress_mpa, warnings, disclaimer }
+ *
+ * Thermo-mechanical fields (am_thermomechanical_simulate) — superset of ISM:
+ *   + layer_peak_temp_k      : list[float] — peak temperature per layer [K]
+ *   + melt_pool_depth_mm     : list[float] — melt-pool depth per layer [mm]
+ *   + melt_pool_width_mm     : list[float] — melt-pool width per layer [mm]
+ *   + melt_pool_reached      : list[bool]  — did layer reach T_melt?
+ *   + energy_input_j         : float — total energy deposited [J]
+ *   + energy_balance_ok      : bool
  *
  * Pure display — no live API calls.
  *
  * Exported pure helpers (no DOM) for vitest:
- *   parseAMResult(content)   → { kind, data, error? }
- *   deviationColor(frac)     → CSS colour string (0=blue, 1=red)
- *   stressLabel(mpa)         → risk label string
- *   fmtMm(mm, digits)        → formatted string
+ *   parseAMResult(content)      → { kind, data, error? }
+ *   deviationColor(frac)        → CSS colour string (0=blue, 1=red)
+ *   stressLabel(mpa)            → risk label string
+ *   fmtMm(mm, digits)           → formatted string
+ *   tempColor(T_k, T_melt_k)    → CSS colour for temperature (blue → red)
+ *   isThermoMech(data)          → true if data is from thermo-mechanical tool
  *
  * References:
- *   Mercelis P. & Kruth J.-P. (2006). Residual stresses in selective laser
- *     sintering and selective laser melting. Rapid Prototyping Journal 12(5).
- *   Liang X. et al. (2019). Inherent strain homogenisation for AM.
- *     Manufacturing Letters 20.
+ *   Goldak J. et al. (1984). A new FE model for welding heat sources.
+ *     Metallurgical Transactions B 15:299–305.
+ *   Mercelis P. & Kruth J.-P. (2006). Residual stresses in SLS/SLM.
+ *     Rapid Prototyping Journal 12(5).
+ *   Vastola G. et al. (2016). Controlling residual stress in Ti6Al4V AM.
+ *     Additive Manufacturing 12.
  */
 
-import { AlertTriangle, CheckCircle2, Layers, Activity, Zap, BarChart2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Layers, Activity, Zap, BarChart2, Thermometer, Droplets } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for tests)
@@ -115,6 +115,23 @@ export function stressLabel(mpa) {
 export function fmtMm(mm, digits = 3) {
   if (mm == null || !isFinite(mm)) return '—'
   return mm.toFixed(digits)
+}
+
+/**
+ * Map a temperature [K] to a heat-map CSS colour (blue=cold, red=hot).
+ * T_melt_k is used to set the 1.0 anchor (above melt = full red).
+ */
+export function tempColor(T_k, T_melt_k = 1878) {
+  const T_ref = 298.15
+  const frac = Math.max(0, Math.min(1, (T_k - T_ref) / Math.max(T_melt_k - T_ref, 1)))
+  return deviationColor(frac)
+}
+
+/**
+ * True if the data payload includes thermal fields from am_thermomechanical_simulate.
+ */
+export function isThermoMech(data) {
+  return data != null && Array.isArray(data.layer_peak_temp_k) && data.layer_peak_temp_k.length > 0
 }
 
 // ---------------------------------------------------------------------------
@@ -207,6 +224,7 @@ export default function AMProcessSimPanel({ parsedContent }) {
   const layerMm = Array.isArray(d.layer_max_disp_mm) ? d.layer_max_disp_mm : []
   const warnings = Array.isArray(d.warnings) ? d.warnings : []
   const stressLbl = stressLabel(d.max_von_mises_mpa ?? 0)
+  const isTM = isThermoMech(d)
 
   return (
     <div style={styles.root}>
@@ -214,7 +232,9 @@ export default function AMProcessSimPanel({ parsedContent }) {
       <div style={styles.header}>
         <Layers size={16} style={{ marginRight: 6, color: '#3b82f6' }} />
         <span style={styles.title}>AM Process Simulation</span>
-        <span style={styles.badge}>Inherent-Strain Method</span>
+        <span style={isTM ? styles.badgeTM : styles.badge}>
+          {isTM ? 'Thermo-Mechanical' : 'Inherent-Strain Method'}
+        </span>
       </div>
 
       {/* Mesh summary */}
@@ -276,6 +296,11 @@ export default function AMProcessSimPanel({ parsedContent }) {
         </div>
       )}
 
+      {/* Thermo-mechanical: thermal history + melt pool */}
+      {isTM && (
+        <ThermoMechSection data={d} />
+      )}
+
       {/* Warnings */}
       {warnings.length > 0 && (
         <div style={styles.section}>
@@ -294,6 +319,137 @@ export default function AMProcessSimPanel({ parsedContent }) {
         <div style={styles.disclaimer}>{d.disclaimer}</div>
       )}
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Thermo-mechanical section (rendered only when data is from TM tool)
+// ---------------------------------------------------------------------------
+
+function ThermoMechSection({ data: d }) {
+  const peakTemps = Array.isArray(d.layer_peak_temp_k) ? d.layer_peak_temp_k : []
+  const meltDepths = Array.isArray(d.melt_pool_depth_mm) ? d.melt_pool_depth_mm : []
+  const meltWidths = Array.isArray(d.melt_pool_width_mm) ? d.melt_pool_width_mm : []
+  const meltReached = Array.isArray(d.melt_pool_reached) ? d.melt_pool_reached : []
+  const T_melt = d.T_melt_k ?? 1878
+  const maxTemp = peakTemps.length > 0 ? Math.max(...peakTemps) : 0
+  const minTemp = peakTemps.length > 0 ? Math.min(...peakTemps) : 0
+  const meltCount = meltReached.filter(Boolean).length
+
+  return (
+    <>
+      {/* Thermal summary stats */}
+      <div style={styles.section}>
+        <div style={styles.sectionTitle}>
+          <Thermometer size={10} style={{ marginRight: 3, verticalAlign: 'middle' }} />
+          Thermal History
+        </div>
+        <div style={styles.statsGrid}>
+          <StatCard
+            icon={<Thermometer size={14} />}
+            label="Peak Temperature"
+            value={maxTemp > 0 ? `${Math.round(maxTemp)} K` : '—'}
+            sub={maxTemp >= T_melt ? 'Above Melt' : 'Below Melt'}
+            color={maxTemp >= T_melt ? '#dc2626' : '#f59e0b'}
+          />
+          <StatCard
+            icon={<Droplets size={14} />}
+            label="Melt Pool Layers"
+            value={`${meltCount} / ${meltReached.length}`}
+            sub={meltCount === 0 ? 'No melting' : meltCount === meltReached.length ? 'All melted' : 'Partial'}
+            color={meltCount > 0 ? '#dc2626' : '#6b7280'}
+          />
+          <StatCard
+            icon={<Activity size={14} />}
+            label="Avg Melt Depth"
+            value={meltDepths.length > 0
+              ? `${(meltDepths.reduce((a,b) => a+b, 0) / meltDepths.length).toFixed(3)} mm`
+              : '—'}
+            color="#7c3aed"
+          />
+          <StatCard
+            icon={<Zap size={14} />}
+            label="Energy Input"
+            value={d.energy_input_j != null ? `${d.energy_input_j.toFixed(2)} J` : '—'}
+            sub={d.energy_balance_ok === false ? 'Balance Warning' : 'OK'}
+            color={d.energy_balance_ok === false ? '#f59e0b' : '#16a34a'}
+          />
+        </div>
+      </div>
+
+      {/* Peak temperature sparkline per layer */}
+      {peakTemps.length > 0 && (
+        <div style={styles.section}>
+          <div style={styles.sectionTitle}>Peak Temperature per Layer [K]</div>
+          <TempSparkline values={peakTemps} T_melt={T_melt} />
+          <div style={styles.sparklineLabels}>
+            <span>Layer 1  ({Math.round(minTemp)} K)</span>
+            <span>Max: {Math.round(maxTemp)} K</span>
+          </div>
+        </div>
+      )}
+
+      {/* Melt pool heat map (colour-coded by melt reached) */}
+      {meltReached.length > 0 && (
+        <div style={styles.section}>
+          <div style={styles.sectionTitle}>Melt Pool Status per Layer</div>
+          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+            {meltReached.map((reached, i) => (
+              <div
+                key={i}
+                title={`Layer ${i + 1}: ${reached ? 'Melted' : 'Not melted'} | Peak ${peakTemps[i] != null ? Math.round(peakTemps[i]) + ' K' : '?'}`}
+                style={{
+                  width: 18, height: 18,
+                  borderRadius: 3,
+                  background: reached ? '#dc2626' : '#bfdbfe',
+                  border: '1px solid #e5e7eb',
+                  cursor: 'default',
+                  fontSize: 9, color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                {i + 1}
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 4 }}>
+            Red = melted (&ge;{Math.round(T_melt)} K) &nbsp;|&nbsp; Blue = not melted
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Temperature sparkline with T_melt reference line
+// ---------------------------------------------------------------------------
+
+function TempSparkline({ values, T_melt, width = 280, height = 60 }) {
+  if (!values || values.length === 0) return null
+  const max = Math.max(...values, T_melt * 1.05)
+  const min = 250   // K floor
+  const range = max - min
+  const pts = values.map((v, i) => {
+    const x = (i / Math.max(values.length - 1, 1)) * width
+    const y = height - ((v - min) / range) * (height - 4)
+    return `${x},${y}`
+  })
+  const meltY = height - ((T_melt - min) / range) * (height - 4)
+  return (
+    <svg width={width} height={height} style={{ display: 'block', overflow: 'visible' }} aria-label="Peak temperature per layer">
+      {/* Melt temperature reference line */}
+      <line x1={0} y1={meltY} x2={width} y2={meltY}
+        stroke="#dc2626" strokeWidth={1} strokeDasharray="4 2" opacity={0.6} />
+      <text x={width - 2} y={meltY - 3} fontSize={8} fill="#dc2626" textAnchor="end">T_melt</text>
+      {/* Temperature curve */}
+      <polyline points={pts.join(' ')} fill="none" stroke="#f97316" strokeWidth={1.5} strokeLinejoin="round" />
+      {values.map((v, i) => {
+        const x = (i / Math.max(values.length - 1, 1)) * width
+        const y = height - ((v - min) / range) * (height - 4)
+        return <circle key={i} cx={x} cy={y} r={2} fill={v >= T_melt ? '#dc2626' : '#f97316'} />
+      })}
+    </svg>
   )
 }
 
@@ -338,6 +494,16 @@ const styles = {
     background: '#eff6ff',
     color: '#1d4ed8',
     border: '1px solid #bfdbfe',
+    borderRadius: 4,
+    fontSize: 10,
+    padding: '1px 6px',
+    fontWeight: 600,
+    letterSpacing: 0.3,
+  },
+  badgeTM: {
+    background: '#fff7ed',
+    color: '#c2410c',
+    border: '1px solid #fed7aa',
     borderRadius: 4,
     fontSize: 10,
     padding: '1px 6px',

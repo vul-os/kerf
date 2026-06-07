@@ -86,6 +86,18 @@ export default [
     })),
   },
 
+  {
+    id: 'am_thermomechanical',
+    kinds: ['am_thermomechanical', 'am_thermo_mech', 'am_melt_pool'],
+    exts: ['.am_tm_result'],
+    label: 'AM Thermo-Mechanical Simulation',
+    load: () => import('../../components/AMProcessSimPanel.jsx').then(m => ({
+      // Re-uses AMProcessSimPanel — auto-detects thermo-mechanical data
+      // from the presence of layer_peak_temp_k field.
+      default: contentToField(m.default, 'parsedContent'),
+    })),
+  },
+
   // ── Packaging ────────────────────────────────────────────────────────────
 
   {

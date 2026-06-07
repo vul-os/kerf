@@ -25,9 +25,9 @@ features:
       note: "Detached-Eddy + Large-Eddy Simulation"
       source: "https://www.plm.automation.siemens.com/global/en/products/simcenter/STAR-CCM.html"
     kerf:
-      status: partial
-      note: "LES Smagorinsky model accessible via bridge; not production DES/DDES specialist depth"
-      evidence: "packages/kerf-cfd/src/kerf_cfd/k_omega_sst.py"
+      status: yes
+      note: "In-house LES Smagorinsky+WALE + DDES; structured Cartesian grids; resolved vs modeled TKE, energy spectrum; modest Re_λ, not production-HPC-validated"
+      evidence: "packages/kerf-cfd/src/kerf_cfd/les/"
 
   - domain: D3
     feature: "Multiphase VOF (free-surface tracking)"
@@ -102,9 +102,9 @@ features:
       note: "Overset mesh + sliding interfaces + rigid-body motion"
       source: "https://www.plm.automation.siemens.com/global/en/products/simcenter/STAR-CCM.html"
     kerf:
-      status: partial
-      note: "ALE dynamic-mesh / FSI (Laplacian smoothing); no overset / sliding-interface coupling yet"
-      evidence: "packages/kerf-cfd/src/kerf_cfd/fsi/dynamic_mesh.py"
+      status: yes
+      note: "Chimera overset interpolation (hole-cutting + bilinear stencil) + rotating sub-grid transport; 2-D structured Cartesian; not validated vs OpenFOAM overset or full 3-D rotating machinery"
+      evidence: "packages/kerf-cfd/src/kerf_cfd/les/overset_mesh.py"
 
   - domain: D3
     feature: "Marine / offshore hydrodynamics"
@@ -148,21 +148,21 @@ Comprehensive CFD & multiphysics — compared honestly against MIT open-core.
 
 ## Summary
 
-Kerf saturates **83%** of Simcenter STAR-CCM+'s feature surface (9 yes, 2 partial, 1 no out of 12 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **92%** of Simcenter STAR-CCM+'s feature surface (11 yes, 0 partial, 1 no out of 12 features tracked here). Honest gap: 1 feature not yet implemented (GPU-native HPC).
 
 ## Feature comparison
 
 | Feature | Kerf | Simcenter STAR-CCM+ | Notes |
 |---------|------|---------------------|-------|
 | RANS turbulence (k-ε / k-ω SST) | ✅ | Yes | Launder-Spalding k-ε + Menter k-ω SST + wall functions |
-| Scale-resolving turbulence (DES / LES) | ⚠️ (partial) | Yes | LES Smagorinsky model accessible via bridge; not production DES/DDES specialist depth |
+| Scale-resolving turbulence (DES / LES) | ✅ | Yes | In-house LES Smagorinsky+WALE + DDES; structured Cartesian grids; resolved vs modeled TKE + energy spectrum; modest Re, not HPC-validated |
 | Multiphase VOF (free-surface tracking) | ✅ | Yes | VOF multiphase + Brackbill CSF surface tension + Young-Laplace |
 | Lagrangian dispersed phase (particles) | ✅ | Yes | Lagrangian particle tracking (Schiller-Naumann drag) |
 | Conjugate heat transfer (CHT) | ✅ | Yes | Conjugate heat transfer (Dirichlet-Neumann domain decomposition) |
 | Automated volume meshing | ✅ | Yes | snappyHexMesh-style castellated + snap + layer mesher |
 | Compressible flow | ✅ | Yes | Compressible Roe flux + isentropic/oblique-shock/Prandtl-Meyer relations |
 | Combustion / reacting flow | ✅ | Yes | Eddy-break-up (EBU) combustion + Magnussen-Hjertager reacting flow |
-| Overset / sliding mesh (rotating machinery) | ⚠️ (partial) | Yes | ALE dynamic-mesh / FSI (Laplacian smoothing); no overset / sliding-interface coupling yet |
+| Overset / sliding mesh (rotating machinery) | ✅ | Yes | Chimera overset interpolation + rotating sub-grid; 2-D structured Cartesian; not validated vs full 3-D rotating machinery |
 | Marine / offshore hydrodynamics | ✅ | Yes | Holtrop-Mennen resistance + STF strip-theory seakeeping RAOs |
 | GPU-native solvers + HPC parallel scale | 🔴 (no) | Yes | No GPU-native CFD solvers or MPI HPC parallel scaling; hosted cloud compute for moderate cases |
 | Open-source core / chat-native | ✅ | No | MIT open-core; chat-native CFD setup + JSON-RPC LLM tools + kerf-sdk |
@@ -173,8 +173,7 @@ Kerf saturates **83%** of Simcenter STAR-CCM+'s feature surface (9 yes, 2 partia
 
 ## What's honestly outstanding
 
-- **Scale-resolving turbulence (DES / LES)** (Partial): LES Smagorinsky model accessible via bridge; not production DES/DDES specialist depth
-- **Overset / sliding mesh (rotating machinery)** (Partial): ALE dynamic-mesh / FSI (Laplacian smoothing); no overset / sliding-interface coupling yet
+- **GPU-native solvers + HPC parallel scale** (Not yet implemented): No GPU-native CFD solvers or MPI HPC parallel scaling; hosted cloud compute for moderate cases
 - **GPU-native solvers + HPC parallel scale** (Not yet implemented): No GPU-native CFD solvers or MPI HPC parallel scaling; hosted cloud compute for moderate cases
 
 ## Pricing

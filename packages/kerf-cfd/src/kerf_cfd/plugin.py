@@ -34,6 +34,12 @@ Registers:
   - LLM tool:  cfd_postprocess_filter  (ParaView-style server-side filters:
                                          slice | contour | streamline | integral |
                                          probe | derived — vorticity/Q/grad/Cp)
+  - LLM tool:  cfd_les_simulate        (in-house LES: filtered NS + Smagorinsky/WALE SGS;
+                                         AB2 fractional-step; resolved + modeled TKE; energy spectrum)
+  - LLM tool:  cfd_des_simulate        (hybrid DES/DDES: RANS near-wall + LES off-wall;
+                                         Spalart 1997/2006 model-index switching by d_w vs C_DES·Δ)
+  - LLM tool:  cfd_overset_rotating    (Chimera overset: rotating sub-grid + background grid;
+                                         hole-cutting + bilinear interpolation; rotating feature transport)
 
 # Wave 9C: OpenFOAM combustion + Lagrangian + FSI
 # Wave 10C: snappyHexMesh-style mesher + wind engineering
@@ -42,6 +48,7 @@ Registers:
 # Multi-species reacting flow: general finite-rate chemistry + 1-D plug-flow reactor
 # Wave plasma: 1-D drift-diffusion glow-discharge (ionisation transport, COMSOL compare flip)
 # VTK/ParaView: VTK/VTU export + server-side ParaView-style filters
+# LES/DES/overset: in-house LES Smagorinsky+WALE + DDES + Chimera rotating mesh
 """
 
 from __future__ import annotations
@@ -103,6 +110,16 @@ async def register(app: FastAPI, ctx):
         plasma_discharge_simulate_spec,
         run_plasma_discharge_simulate,
     )
+
+    # LES/DES/overset: in-house scale-resolving turbulence + Chimera rotating mesh
+    from kerf_cfd.les.les_tools import (
+        cfd_les_simulate_spec,    run_cfd_les_simulate,
+        cfd_des_simulate_spec,    run_cfd_des_simulate,
+        cfd_overset_rotating_spec, run_cfd_overset_rotating,
+    )
+    ctx.tools.register("cfd_les_simulate",     cfd_les_simulate_spec,     run_cfd_les_simulate)
+    ctx.tools.register("cfd_des_simulate",     cfd_des_simulate_spec,     run_cfd_des_simulate)
+    ctx.tools.register("cfd_overset_rotating", cfd_overset_rotating_spec, run_cfd_overset_rotating)
 
     # Wave 12B: Landscape + Quote-to-delivery + MicroFlo
     # IES MicroFlo-style room airflow: preview-grade RANS + Fanger 1972 PMV/PPD
@@ -169,6 +186,10 @@ async def register(app: FastAPI, ctx):
         "plasma.paschen_curve",
         "cfd.vtk_export",
         "cfd.vtk_paraview_filters",
+        "cfd.les_smagorinsky_wale",
+        "cfd.des_ddes_hybrid",
+        "cfd.overset_chimera",
+        "cfd.sliding_rotating_mesh",
     ]
 
     try:

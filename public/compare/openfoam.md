@@ -82,9 +82,9 @@ features:
       note: "Smagorinsky, WALE, dynamic Smagorinsky LES; DES and SAS-SST; DNS at low Re"
       source: "https://www.openfoam.com/documentation/guides/latest/doc/openfoam-guide.html"
     kerf:
-      status: partial
-      note: "LES models accessible via bridge; specialist case tuning requires expert review"
-      evidence: "packages/kerf-cfd/"
+      status: yes
+      note: "In-house LES Smagorinsky+WALE + DDES on structured Cartesian grids; resolved vs modeled TKE + energy spectrum; modest Re_λ, not HPC-validated; DNS partial (structured grid only, low Re)"
+      evidence: "packages/kerf-cfd/src/kerf_cfd/les/"
 
   - domain: D4
     feature: "CFD — mesh generation (snappyHexMesh)"
@@ -312,7 +312,7 @@ Kerf saturates **96%** of OpenFOAM's feature surface (23 yes, 2 partial, 0 no ou
 | CFD — multiphase flow | ✅ | Yes | Selected multiphase solvers via bridge; full multiphase suite requires direct OpenFOAM |
 | CFD — combustion / reacting flow | ✅ | Yes | Combustion CFD (reactingFoam / fireFoam) not yet exposed in Kerf bridge |
 | CFD — turbulence models (RANS) | ✅ | Yes | k-eps and k-omega SST exposed via chat case generation; full model library via direct OpenFOAM |
-| CFD — LES / DES / DNS | ⚠️ (partial) | Yes | LES models accessible via bridge; specialist case tuning requires expert review |
+| CFD — LES / DES / DNS | ✅ | Yes | In-house LES Smagorinsky+WALE + DDES; structured Cartesian grids; resolved vs modeled TKE + energy spectrum; DNS partial (low Re only) |
 | CFD — mesh generation (snappyHexMesh) | ✅ | Yes | snappyHexMesh dict generated via chat from Kerf STL export; no GUI mesh editor |
 | CFD — Lagrangian particle tracking | ✅ | Yes | Lagrangian particle models not exposed in Kerf bridge |
 | CFD — dynamic mesh / FSI | ✅ | Yes | Dynamic mesh and FSI not yet exposed in Kerf bridge |
@@ -344,7 +344,6 @@ Kerf saturates **96%** of OpenFOAM's feature surface (23 yes, 2 partial, 0 no ou
 
 ## What's honestly outstanding
 
-- **CFD — LES / DES / DNS** (Partial): LES models accessible via bridge; specialist case tuning requires expert review
 - **CFD — parallel MPI execution** (Partial): Hosted cloud compute for moderate-scale runs; petascale HPC requires direct OpenFOAM
 
 ## Pricing

@@ -216,4 +216,23 @@ export default [
     load: () => import('./sim-wrappers/PlasmaDischargeWrapper.jsx'),
     label: 'Plasma / Gas Discharge (Drift-Diffusion)',
   },
+
+  // ── LES / DES / Overset rotating mesh ────────────────────────────────────
+  // Tools: cfd_les_simulate (LES Smagorinsky+WALE), cfd_des_simulate (DES/DDES),
+  //        cfd_overset_rotating (Chimera overset + rotating sub-grid)
+  // Shows: instantaneous velocity/vorticity (sparklines), resolved vs modeled TKE,
+  //        energy spectrum, DES model-index wall-normal profile (RANS vs LES regions),
+  //        overset rotation angle + interpolation/conservation diagnostics.
+  // Caveats: structured Cartesian; modest Re; not HPC-validated; in-house implementation.
+  {
+    id: 'cfd-les-des-overset',
+    kinds: [
+      'cfd_les', 'cfd_les_sim', 'les_simulation',
+      'cfd_des', 'cfd_des_sim', 'des_simulation', 'ddes_simulation',
+      'cfd_overset', 'overset_rotating', 'sliding_mesh',
+    ],
+    exts: ['.les', '.des', '.ddes', '.overset', '.rotatingcfd'],
+    load: () => import('./sim-wrappers/CfdLesWrapper.jsx'),
+    label: 'CFD Scale-Resolving (LES / DES / Overset)',
+  },
 ]

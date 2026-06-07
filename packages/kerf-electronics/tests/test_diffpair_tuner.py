@@ -15,11 +15,6 @@ import math
 import sys
 import pytest
 
-# Patch ok_payload to include {"ok": True} wrapper so tests can assert result.get("ok")
-import kerf_electronics._compat as _compat_mod
-_compat_mod.ok_payload = lambda v: json.dumps({"ok": True, "result": v})
-_compat_mod.err_payload = lambda msg, code: json.dumps({"ok": False, "message": msg, "code": code})
-
 from kerf_electronics.routing.diffpair_tuner import (
     DiffPairTuneResult,
     MeanderSpec,
@@ -321,11 +316,11 @@ def test_tool_wrapper_tune_trace():
 
     result_json = asyncio.run(electronics_tune_trace_to_length(None, args))
     result = json.loads(result_json)
-    assert result.get("ok") is True
-    data = result["result"]
-    assert "tuned_path" in data
-    assert data["inserted_meander_count"] >= 1
-    assert "honest_caveat" in data
+    # ok_payload returns the dict directly (no 'ok' wrapper key)
+    assert "error" not in result, result
+    assert "tuned_path" in result
+    assert result["inserted_meander_count"] >= 1
+    assert "honest_caveat" in result
 
 
 def test_tool_wrapper_tune_diffpair():
@@ -341,12 +336,12 @@ def test_tool_wrapper_tune_diffpair():
 
     result_json = asyncio.run(electronics_tune_diff_pair_lengths(None, args))
     result = json.loads(result_json)
-    assert result.get("ok") is True
-    data = result["result"]
-    assert "skew_mm" in data
-    assert "is_skew_within_tolerance" in data
-    assert "references" in data
-    assert data["length_a_mm"] >= 99.0
+    # ok_payload returns the dict directly (no 'ok' wrapper key)
+    assert "error" not in result, result
+    assert "skew_mm" in result
+    assert "is_skew_within_tolerance" in result
+    assert "references" in result
+    assert result["length_a_mm"] >= 99.0
 
 
 def test_tool_wrapper_bad_args():
@@ -356,5 +351,6 @@ def test_tool_wrapper_bad_args():
     args = json.dumps({"path": [[0, 0], [10, 0]]}).encode()  # missing target_length_mm
     result_json = asyncio.run(electronics_tune_trace_to_length(None, args))
     result = json.loads(result_json)
-    assert result.get("ok") is False
+    # err_payload returns {"error": ..., "code": ...}
+    assert "error" in result
     assert result.get("code") == "BAD_ARGS"

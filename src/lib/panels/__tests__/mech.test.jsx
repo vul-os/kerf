@@ -49,6 +49,7 @@ const EXPECTED = [
   { id: 'weldment_frame',       kind: 'weldment_frame',       ext: '.weldment' },
   { id: 'mechanism_synthesis',  kind: 'mechanism_synthesis',  ext: '.mechanism' },
   { id: 'nurbs_surfacing',      kind: 'nurbs_surfacing',      ext: '.surf' },
+  { id: 'surface_quality',      kind: 'surface_quality',      ext: '.surfquality' },
   { id: 'mesh_repair',          kind: 'mesh_repair',          ext: '.meshfix' },
   { id: 'sheet_metal',          kind: 'sheet_metal',          ext: '.sheetmetal' },
 ]
@@ -114,6 +115,8 @@ import MeshRepairPanel from '../../../components/MeshRepairPanel.jsx'
 import SheetMetalPanel from '../../../components/SheetMetalPanel.jsx'
 // SurfacingPanel
 import SurfacingPanel from '../../../components/SurfacingPanel.jsx'
+// SurfaceQualityPanel
+import SurfaceQualityPanel from '../../../components/SurfaceQualityPanel.jsx'
 // MechanismSynthesisPanel
 import MechanismSynthesisPanel from '../../../components/MechanismSynthesisPanel.jsx'
 
@@ -127,11 +130,11 @@ vi.mock('lucide-react', () => {
     Activity: i, AlertTriangle: i, BarChart2: i, Box: i,
     Calculator: i, CheckCircle: i, ChevronDown: i, ChevronRight: i,
     ChevronUp: i, Circle: i, Cog: i, Cpu: i,
-    FileDown: i, Frame: i, GitBranch: i, Grid3X3: i,
+    Eye: i, FileDown: i, Frame: i, Gauge: i, GitBranch: i, Grid3X3: i,
     Info: i, Layers: i, Loader2: i, Play: i,
     Ruler: i, Scan: i, Scissors: i, Settings: i,
     Sliders: i, Square: i, Triangle: i, TrendingDown: i,
-    Wrench: i, Zap: i,
+    Wrench: i, XCircle: i, Zap: i,
   }
 })
 
@@ -223,6 +226,17 @@ describe('mount — SurfacingPanel accepts content prop', () => {
   it('contains NURBS Surfacing heading', () => {
     const html = renderToStaticMarkup(<SurfacingPanel />)
     expect(html).toContain('NURBS Surfacing')
+  })
+})
+
+describe('mount — SurfaceQualityPanel renders', () => {
+  it('renders with no props', () => {
+    expect(() => renderToStaticMarkup(<SurfaceQualityPanel />)).not.toThrow()
+  })
+
+  it('contains Surface Quality heading', () => {
+    const html = renderToStaticMarkup(<SurfaceQualityPanel />)
+    expect(html).toContain('Surface Quality')
   })
 })
 

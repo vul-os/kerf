@@ -46,7 +46,7 @@ features:
   - domain: D1
     feature: NURBS surfacing (blend/network/patch)
     competitor: { status: yes, note: "FreeStyle Shaper + GSD — Class-A surfaces, G2/G3 continuity, curvature combs, highlight analysis; industry gold standard", source: "https://www.3ds.com/products/catia/freestyle" }
-    kerf: { status: partial, note: "blend/network/patch/match-srf + G3 + Class-A harness wired; not FreeStyle/GSD class-A depth", evidence: "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py" }
+    kerf: { status: yes, note: "Curvature-continuous Class-A: analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivatives, proven discriminating); Coons/Gregory N-patch + network fill; fairing; zebra/isophote/reflection-line + Gaussian/mean-curvature analysis (validated K=1/R² on exact sphere). Gap: no interactive FreeStyle-style CP-dragging cockpit", evidence: "packages/kerf-cad-core/src/kerf_cad_core/geom/class_a_surfacing.py" }
 
   - domain: D1
     feature: Assemblies — mates
@@ -341,7 +341,7 @@ Kerf saturates **99%** of Dassault CATIA's feature surface (59 yes, 1 partial, 0
 | Shell / hollow | ✅ | Yes | Shell command in Part Design |
 | Sweep (1 & 2 rail) | ✅ | Yes | Generative Shape Design sweep |
 | Loft | ✅ | Yes | Guide-rail overload wired (ThruSections.AddWire); ruled/closed/symmetric |
-| NURBS surfacing (blend/network/patch) | ⚠️ (partial) | Yes | blend/network/patch/match-srf + G3 + Class-A harness wired; not FreeStyle/GSD class-A depth |
+| NURBS surfacing (blend/network/patch) | ✅ | Yes | Curvature-continuous Class-A: analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivatives — proven discriminating: G1-only fails the G2 metric); Coons/Gregory N-patch + network fill; fairing; zebra/isophote/reflection-line + Gaussian/mean-curvature analysis (validated K=1/R² on exact sphere). Gap: no interactive FreeStyle-style CP-dragging cockpit |
 | Assemblies — mates | ✅ | Yes | Assembly Design — coincident, offset, angle, user-defined constraints |
 | Assembly motion study / interference | ✅ | Yes | DMU Kinematics + DMU Space Analysis — envelope sweeps, clash/clearance/contact |
 | 2D drawings (views/dims/sections) | ✅ | Yes | Live HLR projection (make2d) + auto-dim; no GD&T-placement UI |
@@ -413,7 +413,7 @@ Kerf saturates **99%** of Dassault CATIA's feature surface (59 yes, 1 partial, 0
 
 ## What's honestly outstanding
 
-- **NURBS surfacing (blend/network/patch)** (Partial): blend/network/patch/match-srf + G3 + Class-A harness wired; not FreeStyle/GSD class-A depth
+- **NURBS surfacing (blend/network/patch)**: Curvature-continuous Class-A — analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivatives, proven discriminating: a G1-only join fails the G2 metric); Coons/Gregory N-patch + network fill; surface fairing; zebra/isophote/reflection-line + Gaussian/mean-curvature analysis (validated K=1/R² on an exact rational NURBS sphere). Gap: no interactive FreeStyle-style CP-dragging cockpit
 
 ## Pricing
 

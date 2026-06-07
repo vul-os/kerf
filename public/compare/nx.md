@@ -46,9 +46,9 @@ features:
       tier: paid
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html
     kerf:
-      status: partial
-      note: "blend/network/patch/match-srf + G3 + zebra/isophote + Class-A harness wired; not Shape-Studio depth"
-      evidence: packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py
+      status: yes
+      note: "Curvature-continuous Class-A: analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivatives, proven discriminating); Coons/Gregory N-patch + network fill; fairing; zebra/isophote/reflection-line + Gaussian/mean-curvature analysis (validated K=1/R² on exact sphere). Gap: no interactive Shape-Studio-style CP-dragging cockpit"
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/geom/class_a_surfacing.py
   - domain: D1
     feature: Direct edit (push-pull)
     competitor:
@@ -583,7 +583,7 @@ Kerf saturates **99%** of Siemens NX's feature surface (53 yes, 1 partial, 0 no 
 | Constraint sketcher (geo + dim) | ✅ | Yes | Full parametric sketcher — geometric + dimensional constraints, fully integrated with history |
 | Pad / pocket / revolve | ✅ | Yes | Extrude / revolve feature commands with full taper and symmetric options |
 | Variable-radius fillet | ✅ | Yes | Edge blend with variable radius law (linear / cubic / S-shape) and face-blend types |
-| NURBS surfacing (blend/network/patch) | ⚠️ (partial) | Yes | blend/network/patch/match-srf + G3 + zebra/isophote + Class-A harness wired; not Shape-Studio depth |
+| NURBS surfacing (blend/network/patch) | ✅ | Yes | Curvature-continuous Class-A: analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivatives — proven discriminating: G1-only fails the G2 metric); Coons/Gregory N-patch + network fill; fairing; zebra/isophote/reflection-line + Gaussian/mean-curvature analysis (validated K=1/R² on exact sphere). Gap: no interactive Shape-Studio-style CP-dragging cockpit |
 | Direct edit (push-pull) | ✅ | Yes | push_pull (planar + curved), move_face, delete_face wired as ops |
 | Assemblies — mates | ✅ | Yes | Assembly constraints (coincident, concentric, parallel, distance, angle) with full kinematic DoF tracking |
 | Sheet metal | ✅ | Yes | flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
@@ -637,7 +637,7 @@ Kerf saturates **99%** of Siemens NX's feature surface (53 yes, 1 partial, 0 no 
 
 ## What's honestly outstanding
 
-- **NURBS surfacing (blend/network/patch)** (Partial): blend/network/patch/match-srf + G3 + zebra/isophote + Class-A harness wired; not Shape-Studio depth
+- **NURBS surfacing (blend/network/patch)**: Curvature-continuous Class-A — analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivatives, proven discriminating: a G1-only join fails the G2 metric); Coons/Gregory N-patch + network fill; surface fairing; zebra/isophote/reflection-line + Gaussian/mean-curvature analysis (validated K=1/R² on an exact rational NURBS sphere). Gap: no interactive Shape-Studio-style CP-dragging cockpit
 
 ## Pricing
 

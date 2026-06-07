@@ -14,6 +14,8 @@
 //   WeldmentFramePanel        — Structural weldment framework generator
 //   MechanismSynthesisPanel   — Four-bar, cam-follower, gear-train synthesis
 //   SurfacingPanel            — NURBS Gordon/skinning/guide-rail surfacing
+//   SurfaceQualityPanel       — Class-A surface quality: G0/G1/G2/G3 continuity,
+//                               zebra + isophote inspection (surface_class_a_analyze)
 //   MeshRepairPanel           — Mesh repair, diagnostics, shrinkwrap, boolean
 //   SheetMetalPanel           — Flat pattern, corner relief, multi-flange
 //   HyperelasticSolverPanel   — Nonlinear hyperelastic FEM (NH/MR/Ogden, TL-NR)
@@ -88,6 +90,13 @@ export default [
     exts: ['.surf'],
     load: () => import('../../components/SurfacingPanel.jsx'),
     label: 'NURBS Surfacing',
+  },
+  {
+    id: 'surface_quality',
+    kinds: ['surface_quality', 'class_a'],
+    exts: ['.surfquality', '.classa'],
+    load: () => import('../../components/SurfaceQualityPanel.jsx'),
+    label: 'Surface Quality (Class-A: G0/G1/G2/G3 · zebra · isophote)',
   },
   {
     id: 'mesh_repair',

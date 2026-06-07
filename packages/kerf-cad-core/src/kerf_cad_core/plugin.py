@@ -282,6 +282,10 @@ _TOOL_MODULES = [
     "kerf_cad_core.jewelry.hollowing",
     "kerf_cad_core.jewelry.engraving",
     "kerf_cad_core.geom.match_srf",
+    # Class-A NURBS surfacing — consolidated entry points
+    # (surface_class_a_analyze / surface_match_g2 / surface_network_fill);
+    # honest wrappers over the analytic continuity + match-srf + network cores.
+    "kerf_cad_core.geom.class_a_surfacing",
     "kerf_cad_core.geom.intersection",
     "kerf_cad_core.geom.curve_projection",  # GK-P: nurbs_project_point (Newton + arc-length)
     "kerf_cad_core.geom.edge_curve_from_face_pair",

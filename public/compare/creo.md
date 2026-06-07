@@ -114,9 +114,9 @@ features:
       note: "Creo Style (ISDX) — Class-A NURBS surfacing, curve networks, curvature continuity"
       source: "https://www.ptc.com/en/products/creo/options/style"
     kerf:
-      status: partial
-      note: "blend/network/patch/match-srf + G3 + Class-A harness wired; not Creo Style ISDX depth"
-      evidence: "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py"
+      status: yes
+      note: "Curvature-continuous Class-A: analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivatives, proven discriminating); Coons/Gregory N-patch + network fill; fairing; zebra/isophote/reflection-line + Gaussian/mean-curvature analysis (validated K=1/R² on exact sphere). Gap: no interactive ISDX-style CP-dragging cockpit"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/geom/class_a_surfacing.py"
 
   - domain: D1
     feature: "Assemblies — mates"
@@ -678,7 +678,7 @@ Kerf saturates **99%** of PTC Creo's feature surface (57 yes, 1 partial, 0 no ou
 | Loft | ✅ | Yes | Guide-rail overload wired (ThruSections.AddWire); ruled/closed/symmetric |
 | Patterns (linear/polar) + mirror | ✅ | Yes | Linear/polar pattern + mirror wired |
 | Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
-| NURBS surfacing (blend/network/patch) | ⚠️ (partial) | Yes | blend/network/patch/match-srf + G3 + Class-A harness wired; not Creo Style ISDX depth |
+| NURBS surfacing (blend/network/patch) | ✅ | Yes | Curvature-continuous Class-A: analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivatives — proven discriminating: G1-only fails the G2 metric); Coons/Gregory N-patch + network fill; fairing; zebra/isophote/reflection-line + Gaussian/mean-curvature analysis (validated K=1/R² on exact sphere). Gap: no interactive ISDX-style CP-dragging cockpit |
 | Assemblies — mates | ✅ | Yes | Wired: coincident/concentric/parallel/angle + BOM panel |
 | Large assembly / simplified representations | ✅ | Yes | LOD mesh swapping configurable; no formal simplified-rep workflow |
 | 2D drawings (views/dims/sections) | ✅ | Yes | Live HLR projection (make2d) + auto-dim; no GD&T-placement UI |
@@ -746,7 +746,7 @@ Kerf saturates **99%** of PTC Creo's feature surface (57 yes, 1 partial, 0 no ou
 
 ## What's honestly outstanding
 
-- **NURBS surfacing (blend/network/patch)** (Partial): blend/network/patch/match-srf + G3 + Class-A harness wired; not Creo Style ISDX depth
+- **NURBS surfacing (blend/network/patch)**: Curvature-continuous Class-A — analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivatives, proven discriminating: a G1-only join fails the G2 metric); Coons/Gregory N-patch + network fill; surface fairing; zebra/isophote/reflection-line + Gaussian/mean-curvature analysis (validated K=1/R² on an exact rational NURBS sphere). Gap: no interactive ISDX-style CP-dragging cockpit
 
 ## Pricing
 

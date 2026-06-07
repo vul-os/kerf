@@ -15,10 +15,11 @@
 //     garment_auto_arrange   → GarmentAutoArrangePanel     (.autoarrange)
 //
 //   DENTAL
-//     dental_crown_bridge  → CrownBridgePanel          (.dentalcrown)
-//     dental_implant       → ImplantPlanningPanel      (.implant)
-//     dental_intraoral     → IntraoralScanLabPanel     (.intrascan)
-//     dental_rpd           → RPDDenturePanel           (.rpd)
+//     dental_crown_bridge  → CrownBridgePanel            (.dentalcrown)
+//     dental_auto_design   → DentalAutoDesignPanel        (.dentalauto)
+//     dental_implant       → ImplantPlanningPanel         (.implant)
+//     dental_intraoral     → IntraoralScanLabPanel        (.intrascan)
+//     dental_rpd           → RPDDenturePanel              (.rpd)
 //
 //   JEWELRY
 //     jewelry_configurator → JewelryConfiguratorPanel  (.jewelry)
@@ -93,6 +94,13 @@ export default [
     exts: ['.dentalcrown'],
     label: 'Crown & Bridge',
     load: () => import('../../components/dental/CrownBridgePanel.jsx'),
+  },
+  {
+    id: 'dental_auto_design',
+    kinds: ['dental_auto_design'],
+    exts: ['.dentalauto'],
+    label: 'Auto Crown Design (Algorithmic)',
+    load: () => import('../../components/dental/DentalAutoDesignPanel.jsx'),
   },
   {
     id: 'dental_implant',

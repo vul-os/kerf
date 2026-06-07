@@ -1410,3 +1410,281 @@ async def run_dental_lab_stl_export(args: dict, ctx: "ProjectCtx") -> str:
         })
     except Exception as exc:
         return err_payload(str(exc), "LAB_STL_EXPORT_ERROR")
+
+
+# ===========================================================================
+# Algorithmic automated restoration design — ALGORITHMIC/heuristic, NOT AI/ML
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# dental_auto_design_crown
+# ---------------------------------------------------------------------------
+
+dental_auto_design_crown_spec = ToolSpec(
+    name="dental_auto_design_crown",
+    description=(
+        "ALGORITHMIC automated crown/restoration generation from a prepared-tooth context.\n\n"
+        "Pipeline:\n"
+        "1. FDI-position anatomical template selection (incisor/canine/premolar/molar × arch).\n"
+        "2. Curvature-based margin line detection on the prep scan (Taubin 1995 PCA method).\n"
+        "3. Insertion axis determination + undercut detection (Gilboe 1983 hemisphere search).\n"
+        "4. Crown morphed from anatomical template to fit prep margin.\n"
+        "5. Proximal contact gap measured vs mesial/distal neighbours (target 0.01–0.10 mm, "
+        "Neff 1949).\n"
+        "6. Occlusal clearance measured vs antagonist (≥ material minimum, ISO 6872).\n"
+        "7. Minimum wall thickness enforced (material-specific, ISO 6872; Guess 2010).\n\n"
+        "HONEST: ALGORITHMIC/heuristic automated design (anatomical-template fitting + "
+        "margin/contact/clearance rules), NOT a trained ML/AI model.\n"
+        "NOT FDA-cleared or CE-marked. Requires clinical review."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "prep_vertices": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+                "description": "Prepared tooth scan vertices (x,y,z) in mm. Minimum 4 vertices.",
+                "minItems": 4,
+            },
+            "prep_triangles": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": "integer"}, "minItems": 3, "maxItems": 3},
+                "description": "Triangle indices for the prep mesh. Minimum 1 triangle.",
+                "minItems": 1,
+            },
+            "universal_tooth_number": {
+                "type": "integer",
+                "description": "Universal tooth number 1–32 for FDI template selection.",
+            },
+            "material": {
+                "type": "string",
+                "description": (
+                    "Restorative material: 'zirconia' | 'lithium_disilicate' | "
+                    "'metal_ceramic' | 'pmma'. Default 'zirconia'."
+                ),
+            },
+            "mesial_vertices": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+                "description": "Mesial adjacent tooth surface vertices (mm). Optional.",
+            },
+            "distal_vertices": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+                "description": "Distal adjacent tooth surface vertices (mm). Optional.",
+            },
+            "antagonist_vertices": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+                "description": "Antagonist (opposing arch) surface vertices (mm). Optional.",
+            },
+        },
+        "required": ["prep_vertices", "prep_triangles", "universal_tooth_number"],
+    },
+)
+
+
+async def run_dental_auto_design_crown(args: dict, ctx: "ProjectCtx") -> str:
+    try:
+        import numpy as np
+        from kerf_dental.crown_bridge import ToothNumber
+        from kerf_dental.restoration_auto import PrepContext, auto_design_crown
+
+        tooth = ToothNumber.from_universal(int(args["universal_tooth_number"]))
+        prep_v = np.array(args["prep_vertices"], dtype=float)
+        prep_t = np.array(args["prep_triangles"], dtype=int)
+
+        mesial = (np.array(args["mesial_vertices"], dtype=float)
+                  if args.get("mesial_vertices") else None)
+        distal = (np.array(args["distal_vertices"], dtype=float)
+                  if args.get("distal_vertices") else None)
+        antagonist = (np.array(args["antagonist_vertices"], dtype=float)
+                      if args.get("antagonist_vertices") else None)
+
+        ctx_obj = PrepContext(
+            prep_vertices=prep_v,
+            prep_triangles=prep_t,
+            tooth_number=tooth,
+            mesial_vertices=mesial,
+            distal_vertices=distal,
+            antagonist_vertices=antagonist,
+            material=str(args.get("material", "zirconia")),
+        )
+
+        result = auto_design_crown(ctx_obj)
+        q = result.quality
+
+        return ok_payload({
+            "tooth_fdi": tooth.fdi,
+            "tooth_type": tooth.tooth_type,
+            "fdi_template_used": q.fdi_template_used,
+            "crown_outer_vertices": len(result.crown.outer_surface_mesh[0]),
+            "crown_outer_triangles": len(result.crown.outer_surface_mesh[1]),
+            "wall_thickness_min_mm": round(q.wall_thickness_min_mm, 3),
+            "wall_thickness_ok": q.wall_thickness_ok,
+            "proximal_contact_mesial_mm": (round(q.proximal_contact_mesial_mm, 3)
+                                           if q.proximal_contact_mesial_mm is not None else None),
+            "proximal_contact_distal_mm": (round(q.proximal_contact_distal_mm, 3)
+                                           if q.proximal_contact_distal_mm is not None else None),
+            "proximal_contacts_ok": q.proximal_contacts_ok,
+            "occlusal_clearance_mm": round(q.occlusal_clearance_mm, 3),
+            "occlusal_clearance_ok": q.occlusal_clearance_ok,
+            "margin_fit_um": round(q.margin_fit_um, 1),
+            "margin_curvature": round(result.margin_detection.mean_curvature_at_margin, 4),
+            "insertion_axis": [round(float(v), 4) for v in result.insertion_axis.axis],
+            "undercut_fraction": round(result.insertion_axis.undercut_fraction, 4),
+            "max_undercut_depth_mm": round(result.insertion_axis.max_undercut_depth_mm, 3),
+            "passes_all_checks": q.passes_all,
+            "honest_caveat": result.honest_caveat,
+        })
+    except Exception as exc:
+        return err_payload(str(exc), "AUTO_DESIGN_CROWN_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# dental_detect_margin
+# ---------------------------------------------------------------------------
+
+dental_detect_margin_spec = ToolSpec(
+    name="dental_detect_margin",
+    description=(
+        "Detect the preparation margin line on a prep scan using curvature analysis.\n\n"
+        "Method: principal-curvature estimation via local PCA on vertex neighbourhoods "
+        "(Taubin 1995; Rusinkiewicz 2004).  The margin is the Z-level with the highest "
+        "mean curvature concentration, corresponding to the finish-line transition.\n\n"
+        "Returns a 16-point margin polygon + mean curvature at the detected level.\n\n"
+        "HONEST: ALGORITHMIC heuristic using geometric curvature analysis, NOT a neural "
+        "network segmentation. Production systems may use colour/texture cues from scanner."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "prep_vertices": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+                "description": "Prepared tooth scan vertices (x,y,z) in mm. Minimum 4 vertices.",
+                "minItems": 4,
+            },
+            "prep_triangles": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": "integer"}, "minItems": 3, "maxItems": 3},
+                "description": "Triangle indices for the prep mesh. Minimum 1 triangle.",
+                "minItems": 1,
+            },
+            "n_margin_pts": {
+                "type": "integer",
+                "description": "Number of output margin polygon points (default 16).",
+            },
+            "margin_type": {
+                "type": "string",
+                "enum": ["chamfer", "shoulder", "feather", "knife"],
+                "description": "Margin finish-line design. Default 'chamfer'.",
+            },
+            "margin_width_mm": {
+                "type": "number",
+                "description": "Margin width in mm. Default 0.8.",
+            },
+        },
+        "required": ["prep_vertices", "prep_triangles"],
+    },
+)
+
+
+async def run_dental_detect_margin(args: dict, ctx: "ProjectCtx") -> str:
+    try:
+        import numpy as np
+        from kerf_dental.restoration_auto import detect_margin_line
+
+        prep_v = np.array(args["prep_vertices"], dtype=float)
+        prep_t = np.array(args["prep_triangles"], dtype=int)
+
+        result = detect_margin_line(
+            prep_v, prep_t,
+            n_margin_pts=int(args.get("n_margin_pts", 16)),
+            margin_type=str(args.get("margin_type", "chamfer")),
+            margin_width_mm=float(args.get("margin_width_mm", 0.8)),
+        )
+
+        return ok_payload({
+            "margin_points": result.margin_line.points.tolist(),
+            "margin_type": result.margin_line.type,
+            "margin_width_mm": result.margin_line.width_mm,
+            "margin_perimeter_mm": round(result.margin_line.perimeter_mm, 3),
+            "mean_curvature_at_margin": round(result.mean_curvature_at_margin, 6),
+            "detection_method": result.detection_method,
+        })
+    except Exception as exc:
+        return err_payload(str(exc), "DETECT_MARGIN_ERROR")
+
+
+# ---------------------------------------------------------------------------
+# dental_insertion_axis
+# ---------------------------------------------------------------------------
+
+dental_insertion_axis_spec = ToolSpec(
+    name="dental_insertion_axis",
+    description=(
+        "Determine optimal insertion axis for a crown preparation and detect undercuts.\n\n"
+        "Method: discrete hemisphere search over 25 candidate axis directions using "
+        "line-of-sight casting from the margin polygon (Gilboe 1983; Kratochvil 1963 "
+        "undercut theory).  Selects the axis that minimises maximum undercut depth.\n\n"
+        "Returns insertion axis unit vector, undercut fraction, and max undercut depth.\n\n"
+        "HONEST: Algorithmic hemisphere grid search. NOT a learned prediction model."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "prep_vertices": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+                "description": "Prepared tooth scan vertices (x,y,z) in mm. Minimum 4 vertices.",
+                "minItems": 4,
+            },
+            "prep_triangles": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": "integer"}, "minItems": 3, "maxItems": 3},
+                "description": "Triangle indices for the prep mesh. Minimum 1 triangle.",
+                "minItems": 1,
+            },
+            "margin_points": {
+                "type": "array",
+                "items": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+                "description": "Margin polygon points (mm). Optional — if omitted, estimated from prep.",
+            },
+            "n_candidates": {
+                "type": "integer",
+                "description": "Number of hemisphere candidate directions to test (default 25).",
+            },
+        },
+        "required": ["prep_vertices", "prep_triangles"],
+    },
+)
+
+
+async def run_dental_insertion_axis(args: dict, ctx: "ProjectCtx") -> str:
+    try:
+        import numpy as np
+        from kerf_dental.restoration_auto import determine_insertion_axis
+
+        prep_v = np.array(args["prep_vertices"], dtype=float)
+        prep_t = np.array(args["prep_triangles"], dtype=int)
+
+        margin_pts = None
+        if args.get("margin_points"):
+            margin_pts = np.array(args["margin_points"], dtype=float)
+
+        result = determine_insertion_axis(
+            prep_v, prep_t,
+            margin_pts=margin_pts,
+            n_candidates=int(args.get("n_candidates", 25)),
+        )
+
+        return ok_payload({
+            "insertion_axis": [round(float(v), 6) for v in result.axis],
+            "undercut_fraction": round(result.undercut_fraction, 4),
+            "max_undercut_depth_mm": round(result.max_undercut_depth_mm, 3),
+            "candidate_axes_tested": result.candidate_axes_tested,
+            "honest_caveat": result.honest_caveat,
+        })
+    except Exception as exc:
+        return err_payload(str(exc), "INSERTION_AXIS_ERROR")

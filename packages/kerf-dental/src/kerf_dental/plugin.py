@@ -43,6 +43,10 @@ async def register(app: FastAPI, ctx):
         dental_denture_design_v2_spec, run_dental_denture_design_v2,
         dental_intraoral_scan_process_spec, run_dental_intraoral_scan_process,
         dental_lab_stl_export_spec, run_dental_lab_stl_export,
+        # Algorithmic automated restoration design (ALGORITHMIC, not ML/AI)
+        dental_auto_design_crown_spec, run_dental_auto_design_crown,
+        dental_detect_margin_spec, run_dental_detect_margin,
+        dental_insertion_axis_spec, run_dental_insertion_axis,
     )
     ctx.tools.register("dental_crown_design", dental_crown_design_spec, run_dental_crown_design)
     ctx.tools.register("dental_surgical_guide", dental_surgical_guide_spec, run_dental_surgical_guide)
@@ -63,6 +67,10 @@ async def register(app: FastAPI, ctx):
     ctx.tools.register("dental_denture_design_v2", dental_denture_design_v2_spec, run_dental_denture_design_v2)
     ctx.tools.register("dental_intraoral_scan_process", dental_intraoral_scan_process_spec, run_dental_intraoral_scan_process)
     ctx.tools.register("dental_lab_stl_export", dental_lab_stl_export_spec, run_dental_lab_stl_export)
+    # Algorithmic automated restoration design (ALGORITHMIC, not ML/AI)
+    ctx.tools.register("dental_auto_design_crown", dental_auto_design_crown_spec, run_dental_auto_design_crown)
+    ctx.tools.register("dental_detect_margin", dental_detect_margin_spec, run_dental_detect_margin)
+    ctx.tools.register("dental_insertion_axis", dental_insertion_axis_spec, run_dental_insertion_axis)
 
     provides = ["dental.crown", "dental.guide", "dental.denture", "dental.stl",
                 "dental.registration", "dental.deviation", "dental.implant_planning",
@@ -73,7 +81,10 @@ async def register(app: FastAPI, ctx):
                 # Wave 11C deepening
                 "dental.implant_spacing_check", "dental.drill_sequence",
                 "dental.denture_v2_kennedy", "dental.intraoral_scan_process",
-                "dental.lab_stl_export"]
+                "dental.lab_stl_export",
+                # Algorithmic automated restoration design
+                "dental.auto_design_crown", "dental.detect_margin",
+                "dental.insertion_axis"]
     if _PYDICOM_AVAILABLE:
         provides.append("dental.dicom")
 

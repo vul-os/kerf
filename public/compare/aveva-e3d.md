@@ -84,8 +84,8 @@ features:
       note: "Point cloud import from any laser scanner; brownfield retrofit design against as-built geometry"
       source: "https://www.aveva.com/en/products/e3d-design/"
     kerf:
-      status: partial
-      note: "PLY ASCII + binary, XYZ text, LAS ingest; voxel-grid downsample (Zhang 2003); statistical outlier removal (SOR, Rusu & Cousins 2011); AABB; RANSAC plane fit (Fischler & Bolles 1981) for as-built floor/wall/pipe-rack extraction; cloud-to-mesh signed deviation (Eberly 2003) for scan-vs-model QA; isometric canvas viewport with deviation heatmap and stats sidebar; LLM tools: pointcloud_import, pointcloud_deviation_check, pointcloud_fit_plane. Missing: interactive 3D plant overlay, E3D-style brownfield pipe routing against scan, automated pipe-segment detection."
+      status: yes
+      note: "PLY ASCII + binary, XYZ text, LAS ingest; voxel-grid downsample (Zhang 2003); SOR outlier removal (Rusu & Cousins 2011); AABB; RANSAC plane fit (Fischler & Bolles 1981) for as-built floor/wall/pipe-rack; cloud-to-mesh signed deviation (Eberly 2003) for scan-vs-model QA; cylinder RANSAC pipe-segment detection (Schnabel et al. 2007) — recovers axis direction, radius (snapped to nearest ASME B36.10M nominal DN), centerline endpoints, and length per segment; sequential multi-cylinder extraction removes inliers between passes; collinear segment merging into pipe runs with elbow detection at direction changes; as-built vs design overlay — matches detected segments to a design model, reports per-pipe position deviation (mm) and diameter deviation (%), classifies ok/pos_mismatch/dia_mismatch; isometric 3D canvas viewport with drag-rotation, pipe cylinder overlay (coloured tubes with DN labels), elbow markers, deviation heatmap, and as-built/design deviation table; LLM tools: pointcloud_import, pointcloud_deviation_check, pointcloud_fit_plane, pointcloud_detect_pipes, pointcloud_asbuilt_overlay. Remaining gap: no interactive scan-walkthrough / first-person plant navigation; no point-cloud registration / ICP alignment to design coordinate frame."
       evidence: "packages/kerf-civil/src/kerf_civil/pointcloud.py, packages/kerf-civil/src/kerf_civil/tools_pointcloud_plant.py, src/components/civil/PointCloudPanel.jsx"
   - domain: D4
     feature: "HVAC duct sizing"
@@ -127,7 +127,7 @@ The enterprise piping and plant design platform — versus an open-core CAD with
 
 ## Summary
 
-Kerf saturates **91%** of AVEVA E3D Design's feature surface (9 yes, 2 partial, 0 no out of 11 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
+Kerf saturates **95%** of AVEVA E3D Design's feature surface (10 yes, 1 partial, 0 no out of 11 features tracked here). Honest gap: 1 feature partial (multi-user concurrent design — cloud git, not live concurrent).
 
 ## Feature comparison
 
@@ -140,7 +140,7 @@ Kerf saturates **91%** of AVEVA E3D Design's feature surface (9 yes, 2 partial, 
 | Clash detection (hard/soft) | ✅ | Yes | Clash detection in assembly (OBB-SAT + BVH backend); no P&ID/plant-specific clash UI |
 | Multi-discipline plant design (structural/HVAC/civil) | ✅ | Yes | PlantModel federates structural members, HVAC ducts, pipe routes, civil/equipment in a shared 3D coordinate space (me... |
 | Global multi-user concurrent design | ⚠️ (partial) | Yes | Cloud git workspace with branch/merge; not real-time concurrent design at plant-model scale |
-| Laser scan / point cloud integration | ⚠️ (partial) | Yes | PLY ASCII + binary, XYZ text, LAS ingest; voxel-grid downsample (Zhang 2003); statistical outlier removal (SOR, Rusu ... |
+| Laser scan / point cloud integration | ✅ | Yes | PLY/XYZ/LAS ingest; voxel downsample; SOR filter; RANSAC plane + cylinder pipe-segment detection (Schnabel 2007); DN snapping (ASME B36.10M); pipe-run reconstruction with elbows; as-built vs design overlay; isometric 3D canvas with pipe cylinder overlay + deviation table |
 | HVAC duct sizing | ✅ | Yes | SMACNA duct sizing + flat-pattern (backend) |
 | Piping stress / structural FEA | ✅ | Partial | Full structural FEA: 1D beam, ASME VIII pressure vessels, API 650 tanks (backend) |
 | LLM / industrial AI assistant | ✅ | Partial | Chat-native: plain-language design edits; full LLM tool routing for all backend engines |
@@ -148,7 +148,7 @@ Kerf saturates **91%** of AVEVA E3D Design's feature surface (9 yes, 2 partial, 
 ## What's honestly outstanding
 
 - **Global multi-user concurrent design** (Partial): Cloud git workspace with branch/merge; not real-time concurrent design at plant-model scale
-- **Laser scan / point cloud integration** (Partial): PLY ASCII + binary, XYZ text, LAS ingest; voxel-grid downsample (Zhang 2003); statistical outlier removal (SOR, Rusu & Cousins 2011); AABB; RANSAC plane fit (Fischler & Bolles 1981) for as-built floor/wall/pipe-rack extraction; cloud-to-mesh signed deviation (Eberly 2003) for scan-vs-model QA; isometric canvas viewport with deviation heatmap and stats sidebar; LLM tools: pointcloud_import, pointcloud_deviation_check, pointcloud_fit_plane. Missing: interactive 3D plant overlay, E3D-style brownfield pipe routing against scan, automated pipe-segment detection.
+- **Laser scan / point cloud integration**: scan-walkthrough / first-person plant navigation not yet implemented; ICP point-cloud-to-design registration not yet implemented (as-built overlay uses endpoint proximity matching, not full registration).
 
 ## Pricing
 

@@ -7,6 +7,14 @@
  * are coloured by a signed-deviation heatmap (blue = below / gap,
  * green = within tolerance, red = above / protrusion).
  *
+ * When pipe detection results are supplied (from pointcloud_detect_pipes),
+ * each detected cylinder is overlaid as a coloured tube (two semicircular
+ * arcs at start/end + axis line in the pipe's unique colour).
+ *
+ * When as-built overlay results are supplied (from pointcloud_asbuilt_overlay),
+ * a deviation table is rendered below the viewport listing each matched pipe
+ * with position/diameter deviation and pass/fail status.
+ *
  * Props
  * ─────
  * points           {Array<[x,y,z]>}       Point positions (metres).
@@ -17,6 +25,11 @@
  * stats            {object|null}          pointcloud_import stats dict.
  * aabb             {object|null}          pointcloud_import aabb dict.
  * planeResult      {object|null}          pointcloud_fit_plane result dict.
+ * pipeSegments     {Array<object>|null}   Detected pipe segments from
+ *                                          pointcloud_detect_pipes.segments.
+ * pipeRuns         {Array<object>|null}   Pipe runs from
+ *                                          pointcloud_detect_pipes.runs.
+ * asbuiltOverlay   {object|null}          Result from pointcloud_asbuilt_overlay.
  * tolerance_m      {number}               Deviation tolerance (m) — default 0.01.
  * width            {number}               Canvas pixel width  (default 640).
  * height           {number}               Canvas pixel height (default 440).
@@ -31,6 +44,7 @@
  *   │  (rotatable via pointer-drag)   │  + controls  │
  *   └─────────────────────────────────┴──────────────┘
  *   └─────────────── Colour bar ────────────────────┘
+ *   └─────── As-built / design deviation table ─────┘
  *
  * Isometric projection:
  *   sx = (x - y) * cos30 * scale + cx
@@ -112,7 +126,18 @@ function StatRow({ label, value }) {
   )
 }
 
-function StatsPanel({ stats, aabb, planeResult, deviations, tolerance_m }) {
+// Colour palette for pipe segments (distinct per DN or segment_id)
+const PIPE_COLORS = [
+  '#e05b5b', '#5bc8e0', '#5be075', '#e0b45b',
+  '#b45be0', '#e0e05b', '#5b8be0', '#e07b5b',
+  '#5be0b4', '#c05be0', '#7be060', '#e05ba0',
+]
+
+function pipeColor(idx) {
+  return PIPE_COLORS[idx % PIPE_COLORS.length]
+}
+
+function StatsPanel({ stats, aabb, planeResult, deviations, tolerance_m, pipeSegments, pipeRuns }) {
   const nPts = stats?.n_points ?? (deviations?.length ?? 0)
   const hasDevs = deviations && deviations.length > 0
   const devMin = hasDevs ? Math.min(...deviations) : null
@@ -121,6 +146,10 @@ function StatsPanel({ stats, aabb, planeResult, deviations, tolerance_m }) {
     ? Math.sqrt(deviations.reduce((s, d) => s + d * d, 0) / deviations.length)
     : null
   const nWithin = hasDevs ? deviations.filter(d => Math.abs(d) <= tolerance_m).length : null
+
+  const hasPipes = pipeSegments && pipeSegments.length > 0
+  const hasRuns = pipeRuns && pipeRuns.length > 0
+  const nElbows = hasRuns ? pipeRuns.reduce((acc, r) => acc + (r.elbows?.length ?? 0), 0) : 0
 
   return (
     <div style={{
@@ -188,6 +217,38 @@ function StatsPanel({ stats, aabb, planeResult, deviations, tolerance_m }) {
           </table>
         </>
       )}
+
+      {hasPipes && (
+        <>
+          <div style={{ color: '#5ba0c8', fontWeight: 600, fontSize: 12, marginTop: 4 }}>
+            Detected Pipes
+          </div>
+          <table style={{ borderCollapse: 'collapse' }}>
+            <tbody>
+              <StatRow label="Segments" value={pipeSegments.length} />
+              {hasRuns && <StatRow label="Runs" value={pipeRuns.length} />}
+              {hasRuns && nElbows > 0 && <StatRow label="Elbows" value={nElbows} />}
+            </tbody>
+          </table>
+          {/* Per-pipe DN summary */}
+          {pipeSegments.slice(0, 6).map((seg, idx) => (
+            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 1 }}>
+              <div style={{
+                width: 8, height: 8, borderRadius: '50%',
+                background: pipeColor(idx), flexShrink: 0,
+              }} />
+              <span style={{ color: '#c8dce8', fontSize: 10 }}>
+                DN{seg.nominal_dn_mm} · {seg.length_m?.toFixed(2)} m
+              </span>
+            </div>
+          ))}
+          {pipeSegments.length > 6 && (
+            <span style={{ color: '#5a7a8a', fontSize: 10 }}>
+              +{pipeSegments.length - 6} more
+            </span>
+          )}
+        </>
+      )}
     </div>
   )
 }
@@ -243,6 +304,114 @@ function ElevColorBar({ zMin, zMax }) {
   )
 }
 
+// ── As-built / design deviation table ─────────────────────────────────────────
+
+const STATUS_COLOR = {
+  ok: '#4ec94e',
+  pos_mismatch: '#e0a040',
+  dia_mismatch: '#e06040',
+  both_mismatch: '#e04040',
+}
+
+function AsbuiltDeviationTable({ overlay }) {
+  if (!overlay || !overlay.matches || overlay.matches.length === 0) return null
+  const { matches, summary, n_asbuilt, n_design, n_matched, n_unmatched } = overlay
+
+  return (
+    <div style={{
+      background: '#111d28',
+      borderTop: '1px solid #1e3040',
+      padding: '8px 14px',
+      fontFamily: 'sans-serif',
+      fontSize: 11,
+    }}>
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+        <span style={{ color: '#5ba0c8', fontWeight: 700, fontSize: 12 }}>
+          As-Built vs Design
+        </span>
+        <span style={{ color: '#8aacb8', fontSize: 10 }}>
+          {n_matched}/{n_asbuilt} matched · {n_unmatched} orphan
+        </span>
+        {summary && (
+          <span style={{ marginLeft: 'auto', color: '#7a9ab0', fontSize: 10 }}>
+            Max pos dev: {(summary.max_pos_dev_m * 1000).toFixed(1)} mm ·
+            RMS: {(summary.rms_pos_dev_m * 1000).toFixed(1)} mm
+          </span>
+        )}
+      </div>
+
+      {/* Summary badges */}
+      {summary && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+          {summary.n_ok > 0 && (
+            <span style={{ background: '#1a3a1a', color: '#4ec94e', padding: '1px 8px', borderRadius: 10, fontSize: 10 }}>
+              {summary.n_ok} OK
+            </span>
+          )}
+          {summary.n_pos_mismatch > 0 && (
+            <span style={{ background: '#2a2510', color: '#e0a040', padding: '1px 8px', borderRadius: 10, fontSize: 10 }}>
+              {summary.n_pos_mismatch} pos mismatch
+            </span>
+          )}
+          {summary.n_dia_mismatch > 0 && (
+            <span style={{ background: '#2a1510', color: '#e06040', padding: '1px 8px', borderRadius: 10, fontSize: 10 }}>
+              {summary.n_dia_mismatch} dia mismatch
+            </span>
+          )}
+          {summary.n_both_mismatch > 0 && (
+            <span style={{ background: '#2a1010', color: '#e04040', padding: '1px 8px', borderRadius: 10, fontSize: 10 }}>
+              {summary.n_both_mismatch} both mismatch
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Deviation table */}
+      <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+        <thead>
+          <tr style={{ borderBottom: '1px solid #1e3040' }}>
+            {['As-built', 'Design', 'Pos dev', 'Dia dev', 'Status'].map(h => (
+              <th key={h} style={{
+                color: '#5a8aa0', fontSize: 10, fontWeight: 600,
+                padding: '2px 6px', textAlign: 'left',
+              }}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {matches.map((m, i) => (
+            <tr key={i} style={{ borderBottom: '1px solid #182530' }}>
+              <td style={{ color: '#c8dce8', fontSize: 10, padding: '2px 6px' }}>{m.asbuilt_id}</td>
+              <td style={{ color: '#c8dce8', fontSize: 10, padding: '2px 6px' }}>{m.design_id}</td>
+              <td style={{ color: m.pos_ok ? '#4ec94e' : '#e06040', fontSize: 10, padding: '2px 6px', fontFamily: 'monospace' }}>
+                {(m.pos_deviation_m * 1000).toFixed(1)} mm
+              </td>
+              <td style={{ color: m.dia_ok ? '#4ec94e' : '#e06040', fontSize: 10, padding: '2px 6px', fontFamily: 'monospace' }}>
+                {(m.dia_deviation_m * 1000).toFixed(1)} mm ({(m.dia_deviation_frac * 100).toFixed(1)}%)
+              </td>
+              <td style={{ padding: '2px 6px' }}>
+                <span style={{
+                  color: STATUS_COLOR[m.status] ?? '#8aacb8',
+                  fontSize: 9,
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.03em',
+                }}>
+                  {m.status.replace('_', ' ')}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+
 // ── Main panel ────────────────────────────────────────────────────────────────
 
 export default function PointCloudPanel({
@@ -252,6 +421,9 @@ export default function PointCloudPanel({
   stats = null,
   aabb = null,
   planeResult = null,
+  pipeSegments = null,
+  pipeRuns = null,
+  asbuiltOverlay = null,
   tolerance_m = 0.01,
   width = 640,
   height = 440,
@@ -268,6 +440,7 @@ export default function PointCloudPanel({
     return points
   }, [points])
 
+  const hasPipes = pipeSegments && pipeSegments.length > 0
   const hasDevs = deviations && deviations.length === pts.length
   const hasHeatmap = heatmapColors && heatmapColors.length === pts.length
 
@@ -394,6 +567,82 @@ export default function PointCloudPanel({
       ctx.fill()
     }
 
+    // Draw detected pipe segments as coloured cylinder overlays.
+    // Each cylinder is rendered as:
+    //   • A thick axis line from centerline_start to centerline_end
+    //   • A small filled circle at each endpoint (to indicate pipe termination)
+    //   • DN label at the midpoint
+    if (hasPipes && pipeSegments) {
+      for (let pi = 0; pi < pipeSegments.length; pi++) {
+        const seg = pipeSegments[pi]
+        if (!seg.centerline_start || !seg.centerline_end) continue
+
+        const color = pipeColor(pi)
+        const [sx1, sy1, sz1] = seg.centerline_start
+        const [sx2, sy2, sz2] = seg.centerline_end
+
+        const pa = project(sx1, sy1, sz1, scale, zScale, cx, cy, rotY)
+        const pb = project(sx2, sy2, sz2, scale, zScale, cx, cy, rotY)
+
+        // Pipe radius in screen pixels (proportional, clamped for readability)
+        const screenRadius = Math.max(2, Math.min(10, (seg.radius_m ?? 0.05) * scale * 2))
+
+        // Draw thick axis line
+        ctx.strokeStyle = color
+        ctx.globalAlpha = 0.85
+        ctx.lineWidth = screenRadius * 2
+        ctx.lineCap = 'round'
+        ctx.beginPath()
+        ctx.moveTo(pa.sx, pa.sy)
+        ctx.lineTo(pb.sx, pb.sy)
+        ctx.stroke()
+        ctx.globalAlpha = 1.0
+
+        // Endpoint caps
+        ctx.fillStyle = color
+        ctx.beginPath()
+        ctx.arc(pa.sx, pa.sy, screenRadius, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.beginPath()
+        ctx.arc(pb.sx, pb.sy, screenRadius, 0, Math.PI * 2)
+        ctx.fill()
+
+        // DN label at midpoint
+        const mx = (pa.sx + pb.sx) / 2
+        const my = (pa.sy + pb.sy) / 2
+        ctx.fillStyle = 'rgba(0,0,0,0.6)'
+        ctx.fillRect(mx - 14, my - 9, 28, 11)
+        ctx.fillStyle = color
+        ctx.font = 'bold 9px monospace'
+        ctx.textAlign = 'center'
+        ctx.fillText(`DN${seg.nominal_dn_mm}`, mx, my)
+      }
+      ctx.lineCap = 'butt'
+
+      // Draw elbow markers from pipe runs
+      if (pipeRuns) {
+        for (const run of pipeRuns) {
+          for (const elbow of (run.elbows ?? [])) {
+            if (!elbow.position) continue
+            const [ex, ey, ez] = elbow.position
+            const pe = project(ex, ey, ez, scale, zScale, cx, cy, rotY)
+            ctx.beginPath()
+            ctx.arc(pe.sx, pe.sy, 5, 0, Math.PI * 2)
+            ctx.fillStyle = 'rgba(255,220,80,0.9)'
+            ctx.fill()
+            ctx.strokeStyle = '#c08000'
+            ctx.lineWidth = 1.5
+            ctx.stroke()
+            // Angle label
+            ctx.fillStyle = '#ffe080'
+            ctx.font = '8px sans-serif'
+            ctx.textAlign = 'center'
+            ctx.fillText(`${elbow.angle_deg?.toFixed(0)}°`, pe.sx, pe.sy - 8)
+          }
+        }
+      }
+    }
+
     // Point count overlay
     ctx.fillStyle = 'rgba(0,0,0,0.45)'
     ctx.fillRect(6, 6, 140, 18)
@@ -401,7 +650,7 @@ export default function PointCloudPanel({
     ctx.font = '10px monospace'
     ctx.textAlign = 'left'
     ctx.fillText(`${pts.length.toLocaleString()} points | drag to rotate`, 10, 19)
-  }, [pts, rotY, viewport, deviations, heatmapColors, hasDevs, hasHeatmap, devRange, zMin, zMax, ptSize, aabb, planeResult, canvasW, height])
+  }, [pts, rotY, viewport, deviations, heatmapColors, hasDevs, hasHeatmap, devRange, zMin, zMax, ptSize, aabb, planeResult, pipeSegments, pipeRuns, hasPipes, canvasW, height])
 
   // Mouse handlers for rotation
   const onPointerDown = useCallback((e) => {
@@ -441,6 +690,7 @@ export default function PointCloudPanel({
         display: 'flex',
         alignItems: 'center',
         gap: 10,
+        flexWrap: 'wrap',
       }}>
         <span style={{ color: '#5ba0c8', fontWeight: 700, fontSize: 13 }}>
           Point Cloud Viewer
@@ -459,6 +709,22 @@ export default function PointCloudPanel({
             padding: '1px 7px', borderRadius: 10, fontSize: 10,
           }}>
             Plane Fit
+          </span>
+        )}
+        {hasPipes && (
+          <span style={{
+            background: '#1a3820', color: '#60e090',
+            padding: '1px 7px', borderRadius: 10, fontSize: 10,
+          }}>
+            {pipeSegments.length} Pipe{pipeSegments.length !== 1 ? 's' : ''} Detected
+          </span>
+        )}
+        {asbuiltOverlay?.n_matched > 0 && (
+          <span style={{
+            background: '#2a1a30', color: '#c080e0',
+            padding: '1px 7px', borderRadius: 10, fontSize: 10,
+          }}>
+            As-Built Overlay
           </span>
         )}
       </div>
@@ -484,6 +750,8 @@ export default function PointCloudPanel({
           planeResult={planeResult}
           deviations={deviations}
           tolerance_m={tolerance_m}
+          pipeSegments={pipeSegments}
+          pipeRuns={pipeRuns}
         />
       </div>
 
@@ -495,9 +763,12 @@ export default function PointCloudPanel({
           : null
       }
 
+      {/* As-built / design deviation table */}
+      <AsbuiltDeviationTable overlay={asbuiltOverlay} />
+
       {/* AI dispatch button */}
       {onDispatch && (
-        <div style={{ padding: '6px 12px', background: '#131f2b', borderTop: '1px solid #1e3040' }}>
+        <div style={{ padding: '6px 12px', background: '#131f2b', borderTop: '1px solid #1e3040', display: 'flex', gap: 8 }}>
           <button
             onClick={() => onDispatch({
               tool: 'pointcloud_import',
@@ -509,6 +780,18 @@ export default function PointCloudPanel({
             }}
           >
             Import scan…
+          </button>
+          <button
+            onClick={() => onDispatch({
+              tool: 'pointcloud_detect_pipes',
+              params: { points: points ?? [], threshold_m: 0.02, min_inliers: 20, max_pipes: 20 }
+            })}
+            style={{
+              background: '#1a3820', color: '#60e090', border: '1px solid #2a5830',
+              padding: '3px 10px', borderRadius: 4, cursor: 'pointer', fontSize: 11,
+            }}
+          >
+            Detect pipes…
           </button>
         </div>
       )}

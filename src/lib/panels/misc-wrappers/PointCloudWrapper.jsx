@@ -9,13 +9,20 @@
 //     stats?:          { n_points, density_per_m2, … }
 //     aabb?:           { min_x, max_x, … }
 //     planeResult?:    { success, normal, d, inlier_count, … }
+//     pipeSegments?:   [ { axis_point, axis_direction, radius_m, diameter_m,
+//                          nominal_dn_mm, centerline_start, centerline_end,
+//                          length_m, inlier_count }, … ]
+//     pipeRuns?:       [ { run_id, segment_ids, nominal_dn_mm, centerlines,
+//                          elbows, total_length_m, diameter_m }, … ]
+//     asbuiltOverlay?: { n_asbuilt, n_design, n_matched, matches, summary, … }
 //     tolerance_m?:    number                — deviation tolerance (m)
 //     width?:          number                — canvas pixel width
 //     height?:         number                — canvas pixel height
 //   }
 //
 // These keys match the output fields of the pointcloud_import,
-// pointcloud_deviation_check, and pointcloud_fit_plane LLM tools.
+// pointcloud_deviation_check, pointcloud_fit_plane,
+// pointcloud_detect_pipes, and pointcloud_asbuilt_overlay LLM tools.
 
 import Panel from '../../../components/civil/PointCloudPanel.jsx'
 
@@ -26,6 +33,9 @@ const DEFAULTS = {
   stats: null,
   aabb: null,
   planeResult: null,
+  pipeSegments: null,
+  pipeRuns: null,
+  asbuiltOverlay: null,
   tolerance_m: 0.01,
   width: 720,
   height: 480,

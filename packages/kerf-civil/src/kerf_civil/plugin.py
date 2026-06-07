@@ -10,7 +10,8 @@ Registers:
                civil_drainage_rational_method, civil_time_of_concentration,
                civil_gravity_sewer_profile, civil_gravity_network_solve,
                civil_landxml_import, civil_landxml_export,
-               pointcloud_import, pointcloud_deviation_check, pointcloud_fit_plane
+               pointcloud_import, pointcloud_deviation_check, pointcloud_fit_plane,
+               pointcloud_detect_pipes, pointcloud_asbuilt_overlay
 """
 
 from __future__ import annotations
@@ -164,6 +165,11 @@ async def register(app: FastAPI, ctx):
         "plant.pointcloud-deviation",
         "plant.pointcloud-ransac-plane",
         "plant.pointcloud-aabb",
+        "plant.pointcloud-cylinder-ransac",
+        "plant.pointcloud-pipe-detection",
+        "plant.pointcloud-pipe-runs",
+        "plant.pointcloud-asbuilt-overlay",
+        "plant.pointcloud-nominal-dn-snap",
     ]
 
     try:

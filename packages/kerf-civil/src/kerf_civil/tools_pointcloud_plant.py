@@ -21,12 +21,23 @@ Tools
                                scan for as-built pipe-rack / floor / wall
                                detection.
 
+  pointcloud_detect_pipes    — sequential cylinder RANSAC: extract all pipe
+                               segments from a plant scan cloud (axis, radius,
+                               length, nominal DN) and reconstruct pipe runs
+                               with elbows at direction changes.
+
+  pointcloud_asbuilt_overlay — register detected as-built pipe segments against
+                               a design pipe model; report position/diameter
+                               deviations per segment and aggregate statistics.
+
 References
 ----------
 Fischler & Bolles (1981). RANSAC. Commun. ACM 24(6):381-395.
 Rusu & Cousins (2011). PCL. IEEE ICRA. (SOR, VoxelGrid)
 Eberly (2003). Point-to-triangle distance. Geometric Tools.
+Schnabel et al. (2007). Efficient RANSAC for Point-Cloud Shape Detection. CGF.
 ASPRS LAS Spec 1.4-R15.
+ASME B36.10M-2018. Nominal Pipe Sizes and OD table.
 """
 
 from __future__ import annotations
@@ -496,6 +507,275 @@ async def run_pointcloud_fit_plane(params: dict, ctx: "ProjectCtx") -> str:
 
 
 # ===========================================================================
+# Tool: pointcloud_detect_pipes
+# ===========================================================================
+
+pointcloud_detect_pipes_spec = ToolSpec(
+    name="pointcloud_detect_pipes",
+    description=(
+        "Detect pipe segments in a plant laser-scan point cloud using sequential\n"
+        "cylinder RANSAC (Schnabel et al. 2007).\n"
+        "\n"
+        "For each cylinder detected:\n"
+        "  • Axis direction, axis point, radius, length, centerline endpoints.\n"
+        "  • Nominal diameter snapped to nearest ASME B36.10M DN size.\n"
+        "  • Inlier points removed before next RANSAC iteration (sequential\n"
+        "    extraction — each pipe segment is isolated independently).\n"
+        "\n"
+        "After extraction, collinear adjacent segments are connected into pipe\n"
+        "runs and direction-change junctions are labelled as virtual elbows.\n"
+        "\n"
+        "Use for:\n"
+        "  • Automated as-built pipe-segment detection from brownfield scan\n"
+        "  • Reverse-engineering existing plant geometry\n"
+        "  • As-built BOM extraction (pipe diameters + run lengths)\n"
+        "\n"
+        "Parameters\n"
+        "----------\n"
+        "points             : list of [x, y, z] — scan cloud (metres)\n"
+        "threshold_m        : RANSAC inlier band (m); default 0.02 m\n"
+        "max_iterations     : RANSAC budget per cylinder (default 2000)\n"
+        "min_inliers        : minimum inlier count to accept a pipe (default 20)\n"
+        "max_pipes          : maximum pipe segments to extract (default 20)\n"
+        "min_radius_m       : minimum pipe radius (m) — filters noise (default 0.005)\n"
+        "max_radius_m       : maximum pipe radius (m) — filters vessels (default 0.400)\n"
+        "collinear_angle_deg: angle threshold for merging into a run (default 10°)\n"
+        "gap_m              : max endpoint gap for run merging (default 0.5 m)\n"
+        "seed               : RNG seed for reproducibility\n"
+        "\n"
+        "Returns\n"
+        "-------\n"
+        "ok, n_pipes (count of detected segments),\n"
+        "segments (list per pipe: axis_point, axis_direction, radius_m, diameter_m,\n"
+        "          length_m, nominal_dn_mm, nominal_od_m, centerline_start/end,\n"
+        "          inlier_count, inlier_fraction, rmse_m),\n"
+        "runs (list per pipe run: run_id, segment_ids, nominal_dn_mm, centerlines,\n"
+        "      elbows[{position, angle_deg}], total_length_m, diameter_m),\n"
+        "n_runs, n_elbows.\n"
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "points": {
+                "type": "array",
+                "description": "Scan point cloud as [[x,y,z], …] (metres).",
+                "items": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
+                },
+                "minItems": 5,
+            },
+            "threshold_m": {
+                "type": "number",
+                "description": "RANSAC inlier band half-width around cylinder surface (m).",
+                "default": 0.02,
+            },
+            "max_iterations": {
+                "type": "integer",
+                "description": "RANSAC iteration budget per cylinder.",
+                "default": 2000,
+                "minimum": 50,
+            },
+            "min_inliers": {
+                "type": "integer",
+                "description": "Minimum inlier count to accept a cylinder.",
+                "default": 20,
+                "minimum": 5,
+            },
+            "max_pipes": {
+                "type": "integer",
+                "description": "Maximum number of pipe segments to extract.",
+                "default": 20,
+                "minimum": 1,
+            },
+            "min_radius_m": {
+                "type": "number",
+                "description": "Minimum cylinder radius (m) — filters noise/non-pipe shapes.",
+                "default": 0.005,
+            },
+            "max_radius_m": {
+                "type": "number",
+                "description": "Maximum cylinder radius (m) — filters vessels/tanks.",
+                "default": 0.400,
+            },
+            "collinear_angle_deg": {
+                "type": "number",
+                "description": "Max axis-direction angle (°) for merging segments into a run.",
+                "default": 10.0,
+            },
+            "gap_m": {
+                "type": "number",
+                "description": "Maximum endpoint gap (m) for joining segments into a run.",
+                "default": 0.5,
+            },
+            "seed": {
+                "type": "integer",
+                "description": "RNG seed for reproducibility.",
+            },
+        },
+        "required": ["points"],
+    },
+)
+
+
+async def run_pointcloud_detect_pipes(params: dict, ctx: "ProjectCtx") -> str:
+    try:
+        import numpy as np
+        from kerf_civil.pointcloud import detect_pipes, connect_pipe_runs
+
+        pts_raw = params.get("points", [])
+        threshold = float(params.get("threshold_m", 0.02))
+        max_iter = int(params.get("max_iterations", 2000))
+        min_inl = int(params.get("min_inliers", 20))
+        max_pipes = int(params.get("max_pipes", 20))
+        min_r = float(params.get("min_radius_m", 0.005))
+        max_r = float(params.get("max_radius_m", 0.400))
+        col_ang = float(params.get("collinear_angle_deg", 10.0))
+        gap = float(params.get("gap_m", 0.5))
+        seed = params.get("seed")
+        if seed is not None:
+            seed = int(seed)
+
+        if len(pts_raw) < 5:
+            return err_payload("points must have >= 5 entries", "BAD_ARGS")
+
+        pts = np.array(pts_raw, dtype=np.float64)
+
+        segments = detect_pipes(
+            pts,
+            threshold=threshold,
+            max_iterations=max_iter,
+            min_inliers=min_inl,
+            max_pipes=max_pipes,
+            min_radius_m=min_r,
+            max_radius_m=max_r,
+            seed=seed,
+        )
+
+        runs = connect_pipe_runs(segments, collinear_angle_deg=col_ang, gap_m=gap)
+        n_elbows = sum(len(r["elbows"]) for r in runs)
+
+        # Strip inlier_mask from response (too large)
+        clean_segs = []
+        for s in segments:
+            cs = {k: v for k, v in s.items() if k != "inlier_mask"}
+            clean_segs.append(cs)
+
+        return ok_payload({
+            "ok": True,
+            "n_pipes": len(segments),
+            "segments": clean_segs,
+            "runs": runs,
+            "n_runs": len(runs),
+            "n_elbows": n_elbows,
+        })
+
+    except Exception as exc:
+        return err_payload(str(exc), "POINTCLOUD_DETECT_PIPES_ERROR")
+
+
+# ===========================================================================
+# Tool: pointcloud_asbuilt_overlay
+# ===========================================================================
+
+pointcloud_asbuilt_overlay_spec = ToolSpec(
+    name="pointcloud_asbuilt_overlay",
+    description=(
+        "Compare detected as-built pipe segments (from pointcloud_detect_pipes)\n"
+        "against a design pipe model to identify position and diameter deviations.\n"
+        "\n"
+        "Each as-built segment is matched to the closest design pipe by\n"
+        "centerline proximity (endpoint-to-endpoint distance).  Deviations are\n"
+        "classified as:\n"
+        "  ok              — within both positional and diameter tolerance\n"
+        "  pos_mismatch    — centerline offset > pos_tol_m\n"
+        "  dia_mismatch    — diameter differs by > dia_tol_frac × nominal\n"
+        "  both_mismatch   — both out of tolerance\n"
+        "\n"
+        "Use for:\n"
+        "  • As-built vs design overlay for brownfield retrofit / upgrade\n"
+        "  • Construction QA — verifying installed pipe positions match design\n"
+        "  • Change detection between successive scans of an operating plant\n"
+        "\n"
+        "Parameters\n"
+        "----------\n"
+        "asbuilt_segments : list — from pointcloud_detect_pipes segments output\n"
+        "design_pipes     : list of design pipes, each containing:\n"
+        "                     centerline_start [x,y,z]\n"
+        "                     centerline_end   [x,y,z]\n"
+        "                     diameter_m       float\n"
+        "                     id               (optional) — unique pipe tag\n"
+        "pos_tol_m        : positional tolerance (m) for pass/fail (default 0.05 m)\n"
+        "dia_tol_frac     : diameter tolerance as fraction of nominal (default 0.10)\n"
+        "\n"
+        "Returns\n"
+        "-------\n"
+        "ok, n_asbuilt, n_design, n_matched, n_unmatched,\n"
+        "matches (list: asbuilt_id, design_id, pos_deviation_m, dia_deviation_m,\n"
+        "         dia_deviation_frac, pos_ok, dia_ok, status),\n"
+        "unmatched_asbuilt (list of unmatched segment_ids),\n"
+        "summary (n_ok, n_pos_mismatch, n_dia_mismatch, n_both_mismatch,\n"
+        "         max_pos_dev_m, rms_pos_dev_m).\n"
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "asbuilt_segments": {
+                "type": "array",
+                "description": "As-built pipe segments from pointcloud_detect_pipes.",
+                "items": {"type": "object"},
+                "minItems": 1,
+            },
+            "design_pipes": {
+                "type": "array",
+                "description": (
+                    "Design pipe model — list of pipes each with "
+                    "centerline_start, centerline_end, diameter_m, (opt) id."
+                ),
+                "items": {"type": "object"},
+                "minItems": 1,
+            },
+            "pos_tol_m": {
+                "type": "number",
+                "description": "Positional tolerance (m) for pass/fail classification.",
+                "default": 0.05,
+            },
+            "dia_tol_frac": {
+                "type": "number",
+                "description": "Diameter tolerance as fraction of nominal (0.10 = 10%).",
+                "default": 0.10,
+            },
+        },
+        "required": ["asbuilt_segments", "design_pipes"],
+    },
+)
+
+
+async def run_pointcloud_asbuilt_overlay(params: dict, ctx: "ProjectCtx") -> str:
+    try:
+        from kerf_civil.pointcloud import asbuilt_vs_design
+
+        ab_segs = params.get("asbuilt_segments", [])
+        des_pipes = params.get("design_pipes", [])
+        pos_tol = float(params.get("pos_tol_m", 0.05))
+        dia_tol = float(params.get("dia_tol_frac", 0.10))
+
+        if not ab_segs:
+            return err_payload("asbuilt_segments must be non-empty", "BAD_ARGS")
+        if not des_pipes:
+            return err_payload("design_pipes must be non-empty", "BAD_ARGS")
+
+        result = asbuilt_vs_design(ab_segs, des_pipes, pos_tol_m=pos_tol, dia_tol_frac=dia_tol)
+        result["ok"] = True
+        return ok_payload(result)
+
+    except Exception as exc:
+        return err_payload(str(exc), "POINTCLOUD_ASBUILT_OVERLAY_ERROR")
+
+
+# ===========================================================================
 # TOOLS list consumed by plugin
 # ===========================================================================
 
@@ -514,5 +794,15 @@ TOOLS = [
         "pointcloud_fit_plane",
         pointcloud_fit_plane_spec,
         run_pointcloud_fit_plane,
+    ),
+    (
+        "pointcloud_detect_pipes",
+        pointcloud_detect_pipes_spec,
+        run_pointcloud_detect_pipes,
+    ),
+    (
+        "pointcloud_asbuilt_overlay",
+        pointcloud_asbuilt_overlay_spec,
+        run_pointcloud_asbuilt_overlay,
     ),
 ]

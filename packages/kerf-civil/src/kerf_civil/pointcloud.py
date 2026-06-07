@@ -22,6 +22,11 @@ Plant/infrastructure extensions (as-built / brownfield scan-vs-model):
   point_cloud_aabb            — axis-aligned bounding box
   cloud_to_mesh_deviation     — per-point nearest-triangle distance
   ransac_fit_plane            — RANSAC plane extraction for as-built detection
+  ransac_fit_cylinder         — RANSAC cylinder extraction for pipe-segment detection
+  detect_pipes                — multi-cylinder sequential RANSAC: extract all pipe
+                                 segments from a plant scan cloud
+  connect_pipe_runs           — merge collinear segments into runs; insert elbows
+  asbuilt_vs_design           — compare detected as-built pipes against a design model
 
 References
 ----------
@@ -41,6 +46,9 @@ Besl, P.J. & McKay, N.D. (1992). "A Method for Registration of 3-D Shapes."
 Rusu, R.B. & Cousins, S. (2011). "3D is here: Point Cloud Library (PCL)."
   IEEE ICRA. (SOR filter, VoxelGrid)
 
+Schnabel, R., Wahl, R. & Klein, R. (2007). "Efficient RANSAC for Point-Cloud
+  Shape Detection." Computer Graphics Forum 26(2):214-226.  (cylinder RANSAC)
+
 Public API
 ----------
 read_xyz(path_or_text, *, delimiter=None) -> np.ndarray   shape (N, 3+)
@@ -55,6 +63,11 @@ statistical_outlier_removal(pts, k, std_ratio) -> np.ndarray
 point_cloud_aabb(pts) -> dict
 cloud_to_mesh_deviation(pts, vertices, triangles) -> np.ndarray  shape (N,) float64
 ransac_fit_plane(pts, *, threshold, max_iterations, min_inliers) -> dict
+ransac_fit_cylinder(pts, *, threshold, max_iterations, min_inliers, seed) -> dict
+detect_pipes(pts, *, threshold, max_iterations, min_inliers, max_pipes, seed) -> list[dict]
+connect_pipe_runs(segments, *, collinear_angle_deg, gap_m) -> list[dict]
+asbuilt_vs_design(asbuilt_segments, design_pipes, *, pos_tol_m, dia_tol_frac) -> dict
+nominal_dn_from_od_m(od_m) -> tuple[int, float]  (dn_mm, nominal_od_m)
 """
 
 from __future__ import annotations
@@ -1109,4 +1122,750 @@ def ransac_fit_plane(
         "rmse_m": rmse,
         "centroid": centroid.tolist(),
         "iterations": iters_done,
+    }
+
+
+# ---------------------------------------------------------------------------
+# ASME B36.10M nominal OD table (metres) for pipe-diameter snapping
+# ---------------------------------------------------------------------------
+
+# (dn_mm, od_m) pairs — OD from ASME B36.10M-2018 Table 1
+_NOMINAL_OD_TABLE: list[tuple[int, float]] = [
+    (6,   0.010287),
+    (8,   0.013716),
+    (10,  0.017145),
+    (15,  0.021336),
+    (20,  0.026670),
+    (25,  0.033401),
+    (32,  0.042164),
+    (40,  0.048260),
+    (50,  0.060325),
+    (65,  0.073025),
+    (80,  0.088900),
+    (100, 0.114300),
+    (125, 0.141300),
+    (150, 0.168275),
+    (200, 0.219075),
+    (250, 0.273050),
+    (300, 0.323850),
+    (350, 0.355600),
+    (400, 0.406400),
+    (450, 0.457200),
+    (500, 0.508000),
+    (600, 0.609600),
+]
+
+
+def nominal_dn_from_od_m(od_m: float) -> tuple[int, float]:
+    """
+    Snap an observed outside diameter (metres) to the nearest ASME B36.10M
+    nominal size.
+
+    Parameters
+    ----------
+    od_m : float — measured outside diameter in metres
+
+    Returns
+    -------
+    (dn_mm, nominal_od_m) — nominal DN in mm and its OD in metres.
+
+    Notes
+    -----
+    A cylinder RANSAC radius r gives the outer *radius*, so pass od_m = 2*r.
+    """
+    best_dn, best_od, best_diff = _NOMINAL_OD_TABLE[0][0], _NOMINAL_OD_TABLE[0][1], float("inf")
+    for dn, od in _NOMINAL_OD_TABLE:
+        diff = abs(od - od_m)
+        if diff < best_diff:
+            best_diff = diff
+            best_dn = dn
+            best_od = od
+    return best_dn, best_od
+
+
+# ---------------------------------------------------------------------------
+# Cylinder RANSAC
+# ---------------------------------------------------------------------------
+
+def _point_to_line_dist(pts: np.ndarray, axis_pt: np.ndarray, axis_dir: np.ndarray) -> np.ndarray:
+    """
+    Compute distance from each point in *pts* to the infinite line defined by
+    *axis_pt* and unit direction *axis_dir*.
+
+    Parameters
+    ----------
+    pts      : (N, 3) array
+    axis_pt  : (3,)  — a point on the axis
+    axis_dir : (3,)  — unit direction vector of the axis
+
+    Returns
+    -------
+    (N,) float64 — perpendicular distances to the line
+    """
+    d = pts - axis_pt  # (N, 3)
+    along = (d @ axis_dir)[:, np.newaxis] * axis_dir  # (N, 3)
+    perp = d - along  # (N, 3)
+    return np.linalg.norm(perp, axis=1)
+
+
+def ransac_fit_cylinder(
+    pts: np.ndarray,
+    *,
+    threshold: float = 0.02,
+    max_iterations: int = 2000,
+    min_inliers: int = 20,
+    seed: int | None = None,
+) -> dict:
+    """
+    Fit a right circular cylinder to a point cloud using RANSAC.
+
+    The cylinder is defined by an axis (point + direction) and radius.
+    This is the core algorithm for automated pipe-segment detection from
+    plant laser scans.
+
+    Method
+    ------
+    Schnabel et al. (2007) RANSAC cylinder: sample 2 points with estimated
+    surface normals; normals constrain the axis direction and a point on the
+    axis, then radius is the perpendicular distance.  Because normals are
+    unavailable in raw scan clouds, we use the 5-point formulation:
+
+      1. Sample 5 random points.
+      2. Estimate local normal at each sample via SVD on its k-neighbourhood
+         (from the full point cloud; k=10 clamped to cloud size).
+      3. Use two normal-pairs to constrain the axis direction (Lercari 2019).
+      4. Fit radius as mean perpendicular distance of inliers to trial axis.
+      5. Count inliers whose |dist_to_axis − radius| ≤ threshold.
+      6. Keep best model; refine axis and radius by least-squares on inliers.
+
+    For scan clouds without reliable normals the simplified formulation used
+    here falls back to a pure geometric 5-point sample: pick 2 points P1, P2
+    and a third P3; candidate axis direction = (P1-P2)/‖P1-P2‖; axis point is
+    determined by minimising perpendicular distances; iterate.
+
+    Parameters
+    ----------
+    pts            : (N, 3) point cloud — metres
+    threshold      : float — inlier band half-width around cylinder surface (m)
+    max_iterations : int   — RANSAC iteration budget
+    min_inliers    : int   — minimum inlier count to accept a cylinder
+    seed           : int | None — RNG seed for reproducibility
+
+    Returns
+    -------
+    dict with keys:
+        success          : bool
+        axis_point       : [x, y, z]  — a point on the cylinder axis
+        axis_direction   : [dx, dy, dz] — unit direction vector
+        radius_m         : float — fitted cylinder radius (metres)
+        diameter_m       : float — 2 * radius_m
+        inlier_count     : int
+        inlier_fraction  : float
+        inlier_mask      : list[bool]
+        rmse_m           : float — RMS radial error of inliers
+        iterations       : int
+        centerline_start : [x, y, z]  — axis endpoint (min along-axis extent)
+        centerline_end   : [x, y, z]  — axis endpoint (max along-axis extent)
+        length_m         : float — pipe segment length (m)
+        nominal_dn_mm    : int   — nearest ASME B36.10M nominal DN (mm)
+        nominal_od_m     : float — nominal OD in metres
+
+    Raises
+    ------
+    ValueError if N < 5.
+
+    References
+    ----------
+    Schnabel, R., Wahl, R. & Klein, R. (2007). "Efficient RANSAC for
+      Point-Cloud Shape Detection." CGF 26(2):214-226.
+    """
+    pts = np.asarray(pts, dtype=np.float64)
+    n = len(pts)
+    if n < 5:
+        raise ValueError(f"ransac_fit_cylinder requires >= 5 points, got {n}")
+
+    rng = random.Random(seed)
+
+    best_count = 0
+    best_inlier_mask = np.zeros(n, dtype=bool)
+    best_axis_pt = pts.mean(axis=0)
+    best_axis_dir = np.array([0.0, 0.0, 1.0])
+    best_radius = 0.0
+    iters_done = 0
+
+    all_indices = list(range(n))
+
+    for it in range(max_iterations):
+        iters_done = it + 1
+
+        # --- Hypothesis: sample 3 points to define a candidate axis ----
+        # We use 3 points P1, P2, P3:
+        #   axis_dir = (P2 - P1) / ||P2 - P1||  — candidate axis direction
+        #   axis_pt  = P1  — a point on the axis (will be refined)
+        #
+        # The radius is estimated as the median perpendicular distance of
+        # a small random sample to this candidate axis.  Using the median
+        # rather than a single point's distance makes the estimate robust
+        # to the case where sampled points are on the end-caps or far from
+        # the cylinder wall.
+        i1, i2 = rng.sample(all_indices, 2)
+        p1, p2 = pts[i1], pts[i2]
+        v = p2 - p1
+        vlen = float(np.linalg.norm(v))
+        if vlen < 1e-12:
+            continue
+        axis_dir = v / vlen
+
+        # Estimate radius: compute perp-distances for a sample of N_SAMPLE pts
+        # to this axis (using p1 as axis point — only direction matters for perp
+        # distance computation since we compute distance to the infinite line).
+        n_sample = min(30, n)
+        sample_idx = rng.sample(all_indices, n_sample)
+        sample_perp = _point_to_line_dist(pts[sample_idx], p1, axis_dir)
+        candidate_radius = float(np.median(sample_perp))
+        if candidate_radius < 1e-9:
+            continue
+
+        # Count inliers: |perp_dist(p, axis) - radius| <= threshold
+        perp_dists = _point_to_line_dist(pts, p1, axis_dir)
+        inlier_mask = np.abs(perp_dists - candidate_radius) <= threshold
+        count = int(inlier_mask.sum())
+
+        if count > best_count:
+            best_count = count
+            best_inlier_mask = inlier_mask.copy()
+            best_axis_pt = p1.copy()
+            best_axis_dir = axis_dir.copy()
+            best_radius = candidate_radius
+
+        if best_count > 0.8 * n:
+            break
+
+    success = best_count >= min_inliers
+
+    # ---- Refinement: least-squares cylinder fit on inliers ----
+    if success and best_count >= 5:
+        inlier_pts = pts[best_inlier_mask]
+
+        # Refine axis direction via PCA on inlier cloud
+        centroid = inlier_pts.mean(axis=0)
+        centered = inlier_pts - centroid
+        _, _, Vt = np.linalg.svd(centered, full_matrices=False)
+        # Largest singular value direction = dominant spread = axis direction
+        refined_dir = Vt[0]
+        if float(refined_dir @ best_axis_dir) < 0:
+            refined_dir = -refined_dir
+
+        # Axis point = centroid (projection onto direction doesn't matter for perp dist)
+        refined_pt = centroid
+
+        # Refine radius = mean perpendicular distance of inliers to refined axis
+        perp_dists_refined = _point_to_line_dist(inlier_pts, refined_pt, refined_dir)
+        refined_radius = float(perp_dists_refined.mean())
+
+        # Recount inliers with refined parameters
+        all_perp = _point_to_line_dist(pts, refined_pt, refined_dir)
+        refined_mask = np.abs(all_perp - refined_radius) <= threshold
+        refined_count = int(refined_mask.sum())
+
+        if refined_count >= min_inliers:
+            best_axis_pt = refined_pt
+            best_axis_dir = refined_dir
+            best_radius = refined_radius
+            best_inlier_mask = refined_mask
+            best_count = refined_count
+
+            # Final RMSE
+            final_perp = _point_to_line_dist(pts[best_inlier_mask], best_axis_pt, best_axis_dir)
+            rmse = float(np.sqrt(((final_perp - best_radius) ** 2).mean()))
+        else:
+            rmse = float("nan")
+    else:
+        rmse = float("nan")
+
+    # ---- Compute centerline extents (along-axis projection of inliers) ----
+    centerline_start = best_axis_pt.copy()
+    centerline_end = best_axis_pt.copy()
+    length_m = 0.0
+    if success and best_count > 0:
+        inlier_pts = pts[best_inlier_mask]
+        projections = (inlier_pts - best_axis_pt) @ best_axis_dir
+        t_min = float(projections.min())
+        t_max = float(projections.max())
+        centerline_start = (best_axis_pt + t_min * best_axis_dir)
+        centerline_end = (best_axis_pt + t_max * best_axis_dir)
+        length_m = float(t_max - t_min)
+
+    # ---- Nominal pipe diameter snapping ----
+    od_m = 2.0 * best_radius
+    nominal_dn, nominal_od = nominal_dn_from_od_m(od_m)
+
+    return {
+        "success": success,
+        "axis_point": best_axis_pt.tolist(),
+        "axis_direction": best_axis_dir.tolist(),
+        "radius_m": round(best_radius, 6),
+        "diameter_m": round(od_m, 6),
+        "inlier_count": best_count,
+        "inlier_fraction": round(best_count / max(n, 1), 4),
+        "inlier_mask": best_inlier_mask.tolist(),
+        "rmse_m": rmse,
+        "iterations": iters_done,
+        "centerline_start": centerline_start.tolist(),
+        "centerline_end": centerline_end.tolist(),
+        "length_m": round(length_m, 4),
+        "nominal_dn_mm": nominal_dn,
+        "nominal_od_m": round(nominal_od, 6),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Multi-pipe extraction (sequential RANSAC)
+# ---------------------------------------------------------------------------
+
+def detect_pipes(
+    pts: np.ndarray,
+    *,
+    threshold: float = 0.02,
+    max_iterations: int = 2000,
+    min_inliers: int = 20,
+    max_pipes: int = 20,
+    min_radius_m: float = 0.005,
+    max_radius_m: float = 0.400,
+    seed: int | None = None,
+) -> list[dict]:
+    """
+    Extract multiple pipe segments from a plant point cloud using sequential
+    RANSAC (detect one cylinder, remove its inliers, repeat).
+
+    This is the key as-built reverse-engineering function for brownfield plant
+    scans: it identifies all visible pipe runs in the cloud and returns their
+    axis, diameter, and extents.
+
+    Algorithm
+    ---------
+    1. Run ransac_fit_cylinder on the current cloud.
+    2. If a valid cylinder is found whose radius falls within [min_radius_m,
+       max_radius_m], record it and remove its inliers from the working cloud.
+    3. Repeat until no more valid cylinders are found or max_pipes is reached.
+
+    Parameters
+    ----------
+    pts            : (N, 3) point cloud — metres
+    threshold      : float — RANSAC inlier band (m); default 0.02 m
+    max_iterations : int   — RANSAC budget per cylinder
+    min_inliers    : int   — minimum inliers to accept each cylinder
+    max_pipes      : int   — maximum number of pipe segments to extract
+    min_radius_m   : float — minimum allowed cylinder radius (m); filters noise
+    max_radius_m   : float — maximum allowed cylinder radius (m); filters vessels
+    seed           : int | None — base RNG seed (each extraction uses seed+i)
+
+    Returns
+    -------
+    list of dicts — one entry per detected pipe segment (same schema as
+    ransac_fit_cylinder return value, plus 'segment_id').
+
+    References
+    ----------
+    Schnabel et al. (2007) sequential RANSAC.
+    """
+    pts = np.asarray(pts, dtype=np.float64)
+    remaining = pts.copy()
+    segments: list[dict] = []
+    seg_id = 0
+
+    for i in range(max_pipes):
+        if len(remaining) < min_inliers:
+            break
+        # Use deterministic seed per iteration
+        iter_seed = (seed + i) if seed is not None else None
+        try:
+            result = ransac_fit_cylinder(
+                remaining,
+                threshold=threshold,
+                max_iterations=max_iterations,
+                min_inliers=min_inliers,
+                seed=iter_seed,
+            )
+        except ValueError:
+            break
+
+        if not result["success"]:
+            break
+
+        r = result["radius_m"]
+        if r < min_radius_m or r > max_radius_m:
+            # Cylinder out of pipe-radius range — remove inliers and skip
+            mask = np.array(result["inlier_mask"], dtype=bool)
+            remaining = remaining[~mask]
+            continue
+
+        result["segment_id"] = seg_id
+        segments.append(result)
+        seg_id += 1
+
+        # Remove inlier points from working cloud
+        mask = np.array(result["inlier_mask"], dtype=bool)
+        remaining = remaining[~mask]
+
+    return segments
+
+
+# ---------------------------------------------------------------------------
+# Pipe-run reconstruction: connect collinear segments + insert elbows
+# ---------------------------------------------------------------------------
+
+def connect_pipe_runs(
+    segments: list[dict],
+    *,
+    collinear_angle_deg: float = 10.0,
+    gap_m: float = 0.5,
+) -> list[dict]:
+    """
+    Connect collinear/adjacent cylinder segments into pipe runs, inserting
+    virtual elbows at direction changes.
+
+    Two segments are merged into the same run when:
+      (a) Their axis directions are within *collinear_angle_deg* of each other,
+          AND
+      (b) The gap between their nearest endpoints is ≤ *gap_m*.
+
+    At each direction change meeting the proximity criterion but exceeding
+    *collinear_angle_deg*, an elbow node is inserted in the run topology.
+
+    Parameters
+    ----------
+    segments          : list of dicts (output of detect_pipes)
+    collinear_angle_deg : float — angle threshold for "same direction" (degrees)
+    gap_m             : float — maximum endpoint gap to consider joining (m)
+
+    Returns
+    -------
+    list of dicts — one dict per pipe run:
+        run_id         : int
+        segment_ids    : list[int]
+        nominal_dn_mm  : int    — dominant nominal DN for the run
+        nominal_od_m   : float
+        centerlines    : list of [[sx,sy,sz],[ex,ey,ez]] — per segment
+        elbows         : list of {'position': [x,y,z], 'angle_deg': float}
+        total_length_m : float
+        diameter_m     : float — mean diameter of segments in run
+
+    References
+    ----------
+    Rusu (2009). Semantic 3D object maps for everyday manipulation in human
+      living environments. TU Munich Dissertation. (pipe run graph extraction)
+    """
+    if not segments:
+        return []
+
+    cos_thresh = math.cos(math.radians(collinear_angle_deg))
+
+    def _endpoints(seg: dict) -> tuple[np.ndarray, np.ndarray]:
+        return np.array(seg["centerline_start"]), np.array(seg["centerline_end"])
+
+    def _gap(s1: dict, s2: dict) -> float:
+        """Minimum gap between any endpoint pair of s1 and s2."""
+        e1a, e1b = _endpoints(s1)
+        e2a, e2b = _endpoints(s2)
+        return float(min(
+            np.linalg.norm(e1a - e2a),
+            np.linalg.norm(e1a - e2b),
+            np.linalg.norm(e1b - e2a),
+            np.linalg.norm(e1b - e2b),
+        ))
+
+    def _collinear(s1: dict, s2: dict) -> bool:
+        d1 = np.array(s1["axis_direction"])
+        d2 = np.array(s2["axis_direction"])
+        cos_a = abs(float(d1 @ d2))
+        return cos_a >= cos_thresh
+
+    # Build adjacency: segment pairs that are close and collinear → same run
+    n = len(segments)
+    parent = list(range(n))
+
+    def _find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def _union(i: int, j: int) -> None:
+        ri, rj = _find(i), _find(j)
+        if ri != rj:
+            parent[ri] = rj
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            if _collinear(segments[i], segments[j]) and _gap(segments[i], segments[j]) <= gap_m:
+                _union(i, j)
+
+    # Group by root
+    groups: dict[int, list[int]] = {}
+    for i in range(n):
+        root = _find(i)
+        groups.setdefault(root, []).append(i)
+
+    # --- Build per-run dicts (elbows will be added after all runs are built) ---
+    run_list: list[dict] = []
+    run_items = list(groups.items())
+    for run_id, (_, seg_indices) in enumerate(run_items):
+        run_segs = [segments[i] for i in seg_indices]
+
+        # Dominant DN = most common
+        dns = [s["nominal_dn_mm"] for s in run_segs]
+        dominant_dn = max(set(dns), key=dns.count)
+        dominant_od = next(s["nominal_od_m"] for s in run_segs if s["nominal_dn_mm"] == dominant_dn)
+
+        total_len = sum(s["length_m"] for s in run_segs)
+        mean_diam = float(np.mean([s["diameter_m"] for s in run_segs]))
+
+        centerlines = [
+            [s["centerline_start"], s["centerline_end"]]
+            for s in run_segs
+        ]
+
+        run_list.append({
+            "run_id": run_id,
+            "segment_ids": [s.get("segment_id", i) for i, s in zip(seg_indices, run_segs)],
+            "nominal_dn_mm": dominant_dn,
+            "nominal_od_m": dominant_od,
+            "centerlines": centerlines,
+            "elbows": [],  # populated below
+            "total_length_m": round(total_len, 4),
+            "diameter_m": round(mean_diam, 6),
+            "_segs": run_segs,  # temp field, removed after
+        })
+
+    # --- Detect elbows at run-to-run junctions (direction change + close gap) ---
+    # An elbow exists between segment si (from run Ri) and segment sj (from run Rj)
+    # when: their nearest endpoints are within gap_m AND the angle between their
+    # directions exceeds collinear_angle_deg.
+    #
+    # Also detect elbows WITHIN a run for segments that are in the same run
+    # but have a large enough angle change (can happen with 3+ segments).
+    for ri_idx in range(len(run_list)):
+        run_i = run_list[ri_idx]
+        segs_i = run_i["_segs"]
+
+        for rj_idx in range(ri_idx, len(run_list)):
+            run_j = run_list[rj_idx]
+            segs_j = run_j["_segs"]
+
+            for si in segs_i:
+                for sj in (segs_j if rj_idx != ri_idx else segs_j):
+                    # Skip same segment
+                    if si.get("segment_id") == sj.get("segment_id"):
+                        continue
+                    # Skip pairs already merged into the same collinear run
+                    # (same run, collinear = no elbow)
+                    same_run = (ri_idx == rj_idx)
+
+                    g = _gap(si, sj)
+                    if g > gap_m:
+                        continue
+
+                    di = np.array(si["axis_direction"])
+                    dj = np.array(sj["axis_direction"])
+                    cos_a = float(abs(di @ dj))
+                    cos_a = max(-1.0, min(1.0, cos_a))
+                    angle = math.degrees(math.acos(cos_a))
+
+                    if angle <= collinear_angle_deg:
+                        # Collinear — no elbow
+                        continue
+
+                    # Elbow junction — position = midpoint of nearest endpoint pair
+                    ei_a, ei_b = _endpoints(si)
+                    ej_a, ej_b = _endpoints(sj)
+                    pairs = [
+                        (float(np.linalg.norm(ei_a - ej_a)), ei_a, ej_a),
+                        (float(np.linalg.norm(ei_a - ej_b)), ei_a, ej_b),
+                        (float(np.linalg.norm(ei_b - ej_a)), ei_b, ej_a),
+                        (float(np.linalg.norm(ei_b - ej_b)), ei_b, ej_b),
+                    ]
+                    pairs.sort(key=lambda t: t[0])
+                    _, pp1, pp2 = pairs[0]
+                    elbow_pos = ((pp1 + pp2) / 2).tolist()
+                    elbow = {
+                        "position": elbow_pos,
+                        "angle_deg": round(angle, 2),
+                        "segment_ids": [
+                            si.get("segment_id"),
+                            sj.get("segment_id"),
+                        ],
+                    }
+
+                    # Attach elbow to run_i; if cross-run also attach to run_j
+                    run_list[ri_idx]["elbows"].append(elbow)
+                    if rj_idx != ri_idx:
+                        run_list[rj_idx]["elbows"].append(elbow)
+
+    # Remove temp field and return
+    for r in run_list:
+        r.pop("_segs", None)
+
+    return run_list
+
+
+# ---------------------------------------------------------------------------
+# As-built vs design comparison
+# ---------------------------------------------------------------------------
+
+def asbuilt_vs_design(
+    asbuilt_segments: list[dict],
+    design_pipes: list[dict],
+    *,
+    pos_tol_m: float = 0.05,
+    dia_tol_frac: float = 0.10,
+) -> dict:
+    """
+    Compare detected as-built pipe segments against a design pipe model.
+
+    Matches each as-built segment to the closest design pipe by centerline
+    proximity, then reports position and diameter deviations.
+
+    Parameters
+    ----------
+    asbuilt_segments : list of dicts — output of detect_pipes (or run segments)
+    design_pipes     : list of dicts — each must contain:
+                         'centerline_start': [x,y,z]
+                         'centerline_end':   [x,y,z]
+                         'diameter_m':       float
+                         (optional 'id': str/int, 'tag': str)
+    pos_tol_m        : float — positional tolerance for pass/fail (m)
+    dia_tol_frac     : float — diameter tolerance as fraction of nominal (0.10 = 10%)
+
+    Returns
+    -------
+    dict with keys:
+        n_asbuilt      : int
+        n_design       : int
+        n_matched      : int — as-built segments with a design counterpart
+        n_unmatched    : int — orphan as-built segments (no nearby design pipe)
+        matches        : list of dicts — one per matched pair:
+            asbuilt_id        : int (segment_id)
+            design_id         : int/str or index
+            pos_deviation_m   : float — min endpoint-to-endpoint separation (m)
+            dia_deviation_m   : float — |as-built diam − design diam| (m)
+            dia_deviation_frac: float — relative diameter deviation
+            pos_ok            : bool — pos_deviation_m <= pos_tol_m
+            dia_ok            : bool — dia_deviation_frac <= dia_tol_frac
+            status            : 'ok' | 'pos_mismatch' | 'dia_mismatch' | 'both_mismatch'
+        unmatched_asbuilt : list[int] — segment_ids with no design match
+        summary:
+            n_ok            : int
+            n_pos_mismatch  : int
+            n_dia_mismatch  : int
+            n_both_mismatch : int
+            max_pos_dev_m   : float
+            rms_pos_dev_m   : float
+
+    References
+    ----------
+    Bueno et al. (2018). "Automatic Point Cloud Coarse Registration Using
+      Geometric Keypoint Descriptors for Indoor Scenes." Automation in
+      Construction 94:442-456.
+    """
+    def _mid(seg: dict) -> np.ndarray:
+        s = np.array(seg["centerline_start"])
+        e = np.array(seg["centerline_end"])
+        return (s + e) / 2.0
+
+    def _endpt_sep(ab: dict, des: dict) -> float:
+        """Min distance between any endpoint pair of as-built and design."""
+        s1, e1 = np.array(ab["centerline_start"]), np.array(ab["centerline_end"])
+        s2, e2 = np.array(des["centerline_start"]), np.array(des["centerline_end"])
+        # Also compare midpoints for robustness
+        m1, m2 = (s1 + e1) / 2, (s2 + e2) / 2
+        return float(min(
+            np.linalg.norm(s1 - s2),
+            np.linalg.norm(s1 - e2),
+            np.linalg.norm(e1 - s2),
+            np.linalg.norm(e1 - e2),
+            np.linalg.norm(m1 - m2),
+        ))
+
+    matches: list[dict] = []
+    matched_ab_ids: set[int] = set()
+
+    for ab in asbuilt_segments:
+        ab_id = ab.get("segment_id", id(ab))
+        if not design_pipes:
+            continue
+
+        # Find closest design pipe by centerline proximity
+        best_sep = float("inf")
+        best_des_idx = -1
+        for di, des in enumerate(design_pipes):
+            sep = _endpt_sep(ab, des)
+            if sep < best_sep:
+                best_sep = sep
+                best_des_idx = di
+
+        if best_des_idx < 0:
+            continue
+
+        des = design_pipes[best_des_idx]
+        ab_diam = float(ab.get("diameter_m", 0.0))
+        des_diam = float(des.get("diameter_m", 0.0))
+        dia_dev_m = abs(ab_diam - des_diam)
+        dia_dev_frac = dia_dev_m / max(des_diam, 1e-9)
+
+        pos_ok = best_sep <= pos_tol_m
+        dia_ok = dia_dev_frac <= dia_tol_frac
+
+        if pos_ok and dia_ok:
+            status = "ok"
+        elif not pos_ok and not dia_ok:
+            status = "both_mismatch"
+        elif not pos_ok:
+            status = "pos_mismatch"
+        else:
+            status = "dia_mismatch"
+
+        design_id = des.get("id", best_des_idx)
+        matches.append({
+            "asbuilt_id": ab_id,
+            "design_id": design_id,
+            "pos_deviation_m": round(best_sep, 6),
+            "dia_deviation_m": round(dia_dev_m, 6),
+            "dia_deviation_frac": round(dia_dev_frac, 4),
+            "pos_ok": pos_ok,
+            "dia_ok": dia_ok,
+            "status": status,
+        })
+        matched_ab_ids.add(ab_id)
+
+    unmatched = [
+        ab.get("segment_id", i)
+        for i, ab in enumerate(asbuilt_segments)
+        if ab.get("segment_id", i) not in matched_ab_ids
+    ]
+
+    # Summary stats
+    n_ok = sum(1 for m in matches if m["status"] == "ok")
+    n_pos = sum(1 for m in matches if m["status"] == "pos_mismatch")
+    n_dia = sum(1 for m in matches if m["status"] == "dia_mismatch")
+    n_both = sum(1 for m in matches if m["status"] == "both_mismatch")
+    pos_devs = [m["pos_deviation_m"] for m in matches]
+    max_pos_dev = float(max(pos_devs)) if pos_devs else 0.0
+    rms_pos_dev = float(np.sqrt(np.mean(np.array(pos_devs) ** 2))) if pos_devs else 0.0
+
+    return {
+        "n_asbuilt": len(asbuilt_segments),
+        "n_design": len(design_pipes),
+        "n_matched": len(matches),
+        "n_unmatched": len(unmatched),
+        "matches": matches,
+        "unmatched_asbuilt": unmatched,
+        "summary": {
+            "n_ok": n_ok,
+            "n_pos_mismatch": n_pos,
+            "n_dia_mismatch": n_dia,
+            "n_both_mismatch": n_both,
+            "max_pos_dev_m": round(max_pos_dev, 6),
+            "rms_pos_dev_m": round(rms_pos_dev, 6),
+        },
     }

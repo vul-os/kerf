@@ -441,7 +441,7 @@ Industry-standard BIM for AEC — compared honestly against MIT open-core.
 
 ## Summary
 
-Kerf saturates **97%** of Autodesk Revit's feature surface (39 yes, 1 partial, 1 no out of 41 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **96%** of Autodesk Revit's feature surface (39 yes, 1 partial, 1 no out of 41 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -471,7 +471,7 @@ Kerf saturates **97%** of Autodesk Revit's feature surface (39 yes, 1 partial, 1
 | IFC import (IFC2x3 / IFC4) | ✅ | ✅ certified — buildingsmart certified ifc 2x3 and ifc4 import |  |
 | IFC export (IFC4 round-trip) | ✅ | ✅ certified — ifc 2x3 and ifc4 export with property sets |  |
 | Clash detection (cross-discipline) | ✅ | ✅ via navisworks — federated multi-model clash detection |  |
-| Worksharing / concurrent BIM editing | ✅ | ✅ full — worksets, central model, cloud worksharing via autodesk construction cloud | Checkout/borrow/sync worksharing model (matches Revit's actual workshared model: worksets, element borrow, sync-to-central, conflict detection). NOT live real-time co-editing — Revit Worksharing itself is the same checkout/sync model. |
+| Worksharing / concurrent BIM editing | ✅ | ✅ full — worksets, central model, cloud worksharing via autodesk construction cloud | Checkout/borrow/sync worksharing model matching Revit's actual workshared workflow: central manifest, named worksets ... |
 | Dynamo visual programming | ✅ | ✅ full — dynamo studio + dynamo player; node-based scripting of bim model | NodeGraphCanvas visual node editor + kerf-sdk Python scripting |
 | pyRevit / Revit API Python automation | ✅ | ✅ full — open revit api + pyrevit community extensions |  |
 | BIM model-based energy analysis (Revit Insight) | ✅ | ✅ via autodesk insight — whole-building eui benchmarking from revit mass |  |

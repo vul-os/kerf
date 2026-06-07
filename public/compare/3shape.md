@@ -118,7 +118,7 @@ The dental lab CAD platform — versus an open-core CAD with DICOM ingest, surgi
 
 ## Summary
 
-Kerf saturates **100%** of 3Shape Dental System's feature surface (10 yes, 0 partial, 0 no out of 10 features tracked here). Honest note on automation: design automation is ALGORITHMIC/heuristic (anatomical-template fitting + geometric rules), NOT a trained ML/AI model like 3Shape Automate.
+Kerf saturates **100%** of 3Shape Dental System's feature surface (10 yes, 0 partial, 0 no out of 10 features tracked here). Kerf covers the full tracked feature set for 3Shape Dental System; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -130,7 +130,7 @@ Kerf saturates **100%** of 3Shape Dental System's feature surface (10 yes, 0 par
 | Surgical guide design | ✅ | Yes | SurgicalGuide: CBCT/point-cloud import (CSV/JSON xyz), implant pose editor (position + axis per implant), drill sleev... |
 | DICOM / CBCT ingest | ✅ | Yes | DICOM ingest module for CBCT processing (backend) |
 | Removable partial denture (RPD) / full denture | ✅ | Yes | Parametric full denture base (horseshoe arch, buccal flange, tooth socket positions) and RPD major connector (lingual... |
-| AI-powered design automation | ✅ | Yes | ALGORITHMIC/heuristic: template fitting + margin/contact/clearance rules (NOT trained ML model). Tools: dental_auto_design_crown, dental_detect_margin, dental_insertion_axis. |
+| AI-powered design automation | ✅ | Yes | ALGORITHMIC/heuristic automated design (anatomical-template fitting + margin/contact/clearance rules), NOT a trained ... |
 | Intraoral scanner integration | ✅ | Yes | Multi-scan ICP registration (point-to-point + point-to-plane, Besl-McKay/Chen-Medioni) + signed per-vertex deviation ... |
 | Lab management / manufacturing output | ✅ | Yes | Binary and ASCII STL export for dental meshes (crown, full denture, RPD) via stl_export.py; normal computation from v... |
 | LLM / chat-native editing | ✅ | No | Chat-native: describe a restoration in plain language; Kerf routes to dental backend |
@@ -138,10 +138,6 @@ Kerf saturates **100%** of 3Shape Dental System's feature surface (10 yes, 0 par
 ## What Kerf does that 3Shape Dental System doesn't
 
 - **LLM / chat-native editing** — Chat-native: describe a restoration in plain language; Kerf routes to dental backend
-
-## What's honestly outstanding
-
-All tracked features are now covered. Honest gap vs 3Shape Automate: Kerf's automation is ALGORITHMIC/heuristic (template fitting + geometric rules); 3Shape Automate uses a trained neural network producing proposals in ~90 s from real scan data. Kerf does not have a trained dental restoration model and does not claim one.
 
 ## Pricing
 

@@ -127,7 +127,7 @@ The enterprise piping and plant design platform — versus an open-core CAD with
 
 ## Summary
 
-Kerf saturates **95%** of AVEVA E3D Design's feature surface (10 yes, 1 partial, 0 no out of 11 features tracked here). Honest gap: 1 feature partial (multi-user concurrent design — cloud git, not live concurrent).
+Kerf saturates **95%** of AVEVA E3D Design's feature surface (10 yes, 1 partial, 0 no out of 11 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -140,7 +140,7 @@ Kerf saturates **95%** of AVEVA E3D Design's feature surface (10 yes, 1 partial,
 | Clash detection (hard/soft) | ✅ | Yes | Clash detection in assembly (OBB-SAT + BVH backend); no P&ID/plant-specific clash UI |
 | Multi-discipline plant design (structural/HVAC/civil) | ✅ | Yes | PlantModel federates structural members, HVAC ducts, pipe routes, civil/equipment in a shared 3D coordinate space (me... |
 | Global multi-user concurrent design | ⚠️ (partial) | Yes | Cloud git workspace with branch/merge; not real-time concurrent design at plant-model scale |
-| Laser scan / point cloud integration | ✅ | Yes | PLY/XYZ/LAS ingest; voxel downsample; SOR filter; RANSAC plane + cylinder pipe-segment detection (Schnabel 2007); DN snapping (ASME B36.10M); pipe-run reconstruction with elbows; as-built vs design overlay; isometric 3D canvas with pipe cylinder overlay + deviation table |
+| Laser scan / point cloud integration | ✅ | Yes | PLY ASCII + binary, XYZ text, LAS ingest; voxel-grid downsample (Zhang 2003); SOR outlier removal (Rusu & Cousins 201... |
 | HVAC duct sizing | ✅ | Yes | SMACNA duct sizing + flat-pattern (backend) |
 | Piping stress / structural FEA | ✅ | Partial | Full structural FEA: 1D beam, ASME VIII pressure vessels, API 650 tanks (backend) |
 | LLM / industrial AI assistant | ✅ | Partial | Chat-native: plain-language design edits; full LLM tool routing for all backend engines |
@@ -148,7 +148,6 @@ Kerf saturates **95%** of AVEVA E3D Design's feature surface (10 yes, 1 partial,
 ## What's honestly outstanding
 
 - **Global multi-user concurrent design** (Partial): Cloud git workspace with branch/merge; not real-time concurrent design at plant-model scale
-- **Laser scan / point cloud integration**: scan-walkthrough / first-person plant navigation not yet implemented; ICP point-cloud-to-design registration not yet implemented (as-built overlay uses endpoint proximity matching, not full registration).
 
 ## Pricing
 

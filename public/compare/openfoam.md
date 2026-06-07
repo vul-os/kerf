@@ -300,7 +300,7 @@ OpenFOAM solves the Navier-Stokes equations — Kerf wraps it so you describe th
 
 ## Summary
 
-Kerf saturates **96%** of OpenFOAM's feature surface (23 yes, 2 partial, 0 no out of 25 features tracked here). Honest gaps: 2 features partial (engine complete, UI or depth gap).
+Kerf saturates **98%** of OpenFOAM's feature surface (24 yes, 1 partial, 0 no out of 25 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
 
 ## Feature comparison
 
@@ -312,7 +312,7 @@ Kerf saturates **96%** of OpenFOAM's feature surface (23 yes, 2 partial, 0 no ou
 | CFD — multiphase flow | ✅ | Yes | Selected multiphase solvers via bridge; full multiphase suite requires direct OpenFOAM |
 | CFD — combustion / reacting flow | ✅ | Yes | Combustion CFD (reactingFoam / fireFoam) not yet exposed in Kerf bridge |
 | CFD — turbulence models (RANS) | ✅ | Yes | k-eps and k-omega SST exposed via chat case generation; full model library via direct OpenFOAM |
-| CFD — LES / DES / DNS | ✅ | Yes | In-house LES Smagorinsky+WALE + DDES; structured Cartesian grids; resolved vs modeled TKE + energy spectrum; DNS partial (low Re only) |
+| CFD — LES / DES / DNS | ✅ | Yes | In-house LES Smagorinsky+WALE + DDES on structured Cartesian grids; resolved vs modeled TKE + energy spectrum; modest... |
 | CFD — mesh generation (snappyHexMesh) | ✅ | Yes | snappyHexMesh dict generated via chat from Kerf STL export; no GUI mesh editor |
 | CFD — Lagrangian particle tracking | ✅ | Yes | Lagrangian particle models not exposed in Kerf bridge |
 | CFD — dynamic mesh / FSI | ✅ | Yes | Dynamic mesh and FSI not yet exposed in Kerf bridge |

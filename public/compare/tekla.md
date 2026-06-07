@@ -148,7 +148,7 @@ The structural steel & concrete detailing standard — compared honestly against
 
 ## Summary
 
-Kerf saturates **100%** of Tekla Structures's feature surface (12 yes, 0 partial, 0 no out of 12 features tracked here).
+Kerf saturates **100%** of Tekla Structures's feature surface (12 yes, 0 partial, 0 no out of 12 features tracked here). Kerf covers the full tracked feature set for Tekla Structures; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -164,7 +164,7 @@ Kerf saturates **100%** of Tekla Structures's feature surface (12 yes, 0 partial
 | General-arrangement + shop drawings | ✅ | Yes | Multi-sheet drawings engine (HLR views/sections/details/title-block) + RC shop drawings: section view, elevation with... |
 | Bill of materials / assembly marks | ✅ | Yes | BOM rollup + quantity schedules (area/volume/count) + cost |
 | Clash detection / constructability | ✅ | Yes | OBB-SAT + BVH + tri-tri clash detection panel |
-| Real-time multi-user model sharing | ✅ | Yes | Checkout/borrow/sync worksharing model (matches Tekla Model Sharing's actual mechanism): central manifest, worksets, element borrow, sync-to-central, conflict detection. NOT live real-time co-editing — Tekla Model Sharing itself is the same checkout/sync model. |
+| Real-time multi-user model sharing | ✅ | Yes | Checkout/borrow/sync worksharing model (matches Tekla Model Sharing's actual mechanism): central manifest, named work... |
 | Open-source core / chat-native | ✅ | No | MIT open-core; chat-native + JSON-RPC LLM tools + kerf-sdk |
 
 ## What Kerf does that Tekla Structures doesn't

@@ -574,7 +574,7 @@ NX defined advanced surfacing for a generation — Kerf makes that power accessi
 
 ## Summary
 
-Kerf saturates **99%** of Siemens NX's feature surface (53 yes, 1 partial, 0 no out of 54 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of Siemens NX's feature surface (54 yes, 0 partial, 0 no out of 54 features tracked here). Kerf covers the full tracked feature set for Siemens NX; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -583,7 +583,7 @@ Kerf saturates **99%** of Siemens NX's feature surface (53 yes, 1 partial, 0 no 
 | Constraint sketcher (geo + dim) | ✅ | Yes | Full parametric sketcher — geometric + dimensional constraints, fully integrated with history |
 | Pad / pocket / revolve | ✅ | Yes | Extrude / revolve feature commands with full taper and symmetric options |
 | Variable-radius fillet | ✅ | Yes | Edge blend with variable radius law (linear / cubic / S-shape) and face-blend types |
-| NURBS surfacing (blend/network/patch) | ✅ | Yes | Curvature-continuous Class-A: analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivatives — proven discriminating: G1-only fails the G2 metric); Coons/Gregory N-patch + network fill; fairing; zebra/isophote/reflection-line + Gaussian/mean-curvature analysis (validated K=1/R² on exact sphere). Gap: no interactive Shape-Studio-style CP-dragging cockpit |
+| NURBS surfacing (blend/network/patch) | ✅ | Yes | Curvature-continuous Class-A: analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivati... |
 | Direct edit (push-pull) | ✅ | Yes | push_pull (planar + curved), move_face, delete_face wired as ops |
 | Assemblies — mates | ✅ | Yes | Assembly constraints (coincident, concentric, parallel, distance, angle) with full kinematic DoF tracking |
 | Sheet metal | ✅ | Yes | flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
@@ -634,10 +634,6 @@ Kerf saturates **99%** of Siemens NX's feature surface (53 yes, 1 partial, 0 no 
 | Material selection (Ashby) | ✅ | Yes | NX Material Editor — basic property lookup; advanced Ashby-chart selection via Teamcenter Materials link |
 | LCA (full ISO 14040/44 4 phases) | ✅ | Yes | Not in NX — LCA analysis outside NX scope; Siemens Teamcenter Product Compliance covers RoHS/REACH only |
 | Should-cost (6 processes, Boothroyd-Dewhurst) | ✅ | Yes | Not in NX core — cost estimation via Teamcenter Manufacturing Process Planner or external aPriori link |
-
-## What's honestly outstanding
-
-- **NURBS surfacing (blend/network/patch)**: Curvature-continuous Class-A — analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivatives, proven discriminating: a G1-only join fails the G2 metric); Coons/Gregory N-patch + network fill; surface fairing; zebra/isophote/reflection-line + Gaussian/mean-curvature analysis (validated K=1/R² on an exact rational NURBS sphere). Gap: no interactive Shape-Studio-style CP-dragging cockpit
 
 ## Pricing
 

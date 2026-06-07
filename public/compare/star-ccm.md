@@ -148,21 +148,21 @@ Comprehensive CFD & multiphysics — compared honestly against MIT open-core.
 
 ## Summary
 
-Kerf saturates **92%** of Simcenter STAR-CCM+'s feature surface (11 yes, 0 partial, 1 no out of 12 features tracked here). Honest gap: 1 feature not yet implemented (GPU-native HPC).
+Kerf saturates **92%** of Simcenter STAR-CCM+'s feature surface (11 yes, 0 partial, 1 no out of 12 features tracked here). Honest gaps: 1 feature not yet implemented.
 
 ## Feature comparison
 
 | Feature | Kerf | Simcenter STAR-CCM+ | Notes |
 |---------|------|---------------------|-------|
 | RANS turbulence (k-ε / k-ω SST) | ✅ | Yes | Launder-Spalding k-ε + Menter k-ω SST + wall functions |
-| Scale-resolving turbulence (DES / LES) | ✅ | Yes | In-house LES Smagorinsky+WALE + DDES; structured Cartesian grids; resolved vs modeled TKE + energy spectrum; modest Re, not HPC-validated |
+| Scale-resolving turbulence (DES / LES) | ✅ | Yes | In-house LES Smagorinsky+WALE + DDES; structured Cartesian grids; resolved vs modeled TKE, energy spectrum; modest Re... |
 | Multiphase VOF (free-surface tracking) | ✅ | Yes | VOF multiphase + Brackbill CSF surface tension + Young-Laplace |
 | Lagrangian dispersed phase (particles) | ✅ | Yes | Lagrangian particle tracking (Schiller-Naumann drag) |
 | Conjugate heat transfer (CHT) | ✅ | Yes | Conjugate heat transfer (Dirichlet-Neumann domain decomposition) |
 | Automated volume meshing | ✅ | Yes | snappyHexMesh-style castellated + snap + layer mesher |
 | Compressible flow | ✅ | Yes | Compressible Roe flux + isentropic/oblique-shock/Prandtl-Meyer relations |
 | Combustion / reacting flow | ✅ | Yes | Eddy-break-up (EBU) combustion + Magnussen-Hjertager reacting flow |
-| Overset / sliding mesh (rotating machinery) | ✅ | Yes | Chimera overset interpolation + rotating sub-grid; 2-D structured Cartesian; not validated vs full 3-D rotating machinery |
+| Overset / sliding mesh (rotating machinery) | ✅ | Yes | Chimera overset interpolation (hole-cutting + bilinear stencil) + rotating sub-grid transport; 2-D structured Cartesi... |
 | Marine / offshore hydrodynamics | ✅ | Yes | Holtrop-Mennen resistance + STF strip-theory seakeeping RAOs |
 | GPU-native solvers + HPC parallel scale | 🔴 (no) | Yes | No GPU-native CFD solvers or MPI HPC parallel scaling; hosted cloud compute for moderate cases |
 | Open-source core / chat-native | ✅ | No | MIT open-core; chat-native CFD setup + JSON-RPC LLM tools + kerf-sdk |
@@ -173,7 +173,6 @@ Kerf saturates **92%** of Simcenter STAR-CCM+'s feature surface (11 yes, 0 parti
 
 ## What's honestly outstanding
 
-- **GPU-native solvers + HPC parallel scale** (Not yet implemented): No GPU-native CFD solvers or MPI HPC parallel scaling; hosted cloud compute for moderate cases
 - **GPU-native solvers + HPC parallel scale** (Not yet implemented): No GPU-native CFD solvers or MPI HPC parallel scaling; hosted cloud compute for moderate cases
 
 ## Pricing

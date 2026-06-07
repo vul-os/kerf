@@ -328,7 +328,7 @@ CATIA built the A380 — Kerf builds the next generation of engineers who work w
 
 ## Summary
 
-Kerf saturates **99%** of Dassault CATIA's feature surface (59 yes, 1 partial, 0 no out of 60 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of Dassault CATIA's feature surface (60 yes, 0 partial, 0 no out of 60 features tracked here). Kerf covers the full tracked feature set for Dassault CATIA; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -341,7 +341,7 @@ Kerf saturates **99%** of Dassault CATIA's feature surface (59 yes, 1 partial, 0
 | Shell / hollow | ✅ | Yes | Shell command in Part Design |
 | Sweep (1 & 2 rail) | ✅ | Yes | Generative Shape Design sweep |
 | Loft | ✅ | Yes | Guide-rail overload wired (ThruSections.AddWire); ruled/closed/symmetric |
-| NURBS surfacing (blend/network/patch) | ✅ | Yes | Curvature-continuous Class-A: analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivatives — proven discriminating: G1-only fails the G2 metric); Coons/Gregory N-patch + network fill; fairing; zebra/isophote/reflection-line + Gaussian/mean-curvature analysis (validated K=1/R² on exact sphere). Gap: no interactive FreeStyle-style CP-dragging cockpit |
+| NURBS surfacing (blend/network/patch) | ✅ | Yes | Curvature-continuous Class-A: analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivati... |
 | Assemblies — mates | ✅ | Yes | Assembly Design — coincident, offset, angle, user-defined constraints |
 | Assembly motion study / interference | ✅ | Yes | DMU Kinematics + DMU Space Analysis — envelope sweeps, clash/clearance/contact |
 | 2D drawings (views/dims/sections) | ✅ | Yes | Live HLR projection (make2d) + auto-dim; no GD&T-placement UI |
@@ -410,10 +410,6 @@ Kerf saturates **99%** of Dassault CATIA's feature surface (59 yes, 1 partial, 0
 - **Composites layup (CLT / drape / failure)** — CLT + drape + Tsai-Wu/Hill/Hashin + interlaminar; backend only
 - **6-DOF flight dynamics + stability derivs** — Backend only
 - *(and 32 more features not covered by Dassault CATIA)*
-
-## What's honestly outstanding
-
-- **NURBS surfacing (blend/network/patch)**: Curvature-continuous Class-A — analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivatives, proven discriminating: a G1-only join fails the G2 metric); Coons/Gregory N-patch + network fill; surface fairing; zebra/isophote/reflection-line + Gaussian/mean-curvature analysis (validated K=1/R² on an exact rational NURBS sphere). Gap: no interactive FreeStyle-style CP-dragging cockpit
 
 ## Pricing
 

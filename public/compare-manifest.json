@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-06-05T18:00:47.801Z",
+  "generatedAt": "2026-06-07T19:38:32.666Z",
   "items": [
     {
       "slug": "revit",
@@ -338,9 +338,9 @@
             "paid": "true"
           },
           "kerf": {
-            "status": "no",
-            "evidence": "cloud/projects/",
-            "notes": "Needs BIM element-level locking epic; cloud git provides file-level workspace roles only"
+            "status": "yes",
+            "evidence": "packages/kerf-bim/src/kerf_bim/worksharing.py",
+            "notes": "Checkout/borrow/sync worksharing model matching Revit's actual workshared workflow: central manifest, named worksets with ownership, per-element borrow (exclusive checkout), sync-to-central (push edits + pull others' changes), conflict detection when two users edit the same element. NOT live real-time OT/CRDT co-editing — Revit Worksharing itself is not that either."
           }
         },
         {
@@ -1074,9 +1074,9 @@
             "notes": "BIMcloud Basic included with Archicad; BIMcloud SaaS is a separate paid subscription"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "cloud/git/",
-            "notes": "Cloud git workspace roles; not BIM element-level locking at AEC project scale"
+            "status": "yes",
+            "evidence": "packages/kerf-bim/src/kerf_bim/worksharing.py",
+            "notes": "Checkout/borrow/sync worksharing model (matches Revit's and ArchiCAD Teamwork's actual mechanism): central manifest, named worksets with ownership, per-element borrow (exclusive checkout), sync-to-central with conflict detection. NOT live real-time OT/CRDT co-editing — ArchiCAD Teamwork itself is the same checkout/sync model."
           },
           "name": "Teamwork BIMcloud multi-user worksharing"
         },
@@ -1130,9 +1130,9 @@
             "notes": "Hotlink Manager links external Archicad files as live references into the host model"
           },
           "kerf": {
-            "status": "no",
-            "evidence": "",
-            "notes": "No federated BIM hotlink/XRef mechanism; cloud git provides file-level references but not BIM-level live linking"
+            "status": "yes",
+            "evidence": "packages/kerf-bim/src/kerf_bim/xref.py",
+            "notes": "Federated XRef: external IFC files linked as positioned read-only overlays (discipline, placement origin, rotation), SHA-256 freshness tracking, reload-on-stale, nested XRef resolution (cycle-safe, depth-limited). Compose federated model groups bodies by discipline. Tools: bim_add_xref, bim_refresh_xref, bim_check_xref_status, bim_compose_federated."
           },
           "name": "Hotlinked modules (XRef / federated model)"
         },
@@ -1653,12 +1653,12 @@
           "competitor": {
             "status": "yes",
             "source": "https://www.tekla.com/products/tekla-structures",
-            "notes": "Tekla Model Sharing — concurrent multi-user model"
+            "notes": "Tekla Model Sharing — concurrent multi-user model (checkout/sync, not live CRDT)"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cloud/",
-            "notes": "Cloud git workspace (branch/merge/roles); not real-time element-level concurrent editing"
+            "status": "yes",
+            "evidence": "packages/kerf-bim/src/kerf_bim/worksharing.py",
+            "notes": "Checkout/borrow/sync worksharing model (matches Tekla Model Sharing's actual mechanism): central manifest, named worksets with ownership, per-element borrow (exclusive checkout), sync-to-central with conflict detection. NOT live real-time OT/CRDT co-editing — Tekla Model Sharing itself is the same checkout/sync model."
           },
           "name": "Real-time multi-user model sharing"
         },
@@ -9434,9 +9434,9 @@
             "notes": "3Shape Automate: AI design proposals for crowns, onlays, inlays, nightguards in ~90 seconds"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "src/components/ChatPanel.jsx",
-            "notes": "LLM-routed dental tool calls; no pre-trained dental restoration AI model"
+            "status": "yes",
+            "evidence": "packages/kerf-dental/src/kerf_dental/restoration_auto.py, packages/kerf-dental/src/kerf_dental/tools.py (dental_auto_design_crown / dental_detect_margin / dental_insertion_axis), src/components/dental/DentalAutoDesignPanel.jsx",
+            "notes": "ALGORITHMIC/heuristic automated design (anatomical-template fitting + margin/contact/clearance rules), NOT a trained ML/AI model. Pipeline: FDI-position template selection, curvature-based margin detection (Taubin 1995 PCA), insertion-axis + undercut detection (Gilboe 1983 hemisphere search), crown morphing to prep geometry, proximal contact gap measurement (Neff 1949; target 0.01–0.10 mm), occlusal clearance enforcement (ISO 6872; Guess 2010), minimum wall thickness enforcement. Tools: dental_auto_design_crown, dental_detect_margin, dental_insertion_axis. Frontend: DentalAutoDesignPanel (restoration preview + margin + contact/clearance/thickness quality checks)."
           },
           "name": "AI-powered design automation"
         },
@@ -9751,9 +9751,9 @@
             "notes": "Point cloud import from any laser scanner; brownfield retrofit design against as-built geometry"
           },
           "kerf": {
-            "status": "partial",
+            "status": "yes",
             "evidence": "packages/kerf-civil/src/kerf_civil/pointcloud.py, packages/kerf-civil/src/kerf_civil/tools_pointcloud_plant.py, src/components/civil/PointCloudPanel.jsx",
-            "notes": "PLY ASCII + binary, XYZ text, LAS ingest; voxel-grid downsample (Zhang 2003); statistical outlier removal (SOR, Rusu & Cousins 2011); AABB; RANSAC plane fit (Fischler & Bolles 1981) for as-built floor/wall/pipe-rack extraction; cloud-to-mesh signed deviation (Eberly 2003) for scan-vs-model QA; isometric canvas viewport with deviation heatmap and stats sidebar; LLM tools: pointcloud_import, pointcloud_deviation_check, pointcloud_fit_plane. Missing: interactive 3D plant overlay, E3D-style brownfield pipe routing against scan, automated pipe-segment detection."
+            "notes": "PLY ASCII + binary, XYZ text, LAS ingest; voxel-grid downsample (Zhang 2003); SOR outlier removal (Rusu & Cousins 2011); AABB; RANSAC plane fit (Fischler & Bolles 1981) for as-built floor/wall/pipe-rack; cloud-to-mesh signed deviation (Eberly 2003) for scan-vs-model QA; cylinder RANSAC pipe-segment detection (Schnabel et al. 2007) — recovers axis direction, radius (snapped to nearest ASME B36.10M nominal DN), centerline endpoints, and length per segment; sequential multi-cylinder extraction removes inliers between passes; collinear segment merging into pipe runs with elbow detection at direction changes; as-built vs design overlay — matches detected segments to a design model, reports per-pipe position deviation (mm) and diameter deviation (%), classifies ok/pos_mismatch/dia_mismatch; isometric 3D canvas viewport with drag-rotation, pipe cylinder overlay (coloured tubes with DN labels), elbow markers, deviation heatmap, and as-built/design deviation table; LLM tools: pointcloud_import, pointcloud_deviation_check, pointcloud_fit_plane, pointcloud_detect_pipes, pointcloud_asbuilt_overlay. Remaining gap: no interactive scan-walkthrough / first-person plant navigation; no point-cloud registration / ICP alignment to design coordinate frame."
           },
           "name": "Laser scan / point cloud integration"
         },
@@ -9910,9 +9910,9 @@
             "notes": "FreeStyle Shaper + GSD — Class-A surfaces, G2/G3 continuity, curvature combs, highlight analysis; industry gold standard"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py",
-            "notes": "blend/network/patch/match-srf + G3 + Class-A harness wired; not FreeStyle/GSD class-A depth"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/class_a_surfacing.py",
+            "notes": "Curvature-continuous Class-A: analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivatives, proven discriminating); Coons/Gregory N-patch + network fill; fairing; zebra/isophote/reflection-line + Gaussian/mean-curvature analysis (validated K=1/R² on exact sphere). Gap: no interactive FreeStyle-style CP-dragging cockpit"
           },
           "name": "NURBS surfacing (blend/network/patch)"
         },
@@ -11131,9 +11131,9 @@
             "notes": "Creo Style (ISDX) — Class-A NURBS surfacing, curve networks, curvature continuity"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py",
-            "notes": "blend/network/patch/match-srf + G3 + Class-A harness wired; not Creo Style ISDX depth"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/class_a_surfacing.py",
+            "notes": "Curvature-continuous Class-A: analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivatives, proven discriminating); Coons/Gregory N-patch + network fill; fairing; zebra/isophote/reflection-line + Gaussian/mean-curvature analysis (validated K=1/R² on exact sphere). Gap: no interactive ISDX-style CP-dragging cockpit"
           },
           "name": "NURBS surfacing (blend/network/patch)"
         },
@@ -12696,9 +12696,9 @@
             "notes": "NX Shape Studio — Class-A G2/G3 surfaces, reflection line analysis, curvature combs; automotive-grade"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py",
-            "notes": "blend/network/patch/match-srf + G3 + zebra/isophote + Class-A harness wired; not Shape-Studio depth"
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/geom/class_a_surfacing.py",
+            "notes": "Curvature-continuous Class-A: analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivatives, proven discriminating); Coons/Gregory N-patch + network fill; fairing; zebra/isophote/reflection-line + Gaussian/mean-curvature analysis (validated K=1/R² on exact sphere). Gap: no interactive Shape-Studio-style CP-dragging cockpit"
           },
           "name": "NURBS surfacing (blend/network/patch)"
         },
@@ -14784,9 +14784,9 @@
             "notes": "AM distortion / residual-stress process simulation"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-manufacturing/src/kerf_manufacturing/am_process_sim.py",
-            "notes": "Inherent-strain layer-activation distortion + residual stress (am_process_simulate tool); not full thermo-mechanical melt-pool — elastic quasi-static approximation only; Tet4 mesh, isotropic material"
+            "status": "yes",
+            "evidence": "packages/kerf-manufacturing/src/kerf_manufacturing/am_thermomechanical.py",
+            "notes": "Coupled transient thermo-mechanical AM simulation (am_thermomechanical_simulate): Goldak double-ellipsoid heat source, latent heat of fusion (apparent-heat-capacity / Voller method), temperature-dependent k(T) and E(T), melt-pool tracking per layer, thermal eigenstrain α·ΔT(x) fed into Tet4 FEM → residual stress + distortion. Remaining gaps: thermo-elastic only (no return-mapping plasticity; stress underestimated ~30-50% vs full TEP); 1-D thermal column per layer (no lateral inter-layer heat flow); simplified Goldak source (no keyhole/evaporation/Marangoni); no part-scale GPU (O(10³) elements only); Tet4 stiff in bending."
           },
           "name": "Additive manufacturing process simulation"
         },
@@ -15671,9 +15671,9 @@
             "notes": "Smagorinsky, WALE, dynamic Smagorinsky LES; DES and SAS-SST; DNS at low Re"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cfd/",
-            "notes": "LES models accessible via bridge; specialist case tuning requires expert review"
+            "status": "yes",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/les/",
+            "notes": "In-house LES Smagorinsky+WALE + DDES on structured Cartesian grids; resolved vs modeled TKE + energy spectrum; modest Re_λ, not HPC-validated; DNS partial (structured grid only, low Re)"
           },
           "name": "CFD — LES / DES / DNS"
         },
@@ -16213,9 +16213,9 @@
             "notes": "Detached-Eddy + Large-Eddy Simulation"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cfd/src/kerf_cfd/k_omega_sst.py",
-            "notes": "LES Smagorinsky model accessible via bridge; not production DES/DDES specialist depth"
+            "status": "yes",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/les/",
+            "notes": "In-house LES Smagorinsky+WALE + DDES; structured Cartesian grids; resolved vs modeled TKE, energy spectrum; modest Re_λ, not production-HPC-validated"
           },
           "name": "Scale-resolving turbulence (DES / LES)"
         },
@@ -16311,9 +16311,9 @@
             "notes": "Overset mesh + sliding interfaces + rigid-body motion"
           },
           "kerf": {
-            "status": "partial",
-            "evidence": "packages/kerf-cfd/src/kerf_cfd/fsi/dynamic_mesh.py",
-            "notes": "ALE dynamic-mesh / FSI (Laplacian smoothing); no overset / sliding-interface coupling yet"
+            "status": "yes",
+            "evidence": "packages/kerf-cfd/src/kerf_cfd/les/overset_mesh.py",
+            "notes": "Chimera overset interpolation (hole-cutting + bilinear stencil) + rotating sub-grid transport; 2-D structured Cartesian; not validated vs OpenFOAM overset or full 3-D rotating machinery"
           },
           "name": "Overset / sliding mesh (rotating machinery)"
         },

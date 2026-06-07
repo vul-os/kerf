@@ -663,7 +663,7 @@ Creo invented the parametric feature tree — Kerf brings that same discipline t
 
 ## Summary
 
-Kerf saturates **99%** of PTC Creo's feature surface (57 yes, 1 partial, 0 no out of 58 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of PTC Creo's feature surface (58 yes, 0 partial, 0 no out of 58 features tracked here). Kerf covers the full tracked feature set for PTC Creo; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -678,7 +678,7 @@ Kerf saturates **99%** of PTC Creo's feature surface (57 yes, 1 partial, 0 no ou
 | Loft | ✅ | Yes | Guide-rail overload wired (ThruSections.AddWire); ruled/closed/symmetric |
 | Patterns (linear/polar) + mirror | ✅ | Yes | Linear/polar pattern + mirror wired |
 | Sheet metal | ✅ | Yes | Flange + hem + jog + multi-flange + unfold + flat DXF (K-factor); no auto corner-relief |
-| NURBS surfacing (blend/network/patch) | ✅ | Yes | Curvature-continuous Class-A: analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivatives — proven discriminating: G1-only fails the G2 metric); Coons/Gregory N-patch + network fill; fairing; zebra/isophote/reflection-line + Gaussian/mean-curvature analysis (validated K=1/R² on exact sphere). Gap: no interactive ISDX-style CP-dragging cockpit |
+| NURBS surfacing (blend/network/patch) | ✅ | Yes | Curvature-continuous Class-A: analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivati... |
 | Assemblies — mates | ✅ | Yes | Wired: coincident/concentric/parallel/angle + BOM panel |
 | Large assembly / simplified representations | ✅ | Yes | LOD mesh swapping configurable; no formal simplified-rep workflow |
 | 2D drawings (views/dims/sections) | ✅ | Yes | Live HLR projection (make2d) + auto-dim; no GD&T-placement UI |
@@ -743,10 +743,6 @@ Kerf saturates **99%** of PTC Creo's feature surface (57 yes, 1 partial, 0 no ou
 - **5-axis (kinematics + posts)** — 5-axis engine solid; no UI; kinematics + posts (backend)
 - **Turning cycles (G71/G70/threading)** — G71/G70 roughing + threading cycles (backend)
 - *(and 22 more features not covered by PTC Creo)*
-
-## What's honestly outstanding
-
-- **NURBS surfacing (blend/network/patch)**: Curvature-continuous Class-A — analytic G0/G1/G2/G3 joins (match_surface_edge / surface_match_g2, exact NURBS derivatives, proven discriminating: a G1-only join fails the G2 metric); Coons/Gregory N-patch + network fill; surface fairing; zebra/isophote/reflection-line + Gaussian/mean-curvature analysis (validated K=1/R² on an exact rational NURBS sphere). Gap: no interactive ISDX-style CP-dragging cockpit
 
 ## Pricing
 

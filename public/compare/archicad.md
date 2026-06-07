@@ -277,7 +277,7 @@ ArchiCAD pioneered BIM — Kerf brings engineering-grade precision to teams buil
 
 ## Summary
 
-Kerf saturates **100%** of Graphisoft ArchiCAD's feature surface (26 yes, 0 partial, 0 no out of 26 features tracked here).
+Kerf saturates **100%** of Graphisoft ArchiCAD's feature surface (26 yes, 0 partial, 0 no out of 26 features tracked here). Kerf covers the full tracked feature set for Graphisoft ArchiCAD; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -290,11 +290,11 @@ Kerf saturates **100%** of Graphisoft ArchiCAD's feature surface (26 yes, 0 part
 | IFC 4 authoring and export | ✅ | Yes | IFC4 export wired (walls/slabs/doors/windows/spaces/stairs/openings/site); Tier 2 import; not yet buildingSMART certi... |
 | GDL parametric object library | ✅ | Yes | Parametric .family.json (type/instance params, formulas); no GDL-equivalent object market |
 | MEP Modeler (HVAC / plumbing / electrical routing) | ✅ | Yes (paid tier) | BIM MEP routing (duct/pipe/conduit segments, fittings, endpoints) via create_mep_route tool; no clash-aware auto-rout... |
-| Teamwork BIMcloud multi-user worksharing | ✅ | Yes (paid tier) | Checkout/borrow/sync worksharing model (matches ArchiCAD Teamwork's actual mechanism): central manifest, worksets, element borrow, sync-to-central, conflict detection. NOT live real-time co-editing — ArchiCAD Teamwork itself is the same checkout/sync model. |
+| Teamwork BIMcloud multi-user worksharing | ✅ | Yes (paid tier) | Checkout/borrow/sync worksharing model (matches Revit's and ArchiCAD Teamwork's actual mechanism): central manifest, ... |
 | Schedules and quantity take-off | ✅ | Yes | BIM element schedules (walls/doors/windows/spaces/slabs); area/volume/occupancy totals per level; bim_space_schedule ... |
 | Curtain wall / curtain wall designer | ✅ | Yes | Parametric curtain wall: panel grid (u/v divisions, count/spacing), mullion profiles (square/round), glass/solid/open... |
 | Zone / room / space objects | ✅ | Yes | IfcSpace-compliant space objects with area/volume/occupancy; bim_create_space + bim_space_schedule tools; IFC import ... |
-| Hotlinked modules (XRef / federated model) | ✅ | Yes | Federated XRef: external IFC files linked as positioned read-only overlays with SHA-256 freshness tracking, reload, and nested XRef resolution. Tools: bim_add_xref, bim_refresh_xref, bim_compose_federated. |
+| Hotlinked modules (XRef / federated model) | ✅ | Yes | Federated XRef: external IFC files linked as positioned read-only overlays (discipline, placement origin, rotation), ... |
 | Site terrain / mesh modelling | ✅ | Yes | Backend geotech + earthwork volumes; no interactive site mesh UI |
 | Parametric object model | ✅ | Yes | Feature-tree parametric model; OCCT B-rep; sketch constraints via PlaneGCS |
 | 2D technical drawings / documentation | ✅ | Yes | Engineering multi-sheet drawings (template-based, not live B-rep projection); no layout book |
@@ -313,6 +313,7 @@ Kerf saturates **100%** of Graphisoft ArchiCAD's feature surface (26 yes, 0 part
 ## What Kerf does that Graphisoft ArchiCAD doesn't
 
 - **MEP Modeler (HVAC / plumbing / electrical routing)** — BIM MEP routing (duct/pipe/conduit segments, fittings, endpoints) via create_mep_route tool; no clash-aware auto-routing UI
+- **Teamwork BIMcloud multi-user worksharing** — Checkout/borrow/sync worksharing model (matches Revit's and ArchiCAD Teamwork's actual mechanism): central manifest, named worksets with ownership, per-element borrow (exclusive checkout), sync-to-central with conflict detection. NOT live real-time OT/CRDT co-editing — ArchiCAD Teamwork itself is the same checkout/sync model.
 - **Sheet metal flat-pattern** — Single flange + unfold + flat DXF; no hem/relief/jog/multi-flange
 - **GD&T / tolerancing** — GD&T data model (ASME Y14.5); no MBD/PMI on model view
 - **HVAC duct sizing** — SMACNA duct sizing + flat-pattern (backend)

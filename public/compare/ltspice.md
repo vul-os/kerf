@@ -16,7 +16,7 @@ features:
     kerf:
       status: yes
       note: "Transient via ngspice bridge; .TRAN directive injected automatically; waveforms returned as .spice.waveform JSON"
-      evidence: "packages/kerf-silicon/bridges/ngspice_bridge.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/bridges/ngspice_bridge.py"
 
   - domain: D6
     feature: "SPICE — AC small-signal analysis"
@@ -27,7 +27,7 @@ features:
     kerf:
       status: yes
       note: "AC analysis via ngspice bridge (.AC directive)"
-      evidence: "packages/kerf-silicon/bridges/ngspice_bridge.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/bridges/ngspice_bridge.py"
 
   - domain: D6
     feature: "SPICE — DC operating-point / sweep"
@@ -38,7 +38,7 @@ features:
     kerf:
       status: yes
       note: "DC sweep via ngspice bridge"
-      evidence: "packages/kerf-silicon/bridges/ngspice_bridge.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/bridges/ngspice_bridge.py"
 
   - domain: D6
     feature: "SPICE — PVT corner sweep (60 corners)"
@@ -49,7 +49,7 @@ features:
     kerf:
       status: yes
       note: "60-corner PVT sweep (5P × 3V × 4T) with Monte-Carlo mismatch via silicon_pvt_sweep tool; Pelgrom-matched sky130 model"
-      evidence: "packages/kerf-silicon/analog/pvt.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py"
 
   - domain: D6
     feature: "SPICE — Monte-Carlo mismatch"
@@ -60,7 +60,7 @@ features:
     kerf:
       status: yes
       note: "Pelgrom model Monte-Carlo (A_VT = 4 mV·µm) per corner; 50 samples/corner default, configurable"
-      evidence: "packages/kerf-silicon/analog/pvt.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py"
 
   - domain: D6
     feature: "SPICE — waveform viewer (interactive)"
@@ -91,8 +91,9 @@ features:
       note: "LTspice has a full schematic capture GUI (proprietary symbol format)"
       source: "https://www.analog.com/en/resources/design-tools-and-calculators/ltspice-simulator.html"
     kerf:
-      status: yes
-      note: "Kerf accepts netlists directly; no schematic GUI for SPICE (circuit.tsx is for PCB-level schematics)"
+      status: partial
+      note: "Kerf accepts netlists directly via SpiceRunPanel; no dedicated schematic-capture GUI for SPICE (PCB-level schematic editor is separate)"
+      evidence: "src/components/silicon/SpiceRunPanel.jsx"
 
   - domain: D6
     feature: "SPICE — chat-native / LLM-driven flow"
@@ -125,7 +126,7 @@ features:
     kerf:
       status: yes
       note: "PVT sweep models derived from sky130 BSIM4 corner data; ngspice bridge accepts sky130 PDK SPICE decks"
-      evidence: "packages/kerf-silicon/analog/pvt.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py"
 ---
 
 # Kerf vs LTspice
@@ -149,7 +150,7 @@ Kerf saturates **100%** of LTspice's feature surface (11 yes, 0 partial, 0 no ou
 | SPICE — Monte-Carlo mismatch | ✅ | Partial | Pelgrom model Monte-Carlo (A_VT = 4 mV·µm) per corner; 50 samples/corner default, configurable |
 | SPICE — waveform viewer (interactive) | ✅ | Yes | WaveformViewer.jsx: multi-trace SVG plot, zoom/scroll, dual cursors (A/B), ΔT/ΔY measurement, per-trace toggle; .spic... |
 | SPICE — netlist editor with syntax highlighting | ✅ | Yes | SpiceRunPanel.jsx netlist textarea + Monaco SPICE syntax mode (.cir / .spice.net files) |
-| SPICE — schematic capture GUI | ✅ | Yes | Kerf accepts netlists directly; no schematic GUI for SPICE (circuit.tsx is for PCB-level schematics) |
+| SPICE — schematic capture GUI | ⚠️ | Yes | Kerf accepts netlists directly via SpiceRunPanel; no dedicated schematic-capture GUI for SPICE (PCB-level schematic editor is separate) |
 | SPICE — chat-native / LLM-driven flow | ✅ | No | All silicon tools reachable via plain-language prompts; LLM translates to tool calls, backed by doc-search |
 | SPICE — open-source / free | ✅ | Yes | Kerf is MIT open-core; the ngspice backend is GPL-licensed (user installs ngspice) |
 | SPICE — sky130 / open PDK model support | ✅ | Partial | PVT sweep models derived from sky130 BSIM4 corner data; ngspice bridge accepts sky130 PDK SPICE decks |

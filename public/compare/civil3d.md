@@ -18,7 +18,7 @@ features:
     kerf:
       status: yes
       note: "Backend; no UI"
-      evidence: "packages/kerf-civil/superelevation.py"
+      evidence: "packages/kerf-civil/src/kerf_civil/superelevation.py"
 
   - domain: D8
     feature: "Superelevation runoff transition"
@@ -29,7 +29,7 @@ features:
     kerf:
       status: yes
       note: "Backend; AASHTO Exhibit 3-20 validated"
-      evidence: "packages/kerf-civil/superelevation.py"
+      evidence: "packages/kerf-civil/src/kerf_civil/superelevation.py"
 
   - domain: D8
     feature: "Corridor / cross-section"
@@ -117,7 +117,7 @@ features:
     kerf:
       status: yes
       note: "Backend; Seed-Idriss CSR + SPT/CPT CRR validated"
-      evidence: "packages/kerf-civil/geotech/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/geotech"
 
   - domain: D8
     feature: "Hydrology (rational/SCS/TR-55)"
@@ -195,7 +195,7 @@ features:
     kerf:
       status: yes
       note: "Backend; ELF + RSA (SRSS+CQC) + Newmark time-history"
-      evidence: "packages/kerf-structural/seismic/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/seismic"
 
   # D4 — Thermal / fluid / HVAC
   - domain: D4
@@ -230,7 +230,7 @@ features:
     kerf:
       status: yes
       note: "OCCT; no graceful failure / fuzzy heal"
-      evidence: "packages/kerf-occt/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/brep"
 
   # D7 — Manufacturing / CAM
   - domain: D7
@@ -242,7 +242,7 @@ features:
     kerf:
       status: yes
       note: "Backend; Minkowski-sum NFP, 57.6% L-shape utilisation"
-      evidence: "packages/kerf-cam/nesting/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/nesting"
 
   # D10 — Electrical / energy / PLC
   - domain: D10
@@ -254,7 +254,7 @@ features:
     kerf:
       status: yes
       note: "Backend; NEC power distribution + point-to-point SC"
-      evidence: "packages/kerf-electrical/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/elecpower"
 
   # D14 — Cost / materials / LCA
   - domain: D14
@@ -266,7 +266,7 @@ features:
     kerf:
       status: yes
       note: "Backend; 6 processes, Boothroyd-Dewhurst method"
-      evidence: "packages/kerf-cost/"
+      evidence: "packages/kerf-costing/src/kerf_costing"
 
   - domain: D14
     feature: "Material selection (Ashby)"
@@ -277,7 +277,7 @@ features:
     kerf:
       status: yes
       note: "Backend; 200 materials, Pareto frontier, weighted-score"
-      evidence: "packages/kerf-matsel/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/matsel"
 
   # D13 — Verticals
   - domain: D13
@@ -313,7 +313,7 @@ features:
     kerf:
       status: yes
       note: "Backend; classical control design tools"
-      evidence: "packages/kerf-controls/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/controls"
 
   # D11 — Tolerancing / QA
   - domain: D11
@@ -325,7 +325,7 @@ features:
     kerf:
       status: yes
       note: "Backend"
-      evidence: "packages/kerf-qa/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/spc"
 ---
 
 # Kerf vs Civil 3D

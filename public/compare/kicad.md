@@ -261,7 +261,7 @@ features:
     kerf:
       status: yes
       note: "60-corner (5P×3V×4T) + MC Pelgrom mismatch (backend)"
-      evidence: "packages/kerf-electronics/src/kerf_silicon/analog/pvt.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py"
 
   - domain: D6
     feature: "Silicon synth (Yosys) / STA / GDS / DRC / LVS"

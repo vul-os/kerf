@@ -16,7 +16,7 @@ features:
     kerf:
       status: yes
       note: "Transient via ngspice bridge; suitable for sky130/open-PDK scale netlists"
-      evidence: "packages/kerf-silicon/bridges/ngspice_bridge.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/bridges/ngspice_bridge.py"
 
   - domain: D6
     feature: "SPICE — PVT corner sweep"
@@ -27,7 +27,7 @@ features:
     kerf:
       status: yes
       note: "60-corner automated sweep (5P × 3V × 4T) with Monte-Carlo via silicon_pvt_sweep"
-      evidence: "packages/kerf-silicon/analog/pvt.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py"
 
   - domain: D6
     feature: "SPICE — Monte-Carlo mismatch"
@@ -38,7 +38,7 @@ features:
     kerf:
       status: yes
       note: "Pelgrom model (A_VT = 4 mV·µm, sky130) Monte-Carlo; not a foundry-certified MC deck"
-      evidence: "packages/kerf-silicon/analog/pvt.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py"
 
   - domain: D6
     feature: "SPICE — commercial foundry sign-off accuracy"
@@ -92,7 +92,7 @@ features:
     kerf:
       status: yes
       note: "PVT sweep models are sky130-calibrated; ngspice bridge accepts sky130 PDK decks natively"
-      evidence: "packages/kerf-silicon/analog/pvt.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py"
 ---
 
 # Kerf vs Synopsys HSPICE

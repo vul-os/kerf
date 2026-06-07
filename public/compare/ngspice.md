@@ -16,7 +16,7 @@ features:
     kerf:
       status: yes
       note: "Kerf wraps ngspice -b in a subprocess bridge; .TRAN injected automatically; result serialised to .spice.waveform JSON"
-      evidence: "packages/kerf-silicon/bridges/ngspice_bridge.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/bridges/ngspice_bridge.py"
 
   - domain: D6
     feature: "SPICE — AC analysis"
@@ -27,7 +27,7 @@ features:
     kerf:
       status: yes
       note: "AC analysis via ngspice bridge"
-      evidence: "packages/kerf-silicon/bridges/ngspice_bridge.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/bridges/ngspice_bridge.py"
 
   - domain: D6
     feature: "SPICE — PVT corner sweep"
@@ -38,7 +38,7 @@ features:
     kerf:
       status: yes
       note: "60-corner automated PVT sweep (5P × 3V × 4T) with Monte-Carlo; silicon_pvt_sweep tool"
-      evidence: "packages/kerf-silicon/analog/pvt.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py"
 
   - domain: D6
     feature: "SPICE — Monte-Carlo mismatch"
@@ -49,7 +49,7 @@ features:
     kerf:
       status: yes
       note: "Pelgrom model Monte-Carlo built into PVT sweep; 50 samples/corner default"
-      evidence: "packages/kerf-silicon/analog/pvt.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py"
 
   - domain: D6
     feature: "SPICE — waveform viewer"

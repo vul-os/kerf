@@ -16,7 +16,7 @@ features:
     kerf:
       status: yes
       note: "kerf-bim walls/slabs/framing wired; parametric engine + IFC viewer"
-      evidence: "packages/kerf-bim/src/bim.py"
+      evidence: "packages/kerf-bim/src/kerf_bim/tools/bim.py"
   - domain: D13
     feature: "BIM stairs / ramps"
     competitor:
@@ -26,7 +26,7 @@ features:
     kerf:
       status: yes
       note: "Stairs and ramps in kerf-bim engine; viewer wired"
-      evidence: "packages/kerf-bim/src/bim.py"
+      evidence: "packages/kerf-bim/src/kerf_bim/tools/bim.py"
   - domain: D13
     feature: "BIM doors / windows"
     competitor:
@@ -36,7 +36,7 @@ features:
     kerf:
       status: yes
       note: "Parametric doors/windows in kerf-bim; wired in viewer"
-      evidence: "packages/kerf-bim/src/bim.py"
+      evidence: "packages/kerf-bim/src/kerf_bim/tools/bim.py"
   - domain: D13
     feature: "BIM roof generator"
     competitor:
@@ -136,7 +136,7 @@ features:
     kerf:
       status: yes
       note: "Backend geotech + earthwork volumes; no interactive site mesh UI"
-      evidence: "packages/kerf-civil/geotech/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/geotech"
   - domain: D1
     feature: "Parametric object model"
     competitor:
@@ -156,7 +156,7 @@ features:
     kerf:
       status: yes
       note: "Engineering multi-sheet drawings (template-based, not live B-rep projection); no layout book"
-      evidence: "src/components/DrawingsView.jsx"
+      evidence: "src/components/DrawingView.jsx"
   - domain: D1
     feature: "3D solid B-rep modelling"
     competitor:
@@ -166,7 +166,7 @@ features:
     kerf:
       status: yes
       note: "Full OCCT B-rep; pad/pocket/revolve/sweep/loft/fillet/boolean wired"
-      evidence: "packages/kerf-core/src/occt/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/brep"
   - domain: D1
     feature: "Sheet metal flat-pattern"
     competitor:
@@ -176,7 +176,7 @@ features:
     kerf:
       status: yes
       note: "Single flange + unfold + flat DXF; no hem/relief/jog/multi-flange"
-      evidence: "packages/kerf-core/src/sheetmetal.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/sheetmetal_features.py"
   - domain: D1
     feature: "GD&T / tolerancing"
     competitor:
@@ -186,7 +186,7 @@ features:
     kerf:
       status: yes
       note: "GD&T data model (ASME Y14.5); no MBD/PMI on model view"
-      evidence: "packages/kerf-core/src/gdandt.py"
+      evidence: "packages/kerf-gdnt/src/kerf_gdnt/feature_control_frame.py"
   - domain: D4
     feature: "Building energy analysis export"
     competitor:
@@ -196,7 +196,7 @@ features:
     kerf:
       status: yes
       note: "Backend building loads (CLTD/RTS, ASHRAE Ch.18, degree-day); no energy simulation export"
-      evidence: "packages/kerf-thermal/buildingenergy/transient.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/buildingenergy/transient.py"
   - domain: D4
     feature: "HVAC duct sizing"
     competitor:
@@ -206,7 +206,7 @@ features:
     kerf:
       status: yes
       note: "SMACNA duct sizing + flat-pattern (backend)"
-      evidence: "packages/kerf-thermal/hvac/duct.py"
+      evidence: "packages/kerf-hvac/src/kerf_hvac/duct.py"
   - domain: D6
     feature: "PCB / electronics design"
     competitor:
@@ -226,7 +226,7 @@ features:
     kerf:
       status: yes
       note: "1D WC/RSS/MC stackup + 3D vector-loop; no MBD on model"
-      evidence: "packages/kerf-qa/tolstack/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/tolstack"
   - domain: D14
     feature: "Material cost / quantity schedules"
     competitor:
@@ -246,7 +246,7 @@ features:
     kerf:
       status: yes
       note: "Full ISO 14040/44 4-phase LCA; 6 impact categories + uncertainty (backend)"
-      evidence: "packages/kerf-lca/phases.py"
+      evidence: "packages/kerf-lca/src/kerf_lca/phases.py"
   - domain: D13
     feature: "Python / open scripting API"
     competitor:

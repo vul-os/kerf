@@ -16,7 +16,7 @@ features:
     kerf:
       status: yes
       note: "Transient via ngspice bridge; sufficient for sky130-scale netlists"
-      evidence: "packages/kerf-silicon/bridges/ngspice_bridge.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/bridges/ngspice_bridge.py"
 
   - domain: D6
     feature: "SPICE — PVT corner sweep (automated)"
@@ -27,7 +27,7 @@ features:
     kerf:
       status: yes
       note: "60-corner PVT sweep automated via silicon_pvt_sweep (sky130 model); Monte-Carlo mismatch included"
-      evidence: "packages/kerf-silicon/analog/pvt.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py"
 
   - domain: D6
     feature: "SPICE — Monte-Carlo mismatch"
@@ -38,7 +38,7 @@ features:
     kerf:
       status: yes
       note: "Pelgrom A_VT = 4 mV·µm model for sky130; production-sign-off accuracy requires foundry MC deck (not yet integrated)"
-      evidence: "packages/kerf-silicon/analog/pvt.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py"
 
   - domain: D6
     feature: "SPICE — commercial foundry PDK sign-off accuracy"
@@ -68,8 +68,9 @@ features:
       note: "Spectre + Virtuoso schematic editor; fully integrated testbench workflow"
       source: "https://www.cadence.com/en_US/home/tools/custom-ic-analog-rf-design/circuit-simulation/spectre-simulation-platform.html"
     kerf:
-      status: yes
-      note: "Kerf accepts netlists only; no analog schematic capture GUI yet"
+      status: partial
+      note: "Kerf accepts netlists via SpiceRunPanel; no analog schematic capture GUI — netlist-driven workflow only"
+      evidence: "src/components/silicon/SpiceRunPanel.jsx"
 
   - domain: D6
     feature: "SPICE — license cost"

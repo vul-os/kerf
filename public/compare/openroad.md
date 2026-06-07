@@ -181,7 +181,7 @@ features:
     kerf:
       status: yes
       note: "60 PVT corners (5P×3V×4T) + Monte-Carlo mismatch per corner; Pelgrom-matched (backend)"
-      evidence: "packages/kerf-silicon/analog/pvt.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py"
 
   - domain: D6
     feature: "Silicon — formal verification"
@@ -213,8 +213,8 @@ features:
       source: "https://openroad.readthedocs.io/en/latest/main/README.html"
     kerf:
       status: yes
-      note: "Kerf hosted environment provides cloud compute for OpenROAD runs"
-      evidence: "cloud/"
+      note: "Kerf hosted environment provides cloud compute for OpenROAD runs (cloud backend is proprietary / gitignored)"
+      evidence: "packages/kerf-workers/src/kerf_workers/compute_backend.py"
 ---
 
 # Kerf vs OpenROAD

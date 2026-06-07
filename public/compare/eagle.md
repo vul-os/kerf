@@ -83,7 +83,7 @@ features:
     kerf:
       status: yes
       note: "IBIS 5.1 parser + Bergeron channel + PRBS eye envelope; backend"
-      evidence: "packages/kerf-electronics/si/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/si"
 
   - domain: D6
     feature: "EMC (radiated/shielding/limits)"
@@ -94,7 +94,7 @@ features:
     kerf:
       status: yes
       note: "Closed-form EMC analysis (radiated/shielding/limits); no full-wave; backend"
-      evidence: "packages/kerf-electronics/emc/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/emc"
 
   - domain: D6
     feature: "PDN (DC IR-drop + AC sweep)"
@@ -105,7 +105,7 @@ features:
     kerf:
       status: yes
       note: "Frequency-domain Z(omega) + target-Z + decap optimiser; backend"
-      evidence: "packages/kerf-electronics/pdn/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/pdn"
 
   - domain: D6
     feature: "PCB thermal"
@@ -215,7 +215,7 @@ features:
     kerf:
       status: yes
       note: "Yosys synth + STA + GDS + DRC + LVS + formal + CTS; backend, zero UI"
-      evidence: "packages/kerf-electronics/silicon/"
+      evidence: "packages/kerf-silicon/"
 
   - domain: D6
     feature: "Silicon P&R (OpenLane)"
@@ -226,7 +226,7 @@ features:
     kerf:
       status: yes
       note: "OpenLane P&R integration; backend, needs install"
-      evidence: "packages/kerf-electronics/silicon/"
+      evidence: "packages/kerf-silicon/"
 
   - domain: D6
     feature: "Analog PVT-corner simulation"
@@ -237,7 +237,7 @@ features:
     kerf:
       status: yes
       note: "60 corners (5P x 3V x 4T) + Monte-Carlo per corner; Pelgrom sigma matched; backend"
-      evidence: "packages/kerf-electronics/silicon/analog/pvt.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/analog/pvt.py"
 
   - domain: D6
     feature: "License model"

@@ -26,7 +26,7 @@ features:
     kerf:
       status: yes
       note: "Cabinet room layout (CabinetPlacement) + cut-list generation"
-      evidence: ""
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/woodworking/cabinet_room_layout.py"
   - domain: D13
     feature: "Parametric cabinet libraries"
     competitor:
@@ -46,7 +46,7 @@ features:
     kerf:
       status: yes
       note: "True-shape NFP nesting + G-code post (Fanuc/GRBL/LinuxCNC); no cabinet-specific bore patterns"
-      evidence: "packages/kerf-manufacturing/src/kerf_manufacturing/nesting/nfp.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/nesting/nfp.py"
   - domain: D7
     feature: "Hardware boring / machining automation"
     competitor:
@@ -86,7 +86,7 @@ features:
     kerf:
       status: yes
       note: "Engineering multi-sheet drawings (template-based); no cabinet shop drawing format"
-      evidence: "src/components/DrawingsView.jsx"
+      evidence: "src/components/DrawingView.jsx"
   - domain: D1
     feature: "LLM / chat-native editing"
     competitor:

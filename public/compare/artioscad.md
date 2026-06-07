@@ -46,7 +46,7 @@ features:
     kerf:
       status: yes
       note: "Skyline + true-shape NFP nesting (backend); 57.6% L-shape utilisation validated"
-      evidence: "packages/kerf-manufacturing/src/kerf_manufacturing/nesting/nfp.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/nesting/nfp.py"
   - domain: D13
     feature: "Structural performance (BCT / ECT)"
     competitor:
@@ -76,7 +76,7 @@ features:
     kerf:
       status: yes
       note: "ISO 15930-1 PDF/X-1a export + registration marks + bleed/safety check"
-      evidence: ""
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/packaging/pre_press.py"
   - domain: D14
     feature: "Material cost / yield estimation"
     competitor:

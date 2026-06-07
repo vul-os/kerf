@@ -16,7 +16,7 @@ features:
     kerf:
       status: yes
       note: "OCCT B-rep kernel; pad/pocket/revolve/fillet/sweep/loft wired"
-      evidence: "packages/kerf-occt/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/brep"
 
   - domain: D1
     feature: "Geometry & core CAD — constraint sketcher"
@@ -27,7 +27,7 @@ features:
     kerf:
       status: yes
       note: "PlaneGCS WASM sketcher with geometric + dimensional constraints"
-      evidence: "packages/kerf-sketcher/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/sketch.py"
 
   - domain: D1
     feature: "Geometry & core CAD — parametric feature history"
@@ -38,7 +38,7 @@ features:
     kerf:
       status: yes
       note: "Persistent feature DAG; upstream edits regenerate downstream geometry"
-      evidence: "packages/kerf-modeller/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core"
 
   - domain: D1
     feature: "Geometry & core CAD — organic mesh sculpting"
@@ -49,7 +49,7 @@ features:
     kerf:
       status: yes
       note: "Sculpt brushes (grab/smooth/inflate/crease/pinch) + dynamesh remesh"
-      evidence: "packages/kerf-mesh/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/mesh_sculpt_brushes.py"
 
   - domain: D1
     feature: "Geometry & core CAD — STEP / IGES B-rep export"
@@ -60,7 +60,7 @@ features:
     kerf:
       status: yes
       note: "STEP, IGES, 3DM B-rep round-trip via OCCT"
-      evidence: "packages/kerf-io/"
+      evidence: "packages/kerf-imports/"
 
   - domain: D2
     feature: "Structural / FEA — finite element analysis"
@@ -82,7 +82,7 @@ features:
     kerf:
       status: yes
       note: "Shigley/AGMA/ISO/VDI grade engines; entirely backend, no UI panel"
-      evidence: "packages/kerf-mechanical/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/gearstrength"
 
   - domain: D4
     feature: "Thermal / fluid / HVAC — simulation"
@@ -93,7 +93,7 @@ features:
     kerf:
       status: yes
       note: "ASHRAE psychrometrics, LMTD/ε-NTU HX, Hardy-Cross pipe network, OpenFOAM bridge; backend"
-      evidence: "packages/kerf-thermal/"
+      evidence: "packages/kerf-hvac/"
 
   - domain: D6
     feature: "Electronics / EDA / silicon — PCB and schematic"
@@ -104,7 +104,7 @@ features:
     kerf:
       status: yes
       note: "KiCad-round-trip viewer, ngspice SPICE, DRC overlay wired; interactive routing not yet"
-      evidence: "packages/kerf-ecad/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics"
 
   - domain: D7
     feature: "Manufacturing / CAM — 3D print output"
@@ -159,7 +159,7 @@ features:
     kerf:
       status: yes
       note: "41-module jewelry suite: ring v4, gemstone v2, settings v3/v4, chain v2, casting export"
-      evidence: "packages/kerf-jewelry/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry"
 
   - domain: D13
     feature: "Verticals — dental anatomic sculpting"
@@ -181,7 +181,7 @@ features:
     kerf:
       status: yes
       note: "Sculpt + dynamesh + auto-weight + LBS pose (sculpt_extended_tools)"
-      evidence: ""
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/sculpt/sculpt_extended_tools.py"
 
   - domain: D13
     feature: "Verticals — texture / polypaint / displacement"
@@ -192,7 +192,7 @@ features:
     kerf:
       status: yes
       note: "Polypaint stroke/bake + displacement bake"
-      evidence: ""
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/sculpt/polypaint.py"
 
   - domain: D13
     feature: "Verticals — hard-surface modelling (ZModeler)"
@@ -203,7 +203,7 @@ features:
     kerf:
       status: yes
       note: "Exact B-rep hard-surface via OCCT feature tree — dimensionally accurate"
-      evidence: "packages/kerf-occt/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/brep"
 
   - domain: D13
     feature: "Verticals — rendering quality"
@@ -225,7 +225,7 @@ features:
     kerf:
       status: yes
       note: "Ashby material selector (200 materials), should-cost (6 processes), full LCA; backend/agent only"
-      evidence: "packages/kerf-materials/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/matsel"
 ---
 
 # Kerf vs Maxon ZBrush

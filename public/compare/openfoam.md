@@ -163,7 +163,7 @@ features:
     kerf:
       status: yes
       note: "LMTD + epsilon-NTU + Bell-Delaware + TEMA layout (backend)"
-      evidence: "packages/kerf-hvac/heatxfer/"
+      evidence: "packages/kerf-hvac/src/kerf_hvac/sizing.py"
 
   - domain: D4
     feature: "HVAC duct sizing (SMACNA)"
@@ -231,7 +231,7 @@ features:
     kerf:
       status: yes
       note: "Hele-Shaw flow-front tracking + weld-line + air-trap detection (backend)"
-      evidence: "packages/kerf-mfg/moldflow/"
+      evidence: "packages/kerf-manufacturing/src/kerf_manufacturing/moldflow"
 
   # ── D1 Geometry / core CAD ─────────────────────────────────────────────────
   - domain: D1
@@ -243,7 +243,7 @@ features:
     kerf:
       status: yes
       note: "Full parametric B-rep modeller (OCCT); sketcher + feature tree wired in browser"
-      evidence: "src/components/ModellingWorkspace/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/brep"
 
   - domain: D1
     feature: "Unified CAD + simulation project"

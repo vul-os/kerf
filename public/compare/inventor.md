@@ -139,7 +139,7 @@ features:
     kerf:
       status: yes
       note: "Chat-driven scripting + kerf-sdk Python API"
-      evidence: "packages/kerf-sdk/src/kerf_sdk"
+      evidence: "packages/kerf-sdk/src/kerf"
 
   # D2 — Structural / FEA
   - domain: D2
@@ -712,7 +712,7 @@ features:
     kerf:
       status: yes
       note: "Deep — full configurator UI; RhinoGold/Matrix-class"
-      evidence: "src/components/JewelryView.jsx"
+      evidence: "src/components/JewelryConfiguratorPanel.jsx"
 
   - domain: D13
     feature: "BIM (walls/slabs/framing/stairs/IFC4)"

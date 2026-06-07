@@ -15,8 +15,8 @@ features:
       source: "https://openrocket.info/documentation.html"
     kerf:
       status: yes
-      note: "kerf_cad_core/dynamics/six_dof.py — backend LLM tool"
-      evidence: "packages/kerf-cad-core/src/kerf_cad_core/dynamics/six_dof.py"
+      note: "6-DOF integrator in kerf-aero flight_dynamics — backend LLM tool"
+      evidence: "packages/kerf-aero/src/kerf_aero/flight_dynamics/sixdof.py"
   - domain: D5
     feature: "Barrowman aerodynamics / CP-CG stability margin"
     competitor:
@@ -36,7 +36,7 @@ features:
     kerf:
       status: yes
       note: "Wired aero tool — USSA-76 exact"
-      evidence: "packages/kerf-aero/src/kerf_aero/atmosphere.py"
+      evidence: "packages/kerf-aero/src/kerf_aero/flight_dynamics/atmosphere.py"
   - domain: D5
     feature: "Drag estimation (form + base + friction + wave)"
     competitor:
@@ -66,7 +66,7 @@ features:
     kerf:
       status: yes
       note: "Wraps OpenRocket motor database via integration; no independent replication"
-      evidence: ""
+      evidence: "packages/kerf-aero/src/kerf_aero/propulsion/motor_database.py"
   - domain: D5
     feature: "Monte-Carlo dispersion / landing scatter"
     competitor:
@@ -96,7 +96,7 @@ features:
     kerf:
       status: yes
       note: "Tsiolkovsky + staging + CEA-lite — wired propulsion tool"
-      evidence: "packages/kerf-aero/src/kerf_aero/propulsion.py"
+      evidence: "packages/kerf-aero/src/kerf_aero/propulsion"
   - domain: D5
     feature: "Trajectory export (CSV / KML)"
     competitor:
@@ -106,7 +106,7 @@ features:
     kerf:
       status: yes
       note: "OpenRocket integration produces same CSV/KML output via chat interface"
-      evidence: ""
+      evidence: "packages/kerf-aero/src/kerf_aero/flight_dynamics"
   - domain: D5
     feature: "Orbital mechanics (Kepler, J2/J3, Hohmann)"
     competitor:
@@ -116,7 +116,7 @@ features:
     kerf:
       status: yes
       note: "Kepler + J2/J3 + Hohmann + Lambert solver — wired aero tools"
-      evidence: "packages/kerf-aero/src/kerf_aero/orbital.py"
+      evidence: "packages/kerf-aero/src/kerf_aero/orbital"
   - domain: D1
     feature: "Airframe 3D B-rep CAD (nose cone, body tube, fins)"
     competitor:
@@ -126,7 +126,7 @@ features:
     kerf:
       status: yes
       note: "Full OCCT B-rep with wall thickness, material, mass — wired UI"
-      evidence: "packages/kerf-cad-core/src/kerf_cad_core/occt_bridge.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/brep"
   - domain: D1
     feature: "Assembly BOM (airframe + avionics)"
     competitor:
@@ -136,7 +136,7 @@ features:
     kerf:
       status: yes
       note: "Kerf BOM panel with distributor pricing — wired UI"
-      evidence: "src/components/BOMView.jsx"
+      evidence: "src/components/BOMPanel.jsx"
   - domain: D6
     feature: "Avionics PCB design (altimeter, GPS, deployment)"
     competitor:
@@ -156,7 +156,7 @@ features:
     kerf:
       status: yes
       note: "ngspice bridge + EMC/PDN/link-budget backend tools — wired"
-      evidence: "packages/kerf-eda/src/kerf_eda/spice_bridge.py"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/bridges/ngspice_bridge.py"
   - domain: D10
     feature: "Recovery / pyro deployment electronics (e-match driver, dual-deploy)"
     competitor:
@@ -175,8 +175,8 @@ features:
       source: "https://openrocket.info/documentation.html"
     kerf:
       status: yes
-      note: "Should-cost engine (Boothroyd-Dewhurst, 6 processes) — backend tool"
-      evidence: "packages/kerf-manufacturing/src/kerf_manufacturing/should_cost.py"
+      note: "Should-cost engine (Boothroyd-Dewhurst tolerance-cost curves) — backend tool"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/costing/tolerance_cost.py"
 ---
 
 # Kerf vs OpenRocket
@@ -193,7 +193,7 @@ Kerf saturates **100%** of OpenRocket's feature surface (17 yes, 0 partial, 0 no
 
 | Feature | Kerf | OpenRocket | Notes |
 |---------|------|------------|-------|
-| 6-DOF flight dynamics + stability derivs | ✅ | Yes | kerf_cad_core/dynamics/six_dof.py — backend LLM tool |
+| 6-DOF flight dynamics + stability derivs | ✅ | Yes | 6-DOF integrator in kerf-aero flight_dynamics — backend LLM tool |
 | Barrowman aerodynamics / CP-CG stability margin | ✅ | Yes | Barrowman CP + VLM in kerf-aero; wired aero tools |
 | Standard atmosphere (USSA76) | ✅ | Yes | Wired aero tool — USSA-76 exact |
 | Drag estimation (form + base + friction + wave) | ✅ | Yes | Squire-Young viscous Cd + Korn-Lock wave-drag in vlm_viscous.py |

@@ -17,7 +17,7 @@ features:
       source: https://docs.sw.siemens.com/en-US/doc/288068776/PL20231017083816340.xid1428004/en-US
     kerf:
       status: shipped
-      evidence: src/lib/planeGCS/
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/geom/sketch_solver.py
   - domain: D1
     feature: Pad / pocket / revolve
     competitor:
@@ -27,7 +27,7 @@ features:
       source: https://docs.sw.siemens.com/en-US/doc/288068776/PL20231017083816340.xid1427993/en-US
     kerf:
       status: shipped
-      evidence: cloud/occt/features/extrude.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/geom/solid_features.py
   - domain: D1
     feature: Variable-radius fillet
     competitor:
@@ -37,7 +37,7 @@ features:
       source: https://docs.sw.siemens.com/en-US/doc/288068776/PL20231017083816340.xid1428075/en-US
     kerf:
       status: shipped
-      evidence: cloud/occt/features/fillet.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/geom/edge_blend.py
   - domain: D1
     feature: NURBS surfacing (blend/network/patch)
     competitor:
@@ -69,7 +69,7 @@ features:
       source: https://docs.sw.siemens.com/en-US/doc/288068776/PL20231017083816340.xid1427957/en-US
     kerf:
       status: shipped
-      evidence: cloud/assembly/mates.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/assembly/mates.py
   - domain: D1
     feature: Sheet metal
     competitor:
@@ -90,7 +90,7 @@ features:
       source: https://docs.sw.siemens.com/en-US/doc/288068776/PL20231017083816340.xid1428294/en-US
     kerf:
       status: yes
-      evidence: cloud/drawings/
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/drawings/
   # D2 — Structural / FEA
   - domain: D1
     feature: GD&T on drawings / MBD / PMI
@@ -101,7 +101,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html
     kerf:
       status: yes
-      evidence: cloud/gdt/model.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/gdt/tolerances.py
   - domain: D2
     feature: FE — solid (tet/hex)
     competitor:
@@ -111,7 +111,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/simcenter/simcenter-nastran.html
     kerf:
       status: shipped
-      evidence: cloud/fem/solid_bridge.py
+      evidence: packages/kerf-fem/src/kerf_fem/solid_tet.py
   - domain: D2
     feature: Modal / buckling / nonlinear
     competitor:
@@ -121,7 +121,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/simcenter/simcenter-nastran.html
     kerf:
       status: shipped
-      evidence: cloud/fem/modal.py
+      evidence: packages/kerf-fem/src/kerf_fem/modal.py
   - domain: D2
     feature: AISC 360-22 steel (members)
     competitor:
@@ -131,7 +131,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html
     kerf:
       status: shipped
-      evidence: cloud/structural/aisc_member.py
+      evidence: packages/kerf-structural/src/kerf_structural/aisc_member.py
   # D3 — Machine elements
   - domain: D2
     feature: Fatigue (S-N, ε-N, rainflow)
@@ -142,7 +142,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/simcenter/simcenter-3d.html
     kerf:
       status: shipped
-      evidence: cloud/structural/fatigue.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/fatigue/life.py
   - domain: D3
     feature: Spur/helical gear rating (AGMA 2001-D04)
     competitor:
@@ -152,7 +152,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html
     kerf:
       status: shipped
-      evidence: cloud/machine/gearstrength/agma.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/gearstrength/rating.py
   - domain: D3
     feature: Bearings — ISO 281 L10
     competitor:
@@ -162,7 +162,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html
     kerf:
       status: shipped
-      evidence: cloud/machine/bearings/select.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/bearings/select.py
   # D4 — Thermal / fluid / HVAC
   - domain: D3
     feature: Shaft (stress + critical speed)
@@ -173,7 +173,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/simcenter/simcenter-3d.html
     kerf:
       status: shipped
-      evidence: cloud/machine/shaft.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/shaft/calc.py
   - domain: D4
     feature: Thermo cycles (Rankine/Brayton/Otto)
     competitor:
@@ -183,7 +183,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html
     kerf:
       status: shipped
-      evidence: cloud/thermal/cycles.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/thermocycle/cycles.py
   - domain: D4
     feature: CFD
     competitor:
@@ -193,7 +193,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/simcenter/simcenter-star-ccm.html
     kerf:
       status: shipped
-      evidence: cloud/cfd/openfoam_bridge.py
+      evidence: packages/kerf-cfd/src/kerf_cfd/openfoam_bridge.py
   # D5 — Aero / marine / space
   - domain: D4
     feature: Heat exchangers (LMTD + ε-NTU + Bell-Delaware)
@@ -204,7 +204,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html
     kerf:
       status: shipped
-      evidence: cloud/thermal/heatxfer/shell_tube_bell.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/heatxfer/shell_tube_bell.py
   - domain: D5
     feature: 3D wing VLM (+ viscous + compressibility)
     competitor:
@@ -214,7 +214,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/simcenter/simcenter-star-ccm.html
     kerf:
       status: shipped
-      evidence: cloud/aero/vlm_viscous.py
+      evidence: packages/kerf-aero/src/kerf_aero/vlm_viscous.py
   - domain: D5
     feature: Orbital (Kepler, J2/J3, Hohmann)
     competitor:
@@ -224,7 +224,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html
     kerf:
       status: shipped
-      evidence: cloud/space/orbital.py
+      evidence: packages/kerf-aero/src/kerf_aero/orbital/kepler.py
   - domain: D5
     feature: Turbomachinery / wind-turbine BEM
     competitor:
@@ -234,7 +234,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/simcenter/simcenter-3d.html
     kerf:
       status: shipped
-      evidence: cloud/aero/turbomachinery.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/turbo/stage.py
   # D6 — Electronics / EDA / silicon
   - domain: D5
     feature: Naval hydrostatics + GZ stability (IMO)
@@ -245,7 +245,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html
     kerf:
       status: shipped
-      evidence: cloud/marine/hydrostatics.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/navalarch/hydrostatics.py
   - domain: D6
     feature: Schematic capture (KiCad round-trip, ERC)
     competitor:
@@ -275,7 +275,7 @@ features:
       source: https://eda.sw.siemens.com/en-US/pcb/hyperlynx/
     kerf:
       status: shipped
-      evidence: cloud/ecad/spice/ngspice_bridge.py
+      evidence: packages/kerf-electronics/src/kerf_electronics/spice/netlist_codegen.py
   - domain: D6
     feature: Signal integrity (Z0/crosstalk/eye/IBIS)
     competitor:
@@ -285,7 +285,7 @@ features:
       source: https://eda.sw.siemens.com/en-US/pcb/hyperlynx/
     kerf:
       status: shipped
-      evidence: cloud/ecad/si/ibis_channel.py
+      evidence: packages/kerf-electronics/src/kerf_electronics/si/ibis_channel.py
   # D7 — Manufacturing / CAM
   - domain: D6
     feature: Silicon synth (Yosys) / STA / GDS / DRC / LVS / formal / CTS
@@ -296,7 +296,7 @@ features:
       source: https://eda.sw.siemens.com/en-US/ic-physical-design/calibre-design/
     kerf:
       status: shipped
-      evidence: cloud/silicon/synth/yosys_bridge.py
+      evidence: packages/kerf-silicon/src/kerf_silicon/bridges/yosys_bridge.py
   - domain: D7
     feature: 3-axis CAM (profile/contour/pocket/face)
     competitor:
@@ -316,7 +316,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-cam.html
     kerf:
       status: yes
-      evidence: cloud/cam/fiveaxis.py
+      evidence: packages/kerf-cam/src/kerf_cam/five_axis
   - domain: D7
     feature: Adaptive / trochoidal clearing
     competitor:
@@ -326,7 +326,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-cam.html
     kerf:
       status: shipped
-      evidence: cloud/cam/adaptive.py
+      evidence: packages/kerf-cam/src/kerf_cam/adaptive.py
   - domain: D7
     feature: Moldflow / fill sim
     competitor:
@@ -336,7 +336,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-mold-design.html
     kerf:
       status: shipped
-      evidence: cloud/manufacturing/moldflow/flow_front.py
+      evidence: packages/kerf-manufacturing/src/kerf_manufacturing/moldflow/flow_front.py
   - domain: D7
     feature: Feeds & speeds + tool-life
     competitor:
@@ -346,7 +346,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-cam.html
     kerf:
       status: shipped
-      evidence: cloud/manufacturing/cuttingtool/tool_life.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/cuttingtool/tool_life.py
   - domain: D7
     feature: Nesting (skyline + true-shape NFP)
     competitor:
@@ -356,7 +356,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-manufacturing.html
     kerf:
       status: shipped
-      evidence: cloud/manufacturing/nesting/nfp.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/nesting/nfp.py
   # D8 — Civil / infrastructure / geo
   - domain: D7
     feature: FDM slicing (Cura)
@@ -377,7 +377,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html
     kerf:
       status: shipped
-      evidence: cloud/civil/alignment.py
+      evidence: packages/kerf-civil/src/kerf_civil/horizontal_alignment.py
   # D9 — Dynamics / motion / controls
   - domain: D8
     feature: Geotech (bearing/settlement/slope/pile/liquefaction)
@@ -388,7 +388,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html
     kerf:
       status: shipped
-      evidence: cloud/civil/geotech/liquefaction.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/geotech/liquefaction.py
   - domain: D9
     feature: Planar MBD (Lagrange/DAE, Baumgarte)
     competitor:
@@ -398,7 +398,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/simcenter/simcenter-3d.html
     kerf:
       status: shipped
-      evidence: cloud/dynamics/mbd.py
+      evidence: packages/kerf-mates/src/kerf_mates/mbd/mbd_tools.py
   - domain: D9
     feature: Vibration n-DOF modal / FRF
     competitor:
@@ -408,7 +408,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/simcenter/simcenter-nastran.html
     kerf:
       status: shipped
-      evidence: cloud/dynamics/vibration/mdof.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/vibration/mdof.py
   # D10 — Electrical / energy / PLC / firmware
   - domain: D9
     feature: Controls — state-space / LQR / Kalman
@@ -419,7 +419,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/simcenter/simcenter-amesim.html
     kerf:
       status: shipped
-      evidence: cloud/dynamics/controls/statespace.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/controls/statespace_tools.py
   - domain: D10
     feature: Wiring/harness (WireViz + 3D router)
     competitor:
@@ -439,7 +439,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html
     kerf:
       status: shipped
-      evidence: cloud/electrical/elecpower/loadflow.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/elecpower/loadflow.py
   # D11 — Tolerancing / metrology / QA
   - domain: D10
     feature: PLC IEC 61131-3 (ST/Ladder/FB/motion)
@@ -450,7 +450,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/mechatronics-concept-designer.html
     kerf:
       status: shipped
-      evidence: src/components/PLCEditor.jsx
+      evidence: src/components/PLCView.jsx
   - domain: D11
     feature: GD&T data model (ASME Y14.5)
     competitor:
@@ -460,7 +460,7 @@ features:
       source: https://docs.sw.siemens.com/en-US/doc/288068776/PL20231017083816340.xid1428294/en-US
     kerf:
       status: shipped
-      evidence: cloud/gdt/model.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/gdt/tolerances.py
   - domain: D11
     feature: Tolerance stackup — 1D (WC/RSS/MC)
     competitor:
@@ -470,7 +470,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html
     kerf:
       status: shipped
-      evidence: cloud/qa/tolstack/stackup.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/tolstack/stack.py
   - domain: D11
     feature: Tolerance stackup — 3D vector loop
     competitor:
@@ -480,7 +480,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html
     kerf:
       status: shipped
-      evidence: cloud/qa/tolstack/tol3d.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/tolstack/tol3d.py
   # D12 — Optics / acoustics
   - domain: D11
     feature: Process capability (Cpk/Ppk)
@@ -491,7 +491,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/teamcenter/quality.html
     kerf:
       status: shipped
-      evidence: cloud/qa/spc/capability.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/spc/charts.py
   - domain: D12
     feature: Acoustics (ISO 9613, RT60, weighting, mass-law TL)
     competitor:
@@ -501,7 +501,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/simcenter/simcenter-3d.html
     kerf:
       status: shipped
-      evidence: cloud/acoustics/iso9613.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/acoustics/sound.py
   # D13 — Verticals
   - domain: D12
     feature: Paraxial ABCD ray transfer
@@ -512,7 +512,7 @@ features:
       source: https://www.zemax.com/products/opticstudio
     kerf:
       status: shipped
-      evidence: cloud/optics/paraxial.py
+      evidence: packages/kerf-optics/src/kerf_optics/ray_transfer.py
   - domain: D13
     feature: BIM (walls/slabs/framing/stairs/IFC4)
     competitor:
@@ -522,7 +522,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html
     kerf:
       status: shipped
-      evidence: cloud/bim/ifc_compiler.py
+      evidence: packages/kerf-bim/src/kerf_bim/export_ifc/
   # D14 — Cost / materials / LCA
   - domain: D13
     feature: Jewelry (41 modules)
@@ -533,7 +533,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/nx/nx-design.html
     kerf:
       status: shipped
-      evidence: cloud/jewelry/
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/jewelry/
   - domain: D14
     feature: Material selection (Ashby)
     competitor:
@@ -543,7 +543,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/teamcenter/materials-compliance.html
     kerf:
       status: shipped
-      evidence: cloud/materials/matsel/multi_objective.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/matsel/multi_objective.py
   - domain: D14
     feature: LCA (full ISO 14040/44 4 phases)
     competitor:
@@ -553,7 +553,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/teamcenter/product-compliance.html
     kerf:
       status: shipped
-      evidence: cloud/lca/phases.py
+      evidence: packages/kerf-lca/src/kerf_lca/phases.py
   - domain: D14
     feature: Should-cost (6 processes, Boothroyd-Dewhurst)
     competitor:
@@ -563,7 +563,7 @@ features:
       source: https://plm.automation.siemens.com/global/en/products/teamcenter/
     kerf:
       status: shipped
-      evidence: cloud/cost/should_cost.py
+      evidence: packages/kerf-cad-core/src/kerf_cad_core/costing/estimate.py
 ---
 
 # Kerf vs Siemens NX

@@ -18,7 +18,7 @@ features:
       paid: false
     kerf:
       status: "[x]"
-      evidence: "cloud/bim/walls.go"
+      evidence: "packages/kerf-bim/src/kerf_bim/walls.py"
 
   - name: "Curtain wall system (grid, panels, mullions)"
     domain: D13
@@ -39,7 +39,7 @@ features:
       paid: false
     kerf:
       status: "[x]"
-      evidence: "cloud/bim/elements.go"
+      evidence: "packages/kerf-bim/src/kerf_bim/openings.py"
 
   - name: "Floor / slab (span direction, structural layers)"
     domain: D13
@@ -49,7 +49,7 @@ features:
       paid: false
     kerf:
       status: "[x]"
-      evidence: "cloud/bim/elements.go"
+      evidence: "packages/kerf-bim/src/kerf_bim/slabs.py"
 
   - name: "Roof (footprint, extrusion, mass)"
     domain: D13
@@ -70,7 +70,7 @@ features:
       paid: false
     kerf:
       status: "[x]"
-      evidence: "cloud/bim/elements.go"
+      evidence: "packages/kerf-bim/src/kerf_bim/stairs.py"
 
   - name: "Ramps"
     domain: D13
@@ -80,7 +80,7 @@ features:
       paid: false
     kerf:
       status: "[x]"
-      evidence: "cloud/bim/elements.go"
+      evidence: "packages/kerf-bim/src/kerf_bim/walls.py"
 
   - name: "Columns (architectural + structural)"
     domain: D13
@@ -90,7 +90,7 @@ features:
       paid: false
     kerf:
       status: "[x]"
-      evidence: "cloud/bim/elements.go"
+      evidence: "packages/kerf-bim/src/kerf_bim/framing.py"
 
   - name: "Structural framing (beams, braces, trusses)"
     domain: D13
@@ -100,7 +100,7 @@ features:
       paid: false
     kerf:
       status: yes
-      evidence: "cloud/bim/structural_grid.go"
+      evidence: "packages/kerf-bim/src/kerf_bim/grid.py"
 
   - name: "Structural grid (levels, grids, column grids)"
     domain: D13
@@ -110,7 +110,7 @@ features:
       paid: false
     kerf:
       status: "[x]"
-      evidence: "cloud/bim/structural_grid.go"
+      evidence: "packages/kerf-bim/src/kerf_bim/grid.py"
 
   - name: "MEP — HVAC duct systems"
     domain: D13
@@ -153,7 +153,7 @@ features:
       paid: false
     kerf:
       status: yes
-      evidence: "cloud/bim/families.go"
+      evidence: "packages/kerf-bim/src/kerf_bim/family_editor.py"
 
   - name: "Site toposolids and earthwork"
     domain: D13
@@ -163,7 +163,7 @@ features:
       paid: false
     kerf:
       status: "[x]"
-      evidence: "cloud/bim/site.go"
+      evidence: "packages/kerf-bim/src/kerf_bim/site.py"
 
   - name: "Material catalogue (render appearance, structural, thermal)"
     domain: D13
@@ -173,7 +173,7 @@ features:
       paid: false
     kerf:
       status: "[x]"
-      evidence: "cloud/bim/materials.go"
+      evidence: "packages/kerf-bim/src/kerf_bim/materials.py"
 
   - name: "Element schedules (quantity takeoff, room schedules)"
     domain: D13
@@ -183,7 +183,7 @@ features:
       paid: false
     kerf:
       status: "[x]"
-      evidence: "cloud/bim/schedules.go"
+      evidence: "packages/kerf-bim/src/kerf_bim/tools/schedule.py"
 
   - name: "Rooms and spaces (area, occupancy, program)"
     domain: D13
@@ -204,7 +204,7 @@ features:
       paid: false
     kerf:
       status: "[x]"
-      evidence: "cloud/bim/viewer.go"
+      evidence: "packages/kerf-bim/src/kerf_bim/tools/view.py"
 
   - name: "Sheets and title blocks (multi-sheet drawing sets)"
     domain: D13
@@ -214,7 +214,7 @@ features:
       paid: false
     kerf:
       status: "[x]"
-      evidence: "cloud/drawings/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/drawings/"
 
   - name: "Dimensions and annotations on sheets"
     domain: D13
@@ -224,7 +224,7 @@ features:
       paid: false
     kerf:
       status: "[x]"
-      evidence: "cloud/drawings/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/drawings/"
 
   - name: "IFC import (IFC2x3 / IFC4)"
     domain: D13
@@ -234,7 +234,7 @@ features:
       paid: false
     kerf:
       status: "[x]"
-      evidence: "cloud/bim/ifc_import.go"
+      evidence: "packages/kerf-bim/src/kerf_bim/import_ifc/"
 
   - name: "IFC export (IFC4 round-trip)"
     domain: D13
@@ -244,7 +244,7 @@ features:
       paid: false
     kerf:
       status: yes
-      evidence: "cloud/bim/ifc_export.go"
+      evidence: "packages/kerf-bim/src/kerf_bim/export_ifc/"
 
   - name: "Clash detection (cross-discipline)"
     domain: D13
@@ -254,7 +254,7 @@ features:
       paid: true
     kerf:
       status: "[x]"
-      evidence: "cloud/bim/clash.go"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/clash/detect.py"
 
   - name: "Worksharing / concurrent BIM editing"
     domain: D13
@@ -276,7 +276,7 @@ features:
     kerf:
       status: yes
       note: "NodeGraphCanvas visual node editor + kerf-sdk Python scripting"
-      evidence: "cloud/bim/"
+      evidence: "packages/kerf-bim/src/kerf_bim/"
 
   - name: "pyRevit / Revit API Python automation"
     domain: D13
@@ -286,7 +286,7 @@ features:
       paid: false
     kerf:
       status: "[x]"
-      evidence: "kerf-sdk/"
+      evidence: "packages/kerf-sdk/src/kerf/"
 
   - name: "BIM model-based energy analysis (Revit Insight)"
     domain: D13
@@ -296,7 +296,7 @@ features:
       paid: true
     kerf:
       status: "[x] (backend)"
-      evidence: "kerf-civil/buildingenergy/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/buildingenergy/"
 
   - name: "4D construction sequencing"
     domain: D13
@@ -307,7 +307,7 @@ features:
     kerf:
       status: yes
       note: "Needs construction sequencing / schedule-linked model epic; out of current scope"
-      evidence: "cloud/bim/"
+      evidence: "packages/kerf-bim/src/kerf_bim/"
 
   # ── D2 Structural via BIM ─────────────────────────────────────────────────
   - name: "5D cost estimation integration"
@@ -319,7 +319,7 @@ features:
     kerf:
       status: yes
       note: "BIM quantity takeoff (area/volume schedules) exists; no BIM-linked cost estimation integration with external tools"
-      evidence: "cloud/bim/"
+      evidence: "packages/kerf-bim/src/kerf_bim/"
 
   - name: "Structural analytical model (node/member/load)"
     domain: D2
@@ -329,7 +329,7 @@ features:
       paid: false
     kerf:
       status: "[x] (backend)"
-      evidence: "kerf-structural/aisc_member.py"
+      evidence: "packages/kerf-structural/src/kerf_structural/aisc_member.py"
 
   - name: "Robot Structural Analysis integration"
     domain: D2
@@ -339,7 +339,7 @@ features:
       paid: true
     kerf:
       status: "[ ]"
-      evidence: "kerf-structural/"
+      evidence: "packages/kerf-structural/src/kerf_structural/"
 
   - name: "AISC 360 steel member design"
     domain: D2
@@ -349,7 +349,7 @@ features:
       paid: true
     kerf:
       status: "[x] (backend)"
-      evidence: "kerf-structural/aisc_member.py"
+      evidence: "packages/kerf-structural/src/kerf_structural/aisc_member.py"
 
   - name: "ACI 318 concrete design"
     domain: D2
@@ -359,7 +359,7 @@ features:
       paid: true
     kerf:
       status: "[x] (backend)"
-      evidence: "kerf-structural/aci318.py"
+      evidence: "packages/kerf-structural/src/kerf_structural/aci_column.py"
 
   - name: "ASCE 7 wind and seismic loads"
     domain: D2
@@ -369,7 +369,7 @@ features:
       paid: true
     kerf:
       status: "[x] (backend)"
-      evidence: "kerf-structural/seismic/rsa.py"
+      evidence: "packages/kerf-structural/src/kerf_structural/load_combinations.py"
 
   # ── D8 Civil interop ───────────────────────────────────────────────────────
   - name: "FEM linear static (3D solid)"
@@ -380,7 +380,7 @@ features:
       paid: true
     kerf:
       status: "[x] (backend)"
-      evidence: "kerf-fem/plate.py"
+      evidence: "packages/kerf-fem/src/kerf_fem/plate.py"
 
   - name: "Civil 3D interoperability (site, alignment, corridor)"
     domain: D8
@@ -390,7 +390,7 @@ features:
       paid: true
     kerf:
       status: "[x] (backend)"
-      evidence: "kerf-civil/superelevation.py"
+      evidence: "packages/kerf-civil/src/kerf_civil/superelevation.py"
 
   # ── Integration and platform ───────────────────────────────────────────────
   - name: "Geotech / site analysis"
@@ -401,7 +401,7 @@ features:
       paid: true
     kerf:
       status: "[x] (backend)"
-      evidence: "kerf-civil/geotech/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/geotech/"
 
   - name: "Autodesk Construction Cloud / BIM 360 (cloud hosting)"
     domain: D13
@@ -411,7 +411,7 @@ features:
       paid: true
     kerf:
       status: "[~]"
-      evidence: "cloud/projects/"
+      evidence: "packages/kerf-cloud/src/kerf_cloud/"
 
   - name: "Open-source / self-hosted deployment"
     domain: D13
@@ -430,7 +430,7 @@ features:
       paid: false
     kerf:
       status: "[x]"
-      evidence: "cloud/agent/"
+      evidence: "packages/kerf-chat/src/kerf_chat/"
 ---
 
 # Kerf vs Autodesk Revit

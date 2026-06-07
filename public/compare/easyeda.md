@@ -16,7 +16,7 @@ features:
     kerf:
       status: yes
       note: "Hierarchical schematic + ERC + IPC-2221B presets"
-      evidence: "packages/kerf-electronics/schematic/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/schematic/"
 
   - domain: D6
     feature: "PCB layout (tscircuit, KiCad round-trip)"
@@ -27,7 +27,7 @@ features:
     kerf:
       status: yes
       note: "tscircuit PCB layout + KiCad round-trip"
-      evidence: "packages/kerf-electronics/pcb/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/routing/"
 
   - domain: D6
     feature: "Interactive PCB editing (route/place)"
@@ -39,7 +39,7 @@ features:
       status: yes
       note: "View-only; no cursor editing today"
       kerf_note: "Frontend PCB canvas editor is the gap (cad-core UI); backend router and FreeRouting autorouter are already wired."
-      evidence: "packages/kerf-electronics/pcb/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/routing/"
 
   - domain: D6
     feature: "Autoroute (FreeRouting)"
@@ -61,7 +61,7 @@ features:
     kerf:
       status: yes
       note: "Real ngspice + model library; binary .raw parsing pending"
-      evidence: "packages/kerf-electronics/spice/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/spice/"
 
   - domain: D6
     feature: "Signal integrity (Z0/crosstalk/eye/IBIS)"
@@ -72,7 +72,7 @@ features:
     kerf:
       status: yes
       note: "IBIS 5.1 + Bergeron channel + PRBS eye envelope (backend)"
-      evidence: "packages/kerf-electronics/si/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/si/"
 
   - domain: D6
     feature: "EMC (radiated/shielding/limits)"
@@ -83,7 +83,7 @@ features:
     kerf:
       status: yes
       note: "Closed-form EMC/EMI common-mode, return-path gap, slot antenna (backend)"
-      evidence: "packages/kerf-electronics/emc/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/emc/"
 
   - domain: D6
     feature: "PDN (DC IR-drop + AC sweep)"
@@ -94,7 +94,7 @@ features:
     kerf:
       status: yes
       note: "Frequency-domain Z(ω) + target-Z + decap optimiser (backend)"
-      evidence: "packages/kerf-electronics/pdn/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/pdn/"
 
   - domain: D6
     feature: "PCB thermal"
@@ -105,7 +105,7 @@ features:
     kerf:
       status: yes
       note: "Lumped Rθ thermal model (backend)"
-      evidence: "packages/kerf-electronics/thermal/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/thermal/"
 
   - domain: D6
     feature: "DRC / ERC"
@@ -116,7 +116,7 @@ features:
     kerf:
       status: yes
       note: "DRC overlay wired + IPC-2221B presets"
-      evidence: "packages/kerf-electronics/drc/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/drc.py"
 
   - domain: D6
     feature: "Battery/BMS, motor/gate/LED driver"
@@ -127,7 +127,7 @@ features:
     kerf:
       status: yes
       note: "Battery/BMS, motor, gate driver, LED driver sizing calculators (backend)"
-      evidence: "packages/kerf-electronics/drivers/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/battery/"
 
   - domain: D6
     feature: "Antenna / link budget"
@@ -138,7 +138,7 @@ features:
     kerf:
       status: yes
       note: "Antenna and link budget analysis (backend)"
-      evidence: "packages/kerf-electronics/rf/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/antenna/"
 
   - domain: D6
     feature: "Silicon synth (Yosys) / STA / GDS / DRC / LVS / formal / CTS"
@@ -149,7 +149,7 @@ features:
     kerf:
       status: yes
       note: "Deep silicon backend; zero UI (backend only)"
-      evidence: "packages/kerf-electronics/silicon/"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/bridges/yosys_bridge.py"
 
   - domain: D6
     feature: "Silicon P&R (OpenLane)"
@@ -160,7 +160,7 @@ features:
     kerf:
       status: yes
       note: "OpenLane bridge (needs install, backend only)"
-      evidence: "packages/kerf-electronics/silicon/"
+      evidence: "packages/kerf-silicon/src/kerf_silicon/openlane/"
 
   - domain: D6
     feature: "Analog PVT-corner sim"
@@ -171,7 +171,7 @@ features:
     kerf:
       status: yes
       note: "60 corners (5P×3V×4T) + MC per corner; Pelgrom σ matched (backend)"
-      evidence: "packages/kerf-electronics/silicon/analog/pvt.py"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/spice/corner_analysis.py"
 
   - domain: D6
     feature: "Gerber / Excellon output"
@@ -182,7 +182,7 @@ features:
     kerf:
       status: yes
       note: "Gerber RS-274X + Excellon NC drill"
-      evidence: "packages/kerf-electronics/export/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/fab/"
 
   - domain: D6
     feature: "IPC-2581 output"
@@ -193,7 +193,7 @@ features:
     kerf:
       status: yes
       note: "IPC-2581 export in-box"
-      evidence: "packages/kerf-electronics/export/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/fab/"
 
   - domain: D6
     feature: "ODB++ output"
@@ -204,7 +204,7 @@ features:
     kerf:
       status: yes
       note: "ODB++ export in-box"
-      evidence: "packages/kerf-electronics/export/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/fab/"
 
   - domain: D6
     feature: "Panelisation"
@@ -215,7 +215,7 @@ features:
     kerf:
       status: yes
       note: "Panelise built in"
-      evidence: "packages/kerf-electronics/panelize/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/tools/panelize.py"
 
   - domain: D6
     feature: "JLCPCB / fab ordering integration"
@@ -226,7 +226,7 @@ features:
     kerf:
       status: yes
       note: "Gerber export → manual JLCPCB upload"
-      evidence: "packages/kerf-electronics/export/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/fab/"
 
   - domain: D6
     feature: "Component library (LCSC-backed)"
@@ -237,7 +237,7 @@ features:
     kerf:
       status: yes
       note: "Growing library; not LCSC-depth"
-      evidence: "packages/kerf-electronics/library/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/tools/lib_mgmt.py"
 
   - domain: D1
     feature: "MCAD/ECAD integration (co-resident)"
@@ -248,7 +248,7 @@ features:
     kerf:
       status: yes
       note: "Co-resident OCCT B-rep + IDF + STEP export; board outline = mechanical geometry"
-      evidence: "packages/kerf-electronics/mcad/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/idf_roundtrip.py"
 ---
 
 # Kerf vs EasyEDA

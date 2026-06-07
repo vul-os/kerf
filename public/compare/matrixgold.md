@@ -17,7 +17,7 @@ features:
     kerf:
       status: yes
       note: "Gemstones v2 — 30 cuts"
-      evidence: "packages/kerf-jewelry/gemstones/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/gemstones.py"
   - domain: D13
     feature: "Jewelry — ring builder (profiles + styles)"
     competitor:
@@ -27,7 +27,7 @@ features:
     kerf:
       status: yes
       note: "Ring v4 — 13+ profiles + 31 templates"
-      evidence: "packages/kerf-jewelry/ring/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/ring.py"
   - domain: D13
     feature: "Jewelry — prong setting"
     competitor:
@@ -37,7 +37,7 @@ features:
     kerf:
       status: yes
       note: "Settings v3/v4 — prong style included"
-      evidence: "packages/kerf-jewelry/settings/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/settings.py"
   - domain: D13
     feature: "Jewelry — bezel setting"
     competitor:
@@ -47,7 +47,7 @@ features:
     kerf:
       status: yes
       note: "Settings v3/v4 — bezel style included"
-      evidence: "packages/kerf-jewelry/settings/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/settings.py"
   - domain: D13
     feature: "Jewelry — pavé setting"
     competitor:
@@ -57,7 +57,7 @@ features:
     kerf:
       status: yes
       note: "Settings v3/v4 — pavé style included"
-      evidence: "packages/kerf-jewelry/settings/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/settings.py"
   - domain: D13
     feature: "Jewelry — channel setting"
     competitor:
@@ -67,7 +67,7 @@ features:
     kerf:
       status: yes
       note: "Settings v3/v4 — channel style included"
-      evidence: "packages/kerf-jewelry/settings/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/settings.py"
   - domain: D13
     feature: "Jewelry — halo setting"
     competitor:
@@ -77,7 +77,7 @@ features:
     kerf:
       status: yes
       note: "Settings v3/v4 — halo style included"
-      evidence: "packages/kerf-jewelry/settings/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/settings.py"
   - domain: D13
     feature: "Jewelry — gem seat generation"
     competitor:
@@ -87,7 +87,7 @@ features:
     kerf:
       status: yes
       note: "Gem-seat v2 automated seat generation"
-      evidence: "packages/kerf-jewelry/gem_seat/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/gem_seat.py"
   - domain: D13
     feature: "Jewelry — chain / bracelet builder"
     competitor:
@@ -97,7 +97,7 @@ features:
     kerf:
       status: yes
       note: "Chain v2"
-      evidence: "packages/kerf-jewelry/chain/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/chain.py"
   - domain: D13
     feature: "Jewelry — eternity band"
     competitor:
@@ -107,7 +107,7 @@ features:
     kerf:
       status: yes
       note: "Eternity band module in settings suite"
-      evidence: "packages/kerf-jewelry/settings/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/settings.py"
   - domain: D13
     feature: "Jewelry — head builder"
     competitor:
@@ -117,7 +117,7 @@ features:
     kerf:
       status: yes
       note: "Head configurations via settings v3/v4"
-      evidence: "packages/kerf-jewelry/settings/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/settings.py"
   - domain: D13
     feature: "Jewelry — weight calculation"
     competitor:
@@ -127,7 +127,7 @@ features:
     kerf:
       status: yes
       note: "Full cost/quote panel includes metal weight + alloy pricing"
-      evidence: "packages/kerf-jewelry/cost/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/metal_cost.py"
   - domain: D13
     feature: "Jewelry — casting / STL export"
     competitor:
@@ -137,7 +137,7 @@ features:
     kerf:
       status: yes
       note: "Casting + STL production export"
-      evidence: "packages/kerf-jewelry/casting/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/casting_export.py"
   - domain: D13
     feature: "Jewelry — wax-mill toolpaths"
     competitor:
@@ -147,7 +147,7 @@ features:
     kerf:
       status: yes
       note: "Wax-carving plan module present; full mill-path generation not complete"
-      evidence: "packages/kerf-jewelry/casting/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/casting_export.py"
   - domain: D13
     feature: "Jewelry — rendering (PBR / photoreal)"
     competitor:
@@ -167,7 +167,7 @@ features:
     kerf:
       status: yes
       note: "Findings modules present; no live supplier catalog integration"
-      evidence: "packages/kerf-jewelry/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/findings.py"
   - domain: D13
     feature: "Jewelry — supplier catalog integration"
     competitor:
@@ -187,7 +187,7 @@ features:
     kerf:
       status: yes
       note: "Gem-cert output built in"
-      evidence: "packages/kerf-jewelry/gem_cert/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/gem_cert.py"
   - domain: D13
     feature: "Jewelry — milgrain"
     competitor:
@@ -197,7 +197,7 @@ features:
     kerf:
       status: yes
       note: "Milgrain module built in"
-      evidence: "packages/kerf-jewelry/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/decorative.py"
   - domain: D13
     feature: "Jewelry — filigree / granulation"
     competitor:
@@ -207,7 +207,7 @@ features:
     kerf:
       status: yes
       note: "Filigree and granulation modules built in"
-      evidence: "packages/kerf-jewelry/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/filigree_advanced.py"
   - domain: D13
     feature: "Jewelry — enamel / engraving / laser marking"
     competitor:
@@ -217,7 +217,7 @@ features:
     kerf:
       status: yes
       note: "Enamel + laser_marking modules built in"
-      evidence: "packages/kerf-jewelry/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/enamel.py"
   - domain: D13
     feature: "Jewelry — retail workflow (appraisal / repair estimator / mount_finder)"
     competitor:
@@ -227,7 +227,7 @@ features:
     kerf:
       status: yes
       note: "Appraisal + repair estimator + mount_finder modules included"
-      evidence: "packages/kerf-jewelry/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/appraisal.py"
   - domain: D13
     feature: "Jewelry — cost / quote panel"
     competitor:
@@ -237,7 +237,7 @@ features:
     kerf:
       status: yes
       note: "Full metal + gem + labour cost/quote panel"
-      evidence: "packages/kerf-jewelry/cost/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/metal_cost.py"
   - domain: D13
     feature: "Jewelry — parametric visual scripting"
     competitor:
@@ -247,7 +247,7 @@ features:
     kerf:
       status: yes
       note: "NodeGraphCanvas node editor + Marionette + kerf-sdk Python"
-      evidence: ""
+      evidence: "packages/kerf-sdk/src/kerf/"
   - domain: D1
     feature: "NURBS surfacing (blend/network/patch)"
     competitor:

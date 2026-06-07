@@ -49,7 +49,7 @@ features:
     kerf:
       status: yes
       note: "Hermite beam native; validated vs Roark"
-      evidence: "packages/kerf-fem/src/kerf_fem/beam.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/beam/analysis.py"
 
   - domain: D2
     feature: "AISC 360-22 steel (members)"
@@ -71,7 +71,7 @@ features:
     kerf:
       status: yes
       note: "flexure/shear/PM/dev-length"
-      evidence: "packages/kerf-structural/src/kerf_structural/concrete.py"
+      evidence: "packages/kerf-structural/src/kerf_structural/rc_beam.py"
 
   - domain: D2
     feature: "Eurocode design (EC2/3/5/8)"
@@ -82,7 +82,7 @@ features:
     kerf:
       status: yes
       note: "EC2 concrete + EC3 steel + EC5 timber + EC8 seismic"
-      evidence: "packages/kerf-structural/src/kerf_structural/eurocode.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/struct/eurocode3.py"
 
   - domain: D2
     feature: "ASCE 7-22 seismic"
@@ -93,7 +93,7 @@ features:
     kerf:
       status: yes
       note: "ELF + RSA (SRSS+CQC) + Newmark time-history"
-      evidence: "packages/kerf-structural/src/kerf_structural/seismic/rsa.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/seismic/rsa.py"
 
   - domain: D2
     feature: "ASCE 7-22 wind (MWFRS+C&C)"
@@ -104,7 +104,7 @@ features:
     kerf:
       status: yes
       note: "MWFRS + C&C per ASCE 7-22"
-      evidence: "packages/kerf-structural/src/kerf_structural/wind.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/windload/asce7.py"
 
   - domain: D2
     feature: "Fatigue (S-N, ε-N, rainflow)"
@@ -115,7 +115,7 @@ features:
     kerf:
       status: yes
       note: "S-N, ε-N, rainflow counting, Miner's rule"
-      evidence: "packages/kerf-structural/src/kerf_structural/fatigue.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/fatigue/life.py"
 
   - domain: D2
     feature: "ASME VIII pressure vessel"
@@ -126,7 +126,7 @@ features:
     kerf:
       status: yes
       note: "ASME VIII Div 1 thickness + nozzle + wind/seismic"
-      evidence: "packages/kerf-structural/src/kerf_structural/pressure_vessel.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/pressvessel/shell.py"
 
   - domain: D2
     feature: "Frame stiffness assembly (2D/3D)"
@@ -137,7 +137,7 @@ features:
     kerf:
       status: yes
       note: "2D+3D beam-column + ASCE 7 combos + story drift"
-      evidence: "packages/kerf-structural/src/kerf_structural/frame.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/struct/frame.py"
 
   - domain: D2
     feature: "API 650 tank"
@@ -148,7 +148,7 @@ features:
     kerf:
       status: yes
       note: "API 650 incl. seismic annex E"
-      evidence: "packages/kerf-structural/src/kerf_structural/api650.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/tank/api650.py"
 
   - domain: D2
     feature: "NDS 2018 timber"
@@ -159,7 +159,7 @@ features:
     kerf:
       status: yes
       note: "full NDS 2018 adjustment factors"
-      evidence: "packages/kerf-structural/src/kerf_structural/timber.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/timber/design.py"
 
   - domain: D2
     feature: "AISC steel connections"
@@ -170,7 +170,7 @@ features:
     kerf:
       status: yes
       note: "bolts/welds/base-plate, LRFD+ASD"
-      evidence: "packages/kerf-structural/src/kerf_structural/connections.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/steelconn/connections.py"
 
   - domain: D1
     feature: "Constraint sketcher (geo + dim)"
@@ -181,7 +181,7 @@ features:
     kerf:
       status: yes
       note: "PlaneGCS WASM; geo + dim constraints"
-      evidence: "src/components/Sketcher.jsx"
+      evidence: "src/components/SketchView.jsx"
 
   - domain: D1
     feature: "B-rep booleans (general NURBS)"
@@ -192,7 +192,7 @@ features:
     kerf:
       status: yes
       note: "OCCT B-rep booleans"
-      evidence: "packages/kerf-occt/src/occt_bridge.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/geom/boolean.py"
 
   - domain: D1
     feature: "Assemblies — mates"
@@ -203,7 +203,7 @@ features:
     kerf:
       status: yes
       note: "coincident/concentric/parallel/+BOM panel"
-      evidence: "src/components/AssemblyView.jsx"
+      evidence: "src/components/AssemblyEditor.jsx"
 
   - domain: D7
     feature: "3-axis CAM (profile/contour/pocket/face)"
@@ -236,7 +236,7 @@ features:
     kerf:
       status: yes
       note: "Rankine/Brayton/Otto/Diesel cycle analysis"
-      evidence: "packages/kerf-thermal/src/kerf_thermal/cycles.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/thermocycle/"
 
   - domain: D14
     feature: "Material selection (Ashby)"
@@ -247,7 +247,7 @@ features:
     kerf:
       status: yes
       note: "200 materials, 14 families, Pareto frontier"
-      evidence: "packages/kerf-matsel/src/kerf_matsel/multi_objective.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/matsel/multi_objective.py"
 
   - domain: D14
     feature: "Should-cost (6 processes, Boothroyd-Dewhurst)"
@@ -258,7 +258,7 @@ features:
     kerf:
       status: yes
       note: "6-process Boothroyd-Dewhurst should-cost"
-      evidence: "packages/kerf-cost/src/kerf_cost/should_cost.py"
+      evidence: "packages/kerf-costing/src/kerf_costing/tools.py"
 ---
 
 # Kerf vs CalculiX

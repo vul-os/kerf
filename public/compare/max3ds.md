@@ -17,7 +17,7 @@ features:
     kerf:
       status: yes
       note: "OCCT B-rep kernel — exact rational geometry"
-      evidence: "packages/kerf-occt/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/brep/"
   - domain: D1
     feature: "Geometry — constraint sketcher"
     competitor:
@@ -27,7 +27,7 @@ features:
     kerf:
       status: yes
       note: "PlaneGCS WASM sketcher v2 — geometric + dimensional constraints"
-      evidence: "src/components/Sketcher/"
+      evidence: "src/components/SketchView.jsx"
   - domain: D1
     feature: "Geometry — parametric feature history DAG"
     competitor:
@@ -37,7 +37,7 @@ features:
     kerf:
       status: yes
       note: "OCCT feature tree with persistent face IDs"
-      evidence: "packages/kerf-occt/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/geom/"
   - domain: D1
     feature: "Geometry — STEP / IGES B-rep interop"
     competitor:
@@ -47,7 +47,7 @@ features:
     kerf:
       status: yes
       note: "STEP / IGES / 3DM B-rep round-trip"
-      evidence: "packages/kerf-occt/io/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/io/"
   - domain: D1
     feature: "Geometry — polygon mesh modelling"
     competitor:
@@ -87,7 +87,7 @@ features:
     kerf:
       status: yes
       note: "AGMA 2001-D04 / ISO 6336 gears, ISO 281 bearings, VDI 2230 fasteners (backend)"
-      evidence: "packages/kerf-mechanical/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/gearstrength/"
   - domain: D4
     feature: "Thermal / fluid / HVAC — heat-exchanger and pipe-network calc"
     competitor:
@@ -97,7 +97,7 @@ features:
     kerf:
       status: yes
       note: "LMTD + Bell-Delaware shell-and-tube, Hardy-Cross pipe network (backend)"
-      evidence: "packages/kerf-thermal/"
+      evidence: "packages/kerf-hvac/"
   - domain: D4
     feature: "Thermal / fluid — visual fluid simulation (Phoenix FD)"
     competitor:
@@ -107,7 +107,7 @@ features:
     kerf:
       status: yes
       note: "Visual fluid simulation (Phoenix-FD-equivalent) + CFD suite"
-      evidence: ""
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/fluid/visual_fluid.py"
   - domain: D5
     feature: "Aero / marine / space — aerodynamic and orbital analysis"
     competitor:
@@ -127,7 +127,7 @@ features:
     kerf:
       status: yes
       note: "Full EDA: schematic capture, PCB layout, DRC, Gerber/IPC-2581"
-      evidence: "packages/kerf-ecad/"
+      evidence: "packages/kerf-electronics/"
   - domain: D6
     feature: "Electronics — SPICE simulation"
     competitor:
@@ -137,7 +137,7 @@ features:
     kerf:
       status: yes
       note: "Real ngspice bridge wired"
-      evidence: "packages/kerf-spice/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/spice/"
   - domain: D7
     feature: "Manufacturing / CAM — CNC toolpath generation"
     competitor:
@@ -157,7 +157,7 @@ features:
     kerf:
       status: yes
       note: "Cura slicing wired (PrintSliceView)"
-      evidence: "src/components/PrintSliceView/"
+      evidence: "src/components/PrintSliceView.jsx"
   - domain: D8
     feature: "Civil / infrastructure — road alignment, pavement, geotech"
     competitor:
@@ -177,7 +177,7 @@ features:
     kerf:
       status: yes
       note: "Lagrangian MBD, PID/LQR/Kalman state-space, 6-DOF IK (backend)"
-      evidence: "packages/kerf-dynamics/"
+      evidence: "packages/kerf-motion/"
   - domain: D9
     feature: "Dynamics — skeletal animation and rigging"
     competitor:
@@ -187,7 +187,7 @@ features:
     kerf:
       status: yes
       note: "Armature poser + CCD/FABRIK IK + keyframe animation"
-      evidence: ""
+      evidence: "src/components/dcc/AnimationTimelinePanel.jsx"
   - domain: D10
     feature: "Electrical / energy — power distribution and PLC"
     competitor:
@@ -197,7 +197,7 @@ features:
     kerf:
       status: yes
       note: "NEC power distribution, AC load-flow, IEC 61131-3 PLC (ST + live Ladder)"
-      evidence: "packages/kerf-electrical/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/elecpower/"
   - domain: D11
     feature: "Tolerancing / QA — GD&T and tolerance stackup"
     competitor:
@@ -207,7 +207,7 @@ features:
     kerf:
       status: yes
       note: "ASME Y14.5 GD&T data model, 1D/3D tolerance stackup, SPC charts (backend)"
-      evidence: "packages/kerf-tolerancing/"
+      evidence: "packages/kerf-gdnt/"
   - domain: D12
     feature: "Optics — paraxial ABCD ray transfer"
     competitor:
@@ -237,7 +237,7 @@ features:
     kerf:
       status: yes
       note: "ISO 9613 propagation, RT60, image-source room IR, SEA (backend)"
-      evidence: "packages/kerf-acoustics/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/acoustics/"
   - domain: D13
     feature: "Verticals — jewelry design"
     competitor:
@@ -247,7 +247,7 @@ features:
     kerf:
       status: yes
       note: "41-module jewelry suite: ring v4, gemstones v2, settings v3/v4, chain v2"
-      evidence: "src/components/jewelry/"
+      evidence: "src/components/JewelryConfiguratorPanel.jsx"
   - domain: D13
     feature: "Verticals — BIM / architectural (IFC)"
     competitor:
@@ -287,7 +287,7 @@ features:
     kerf:
       status: yes
       note: "200-material Ashby selector (14 families) + Pareto frontier (backend)"
-      evidence: "packages/kerf-matsel/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/matsel/"
 ---
 
 # Kerf vs Autodesk 3ds Max

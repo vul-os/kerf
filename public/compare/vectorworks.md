@@ -17,7 +17,7 @@ features:
     kerf:
       status: yes
       note: "PlaneGCS WASM sketcher wired; missing collinear, ellipse entity, G2"
-      evidence: "packages/kerf-sketcher/planegcs_wasm/"
+      evidence: "public/planegcs.wasm"
 
   - domain: D1
     feature: "3D solid modelling (pad / pocket / revolve / sweep / loft)"
@@ -28,7 +28,7 @@ features:
     kerf:
       status: yes
       note: "OCCT pad/pocket/revolve/sweep fully wired; loft lacks guide-rail overload"
-      evidence: "packages/kerf-occt/bindings/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/geom/"
 
   - domain: D1
     feature: "NURBS surface modelling"
@@ -39,7 +39,7 @@ features:
     kerf:
       status: yes
       note: "OCCT NURBS math complete; browser WASM bindings unconfirmed at build"
-      evidence: "packages/kerf-occt/nurbs/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/geom/nurbs.py"
 
   - domain: D1
     feature: "2D technical drawings (views / dimensions / sections)"
@@ -50,7 +50,7 @@ features:
     kerf:
       status: yes
       note: "Template-based drawings; not live B-rep projection; no UI panel"
-      evidence: "packages/kerf-drawings/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/drawings/"
 
   - domain: D1
     feature: "DXF / DWG import-export"
@@ -61,7 +61,7 @@ features:
     kerf:
       status: yes
       note: "DXF export wired"
-      evidence: "packages/kerf-export/dxf.ts"
+      evidence: "packages/kerf-imports/src/kerf_imports/dxf_writer.py"
 
   - domain: D1
     feature: "STEP / IGES export"
@@ -72,7 +72,7 @@ features:
     kerf:
       status: yes
       note: "OCCT STEP export wired"
-      evidence: "packages/kerf-export/step.ts"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/io/step_writer.py"
 
   - domain: D1
     feature: "Symbol / component library"
@@ -83,7 +83,7 @@ features:
     kerf:
       status: yes
       note: "Parts library + BOM panel wired; community library early-stage"
-      evidence: "src/components/LibraryPanel.jsx"
+      evidence: "src/components/LibraryPicker.jsx"
 
   # ── D7 Manufacturing / CAM ───────────────────────────────────────────────
   - domain: D7
@@ -95,7 +95,7 @@ features:
     kerf:
       status: yes
       note: "Single flange + unfold + flat DXF wired; no hem/relief/jog/multi-flange"
-      evidence: "packages/kerf-sheetmetal/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/sheet_metal.py"
 
   - domain: D7
     feature: "CNC / CAM toolpath output"
@@ -174,7 +174,7 @@ features:
     kerf:
       status: yes
       note: "Three.js WebGL viewport wired; PBR materials"
-      evidence: "src/components/Viewport3D.jsx"
+      evidence: "src/components/CfdViewport.jsx"
 
   - domain: D12
     feature: "Lighting simulation (luminance / lux)"
@@ -185,7 +185,7 @@ features:
     kerf:
       status: yes
       note: "Photonics backend exists (LED/photodiode); no lux/luminance scene simulation"
-      evidence: "packages/kerf-optics/photonics.py"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/photonics/"
 
   # ── D13 Verticals ────────────────────────────────────────────────────────
   - domain: D13
@@ -208,7 +208,7 @@ features:
     kerf:
       status: yes
       note: "kerf-bim stair geometry engine included"
-      evidence: "packages/kerf-bim/stairs.py"
+      evidence: "packages/kerf-bim/src/kerf_bim/stairs.py"
 
   - domain: D13
     feature: "IFC4 export / import (open BIM round-trip)"
@@ -219,7 +219,7 @@ features:
     kerf:
       status: yes
       note: "IFC4 engine + viewer via /compile-ifc; BIMView null-feed visual QA pending"
-      evidence: "packages/kerf-bim/ifc4.py"
+      evidence: "packages/kerf-bim/src/kerf_bim/export_ifc/writer.py"
 
   - domain: D13
     feature: "Space / room objects and area schedule"
@@ -230,7 +230,7 @@ features:
     kerf:
       status: yes
       note: "Interior space-planning engine exists (backend only); no UI route"
-      evidence: "packages/kerf-verticals/interior.py"
+      evidence: "packages/kerf-interior/src/kerf_interior/space_planning.py"
 
   - domain: D13
     feature: "Door and window parametric objects"
@@ -307,7 +307,7 @@ features:
     kerf:
       status: yes
       note: "NodeGraphCanvas node editor + Marionette engine (marionette.py)"
-      evidence: ""
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/visualscript/marionette.py"
 
   - domain: D13
     feature: "Python scripting API"
@@ -341,7 +341,7 @@ features:
     kerf:
       status: yes
       note: "Should-cost engine (6 processes, Boothroyd-Dewhurst) — backend only"
-      evidence: "packages/kerf-cost/"
+      evidence: "packages/kerf-costing/"
 ---
 
 # Kerf vs Vectorworks

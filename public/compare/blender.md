@@ -128,7 +128,7 @@ features:
     kerf:
       status: yes
       note: "Engine complete; no UI panel"
-      evidence: "packages/kerf-cad-core/src/kerf_cad_core/configs"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/family/"
 
   # D2 — Structural / FEA
   - domain: D2
@@ -287,7 +287,7 @@ features:
     kerf:
       status: yes
       note: "Real ngspice, wired; binary .raw not parsed"
-      evidence: "packages/kerf-electronics/src/kerf_electronics/spice_bridge.py"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/spice/"
 
   - domain: D6
     feature: "Signal integrity (Z0/crosstalk/eye/IBIS)"
@@ -321,7 +321,7 @@ features:
     kerf:
       status: yes
       note: "Fanuc/GRBL/LinuxCNC/Mach3; no G41/42 cutter-comp"
-      evidence: "packages/kerf-cam/src/kerf_cam/gcode_post.py"
+      evidence: "packages/kerf-cam/src/kerf_cam/posts/fanuc_3x.py"
 
   - domain: D7
     feature: "FDM slicing (Cura)"
@@ -343,7 +343,7 @@ features:
     kerf:
       status: yes
       note: "Hele-Shaw front tracking + weld-line + air-trap (backend)"
-      evidence: "packages/kerf-cam/src/kerf_cam/moldflow/flow_front.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/procsim/moldflow.py"
 
   - domain: D7
     feature: "Nesting (skyline + true-shape NFP)"
@@ -354,7 +354,7 @@ features:
     kerf:
       status: yes
       note: "Minkowski-sum NFP + IFP + bottom-left fill (backend)"
-      evidence: "packages/kerf-cam/src/kerf_cam/nesting/nfp.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/nesting/nfp.py"
 
   # D8 — Civil / infrastructure / geo
   - domain: D8
@@ -366,7 +366,7 @@ features:
     kerf:
       status: yes
       note: "Clothoid + SSD + corridor templates (backend)"
-      evidence: "packages/kerf-civil/src/kerf_civil/alignment.py"
+      evidence: "packages/kerf-civil/src/kerf_civil/horizontal_alignment.py"
 
   - domain: D8
     feature: "Geotech (bearing/settlement/slope/pile/liquefaction)"
@@ -377,7 +377,7 @@ features:
     kerf:
       status: yes
       note: "Full geotech suite + Seed-Idriss liquefaction (backend)"
-      evidence: "packages/kerf-civil/src/kerf_civil/geotech/liquefaction.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/geotech/liquefaction.py"
 
   # D9 — Dynamics / controls
   - domain: D9
@@ -389,7 +389,7 @@ features:
     kerf:
       status: yes
       note: "Lagrange/DAE + Baumgarte stabilisation (backend)"
-      evidence: "packages/kerf-motion/src/kerf_motion/mbd_2d.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/mbd/solver.py"
 
   - domain: D9
     feature: "Controls — classical (Routh/Bode/RL/PID tune)"
@@ -400,7 +400,7 @@ features:
     kerf:
       status: yes
       note: "Routh/Bode/root-locus/PID (backend)"
-      evidence: "packages/kerf-motion/src/kerf_motion/controls/pid.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/controls/pid_tuning.py"
 
   - domain: D9
     feature: "Controls — state-space / LQR / Kalman"
@@ -411,7 +411,7 @@ features:
     kerf:
       status: yes
       note: "Ackermann + LQR (CARE) + Luenberger (backend)"
-      evidence: "packages/kerf-motion/src/kerf_motion/controls/statespace.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/controls/statespace.py"
 
   # D10 — Electrical / energy / PLC
   - domain: D10
@@ -423,7 +423,7 @@ features:
     kerf:
       status: yes
       note: "ST editor + live Ladder power-flow sim, wired"
-      evidence: "src/components/PLCEditorPanel.jsx"
+      evidence: "src/components/PLCView.jsx"
 
   - domain: D10
     feature: "Solar PV (system + partial shading)"
@@ -434,7 +434,7 @@ features:
     kerf:
       status: yes
       note: "Single-diode + bypass-diode IV + global MPPT (backend)"
-      evidence: "packages/kerf-electronics/src/kerf_electronics/solarpv/shading.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/solarpv/shading.py"
 
   # D11 — Tolerancing / QA
   - domain: D11
@@ -480,7 +480,7 @@ features:
     kerf:
       status: yes
       note: "Paraxial ABCD ray transfer (backend)"
-      evidence: "packages/kerf-optics/src/kerf_optics/abcd.py"
+      evidence: "packages/kerf-optics/src/kerf_optics/ray_transfer.py"
 
   - domain: D12
     feature: "Acoustics (ISO 9613, RT60, weighting, mass-law TL)"
@@ -491,7 +491,7 @@ features:
     kerf:
       status: yes
       note: "ISO 9613 + RT60 + SEA + image-source IR (backend)"
-      evidence: "packages/kerf-optics/src/kerf_optics/acoustics/wave.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/acoustics/wave.py"
 
   # D13 — Verticals
   - domain: D13
@@ -536,7 +536,7 @@ features:
     kerf:
       status: yes
       note: "Weave/knit/drape/cut-room (backend; textiles page)"
-      evidence: "packages/kerf-cad-core/src/kerf_cad_core/textiles"
+      evidence: "packages/kerf-textiles/src/kerf_textiles/"
 
   - domain: D13
     feature: "Jewelry (configurator)"
@@ -547,7 +547,7 @@ features:
     kerf:
       status: yes
       note: "41 modules — ring v4, gemstones v2, settings v3/v4, chain v2"
-      evidence: "packages/kerf-jewelry/src/kerf_jewelry"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/"
 
   - domain: D13
     feature: "BIM (walls/slabs/framing/stairs/IFC4)"

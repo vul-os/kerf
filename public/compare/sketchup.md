@@ -16,7 +16,7 @@ features:
     kerf:
       status: yes
       note: "PlaneGCS WASM; missing collinear, ellipse entity, G2"
-      evidence: "packages/kerf-cad-core/src/sketcher/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/sketch.py"
 
   - domain: D1
     feature: "Pad / pocket / revolve"
@@ -27,7 +27,7 @@ features:
     kerf:
       status: yes
       note: "OCCT, wired"
-      evidence: "packages/kerf-cad-core/src/features/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/geom/solid_features.py"
 
   - domain: D1
     feature: "B-rep booleans (general NURBS)"
@@ -38,7 +38,7 @@ features:
     kerf:
       status: yes
       note: "OCCT exact B-rep booleans; no graceful failure handling / fuzzy heal"
-      evidence: "packages/kerf-cad-core/src/occt/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/geom/boolean.py"
 
   - domain: D1
     feature: "Assemblies — mates"
@@ -49,7 +49,7 @@ features:
     kerf:
       status: yes
       note: "Coincident/concentric/parallel mates wired; BOM panel"
-      evidence: "packages/kerf-cad-core/src/assembly/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/assembly/mates.py"
 
   - domain: D1
     feature: "2D drawings (views/dims/sections)"
@@ -82,7 +82,7 @@ features:
     kerf:
       status: yes
       note: "AISC 360-22 + ACI 318-19 + NDS 2018 + Eurocodes; backend"
-      evidence: "kerf-structural/"
+      evidence: "packages/kerf-structural/"
 
   - domain: D2
     feature: "FE — plate / shell / solid"
@@ -93,7 +93,7 @@ features:
     kerf:
       status: yes
       note: "MITC4 plate/shell + CalculiX solid bridge; backend only"
-      evidence: "kerf-fem/"
+      evidence: "packages/kerf-fem/"
 
   - domain: D3
     feature: "Gear rating (AGMA / ISO 6336)"
@@ -104,7 +104,7 @@ features:
     kerf:
       status: yes
       note: "AGMA 2001-D04 + ISO 6336 Method B; backend"
-      evidence: "kerf-mechanical/gearstrength/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/gearstrength/"
 
   - domain: D3
     feature: "Shaft / bearing / fastener sizing"
@@ -115,7 +115,7 @@ features:
     kerf:
       status: yes
       note: "ISO 281 + ISO/TS 16281 bearings, VDI 2230 fasteners, shaft stress; backend"
-      evidence: "kerf-mechanical/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/bearings/"
 
   - domain: D4
     feature: "Thermal / HVAC analysis"
@@ -126,7 +126,7 @@ features:
     kerf:
       status: yes
       note: "Psychrometrics, LMTD/ε-NTU heat exchangers, SMACNA duct sizing, building loads; backend"
-      evidence: "kerf-thermal/"
+      evidence: "packages/kerf-hvac/"
 
   - domain: D5
     feature: "Aerodynamic / structural analysis"
@@ -137,7 +137,7 @@ features:
     kerf:
       status: yes
       note: "VLM + viscous + compressibility; orbital mechanics; naval hydrostatics; backend"
-      evidence: "kerf-aero/"
+      evidence: "packages/kerf-aero/"
 
   - domain: D6
     feature: "Schematic / PCB (EDA)"
@@ -148,7 +148,7 @@ features:
     kerf:
       status: yes
       note: "KiCad round-trip viewer + tscircuit PCB; SPICE via ngspice; wired"
-      evidence: "packages/kerf-ecad/"
+      evidence: "packages/kerf-electronics/"
 
   - domain: D6
     feature: "SPICE simulation"
@@ -159,7 +159,7 @@ features:
     kerf:
       status: yes
       note: "Real ngspice wired; binary .raw not yet parsed"
-      evidence: "packages/kerf-ecad/spice/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/spice/"
 
   - domain: D7
     feature: "3-axis CAM (toolpaths / G-code)"
@@ -181,7 +181,7 @@ features:
     kerf:
       status: yes
       note: "Cura bridge wired (PrintSliceView)"
-      evidence: "packages/kerf-cam/slicing/"
+      evidence: "packages/kerf-slicing/src/kerf_slicing/cura_runner.py"
 
   - domain: D8
     feature: "Civil / geo analysis"
@@ -192,7 +192,7 @@ features:
     kerf:
       status: yes
       note: "Alignment, pavement, geotech, hydrology, geodesy; backend"
-      evidence: "kerf-civil/"
+      evidence: "packages/kerf-civil/"
 
   - domain: D9
     feature: "Dynamics / motion / controls"
@@ -203,7 +203,7 @@ features:
     kerf:
       status: yes
       note: "Planar MBD, 6-DOF IK, SDOF/n-DOF vibration, LQR/Kalman; backend"
-      evidence: "kerf-motion/"
+      evidence: "packages/kerf-motion/"
 
   - domain: D10
     feature: "PLC / firmware (IEC 61131-3)"
@@ -225,7 +225,7 @@ features:
     kerf:
       status: yes
       note: "Single-diode + bypass-diode IV + global MPPT + mismatch loss; backend"
-      evidence: "kerf-energy/solarpv/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/solarpv/"
 
   - domain: D11
     feature: "Tolerance stackup / GD&T"
@@ -236,7 +236,7 @@ features:
     kerf:
       status: yes
       note: "ASME Y14.5 data model; 1D WC/RSS/MC + 3D vector loop; backend"
-      evidence: "kerf-qa/tolstack/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/tolstack/"
 
   - domain: D12
     feature: "Optics / acoustics analysis"
@@ -247,7 +247,7 @@ features:
     kerf:
       status: yes
       note: "Paraxial ABCD + Seidel + non-sequential RT; ISO 9613 + RT60 acoustics; backend"
-      evidence: "kerf-optics/"
+      evidence: "packages/kerf-optics/"
 
   - domain: D13
     feature: "BIM (IFC export)"
@@ -269,7 +269,7 @@ features:
     kerf:
       status: yes
       note: "41 jewelry modules; full configurator UI — RhinoGold/Matrix-class"
-      evidence: "packages/kerf-jewelry/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/jewelry/"
 
   - domain: D14
     feature: "Should-cost / material selection / LCA"
@@ -280,7 +280,7 @@ features:
     kerf:
       status: yes
       note: "Boothroyd-Dewhurst should-cost; Ashby material selection (200 materials); ISO 14040/44 LCA; backend"
-      evidence: "kerf-cost/"
+      evidence: "packages/kerf-costing/"
 ---
 
 # Kerf vs Trimble SketchUp

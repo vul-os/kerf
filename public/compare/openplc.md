@@ -36,7 +36,7 @@ features:
     kerf:
       status: yes
       note: "FirmwareActions + debug panel wired; build/upload/monitor/debug in-browser"
-      evidence: "src/components/FirmwareActions"
+      evidence: "src/components/FirmwareActions.jsx"
   - domain: D10
     feature: "Wiring/harness (WireViz + 3D router)"
     competitor:
@@ -46,7 +46,7 @@ features:
     kerf:
       status: yes
       note: "WiringView with WireViz + 3D harness router wired"
-      evidence: "src/components/WiringView"
+      evidence: "src/components/WiringView.jsx"
   - domain: D10
     feature: "NEC power distribution + point-to-point SC"
     competitor:
@@ -56,7 +56,7 @@ features:
     kerf:
       status: yes
       note: "NEC power distribution + point-to-point short-circuit (backend)"
-      evidence: "packages/kerf-electrical/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/elecpower/distribution.py"
   - domain: D10
     feature: "AC load-flow (Ybus / Newton-Raphson)"
     competitor:
@@ -66,7 +66,7 @@ features:
     kerf:
       status: yes
       note: "Full polar-form Newton-Raphson load-flow; 3+5-bus validated (backend)"
-      evidence: "packages/kerf-electrical/loadflow.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/elecpower/loadflow.py"
   - domain: D10
     feature: "OTA delivery endpoint (cloud)"
     competitor:
@@ -86,7 +86,7 @@ features:
     kerf:
       status: yes
       note: "Single-diode + bypass-diode IV + global MPPT + mismatch loss + partial shading (backend)"
-      evidence: "packages/kerf-electrical/solarpv/shading.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/solarpv/shading.py"
   - domain: D10
     feature: "Protection coordination (TCC) / arc-flash"
     competitor:
@@ -96,7 +96,7 @@ features:
     kerf:
       status: yes
       note: "IEEE C37.112 U1-U5 TCC + IEEE 1584-2018 arc-flash incident energy (backend)"
-      evidence: "packages/kerf-electrical/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/elecpower/protection.py"
   - domain: D6
     feature: "Schematic capture (KiCad round-trip, ERC)"
     competitor:
@@ -106,7 +106,7 @@ features:
     kerf:
       status: yes
       note: "Schematic capture + ERC wired; KiCad round-trip import/export"
-      evidence: "src/components/SchematicView"
+      evidence: "src/components/SchematicView.jsx"
   - domain: D6
     feature: "PCB layout (tscircuit, KiCad round-trip)"
     competitor:
@@ -116,7 +116,7 @@ features:
     kerf:
       status: yes
       note: "PCB layout viewer wired (KiCad round-trip + tscircuit); DRC overlay included"
-      evidence: "src/components/PCBView"
+      evidence: "src/components/PCBView.jsx"
   - domain: D6
     feature: "EMC (radiated/shielding/limits)"
     competitor:
@@ -126,7 +126,7 @@ features:
     kerf:
       status: yes
       note: "emc_wizard: FCC §15.109 + CISPR 32 closed-form radiated/conducted limits (backend)"
-      evidence: "packages/kerf-emc/"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/emc/"
   - domain: D6
     feature: "PDN (DC IR-drop + AC sweep)"
     competitor:
@@ -136,7 +136,7 @@ features:
     kerf:
       status: yes
       note: "pdn_wizard: Z(ω) target-Z, DC IR-drop, decap optimiser (backend)"
-      evidence: "packages/kerf-si/pdn/ac_impedance.py"
+      evidence: "packages/kerf-electronics/src/kerf_electronics/pdn/ac_impedance.py"
   - domain: D9
     feature: "Controls — classical (Routh/Bode/RL/PID tune)"
     competitor:
@@ -146,7 +146,7 @@ features:
     kerf:
       status: yes
       note: "Classical controls: Routh stability, Bode, root locus, PID auto-tune (backend)"
-      evidence: "packages/kerf-controls/"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/controls/"
   - domain: D9
     feature: "Controls — state-space / LQR / Kalman"
     competitor:
@@ -156,7 +156,7 @@ features:
     kerf:
       status: yes
       note: "State-space, LQR (CARE), Luenberger observer, discrete ZOH c2d (backend)"
-      evidence: "packages/kerf-controls/statespace.py"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/controls/statespace.py"
   - domain: D1
     feature: "Parametric solid modelling (B-rep)"
     competitor:
@@ -166,7 +166,7 @@ features:
     kerf:
       status: yes
       note: "Full OCCT B-rep, constraint sketcher, sheet metal, assemblies — all in-browser"
-      evidence: "src/components/CADView"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/brep/"
   - domain: D7
     feature: "G-code post (Fanuc/GRBL/LinuxCNC/Mach3)"
     competitor:
@@ -176,7 +176,7 @@ features:
     kerf:
       status: yes
       note: "G-code post for Fanuc, GRBL, LinuxCNC, Mach3; 3-axis toolpaths wired in CAMView"
-      evidence: "src/components/CAMView"
+      evidence: "src/components/CAMView.jsx"
   - domain: D14
     feature: "BOM + distributor pricing"
     competitor:
@@ -186,7 +186,7 @@ features:
     kerf:
       status: yes
       note: "BOM management + real-time distributor pricing (Octopart/Mouser/Digi-Key) in-browser"
-      evidence: "src/components/BOMView"
+      evidence: "src/components/BOMPanel.jsx"
 ---
 
 # Kerf vs OpenPLC

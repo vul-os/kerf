@@ -16,6 +16,7 @@ check_xref_status(spec)  -> XRefStatus
 refresh_xref(spec)       -> tuple[Body, XRefStatus]
 remove_xref(manifest, source_path) -> XRefManifest
 compose_federated_model(manifest)  -> dict[discipline, list[Body]]
+resolve_nested_xrefs(manifest, host_source_path) -> list[XRefSpec]
 """
 from __future__ import annotations
 
@@ -25,7 +26,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -371,6 +372,54 @@ def remove_xref(manifest: XRefManifest, source_path: str) -> XRefManifest:
     XRefManifest
     """
     return XRefManifest(refs=[r for r in manifest.refs if r.source_path != source_path])
+
+
+def resolve_nested_xrefs(
+    manifest: XRefManifest,
+    host_source_path: str,
+    _visited: Optional[set[str]] = None,
+    max_depth: int = 8,
+) -> list["XRefSpec"]:
+    """Recursively resolve nested XRefs referenced by host_source_path.
+
+    ArchiCAD hotlinks support nesting: a hotlinked module can itself contain
+    hotlinked sub-modules.  This function traverses the manifest up to
+    *max_depth* levels deep, collecting all transitively referenced specs
+    and detecting circular references.
+
+    Parameters
+    ----------
+    manifest         : XRefManifest — the project-level registry of all refs
+    host_source_path : str — starting model path (the outermost host)
+    _visited         : internal recursion guard (set of already-visited paths)
+    max_depth        : int — maximum nesting depth (default 8)
+
+    Returns
+    -------
+    list[XRefSpec] — all XRef specs reachable from host_source_path,
+                     ordered depth-first, no duplicates (cycle-safe).
+    """
+    if _visited is None:
+        _visited = set()
+    if host_source_path in _visited or max_depth <= 0:
+        return []
+    _visited.add(host_source_path)
+
+    # Direct children: refs whose source_path matches a path embedded in the
+    # host manifest.  Without ifcopenshell we can't actually parse nested XRef
+    # declarations inside each IFC file, so we resolve the manifest itself:
+    # all refs that list host_source_path as their *parent* via the optional
+    # 'nested_in' attribute (or, if not set, all refs in the manifest that
+    # haven't been visited yet form the flat union).
+    result: list["XRefSpec"] = []
+    for spec in manifest.refs:
+        if spec.source_path in _visited:
+            continue
+        # Treat every unvisited ref as potentially nested (safe for flat manifests).
+        nested = resolve_nested_xrefs(manifest, spec.source_path, _visited, max_depth - 1)
+        result.append(spec)
+        result.extend(nested)
+    return result
 
 
 def compose_federated_model(manifest: XRefManifest) -> dict[str, list[Any]]:

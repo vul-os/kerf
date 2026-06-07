@@ -121,12 +121,12 @@ features:
     feature: "Real-time multi-user model sharing"
     competitor:
       status: yes
-      note: "Tekla Model Sharing — concurrent multi-user model"
+      note: "Tekla Model Sharing — concurrent multi-user model (checkout/sync, not live CRDT)"
       source: "https://www.tekla.com/products/tekla-structures"
     kerf:
-      status: partial
-      note: "Cloud git workspace (branch/merge/roles); not real-time element-level concurrent editing"
-      evidence: "packages/kerf-cloud/"
+      status: yes
+      note: "Checkout/borrow/sync worksharing model (matches Tekla Model Sharing's actual mechanism): central manifest, named worksets with ownership, per-element borrow (exclusive checkout), sync-to-central with conflict detection. NOT live real-time OT/CRDT co-editing — Tekla Model Sharing itself is the same checkout/sync model."
+      evidence: "packages/kerf-bim/src/kerf_bim/worksharing.py"
 
   - domain: D1
     feature: "Open-source core / chat-native"
@@ -148,7 +148,7 @@ The structural steel & concrete detailing standard — compared honestly against
 
 ## Summary
 
-Kerf saturates **96%** of Tekla Structures's feature surface (11 yes, 1 partial, 0 no out of 12 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap).
+Kerf saturates **100%** of Tekla Structures's feature surface (12 yes, 0 partial, 0 no out of 12 features tracked here).
 
 ## Feature comparison
 
@@ -164,16 +164,12 @@ Kerf saturates **96%** of Tekla Structures's feature surface (11 yes, 1 partial,
 | General-arrangement + shop drawings | ✅ | Yes | Multi-sheet drawings engine (HLR views/sections/details/title-block) + RC shop drawings: section view, elevation with... |
 | Bill of materials / assembly marks | ✅ | Yes | BOM rollup + quantity schedules (area/volume/count) + cost |
 | Clash detection / constructability | ✅ | Yes | OBB-SAT + BVH + tri-tri clash detection panel |
-| Real-time multi-user model sharing | ⚠️ (partial) | Yes | Cloud git workspace (branch/merge/roles); not real-time element-level concurrent editing |
+| Real-time multi-user model sharing | ✅ | Yes | Checkout/borrow/sync worksharing model (matches Tekla Model Sharing's actual mechanism): central manifest, worksets, element borrow, sync-to-central, conflict detection. NOT live real-time co-editing — Tekla Model Sharing itself is the same checkout/sync model. |
 | Open-source core / chat-native | ✅ | No | MIT open-core; chat-native + JSON-RPC LLM tools + kerf-sdk |
 
 ## What Kerf does that Tekla Structures doesn't
 
 - **Open-source core / chat-native** — MIT open-core; chat-native + JSON-RPC LLM tools + kerf-sdk
-
-## What's honestly outstanding
-
-- **Real-time multi-user model sharing** (Partial): Cloud git workspace (branch/merge/roles); not real-time element-level concurrent editing
 
 ## Pricing
 

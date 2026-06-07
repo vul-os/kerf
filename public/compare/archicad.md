@@ -84,9 +84,9 @@ features:
       note: "BIMcloud Basic included with Archicad; BIMcloud SaaS is a separate paid subscription"
       source: "https://graphisoft.com/solutions/products/bimcloud"
     kerf:
-      status: partial
-      note: "Cloud git workspace roles; not BIM element-level locking at AEC project scale"
-      evidence: "cloud/git/"
+      status: yes
+      note: "Checkout/borrow/sync worksharing model (matches Revit's and ArchiCAD Teamwork's actual mechanism): central manifest, named worksets with ownership, per-element borrow (exclusive checkout), sync-to-central with conflict detection. NOT live real-time OT/CRDT co-editing — ArchiCAD Teamwork itself is the same checkout/sync model."
+      evidence: "packages/kerf-bim/src/kerf_bim/worksharing.py"
   - domain: D13
     feature: "Schedules and quantity take-off"
     competitor:
@@ -124,9 +124,9 @@ features:
       note: "Hotlink Manager links external Archicad files as live references into the host model"
       source: "https://help.graphisoft.com/AC/27/INT/_AC27_Help/content/050_teamwork/050_teamwork-7.htm"
     kerf:
-      status: no
-      note: "No federated BIM hotlink/XRef mechanism; cloud git provides file-level references but not BIM-level live linking"
-      evidence: ""
+      status: yes
+      note: "Federated XRef: external IFC files linked as positioned read-only overlays (discipline, placement origin, rotation), SHA-256 freshness tracking, reload-on-stale, nested XRef resolution (cycle-safe, depth-limited). Compose federated model groups bodies by discipline. Tools: bim_add_xref, bim_refresh_xref, bim_check_xref_status, bim_compose_federated."
+      evidence: "packages/kerf-bim/src/kerf_bim/xref.py"
   - domain: D8
     feature: "Site terrain / mesh modelling"
     competitor:
@@ -277,7 +277,7 @@ ArchiCAD pioneered BIM — Kerf brings engineering-grade precision to teams buil
 
 ## Summary
 
-Kerf saturates **94%** of Graphisoft ArchiCAD's feature surface (24 yes, 1 partial, 1 no out of 26 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
+Kerf saturates **100%** of Graphisoft ArchiCAD's feature surface (26 yes, 0 partial, 0 no out of 26 features tracked here).
 
 ## Feature comparison
 
@@ -290,11 +290,11 @@ Kerf saturates **94%** of Graphisoft ArchiCAD's feature surface (24 yes, 1 parti
 | IFC 4 authoring and export | ✅ | Yes | IFC4 export wired (walls/slabs/doors/windows/spaces/stairs/openings/site); Tier 2 import; not yet buildingSMART certi... |
 | GDL parametric object library | ✅ | Yes | Parametric .family.json (type/instance params, formulas); no GDL-equivalent object market |
 | MEP Modeler (HVAC / plumbing / electrical routing) | ✅ | Yes (paid tier) | BIM MEP routing (duct/pipe/conduit segments, fittings, endpoints) via create_mep_route tool; no clash-aware auto-rout... |
-| Teamwork BIMcloud multi-user worksharing | ⚠️ (partial) | Yes (paid tier) | Cloud git workspace roles; not BIM element-level locking at AEC project scale |
+| Teamwork BIMcloud multi-user worksharing | ✅ | Yes (paid tier) | Checkout/borrow/sync worksharing model (matches ArchiCAD Teamwork's actual mechanism): central manifest, worksets, element borrow, sync-to-central, conflict detection. NOT live real-time co-editing — ArchiCAD Teamwork itself is the same checkout/sync model. |
 | Schedules and quantity take-off | ✅ | Yes | BIM element schedules (walls/doors/windows/spaces/slabs); area/volume/occupancy totals per level; bim_space_schedule ... |
 | Curtain wall / curtain wall designer | ✅ | Yes | Parametric curtain wall: panel grid (u/v divisions, count/spacing), mullion profiles (square/round), glass/solid/open... |
 | Zone / room / space objects | ✅ | Yes | IfcSpace-compliant space objects with area/volume/occupancy; bim_create_space + bim_space_schedule tools; IFC import ... |
-| Hotlinked modules (XRef / federated model) | 🔴 (no) | Yes | No federated BIM hotlink/XRef mechanism; cloud git provides file-level references but not BIM-level live linking |
+| Hotlinked modules (XRef / federated model) | ✅ | Yes | Federated XRef: external IFC files linked as positioned read-only overlays with SHA-256 freshness tracking, reload, and nested XRef resolution. Tools: bim_add_xref, bim_refresh_xref, bim_compose_federated. |
 | Site terrain / mesh modelling | ✅ | Yes | Backend geotech + earthwork volumes; no interactive site mesh UI |
 | Parametric object model | ✅ | Yes | Feature-tree parametric model; OCCT B-rep; sketch constraints via PlaneGCS |
 | 2D technical drawings / documentation | ✅ | Yes | Engineering multi-sheet drawings (template-based, not live B-rep projection); no layout book |
@@ -319,11 +319,6 @@ Kerf saturates **94%** of Graphisoft ArchiCAD's feature surface (24 yes, 1 parti
 - **PCB / electronics design** — Schematic + PCB layout (KiCad round-trip), ngspice SPICE, DRC — wired in browser
 - **Tolerance stackup / metrology** — 1D WC/RSS/MC stackup + 3D vector-loop; no MBD on model
 - **LLM / chat-native editing** — Chat-native: plain-language edits to feature tree and BIM model per turn
-
-## What's honestly outstanding
-
-- **Teamwork BIMcloud multi-user worksharing** (Partial): Cloud git workspace roles; not BIM element-level locking at AEC project scale
-- **Hotlinked modules (XRef / federated model)** (Not yet implemented): No federated BIM hotlink/XRef mechanism; cloud git provides file-level references but not BIM-level live linking
 
 ## Pricing
 

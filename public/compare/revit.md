@@ -263,9 +263,9 @@ features:
       source: "https://help.autodesk.com/view/RVT/2025/ENU/?guid=GUID-T0SNP291-6Q7R-4P8S-4T0U-7R8S9T0U1V2W"
       paid: true
     kerf:
-      status: "[ ]"
-      note: "Needs BIM element-level locking epic; cloud git provides file-level workspace roles only"
-      evidence: "cloud/projects/"
+      status: "[x]"
+      note: "Checkout/borrow/sync worksharing model matching Revit's actual workshared workflow: central manifest, named worksets with ownership, per-element borrow (exclusive checkout), sync-to-central (push edits + pull others' changes), conflict detection when two users edit the same element. NOT live real-time OT/CRDT co-editing — Revit Worksharing itself is not that either."
+      evidence: "packages/kerf-bim/src/kerf_bim/worksharing.py"
 
   - name: "Dynamo visual programming"
     domain: D13
@@ -441,7 +441,7 @@ Industry-standard BIM for AEC — compared honestly against MIT open-core.
 
 ## Summary
 
-Kerf saturates **94%** of Autodesk Revit's feature surface (38 yes, 1 partial, 2 no out of 41 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 2 features not yet implemented.
+Kerf saturates **97%** of Autodesk Revit's feature surface (39 yes, 1 partial, 1 no out of 41 features tracked here). Honest gaps: 1 feature partial (engine complete, UI or depth gap); 1 feature not yet implemented.
 
 ## Feature comparison
 
@@ -471,7 +471,7 @@ Kerf saturates **94%** of Autodesk Revit's feature surface (38 yes, 1 partial, 2
 | IFC import (IFC2x3 / IFC4) | ✅ | ✅ certified — buildingsmart certified ifc 2x3 and ifc4 import |  |
 | IFC export (IFC4 round-trip) | ✅ | ✅ certified — ifc 2x3 and ifc4 export with property sets |  |
 | Clash detection (cross-discipline) | ✅ | ✅ via navisworks — federated multi-model clash detection |  |
-| Worksharing / concurrent BIM editing | 🔴 (no) | ✅ full — worksets, central model, cloud worksharing via autodesk construction cloud | Needs BIM element-level locking epic; cloud git provides file-level workspace roles only |
+| Worksharing / concurrent BIM editing | ✅ | ✅ full — worksets, central model, cloud worksharing via autodesk construction cloud | Checkout/borrow/sync worksharing model (matches Revit's actual workshared model: worksets, element borrow, sync-to-central, conflict detection). NOT live real-time co-editing — Revit Worksharing itself is the same checkout/sync model. |
 | Dynamo visual programming | ✅ | ✅ full — dynamo studio + dynamo player; node-based scripting of bim model | NodeGraphCanvas visual node editor + kerf-sdk Python scripting |
 | pyRevit / Revit API Python automation | ✅ | ✅ full — open revit api + pyrevit community extensions |  |
 | BIM model-based energy analysis (Revit Insight) | ✅ | ✅ via autodesk insight — whole-building eui benchmarking from revit mass |  |
@@ -491,7 +491,6 @@ Kerf saturates **94%** of Autodesk Revit's feature surface (38 yes, 1 partial, 2
 
 ## What's honestly outstanding
 
-- **Worksharing / concurrent BIM editing** (Not yet implemented): Needs BIM element-level locking epic; cloud git provides file-level workspace roles only
 - **Robot Structural Analysis integration** (Not yet implemented)
 - **Autodesk Construction Cloud / BIM 360 (cloud hosting)** (Partial)
 

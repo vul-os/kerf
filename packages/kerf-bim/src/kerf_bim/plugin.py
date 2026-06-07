@@ -91,6 +91,8 @@ def _register_tools(ctx, provides: list) -> None:
         ("kerf_bim.tools.gdl_library", "bim.gdl-library"),
         # Site terrain / mesh modelling (ArchiCAD parity)
         ("kerf_bim.tools.site_terrain", "bim.site-terrain"),
+        # Worksharing: central model + worksets + element borrow/sync (Revit/ArchiCAD/Tekla parity)
+        ("kerf_bim.tools.worksharing", "bim.worksharing"),
     ]
 
     for module_path, capability in tool_modules:
@@ -116,3 +118,7 @@ def _register_tools(ctx, provides: list) -> None:
     provides.append("bim.site-toposolid")
     # Wave 12B: AVEVA E3D parity (piping catalog + multi-discipline + concurrent)
     provides.append("bim.aveva-e3d-parity")
+    # Worksharing (Revit/ArchiCAD Teamwork/Tekla parity): checkout/borrow/sync model
+    provides.append("bim.worksharing-central-model")
+    # Federated XRef with nested hotlinks (ArchiCAD hotlink parity)
+    provides.append("bim.federated-xref-nested")

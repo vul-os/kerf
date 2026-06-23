@@ -56,7 +56,11 @@ async def run_migrations(database_url: str):
             name = migration_file.name
             if name in applied:
                 continue
-            sql = migration_file.read_text()
+            # Explicit utf-8: migration files contain non-ASCII bytes (e.g.
+            # comment glyphs), and Path.read_text() otherwise defaults to the
+            # platform locale encoding — cp1252 on Windows — which raises
+            # UnicodeDecodeError. utf-8 matches how the files are authored.
+            sql = migration_file.read_text(encoding="utf-8")
             # Strip SQL line comments + whitespace to check whether the file
             # actually contains any statement to execute. T-307's fold
             # produced "tombstone" files (0003, 0007, 0009) that are

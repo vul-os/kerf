@@ -9,6 +9,7 @@ import CodeEditor from '../components/CodeEditor.jsx'
 import ChatPanel from '../components/ChatPanel.jsx'
 import ShareModal from '../components/ShareModal.jsx'
 import ObjectsPanel from '../components/ObjectsPanel.jsx'
+import ObjectContextMenu from '../components/ObjectContextMenu.jsx'
 import CircuitComponentsPanel from '../components/CircuitComponentsPanel.jsx'
 import ExportButton from '../components/ExportButton.jsx'
 import MeasureToolbar from '../components/MeasureToolbar.jsx'
@@ -397,6 +398,16 @@ function isStepFile(file) {
   if (!file) return false
   const n = (file.name || '').toLowerCase()
   return n.endsWith('.step') || n.endsWith('.stp')
+}
+
+// Must match Renderer.jsx / ObjectsPanel.jsx so the context-menu swatch shows
+// the colour actually drawn for parts without an explicit `color`.
+const PART_PALETTE = [0xc9a96b, 0x6b9bc9, 0xc96b89, 0x89c96b, 0xc9b86b, 0x9b6bc9]
+function partColorHex(parts, partId) {
+  const i = parts.findIndex((p) => p.id === partId)
+  if (i < 0) return '#cccccc'
+  const c = parts[i].color != null ? parts[i].color : PART_PALETTE[i % PART_PALETTE.length]
+  return '#' + c.toString(16).padStart(6, '0')
 }
 
 function isAssemblyFile(file) {
@@ -1230,6 +1241,14 @@ export default function Editor() {
   const hiddenIds = useMemo(() => {
     return w.hiddenPartIds.get(w.currentFileId) || new Set()
   }, [w.hiddenPartIds, w.currentFileId])
+
+  // Per-part opacity overrides for the current file (Map<partId, 0..1>).
+  const partOpacity = useMemo(() => {
+    return w.partOpacity.get(w.currentFileId) || new Map()
+  }, [w.partOpacity, w.currentFileId])
+
+  // Right-click object context menu: { partId, x, y } or null.
+  const [objCtxMenu, setObjCtxMenu] = useState(null)
 
   // Per-part topologies. Lazy: nothing computes until a consumer (measure
   // tool, FeatureInspector, distance chip) calls `.get(id)`. The shape is
@@ -2283,13 +2302,32 @@ export default function Editor() {
               selectedId={w.pickedPart?.part_id}
               selectedComponentId={assemblyFile ? w.selectedComponentId : null}
               hiddenIds={hiddenIds}
+              partOpacity={partOpacity}
               onPick={handlePick}
+              onContextMenuPart={(id, x, y) => setObjCtxMenu({ partId: id, x, y })}
               mode={w.measureMode}
               selectedFeatures={w.selectedFeatures}
               onPickFeature={handlePickFeature}
               assemblyComponents={assemblyComponents}
               className="w-full h-full"
             />
+            {objCtxMenu && w.parts.some((p) => p.id === objCtxMenu.partId) && (
+              <ObjectContextMenu
+                x={objCtxMenu.x}
+                y={objCtxMenu.y}
+                partId={objCtxMenu.partId}
+                isHidden={hiddenIds.has(objCtxMenu.partId)}
+                colorHex={partColorHex(w.parts, objCtxMenu.partId)}
+                opacity={partOpacity.get(objCtxMenu.partId) ?? 1}
+                isStepFile={stepFile}
+                onHide={() => w.togglePartVisibility(w.currentFileId, objCtxMenu.partId)}
+                onIsolate={() => w.isolatePart(w.currentFileId, objCtxMenu.partId)}
+                onShowAll={() => w.showAllParts(w.currentFileId)}
+                onRecolor={(rgb) => w.recolorPart(objCtxMenu.partId, rgb)}
+                onSetOpacity={(o) => w.setPartOpacity(w.currentFileId, objCtxMenu.partId, o)}
+                onClose={() => setObjCtxMenu(null)}
+              />
+            )}
             {w.partsError && (
               <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center pt-4 z-10">
                 <div className="max-w-lg w-full mx-4 px-4 py-3 rounded-lg bg-red-950/90 border border-red-700/70 text-red-300 text-[11px] font-mono shadow-lg backdrop-blur">

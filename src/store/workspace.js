@@ -162,6 +162,11 @@ const initial = {
   // Per-file visibility map: Map<file_id, Set<part_id>>. Session-only.
   hiddenPartIds: new Map(),
 
+  // Per-file part opacity overrides: Map<file_id, Map<part_id, opacity 0..1>>.
+  // Session-only viewport display state (like hiddenPartIds) — not persisted
+  // to source. Absence of an entry means fully opaque (1).
+  partOpacity: new Map(),
+
   // Measure-tool state (session-only; not persisted).
   // mode ∈ 'object' | 'face' | 'edge' | 'vertex'
   measureMode: 'object',
@@ -1571,6 +1576,23 @@ export const useWorkspace = create((set, get) => ({
     })
   },
 
+  // ---- Transparency ----
+  // opacity ∈ [0,1]; 1 (or out-of-range) drops the override so the part renders
+  // fully opaque again. Session-only — the Renderer reads this map and flips
+  // material.transparent / .opacity accordingly.
+  setPartOpacity: (fileId, partId, opacity) => {
+    if (!fileId || !partId) return
+    const clamped = Math.max(0, Math.min(1, Number(opacity)))
+    set((s) => {
+      const next = new Map(s.partOpacity)
+      const current = new Map(next.get(fileId) || [])
+      if (!Number.isFinite(clamped) || clamped >= 1) current.delete(partId)
+      else current.set(partId, clamped)
+      next.set(fileId, current)
+      return { partOpacity: next }
+    })
+  },
+
   // ---- Measure tool ----
   setMeasureMode: (mode) => {
     // Switching out of object mode keeps any picked-part for the chat panel
@@ -2133,6 +2155,7 @@ export const useWorkspace = create((set, get) => ({
     set({
       ...initial,
       hiddenPartIds: new Map(),
+      partOpacity: new Map(),
       selectedFeatures: [],
       parsedAssembly: null,
       selectedComponentId: null,

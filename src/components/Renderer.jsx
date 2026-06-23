@@ -174,7 +174,14 @@ function Renderer({
   parts,
   selectedId,
   hiddenIds,
+  // Per-part opacity overrides for the current file: Map<partId, opacity 0..1>.
+  // Absent entry → fully opaque. Session-only viewport display state.
+  partOpacity,
   onPick,
+  // Right-click on a part → (partId, clientX, clientY) so the caller can show
+  // a context menu. Fires only on a right-click that isn't a pan-drag and only
+  // in object mode.
+  onContextMenuPart,
   className = '',
   // Measure-tool extension:
   mode = 'object',
@@ -245,10 +252,12 @@ function Renderer({
   const modeRef = useRef(mode)
   const selectedFeaturesRef = useRef(selectedFeatures)
   const onPickFeatureRef = useRef(onPickFeature)
+  const onContextMenuPartRef = useRef(onContextMenuPart)
 
   useEffect(() => { modeRef.current = mode }, [mode])
   useEffect(() => { selectedFeaturesRef.current = selectedFeatures }, [selectedFeatures])
   useEffect(() => { onPickFeatureRef.current = onPickFeature }, [onPickFeature])
+  useEffect(() => { onContextMenuPartRef.current = onContextMenuPart }, [onContextMenuPart])
 
   // T-C5: announce selection changes to screen readers.
   useEffect(() => {
@@ -608,6 +617,10 @@ function Renderer({
     let longPressTimer = null
     let longPressFired = false
     let activePointerCount = 0
+    // Right-button-down coords — used by the contextmenu handler to tell a
+    // right-click (show menu) from a right-drag pan (OrbitControls).
+    let rcDownX = 0
+    let rcDownY = 0
 
     function cancelLongPress() {
       if (longPressTimer !== null) {
@@ -689,6 +702,12 @@ function Renderer({
 
     function onPointerDown(ev) {
       activePointerCount += 1
+      // Record the press position for any mouse button so the contextmenu
+      // handler can measure drag distance (right-click vs right-drag pan).
+      if (ev.pointerType === 'mouse') {
+        rcDownX = ev.clientX
+        rcDownY = ev.clientY
+      }
       // Multi-touch: a second pointer means pinch/pan — cancel any pending
       // pick + long-press.  Note: OrbitControls handles its own multi-touch
       // gesture state via the DOM element directly.
@@ -760,10 +779,40 @@ function Renderer({
       }
     }
 
+    // Right-click → object context menu.  We only act when (a) we're in object
+    // mode, (b) a part is under the cursor, and (c) the press wasn't a pan-drag
+    // (right-drag is OrbitControls' pan).  OrbitControls also registers a
+    // contextmenu listener that preventDefaults; we preventDefault here too so
+    // the native browser menu never appears over the viewport.
+    function onContextMenu(ev) {
+      ev.preventDefault()
+      if (!onContextMenuPartRef.current) return
+      if (modeRef.current !== 'object') return
+      // Drag distance from the press position → treat as pan, not a click.
+      if (Math.hypot(ev.clientX - rcDownX, ev.clientY - rcDownY) > TAP_DRAG_PX) return
+
+      setPointerFromEvent(ev)
+      raycaster.setFromCamera(pointer, camera)
+      const visible = meshGroup.children.filter((mm) => mm.visible)
+      const hits = raycaster.intersectObjects(visible, false)
+      if (hits.length === 0) return
+      const hitObj = hits[0].object
+      let id = hitObj.userData.id
+      if (!id && hitObj.isInstancedMesh && hitObj.userData.componentIds) {
+        id = hitObj.userData.componentIds[hits[0].instanceId] ?? null
+      }
+      if (!id) return
+      // Mirror left-click selection so the picked part + menu agree.
+      setHudId(id)
+      stateRef.current?.onPickRef?.(id)
+      onContextMenuPartRef.current(id, ev.clientX, ev.clientY)
+    }
+
     renderer.domElement.addEventListener('pointermove', onPointerMove)
     renderer.domElement.addEventListener('pointerdown', onPointerDown)
     renderer.domElement.addEventListener('pointerup', onPointerUp)
     renderer.domElement.addEventListener('pointercancel', onPointerCancel)
+    renderer.domElement.addEventListener('contextmenu', onContextMenu)
 
     stateRef.current = {
       renderer, scene, camera, controls,
@@ -810,6 +859,7 @@ function Renderer({
       renderer.domElement.removeEventListener('pointerdown', onPointerDown)
       renderer.domElement.removeEventListener('pointerup', onPointerUp)
       renderer.domElement.removeEventListener('pointercancel', onPointerCancel)
+      renderer.domElement.removeEventListener('contextmenu', onContextMenu)
       disposeAll(stateRef.current)
       // Dispose any doc-lights spawned from docLights prop.
       for (const light of (stateRef.current?.docLightHandles ?? [])) {
@@ -1059,6 +1109,32 @@ function Renderer({
       if (aux.vertexInstanced) aux.vertexInstanced.visible = visible
     }
   }, [hiddenIds, parts])
+
+  // ----- Per-part transparency -----
+  // Applies the partOpacity overrides to each mesh's material. An opacity < 1
+  // flips the material to transparent (and disables depthWrite so it blends
+  // correctly against parts behind it); 1 restores fully-opaque rendering.
+  // Re-runs on `parts` because the mesh rebuild creates fresh materials.
+  // Instanced batches share one material across copies, so per-instance opacity
+  // isn't supported — same trade-off as visibility above.
+  useEffect(() => {
+    const s = stateRef.current
+    if (!s) return
+    const opac = partOpacity || new Map()
+    s.meshGroup.children.forEach((m) => {
+      if (m.isInstancedMesh) return
+      const id = m.userData.id ?? m.userData.componentId
+      if (!id || !m.material) return
+      const o = opac.has(id) ? opac.get(id) : 1
+      const apply = (mat) => {
+        mat.opacity = o
+        mat.transparent = o < 1
+        mat.depthWrite = o >= 1
+        mat.needsUpdate = true
+      }
+      Array.isArray(m.material) ? m.material.forEach(apply) : apply(m.material)
+    })
+  }, [partOpacity, parts])
 
   // ----- Highlight selected (object mode) -----
   useEffect(() => {

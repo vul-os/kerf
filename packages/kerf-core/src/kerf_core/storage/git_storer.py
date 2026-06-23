@@ -45,9 +45,14 @@ import time
 from dataclasses import dataclass
 from typing import Iterable
 
-import pygit2
-
 logger = logging.getLogger(__name__)
+
+# NOTE: ``pygit2`` is intentionally NOT imported at module top level. It is an
+# optional, cloud-only dependency — the S3-backed git storer below is only
+# constructed by hosted deploys (STORAGE_BACKEND=s3). Importing it lazily inside
+# the methods that use it lets OSS / local installs import this module — and the
+# storage-factory helpers it also exports (project_git_prefix, resolve_project_repo,
+# ProjectRepoLocation) — without pygit2 installed.
 
 # Maximum keys per S3 DeleteObjects call (S3 API hard limit).
 _BATCH_DELETE_MAX = 1000
@@ -200,6 +205,8 @@ class S3GitStorer:
                     self._prefix, local_dir,
                 )
             else:
+                import pygit2
+
                 pygit2.init_repository(local_dir, bare=True)
                 logger.info(
                     "S3GitStorer.clone_to_local: prefix=%s empty; initialized fresh bare repo at %s",
@@ -350,6 +357,8 @@ class S3GitStorer:
         return deleted
 
     def open_repo(self, local_dir: str) -> pygit2.Repository:
+        import pygit2
+
         if not os.path.isdir(local_dir):
             raise FileNotFoundError(
                 f"{local_dir} does not exist as a directory. Call clone_to_local first."

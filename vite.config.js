@@ -7,12 +7,39 @@ import pkg from './package.json' with { type: 'json' }
 // Build outputs into `dist/` (Vite default). kerf-api serves it via
 // StaticFiles at runtime. In dev, Vite serves :5173 directly (HMR) and
 // proxies /api + /auth to kerf-server on VITE_API_URL.
+// Dev-server-only CSP widening.
+//
+// index.html ships a strict production Content-Security-Policy whose
+// `connect-src` allows same-origin + the hosted API (https://*.kerf.sh). In
+// dev and (especially) the Playwright e2e run the browser talks to the API
+// cross-origin at VITE_API_URL (e.g. http://localhost:8081), which the prod
+// CSP would block — leaving every local-mode spec stuck on the sign-in page
+// because /api/config and /auth/bootstrap-local never leave the browser.
+//
+// This plugin runs ONLY when Vite is serving (`apply: 'serve'`), so it never
+// touches the `vite build` output — production keeps its strict CSP. It appends
+// the dev API origin (plus localhost ws/http for HMR + any port) to connect-src.
+function devCspPlugin(apiOrigin) {
+  return {
+    name: 'kerf-dev-csp',
+    apply: 'serve',
+    transformIndexHtml(html) {
+      // Anchor on `https://` so we match the real CSP directive and not the
+      // explanatory `connect-src 'self'` mention in the comment above it.
+      return html.replace(
+        /(connect-src 'self'\s+https:\/\/[^;]*)/,
+        `$1 ${apiOrigin} http://localhost:* ws://localhost:*`,
+      )
+    },
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const apiUrl = env.VITE_API_URL || 'http://localhost:8080'
 
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), devCspPlugin(apiUrl)],
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version),
     },

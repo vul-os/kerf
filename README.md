@@ -118,19 +118,25 @@ pip install 'kerf[full]'          # everything
 ```sh
 git clone https://github.com/kerf-sh/kerf
 cd kerf
-pip install -e .[mech]   # or .[full] for everything; choose your persona
+
+# Install the Python workspace packages (choose your persona):
+uv sync --extra mech              # uv users — resolves the workspace
+./scripts/dev-install.sh mech     # pip users — editable install helper
+
 npm install
 npm run dev              # vite :5173 + kerf-server :8080
 ```
 
 You'll need Python 3.11+, Node 22+, and Postgres 14+. Run `npm run init` to generate `kerf.toml` from the example (add at least one LLM API key), then `npm run migrate` to initialise the database before starting the dev server.
 
+> **Note:** a bare `pip install -e .[mech]` fails — the repo is a `uv` workspace, so the local `kerf-*` packages are wired up via `[tool.uv.sources]`, which only `uv` reads. Use `uv sync` or `./scripts/dev-install.sh`. The `mech`/`full` solver extras (pythonOCC, dolfinx) are conda-only; see [docs/local-install.md](./docs/local-install.md#solver-dependencies-dolfinx--pythonocc).
+
 ## Build
 
 ```sh
 npm run build              # full production build — compiles the SPA via Vite
 npm run build:web          # just the Vite frontend (outputs to dist/)
-npm run build:api          # install Python dependencies (pip install -e .[full])
+npm run build:api          # install Python dependencies (uv sync --extra full)
 npm run build:icons        # regenerate favicon set + OG image from public/favicon.svg
 npm run build:docs         # rebuild public/docs-manifest.json from the markdown corpus
 ```
@@ -141,7 +147,7 @@ The Python backend uses environment variables and optional feature flags to gate
 
 ```sh
 # OSS build (default) — local install, no billing, no Workshop
-pip install -e .[full] && kerf-server --reload
+./scripts/dev-install.sh full && kerf-server --reload
 
 # Cloud build — adds Workshop sharing, Paystack billing, git, transactional email
 CLOUD_ENABLED=true kerf-server --reload
@@ -151,7 +157,7 @@ npm run build              # OSS
 npm run build:cloud        # cloud
 ```
 
-The same source tree runs both. Cloud-only plugins (`kerf-billing`, `kerf-cloud`) are only active when installed (e.g. `pip install -e .[full]`). The OSS install (`pip install -e .[mech]` etc.) cannot accidentally pull in cloud code.
+The same source tree runs both. Cloud-only plugins (`kerf-billing`, `kerf-cloud`) are only active when installed (e.g. the `full` persona). The OSS personas (`mech`, `electronics`, `bim`) cannot accidentally pull in cloud code.
 
 ### Configuration
 

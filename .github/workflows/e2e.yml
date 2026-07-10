@@ -79,6 +79,9 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Run DB migrations
         env:
+          # The runner reads the UNPREFIXED DATABASE_URL (or argv[1]); the KERF_*
+          # duplicate is kept for any deploy path that consumes it.
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/${{ env.E2E_DB }}
           KERF_DATABASE_URL: postgres://postgres:postgres@localhost:5432/${{ env.E2E_DB }}
           PGHOST: localhost
           PGPORT: 5432
@@ -113,6 +116,11 @@ jobs:
         env:
           CI: "true"
           KERF_LOCAL_MODE: "true"
+          # playwright.config.ts forwards DATABASE_URL into the webServer backend
+          # commands only when process.env.DATABASE_URL is set — without the
+          # unprefixed name the servers fall back to the default DSN and never
+          # reach the kerf_e2e database.
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/${{ env.E2E_DB }}
           KERF_DATABASE_URL: postgres://postgres:postgres@localhost:5432/${{ env.E2E_DB }}
           # Tell the playwright.config.ts webServer commands which ports to use.
           # The playwright.config.ts picks these up directly via the hardcoded

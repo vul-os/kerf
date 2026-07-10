@@ -54,10 +54,25 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install Python dependencies (full persona)
+      - name: Install Python dependencies (api-only persona)
         run: |
-          pip install --quiet -e ".[full]" 2>/dev/null || \
-            for d in packages/kerf-*/; do pip install --quiet -e "$d"; done
+          # The api-only persona is everything the E2E backend needs: the heavy
+          # OCCT/JSCAD compute runs client-side as WASM, so the mech/fem/cam
+          # packages (which pull conda-only native deps like pythonocc-core and
+          # fenics-dolfinx that cannot pip-install on Linux) are not required.
+          #
+          # These packages depend on each other (kerf-api → kerf-auth → kerf-core,
+          # etc.) but are NOT published to PyPI — they resolve locally only via
+          # [tool.uv.sources], which pip does not read. So install them together
+          # in ONE pip command: pip then satisfies each intra-workspace
+          # requirement from the checked-out source instead of trying (and
+          # failing) to fetch e.g. `kerf-auth` from PyPI.
+          pip install --quiet \
+            -e packages/kerf-core \
+            -e packages/kerf-auth \
+            -e packages/kerf-api \
+            -e packages/kerf-chat \
+            -e packages/kerf-v1
 
       # -----------------------------------------------------------------------
       # Database migrations

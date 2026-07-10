@@ -31,7 +31,6 @@ import logging
 from typing import Optional
 from uuid import UUID
 
-import pygit2
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
@@ -53,6 +52,13 @@ from kerf_core.storage.materialize import (
 )
 
 logger = logging.getLogger(__name__)
+
+# NOTE: ``pygit2`` is intentionally NOT imported at module top level. It is an
+# optional, cloud-only dependency (declared by kerf-cloud) — the git diff/resolve
+# routes below only run on hosted, git-backed deploys. Importing it lazily inside
+# the functions that use it lets this module import — and kerf-api register its
+# routes — on OSS / local installs (e.g. the api-only persona) without pygit2
+# present. Mirrors the same lazy-import fix in kerf_core.storage.git_storer.
 
 router = APIRouter()
 
@@ -98,6 +104,8 @@ def _list_commit_changes(repo_dir: str, sha: str) -> list[dict]:
 
     LFS-pointer blobs are returned verbatim (the caller decides hydration).
     """
+    import pygit2
+
     try:
         repo = pygit2.Repository(repo_dir)
     except (pygit2.GitError, KeyError) as exc:
@@ -193,6 +201,8 @@ def _list_commit_changes(repo_dir: str, sha: str) -> list[dict]:
 
 def _walk_tree(repo: pygit2.Repository, tree, prefix: str):
     """Recursively yield (full_path, entry) tuples for every blob in *tree*."""
+    import pygit2
+
     for entry in tree:
         name = f"{prefix}/{entry.name}" if prefix else entry.name
         obj = repo[entry.id]
@@ -204,6 +214,8 @@ def _walk_tree(repo: pygit2.Repository, tree, prefix: str):
 
 def _get_commit_parent_sha(repo_dir: str, sha: str) -> str:
     """Return the parent sha of *sha*, or empty string for the root commit."""
+    import pygit2
+
     try:
         repo = pygit2.Repository(repo_dir)
         commit = repo.revparse_single(sha).peel(pygit2.Commit)
@@ -364,6 +376,8 @@ async def resolve_conflict(
 
     After writing, returns ``{ok: true, sha: "<new-commit-sha>"}``.
     """
+    import pygit2
+
     if req.pick not in ("yours", "theirs"):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -440,6 +454,8 @@ def _collect_tree_paths(
     prefix: str,
 ) -> list[tuple[str, bytes]]:
     """Recursively collect (path, raw_bytes) for every blob in *tree*."""
+    import pygit2
+
     results = []
     for entry in tree:
         full_path = f"{prefix}/{entry.name}" if prefix else entry.name
@@ -453,6 +469,8 @@ def _collect_tree_paths(
 
 def _read_head_tree_sync(repo_dir: str) -> list[tuple[str, bytes]]:
     """Synchronous helper — returns list of (path, raw_bytes) at HEAD."""
+    import pygit2
+
     try:
         repo = pygit2.Repository(repo_dir)
         head = repo.revparse_single("HEAD").peel(pygit2.Commit)

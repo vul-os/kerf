@@ -52,7 +52,11 @@ from dataclasses import dataclass, field
 from typing import Mapping, Optional
 from uuid import UUID
 
-import pygit2
+# NOTE: ``pygit2`` is imported lazily inside the functions that use it rather
+# than at module top level. It is an optional, cloud-only dependency (declared
+# by kerf-cloud) and this module is imported on the plugin-load path — so an
+# OSS / local install (e.g. the api-only persona) without pygit2 must still be
+# able to import it. Mirrors kerf_core.storage.git_storer.
 
 from kerf_core.db.queries.blob_objects import add_ref, record_blob
 from kerf_core.storage.base import Storage
@@ -141,6 +145,8 @@ def _ensure_bare_repo(repo_dir: str) -> pygit2.Repository:
     check out on the server; the tree is assembled object-by-object from the
     materialized file set.
     """
+    import pygit2
+
     os.makedirs(repo_dir, exist_ok=True)
     try:
         return pygit2.Repository(repo_dir)
@@ -155,6 +161,8 @@ def _build_tree(repo: pygit2.Repository, blobs_by_path: Mapping[str, bytes]) -> 
     content for inline files, or the serialized LFS pointer for offloaded
     files. Nested directories are reconstructed faithfully.
     """
+    import pygit2
+
     # nested dict: dir-name -> subtree dict, file-name -> git blob Oid
     root: dict = {}
     for path, content in blobs_by_path.items():
@@ -223,6 +231,8 @@ async def materialize_and_commit(
         ``MaterializeResult`` with the new commit/tree shas and a breakdown of
         which paths were offloaded as blobs vs. stored inline.
     """
+    import pygit2
+
     tree_content: dict[str, bytes] = {}
     result = MaterializeResult(commit_sha="", tree_sha="", kind=kind)
 
@@ -472,6 +482,8 @@ async def read_path(
     the git tree holds an LFS pointer; this resolves the oid back to the
     bytes in the object store. This is the round-trip / hydrate primitive.
     """
+    import pygit2
+
     norm = _normalize_path(path)
 
     def _read_tree_blob() -> bytes:

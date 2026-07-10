@@ -18,34 +18,43 @@ PLUGIN_DEPENDS = ["kerf-auth"]
 
 
 async def register(app: FastAPI, ctx) -> PluginManifest:
+    import importlib
+
+    # ---- Core routers: always required (files/projects CRUD, git diff). ----
     from kerf_api.routes import router
-    from kerf_api.routes_atopile import router as atopile_router
     app.include_router(router, prefix="/api", tags=["api"])
     from kerf_api.routes_git_diff import router as git_diff_router
     app.include_router(git_diff_router, prefix="/api", tags=["git-diff"])
-    app.include_router(atopile_router, tags=["atopile"])
-    from kerf_api.routes_plc_sim import router as plc_sim_router
-    app.include_router(plc_sim_router, prefix="/api", tags=["plc-sim"])
 
-    from kerf_api.routes_aero_propulsion import router as aero_propulsion_router
-    app.include_router(aero_propulsion_router, prefix="/api", tags=["aero"])
-    from kerf_api.routes_aero_atmosphere import router as aero_atmosphere_router
-    app.include_router(aero_atmosphere_router, prefix="/api", tags=["aero"])
-    from kerf_api.routes_aero_airfoil import router as aero_airfoil_router
-    app.include_router(aero_airfoil_router, prefix="/api", tags=["aero"])
-    from kerf_api.routes_aero_orbit import router as aero_orbit_router
-    app.include_router(aero_orbit_router, prefix="/api", tags=["aero"])
-    from kerf_api.routes_silicon_synth import router as silicon_synth_router
-    app.include_router(silicon_synth_router, prefix="/api", tags=["silicon"])
-    from kerf_api.routes_silicon import router as silicon_router
-    app.include_router(silicon_router, prefix="/api", tags=["silicon"])
-    from kerf_api.routes_composites import router as composites_router
-    app.include_router(composites_router, prefix="/api", tags=["composites"])
-    from kerf_api.routes_ota import router as ota_router
-    app.include_router(ota_router, prefix="/api", tags=["ota"])
-    # T-408: break-even margin admin endpoint
-    from kerf_api.routes_admin_margin import router as admin_margin_router
-    app.include_router(admin_margin_router, prefix="/api", tags=["admin"])
+    # ---- Optional persona routers ----
+    # Each of these pulls in a persona-specific package (kerf_aero, numpy-backed
+    # airfoil math, silicon/composites compute, …) that lean personas such as
+    # api-only do not install. Import each defensively so a missing persona
+    # dependency skips just that router instead of aborting the entire kerf-api
+    # registration — which would drop the core /api routes too. Mirrors the
+    # try/except tolerance already used by _register_tools below.
+    optional_routers = [
+        ("kerf_api.routes_atopile", {"tags": ["atopile"]}),
+        ("kerf_api.routes_plc_sim", {"prefix": "/api", "tags": ["plc-sim"]}),
+        ("kerf_api.routes_aero_propulsion", {"prefix": "/api", "tags": ["aero"]}),
+        ("kerf_api.routes_aero_atmosphere", {"prefix": "/api", "tags": ["aero"]}),
+        ("kerf_api.routes_aero_airfoil", {"prefix": "/api", "tags": ["aero"]}),
+        ("kerf_api.routes_aero_orbit", {"prefix": "/api", "tags": ["aero"]}),
+        ("kerf_api.routes_silicon_synth", {"prefix": "/api", "tags": ["silicon"]}),
+        ("kerf_api.routes_silicon", {"prefix": "/api", "tags": ["silicon"]}),
+        ("kerf_api.routes_composites", {"prefix": "/api", "tags": ["composites"]}),
+        ("kerf_api.routes_ota", {"prefix": "/api", "tags": ["ota"]}),
+        # T-408: break-even margin admin endpoint
+        ("kerf_api.routes_admin_margin", {"prefix": "/api", "tags": ["admin"]}),
+    ]
+    for module_path, include_kwargs in optional_routers:
+        try:
+            mod = importlib.import_module(module_path)
+            app.include_router(mod.router, **include_kwargs)
+        except Exception as exc:
+            logger.info(
+                "kerf-api: optional router %s not loaded (%s)", module_path, exc
+            )
 
     _register_tools(ctx)
 

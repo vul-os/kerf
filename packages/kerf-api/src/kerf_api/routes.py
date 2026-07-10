@@ -46,7 +46,11 @@ from kerf_core.storage.materialize import blob_storage_key
 from kerf_chat import llm as llm_module
 from kerf_chat.tools.executor import execute as tools_execute, specs as tools_specs
 from kerf_core.utils.context import ProjectCtx
-from kerf_tess.worker import notify_step_uploaded
+
+# NOTE: ``notify_step_uploaded`` lives in kerf_tess, a mech-persona package that
+# is absent on api-only installs. It is imported lazily at its (already
+# exception-guarded) call sites so this core router module — and thus the whole
+# kerf-api plugin — imports without kerf_tess present.
 
 router = APIRouter()
 LARGE_STEP_THRESHOLD = 5 * 1024 * 1024
@@ -4909,6 +4913,7 @@ async def finalize_upload(
             if settings.usage_enabled and size > 0:
                 await usage_queries.record_storage(conn, uid, pid, size)
             try:
+                from kerf_tess.worker import notify_step_uploaded
                 await notify_step_uploaded(conn, str(f["id"]))
             except Exception:
                 pass
@@ -4945,6 +4950,7 @@ async def finalize_upload(
         )
 
         try:
+            from kerf_tess.worker import notify_step_uploaded
             await notify_step_uploaded(conn, str(f["id"]))
         except Exception:
             pass

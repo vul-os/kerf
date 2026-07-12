@@ -270,8 +270,12 @@ def _compile(bim_content: str, warnings: list) -> bytes:
 
     # -- project --
     project_name = doc.get("name", "Kerf Building")
+    # IfcSIUnitName has no MILLIMETRE member — millimetres are METRE carrying
+    # the MILLI prefix. Passing "MILLIMETRE" makes ifcopenshell raise
+    # "Unable to find keyword in schema", which surfaces as an IFC compile
+    # failure for every .bim file. All geometry below is authored in mm.
     units = model.createIfcUnitAssignment(Units=[
-        model.createIfcSIUnit(UnitType="LENGTHUNIT", Name="MILLIMETRE"),
+        model.createIfcSIUnit(UnitType="LENGTHUNIT", Name="METRE", Prefix="MILLI"),
         model.createIfcSIUnit(UnitType="AREAUNIT", Name="SQUARE_METRE"),
         model.createIfcSIUnit(UnitType="VOLUMEUNIT", Name="CUBIC_METRE"),
     ])

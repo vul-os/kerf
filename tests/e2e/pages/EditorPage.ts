@@ -46,10 +46,12 @@ export class EditorPage {
   async createFile(kind: 'File' | 'Sketch' | 'Drawing' | 'Feature' | 'Assembly' | 'Part') {
     await this.newFileDropdownButton.click()
     // "+ New" opens a dialog of CreateCard tiles, each a <button> whose
-    // accessible name is "<Kind> <hint>", e.g. "File Generic .jscad code
-    // module". Anchor on the leading kind so "File" doesn't also match "Folder".
+    // accessible name starts with the kind label (the hint text follows).
     const dialog = this.page.getByRole('dialog', { name: 'New file' })
     await dialog.waitFor({ state: 'visible', timeout: 10_000 })
+    // Each tile's accessible name is "<Kind> <hint>", e.g.
+    // "File Generic .jscad code module". Anchor on the leading kind so
+    // "File" doesn't also match "Folder".
     await dialog
       .getByRole('button', { name: new RegExp(`^${kind}\\b`) })
       .first()
@@ -61,6 +63,34 @@ export class EditorPage {
    */
   async openFile(name: string) {
     await this.page.getByText(name, { exact: true }).first().click()
+  }
+
+  /**
+   * Rename a file via the tree's context menu.
+   *
+   * Used to reach kinds that have no "+ New" entry — BIM is one: Editor.jsx
+   * routes to BIMFileView on the `.bim` extension (isBIMFile()), so a .bim is
+   * authored by creating a generic file and renaming it.
+   *
+   * The inline input seeds with the old name, so we select-all before typing.
+   */
+  async renameFile(from: string, to: string) {
+    // Double-click the row — FileTree's onDoubleClick puts it straight into
+    // inline-rename mode (same as the context menu's "Rename (F2)").
+    await this.page
+      .locator('span.font-mono')
+      .filter({ hasText: from })
+      .first()
+      .dblclick()
+
+    const input = this.page.getByTestId('rename-input')
+    await input.waitFor({ state: 'visible', timeout: 10_000 })
+    await input.fill(to)
+    await input.press('Enter')
+
+    await expect(this.page.getByText(to, { exact: true }).first()).toBeVisible({
+      timeout: 10_000,
+    })
   }
 
   /**

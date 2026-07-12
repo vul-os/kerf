@@ -36,6 +36,8 @@ import HeroRenderPanel from './HeroRenderPanel.jsx'
 import { applyDocLightsToScene } from '../lib/applyDocLightsToScene.js'
 import { detectWebGL } from '../lib/detectWebGL.js'
 import { hexToInt } from '../lib/appearance.js'
+import NavPrefsTab from './NavPrefsTab.jsx'
+import { resolveButtons, loadNavPreset, saveNavPreset } from '../lib/navPresets.js'
 
 const PALETTE = [0xc9a96b, 0x6b9bc9, 0xc96b89, 0x89c96b, 0xc9b86b, 0x9b6bc9]
 const HIGHLIGHT_EMISSIVE = 0x4d3c00 // kerf yellow tint
@@ -950,6 +952,59 @@ function Renderer({
     if (stateRef.current) stateRef.current.onContextPickRef = onContextPick
   }, [onContextPick])
 
+  // ----- Navigation style -----
+  // OrbitControls has ONE static mouseButtons map and no concept of modifier
+  // keys, so "Alt+LMB orbits, plain LMB selects" (Maya) can't be expressed
+  // declaratively. We resolve the map from (preset, modifiers held) and reassign
+  // it on every modifier keydown/keyup. OrbitControls reads mouseButtons at
+  // pointerdown, so swapping it between presses is enough — no patching needed.
+  const [navPreset, setNavPreset] = useState(() => loadNavPreset())
+  const modsRef = useRef({ alt: false, shift: false, ctrl: false })
+
+  useEffect(() => {
+    const MOUSE_ACTION = {
+      rotate: THREE.MOUSE.ROTATE,
+      pan: THREE.MOUSE.PAN,
+      dolly: THREE.MOUSE.DOLLY,
+    }
+
+    const apply = () => {
+      const controls = stateRef.current?.controls
+      if (!controls) return
+      const b = resolveButtons(navPreset, modsRef.current)
+      // null → OrbitControls falls through to STATE.NONE, leaving that button
+      // free for selection / the context menu.
+      controls.mouseButtons = {
+        LEFT: b.LEFT ? MOUSE_ACTION[b.LEFT] : null,
+        MIDDLE: b.MIDDLE ? MOUSE_ACTION[b.MIDDLE] : null,
+        RIGHT: b.RIGHT ? MOUSE_ACTION[b.RIGHT] : null,
+      }
+    }
+    apply()
+
+    const onKey = (ev) => {
+      const next = { alt: ev.altKey, shift: ev.shiftKey, ctrl: ev.ctrlKey || ev.metaKey }
+      const m = modsRef.current
+      if (next.alt === m.alt && next.shift === m.shift && next.ctrl === m.ctrl) return
+      modsRef.current = next
+      apply()
+    }
+    // Alt-tabbing away with a modifier down would otherwise leave it stuck.
+    const onBlur = () => {
+      modsRef.current = { alt: false, shift: false, ctrl: false }
+      apply()
+    }
+
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('keyup', onKey)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keyup', onKey)
+      window.removeEventListener('blur', onBlur)
+    }
+  }, [navPreset, webGLUnavailable])
+
   // The mesh-build loop reads appearance through a ref (it isn't in that
   // effect's deps — we do NOT want a colour change to tear down every mesh).
   const appearanceRef = useRef(appearance)
@@ -1718,6 +1773,13 @@ function Renderer({
       onKeyDown={handleCanvasKeyDown}
     >
       <div ref={mountRef} className="absolute inset-0 overflow-hidden" />
+      <NavPrefsTab
+        value={navPreset}
+        onChange={(id) => {
+          setNavPreset(id)
+          saveNavPreset(id)
+        }}
+      />
       {/* T-C5: visually-hidden live region announces selection + camera resets
           to screen readers without disrupting the visual layout. */}
       <div

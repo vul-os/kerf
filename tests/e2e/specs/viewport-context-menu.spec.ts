@@ -25,8 +25,14 @@
 import { test, expect, Page } from '@playwright/test'
 import { ProjectsPage } from '../pages/ProjectsPage'
 import { EditorPage } from '../pages/EditorPage'
+import { deleteProject, projectIdFromUrl } from '../utils/cleanup'
 
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+
+// Tracked at module scope so the setup helper below can record it and afterEach
+// can delete it.
+let createdProjectId: string | null = null
+const registerProject = (id: string | null) => { createdProjectId = id }
 
 // One cube, id 'block' — a single object keeps "what is under the cursor"
 // unambiguous (the default camera sits on the +X+Y+Z diagonal, so objects
@@ -79,6 +85,7 @@ async function projectWithCube(page: Page) {
   await page.waitForURL(/\/projects$/, { timeout: 20_000 })
   await pp.createProject(`e2e-ctxmenu-${uid()}`)
   await page.waitForURL(/\/projects\//, { timeout: 20_000 })
+  registerProject(projectIdFromUrl(page))
 
   const ep = new EditorPage(page)
   await ep.waitForLoad()
@@ -100,6 +107,13 @@ test.describe('Viewport object context menu (local mode)', () => {
   // Each test creates a project, boots the JSCAD worker, and then polls the
   // WebGL buffer through several appearance changes — comfortably past the 30 s
   // default on a cold CI runner.
+  // Clean up after ourselves: leftover projects accumulate in the shared DB and
+  // eventually break projects.spec's grid assertions (issue #5).
+  test.afterEach(async ({ page }) => {
+    await deleteProject(page, createdProjectId)
+    createdProjectId = null
+  })
+
   test.setTimeout(90_000)
 
   test('right-click a solid — recolour, persist to source, and hide', async ({ page }) => {

@@ -9,7 +9,14 @@ import pkg from './package.json' with { type: 'json' }
 // proxies /api + /auth to kerf-server on VITE_API_URL.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const apiUrl = env.VITE_API_URL || 'http://localhost:8080'
+  // Proxy target for the dev server. KERF_API_PROXY_TARGET is server-only:
+  // unlike VITE_API_URL it is NOT inlined into the client bundle, so the browser
+  // keeps issuing same-origin requests and stays within the index.html CSP
+  // (connect-src 'self'). Pointing VITE_API_URL at an absolute cross-origin URL
+  // makes every fetch violate that CSP and strands the app on /login — which is
+  // what the e2e suite was doing to itself.
+  const apiUrl =
+    env.KERF_API_PROXY_TARGET || env.VITE_API_URL || 'http://localhost:8080'
 
   return {
     plugins: [react(), tailwindcss()],
@@ -27,10 +34,30 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 5173,
-      proxy: {
-        '/api': { target: apiUrl, changeOrigin: true },
-        '/auth': { target: apiUrl, changeOrigin: true },
-      },
+      // Not every backend route lives under /api. The compute plugins mount
+      // their entry points at the ROOT (see `paths` in /openapi.json):
+      // /compile-ifc, /run-fem, /run-cam, /atopile/compile, … In production
+      // kerf-api serves the SPA and the API from one origin, so these resolve;
+      // in dev, anything not listed here is answered by Vite with the SPA's
+      // index.html instead of being forwarded, and the caller sees a 404. That
+      // silently broke BIM/FEM/CAM/topo/tess under `npm run dev`.
+      proxy: Object.fromEntries(
+        [
+          '/api',
+          '/auth',
+          '/compile-ifc',
+          '/compile-bim',
+          '/import-ifc',
+          '/run-fem',
+          '/run-cam',
+          '/run-5axis',
+          '/run-tess',
+          '/run-topo',
+          '/run-mates',
+          '/run-quad-remesh',
+          '/atopile',
+        ].map((route) => [route, { target: apiUrl, changeOrigin: true }]),
+      ),
     },
     build: {
       outDir: 'dist',

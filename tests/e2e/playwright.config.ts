@@ -88,11 +88,13 @@ export default defineConfig({
       // Backend: kerf-server on :8081
       // NOTE: kerf_core.config.Settings has no env prefix, so it reads the
       // UNPREFIXED names (LOCAL_MODE / DATABASE_URL / CORS_ORIGIN). The
-      // KERF_* duplicates are kept for any deploy path that consumes them.
-      // CORS_ORIGIN must be the Vite e2e origin (:5174) — the browser calls
-      // the API cross-origin (VITE_API_URL=http://localhost:8081), and the
-      // default cors_origin is :5173, which would block /auth/bootstrap-local
-      // and leave every local-mode spec stuck on the sign-in page.
+      // KERF_* duplicates are kept for any deploy path that consumes them —
+      // setting only KERF_DATABASE_URL would leave the server on its default
+      // DSN.
+      // CORS_ORIGIN is belt-and-braces: the browser now reaches the API
+      // same-origin through the Vite proxy (see KERF_API_PROXY_TARGET below),
+      // so preflight shouldn't arise, but a direct call would otherwise be
+      // rejected against the default :5173 origin.
       command:
         'KERF_PORT=8081 KERF_LOCAL_MODE=true LOCAL_MODE=true ' +
         'CORS_ORIGIN=http://localhost:5174 ' +
@@ -109,8 +111,14 @@ export default defineConfig({
     },
     {
       // Frontend: Vite on :5174 (proxies /api + /auth to :8081)
+      //
+      // KERF_API_PROXY_TARGET, not VITE_API_URL: VITE_-prefixed vars are inlined
+      // into the client bundle, so the browser would call http://localhost:8081
+      // cross-origin and every fetch would be blocked by the index.html CSP
+      // (connect-src 'self'), stranding all local specs on /login. Going through
+      // the Vite proxy keeps requests same-origin.
       command:
-        'VITE_API_URL=http://localhost:8081 ' +
+        'KERF_API_PROXY_TARGET=http://localhost:8081 ' +
         'npx vite --port 5174 --host localhost',
       cwd: '../..',
       url: 'http://localhost:5174',
@@ -141,8 +149,9 @@ export default defineConfig({
     },
     {
       // Cloud frontend: Vite on :5175 (proxies /api + /auth to :8082)
+      // Same-origin proxy rather than VITE_API_URL — see the :5174 note above.
       command:
-        'VITE_API_URL=http://localhost:8082 ' +
+        'KERF_API_PROXY_TARGET=http://localhost:8082 ' +
         'npx vite --port 5175 --host localhost',
       cwd: '../..',
       url: 'http://localhost:5175',

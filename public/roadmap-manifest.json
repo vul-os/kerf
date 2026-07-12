@@ -1,11 +1,31 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-25T19:38:29.982Z",
+  "generatedAt": "2026-07-12T16:22:48.281Z",
   "source": "ROADMAP.md",
   "latestDelta": {
-    "date": "2026-05-25",
-    "itemCount": 14,
+    "date": "2026-05-26",
+    "itemCount": 18,
     "items": [
+      {
+        "title": "Civil hydraulics",
+        "body": "LandXML 1.2 import/export (`civil_landxml_import/export`); steady-state pressurised pipe network (Todini GGA + HW/DW, `civil_water_network_solve`); Manning circular/trapezoidal sewer (`civil_sewer_manning_capacity`); rational-method peak runoff (`civil_storm_rational`); HDS-5 inlet-control culvert (`civil_culvert_capacity`) — `kerf-civil/src/kerf_civil/tools_hydraulics.py`",
+        "domain": "Structural"
+      },
+      {
+        "title": "FEM dynamics",
+        "body": "linear eigenvalue buckling (`fem_buckling_linear`); mode-superposition harmonic frequency response (`fem_harmonic_response`); random-vibration PSD / Miles equation (`fem_random_vibration_psd`); acoustics cavity FEM + BEM radiation; high-frequency EM (waveguide, S-params, FDTD); electrostatics + magnetostatics; 2-D projection Navier-Stokes — `kerf-fem/src/kerf_fem/{buckling,harmonic,random_vibration,acoustics_fem,em_highfreq,em_field,cfd_navier_stokes}.py`",
+        "domain": "Optics"
+      },
+      {
+        "title": "Structural codes (AISI + TMS)",
+        "body": "AISI S100-16 cold-formed steel: effective-width, flexure (`structural_cfs_flexure`), compression (`structural_cfs_compression`), web-crippling (`structural_cfs_web_crippling`); TMS 402-16 masonry ASD: flexure/shear/axial (`structural_masonry_*`) — `kerf-structural/src/kerf_structural/{cold_formed_steel,masonry}.py`",
+        "domain": "Platform"
+      },
+      {
+        "title": "G3 surfacing wired",
+        "body": "`feature_blend_srf_g3` (surfacing.py:1376) + `feature_g3_chain_blend` (surfacing.py:1894) registered as LLM tools via `surfacing` module in `_TOOL_MODULES`; `blend_srf_g3`, `curvature_rate_continuity_residual`, `zebra_stripe`, `reflection_lines`, `curvature_comb` all exported from `geom/__init__.py`; `feature_zebra_analysis` and `feature_isophote_analysis` also wired",
+        "domain": "Structural"
+      },
       {
         "title": "Structural code design",
         "body": "AISC 360-22 (Ch. E/F/H members + connections + base-plate, LRFD+ASD); ACI 318-19 (flexure/shear/PM + punching §22.6 + torsion §22.7); NDS 2018 timber; AISI S100-16 cold-formed steel (effective-width, flexure/compression/web-crippling); TMS 402-16 masonry ASD (flexure/shear/axial); ASCE 7-22 load combos + ELF + RSA/Newmark seismic. Full Eurocode: EC2, EC3, EC5, EC8",
@@ -13,7 +33,7 @@
       },
       {
         "title": "Native FE",
-        "body": "MITC4 plate/shell (Bathe-Dvorkin) + modal via inverse iteration; 2D/3D frame stiffness + story drift; multi-axial critical-plane fatigue (Findley, SWT-3D, Brown-Miller); geotech liquefaction triggering (Seed-Idriss/Tokimatsu)",
+        "body": "MITC4 plate/shell (Bathe-Dvorkin) + modal via inverse iteration; linear eigenvalue buckling + harmonic response + random-vibration PSD; 2D/3D frame stiffness + story drift; multi-axial critical-plane fatigue (Findley, SWT-3D, Brown-Miller); acoustics FEM/BEM + high-frequency EM + electrostatics/magnetostatics; geotech liquefaction triggering (Seed-Idriss/Tokimatsu)",
         "domain": "Structural"
       },
       {

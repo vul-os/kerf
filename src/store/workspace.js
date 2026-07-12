@@ -1619,8 +1619,35 @@ export const useWorkspace = create((set, get) => ({
       currentFileContent,
       mergeAppearance(parseAppearance(currentFileContent), partId, patch),
     )
-    if (nextSource === currentFileContent) return
-    await applyAppearanceEdit(set, get, nextSource)
+    if (nextSource !== currentFileContent) {
+      await applyAppearanceEdit(set, get, nextSource)
+    }
+
+    // The source is now authoritative for this part — drop any preview overlay
+    // so the two can't disagree.
+    set((s) => {
+      const forFile = s.sessionAppearance.get(currentFileId)
+      if (!forFile || !forFile[partId]) return {}
+      const next = new Map(s.sessionAppearance)
+      const copy = { ...forFile }
+      delete copy[partId]
+      next.set(currentFileId, copy)
+      return { sessionAppearance: next }
+    })
+  },
+
+  // Live preview for continuous controls (the opacity slider). Writes ONLY to
+  // the session overlay — no source rewrite, no PATCH — so dragging is smooth
+  // and doesn't spam the server. The caller commits the final value with
+  // setPartAppearance on release, which persists it and clears this overlay.
+  previewPartAppearance: (partId, patch) => {
+    const { currentFileId } = get()
+    if (!currentFileId || !partId) return
+    set((s) => {
+      const next = new Map(s.sessionAppearance)
+      next.set(currentFileId, mergeAppearance(next.get(currentFileId) || {}, partId, patch))
+      return { sessionAppearance: next }
+    })
   },
 
   resetPartAppearance: (partId) =>

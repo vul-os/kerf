@@ -158,6 +158,28 @@ export function writeAppearance(content, appearance) {
 }
 
 /**
+ * The source with the appearance marker removed.
+ *
+ * Used to decide whether a content change is *geometrically* meaningful: the
+ * marker is a comment, so JSCAD's output cannot depend on it. Editing appearance
+ * must not re-run the model (a re-run rebuilds every mesh, which flashes the
+ * viewport), so the editor compares stripped sources and skips the run when only
+ * the marker moved.
+ */
+export function stripAppearance(content) {
+  if (typeof content !== 'string' || content.length === 0) return ''
+  const lines = content.split('\n')
+  const scanLimit = Math.min(lines.length, SCAN_LINES)
+  for (let i = 0; i < scanLimit; i++) {
+    if (lines[i].trimStart().startsWith(MARKER)) {
+      lines.splice(i, 1)
+      return lines.join('\n')
+    }
+  }
+  return content
+}
+
+/**
  * Merge a patch into one part's entry, returning the whole map.
  *
  * A `null`/`undefined` field value CLEARS that field (that is how "reset

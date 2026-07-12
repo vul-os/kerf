@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   parseAppearance,
   writeAppearance,
+  stripAppearance,
   mergeAppearance,
   normalizeHex,
   hexToInt,
@@ -71,6 +72,30 @@ describe('opacity normalisation', () => {
   it('clamps opacity into 0..1', () => {
     const written = writeAppearance(SRC, { body: { opacity: -3, color: '#abcdef' } })
     expect(parseAppearance(written).body.opacity).toBe(0)
+  })
+})
+
+describe('stripAppearance', () => {
+  // The editor compares STRIPPED sources to decide whether to re-run JSCAD.
+  // If a marker-only edit doesn't strip to the same string, the model re-runs,
+  // every mesh is rebuilt, and the viewport visibly flashes on each colour tweak.
+  it('makes a marker-only edit indistinguishable from the original', () => {
+    const a = writeAppearance(SRC, { body: { color: '#111111' } })
+    const b = writeAppearance(SRC, { body: { color: '#222222', opacity: 0.5 } })
+    expect(stripAppearance(a)).toBe(SRC)
+    expect(stripAppearance(a)).toBe(stripAppearance(b))
+  })
+
+  it('leaves a source with no marker untouched', () => {
+    expect(stripAppearance(SRC)).toBe(SRC)
+  })
+
+  it('still sees a real code edit', () => {
+    const withMarker = writeAppearance(SRC, { body: { color: '#111111' } })
+    const edited = writeAppearance(SRC.replace('20, 20, 20', '30, 30, 30'), {
+      body: { color: '#111111' },
+    })
+    expect(stripAppearance(edited)).not.toBe(stripAppearance(withMarker))
   })
 })
 

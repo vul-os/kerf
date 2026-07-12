@@ -146,6 +146,39 @@ test.describe('Viewport object context menu (local mode)', () => {
       .toBeLessThan(0.1)
   })
 
+  // The opacity slider is a CONTINUOUS control: it must apply as you drag and
+  // must NOT dismiss the menu (committing-and-closing on the first change made it
+  // impossible to adjust — you got one step and the menu vanished).
+  test('opacity slider adjusts without closing the menu', async ({ page }) => {
+    await projectWithCube(page)
+
+    const menu = await openMenuOnObject(page)
+    await menu.getByRole('menuitem', { name: /Opacity/i }).hover()
+
+    const slider = page.getByRole('slider', { name: /Custom opacity/i })
+    await expect(slider).toBeVisible()
+
+    await slider.fill('30')
+    await page.waitForTimeout(1500)
+
+    // Still open — you can keep dragging.
+    await expect(menu).toBeVisible()
+
+    // And it actually took effect: a transparent part lets the dark background
+    // through, so the lit pixels dim.
+    await expect
+      .poll(async () => (await litStats(page)).rgb?.[0] ?? 255, {
+        timeout: 15_000,
+        intervals: [500, 1_000],
+        message: 'object never became transparent',
+      })
+      .toBeLessThan(180)
+
+    await slider.fill('100')
+    await page.waitForTimeout(1000)
+    await expect(menu).toBeVisible()
+  })
+
   // Platform-ordering guard. `contextmenu` fires on mouse DOWN on Linux/GTK but
   // on mouse UP on Windows — i.e. AFTER the pointerup we open the menu on. A
   // dismiss-on-contextmenu listener therefore closed the menu in the very

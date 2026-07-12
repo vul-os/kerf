@@ -108,6 +108,7 @@ export default function ViewportContextMenu({
   onIsolate,
   onShowAll,
   onSetAppearance,
+  onPreviewAppearance,
   onResetAppearance,
   onZoomTo,
   onDuplicate,
@@ -159,11 +160,17 @@ export default function ViewportContextMenu({
     }
   }, [onClose])
 
-  // Every appearance action closes the menu after dispatching — matching the
-  // native menus, where picking a value commits and dismisses.
+  // Discrete picks (a swatch, an opacity preset, a material) commit and dismiss,
+  // matching the native menus.
   const dispatch = (patch) => {
     onSetAppearance?.(patch)
     onClose?.()
+  }
+
+  // Continuous controls (the opacity slider) apply WITHOUT dismissing — closing
+  // the menu on the first change makes the slider impossible to drag.
+  const dispatchLive = (patch) => {
+    onSetAppearance?.(patch)
   }
 
   const currentOpacity = appearance.opacity == null ? 1 : appearance.opacity
@@ -239,8 +246,10 @@ export default function ViewportContextMenu({
           </button>
         ))}
         <Divider />
-        {/* Committing on change (not input) keeps us to one PATCH per drag. */}
-        <div className="px-3 py-1.5">
+        {/* `input` previews on every step (session overlay only — no save), and
+            `change` fires once on release to persist. Neither closes the menu:
+            dismissing on the first change made the slider impossible to drag. */}
+        <div className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
           <label className="mb-1 block text-[10px] uppercase tracking-wider text-ink-500">
             Custom
           </label>
@@ -249,10 +258,12 @@ export default function ViewportContextMenu({
             min="5"
             max="100"
             step="5"
+            aria-label="Custom opacity"
             defaultValue={Math.round(currentOpacity * 100)}
+            onInput={(e) => onPreviewAppearance?.({ opacity: Number(e.target.value) / 100 })}
             onChange={(e) => {
               const v = Number(e.target.value) / 100
-              dispatch({ opacity: v >= 1 ? null : v })
+              dispatchLive({ opacity: v >= 1 ? null : v })
             }}
             className="w-full accent-kerf-300"
           />

@@ -10,7 +10,7 @@ import ChatPanel from '../components/ChatPanel.jsx'
 import ShareModal from '../components/ShareModal.jsx'
 import ObjectsPanel from '../components/ObjectsPanel.jsx'
 import ViewportContextMenu from '../components/ViewportContextMenu.jsx'
-import { parseAppearance } from '../lib/appearance.js'
+import { parseAppearance, stripAppearance } from '../lib/appearance.js'
 import { duplicateObject, deleteObject } from '../lib/jscadObjectOps.js'
 import { exportParts, downloadBlob } from '../lib/exporters.js'
 import CircuitComponentsPanel from '../components/CircuitComponentsPanel.jsx'
@@ -819,6 +819,9 @@ export default function Editor() {
   // errors are stashed on the store so they survive across component-level
   // re-renders without a setState-in-effect.
   const runTimerRef = useRef(null)
+  // Source of the last JSCAD run, with the appearance marker stripped and keyed
+  // by file id — lets us skip re-running the model for appearance-only edits.
+  const lastRunKeyRef = useRef(null)
   useEffect(() => {
     if (isStepFile(w.currentFile)) return
     if (isAssemblyFile(w.currentFile)) return
@@ -852,6 +855,16 @@ export default function Editor() {
     if (isOrbitFile(w.currentFile)) return
     if (runTimerRef.current) clearTimeout(runTimerRef.current)
     const code = w.currentFileContent
+
+    // Appearance edits rewrite a `// kerf:appearance=` COMMENT. JSCAD's output
+    // cannot depend on a comment, so re-running the model would produce
+    // identical geometry — but it hands the renderer a fresh `parts` array,
+    // which tears down and rebuilds every mesh and flashes the viewport. Skip
+    // the run when the source is unchanged with the marker stripped out.
+    const codeKey = `${w.currentFileId} ${stripAppearance(code)}`
+    if (lastRunKeyRef.current === codeKey) return
+    lastRunKeyRef.current = codeKey
+
     const delay = runDebounceFor(code)
     runTimerRef.current = setTimeout(async () => {
       // Cache hit → skip the worker entirely. Same SHA-256 keyspace the
@@ -2353,6 +2366,9 @@ export default function Editor() {
                 onIsolate={() => w.isolatePart(w.currentFileId, objectMenu.partId)}
                 onShowAll={() => w.showAllParts(w.currentFileId)}
                 onSetAppearance={(patch) => w.setPartAppearance(objectMenu.partId, patch)}
+                onPreviewAppearance={(patch) =>
+                  w.previewPartAppearance(objectMenu.partId, patch)
+                }
                 onResetAppearance={() => w.resetPartAppearance(objectMenu.partId)}
                 onZoomTo={() => rendererRef.current?.zoomToPart?.(objectMenu.partId)}
                 onDuplicate={() =>

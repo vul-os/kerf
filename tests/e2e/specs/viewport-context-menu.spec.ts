@@ -146,6 +146,25 @@ test.describe('Viewport object context menu (local mode)', () => {
       .toBeLessThan(0.1)
   })
 
+  // Platform-ordering guard. `contextmenu` fires on mouse DOWN on Linux/GTK but
+  // on mouse UP on Windows — i.e. AFTER the pointerup we open the menu on. A
+  // dismiss-on-contextmenu listener therefore closed the menu in the very
+  // gesture that opened it on Windows, while looking fine on Linux (it read as
+  // "the viewport flickers and no menu ever appears"). Headless Linux can't
+  // reproduce the native ordering, so we assert the invariant directly: a
+  // contextmenu event arriving after the menu is open must not dismiss it.
+  test('menu survives a contextmenu event delivered after it opens (Windows ordering)', async ({
+    page,
+  }) => {
+    await projectWithCube(page)
+    const menu = await openMenuOnObject(page)
+
+    await page.locator('canvas').first().dispatchEvent('contextmenu')
+    await page.waitForTimeout(300)
+
+    await expect(menu).toBeVisible()
+  })
+
   test('right-DRAG still pans the camera and opens no menu', async ({ page }) => {
     await projectWithCube(page)
 

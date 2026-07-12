@@ -131,7 +131,18 @@ export default function ViewportContextMenu({
     })
   }, [x, y])
 
-  // Dismiss on outside click, on a second right-click, and on Escape.
+  // Dismiss on an outside press, or Escape.
+  //
+  // We deliberately do NOT close on `contextmenu`. The event's timing is
+  // platform-dependent: Linux/GTK fires it on mouse DOWN, but Windows fires it
+  // on mouse UP — i.e. straight after the pointerup that opened this menu. A
+  // contextmenu-close listener therefore dismissed the menu in the same gesture
+  // that opened it on Windows (it looked like a flicker and no menu at all),
+  // while passing fine on Linux.
+  //
+  // pointerdown-outside covers the dismissal anyway, including right-clicking a
+  // different object: that press closes this menu, and the following pointerup
+  // opens a fresh one at the new location.
   useEffect(() => {
     const close = (ev) => {
       if (ref.current && ev && ev.target && ref.current.contains(ev.target)) return
@@ -141,11 +152,9 @@ export default function ViewportContextMenu({
       if (ev.key === 'Escape') onClose?.()
     }
     window.addEventListener('pointerdown', close, true)
-    window.addEventListener('contextmenu', close, true)
     window.addEventListener('keydown', onKey)
     return () => {
       window.removeEventListener('pointerdown', close, true)
-      window.removeEventListener('contextmenu', close, true)
       window.removeEventListener('keydown', onKey)
     }
   }, [onClose])

@@ -61,13 +61,22 @@ case "$persona" in
     exit 1 ;;
 esac
 
+# Extras to pull in alongside a package. Only PyPI-installable ones belong here
+# — the conda-forge-only solvers (pythonOCC, dolfinx) are deliberately absent,
+# see the note above. IfcOpenShell IS on PyPI, and without it kerf-bim registers
+# /compile-ifc but every .bim file fails to compile with
+# "ifcopenshell not available", so the BIM viewer never receives a model.
+declare -A extras=(
+  [kerf-bim]="[ifc]"
+)
+
 # Only install packages that actually exist in this checkout (cloud packages
 # may be absent from an OSS-only tree). Build the `-e path` argument list.
 args=()
 missing=()
 for name in $pkgs; do
   if [ -d "packages/$name" ]; then
-    args+=(-e "packages/$name")
+    args+=(-e "packages/${name}${extras[$name]:-}")
   else
     missing+=("$name")
   fi

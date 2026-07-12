@@ -17,6 +17,8 @@ import { setEquationsResolver as setOcctEquationsResolver, setActiveConfigResolv
 import { loadStep } from '../lib/stepLoader.js'
 import { loadMeshFromURL } from '../lib/meshLoader.js'
 import { withColorizedPart, withTranslatedPart } from '../lib/sourceEdit.js'
+import { parseAppearance, writeAppearance, mergeAppearance } from '../lib/appearance.js'
+import { parseMaterial } from '../lib/material.js'
 import { parseAssembly, resolveAssemblyParts as resolveAssemblyPartsHelper, loadExternalParts } from '../lib/assembly.js'
 import { encodePayload, decodePayload } from '../lib/derivedPayload.js'
 import { parseSketch, serializeSketch, defaultSketch, setSketchEquationsResolverSync } from '../lib/sketchSolver.js'
@@ -161,6 +163,14 @@ const initial = {
 
   // Per-file visibility map: Map<file_id, Set<part_id>>. Session-only.
   hiddenPartIds: new Map(),
+
+  // Per-file appearance overrides for files whose source we CANNOT write to —
+  // STEP/mesh imports, whose content is a binary storage ref, not JS. For
+  // .jscad files the overrides live in a `// kerf:appearance=` marker in the
+  // source instead (see lib/appearance.js) and are read straight back out of
+  // currentFileContent, so this map stays empty for them.
+  // Map<file_id, Record<part_id, appearance>>. Session-only.
+  sessionAppearance: new Map(),
 
   // Measure-tool state (session-only; not persisted).
   // mode ∈ 'object' | 'face' | 'edge' | 'vertex'
@@ -1571,6 +1581,77 @@ export const useWorkspace = create((set, get) => ({
     })
   },
 
+  hideOthers: (fileId, keepIds) => {
+    if (!fileId) return
+    const keep = new Set(keepIds || [])
+    set((s) => {
+      const next = new Map(s.hiddenPartIds)
+      next.set(fileId, new Set(s.parts.map((p) => p.id).filter((id) => !keep.has(id))))
+      return { hiddenPartIds: next }
+    })
+  },
+
+  // ---- Appearance ----
+  //
+  // Overrides are keyed by part id and merged over the renderer's defaults.
+  // Where they LIVE depends on the file: a .jscad file gets a marker comment in
+  // its own source (so the look survives a reload and travels with the file),
+  // while a STEP/mesh import — whose content is a binary storage ref we must not
+  // rewrite — falls back to a session-only map.
+  //
+  // A patch field set to null CLEARS that field; `resetPartAppearance` clears
+  // the lot, which removes the marker line entirely when it was the last one.
+  setPartAppearance: async (partId, patch) => {
+    const { currentFileId, currentFile, currentFileContent } = get()
+    if (!currentFileId || !partId) return
+
+    if (!appearancePersistsInSource(currentFile)) {
+      set((s) => {
+        const next = new Map(s.sessionAppearance)
+        const forFile = next.get(currentFileId) || {}
+        next.set(currentFileId, mergeAppearance(forFile, partId, patch))
+        return { sessionAppearance: next }
+      })
+      return
+    }
+
+    const nextSource = writeAppearance(
+      currentFileContent,
+      mergeAppearance(parseAppearance(currentFileContent), partId, patch),
+    )
+    if (nextSource === currentFileContent) return
+    await applyAppearanceEdit(set, get, nextSource)
+  },
+
+  resetPartAppearance: (partId) =>
+    get().setPartAppearance(partId, {
+      color: null, opacity: null, material: null, metalness: null, roughness: null,
+    }),
+
+  // The project's .material library files, flattened to what the appearance UI
+  // needs. Loaded on demand (when the context menu opens) rather than eagerly —
+  // most sessions never assign a material, and each one costs a getFile.
+  materials: [],
+  loadMaterials: async () => {
+    const { projectId, files } = get()
+    if (!projectId) return
+    const matFiles = (files || []).filter(
+      (f) => f.kind === 'material' || /\.material$/i.test(f.name || ''),
+    )
+    const out = []
+    for (const f of matFiles) {
+      try {
+        const full = await api.getFile(projectId, f.id)
+        const doc = parseMaterial(full?.content || '')
+        const name = doc?.name || (f.name || '').replace(/\.material$/i, '')
+        if (name) out.push({ id: f.id, name, color: doc?.color_hex || null })
+      } catch {
+        // A material we can't read just doesn't appear in the menu.
+      }
+    }
+    set({ materials: out })
+  },
+
   // ---- Measure tool ----
   setMeasureMode: (mode) => {
     // Switching out of object mode keeps any picked-part for the chat panel
@@ -1676,6 +1757,7 @@ export const useWorkspace = create((set, get) => ({
   },
 
   dismissToast: () => set({ toast: null }),
+  setToast: (msg) => set({ toast: msg || null }),
 
   // ---- Threads + messages ----
   selectThread: async (threadId) => {
@@ -3687,6 +3769,35 @@ export function collectSketchPaths(files) {
 // refresh parts, and PATCH the file (so other clients pick it up too). We
 // don't go through the autosave timer because the user didn't type — they
 // clicked an action and expects an immediate result.
+// Appearance can only be written into the source when the source IS JS. STEP and
+// mesh imports store a binary/storage ref as content — prepending a `//` comment
+// to those would corrupt the file — so they get session-only overrides instead.
+function appearancePersistsInSource(file) {
+  const name = (file?.name || '').toLowerCase()
+  if (!name) return false
+  return !/\.(step|stp|stl|obj|glb|gltf|3mf|ply|fcstd)$/i.test(name)
+}
+
+// Like applySourceEdit, but for edits that only touch the appearance marker
+// COMMENT. Geometry cannot have changed, so we deliberately skip the JSCAD
+// re-run (and the mesh teardown/rebuild it triggers): the renderer picks the new
+// look up from the appearance prop while the parts array stays identical.
+async function applyAppearanceEdit(set, get, nextSource) {
+  const { projectId, currentFileId } = get()
+  if (!projectId || !currentFileId) return
+  set({ currentFileContent: nextSource, dirty: false, saving: true })
+  try {
+    const updated = await api.updateFile(projectId, currentFileId, { content: nextSource })
+    set((s) => ({
+      saving: false,
+      currentFile: updated,
+      files: s.files.map((f) => (f.id === updated.id ? { ...f, ...updated, content: undefined } : f)),
+    }))
+  } catch (err) {
+    set({ saving: false, toast: err?.message || 'Failed to save appearance' })
+  }
+}
+
 async function applySourceEdit(set, get, nextSource) {
   const { projectId, currentFileId } = get()
   if (!projectId || !currentFileId) return

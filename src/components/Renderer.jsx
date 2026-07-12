@@ -35,9 +35,36 @@ import { captureHeroShot as _captureHeroShot } from '../lib/heroShot.js'
 import HeroRenderPanel from './HeroRenderPanel.jsx'
 import { applyDocLightsToScene } from '../lib/applyDocLightsToScene.js'
 import { detectWebGL } from '../lib/detectWebGL.js'
+import { hexToInt } from '../lib/appearance.js'
 
 const PALETTE = [0xc9a96b, 0x6b9bc9, 0xc96b89, 0x89c96b, 0xc9b86b, 0x9b6bc9]
 const HIGHLIGHT_EMISSIVE = 0x4d3c00 // kerf yellow tint
+
+// Material defaults for a part with no overrides.
+const BASE_METALNESS = 0.15
+const BASE_ROUGHNESS = 0.55
+
+// Stamp a part's appearance override onto its material.
+//
+// `baseColor` is what the part would be WITHOUT an override (its own part.color,
+// else the index palette) so clearing an override restores it without a rebuild.
+// depthWrite is turned off while transparent — otherwise a see-through part
+// writes depth and hides the geometry behind (and inside) it, which defeats the
+// point of turning the opacity down.
+function applyAppearance(material, override, baseColor) {
+  const ov = override || {}
+  const color = ov.color != null ? hexToInt(ov.color) : null
+  material.color.setHex(color != null ? color : baseColor)
+
+  const opacity = typeof ov.opacity === 'number' ? ov.opacity : 1
+  material.opacity = opacity
+  material.transparent = opacity < 1
+  material.depthWrite = opacity >= 1
+
+  material.metalness = typeof ov.metalness === 'number' ? ov.metalness : BASE_METALNESS
+  material.roughness = typeof ov.roughness === 'number' ? ov.roughness : BASE_ROUGHNESS
+  material.needsUpdate = true
+}
 const BG_COLOR = 0x0f1115 // ink-900
 const BG_COLOR_TOP = 0x1a1d24 // soft studio gradient top (slightly warmer)
 const KERF_YELLOW = 0xffd633
@@ -175,6 +202,15 @@ function Renderer({
   selectedId,
   hiddenIds,
   onPick,
+  // Right-click on an object → (partId, clientX, clientY). partId is null when
+  // the click landed on empty space. Right-DRAG still pans (OrbitControls); we
+  // only fire this when the press didn't move.
+  onContextPick,
+  // Per-part appearance overrides: Record<partId, {color, opacity, metalness,
+  // roughness}>. Merged over the palette default when meshes are built, and
+  // re-applied in place when it changes so a colour tweak doesn't rebuild the
+  // scene. See lib/appearance.js.
+  appearance = null,
   className = '',
   // Measure-tool extension:
   mode = 'object',
@@ -605,6 +641,13 @@ function Renderer({
     let downY = 0
     let downShift = false
     let movedBeyondThreshold = false
+    // Right-button press tracking, kept separate from the primary-pointer state
+    // above because onPointerDown deliberately ignores non-primary buttons.
+    // Right-DRAG is OrbitControls PAN and must stay that way, so we only open
+    // the context menu when the right press never moved beyond TAP_DRAG_PX.
+    let rightDownX = 0
+    let rightDownY = 0
+    let rightMoved = false
     let longPressTimer = null
     let longPressFired = false
     let activePointerCount = 0
@@ -624,6 +667,14 @@ function Renderer({
 
     // Run hover only for mouse / pen — there's no hover state on touch.
     function onPointerMove(ev) {
+      // Right button held → this is a pan in progress; remember that it moved so
+      // the contextmenu that follows doesn't pop a menu at the end of the drag.
+      if ((ev.buttons & 2) !== 0 && !rightMoved) {
+        if (Math.hypot(ev.clientX - rightDownX, ev.clientY - rightDownY) > TAP_DRAG_PX) {
+          rightMoved = true
+        }
+      }
+
       // Track movement on the primary pointer (used for tap-vs-drag decision).
       if (ev.pointerId === primaryPointerId) {
         const dx = ev.clientX - downX
@@ -698,6 +749,14 @@ function Renderer({
         movedBeyondThreshold = true // also kills any latent tap dispatch
         return
       }
+      // Right press: seed the drag-vs-click test for the contextmenu that will
+      // follow. Must happen BEFORE the early-return below.
+      if (ev.pointerType === 'mouse' && ev.button === 2) {
+        rightDownX = ev.clientX
+        rightDownY = ev.clientY
+        rightMoved = false
+      }
+
       // Only the primary mouse button starts a pick.  Right / middle drag
       // is OrbitControls pan/dolly territory; pen barrel buttons fall
       // through too (we only pick on the contact tip).
@@ -730,6 +789,15 @@ function Renderer({
     function onPointerUp(ev) {
       activePointerCount = Math.max(0, activePointerCount - 1)
       cancelLongPress()
+
+      // Right button released: a clean click (no pan) raises the context menu.
+      // Handled before the primary-pointer guard below, which would drop it —
+      // onPointerDown never claims the right button as the primary pointer.
+      if (ev.pointerType === 'mouse' && ev.button === 2) {
+        openContextMenu(ev)
+        return
+      }
+
       if (ev.pointerId !== primaryPointerId) return
       primaryPointerId = null
 
@@ -760,10 +828,48 @@ function Renderer({
       }
     }
 
+    // Suppress the browser menu inside the viewport. We do NOT open our menu
+    // here: Chromium on Linux/GTK fires `contextmenu` on mouse DOWN, before any
+    // drag has happened, so deciding here would pop the menu at the start of
+    // every right-drag pan. The decision is made on pointerup instead, once we
+    // know whether the press moved.
+    function onContextMenu(ev) {
+      ev.preventDefault()
+    }
+
+    // Right-click (press + release without moving) on an object → context menu.
+    // Object mode only; face/edge/vertex picking has its own semantics.
+    function openContextMenu(ev) {
+      if (rightMoved || modeRef.current !== 'object') return
+
+      setPointerFromEvent(ev)
+      raycaster.setFromCamera(pointer, camera)
+      const visible = meshGroup.children.filter((mm) => mm.visible)
+      const hits = raycaster.intersectObjects(visible, false)
+
+      let id = null
+      if (hits.length > 0) {
+        const hitObj = hits[0].object
+        id = hitObj.userData.id
+        if (!id && hitObj.isInstancedMesh && hitObj.userData.componentIds) {
+          id = hitObj.userData.componentIds[hits[0].instanceId] ?? null
+        }
+      }
+
+      // Right-click also selects, the way SolidWorks and Fusion do — acting on
+      // an object you haven't visibly selected is disorienting.
+      if (id) {
+        setHudId(id)
+        stateRef.current?.onPickRef?.(id)
+      }
+      stateRef.current?.onContextPickRef?.(id, ev.clientX, ev.clientY)
+    }
+
     renderer.domElement.addEventListener('pointermove', onPointerMove)
     renderer.domElement.addEventListener('pointerdown', onPointerDown)
     renderer.domElement.addEventListener('pointerup', onPointerUp)
     renderer.domElement.addEventListener('pointercancel', onPointerCancel)
+    renderer.domElement.addEventListener('contextmenu', onContextMenu)
 
     stateRef.current = {
       renderer, scene, camera, controls,
@@ -810,6 +916,7 @@ function Renderer({
       renderer.domElement.removeEventListener('pointerdown', onPointerDown)
       renderer.domElement.removeEventListener('pointerup', onPointerUp)
       renderer.domElement.removeEventListener('pointercancel', onPointerCancel)
+      renderer.domElement.removeEventListener('contextmenu', onContextMenu)
       disposeAll(stateRef.current)
       // Dispose any doc-lights spawned from docLights prop.
       for (const light of (stateRef.current?.docLightHandles ?? [])) {
@@ -838,6 +945,33 @@ function Renderer({
   useEffect(() => {
     if (stateRef.current) stateRef.current.onPickRef = onPick
   }, [onPick])
+
+  useEffect(() => {
+    if (stateRef.current) stateRef.current.onContextPickRef = onContextPick
+  }, [onContextPick])
+
+  // The mesh-build loop reads appearance through a ref (it isn't in that
+  // effect's deps — we do NOT want a colour change to tear down every mesh).
+  const appearanceRef = useRef(appearance)
+  useEffect(() => {
+    appearanceRef.current = appearance
+  }, [appearance])
+
+  // ----- Apply appearance overrides in place -----
+  // Runs on appearance changes AND after a parts rebuild (new meshes), mirroring
+  // how the selection-highlight effect below re-asserts itself.
+  useEffect(() => {
+    const s = stateRef.current
+    if (!s) return
+    for (const mesh of s.meshGroup.children) {
+      const id = mesh.userData?.id
+      if (!id || !mesh.material) continue
+      // Zebra swaps in its own material and stashes the real one; write the
+      // override to whichever will survive the toggle.
+      const target = mesh.userData._origMaterial || mesh.material
+      applyAppearance(target, appearance?.[id], mesh.userData.baseColor ?? 0xffffff)
+    }
+  }, [appearance, parts])
 
   // ----- Rebuild meshes when parts change -----
   // Only mesh + bbox are built up-front. Edge/vertex aux is deferred to
@@ -947,14 +1081,18 @@ function Renderer({
       const color = part.color != null ? part.color : PALETTE[i % PALETTE.length]
       const material = new THREE.MeshStandardMaterial({
         color,
-        metalness: 0.15,
-        roughness: 0.55,
+        metalness: BASE_METALNESS,
+        roughness: BASE_ROUGHNESS,
         flatShading: true,
         emissive: 0x000000,
       })
       const mesh = new THREE.Mesh(geometry, material)
       mesh.userData.id = part.id
       mesh.userData.kind = 'part'
+      // Remember the un-overridden colour so "reset appearance" can restore it
+      // in place; without this we'd have to rebuild the scene to recover it.
+      mesh.userData.baseColor = color
+      applyAppearance(material, appearanceRef.current?.[part.id], color)
       mesh.userData.componentId = part.componentId || null
       // Shadow flags — the contact-shadow plane grounds the model and parts
       // sharing the scene cast onto each other (intended for assemblies).
@@ -1387,6 +1525,34 @@ function Renderer({
    *     Existing DFM overlay attach/detach.
    */
   useImperativeHandle(ref, () => ({
+    /**
+     * Frame the camera on a single part ("Zoom to selection").
+     *
+     * Same maths as the auto-frame on parts-change, but over one mesh's bounds.
+     * No-ops for an unknown id (e.g. an InstancedMesh component, which has no
+     * per-instance mesh to measure).
+     */
+    zoomToPart(partId) {
+      const s = stateRef.current
+      if (!s || !partId) return
+      const mesh = s.meshGroup.children.find((m) => m.userData?.id === partId)
+      if (!mesh || !mesh.geometry) return
+
+      const box = new THREE.Box3().setFromObject(mesh)
+      if (box.isEmpty()) return
+      const center = box.getCenter(new THREE.Vector3())
+      const size = box.getSize(new THREE.Vector3())
+      const radius = Math.max(size.x, size.y, size.z) || 10
+      const dist = radius * 2.2 + 10
+
+      s.camera.position.set(center.x + dist, center.y + dist, center.z + dist * 0.8)
+      s.camera.near = Math.max(0.1, radius / 100)
+      s.camera.far = Math.max(2000, radius * 50)
+      s.camera.updateProjectionMatrix()
+      s.controls.target.copy(center)
+      s.controls.update()
+    },
+
     /**
      * Capture the rendered scene as a JPEG Blob.
      * @param {{ size?: number, quality?: number }} [opts]

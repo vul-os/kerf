@@ -34,17 +34,34 @@ function transformSource(code) {
   return src
 }
 
+// Keep in step with normalizeParts in jscadRunner.js — colors.colorize() stamps
+// geom.color as 0..1 floats, and it must be lifted onto the part or the renderer
+// never sees it (geom3ToBufferGeometry drops it).
+function geomColorToInt(geom) {
+  const c = geom && geom.color
+  if (!Array.isArray(c) || c.length < 3) return undefined
+  const ch = (v) => Math.max(0, Math.min(255, Math.round((Number(v) || 0) * 255)))
+  return (ch(c[0]) << 16) | (ch(c[1]) << 8) | ch(c[2])
+}
+
+function toPart(id, geom, explicitColor) {
+  const color = explicitColor != null ? explicitColor : geomColorToInt(geom)
+  return color != null ? { id, geom, color } : { id, geom }
+}
+
 function normalizeParts(out) {
   if (out == null) return []
   if (Array.isArray(out)) {
     if (out.length === 0) return []
     if (out[0] && typeof out[0] === 'object' && 'geom' in out[0]) {
-      return out.map((p, i) => ({ id: p.id ?? `part-${i}`, geom: p.geom }))
+      return out.map((p, i) => toPart(p.id ?? `part-${i}`, p.geom, p.color))
     }
-    return out.map((g, i) => ({ id: `part-${i}`, geom: g }))
+    return out.map((g, i) => toPart(`part-${i}`, g))
   }
-  if (typeof out === 'object' && 'geom' in out) return [{ id: out.id ?? 'part-0', geom: out.geom }]
-  return [{ id: 'part-0', geom: out }]
+  if (typeof out === 'object' && 'geom' in out) {
+    return [toPart(out.id ?? 'part-0', out.geom, out.color)]
+  }
+  return [toPart('part-0', out)]
 }
 
 const SCOPE_KEYS = [

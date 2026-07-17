@@ -96,17 +96,15 @@ const PCBEditor = lazy(() => import('./routes/PCBEditor.jsx'))
 const GmatViewer = lazy(() => import('./routes/GmatViewer.jsx'))
 const SchematicEditor = lazy(() => import('./routes/SchematicEditor.jsx'))
 
-// Cloud surface — these come from the cloud/ open-core split and may be
-// stubs on OSS builds. useCloudConfig stays eager (we need it before any
-// route renders) but is imported from its own file so the cloud-index
-// barrel doesn't end up in the initial chunk; the route components
-// themselves lazy-import their own modules and become their own chunks.
+// Node-capability surface — Workshop (distributed DMTAP-PUB feeds) is a
+// core MIT capability and is never gated on cloudEnabled; only AdminEmail
+// still is. useCloudConfig stays eager (we need it before any route
+// renders) but is imported from its own file so the rest of cloud/ doesn't
+// end up in the initial chunk; the route components themselves lazy-import
+// their own modules and become their own chunks.
 import { useCloudConfig } from './cloud/useCloudConfig.js'
 const Workshop = lazy(() =>
   import('./cloud/Workshop.jsx').then((m) => ({ default: m.Workshop })),
-)
-const WorkshopListing = lazy(() =>
-  import('./cloud/WorkshopListing.jsx').then((m) => ({ default: m.WorkshopListing })),
 )
 const AdminEmail = lazy(() => import('./cloud/AdminEmail.jsx'))
 
@@ -228,10 +226,9 @@ export default function App() {
       <Route path="/compare/:slug" element={<CompareMdRoute />} />
       {/* Cross-tool domain matrix pages */}
       <Route path="/compare/by-domain/:slug" element={<CompareByDomain />} />
-      {cloudEnabled && <Route path="/workshop" element={<Workshop />} />}
-      {cloudEnabled && (
-        <Route path="/workshop/:slug" element={<WorkshopListing />} />
-      )}
+      {/* Workshop is the distributed DMTAP-PUB feed browser — a core MIT
+          node capability, never gated behind cloudEnabled. */}
+      <Route path="/workshop" element={<Workshop />} />
       <Route path="/domains/jewelry" element={<JewelryDomainPage />} />
       <Route path="/jewelry-configurator" element={<JewelryConfigurator />} />
       <Route path="/share/:token" element={<JewelryShare />} />

@@ -193,61 +193,9 @@ describe('cover URL resolution', () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// 5. Publish flow — gallery is optional (no validation error)
-// ---------------------------------------------------------------------------
-
-describe('publish flow — gallery is optional', () => {
-  // We test the API client shape to ensure publish() can be called with
-  // zero gallery images (the API body does not include gallery image count).
-  it('workshop.publish body does not require gallery images', () => {
-    // The publish function should accept {projectId, title, description}
-    // without any gallery-image field.
-    const buildBody = ({ projectId, title, description, readme, generateReadme = true }) => ({
-      project_id: projectId,
-      title: title || '',
-      description: description || '',
-      ...(readme != null ? { readme } : {}),
-      generate_readme: generateReadme,
-    })
-
-    const body = buildBody({ projectId: 'abc', title: 'My Part', description: '' })
-    // No gallery_images key in the body.
-    expect(body).not.toHaveProperty('gallery_images')
-    expect(body.project_id).toBe('abc')
-  })
-
-  it('workshop.publish body passes readme override when supplied', () => {
-    const buildBody = ({ projectId, title, description, readme, generateReadme = true }) => ({
-      project_id: projectId,
-      title: title || '',
-      description: description || '',
-      ...(readme != null ? { readme } : {}),
-      generate_readme: generateReadme,
-    })
-
-    const body = buildBody({
-      projectId: 'abc',
-      title: 'T',
-      description: '',
-      readme: '# Custom README',
-      generateReadme: false,
-    })
-    expect(body.readme).toBe('# Custom README')
-    expect(body.generate_readme).toBe(false)
-  })
-
-  it('workshop.publish body defaults generate_readme to true', () => {
-    const buildBody = ({ projectId, title, description, readme, generateReadme = true }) => ({
-      project_id: projectId,
-      title: title || '',
-      description: description || '',
-      ...(readme != null ? { readme } : {}),
-      generate_readme: generateReadme,
-    })
-
-    const body = buildBody({ projectId: 'abc', title: '', description: '' })
-    expect(body.generate_readme).toBe(true)
-    expect(body).not.toHaveProperty('readme')
-  })
-})
+// Section 5 (publish flow / gallery-optional) tested the retired
+// account-based workshop.publish({title, description, readme, ...}) body
+// shape. The Workshop is now a distributed DMTAP-PUB feed browser
+// (decisions.md 2026-07-17 "Final form" ADR) — publishing goes through
+// pub.publish({projectId, metadata}) instead; see
+// src/cloud/__tests__/PublishButton.test.jsx for its coverage.

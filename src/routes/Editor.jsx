@@ -1813,8 +1813,13 @@ export default function Editor() {
                 {thumbToast}
               </span>
             )}
-            <PublishButton project={w.project} captureSnapshot={captureSnapshotFn} />
           </>
+        )}
+        {/* Publish is a core MIT node capability (distributed Workshop over
+            DMTAP-PUB) — never gated on cloudEnabled. Thumbnail refresh above
+            stays cloud-gated; it's an unrelated hosted-project convenience. */}
+        {w.project && (
+          <PublishButton project={w.project} captureSnapshot={captureSnapshotFn} />
         )}
 
         {/* T-L2 Share: visible ≥ lg; collapses into overflow at < lg */}
@@ -2967,20 +2972,20 @@ export default function Editor() {
             >
               <ActivityIcon size={12} /> Activity
             </button>
-            {cloudEnabled && (
-              <button
-                type="button"
-                data-testid="right-drawer-tab-git"
-                onClick={() => setRightDrawerTab('git')}
-                className={`flex items-center gap-1.5 px-4 h-10 text-[11px] uppercase tracking-wider font-medium border-b-2 transition-colors ${
-                  rightDrawer.tab === 'git'
-                    ? 'border-kerf-300 text-kerf-300'
-                    : 'border-transparent text-ink-400 hover:text-ink-200'
-                }`}
-              >
-                <GitBranch size={12} /> Git
-              </button>
-            )}
+            {/* Git panel is a core MIT node capability (local git only, no
+                OAuth) — never gated on cloudEnabled. */}
+            <button
+              type="button"
+              data-testid="right-drawer-tab-git"
+              onClick={() => setRightDrawerTab('git')}
+              className={`flex items-center gap-1.5 px-4 h-10 text-[11px] uppercase tracking-wider font-medium border-b-2 transition-colors ${
+                rightDrawer.tab === 'git'
+                  ? 'border-kerf-300 text-kerf-300'
+                  : 'border-transparent text-ink-400 hover:text-ink-200'
+              }`}
+            >
+              <GitBranch size={12} /> Git
+            </button>
             <button
               type="button"
               data-testid="right-drawer-tab-fea"
@@ -3029,7 +3034,7 @@ export default function Editor() {
             {rightDrawer.tab === 'activity' && projectId && (
               <ActivityTimelineBody projectId={projectId} />
             )}
-            {rightDrawer.tab === 'git' && cloudEnabled && projectId && (
+            {rightDrawer.tab === 'git' && projectId && (
               <GitPanel
                 projectId={projectId}
                 onClose={() => closeRightDrawer()}

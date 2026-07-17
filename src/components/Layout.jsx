@@ -6,7 +6,6 @@ import { LogoWordmark } from './Logo.jsx'
 import WorkspaceSwitcher from './WorkspaceSwitcher.jsx'
 import { useAuth } from '../store/auth.js'
 import { useWorkspaces } from '../store/workspaces.js'
-import { useCloudConfig } from '../cloud/useCloudConfig.js'
 import { api } from '../lib/api.js'
 
 function initials(name = '', email = '') {
@@ -202,7 +201,6 @@ export default function Layout({ children, wide = false, padded = true }) {
   const setUser = useAuth((s) => s.setUser)
   const logout = useAuth((s) => s.logout)
   const currentWorkspaceSlug = useWorkspaces((s) => s.currentSlug)
-  const { cloudEnabled } = useCloudConfig()
   const fetchedRef = useRef(false)
 
   // Hydrate user once if we have a token but no profile yet.
@@ -271,20 +269,18 @@ export default function Layout({ children, wide = false, padded = true }) {
                 Docs
               </Link>
             </nav>
-            {/* Cloud top-nav: Workshop hosts the project showcase (hosted
-                multi-user sharing — cloud-only, gated on `cloudEnabled`).
+            {/* Top-nav: Workshop is the distributed DMTAP-PUB feed browser —
+                a core MIT node capability, never gated on `cloudEnabled`.
                 Library hosts the parts catalog, a design capability that is
-                never gated — it works identically self-hosted. */}
+                also never gated — both work identically self-hosted. */}
             {accessToken && (
               <nav className="hidden sm:flex items-center gap-1 mr-1">
-                {cloudEnabled && (
-                  <Link
-                    to="/workshop"
-                    className="text-xs text-ink-300 hover:text-ink-100 px-2 py-1 rounded-md hover:bg-ink-800/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
-                  >
-                    Workshop
-                  </Link>
-                )}
+                <Link
+                  to="/workshop"
+                  className="text-xs text-ink-300 hover:text-ink-100 px-2 py-1 rounded-md hover:bg-ink-800/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
+                >
+                  Workshop
+                </Link>
                 <Link
                   to="/library"
                   className="text-xs text-ink-300 hover:text-ink-100 px-2 py-1 rounded-md hover:bg-ink-800/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"

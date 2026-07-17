@@ -32,7 +32,6 @@ import { extractBoardOutline } from '../lib/circuitOutline.js'
 import { sketchToGeom2 } from '../lib/sketchGeom2.js'
 import { meshCache } from '../lib/meshCache.js'
 import { subdToBufferGeometry, meshDocToBufferGeometry } from '../lib/subdToBufferGeometry.js'
-import { git as gitApi } from '../cloud/api.js'
 import { stash as l1Stash, markFlushed as l1MarkFlushed, listUnflushed as l1ListUnflushed } from '../lib/localStash.js'
 import { markDirty as schedulerMarkDirty } from '../lib/autosaveScheduler.js'
 
@@ -295,20 +294,14 @@ const initial = {
   // `tab` is the last-active tab so re-opening returns to where the user was.
   rightDrawer: { open: false, tab: 'chat' },
 
-  // ---- Git (cloud-only) ----
-  // Owned by the GitPanel. `gitRepoState` is 'unknown' until we probe; the
-  // panel renders an empty-state CTA when it's 'absent' and the graph + branch
-  // selector when 'ready'. `gitError` surfaces the last failed op as an inline
-  // banner — the panel has its own dedicated real estate, so we deliberately
-  // don't route git failures through the global `toast` channel.
-  // NOTE: `gitOpen` is a backward-compat derived getter — see openGitPanel().
+  // ---- Git drawer-tab plumbing ----
+  // `gitOpen` only tracks whether the right-drawer's Git tab is the active
+  // one — see openGitPanel()/closeGitPanel() below. GitPanel.jsx (a core MIT
+  // node capability as of decisions.md's 2026-07-17 "local git only; no
+  // OAuth" addendum) owns its own local git state directly against
+  // src/cloud/api.js's `git` client and no longer reads/writes store state;
+  // there is nothing else git-related in this store.
   gitOpen: false,
-  gitRepoState: 'unknown',
-  gitBranch: '',
-  gitBranches: [],
-  gitCommits: [],
-  gitLoading: false,
-  gitError: null,
 
   // ---- Activity timeline ----
   // Slide-out panel showing the merged event feed for a project. Lazily
@@ -3064,11 +3057,6 @@ export const useWorkspace = create((set, get) => ({
     }
   },
 
-  // ---- Git actions ----
-  // The GitPanel drives these. We don't auto-load on project open: the panel
-  // calls loadGitState() on mount, so projects without a backing repo never
-  // pay the round-trip cost when the user doesn't open the panel.
-
   // ---- Unified right-drawer actions ----
   // All three panel buttons (chat, activity, git) funnel into these.
   openRightDrawer: (tab) => {
@@ -3106,183 +3094,6 @@ export const useWorkspace = create((set, get) => ({
     set({ gitOpen: false })
     const rd = get().rightDrawer
     if (rd.tab === 'git') set({ rightDrawer: { ...rd, open: false } })
-  },
-  dismissGitError: () => set({ gitError: null }),
-
-  // Probe /branches; on 404 we mark the repo absent (empty-state UI). On
-  // success we pick the current branch (default if available, else first)
-  // and follow up with /log for that branch. Subsequent calls reuse the
-  // existing branch unless it disappeared from the list.
-  loadGitState: async () => {
-    const { projectId, gitBranch } = get()
-    if (!projectId) return
-    set({ gitLoading: true, gitError: null })
-    try {
-      const branches = await gitApi.branches(projectId)
-      const list = Array.isArray(branches) ? branches : []
-      const current = list.find((b) => b.name === gitBranch)
-        || list.find((b) => b.is_default)
-        || list[0]
-      const branchName = current?.name || ''
-      set({
-        gitBranches: list,
-        gitBranch: branchName,
-        gitRepoState: 'ready',
-      })
-      if (branchName) {
-        const commits = await gitApi.log(projectId, branchName, 50)
-        set({ gitCommits: Array.isArray(commits) ? commits : [] })
-      } else {
-        set({ gitCommits: [] })
-      }
-      set({ gitLoading: false })
-    } catch (err) {
-      // 404 → no repo yet (the panel's empty state takes over). Other errors
-      // surface as inline banners and leave repoState alone so a transient
-      // failure doesn't blow away an already-loaded view.
-      if (err instanceof ApiError && err.status === 404) {
-        set({
-          gitRepoState: 'absent',
-          gitBranches: [],
-          gitBranch: '',
-          gitCommits: [],
-          gitLoading: false,
-          gitError: null,
-        })
-      } else {
-        set({
-          gitLoading: false,
-          gitError: err?.message || 'Could not load git state.',
-        })
-      }
-    }
-  },
-
-  switchBranch: async (name, { force = false } = {}) => {
-    const { projectId } = get()
-    if (!projectId || !name) return
-    set({ gitLoading: true, gitError: null })
-    try {
-      await gitApi.checkout(projectId, name, force)
-      set({ gitBranch: name })
-      // Refresh commits for the new branch + the file tree (server may have
-      // swapped contents on the server side; local cached file content is
-      // stale on the next selectFile).
-      const commits = await gitApi.log(projectId, name, 50)
-      set({ gitCommits: Array.isArray(commits) ? commits : [], gitLoading: false })
-      try {
-        const files = await api.listFiles(projectId)
-        set({ files })
-        // Reload current file content if it still exists, otherwise the
-        // user will see the next file when they click around.
-        const fid = get().currentFileId
-        if (fid && files.some((f) => f.id === fid)) {
-          await get().loadFileForEditor(fid)
-        }
-      } catch { /* tolerate */ }
-    } catch (err) {
-      // 409 with has_uncommitted: confirm and force.
-      if (err instanceof ApiError && err.status === 409) {
-        set({ gitLoading: false })
-        if (typeof window !== 'undefined' && window.confirm(
-          'You have uncommitted changes. Switch anyway and discard them?',
-        )) {
-          await get().switchBranch(name, { force: true })
-          return
-        }
-      }
-      set({
-        gitLoading: false,
-        gitError: err instanceof ApiError ? err.message : 'Checkout failed.',
-      })
-    }
-  },
-
-  gitCommit: async (message, branch) => {
-    const { projectId } = get()
-    if (!projectId || !message) return
-    set({ gitError: null })
-    try {
-      const res = await gitApi.commit(projectId, message, branch || undefined)
-      await get().loadGitState()
-      // After a commit the file tree might have new sha-anchored content;
-      // we rely on the user's next interaction to refresh the open file.
-      return res
-    } catch (err) {
-      set({ gitError: err instanceof ApiError ? err.message : 'Commit failed.' })
-      throw err
-    }
-  },
-
-  gitPush: async () => {
-    const { projectId } = get()
-    if (!projectId) return
-    set({ gitError: null })
-    try {
-      await gitApi.push(projectId)
-      set({ toast: 'Pushed to GitHub' })
-    } catch (err) {
-      set({ gitError: err instanceof ApiError ? err.message : 'Push failed.' })
-    }
-  },
-
-  gitPull: async (branch) => {
-    const { projectId, gitBranch } = get()
-    if (!projectId) return
-    set({ gitError: null })
-    try {
-      await gitApi.pull(projectId, branch || gitBranch)
-      await get().loadGitState()
-      const fid = get().currentFileId
-      if (fid) await get().loadFileForEditor(fid)
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
-        // Diverged history — the backend hands back {ahead, behind}. We
-        // surface a hint and stop short of forcing.
-        let msg = 'Branches diverged — push or rebase before pulling.'
-        try {
-          const parsed = JSON.parse(err.message)
-          if (parsed && (parsed.ahead != null || parsed.behind != null)) {
-            msg = `Diverged (${parsed.ahead ?? '?'} ahead / ${parsed.behind ?? '?'} behind). Push or merge first.`
-          }
-        } catch { /* ignore */ }
-        set({ gitError: msg })
-      } else {
-        set({ gitError: err instanceof ApiError ? err.message : 'Pull failed.' })
-      }
-    }
-  },
-
-  gitMerge: async (from_branch, into_branch) => {
-    const { projectId } = get()
-    if (!projectId) return
-    set({ gitError: null })
-    try {
-      const res = await gitApi.merge(projectId, from_branch, into_branch)
-      await get().loadGitState()
-      return res
-    } catch (err) {
-      // Conflicts are handled in the MergeDialog itself (it parses the 409).
-      set({ gitError: err instanceof ApiError ? err.message : 'Merge failed.' })
-      throw err
-    }
-  },
-
-  gitDelete: async () => {
-    const { projectId } = get()
-    if (!projectId) return
-    set({ gitError: null })
-    try {
-      await gitApi.deleteRepo(projectId)
-      set({
-        gitRepoState: 'absent',
-        gitBranches: [],
-        gitBranch: '',
-        gitCommits: [],
-      })
-    } catch (err) {
-      set({ gitError: err instanceof ApiError ? err.message : 'Delete failed.' })
-    }
   },
 
   // ---- Activity timeline ----

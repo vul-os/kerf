@@ -1,369 +1,444 @@
-// PublishButton — toolbar drop-in for the editor.
+// PublishButton — toolbar drop-in for the editor. Publishes a project to
+// the distributed Workshop over DMTAP-PUB (decisions.md's 2026-07-17
+// "Final form" ADR; docs/distributed-workshop.md).
 //
-// T-44: updated publish flow:
-//   - README preview / edit with "Regenerate with AI" action.
-//   - Gallery upload is now OPTIONAL (not required to publish).
-//   - On publish, the backend AI-generates a README by default; the author
-//     can view and edit the draft before submitting.
+// Flow:
+//   1. Check for a local publishing identity (Ed25519 keypair). If absent,
+//      prompt to create one first — it signs every publish and is not an
+//      account with anyone.
+//   2. Collect metadata: name, description, artifact kind, SPDX license
+//      (required), length unit (required, mm default), tags.
+//   3. Explicit confirmation step warning that publishing is irrevocable —
+//      normative client MUST per dmtap §22.7 — before the actual publish
+//      call fires.
+//   4. Show the resulting announce_id on success.
 //
-// Caller hands us a `project` (id + name + visibility, at minimum). On
-// click, we open a modal collecting title, description, and an optional
-// README override, then POST to /api/workshop/publish. If the project is
-// already listed, the button shows "Unpublish" instead.
+// There is no "Unpublish" — once published, an object may be swarmed to
+// other holders and there is no protocol-level takedown (see
+// docs/distributed-workshop.md "Publishing is irrevocable"). Superseding or
+// deprecating a mistake is a future publish, not a delete.
 
-import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import {
-  AlertCircle,
-  BookOpen,
-  ChevronDown,
-  ChevronUp,
-  Globe,
-  Loader2,
-  RefreshCw,
-  RotateCcw,
-  Sparkles,
-  X,
+  AlertCircle, Check, Copy, Globe, KeyRound, Loader2, ShieldAlert,
 } from 'lucide-react'
+import Modal from '../components/Modal.jsx'
 import Button from '../components/Button.jsx'
 import Input, { Textarea } from '../components/Input.jsx'
-import { api, ApiError } from '../lib/api.js'
-import { workshop } from './api.js'
+import { ApiError } from '../lib/api.js'
+import { pub } from './api.js'
 
-// PublishModal — collect title/description/readme, then POST /workshop/publish.
-// captureSnapshot: optional async () => Blob|null (from Editor currentViewRef).
-function PublishModal({ open, onClose, project, onPublished, captureSnapshot }) {
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [readmeDraft, setReadmeDraft] = useState(null)   // null = use AI default
-  const [readmeEditing, setReadmeEditing] = useState(false)
-  const [readmeExpanded, setReadmeExpanded] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState(null)
-  const [thumbRefreshing, setThumbRefreshing] = useState(false)
-  const [thumbToast, setThumbToast] = useState(null)
-  const [generating, setGenerating] = useState(false)
-  const [generateError, setGenerateError] = useState(null)
-  const toastTimerRef = useRef(null)
+const KIND_OPTIONS = [
+  { value: 'part', label: 'Part' },
+  { value: 'assembly', label: 'Assembly' },
+  { value: 'pcb', label: 'PCB' },
+  { value: 'schematic', label: 'Schematic' },
+  { value: 'drawing', label: 'Drawing' },
+  { value: 'dataset', label: 'Dataset' },
+  { value: 'doc', label: 'Doc' },
+]
 
-  useEffect(() => {
-    if (!open) return
-    setTitle(project?.name || '')
-    setDescription(project?.description || '')
-    setReadmeDraft(null)
-    setReadmeEditing(false)
-    setReadmeExpanded(false)
-    setError(null)
-    setGenerateError(null)
-    setSubmitting(false)
-    setThumbToast(null)
-  }, [open, project?.id, project?.name, project?.description])
+// Common SPDX identifiers relevant to hardware/CAD publishing, per
+// docs/distributed-workshop.md ("CERN-OHL for hardware, MIT/Apache-2.0 for
+// accompanying software/firmware, CC-BY/CC0 for docs, and more"). A free-text
+// fallback covers anything not on this shortlist — the field is a required
+// SPDX *expression*, not constrained to this exact set.
+const LICENSE_OPTIONS = [
+  'CERN-OHL-S-2.0',
+  'CERN-OHL-W-2.0',
+  'CERN-OHL-P-2.0',
+  'MIT',
+  'Apache-2.0',
+  'GPL-3.0-only',
+  'CC-BY-4.0',
+  'CC-BY-SA-4.0',
+  'CC0-1.0',
+]
+const CUSTOM_LICENSE = '__custom__'
 
-  const onRefreshThumbnail = async () => {
-    if (!captureSnapshot || thumbRefreshing || !project?.id) return
-    setThumbRefreshing(true)
+const UNIT_OPTIONS = ['mm', 'cm', 'm', 'in', 'ft']
+
+const IRREVOCABLE_WARNING =
+  'Publishing is public and irrevocable — a published artifact cannot be unpublished.'
+
+export function IdentityStep({ identityError, creating, onCreate }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-start gap-2.5 rounded-lg border border-ink-800 bg-ink-850/40 p-4">
+        <KeyRound size={16} className="mt-0.5 text-kerf-300 shrink-0" />
+        <div className="text-sm text-ink-300 leading-relaxed">
+          Publishing signs an announcement with your identity key so anyone
+          can verify you as the publisher. This isn&apos;t an account with
+          anyone — it&apos;s a local Ed25519 keypair kept on this node.
+        </div>
+      </div>
+      {identityError && (
+        <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+          <AlertCircle size={14} className="mt-0.5 shrink-0" />
+          <span>{identityError}</span>
+        </div>
+      )}
+      <Button variant="primary" size="md" onClick={onCreate} disabled={creating} className="self-start">
+        {creating
+          ? <><Loader2 size={14} className="animate-spin" /> Creating…</>
+          : <><KeyRound size={14} /> Create your publishing identity</>}
+      </Button>
+    </div>
+  )
+}
+
+export function IdentityCreatedStep({ pubKey, onContinue }) {
+  const [copied, setCopied] = useState(false)
+  const onCopy = async () => {
     try {
-      const blob = await captureSnapshot({ size: 512, quality: 0.7 })
-      if (blob) {
-        await api.uploadProjectThumbnail(project.id, blob)
-        if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
-        setThumbToast('Thumbnail updated')
-        toastTimerRef.current = setTimeout(() => setThumbToast(null), 3000)
-      }
-    } catch (err) {
-      console.warn('[PublishModal] thumbnail refresh failed', err)
-    } finally {
-      setThumbRefreshing(false)
-    }
+      await navigator.clipboard.writeText(pubKey)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch { /* clipboard unavailable — the key is still shown inline */ }
   }
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-start gap-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
+        <Check size={16} className="mt-0.5 text-emerald-300 shrink-0" />
+        <div className="text-sm text-emerald-100 leading-relaxed">
+          Publishing identity created. This key signs everything you publish
+          from this node — <strong>back it up</strong>; there is no account
+          recovery for it.
+        </div>
+      </div>
+      <div className="flex items-center gap-2 rounded-lg bg-ink-950 border border-ink-800 px-3 py-2">
+        <code className="flex-1 text-xs font-mono text-ink-200 break-all">{pubKey}</code>
+        <button
+          type="button"
+          onClick={onCopy}
+          className="p-1.5 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800 shrink-0"
+          title="Copy to clipboard"
+        >
+          {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+        </button>
+      </div>
+      <Button variant="primary" size="md" onClick={onContinue} className="self-start">
+        Continue to publish
+      </Button>
+    </div>
+  )
+}
 
-  // Fetch an AI-generated README preview before final publish.
-  // We call /workshop/regenerate-readme on the project — this requires the
-  // project to already exist (it always does by the time Publish is clicked).
-  // The pre-generated draft is stored locally in readmeDraft; on submit it is
-  // sent as the explicit readme= override so the backend doesn't regenerate.
-  const onPreviewReadme = async () => {
-    if (!project?.id || generating) return
-    setGenerating(true)
-    setGenerateError(null)
-    try {
-      const res = await workshop.regenerateReadme(project.id)
-      setReadmeDraft(res.readme || '')
-      setReadmeExpanded(true)
-    } catch (err) {
-      setGenerateError(err instanceof ApiError ? err.message : 'Could not generate README.')
-    } finally {
-      setGenerating(false)
-    }
-  }
-
-  if (!open) return null
-
-  const onSubmit = async (e) => {
-    e?.preventDefault?.()
-    if (submitting) return
-    setSubmitting(true)
-    setError(null)
-    try {
-      const res = await workshop.publish({
-        projectId: project.id,
-        title: title.trim() || project?.name || '',
-        description: description.trim(),
-        // If the user edited or previewed the README, send it explicitly so the
-        // backend skips re-generation. Otherwise let the backend AI-generate it.
-        ...(readmeDraft != null ? { readme: readmeDraft, generateReadme: false } : {}),
-      })
-      onPublished(res)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Publish failed.')
-      setSubmitting(false)
-    }
-  }
-
-  const willBePrivate = project?.visibility === 'private'
-  const hasReadmeDraft = readmeDraft != null
+export function MetadataStep({ form, setForm, error, onContinue }) {
+  const licenseIsCustom = form.licensePreset === CUSTOM_LICENSE
+  const valid = form.name.trim() && (licenseIsCustom ? form.licenseCustom.trim() : form.licensePreset) && form.units
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center px-4">
-      <div className="absolute inset-0 bg-ink-950/80 backdrop-blur-sm" onClick={onClose} aria-hidden />
-      <div className="relative w-full max-w-2xl bg-ink-900 border border-ink-800 rounded-2xl shadow-2xl shadow-black/50 max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-ink-800 flex-shrink-0">
-          <h2 className="font-display text-lg font-semibold tracking-tight">Publish to workshop</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-ink-400 hover:text-ink-100"
-            aria-label="Close"
+    <form
+      onSubmit={(e) => { e.preventDefault(); if (valid) onContinue() }}
+      className="flex flex-col gap-4"
+    >
+      <Input
+        label="Name"
+        value={form.name}
+        onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+        required
+      />
+      <Textarea
+        label="Description"
+        rows={3}
+        value={form.description}
+        onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+        placeholder="What is it? Who's it for?"
+      />
+
+      <div className="grid grid-cols-2 gap-3">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-ink-200 tracking-wide uppercase">Kind</span>
+          <select
+            value={form.kind}
+            onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value }))}
+            className="h-10 rounded-lg bg-ink-900 border border-ink-700 px-3 text-sm text-ink-100 focus:outline-none focus:border-kerf-300 focus:ring-4 focus:ring-kerf-300/20"
           >
-            <X size={16} />
-          </button>
-        </div>
-        <form onSubmit={onSubmit} className="p-5 flex flex-col gap-4 overflow-y-auto">
-          <p className="text-sm text-ink-300">
-            Anyone will be able to browse this listing, like it, and fork their
-            own copy. You stay the owner of the original project.
-          </p>
-          {willBePrivate && (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-              <AlertCircle size={14} className="mt-0.5 shrink-0" />
-              <span>
-                This project is private. Set its visibility to{' '}
-                <span className="font-mono">unlisted</span> or{' '}
-                <span className="font-mono">public</span> before publishing.
-              </span>
-            </div>
-          )}
-          <Input
-            label="Title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder={project?.name || 'Cool bracket'}
-            required
-          />
-          <Textarea
-            label="Description"
-            rows={3}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="What is it? Who's it for?"
-          />
-
-          {/* ---- README section ---- */}
-          <div className="flex flex-col gap-2 rounded-lg border border-ink-800 bg-ink-950/40 p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs font-medium text-ink-200">
-                <BookOpen size={13} className="text-kerf-300" />
-                README
-                <span className="font-mono text-[10px] text-kerf-300 bg-kerf-300/10 border border-kerf-300/20 rounded px-1.5 py-0.5">
-                  AI-generated on publish
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                {hasReadmeDraft && (
-                  <button
-                    type="button"
-                    onClick={() => setReadmeEditing((v) => !v)}
-                    className="text-xs text-ink-400 hover:text-ink-200 flex items-center gap-1"
-                  >
-                    {readmeEditing ? 'Done editing' : 'Edit'}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={onPreviewReadme}
-                  disabled={generating}
-                  className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded bg-ink-800 border border-ink-700 text-ink-200 hover:bg-ink-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {generating
-                    ? <><Loader2 size={11} className="animate-spin" /> Generating…</>
-                    : hasReadmeDraft
-                      ? <><RefreshCw size={11} /> Regenerate</>
-                      : <><Sparkles size={11} /> Preview README</>}
-                </button>
-                {hasReadmeDraft && (
-                  <button
-                    type="button"
-                    onClick={() => setReadmeExpanded((v) => !v)}
-                    className="text-ink-400 hover:text-ink-200"
-                    aria-label={readmeExpanded ? 'Collapse README' : 'Expand README'}
-                  >
-                    {readmeExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {generateError && (
-              <div className="flex items-start gap-2 rounded border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-200">
-                <AlertCircle size={12} className="mt-0.5 shrink-0" />
-                <span>{generateError}</span>
-              </div>
-            )}
-
-            {!hasReadmeDraft && (
-              <p className="text-[11px] text-ink-500">
-                A README will be auto-generated from your project parameters, BOM, and parts on publish.
-                Click &ldquo;Preview README&rdquo; to see and edit the draft first.
-              </p>
-            )}
-
-            {hasReadmeDraft && readmeExpanded && (
-              readmeEditing ? (
-                <Textarea
-                  rows={12}
-                  value={readmeDraft}
-                  onChange={(e) => setReadmeDraft(e.target.value)}
-                  className="font-mono text-xs"
-                  aria-label="README editor"
-                />
-              ) : (
-                <div className="max-h-48 overflow-y-auto rounded bg-ink-900 border border-ink-800 p-3">
-                  <pre className="text-[11px] text-ink-300 whitespace-pre-wrap font-mono leading-relaxed">
-                    {readmeDraft}
-                  </pre>
-                </div>
-              )
-            )}
-          </div>
-
-          {/* ---- Thumbnail & gallery (gallery is optional) ---- */}
-          {project?.id && (
-            <div className="pt-1 flex flex-col gap-3">
-              {captureSnapshot && (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={onRefreshThumbnail}
-                    disabled={thumbRefreshing}
-                    className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded bg-ink-800 border border-ink-700 text-ink-200 hover:bg-ink-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {thumbRefreshing
-                      ? <><Loader2 size={12} className="animate-spin" /> Refreshing…</>
-                      : <><RotateCcw size={12} /> Refresh thumbnail</>}
-                  </button>
-                  {thumbToast && (
-                    <span className="text-xs text-emerald-400 font-mono">{thumbToast}</span>
-                  )}
-                </div>
-              )}
-              {/* Files-in-repo: gallery + 3D model come from the project
-                  itself (GitHub-style), not a separate uploader. */}
-              <div>
-                <p className="text-xs text-ink-400 mb-2">
-                  Gallery &amp; 3D <span className="text-ink-600">(optional)</span>
-                </p>
-                <p className="text-[11px] leading-relaxed text-ink-500 rounded-lg border border-ink-800 bg-ink-900/50 px-3 py-2">
-                  Add a <code className="text-ink-300">workshop/</code> folder
-                  to this project: image files there show in the gallery, and a
-                  model file (e.g. <code className="text-ink-300">workshop.jscad</code>)
-                  becomes the 3D view. A <code className="text-ink-300">cover.png</code>
-                  overrides the auto-generated cover.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {error && (
-            <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
-              <AlertCircle size={14} className="mt-0.5 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-          <button type="submit" className="hidden" />
-        </form>
-        <div className="px-5 py-4 border-t border-ink-800 flex justify-end gap-2">
-          <Button variant="ghost" size="md" onClick={onClose} disabled={submitting}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            size="md"
-            onClick={onSubmit}
-            disabled={submitting || willBePrivate}
+            {KIND_OPTIONS.map((k) => (
+              <option key={k.value} value={k.value}>{k.label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-ink-200 tracking-wide uppercase">Length unit</span>
+          <select
+            value={form.units}
+            onChange={(e) => setForm((f) => ({ ...f, units: e.target.value }))}
+            className="h-10 rounded-lg bg-ink-900 border border-ink-700 px-3 text-sm text-ink-100 focus:outline-none focus:border-kerf-300 focus:ring-4 focus:ring-kerf-300/20"
           >
-            {submitting ? (
-              <>
-                <Loader2 size={14} className="animate-spin" /> Publishing…
-              </>
-            ) : (
-              <>
-                <Globe size={14} /> Publish
-              </>
-            )}
-          </Button>
+            {UNIT_OPTIONS.map((u) => (
+              <option key={u} value={u}>{u}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-ink-200 tracking-wide uppercase">
+          License <span className="text-red-400">*</span>
+        </span>
+        <select
+          value={form.licensePreset}
+          onChange={(e) => setForm((f) => ({ ...f, licensePreset: e.target.value }))}
+          className="h-10 rounded-lg bg-ink-900 border border-ink-700 px-3 text-sm text-ink-100 focus:outline-none focus:border-kerf-300 focus:ring-4 focus:ring-kerf-300/20"
+        >
+          <option value="">Choose a license…</option>
+          {LICENSE_OPTIONS.map((l) => (
+            <option key={l} value={l}>{l}</option>
+          ))}
+          <option value={CUSTOM_LICENSE}>Other SPDX expression…</option>
+        </select>
+      </label>
+      {licenseIsCustom && (
+        <Input
+          label="SPDX expression"
+          placeholder="e.g. TAPR-OHL-1.0"
+          value={form.licenseCustom}
+          onChange={(e) => setForm((f) => ({ ...f, licenseCustom: e.target.value }))}
+        />
+      )}
+
+      <Input
+        label="Tags (comma-separated)"
+        placeholder="bracket, 3d-printed, m3"
+        value={form.tagsRaw}
+        onChange={(e) => setForm((f) => ({ ...f, tagsRaw: e.target.value }))}
+      />
+
+      {error && (
+        <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+          <AlertCircle size={14} className="mt-0.5 shrink-0" />
+          <span>{error}</span>
         </div>
+      )}
+
+      <Button type="submit" variant="primary" size="md" disabled={!valid} className="self-start">
+        Continue
+      </Button>
+    </form>
+  )
+}
+
+export function ConfirmStep({ form, submitting, error, onBack, onConfirm }) {
+  const [ack, setAck] = useState(false)
+  return (
+    <div className="flex flex-col gap-4">
+      <div
+        className="flex items-start gap-2.5 rounded-lg border border-red-500/40 bg-red-500/10 p-4"
+        role="alert"
+        data-testid="irrevocable-warning"
+      >
+        <ShieldAlert size={18} className="mt-0.5 text-red-300 shrink-0" />
+        <p className="text-sm text-red-100 leading-relaxed font-medium">
+          {IRREVOCABLE_WARNING}
+        </p>
+      </div>
+      <p className="text-xs text-ink-400 leading-relaxed">
+        As soon as any other node holds a copy, there is no mechanism —
+        protocol-level or otherwise — to force that copy to disappear. You
+        can publish a corrected revision later (supersede) or mark this one
+        deprecated, but you cannot delete it from the network.
+      </p>
+      <label className="flex items-center gap-2.5 text-sm text-ink-200 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={ack}
+          onChange={(e) => setAck(e.target.checked)}
+          className="w-4 h-4 rounded border-ink-600 bg-ink-900 text-kerf-300 focus:ring-kerf-300/40"
+          data-testid="irrevocable-ack-checkbox"
+        />
+        I understand this cannot be undone.
+      </label>
+      {error && (
+        <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+          <AlertCircle size={14} className="mt-0.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="md" onClick={onBack} disabled={submitting}>
+          Back
+        </Button>
+        <Button
+          variant="primary"
+          size="md"
+          onClick={onConfirm}
+          disabled={!ack || submitting}
+          data-testid="confirm-publish-button"
+        >
+          {submitting
+            ? <><Loader2 size={14} className="animate-spin" /> Publishing…</>
+            : <><Globe size={14} /> Publish permanently</>}
+        </Button>
       </div>
     </div>
   )
 }
 
-// captureSnapshot: optional async () => Blob|null, forwarded from the Editor's
-// currentViewRef.snapshot(). When absent, the "Refresh thumbnail" affordance
-// in the modal is hidden.
-export function PublishButton({ project, existingSlug, onChange, size = 'sm', variant = 'ghost', captureSnapshot }) {
-  const navigate = useNavigate()
-  const [open, setOpen] = useState(false)
-  const [slug, setSlug] = useState(existingSlug || null)
-  const [working, setWorking] = useState(false)
+export function SuccessStep({ announceId, onClose }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-start gap-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
+        <Check size={16} className="mt-0.5 text-emerald-300 shrink-0" />
+        <div className="text-sm text-emerald-100 leading-relaxed">
+          Published. Anyone following your feed can see it now.
+        </div>
+      </div>
+      <div className="rounded-lg bg-ink-950 border border-ink-800 px-3 py-2">
+        <p className="text-[10px] uppercase tracking-widest font-mono text-ink-500">Announcement</p>
+        <code className="text-xs font-mono text-ink-200 break-all">{announceId}</code>
+      </div>
+      <Button variant="primary" size="md" onClick={onClose} className="self-start">
+        Done
+      </Button>
+    </div>
+  )
+}
+
+function PublishModal({ open, onClose, project, onPublished }) {
+  const [step, setStep] = useState('loading') // loading | identity | identity-created | form | confirm | success
+  const [identityError, setIdentityError] = useState(null)
+  const [creatingIdentity, setCreatingIdentity] = useState(false)
+  const [newPubKey, setNewPubKey] = useState(null)
+
+  const [form, setForm] = useState(() => ({
+    name: project?.name || '',
+    description: '',
+    kind: 'part',
+    units: 'mm',
+    licensePreset: '',
+    licenseCustom: '',
+    tagsRaw: '',
+  }))
+  const [formError, setFormError] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState(null)
+  const [announceId, setAnnounceId] = useState(null)
 
   useEffect(() => {
-    setSlug(existingSlug || null)
-  }, [existingSlug])
+    if (!open) return
+    setStep('loading')
+    setIdentityError(null)
+    setSubmitError(null)
+    setFormError(null)
+    setAnnounceId(null)
+    setForm({
+      name: project?.name || '',
+      description: '',
+      kind: 'part',
+      units: 'mm',
+      licensePreset: '',
+      licenseCustom: '',
+      tagsRaw: '',
+    })
+    pub.getIdentity()
+      .then((res) => {
+        if (res?.pub) setStep('form')
+        else setStep('identity')
+      })
+      .catch((err) => {
+        setIdentityError(err instanceof ApiError ? err.message : 'Could not check publishing identity.')
+        setStep('identity')
+      })
+  }, [open, project?.id, project?.name])
 
-  if (!project?.id) return null
+  if (!open) return null
 
-  const onPublished = (res) => {
-    const newSlug = res.slug || res.project_id
-    setSlug(newSlug)
-    setOpen(false)
-    onChange?.({ slug: newSlug, listed: true })
-    navigate(`/workshop/${newSlug}`)
-  }
-
-  const onUnpublish = async () => {
-    if (!slug || working) return
-    if (!window.confirm('Remove this listing from the workshop?')) return
-    setWorking(true)
+  const onCreateIdentity = async () => {
+    setCreatingIdentity(true)
+    setIdentityError(null)
     try {
-      await workshop.unpublish(slug)
-      setSlug(null)
-      onChange?.({ slug: null, listed: false })
+      const res = await pub.createIdentity()
+      setNewPubKey(res?.pub || '')
+      setStep('identity-created')
     } catch (err) {
-      console.error('[PublishButton] unpublish failed', err)
-      window.alert(err instanceof ApiError ? err.message : 'Unpublish failed.')
+      setIdentityError(err instanceof ApiError ? err.message : 'Could not create identity.')
     } finally {
-      setWorking(false)
+      setCreatingIdentity(false)
     }
   }
 
-  if (slug) {
-    return (
-      <Button variant={variant} size={size} onClick={onUnpublish} disabled={working}>
-        {working ? <Loader2 size={14} className="animate-spin" /> : <Globe size={14} />}
-        Unpublish
-      </Button>
-    )
+  const onConfirmPublish = async () => {
+    setSubmitting(true)
+    setSubmitError(null)
+    try {
+      const license = form.licensePreset === CUSTOM_LICENSE ? form.licenseCustom.trim() : form.licensePreset
+      const tags = form.tagsRaw.split(',').map((t) => t.trim()).filter(Boolean)
+      const res = await pub.publish({
+        projectId: project.id,
+        metadata: {
+          name: form.name.trim(),
+          description: form.description.trim(),
+          artifact_kind: form.kind,
+          license,
+          units: form.units,
+          tags,
+        },
+      })
+      setAnnounceId(res?.announce_id || null)
+      setStep('success')
+      onPublished?.(res)
+    } catch (err) {
+      setSubmitError(err instanceof ApiError ? err.message : 'Publish failed.')
+    } finally {
+      setSubmitting(false)
+    }
   }
+
+  const titles = {
+    loading: 'Publish to Workshop',
+    identity: 'Create your publishing identity',
+    'identity-created': 'Publishing identity created',
+    form: 'Publish to Workshop',
+    confirm: 'Confirm publish',
+    success: 'Published',
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title={titles[step]} widthClass="max-w-lg">
+      {step === 'loading' && (
+        <div className="flex items-center gap-2 text-sm text-ink-400 py-6 justify-center">
+          <Loader2 size={16} className="animate-spin" /> Checking identity…
+        </div>
+      )}
+      {step === 'identity' && (
+        <IdentityStep identityError={identityError} creating={creatingIdentity} onCreate={onCreateIdentity} />
+      )}
+      {step === 'identity-created' && (
+        <IdentityCreatedStep pubKey={newPubKey} onContinue={() => setStep('form')} />
+      )}
+      {step === 'form' && (
+        <MetadataStep
+          form={form}
+          setForm={setForm}
+          error={formError}
+          onContinue={() => { setFormError(null); setStep('confirm') }}
+        />
+      )}
+      {step === 'confirm' && (
+        <ConfirmStep
+          form={form}
+          submitting={submitting}
+          error={submitError}
+          onBack={() => setStep('form')}
+          onConfirm={onConfirmPublish}
+        />
+      )}
+      {step === 'success' && (
+        <SuccessStep announceId={announceId} onClose={onClose} />
+      )}
+    </Modal>
+  )
+}
+
+// captureSnapshot is accepted for backward-compat with existing Editor.jsx
+// call sites but is unused: the distributed Workshop's publish metadata
+// (docs/distributed-workshop.md) has no thumbnail/cover field.
+export function PublishButton({ project, size = 'sm', variant = 'ghost' }) {
+  const [open, setOpen] = useState(false)
+
+  if (!project?.id) return null
 
   return (
     <>
@@ -374,8 +449,7 @@ export function PublishButton({ project, existingSlug, onChange, size = 'sm', va
         open={open}
         onClose={() => setOpen(false)}
         project={project}
-        onPublished={onPublished}
-        captureSnapshot={captureSnapshot}
+        onPublished={() => {}}
       />
     </>
   )

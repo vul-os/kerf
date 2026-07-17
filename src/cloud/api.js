@@ -74,90 +74,83 @@ async function request(path, { method = 'GET', body, headers = {}, auth = true }
   return res.json()
 }
 
-// ---- Workshop ----
-// All endpoints sit under /api/workshop; the public ones (list/get)
-// pass auth=false so the request still works for signed-out visitors.
-// The backend uses OptionalAuth on those routes so a logged-in caller
-// still sees liked_by_me populated; we keep auth=true here to forward
-// the bearer token whenever it's present.
-
-export const workshop = {
-  // GET /api/workshop/?page=&sort=&tag=
-  // `tag` is an optional string or string[] of tag filters; multiple tags
-  // are ANDed server-side. Omit for the unfiltered "All" view. Free-form
-  // (no enum validation) so any tag the user wrote on a project is valid.
-  list({ page = 1, sort = 'newest', tag } = {}) {
-    const q = new URLSearchParams()
-    if (page) q.set('page', String(page))
-    if (sort) q.set('sort', sort)
-    const tags = Array.isArray(tag) ? tag : (tag ? [tag] : [])
-    for (const t of tags) {
-      if (t) q.append('tag', t)
-    }
-    return request(`/api/workshop/?${q.toString()}`)
+// ---- Pub (distributed Workshop, DMTAP-PUB) ----
+// The Workshop is no longer a hosted listings service — it is a client-side
+// view over feeds you follow, per decisions.md's 2026-07-17 "Final form"
+// ADR and docs/distributed-workshop.md. All endpoints sit under /api/pub.
+// This is a core MIT node capability (kerf-pub), never gated on
+// `cloudEnabled`. Contract (frontend wave 2, coded against a parallel
+// backend build):
+//   GET  /api/pub/identity                 -> { pub: string|null }
+//   POST /api/pub/identity                 -> { pub: string }
+//   GET  /api/pub/follows                  -> [{ pub, label, gateway_url }]
+//   POST /api/pub/follows { pub, label, gateway_url }
+//   DELETE /api/pub/follows/:pub
+//   GET  /api/pub/workshop -> [{ announce_id, pub, meta, roots, ts,
+//     supersedes, availability: { status, holders, last_verified }, pinned }]
+//   POST /api/pub/publish { project_id, metadata } -> { announce_id }
+//   POST/DELETE /api/pub/pin/:announce_id
+export const pub = {
+  // GET /api/pub/identity — the local node's Ed25519 publishing keypair,
+  // or {pub: null} if one hasn't been created yet.
+  getIdentity() {
+    return request('/api/pub/identity')
   },
 
-  // GET /api/workshop/:slug
-  get(slug) {
-    return request(`/api/workshop/${encodeURIComponent(slug)}`)
+  // POST /api/pub/identity — creates the identity keypair the first time
+  // this node publishes. Idempotent-ish from the UI's perspective: callers
+  // should check getIdentity() first and only call this from the
+  // "create your publishing identity" prompt.
+  createIdentity() {
+    return request('/api/pub/identity', { method: 'POST' })
   },
 
-  // POST /api/workshop/publish — owner-only. Idempotent: republishing
-  // an already-listed project just updates title/description.
-  // `readme` may be a string to supply an explicit README (overrides AI gen).
-  // `generateReadme` defaults to true; pass false to skip AI generation.
-  publish({ projectId, title, description, readme, generateReadme = true }) {
-    return request('/api/workshop/publish', {
+  // GET /api/pub/follows — the set of feeds that make up "your workshop".
+  listFollows() {
+    return request('/api/pub/follows')
+  },
+
+  // POST /api/pub/follows { pub, label, gateway_url } — follow a publisher.
+  // Entirely local: no permission needed from the followed identity.
+  addFollow({ pub: pubKey, label, gatewayUrl }) {
+    return request('/api/pub/follows', {
       method: 'POST',
-      body: {
-        project_id: projectId,
-        title: title || '',
-        description: description || '',
-        ...(readme != null ? { readme } : {}),
-        generate_readme: generateReadme,
-      },
+      body: { pub: pubKey, label: label || '', gateway_url: gatewayUrl || '' },
     })
   },
 
-  // POST /api/workshop/regenerate-readme — owner-only. Replaces the stored
-  // README with a freshly AI-generated version. Returns {project_id, readme,
-  // readme_generated_at}.
-  regenerateReadme(projectId) {
-    return request('/api/workshop/regenerate-readme', {
+  // DELETE /api/pub/follows/:pub — unfollow. Local only, changes nothing
+  // on the publisher's end.
+  removeFollow(pubKey) {
+    return request(`/api/pub/follows/${encodeURIComponent(pubKey)}`, { method: 'DELETE' })
+  },
+
+  // GET /api/pub/workshop — the derived, rebuildable browse index built by
+  // crawling followed feeds. Never authoritative; the feeds themselves are.
+  listWorkshop() {
+    return request('/api/pub/workshop')
+  },
+
+  // POST /api/pub/publish { project_id, metadata } -> { announce_id }.
+  // Irrevocable once any other node holds a copy — the UI must confirm this
+  // explicitly before calling. `metadata` is { name, description,
+  // artifact_kind, license, units, tags }.
+  publish({ projectId, metadata }) {
+    return request('/api/pub/publish', {
       method: 'POST',
-      body: { project_id: projectId },
+      body: { project_id: projectId, metadata },
     })
   },
 
-  // DELETE /api/workshop/:slug — owner-only.
-  unpublish(slug) {
-    return request(`/api/workshop/${encodeURIComponent(slug)}`, { method: 'DELETE' })
+  // POST /api/pub/pin/:announce_id — fetch + durably keep + start serving.
+  pin(announceId) {
+    return request(`/api/pub/pin/${encodeURIComponent(announceId)}`, { method: 'POST' })
   },
 
-  // POST /api/workshop/:slug/like — toggles. Returns {liked_by_me, likes_count}.
-  toggleLike(slug) {
-    return request(`/api/workshop/${encodeURIComponent(slug)}/like`, { method: 'POST' })
-  },
-
-  // POST /api/workshop/:slug/fork — clones the listing's project under
-  // the caller. Returns {project_id, truncated}.
-  fork(slug, projectName) {
-    return request(`/api/workshop/${encodeURIComponent(slug)}/fork`, {
-      method: 'POST',
-      body: projectName ? { project_name: projectName } : {},
-    })
-  },
-
-  // GET /api/workshop/parts — DEPRECATED alias of library.listParts.
-  // Kept around for one release while callers migrate. New code should
-  // use library.listParts() instead.
-  listParts({ search, category, verifiedOnly } = {}) {
-    const q = new URLSearchParams()
-    if (search) q.set('search', search)
-    if (category) q.set('category', category)
-    if (verifiedOnly) q.set('verified_only', 'true')
-    const qs = q.toString()
-    return request(`/api/workshop/parts${qs ? `?${qs}` : ''}`)
+  // DELETE /api/pub/pin/:announce_id — stop serving locally. Never implies
+  // deletion for other holders (there is no protocol-level takedown).
+  unpin(announceId) {
+    return request(`/api/pub/pin/${encodeURIComponent(announceId)}`, { method: 'DELETE' })
   },
 }
 
@@ -333,168 +326,68 @@ export const adminLibrary = {
 }
 
 // ---- Git ----
-// All endpoints sit under /api/projects/:pid/git. Auth is required for every
-// route. The server-side implementation lives in backend/cloud/git/ — this
-// frontend wrapper assumes the contract documented in the cloud roadmap and
-// gracefully surfaces 4xx errors to callers via ApiError.
+// Local git only, per decisions.md's 2026-07-17 "local git only; no OAuth"
+// addendum: a kerf project is a plain local git repo, and collaboration is
+// git push/pull to any remote the user configures — a teammate's node, a
+// homelab box, GitHub, Gitea. There is no hosted-git product, no kerf-run
+// GitHub OAuth app, no server-held tokens. Authentication for a remote uses
+// the caller's own SSH key or token, exactly like the git CLI; kerf never
+// stores credentials. All endpoints sit under /api/git/:project_id.
 export const git = {
-  // POST /init — create an empty repo backing the project. 204 on success.
+  // GET /api/git/:pid/status
+  // -> { initialized, branch, dirty, ahead, behind, remotes: [{name,url}] }
+  status: (projectId) =>
+    request(`/api/git/${encodeURIComponent(projectId)}/status`),
+
+  // POST /api/git/:pid/init — create an empty local repo for the project.
   init: (projectId) =>
-    request(`/api/projects/${projectId}/git/init`, { method: 'POST' }),
+    request(`/api/git/${encodeURIComponent(projectId)}/init`, { method: 'POST' }),
 
-  // POST /import — clone an existing GitHub repo into the project. Body:
-  // {github_url, branch?}. Private repos require the caller to have linked
-  // their GitHub account first (see githubOAuth.startUrl).
-  importRepo: (projectId, body) =>
-    request(`/api/projects/${projectId}/git/import`, {
+  // POST /api/git/:pid/commit { message } -> { sha }. Stages + commits
+  // everything in the working tree.
+  commit: (projectId, message) =>
+    request(`/api/git/${encodeURIComponent(projectId)}/commit`, {
       method: 'POST',
-      body,
+      body: { message },
     }),
 
-  // POST /connect — link the project to an existing GitHub repo (no clone).
-  // Body: {github_owner, github_repo}.
-  connect: (projectId, body) =>
-    request(`/api/projects/${projectId}/git/connect`, {
-      method: 'POST',
-      body,
-    }),
-
-  // GET /log?branch=&limit= — newest-first commit list for the given branch.
-  log: (projectId, branch, limit = 50) => {
+  // GET /api/git/:pid/log?limit=50 -> [{ sha, message, author, ts }]
+  log: (projectId, limit = 50) => {
     const q = new URLSearchParams()
-    if (branch) q.set('branch', branch)
     if (limit) q.set('limit', String(limit))
-    return request(`/api/projects/${projectId}/git/log?${q.toString()}`)
+    return request(`/api/git/${encodeURIComponent(projectId)}/log?${q.toString()}`)
   },
 
-  // GET /status — {changed_files: [{path, status, additions, deletions}]}.
-  // Diffs live files table vs latest commit tree (HEAD).
-  status: (projectId) =>
-    request(`/api/projects/${projectId}/git/status`),
+  // GET /api/git/:pid/remotes -> [{ name, url }]
+  listRemotes: (projectId) =>
+    request(`/api/git/${encodeURIComponent(projectId)}/remotes`),
 
-  // GET /branches — [{name, head_sha, is_default, ahead, behind}].
-  branches: (projectId) =>
-    request(`/api/projects/${projectId}/git/branches`),
-
-  // POST /branches {name, from_sha?} — create a new branch at the given
-  // commit (or the current HEAD if from_sha is omitted).
-  createBranch: (projectId, name, from_sha) =>
-    request(`/api/projects/${projectId}/git/branches`, {
+  // POST /api/git/:pid/remotes { name, url } — add (or update) a remote.
+  addRemote: (projectId, name, url) =>
+    request(`/api/git/${encodeURIComponent(projectId)}/remotes`, {
       method: 'POST',
-      body: from_sha ? { name, from_sha } : { name },
+      body: { name, url },
     }),
 
-  // DELETE /branches/:name — delete a non-current branch.
-  deleteBranch: (projectId, name) =>
-    request(`/api/projects/${projectId}/git/branches/${encodeURIComponent(name)}`, {
+  // DELETE /api/git/:pid/remotes/:name
+  removeRemote: (projectId, name) =>
+    request(`/api/git/${encodeURIComponent(projectId)}/remotes/${encodeURIComponent(name)}`, {
       method: 'DELETE',
     }),
 
-  // POST /checkout {branch, force?} — switch the working tree. 409 with
-  // {has_uncommitted: true} if there are unstaged changes and force≠true.
-  checkout: (projectId, branch, force = false) =>
-    request(`/api/projects/${projectId}/git/checkout`, {
+  // POST /api/git/:pid/push { remote, branch }
+  push: (projectId, remote, branch) =>
+    request(`/api/git/${encodeURIComponent(projectId)}/push`, {
       method: 'POST',
-      body: { branch, force },
+      body: { remote, branch },
     }),
 
-  // POST /commit {message, branch?} — stage all and commit. 201 {sha}.
-  commit: (projectId, message, branch) =>
-    request(`/api/projects/${projectId}/git/commit`, {
+  // POST /api/git/:pid/pull { remote, branch }
+  pull: (projectId, remote, branch) =>
+    request(`/api/git/${encodeURIComponent(projectId)}/pull`, {
       method: 'POST',
-      body: branch ? { message, branch } : { message },
+      body: { remote, branch },
     }),
-
-  // POST /merge {from_branch, into_branch} — fast-forward when possible,
-  // 409 {conflicts: [paths]} on conflict.
-  merge: (projectId, from_branch, into_branch) =>
-    request(`/api/projects/${projectId}/git/merge`, {
-      method: 'POST',
-      body: { from_branch, into_branch },
-    }),
-
-  // POST /push — push every branch to the linked GitHub remote.
-  push: (projectId) =>
-    request(`/api/projects/${projectId}/git/push`, { method: 'POST' }),
-
-  // POST /pull {branch?} — fetch + fast-forward. 409 {ahead, behind} on
-  // diverged history.
-  pull: (projectId, branch) =>
-    request(`/api/projects/${projectId}/git/pull`, {
-      method: 'POST',
-      body: branch ? { branch } : {},
-    }),
-
-  // GET /diff/:sha — unified diff string. We fetch raw text instead of JSON.
-  diff: async (projectId, sha) => {
-    const url = `${API_URL}/api/projects/${projectId}/git/diff/${encodeURIComponent(sha)}`
-    const token = useAuth.getState().accessToken
-    const headers = {}
-    if (token) headers.authorization = `Bearer ${token}`
-    let res = await fetch(url, { headers })
-    if (res.status === 401 && useAuth.getState().refreshToken) {
-      try {
-        const newToken = await refreshAccessToken()
-        headers.authorization = `Bearer ${newToken}`
-        res = await fetch(url, { headers })
-      } catch { /* fall through */ }
-    }
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      throw new ApiError(res.status, text || res.statusText)
-    }
-    return res.text()
-  },
-
-  // GET /commits/:sha/diff — per-file JSON diff for a commit.
-  // Returns { sha, files: [{ path, status, additions, deletions, hunks }] }
-  commitDiff: (projectId, sha) =>
-    request(`/api/projects/${projectId}/git/commits/${encodeURIComponent(sha)}/diff`),
-
-  // DELETE /repo — tear down the repo and clear the link.
-  deleteRepo: (projectId) =>
-    request(`/api/projects/${projectId}/git/repo`, { method: 'DELETE' }),
-
-  // ---- T-146 provider mirror endpoints ----
-
-  // GET /git/providers
-  // → { providers: [{ id, name, label, icon_url? }] }
-  // Only returns providers the server has env-credentials for.
-  listProviders: () =>
-    request('/api/git/providers'),
-
-  // GET /projects/:pid/git/provider/status
-  // → { connected, provider_id?, remote_url?, kerf_git_retained, note, last_sync_at? }
-  providerStatus: (projectId) =>
-    request(`/api/projects/${encodeURIComponent(projectId)}/git/provider/status`),
-
-  // POST /projects/:pid/git/provider/connect
-  // body: { provider, remote_url }  — backend parses remote_url into owner/repo etc.
-  // → { kerf_git_retained, note, provider, remote_url?, github_owner?, … }
-  providerConnect: (projectId, providerId, remoteUrl) =>
-    request(
-      `/api/projects/${encodeURIComponent(projectId)}/git/provider/connect`,
-      { method: 'POST', body: { provider: providerId, remote_url: remoteUrl } },
-    ),
-
-  // POST /projects/:pid/git/provider/disconnect
-  // body: { provider }  (omit to disconnect all mirrors)
-  // → { disconnected: true, kerf_git_retained: true, note }
-  providerDisconnect: (projectId, providerId) =>
-    request(
-      `/api/projects/${encodeURIComponent(projectId)}/git/provider/disconnect`,
-      { method: 'POST', body: providerId ? { provider: providerId } : {} },
-    ),
-}
-
-// GitHub OAuth — top-level (not project-scoped). The start URL is meant to
-// be assigned to window.location so the browser follows the 302 to GitHub.
-export const githubOAuth = {
-  startUrl: (redirect) => {
-    const r = redirect || (typeof window !== 'undefined' ? window.location.href : '/')
-    return `${API_URL}/auth/github/start?redirect=${encodeURIComponent(r)}`
-  },
-  unlink: () => request('/auth/github', { method: 'DELETE' }),
 }
 
 // ---- Admin: transactional email ----

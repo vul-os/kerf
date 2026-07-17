@@ -1052,3 +1052,38 @@ invariants), `docs/cloud-features.md` and `docs/billing-and-credits.md`
 `packages/kerf-pricing/` (deletion — owned by a parallel agent, not this
 doc pass), `LICENSE-CLOUD` (removal — same), new `packages/kerf-pub/`
 (implementation — future work, not this doc pass).
+
+## ADR — Addendum: local git only; no OAuth; accounts shrink to the box (2026-07-17)
+
+**Context:** Same-day extension of the final-form ADR above, settled in
+the founder discussion that produced it.
+
+**Decision:**
+
+- **Hosted git dies as a product.** A kerf project is a plain local git
+  repo. Collaboration is `git push`/`pull` to any remote the user
+  configures — a teammate's node, a homelab box, GitHub, Gitea. Kerf
+  ships a git UI over local repos plus a remotes config field, nothing
+  else. A node MAY serve its own repos over standard git HTTP/SSH (the
+  one-node-type capability), which is self-hosting, not a service.
+  `file_revisions` (fine-grained local undo) is unchanged and remains
+  the default safety net beneath deliberate git commits.
+- **GitHub OAuth is removed.** GitHub becomes an ordinary git remote
+  using the user's own credentials (SSH key / PAT), exactly as with the
+  git CLI. No kerf-operated OAuth app, no server-held tokens.
+- **Accounts shrink to the box.** A single-user local install has zero
+  login. Workshop identity is the user's Ed25519 keypair (it signs
+  publishes; it is not an account with anyone). Local accounts exist
+  only on a shared multi-user node (a team box) — the VulOS account
+  model applied to hardware the team owns, never a central service.
+  Transactional email is retired with the accounts it served.
+
+**Why:** every remaining server-shaped surface (hosted remotes, OAuth
+brokering, account email) existed to operate a service kerf no longer
+has. Removing them completes the invariant that kerf never requires a
+vendor-shaped credential.
+
+**Affected (wave 2, planned):** `packages/kerf-cloud/` hosted-git/OAuth/
+email surface (strip), git panel UI (rewire onto local git + configured
+remotes), `docs/github-sync.md` (rewrite as "GitHub as an ordinary
+remote").

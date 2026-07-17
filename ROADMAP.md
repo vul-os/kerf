@@ -10,7 +10,7 @@
 
 This is a **priority-ordered** roadmap, not a date-ordered or effort-ordered one. The tiers (P0 → P3) express sequence and leverage: which items earn the most credibility per unit of work.
 
-Kerf is dual-licensed: the OSS core (MIT) and the hosted-tier code under `packages/kerf-{billing,cloud}/` + `src/cloud/`.
+Kerf is **100% MIT** — free, open-source software with no paid tier, no billing, and no hosted product. (The former dual-license split is retired; see the 2026-07-17 final-form ADR in `decisions.md` and `docs/oss-cloud-separation.md`.)
 
 ### Why chat-driven CAD works
 

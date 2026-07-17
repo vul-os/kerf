@@ -44,6 +44,7 @@ api-only = [
     "kerf-api",
     "kerf-chat",
     "kerf-v1",
+    "kerf-pub",
 ]
 
 mech = [
@@ -81,6 +82,7 @@ full = [
     "kerf-api",
     "kerf-chat",
     "kerf-v1",
+    "kerf-pub",
     "kerf-billing",
     "kerf-cloud",
     "kerf-pricing",

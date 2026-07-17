@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kerf — Free, Open-Source CAD with a Distributed Workshop</title>
+<meta name="description" content="Kerf is a complete, free, open-source CAD that runs entirely on your machine — parametric modeling, drawings, FEM/CFD, CAM, electronics, and a distributed parts Workshop over an open protocol. No accounts, no cloud, no billing.">
+<meta name="keywords" content="open source CAD, self-hosted CAD, parametric modeling, OpenCascade, FreeCAD alternative, PCB design, FEM simulation, CAM software, distributed parts library, DMTAP, decentralized workshop, MIT licensed CAD">
+<meta name="author" content="Kerf">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Kerf — Free, Open-Source CAD with a Distributed Workshop">
+<meta property="og:description" content="A complete CAD system that runs on your machine. Sketching, B-rep modeling, drawings, FEM/CFD, CAM, electronics, BIM — 37 domains, MIT licensed. Share parts over an open, serverless protocol.">
+<meta property="og:url" content="https://kerf.sh/">
+
+<!-- Favicon -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0b0d'/%3E%3Crect x='7' y='6' width='3.5' height='20' fill='%23ffd633'/%3E%3Cpolygon points='10.5,16 26,6 26,13' fill='%23ffd633'/%3E%3Cpolygon points='10.5,16 26,19 26,26' fill='%23ffd633'/%3E%3C/svg%3E">
+
+<!-- SOVEREIGNTY: this page makes zero network requests. No CDN, no Google -->
+<!-- Fonts, no analytics, no external images — the logo mark is inline SVG -->
+<!-- and every asset lives in this one file. System font stack only. -->
+
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0b0d;
+  --surface: #111318;
+  --elevated: #16181f;
+  --border: #23262f;
+  --text: #f5f3ee;
+  --text-2: #a6a9b4;
+  --text-3: #71747f;
+  --text-4: #3a3d47;
+  --gold: #ffd633;
+  --gold-dim: #cca82a;
+  --mono: 'SF Mono', 'JetBrains Mono', 'Menlo', 'Consolas', monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text-2);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--text-2); text-decoration: none; transition: color .15s; }
+a:hover { color: var(--text); }
+
+.mono { font-family: var(--mono); }
+.container { max-width: 1100px; margin: 0 auto; padding: 0 1.5rem; }
+.gold { color: var(--gold); }
+
+/* ── Nav ── */
+.nav {
+  position: fixed; top: 10px; left: 1rem; right: 1rem; z-index: 100;
+  max-width: 1100px; margin: 0 auto;
+  background: rgba(10, 11, 13, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0 1.25rem;
+  height: 54px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.nav-logo {
+  display: flex; align-items: center; gap: .55rem;
+  font-family: var(--mono); font-weight: 700; font-size: .95rem; color: var(--text);
+}
+.nav-logo svg { width: 24px; height: 24px; border-radius: 5px; }
+.nav-links { display: flex; align-items: center; gap: 1.75rem; }
+.nav-links a { font-family: var(--mono); font-size: .78rem; color: var(--text-3); letter-spacing: -.01em; }
+.nav-links a:hover { color: var(--text); }
+.nav-links .gh { display: flex; align-items: center; gap: .4rem; }
+.nav-links .gh svg { width: 14px; height: 14px; }
+
+/* ── Hero ── */
+.hero { padding: 10.5rem 0 5rem; text-align: center; }
+.hero-badge {
+  display: inline-block;
+  font-family: var(--mono); font-size: .7rem; font-weight: 500;
+  color: var(--gold); letter-spacing: .08em; text-transform: uppercase;
+  border: 1px solid rgba(255,214,51,.35); border-radius: 999px;
+  padding: .35rem 1rem; margin-bottom: 2rem;
+  background: rgba(255,214,51,.06);
+}
+.hero h1 {
+  font-weight: 700;
+  font-size: clamp(2.1rem, 5vw, 3.4rem);
+  color: var(--text); line-height: 1.18;
+  margin-bottom: 1.35rem; letter-spacing: -.02em;
+}
+.hero h1 span { color: var(--gold); }
+.hero p {
+  font-size: 1.08rem; color: var(--text-2);
+  max-width: 620px; margin: 0 auto 2.5rem;
+  line-height: 1.7;
+}
+.hero-actions { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; margin-bottom: 3.5rem; }
+.btn {
+  display: inline-flex; align-items: center; gap: .5rem;
+  font-family: var(--mono); font-size: .82rem; font-weight: 600;
+  padding: .7rem 1.6rem; border-radius: 8px;
+  border: 1px solid var(--border); cursor: pointer;
+  transition: all .15s;
+}
+.btn-primary { background: var(--gold); color: #14120a; border-color: var(--gold); }
+.btn-primary:hover { background: var(--gold-dim); border-color: var(--gold-dim); }
+.btn-secondary { background: transparent; color: var(--text-2); }
+.btn-secondary:hover { border-color: var(--text-3); color: var(--text); }
+.btn svg { width: 15px; height: 15px; }
+
+.hero-strip {
+  display: flex; justify-content: center; flex-wrap: wrap; gap: 2.5rem;
+  font-family: var(--mono); font-size: .75rem; color: var(--text-3);
+}
+.hero-strip b { color: var(--text-2); font-weight: 600; }
+
+/* ── Section shared ── */
+section { padding: 5.5rem 0; }
+.section-head { text-align: center; max-width: 640px; margin: 0 auto 3rem; }
+.section-tag {
+  font-family: var(--mono); font-size: .72rem; color: var(--gold);
+  text-transform: uppercase; letter-spacing: .1em; margin-bottom: .75rem;
+}
+.section-head h2 {
+  font-size: clamp(1.5rem, 3vw, 2.1rem); color: var(--text);
+  letter-spacing: -.02em; margin-bottom: .85rem; font-weight: 700;
+}
+.section-head p { font-size: .98rem; color: var(--text-3); line-height: 1.7; }
+
+/* ── Features grid ── */
+.features-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+  background: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+}
+.feature { padding: 1.9rem; background: var(--bg); transition: background .15s; }
+.feature:hover { background: var(--elevated); }
+.feature .icon { font-size: 1.1rem; margin-bottom: .6rem; }
+.feature h3 { font-size: .92rem; font-weight: 700; color: var(--text); margin-bottom: .45rem; letter-spacing: -.01em; }
+.feature p { font-size: .82rem; color: var(--text-3); line-height: 1.6; }
+
+/* ── Workshop / decentralization story ── */
+.workshop {
+  background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+}
+.workshop-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 3.5rem; align-items: center; }
+.workshop-text h2 {
+  font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; color: var(--text);
+  margin-bottom: 1rem; letter-spacing: -.02em; line-height: 1.25;
+}
+.workshop-text > p { font-size: .95rem; color: var(--text-3); line-height: 1.75; margin-bottom: 1.5rem; }
+.workshop-points { list-style: none; display: flex; flex-direction: column; gap: 1rem; }
+.workshop-points li { display: flex; gap: .75rem; align-items: flex-start; }
+.workshop-points .mark {
+  flex: none; width: 20px; height: 20px; border-radius: 5px;
+  background: rgba(255,214,51,.12); color: var(--gold);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: .7rem; font-weight: 700; margin-top: .1rem;
+}
+.workshop-points span { font-size: .88rem; color: var(--text-2); line-height: 1.6; }
+.workshop-points b { color: var(--text); }
+
+.diagram {
+  border: 1px solid var(--border); border-radius: 12px; background: var(--bg);
+  padding: 1.75rem; font-family: var(--mono); font-size: .74rem; color: var(--text-3);
+}
+.diagram .node-box {
+  border: 1px solid var(--border); border-radius: 8px; padding: .9rem 1rem;
+  margin-bottom: .9rem; background: var(--elevated);
+}
+.diagram .node-box.you { border-color: rgba(255,214,51,.4); }
+.diagram .node-box .label { color: var(--text-4); text-transform: uppercase; letter-spacing: .08em; font-size: .62rem; margin-bottom: .4rem; }
+.diagram .node-box .verbs { color: var(--gold); }
+.diagram .arrow { text-align: center; color: var(--text-4); margin: .35rem 0; font-size: .7rem; }
+.diagram .dashed { border-style: dashed; opacity: .8; }
+
+/* ── Install ── */
+.install-box { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.install-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .75rem 1.25rem; background: var(--elevated); border-bottom: 1px solid var(--border);
+}
+.install-header span { font-family: var(--mono); font-size: .7rem; color: var(--text-3); text-transform: uppercase; letter-spacing: .08em; }
+.install-header button {
+  font-family: var(--mono); font-size: .7rem; color: var(--text-3);
+  background: none; border: 1px solid var(--border); border-radius: 6px;
+  padding: .25rem .6rem; cursor: pointer; transition: all .15s;
+}
+.install-header button:hover { color: var(--text); border-color: var(--text-3); }
+.install-code {
+  padding: 1.25rem 1.5rem; font-family: var(--mono); font-size: .84rem;
+  color: var(--text-2); background: var(--bg); overflow-x: auto; white-space: pre;
+}
+.install-code .p { color: var(--text-4); user-select: none; }
+.install-code .cmd { color: var(--text); }
+.install-code .str { color: var(--gold); }
+.install-code .cm { color: var(--text-4); }
+.install-note { font-size: .8rem; color: var(--text-3); margin-top: 1rem; text-align: center; }
+.install-note code { font-family: var(--mono); color: var(--text-2); }
+
+/* ── Dev ── */
+.dev-box { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.dev-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); }
+.dev-cell { padding: 1.5rem 1.75rem; background: var(--bg); }
+.dev-cell h4 { font-family: var(--mono); font-size: .7rem; color: var(--text-4); text-transform: uppercase; letter-spacing: .1em; margin-bottom: .75rem; }
+.dev-cell code { display: block; font-family: var(--mono); font-size: .82rem; color: var(--text-2); line-height: 1.85; white-space: pre; }
+.dev-cell code .p { color: var(--text-4); }
+.dev-cell code .cm { color: var(--text-4); }
+
+/* ── VulOS family footer ── */
+.family { border-top: 1px solid var(--border); background: var(--surface); }
+.family-head { text-align: center; margin-bottom: 2.5rem; }
+.family-head .tag { font-family: var(--mono); font-size: .72rem; color: var(--gold); text-transform: uppercase; letter-spacing: .1em; margin-bottom: .6rem; }
+.family-head p { font-size: .92rem; color: var(--text-3); max-width: 560px; margin: 0 auto; line-height: 1.7; }
+.family-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.family-item { padding: 1.4rem 1.1rem; background: var(--bg); text-align: center; }
+.family-item .name { font-family: var(--mono); font-size: .82rem; font-weight: 700; color: var(--text); margin-bottom: .3rem; }
+.family-item .role { font-size: .72rem; color: var(--text-3); line-height: 1.5; }
+.family-item.current { background: var(--elevated); }
+.family-item.current .name { color: var(--gold); }
+
+/* ── Footer ── */
+footer.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; }
+.footer-inner { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+.footer-left { display: flex; align-items: center; gap: .5rem; font-family: var(--mono); font-size: .8rem; color: var(--text-4); }
+.footer-left svg { width: 16px; height: 16px; opacity: .5; border-radius: 3px; }
+.footer-links { display: flex; gap: 1.5rem; }
+.footer-links a { font-family: var(--mono); font-size: .75rem; color: var(--text-4); }
+.footer-links a:hover { color: var(--text-2); }
+.footer-right { font-family: var(--mono); font-size: .75rem; color: var(--text-4); }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .workshop-grid { grid-template-columns: 1fr; gap: 2rem; }
+  .family-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+  .nav-links { display: none; }
+  .features-grid { grid-template-columns: 1fr; }
+  .dev-grid { grid-template-columns: 1fr; }
+  .hero { padding-top: 8.5rem; }
+  .footer-inner { flex-direction: column; text-align: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="nav">
+  <a href="#" class="nav-logo">
+    <svg viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0a0b0d"/><rect x="7" y="6" width="3.5" height="20" fill="#ffd633"/><polygon points="10.5,16 26,6 26,13" fill="#ffd633"/><polygon points="10.5,16 26,19 26,26" fill="#ffd633"/></svg>
+    kerf
+  </a>
+  <div class="nav-links">
+    <a href="#features">features</a>
+    <a href="#workshop">workshop</a>
+    <a href="#install">install</a>
+    <a href="#dev">dev</a>
+    <a href="https://github.com/kerf-sh/kerf" target="_blank" class="gh">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      github
+    </a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-badge">MIT · self-hosted · no accounts</div>
+    <h1>Real CAD.<br>On <span>your</span> machine.<br>Shared without a server.</h1>
+    <p>Kerf is a complete, free, open-source CAD — parametric modeling, drawings, FEM/CFD, CAM, electronics, and 37 engineering domains — that runs entirely on your own hardware. When you want to share a part, publish it to a distributed Workshop over an open protocol: signed, content-addressed, no accounts, no central server.</p>
+    <div class="hero-actions">
+      <a href="#install" class="btn btn-primary">get started</a>
+      <a href="https://github.com/kerf-sh/kerf" target="_blank" class="btn btn-secondary">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        star on github
+      </a>
+    </div>
+    <div class="hero-strip">
+      <div><b>37</b> engineering domains</div>
+      <div><b>2</b> geometry kernels — JSCAD + OpenCascade</div>
+      <div><b>0</b> accounts required</div>
+      <div><b>$0</b> — always, everywhere</div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features">
+  <div class="container">
+    <div class="section-head">
+      <div class="section-tag">the CAD</div>
+      <h2>Everything a modern engineering team touches, in one workspace</h2>
+      <p>Every design lives in plain files an LLM can read and edit directly — JSCAD, `.feature` JSON, `.circuit.tsx`, `.sketch`, `.drawing`. Diffable, reviewable, yours.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature">
+        <div class="icon">◆</div>
+        <h3>Two real kernels</h3>
+        <p>JSCAD for fast iteration; OpenCascade B-rep for fillets, shells, and lossless STEP export. Pick per file.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">◇</div>
+        <h3>Parametric sketcher</h3>
+        <p>planegcs (FreeCAD's own constraint solver, compiled to WASM) driving a full feature-tree modeling stack.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">▤</div>
+        <h3>Drawings &amp; GD&amp;T</h3>
+        <p>Multi-sheet drawings, hatching, leaders, balloons, title blocks — production-ready output, not a viewer.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">⌁</div>
+        <h3>Electronics</h3>
+        <p>tscircuit JSX to schematic, PCB, and 3D board view. SPICE simulation, RF s-parameters, autoroute.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">≋</div>
+        <h3>FEM + CFD</h3>
+        <p>Linear/modal/nonlinear FEM, fatigue, thermal, explicit dynamics. k-ω SST CFD via OpenFOAM.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">⚙</div>
+        <h3>CAM + manufacturing</h3>
+        <p>2.5D/3D/lathe toolpaths, G-code posts, sheet metal, mold splits, and 3D-print slicing.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">▦</div>
+        <h3>BIM</h3>
+        <p>Walls, slabs, doors, windows, schedules — full IFC4 round-trip for architecture and MEP.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">✳</div>
+        <h3>37 domains</h3>
+        <p>Aerospace, silicon/IC, firmware, PLC, composites, dental, optics, jewelry, marine, civil, and more — one app.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">✎</div>
+        <h3>Chat-driven editing</h3>
+        <p>An LLM reads and edits your project's actual source files. Every change is a diffable, reviewable commit.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Workshop -->
+<section id="workshop" class="workshop">
+  <div class="container">
+    <div class="workshop-grid">
+      <div class="workshop-text">
+        <h2>The Workshop isn't a server.<br>It's a protocol.</h2>
+        <p>Sharing a part shouldn't require an account on someone else's platform. Kerf's Workshop is built on <b class="gold">DMTAP-PUB</b>, an open protocol for publishing signed, content-addressed objects — the same idea behind Nostr's feeds and IPFS's content addressing, purpose-built for engineering artifacts.</p>
+        <ul class="workshop-points">
+          <li><span class="mark">✓</span><span><b>No accounts.</b> Your identity is a keypair you hold, not a login on a database you don't control.</span></li>
+          <li><span class="mark">✓</span><span><b>No central server.</b> Any gateway — yours, a friend's, kerf.sh's — can serve any object, because every object proves itself.</span></li>
+          <li><span class="mark">✓</span><span><b>A workshop is just feeds you follow.</b> Publishing appends to your own feed; browsing means fetching feeds you chose.</span></li>
+          <li><span class="mark">✓</span><span><b>Offline once pinned.</b> Content-addressed and self-verifying — a part you've pinned works with zero live infrastructure.</span></li>
+          <li><span class="mark">✓</span><span><b>Plain HTTPS today.</b> No mesh client required to publish or follow — a handful of <code class="mono">GET</code> endpoints is a complete implementation.</span></li>
+        </ul>
+      </div>
+      <div class="diagram">
+        <div class="node-box you">
+          <div class="label">your machine — one kerf node</div>
+          kerf app → your storage<br>
+          <span class="verbs">pub module: publish · follow · pin · fetch</span>
+        </div>
+        <div class="arrow">┊ optional, signed, opt-in ┊</div>
+        <div class="node-box dashed">
+          <div class="label">a gateway (yours, or anyone's)</div>
+          plain HTTPS · <span class="verbs">/.well-known/dmtap-pub/*</span>
+        </div>
+        <div class="arrow">┊ ┊</div>
+        <div class="node-box dashed">
+          <div class="label">a workshop feed you follow</div>
+          another node's signed announcements
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Install -->
+<section id="install">
+  <div class="container">
+    <div class="section-head">
+      <div class="section-tag">get started</div>
+      <h2>Self-host in minutes</h2>
+      <p>No account, no cloud, no external service beyond a Postgres database you already control.</p>
+    </div>
+    <div class="install-box">
+      <div class="install-header">
+        <span>docker</span>
+        <button onclick="navigator.clipboard.writeText('git clone https://github.com/kerf-sh/kerf\ncd kerf\ndocker compose up');this.textContent='copied';setTimeout(()=>this.textContent='copy',2000)">copy</button>
+      </div>
+      <div class="install-code"><span class="p">$ </span><span class="cmd">git</span> clone <span class="str">https://github.com/kerf-sh/kerf</span>
+<span class="p">$ </span><span class="cmd">cd</span> kerf
+<span class="p">$ </span><span class="cmd">docker</span> compose up  <span class="cm"># app + postgres + redis, builds the full persona</span></div>
+    </div>
+    <p class="install-note">Then open <code>http://localhost:8080</code>. Prefer running from source? See <code>docs/getting-started.md</code> for the pip + npm walkthrough.</p>
+  </div>
+</section>
+
+<!-- Dev -->
+<section id="dev">
+  <div class="container">
+    <div class="dev-box">
+      <div class="dev-header" style="padding:2rem 2rem 1rem;background:var(--elevated);border-bottom:1px solid var(--border);">
+        <h2 style="font-family:var(--mono);font-size:1.05rem;font-weight:700;color:var(--text);margin-bottom:.35rem;">hack on kerf</h2>
+        <p style="font-size:.85rem;color:var(--text-3);">Vite + React frontend, Python/FastAPI backend, MIT top to bottom.</p>
+      </div>
+      <div class="dev-grid">
+        <div class="dev-cell">
+          <h4>frontend + backend (dev)</h4>
+          <code><span class="p">$ </span>pip install -e .[mech]<br><span class="p">$ </span>npm install<br><span class="p">$ </span>npm run dev <span class="cm"># :5173 + :8080</span></code>
+        </div>
+        <div class="dev-cell">
+          <h4>tests</h4>
+          <code><span class="p">$ </span>pytest packages/ -n auto<br><span class="p">$ </span>npm test<br><span class="p">$ </span>npm run lint</code>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VulOS family -->
+<section class="family">
+  <div class="container">
+    <div class="family-head">
+      <div class="tag">part of vulos</div>
+      <p>Kerf is one product in the VulOS suite — an open, self-hostable web OS and app family. Every product runs standalone; each is also hosted as an app by the Vulos OS shell.</p>
+    </div>
+    <div class="family-grid">
+      <div class="family-item"><div class="name">Vulos OS</div><div class="role">the shell — launcher, windows, dock</div></div>
+      <div class="family-item"><div class="name">Vulos Office</div><div class="role">docs, sheets, slides, whiteboards</div></div>
+      <div class="family-item"><div class="name">Vulos Files</div><div class="role">storage + P2P sharing</div></div>
+      <div class="family-item"><div class="name">Vulos Relay</div><div class="role">sovereign connectivity fabric</div></div>
+      <div class="family-item current"><div class="name">kerf</div><div class="role">CAD + distributed Workshop</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-left">
+        <svg viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0a0b0d"/><rect x="7" y="6" width="3.5" height="20" fill="#ffd633"/><polygon points="10.5,16 26,6 26,13" fill="#ffd633"/><polygon points="10.5,16 26,19 26,26" fill="#ffd633"/></svg>
+        kerf
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/kerf-sh/kerf" target="_blank">github</a>
+        <a href="https://github.com/kerf-sh/kerf/blob/main/ROADMAP.md" target="_blank">roadmap</a>
+        <a href="https://github.com/kerf-sh/kerf/issues" target="_blank">issues</a>
+        <a href="https://github.com/kerf-sh/kerf/blob/main/LICENSE" target="_blank">license (MIT)</a>
+        <a href="https://vulos.org" target="_blank">vulos.org</a>
+      </div>
+      <div class="footer-right">made in south africa 🇿🇦</div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

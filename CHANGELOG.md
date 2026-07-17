@@ -12,6 +12,47 @@ The authoritative source for what's shipped vs in-flight is
 See `🔮 planned` rows in [ROADMAP.md](./ROADMAP.md). The v0.2 milestone
 focus is in [docs/plans/v0.2-milestone.md](./docs/plans/v0.2-milestone.md).
 
+### 2026-07-17 — Docs: VulOS-standard README, docs, and landing page — CAD-first, distributed Workshop, no billing
+
+Public-facing docs brought up to the VulOS product standard (see the ADR
+"Kerf decentralizes: one node type, gateways as rented uptime, Workshop
+federation over DMTAP-PUB" in `decisions.md`, 2026-07-17, and the matching
+`ROADMAP.md` section). This is a documentation-first pass describing the
+decided target state; the underlying license-line redraw and DMTAP-PUB
+object model (ROADMAP P0) are tracked separately and not yet code-complete.
+
+#### Added
+- **Distributed Workshop positioning** — README, `docs/node-architecture.md`,
+  and `docs/distributed-workshop.md` (new) document Kerf's Workshop as a
+  federated protocol over **DMTAP-PUB** (`github.com/vul-os/dmtap` §22
+  public-objects extension + §23 CAD/artifact profile): signed,
+  content-addressed publish/follow/pin/fetch, no accounts, no central
+  server, availability states (on-node / available / stale / unreachable),
+  and the irrevocability-of-publishing warning.
+- **"Part of VulOS" standard docs** — README rewritten to the VulOS
+  product-repo standard's exact section order and required banner; product
+  map and family footer added to `landing/index.html`.
+- **`landing/` marketing page** — a new, self-contained static landing page
+  (`landing/index.html`, no build step, matching the sibling `wede` repo's
+  landing tooling) covering the CAD feature set, the Workshop/decentralization
+  story, and a self-host quick start.
+- **`docs/assets/vulos-logo.png`** — shared VulOS brand asset for the README
+  banner, matching sibling product repos.
+
+#### Changed
+- **No-billing positioning** — the README and landing page describe Kerf as
+  billing for nothing, ever: self-host on your own hardware, with VulOS
+  tooling (Vulos Relay, backup buckets — both VulOS services, not Kerf ones)
+  available if you want an always-on, publicly-reachable node. No pricing,
+  tiers, or cloud-product language appears in either.
+
+Files: `README.md` (full rewrite), `docs/node-architecture.md` (new),
+`docs/distributed-workshop.md` (new), `docs/assets/vulos-logo.png` (new),
+`landing/index.html` (new). Existing `docs/` files (including
+`docs/architecture.md`, `docs/getting-started.md`, and `docs/workshop.md`,
+which still documents the current centralized cloud Workshop gallery) are
+untouched.
+
 ### 2026-06-01 — Infrastructure: Koyeb migration withdrawn; stack confirmed on Fly.io
 
 - **Infrastructure** — the 2026-05-24 Koyeb migration (T-400…T-410) is

@@ -33,7 +33,6 @@ import {
 } from '../lib/projectTags.js'
 // Forward dep — workspace agent owns this file. Treat as optional.
 import ShareModal from '../components/ShareModal.jsx'
-import { useCloudConfig } from '../cloud/useCloudConfig.js'
 
 function relativeTime(iso) {
   if (!iso) return ''
@@ -239,27 +238,6 @@ function NewProjectModalBody({ onClose, onCreated, workspaceId }) {
   const [error, setError] = useState(null)
   const inputRef = useRef(null)
 
-  // Visibility default hint — cloud only. Self-hosted: cloudEnabled=false,
-  // so this block is skipped entirely (no billing concept there).
-  const { cloudEnabled } = useCloudConfig()
-  const [isPaid, setIsPaid] = useState(null) // null = loading/unknown
-
-  useEffect(() => {
-    if (!cloudEnabled) return
-    let cancelled = false
-    import('../cloud/api.js').then(({ getBillingMe }) => {
-      getBillingMe()
-        .then((me) => {
-          if (cancelled) return
-          setIsPaid(Number(me?.credits_usd) > 0)
-        })
-        .catch(() => {
-          if (!cancelled) setIsPaid(null)
-        })
-    })
-    return () => { cancelled = true }
-  }, [cloudEnabled])
-
   useEffect(() => {
     const t = setTimeout(() => inputRef.current?.focus(), 30)
     return () => clearTimeout(t)
@@ -395,18 +373,10 @@ function NewProjectModalBody({ onClose, onCreated, workspaceId }) {
           )}
         </div>
 
-        {cloudEnabled && isPaid === true && (
-          <div className="flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-800/60 px-3 py-2 text-xs text-ink-300">
-            <Lock size={12} className="shrink-0 text-ink-400" />
-            <span>Your projects are <span className="font-medium text-ink-100">private by default</span> (paid plan).</span>
-          </div>
-        )}
-        {cloudEnabled && isPaid === false && (
-          <div className="flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-800/60 px-3 py-2 text-xs text-ink-300">
-            <Globe size={12} className="shrink-0 text-ink-400" />
-            <span>Your projects are <span className="font-medium text-ink-100">public by default</span>. <span className="text-ink-400">Add credits for private projects.</span></span>
-          </div>
-        )}
+        <div className="flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-800/60 px-3 py-2 text-xs text-ink-300">
+          <Lock size={12} className="shrink-0 text-ink-400" />
+          <span>Your projects are <span className="font-medium text-ink-100">private by default</span>.</span>
+        </div>
         {/* Submit handled in footer; hidden submit lets Enter work */}
         <button type="submit" className="hidden" />
       </form>

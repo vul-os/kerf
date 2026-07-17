@@ -13,11 +13,10 @@ Worker-facing endpoints (heartbeat, claim-job, complete) use a ``Bearer``
 token that was returned ONCE on enrollment.  The token is stored as a
 bcrypt hash in ``gpu_workers.token_hash``; the raw token is NEVER stored.
 
-Billing short-circuit
----------------------
-When a BYO worker completes a job (``billing_bucket = 'byo'`` on the
-``render_jobs`` row), the billing meter is NOT charged.  This is enforced
-inside the ``/complete`` handler before it calls any credit-deduction code.
+No billing
+----------
+Kerf has no billing anywhere. GPU render jobs always run on the user's own
+hardware; ``/complete`` never charges a credit.
 
 Signed-upload-URL flow (SIGNED-UPLOAD-URL)
 ------------------------------------------
@@ -33,7 +32,6 @@ directly to that URL (R2 / S3), then calls ``/complete`` with the
 2. ``signed_url`` (legacy) — worker provides a pre-formed URL; recorded
    verbatim (back-compat).
 
-Both paths respect the BYO billing short-circuit.
 """
 from __future__ import annotations
 
@@ -402,7 +400,7 @@ async def complete_job(
 ):
     """Mark a render job as complete.
 
-    Accepts two upload paths — both respect the BYO billing short-circuit.
+    Accepts two upload paths.
 
     result_key path (preferred)
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -415,14 +413,6 @@ async def complete_job(
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Worker provides a pre-formed URL in ``signed_url``; recorded verbatim.
     No storage verification is performed.
-
-    Billing short-circuit
-    ~~~~~~~~~~~~~~~~~~~~~
-    When ``render_jobs.billing_bucket = 'byo'``, credit charging is
-    skipped entirely — the user is paying their own GPU bill.
-
-    For ``billing_bucket = 'kerf_paid'``, the existing
-    :func:`kerf_billing.render_meter.charge_render` path is invoked.
     """
     pool = await get_pool_required()
     await _verify_worker_token(request, worker_id, pool)
@@ -526,37 +516,15 @@ async def complete_job(
             worker_id, job_id,
         )
 
+    # Kerf has no billing anywhere — GPU render jobs always run on the
+    # user's own hardware (BYO), so there is never a credit charge here.
+    # ``billing_bucket`` is kept only as a legacy label on the row.
     charged = False
     charge_result: Dict[str, Any] = {}
-
-    if billing_bucket == "byo":
-        # BYO path: user's own GPU — no credit deduction.
-        logger.info(
-            "complete_job: job=%s billing_bucket=byo — skipping credit charge (user=%s)",
-            job_id, user_id,
-        )
-        charged = False
-    elif billing_bucket == "kerf_paid" and user_id:
-        # Hosted-backend path: deduct from kerf_paid credits.
-        try:
-            from kerf_billing.render_meter import charge_render
-            charge_result = await charge_render(
-                pool,
-                user_id=user_id,
-                job_id=job_id,
-                preset=preset,
-                gpu_seconds_actual=body.gpu_seconds,
-            )
-            charged = charge_result.get("ok", False)
-        except Exception as exc:
-            logger.warning(
-                "complete_job: charge_render failed for job=%s: %s", job_id, exc
-            )
-    else:
-        logger.debug(
-            "complete_job: job=%s billing_bucket=%r user_id=%r — no charge path",
-            job_id, billing_bucket, user_id,
-        )
+    logger.info(
+        "complete_job: job=%s user=%s — no charge (BYO) completion_path=%s",
+        job_id, user_id, completion_path,
+    )
 
     logger.info(
         "complete_job: worker=%s job=%s billing_bucket=%s charged=%s completion_path=%s",
@@ -567,7 +535,7 @@ async def complete_job(
         "charged": charged,
         "billing_bucket": billing_bucket,
         "completion_path": completion_path,
-        "charge_result": charge_result if charged else None,
+        "charge_result": None,
     }
 
 

@@ -50,17 +50,15 @@ def test_zero_workers_is_clean_noop(monkeypatch):
     from kerf_workers import runner
     from kerf_workers.runner import InProcessWorkers, _build_workers
 
-    # All JOB-worker counts 0 → only the always-on PricingRefreshWorker
-    # and RateLimitGCWorker remain (both are unconditional infrastructure
-    # workers: one keeps model_prices current, the other prunes stale
-    # rate-limit rows every 15 min).
+    # All JOB-worker counts 0 → only the always-on RateLimitGCWorker
+    # remains (unconditional infrastructure: prunes stale rate-limit rows
+    # every 15 min).
     workers = _build_workers(
         pool=object(), storage_getter=lambda: None,
         fem_count=0, sim_count=0, tess_count=0, cam_count=0,
         compaction_count=0, cloud_enabled=False, local_mode=True,
     )
     worker_names = {type(w).__name__ for w in workers}
-    assert "PricingRefreshWorker" in worker_names
     assert "RateLimitGCWorker" in worker_names
     # No job-processing workers should be present.
     job_worker_names = {"FEMWorker", "SPICEWorker", "AutoTessWorker", "CAMWorker", "CompactionWorker"}

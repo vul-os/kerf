@@ -69,8 +69,6 @@ const TEMPLATES = [
   'welcome',
   'password_reset',
   'password_reset_complete',
-  'billing_receipt',
-  'low_balance',
   'github_linked',
   'workshop_published',
 ]

@@ -206,7 +206,8 @@ async def materialize_and_commit(
                       tree is exactly this set (a snapshot, not a delta).
         project_id:   Project UUID — recorded in ``blob_refs``.
         workspace_id: Workspace UUID — recorded as ``first_workspace_id`` on
-                      first upload of an oid (dedup billing). May be ``None``.
+                      first upload of an oid (storage dedup bookkeeping).
+                      May be ``None``.
         storage:      Object-storage backend (``LocalStorage``/``S3Storage``).
         db_conn:      An ``asyncpg`` connection for the dedup ledger writes.
         message:      Commit message.

@@ -158,10 +158,8 @@ class CyclesQueueWorker(BaseWorker):
                 "cycles_queue_worker: job=%s complete url=%s seconds=%.1f",
                 job_id, signed_url, gpu_seconds,
             )
-            # Charge the workspace owner for GPU time consumed (R1 — T-402).
-            # Propagate failures so the caller marks the job as failed rather
-            # than silently under-billing (we would rather refund than miss a
-            # charge).
+            # Record local usage telemetry for GPU time consumed. No billing
+            # — this is only the owner's own record of what a render used.
             if job_user_id is not None:
                 gpu_model = result.get("gpu_model", "l4")
                 await meter_render_job(
@@ -173,7 +171,7 @@ class CyclesQueueWorker(BaseWorker):
                 )
             else:
                 logger.warning(
-                    "cycles_queue_worker: job=%s has no user_id — skipping billing",
+                    "cycles_queue_worker: job=%s has no user_id — skipping usage telemetry",
                     job_id,
                 )
         else:

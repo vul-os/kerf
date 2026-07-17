@@ -3,8 +3,6 @@
  * marketing / domain / compare / docs pages.
  *
  * Checks:
- *   Pricing    — main landmark, section labels, aria-expanded on FAQ,
- *                plan cards use article role, icon aria-hidden
  *   Roadmap    — aria-pressed on filter chips, filter groups have labels,
  *                hero section label
  *   DomainPage — table caption, scope=col/row, icon aria-labels,
@@ -53,66 +51,6 @@ vi.mock('../../routes/Docs/searchIndex.js', () => ({
 vi.mock('../../lib/compareManifest.js', () => ({
   fetchCompareManifest: () => Promise.resolve({ items: [] }),
 }))
-
-/* ── Pricing ────────────────────────────────────────────────────────────── */
-
-describe('Pricing page — T-H1 a11y', () => {
-  let Pricing
-  beforeAll(async () => {
-    const mod = await import('../Pricing.jsx')
-    Pricing = mod.default
-  })
-
-  it('renders without throwing', () => {
-    expect(() => render(<Pricing />)).not.toThrow()
-  })
-
-  it('has a <main> landmark', () => {
-    const html = render(<Pricing />)
-    expect(html).toMatch(/<main[\s>]/)
-  })
-
-  it('hero section has aria-labelledby pointing to an h1 id', () => {
-    const html = render(<Pricing />)
-    expect(html).toMatch(/aria-labelledby="pricing-hero-heading"/)
-    expect(html).toMatch(/id="pricing-hero-heading"/)
-  })
-
-  it('billing section has aria-labelledby', () => {
-    const html = render(<Pricing />)
-    expect(html).toMatch(/aria-labelledby="pricing-billing-heading"/)
-  })
-
-  it('FAQ section has aria-labelledby', () => {
-    const html = render(<Pricing />)
-    expect(html).toMatch(/aria-labelledby="pricing-faq-heading"/)
-  })
-
-  it('plan cards use article role with aria-label', () => {
-    const html = render(<Pricing />)
-    // Each plan card wraps in <article aria-label="… plan">
-    expect(html).toMatch(/aria-label="Free plan"/)
-    expect(html).toMatch(/aria-label="Studio plan"/)
-    expect(html).toMatch(/aria-label="Pro plan"/)
-  })
-
-  it('FAQ summary has aria-expanded', () => {
-    const html = render(<Pricing />)
-    // Initially closed — all FAQ items render with aria-expanded="false"
-    expect(html).toMatch(/aria-expanded="false"/)
-  })
-
-  it('plan icon wrappers have aria-hidden', () => {
-    const html = render(<Pricing />)
-    // The plan icon span has aria-hidden
-    expect(html).toMatch(/aria-hidden="true"/)
-  })
-
-  it('plan pricing section has aria-label', () => {
-    const html = render(<Pricing />)
-    expect(html).toMatch(/aria-label="Pricing plans"/)
-  })
-})
 
 /* ── Roadmap ─────────────────────────────────────────────────────────────── */
 

@@ -30,7 +30,6 @@ _SERVER_PACKAGES_REQUIRED = {
     "kerf-core",
     "kerf-api",
     "kerf-auth",
-    "kerf-billing",
     "kerf-cloud",
     "asyncpg",
     "uvicorn",
@@ -199,7 +198,7 @@ class TestEntryPointResolution:
         server_req_names = _server_dep_names(
             [r.split(";")[0].strip() for r in server_reqs]
         )
-        for pkg in ("kerf-core", "kerf-api", "kerf-auth", "kerf-billing", "kerf-cloud"):
+        for pkg in ("kerf-core", "kerf-api", "kerf-auth", "kerf-cloud"):
             assert pkg in server_req_names, (
                 f"'{pkg}' not found in installed kerf-cli [server] requires. "
                 f"Available: {sorted(server_req_names)}"

@@ -1,6 +1,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Share2, Save, Loader2, ArrowLeft, Check, X, RotateCcw, Undo2, Redo2, GitBranch, MessageSquare, PanelRightClose, PanelRightOpen, PanelLeftOpen, PanelLeftClose, Plus, Box, SlidersHorizontal, ChevronDown, ArrowRight, RotateCw, Activity as ActivityIcon, FileDown, LogOut, UserCog, Settings, CreditCard, Users } from 'lucide-react'
+import { Share2, Save, Loader2, ArrowLeft, Check, X, RotateCcw, Undo2, Redo2, GitBranch, MessageSquare, PanelRightClose, PanelRightOpen, PanelLeftOpen, PanelLeftClose, Plus, Box, SlidersHorizontal, ChevronDown, ArrowRight, RotateCw, Activity as ActivityIcon, FileDown, LogOut, UserCog, Settings, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { LogoWordmark } from '../components/Logo.jsx'
 import FileTree from '../components/FileTree.jsx'
@@ -265,7 +265,6 @@ function EditorUserMenu({ user }) {
   const navigate = useNavigate()
   const logout = useAuth((s) => s.logout)
   const currentWorkspaceSlug = useWorkspaces((s) => s.currentSlug)
-  const { cloudEnabled } = useCloudConfig()
 
   // Keep openRef in sync so the stable listener reads the latest value
   // without depending on `open` (and thus avoiding re-registration races
@@ -358,17 +357,6 @@ function EditorUserMenu({ user }) {
                 <Settings size={14} className="text-ink-300" />
                 Workspace settings
               </Link>
-              {cloudEnabled && (
-                <Link
-                  to="/billing"
-                  role="menuitem"
-                  onClick={() => setOpen(false)}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
-                >
-                  <CreditCard size={14} className="text-ink-300" />
-                  Billing
-                </Link>
-              )}
             </div>
           )}
           <div className="py-1 border-t border-ink-800">

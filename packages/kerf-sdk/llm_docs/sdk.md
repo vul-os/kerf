@@ -175,7 +175,7 @@ with Kerf(token=load_token(), base_url=load_url()) as kerf:
 ## Integration points
 
 - **API tokens** (`kerf-auth`): the SDK token authenticates through `require_auth` — same dependency as all other protected routes.
-- **Billing** (`kerf-billing`): SDK tokens on paid paths can carry a `max_spend_per_day_usd` cap. Exceeding the cap returns `ApiTokenDailyCapExceeded` as a `KerfError`.
+- **No billing anywhere**: Kerf has no billing anywhere, so SDK calls run unconditionally — there is no spend cap enforcement.
 - **RPC endpoint**: `/v1/rpc` is mounted by `kerf-api` and dispatches to the same tool handlers used by the chat agent.
 
 ---

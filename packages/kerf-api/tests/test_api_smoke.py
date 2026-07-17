@@ -503,32 +503,3 @@ def test_smoke_cover_no_cover_404(client: TestClient):
         f"cover with no image should 404, got {r.status_code}: {r.text}"
     )
 
-
-# ── 15. GET /api/billing/me — billing group (skipped if cloud disabled) ───
-
-def test_smoke_billing_me(client: TestClient):
-    from kerf_core.config import get_settings
-    if not get_settings().cloud_enabled:
-        pytest.skip("billing routes not mounted: cloud_enabled=False")
-
-    uid = _ids()["user_id"]
-    r = client.get("/api/billing/me", headers=_auth_headers(uid))
-    assert r.status_code < 500, f"billing/me {r.status_code}: {r.text}"
-    assert r.status_code == 200, f"billing/me {r.status_code}: {r.text}"
-    body = r.json()
-    assert "credits_usd" in body, f"billing/me missing credits_usd: {body}"
-
-
-# ── 16. GET /api/billing/usage — billing usage group (skipped if cloud off)
-
-def test_smoke_billing_usage(client: TestClient):
-    from kerf_core.config import get_settings
-    if not get_settings().cloud_enabled:
-        pytest.skip("billing routes not mounted: cloud_enabled=False")
-
-    uid = _ids()["user_id"]
-    r = client.get("/api/billing/usage", headers=_auth_headers(uid))
-    assert r.status_code < 500, f"billing/usage {r.status_code}: {r.text}"
-    assert r.status_code == 200, f"billing/usage {r.status_code}: {r.text}"
-    body = r.json()
-    assert "events" in body, f"billing/usage missing events: {body}"

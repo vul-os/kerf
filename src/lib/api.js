@@ -573,14 +573,6 @@ export const api = {
         method: 'PUT',
         body: { is_verified_publisher: !!isVerified },
       }),
-
-    // T-408: break-even margin monitoring
-    // Returns {month, fixed_cost_usd, by_kind, totals, margin_after_fixed_usd,
-    //          break_even_seats, margin_pct}
-    getMargin: (month) => {
-      const qs = month ? `?month=${encodeURIComponent(month)}` : ''
-      return request(`/api/admin/margin${qs}`)
-    },
   },
 
   // ---- Library Phase 2: per-Part distributor refresh ----

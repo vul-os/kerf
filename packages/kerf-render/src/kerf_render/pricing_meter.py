@@ -1,37 +1,31 @@
-"""GPU-seconds → kerf_paid credit debit meter for Cycles render jobs.
+"""GPU-seconds → local usage telemetry for Cycles render jobs.
 
-After a Cycles job completes the worker calls :func:`meter_render_job` to
-convert the measured GPU wall-clock seconds into a USD cost and debit the
-workspace owner's ``kerf_paid`` balance via the ``cloud_debit_balance()``
-Postgres stored function.
+Kerf has no billing anywhere. After a Cycles job completes the worker calls
+:func:`meter_render_job` to record the measured GPU wall-clock seconds (and
+an informational cost estimate) as a local ``usage_events`` row — a box
+owner's own record of what a render job consumed, not a credit charge. No
+balance is debited and no network call is made.
 
-Short-circuit paths
+Short-circuit path
 -------------------
 * **Free/browser preview** — ``gpu_seconds == 0`` (browser WebGL fallback,
-  cache hit reported as 0 s, or an explicit zero override).  No debit is
-  issued and the function returns immediately with ``charged_usd=0``.
-
-* **Self-hosted / billing disabled** — when the environment variable
-  ``KERF_RENDER_BILLING_DISABLED=1`` is set (standard in the self-host
-  docker image, T-106e) the function returns without touching the DB.
-  This makes the worker safe to run on user-owned GPU hardware where no
-  Kerf cloud account is involved.
+  cache hit reported as 0 s, or an explicit zero override).  No telemetry
+  row is written and the function returns immediately with
+  ``charged_usd=0``.
 
 GPU rate table
 --------------
 Rates are in **USD per GPU-second** (not per hour) to keep the arithmetic
-straightforward.  Operators can override the defaults at import time by
-mutating :data:`GPU_RATES_USD_PER_SECOND` — the dict is module-level and
-looked up at call time, not at import time.
+straightforward, purely for the informational cost estimate recorded in
+local telemetry (never billed to anyone). Operators can override the
+defaults at import time by mutating :data:`GPU_RATES_USD_PER_SECOND` — the
+dict is module-level and looked up at call time, not at import time.
 
 .. note::
-   **GPU pricing is a placeholder.**  Current Fly.io-only deploys use
-   CPU rendering on the app server (no GPU spend).  These rates will be
-   re-grounded to live RunPod Serverless or Modal pricing once a GPU
-   backend is integrated (see ``kerf_render.dispatch`` for the dispatch
-   seam and ``kerf_workers.compute_backend`` for the backend interface).
-   The table below uses representative market rates for common GPU SKUs;
-   treat them as estimates until the backend is confirmed.
+   **GPU pricing is a placeholder.**  These rates are representative market
+   rates for common GPU SKUs, used only to estimate a "this render would
+   have cost about $X on rented hardware" figure for the owner's own
+   dashboard; treat them as estimates.
 
 +----------------+-------+--------------------+------------------------------+
 | model key      | VRAM  | est. $/hr (market) | est. rate (USD / GPU-second) |
@@ -47,45 +41,19 @@ looked up at call time, not at import time.
 | h200           |141 GB | ~3.00              | 0.000833                     |
 +----------------+-------+--------------------+------------------------------+
 
-Unknown GPU models fall back to the L4 rate — the entry-level SKU that
-serves as the default for Cycles render dispatch.
-
-Database contract
------------------
-``cloud_debit_balance(user_id UUID, amount NUMERIC)``
-
-A *positive* ``amount`` is a debit (reduces ``credits_usd``); a negative
-amount credits the balance.  The function upserts the ``cloud_user_balances``
-row so it is safe to call even if no balance row exists for the user yet.
+Unknown GPU models fall back to the L4 rate.
 """
 from __future__ import annotations
 
 import logging
-import os
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# GPU markup — mirrors cloud_pricing_token_markup_pct in Settings.
-# When non-zero, the billed amount = COGS × (1 + markup/100).
-# Overridable at runtime by mutating this module-level variable or by
-# passing markup_pct= explicitly to compute_usd_cost / meter_render_job.
-# ---------------------------------------------------------------------------
-
-#: Default GPU markup percentage (mirrors cloud_pricing_token_markup_pct).
-#: Operators may override this after import; the value is read at call time.
-#: TODO: re-calibrate once RunPod/Modal backend is live and per-second billing
-#: variance is known. 35% is a conservative placeholder that absorbs storage
-#: egress, autoscale buffer, and operational overhead.
-GPU_MARKUP_PCT: float = 35.0
-
-# ---------------------------------------------------------------------------
 # GPU rate table (USD per GPU-second) — placeholder rates based on market
-# estimates for common GPU SKUs (rate = hourly $ / 3600).
-#
-# TODO: ground these to live RunPod Serverless or Modal pricing once the
-# GPU backend is integrated. See kerf_render.dispatch for the dispatch seam.
+# estimates for common GPU SKUs (rate = hourly $ / 3600). Used only for the
+# informational cost estimate in local telemetry — never billed.
 # ---------------------------------------------------------------------------
 
 #: Maps GPU model name (case-insensitive lookup key) to USD per GPU-second.
@@ -108,51 +76,29 @@ GPU_RATES_USD_PER_SECOND: dict[str, float] = {
 #: L4 — the default SKU used by the Cycles dispatch policy.
 _DEFAULT_GPU_RATE: float = GPU_RATES_USD_PER_SECOND["l4"]
 
-# ---------------------------------------------------------------------------
-# Env-var kill-switch
-# ---------------------------------------------------------------------------
-
-_BILLING_DISABLED_VAR = "KERF_RENDER_BILLING_DISABLED"
-
-
-def _billing_disabled() -> bool:
-    """Return True when the self-host billing kill-switch is active."""
-    return os.environ.get(_BILLING_DISABLED_VAR, "").strip() == "1"
-
 
 # ---------------------------------------------------------------------------
 # Rate lookup
 # ---------------------------------------------------------------------------
 
 def gpu_rate(gpu_model: str) -> float:
-    """Return the USD-per-GPU-second rate for *gpu_model*.
+    """Return the USD-per-GPU-second estimate rate for *gpu_model*.
 
     The lookup is case-insensitive.  Unknown models fall back to the L4
-    (default GPU tier) rate so we never under-bill an unrecognised
-    hardware type by accident.
+    (default GPU tier) rate.
     """
     return GPU_RATES_USD_PER_SECOND.get(gpu_model.lower(), _DEFAULT_GPU_RATE)
 
 
-def compute_usd_cost(
-    gpu_seconds: float,
-    gpu_model: str,
-    *,
-    markup_pct: Optional[float] = None,
-) -> float:
-    """Return the billed USD cost for *gpu_seconds* on *gpu_model*.
-
-    The billed amount is COGS × (1 + markup/100).  When *markup_pct* is
-    ``None`` the module-level :data:`GPU_MARKUP_PCT` is used (default 35%).
-    Pass ``markup_pct=0`` to get the bare COGS figure.
+def compute_usd_cost(gpu_seconds: float, gpu_model: str) -> float:
+    """Return the informational USD cost estimate for *gpu_seconds* on
+    *gpu_model*. Never billed to anyone — purely a local telemetry figure.
 
     Returns ``0.0`` when ``gpu_seconds <= 0`` (free / browser path).
     """
     if gpu_seconds <= 0:
         return 0.0
-    cogs = gpu_seconds * gpu_rate(gpu_model)
-    pct = markup_pct if markup_pct is not None else GPU_MARKUP_PCT
-    return cogs * (1.0 + pct / 100.0)
+    return gpu_seconds * gpu_rate(gpu_model)
 
 
 # ---------------------------------------------------------------------------
@@ -166,20 +112,19 @@ async def meter_render_job(
     gpu_model: str = "l4",
     *,
     job_id: Optional[str] = None,
-    markup_pct: Optional[float] = None,
 ) -> dict:
-    """Debit the workspace owner's kerf_paid balance for a completed render.
+    """Record a local usage_events row for a completed render — no billing.
 
     Parameters
     ----------
     pool:
         asyncpg connection pool (or any object exposing ``acquire()`` as an
         async context manager that yields a connection with ``execute()``).
-        May be ``None`` when ``gpu_seconds == 0`` or billing is disabled,
-        in which case no DB calls are made.
+        May be ``None`` when ``gpu_seconds == 0``, in which case no DB calls
+        are made.
     workspace_id:
-        The UUID of the workspace that owns the render job.  Used as the
-        ``user_id`` argument to ``cloud_debit_balance()``.
+        The UUID of the workspace that owns the render job. Recorded as the
+        ``user_id`` on the local usage_events row.
     gpu_seconds:
         Measured GPU wall-clock seconds as reported by the cycles_worker.
         Pass ``0`` for cache hits or browser-fallback renders (free path).
@@ -187,20 +132,16 @@ async def meter_render_job(
         GPU hardware identifier (e.g. ``"l4"``, ``"a100"``).
         Case-insensitive; unknown values fall back to the L4 rate.
     job_id:
-        Optional render job UUID for logging / traceability.  Also used as
-        the primary key when writing a ``usage_events`` row.
-    markup_pct:
-        GPU markup percentage to apply on top of COGS.  ``None`` uses the
-        module-level :data:`GPU_MARKUP_PCT` (default 35%).  Pass ``0`` to
-        charge bare COGS (useful for BYO / test scenarios).
+        Optional render job UUID for logging / traceability. Also used as
+        the primary key when writing the ``usage_events`` row.
 
     Returns
     -------
     dict with keys:
-        ``charged_usd``  float — actual USD debited (0 if skipped)
-        ``skipped``      bool  — True when no debit was issued
-        ``skip_reason``  str | None — ``"zero_gpu_seconds"``,
-                         ``"billing_disabled"``, or ``None``
+        ``charged_usd``  float — informational cost estimate (always 0 if
+                          skipped; never actually charged to anyone)
+        ``skipped``      bool  — True when no telemetry row was written
+        ``skip_reason``  str | None — ``"zero_gpu_seconds"`` or ``None``
     """
     tag = f"[job={job_id}] " if job_id else ""
 
@@ -213,35 +154,16 @@ async def meter_render_job(
             "skip_reason": "zero_gpu_seconds",
         }
 
-    # ── Short-circuit: self-hosted / billing disabled ────────────────────────
-    if _billing_disabled():
-        logger.debug(
-            "%smeter_render_job: skip (%s=1)", tag, _BILLING_DISABLED_VAR
-        )
-        return {
-            "charged_usd": 0.0,
-            "skipped": True,
-            "skip_reason": "billing_disabled",
-        }
+    # ── Compute informational cost estimate (never billed) ──────────────────
+    cost_usd = compute_usd_cost(gpu_seconds, gpu_model)
 
-    # ── Compute cost (COGS × (1 + markup)) ───────────────────────────────────
-    cost_usd = compute_usd_cost(gpu_seconds, gpu_model, markup_pct=markup_pct)
-
-    # ── Debit via cloud_debit_balance() ──────────────────────────────────────
-    async with pool.acquire() as conn:
-        await conn.execute(
-            "SELECT cloud_debit_balance($1, $2)",
-            workspace_id,
-            cost_usd,
-        )
-
-    # ── Emit gpu usage_events row (makes GPU spend visible on ledger) ─────────
+    # ── Local usage telemetry — a kind='gpu' usage_events row ───────────────
     if job_id and pool is not None:
         await _record_gpu_usage_event(pool, workspace_id, job_id, gpu_seconds, cost_usd)
 
     logger.info(
-        "%smeter_render_job: charged workspace=%s gpu_model=%s "
-        "gpu_seconds=%.2f charged_usd=%.6f",
+        "%smeter_render_job: recorded workspace=%s gpu_model=%s "
+        "gpu_seconds=%.2f est_usd=%.6f",
         tag,
         workspace_id,
         gpu_model,
@@ -265,9 +187,8 @@ async def _record_gpu_usage_event(
 ) -> None:
     """Append a kind='gpu' row to usage_events (best-effort, fire-and-forget).
 
-    This makes GPU render spend visible alongside token/storage on the user-
-    facing billing dashboard, replacing the render-only ``render_usage_events``
-    table as the public ledger entry point.
+    Local telemetry only — a box owner's own record of GPU render usage.
+    No credits, no balance, no network call.
     """
     try:
         async with pool.acquire() as conn:
@@ -275,7 +196,7 @@ async def _record_gpu_usage_event(
                 """
                 INSERT INTO usage_events
                     (id, user_id, kind, usd_cost, payer)
-                VALUES ($1, $2, 'gpu', $3, 'kerf_paid')
+                VALUES ($1, $2, 'gpu', $3, 'byo')
                 ON CONFLICT (id) DO NOTHING
                 """,
                 job_id,
@@ -288,7 +209,6 @@ async def _record_gpu_usage_event(
 
 __all__ = [
     "GPU_RATES_USD_PER_SECOND",
-    "GPU_MARKUP_PCT",
     "gpu_rate",
     "compute_usd_cost",
     "meter_render_job",

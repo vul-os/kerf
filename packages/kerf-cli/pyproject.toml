@@ -22,7 +22,6 @@ server = [
     "kerf-api>=0.1.0",
     "kerf-auth>=0.1.0",
     "kerf-pub>=0.1.0",
-    "kerf-billing>=0.1.0",
     "kerf-cloud>=0.1.0",
     "asyncpg>=0.29.0",
     "uvicorn[standard]>=0.29.0",

@@ -265,9 +265,6 @@ async def get_config():
         "local_mode": settings.local_mode,
     }
     if settings.cloud_enabled:
-        # cloud_beta: billing-disabled mode. Mirrored from KERF_CLOUD_BETA env.
-        if settings.cloud_beta:
-            payload["cloud_beta"] = True
         # OAuth availability — public client IDs + bool flags only, no
         # secrets. The frontend renders the Google/GitHub buttons from
         # these runtime values (Vite can't inline per-env build-time vars).
@@ -277,8 +274,6 @@ async def get_config():
             payload["google_client_id"] = settings.google_client_id
         if settings.cloud_github_client_id:
             payload["github_client_id"] = settings.cloud_github_client_id
-        if settings.cloud_paystack_public_key:
-            payload["paystack_public_key"] = settings.cloud_paystack_public_key
     return payload
 
 
@@ -638,17 +633,17 @@ def _get_llm_registry() -> llm_module.Registry:
     ))
 
 
-async def _make_byo_provider(pool, user_id: str, provider_name: str, *, fallback):
-    """Build a Provider instance whose api_key comes from the user's saved
-    BYO key.
+async def _prefer_byo_provider(pool, user_id: Optional[str], provider):
+    """Swap in the user's own saved provider key when they have one.
 
-    R12: on any failure (missing row, decryption error, unsupported provider)
-    we raise HTTP 402 with ``detail="byo_key_unavailable"`` rather than
-    silently falling back to Kerf's server key.  Falling back would bill $0
-    (bucket=Byo) while using Kerf's API key — Kerf eats the provider cost.
-    The ``fallback`` parameter is kept for signature compatibility but is
-    never used; callers should expect a possible 402.
+    Kerf has no billing anywhere, so this is a pure convenience preference —
+    not a credit bucket. If the user saved a key for this provider via
+    POST /api/provider-keys, use it instead of the operator's configured
+    key. Best-effort: any failure (no key saved, decrypt error, etc.) just
+    keeps the operator's default `provider` — never raises.
     """
+    if not user_id:
+        return provider
     try:
         from kerf_core.utils.encrypt import decrypt_secret
         async with pool.acquire() as conn:
@@ -658,15 +653,12 @@ async def _make_byo_provider(pool, user_id: str, provider_name: str, *, fallback
                 FROM user_provider_keys
                 WHERE user_id = $1 AND provider = $2
                 """,
-                user_id, provider_name,
+                user_id, provider.name(),
             )
         if not row:
-            _logger.warning("byo: no key row for user_id=%s provider=%s", user_id, provider_name)
-            raise HTTPException(status_code=402, detail="byo_key_unavailable")
+            return provider
         api_key = decrypt_secret(row["encrypted_key"], "byo-provider-key").decode()
-
-        # Match Registry.resolve's provider mapping — the names we accept
-        # match Provider.name() return values from kerf_chat.llm.
+        provider_name = provider.name()
         if provider_name == "anthropic":
             return llm_module.AnthropicProvider(api_key)
         if provider_name == "openai":
@@ -675,14 +667,10 @@ async def _make_byo_provider(pool, user_id: str, provider_name: str, *, fallback
             return llm_module.MoonshotProvider(api_key)
         if provider_name == "gemini":
             return llm_module.GeminiProvider(api_key)
-        # Unsupported provider name — refuse rather than fall back.
-        _logger.warning("byo: unsupported provider=%s for user_id=%s", provider_name, user_id)
-        raise HTTPException(status_code=402, detail="byo_key_unavailable")
-    except HTTPException:
-        raise
-    except Exception:
-        _logger.exception("byo: provider override failed — raising 402 (not falling back)")
-        raise HTTPException(status_code=402, detail="byo_key_unavailable")
+        return provider
+    except Exception as exc:
+        _logger.debug("byo: no usable saved key for user_id=%s: %s", user_id, exc)
+        return provider
 
 
 @router.get("/bootstrap")
@@ -1241,17 +1229,9 @@ async def create_project(req: CreateProjectRequest, payload: dict = Depends(requ
             starter, STARTER_SEEDS[DEFAULT_STARTER]
         )
 
-        # ── Default visibility: cloud paid → private, cloud free → public,
-        #    self-hosted → private (Workshop concept doesn't exist there).
+        # ── Default visibility: always private. There is no paid/free tier
+        #    to distinguish any more — the user opts in to Workshop sharing.
         default_visibility = "private"
-        if settings.cloud_enabled:
-            try:
-                from kerf_billing.buckets import is_paid_user as _is_paid_user
-                if not await _is_paid_user(conn, user_id):
-                    default_visibility = "public"
-            except Exception:
-                # Billing module absent or DB error — stay safe with private.
-                pass
 
         async with conn.transaction():
             project = await projects_queries.create_project(
@@ -1502,13 +1482,6 @@ async def import_project_zip(
 
                 # default visibility: mirrors create_project logic
                 default_visibility = "private"
-                if settings.cloud_enabled:
-                    try:
-                        from kerf_billing.buckets import is_paid_user as _is_paid_user
-                        if not await _is_paid_user(conn, user_id):
-                            default_visibility = "public"
-                    except Exception:
-                        pass
 
                 async with conn.transaction():
                     project = await projects_queries.create_project(
@@ -3645,92 +3618,11 @@ async def post_message(
             )
         return {"user_message": user_msg, "assistant_message": assistant_msg, "tool_messages": []}
 
-    # ── Three-bucket billing selection (cloud only) ─────────────────────────
-    # In OSS/local mode billing is dormant; pick_bucket can't talk to
-    # cloud_user_balances (the table may not exist) so we wrap the whole
-    # gate in settings.usage_enabled and short-circuit otherwise.
-    bucket = None
-    bucket_model_info = None
-    bucket_model_info_price = None
-    bucket_provider_name = provider.name()
-    if settings.usage_enabled:
-        try:
-            from kerf_billing.buckets import (
-                load_model_info,
-                load_user_billing,
-                pick_bucket,
-                InsufficientCredits,
-                Byo,
-            )
-            from kerf_pricing.queries import get_price as _get_price
-
-            bucket_model_info = await load_model_info(
-                pool, bucket_provider_name, provider_model_id,
-            )
-            if bucket_model_info is None:
-                # The model isn't in our pricing table — refuse to bill an
-                # unknown rate.  Tell the user; their admin can refresh.
-                async with pool.acquire() as conn:
-                    assistant_msg = await _insert_assistant_message(
-                        conn, tid,
-                        "That model isn't in the pricing table yet — contact admin to refresh /api/admin/pricing/refresh.",
-                        "none", None,
-                    )
-                    await conn.execute(
-                        "UPDATE chat_threads SET last_message_at = now(), updated_at = now() WHERE id = $1", tid
-                    )
-                return {"user_message": user_msg, "assistant_message": assistant_msg, "tool_messages": []}
-
-            user_billing = await load_user_billing(pool, user_id)
-
-            # Rough estimate for the credit check: assume ~1k in + ~1k out
-            # at provider COGS × markup.  Off by an order of magnitude on
-            # large turns, but the spend-commit path settles against the
-            # real numbers so this only gates rejection.
-            bucket_model_info_price = await _get_price(
-                pool, bucket_provider_name, provider_model_id,
-            )
-            est_cogs = bucket_model_info_price.compute_cost_usd(1000, 1000) \
-                if bucket_model_info_price else 0.0
-            # R7: read markup from settings
-            _token_markup = 1.0 + settings.cloud_pricing_token_markup_pct / 100.0
-            est_billed = est_cogs * _token_markup
-
-            bucket = pick_bucket(
-                user_billing, bucket_model_info, est_billed,
-                estimated_input_tokens=1000, estimated_output_tokens=1000,
-            )
-
-            if isinstance(bucket, InsufficientCredits):
-                code = (
-                    "INSUFFICIENT_CREDITS_BYO_AVAILABLE"
-                    if bucket.byo_available
-                    else "INSUFFICIENT_CREDITS"
-                )
-                raise HTTPException(
-                    status_code=402,
-                    detail={"code": code, "provider": bucket_provider_name},
-                )
-
-            # BYO: pull the encrypted key and instantiate an override provider.
-            if isinstance(bucket, Byo):
-                provider = await _make_byo_provider(
-                    pool, user_id, bucket.provider, fallback=provider,
-                )
-        except HTTPException:
-            raise
-        except ImportError as bx:
-            # Billing module not installed (OSS/local mode) — safe to skip.
-            _logger.debug(f"bucket-select: billing module unavailable, skipping: {bx}")
-            bucket = None
-        except Exception as bx:
-            # Unexpected error in billing gate — fail closed to avoid a free
-            # expensive-model call.
-            _logger.error(f"bucket-select: unexpected billing error: {bx}")
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="billing service error — please try again",
-            )
+    # Kerf is 100% free, self-hosted software — there is no credit/quota gate.
+    # If the caller saved their own provider key (POST /api/provider-keys),
+    # prefer it over the operator's configured key; otherwise use the
+    # operator's key (ANTHROPIC_API_KEY etc. in Settings) directly.
+    provider = await _prefer_byo_provider(pool, user_id, provider)
 
     # Resolve project tags addendum
     async with pool.acquire() as conn:
@@ -3756,56 +3648,6 @@ async def post_message(
     tool_msgs: list = []
 
     for iteration in range(_MAX_AGENT_ITERATIONS):
-        # R10: re-snapshot user_billing and re-pick bucket on every iteration
-        # (except the first, which was already resolved above) so that a
-        # drained free-tier quota from a prior commit_spend stops the loop
-        # rather than letting later iterations proceed on a stale snapshot.
-        if iteration > 0 and settings.usage_enabled and bucket is not None:
-            try:
-                from kerf_billing.buckets import (
-                    load_user_billing as _lub,
-                    pick_bucket as _pb,
-                    InsufficientCredits as _IC,
-                )
-                _user_billing_fresh = await _lub(pool, user_id)
-                _bucket_fresh = _pb(
-                    _user_billing_fresh, bucket_model_info, est_billed,
-                    estimated_input_tokens=1000, estimated_output_tokens=1000,
-                )
-                if isinstance(_bucket_fresh, _IC):
-                    code = (
-                        "INSUFFICIENT_CREDITS_BYO_AVAILABLE"
-                        if _bucket_fresh.byo_available
-                        else "INSUFFICIENT_CREDITS"
-                    )
-                    async with pool.acquire() as conn:
-                        last_assistant = await _insert_assistant_message(
-                            conn, tid,
-                            "Insufficient credits to continue.",
-                            provider_model_id, None,
-                        )
-                        await conn.execute(
-                            "UPDATE chat_threads SET last_message_at = now(), updated_at = now() WHERE id = $1", tid
-                        )
-                    raise HTTPException(
-                        status_code=402,
-                        detail={"code": code, "provider": bucket_provider_name},
-                    )
-                bucket = _bucket_fresh
-            except HTTPException:
-                raise
-            except ImportError:
-                pass
-            except Exception as _rebucket_exc:
-                _logger.error(
-                    "bucket-recheck: unexpected error at iter=%d: %s",
-                    iteration, _rebucket_exc,
-                )
-                raise HTTPException(
-                    status_code=503,
-                    detail="billing service error — please try again",
-                )
-
         try:
             resp = await asyncio.get_event_loop().run_in_executor(
                 None,
@@ -3836,65 +3678,21 @@ async def post_message(
                 conn, tid, resp.content, provider_model_id, resp.tool_calls
             )
 
-        # Record token usage (cloud only)
+        # Local usage telemetry — a box owner's own record of token spend.
+        # No billing, no credits, no network call: just a row in the local
+        # usage_events table (kerf-core, MIT).
         if settings.usage_enabled and (resp.input_tokens > 0 or resp.output_tokens > 0):
             try:
-                if bucket is not None and bucket_model_info is not None:
-                    # New three-bucket path: commit via kerf_billing.spend
-                    # so usage_events.payer is set correctly + balance/quota
-                    # gets debited atomically in one txn.
-                    from kerf_billing.spend import commit_spend, ApiTokenDailyCapExceeded
-                    cogs = bucket_model_info_price.compute_cost_usd(
-                        resp.input_tokens, resp.output_tokens,
-                    ) if bucket_model_info_price else 0.0
-                    # R7: read markup from settings rather than hardcoding 1.20
-                    billed = cogs * (1.0 + settings.cloud_pricing_token_markup_pct / 100.0)
-                    try:
-                        await commit_spend(
-                            pool,
-                            bucket=bucket,
-                            user_id=user_id,
-                            project_id=pid,
-                            model=provider_model_id,
-                            input_tokens=resp.input_tokens,
-                            output_tokens=resp.output_tokens,
-                            cogs_usd=cogs,
-                            billed_usd=billed,
-                            api_token_id=None,  # web sessions don't have an api_token
-                        )
-                    except ApiTokenDailyCapExceeded as cap:
-                        # R9: known cap-exceeded is a legitimate 402 — log and
-                        # raise so the caller gets a proper error, not silence.
-                        _logger.warning(
-                            "usage: api token daily cap exceeded — "
-                            "user_id=%s model=%s est_cost=%.6f: %s",
-                            user_id, provider_model_id, billed, cap,
-                        )
-                        raise HTTPException(
-                            status_code=402,
-                            detail={"code": "API_TOKEN_DAILY_CAP_EXCEEDED"},
-                        )
-                    except Exception as billing_exc:
-                        # R9: unexpected billing failure — log with full context
-                        # and surface as 503 so the LLM call is not treated as
-                        # successfully billed.
-                        _logger.error(
-                            "usage: commit_spend failed (UNEXPECTED) — "
-                            "user_id=%s model=%s est_cost=%.6f: %s",
-                            user_id, provider_model_id, billed, billing_exc,
-                            exc_info=True,
-                        )
-                        raise HTTPException(
-                            status_code=503,
-                            detail={"code": "BILLING_WRITE_FAILED"},
-                        )
-                else:
-                    # Legacy fallback path (OSS local mode / cloud_user_balances
-                    # missing).  Records the token row only.
-                    from cloud.usage import record_token_event
-                    await record_token_event(
-                        pool, user_id, pid, provider_model_id,
-                        resp.input_tokens, resp.output_tokens, cost_usd=0.0,
+                async with pool.acquire() as conn:
+                    await usage_queries.create_usage_event(
+                        conn,
+                        user_id=uuid.UUID(user_id),
+                        kind="token",
+                        project_id=uuid.UUID(pid) if pid else None,
+                        model=provider_model_id,
+                        input_tokens=resp.input_tokens,
+                        output_tokens=resp.output_tokens,
+                        payer="byo",
                     )
             except Exception as ue:
                 _logger.warning(f"usage: record token event: {ue}")
@@ -4106,65 +3904,9 @@ async def post_message_stream(
                 )
             return
 
-        # ── Three-bucket billing (cloud only) ───────────────────────────────
-        bucket = None
-        bucket_model_info = None
-        bucket_model_info_price = None
-        bucket_provider_name = provider.name()
-        if settings.usage_enabled:
-            try:
-                from kerf_billing.buckets import (
-                    load_model_info,
-                    load_user_billing,
-                    pick_bucket,
-                    InsufficientCredits,
-                    Byo,
-                )
-                from kerf_pricing.queries import get_price as _get_price
-
-                bucket_model_info = await load_model_info(pool, bucket_provider_name, provider_model_id)
-                if bucket_model_info is None:
-                    msg = "That model isn't in the pricing table yet — contact admin to refresh /api/admin/pricing/refresh."
-                    yield _sse_frame("error", {"message": msg, "is_error": True})
-                    async with pool.acquire() as conn:
-                        await _insert_assistant_message(conn, tid, msg, "none", None)
-                        await conn.execute(
-                            "UPDATE chat_threads SET last_message_at = now(), updated_at = now() WHERE id = $1", tid
-                        )
-                    return
-
-                user_billing = await load_user_billing(pool, user_id)
-                bucket_model_info_price = await _get_price(pool, bucket_provider_name, provider_model_id)
-                est_cogs = bucket_model_info_price.compute_cost_usd(1000, 1000) if bucket_model_info_price else 0.0
-                # R7: read markup from settings
-                _token_markup = 1.0 + settings.cloud_pricing_token_markup_pct / 100.0
-                est_billed = est_cogs * _token_markup
-
-                bucket = pick_bucket(
-                    user_billing, bucket_model_info, est_billed,
-                    estimated_input_tokens=1000, estimated_output_tokens=1000,
-                )
-
-                if isinstance(bucket, InsufficientCredits):
-                    code = "INSUFFICIENT_CREDITS_BYO_AVAILABLE" if bucket.byo_available else "INSUFFICIENT_CREDITS"
-                    yield _sse_frame("error", {"message": code, "is_error": True, "code": code})
-                    return
-
-                if isinstance(bucket, Byo):
-                    provider = await _make_byo_provider(
-                        pool, user_id, bucket.provider, fallback=provider,
-                    )
-            except (GeneratorExit, asyncio.CancelledError):
-                return
-            except ImportError as bx:
-                # Billing module not installed (OSS/local mode) — safe to skip.
-                _logger.debug(f"bucket-select stream: billing module unavailable, skipping: {bx}")
-                bucket = None
-            except Exception as bx:
-                # Unexpected billing error — fail closed.
-                _logger.error(f"bucket-select stream: unexpected billing error: {bx}")
-                yield _sse_frame("error", {"message": "billing service error — please try again", "is_error": True})
-                return
+        # Kerf is 100% free, self-hosted software — there is no credit/quota
+        # gate. Prefer the caller's own saved provider key when present.
+        provider = await _prefer_byo_provider(pool, user_id, provider)
 
         last_assistant_content = ""
         last_assistant_tool_calls: list = []
@@ -4173,48 +3915,6 @@ async def post_message_stream(
 
         try:
             for iteration in range(_MAX_AGENT_ITERATIONS):
-                # R10: re-snapshot user_billing and re-pick bucket on every
-                # iteration after the first so a drained quota stops the loop.
-                if iteration > 0 and settings.usage_enabled and bucket is not None:
-                    try:
-                        from kerf_billing.buckets import (
-                            load_user_billing as _lub,
-                            pick_bucket as _pb,
-                            InsufficientCredits as _IC,
-                        )
-                        _user_billing_fresh = await _lub(pool, user_id)
-                        _bucket_fresh = _pb(
-                            _user_billing_fresh, bucket_model_info, est_billed,
-                            estimated_input_tokens=1000, estimated_output_tokens=1000,
-                        )
-                        if isinstance(_bucket_fresh, _IC):
-                            code = (
-                                "INSUFFICIENT_CREDITS_BYO_AVAILABLE"
-                                if _bucket_fresh.byo_available
-                                else "INSUFFICIENT_CREDITS"
-                            )
-                            yield _sse_frame("error", {
-                                "message": "Insufficient credits to continue",
-                                "code": code,
-                                "is_error": True,
-                            })
-                            return
-                        bucket = _bucket_fresh
-                    except (GeneratorExit, asyncio.CancelledError):
-                        return
-                    except ImportError:
-                        pass
-                    except Exception as _rebucket_exc:
-                        _logger.error(
-                            "bucket-recheck stream: unexpected error at iter=%d: %s",
-                            iteration, _rebucket_exc,
-                        )
-                        yield _sse_frame("error", {
-                            "message": "billing service error — please try again",
-                            "is_error": True,
-                        })
-                        return
-
                 complete_req = llm_module.CompleteRequest(
                     model=provider_model_id,
                     system=llm_module.SystemPrompt + _AGENT_SYSTEM_ADDENDUM + type_addendum,
@@ -4326,55 +4026,19 @@ async def post_message_stream(
                         conn, tid, assistant_content, provider_model_id, turn_tool_calls
                     )
 
-                # ── Record token usage (cloud only) ──────────────────────────
+                # ── Local usage telemetry (no billing, no network call) ──────
                 if settings.usage_enabled and (input_tokens > 0 or output_tokens > 0):
                     try:
-                        if bucket is not None and bucket_model_info is not None:
-                            from kerf_billing.spend import commit_spend, ApiTokenDailyCapExceeded
-                            cogs = bucket_model_info_price.compute_cost_usd(input_tokens, output_tokens) \
-                                if bucket_model_info_price else 0.0
-                            # R7: read markup from settings
-                            billed = cogs * (1.0 + settings.cloud_pricing_token_markup_pct / 100.0)
-                            try:
-                                await commit_spend(
-                                    pool, bucket=bucket, user_id=user_id, project_id=pid,
-                                    model=provider_model_id,
-                                    input_tokens=input_tokens, output_tokens=output_tokens,
-                                    cogs_usd=cogs, billed_usd=billed, api_token_id=None,
-                                )
-                            except ApiTokenDailyCapExceeded as cap:
-                                # R9: known cap — emit SSE error and stop the loop.
-                                _logger.warning(
-                                    "usage stream: api token daily cap exceeded — "
-                                    "user_id=%s model=%s est_cost=%.6f: %s",
-                                    user_id, provider_model_id, billed, cap,
-                                )
-                                yield _sse_frame("error", {
-                                    "message": "API token daily cap exceeded",
-                                    "code": "API_TOKEN_DAILY_CAP_EXCEEDED",
-                                    "is_error": True,
-                                })
-                                return
-                            except Exception as billing_exc:
-                                # R9: unexpected billing failure — emit SSE error
-                                # and stop; do not let the loop continue unbilled.
-                                _logger.error(
-                                    "usage stream: commit_spend failed (UNEXPECTED) — "
-                                    "user_id=%s model=%s est_cost=%.6f: %s",
-                                    user_id, provider_model_id, billed, billing_exc,
-                                    exc_info=True,
-                                )
-                                yield _sse_frame("error", {
-                                    "message": "Billing write failed — please try again",
-                                    "code": "BILLING_WRITE_FAILED",
-                                    "is_error": True,
-                                })
-                                return
-                        else:
-                            from cloud.usage import record_token_event
-                            await record_token_event(
-                                pool, user_id, pid, provider_model_id,
-                                input_tokens, output_tokens, cost_usd=0.0,
+                        async with pool.acquire() as conn:
+                            await usage_queries.create_usage_event(
+                                conn,
+                                user_id=uuid.UUID(user_id),
+                                kind="token",
+                                project_id=uuid.UUID(pid) if pid else None,
+                                model=provider_model_id,
+                                input_tokens=input_tokens,
+                                output_tokens=output_tokens,
+                                payer="byo",
                             )
                     except (GeneratorExit, asyncio.CancelledError):
                         return
@@ -7055,10 +6719,6 @@ async def _generate_project_cover(
     Uses kerf-render if Blender is available; falls back to the existing
     thumbnail_storage_key gracefully (no exception raised).
 
-    ``user_id`` is required in cloud mode (usage_enabled=True): the billing
-    gate is checked BEFORE the HTTP call so the publisher's account is charged
-    rather than the platform absorbing an unmetered GPU render (R6 fix).
-
     Returns the storage key of the generated cover, or None on failure.
     """
     try:
@@ -7091,15 +6751,6 @@ async def _generate_project_cover(
         if not render_url:
             return None
 
-        # ── R6: pre-gate billing BEFORE dispatching the HTTP render call ──────
-        # Estimate GPU-seconds for 64 samples at 1280×960 (matches the payload
-        # below).  This uses the same formula as run_render so the gate sees a
-        # consistent estimate.
-        _pixels_ratio = (1280 * 960) / (1920 * 1080)
-        _est_gpu_seconds = max(5.0, 64 * _pixels_ratio * 0.1)
-        from kerf_render.routes import _run_billing_gate  # type: ignore[import]
-        await _run_billing_gate(user_id, _est_gpu_seconds)
-        # ─────────────────────────────────────────────────────────────────────
 
         # Build a minimal render request; mesh_b64 empty means Blender uses a
         # default cube as placeholder — good enough for a cover thumbnail.
@@ -7249,8 +6900,6 @@ async def workshop_publish(
             updates["readme"] = readme_text
 
         # ---- Hero cover generation (T-42) ----
-        # Pass user_id so _generate_project_cover can pre-gate billing before
-        # dispatching the HTTP render call (R6 fix — prevents unmetered renders).
         cover_key: Optional[str] = None
         try:
             storage = get_storage_required()

@@ -10,13 +10,9 @@ verify_email        — sent on signup; confirms the email address.
 welcome             — onboarding/welcome; sent after successful signup.
 password_reset      — password-reset link with expiry.
 password_reset_complete — confirmation that the password was changed.
-billing_receipt     — top-up receipt.
-low_balance         — credit balance warning.
 github_linked       — GitHub OAuth connection notice.
 workshop_published  — Workshop listing go-live notice.
 """
-# Kerf Cloud — Proprietary. Copyright (c) 2026 Imran Paruk.
-# See cloud/LICENSE for terms.
 
 import re
 from typing import Any
@@ -32,8 +28,6 @@ TEMPLATES = [
     "welcome",
     "password_reset",
     "password_reset_complete",
-    "billing_receipt",
-    "low_balance",
     "github_linked",
     "workshop_published",
 ]
@@ -43,8 +37,6 @@ template_subjects = {
     "welcome": "Welcome to Kerf — let’s build something",
     "password_reset": "Reset your Kerf password",
     "password_reset_complete": "Your Kerf password was changed",
-    "billing_receipt": "Receipt for your top-up · Kerf",
-    "low_balance": "Your balance is running low · Kerf",
     "github_linked": "GitHub linked to your Kerf account",
     "workshop_published": "Your project is live on Kerf Workshop · Kerf",
 }
@@ -54,8 +46,6 @@ template_subjects_plain = {
     "welcome": "Welcome to Kerf",
     "password_reset": "Reset your Kerf password",
     "password_reset_complete": "Your Kerf password was changed",
-    "billing_receipt": "Receipt for your top-up",
-    "low_balance": "Your balance is running low",
     "github_linked": "GitHub linked to Kerf account",
     "workshop_published": "Your project is live on Kerf Workshop",
 }
@@ -80,10 +70,6 @@ _K_SVG = (
 
 # Outer shell — dark canvas, centred 600px card.
 _OPEN = """\
-<!--
-Kerf Cloud — Proprietary. Copyright (c) 2026 Imran Paruk.
-See cloud/LICENSE for terms.
--->
 <!doctype html>
 <html lang="en">
 <head>
@@ -210,9 +196,6 @@ verify_email_html = _build_html(
 )
 
 verify_email_txt = """\
-Kerf Cloud — Proprietary. Copyright (c) 2026 Imran Paruk.
-See cloud/LICENSE for terms.
-
 Confirm your email address
 ===========================
 
@@ -303,9 +286,6 @@ welcome_html = _build_html(
 )
 
 welcome_txt = """\
-Kerf Cloud — Proprietary. Copyright (c) 2026 Imran Paruk.
-See cloud/LICENSE for terms.
-
 Welcome to Kerf — let’s build something.
 ==========================================
 
@@ -361,9 +341,6 @@ password_reset_html = _build_html(
 )
 
 password_reset_txt = """\
-Kerf Cloud — Proprietary. Copyright (c) 2026 Imran Paruk.
-See cloud/LICENSE for terms.
-
 Reset your Kerf password
 =========================
 
@@ -402,9 +379,6 @@ password_reset_complete_html = _build_html(
 )
 
 password_reset_complete_txt = """\
-Kerf Cloud — Proprietary. Copyright (c) 2026 Imran Paruk.
-See cloud/LICENSE for terms.
-
 Your Kerf password was changed.
 
 If this was you, you’re all set.
@@ -414,138 +388,6 @@ to this email.
 
 ––
 This is a transactional email sent by Kerf (kerf.sh).
-Questions? Reply to this email and a human will respond."""
-
-# ---------------------------------------------------------------------------
-# billing_receipt
-# ---------------------------------------------------------------------------
-
-billing_receipt_html = (
-    "<!--\n"
-    "Kerf Cloud — Proprietary. Copyright (c) 2026 Imran Paruk.\n"
-    "See cloud/LICENSE for terms.\n"
-    "-->\n"
-    "<!doctype html>\n"
-    '<html lang="en">\n'
-    "<head>\n"
-    '<meta charset="utf-8"/>\n'
-    '<meta name="viewport" content="width=device-width,initial-scale=1"/>\n'
-    '<meta name="color-scheme" content="dark"/>\n'
-    "<title>Kerf</title>\n"
-    "</head>\n"
-    '<body style="margin:0;padding:0;background-color:#0a0b0d;'
-    "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;\">\n"
-    '<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"'
-    ' style="background-color:#0a0b0d;padding:32px 12px;">\n'
-    "<tr><td align=\"center\">\n"
-    '<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"'
-    ' style="max-width:600px;background-color:#13161b;border:1px solid #1f242c;border-radius:8px;">\n'
-    '<tr><td style="padding:18px 28px;border-bottom:1px solid #1f242c;">\n'
-    '  <span style="color:#ffd633;font-weight:700;font-size:17px;letter-spacing:-0.02em;">Kerf</span>\n'
-    '  <span style="color:#4a5568;font-size:14px;margin-left:8px;">— receipt</span>\n'
-    "</td></tr>\n"
-    '<tr><td style="padding:28px 28px 8px 28px;">\n'
-    '  <h1 style="margin:0 0 16px 0;color:#e8ecf1;font-size:18px;font-weight:700;letter-spacing:-0.02em;">Top-up confirmed</h1>\n'
-    '  <p style="margin:0 0 16px 0;color:#9aa3af;font-size:14px;line-height:1.7;">Thanks — your credits have been applied to your account.</p>\n'
-    '  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"'
-    ' style="margin-bottom:16px;border-top:1px solid #1f242c;">\n'
-    "    <tr>\n"
-    '      <td style="padding:10px 0;border-bottom:1px solid #1f242c;color:#6b7280;font-size:12px;">Amount (USD)</td>\n'
-    '      <td align="right" style="padding:10px 0;border-bottom:1px solid #1f242c;'
-    "font-family:'SF Mono',Menlo,Consolas,monospace;color:#cfd6df;font-size:13px;\">"
-    "$${AmountUSD}</td>\n"
-    "    </tr>\n"
-    "    <tr>\n"
-    '      <td style="padding:10px 0;border-bottom:1px solid #1f242c;color:#6b7280;font-size:12px;">Charged (ZAR)</td>\n'
-    '      <td align="right" style="padding:10px 0;border-bottom:1px solid #1f242c;'
-    "font-family:'SF Mono',Menlo,Consolas,monospace;color:#cfd6df;font-size:13px;\">R${AmountZAR}</td>\n"
-    "    </tr>\n"
-    "    <tr>\n"
-    '      <td style="padding:10px 0;border-bottom:1px solid #1f242c;color:#6b7280;font-size:12px;">Rate</td>\n'
-    '      <td align="right" style="padding:10px 0;border-bottom:1px solid #1f242c;'
-    "font-family:'SF Mono',Menlo,Consolas,monospace;color:#9aa3af;font-size:12px;\">1 USD = ${FXRate} ZAR</td>\n"
-    "    </tr>\n"
-    "    <tr>\n"
-    '      <td style="padding:10px 0;color:#6b7280;font-size:12px;">Reference</td>\n'
-    '      <td align="right" style="padding:10px 0;'
-    "font-family:'SF Mono',Menlo,Consolas,monospace;color:#6b7280;font-size:11px;\">$TxID</td>\n"
-    "    </tr>\n"
-    "  </table>\n"
-    '  <p style="margin:0 0 20px 0;">'
-    '<a href="$AppURL/billing" style="color:#4a7ebb;text-decoration:none;font-size:13px;">'
-    "View balance and history →</a></p>\n"
-    "</td></tr>\n"
-    '<tr><td style="padding:16px 28px;border-top:1px solid #1f242c;">\n'
-    '  <p style="margin:0;color:#4a5568;font-size:11px;line-height:1.6;">'
-    + _FOOTER_TRANSACTIONAL
-    + "</p>\n"
-    "</td></tr>\n"
-    "</table>\n"
-    "</td></tr>\n"
-    "</table>\n"
-    "</body>\n"
-    "</html>"
-)
-
-billing_receipt_txt = """\
-Kerf Cloud — Proprietary. Copyright (c) 2026 Imran Paruk.
-See cloud/LICENSE for terms.
-
-Top-up confirmed — your credits have been applied.
-
-  Amount (USD):  $${AmountUSD}
-  Charged (ZAR): R${AmountZAR}
-  Rate:          1 USD = ${FXRate} ZAR
-  Reference:     $TxID
-
-View balance and history: $AppURL/billing
-
-––
-This is a transactional email sent by Kerf (kerf.sh).
-Questions? Reply to this email and a human will respond."""
-
-# ---------------------------------------------------------------------------
-# low_balance
-# ---------------------------------------------------------------------------
-
-low_balance_html = _build_html(
-    body_rows=(
-        "<tr>"
-        '<td style="padding:28px 28px 24px 28px;">'
-        '<h1 style="margin:0 0 16px 0;color:#e8ecf1;font-size:20px;'
-        'font-weight:700;letter-spacing:-0.02em;line-height:1.2;">'
-        "Your Kerf credit balance is low"
-        "</h1>"
-        '<p style="margin:0 0 12px 0;color:#9aa3af;font-size:14px;line-height:1.7;">'
-        "Current balance: "
-        '<strong style="font-family:\'SF Mono\',Menlo,Consolas,monospace;color:#ffd633;">'
-        "$${BalanceUSD}"
-        "</strong>. "
-        "Requests will start to fail once the balance reaches zero."
-        "</p>"
-        + _cta_button("$AppURL/billing", "Top up")
-        + "</td></tr>"
-    ),
-    footer_text=(
-        _FOOTER_TRANSACTIONAL
-        + " We send at most one low-balance notice per 24 hours."
-    ),
-)
-
-low_balance_txt = """\
-Kerf Cloud — Proprietary. Copyright (c) 2026 Imran Paruk.
-See cloud/LICENSE for terms.
-
-Your Kerf credit balance is low.
-
-Current balance: $${BalanceUSD}. Requests will start to fail
-once the balance reaches zero.
-
-Top up: $AppURL/billing
-
-––
-This is a transactional email sent by Kerf (kerf.sh).
-We send at most one low-balance notice per 24 hours.
 Questions? Reply to this email and a human will respond."""
 
 # ---------------------------------------------------------------------------
@@ -577,9 +419,6 @@ github_linked_html = _build_html(
 )
 
 github_linked_txt = """\
-Kerf Cloud — Proprietary. Copyright (c) 2026 Imran Paruk.
-See cloud/LICENSE for terms.
-
 GitHub account linked
 ======================
 
@@ -621,9 +460,6 @@ workshop_published_html = _build_html(
 )
 
 workshop_published_txt = """\
-Kerf Cloud — Proprietary. Copyright (c) 2026 Imran Paruk.
-See cloud/LICENSE for terms.
-
 Your project is live
 =====================
 
@@ -647,8 +483,6 @@ _templates_html: dict[str, str] = {
     "welcome": welcome_html,
     "password_reset": password_reset_html,
     "password_reset_complete": password_reset_complete_html,
-    "billing_receipt": billing_receipt_html,
-    "low_balance": low_balance_html,
     "github_linked": github_linked_html,
     "workshop_published": workshop_published_html,
 }
@@ -658,8 +492,6 @@ _templates_txt: dict[str, str] = {
     "welcome": welcome_txt,
     "password_reset": password_reset_txt,
     "password_reset_complete": password_reset_complete_txt,
-    "billing_receipt": billing_receipt_txt,
-    "low_balance": low_balance_txt,
     "github_linked": github_linked_txt,
     "workshop_published": workshop_published_txt,
 }

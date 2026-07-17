@@ -64,7 +64,6 @@ import Header from '../components/Header.jsx'
 import Footer from '../components/Footer.jsx'
 import { useAuth } from '../store/auth.js'
 import Button from '../components/Button.jsx'
-import { useCloudConfig } from '../cloud/useCloudConfig.js'
 import DomainSpotlights from '../components/landing/DomainSpotlights.jsx'
 import KernelDepth from '../components/landing/KernelDepth.jsx'
 import {
@@ -1336,7 +1335,7 @@ function LocalVsHosted() {
             Same product. Two ways to run it.
           </h2>
           <p className="mt-3 text-ink-300 leading-relaxed">
-            Every line of code is open source — including billing, Workshop, and
+            Every line of code is open source — including Workshop and
             git sync. We host the binary as a service so you don&apos;t have to
             operate Postgres yourself.
           </p>
@@ -1361,7 +1360,7 @@ function LocalVsHosted() {
             ctaTo="/signup"
             extra="Metered LLM tokens + storage"
             features={SHARED_FEATURES}
-            extras={['Daily backups', 'GitHub OAuth + branch sync', 'USD billing, ZAR settlement']}
+            extras={['Daily backups', 'GitHub OAuth + branch sync']}
           />
         </div>
       </div>
@@ -1431,118 +1430,6 @@ function RunCard({ icon, label, sub, ctaText, ctaTo, features, extras = [], extr
         {ctaText}
         <ArrowRight size={14} />
       </Button>
-    </div>
-  )
-}
-
-/* -------------------------------------------------------------------------- */
-/* § 12 — Pricing teaser (cloud only)                                          */
-/* -------------------------------------------------------------------------- */
-
-function PricingTeaser() {
-  return (
-    <section className="relative border-t border-ink-900 bg-gradient-to-b from-ink-950 to-ink-900/40">
-      <div className="mx-auto max-w-7xl px-6 py-12 lg:py-14">
-        <div className="flex items-end justify-between mb-6 gap-6">
-          <div className="max-w-2xl">
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-kerf-300">
-              Pricing
-            </p>
-            <h2 className="mt-2 font-display text-3xl sm:text-4xl font-semibold tracking-[-0.02em]">
-              No seats. No tiers. Just usage.
-            </h2>
-          </div>
-          <Link
-            to="/pricing"
-            className="hidden sm:inline-flex items-center gap-1.5 text-sm text-ink-400 hover:text-ink-100 transition-colors"
-          >
-            see full pricing
-            <ArrowRight size={14} />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <TeaserPlan
-            label="Free"
-            price="$0"
-            note="forever"
-            bullets={['50 MB · public projects', '100k in + 20k out free tokens/mo', 'Cheap-tier models · Workshop publish']}
-            ctaTo="/signup"
-            ctaText="Sign up"
-          />
-          <TeaserPlan
-            highlighted
-            label="Studio"
-            price="$9"
-            note="per month"
-            bullets={['5 GB · private projects', '$8/mo LLM credits at cost · any model', 'Wallet top-up for overage']}
-            ctaTo="/signup"
-            ctaText="Start Studio"
-          />
-          <TeaserPlan
-            label="Pro"
-            price="$29"
-            note="per month"
-            bullets={['20 GB · higher worker concurrency', '$20/mo LLM credits at cost', 'Same wallet · same at-cost overage']}
-            ctaTo="/pricing"
-            ctaText="See pricing"
-          />
-        </div>
-
-        <p className="mt-4 text-center text-xs text-ink-500 font-mono">
-          At-cost LLM pricing · live provider rates · MIT self-host always free
-        </p>
-      </div>
-    </section>
-  )
-}
-
-function TeaserPlan({ label, price, note, bullets, ctaTo, ctaText, highlighted }) {
-  return (
-    <div
-      className={
-        'relative rounded-2xl border p-5 bg-ink-900/40 backdrop-blur transition-colors ' +
-        (highlighted
-          ? 'border-kerf-300/40 ring-1 ring-kerf-300/20'
-          : 'border-ink-800 hover:border-ink-700')
-      }
-    >
-      <div className="flex items-baseline justify-between mb-1">
-        <h3 className="font-display text-base font-semibold tracking-tight text-ink-100">
-          {label}
-        </h3>
-        {highlighted && (
-          <span className="text-[10px] font-mono uppercase tracking-widest text-kerf-300">
-            popular
-          </span>
-        )}
-      </div>
-      <div className="flex items-baseline gap-2 mb-3">
-        <span className="font-display text-3xl font-semibold tracking-tight text-ink-100">
-          {price}
-        </span>
-        <span className="text-xs text-ink-400 font-mono">{note}</span>
-      </div>
-      <ul className="flex flex-col gap-1.5 mb-4">
-        {bullets.map((b) => (
-          <li key={b} className="flex items-start gap-2 text-sm text-ink-300">
-            <span className="mt-2 w-1 h-1 rounded-full bg-ink-500 shrink-0" />
-            <span>{b}</span>
-          </li>
-        ))}
-      </ul>
-      <Link
-        to={ctaTo}
-        className={
-          'inline-flex items-center justify-center gap-1.5 w-full h-9 rounded-md text-sm font-medium transition-colors ' +
-          (highlighted
-            ? 'bg-kerf-300 text-ink-950 hover:bg-kerf-200'
-            : 'bg-ink-800 text-ink-100 border border-ink-700 hover:border-ink-600')
-        }
-      >
-        {ctaText}
-        <ArrowRight size={13} />
-      </Link>
     </div>
   )
 }
@@ -1726,7 +1613,6 @@ function LandingHead() {
 }
 
 export default function Landing() {
-  const { cloudEnabled } = useCloudConfig()
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100">
       <LandingHead />
@@ -1764,9 +1650,6 @@ export default function Landing() {
 
       {/* 11. Local vs hosted */}
       <LocalVsHosted />
-
-      {/* 12. Pricing (cloud only) */}
-      {cloudEnabled && <PricingTeaser />}
 
       {/* Compare matrix links */}
       <Compare />

@@ -17,7 +17,6 @@ from .service import (
     DRAIN_INTERVAL,
     DRAIN_BATCH,
     MAX_ATTEMPTS,
-    LOW_BALANCE_WINDOW,
     ErrInvalidCredentials,
 )
 from .templates import renderer, TEMPLATES, template_subjects
@@ -283,24 +282,3 @@ class Mailer:
             id,
             err_msg,
         )
-
-    async def eligible_for_low_balance(self, user_id: str) -> bool:
-        if not user_id:
-            return False
-
-        row = await self._pool.fetchrow(
-            "select max(created_at) as last_at from cloud_email_log "
-            "where user_id = $1 and template = 'low_balance' and status in ('queued', 'sent')",
-            user_id,
-        )
-
-        last_at = row["last_at"] if row else None
-        if last_at is None:
-            return True
-
-        now = datetime.now(timezone.utc)
-        if last_at.tzinfo is None:
-            last_at = last_at.replace(tzinfo=timezone.utc)
-
-        elapsed = (now - last_at).total_seconds()
-        return elapsed >= LOW_BALANCE_WINDOW

@@ -163,15 +163,6 @@ class TestSMTPTransactionalSends:
         smtp.sendmail.assert_called_once()
         assert _RESET_URL in msg.HTML
 
-    def test_smtp_send_low_balance(self):
-        msg = renderer.render(
-            "low_balance",
-            "dave@example.com",
-            {"BalanceUSD": 0.50, "AppURL": _APP_URL},
-        )
-        smtp = self._send("dave@example.com", msg.Subject, msg.HTML, text=msg.Text)
-        smtp.sendmail.assert_called_once()
-
     def test_smtp_send_github_linked(self):
         msg = renderer.render(
             "github_linked",
@@ -218,21 +209,6 @@ class TestResendTransactionalSends:
         cap = self._send("g@example.com", msg.Subject, msg.HTML, text=msg.Text)
         assert cap["subject"] == "Your Kerf password was changed"
 
-    def test_resend_send_billing_receipt(self):
-        msg = renderer.render(
-            "billing_receipt",
-            "h@example.com",
-            {
-                "AmountUSD": 10.00,
-                "AmountZAR": 189.50,
-                "FXRate": 18.95,
-                "TxID": "tx_test_001",
-                "AppURL": _APP_URL,
-            },
-        )
-        cap = self._send("h@example.com", msg.Subject, msg.HTML, text=msg.Text)
-        assert "Receipt" in cap["subject"] or "receipt" in cap["subject"].lower()
-
     def test_resend_send_workshop_published(self):
         msg = renderer.render(
             "workshop_published",
@@ -242,15 +218,6 @@ class TestResendTransactionalSends:
         cap = self._send("i@example.com", msg.Subject, msg.HTML, text=msg.Text)
         assert cap["subject"] == "Your project is live on Kerf Workshop · Kerf"
 
-    def test_resend_send_low_balance(self):
-        msg = renderer.render(
-            "low_balance",
-            "j@example.com",
-            {"BalanceUSD": 1.25, "AppURL": _APP_URL},
-        )
-        cap = self._send("j@example.com", msg.Subject, msg.HTML, text=msg.Text)
-        assert "balance" in cap["subject"].lower()
-
 
 # ---------------------------------------------------------------------------
 # 3. Subject + body render quality (5 scenarios)
@@ -259,34 +226,6 @@ class TestResendTransactionalSends:
 
 class TestSubjectBodyRender:
     """Subject lines and rendered bodies are correct and fully substituted."""
-
-    def test_billing_receipt_amounts_rendered(self):
-        msg = renderer.render(
-            "billing_receipt",
-            "k@example.com",
-            {
-                "AmountUSD": 25.00,
-                "AmountZAR": 475.00,
-                "FXRate": 19.00,
-                "TxID": "pay_abc123",
-                "AppURL": _APP_URL,
-            },
-        )
-        assert "25.00" in msg.HTML
-        assert "475.00" in msg.HTML
-        assert "pay_abc123" in msg.HTML
-        assert _no_dollar_vars(msg.HTML)
-        assert _no_dollar_vars(msg.Text)
-
-    def test_low_balance_renders_balance(self):
-        msg = renderer.render(
-            "low_balance",
-            "l@example.com",
-            {"BalanceUSD": 3.75, "AppURL": _APP_URL},
-        )
-        assert "3.75" in msg.HTML
-        assert f"{_APP_URL}/billing" in msg.HTML
-        assert _no_dollar_vars(msg.HTML)
 
     def test_github_linked_renders_login(self):
         msg = renderer.render(
@@ -371,70 +310,6 @@ class TestBounceAndSuppression:
 
         failed_calls = [u for u in updates if "status = 'failed'" in u[0]]
         assert len(failed_calls) == 1
-
-    @pytest.mark.asyncio
-    async def test_low_balance_suppression_within_24h(self):
-        """eligible_for_low_balance returns False if last send was < 24h ago."""
-        pool = MagicMock()
-        recent = datetime.now(timezone.utc) - timedelta(hours=12)
-
-        async def fake_fetchrow(sql, *args):
-            return {"last_at": recent}
-
-        pool.fetchrow = fake_fetchrow
-
-        cfg = MagicMock()
-        cfg.jwt_secret = "secret"
-        mailer = Mailer(pool=pool, cfg=cfg)
-
-        eligible = await mailer.eligible_for_low_balance("user-001")
-        assert eligible is False
-
-    @pytest.mark.asyncio
-    async def test_low_balance_suppression_beyond_24h(self):
-        """eligible_for_low_balance returns True if last send was > 24h ago."""
-        pool = MagicMock()
-        old = datetime.now(timezone.utc) - timedelta(hours=25)
-
-        async def fake_fetchrow(sql, *args):
-            return {"last_at": old}
-
-        pool.fetchrow = fake_fetchrow
-
-        cfg = MagicMock()
-        cfg.jwt_secret = "secret"
-        mailer = Mailer(pool=pool, cfg=cfg)
-
-        eligible = await mailer.eligible_for_low_balance("user-002")
-        assert eligible is True
-
-    @pytest.mark.asyncio
-    async def test_low_balance_suppression_no_prior_send(self):
-        """eligible_for_low_balance returns True when no prior send exists."""
-        pool = MagicMock()
-
-        async def fake_fetchrow(sql, *args):
-            return {"last_at": None}
-
-        pool.fetchrow = fake_fetchrow
-
-        cfg = MagicMock()
-        cfg.jwt_secret = "secret"
-        mailer = Mailer(pool=pool, cfg=cfg)
-
-        eligible = await mailer.eligible_for_low_balance("user-003")
-        assert eligible is True
-
-    @pytest.mark.asyncio
-    async def test_low_balance_empty_user_returns_false(self):
-        """eligible_for_low_balance is False for an empty user_id."""
-        pool = MagicMock()
-        cfg = MagicMock()
-        mailer = Mailer(pool=pool, cfg=cfg)
-
-        eligible = await mailer.eligible_for_low_balance("")
-        assert eligible is False
-
 
 # ---------------------------------------------------------------------------
 # 5. validate_credentials + _build_provider (5 scenarios)
@@ -583,17 +458,14 @@ class TestMailerSendTemplate:
 
         mailer_mod.payloads.clear()
         await m.send_template(
-            "billing_receipt",
+            "github_linked",
             "k@example.com",
             data={
-                "AmountUSD": 5.00,
-                "AmountZAR": 95.00,
-                "FXRate": 19.00,
-                "TxID": "tx_99",
+                "GithubLogin": "kgithub",
                 "AppURL": _APP_URL,
             },
         )
 
         assert "row-pay-1" in mailer_mod.payloads
         payload_data = json.loads(mailer_mod.payloads["row-pay-1"])
-        assert payload_data["TxID"] == "tx_99"
+        assert payload_data["GithubLogin"] == "kgithub"

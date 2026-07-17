@@ -7,9 +7,10 @@
  *   - Profile → /profile
  *   - Workspace settings → /w/{slug}/settings  (gated on currentWorkspaceSlug)
  *   - Members → /w/{slug}/members              (gated on currentWorkspaceSlug)
- *   - Billing → /billing                       (gated on cloudEnabled)
  *   - All projects → /projects
  *   - Sign out
+ *
+ * Kerf has no billing anywhere, so there is no Billing menu item.
  *
  * We use a source-level approach to avoid spinning up the full React tree
  * (Editor.jsx transitively pulls CodeMirror, OCCT, etc.).
@@ -59,19 +60,14 @@ describe('EditorUserMenu — dropdown items', () => {
     expect(MENU_SRC).toMatch(/Members/)
   })
 
-  it('renders billing link gated on cloudEnabled', () => {
-    expect(MENU_SRC).toMatch(/cloudEnabled/)
-    expect(MENU_SRC).toMatch(/\/billing/)
-    expect(MENU_SRC).toMatch(/Billing/)
+  it('has no Billing link — Kerf has no billing anywhere', () => {
+    expect(MENU_SRC).not.toMatch(/\/billing/)
+    expect(MENU_SRC).not.toMatch(/Billing/)
   })
 
   it('uses useWorkspaces to get currentWorkspaceSlug', () => {
     expect(MENU_SRC).toMatch(/useWorkspaces/)
     expect(MENU_SRC).toMatch(/currentSlug/)
-  })
-
-  it('uses useCloudConfig to get cloudEnabled', () => {
-    expect(MENU_SRC).toMatch(/useCloudConfig/)
   })
 
   it('has aria-haspopup="menu" on the avatar button', () => {

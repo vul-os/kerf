@@ -22,7 +22,6 @@ const DomainsHub = lazy(() => import('./routes/domains/index.jsx'))
 const JewelryDomainPage = lazy(() => import('./routes/domains/Jewelry.jsx'))
 const Architecture = lazy(() => import('./routes/domains/Architecture.jsx'))
 const Automotive = lazy(() => import('./routes/domains/Automotive.jsx'))
-const Pricing = lazy(() => import('./routes/Pricing.jsx'))
 const Roadmap = lazy(() => import('./routes/Roadmap.jsx'))
 const DocsHome = lazy(() => import('./routes/Docs/index.jsx'))
 const DocsArticle = lazy(() => import('./routes/Docs/Article.jsx'))
@@ -41,7 +40,6 @@ const WorkspaceSettings = lazy(() => import('./routes/WorkspaceSettings.jsx'))
 const WorkspaceMembers = lazy(() => import('./routes/WorkspaceMembers.jsx'))
 const AdminDistributors = lazy(() => import('./routes/AdminDistributors.jsx'))
 const AdminPublishers = lazy(() => import('./routes/AdminPublishers.jsx'))
-const AdminMargin = lazy(() => import('./routes/AdminMargin.jsx'))
 const Mechanical = lazy(() => import('./routes/domains/Mechanical.jsx'))
 const JewelryConfigurator = lazy(() => import('./routes/JewelryConfigurator.jsx'))
 const JewelryShare = lazy(() => import('./routes/JewelryShare.jsx'))
@@ -104,9 +102,6 @@ const SchematicEditor = lazy(() => import('./routes/SchematicEditor.jsx'))
 // barrel doesn't end up in the initial chunk; the route components
 // themselves lazy-import their own modules and become their own chunks.
 import { useCloudConfig } from './cloud/useCloudConfig.js'
-const BillingPanel = lazy(() =>
-  import('./cloud/BillingPanel.jsx').then((m) => ({ default: m.BillingPanel })),
-)
 const Workshop = lazy(() =>
   import('./cloud/Workshop.jsx').then((m) => ({ default: m.Workshop })),
 )
@@ -114,9 +109,6 @@ const WorkshopListing = lazy(() =>
   import('./cloud/WorkshopListing.jsx').then((m) => ({ default: m.WorkshopListing })),
 )
 const AdminEmail = lazy(() => import('./cloud/AdminEmail.jsx'))
-const UsagePage = lazy(() =>
-  import('./cloud/UsageWidget.jsx').then((m) => ({ default: m.UsagePage })),
-)
 
 import { useAuth } from './store/auth.js'
 import { api } from './lib/api.js'
@@ -185,7 +177,7 @@ export default function App() {
   // In local mode the marketing landing + login/signup pages don't apply —
   // there's exactly one user, the auto-bootstrap above has already minted
   // their session, send them straight to /projects. Cloud builds keep the
-  // existing public surface (Landing, Login, Signup, Pricing, Docs).
+  // existing public surface (Landing, Login, Signup, Docs).
   const localShortcut = localMode && accessToken
   return (
     <>
@@ -208,7 +200,6 @@ export default function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
-      {cloudEnabled && <Route path="/pricing" element={<Pricing />} />}
       <Route path="/roadmap" element={<Roadmap />} />
       <Route path="/tools" element={<Tools />} />
       <Route path="/inspect" element={<GeometryInspect />} />
@@ -283,14 +274,14 @@ export default function App() {
         <Route path="/projects/:projectId" element={<Editor />} />
         <Route path="/projects/:projectId/files/:fileId" element={<Editor />} />
         <Route path="/projects/:projectId/bom" element={<BOMPage />} />
-        {cloudEnabled && <Route path="/library" element={<Library />} />}
-        {cloudEnabled && <Route path="/library/:slug" element={<LibraryPart />} />}
+        {/* Library (parts catalog) is a design capability, not a hosted
+            convenience — never gated behind cloudEnabled (it's backed by
+            the MIT kerf-api /api/library/parts route). */}
+        <Route path="/library" element={<Library />} />
+        <Route path="/library/:slug" element={<LibraryPart />} />
         <Route path="/admin/distributors" element={<AdminDistributors />} />
         <Route path="/admin/publishers" element={<AdminPublishers />} />
-        <Route path="/admin/margin" element={<AdminMargin />} />
         {cloudEnabled && <Route path="/admin/email" element={<AdminEmail />} />}
-        {cloudEnabled && <Route path="/billing" element={<BillingPanel />} />}
-        {cloudEnabled && <Route path="/usage" element={<UsagePage />} />}
       </Route>
 
       <Route path="/pathtracer" element={<PathTracer />} />

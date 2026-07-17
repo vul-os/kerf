@@ -31,11 +31,11 @@ async def register(app, ctx) -> PluginManifest:
 The agent loop implements a streaming ReAct-style tool-use cycle:
 
 1. Build system prompt (includes project type, active file list, available tool specs)
-2. `kerf-billing`: `load_user_billing`, `load_model_info`, `pick_bucket` — or 402
+2. Resolve the provider directly — the operator's configured key, or the caller's own saved BYO key via `_prefer_byo_provider` (Kerf has no billing anywhere, so there is no credit gate here)
 3. Stream LLM response as SSE events (`text`, `tool_use`, `tool_result`, `done`)
 4. For each `tool_use` block: look up handler in `ctx.tools`, run it, stream result
 5. Feed tool results back into the LLM context for the next turn
-6. After last token: `commit_spend` with actual input/output token counts
+6. After last token: record a local `usage_events` telemetry row (token counts only, no billing)
 
 Prompt caching is enabled via `ANTHROPIC_PROMPT_CACHE=true` (default). The system prompt and docs corpus are marked as cacheable to reduce latency on repeated turns.
 
@@ -113,7 +113,7 @@ A utility module that auto-generates `README.md` files for Workshop submissions.
 
 ## Integration points
 
-- **kerf-billing**: the billing loop wraps every LLM call — see `billing.md` for the three-bucket model
+- **Kerf has no billing anywhere**: every LLM call runs unconditionally on the operator's configured provider (or the caller's own saved key); only local `usage_events` telemetry is recorded
 - **kerf-api `ctx.tools`**: all tools registered by other plugins (CAM, FEM, BIM, render, etc.) are available to the agent via the tool registry
 - **kerf-auth**: every `/api/projects/{id}/chat` request requires a valid JWT or API token
 - **kerf-workers**: long-running operations (CAM, FEM, topo) use the job-queue pattern; the agent polls via `cam_job_status` / `fem_job_status` tools

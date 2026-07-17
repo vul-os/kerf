@@ -68,7 +68,7 @@ async def register(app, ctx) -> PluginManifest:
 - Never expire unless explicitly revoked
 - Stored as SHA-256 hash in `api_tokens` table
 - Format: `kerf_<random_urlsafe_bytes>` (easily recognisable for scanning)
-- Optional per-token daily spend cap (`max_spend_per_day_usd`) enforced by `kerf-billing`
+- `max_spend_per_day_usd` / `spend_today_usd` columns remain on `api_tokens` but are no longer enforced — Kerf has no billing anywhere, so every request runs unconditionally
 
 ---
 

@@ -1,9 +1,7 @@
-// Barrel exports for the proprietary cloud bundle. The OSS frontend should
-// only import from this file *after* checking useCloudConfig().cloudEnabled.
+// Barrel exports for the cloud-hosted-convenience bundle (Workshop sharing,
+// hosted git, operator email admin). The OSS frontend should only import
+// from this file *after* checking useCloudConfig().cloudEnabled.
 
-export { BillingPanel } from './BillingPanel.jsx'
-export { UsageWidget } from './UsageWidget.jsx'
-export { PlanSelector } from './PlanSelector.jsx'
 export { Workshop } from './Workshop.jsx'
 export { WorkshopListing } from './WorkshopListing.jsx'
 export { PublishButton } from './PublishButton.jsx'
@@ -12,5 +10,4 @@ export { default as GitConnectDialog } from './GitConnectDialog.jsx'
 export { default as MergeDialog } from './MergeDialog.jsx'
 export { default as AdminEmail } from './AdminEmail.jsx'
 export { useCloudConfig } from './useCloudConfig.js'
-export * as billingApi from './api.js'
 export { git as gitApi, githubOAuth, adminEmail } from './api.js'

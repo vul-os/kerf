@@ -44,15 +44,14 @@ export GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}"
 export GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET:-}"
 export GOOGLE_REDIRECT_URL="${GOOGLE_REDIRECT_URL:-http://localhost:8080/auth/google/callback}"
 
-# Cloud surface, billing dormant (no Paystack needed locally).
+# Cloud surface (Workshop + hosted git). Kerf has no billing anywhere.
 # kerf_core.config.Settings has NO env prefix — these UNPREFIXED names
 # are what it actually reads.
 export LOCAL_MODE=false
 export CLOUD_ENABLED=true
-export CLOUD_BETA=true
 export CORS_ORIGIN="http://localhost:5173"
 
-echo "▸ DATABASE_URL : ${DATABASE_URL%%\?*}  (cloud mode, billing beta)"
+echo "▸ DATABASE_URL : ${DATABASE_URL%%\?*}  (cloud mode)"
 echo "▸ migrating …"
 python3 -m kerf_core.db.migrations.runner "$DATABASE_URL"
 

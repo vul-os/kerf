@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ChevronDown, LogOut, User as UserIcon, Settings, CreditCard, UserCog, Users, BarChart2 } from 'lucide-react'
+import { ChevronDown, LogOut, User as UserIcon, Settings, UserCog, Users } from 'lucide-react'
 import clsx from 'clsx'
 import { LogoWordmark } from './Logo.jsx'
 import WorkspaceSwitcher from './WorkspaceSwitcher.jsx'
@@ -19,7 +19,7 @@ function initials(name = '', email = '') {
   return src.slice(0, 2).toUpperCase()
 }
 
-function UserMenu({ user, onLogout, currentWorkspaceSlug, cloudEnabled }) {
+function UserMenu({ user, onLogout, currentWorkspaceSlug }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   // Keep a ref to the latest `open` value so the stable click-outside
@@ -135,28 +135,6 @@ function UserMenu({ user, onLogout, currentWorkspaceSlug, cloudEnabled }) {
                 <Settings size={14} className="text-ink-300" />
                 Settings
               </Link>
-              {cloudEnabled && (
-                <>
-                  <Link
-                    to="/usage"
-                    role="menuitem"
-                    onClick={() => setOpen(false)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
-                  >
-                    <BarChart2 size={14} className="text-ink-300" />
-                    Usage
-                  </Link>
-                  <Link
-                    to="/billing"
-                    role="menuitem"
-                    onClick={() => setOpen(false)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
-                  >
-                    <CreditCard size={14} className="text-ink-300" />
-                    Billing
-                  </Link>
-                </>
-              )}
             </div>
           )}
 
@@ -293,17 +271,20 @@ export default function Layout({ children, wide = false, padded = true }) {
                 Docs
               </Link>
             </nav>
-            {/* Cloud top-nav: Workshop hosts the project showcase, Library
-                hosts the parts catalog. Both are cloud-only — gated on
-                `cloudEnabled`. Hidden for signed-out and OSS callers. */}
-            {accessToken && cloudEnabled && (
+            {/* Cloud top-nav: Workshop hosts the project showcase (hosted
+                multi-user sharing — cloud-only, gated on `cloudEnabled`).
+                Library hosts the parts catalog, a design capability that is
+                never gated — it works identically self-hosted. */}
+            {accessToken && (
               <nav className="hidden sm:flex items-center gap-1 mr-1">
-                <Link
-                  to="/workshop"
-                  className="text-xs text-ink-300 hover:text-ink-100 px-2 py-1 rounded-md hover:bg-ink-800/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
-                >
-                  Workshop
-                </Link>
+                {cloudEnabled && (
+                  <Link
+                    to="/workshop"
+                    className="text-xs text-ink-300 hover:text-ink-100 px-2 py-1 rounded-md hover:bg-ink-800/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
+                  >
+                    Workshop
+                  </Link>
+                )}
                 <Link
                   to="/library"
                   className="text-xs text-ink-300 hover:text-ink-100 px-2 py-1 rounded-md hover:bg-ink-800/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
@@ -322,7 +303,6 @@ export default function Layout({ children, wide = false, padded = true }) {
               user={fallbackUser}
               onLogout={onLogout}
               currentWorkspaceSlug={currentWorkspaceSlug}
-              cloudEnabled={cloudEnabled}
             />
           </div>
         </div>

@@ -140,9 +140,10 @@ class GPUBackend(Protocol):
     ``backend_id`` is a short lowercase string used for logging and routing
     (e.g. ``"runpod"``, ``"self_hosted"``, ``"local"``).
 
-    ``billing_bucket`` controls whether a completed job charges credits:
-    - ``"kerf_paid"`` — draw from the user's prepaid credit balance.
-    - ``"byo"``        — user's own hardware; no credit charge.
+    ``billing_bucket`` is a legacy descriptive label only — Kerf has no
+    billing anywhere, so no bucket ever charges a credit:
+    - ``"kerf_paid"`` — operator-provisioned GPU pool (e.g. RunPod).
+    - ``"byo"``        — user's own hardware.
     """
 
     backend_id: str

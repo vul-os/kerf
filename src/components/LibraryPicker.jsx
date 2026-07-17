@@ -21,7 +21,6 @@ import { Loader2, Package, Search, Star, X } from 'lucide-react'
 import { ApiError } from '../lib/api.js'
 import { api } from '../lib/api.js'
 import { library } from '../cloud/api.js'
-import { useCloudConfig } from '../cloud/useCloudConfig.js'
 
 const CATEGORY_OPTIONS = [
   { id: 'all', label: 'All' },
@@ -106,7 +105,6 @@ function PartRow({ row, onSelect }) {
 }
 
 export default function LibraryPicker({ onSelect, onClose, currentProjectId }) {
-  const { cloudEnabled } = useCloudConfig()
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [category, setCategory] = useState('all')
@@ -152,12 +150,10 @@ export default function LibraryPicker({ onSelect, onClose, currentProjectId }) {
     return () => { cancelled = true }
   }, [currentProjectId])
 
-  // Global Library catalog — cloud-only. Re-fires on filter changes.
+  // Global Library catalog — a design capability, available identically
+  // self-hosted (backed by the MIT /api/library/parts route). Re-fires on
+  // filter changes.
   useEffect(() => {
-    if (!cloudEnabled) {
-      setGlobalRows([])
-      return
-    }
     let cancelled = false
     setGlobalLoading(true)
     library
@@ -177,7 +173,7 @@ export default function LibraryPicker({ onSelect, onClose, currentProjectId }) {
       })
       .finally(() => { if (!cancelled) setGlobalLoading(false) })
     return () => { cancelled = true }
-  }, [cloudEnabled, debouncedSearch, category])
+  }, [debouncedSearch, category])
 
   // Filter project-local parts client-side so the user gets the same
   // search affordance for both groups.
@@ -300,39 +296,38 @@ export default function LibraryPicker({ onSelect, onClose, currentProjectId }) {
             )}
           </section>
 
-          {/* Global Library section */}
-          {cloudEnabled && (
-            <section>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] uppercase tracking-wider text-ink-500">
-                  Library
+          {/* Global Library section — a design capability, always available
+              (self-hosted and cloud alike). */}
+          <section>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] uppercase tracking-wider text-ink-500">
+                Library
+              </span>
+              {filteredGlobal && (
+                <span className="text-[10px] text-ink-500">
+                  {filteredGlobal.length} part{filteredGlobal.length === 1 ? '' : 's'}
                 </span>
-                {filteredGlobal && (
-                  <span className="text-[10px] text-ink-500">
-                    {filteredGlobal.length} part{filteredGlobal.length === 1 ? '' : 's'}
-                  </span>
-                )}
+              )}
+            </div>
+            {globalErr && (
+              <p className="text-[11px] text-red-300">{globalErr}</p>
+            )}
+            {globalLoading && !filteredGlobal && (
+              <div className="flex items-center gap-2 py-2 text-xs text-ink-400">
+                <Loader2 size={12} className="animate-spin" /> Loading…
               </div>
-              {globalErr && (
-                <p className="text-[11px] text-red-300">{globalErr}</p>
-              )}
-              {globalLoading && !filteredGlobal && (
-                <div className="flex items-center gap-2 py-2 text-xs text-ink-400">
-                  <Loader2 size={12} className="animate-spin" /> Loading…
-                </div>
-              )}
-              {filteredGlobal && filteredGlobal.length === 0 && !globalLoading && (
-                <p className="text-[11px] text-ink-500">No matches.</p>
-              )}
-              {filteredGlobal && filteredGlobal.length > 0 && (
-                <div className="space-y-1.5">
-                  {filteredGlobal.map((row) => (
-                    <PartRow key={row.file_id} row={row} onSelect={onSelect} />
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
+            )}
+            {filteredGlobal && filteredGlobal.length === 0 && !globalLoading && (
+              <p className="text-[11px] text-ink-500">No matches.</p>
+            )}
+            {filteredGlobal && filteredGlobal.length > 0 && (
+              <div className="space-y-1.5">
+                {filteredGlobal.map((row) => (
+                  <PartRow key={row.file_id} row={row} onSelect={onSelect} />
+                ))}
+              </div>
+            )}
+          </section>
         </div>
 
         {/* Footer */}

@@ -83,9 +83,7 @@ full = [
     "kerf-chat",
     "kerf-v1",
     "kerf-pub",
-    "kerf-billing",
     "kerf-cloud",
-    "kerf-pricing",
     "kerf-cad-core",
     "kerf-tess",
     "kerf-fem",
@@ -174,7 +172,6 @@ members = [
     "packages/kerf-api",
     "packages/kerf-apparel",
     "packages/kerf-auth",
-    "packages/kerf-billing",
     "packages/kerf-bim",
     "packages/kerf-cad-core",
     "packages/kerf-cam",
@@ -209,7 +206,6 @@ members = [
     "packages/kerf-partsgen",
     "packages/kerf-piping",
     "packages/kerf-plc",
-    "packages/kerf-pricing",
     "packages/kerf-render",
     "packages/kerf-rules",
     "packages/kerf-sdk",
@@ -234,7 +230,6 @@ kerf-aero = { workspace = true }
 kerf-api = { workspace = true }
 kerf-apparel = { workspace = true }
 kerf-auth = { workspace = true }
-kerf-billing = { workspace = true }
 kerf-bim = { workspace = true }
 kerf-cad-core = { workspace = true }
 kerf-cam = { workspace = true }
@@ -269,7 +264,6 @@ kerf-parts = { workspace = true }
 kerf-partsgen = { workspace = true }
 kerf-piping = { workspace = true }
 kerf-plc = { workspace = true }
-kerf-pricing = { workspace = true }
 kerf-render = { workspace = true }
 kerf-rules = { workspace = true }
 kerf-sdk = { workspace = true }
@@ -298,9 +292,7 @@ testpaths = [
     "packages/kerf-api/tests",
     "packages/kerf-chat/tests",
     "packages/kerf-v1/tests",
-    "packages/kerf-billing/tests",
     "packages/kerf-cloud/tests",
-    "packages/kerf-pricing/tests",
     "packages/kerf-cad-core/tests",
     "packages/kerf-tess/tests",
     "packages/kerf-fem/tests",

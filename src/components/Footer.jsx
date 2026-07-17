@@ -74,7 +74,6 @@ export default function Footer() {
             <Item to="/projects">Editor</Item>
             <Item to="/library">Library</Item>
             <Item to="/workshop">Workshop</Item>
-            <Item to="/pricing">Pricing</Item>
             <Item to="/roadmap">Roadmap</Item>
           </Col>
 

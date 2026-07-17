@@ -9,8 +9,9 @@
 // Curation is via the existing `is_verified_publisher` flag on user
 // accounts — verified rows float to the top and earn a small badge.
 //
-// The Library is gated behind cloudEnabled. On OSS-only builds the
-// route still renders, but with an "available on cloud" notice.
+// The Library is a design capability and is never gated — it works
+// identically self-hosted (backed by the MIT kerf-api /api/library/parts
+// route) and on the hosted tier.
 
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -22,7 +23,6 @@ import Layout from '../components/Layout.jsx'
 import Card from '../components/Card.jsx'
 import { ApiError } from '../lib/api.js'
 import { library } from '../cloud/api.js'
-import { useCloudConfig } from '../cloud/useCloudConfig.js'
 import { useAuth } from '../store/auth.js'
 
 // Categories surfaced in the filter chip strip. Keep this list short —
@@ -349,7 +349,6 @@ function Field({ label, value, onChange, placeholder, required }) {
 }
 
 export default function Library() {
-  const { cloudEnabled, ready } = useCloudConfig()
   const navigate = useNavigate()
   const accessToken = useAuth((s) => s.accessToken)
   // URL state — `?q=`, `?cat=`, `?verified=1` so links are shareable and
@@ -412,11 +411,6 @@ export default function Library() {
   }
 
   useEffect(() => {
-    if (!ready) return
-    if (!cloudEnabled) {
-      setLoading(false)
-      return
-    }
     let cancelled = false
     setLoading(true)
     // Phase 2: hits the canonical /api/library/parts endpoint. The
@@ -442,7 +436,7 @@ export default function Library() {
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [ready, cloudEnabled, debouncedSearch, category, verifiedOnly])
+  }, [debouncedSearch, category, verifiedOnly])
 
   const rows = data?.rows || []
   const headerSubtitle = useMemo(() => {
@@ -451,24 +445,6 @@ export default function Library() {
     if (!rows.length) return 'No parts found'
     return `${rows.length} part${rows.length === 1 ? '' : 's'}`
   }, [loading, data, error, rows.length])
-
-  if (ready && !cloudEnabled) {
-    return (
-      <Layout>
-        <div className="max-w-2xl mx-auto py-12 text-center">
-          <div className="mx-auto grid place-items-center w-12 h-12 rounded-xl bg-ink-800 border border-ink-700">
-            <Package size={20} className="text-kerf-300" />
-          </div>
-          <h1 className="mt-4 font-display text-2xl font-semibold tracking-tight">Library</h1>
-          <p className="mt-2 text-sm text-ink-400">
-            The parts catalog is part of the hosted tier. Sign in at{' '}
-            <a className="text-kerf-300 hover:underline" href="https://kerf.sh">kerf.sh</a>{' '}
-            to browse community-published Parts and verified-publisher catalogs.
-          </p>
-        </div>
-      </Layout>
-    )
-  }
 
   return (
     <Layout>

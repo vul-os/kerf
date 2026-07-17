@@ -1,4 +1,5 @@
-// Billing API helpers for the hosted (cloud) tier.
+// API helpers for the cloud-hosted-convenience surface (Workshop, Library,
+// hosted git, operator email admin). Kerf has no billing anywhere.
 //
 // Mirrors the patterns in src/lib/api.js: same fetch wrapper for bearer auth
 // and refresh-on-401, same ApiError shape. We intentionally re-import the
@@ -71,37 +72,6 @@ async function request(path, { method = 'GET', body, headers = {}, auth = true }
   }
   if (res.status === 204) return null
   return res.json()
-}
-
-// GET /api/billing/me
-// → { credits_usd, recent_invoices: [...], recent_usage: [...], fx_rate?, fx_quoted_at? }
-export function getBillingMe() {
-  return request('/api/billing/me')
-}
-
-// POST /api/billing/topup
-// → { authorization_url, reference, amount_usd, amount_zar, fx_rate }
-// Caller is expected to redirect via window.location.assign(authorization_url).
-export function topUp(amountUSD) {
-  return request('/api/billing/topup', {
-    method: 'POST',
-    body: { amount_usd: Number(amountUSD) },
-  })
-}
-
-// GET /api/billing/usage?from=ISO&to=ISO
-export function getUsage(from, to) {
-  const q = new URLSearchParams()
-  if (from) q.set('from', from)
-  if (to) q.set('to', to)
-  const qs = q.toString()
-  return request(`/api/billing/usage${qs ? `?${qs}` : ''}`)
-}
-
-// GET /api/billing/pricing — current rate card. Returns { models: [...], storage_usd_per_gb_month }.
-// Optional today; PlanSelector falls back to the hardcoded constant if this 404s.
-export function getPricing() {
-  return request('/api/billing/pricing')
 }
 
 // ---- Workshop ----

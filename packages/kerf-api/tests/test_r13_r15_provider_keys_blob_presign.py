@@ -1,5 +1,10 @@
 """T-402b / T-409 — unit tests for R13 (BYO key save+validation) and R15 (blob presign).
 
+R13 is a pure convenience feature — a user may save their own provider API
+key (POST /api/provider-keys) instead of using the operator's configured
+key. Kerf has no billing anywhere, so this is not a credit bucket; it is
+consumed unconditionally by ``_prefer_byo_provider`` in the chat handler.
+
 All tests are pure-unit (no DB, no real HTTP) using mocks so they run in any
 environment including CI without DATABASE_URL.
 """
@@ -204,6 +209,79 @@ class TestR13DeleteProviderKey:
         assert require_auth in dep_funcs, (
             "delete_provider_key must declare Depends(require_auth)"
         )
+
+
+# ---------------------------------------------------------------------------
+# R13 — _prefer_byo_provider: unconditional consumption of a saved BYO key
+# ---------------------------------------------------------------------------
+
+
+class TestPreferByoProvider:
+    """_prefer_byo_provider swaps in the caller's saved key, no billing gate."""
+
+    def test_no_user_id_keeps_default_provider(self):
+        from kerf_api.routes import _prefer_byo_provider
+
+        default_provider = object()
+        pool, _conn = _make_pool()
+        result = _run(_prefer_byo_provider(pool, None, default_provider))
+        assert result is default_provider
+
+    def test_no_saved_key_keeps_default_provider(self):
+        from kerf_api.routes import _prefer_byo_provider
+
+        pool, conn = _make_pool(fetchrow_return=None)
+        default_provider = MagicMock()
+        default_provider.name = MagicMock(return_value="anthropic")
+
+        with patch("kerf_api.routes.get_pool_required", new=AsyncMock(return_value=pool)):
+            result = _run(_prefer_byo_provider(pool, str(uuid.uuid4()), default_provider))
+
+        assert result is default_provider
+
+    def test_saved_key_swaps_in_byo_provider(self):
+        from kerf_core.utils.encrypt import encrypt_secret
+        import kerf_api.routes as routes_mod
+
+        encrypted = encrypt_secret(b"sk-ant-user-owned", "byo-provider-key")
+        pool, conn = _make_pool(fetchrow_return={"encrypted_key": encrypted})
+        default_provider = MagicMock()
+        default_provider.name = MagicMock(return_value="anthropic")
+
+        result = _run(routes_mod._prefer_byo_provider(pool, str(uuid.uuid4()), default_provider))
+
+        assert isinstance(result, routes_mod.llm_module.AnthropicProvider)
+        assert result is not default_provider
+
+    def test_lookup_scoped_to_user_and_provider(self):
+        """The SELECT must filter on both user_id and provider (no cross-user leak)."""
+        from kerf_api.routes import _prefer_byo_provider
+
+        pool, conn = _make_pool(fetchrow_return=None)
+        default_provider = MagicMock()
+        default_provider.name = MagicMock(return_value="openai")
+        uid = str(uuid.uuid4())
+
+        _run(_prefer_byo_provider(pool, uid, default_provider))
+
+        conn.fetchrow.assert_awaited_once()
+        sql, *args = conn.fetchrow.call_args[0]
+        assert "user_provider_keys" in sql
+        assert "user_id" in sql and "provider" in sql
+        assert args[0] == uid
+        assert args[1] == "openai"
+
+    def test_decrypt_failure_falls_back_silently(self):
+        """A corrupt/undecryptable row must never raise — fall back to default."""
+        from kerf_api.routes import _prefer_byo_provider
+
+        pool, conn = _make_pool(fetchrow_return={"encrypted_key": b"not-a-valid-blob"})
+        default_provider = MagicMock()
+        default_provider.name = MagicMock(return_value="anthropic")
+
+        result = _run(_prefer_byo_provider(pool, str(uuid.uuid4()), default_provider))
+
+        assert result is default_provider
 
 
 # ---------------------------------------------------------------------------

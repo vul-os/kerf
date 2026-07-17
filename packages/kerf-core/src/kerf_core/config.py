@@ -81,21 +81,6 @@ class Settings(BaseSettings):
     system_user_password: str = ""
 
     cloud_enabled: bool = False
-    # Cloud beta: when True billing is disabled server-side and the frontend
-    # renders payment controls as visibly greyed-out. Set KERF_CLOUD_BETA=true
-    # on the server; the value is mirrored to the frontend via /api/config.
-    cloud_beta: bool = False
-    cloud_paystack_secret_key: str = ""
-    cloud_paystack_public_key: str = ""
-    cloud_paystack_webhook_secret: str = ""
-    cloud_fx_base_currency: str = "USD"
-    cloud_fx_settlement_currency: str = "ZAR"
-    cloud_fx_refresh_url: str = "https://api.exchangerate.host/latest?base=USD&symbols=ZAR"
-    cloud_fx_spread_pct: float = 1.5
-    cloud_pricing_token_markup_pct: float = 20.0
-    cloud_pricing_gpu_markup_pct: float = 20.0
-    cloud_pricing_storage_usd_per_gb_month: float = 0.20
-    cloud_pricing_free_storage_mb: int = 50
     cloud_git_prefix: str = "git"
     cloud_github_client_id: str = ""
     cloud_github_client_secret: str = ""

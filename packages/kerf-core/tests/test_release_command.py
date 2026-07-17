@@ -4,8 +4,8 @@ The pre-deploy migration step in fly.toml (`release_command`) relies on the
 runner reading the DSN from the environment — it can't inject secrets directly
 into the command string. We moved migrations into this pre-deploy hook to
 fix the race where in-process workers booted and crashed on UndefinedTableError
-(fem_jobs / sim_jobs / step_tessellation_jobs / model_prices) before a
-post-deploy manual migration step could land.
+(fem_jobs / sim_jobs / step_tessellation_jobs) before a post-deploy manual
+migration step could land.
 
 To support that, the runner now reads from argv[1] OR $DATABASE_URL.
 This test pins both behaviours and is host-agnostic.

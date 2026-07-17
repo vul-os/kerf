@@ -10,7 +10,6 @@
 //     google_enabled?: bool,
 //     github_enabled?: bool,
 //     github_client_id?: string,
-//     paystack_public_key?: string,
 //   }
 //
 // OAuth availability (googleEnabled / githubEnabled) is derived at runtime
@@ -39,7 +38,6 @@ const DEFAULTS = {
   googleEnabled: !!BUILD_GOOGLE_CLIENT_ID,
   githubEnabled: false,
   githubClientId: '',
-  paystackPublicKey: '',
 }
 
 const useStore = create((set, get) => ({
@@ -75,7 +73,6 @@ const useStore = create((set, get) => ({
           googleEnabled,
           githubEnabled,
           githubClientId,
-          paystackPublicKey: data.paystack_public_key || '',
           _inflight: null,
         })
       })
@@ -104,7 +101,6 @@ export function useCloudConfig() {
     googleEnabled: state.googleEnabled,
     githubEnabled: state.githubEnabled,
     githubClientId: state.githubClientId,
-    paystackPublicKey: state.paystackPublicKey,
   }
 }
 

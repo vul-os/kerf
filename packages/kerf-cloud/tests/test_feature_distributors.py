@@ -2,8 +2,10 @@
 
 Covers:
   - 25 part lookups across mocked DigiKey / Mouser / LCSC providers
-  - FX conversion (CNY→USD via mocked fx helper)
-  - Cache TTL behaviour (sync.is_stale + fx.Fetcher in-memory cache)
+  - FX conversion (CNY→USD via a mocked fx helper injected into LCSCService;
+    Kerf has no billing anywhere, so the fx=None default just means LCSC
+    search results skip the USD price conversion, per test_lcsc_search_no_fx)
+  - Cache TTL behaviour (sync.is_stale)
   - Error paths: auth failures, empty results, rate-limit, malformed responses
   - Registry.has / Registry.acquire / refresh_part happy + sad paths
 
@@ -347,66 +349,6 @@ async def test_lcsc_search_zero_stock():
     with patch("aiohttp.ClientSession", return_value=_lcsc_session(products)):
         results = await svc.search(None, "C005", 1)
     assert results[0].stock is None
-
-
-# ---------------------------------------------------------------------------
-# 18–20  FX in-memory cache TTL (fx.Fetcher)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_fx_fetcher_cache_hit():
-    """T-56-18  fx.Fetcher returns cached rate within TTL without hitting DB."""
-    from kerf_cloud.fx import CachedRate, Fetcher
-
-    pool = MagicMock()
-    fetcher = Fetcher(cfg=MagicMock(cloud_fx_base_currency="USD", cloud_fx_settlement_currency="ZAR"), pool=pool)
-    fetcher._cache["CNY/USD"] = CachedRate(
-        rate=0.137,
-        as_of=datetime.now(UTC),
-        cached_at=datetime.now(UTC),  # fresh
-    )
-
-    rate, _, ok = await fetcher.rate("CNY", "USD")
-    assert ok
-    assert rate == pytest.approx(0.137)
-    pool.acquire.assert_not_called()  # no DB call
-
-
-@pytest.mark.asyncio
-async def test_fx_fetcher_cache_miss_hits_db():
-    """T-56-19  fx.Fetcher queries DB when cache is stale."""
-    from kerf_cloud.fx import CachedRate, Fetcher
-
-    stale_cached_at = datetime.now(UTC) - timedelta(seconds=200)
-    conn = AsyncMock()
-    conn.fetchrow = AsyncMock(return_value={"rate": 0.13, "fetched_at": datetime.now(UTC)})
-    pool = MagicMock()
-    pool.acquire = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=conn), __aexit__=AsyncMock(return_value=False)))
-
-    fetcher = Fetcher(cfg=MagicMock(), pool=pool)
-    fetcher._cache["CNY/USD"] = CachedRate(rate=0.10, as_of=datetime.now(UTC), cached_at=stale_cached_at)
-
-    rate, _, ok = await fetcher.rate("CNY", "USD")
-    assert ok
-    assert rate == pytest.approx(0.13)
-
-
-@pytest.mark.asyncio
-async def test_fx_fetcher_no_db_row_returns_false():
-    """T-56-20  fx.Fetcher returns ok=False when no DB row exists."""
-    from kerf_cloud.fx import Fetcher
-
-    conn = AsyncMock()
-    conn.fetchrow = AsyncMock(return_value=None)
-    pool = MagicMock()
-    pool.acquire = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=conn), __aexit__=AsyncMock(return_value=False)))
-
-    fetcher = Fetcher(cfg=MagicMock(), pool=pool)
-
-    rate, _, ok = await fetcher.rate("CNY", "USD")
-    assert not ok
-    assert rate == 0.0
 
 
 # ---------------------------------------------------------------------------

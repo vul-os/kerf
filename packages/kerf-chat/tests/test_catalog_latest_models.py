@@ -1,9 +1,8 @@
 """Regression: chat-model CATALOG must list the latest provider models.
 
 User report (2026-05-19): "gemini latest aren't picking up". The CATALOG
-used to top out at gemini-2.5-pro / gemini-2.5-flash even though
-cheap_tier.py already routed `gemini-3-flash-*` billing buckets — i.e.
-the rest of the system knew about Gemini 3 but the model picker didn't.
+used to top out at gemini-2.5-pro / gemini-2.5-flash even though the rest
+of the system already knew about Gemini 3 — the model picker didn't.
 
 This test pins the catalog so a refactor can't silently drop the latest
 ids again.

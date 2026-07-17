@@ -57,14 +57,9 @@ _BLENDER_AVAILABLE = shutil.which("blender") is not None
 
 
 # ---------------------------------------------------------------------------
-# Billing gate helpers
+# No billing anywhere — GPU renders always run on the caller's own hardware.
+# _run_billing_gate is kept as a no-op so call sites don't need to change.
 # ---------------------------------------------------------------------------
-
-def _get_settings():
-    """Lazy import to avoid circular-import at module load time."""
-    from kerf_core.config import get_settings
-    return get_settings()
-
 
 async def _optional_user_id(request: Request) -> Optional[str]:
     """Extract user_id from Bearer JWT if present; return None otherwise."""
@@ -85,72 +80,8 @@ async def _optional_user_id(request: Request) -> Optional[str]:
 
 
 async def _run_billing_gate(user_id: Optional[str], est_gpu_seconds: float) -> None:
-    """Invoke gate_render_job when billing is cloud-enabled.
-
-    Skips silently when:
-    - KERF_RENDER_BILLING_DISABLED=1  (self-host kill-switch)
-    - usage_enabled=False in settings (local / OSS mode)
-
-    In cloud mode (usage_enabled=True) a missing user_id is a hard 401 —
-    unauthenticated callers must NEVER bypass the billing gate.
-
-    Raises HTTP 401 when user_id is None in cloud mode.
-    Raises HTTP 402 on billing denial.
-    """
-    settings = _get_settings()
-    if not settings.usage_enabled:
-        return  # local / OSS — no billing gate (self-host owns its own GPU)
-    if user_id is None:
-        # Cloud mode + no authenticated identity: hard-fail.
-        # require_auth on the route handler should have already caught this,
-        # but _run_billing_gate is also called from internal paths (e.g.
-        # _generate_project_cover) so we enforce it here too.
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required for GPU renders.",
-        )
-
-    try:
-        from kerf_billing.render_meter import gate_render_job, RenderGateDenied
-        from kerf_core.db.connection import get_pool_required
-        pool = await get_pool_required()
-        await gate_render_job(
-            pool,
-            user_id,
-            est_gpu_seconds,
-            usage_enabled=settings.usage_enabled,
-        )
-    except Exception as exc:
-        # Import the specific exception type to distinguish denial vs other errors.
-        try:
-            from kerf_billing.render_meter import RenderGateDenied
-        except ImportError:
-            RenderGateDenied = None  # type: ignore
-
-        if RenderGateDenied is not None and isinstance(exc, RenderGateDenied):
-            reason = exc.reason  # type: ignore[attr-defined]
-            if reason == "gpu_paid_only":
-                raise HTTPException(
-                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                    detail="GPU rendering requires a paid plan. Please upgrade to Studio or Pro.",
-                )
-            elif reason == "insufficient_credits":
-                need = getattr(exc, "need_credits", None)
-                detail = "Insufficient credits for GPU render."
-                if need is not None:
-                    detail += f" Add at least ${need:.2f} USD to continue."
-                raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=detail)
-            else:
-                # gate_error or unknown — fail closed
-                raise HTTPException(
-                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                    detail="Render billing gate error. Please try again later.",
-                )
-        # Non-denial exception — fail closed (GPU is a direct cost)
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="Render billing gate unavailable. Please try again later.",
-        )
+    """No-op. Kerf has no billing anywhere — GPU renders are never gated."""
+    return
 
 
 class CameraSettings(BaseModel):

@@ -109,9 +109,9 @@ default_model = "claude-opus-4-7"
 # ---------------------------------------------------------------------------
 # Usage tracking
 #
-# When enabled, the server records token + storage usage in cloud_usage_events
-# even in OSS builds — useful for "how much have I burned this month" stats.
-# Cloud builds layer billing on top of these same events.
+# When enabled, the server records token + storage usage in usage_events —
+# local telemetry only (no billing anywhere): useful for "how much have I
+# burned this month" stats on your own box.
 # ---------------------------------------------------------------------------
 [usage]
 enabled = true
@@ -171,22 +171,6 @@ password = ""
 # ---------------------------------------------------------------------------
 [cloud]
 enabled = false
-
-  [cloud.paystack]
-  secret_key = ""
-  public_key = ""
-  webhook_secret = ""
-
-  [cloud.fx]
-  base_currency = "USD"
-  settlement_currency = "ZAR"
-  refresh_url = "https://api.exchangerate.host/latest?base=USD&symbols=ZAR"
-  spread_pct = 1.5                    # added to fetched rate before charging
-
-  [cloud.pricing]
-  token_markup_pct = 20.0
-  storage_usd_per_gb_month = 0.20
-  free_storage_mb = 50
 
   # Real git integration (cloud-only). Bare repos are stored as S3 objects
   # under `<prefix>/<project_id>/...` in the same bucket as `[storage.s3]`,

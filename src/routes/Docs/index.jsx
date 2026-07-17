@@ -40,7 +40,7 @@ const GROUP_ACCENTS = {
 const GROUP_BLURBS = {
   'get-started': 'Install, configure, and ship your first parametric model.',
   'workflows': 'End-to-end recipes for the everyday Kerf jobs.',
-  'cloud-features': 'Projects, sharing, workshop, billing — everything the hosted service adds.',
+  'cloud-features': 'Projects, sharing, workshop — everything the hosted service adds.',
   'reference': 'Architecture, data model, tool registry, SDK.',
   'develop': 'Author plugins, contribute, troubleshoot deploys.',
   'whats-new': 'Recent releases and changelog.',

@@ -125,20 +125,18 @@ describe('/api/config OAuth fields — full server response', () => {
     expect(s).not.toHaveProperty('githubClientSecret')
   })
 
-  it('existing fields (cloudEnabled, localMode, paystackPublicKey) are unchanged', async () => {
+  it('existing fields (cloudEnabled, localMode) are unchanged', async () => {
     mockConfigFetch({
       cloud_enabled: true,
       local_mode: false,
       google_enabled: false,
       github_enabled: false,
-      paystack_public_key: 'pk_test_abc',
     })
     const { getCloudConfig } = await freshStore()
     await getCloudConfig().fetch()
     const s = getCloudConfig()
     expect(s.cloudEnabled).toBe(true)
     expect(s.localMode).toBe(false)
-    expect(s.paystackPublicKey).toBe('pk_test_abc')
     expect(s.ready).toBe(true)
   })
 })

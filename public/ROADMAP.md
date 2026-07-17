@@ -340,3 +340,25 @@ This list is only AI-redundant *authoring/UX interaction paradigms* — not skip
 ## How to contribute
 
 Pick a task from [`tasks.md`](./tasks.md) (sized for a single isolated agent run), or open an issue proposing a new long-tail sector line. The roadmap states *why* and *in what order*; `tasks.md` is the *how*. Keep them in sync: when a priority moves here, move the corresponding tasks there.
+
+---
+
+## Decentralized node model
+
+Decided 2026-07-17 (full rationale + rejected alternatives in `decisions.md`). **Kerf decentralizes: one node type, gateways are rented uptime, Workshop federates over the DMTAP-PUB protocol.**
+
+Every kerf install — a homelab "big PC," a self-hosted server, kerf.sh — is a full node: client (embedded frontend), project storage, git/LFS hosting, Workshop serving, worker orchestration. There is no "cloud edition" vs "local edition," only four config toggles: publicly-reachable, relay-for-others, pin-storage, offer-compute. kerf.sh runs identical software to any self-hosted node; it is simply the best-operated, always-on one — **rented uptime, not privileged capability.**
+
+**License line redraw.** Workshop serving/publish, hosted git + LFS serving, worker queue/orchestration, and GitHub sync (self-hosters supply their own OAuth app) move from proprietary `packages/kerf-cloud/` into MIT root. Stays proprietary: `kerf-billing`, `kerf-pricing`, the provisioning control plane (bucket provisioning, fleet compute, API-key minting), operator admin UI, transactional email. One-sentence rule: **everything a NODE does is MIT; everything a BUSINESS does is proprietary.** This closes the `LICENSE-CLOUD` scoping gap and the parts-catalog `VITE_CLOUD` gating leak both logged in `docs/oss-cloud-separation.md`.
+
+**The clean seam.** Three narrow interfaces keep the node/business boundary auditable instead of scattered: (a) usage events out — a metering hook, OSS no-op / cloud bills; (b) standard credentials in — provisioning hands a node config indistinguishable from self-supplied config; (c) policy check — an injected hook gates metered actions, OSS default always-yes / cloud checks credits. CI invariant: the node builds, runs, federates, and serves Workshop with the cloud packages deleted from disk.
+
+**Workshop federation on DMTAP-PUB.** Protocol: `github.com/vul-os/dmtap` (§22 public-objects extension + §23 CAD/artifact profile). Identity is user keypairs. A part/artifact is a plaintext content-addressed Merkle-DAG manifest (global dedup; kerf's sha256 LFS objects coexist via the multihash agility prefix). Publishing is a signed `pub_announce` appended to the author's feed. A "workshop" is a set of followed feeds; kerf.io's workshop feed ships as the removable default. Indexes are derived and rebuildable, never authoritative. Assemblies reference sub-parts by content address — BOM resolution is a tree walk, dedup composes. Public parts are plaintext-addressed; private projects stay encrypted (dedup scoped to key holder). Everything is offline-verifiable — signed, content-addressed objects survive with zero live infrastructure (sneakernet / apocalypse / Mars-latency safe; store-and-forward, no interactive round trips required).
+
+| Phase | What | Status |
+|---|---|---|
+| **P0** | Object model over plain HTTPS — keypair identity in accounts, publish flow (manifest → sign announce → append feed), Workshop UI reads verified announcements from followed feeds, gateways serve feed/manifest/chunk endpoints. License/package moves land with P0. | 🔴 not started |
+| **P1** | Mirrors + swarm chunk-fetch, community indexes, third-party gateway hardening, provisioning utility APIs (self-hosted nodes rent kerf-cloud buckets/compute via API key). | 🔴 not started |
+| **P2** | Native mesh transport (`dmtap`) + MLS private team folders, desktop/Tauri node as the true peer client. | 🔴 not started |
+
+**Reversibility:** the durable commitment is the data model — keys, signatures, content addresses, git/LFS coexistence. Transports (HTTPS now, mesh later) and packaging (single-binary now, Tauri later) stay swappable underneath it.

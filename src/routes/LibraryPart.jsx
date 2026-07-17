@@ -412,9 +412,9 @@ export default function LibraryPart() {
                   <Plus size={14} /> Use in Assembly
                 </Button>
                 {sourceSlug && (
-                  <Link to={`/workshop/${encodeURIComponent(sourceSlug)}`}>
+                  <Link to="/workshop">
                     <Button variant="ghost" size="md" className="w-full">
-                      View source project
+                      Find in Workshop
                     </Button>
                   </Link>
                 )}

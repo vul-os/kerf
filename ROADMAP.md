@@ -361,8 +361,8 @@ Every kerf install — a homelab "big PC," a self-hosted server, kerf.sh itself 
 
 | Phase | What | Status |
 |---|---|---|
-| **P0** | `kerf-pub` package (publish/fetch/resolve/submit over plain HTTPS) + total billing removal (`kerf-billing`/`kerf-pricing`/`LICENSE-CLOUD` deleted) + VulOS-standard docs/landing updates. | 🚧 in flight |
-| **P1** | Workshop UI rewire onto `kerf-pub` feeds + on-node/available/stale/unreachable availability badges + Pin action + user keypair onboarding. | 🔴 not started |
-| **P2** | Mesh transport (`dmtap` native) + MLS private team folders + IPFS fetch-adapter, as demand warrants. | 🔴 not started |
+| **P0** | `kerf-pub` package (publish/fetch/resolve/submit over plain HTTPS) + total billing removal (`kerf-billing`/`kerf-pricing`/`LICENSE-CLOUD` deleted) + VulOS-standard docs/landing updates. | ✅ shipped 2026-07-18 |
+| **P1** | Workshop UI rewire onto `kerf-pub` feeds + on-node/available/stale/unreachable availability badges + Pin action + user keypair onboarding; local git API + remotes UI (no OAuth); hosted-git/OAuth/email stripped from `kerf-cloud`. | ✅ shipped 2026-07-18 (pin does not yet hydrate bytes from gateways — that's P2 swarm fetch; assembly publish deferred; dead hosted-git/workshop table DDL cleanup pending) |
+| **P2** | Mesh transport (`dmtap` native) + MLS private team folders + IPFS fetch-adapter + pin-triggered gateway/swarm hydration + assembly (`AssemblyStructure`) publish, as demand warrants. | 🔴 not started |
 
 **Reversibility:** the durable commitment is the data model — keys, signatures, content addresses, git/LFS coexistence via the multihash prefix. Transports (HTTPS now, mesh/IPFS-adapter later) and packaging (single-binary now, Tauri later) stay swappable underneath it without another rewrite.

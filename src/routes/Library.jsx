@@ -147,10 +147,10 @@ function DetailsPanel({ row, onClose }) {
 
       {row.slug && (
         <Link
-          to={`/workshop/${row.slug}`}
+          to="/workshop"
           className="mt-4 inline-flex items-center text-xs text-kerf-300 hover:underline"
         >
-          View source project →
+          Find in Workshop →
         </Link>
       )}
 

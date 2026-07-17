@@ -5,6 +5,15 @@
 Sonnet agent can complete it in one isolated-worktree run**: bounded scope,
 clear target files, a concrete Definition of Done.
 
+> **2026-07-17 pivot.** Kerf's final-form ADRs (`decisions.md`: "Final form:
+> no billing anywhere; BYO boxes; Workshop = DMTAP-PUB via kerf-pub" and the
+> "Addendum: local git only; no OAuth; accounts shrink to the box") retired
+> billing, hosted git, GitHub OAuth, transactional email, and the Koyeb
+> migration as product surfaces. Already-shipped tasks below are left
+> untouched as history. Pending tasks that targeted a now-retired surface are
+> marked `RETIRED` in place, next to their original status line — task text
+> is kept for the record, not deleted.
+
 ## The prioritization lens
 
 The roadmap orders by *leverage / credibility per unit work*. This backlog
@@ -5475,7 +5484,7 @@ deploy model. All tasks are P0; the order is the order they should ship.
 ### T-400 Ground GPU billing rates to Koyeb actuals
 - **Tier:** A
 - **Priority:** P0
-- **Status:** 🚧 in flight (2026-05-24)
+- **Status:** 🚧 in flight (2026-05-24) — **RETIRED (2026-07-17 — Koyeb withdrawn, billing removed; see decisions.md final-form ADR)**
 - **Scope:** Replace the placeholder Modal-tier numbers in `kerf-render.pricing_meter` with the real Koyeb hourly rates. Add SKUs for the full Koyeb ladder (rtx_a4000, l4, a6000, l40s, a100, a100_sxm, h100, h200) converted to USD/GPU-second. Lift `GPU_MARKUP_PCT` from 20% → 35% to absorb per-second billing variance + storage egress + autoscale buffer. Make `l4` the default (replaces `a10g`, similar 24GB tier).
 - **Target files:** `packages/kerf-render/src/kerf_render/pricing_meter.py`, `packages/kerf-render/tests/test_pricing_meter.py`, `packages/kerf-billing/src/kerf_billing/render_meter.py` (default-rate lookup), `packages/kerf-pricing/llm_docs/pricing.md`.
 - **Definition of Done:**
@@ -5526,7 +5535,7 @@ deploy model. All tasks are P0; the order is the order they should ship.
 ### T-403 Author `koyeb.yaml` + `koyeb.worker.yaml`
 - **Tier:** A
 - **Priority:** P0
-- **Status:** 🔴 not started
+- **Status:** 🔴 not started — **RETIRED (2026-07-17 — Koyeb withdrawn; see decisions.md final-form ADR)**
 - **Scope:** Mirror `fly.toml` / `fly.worker.toml` 1:1 in Koyeb's config format. Same Dockerfile (no change), same env-var set, same Tigris S3 bindings, same pre-deploy migration command, same `/healthz` health-check. Default instance: `large` (4 vCPU, 4GB, 40GB SSD, $42.85/mo) — closest match to current `performance-2x`. Autoscale on requests (1 min, soft 200, hard 250).
 - **Target files:** new `koyeb.yaml`, `koyeb.worker.yaml`, `koyeb.dev.yaml`. Leave `fly.*.toml` in place for the duration of T-405 cutover.
 - **Definition of Done:**
@@ -5537,7 +5546,7 @@ deploy model. All tasks are P0; the order is the order they should ship.
 ### T-404 `scripts/deploy-koyeb.sh`
 - **Tier:** A
 - **Priority:** P0
-- **Status:** 🔴 not started
+- **Status:** 🔴 not started — **RETIRED (2026-07-17 — Koyeb withdrawn; see decisions.md final-form ADR)**
 - **Scope:** New shell script mirroring `scripts/deploy-fly.sh`. Supports `--env dev|prod`, runs `koyeb-cli secrets sync` if needed, then `koyeb-cli deploy`. Wait for health-check pass before exit-0.
 - **Target files:** new `scripts/deploy-koyeb.sh` (executable).
 - **Definition of Done:**
@@ -5548,7 +5557,7 @@ deploy model. All tasks are P0; the order is the order they should ship.
 ### T-405 Smoke-test on `kerf-dev`, cut DNS, decommission Fly app
 - **Tier:** A
 - **Priority:** P0
-- **Status:** 🔴 not started (blocked on T-403, T-404)
+- **Status:** 🔴 not started (blocked on T-403, T-404) — **RETIRED (2026-07-17 — Koyeb withdrawn; see decisions.md final-form ADR)**
 - **Scope:** Deploy `kerf-dev` to Koyeb. Run the e2e suite against the staging URL. Cut DNS for `kerf.sh` once green. Keep the Fly app running for 7 days as warm rollback; then `flyctl apps destroy`.
 - **Definition of Done:**
   - e2e suite green against Koyeb staging

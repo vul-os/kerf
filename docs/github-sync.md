@@ -1,205 +1,80 @@
-# Git sync (GitHub & GitLab)
+# Git sync (GitHub, GitLab, Gitea, any remote)
 
-Every Kerf project is a real, cloneable git repository. Large files are stored
-as pointer objects in object storage — forks are near-free because they share
-immutable blobs. The hosted git layer is a deliberate-commit version control
-layer that sits on top of (and complements, not replaces) the always-on
-[file revision history](./file-revisions.md).
+Every Kerf project is a real, local git repository — nothing more. Kerf
+ships a git UI over that repo plus a **remotes** config field; there is no
+hosted git product, no kerf-operated OAuth app, and no server holding your
+credentials. Collaboration is `git push` / `git pull` to whatever remote
+you configure, exactly like using the `git` CLI directly.
 
-This feature is cloud-only by nature: it presupposes a hosted managed git remote. A self-hosted Kerf install retains full version-control capability through `file_revisions` alone.
-
-## CLI commands
-
-The `kerf` CLI exposes folder-level sync:
-
-| Command | Description |
-|---------|-------------|
-| `kerf sync` | Two-way folder ↔ project sync |
-| `kerf export` | Snapshot export to a local directory |
-| `kerf import` | Import a local directory into a new or existing project |
-| `kerf hydrate` | Resolve large-file pointers and download binary assets |
+This page replaces the old hosted-GitHub-sync model. See `decisions.md`'s
+*"Addendum: local git only; no OAuth; accounts shrink to the box"*
+(2026-07-17) for the decision record.
 
 ---
 
-## Two version-control layers
+## What changed
 
-Kerf has two coexisting layers. They are not alternatives.
+**Was:** Kerf operated a hosted git layer — a server-side bare repo per
+project, a `POST /api/projects/:pid/git/init` endpoint, `cloud_git_commits`
+/ `cloud_git_branches` tables, and a GitHub OAuth app that stored an
+encrypted access token per user so Kerf could push/pull on your behalf.
 
-| Layer | Scope | When it writes | Who uses it |
-|---|---|---|---|
-| `file_revisions` (OSS, always-on) | Per-file | Every save (automatic) | Cmd+Z undo, History drawer |
-| Cloud git (hosted, deliberate) | Project-level | When you click Commit | Branches, GitHub sync, code review |
+**Now:** a Kerf project *is* a plain local git repo on disk (or on whatever
+node you're running Kerf on). GitHub — and GitLab, Gitea, a teammate's node,
+a homelab box — is just an ordinary git remote, added and authenticated the
+same way you'd add one from the command line: an SSH key or a Personal
+Access Token that you supply and that Kerf never sees a copy of beyond what
+it needs to invoke `git` on your behalf, locally. There is no kerf-operated
+OAuth app and no server-held token.
 
-See [file-revisions.md](./file-revisions.md) for the OSS layer.
-
-The cloud git layer exists because customers — especially those working with large STEP files and production BOM tracking — need:
-- Explicit named checkpoints ("v2 — rounded corners approved")
-- Branching to explore design variants without losing the main state
-- A GitHub remote to integrate with downstream CI / ERP
-
----
-
-## Initialising git for a project
-
-```
-POST /api/projects/:pid/git/init
-```
-
-This creates a bare git repo for the project (stored on the server side in the configured storage backend) and registers the project in `cloud_git_repos`. Idempotent — calling it again returns the existing state.
-
-Response:
-```json
-{
-  "project_id": "...",
-  "default_branch": "main",
-  "head_sha": ""
-}
-```
+`file_revisions` (the always-on, per-file undo layer — see
+[file-revisions.md](./file-revisions.md)) is unchanged and remains the
+default safety net beneath deliberate git commits. The two layers still
+coexist: `file_revisions` fires on every save, git commits are deliberate
+checkpoints.
 
 ---
 
-## Branches
+## Adding a remote
 
-| Operation | Endpoint |
-|---|---|
-| List branches | `GET /api/projects/:pid/git/branches` |
-| Create a branch | `POST /api/projects/:pid/git/branches` — body: `{name, from_sha?}` |
-| Checkout a branch | `POST /api/projects/:pid/git/checkout` — body: `{branch, force?}` |
-
-Branches are tracked in `cloud_git_branches`. `head_sha` is updated on every commit.
-
----
-
-## Commits
-
-```
-POST /api/projects/:pid/git/commit
-```
-
-Body: `{message, branch?}`
-
-A commit captures the current state of all project files into the git repo. The commit SHA is recorded in `cloud_git_commits` (which serves as the commit-graph index for the UI). The bare repo on the server is the source of truth; `cloud_git_commits` is a denormalised cache.
-
-Commit log:
-```
-GET /api/projects/:pid/git/log?branch=main&limit=50
-```
-
----
-
-## Merge
-
-```
-POST /api/projects/:pid/git/merge
-```
-
-Body: `{from_branch, into_branch}`
-
-Merges one branch into another. Conflicts surface as an error — the caller is expected to resolve and retry.
-
----
-
-## GitHub sync
-
-GitHub sync connects a Kerf project to a GitHub repository so that commits can be pushed to (and pulled from) a remote.
-
-### Connecting a GitHub account
-
-The GitHub connect flow is fully wired end-to-end. You connect directly from the Git panel — no external settings page required.
+Kerf's Git panel is a UI over your project's local repo plus a **remotes**
+list. To connect a remote:
 
 1. Open the **Git panel** in the editor.
-2. Click **Connect GitHub** in the panel footer.
-3. You are redirected to GitHub to authorise Kerf (scope: `repo`).
-4. After authorising, you are redirected back. Your encrypted access token is stored and push/pull buttons become active.
+2. Add a remote URL and, if the remote requires it, your own credential:
+   - **GitHub / GitLab / Gitea (HTTPS):** a Personal Access Token you
+     generate on that host, scoped to the repo(s) you want to push/pull.
+   - **Any host (SSH):** an SSH key pair — point Kerf at your existing key,
+     or generate one and add the public half to the remote host yourself.
+3. Push and pull from the Git panel exactly as you would with `git push` /
+   `git pull` on the command line — Kerf is invoking the same operations
+   against the remote you configured.
 
-To disconnect: click **Disconnect GitHub** in the Git panel, or call `DELETE /auth/github`.
+Kerf never brokers the credential exchange: you generate the token or key
+on the remote host's own site (GitHub Settings → Developer settings →
+Personal access tokens; GitLab → Access Tokens; Gitea → Applications), and
+you paste or point Kerf at it directly. Nothing is proxied through a
+kerf-operated server.
 
-### Connecting a repo to a project
-
-Once your GitHub account is connected, link a specific repo to a project:
-
-```
-POST /api/projects/:pid/git/connect
-```
-
-Body: `{github_owner, github_repo}`
-
-### Import from a GitHub URL
-
-You can also initialise git for a project from an existing GitHub repo:
-
-```
-POST /api/projects/:pid/git/import
-```
-
-Body: `{github_url, branch?}`
-
-This registers the remote URL. The initial content import (cloning) happens on the next pull.
-
-### Push and pull
-
-```
-POST /api/projects/:pid/git/push   — push local commits to GitHub
-POST /api/projects/:pid/git/pull   — pull remote commits from GitHub
-```
+A node MAY also *serve* its own repos over standard git HTTP/SSH — that's
+self-hosting a git remote for others to pull from, using the same
+one-node-type capability every Kerf install has (see
+[node-architecture.md](./node-architecture.md)). It's a capability of your
+node, not a service Kerf runs for you.
 
 ---
 
-## What is stored where
+## Multiple remotes
 
-| Data | Location |
-|---|---|
-| File content (current) | Postgres `files.content` + object storage for binaries |
-| Per-file revision history | Postgres `file_revisions` |
-| Git objects (commits, trees, blobs) | Server-side bare repo in the storage backend |
-| Commit metadata index | Postgres `cloud_git_commits` and `cloud_git_branches` |
-| GitHub OAuth token | Postgres `cloud_github_tokens` — AES-GCM encrypted |
-| GitHub remote URL | Postgres `cloud_git_repos.github_remote_url` |
-
-For stateless deployments, the git backend uses an object-storage-backed storer (`S3GitStorer`) that keeps bare repos in object storage. The consistency protocol uploads objects before updating refs so a concurrent reader never sees a ref pointing to a missing object.
-
----
-
-## GitHub OAuth token security
-
-The GitHub access token is never stored in plaintext. It is encrypted with AES-GCM using a key derived from the server's `JWT_SECRET`. Rotating `JWT_SECRET` invalidates all stored tokens — users must re-link their GitHub account on the next push or pull operation.
-
----
-
----
-
-## GitLab mirror
-
-GitLab mirror works the same as GitHub mirror, using a GitLab personal access
-token (PAT) with `read_repository` + `write_repository` scopes.
-
-### Connecting a GitLab account
-
-The GitLab connect flow is also wired directly from the Git panel.
-
-1. Open the **Git panel** in the editor.
-2. Click **Connect GitLab** in the panel footer.
-3. Paste your GitLab personal access token and the instance URL (defaults to `https://gitlab.com`).
-4. Your token is stored encrypted at rest (AES-GCM, same as GitHub).
-
-### Connecting a GitLab repo to a project
-
-```
-POST /api/projects/:pid/git/connect
-```
-
-Body: `{gitlab_url, gitlab_project_id}` — the project ID is the integer shown
-in the GitLab project overview.
-
-Push and pull work identically to the GitHub path.
+Nothing limits a project to one remote. Add GitHub as one remote and a
+teammate's node or a Gitea instance as another; push to either
+independently. Kerf doesn't privilege any particular host — GitHub, GitLab,
+Gitea, and a self-hosted remote are configured and used identically.
 
 ---
 
 ## Related pages
 
-- [commit-and-branches.md](/docs/commit-and-branches) — staged changes view, commit graph, and branch picker in the Git panel
-- [auto-git-init.md](/docs/auto-git-init) — every project is a git repo from creation
-- [file-revisions.md](/docs/file-revisions) — the OSS per-file undo layer
-- [projects.md](/docs/projects) — project model
-- [account-and-auth.md](/docs/account-and-auth) — GitHub OAuth for sign-in vs for repo connect
-- [cloud-features.md](/docs/cloud-features) — why git is cloud-only by nature
+- [file-revisions.md](./file-revisions.md) — the always-on per-file undo layer
+- [node-architecture.md](./node-architecture.md) — node model; serving your own repos
+- [projects.md](./projects.md) — project model

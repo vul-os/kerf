@@ -6,7 +6,9 @@ Kerf can run entirely on your own machine. This page covers what you get, what y
 
 ## What you get
 
-A self-hosted Kerf install is the full MIT codebase. There is no feature difference from Kerf Cloud for design capabilities:
+Kerf is 100% MIT and there is only one node type — there is no separate
+"Kerf Cloud" product to compare against, and no feature is gated behind a
+paid tier or a cloud-only build:
 
 - Every CAD tool: JSCAD, OCCT B-rep, sketcher, assemblies, drawings, GD&T
 - Electronics / PCB design
@@ -14,15 +16,15 @@ A self-hosted Kerf install is the full MIT codebase. There is no feature differe
 - All LLM agent tools (~150 tools across 19 plugins)
 - [File revision history and undo](./file-revisions.md)
 - Parts library capability (you fetch the data yourself — see [oss-cloud-separation.md §4](./oss-cloud-separation.md))
+- The distributed Workshop — publish, follow, pin over DMTAP-PUB (see [distributed-workshop.md](./distributed-workshop.md)); no account needed
+- Git — every project is a plain local git repo; add GitHub/GitLab/Gitea/any remote yourself (see [github-sync.md](./github-sync.md))
 
-What is not present in a self-hosted install (cloud-only-by-nature surfaces):
-- Hosted billing / usage metering
-- The operator-run Workshop public gallery
-- Hosted git + GitHub sync
-- Operator distributor sweep (configurable with your own credentials)
-- Transactional email
-
-See [cloud-features.md](./cloud-features.md) for the full comparison.
+There is no billing anywhere in kerf, no usage metering sold by kerf, and
+no transactional email tied to an account system (there are no kerf
+accounts beyond what a shared multi-user box defines locally). The only
+things anyone pays for, in this whole stack, are Vulos-standard Relay
+(rented uptime) and backup buckets (durable storage) — optional, sold at
+the Vulos layer, not by kerf.
 
 ---
 
@@ -43,7 +45,7 @@ pip install kerf[mech]          # mechanical CAD stack
 # or
 pip install kerf[electronics]   # EDA stack
 # or
-pip install kerf[full]          # everything (includes cloud plugins — needs KERF_CLOUD=1 to activate)
+pip install kerf[full]          # everything
 ```
 
 Persona options: `api-only`, `mech`, `electronics`, `bim`, `full`, `compute-only`.
@@ -98,13 +100,7 @@ With `local_mode = true`:
 
 ```sh
 createdb kerf                # create the database
-kerf-server --migrate        # apply all OSS migrations
-```
-
-If you are running the `full` persona with `KERF_CLOUD=1`:
-
-```sh
-KERF_CLOUD=1 kerf-server --migrate   # also applies cloud-only migrations
+kerf-server --migrate        # apply all migrations
 ```
 
 ---
@@ -127,7 +123,7 @@ The server binds to `host:port` as configured. The frontend SPA is served from t
 
 ## LLM provider keys
 
-Self-hosted installs use provider API keys directly — there is no Kerf billing layer.
+There is no Kerf billing layer anywhere — every install uses provider API keys directly.
 
 Set keys in `kerf.toml`:
 
@@ -144,7 +140,7 @@ Or via environment variables:
 # leave blank — the server reads ANTHROPIC_API_KEY, OPENAI_API_KEY from env
 ```
 
-With `local_mode = true` and `AUTH_OPTIONAL = true`, you can also let users paste their own keys through the settings panel (`prefer_byo` in the BYO model — see [billing-and-credits.md](./billing-and-credits.md#byo-bring-your-own-keys)).
+With `local_mode = true` and `AUTH_OPTIONAL = true`, you can also let users paste their own keys through the settings panel (`prefer_byo` in the BYO model) — there is no billing behind this, it's simply which key is used for the request.
 
 ---
 
@@ -183,10 +179,8 @@ A persona is a named set of plugin packages. Select one at install time:
 | `mech` | CAD, imports, mates, tess, parts, render, workers |
 | `electronics` | Everything in mech + electronics, PCB, wiring, EDA |
 | `bim` | Everything in mech + BIM, structural |
-| `full` | Everything + cloud plugins (kerf-billing, kerf-cloud, kerf-pricing) |
+| `full` | Everything in the other personas |
 | `compute-only` | Heavy compute plugins only (FEM, CAM, topo, render) — for a sidecar deploy |
-
-With the `full` persona installed, cloud plugins are present but **dormant** unless you set `KERF_CLOUD=1` (or `cloud_enabled = true` in `kerf.toml`). You can run `full` without `KERF_CLOUD=1` and get the complete OSS feature set.
 
 ---
 
@@ -205,7 +199,7 @@ kerf-server library-import --manifest samples/libraries/adafruit-sensors.yaml
 
 ## Hero Render — GPU Cycles worker (T-106e)
 
-The Hero Render pipeline (viewport "Hero Render…" button) dispatches high-sample Blender Cycles render jobs to a dedicated worker. Two paths are available: the hosted Kerf Cloud worker (billed against kerf_paid credits) and a self-hosted worker running on your own GPU machine.
+The Hero Render pipeline (viewport "Hero Render…" button) dispatches high-sample Blender Cycles render jobs to a dedicated worker. There is no billed hosted option — point it at a worker on your own GPU machine, in one of two ways:
 
 ### Option A — Self-hosted Docker worker (own GPU box)
 
@@ -265,36 +259,22 @@ When the worker is unreachable (server returns 503 or the request fails), the vi
 
 ---
 
-## GitLab & GitHub OAuth env vars
+## GitHub / GitLab / Gitea remotes
 
-The following environment variables enable the optional GitHub and GitLab
-sync providers (implemented in T-144/T-145). They are **not required** for a
-working self-hosted install — Kerf always retains git history internally and
-functions fully without any external provider configured. Set these only if you
-want users to be able to push/pull to their own GitHub repositories or a
-self-managed GitLab instance from within the Kerf UI.
-
-| Env var | Notes |
-|---|---|
-| `cloud_github_app_id` | GitHub App ID (from the App settings page on github.com) |
-| `cloud_github_app_secret` | GitHub App private key or client secret used for OAuth |
-| `cloud_github_webhook_secret` | Shared secret for validating incoming GitHub webhook payloads |
-| `cloud_gitlab_app_id` | GitLab OAuth application ID |
-| `cloud_gitlab_app_secret` | GitLab OAuth application secret |
-| `cloud_gitlab_host` | Base URL of the GitLab instance (defaults to `https://gitlab.com`); set this to your self-managed host, e.g. `https://gitlab.example.com`) |
-
-All six vars are consumed by the `kerf-cloud` plugin only when
-`KERF_CLOUD=1` (or `cloud_enabled = true` in `kerf.toml`) is set. Without
-them the sync UI is hidden; with them users see a "Connect to GitHub" /
-"Connect to GitLab" button in project settings. Kerf's internal git history
-(backed by the filesystem or S3) is always present regardless of whether these
-providers are configured.
+There is no kerf-operated OAuth app and no server-held token for any git
+host. A Kerf project is a plain local git repo; GitHub, GitLab, Gitea, or
+any other remote is added and authenticated the same way you'd do it from
+the `git` CLI — your own SSH key or Personal Access Token, configured
+through the Git panel. See [github-sync.md](./github-sync.md) for the
+practical walkthrough. Kerf's internal git history is always present
+regardless of whether any remote is configured.
 
 ---
 
 ## Related pages
 
-- [cloud-features.md](./cloud-features.md) — self-host vs cloud comparison
 - [file-revisions.md](./file-revisions.md) — revision history maintenance
-- [oss-cloud-separation.md](./oss-cloud-separation.md) — canonical OSS/cloud model
+- [github-sync.md](./github-sync.md) — GitHub/GitLab/Gitea as ordinary git remotes
+- [distributed-workshop.md](./distributed-workshop.md) — publish, follow, pin over DMTAP-PUB
+- [oss-cloud-separation.md](./oss-cloud-separation.md) — canonical OSS/cloud model (historical)
 - [architecture.md](./architecture.md) — full stack overview and plugin system

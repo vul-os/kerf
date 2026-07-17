@@ -64,14 +64,14 @@ Browser-side panel to configure and trigger a render job:
 
 Status polling uses the `/api/projects/:pid/files/:fid/render/status` endpoint.
 
-### T-106d — Pricing meter (shipped, cloud only)
+### T-106d — Usage telemetry (shipped) — billing removed 2026-07-17
 
-Cloud installs meter render jobs in GPU-seconds and debit the `kerf_paid`
-bucket at cost + markup. Self-hosted installs run the same render worker at
-no metering cost — you pay only for your own compute.
-
-See [billing-and-credits.md](./billing-and-credits.md) for the three-bucket
-model; render job pricing sits inside the existing `kerf_paid` bucket.
+Kerf has no billing anywhere. What survives from the original "pricing
+meter" is local-first usage telemetry: a node meters its own render
+GPU-seconds for its own owner's usage dashboard (useful when a team shares
+one box), never phoned home and never billed. See
+[billing-and-credits.md](./billing-and-credits.md) for the retired
+three-bucket model and the current telemetry-only behavior.
 
 ### T-106e — Self-host Docker image + BYO path (shipped)
 
@@ -91,7 +91,7 @@ and refines toward the final image.
 Key properties:
 
 - Works **offline** and with self-hosted installs that have no backend renderer.
-- No GPU-seconds billing (the browser tab pays).
+- No backend GPU-seconds consumed (the browser tab's own GPU does the work).
 - Resolution is capped by WebGL/WebGPU limits (typically 4 K).
 - Caustics and dispersion are approximated via path tracing rather than
   full spectral transport — acceptable for most use cases.
@@ -136,5 +136,5 @@ tool that triggers a render job.
 - [architecture.md](./architecture.md) — plugin architecture; `kerf-render` plugin
 - [workshop.md](./workshop.md) — hero cover images on publish
 - [jewelry-workflow.md](./jewelry-workflow.md) — gem/metal PBR materials
-- [billing-and-credits.md](./billing-and-credits.md) — render credit metering (cloud)
+- [billing-and-credits.md](./billing-and-credits.md) — retired render credit metering; kerf has no billing anywhere
 - [local-self-host.md](./local-self-host.md) — BYO render path for self-hosters

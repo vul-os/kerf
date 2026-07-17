@@ -5,6 +5,16 @@
 **Status:** decided — not yet implemented  
 **Date:** 2026-05-18
 
+> **RETIRED 2026-07-17.** Kerf has no billing anywhere — this plan's whole
+> premise (per-workspace cost attribution for shared blobs) assumed a paid
+> hosted tier that no longer exists. `kerf-billing` and `kerf-pricing` are
+> deleted, there are no credits, no plan tiers, no paid cloud (see the
+> "Final form: no billing anywhere" ADR in `decisions.md`, 2026-07-17). The
+> underlying dedup mechanics (content-addressed objects, "forks are free")
+> live on as a data-model property under DMTAP-PUB — see
+> `docs/distributed-workshop.md` — but nothing here is billed. Body below is
+> left as history.
+
 ---
 
 ## 1. Core rule

@@ -179,11 +179,21 @@ noted here as a design requirement.)
 
 ## 5. Sweep worker
 
+> **Note (2026-07-17):** the "cloud-gated" framing in 5.1–5.2 below is
+> RETIRED — kerf has no billing anywhere, `kerf-pricing` and `kerf-billing`
+> are deleted, and there is no `CLOUD_ENABLED` gate (see the "Final form:
+> no billing anywhere" ADR in `decisions.md`). Blob GC is an ordinary node
+> capability that should run on any node with blob objects to sweep,
+> local or hosted — not something gated behind a cloud/billing flag. The
+> worker-loop shape and sweep algorithm (5.3–5.4) are otherwise still valid
+> design; only the analogy-to-billing-workers and the activation gating are
+> stale. Left below as history/reference.
+
 ### 5.1 Worker shape
 
-The `BlobGCWorker` follows the same `run(ctx) / stop()` timer-loop shape as
-`PricingRefreshWorker` (in `packages/kerf-pricing/src/kerf_pricing/worker.py`)
-and `BillingResetWorker` (in `packages/kerf-billing/src/kerf_billing/scheduler.py`):
+The `BlobGCWorker` follows a `run(ctx) / stop()` timer-loop shape (formerly
+described by analogy to the now-deleted `PricingRefreshWorker` and
+`BillingResetWorker`):
 
 ```python
 class BlobGCWorker:
@@ -210,15 +220,15 @@ timer worker.
 
 ### 5.2 Registration
 
-The worker is cloud-gated and registered via a plugin's `register()` function
-(e.g., `kerf-cloud`) into `ctx.workers` using `workers_registry.register(name,
-factory)`, exactly as `PricingRefreshWorker` is registered in
-`packages/kerf-pricing/src/kerf_pricing/plugin.py`.
+The worker registers via a plugin's `register()` function into `ctx.workers`
+using `workers_registry.register(name, factory)` on any node with blob
+objects to sweep — there is no cloud/billing gate (the original design
+gated this behind `kerf-cloud` and `CLOUD_ENABLED`; both are retired, see
+the note at the top of this section).
 
 Activation requires:
 - `KERF_INPROCESS_WORKERS=true` (or `1` / `yes`) — the env flag that gates
   `_maybe_start_inprocess_workers` in `packages/kerf-core/src/kerf_core/app.py`.
-- `CLOUD_ENABLED=true` — the worker is a no-op in local/self-hosted mode.
 - `BLOB_GC_DRY_RUN` defaults to `true`; must be explicitly set to `false` to
   enable physical deletes.
 

@@ -106,7 +106,6 @@ Environment variables accepted by the compose stack (set in `.env` or inline):
 | `ANTHROPIC_API_KEY` | _(empty)_ |
 | `OPENAI_API_KEY` | _(empty)_ |
 | `LOCAL_MODE` | `true` |
-| `CLOUD_ENABLED` | `false` |
 | `STORAGE_BACKEND` | `local` |
 | `S3_BUCKET` / `S3_REGION` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | _(empty)_ |
 
@@ -177,19 +176,23 @@ initContainers:
 - [ ] Run `kerf-server --migrate` before first start
 - [ ] Confirm `/healthz` and `/health/capabilities` are reachable
 
-## Cloud-only features (not OSS)
+## Node capabilities (config toggles, not license gates)
 
-The following features require the proprietary `kerf-billing` + `kerf-cloud`
-packages and `[cloud].enabled = true`:
+There is no proprietary/cloud-only feature set — Kerf is 100% MIT and every
+deploy runs the same software. What a given node does is governed by config
+toggles (`publicly-reachable`, `relay-for-others`, `pin-storage`,
+`offer-compute`; see [node-architecture.md](./node-architecture.md)),
+including:
 
-- Workshop (publish / fork / like)
-- Per-project git mirror + GitHub OAuth sync
-- Paystack billing (ZAR-settled credits)
-- Transactional email
+- Workshop (publish / fetch / resolve, via `packages/kerf-pub` — see
+  [distributed-workshop.md](./distributed-workshop.md))
+- Per-project git — local by default; a node MAY serve its own repos over
+  standard git HTTP/SSH if you configure it to
 - Distributor price sweeps (DigiKey / Mouser / LCSC)
 
-An OSS deploy with these keys absent boots and runs normally; cloud routes
-simply do not exist.
+There is no billing, no GitHub-OAuth brokering, and no transactional email
+in any deploy — GitHub is used as an ordinary git remote with your own
+credentials.
 
 ## See also
 

@@ -26,7 +26,6 @@ users
 
 users ─► refresh_tokens
 users ─► api_tokens        (workspace-scoped)
-users ─► cloud_github_tokens
 ```
 
 ---
@@ -35,8 +34,9 @@ users ─► cloud_github_tokens
 
 ### `users`
 
-Every person or service account. Created on first login (password, Google
-OAuth, GitHub OAuth) or via `POST /api/auth/register`.
+Every person or service account. Created on first login (password or Google
+OAuth) or via `POST /api/auth/register`. GitHub OAuth sign-in is retired —
+GitHub is used only as an ordinary git remote, never an identity provider.
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -225,9 +225,15 @@ Long-lived workspace-scoped tokens for SDK / scripting use.
 
 ---
 
-### `cloud_github_tokens`
+### `cloud_github_tokens` — RETIRED
 
-One row per user who has connected their GitHub account (cloud only).
+> **RETIRED 2026-07-17.** GitHub OAuth brokering is removed — GitHub is used
+> as an ordinary git remote with the user's own SSH key or PAT, exactly as
+> with the git CLI. Kerf never holds a GitHub token on your behalf (see the
+> "Addendum: local git only; no OAuth" ADR in `decisions.md`). Table
+> definition left below as history.
+
+One row per user who had connected their GitHub account (cloud only).
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -237,9 +243,6 @@ One row per user who has connected their GitHub account (cloud only).
 | `github_user_id` | bigint | |
 | `github_login` | text | GitHub username |
 | `updated_at` | timestamptz | |
-
-Used by `kerf-cloud` for cloud git operations. See
-[cloud.md](./cloud.md) for the motivation.
 
 ---
 
@@ -257,8 +260,8 @@ Used by `kerf-cloud` for cloud git operations. See
 | `usage_events` | 007 | Per-request usage tracking (LLM token counts, storage) |
 | `library_parts` | 009 | Community parts catalog |
 | `workshop_likes` | 032 | Likes for Workshop projects |
-| `model_prices` | 050 | Per-model token pricing for billing |
-| `billing_buckets` | 051 | `kerf_free` / `kerf_paid` / `byo` per-user billing classification |
+| `model_prices` | 050 | RETIRED 2026-07-17 — was per-model token pricing for billing; kerf has no paid product |
+| `billing_buckets` | 051 | RETIRED 2026-07-17 — was `kerf_free` / `kerf_paid` / `byo` per-user billing classification; kerf has no billing anywhere |
 
 ---
 

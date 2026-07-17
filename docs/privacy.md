@@ -15,9 +15,12 @@ the data controller for the personal information described below.
 ## Backend architecture
 
 The hosted service runs on Python FastAPI with asyncpg connecting to Postgres.
-File blobs go to S3-compatible storage. Sensitive tokens (GitHub OAuth and
-distributor tokens) are encrypted at rest using AES-GCM
-(see `packages/kerf-core/src/kerf_core/utils/encrypt.py`).
+File blobs go to S3-compatible storage. Sensitive tokens (distributor tokens)
+are encrypted at rest using AES-GCM
+(see `packages/kerf-core/src/kerf_core/utils/encrypt.py`). Kerf does not
+broker GitHub OAuth or hold GitHub credentials on your behalf — GitHub is
+configured as an ordinary git remote using your own SSH key or PAT (see
+`docs/github-sync.md`).
 
 Request logging is handled by middleware in
 `packages/kerf-core/src/kerf_core/app.py`. Every request gets a unique ID
@@ -31,11 +34,9 @@ We collect only what's needed to run the service. No more, no less.
 
 - Your email address.
 - Your display name.
-- A password hash (if you signed up with email + password) or a GitHub OAuth
-  subject ID (if you signed in with GitHub). We never see your GitHub password.
+- A password hash (if you signed up with email + password).
 - Optional avatar image you upload.
-- GitHub OAuth tokens and distributor tokens — both encrypted at rest via
-  AES-GCM before being stored.
+- Distributor tokens — encrypted at rest via AES-GCM before being stored.
 
 **Project content**
 
@@ -47,13 +48,14 @@ We collect only what's needed to run the service. No more, no less.
 - The chat history of conversations you have with the in-app assistant.
 - Activity timeline entries — uploads, publishes, and similar events.
 
-**Usage and billing**
+**Usage telemetry**
 
-- Token counts per chat request, for billing purposes.
-- Storage size per workspace, for billing purposes.
-- Top-up history (amount, currency, timestamp). Card details themselves are
-  handled by our payment processor (Paystack — ZAR settlement, USD pricing) —
-  we never see your full card number.
+- Token counts per chat request, bytes stored, and compute-seconds used —
+  computed and stored locally on the node for the node owner's own usage
+  dashboard (useful when a team shares one box). This is local-first
+  telemetry: it is never phoned home and never sold or shared with anyone
+  outside your own node. Kerf has no paid product, so none of this feeds a
+  billing system.
 - Server logs: timestamps, request paths, response codes, IP addresses, and
   a unique request ID from the RequestID middleware. Kept for 30 days.
 
@@ -66,7 +68,7 @@ We do **not** collect:
 ## Where it's stored
 
 - **Postgres** (via asyncpg) for everything structured — accounts, file
-  metadata, chat messages, billing records, project revisions.
+  metadata, chat messages, project revisions.
 - **S3-compatible object storage** for file blobs, avatars, and large project
   content.
 - Both currently live in **the EU** (specific region to be confirmed on
@@ -89,14 +91,10 @@ We share data only in these specific cases:
   that request. None of those providers train on content sent via their paid
   APIs (per their current policies); you can read each provider's policy
   yourself if that matters to you.
-- **Payment processor** — Paystack handles top-ups. We give them an order
-  amount and your email; they handle the card details. Paystack settles in ZAR
-  (South African Rand) while displaying USD prices to users.
-- **Email provider** — transactional emails (welcome, password reset,
-  receipts) go through a third-party SMTP provider. They see the recipient
-  address and the email body.
-- **GitHub** — only when you opt in to GitHub sync for a project. Once you
-  link a repo, file content gets pushed into your own repo on commit.
+- **GitHub** — only if you configure GitHub as a git remote for a project.
+  Kerf does not broker OAuth or hold GitHub tokens; you push using your own
+  SSH key or PAT, exactly as with the git CLI. Kerf never sees or stores
+  your GitHub credentials.
 - **Law enforcement** — if compelled by a valid legal process under South
   African law. We'll contest fishing expeditions and notify you where the
   law allows.
@@ -146,29 +144,33 @@ section below for regulator complaints.
   30 days of account closure.
 - Chat history: as long as the project exists; deleted with the project.
 - Server logs: 30 days.
-- Billing records: 7 years (South African tax law requires it).
 
 ## Local mode
 
-When `KERF_LOCAL_MODE=1` is set:
+There is no separate "cloud edition" of Kerf — every install (a laptop, a
+homelab box, or a Vulos-hosted instance like `kerf.sh`) runs the same
+software. Behavior is governed by config toggles, not by which build you
+installed (see `docs/node-architecture.md`). With nothing configured beyond
+a local Postgres database:
 
 - Authentication is disabled — no login required, you just use the app.
-- All data stays on disk — no Postgres, no S3, no cloud services involved.
+- All data stays on disk — no Postgres beyond your local instance, no S3, no
+  network services involved.
 - No LLM calls unless you provide your own API key.
-- No billing, no email service, no cloud features.
-
-Cloud-only features (billing, email, large blob storage) require the hosted
-service and are gated by the `cloud_enabled` config flag and `KERF_CLOUD` env
-variable. If those aren't set, the app runs entirely locally.
+- Kerf has no paid product, so there is no billing or payment data anywhere,
+  local or hosted.
+- The **zero-socket invariant** holds: with no endpoint configured and no
+  feed followed, Kerf never opens an outbound socket. No telemetry, no
+  phone-home, no background check-in.
 
 ## Data security
 
 We take security seriously:
 
 - All traffic to the hosted service is over HTTPS.
-- Sensitive tokens (GitHub OAuth and distributor tokens) are encrypted at
-  rest using AES-GCM before being stored in Postgres. The encryption key is
-  managed by the backend configuration, not in code.
+- Sensitive tokens (distributor tokens) are encrypted at rest using AES-GCM
+  before being stored in Postgres. The encryption key is managed by the
+  backend configuration, not in code.
 - Database backups are encrypted.
 - Server logs contain no passwords or token values.
 
@@ -177,13 +179,14 @@ than posting publicly. We'll credit you in the release notes if you'd like.
 
 ## Open source
 
-Kerf is [MIT licensed](https://github.com/kerf-sh/kerf) and the codebase is
-public on [GitHub](https://github.com/kerf-sh/kerf). If you want to know
-exactly what gets logged when, the middleware lives in
+Kerf is 100% [MIT licensed](https://github.com/kerf-sh/kerf) and the codebase
+is public on [GitHub](https://github.com/kerf-sh/kerf) — there is no
+proprietary sliver and no second secret repo. If you want to know exactly
+what gets logged when, the middleware lives in
 `packages/kerf-core/src/kerf_core/app.py`. If you want to see what context
-goes to the LLM, check `packages/kerf-chat/src/kerf_chat/`. The cloud plugin
-packages (`packages/kerf-billing/`, `packages/kerf-cloud/`) carry the
-hosted-only paths. There's no second secret repo — the whole thing is auditable.
+goes to the LLM, check `packages/kerf-chat/src/kerf_chat/`. Every node —
+including `kerf.sh` — runs byte-identical software; the whole thing is
+auditable.
 
 ## Changes to this policy
 
@@ -209,3 +212,10 @@ protection authority.
 Kerf is not directed at children under 16. We don't knowingly collect
 information from children. If you believe a child has provided us with personal
 data, please contact us so we can delete it.
+
+---
+
+_2026-07-17: payment/billing provisions removed — kerf has no paid product.
+GitHub OAuth-brokering provisions removed — GitHub is used as an ordinary
+git remote with your own credentials. See `decisions.md` for the underlying
+ADRs._

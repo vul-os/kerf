@@ -127,10 +127,11 @@ a system user and signs you in without a login screen.
 | `[server].local_mode = true` (default) | No login screen. A singleton user is bootstrapped automatically. Ideal for a personal workstation install. |
 | `[server].local_mode = false` | Standard register/login flow. Use for shared servers with multiple accounts. |
 
-The hosted cloud tier (`[cloud].enabled = true`) always forces multi-user mode
-regardless of `local_mode`. This is a cloud-only feature — it is not available
-in the OSS build unless the proprietary `kerf-billing` + `kerf-cloud` packages
-are installed.
+A shared multi-user node (a team box, or a Vulos-hosted instance like
+`kerf.sh`) sets `[server].local_mode = false` explicitly — there is no
+separate proprietary package or license gate involved. Kerf is 100% MIT and
+every install runs the same software; the config toggle is the only thing
+that changes.
 
 ## Config layering
 
@@ -158,7 +159,6 @@ mapping follows the TOML path with underscores and a `KERF_` prefix:
 | `KERF_PORT` | `[server].port` |
 | `DATABASE_URL` | `[database].url` |
 | `KERF_LOCAL_MODE` | `[server].local_mode` |
-| `CLOUD_ENABLED` | `[cloud].enabled` |
 | `ANTHROPIC_API_KEY` | `[llm.anthropic].api_key` |
 | `OPENAI_API_KEY` | `[llm.openai].api_key` |
 
@@ -172,8 +172,9 @@ Three backends are available:
 | `s3` | `[storage].backend = "s3"` | AWS S3, Cloudflare R2, or MinIO. Configure `[storage.s3]`. |
 | `filesystem` | `[storage].backend = "filesystem"` | Projects mirror to disk under `[storage].filesystem_root`. Each project is a real folder — edit files with your own tools. |
 
-The `git` backend (cloud-only) sits above S3 and adds a per-project bare repo.
-Not available in the OSS install.
+The `git` backend sits above S3 and adds a per-project bare repo. It is an
+ordinary MIT node capability, not a cloud-only feature — a node MAY serve
+its own repos over standard git HTTP/SSH if you configure it to.
 
 ## Upgrading
 

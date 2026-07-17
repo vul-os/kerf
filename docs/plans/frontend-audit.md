@@ -1,5 +1,13 @@
 # Frontend Audit — Phase 1 (responsive / a11y / state)
 
+> **Note (2026-07-17):** this is a historical, point-in-time audit. Rows and
+> tasks below that reference `src/cloud/BillingPanel.jsx`, `src/cloud/
+> UsageWidget.jsx`, GitHub/OAuth sign-in, or "Workshop (cloud)" describe UI
+> that is now RETIRED or renamed — kerf has no billing anywhere and GitHub
+> sign-in/OAuth is removed (see `decisions.md`'s 2026-07-17 ADRs). Left as
+> history; do not treat completed `[x]` items below as current-state UI
+> inventory.
+
 Planning artifact only. No code in this branch. Subsequent agents pull tasks
 from Section 2's checkbox list; `[HARD]` tasks are reserved for opus agents.
 

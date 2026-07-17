@@ -438,13 +438,9 @@ Use:
 npm run migrate          # runs python3 -m kerf_core.db.migrations.runner
 ```
 
-For cloud migrations (when `kerf-billing` / `kerf-cloud` packages add their
-own SQL), set `KERF_CLOUD=1` in the environment and run `npm run migrate` —
-the runner discovers all installed migration sources automatically:
-
-```sh
-KERF_CLOUD=1 npm run migrate
-```
+The runner discovers migrations from every installed plugin package
+automatically — there is no separate "cloud migrations" path; Kerf is 100%
+MIT with no proprietary package tree.
 
 ---
 

@@ -12,7 +12,7 @@
 
 CalculiX is an open-source FEA solver with commercial-grade capability: C3D4/C3D10 tetrahedral elements, C3D8/C3D20 hexahedral elements, linear static, nonlinear static (geometric and material), modal, thermal, and explicit dynamic analysis. It accepts Abaqus-compatible .inp files and outputs .frd results files.
 
-The CalculiX bridge takes a Kerf mesh (from the tessellator), material properties, loads, and boundary conditions, and: (1) generates a valid .inp file, (2) executes CalculiX locally or dispatches to the Koyeb GPU worker, and (3) parses the .frd results back into Python dictionaries. A corpus of reference cases (`calculix_corpus.py`) provides analytic benchmarks for regression testing.
+The CalculiX bridge takes a Kerf mesh (from the tessellator), material properties, loads, and boundary conditions, and: (1) generates a valid .inp file, (2) executes CalculiX locally or dispatches to a trusted node offering GPU compute (the `offer-compute` node toggle — see `docs/node-architecture.md`), and (3) parses the .frd results back into Python dictionaries. A corpus of reference cases (`calculix_corpus.py`) provides analytic benchmarks for regression testing.
 
 ## How to use it
 
@@ -65,7 +65,7 @@ The bridge assembles a CalculiX .inp deck with: `*NODE` section, `*ELEMENT` sect
 ```python
 ccx = CalculiXBridge()
 if not ccx._ccx_available():
-    print("CalculiX not found — install ccx or use Koyeb worker")
+    print("CalculiX not found — install ccx or dispatch to a compute node")
 else:
     result = ccx.run_static(mesh, mat, loads, bcs)
     print(f"Max σ_VM = {result.max_von_mises_pa/1e6:.1f} MPa")
@@ -73,7 +73,7 @@ else:
 
 ## Honest caveats
 
-CalculiX must be installed locally (`ccx` in PATH) or the job dispatched to the Koyeb GPU worker. The bridge generates C3D4 (linear tet) and C3D10 (quadratic tet) elements — shell and beam elements are available in CalculiX but not auto-generated from BRep. Large nonlinear jobs may need manual convergence parameter tuning (increment size, maximum iterations). For Abaqus-incompatible features (XFEM, cohesive elements), use direct .inp authoring.
+CalculiX must be installed locally (`ccx` in PATH) or the job dispatched to a trusted node offering compute. The bridge generates C3D4 (linear tet) and C3D10 (quadratic tet) elements — shell and beam elements are available in CalculiX but not auto-generated from BRep. Large nonlinear jobs may need manual convergence parameter tuning (increment size, maximum iterations). For Abaqus-incompatible features (XFEM, cohesive elements), use direct .inp authoring.
 
 ## References
 

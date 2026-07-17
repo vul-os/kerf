@@ -105,7 +105,16 @@ redundancy + security audits). Populated from the scalability audit. Expected th
 - [ ] **S7-STORAGE** — stream large artifacts (don't buffer in memory); signed/expiring URLs (ties to the security thumbnail finding).
 - [ ] **S7-LIMITS** — rate limiting + request size limits + worker autoscale policy.
 
-## Phase 8 — GPU compute backend (cloud Koyeb GPU + OSS-compatible)
+## Phase 8 — GPU compute backend (cloud Koyeb GPU + OSS-compatible) — RETIRED
+
+> **RETIRED 2026-07-17.** The Koyeb migration was withdrawn 2026-06-01 (Fly.io
+> is the permanent home). More fundamentally, the "cloud GPU pool" premise
+> below is gone: kerf decentralized to one node type with no hosted-GPU
+> product (see the "Kerf decentralizes" / "Final form" ADRs in
+> `decisions.md`, 2026-07-17). GPU compute now happens locally or on a
+> trusted node offering compute via the `offer-compute` toggle
+> (`docs/node-architecture.md`) — never a Kerf-billed cloud pool. Body left
+> below as history.
 
 Directive: add GPU instances on Koyeb for advanced rendering and advanced
 projects (heavy FEM/CFD/topo), with an abstraction so OSS/self-host can use GPU too.
@@ -114,7 +123,14 @@ projects (heavy FEM/CFD/topo), with an abstraction so OSS/self-host can use GPU 
 - [ ] **G8-OSS** — self-host docs + config so a self-hoster points Kerf at a local/own GPU box; no proprietary dependency in the OSS path; graceful CPU fallback.
 - [ ] **G8-WIRE** — route GPU-eligible jobs (render quality tiers, large sims) to the GPU backend; expose status in the UI (ties to TopoView/render wiring in Phase 2).
 
-## Phase 9 — Billing for GPU + billing-model fix/run
+## Phase 9 — Billing for GPU + billing-model fix/run — RETIRED
+
+> **RETIRED 2026-07-17.** Kerf has no billing anywhere — `kerf-billing` and
+> `kerf-pricing` are deleted, `LICENSE-CLOUD` is removed, there is no
+> "hosted tier," no credits, no plan tiers, no paid cloud (see the
+> "Final form: no billing anywhere" ADR in `decisions.md`, 2026-07-17). The
+> only thing anyone pays for anywhere in this stack is Vulos-standard Relay
+> and backup buckets, sold by Vulos, not by kerf. Body left below as history.
 
 Directive: fix and run the billing model to account for GPU.
 - [ ] **B9-METER** — meter GPU-seconds as a billable resource; emit usage events from the GPU backend; atomic, server-authoritative credit decrement (builds on the P1-API billing fail-closed fix).

@@ -55,8 +55,8 @@ EU users.
 
 ## Background workers
 
-Background workers (FEM queue, render queue, billing workers, rate-limit
-GC, etc.) run as a separate OS process on the same Fly machine via the
+Background workers (FEM queue, render queue, rate-limit GC, etc.) run as a
+separate OS process on the same Fly machine via the
 `worker` entry in the `[processes]` table of `fly.toml`.
 
 ```toml
@@ -72,15 +72,11 @@ the queue substrate.
 
 ---
 
-## Email
+## Email — RETIRED 2026-07-17
 
-**Resend** — transactional email (account verification, password reset,
-billing receipts, notifications).
-
-- `EMAIL_PROVIDER=resend` + `RESEND_API_KEY` env var.
-- `FROM_EMAIL=no-reply@kerf.sh` (verified sending domain).
-- SES is the planned migration path: flip `EMAIL_PROVIDER=ses`, set
-  `SES_*` env vars — no code changes required.
+Transactional email (account verification, password reset, notifications)
+is retired along with the accounts it served — see the "Addendum: local
+git only; no OAuth" ADR in `decisions.md`. Kerf sends no email of any kind.
 
 ---
 
@@ -100,11 +96,13 @@ The architectural seam is already in place:
   that will drive the backend when it lands.
 - `kerf_workers.compute_backend.ComputeBackend` — abstract interface
   (MIT-licensed). `LocalSubprocessBackend` is the current implementation.
-  A `RunPodGPUBackend` (or `ModalGPUBackend`) will subclass it and live
-  in the proprietary `cloud/` tree.
+  A `RunPodGPUBackend` (or `ModalGPUBackend`) will subclass it and live in
+  the same MIT tree — kerf has no proprietary package tree (see the "Final
+  form: no billing anywhere" ADR in `decisions.md`, 2026-07-17).
 - `kerf_render.pricing_meter.GPU_RATES_USD_PER_SECOND` — placeholder rate
-  table based on market estimates. Will be re-grounded to live RunPod/Modal
-  pricing once the backend is integrated.
+  table based on market estimates, used only for local usage telemetry (a
+  node's own owner-facing usage dashboard) — kerf has no billing anywhere,
+  so this never feeds an invoice.
 
 **When to integrate GPU:** when GPU render demand is confirmed (≥ N hero/
 cinema renders per day where CPU wall-clock time is unacceptable), open a

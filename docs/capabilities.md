@@ -49,10 +49,9 @@ features it would normally surface are unavailable.
 |                    | `chat.tools-dispatch`      | Tool registry → execution loop                    |
 |                    | `chat.search-docs`         | Embedded LLM-docs corpus search                   |
 | **kerf-v1**        | `v1.rpc`                   | `POST /v1/rpc` unified JSON-RPC endpoint          |
-| **kerf-billing**   | `billing.paystack`         | Paystack ZAR settlement (cloud only)              |
-| **kerf-cloud**     | `cloud.workshop`           | Publish/fork/like surface                         |
-|                    | `cloud.git`                | Per-project git mirror + GitHub OAuth             |
-|                    | `cloud.distributors`       | DigiKey/Mouser/LCSC pricing sweep                 |
+| **kerf-pub**       | `pub.gateway`              | DMTAP-PUB gateway endpoints (feed/manifest/chunk) — mounted unconditionally, never gated |
+|                    | `pub.blob-store`           | Content-addressed object storage for published parts |
+|                    | `pub.author-feeds`         | Signed `pub_announce` author feeds (Workshop publish surface) |
 | **kerf-cad-core**  | `cad.step-io`              | STEP read/write via pythonOCC                     |
 |                    | `cad.brep-mesh`            | B-rep → triangulated mesh                         |
 |                    | `cad.wire-extract`         | Wire/edge extraction for projection + sketches    |
@@ -118,7 +117,7 @@ in a curated subset of plugin packages from `packages/`.
 | `mech`         | core + auth + api + chat + cad-core + tess + fem + cam + topo + mates | Mechanical CAD workstation     |
 | `electronics`  | core + auth + api + chat + electronics                               | EDA / PCB / SPICE              |
 | `bim`          | core + auth + api + chat + bim                                       | Architecture / Revit-parity    |
-| `full`         | everything above + billing + cloud + imports + render + workers + plc + firmware + civil + marine + clash + nesting + git | Single-binary local install or development |
+| `full`         | everything above + pub (Workshop/DMTAP-PUB) + imports + render + workers + plc + firmware + civil + marine + clash + nesting + git | Single-binary local install or development |
 | `compute-only` | core + cad-core + tess + fem + cam + topo + mates + electronics + bim + imports + render + workers | Behind an internal LB; no auth/API |
 
 Install:

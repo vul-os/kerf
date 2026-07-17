@@ -234,7 +234,7 @@ Legend:
 | kerf-cad-core / costing | Cost estimation | No route | `costing/`; no route |
 | kerf-cad-core / quoting | RFQ quoting | No route | `quoting/`; no route |
 | kerf-parts | Parts + distributor search | **Wired** | Library/BOM distributor routes; `BOMTable.js` |
-| kerf-pricing | Billing metering | **Wired** | Cloud billing routes; `BillingPanel.js` |
+| ~~kerf-pricing~~ | ~~Billing metering~~ | RETIRED | `kerf-pricing` is deleted — kerf has no billing anywhere (see the "Final form: no billing anywhere" ADR in `decisions.md`, 2026-07-17); `BillingPanel.js` retired with it |
 
 ---
 

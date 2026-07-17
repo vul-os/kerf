@@ -54,7 +54,7 @@ Projects have three visibility levels:
 | `unlisted` | Anyone with a direct link; not listed in the Workshop |
 | `public` | Listed in the [Workshop](./workshop.md) public gallery |
 
-**Default visibility** on Kerf Cloud: paid users (positive credit balance) start with `private`; free-tier users start with `public`. Self-hosted installs default to `private`.
+**Default visibility**: every project — self-hosted or on a Vulos-hosted node like `kerf.sh` — starts `private`. Kerf has no paid tiers, so default visibility is not tier-dependent; publishing to the Workshop is always an explicit, deliberate act (see [node-architecture.md](./node-architecture.md#the-zero-socket-invariant)).
 
 Setting a project to `public` is done via [Workshop publish](./workshop.md#publishing). To revert, use unpublish (`DELETE /api/workshop/:slug`) — this sets visibility back to `private`.
 

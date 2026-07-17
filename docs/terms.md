@@ -12,11 +12,11 @@ By creating an account or using the Service, you agree to these terms.
 ## 1. The Service
 
 Kerf provides a chat-driven CAD platform — mechanical, electronics,
-drawings, BIM — running on our infrastructure. We bill for storage,
-LLM credits, and worker compute as set out on the
-[Pricing page](https://kerf.sh/pricing). The full software is MIT-licensed
-and available at [github.com/kerf-sh/kerf](https://github.com/kerf-sh/kerf)
-if you'd rather self-host.
+drawings, BIM — running on our infrastructure. Kerf is 100% MIT-licensed
+and available at [github.com/kerf-sh/kerf](https://github.com/kerf-sh/kerf).
+`kerf.sh` runs byte-identical software to what you can self-host; using it
+here is a convenience (rented uptime), not a paid subscription — Kerf has
+no paid product and charges nothing for storage, LLM usage, or compute.
 
 ## 2. Accounts
 
@@ -25,7 +25,6 @@ if you'd rather self-host.
   a token is compromised, rotate it immediately from your Profile page.
 - One person, one account. Workspaces are for teams; team members each
   have their own account.
-- Provide accurate billing information.
 
 ## 3. Acceptable use
 
@@ -38,14 +37,13 @@ You agree not to use the Service to:
   feature.
 - Scrape, mirror, or resell the Service's content without our written
   consent (your own projects are yours to export, of course — see
-  Section 6).
+  Section 5).
 - Reverse-engineer or stress-test our infrastructure beyond ordinary use.
-  If you want to run a load test that goes beyond your tier's quotas,
-  email us first.
-- Run automated workloads at a scale that disrupts other users. The
-  per-API-token daily spend cap and per-user monthly limits are there
-  to bound this; intentionally trying to evade them is grounds for
-  suspension.
+  If you want to run a load test that goes beyond ordinary use, email us
+  first.
+- Run automated workloads at a scale that disrupts other users. Rate limits
+  are there to bound this; intentionally trying to evade them is grounds
+  for suspension.
 
 We reserve the right to suspend or terminate accounts that violate
 these rules.
@@ -69,29 +67,7 @@ the user who forked them. We don't claim ownership.
 property, contains malware, depicts illegal activity, or harasses other
 users. We may remove content that violates these rules.
 
-## 5. Payments and billing
-
-- Prices are displayed on [kerf.sh/pricing](https://kerf.sh/pricing).
-- The hosted service settles in your card's native currency via
-  [Paystack](https://paystack.com). Displayed USD prices are converted
-  at the FX rate active at billing time.
-- Subscription tiers (Studio $9/mo, Pro $29/mo) bundle a monthly credit
-  allowance for LLM tokens at our provider cost (no markup). Overage
-  debits a wallet balance you top up via Paystack.
-- **At-cost token pricing**: we charge the raw provider rate plus a 5%
-  payment-processing fee on the overage portion. No hidden markup.
-- **Storage overage**: $0.30/GB-month past your tier's included storage,
-  prorated daily.
-- **Worker compute overage**: $0.10/minute past your tier's free quota
-  for FEM / topo / autoroute jobs.
-- **Refunds**: we don't offer refunds for partial-month subscriptions or
-  unused credits, but we'll work with you in good faith on edge cases
-  (e.g. duplicate top-up, our outage during your subscription).
-- **Cancellation**: you can cancel a subscription any time. Already-paid
-  subscription periods stay active until they expire; we don't auto-renew
-  if you cancel.
-
-## 6. Data export and account deletion
+## 5. Data export and account deletion
 
 - Every project has a "Download project" button that exports all your
   files as a zip.
@@ -100,34 +76,32 @@ users. We may remove content that violates these rules.
   days. Public Workshop publishes stay live unless you unpublish them
   first.
 
-## 7. Service availability
+## 6. Service availability
 
 We aim for high availability but don't guarantee it. The Service is
-provided **"as is"** without uptime guarantees in the standard tier.
-Enterprise customers can negotiate an SLA — contact
-[hello@kerf.sh](mailto:hello@kerf.sh).
+provided **"as is"** without uptime guarantees. Contact
+[hello@kerf.sh](mailto:hello@kerf.sh) if you need something bespoke.
 
 We may schedule downtime for maintenance and will give reasonable notice
-where possible (email + status page).
+where possible (in-app notice + status page).
 
-## 8. Third-party providers
+## 7. Third-party providers
 
 Kerf uses third-party services to deliver some features:
 
 - **LLM providers** (Anthropic, OpenAI, Google, DeepSeek, MiniMax) —
   your chat content is sent to whichever you choose.
-- **Paystack** — payment processing.
-- **Resend** — transactional email.
-- **Koyeb** — hosting (Frankfurt data centre; GDPR-compliant).
+- **Fly.io** — hosting.
 - **Tigris** — object storage (`fly.storage.tigris.dev`).
-- **GitHub** (if you connect git sync) — your project code mirrors to
-  the repo you authorize.
+- **GitHub** (if you configure it as a git remote) — Kerf does not broker
+  OAuth or hold your GitHub credentials; you push using your own SSH key
+  or PAT, exactly as with the git CLI.
 
 These third parties operate under their own terms. We've chosen each
 based on privacy and reliability; full details in our
 [Privacy Policy](./privacy.md).
 
-## 9. Liability
+## 8. Liability
 
 To the maximum extent permitted by law:
 
@@ -142,17 +116,17 @@ To the maximum extent permitted by law:
 Nothing in these terms limits liability for fraud, gross negligence,
 or other liability that can't be limited by law.
 
-## 10. Changes to these terms
+## 9. Changes to these terms
 
 We may update these terms. If we make a change that materially affects
-your rights or what we charge, we'll email you at the address on your
-account and post a notice in the app at least 30 days before the change
-takes effect. Continued use after that date means you accept the change.
+your rights, we'll post a notice in the app at least 30 days before the
+change takes effect. Continued use after that date means you accept the
+change.
 
 Minor clarifications go in without notice; the change history is visible
 on GitHub.
 
-## 11. Governing law
+## 10. Governing law
 
 These terms are governed by the laws of the Republic of South Africa.
 Disputes are resolved in the courts of Durban, KwaZulu-Natal, unless
@@ -161,7 +135,7 @@ law requires a different forum.
 
 The South African Consumer Protection Act applies where relevant.
 
-## 12. Contact
+## 11. Contact
 
 - **Support**: [support@kerf.sh](mailto:support@kerf.sh)
 - **Privacy**: [privacy@kerf.sh](mailto:privacy@kerf.sh)
@@ -170,3 +144,10 @@ The South African Consumer Protection Act applies where relevant.
 - **Legal / business**: [hello@kerf.sh](mailto:hello@kerf.sh)
 
 Postal address available on request.
+
+---
+
+_2026-07-17: payment/billing provisions removed — kerf has no paid product.
+GitHub OAuth-brokering provisions removed — GitHub is used as an ordinary
+git remote with your own credentials. See `decisions.md` for the underlying
+ADRs._

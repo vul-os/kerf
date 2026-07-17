@@ -69,11 +69,11 @@ share-able history.
 | **◯** (filled circle) | A manual commit — you described what changed |
 | **◌** (hollow circle) | An auto-saved safety-net commit — fired automatically after 15 minutes of dirty edits with no manual commit, so the graph never has a gap longer than 15 minutes |
 
-**GitHub and GitLab sync** — optional. If you link your GitHub (or GitLab) account
-in the Git panel, Kerf will push commits upstream when you click **Push**. Kerf
-is always the system of record; the external repo is a mirror. The sync is
-opt-in and can be disconnected at any time. See [github-sync.md](./github-sync.md)
-for setup instructions.
+**GitHub and GitLab sync** — optional. If you configure GitHub (or GitLab) as a
+remote in the Git panel (using your own SSH key or PAT — Kerf brokers no
+OAuth), Kerf will push commits to it when you click **Push**, exactly like
+`git push` to any remote. The remote is opt-in and can be disconnected at
+any time. See [github-sync.md](./github-sync.md) for setup instructions.
 
 ---
 

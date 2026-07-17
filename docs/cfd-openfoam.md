@@ -78,7 +78,7 @@ print(f"Mesh warnings: {res.mesh_quality_warnings}")
 
 ## Honest caveats
 
-The bridge generates valid OpenFOAM cases for common configurations, but mesh quality and boundary condition correctness are the user's responsibility. blockMesh generates structured hexahedral meshes only — complex geometries need snappyHexMesh (`cfd-snappy-mesh`). OpenFOAM must be installed locally (or on the Koyeb GPU worker) for execution — the bridge does not run the solver. Y⁺ wall treatment must be set manually based on mesh resolution.
+The bridge generates valid OpenFOAM cases for common configurations, but mesh quality and boundary condition correctness are the user's responsibility. blockMesh generates structured hexahedral meshes only — complex geometries need snappyHexMesh (`cfd-snappy-mesh`). OpenFOAM must be installed locally (or on a trusted node offering compute — see `docs/node-architecture.md`) for execution — the bridge does not run the solver. Y⁺ wall treatment must be set manually based on mesh resolution.
 
 ## References
 

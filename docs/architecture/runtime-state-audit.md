@@ -15,9 +15,10 @@ _Anchored at commit `ccb91c8` — 2026-05-19_
   wired to any HTTP endpoint yet, but it **will break** the moment a second instance
   is added or presence is exposed.
 
-  > This audit was written against the Koyeb deployment (`koyeb.yaml`).
-  > The multi-instance safety analysis below applies to any horizontally-scaled
-  > container deployment.
+  > This audit was originally written against a Koyeb deployment; kerf's Koyeb
+  > migration was withdrawn 2026-06-01 and Fly.io is the permanent deploy target
+  > (see `decisions.md`). The multi-instance safety analysis below applies to any
+  > horizontally-scaled container deployment, including Fly.
 
 - **IndexedDB save status: IMPLEMENTED but not wired to editors.** `localStash`,
   `autosaveScheduler`, and `dirtyStore` are fully coded and tested. `reconcile()` is
@@ -45,36 +46,37 @@ _Anchored at commit `ccb91c8` — 2026-05-19_
 
 ## 1 — Multi-instance Safety
 
-### Koyeb service config (current hosted tier)
+### Fly.io service config (historical note: originally audited on Koyeb)
 
-Kerf runs on Koyeb with a single `web` service instance by default.
-Koyeb scales horizontally by adding replicas; the same multi-instance
-safety properties described below apply regardless of the number of
-replicas.
+Kerf runs on Fly.io with a single `web` app/machine by default (the Koyeb
+migration this section originally described was withdrawn 2026-06-01; see
+`decisions.md`). Fly scales horizontally by adding machines; the same
+multi-instance safety properties described below apply regardless of the
+number of machines.
 
-Key Koyeb knobs to review when scaling:
-- **Replicas**: set via the Koyeb dashboard or `koyeb service update --replicas N`.
-- **Health check path**: `/healthz` — Koyeb routes traffic only to healthy instances.
+Key Fly knobs to review when scaling:
+- **Machines/replicas**: set via `fly scale count N` or the Fly dashboard.
+- **Health check path**: `/healthz` — Fly routes traffic only to healthy machines.
 - **No sticky-session config by default**: requests are round-robined across
-  replicas. Do not rely on in-process state surviving across requests.
+  machines. Do not rely on in-process state surviving across requests.
 
-### koyeb.yaml audit
+### fly.toml audit
 
-```yaml
-# koyeb.yaml (relevant scaling fields)
-# replicas: 1          # single replica by default
-# min_scale: 1
-# max_scale: 3         # autoscale up to 3 on concurrency
+```toml
+# fly.toml (relevant scaling fields)
+# [http_service]
+#   min_machines_running = 1
+#   max_machines_running = 3   # autoscale up to 3 on concurrency
 ```
 
-- `min_scale: 1` → one replica kept running at all times; Koyeb autoscales
-  up under concurrency pressure up to `max_scale`.
-- **No sticky-session config by default**: Koyeb round-robins requests across
-  replicas. Do not rely on in-process state surviving across requests.
-- **Health check**: `/healthz` — Koyeb routes traffic only to healthy replicas.
+- `min_machines_running = 1` → one machine kept running at all times; Fly
+  autoscales up under concurrency pressure up to `max_machines_running`.
+- **No sticky-session config by default**: Fly round-robins requests across
+  machines. Do not rely on in-process state surviving across requests.
+- **Health check**: `/healthz` — Fly routes traffic only to healthy machines.
 
-**Today** only one replica is realistic for the current traffic level, but
-Koyeb _can_ add a replica on concurrency spikes and the config does not prevent it.
+**Today** only one machine is realistic for the current traffic level, but
+Fly _can_ add a machine on concurrency spikes and the config does not prevent it.
 
 ### In-memory state audit
 
@@ -113,7 +115,7 @@ as a stub: _"In production it would be backed by Redis pub/sub or a WebSocket fa
 JWT tokens are stateless. There are no in-memory caches that differ between
 instances, no WebSocket fan-out, no SSE persistent connections.
 
-**Risk window:** If the Koyeb autoscaler adds a second replica, requests will be
+**Risk window:** If the Fly autoscaler adds a second machine, requests will be
 round-robined without affinity. This is safe for current features, but the
 `auto_commit_loop` and `_sweep_loop` tasks will each run on every instance —
 wasted work, not corruption, because Postgres constraints make both idempotent.
@@ -121,14 +123,14 @@ wasted work, not corruption, because Postgres constraints make both idempotent.
 ### What would need to change for presence/cursor-sharing
 
 - `PresenceChannel` must be backed by **Redis pub/sub** (e.g. Upstash Redis, or
-  a managed Redis on Koyeb) rather than an in-process dict.
+  a managed Redis add-on on Fly) rather than an in-process dict.
 - Presence events must be pushed to clients via a persistent transport. The
   current `StreamingResponse` usages are one-shot downloads, not SSE streams.
   Real-time delivery would require a new SSE or WebSocket endpoint on the server
   plus a frontend EventSource/WebSocket connection.
 - Until that transport exists, a second instance means cursor events are silently
   dropped (they'd reach subscribers on the same instance only).
-- Sticky sessions (Koyeb session-affinity header) could be a short-term
+- Sticky sessions (Fly `fly-replay`/session-affinity header) could be a short-term
   workaround if presence is collocated with a long-lived SSE connection per
   user, but that breaks horizontal scale.
 
@@ -221,9 +223,16 @@ load-time `reconcile` is a no-op.
 
 ## 3 — Every Project is a Git Repo
 
+> **Note (2026-07-17):** the "hosted git repo" framing below (bunny.net-backed
+> LFS, a kerf-hosted "cloud project" git service) reflects the pre-decentralization
+> design and is superseded. Per the "Addendum: local git only; no OAuth" ADR in
+> `decisions.md`: a kerf project is a plain local git repo; a node MAY serve its
+> own repos over standard git HTTP/SSH (self-hosting, not a kerf-billed service).
+> Left below as history.
+
 ### What the intent is
 
-From project memory (`git_lfs_substrate.md`), Phase 2 of the roadmap is:
+From project memory (`git_lfs_substrate.md`), Phase 2 of the roadmap was:
 > _"every cloud project = a hosted git repo … `git clone` + `git lfs pull` works → no Kerf client/lock-in."_
 
 The design calls for Git LFS (`*.step`, `*.stl`, `*.glb`, etc.) routed to bunny.net,
@@ -310,9 +319,9 @@ absent.
 5. **Redis-back `PresenceChannel` before enabling presence** — when cursor-sharing
    is added, replace the in-process `_slots`/`_subscribers` dicts with a Redis
    pub/sub channel keyed by `project_id`. Do this before enabling auto-scale
-   beyond 1 replica on Koyeb.
+   beyond 1 machine on Fly.
 
-6. **Duplicate auto_commit/sweep_loop work on multi-instance** — if/when replica
-   count is raised above 1 on Koyeb, consider a Postgres advisory lock to avoid N
+6. **Duplicate auto_commit/sweep_loop work on multi-instance** — if/when machine
+   count is raised above 1 on Fly, consider a Postgres advisory lock to avoid N
    instances each polling all workspaces every 60 s. Not a correctness issue
    today, but will become noisy at scale.

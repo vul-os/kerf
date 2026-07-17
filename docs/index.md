@@ -24,8 +24,8 @@ Welcome to the Kerf docs. Use the sidebar to browse topics, or search with **Ctr
 - [Contributing](contributing) — dev setup, migrations, PR checklist
 
 ## Cloud
-- [Cloud features](cloud) — git sync, storage, billing, workspaces
-- [Cloud operator guide](cloud-operator) — deploy, migrate, secrets, email
+- [Cloud features](cloud) — retired page; see node-architecture + distributed-workshop
+- [Cloud operator guide](cloud-operator) — running a Vulos-hosted node like `kerf.sh`
 
 ## What's New
 - [Recent releases](whats-new) — shipped features this sprint
@@ -35,6 +35,6 @@ Welcome to the Kerf docs. Use the sidebar to browse topics, or search with **Ctr
 - [Sketch → JSCAD workflow](plans/sketch-to-jscad) — mesh-side analog of `.feature`
 
 ## Legal
-- [License](license) — MIT (root) + proprietary (cloud plugins)
+- [License](license) — 100% MIT, no proprietary tree
 - [Terms](terms)
 - [Privacy](privacy)

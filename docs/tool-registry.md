@@ -24,15 +24,16 @@ individual rows in the chat.
 
 ---
 
-## OSS vs Cloud
+## Every node, same tools
 
-The tool system is fully available in the OSS self-hosted build. Every one of
-the ~150 tools across 19 plugins is present when you install the matching
-persona.
+The tool system is fully available on every install — Kerf is 100% MIT and
+there is no "cloud edition." Every one of the ~150 tools across the plugin
+packages is present when you install the matching persona, whether that's a
+laptop, a homelab box, or a Vulos-hosted instance like `kerf.sh`.
 
-On Kerf Cloud the same tools run on the hosted server; LLM tokens are metered
-against your credits. On a self-hosted install you configure your own LLM API
-key and no usage is metered.
+You configure your own LLM API key on any install. Kerf has no billing
+anywhere, so there is no metering against credits — token usage is tracked
+only as local-first telemetry for your own usage dashboard.
 
 ---
 

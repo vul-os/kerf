@@ -21,8 +21,11 @@ self-hosted and cloud instances. The URL is the only thing that changes:
 | Self-hosted server | Your server's URL |
 | Kerf Cloud | `https://kerf.sh` |
 
-Cloud-only methods (Workshop, hosted git) return a JSON-RPC error when called
-against an OSS server that does not have those plugins installed.
+There are no cloud-only methods — Kerf is 100% MIT and every node runs the
+same plugins. Workshop and git methods return a JSON-RPC error only if the
+relevant node config toggle (e.g. `offer-compute`, or no feed followed) makes
+the operation inapplicable on that particular node — never because of a
+license or plugin gate.
 
 ---
 

@@ -22,12 +22,15 @@ Browser (React + Three.js)  ←→  Python FastAPI server  ←→  Postgres
 
 ---
 
-## OSS vs Cloud
+## One node type, not OSS vs Cloud
 
-The OSS build (MIT) is the full-featured design tool. Cloud adds the billing
-layer, hosted Workshop, hosted git, and operator-run workers — none of which
-remove a design capability from self-host. See
-[oss-cloud-separation.md](./oss-cloud-separation.md) for the precise split.
+There is no "cloud edition" versus "local edition" — Kerf is 100% MIT and
+every install (a laptop, a homelab box, or a Vulos-hosted instance like
+`kerf.sh`) runs byte-identical software. A node's behavior is governed
+entirely by config toggles (`publicly-reachable`, `relay-for-others`,
+`pin-storage`, `offer-compute`), never by a license gate or a proprietary
+package. See [node-architecture.md](./node-architecture.md) and
+[oss-cloud-separation.md](./oss-cloud-separation.md) for the current model.
 
 ---
 
@@ -197,5 +200,5 @@ kerf-server        # serves dist/ + API on :8080
 - [llm-tools.md](./llm-tools.md) — full LLM tool reference
 - [tool-registry.md](./tool-registry.md) — AI workflow and extending the tool system
 - [render-pipeline.md](./render-pipeline.md) — Three.js + BVH + mesh caching
-- [cloud-operator.md](./cloud-operator.md) — deploying the hosted tier
+- [cloud-operator.md](./cloud-operator.md) — running a Vulos-hosted node like `kerf.sh`
 - [plugins-development.md](./plugins-development.md) — writing a plugin

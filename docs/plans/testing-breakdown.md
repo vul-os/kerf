@@ -300,7 +300,10 @@ noted.
   File: `packages/kerf-parts/tests/test_feature_parts_ingest_gen.py`
   Success: 25 part families (fasteners + connectors); manifest hash deterministic; auto-attribution present.
 
-- [x] T-56 Distributors integration
+- [x] T-56 Distributors integration — **RETIRED 2026-07-17** (the
+  `kerf-billing` price-lookup half is gone; kerf has no billing anywhere —
+  see `decisions.md`. Distributor part lookups themselves are an ordinary
+  node capability, not a cloud-only one.)
   Scope: `kerf-cloud/distributors/` API surface (mocked HTTP) + `kerf-billing` price lookup.
   File: `packages/kerf-cloud/tests/test_feature_distributors.py`
   Success: 25 part lookups across mocked DigiKey/Mouser/LCSC/Octopart; FX conversion; cache TTL behaviour.
@@ -335,17 +338,24 @@ noted.
   File: `packages/kerf-api/tests/test_feature_file_revisions.py`
   Success: 25 edit sequences; restore semantics; compaction preserves sha256 chain; content-ref dedup.
 
-- [x] T-63 Cloud git refs + GitHub App
+- [x] T-63 Cloud git refs + GitHub App — **RETIRED 2026-07-17** (GitHub App /
+  OAuth brokering is removed; GitHub is used as an ordinary git remote with
+  the user's own SSH key or PAT — see the "Addendum: local git only; no
+  OAuth" ADR in `decisions.md`.)
   Scope: `kerf-cloud/github_app.py` + `cloud_github_tokens` round-trip (mocked GH HTTP).
   File: `packages/kerf-cloud/tests/test_feature_cloud_git.py`
   Success: 25 git operations (fetch / push / install / uninstall); installation token rotation; PEM keys not leaked.
 
-- [x] T-64 Billing buckets (kerf_free / kerf_paid / byo)
+- [x] T-64 Billing buckets (kerf_free / kerf_paid / byo) — **RETIRED
+  2026-07-17** (kerf has no billing anywhere; `kerf-billing` is deleted —
+  see the "Final form: no billing anywhere" ADR in `decisions.md`.)
   Scope: `kerf-billing/buckets.py` + `spend.py` + `scheduler.py` cron close-out.
   File: `packages/kerf-billing/tests/test_feature_billing_buckets.py`
   Success: 25 usage scenarios across all three buckets; spend tally correct; cheap-models-only enforcement on kerf_free; BYO bypasses meter.
 
-- [x] T-65 Email providers + templates
+- [x] T-65 Email providers + templates — **RETIRED 2026-07-17** (transactional
+  email is retired with the accounts it served — see the "Addendum" ADR in
+  `decisions.md`.)
   Scope: `kerf-cloud/email/` provider switch + template render.
   File: `packages/kerf-cloud/tests/test_feature_email.py`
   Success: 25 transactional sends across providers (mocked SMTP); subject + body render; bounce / suppression list.
@@ -398,7 +408,9 @@ variants, timing).
   File: `packages/kerf-auth/tests/test_pen_password_reset.py`
   Success: 12 cases — single-use enforced, expired refused, cross-account refused, reset invalidates existing sessions.
 
-- [x] T-74 OAuth state / PKCE
+- [x] T-74 OAuth state / PKCE — **PARTIALLY RETIRED 2026-07-17** (the GitHub
+  half is moot: GitHub is now an ordinary git remote with the user's own
+  credentials, no kerf-operated OAuth app. The Google-login half stands.)
   Scope: Google + GitHub OAuth state randomness + PKCE verifier check.
   File: `packages/kerf-auth/tests/test_pen_oauth_state_pkce.py`
   Success: 12 cases — missing/mismatched state rejected; PKCE downgrade rejected; CSRF on callback caught.
@@ -469,7 +481,9 @@ escalation}).
   File: `packages/kerf-core/tests/test_rls_auth_tokens.py`
   Success: 12 cases — token rows of B not visible; cannot insert refresh_token for B.
 
-- [x] T-86 RLS: usage_events + cloud_user_balances + billing_buckets
+- [x] T-86 RLS: usage_events + cloud_user_balances + billing_buckets —
+  **RETIRED 2026-07-17** (`cloud_user_balances` and `billing_buckets` are
+  gone; kerf has no billing anywhere — see `decisions.md`.)
   Scope: cross-tenant on billing rows.
   File: `packages/kerf-core/tests/test_rls_billing.py`
   Success: 12 cases — B's spend invisible; cannot insert credit for self; cannot mutate B's balance.
@@ -554,7 +568,9 @@ Postgres schema. ≥10 user-visible assertions per spec.
   Success: clash report lists expected interferences; composites layup table renders; export OK.
   Note: hermetic pytest (42 tests) covering CLT QI layup + BIW clash detection with discipline tags.
 
-- [x] T-101 E2E billing flow (paid bucket)
+- [x] T-101 E2E billing flow (paid bucket) — **RETIRED 2026-07-17** (kerf
+  has no billing anywhere — see the "Final form: no billing anywhere" ADR
+  in `decisions.md`.)
   Scope: free user → upgrade simulated → consume usage → invoice line items appear → BETA-mode toggle hides billing UI but features remain.
   File: `tests/e2e/specs/persona_billing.spec.ts`
   Success: usage tally matches API; BETA flag hides Pricing route; features still available.

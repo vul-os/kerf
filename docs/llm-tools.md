@@ -416,5 +416,4 @@ folder + restart the server.
 | `kerf-topo`       | `topo`                                                                     |
 | `kerf-mates`      | `assembly`, `mates`, `tolerance`                                           |
 | `kerf-render`     | `render`                                                                   |
-| `kerf-cloud`      | `library`, `distributors`, `workshop`, `material` (cloud-only)             |
-| `kerf-billing`    | (REST routes only; no LLM tools)                                           |
+| `kerf-pub`        | DMTAP-PUB Workshop publish/fetch/resolve/submit tools — MIT, mounted unconditionally on every node |

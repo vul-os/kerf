@@ -192,17 +192,20 @@ Community and first-party SDKs in other languages are available:
 All language SDKs target the same `/v1/rpc` JSON-RPC surface. The wire
 protocol is identical; see [v1-rpc.md](./v1-rpc.md) for the full spec.
 
-## OSS vs cloud
+## One node type
 
-The SDK works against both OSS self-hosted instances and the hosted cloud at
-kerf.sh. The only difference is the `KERF_API_URL`:
+The SDK works identically against any node — a local install, a self-hosted
+server, or a Vulos-hosted instance at `kerf.sh`. Kerf is 100% MIT with no
+"cloud edition"; the only difference is the `KERF_API_URL`:
 
-- Cloud: `https://kerf.sh` (default when `KERF_API_URL` is unset)
+- `kerf.sh`: `https://kerf.sh` (default when `KERF_API_URL` is unset)
 - Local: `http://localhost:8080`
 - Self-hosted: your server's URL
 
-Cloud-only methods (Workshop, git, billing) return a JSON-RPC error when
-called against an OSS server that does not have those plugins installed.
+There are no cloud-only methods and no billing — every node runs the same
+plugins. Workshop and git methods return a JSON-RPC error only if that
+node's own config toggles make the operation inapplicable, never because of
+a license or plugin gate.
 
 ## See also
 

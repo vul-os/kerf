@@ -138,29 +138,29 @@ Before touching any file kind, the LLM queries `search_kerf_docs` → reads matc
 
 The loop: **user chat → LLM queries docs → reads schema → tool call → execute → render → SSE push to viewport**.
 
-## 7. OSS vs Cloud — same codebase
+## 7. One node type — same codebase everywhere
 
-Cloud-only functionality ships as two proprietary plugin packages
-(`packages/kerf-billing/`, `packages/kerf-cloud/`). They install only when the
-`full` persona is selected. The `cloud_enabled` flag gates registration at
-runtime — when off, the packages load but advertise an empty `provides=[]`
-list (dormant).
+Kerf is 100% MIT — there is no proprietary plugin package and no
+`cloud_enabled` license gate. Every install (a laptop, a homelab box, or a
+Vulos-hosted instance like `kerf.sh`) runs byte-identical software; what a
+given node does is governed by config toggles, not by which build you
+installed:
 
 | Capability                                  | Plugin       |
 |---------------------------------------------|--------------|
-| Paystack billing (USD→ZAR daily FX, ZAR settlement) | kerf-billing |
-| Email (Resend/SES/SMTP)                     | kerf-cloud   |
-| S3 Git Storer (stateless bare-repo deploys) | kerf-cloud   |
-| Distributor live pricing sweep              | kerf-cloud   |
-| GitHub OAuth (AES-GCM encrypted tokens)     | kerf-cloud   |
-| Workshop sharing + library submissions      | kerf-cloud   |
-| STEP pre-tessellation (server-side glTF)    | kerf-tess (OSS, just needs pythonOCC) |
-| Everything else                             | OSS plugins  |
+| Workshop publish/fetch/resolve/submit (DMTAP-PUB) | kerf-pub |
+| S3 Git Storer (stateless bare-repo deploys) | kerf-core / node git |
+| Distributor live pricing sweep              | kerf-parts   |
+| STEP pre-tessellation (server-side glTF)    | kerf-tess (just needs pythonOCC) |
+| Everything else                             | MIT plugins  |
 
-`local_mode` is forced off when `cloud_enabled=true`. Pluggable storage
-(local / S3/R2/MinIO / filesystem mirror / git mirror per-project).
+GitHub is used as an ordinary git remote with your own SSH key or PAT — no
+OAuth brokering, no kerf-held tokens. Pluggable storage (local / S3/R2/MinIO
+/ filesystem mirror / git mirror per-project).
 
-See [cloud.md](./cloud.md) and [capabilities.md](./capabilities.md).
+See [node-architecture.md](./node-architecture.md),
+[distributed-workshop.md](./distributed-workshop.md), and
+[capabilities.md](./capabilities.md).
 
 ## 8. Parametric stack — three layers
 

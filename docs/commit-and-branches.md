@@ -77,10 +77,10 @@ The footer buttons show live ahead/behind counts so you always know what is pend
 To enable push/pull, link your account from the Git panel:
 
 1. Click **Connect GitHub** (or **Connect GitLab**) in the Git panel footer.
-2. For GitHub: you are redirected through an OAuth flow (scope: `repo`). After authorising, your encrypted token is stored and push/pull are enabled.
+2. For GitHub: paste a personal access token (scope: `repo`) or configure an SSH key — Kerf brokers no OAuth and never holds a GitHub-issued token on your behalf; you authenticate exactly as you would with the git CLI.
 3. For GitLab: paste your personal access token (`read_repository` + `write_repository`) and the instance URL (defaults to `https://gitlab.com`).
 
-Once connected, use **Push** to mirror your commits to the external repo and **Pull** to bring in changes made elsewhere. Kerf is always the system of record; the external repo is a mirror.
+Once connected, use **Push** to send your commits to the remote and **Pull** to bring in changes made elsewhere — the same model as any local git repo with a configured remote.
 
 See [github-sync.md](/docs/github-sync) for full setup details and security notes.
 

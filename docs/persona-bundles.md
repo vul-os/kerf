@@ -85,19 +85,17 @@ What you get:
 
 ## full
 
-**Plugins:** all 19 packages including `kerf-billing` and `kerf-cloud`
+**Plugins:** all packages, including `kerf-pub`
 
-Use for local development, monolith deploys, and the hosted cloud tier.
-
-`kerf-billing` (Paystack ZAR settlement) and `kerf-cloud` (Workshop sharing,
-git mirror, GitHub sync, transactional email, distributor pricing) are
-**proprietary cloud-only packages**. They are listed in the `full` optional
-dependency group but are only active when both installed and
-`[cloud].enabled = true` in config (or `CLOUD_ENABLED=true` at runtime).
-
-An OSS `full` install without those packages simply omits cloud features. The
-server starts normally; `/health/capabilities` will not include
-`cloud.workshop` or `cloud.git` tags.
+Use for local development, monolith deploys, and a Vulos-hosted node like
+`kerf.sh`. All packages are MIT — there is no proprietary/cloud-only
+package, and no config flag gates them on or off. `kerf-pub` (the
+DMTAP-PUB gateway — Workshop publish/fetch/resolve/submit) mounts its
+endpoints unconditionally; whether a given node is reachable from outside
+your machine, relays for others, pins content, or offers compute is
+governed by the node config toggles (see
+[node-architecture.md](./node-architecture.md)), not by which packages are
+installed.
 
 ## compute-only
 

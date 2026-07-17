@@ -41,4 +41,4 @@ from kerf_cad_core.topology.multi_load import (
 
 ## Honest caveats
 
-The SIMP solver is 2-D only (plane-stress or plane-strain). 3-D topology optimization is dispatched to the FEniCSx GPU worker, which requires a Koyeb GPU instance. The density filter radius `rmin` controls minimum member size but does not guarantee printability for specific AM processes. Checker-board patterns are suppressed by the filter but may reappear at very low rmin values.
+The SIMP solver is 2-D only (plane-stress or plane-strain). 3-D topology optimization is dispatched to the FEniCSx GPU worker, which requires a GPU-capable machine — either local or a trusted node offering compute (see `docs/node-architecture.md`). The density filter radius `rmin` controls minimum member size but does not guarantee printability for specific AM processes. Checker-board patterns are suppressed by the filter but may reappear at very low rmin values.

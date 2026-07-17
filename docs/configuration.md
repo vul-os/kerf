@@ -29,7 +29,6 @@ replaced by underscores. Key specific overrides:
 | `KERF_PORT` | `[server].port` | CLI `--port` also accepted |
 | `KERF_LOCAL_MODE` | `[server].local_mode` | `true` or `false` |
 | `DATABASE_URL` | `[database].url` | Standard 12-factor convention |
-| `CLOUD_ENABLED` | `[cloud].enabled` | OSS build ignores cloud plugins even if `true` unless they are installed |
 | `ANTHROPIC_API_KEY` | `[llm.anthropic].api_key` | |
 | `OPENAI_API_KEY` | `[llm.openai].api_key` | |
 
@@ -112,7 +111,7 @@ cdn_base_url = ""
 | `"local"` | Opaque blob store under `local_path`. Default. Auth-protected `/api/blobs/{key}` serves bytes. |
 | `"s3"` | AWS S3, Cloudflare R2, or MinIO. Blob downloads are presigned 302 redirects. Set `[storage.s3]` credentials. |
 | `"filesystem"` | Projects mirror to `filesystem_root` as real folders. Files are editable with any tool. |
-| `"git"` | Cloud-only. Per-project git mirror in S3. Requires `[cloud].enabled = true` and `[storage.s3]`. |
+| `"git"` | Per-project git mirror in S3 — an ordinary MIT node capability, not cloud-only. Requires `[storage.s3]`. |
 
 `cdn_base_url` — when set, `Storage.PublicURL` returns a CDN URL instead of
 routing through the backend. Recommended for production S3 deployments with
@@ -179,33 +178,18 @@ single-user local-install UX.
 
 Leave `password` blank for multi-user deploys — bootstrap becomes a no-op.
 
-## [cloud] (cloud-only)
+## Node config (retired: `[cloud]` / Paystack / GitHub OAuth)
 
-```toml
-[cloud]
-enabled = false
+Kerf no longer has a proprietary `[cloud]` config block, Paystack billing, or
+a kerf-operated GitHub OAuth app — there is no billing anywhere and no
+"cloud edition." Every install is a full node whose behavior is governed by
+config toggles (`publicly-reachable`, `relay-for-others`, `pin-storage`,
+`offer-compute`), not by an `enabled` flag on a proprietary package. See
+[node-architecture.md](./node-architecture.md) for the current toggle model.
 
-  [cloud.paystack]
-  secret_key = ""
-  public_key = ""
-  webhook_secret = ""
-
-  [cloud.git]
-  prefix = "git"
-
-    [cloud.git.github]
-    client_id = ""
-    client_secret = ""
-    redirect_url = "http://localhost:8080/auth/github/callback"
-```
-
-Cloud config is only honoured when the proprietary `kerf-billing` and
-`kerf-cloud` packages are installed **and** `[cloud].enabled = true`. An OSS
-install that sets `[cloud].enabled = true` without those packages will simply
-boot without cloud features — no error is raised.
-
-Paystack billing (ZAR settlement) and GitHub sync are cloud-only features not
-available in the MIT build.
+GitHub is used as an ordinary git remote with your own SSH key or PAT — no
+client ID/secret, no OAuth redirect. See
+[github-sync.md](./github-sync.md).
 
 ## See also
 

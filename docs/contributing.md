@@ -1,7 +1,8 @@
 # Contributing
 
-How to set up Kerf locally, run dev, and land changes that fit the
-project's split between OSS and cloud plugins.
+How to set up Kerf locally, run dev, and land changes. Kerf is 100% MIT —
+there is no proprietary/cloud plugin split (see the "Final form" ADR in
+`decisions.md`, 2026-07-17).
 
 ## Quickstart
 
@@ -29,7 +30,7 @@ restarts on file change via `uvicorn --reload` (handled by `npm run dev`).
 ## Repo layout
 
 ```
-packages/                One package per plugin. All under MIT except
+packages/                One package per plugin. All under MIT.
   kerf-core/               core: FastAPI app, plugin loader, DB, storage
   kerf-auth/               JWT + API tokens + sessions
   kerf-api/                REST + LLM-tool surface for projects/files
@@ -47,41 +48,30 @@ packages/                One package per plugin. All under MIT except
   kerf-render/             Blender Cycles renders
   kerf-workers/            Background-worker harness
   kerf-sdk/                Python SDK (PyPI: kerf-sdk) for scripting
-  kerf-billing/            PROPRIETARY — Paystack billing
-  kerf-cloud/              PROPRIETARY — workshop, cloud git, GitHub, mailer
+  kerf-pub/                DMTAP-PUB object model, feeds, publish/fetch/resolve/submit
 
 src/                    React + Vite frontend (MIT)
   components/             shared UI
   routes/                 page-level routes
   lib/                    JSCAD runner, geom helpers, exporters, projection
   store/                  Zustand stores
-src/cloud/              PROPRIETARY frontend — billing UI, Workshop
 docs/                   Markdown docs (you're here)
 scripts/                npm helper scripts (init-config, etc.)
 pyproject.toml          Root meta-package: persona optional-dependency groups
 ```
 
-## OSS / cloud split
+## One license, one node type
 
-Kerf is dual-licensed:
+Kerf is 100% MIT. There is no proprietary tree, no dual license, and no
+"cloud edition" versus "local edition" — every install (a laptop, a homelab
+box, or a Vulos-hosted instance like `kerf.sh`) runs byte-identical
+software. A node's behavior is governed entirely by config toggles
+(`publicly-reachable`, `relay-for-others`, `pin-storage`, `offer-compute`),
+never by which build you installed or a license gate. See
+[node-architecture.md](./node-architecture.md).
 
-- **MIT** covers everything outside `packages/kerf-billing/`,
-  `packages/kerf-cloud/`, and `src/cloud/`.
-- **Proprietary** covers those three trees — see [LICENSE-CLOUD](../LICENSE-CLOUD).
-
-PRs that change OSS files are welcome under the standard MIT contributor
-flow. PRs that touch cloud files require a separate license arrangement —
-open an issue first.
-
-The split is enforced at install time, not build time:
-
-- **Backend** — Cloud plugin packages only install when the `full` persona is
-  selected (`pip install -e .[full]`). The OSS personas (`api-only`, `mech`,
-  `electronics`, `bim`, `compute-only`) cannot pull them in.
-- **Runtime** — Even when installed, cloud plugins only register their routes
-  when `cloud_enabled=true` in `kerf.toml` (or `KERF_CLOUD=1` env).
-- **Frontend** — Cloud routes mount only when `VITE_CLOUD=1` (used by
-  `npm run build:cloud`). The OSS build excludes `src/cloud/` entirely.
+PRs that change any file in this repo are welcome under the standard MIT
+contributor flow — there is no separate license arrangement to negotiate.
 
 ## npm scripts
 
@@ -93,7 +83,6 @@ The split is enforced at install time, not build time:
 | `npm run migrate:reset`  | Drop schema + re-apply all migrations from scratch                    |
 | `npm run build`          | Alias for `build:web` — compiles the Vite SPA into `dist/`            |
 | `npm run build:web`      | Frontend bundle only (runs `build-docs-manifest.mjs` first)           |
-| `npm run build:cloud`    | Build with `VITE_CLOUD=1` for the hosted cloud frontend               |
 | `npm run start`          | Run `kerf-server` serving the pre-built `dist/` on `:8080`            |
 | `npm run lint`           | ESLint                                                                |
 | `npm run test`           | Vitest unit tests                                                     |
@@ -119,7 +108,6 @@ Tests are auto-discovered from every plugin's `tests/` directory. Top-level
 ```sh
 pytest                                 # all plugin tests
 pytest packages/kerf-api/tests/        # one plugin
-KERF_CLOUD=1 pytest packages/kerf-cloud/tests/   # cloud-only tests
 ```
 
 Frontend has no automated test suite yet — assume manual smoke testing
@@ -137,8 +125,7 @@ plus the OpenSCAD vitest suite (`vitest run src/lib/openscadToJscad.test.js`).
 
 The roadmap ([ROADMAP.md](../ROADMAP.md)) flags every shipped, in-flight,
 next, and planned item. Anything marked `📋 next` or `🔮 planned` is fair
-game for an OSS PR; anything under `packages/kerf-billing/` or
-`packages/kerf-cloud/` needs a separate license conversation first.
+game for a PR — there's no proprietary tree to route around.
 
 Bug reports → GitHub Issues. Feature discussions → GitHub Discussions.
 
@@ -156,8 +143,6 @@ Bug reports → GitHub Issues. Feature discussions → GitHub Discussions.
   — `PluginContext`, `PluginManifest`, `ToolSpec`) need matching updates
   across every plugin in the same PR. The CI will catch missing updates
   via the integration tests.
-- Cloud-only PRs (touching `packages/kerf-billing/` or `packages/kerf-cloud/`
-  or `src/cloud/`) require a separate license discussion — open an issue first.
 
 ## Test conventions
 
@@ -186,8 +171,6 @@ tests/
    document why that value is invalid. Stale sentinels (where another commit
    made the value valid) are a common source of spurious failures — see
    [troubleshooting.md § Stale BAD_ARGS sentinel](./troubleshooting.md).
-6. Cloud-only tests: set `KERF_CLOUD=1` in the environment.
-   `pytest packages/kerf-cloud/tests/`.
 
 ## Plugin layout conventions
 

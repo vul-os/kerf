@@ -31,8 +31,6 @@ projects use `optional_auth`. Role enforcement (`owner` / `admin` / `member` /
 | POST | `/api/auth/login` | none | Email+password login. Same cookie response. |
 | POST | `/api/auth/refresh` | refresh cookie | Issue new access token from a valid refresh token. |
 | POST | `/api/auth/logout` | any | Revoke the current refresh token. |
-| GET | `/api/auth/github/login/start` | none | Begin GitHub OAuth. Redirects to GitHub. |
-| GET | `/api/auth/github/login/callback` | none | Handle GitHub OAuth callback. Sets cookies, redirects to app. |
 | GET | `/api/auth/google/start` | none | Begin Google OAuth. Redirects to Google. |
 | GET | `/api/auth/google/callback` | none | Handle Google OAuth callback. |
 | POST | `/api/auth/bootstrap-local` | none | Local-mode auto-login (only when `local_mode=true`). |
@@ -43,7 +41,7 @@ projects use `optional_auth`. Role enforcement (`owner` / `admin` / `member` /
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/config` | none | Public feature flags: `cloud_enabled`, `local_mode`, OAuth availability. No secrets returned. |
+| GET | `/api/config` | none | Public feature flags: `local_mode`, Google OAuth availability. No secrets returned. |
 | GET | `/api/bootstrap` | none | Local-mode only. Returns persisted `refresh_token` from `~/.config/kerf/state.json`. |
 | GET | `/api/models` | none | Available LLM models (`claude-sonnet-4`, `claude-opus-4`, …). |
 
@@ -349,9 +347,13 @@ request. Viewer role cannot post messages.
 
 ---
 
-## Workshop (cloud)
+## Workshop
 
-Public project gallery. Requires `cloud_enabled`.
+Public project gallery, backed by DMTAP-PUB (see
+[distributed-workshop.md](./distributed-workshop.md)). No license or config
+flag gates it — every node mounts these endpoints; whether anything is
+actually published or fetched depends on the node's own toggles and the
+user's explicit publish/follow actions.
 
 | Method | Path | Auth |
 |--------|------|------|

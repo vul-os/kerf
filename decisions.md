@@ -901,3 +901,154 @@ GitHub-sync move to MIT root, remainder proprietary), `LICENSE-CLOUD`
 (the two logged leaks are resolved by this redraw, not patched
 independently — doc update deferred to the P0 implementation task, not
 part of this ADR).
+
+## ADR — Final form: no billing anywhere; BYO boxes; Workshop = DMTAP-PUB via kerf-pub (2026-07-17)
+
+**Supersedes:** the monetization/licensing aspects of the same-day ADR
+above ("Kerf decentralizes: one node type, gateways as rented uptime,
+Workshop federation over DMTAP-PUB"). That ADR's data-model call
+(§4 Workshop federation on DMTAP-PUB) and its one-node-type call (§1)
+both stand and are sharpened below. What it got wrong, decided further
+in the same day's discussion with the founder: it kept a proprietary
+sliver — `kerf-billing`, `kerf-pricing`, a "provisioning control plane,"
+"rented uptime" sold *by kerf* — as if kerf.sh were still a business
+selling metered access to its own software. It isn't. There is nothing
+left to sell inside kerf.
+
+**Context:** the morning ADR's "clean seam" (usage-events-out /
+standard-credentials-in / policy-check) was designed to let a kerf-run
+paid control plane bill self-hosted-shaped nodes for compute and
+storage it provisioned on their behalf. Re-examined same day: that
+control plane has no product-market reason to be *proprietary*, and
+keeping it proprietary re-introduces exactly the "is kerf.sh a
+privileged central server" question the morning ADR was trying to
+close. Meanwhile Vulos — the umbrella org (`github.com/vul-os`) kerf
+lives under — already has a standard shape for monetizing
+infrastructure across its projects: bill for **Relay** (uptime/relay
+service) and **backup buckets** (durable storage), full stop, at the
+Vulos layer, not inside any individual product. Kerf fits that standard
+directly. There is no reason for kerf to duplicate a billing stack
+Vulos already owns.
+
+**Decision:**
+
+1. **No billing anywhere in kerf. Kerf is 100% MIT.** `kerf-billing`
+   and `kerf-pricing` are deleted in full (another agent is executing
+   the deletion in parallel with this doc pass — not done by this
+   change). `LICENSE-CLOUD` is removed; there is no proprietary
+   surface, no dual license, no "hosted tier," no Paystack, no credit
+   ledger, no plan tiers, no paid cloud. `docs/billing-and-credits.md`
+   and `docs/cloud-features.md` are retired to short deprecation
+   stubs (kept so inbound links don't 404, content replaced). The
+   morning ADR's "clean seam" (a)/(b)/(c) interfaces are moot as
+   billing hooks — (a) usage-events survives in a different shape, see
+   point 3; (b) and (c) (credentials-in, policy-check) have nothing
+   left to gate and are dropped.
+
+2. **Vulos bills; kerf doesn't.** The only thing anyone pays for,
+   anywhere in this stack, is Vulos-standard **Relay** (rented uptime
+   for a node that wants to be reachable without the owner's own
+   always-on box) and **backup buckets** (durable off-node storage).
+   Both are Vulos products that happen to work with a kerf node, the
+   same way they'd work with any other Vulos-ecosystem project — kerf
+   itself defines no pricing, no billing code, no metering-to-invoice
+   path. A kerf node with no Relay and no backup bucket configured is
+   a complete, fully-featured install with nothing missing.
+
+3. **Bring-your-own boxes; usage tracking survives as local-first
+   telemetry.** Users self-provision their own hardware or VPS. Vulos
+   tooling *facilitates* provisioning/orchestrating that user-owned
+   infra (scripts, images, docs) but never intermediates it — the box
+   is the user's, not rented from kerf. Because there's no metered
+   service anymore, "enforcement at a service boundary" (the morning
+   ADR's whole reason for the clean seam) is moot. What survives, and
+   is worth keeping deliberately: a node meters its own bytes /
+   GPU-seconds / bandwidth for **its own owner's dashboard** — useful
+   when a team shares one box and wants visibility into who's using
+   what. This is local-first telemetry, computed and stored on the
+   node, never phoned home, never identity-linked to a central biller.
+   It is the same shape as the morning ADR's "usage events out" hook,
+   minus the far end that used to bill it.
+
+4. **One node type stands; zero-socket invariant added.** Every kerf
+   install remains a full node — CAD, storage, git/LFS serving,
+   Workshop serving, no cloud/local split. New, explicit invariant:
+   **with no endpoint configured and no feed followed, kerf never
+   opens a socket.** A fresh local install is inert on the network by
+   default — no phone-home, no default-on federation, no listener
+   until the owner configures one. This is stronger than "no billing";
+   it's a privacy/trust floor for a fully decentralized product with
+   no vendor in the loop.
+
+5. **Workshop = DMTAP-PUB, implemented behind a four-verb interface,
+   protocol-agnostic by design.** DMTAP-PUB (`github.com/vul-os/dmtap`
+   §22 public-objects extension + §23 CAD/artifact profile) is one
+   object model — plaintext content-addressed Merkle-DAG manifests,
+   signed `pub_announce` feed entries — not a promise to natively speak
+   every transport that could theoretically carry it. New MIT package
+   `packages/kerf-pub/` implements it behind four verbs: **publish**
+   (manifest → sign → append to feed), **fetch** (resolve a content
+   address to bytes, from wherever they're currently reachable),
+   **resolve** (follow a feed/identity to its current announcements),
+   **submit** (hand a listing to an index for discoverability — never
+   authoritative, always rebuildable from feeds). Plain HTTPS is a
+   complete implementation of all four verbs on day one — no adapter
+   required to ship. IPFS is a *possible later fetch-adapter* (another
+   way to satisfy `fetch` for objects already announced over
+   DMTAP-PUB). Nostr is a *possible later announce-mirror* (another
+   place `pub_announce` events could also be relayed for
+   discoverability). Neither is, or ever becomes, kerf's native
+   multi-protocol ground truth — the object model is the one thing
+   every transport sits behind, so adding or dropping a transport
+   adapter is never a data-model change.
+
+6. **Availability is surfaced honestly in the client.** For any
+   part/artifact the Workshop UI shows one of: **on-node** (the bytes
+   are here, no network needed), **available (N holders, last
+   verified <time>)** (known reachable from the feed graph, not
+   fetched yet), **stale** (last-verified pushed past a threshold —
+   might still work, unconfirmed), or **unreachable** (tried and
+   failed). Each non-on-node state carries a **Pin** action. Pinning
+   means the node fetches the object, keeps it durably, and starts
+   serving it to others — i.e., pinning is simultaneously "make this
+   durable for me" and "help serve the commons." No fake availability
+   claims (no spinner masquerading as "it's there") and no silent
+   disappearance (a stale/unreachable part stays visible with its
+   real state, never just vanishes from a listing).
+
+7. **Frontend stays React.** The existing large React CAD frontend is
+   kept as-is. A Svelte rewrite was considered and rejected: churn
+   without user-facing value, and per `decisions.md`'s framework-choice
+   precedent, a UI framework swap is the single most expensive
+   decision to reverse in name only (you never actually get the
+   "reversibility" back once thousands of components are ported) — not
+   a bet to make without a concrete reason beyond "framework
+   preference."
+
+**Alternatives ruled out:**
+- **Paid Vulos-run control plane provisioning kerf infra** (the
+  morning ADR's plan) — rejected same day, on reflection: it recreates
+  a privileged-central-server dynamic under a different name (Vulos
+  instead of kerf.sh) and duplicates billing machinery Vulos already
+  runs generically for Relay + backup buckets across its whole
+  ecosystem. No reason for kerf specifically to have its own copy.
+- **Native multi-protocol support (kerf itself speaking IPFS and/or
+  Nostr as first-class transports)** — rejected in favor of one object
+  model (DMTAP-PUB) behind adapters. Native multi-protocol support
+  means every future feature has to be re-validated against N
+  transport semantics; an adapter model means the object model is
+  validated once and a transport is "just" a way to move bytes that
+  already have a stable identity independent of how they arrived.
+- **Svelte rewrite of the frontend** — rejected. No user-facing gap
+  React can't close; framework migration cost (full component-tree
+  port, retraining any future contributor familiarity, months of
+  churn) buys nothing except a different framework.
+
+**Affected:** `decisions.md` (this entry), `ROADMAP.md` ("Decentralized
+node model" section rewritten to final form), `docs/oss-cloud-separation.md`
+(rewritten — dual-license split retired, MIT-everywhere + zero-socket
+invariants), `docs/cloud-features.md` and `docs/billing-and-credits.md`
+(replaced with deprecation stubs), `packages/kerf-billing/`,
+`packages/kerf-pricing/` (deletion — owned by a parallel agent, not this
+doc pass), `LICENSE-CLOUD` (removal — same), new `packages/kerf-pub/`
+(implementation — future work, not this doc pass).

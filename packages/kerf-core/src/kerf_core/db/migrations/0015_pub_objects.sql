@@ -68,3 +68,18 @@ CREATE TABLE IF NOT EXISTS pub_availability (
     known_holders  jsonb       NOT NULL DEFAULT '{}'::jsonb,
     updated_at     timestamptz NOT NULL DEFAULT now()
 );
+
+-- Followed feeds (node-local convenience layer, kerf_pub.router_local /
+-- GET+POST /api/pub/follows, DELETE /api/pub/follows/{pub}). A "workshop" is
+-- simply the set of feeds this node follows (§4 of the 2026-07-17
+-- decentralization ADR) — node-scoped, not per-account, matching kerf-pub's
+-- single node-local identity. `pub` is the followed author's 32-byte
+-- Ed25519 public key (raw, not the 33-byte multihash-prefixed content
+-- address used elsewhere in this file).
+CREATE TABLE IF NOT EXISTS pub_follows (
+    pub          bytea       PRIMARY KEY,
+    label        text        NOT NULL DEFAULT '',
+    gateway_url  text        NOT NULL DEFAULT '',
+    added_ts     bigint      NOT NULL,
+    created_at   timestamptz NOT NULL DEFAULT now()
+);

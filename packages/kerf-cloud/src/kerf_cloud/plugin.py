@@ -1,7 +1,15 @@
 """kerf-cloud plugin entry-point.
 
+Per the 2026-07-17 decentralization ADRs, hosted git serving, GitHub/GitLab
+OAuth sync, transactional email, and the centralized Workshop have all been
+retired (hosted git -> packages/kerf-api's local git API; Workshop ->
+packages/kerf-pub's DMTAP-PUB feeds). What remains here is distributor
+sync (Mouser/DigiKey/LCSC/McMaster) — a node feature (self-hosters supply
+their own distributor API credentials), plus a handful of unrelated
+production-ops features (job traveler, share links, CRDT collab seed, PLM).
+
 Cloud-gated: when ctx.cloud_enabled is False, returns an empty manifest and
-no routes are mounted.
+no routes are mounted (the distributor registry needs a DB pool).
 """
 from __future__ import annotations
 
@@ -22,14 +30,8 @@ async def register(app: FastAPI, ctx) -> PluginManifest:
             depends=["kerf-auth", "kerf-api"],
         )
 
-    from kerf_cloud.routes import router, github_oauth_router
-    app.include_router(router, prefix="/api", tags=["cloud"])
-    app.include_router(github_oauth_router, prefix="/auth", tags=["github-oauth"])
-
-    ctx.logger.info("kerf-cloud: registered /api/projects/*/git/* and /auth/github/* routes")
-
     # -------------------------------------------------------------------------
-    # Distributor registry — cloud-only (needs encrypted creds + DB)
+    # Distributor registry (needs encrypted creds + DB)
     # -------------------------------------------------------------------------
     if not ctx.local_mode:
         await _init_distributor_registry(ctx)
@@ -37,7 +39,7 @@ async def register(app: FastAPI, ctx) -> PluginManifest:
     return PluginManifest(
         name="kerf-cloud",
         version="0.1.0",
-        provides=["cloud.workshop", "cloud.git", "cloud.distributors"],
+        provides=["cloud.distributors"],
         depends=["kerf-auth", "kerf-api"],
     )
 

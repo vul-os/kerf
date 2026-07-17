@@ -88,6 +88,12 @@ class PubStore:
     async def note_holder(self, aid: bytes, url: str,
                           verified_ms: int | None = None) -> None: ...
 
+    # followed feeds (node-local convenience layer, kerf_pub.router_local)
+    async def put_follow(self, pub: bytes, label: str, gateway_url: str,
+                         added_ts: int) -> None: ...
+    async def list_follows(self) -> list[dict]: ...
+    async def delete_follow(self, pub: bytes) -> None: ...
+
 
 # ── in-memory backend ─────────────────────────────────────────────────────────
 
@@ -101,6 +107,7 @@ class InMemoryPubStore(PubStore):
         self._feed_heads: dict[bytes, bytes] = {}
         self._accepted_seq: dict[bytes, int] = {}
         self._avail: dict[bytes, Availability] = {}
+        self._follows: dict[bytes, dict] = {}
 
     async def put_chunk(self, h: bytes, data: bytes) -> None:
         self._chunks[bytes(h)] = bytes(data)
@@ -155,6 +162,19 @@ class InMemoryPubStore(PubStore):
                           verified_ms: int | None = None) -> None:
         rec = self._avail.setdefault(bytes(aid), Availability())
         rec.known_holders[url] = verified_ms if verified_ms is not None else _now_ms()
+
+    async def put_follow(self, pub: bytes, label: str, gateway_url: str,
+                         added_ts: int) -> None:
+        self._follows[bytes(pub)] = {
+            "pub": bytes(pub), "label": label, "gateway_url": gateway_url,
+            "added_ts": added_ts,
+        }
+
+    async def list_follows(self) -> list[dict]:
+        return sorted(self._follows.values(), key=lambda f: f["added_ts"])
+
+    async def delete_follow(self, pub: bytes) -> None:
+        self._follows.pop(bytes(pub), None)
 
 
 # ── postgres backend ──────────────────────────────────────────────────────────
@@ -286,3 +306,26 @@ class PostgresPubStore(PubStore):
             "ON CONFLICT (aid) DO UPDATE SET known_holders = EXCLUDED.known_holders",
             bytes(aid), json.dumps(rec.known_holders),
         )
+
+    async def put_follow(self, pub: bytes, label: str, gateway_url: str,
+                         added_ts: int) -> None:
+        await self._pool.execute(
+            "INSERT INTO pub_follows (pub, label, gateway_url, added_ts) "
+            "VALUES ($1, $2, $3, $4) ON CONFLICT (pub) DO UPDATE SET "
+            "label = EXCLUDED.label, gateway_url = EXCLUDED.gateway_url",
+            bytes(pub), label, gateway_url, added_ts,
+        )
+
+    async def list_follows(self) -> list[dict]:
+        rows = await self._pool.fetch(
+            "SELECT pub, label, gateway_url, added_ts FROM pub_follows ORDER BY added_ts")
+        return [
+            {
+                "pub": bytes(r["pub"]), "label": r["label"],
+                "gateway_url": r["gateway_url"], "added_ts": int(r["added_ts"]),
+            }
+            for r in rows
+        ]
+
+    async def delete_follow(self, pub: bytes) -> None:
+        await self._pool.execute("DELETE FROM pub_follows WHERE pub = $1", bytes(pub))

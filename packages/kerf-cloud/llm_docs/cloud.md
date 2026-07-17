@@ -1,6 +1,21 @@
-# kerf-cloud — cloud plugin: GitHub repo-connect, share links, job traveler, distributor integrations
+# kerf-cloud — distributor sync + production-ops extras
 
-`kerf-cloud` is a cloud-gated plugin. When `CLOUD_ENABLED=false` (local install or OSS self-host) its `register()` function returns an empty manifest and mounts nothing. All code paths are therefore unreachable in the OSS build.
+`kerf-cloud` is a cloud-gated plugin (needs a DB pool). When `CLOUD_ENABLED=false`
+(local install or OSS self-host) its `register()` function returns an empty
+manifest and mounts nothing.
+
+Per the 2026-07-17 decentralization ADRs, hosted git serving, GitHub/GitLab
+OAuth sync, transactional email, and the centralized Workshop were all
+retired from this package:
+
+- Hosted git → `packages/kerf-api`'s local git API (`routes_git_local.py`),
+  a thin subprocess-git wrapper over each project's own repo — no server-held
+  OAuth tokens, no S3-backed "system of record" repo.
+- Centralized Workshop → `packages/kerf-pub`'s DMTAP-PUB feeds
+  (`router_local.py`), a federated protocol rather than a hosted service.
+- Transactional email → retired outright (no accounts to email; see
+  `decisions.md`'s "Addendum: local git only; no OAuth; accounts shrink to
+  the box" ADR).
 
 Depends on `kerf-auth` and `kerf-api`.
 
@@ -15,74 +30,50 @@ async def register(app, ctx) -> PluginManifest:
     if not ctx.cloud_enabled:
         return PluginManifest(name="kerf-cloud", provides=[], ...)
 
-    app.include_router(router, prefix="/api")            # git + share routes
-    app.include_router(github_oauth_router, prefix="/auth")
-    await _init_distributor_registry(ctx)                # cloud-only
+    if not ctx.local_mode:
+        await _init_distributor_registry(ctx)   # needs a DB pool
+
     return PluginManifest(
         name="kerf-cloud",
-        provides=["cloud.workshop", "cloud.git", "cloud.distributors"],
+        provides=["cloud.distributors"],
         ...
     )
 ```
 
+`kerf-cloud` mounts no routes of its own any more — distributor endpoints
+live in `kerf-api`'s `routes.py` (`/api/admin/distributors`,
+`/api/projects/{pid}/files/{fid}/distributors/refresh`), which lazily imports
+`kerf_cloud.distributors.service` / `kerf_cloud.distributors.sync`.
+
 ---
 
-## GitHub repo-connect / repo-sync
+## Distributor integrations (`kerf_cloud.distributors`)
 
-`kerf-cloud` enables projects to be connected to GitHub repositories so that commits in Kerf are pushed upstream and GitHub pushes can be pulled into Kerf.
+A **node feature**, not a hosted-only one: self-hosters supply their own
+distributor API credentials. Proxies part searches/refreshes to
+electronics/hardware distributors. Credentials are AES-GCM encrypted at rest
+in the `distributor_credentials` DB table.
 
-### Routes (`/api/projects/{id}/git/…`)
+Enabled distributors: DigiKey, Mouser, LCSC, McMaster-Carr. The registry
+loads at startup via `Registry.reload()` and is refreshed on a background
+sweep.
 
-| Method | Path | Description |
-|---|---|---|
-| POST | `/api/projects/{id}/git/init` | Initialise a bare git repo for the project (object-storage-backed via `ObjectGitStorer`) |
-| POST | `/api/projects/{id}/git/import` | Import from a GitHub URL (clone → store in object storage) |
-| POST | `/api/projects/{id}/git/connect` | Connect to an existing GitHub repo (owner/repo) |
-| POST | `/api/projects/{id}/git/commit` | Commit current project state to the git backend |
-| POST | `/api/projects/{id}/git/push` | Push local git state to GitHub (requires installation token) |
-| POST | `/api/projects/{id}/git/pull` | Pull from GitHub into the project |
-| POST | `/api/projects/{id}/git/branch` | Create a new branch |
-| POST | `/api/projects/{id}/git/checkout` | Switch branch |
-| POST | `/api/projects/{id}/git/merge` | Merge one branch into another |
-| GET | `/api/projects/{id}/git/log` | Commit history |
-| GET | `/api/projects/{id}/git/status` | Working tree status |
-| GET | `/api/projects/{id}/git/diff` | Diff between two refs |
-| GET | `/api/projects/{id}/git/branches` | List branches |
+```python
+# kerf_cloud/plugin.py  (_init_distributor_registry)
+reg = Registry(pool, cfg, fx=None)
+await reg.reload()
+ctx.workers.register("distributors.sweep", sweep_factory)
+```
 
-### GitHub App flow (`/auth/github/…`)
-
-The GitHub App integration is the preferred path for repo-sync because it uses installation tokens rather than requiring users to store a personal access token.
-
-| Method | Path | Description |
-|---|---|---|
-| GET | `/auth/github/app/install` | Redirect to the GitHub App installation page |
-| GET | `/auth/github/app/callback` | Handle post-installation callback, store `installation_id` |
-
-The `github_app` module provides:
-- `app_jwt(app_id, private_key_pem)` — 9-minute RS256 JWT for authenticating as the App
-- `installation_token(installation_id, app_id, pem)` — short-lived token (in-memory cached, refreshed 5 min before expiry)
-- `install_url(app_slug, state)` — GitHub App installation redirect URL
-
-Private key is stored as base64 in `CLOUD_GITHUB_PRIVATE_KEY_B64` and never logged.
-
-### Git storage architecture
-
-The git backend uses `ObjectGitStorer` from `kerf_core.storage.git_storer`:
-
-1. Each project has a bare git repo under `<STORAGE_PREFIX>/git/<project_id>/`
-2. To work with the repo: `clone_to_local(tmp_dir)` → modify → `push_from_local(tmp_dir)`
-3. Objects upload in order: pack files → loose objects → refs (reader-safe ordering)
-4. Optimistic concurrency via a sentinel `_marker` object; concurrent pushers receive `StorerConcurrencyError`
-
-This model was chosen to support large STEP / binary CAD file workflows without per-object overhead.
+The sweep worker periodically calls `reload()` to pick up new credentials
+without a restart.
 
 ---
 
 ## Share links (`kerf_cloud.share_link`)
 
-Share links let designers share a design revision with a customer for review and approval. They do not require the customer to have a Kerf account.
-
-### API
+Share links let designers share a design revision with a customer for review
+and approval. They do not require the customer to have a Kerf account.
 
 ```python
 token = create_share(project_id, revision_id, ttl_days=30,
@@ -93,20 +84,27 @@ ok    = record_approval(token, customer_name, signature)
 ok    = revoke_share(token)
 ```
 
-Tokens are `<16-char-urlsafe>.<8-char-HMAC>` — the HMAC check digit prevents enumeration attacks. Records are stored as JSON files under `data/cloud/share/` (overridable via `KERF_SHARE_DIR`). No DB dependency.
+Tokens are `<16-char-urlsafe>.<8-char-HMAC>` — the HMAC check digit prevents
+enumeration attacks. Records are stored as JSON files under
+`data/cloud/share/` (overridable via `KERF_SHARE_DIR`). No DB dependency.
 
-LLM tools registered: `share.create`, `share.resolve`, `share.add_comment`, `share.record_approval`, `share.revoke`.
+LLM tools registered: `share.create`, `share.resolve`, `share.add_comment`,
+`share.record_approval`, `share.revoke`.
 
 ---
 
 ## Job Traveler (`kerf_cloud.job_traveler`)
 
-A production-ops layer for tracking a design from order through manufacture to delivery. Suited to jewelry workshops and small-batch manufacturing. No DB dependency — persisted as JSON files under `data/cloud/jobs/`.
+A production-ops layer for tracking a design from order through manufacture
+to delivery. Suited to jewelry workshops and small-batch manufacturing. No
+DB dependency — persisted as JSON files under `data/cloud/jobs/`.
 
 ### Data model
 
-- **PurchaseOrder** — customer + line items (part_ref, qty, unit_price, lead_time); status: `draft → issued → received → closed`
-- **JobTraveler** — links a PO + project/revision; tracks progress through `STAGE_ORDER = ["design", "cast", "clean", "set", "polish", "qc"]`
+- **PurchaseOrder** — customer + line items (part_ref, qty, unit_price,
+  lead_time); status: `draft → issued → received → closed`
+- **JobTraveler** — links a PO + project/revision; tracks progress through
+  `STAGE_ORDER = ["design", "cast", "clean", "set", "polish", "qc"]`
 - **InventoryItem** — on_hand, allocated, reorder_point per SKU
 
 ### Key operations
@@ -126,41 +124,19 @@ LLM tools registered: `job_create_po`, `job_inventory_pick_list`.
 
 ---
 
-## Distributor integrations (`kerf_cloud.distributors`)
+## CRDT collab seed (`kerf_cloud.collab`) and PLM (`kerf_cloud.plm`)
 
-Cloud-only registry that proxies part searches to electronics/hardware distributors. Credentials are AES-GCM encrypted at rest in the `distributor_credentials` DB table.
-
-Enabled distributors: DigiKey, Mouser, LCSC, McMaster-Carr. The registry loads at startup via `Registry.reload()` and is refreshed on a background sweep.
-
-```python
-# kerf_cloud/plugin.py  (_init_distributor_registry)
-reg = Registry(pool, cfg, fx=None)
-await reg.reload()
-ctx.workers.register("distributors.sweep", sweep_factory)
-```
-
-The sweep worker periodically calls `reload()` to pick up new credentials without a restart.
-
----
-
-## Email (`kerf_cloud.email`)
-
-Transactional email via a pluggable provider abstraction. See `packages/kerf-cloud/llm_docs/email_providers.md` for the provider-level docs.
-
-Provider is selected by `EMAIL_PROVIDER` config. See `packages/kerf-cloud/llm_docs/email_providers.md` for the full provider list and configuration.
-
----
-
-## Cloud beta mode
-
-When `CLOUD_BETA=true`, billing routes respond with 503 (payments disabled) while all other features remain active. The frontend greys out payment controls. This is a temporary launch gate; the beta block in `plugin.py` is marked for removal post-launch.
+Unrelated to the hosting/decentralization split — a pure-Python CRDT seed
+(`YDoc`/`YMap`/`YArray`/`PresenceChannel`) and a production-lifecycle layer
+(BOM 150, ECO, SysML trace, where-used). Left in place; out of scope for the
+2026-07-17 decentralization wave.
 
 ---
 
 ## Security notes
 
-- GitHub App private key is never logged; decoded from base64 env var at runtime only
-- Installation tokens are cached in-memory only; never written to DB
-- Share link records are HMAC-signed; brute-force enumeration requires 2^64 guesses
+- Share link records are HMAC-signed; brute-force enumeration requires 2^64
+  guesses
 - Distributor credentials are AES-GCM encrypted at rest
-- Public docs for this package deliberately omit vendor-specific service names
+- Public docs for this package deliberately omit vendor-specific service
+  names

@@ -408,18 +408,6 @@ def test_smoke_post_message(client: TestClient):
     assert "assistant_message" in body, f"missing assistant_message: {body}"
 
 
-# ── 8. GET /api/workshop/ — workshop group ────────────────────────────────
-
-def test_smoke_workshop_list(client: TestClient):
-    r = client.get("/api/workshop/")
-    assert r.status_code < 500, f"workshop_list {r.status_code}: {r.text}"
-    assert r.status_code == 200
-    body = r.json()
-    assert "listings" in body or "rows" in body, (
-        f"workshop list missing listings/rows key: {body}"
-    )
-
-
 # ── 9. GET /api/library/parts — library group ─────────────────────────────
 
 def test_smoke_library_parts(client: TestClient):

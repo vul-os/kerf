@@ -45,6 +45,7 @@ async def register(app: FastAPI, ctx) -> PluginManifest:
 
     # All other sub-routers are optional — wrapped so missing deps degrade.
     _try_include(app, "kerf_api.routes_git_diff",        tags=["git-diff"])
+    _try_include(app, "kerf_api.routes_git_local",       tags=["git-local"])
     _try_include(app, "kerf_api.routes_atopile",  prefix="",                  tags=["atopile"])
     _try_include(app, "kerf_api.routes_plc_sim",         tags=["plc-sim"])
     _try_include(app, "kerf_api.routes_aero_propulsion", tags=["aero"])

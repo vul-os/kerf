@@ -45,6 +45,7 @@ async def register(app, ctx) -> "PluginManifest":
       * an :class:`~kerf_pub.store.InMemoryPubStore` otherwise (dev / zero-DB).
     """
     from kerf_pub.router import router
+    from kerf_pub.router_local import router as local_router
     from kerf_pub.store import InMemoryPubStore, PostgresPubStore
 
     pool = getattr(ctx, "pool", None)
@@ -57,11 +58,12 @@ async def register(app, ctx) -> "PluginManifest":
 
     app.state.pub_store = store
     app.include_router(router)
-    logger.info("kerf-pub: DMTAP-PUB gateway mounted (store backend=%s)", backend)
+    app.include_router(local_router, prefix="/api")
+    logger.info("kerf-pub: DMTAP-PUB gateway + node-local /api/pub/* mounted (store backend=%s)", backend)
 
     return PluginManifest(
         name="pub",
         version="0.1.0",
-        provides=["pub.gateway", "pub.blob-store", "pub.author-feeds"],
+        provides=["pub.gateway", "pub.blob-store", "pub.author-feeds", "pub.local-api"],
         depends=["core"],
     )

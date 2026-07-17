@@ -762,3 +762,142 @@ outweighs any Koyeb advantage now that GPU is decoupled.
 `docs/architecture/stack.md` (new — canonical stack doc),
 plus in-code comment sweeps across kerf-render, kerf-workers, kerf-api,
 kerf-core, scripts, docs, and src/routes.
+## ADR — Kerf decentralizes: one node type, gateways as rented uptime, Workshop federation over DMTAP-PUB (2026-07-17)
+
+**Context:** Kerf has run the whole session on a "cloud edition vs local
+edition" mental model — `packages/kerf-cloud/` (Workshop, hosted git,
+GitHub sync, email, distributor sync) proprietary and gated behind
+`cloud_enabled`, everything else MIT. `docs/oss-cloud-separation.md`
+already documents two open scoping problems with that split: `LICENSE-CLOUD`
+doesn't actually name the live `kerf-{billing,cloud,pricing}` packages
+(it still scopes itself to retired `cloud/**` / `backend/cloud/**`
+paths), and the `VITE_CLOUD` frontend gate leaks onto the parts-library
+catalog UI, which is meant to be a design capability, not a hosted
+convenience. Both are symptoms of the same underlying question never
+being settled: is kerf.sh a privileged central server, or just one
+well-run instance of the same software everyone else can run? Settled in
+discussion with the founder: it's the latter. Kerf decentralizes.
+
+**Decision:** Every kerf install is a full node — client (embedded
+frontend), project storage, git/LFS hosting, Workshop serving, worker
+orchestration, all present. There is no "cloud edition." A node's
+behavior is governed by config toggles only: publicly-reachable,
+relay-for-others, pin-storage, offer-compute. A homelab "big PC" running
+`kerf serve` and kerf.sh run byte-identical software. kerf.sh is simply
+the best-operated, always-on node — **rented uptime, not privileged
+capability.** Workshop itself becomes a federated protocol
+(DMTAP-PUB) rather than a service only kerf.sh can run.
+
+**1. One node type.** Collapses the cloud/local distinction into a single
+build with runtime config. No more "does this feature require
+`cloud_enabled`" branching in application logic — only "is this toggle
+on for this node." A node with all four toggles off is a private
+single-user local install; a node with all four on is kerf.sh.
+
+**2. License line redraw.** Move from `packages/kerf-cloud/` (proprietary)
+into MIT root: Workshop serving/publish, hosted git + LFS serving, worker
+queue/orchestration, GitHub sync (self-hosters supply their own OAuth
+app — same shape as bring-your-own-Postgres). Stays proprietary:
+`kerf-billing`, `kerf-pricing`, the provisioning control plane (bucket
+provisioning, fleet compute, API-key minting), operator admin UI,
+transactional email. One-sentence rule: **everything a NODE does is MIT;
+everything a BUSINESS does is proprietary.** This redraw is also the fix
+for the two known separation leaks logged in
+`docs/oss-cloud-separation.md`: it resolves the `LICENSE-CLOUD` scoping
+gap by moving the newly-MIT surfaces out of the proprietary bundle
+entirely (rather than papering over the mis-scoped license file), and it
+resolves the parts-catalog UI gating leak by removing the last
+node-capability that was hiding behind `VITE_CLOUD` — the only thing
+`cloud_enabled` gates going forward is billing/pricing/admin, matching
+`oss-cloud-separation.md §1`'s stated principle exactly instead of
+approximately.
+
+**3. The clean seam (three narrow interfaces).** The node/business split
+only holds if the boundary is a small, auditable surface instead of
+scattered `if cloud_enabled` checks:
+  - **(a) Usage events out** — the node emits metering events (bytes,
+    GPU-seconds, tokens) to a hook. OSS default is a no-op; cloud wires
+    it to billing.
+  - **(b) Standard credentials in** — provisioning hands a node ordinary
+    config (S3 endpoint + keys, worker join token, API key) that is
+    indistinguishable from config a self-hoster would supply themselves.
+    If a node ever needs a cloud-shaped credential (something a
+    self-hoster structurally *couldn't* supply), the seam has leaked.
+  - **(c) Policy check** — before a metered action, the node asks an
+    injected policy hook whether to proceed. OSS default is always-yes;
+    cloud checks credit balance.
+  - **CI invariant:** the node builds, runs, federates, and serves
+    Workshop with the cloud packages (`kerf-billing`, `kerf-pricing`,
+    the provisioning control plane) deleted from disk. This is the
+    executable version of `oss-cloud-separation.md`'s "if code and this
+    document disagree, the code has a bug" rule — a CI job, not a
+    doc audit, catches the next leak.
+
+**4. Workshop federation on DMTAP-PUB.** Protocol lives at
+`github.com/vul-os/dmtap` (§22 public-objects extension + §23 CAD/
+artifact profile). Identity is user keypairs, not accounts on a server.
+A part/artifact is a plaintext content-addressed Merkle-DAG manifest —
+dedup is global, and kerf's existing LFS sha256 objects coexist via the
+multihash agility prefix (no migration of existing objects required).
+Publishing is a signed `pub_announce` appended to the author's feed. A
+"workshop" is simply a set of followed feeds — kerf.io's workshop feed
+ships as the removable default, not a hardcoded destination. Indexes
+(search, category browse, verified-publisher listings) are derived and
+rebuildable from feeds, never authoritative — losing an index loses
+nothing but query convenience. Assemblies reference sub-parts by content
+address, so BOM resolution is a tree walk and dedup composes naturally
+across assemblies. Public parts are plaintext-addressed (maximizes global
+dedup); private projects stay encrypted, so dedup there is scoped to the
+key holder only. Everything is offline-verifiable: signed,
+content-addressed objects survive with zero live infrastructure —
+sneakernet, apocalypse, and Mars-latency (store-and-forward, no
+interactive round trips required) are all first-class, not edge cases.
+
+**5. Phases.**
+  - **P0:** adopt the object model over plain HTTPS. Keypair identity in
+    accounts; publish flow (manifest → sign announce → append feed);
+    Workshop UI reads verified announcements from followed feeds;
+    gateways serve feed/manifest/chunk endpoints. License/package moves
+    (point 2) land with P0 — the redraw is a precondition for federation,
+    not a follow-on.
+  - **P1:** mirrors + swarm chunk-fetch, community indexes, third-party
+    gateway hardening, provisioning utility APIs (self-hosted nodes can
+    rent kerf-cloud buckets/compute via API key — the first real
+    instance of "rented uptime" being purchasable a la carte rather than
+    bundled into the kerf.sh subscription).
+  - **P2:** native mesh transport (`dmtap`) + MLS private team folders,
+    desktop/Tauri node as the true peer client.
+
+**Alternatives ruled out:**
+- **Full P2P transport rewrite now.** Building the native mesh transport
+  (dmtap) before the data model is a year-scale bet that blocks on a
+  dependency (the dmtap node implementation) outside kerf's control. The
+  data-model-first approach (P0) captures nearly all of the
+  no-lock-in / offline-durable value at a fraction of the cost and over
+  plain HTTPS, which kerf already runs everywhere.
+- **Tauri-first pivot.** A desktop-app packaging change is not an
+  architecture change — it's orthogonal to whether Workshop is federated
+  or centralized. Sequenced to P2, after the protocol and license
+  boundary are settled, so it isn't done twice.
+- **Keeping Workshop serving proprietary.** Contradicts the no-central-node
+  goal directly (a federated protocol with one non-federatable node type
+  isn't federated) and contradicts the operations-as-a-service pricing
+  philosophy of no feature gates — Workshop publish/serve is a design
+  capability, not a hosted convenience, by the same test
+  `oss-cloud-separation.md §1` already applies to everything else.
+
+**Decision reversibility:** the durable commitment is the **data model**
+— keypairs, signatures, content addresses, git/LFS coexistence via the
+multihash prefix. Transports (HTTPS now, `dmtap` mesh later) and
+packaging (single-binary now, Tauri later) stay swappable behind that
+data model without another rewrite. This is why P0 ships over plain
+HTTPS: nothing about the object model needs to change when P2's
+transport lands.
+
+**Affected:** `decisions.md` (this entry), `ROADMAP.md` (new section),
+`packages/kerf-cloud/` (split — Workshop/git/LFS/worker-orchestration/
+GitHub-sync move to MIT root, remainder proprietary), `LICENSE-CLOUD`
+(rescoped to the shrunk proprietary surface), `docs/oss-cloud-separation.md`
+(the two logged leaks are resolved by this redraw, not patched
+independently — doc update deferred to the P0 implementation task, not
+part of this ADR).

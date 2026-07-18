@@ -594,7 +594,9 @@ function PublishModal({ open, onClose, project, onPublished }) {
           description: form.description.trim(),
           artifact_kind: form.kind,
           license,
-          units: form.units,
+          // §23.3.3: units is a struct with an explicit, never-defaulted
+          // length_unit — the backend indexes units["length_unit"] directly.
+          units: { length_unit: form.units },
           tags,
         },
         children: isAssembly ? buildChildrenPayload(childRows) : undefined,

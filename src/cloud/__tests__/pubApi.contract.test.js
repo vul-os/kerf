@@ -11,7 +11,10 @@ describe('pub API client — matches the /api/pub contract', () => {
   beforeEach(() => {
     calls = []
     global.fetch = vi.fn(async (url, opts) => {
-      calls.push({ url, ...opts })
+      // A developer .env can set VITE_API_URL, which api.js prefixes onto
+      // every request; the contract under test is the path, so strip any
+      // origin before recording.
+      calls.push({ url: String(url).replace(/^https?:\/\/[^/]+/, ''), ...opts })
       return {
         ok: true,
         status: 200,

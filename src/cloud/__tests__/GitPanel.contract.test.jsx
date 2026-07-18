@@ -45,7 +45,9 @@ describe('git API client — matches the /api/git/:project_id contract', () => {
   beforeEach(() => {
     calls = []
     global.fetch = vi.fn(async (url, opts) => {
-      calls.push({ url, ...opts })
+      // Strip any VITE_API_URL origin a developer .env injects — the
+      // contract under test is the path.
+      calls.push({ url: String(url).replace(/^https?:\/\/[^/]+/, ''), ...opts })
       return {
         ok: true,
         status: 200,

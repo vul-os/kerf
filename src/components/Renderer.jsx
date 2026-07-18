@@ -57,6 +57,10 @@ const LOD_MAX_VISIBLE_PARTS = 1_000
 const LOD_CAMERA_MOVE_EPS = 0.25   // units²; ~0.5 unit movement threshold
 // Color for bbox-proxy wireframe boxes (LOD tier 2). Matches INK_300.
 const LOD_BBOX_COLOR = 0x8a93a6
+// Selection tint for box-proxy wireframes — matches KERF_YELLOW so a
+// selected component still reads as "selected" even when LOD has swapped
+// it down to its bbox-proxy tier (Wave 4J: box-proxy pick/select parity).
+const LOD_BBOX_SEL_COLOR = 0xffd633
 // Kerf API endpoint for tool dispatch.
 const API_URL = import.meta.env.VITE_API_URL || ''
 const HIGHLIGHT_EMISSIVE = 0x4d3c00 // kerf yellow tint
@@ -996,6 +1000,17 @@ function Renderer({
             const instanceId = hits[0].instanceId
             id = hitObj.userData.componentIds[instanceId] ?? null
           }
+          // Wave 4J: box-proxy sibling hit — resolve via the parent original
+          // InstancedMesh's componentIds so the selection pipeline is unaware
+          // it's picking a proxy wireframe box (LOD-WIREFRAME-BOX-PROXY caveat).
+          if (!id && hitObj.isInstancedMesh && hitObj.userData._lodBoxProxyFor) {
+            const origMesh = meshGroup.children.find(
+              (mm) => mm.uuid === hitObj.userData._lodBoxProxyFor,
+            )
+            if (origMesh?.userData.componentIds) {
+              id = origMesh.userData.componentIds[hits[0].instanceId] ?? null
+            }
+          }
           setHudId(id)
           stateRef.current?.onPickRef?.(id)
         } else {
@@ -1449,6 +1464,25 @@ function Renderer({
     if (!s) return
     s.meshGroup.children.forEach((m) => {
       if (m.isInstancedMesh) {
+        // Wave 4J: box-proxy sibling — resolve componentIds from the parent
+        // original InstancedMesh and tint the whole proxy batch's
+        // LineBasicMaterial to the selection color when any of its instances
+        // is selected (per-instance colour isn't wired for the proxy's
+        // EdgesGeometry batch, so this is a coarser all-or-nothing tint).
+        if (m.userData._lodBoxProxyFor) {
+          const origMesh = s.meshGroup.children.find(
+            (mm) => mm.uuid === m.userData._lodBoxProxyFor,
+          )
+          const cids = origMesh?.userData.componentIds
+          if (!cids) return
+          const anySelected = cids.some(
+            (cid) => cid === selectedId || (selectedComponentId && cid === selectedComponentId),
+          )
+          if (m.material && m.material.color) {
+            m.material.color.setHex(anySelected ? LOD_BBOX_SEL_COLOR : LOD_BBOX_COLOR)
+          }
+          return
+        }
         // S2: For InstancedMesh we use per-instance color to highlight.
         // We reset all instances to white (multiplicative identity) then
         // tint the selected one with the emissive-equivalent color.

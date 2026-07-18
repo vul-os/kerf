@@ -1047,3 +1047,35 @@ describe('Renderer LOD — Wave 4H: box-proxy matrix correctness', () => {
     expect(proxy.instanceMatrix.array[off2 + 0]).toBeCloseTo(0, 5)
   })
 })
+
+// ===========================================================================
+// Wave 4J — source inspection: box-proxy raycaster pick/select parity
+//
+// Closes the LOD-WIREFRAME-BOX-PROXY caveat: once a component's InstancedMesh
+// instance is swapped to its box-proxy sibling (Wave 4H), clicking/selecting
+// it must still resolve back to the original componentId, and the selection
+// highlight pass must still tint the (now-visible) proxy geometry.
+// ===========================================================================
+
+describe('Renderer LOD — Wave 4J: box-proxy pick/select parity (source)', () => {
+  it('defines LOD_BBOX_SEL_COLOR', () => {
+    expect(src).toContain('LOD_BBOX_SEL_COLOR')
+  })
+
+  it('dispatchPick resolves componentId for box-proxy hits via _lodBoxProxyFor', () => {
+    const fnIdx = src.indexOf('function dispatchPick(')
+    expect(fnIdx).toBeGreaterThan(-1)
+    const block = src.slice(fnIdx, fnIdx + 2000)
+    expect(block).toContain('_lodBoxProxyFor')
+    expect(block).toContain('componentIds[hits[0].instanceId]')
+  })
+
+  it('selection-highlight effect tints box-proxy siblings on select', () => {
+    const fnIdx = src.indexOf('// ----- Highlight selected (object mode) -----')
+    expect(fnIdx).toBeGreaterThan(-1)
+    const block = src.slice(fnIdx, fnIdx + 2000)
+    expect(block).toContain('_lodBoxProxyFor')
+    expect(block).toContain('LOD_BBOX_SEL_COLOR')
+    expect(block).toContain('anySelected')
+  })
+})

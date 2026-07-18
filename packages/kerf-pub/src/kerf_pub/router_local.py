@@ -35,12 +35,20 @@ from kerf_core.db.connection import get_pool_required
 from kerf_core.dependencies import require_auth
 from kerf_core.storage import get_storage_required
 
+from .assembly import (
+    UnresolvedChildRef,
+    build_assembly_children,
+    list_own_assembly_candidates,
+    walk_bom,
+)
 from .client import PubClient
 from .errors import PubError, ProfileError
 from .identity import Identity, default_key_path
 from .objects import (
     ArtifactFormat,
     ArtifactMetadata,
+    AssemblyStructure,
+    FMT_ASSEMBLY_STRUCTURE,
     FMT_ECAD,
     FMT_GLTF,
     FMT_NATIVE,
@@ -54,7 +62,10 @@ from .objects import (
     KIND_PCB,
     KIND_SCHEMATIC,
     PubAnnounce,
+    PubManifest,
     ROLE_CANONICAL,
+    ROLE_DERIVED,
+    ROLE_STRUCTURE,
     Units,
     extract_artifact,
 )
@@ -266,9 +277,22 @@ class PublishMetadata(BaseModel):
     tags: Optional[list[str]] = None
 
 
+class AssemblyChildIn(BaseModel):
+    """One entry of a ``POST /api/pub/publish`` assembly ``children`` array
+    (§23.6.2). ``pin`` children carry ``manifest_root``; ``track`` children
+    carry ``announce_id`` — both base64url, both validated against the local
+    store / followed gateways before the announce is signed."""
+
+    ref_kind: str  # "pin" | "track"
+    announce_id: Optional[str] = None
+    manifest_root: Optional[str] = None
+    quantity: int = 1
+
+
 class PublishRequest(BaseModel):
     project_id: str
     metadata: PublishMetadata
+    children: Optional[list[AssemblyChildIn]] = None
 
 
 async def _project_and_role(pid: str, user_id: str) -> tuple[dict, str]:
@@ -385,16 +409,82 @@ async def publish(request: Request, body: PublishRequest, payload: dict = Depend
             detail=f"unrecognized metadata.artifact_kind: {m.artifact_kind!r} "
                    f"(expected one of {sorted(_KIND_NAME_TO_INT)})",
         )
+    identity = Identity.load_or_create()
+    store = _store(request)
+    follows = await store.list_follows()
+    gateways = [f["gateway_url"] for f in follows if f.get("gateway_url")]
+    client = PubClient(store=store, identity=identity, gateways=gateways)
+
     if artifact_kind == KIND_ASSEMBLY:
-        # An assembly needs a role=structure ArtifactFormat (§23.6.2, an
-        # AssemblyStructure blob enumerating sub-part references) — building
-        # that from a project's file tree is future work; publishing a
-        # single-part/dataset/doc artifact is fully supported today.
-        raise HTTPException(
-            status_code=400,
-            detail="assembly publish is not yet supported via this endpoint "
-                   "(requires an AssemblyStructure sub-part graph)",
-        )
+        try:
+            children = await build_assembly_children(
+                store, client, [c.model_dump() for c in (body.children or [])],
+            )
+        except UnresolvedChildRef as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+        # The AssemblyStructure blob (§23.6.2) is itself just an ordinary
+        # public blob — published like any other project file, referenced
+        # from formats with role=structure, format_id=6 (§23.3.4 CAD-3).
+        structure = AssemblyStructure(children=children)
+        struct_bytes = structure.to_cbor()
+        struct_manifest = PubManifest.build(struct_bytes)
+
+        files = await _collect_project_files(body.project_id)
+        publish_files: dict[str, bytes] = {"__assembly_structure__.cbor": struct_bytes}
+        formats = [ArtifactFormat(
+            format_id=FMT_ASSEMBLY_STRUCTURE, manifest_root=struct_manifest.id, role=ROLE_STRUCTURE,
+        )]
+
+        # A native assembly-authoring file, if the project has one, MAY
+        # additionally carry role=canonical (§23.3.4); everything else the
+        # project holds (STEP/glTF/PDF exports) rides in as a derived
+        # rendition of that native file, or of the structure blob itself
+        # when there is no native file to derive from.
+        native_path = next((p for p in files if _format_id_for(p) == FMT_NATIVE), None)
+        native_root = None
+        if native_path is not None:
+            native_manifest = PubManifest.build(files[native_path])
+            native_root = native_manifest.id
+            formats.append(ArtifactFormat(
+                format_id=FMT_NATIVE, manifest_root=native_root, role=ROLE_CANONICAL,
+            ))
+        for path, data in files.items():
+            publish_files[path] = data
+            if path == native_path:
+                continue
+            fmt_manifest = PubManifest.build(data)
+            formats.append(ArtifactFormat(
+                format_id=_format_id_for(path),
+                manifest_root=fmt_manifest.id,
+                role=ROLE_DERIVED,
+                derived_from_format=native_root if native_root is not None else struct_manifest.id,
+            ))
+
+        try:
+            artifact_metadata = ArtifactMetadata(
+                name=m.name,
+                description=m.description,
+                artifact_kind=KIND_ASSEMBLY,
+                formats=formats,
+                units=Units(
+                    length_unit=m.units["length_unit"],
+                    angle_unit=m.units.get("angle_unit"),
+                    mass_unit=m.units.get("mass_unit"),
+                ),
+                license=m.license,
+                tags=m.tags,
+            )
+            artifact_metadata.validate()
+        except ProfileError as exc:
+            raise HTTPException(status_code=400, detail=f"{exc.rule}: {exc}")
+
+        try:
+            announce_id = await client.publish(publish_files, artifact_metadata)
+        except PubError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+        return {"announce_id": _b64url(announce_id)}
 
     files = await _collect_project_files(body.project_id)
     if not files:
@@ -402,17 +492,12 @@ async def publish(request: Request, body: PublishRequest, payload: dict = Depend
 
     canonical_path, canonical_format_id = _pick_canonical(files)
 
-    identity = Identity.load_or_create()
-    store = _store(request)
-    client = PubClient(store=store, identity=identity, gateways=[])
-
     # Manifests are built for every file inside client.publish(); we need the
     # canonical file's manifest root ahead of time to reference it from
     # ArtifactMetadata.formats — PubManifest.build() is a pure/deterministic
     # function of (bytes, chunk_sz), so recomputing it here and letting
     # client.publish() recompute it again is wasted work, not a correctness
     # risk (both calls produce byte-identical manifests).
-    from .objects import PubManifest
     canonical_manifest = PubManifest.build(files[canonical_path])
 
     try:
@@ -443,6 +528,76 @@ async def publish(request: Request, body: PublishRequest, payload: dict = Depend
         raise HTTPException(status_code=400, detail=str(exc))
 
     return {"announce_id": _b64url(announce_id)}
+
+
+# ---------------------------------------------------------------------------
+# GET /api/pub/bom/{announce_id}
+# ---------------------------------------------------------------------------
+
+
+@router.get("/bom/{announce_id}")
+async def bom(announce_id: str, request: Request, payload: dict = Depends(require_auth)):
+    """§23.6.3 BOM walk from an assembly-kind announce: resolves pin/track
+    children (recursing into sub-assemblies), dedups leaf quantities by
+    resolved content address, and surfaces any cycle rather than recursing
+    forever or silently dropping the offending subtree (CAD-10)."""
+    aid = _b64url_decode(announce_id)
+    store = _store(request)
+    follows = await store.list_follows()
+    gateways = [f["gateway_url"] for f in follows if f.get("gateway_url")]
+    client = PubClient(store=store, identity=None, gateways=gateways)
+
+    try:
+        result = await walk_bom(store, aid, client)
+    except PubError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ProfileError as exc:
+        raise HTTPException(status_code=400, detail=f"{exc.rule}: {exc}")
+
+    return {
+        "announce_id": announce_id,
+        "parts": [
+            {
+                "ref": _b64url(p.ref),
+                "ref_kind": p.ref_kind,
+                "resolved_announce": _b64url(p.resolved_announce) if p.resolved_announce else None,
+                "quantity_total": p.quantity_total,
+            }
+            for p in result.parts
+        ],
+        "cycles": [
+            {
+                "ref": _b64url(c.ref),
+                "ref_kind": c.ref_kind,
+                "path": [_b64url(x) for x in c.path],
+            }
+            for c in result.cycles
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# GET /api/pub/assembly-candidates/{project_id}
+# ---------------------------------------------------------------------------
+
+
+@router.get("/assembly-candidates/{project_id}")
+async def assembly_candidates(project_id: str, request: Request, payload: dict = Depends(require_auth)):
+    """Best-effort list of the node owner's OWN published announces, for a UI
+    child-picker when composing an assembly's `children` array. Requires
+    project membership (any role) purely as the standard project-route auth
+    gate; the candidates themselves come from the node-local feed, not the
+    project (§23.7 — workshop identity/follows are node-local, not per-project)."""
+    user_id = payload.get("sub")
+    await _project_and_role(project_id, user_id)
+
+    store = _store(request)
+    identity = Identity.load_or_create()
+    candidates = await list_own_assembly_candidates(store, identity)
+    return [
+        {"announce_id": _b64url(c["announce_id"]), "name": c["name"], "kind": c["kind"]}
+        for c in candidates
+    ]
 
 
 # ---------------------------------------------------------------------------

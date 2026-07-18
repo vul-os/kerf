@@ -417,7 +417,74 @@ class TestPublish:
         )
         assert r.status_code == 404
 
-    def test_publish_rejects_assembly_kind(self, publish_client: TestClient):
+    def test_publish_assembly_happy_path_with_track_child(self, publish_client: TestClient):
+        # Children MUST already be published (§23.6.1) before the parent
+        # assembly can reference them — publish a part first, then track it.
+        data = _get_fixture_data()
+        part_r = publish_client.post(
+            "/api/pub/publish",
+            json={
+                "project_id": data["project_id"],
+                "metadata": {
+                    "name": "Bolt", "description": "d", "artifact_kind": "part",
+                    "license": "MIT", "units": {"length_unit": "mm"},
+                },
+            },
+            headers=_auth_headers(data["user_id"]),
+        )
+        assert part_r.status_code == 200, part_r.text
+        part_announce_id = part_r.json()["announce_id"]
+
+        asm_r = publish_client.post(
+            "/api/pub/publish",
+            json={
+                "project_id": data["project_id"],
+                "metadata": {
+                    "name": "Assy", "description": "d", "artifact_kind": "assembly",
+                    "license": "MIT", "units": {"length_unit": "mm"},
+                },
+                "children": [
+                    {"ref_kind": "track", "announce_id": part_announce_id, "quantity": 4},
+                ],
+            },
+            headers=_auth_headers(data["user_id"]),
+        )
+        assert asm_r.status_code == 200, asm_r.text
+        assert isinstance(asm_r.json()["announce_id"], str) and asm_r.json()["announce_id"]
+
+        bom_r = publish_client.get(
+            f"/api/pub/bom/{asm_r.json()['announce_id']}",
+            headers=_auth_headers(data["user_id"]),
+        )
+        assert bom_r.status_code == 200, bom_r.text
+        body = bom_r.json()
+        assert body["cycles"] == []
+        assert len(body["parts"]) == 1
+        assert body["parts"][0]["ref_kind"] == "track"
+        assert body["parts"][0]["resolved_announce"] == part_announce_id
+        assert body["parts"][0]["quantity_total"] == 4
+
+    def test_publish_assembly_unresolvable_ref_rejected(self, publish_client: TestClient):
+        data = _get_fixture_data()
+        fake_announce_id = _b64(b"\x12" + secrets.token_bytes(32))
+        r = publish_client.post(
+            "/api/pub/publish",
+            json={
+                "project_id": data["project_id"],
+                "metadata": {
+                    "name": "Assy", "description": "d", "artifact_kind": "assembly",
+                    "license": "MIT", "units": {"length_unit": "mm"},
+                },
+                "children": [
+                    {"ref_kind": "track", "announce_id": fake_announce_id, "quantity": 1},
+                ],
+            },
+            headers=_auth_headers(data["user_id"]),
+        )
+        assert r.status_code == 400
+        assert fake_announce_id in r.json()["detail"]
+
+    def test_publish_assembly_requires_children(self, publish_client: TestClient):
         data = _get_fixture_data()
         r = publish_client.post(
             "/api/pub/publish",

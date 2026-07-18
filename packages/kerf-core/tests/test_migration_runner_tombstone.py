@@ -3,7 +3,10 @@
 T-307 folded every alter/drop shim back into the originating CREATE TABLE,
 which left three migrations (0003_revisions_prefs.sql,
 0007_step_tess_revision_finalize.sql, 0009_workshop_gallery.sql) as pure
-comments — no SQL statements at all.
+comments — no SQL statements at all. A fourth, 0012_cloud_git.sql, joined
+them 2026-07-18 when its three tables (cloud_git_repos/branches/commits)
+were dropped as dead DDL — hosted git is retired as a product and nothing
+in-tree read or wrote them any more.
 
 asyncpg's simple-query response parser crashes with
 `AttributeError: 'NoneType' object has no attribute 'decode'` when the
@@ -54,7 +57,7 @@ def test_runner_detects_tombstone_pattern():
     assert stripped == "select 1;"
 
 
-def test_baseline_has_three_tombstone_files():
+def test_baseline_has_four_tombstone_files():
     """Pin the actual tombstone files so a refactor can't silently delete
     them (which would change migration numbering) or accidentally add
     executable SQL into them (which would re-introduce the asyncpg crash)."""
@@ -73,6 +76,7 @@ def test_baseline_has_three_tombstone_files():
         "0003_revisions_prefs.sql",
         "0007_step_tess_revision_finalize.sql",
         "0009_workshop_gallery.sql",
+        "0012_cloud_git.sql",
     }
     assert set(tombstones) == expected, (
         f"expected tombstones {expected}; found {set(tombstones)}. "
@@ -151,6 +155,7 @@ def test_runner_tombstone_skips_execute(monkeypatch):
         "0003_revisions_prefs.sql",
         "0007_step_tess_revision_finalize.sql",
         "0009_workshop_gallery.sql",
+        "0012_cloud_git.sql",
     }
     for ts in tombstone_names:
         ts_text = (migrations_dir / ts).read_text()

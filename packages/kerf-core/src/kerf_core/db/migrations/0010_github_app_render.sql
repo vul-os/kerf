@@ -4,13 +4,16 @@
 -- SQL is byte-exact and applied in the original order.
 
 -- ════════════ folded: 063_github_installation.sql ════════════
--- github_installation_id folded into CREATE TABLE cloud_github_tokens
--- in 0006_github_workshop.sql.
+-- github_installation_id originally folded into CREATE TABLE
+-- cloud_github_tokens in 0006_github_workshop.sql; that table (and this
+-- column with it) was dropped 2026-07-18 — see the tombstone comment in
+-- 0006_github_workshop.sql for why.
 
 -- ════════════ folded: 064_cloud_github_tokens_repair.sql ════════════
 -- Repair migration for legacy DBs that had a partial cloud_github_tokens.
--- Since DBs are always reset on deploy, the full table is created by
--- 0006_github_workshop.sql; this repair and its backfill ALTERs are obsolete.
+-- Moot twice over now: DBs are always reset on deploy, and
+-- cloud_github_tokens itself was dropped 2026-07-18 (see
+-- 0006_github_workshop.sql).
 
 -- ════════════ folded: 065_render_jobs.sql ════════════
 
@@ -18,6 +21,12 @@
 --
 -- Self-contained and fully idempotent: CREATE IF NOT EXISTS throughout.
 -- Safe to run on fresh databases and on already-migrated ones alike.
+--
+-- billing_bucket ('kerf_paid' | 'byo') dropped 2026-07-18: Kerf has no
+-- billing anywhere (decisions.md 2026-07-17 "no billing anywhere; BYO
+-- boxes"). It had become a legacy label nobody read — no query branched
+-- on its value, only logged/echoed it (see routes_workers.py history) —
+-- so it was removed along with the dead reads/writes rather than kept.
 
 CREATE TABLE IF NOT EXISTS render_jobs (
     id              uuid PRIMARY KEY,
@@ -34,9 +43,7 @@ CREATE TABLE IF NOT EXISTS render_jobs (
     -- points at gpu_workers(id) defined in 0013_gpu_workers.sql; no FK
     -- because the baseline order is render_jobs (0010) before gpu_workers
     -- (0013) — relationship enforced at app level.
-    -- billing_bucket: 'kerf_paid' (hosted vendor) | 'byo' (self-hosted worker).
     preferred_worker_id uuid,
-    billing_bucket      text        NOT NULL DEFAULT 'kerf_paid',
     created_at      timestamptz NOT NULL DEFAULT now(),
     updated_at      timestamptz NOT NULL DEFAULT now()
 );

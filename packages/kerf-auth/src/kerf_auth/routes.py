@@ -3,7 +3,6 @@ import base64
 import hashlib
 import hmac
 import json
-import logging
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -14,7 +13,6 @@ import bcrypt
 import httpx
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Cookie
-from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from urllib.parse import urlencode, urlparse
 
@@ -67,10 +65,8 @@ def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-log = logging.getLogger("kerf.auth.email")
-
-# Token lifetimes for the emailed links.
-VERIFY_TOKEN_TTL = timedelta(hours=48)
+# Token lifetime for the operator-relayed password-reset link (see
+# admin_generate_password_reset_link below).
 RESET_TOKEN_TTL = timedelta(minutes=30)
 
 # Constant-time guard: bcrypt hash of a throwaway value used to dummy-check
@@ -96,26 +92,6 @@ async def _create_email_token(conn, user_id: str, kind: str, ttl: timedelta) -> 
         datetime.now(timezone.utc) + ttl,
     )
     return raw
-
-
-def _send_email(template: str, to: str, data: dict) -> None:
-    """Render + send a transactional email.
-
-    Previously every send was wrapped in a bare `except: pass`, so a
-    misconfigured provider produced zero emails AND zero signal. Failures
-    must never break the calling auth flow, but they MUST be logged.
-    """
-    try:
-        from kerf_cloud.email.providers import send_email as _provider_send
-        from kerf_cloud.email.templates import renderer as _renderer
-
-        msg = _renderer.render(template, to, data)
-        _provider_send(
-            to=to, subject=msg.Subject, html=msg.HTML, text=msg.Text,
-            settings=settings,
-        )
-    except Exception as e:  # noqa: BLE001 — must not break the auth flow
-        log.warning("email send failed: template=%s to=%s err=%s", template, to, e)
 
 
 class UserResponse(BaseModel):
@@ -273,23 +249,17 @@ async def register(
         access_token, refresh_token = await issue_tokens(conn, str(user["id"]))
         default_ws, _ = await get_default_workspace(conn, str(user["id"]))
 
-        # Onboarding: welcome + email verification (soft — the account is
-        # usable immediately; the UI shows an unverified banner). Token
-        # created in the same connection; sends log on failure but never
-        # block signup.
-        app_url = _app_url()
-        _send_email("welcome", email, {"Name": display_name, "AppURL": app_url})
-        try:
-            verify_token = await _create_email_token(
-                conn, str(user["id"]), "verify", VERIFY_TOKEN_TTL,
-            )
-            _send_email("verify_email", email, {
-                "Name": display_name,
-                "AppURL": app_url,
-                "VerifyURL": f"{app_url}/api/auth/verify-email?token={verify_token}",
-            })
-        except Exception as e:  # noqa: BLE001
-            log.warning("verification email setup failed for %s: %s", email, e)
+        # Kerf sends no transactional email (decisions.md 2026-07-17
+        # "accounts shrink to the box"), so there is no inbox to click a
+        # verification link from. The account is fully usable immediately;
+        # mark it verified at creation rather than leaving an unclearable
+        # "unverified" banner with no way to ever clear it.
+        await conn.execute(
+            "UPDATE users SET email_verified = true WHERE id = $1",
+            user["id"],
+        )
+        user = dict(user)
+        user["email_verified"] = True
 
         response.status_code = status.HTTP_201_CREATED
         return AuthResponse(
@@ -341,56 +311,28 @@ async def login(
         )
 
 
-@router.get("/verify-email")
-async def verify_email(token: str = ""):
-    """Consume an email-verification token, then redirect into the app."""
-    app_url = _app_url()
-    if token:
-        pool = await get_pool_required()
-        async with pool.acquire() as conn:
-            row = await conn.fetchrow(
-                """
-                SELECT id, user_id FROM email_tokens
-                WHERE token_hash = $1 AND kind = 'verify'
-                  AND used_at IS NULL AND expires_at > now()
-                """,
-                hash_token(token),
-            )
-            if row:
-                async with conn.transaction():
-                    await conn.execute(
-                        "UPDATE users SET email_verified = true WHERE id = $1",
-                        row["user_id"],
-                    )
-                    await conn.execute(
-                        "UPDATE email_tokens SET used_at = now() WHERE id = $1",
-                        row["id"],
-                    )
-                return RedirectResponse(f"{app_url}/projects?verified=1", status_code=302)
-    return RedirectResponse(f"{app_url}/?verify=invalid", status_code=302)
+async def admin_generate_password_reset_link(
+    conn: asyncpg.Connection, email: str,
+) -> Optional[str]:
+    """Operator-only password-reset link generation — no email involved.
 
+    Kerf sends no transactional email (decisions.md 2026-07-17 "accounts
+    shrink to the box"), so self-service /forgot-password can no longer
+    deliver a reset link to anyone. This is the local-account-recovery
+    replacement: a node operator with DATABASE_URL runs
+    ``kerf admin reset-password <email>`` (kerf-cli, calls this function)
+    and relays the returned one-time link to the account owner out of
+    band (chat, SMS, in person — whatever channel the operator trusts).
 
-@router.post("/request-verification")
-async def request_verification(payload: dict = Depends(require_auth)):
-    """Re-send the verification email for the signed-in user."""
-    uid = payload.get("sub")
-    if not uid:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
-    pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        user = await users_queries.get_user(conn, uuid.UUID(uid))
-        if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
-        if dict(user).get("email_verified"):
-            return {"status": "already_verified"}
-        token = await _create_email_token(conn, str(user["id"]), "verify", VERIFY_TOKEN_TTL)
-    app_url = _app_url()
-    _send_email("verify_email", user["email"], {
-        "Name": user["name"] or user["email"],
-        "AppURL": app_url,
-        "VerifyURL": f"{app_url}/api/auth/verify-email?token={token}",
-    })
-    return {"status": "sent"}
+    Reuses the same single-use, sha256-hashed, 30-minute-TTL token
+    machinery as the old email flow; only the delivery mechanism changed.
+    Returns ``None`` when there is no password-auth account for *email*.
+    """
+    user = await users_queries.get_user_by_email(conn, email.strip().lower())
+    if not user or not user.get("password_hash"):
+        return None
+    token = await _create_email_token(conn, str(user["id"]), "reset", RESET_TOKEN_TTL)
+    return f"{_app_url()}/reset-password?token={token}"
 
 
 @router.post("/forgot-password")
@@ -399,24 +341,18 @@ async def forgot_password(
     request: Request,
     _rl: None = Depends(rate_limit(max_per_window=5, window_seconds=3600, key_prefix="auth:forgot_password")),
 ):
-    """Always 200 — never reveal whether an email is registered. Sends a
-    reset link only when the email maps to a password account."""
-    email = req.email.strip().lower()
-    if email:
-        pool = await get_pool_required()
-        async with pool.acquire() as conn:
-            user = await users_queries.get_user_by_email(conn, email)
-            if user and user.get("password_hash"):
-                token = await _create_email_token(
-                    conn, str(user["id"]), "reset", RESET_TOKEN_TTL,
-                )
-                app_url = _app_url()
-                _send_email("password_reset", email, {
-                    "Name": user["name"] or email,
-                    "AppURL": app_url,
-                    "ResetURL": f"{app_url}/reset-password?token={token}",
-                })
-    return {"status": "ok"}
+    """Kerf sends no transactional email — self-service reset is not
+    possible. Always responds the same way regardless of whether *email*
+    is registered (no account enumeration), pointing at the local-account
+    recovery path instead of silently doing nothing."""
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail=(
+            "Kerf has no email to send a reset link to. Ask your node "
+            "operator to run `kerf admin reset-password <email>` and share "
+            "the printed one-time link with you directly."
+        ),
+    )
 
 
 @router.post("/reset-password", response_model=AuthResponse)
@@ -460,10 +396,6 @@ async def reset_password(req: ResetPasswordRequest, response: Response):
         user = await users_queries.get_user(conn, row["user_id"])
         access_token, refresh_token = await issue_tokens(conn, str(user["id"]))
         default_ws, _ = await get_default_workspace(conn, str(user["id"]))
-    _send_email("password_reset_complete", user["email"], {
-        "Name": user["name"] or user["email"],
-        "AppURL": _app_url(),
-    })
     return AuthResponse(
         access_token=access_token,
         refresh_token=refresh_token,

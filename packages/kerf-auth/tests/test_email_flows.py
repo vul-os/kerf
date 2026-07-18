@@ -1,14 +1,28 @@
-"""Slice 8: email verification + password reset.
+"""Slice 8 (revised): no transactional email; local-account recovery.
 
-Bug history: the welcome email was sent inside a bare `except: pass`
-(zero emails, zero signal), and verify/reset flows did not exist at all
-despite the templates being present. This pins the new contract:
-- _send_email never raises and logs on failure (no silent swallow)
-- /verify-email consumes a token then redirects
-- /forgot-password never enumerates accounts
-- /reset-password rejects weak/invalid input
-- register wires welcome + verify (no `except: pass`)
+Kerf sends no email anywhere (decisions.md 2026-07-17 "accounts shrink to
+the box"). ``_send_email`` and the email-token verification flow it fed
+(``/verify-email``, ``/request-verification``) are gone. This pins the
+replacement contract:
+
+- register() never touches email; new accounts are auto-verified since
+  there is no inbox to click a link from.
+- /verify-email and /request-verification no longer exist (404).
+- /forgot-password always 501s with a message pointing at
+  `kerf admin reset-password` — same response regardless of whether the
+  email is registered (no enumeration surface, because there's nothing to
+  differentiate on any more).
+- /reset-password itself (token consumption) is unchanged — see
+  test_pen_password_reset.py — except it no longer sends a confirmation
+  email on success.
+- admin_generate_password_reset_link() is the local-account-recovery
+  primitive `kerf admin reset-password <email>` (kerf-cli) calls: same
+  single-use/expiring token machinery, delivered out of band instead of
+  by email.
 """
+from __future__ import annotations
+
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -54,72 +68,139 @@ def _conn():
     return conn
 
 
-# ---- _send_email must never raise, and must log on failure -------------
+# ---- _send_email is gone -------------------------------------------------
 
-def test_send_email_swallows_then_logs(caplog):
-    # Force the provider import/render path to blow up.
-    with patch("kerf_cloud.email.templates.renderer") as r:
-        r.render.side_effect = RuntimeError("provider boom")
-        with caplog.at_level("WARNING"):
-            auth._send_email("welcome", "a@b.com", {"Name": "A"})  # must not raise
-    assert any("email send failed" in m for m in caplog.messages)
+def test_send_email_no_longer_exists():
+    """The lazily-importing kerf_cloud.email shim is fully removed, not a
+    soft-failing stub."""
+    assert not hasattr(auth, "_send_email")
 
 
-# ---- /verify-email -----------------------------------------------------
+# ---- register(): no email calls, auto-verified ---------------------------
 
-def test_verify_email_empty_token_redirects_invalid():
-    with patch.object(auth, "_app_url", return_value="https://app.test"):
-        c = TestClient(_app())
-        r = c.get("/auth/verify-email", follow_redirects=False)
-    assert r.status_code == 302
-    assert r.headers["location"] == "https://app.test/?verify=invalid"
-
-
-def test_verify_email_valid_token_marks_verified_and_redirects():
+def test_register_auto_verifies_no_email_calls():
+    """New accounts are marked email_verified immediately — there is no
+    verification email to wait on."""
     conn = _conn()
-    conn.fetchrow = AsyncMock(return_value={"id": "tok-1", "user_id": "u-1"})
-    with patch.object(auth, "_app_url", return_value="https://app.test"), \
-         patch.object(auth, "get_pool_required", AsyncMock(return_value=_fake_pool(conn))):
+    created_user = {
+        "id": "u-new-1",
+        "email": "new@example.com",
+        "name": "",
+        "avatar_url": "",
+        "account_role": "user",
+        "is_system": False,
+        "email_verified": False,
+        "created_at": datetime.now(timezone.utc),
+    }
+    conn.fetchrow = AsyncMock(return_value=created_user)
+    conn.execute = AsyncMock()
+
+    with patch.object(auth, "get_pool_required", AsyncMock(return_value=_fake_pool(conn))), \
+         patch.object(auth.users_queries, "create_user", AsyncMock(return_value=created_user)), \
+         patch.object(auth, "create_personal_workspace", AsyncMock(return_value=None)), \
+         patch.object(auth, "issue_tokens", AsyncMock(return_value=("at", "rt"))), \
+         patch.object(auth, "get_default_workspace", AsyncMock(return_value=(None, False))):
         c = TestClient(_app())
-        r = c.get("/auth/verify-email?token=raw", follow_redirects=False)
-    assert r.status_code == 302
-    assert r.headers["location"] == "https://app.test/projects?verified=1"
-    # users.email_verified set + token consumed.
+        r = c.post("/auth/register", json={"email": "new@example.com", "password": "longenough1"})
+
+    assert r.status_code == 201
+    assert r.json()["user"]["email_verified"] is True
+    # The account is verified via a direct UPDATE, never an emailed token.
     sqls = " ".join(str(call.args[0]) for call in conn.execute.await_args_list)
     assert "UPDATE users SET email_verified = true" in sqls
-    assert "UPDATE email_tokens SET used_at = now()" in sqls
+    assert "email_tokens" not in sqls
 
 
-# ---- /forgot-password : no account enumeration -------------------------
+def test_register_source_has_no_send_email_call():
+    """Source contract: register() no longer references _send_email or a
+    verify-kind email token."""
+    import pathlib
+    src = pathlib.Path(auth.__file__).read_text()
+    i = src.index("async def register(")
+    body = src[i:i + 3000]
+    assert "_send_email(" not in body
+    assert '"verify"' not in body
 
-def test_forgot_password_unknown_email_is_ok_and_silent():
+
+# ---- /verify-email and /request-verification are gone --------------------
+
+def test_verify_email_route_removed():
+    c = TestClient(_app())
+    r = c.get("/auth/verify-email?token=whatever")
+    assert r.status_code == 404
+
+
+def test_request_verification_route_removed():
+    c = TestClient(_app())
+    r = c.post("/auth/request-verification")
+    assert r.status_code == 404
+
+
+# ---- /forgot-password : always 501, no enumeration ------------------------
+
+def test_forgot_password_unknown_email_returns_501():
+    c = TestClient(_app())
+    r = c.post("/auth/forgot-password", json={"email": "nobody@x.com"})
+    assert r.status_code == 501
+    assert "kerf admin reset-password" in r.json()["detail"]
+
+
+def test_forgot_password_known_email_returns_identical_501():
+    """Same 501 regardless of whether the email is registered — the route
+    does no DB lookup at all any more, so there is nothing to enumerate."""
+    c = TestClient(_app())
+    r_unknown = c.post("/auth/forgot-password", json={"email": "nobody@x.com"})
+    r_known = c.post("/auth/forgot-password", json={"email": "pat@x.com"})
+    assert r_unknown.status_code == r_known.status_code == 501
+    assert r_unknown.json() == r_known.json()
+
+
+# ---- admin_generate_password_reset_link(): local recovery primitive ------
+
+def test_admin_reset_link_none_for_unknown_email():
     conn = _conn()
-    with patch.object(auth, "get_pool_required", AsyncMock(return_value=_fake_pool(conn))), \
-         patch.object(auth.users_queries, "get_user_by_email", AsyncMock(return_value=None)), \
-         patch.object(auth, "_send_email") as send:
-        c = TestClient(_app())
-        r = c.post("/auth/forgot-password", json={"email": "nobody@x.com"})
-    assert r.status_code == 200 and r.json() == {"status": "ok"}
-    send.assert_not_called()
+
+    import asyncio
+
+    async def _call():
+        with patch.object(auth.users_queries, "get_user_by_email", AsyncMock(return_value=None)):
+            return await auth.admin_generate_password_reset_link(conn, "nobody@x.com")
+
+    result = asyncio.run(_call())
+    assert result is None
 
 
-def test_forgot_password_known_user_sends_reset():
+def test_admin_reset_link_none_for_oauth_only_account():
     conn = _conn()
-    conn.execute = AsyncMock()
-    user = {"id": "u-1", "name": "Pat", "password_hash": "bcrypt$x"}
-    with patch.object(auth, "get_pool_required", AsyncMock(return_value=_fake_pool(conn))), \
-         patch.object(auth.users_queries, "get_user_by_email", AsyncMock(return_value=user)), \
-         patch.object(auth, "_app_url", return_value="https://app.test"), \
-         patch.object(auth, "_send_email") as send:
-        c = TestClient(_app())
-        r = c.post("/auth/forgot-password", json={"email": "pat@x.com"})
-    assert r.status_code == 200 and r.json() == {"status": "ok"}
-    send.assert_called_once()
-    assert send.call_args.args[0] == "password_reset"
-    assert "/reset-password?token=" in send.call_args.args[2]["ResetURL"]
+    user = {"id": "u-oauth-1", "password_hash": None}
+
+    import asyncio
+
+    async def _call():
+        with patch.object(auth.users_queries, "get_user_by_email", AsyncMock(return_value=user)):
+            return await auth.admin_generate_password_reset_link(conn, "oauth@x.com")
+
+    result = asyncio.run(_call())
+    assert result is None
 
 
-# ---- /reset-password : input validation --------------------------------
+def test_admin_reset_link_returns_url_for_password_account():
+    conn = _conn()
+    user = {"id": "u-pw-1", "password_hash": "bcrypt$x"}
+
+    import asyncio
+
+    async def _call():
+        with patch.object(auth.users_queries, "get_user_by_email", AsyncMock(return_value=user)), \
+             patch.object(auth, "_create_email_token", AsyncMock(return_value="tok-abc")), \
+             patch.object(auth, "_app_url", return_value="https://app.test"):
+            return await auth.admin_generate_password_reset_link(conn, "pat@x.com")
+
+    link = asyncio.run(_call())
+    assert link == "https://app.test/reset-password?token=tok-abc"
+
+
+# ---- /reset-password : input validation still holds -----------------------
 
 def test_reset_password_short_password_400():
     c = TestClient(_app())
@@ -135,15 +216,3 @@ def test_reset_password_invalid_token_400():
         r = c.post("/auth/reset-password",
                    json={"token": "bad", "password": "longenough1"})
     assert r.status_code == 400
-
-
-# ---- register wiring (source contract) ---------------------------------
-
-def test_register_wires_welcome_and_verify_no_silent_swallow():
-    import pathlib
-    src = pathlib.Path(auth.__file__).read_text()
-    i = src.index("async def register(")
-    body = src[i:i + 3000]
-    assert '_send_email("welcome"' in body
-    assert '_send_email("verify_email"' in body
-    assert "pass  # email failure must never fail registration" not in body

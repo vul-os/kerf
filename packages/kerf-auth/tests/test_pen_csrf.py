@@ -101,21 +101,17 @@ def _conn_ok():
 def test_same_origin_post_not_blocked_by_cors():
     """A POST from the allowed origin must reach the handler (not be CORS-blocked).
 
-    /forgot-password always returns 200 regardless of whether the email exists
-    so this is safe to exercise without a real DB.
+    /forgot-password always returns 501 (Kerf sends no email) regardless of
+    whether the email exists, so this is safe to exercise without a real DB.
     """
-    conn = _conn_ok()
-    with patch.object(auth, "get_pool_required", AsyncMock(return_value=_fake_pool(conn))), \
-         patch.object(auth.users_queries, "get_user_by_email", AsyncMock(return_value=None)):
-        client = TestClient(_build_app(), raise_server_exceptions=False)
-        r = client.post(
-            "/auth/forgot-password",
-            json={"email": "nobody@test.invalid"},
-            headers={"Origin": ALLOWED_ORIGIN},
-        )
-    # Not 403; the handler ran and returned 200.
-    assert r.status_code == 200
-    assert r.json() == {"status": "ok"}
+    client = TestClient(_build_app(), raise_server_exceptions=False)
+    r = client.post(
+        "/auth/forgot-password",
+        json={"email": "nobody@test.invalid"},
+        headers={"Origin": ALLOWED_ORIGIN},
+    )
+    # Not 403 (CORS-blocked); the handler ran and returned its 501.
+    assert r.status_code == 501
 
 
 # ---------------------------------------------------------------------------

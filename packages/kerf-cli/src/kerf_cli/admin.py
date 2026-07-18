@@ -20,6 +20,17 @@ repo-size <workspace>
     Requires DATABASE_URL to be set for the LFS blob query.  The packfile
     stat is resolved from storage (STORAGE_BACKEND env vars or local
     defaults).
+
+reset-password <email>
+    Local-account recovery. Kerf sends no transactional email (decisions.md
+    2026-07-17 "accounts shrink to the box"), so self-service
+    /auth/forgot-password can no longer deliver a reset link — it returns
+    501 pointing here instead. This command generates a single-use,
+    30-minute reset link and prints it; the operator relays it to the
+    account owner out of band (chat, SMS, in person).
+
+    Requires DATABASE_URL. No-op (prints a message, exit 1) if the email
+    has no password-auth account.
 """
 
 from __future__ import annotations
@@ -127,6 +138,60 @@ def _stat_packfile_bytes(workspace_id: uuid.UUID) -> int:
 
 
 # ---------------------------------------------------------------------------
+# reset-password
+# ---------------------------------------------------------------------------
+
+def _cmd_reset_password(args: argparse.Namespace) -> int:
+    email = args.email.strip()
+    if not email:
+        print("Error: email is required.", file=sys.stderr)
+        return 1
+
+    database_url = os.environ.get("DATABASE_URL", "")
+    if not database_url:
+        print("Error: DATABASE_URL must be set.", file=sys.stderr)
+        return 1
+
+    try:
+        import asyncio  # noqa: PLC0415
+
+        import asyncpg  # noqa: PLC0415
+
+        from kerf_auth.routes import (  # noqa: PLC0415
+            admin_generate_password_reset_link,
+        )
+
+        async def _run():
+            conn = await asyncpg.connect(database_url)
+            try:
+                return await admin_generate_password_reset_link(conn, email)
+            finally:
+                await conn.close()
+
+        link = asyncio.run(_run())
+    except ImportError:
+        print(
+            "Error: kerf-auth is not installed (requires the [server] extra).",
+            file=sys.stderr,
+        )
+        return 1
+    except Exception as exc:
+        print(f"Error: reset-password failed: {exc}", file=sys.stderr)
+        return 1
+
+    if link is None:
+        print(
+            f"No password-auth account found for '{email}' "
+            "(unknown email, or the account uses OAuth only).",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(link)
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # Parser helpers (used from main.py)
 # ---------------------------------------------------------------------------
 
@@ -166,6 +231,27 @@ def add_admin_parser(sub: "argparse._SubParsersAction") -> None:  # type: ignore
         help="Workspace UUID to report sizes for.",
     )
     rs_p.set_defaults(func=_cmd_admin)
+
+    # ---- reset-password ----
+    rp_p = admin_sub.add_parser(
+        "reset-password",
+        help="Generate a one-time password-reset link for a local account",
+        description=(
+            "Local-account recovery. Kerf sends no transactional email, so\n"
+            "self-service /auth/forgot-password cannot deliver a reset link.\n"
+            "This prints a single-use, 30-minute link for the operator to\n"
+            "relay to the account owner out of band (chat, SMS, in person).\n\n"
+            "Requires DATABASE_URL."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    rp_p.add_argument(
+        "email",
+        metavar="email",
+        help="Email address of the account to generate a reset link for.",
+    )
+    rp_p.set_defaults(func=_cmd_admin)
+
     admin_p.set_defaults(func=_cmd_admin)
 
 
@@ -173,5 +259,7 @@ def _cmd_admin(args: argparse.Namespace) -> int:
     admin_command = getattr(args, "admin_command", None)
     if admin_command == "repo-size":
         return _cmd_repo_size(args)
+    if admin_command == "reset-password":
+        return _cmd_reset_password(args)
     print(f"Unknown admin command: {admin_command}", file=sys.stderr)
     return 1

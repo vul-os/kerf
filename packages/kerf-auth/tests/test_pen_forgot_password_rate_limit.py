@@ -3,7 +3,13 @@
 Verifies that:
   - the route has a rate_limit Depends in its signature
   - when the rate_limit dependency raises HTTP 429, the endpoint propagates it
-  - normal requests (rate_limit not triggered) still return 200 {"status": "ok"}
+  - normal requests (rate_limit not triggered) still return the route's own
+    501 (Kerf sends no email — decisions.md 2026-07-17)
+
+The rate_limit dependency stays even though the route no longer touches the
+DB: it is still a public, unauthenticated, cheap-to-call POST endpoint, so
+keeping it rate-limited costs nothing and preempts future regressions if
+the handler ever grows real work again.
 """
 from __future__ import annotations
 
@@ -61,17 +67,13 @@ def test_r17_forgot_password_has_rate_limit_dependency():
 
 
 # ---------------------------------------------------------------------------
-# R17-B  Rate limit pass-through: normal request → 200 {"status": "ok"}
+# R17-B  Rate limit pass-through: normal request reaches the handler
 # ---------------------------------------------------------------------------
 
-def test_r17_forgot_password_normal_request_returns_200():
-    conn = AsyncMock()
-    conn.fetchrow = AsyncMock(return_value=None)  # unknown email
-    with patch.object(auth, "get_pool_required", AsyncMock(return_value=_fake_pool(conn))):
-        c = TestClient(_app())
-        r = c.post("/auth/forgot-password", json={"email": "nobody@example.com"})
-    assert r.status_code == 200
-    assert r.json() == {"status": "ok"}
+def test_r17_forgot_password_normal_request_returns_501():
+    c = TestClient(_app())
+    r = c.post("/auth/forgot-password", json={"email": "nobody@example.com"})
+    assert r.status_code == 501
 
 
 # ---------------------------------------------------------------------------

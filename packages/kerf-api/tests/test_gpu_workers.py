@@ -8,12 +8,12 @@ Tests (all hermetic — no real DB):
   5. heartbeat → valid token succeeds
   6. heartbeat → bad token → 401
   7. heartbeat → revoked token → 401
-  8. complete → BYO billing_bucket skips charge_render → charged=False
+  8. complete → BYO worker completion skips charge_render → charged=False
   9. complete → error body marks job failed, no charge
  10. complete → wrong worker token → 401
  11. claim-job → response includes signed_upload_url, result_key, result_ttl_seconds
  12. claim-job → signed_upload_url key matches "worker-results/{job_id}.bin"
- 13. complete (result_key path) → persists result_key, no raw bytes, BYO billing unaffected
+ 13. complete (result_key path) → persists result_key, no raw bytes, no charge
  14. complete (result_key path) → storage.head not-found → 422
  15. complete → no result_key and no signed_url → 422
  16. complete (signed_url legacy) → back-compat still works
@@ -354,7 +354,6 @@ class TestCompleteJob:
         assert resp.status_code == 200, resp.text
         data = resp.json()
         assert data["charged"] is False
-        assert data["billing_bucket"] == "byo"
 
     def test_complete_with_error_marks_failed(self):
         token = _make_token()
@@ -641,7 +640,6 @@ class TestCompleteResultKeyPath:
         assert resp.status_code == 200, resp.text
         data = resp.json()
         assert data["charged"] is False
-        assert data["billing_bucket"] == "byo"
 
     def test_result_key_not_in_storage_returns_422(self):
         """complete via result_key must 422 when storage.head says object absent."""

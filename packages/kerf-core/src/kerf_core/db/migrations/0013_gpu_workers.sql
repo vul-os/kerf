@@ -9,9 +9,10 @@
 -- gpu_worker_jobs: join table linking a worker to the render jobs it ran.
 --   Used for COGS attribution and per-worker utilisation reporting.
 --
--- render_jobs: two new columns are added inline — preferred_worker_id (so a
---   SelfHostedWorkerBackend-submitted job is only claimable by that worker)
---   and billing_bucket (so charge_render can short-circuit on 'byo').
+-- render_jobs: preferred_worker_id is added inline so a
+--   SelfHostedWorkerBackend-submitted job is only claimable by that worker.
+--   (A billing_bucket column also lived here; dropped 2026-07-18 as dead —
+--   see 0010_github_app_render.sql.)
 --
 -- All DDL is CREATE IF NOT EXISTS / ADD COLUMN IF NOT EXISTS — fully idempotent.
 
@@ -43,9 +44,9 @@ CREATE INDEX IF NOT EXISTS gpu_worker_jobs_worker_id_idx
 CREATE INDEX IF NOT EXISTS gpu_worker_jobs_render_job_id_idx
     ON gpu_worker_jobs (render_job_id);
 
--- render_jobs.preferred_worker_id + billing_bucket are defined in
--- 0010_github_app_render.sql (folded into the render_jobs baseline per the
--- clean-baseline directive — no ALTER shims).
+-- render_jobs.preferred_worker_id is defined in 0010_github_app_render.sql
+-- (folded into the render_jobs baseline per the clean-baseline directive —
+-- no ALTER shims).
 CREATE INDEX IF NOT EXISTS render_jobs_preferred_worker_idx
     ON render_jobs (preferred_worker_id)
     WHERE preferred_worker_id IS NOT NULL;

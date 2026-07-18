@@ -4,17 +4,13 @@
 -- SQL is byte-exact and applied in the original order.
 
 -- ════════════ folded: 031_cloud_github_tokens.sql ════════════
-
-CREATE TABLE IF NOT EXISTS cloud_github_tokens (
-    user_id                 uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    access_token_encrypted  bytea NOT NULL DEFAULT ''::bytea,
-    scope                   text NOT NULL DEFAULT '',
-    github_user_id          bigint,
-    github_login            text NOT NULL DEFAULT '',
-    -- folded from 063_github_installation.sql (0010): GitHub App installation ID
-    github_installation_id  bigint,
-    updated_at              timestamptz NOT NULL DEFAULT now()
-);
+-- Tombstone (2026-07-18): cloud_github_tokens dropped — GitHub OAuth
+-- token storage was hosted-git plumbing (decisions.md 2026-07-18 "local
+-- git only; no OAuth"). Zero readers/writers left in-tree (the only hit
+-- was a self-contained hermetic RLS test with no production caller;
+-- removed with the table — see test_rls_cloud_github_tokens.py history).
+-- github_installation_id (folded here from 063_github_installation.sql via
+-- 0010) went with it.
 
 -- ════════════ folded: 032_workshop_likes.sql ════════════
 
@@ -29,17 +25,7 @@ CREATE TABLE IF NOT EXISTS workshop_likes (
 CREATE INDEX IF NOT EXISTS workshop_likes_project_id_idx ON workshop_likes (project_id);
 
 -- ════════════ folded: cloud_gitlab_tokens (T-152) ════════════
-
--- Persisted GitLab OAuth / PAT credentials, analogous to cloud_github_tokens.
--- One row per user; token encrypted at rest; upserted on connect, deleted on
--- disconnect.  gitlab_host defaults to https://gitlab.com but may be
--- overridden for self-hosted instances.
-CREATE TABLE IF NOT EXISTS cloud_gitlab_tokens (
-    user_id                 uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    access_token_encrypted  bytea NOT NULL DEFAULT ''::bytea,
-    scope                   text NOT NULL DEFAULT '',
-    gitlab_user_id          bigint,
-    gitlab_login            text NOT NULL DEFAULT '',
-    gitlab_host             text NOT NULL DEFAULT 'https://gitlab.com',
-    updated_at              timestamptz NOT NULL DEFAULT now()
-);
+-- Tombstone (2026-07-18): cloud_gitlab_tokens dropped — same reasoning as
+-- cloud_github_tokens above (GitLab OAuth/PAT token storage was hosted-git
+-- plumbing; decisions.md 2026-07-18). Zero readers/writers left in-tree —
+-- not even a test referenced this one.

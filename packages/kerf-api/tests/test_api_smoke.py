@@ -417,17 +417,17 @@ def test_smoke_library_parts(client: TestClient):
 
 
 # ── 10. POST /auth/forgot-password — auth forgot group ────────────────────
-#     Must always return 200 (never reveals whether email is registered).
+#     Kerf sends no email (decisions.md 2026-07-18): always 501, never
+#     reveals whether the email is registered (identical response either way).
 
 def test_smoke_auth_forgot_password(client: TestClient):
     r = client.post(
         "/auth/forgot-password",
         json={"email": f"{_RUN_PREFIX}-nonexistent@kerf.test"},
     )
-    assert r.status_code < 500, f"forgot-password {r.status_code}: {r.text}"
-    assert r.status_code == 200, f"forgot-password {r.status_code}: {r.text}"
+    assert r.status_code == 501, f"forgot-password {r.status_code}: {r.text}"
     body = r.json()
-    assert body.get("status") == "ok", f"unexpected body: {body}"
+    assert "kerf admin reset-password" in body.get("detail", ""), f"unexpected body: {body}"
 
 
 # ── 11. POST /auth/reset-password with invalid token — auth reset group ───
@@ -444,18 +444,20 @@ def test_smoke_auth_reset_password_invalid_token(client: TestClient):
     )
 
 
-# ── 12. GET /auth/verify-email with invalid token — auth verify group ────
-#     Invalid token should redirect (302/307), not 500.
+# ── 12. POST /auth/forgot-password — auth verify group ────────────────────
+#     Kerf sends no email (decisions.md 2026-07-18); the route deliberately
+#     always 501s pointing at `kerf admin reset-password` — verify that
+#     documented contract, not an unhandled-exception 500.
 
-def test_smoke_auth_verify_email_invalid(client: TestClient):
-    r = client.get(
-        f"/auth/verify-email?token={_RUN_PREFIX}-invalid",
-        follow_redirects=False,
+def test_smoke_auth_forgot_password_returns_501(client: TestClient):
+    r = client.post(
+        "/auth/forgot-password",
+        json={"email": f"{_RUN_PREFIX}-nobody@example.com"},
     )
-    assert r.status_code < 500, f"verify-email {r.status_code}: {r.text}"
-    assert r.status_code in (302, 307), (
-        f"verify-email with invalid token should redirect, got {r.status_code}: {r.text}"
+    assert r.status_code == 501, (
+        f"forgot-password should 501 (no email in Kerf), got {r.status_code}: {r.text}"
     )
+    assert "kerf admin reset-password" in r.json().get("detail", "")
 
 
 # ── 13. GET /api/projects/{pid}/thumbnail — thumbnail group ───────────────

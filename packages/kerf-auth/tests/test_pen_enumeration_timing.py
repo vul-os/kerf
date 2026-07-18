@@ -11,11 +11,16 @@ measuring response-time deltas.
   C03  login: unknown email error text == known-wrong-password error text
   C04  login: unknown email performs a dummy bcrypt check (timing guard present)
   C05  login: unknown email status code == known-wrong-password status code
-  C06  forgot-password: unknown email → 200 {"status": "ok"}
-  C07  forgot-password: known email + no password_hash (OAuth) → 200 {"status": "ok"}
-  C08  forgot-password: known email + password_hash → 200 {"status": "ok"}
+  C06  forgot-password: unknown email → 501 (no email; points at local recovery)
+  C07  forgot-password: known email + no password_hash (OAuth) → same 501
+  C08  forgot-password: known email + password_hash → same 501
   C09  forgot-password: identical response body for unknown vs known email
   C10  _DUMMY_HASH constant is a valid bcrypt hash (guard integrity check)
+
+Kerf sends no transactional email (decisions.md 2026-07-17); /forgot-password
+no longer looks anything up in the DB, so C06-C09 are now trivially
+enumeration-safe (the response cannot vary because nothing is queried) —
+kept as regression tests for that invariant rather than deleted.
 """
 from __future__ import annotations
 
@@ -95,31 +100,6 @@ def _conn_known_user(password: str = "correctpassword"):
     user_row.get = lambda k, default=None: {
         "email_verified": True,
         "password_hash": hashed,
-    }.get(k, default)
-    conn = AsyncMock()
-    conn.fetchrow = AsyncMock(return_value=user_row)
-    conn.execute = AsyncMock()
-    return conn, user_row
-
-
-def _conn_known_user_no_hash():
-    """OAuth user — password_hash is None."""
-    from datetime import datetime, timezone
-    user_row = MagicMock()
-    user_row.__getitem__ = lambda self, k: {
-        "id": "u-oauth-1",
-        "email": "oauth@example.com",
-        "name": "OAuth User",
-        "avatar_url": None,
-        "account_role": "user",
-        "is_system": False,
-        "email_verified": True,
-        "created_at": datetime.now(timezone.utc),
-        "password_hash": None,
-    }[k]
-    user_row.get = lambda k, default=None: {
-        "email_verified": True,
-        "password_hash": None,
     }.get(k, default)
     conn = AsyncMock()
     conn.fetchrow = AsyncMock(return_value=user_row)
@@ -224,69 +204,34 @@ def test_c05_login_status_code_identical_for_unknown_vs_wrong_password():
 
 
 # ---------------------------------------------------------------------------
-# C06  forgot-password: unknown email → 200 {"status": "ok"} (no enumeration)
+# C06  forgot-password: unknown email → 501 (no email; no DB lookup at all)
 # ---------------------------------------------------------------------------
 
-def test_c06_forgot_password_unknown_email_returns_200_ok():
-    conn = _conn_no_user()
-    with patch.object(auth, "get_pool_required", AsyncMock(return_value=_fake_pool(conn))):
-        c = TestClient(_app())
-        r = c.post("/auth/forgot-password", json={"email": "nobody@example.com"})
-    assert r.status_code == 200
-    assert r.json() == {"status": "ok"}
+def test_c06_forgot_password_unknown_email_returns_501():
+    c = TestClient(_app())
+    r = c.post("/auth/forgot-password", json={"email": "nobody@example.com"})
+    assert r.status_code == 501
+    assert "kerf admin reset-password" in r.json()["detail"]
 
 
 # ---------------------------------------------------------------------------
-# C07  forgot-password: OAuth user (no password_hash) → 200 {"status": "ok"}
+# C07  forgot-password: OAuth user (no password_hash) → same 501
 # ---------------------------------------------------------------------------
 
-def test_c07_forgot_password_oauth_user_returns_200_ok():
-    conn, user_row = _conn_known_user_no_hash()
-    with patch.object(auth, "get_pool_required", AsyncMock(return_value=_fake_pool(conn))), \
-         patch.object(auth, "_send_email"):
-        c = TestClient(_app())
-        r = c.post("/auth/forgot-password", json={"email": "oauth@example.com"})
-    assert r.status_code == 200
-    assert r.json() == {"status": "ok"}
+def test_c07_forgot_password_oauth_user_returns_501():
+    c = TestClient(_app())
+    r = c.post("/auth/forgot-password", json={"email": "oauth@example.com"})
+    assert r.status_code == 501
 
 
 # ---------------------------------------------------------------------------
-# C08  forgot-password: known email with password_hash → 200 {"status": "ok"}
+# C08  forgot-password: known email with password_hash → same 501
 # ---------------------------------------------------------------------------
 
-def test_c08_forgot_password_known_email_returns_200_ok():
-    from datetime import datetime, timezone
-
-    token_row = None  # _create_email_token is mocked
-    user_row = MagicMock()
-    user_row.__getitem__ = lambda self, k: {
-        "id": "u-known-2",
-        "email": "known2@example.com",
-        "name": "Known User2",
-        "avatar_url": None,
-        "account_role": "user",
-        "is_system": False,
-        "email_verified": True,
-        "created_at": datetime.now(timezone.utc),
-        "password_hash": "$2b$12$fakehash",
-    }[k]
-    user_row.get = lambda k, default=None: {
-        "email_verified": True,
-        "password_hash": "$2b$12$fakehash",
-    }.get(k, default)
-
-    conn = AsyncMock()
-    conn.fetchrow = AsyncMock(return_value=user_row)
-    conn.execute = AsyncMock()
-
-    with patch.object(auth, "get_pool_required", AsyncMock(return_value=_fake_pool(conn))), \
-         patch.object(auth, "_create_email_token", AsyncMock(return_value="reset-tok-123")), \
-         patch.object(auth, "_send_email"):
-        c = TestClient(_app())
-        r = c.post("/auth/forgot-password", json={"email": "known2@example.com"})
-
-    assert r.status_code == 200
-    assert r.json() == {"status": "ok"}
+def test_c08_forgot_password_known_email_returns_501():
+    c = TestClient(_app())
+    r = c.post("/auth/forgot-password", json={"email": "known2@example.com"})
+    assert r.status_code == 501
 
 
 # ---------------------------------------------------------------------------
@@ -294,43 +239,12 @@ def test_c08_forgot_password_known_email_returns_200_ok():
 # ---------------------------------------------------------------------------
 
 def test_c09_forgot_password_identical_response_for_unknown_vs_known():
-    from datetime import datetime, timezone
+    c = TestClient(_app())
+    r_unknown = c.post("/auth/forgot-password", json={"email": "nobody@example.com"})
+    r_known = c.post("/auth/forgot-password", json={"email": "known3@example.com"})
 
-    conn_unknown = _conn_no_user()
-
-    user_row = MagicMock()
-    user_row.__getitem__ = lambda self, k: {
-        "id": "u-known-3",
-        "email": "known3@example.com",
-        "name": "Known User3",
-        "avatar_url": None,
-        "account_role": "user",
-        "is_system": False,
-        "email_verified": True,
-        "created_at": datetime.now(timezone.utc),
-        "password_hash": "$2b$12$fakehash",
-    }[k]
-    user_row.get = lambda k, default=None: {
-        "email_verified": True,
-        "password_hash": "$2b$12$fakehash",
-    }.get(k, default)
-
-    conn_known = AsyncMock()
-    conn_known.fetchrow = AsyncMock(return_value=user_row)
-    conn_known.execute = AsyncMock()
-
-    with patch.object(auth, "get_pool_required", AsyncMock(return_value=_fake_pool(conn_unknown))):
-        c = TestClient(_app())
-        r_unknown = c.post("/auth/forgot-password", json={"email": "nobody@example.com"})
-
-    with patch.object(auth, "get_pool_required", AsyncMock(return_value=_fake_pool(conn_known))), \
-         patch.object(auth, "_create_email_token", AsyncMock(return_value="reset-tok-456")), \
-         patch.object(auth, "_send_email"):
-        c = TestClient(_app())
-        r_known = c.post("/auth/forgot-password", json={"email": "known3@example.com"})
-
-    assert r_unknown.status_code == r_known.status_code == 200
-    assert r_unknown.json() == r_known.json() == {"status": "ok"}
+    assert r_unknown.status_code == r_known.status_code == 501
+    assert r_unknown.json() == r_known.json()
 
 
 # ---------------------------------------------------------------------------

@@ -637,26 +637,24 @@ class TestTokenSingleUse:
 
     def test_reset_token_second_use_rejected(self, scenario):
         """After a reset token is consumed once, a second POST → 400."""
-        import kerf_auth.routes as auth_routes
         from fastapi.testclient import TestClient
 
         raw = _insert_email_token_sync(scenario["uid_a"], "reset")
 
-        with patch.object(auth_routes, "_send_email"):
-            with TestClient(_make_app()) as client:
-                # First use — should succeed (200)
-                r1 = client.post(
-                    "/auth/reset-password",
-                    json={"token": raw, "password": "ValidPassword1!"},
-                )
-                assert r1.status_code == 200, (
-                    f"First reset should succeed (200), got {r1.status_code}: {r1.text}"
-                )
-                # Second use — token consumed (used_at IS NOT NULL) → must be 400
-                r2 = client.post(
-                    "/auth/reset-password",
-                    json={"token": raw, "password": "AnotherPassword2@"},
-                )
+        with TestClient(_make_app()) as client:
+            # First use — should succeed (200)
+            r1 = client.post(
+                "/auth/reset-password",
+                json={"token": raw, "password": "ValidPassword1!"},
+            )
+            assert r1.status_code == 200, (
+                f"First reset should succeed (200), got {r1.status_code}: {r1.text}"
+            )
+            # Second use — token consumed (used_at IS NOT NULL) → must be 400
+            r2 = client.post(
+                "/auth/reset-password",
+                json={"token": raw, "password": "AnotherPassword2@"},
+            )
         assert r2.status_code == 400, (
             f"TOKEN SINGLE-USE FAILURE: second reset returned {r2.status_code} "
             f"instead of 400 — the app accepted the same reset token twice. "
@@ -665,50 +663,25 @@ class TestTokenSingleUse:
 
     def test_pre_consumed_reset_token_rejected(self, scenario):
         """A token row with used_at already set is immediately rejected."""
-        import kerf_auth.routes as auth_routes
         from fastapi.testclient import TestClient
 
         raw = _insert_email_token_sync(scenario["uid_a"], "reset", already_used=True)
 
-        with patch.object(auth_routes, "_send_email"):
-            with TestClient(_make_app()) as client:
-                r = client.post(
-                    "/auth/reset-password",
-                    json={"token": raw, "password": "ValidPassword1!"},
-                )
+        with TestClient(_make_app()) as client:
+            r = client.post(
+                "/auth/reset-password",
+                json={"token": raw, "password": "ValidPassword1!"},
+            )
         assert r.status_code == 400, (
             f"Pre-consumed reset token should be 400, got {r.status_code}: {r.text}"
         )
 
-    def test_verify_token_second_use_redirects_invalid(self, scenario):
-        """A verify-email token accepted once is rejected on second GET."""
-        import kerf_auth.routes as auth_routes
-        from fastapi.testclient import TestClient
-
-        raw = _insert_email_token_sync(scenario["uid_b"], "verify")
-
-        with patch.object(auth_routes, "_app_url", return_value="https://app.test"):
-            with TestClient(_make_app()) as client:
-                # First use — must redirect to verified=1
-                r1 = client.get(
-                    f"/auth/verify-email?token={raw}",
-                    follow_redirects=False,
-                )
-                assert r1.status_code == 302, f"First verify: unexpected {r1.status_code}"
-                assert "verified=1" in r1.headers.get("location", ""), (
-                    f"First verify should redirect to verified=1, got: {r1.headers.get('location')}"
-                )
-                # Second use — token consumed; must redirect to verify=invalid
-                r2 = client.get(
-                    f"/auth/verify-email?token={raw}",
-                    follow_redirects=False,
-                )
-        assert r2.status_code == 302
-        location = r2.headers.get("location", "")
-        assert "verify=invalid" in location, (
-            f"TOKEN SINGLE-USE FAILURE on verify-email: second use redirected to "
-            f"'{location}' instead of verify=invalid — REAL VULNERABILITY."
-        )
+    # test_verify_token_second_use_redirects_invalid removed 2026-07-18:
+    # /auth/verify-email no longer exists. Kerf sends no email, so new
+    # accounts are auto-verified at registration instead of via an emailed
+    # token — see kerf_auth.routes.register() and decisions.md 2026-07-18
+    # "accounts shrink to the box". Single-use-token coverage for the
+    # 'reset' kind (the only email_tokens kind still issued) remains above.
 
 
 # ===========================================================================
@@ -719,7 +692,6 @@ class TestTokenExpiry:
 
     def test_expired_reset_token_is_400(self, scenario):
         """POST /auth/reset-password with expired token → 400."""
-        import kerf_auth.routes as auth_routes
         from fastapi.testclient import TestClient
 
         raw = _insert_email_token_sync(
@@ -727,37 +699,18 @@ class TestTokenExpiry:
             expire_in=timedelta(hours=-2),  # already expired
         )
 
-        with patch.object(auth_routes, "_send_email"):
-            with TestClient(_make_app()) as client:
-                r = client.post(
-                    "/auth/reset-password",
-                    json={"token": raw, "password": "ValidPassword1!"},
-                )
+        with TestClient(_make_app()) as client:
+            r = client.post(
+                "/auth/reset-password",
+                json={"token": raw, "password": "ValidPassword1!"},
+            )
         assert r.status_code == 400, (
             f"Expired reset token should be 400, got {r.status_code}: {r.text}"
         )
 
-    def test_expired_verify_token_redirects_invalid(self, scenario):
-        """GET /auth/verify-email with expired token → redirect to verify=invalid."""
-        import kerf_auth.routes as auth_routes
-        from fastapi.testclient import TestClient
-
-        raw = _insert_email_token_sync(
-            scenario["uid_b"], "verify",
-            expire_in=timedelta(hours=-2),  # already expired
-        )
-
-        with patch.object(auth_routes, "_app_url", return_value="https://app.test"):
-            with TestClient(_make_app()) as client:
-                r = client.get(
-                    f"/auth/verify-email?token={raw}",
-                    follow_redirects=False,
-                )
-        assert r.status_code == 302
-        location = r.headers.get("location", "")
-        assert "verify=invalid" in location, (
-            f"Expired verify token should redirect to verify=invalid, got: {location}"
-        )
+    # test_expired_verify_token_redirects_invalid removed 2026-07-18:
+    # /auth/verify-email no longer exists — see the note in
+    # TestTokenSingleUse above.
 
 
 # ===========================================================================

@@ -97,8 +97,7 @@ def test_c01_valid_token_returns_200_with_tokens():
     _patch_valid_reset(conn)
     with patch.object(auth, "get_pool_required", AsyncMock(return_value=_fake_pool(conn))), \
          patch.object(auth, "issue_tokens", AsyncMock(return_value=("acc-tok", "ref-tok"))), \
-         patch.object(auth, "get_default_workspace", AsyncMock(return_value=(None, False))), \
-         patch.object(auth, "_send_email"):
+         patch.object(auth, "get_default_workspace", AsyncMock(return_value=(None, False))):
         c = TestClient(_app())
         r = c.post("/auth/reset-password", json={"token": "goodtoken", "password": "newpassword1"})
     assert r.status_code == 200
@@ -189,8 +188,7 @@ def test_c08_successful_reset_marks_token_consumed():
     _patch_valid_reset(conn)
     with patch.object(auth, "get_pool_required", AsyncMock(return_value=_fake_pool(conn))), \
          patch.object(auth, "issue_tokens", AsyncMock(return_value=("at", "rt"))), \
-         patch.object(auth, "get_default_workspace", AsyncMock(return_value=(None, False))), \
-         patch.object(auth, "_send_email"):
+         patch.object(auth, "get_default_workspace", AsyncMock(return_value=(None, False))):
         c = TestClient(_app())
         c.post("/auth/reset-password", json={"token": "goodtoken", "password": "newpassword1"})
     sqls = " ".join(str(call.args[0]) for call in conn.execute.await_args_list)
@@ -206,8 +204,7 @@ def test_c09_successful_reset_updates_password_hash():
     _patch_valid_reset(conn)
     with patch.object(auth, "get_pool_required", AsyncMock(return_value=_fake_pool(conn))), \
          patch.object(auth, "issue_tokens", AsyncMock(return_value=("at", "rt"))), \
-         patch.object(auth, "get_default_workspace", AsyncMock(return_value=(None, False))), \
-         patch.object(auth, "_send_email"):
+         patch.object(auth, "get_default_workspace", AsyncMock(return_value=(None, False))):
         c = TestClient(_app())
         c.post("/auth/reset-password", json={"token": "goodtoken", "password": "newpassword1"})
     sqls = " ".join(str(call.args[0]) for call in conn.execute.await_args_list)
@@ -223,8 +220,7 @@ def test_c10_successful_reset_revokes_existing_sessions():
     _patch_valid_reset(conn)
     with patch.object(auth, "get_pool_required", AsyncMock(return_value=_fake_pool(conn))), \
          patch.object(auth, "issue_tokens", AsyncMock(return_value=("at", "rt"))), \
-         patch.object(auth, "get_default_workspace", AsyncMock(return_value=(None, False))), \
-         patch.object(auth, "_send_email"):
+         patch.object(auth, "get_default_workspace", AsyncMock(return_value=(None, False))):
         c = TestClient(_app())
         c.post("/auth/reset-password", json={"token": "goodtoken", "password": "newpassword1"})
     sqls = " ".join(str(call.args[0]) for call in conn.execute.await_args_list)
@@ -251,8 +247,7 @@ def test_c11_reset_is_bound_to_tokens_user_id():
 
     with patch.object(auth, "get_pool_required", AsyncMock(return_value=_fake_pool(conn))), \
          patch.object(auth, "issue_tokens", AsyncMock(return_value=("at", "rt"))), \
-         patch.object(auth, "get_default_workspace", AsyncMock(return_value=(None, False))), \
-         patch.object(auth, "_send_email"):
+         patch.object(auth, "get_default_workspace", AsyncMock(return_value=(None, False))):
         c = TestClient(_app())
         r = c.post("/auth/reset-password", json={"token": "user_a_token", "password": "newpassword1"})
 

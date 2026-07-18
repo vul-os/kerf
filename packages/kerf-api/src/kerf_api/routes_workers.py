@@ -318,7 +318,7 @@ async def claim_job(
                 row = await conn.fetchrow(
                     """
                     SELECT id, user_id, scene_blob_hash, preset,
-                           samples_total, billing_bucket
+                           samples_total
                     FROM render_jobs
                     WHERE status = 'queued'
                       AND (preferred_worker_id = $1 OR preferred_worker_id IS NULL)
@@ -377,7 +377,6 @@ async def claim_job(
                 "scene_blob_hash": row["scene_blob_hash"],
                 "preset": row["preset"],
                 "samples_total": row["samples_total"],
-                "billing_bucket": row["billing_bucket"],
                 "result_key": result_key,
                 "signed_upload_url": signed_upload_url,
                 "result_ttl_seconds": result_ttl_seconds,
@@ -419,7 +418,7 @@ async def complete_job(
 
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT id, user_id, preset, billing_bucket, status FROM render_jobs WHERE id = $1",
+            "SELECT id, user_id, preset, status FROM render_jobs WHERE id = $1",
             job_id,
         )
     if row is None:
@@ -427,7 +426,6 @@ async def complete_job(
     if row["status"] not in ("running", "queued"):
         raise HTTPException(status_code=409, detail=f"Job is already {row['status']}")
 
-    billing_bucket = row["billing_bucket"] or "kerf_paid"
     user_id = str(row["user_id"]) if row["user_id"] else None
     preset = row["preset"] or "standard"
 
@@ -518,7 +516,6 @@ async def complete_job(
 
     # Kerf has no billing anywhere — GPU render jobs always run on the
     # user's own hardware (BYO), so there is never a credit charge here.
-    # ``billing_bucket`` is kept only as a legacy label on the row.
     charged = False
     charge_result: Dict[str, Any] = {}
     logger.info(
@@ -527,13 +524,12 @@ async def complete_job(
     )
 
     logger.info(
-        "complete_job: worker=%s job=%s billing_bucket=%s charged=%s completion_path=%s",
-        worker_id, job_id, billing_bucket, charged, completion_path,
+        "complete_job: worker=%s job=%s charged=%s completion_path=%s",
+        worker_id, job_id, charged, completion_path,
     )
     return {
         "ok": True,
         "charged": charged,
-        "billing_bucket": billing_bucket,
         "completion_path": completion_path,
         "charge_result": None,
     }

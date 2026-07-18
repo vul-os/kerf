@@ -16,7 +16,10 @@ This test:
 3. Reads back expires_at and asserts it is within 5 s of the expected UTC
    instant (not shifted by ±2 h).
 4. Asserts a freshly issued token is NOT considered expired by the DB query
-   that the /verify-email and /reset-password routes use.
+   that the /reset-password route uses (the only email_tokens kind still
+   issued — Kerf sends no email, so accounts are auto-verified at
+   registration instead of via an emailed 'verify' token; decisions.md
+   2026-07-18 "accounts shrink to the box").
 
 Requires DATABASE_URL to be set; skips otherwise.
 """
@@ -76,11 +79,19 @@ class TestEmailTokenTZRoundTrip:
 
     def test_email_token_expires_at_is_correct_utc_instant(self):
         """_create_email_token writes a tz-aware expires_at; read-back in a
-        Africa/Johannesburg session must match the original UTC instant."""
+        Africa/Johannesburg session must match the original UTC instant.
+
+        Exercises the 'reset' kind — the only one still issued now that
+        Kerf sends no email and accounts are auto-verified at registration
+        (decisions.md 2026-07-18 "accounts shrink to the box"; a 'verify'
+        kind token is never created any more). ``_create_email_token``'s
+        tz-correctness is kind-agnostic, so this is exactly the same
+        regression coverage the original 'verify'-kind version had.
+        """
         _skip_no_db()
 
         import asyncpg
-        from kerf_auth.routes import _create_email_token, VERIFY_TOKEN_TTL
+        from kerf_auth.routes import _create_email_token, RESET_TOKEN_TTL
 
         async def _run():
             pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=2)
@@ -90,14 +101,14 @@ class TestEmailTokenTZRoundTrip:
                     try:
                         # Record the expected expiry BEFORE the insert.
                         before = datetime.now(timezone.utc)
-                        expected_expires = before + VERIFY_TOKEN_TTL
+                        expected_expires = before + RESET_TOKEN_TTL
 
                         # Force the session timezone to Africa/Johannesburg (UTC+2).
                         # This is exactly the environment that triggered the original bug.
                         await conn.execute("SET TIME ZONE 'Africa/Johannesburg'")
 
                         # Call the production code path.
-                        await _create_email_token(conn, user_id, "verify", VERIFY_TOKEN_TTL)
+                        await _create_email_token(conn, user_id, "reset", RESET_TOKEN_TTL)
 
                         # Read back; AT TIME ZONE 'UTC' ensures we compare apples to apples.
                         row = await conn.fetchrow(
@@ -120,43 +131,6 @@ class TestEmailTokenTZRoundTrip:
                         # Sanity: the stored instant must NOT be 2 h off (the old bug amount).
                         assert delta < 7200 * 0.9, (
                             "expires_at is shifted by ~2 h — tz-aware fix not applied"
-                        )
-                    finally:
-                        await _teardown_user(conn, user_id)
-            finally:
-                await pool.close()
-
-        asyncio.run(_run())
-
-    def test_fresh_email_token_not_expired_in_johannesburg_session(self):
-        """A freshly inserted verify token must pass the DB expiry check
-        (`expires_at > now()`) even when the session timezone is UTC+2."""
-        _skip_no_db()
-
-        import asyncpg
-        from kerf_auth.routes import _create_email_token, VERIFY_TOKEN_TTL, hash_token
-
-        async def _run():
-            pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=2)
-            try:
-                async with pool.acquire() as conn:
-                    user_id = await _setup_user(conn)
-                    try:
-                        await conn.execute("SET TIME ZONE 'Africa/Johannesburg'")
-
-                        raw = await _create_email_token(conn, user_id, "verify", VERIFY_TOKEN_TTL)
-
-                        # Replicate the exact query used by /verify-email.
-                        row = await conn.fetchrow(
-                            "SELECT id, user_id FROM email_tokens "
-                            "WHERE token_hash = $1 AND kind = 'verify' "
-                            "  AND used_at IS NULL AND expires_at > now()",
-                            hash_token(raw),
-                        )
-                        assert row is not None, (
-                            "Fresh verify token was considered expired immediately — "
-                            "timezone bug still present: expires_at is in the past "
-                            "relative to the UTC+2 session's now()"
                         )
                     finally:
                         await _teardown_user(conn, user_id)

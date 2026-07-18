@@ -690,8 +690,8 @@ class SelfHostedWorkerBackend:
                 """
                 INSERT INTO render_jobs
                     (id, user_id, scene_blob_hash, preset, status,
-                     preferred_worker_id, billing_bucket)
-                VALUES ($1, $2, $3, $4, 'queued', $5, 'byo')
+                     preferred_worker_id)
+                VALUES ($1, $2, $3, $4, 'queued', $5)
                 ON CONFLICT (id) DO NOTHING
                 """,
                 job_id, user_id, scene_blob_hash, preset, self._worker_id,

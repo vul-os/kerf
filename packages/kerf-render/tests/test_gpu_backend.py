@@ -472,7 +472,7 @@ class TestSelfHostedWorkerBackend:
         ext_id = run(b.submit(job))
         assert ext_id == "j-abc"
         sqls = [ex[0] for ex in pool.conn.executions]
-        assert any("billing_bucket" in s for s in sqls)
+        assert any("INSERT INTO render_jobs" in s for s in sqls)
 
     def test_submit_generates_job_id_if_absent(self):
         pool = _FakePool()

@@ -184,29 +184,89 @@ class TestWorkshopFeed:
 
 
 # ---------------------------------------------------------------------------
-# pin / unpin
+# pin / unpin / hydrate — durable pinning (§22.5.3 swarm fetch)
 # ---------------------------------------------------------------------------
+#
+# Deeper swarm-fetch scenarios (multi-gateway rotate, partial hydration,
+# retry, IPFS fallback) are exercised directly against
+# kerf_pub.client.PubClient.hydrate_pin in test_pin_hydration.py; these are
+# the node-local /api/pub/pin/* HTTP-endpoint-level tests.
 
 class TestPin:
-    def test_pin_then_unpin(self):
+    def test_pin_already_local_content_hydrates_with_zero_gateways(self):
+        # Content published on THIS node is already fully local — pinning it
+        # needs no network call at all, even with zero follows/gateways
+        # configured (the zero-socket path that still succeeds).
+        store = InMemoryPubStore()
+        publisher = Identity.generate()
+        client = PubClient(store=store, identity=publisher)
+        aid = asyncio.run(client.publish({"native": b"already-local-bytes" * 10}))
+        # publish() pins as a side effect; reset so the endpoint has real work.
+        asyncio.run(store.set_pinned(aid, False))
+
+        tc = _app(store)
+        aid_b64 = _b64(aid)
+        pin_r = tc.post(f"/api/pub/pin/{aid_b64}")
+        assert pin_r.status_code == 200, pin_r.text
+        body = pin_r.json()
+        assert body == {
+            "announce_id": aid_b64, "pinned": True, "hydrated": True, "missing_chunks": 0,
+        }
+
+        avail = asyncio.run(store.get_availability(aid))
+        assert avail.local_pinned is True
+
+        unpin_r = tc.delete(f"/api/pub/pin/{aid_b64}")
+        assert unpin_r.status_code == 200
+        assert unpin_r.json()["pinned"] is False
+        avail2 = asyncio.run(store.get_availability(aid))
+        assert avail2.local_pinned is False
+
+    def test_pin_zero_socket_unknown_announce_is_a_clear_400(self):
+        # No follows (so no gateways at all) and an announce that is neither
+        # local nor fetchable anywhere: MUST fail loudly, never a silent
+        # 200 {"pinned": true} no-op (the pre-hydration behavior this
+        # replaces).
         store = InMemoryPubStore()
         tc = _app(store)
         fake_aid = b"\x12" + secrets.token_bytes(32)
         aid_b64 = _b64(fake_aid)
 
         pin_r = tc.post(f"/api/pub/pin/{aid_b64}")
-        assert pin_r.status_code == 200
-        assert pin_r.json()["pinned"] is True
+        assert pin_r.status_code == 400
+        assert "gateway" in pin_r.json()["detail"].lower()
 
         avail = asyncio.run(store.get_availability(fake_aid))
-        assert avail.local_pinned is True
+        assert avail.local_pinned is False
 
-        unpin_r = tc.delete(f"/api/pub/pin/{aid_b64}")
-        assert unpin_r.status_code == 200
-        assert unpin_r.json()["pinned"] is False
+    def test_hydrate_endpoint_retries_and_reuses_follow_gateway_ordering(self, monkeypatch):
+        # A follow's own gateway_url is what a real pin would swarm-fetch
+        # through; here it is configured but never actually serves anything
+        # (monkeypatched to simulate every request 404-ing), so the
+        # /hydrate retry endpoint still surfaces a structured (non-200-lying)
+        # result for a locally-unknown announce — exercising
+        # _ordered_gateways_for's follow-lookup path without opening a real
+        # socket in this test.
+        from kerf_pub.client import PubClient
+        monkeypatch.setattr(PubClient, "_http_get", staticmethod(lambda url: None))
 
-        avail2 = asyncio.run(store.get_availability(fake_aid))
-        assert avail2.local_pinned is False
+        store = InMemoryPubStore()
+        publisher = Identity.generate()
+        pub_b64 = _b64(publisher.pub)
+        tc = _app(store)
+        tc.post("/api/pub/follows", json={
+            "pub": pub_b64, "label": "Alice", "gateway_url": "https://nowhere.invalid",
+        })
+
+        fake_aid = b"\x12" + secrets.token_bytes(32)
+        aid_b64 = _b64(fake_aid)
+        r = tc.post(f"/api/pub/pin/{aid_b64}/hydrate")
+        # A configured-but-unresponsive gateway is a network failure per
+        # object, not a zero-socket condition — PubClient.online is True
+        # (len(gateways) > 0), so hydrate_pin resolves nothing and raises
+        # ERR_PUB_NOT_SERVED ("not found on any configured gateway"), which
+        # the endpoint still reports as a clear 400, not a fabricated 200.
+        assert r.status_code == 400
 
 
 # ===========================================================================

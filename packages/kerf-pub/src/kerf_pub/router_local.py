@@ -17,7 +17,11 @@ here and checks workspace membership like any other project route.
 Zero-socket invariant: every read here serves from the local
 :class:`~kerf_pub.store.PubStore` first; a network call to a followed feed's
 ``gateway_url`` is only attempted when that follow configured one (see
-``GET /api/pub/workshop``).
+``GET /api/pub/workshop``). Pin hydration (``POST /api/pub/pin/{id}``,
+``POST /api/pub/pin/{id}/hydrate``) extends the same invariant: with no
+gateway configured anywhere, pinning a non-local announce fails with a clear
+400 rather than a silent no-op (:func:`_do_hydrate`,
+:meth:`kerf_pub.client.PubClient.hydrate_pin`).
 """
 
 from __future__ import annotations
@@ -41,9 +45,10 @@ from .assembly import (
     list_own_assembly_candidates,
     walk_bom,
 )
-from .client import PubClient
+from .client import PubClient, HydrationResult
 from .errors import PubError, ProfileError
 from .identity import Identity, default_key_path
+from .ipfs import default_ipfs_gateway_url
 from .objects import (
     ArtifactFormat,
     ArtifactMetadata,
@@ -601,20 +606,95 @@ async def assembly_candidates(project_id: str, request: Request, payload: dict =
 
 
 # ---------------------------------------------------------------------------
-# POST/DELETE /api/pub/pin/{announce_id}
+# POST/DELETE /api/pub/pin/{announce_id}, POST /api/pub/pin/{announce_id}/hydrate
 # ---------------------------------------------------------------------------
+#
+# Pinning is durable, not a flag flip: POST /pin walks the swarm — the
+# followed author's own gateway first, then every other followed gateway
+# (deduped), then the per-node IPFS fetch-adapter for chunk bytes if
+# configured (kerf_pub.ipfs) — fetching and self-verifying every manifest and
+# chunk the announce names before it reports success (kerf_pub.client.
+# PubClient.hydrate_pin, §22.5.3). POST /pin/{id}/hydrate re-runs the exact
+# same walk to retry a pin that came back incomplete.
+
+
+async def _ordered_gateways_for(store: PubStore, announce_id: bytes) -> list[str]:
+    """Gateway URLs to try, in order: the followed author's OWN gateway_url
+    first (learned from a locally-known copy of the announce, if any), then
+    every other follow's non-empty gateway_url, deduplicated by URL. When the
+    announce isn't locally known yet, the author can't be identified without
+    fetching it first, so every followed gateway is offered in follow order —
+    hydrate_pin() still finds and verifies the announce through whichever one
+    happens to serve it."""
+    follows = await store.list_follows()
+    ordered: list[str] = []
+
+    def _add(url: str | None) -> None:
+        if url and url not in ordered:
+            ordered.append(url)
+
+    primary_pub: bytes | None = None
+    local_raw = await store.get_announce(announce_id)
+    if local_raw is not None:
+        try:
+            primary_pub = PubAnnounce.from_cbor(local_raw).pub
+        except PubError:
+            primary_pub = None
+
+    if primary_pub is not None:
+        for f in follows:
+            if f["pub"] == primary_pub:
+                _add(f.get("gateway_url"))
+
+    for f in follows:
+        _add(f.get("gateway_url"))
+
+    return ordered
+
+
+async def _do_hydrate(store: PubStore, aid: bytes) -> HydrationResult:
+    gateways = await _ordered_gateways_for(store, aid)
+    client = PubClient(
+        store=store, identity=None, gateways=gateways,
+        ipfs_gateway_url=default_ipfs_gateway_url(),
+    )
+    try:
+        return await client.hydrate_pin(aid)
+    except PubError as exc:
+        # Zero-socket / not-found: a clear 400, never a silent 200 (§22.5.1's
+        # "pin cannot silently no-op" requirement).
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+def _hydration_response(announce_id: str, result: HydrationResult) -> dict:
+    out: dict = {
+        "announce_id": announce_id,
+        "pinned": result.pinned,
+        "hydrated": result.hydrated,
+        "missing_chunks": result.missing_chunks,
+    }
+    if result.error:
+        out["error"] = result.error
+    return out
 
 
 @router.post("/pin/{announce_id}")
 async def pin(announce_id: str, request: Request, payload: dict = Depends(require_auth)):
     aid = _b64url_decode(announce_id)
     store = _store(request)
-    # Marks local availability state. Actually walking followed gateways to
-    # hydrate the manifest + chunk bytes into the local store (the full
-    # ADR §6 "pinning fetches the object" behavior) is the P1 swarm-fetch
-    # work — out of scope for this node-local convenience wave.
-    await store.set_pinned(aid, True)
-    return {"announce_id": announce_id, "pinned": True}
+    result = await _do_hydrate(store, aid)
+    return _hydration_response(announce_id, result)
+
+
+@router.post("/pin/{announce_id}/hydrate")
+async def hydrate_pin(announce_id: str, request: Request, payload: dict = Depends(require_auth)):
+    """Retry hydration of a pin that previously came back incomplete
+    (``hydrated: false``) — identical walk to ``POST /pin/{id}``, exposed
+    separately so a client can distinguish "pin this" from "try again"."""
+    aid = _b64url_decode(announce_id)
+    store = _store(request)
+    result = await _do_hydrate(store, aid)
+    return _hydration_response(announce_id, result)
 
 
 @router.delete("/pin/{announce_id}")

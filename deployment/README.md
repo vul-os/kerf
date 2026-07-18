@@ -105,7 +105,6 @@ Manager, Secrets Manager, Key Vault, App Platform secrets).
 | `LLM_ANTHROPIC_API_KEY` | Anthropic API key for AI features |
 | `CLOUD_PAYSTACK_SECRET_KEY` | Paystack billing (hosted deployments) |
 | `CLOUD_PAYSTACK_PUBLIC_KEY` | Paystack billing (hosted deployments) |
-| `CLOUD_ENABLED` | Set to `true` for hosted deployments |
 | `KERF_LOCAL_MODE` | Set to `false` for hosted deployments |
 
 ## Migrations

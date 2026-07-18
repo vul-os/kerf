@@ -56,7 +56,7 @@ def test_zero_workers_is_clean_noop(monkeypatch):
     workers = _build_workers(
         pool=object(), storage_getter=lambda: None,
         fem_count=0, sim_count=0, tess_count=0, cam_count=0,
-        compaction_count=0, cloud_enabled=False, local_mode=True,
+        compaction_count=0, local_mode=True,
     )
     worker_names = {type(w).__name__ for w in workers}
     assert "RateLimitGCWorker" in worker_names

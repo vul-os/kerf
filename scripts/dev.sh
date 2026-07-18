@@ -36,7 +36,6 @@ fi
 
 # ── Local-mode settings ───────────────────────────────────────────────────────
 export LOCAL_MODE=true
-export CLOUD_ENABLED=false
 
 # ── 1. Ensure Postgres is running ─────────────────────────────────────────────
 echo "▸ checking Postgres …"

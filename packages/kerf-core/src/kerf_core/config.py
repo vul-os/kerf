@@ -80,7 +80,6 @@ class Settings(BaseSettings):
     system_user_name: str = ""
     system_user_password: str = ""
 
-    cloud_enabled: bool = False
     cloud_git_prefix: str = "git"
     cloud_github_client_id: str = ""
     cloud_github_client_secret: str = ""
@@ -153,12 +152,6 @@ class Settings(BaseSettings):
                     f"FATAL: Running in env={self.env!r} with dev-default secrets. "
                     "Set JWT_SECRET and PASSWORD_PEPPER to production values."
                 )
-        return self
-
-    @model_validator(mode="after")
-    def _enforce_cloud_disables_local_mode(self):
-        if self.cloud_enabled and self.local_mode:
-            self.local_mode = False
         return self
 
     @model_validator(mode="after")

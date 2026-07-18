@@ -9,11 +9,10 @@ Node sidecar), and stores the resulting GLB in ``derived_artifacts`` keyed by
 file row's ``mesh_storage_key`` is populated so the frontend can resolve the
 mesh without going through the artifact table.
 
-This worker is **cloud-tier-only**. It must not be started when
-``settings.local_mode`` is True or ``settings.cloud_enabled`` is False — the
-OSS local-install path tessellates in the browser. Gating happens at the
-``start_all_workers`` call site in ``main.py``; this module assumes the
-caller already decided to start it.
+This worker is **server-mode-only**. It must not be started when
+``settings.local_mode`` is True — the local-install path tessellates in
+the browser. Gating happens at the ``start_all_workers`` call site in
+``main.py``; this module assumes the caller already decided to start it.
 """
 
 from __future__ import annotations

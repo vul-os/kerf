@@ -1,8 +1,8 @@
 /**
  * signup.spec.ts — sign-up + sign-in flow (cloud project).
  *
- * Runs under the Playwright `cloud` project, which boots a CLOUD_ENABLED
- * kerf-server (no local singleton auto-login) so the real /signup and
+ * Runs under the Playwright `cloud` project, which boots a kerf-server
+ * with LOCAL_MODE=false (no local singleton auto-login) so the real /signup and
  * /login pages exist. Register returns tokens immediately (no email
  * verification gate), then the app navigates to /projects.
  */

@@ -1,6 +1,6 @@
 # kerf-tess — STEP-to-GLB tessellation plugin
 
-`kerf-tess` converts STEP/B-rep files to GLB meshes for browser-side 3D rendering. It provides a `/run-tess` HTTP route, an `AutoTessWorker` for cloud-tier background pre-tessellation, and the `TessInputSpec` / `TessResult` data contracts used across the pipeline.
+`kerf-tess` converts STEP/B-rep files to GLB meshes for browser-side 3D rendering. It provides a `/run-tess` HTTP route, an `AutoTessWorker` for server-mode background pre-tessellation, and the `TessInputSpec` / `TessResult` data contracts used across the pipeline.
 
 Depends on `cad-core`. Provides `tess.step-to-glb` when pythonOCC is available; falls back to the Node.js occt-import-js sidecar otherwise.
 
@@ -14,7 +14,7 @@ async def register(app, ctx) -> PluginManifest:
     from kerf_tess.routes import router
     app.include_router(router)                      # mounts /run-tess
 
-    if ctx.cloud_enabled and not ctx.local_mode:
+    if not ctx.local_mode:
         ctx.workers.register("auto_tess", auto_tess_factory)
 
     provides = ["tess.step-to-glb"] if _OCC_AVAILABLE else []
@@ -102,9 +102,9 @@ Import from `kerf_tess.specs` to avoid a `backend` dependency.
 
 ---
 
-## AutoTessWorker (cloud tier only)
+## AutoTessWorker (server mode only)
 
-`AutoTessWorker` is registered only when `cloud_enabled=True` and `local_mode=False`. In the OSS local-install, tessellation happens in the browser.
+`AutoTessWorker` is registered only when `local_mode=False`. In a single-user local install, tessellation happens in the browser instead.
 
 ### Trigger
 

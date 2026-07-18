@@ -46,7 +46,7 @@ import ActivityTimeline from '../components/ActivityTimeline.jsx'
 import { useWorkspace, loadFilePartsForProject } from '../store/workspace.js'
 import { useWorkspaces } from '../store/workspaces.js'
 import { useAuth } from '../store/auth.js'
-import { useCloudConfig, GitPanel, PublishButton } from '../cloud/index.js'
+import { GitPanel, PublishButton } from '../cloud/index.js'
 import { runJscad, cancelJscad } from '../lib/jscadRunner.js'
 import { getTopologyLazy } from '../lib/topology.js'
 import { meshCache } from '../lib/meshCache.js'
@@ -1409,7 +1409,6 @@ export default function Editor() {
   const captureSnapshotFn = useCallback(async (opts) => {
     return currentViewRef.current?.snapshot?.(opts || { size: 512, quality: 0.7 }) ?? null
   }, [])
-  const { cloudEnabled } = useCloudConfig()
 
   const editorErrors = useMemo(
     () => w.partsError ? [w.partsError] : [],
@@ -1778,7 +1777,7 @@ export default function Editor() {
           <ExportButton onCaptureHero={() => rendererRef.current?.captureHeroShot?.({})} />
         </div>
 
-        {cloudEnabled && w.project && (
+        {w.project && (
           <>
             <button
               type="button"
@@ -1816,8 +1815,10 @@ export default function Editor() {
           </>
         )}
         {/* Publish is a core MIT node capability (distributed Workshop over
-            DMTAP-PUB) — never gated on cloudEnabled. Thumbnail refresh above
-            stays cloud-gated; it's an unrelated hosted-project convenience. */}
+            DMTAP-PUB), present unconditionally — same as thumbnail refresh
+            above (POST /api/projects/:pid/thumbnail is an ordinary MIT
+            kerf-api route backed by whichever storage backend the node
+            configures, not a hosted-only convenience). */}
         {w.project && (
           <PublishButton project={w.project} captureSnapshot={captureSnapshotFn} />
         )}
@@ -1863,7 +1864,7 @@ export default function Editor() {
             viewports are mirrored here.
               - Export:            hidden < md  → menuitem
               - Share:             hidden < lg  → menuitem
-              - Refresh thumbnail: hidden < xl  → menuitem (cloud only)
+              - Refresh thumbnail: hidden < xl  → menuitem
             The TopBarMoreMenu wrapper is `xl:hidden` so at ≥1280px all
             actions are inline and the More button disappears. */}
         <TopBarMoreMenu>
@@ -1888,8 +1889,8 @@ export default function Editor() {
             <Share2 size={12} className="text-ink-400" aria-hidden="true" />
             <span>Share</span>
           </button>
-          {/* Refresh thumbnail — visible in overflow at < xl (cloud only) */}
-          {cloudEnabled && w.project && (
+          {/* Refresh thumbnail — visible in overflow at < xl */}
+          {w.project && (
             <button
               type="button"
               role="menuitem"
@@ -2973,7 +2974,7 @@ export default function Editor() {
               <ActivityIcon size={12} /> Activity
             </button>
             {/* Git panel is a core MIT node capability (local git only, no
-                OAuth) — never gated on cloudEnabled. */}
+                OAuth), present unconditionally. */}
             <button
               type="button"
               data-testid="right-drawer-tab-git"

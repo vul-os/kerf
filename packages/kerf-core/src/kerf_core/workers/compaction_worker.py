@@ -12,13 +12,15 @@ worker:
    not themselves ``base`` rows (cross-file ``ref`` targets are also
    protected; see Part 2 logic in revisions.py).
 
-This worker is **cloud-tier-only**:
-    cloud_enabled=True  AND  local_mode=False
+This worker is **server-mode-only**: ``local_mode=False``.
 
 OSS local-install users have small revision sets (revision cap default
-200) that never need background compaction.  Gating is the caller's
-responsibility; the worker itself will raise ``RuntimeError`` at
-``__init__`` if instantiated in local mode.
+200) that never need background compaction. Any node running in server
+mode (a shared team box or an always-on node) benefits regardless of
+whether it's operated by its owner or by a third party — there is no
+separate "cloud tier" any more. Gating is the caller's responsibility;
+the worker itself will raise ``RuntimeError`` at ``__init__`` if
+instantiated in local mode.
 
 Schedule / cadence: poll every ``poll_interval`` seconds (default 300 s,
 i.e. every 5 minutes).  One chain is compacted per ``run_one`` call;
@@ -55,8 +57,8 @@ class CompactionWorker:
     """
     Background worker that lazily re-compacts long revision chains.
 
-    Instantiate via ``CompactionWorker(pool, cloud_enabled, local_mode)``
-    and call ``run(ctx)`` from an ``asyncio.TaskGroup``.
+    Instantiate via ``CompactionWorker(pool, local_mode)`` and call
+    ``run(ctx)`` from an ``asyncio.TaskGroup``.
     """
 
     name = "compaction"
@@ -64,16 +66,14 @@ class CompactionWorker:
     def __init__(
         self,
         pool: Any,
-        cloud_enabled: bool = True,
         local_mode: bool = False,
         poll_interval: float = 300.0,
         error_delay: float = 10.0,
         threshold: int = COMPACTION_THRESHOLD,
     ) -> None:
-        if not cloud_enabled or local_mode:
+        if local_mode:
             raise RuntimeError(
-                "CompactionWorker must not be started in local_mode or "
-                "when cloud_enabled=False"
+                "CompactionWorker must not be started in local_mode"
             )
         self.pool = pool
         self.poll_interval = poll_interval

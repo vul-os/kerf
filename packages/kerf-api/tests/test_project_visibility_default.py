@@ -2,7 +2,7 @@
 
 Kerf has no billing anywhere, so the old paid/free tier distinction for
 default project visibility is gone — every new project defaults to
-"private" regardless of cloud_enabled. Workshop publish (an explicit
+"private" unconditionally. Workshop publish (an explicit
 opt-in via POST /api/workshop/publish) remains the only path that makes
 a project public.
 

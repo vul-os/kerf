@@ -43,12 +43,7 @@ The two layers are complementary and coexist. See [save-and-recovery.md](/docs/s
 
 ## Manual init (self-hosted)
 
-Self-hosted Kerf installs do not run cloud git by default. The `cloud_enabled` flag in `kerf.toml` controls whether the git layer is active. If you run a self-hosted install and want git features:
-
-1. Set `cloud_enabled = true` in `kerf.toml` and configure a storage backend.
-2. Call `POST /api/projects/:pid/git/init` for any existing projects to initialise their repos.
-
-New projects created after enabling `cloud_enabled` are auto-initialised exactly as on the hosted service.
+Every Kerf node — self-hosted or `kerf.sh` — runs byte-identical software and auto-initialises git unconditionally; there is no flag that turns the git layer on or off. If a project's repo failed to initialise (see above), call `POST /api/projects/:pid/git/init` to retry — the endpoint is idempotent.
 
 ---
 
@@ -68,7 +63,7 @@ No. `file_revisions` is independent of git. Any revisions created before the aut
 
 ### Can I opt out of the git layer?
 
-On Kerf Cloud, the git layer is always active. On a self-hosted install, set `cloud_enabled = false` to skip it entirely — the file-revision layer still works.
+No — the git layer is always active on every install, hosted or self-hosted, with no opt-out flag. The `file_revisions` layer runs alongside it regardless.
 
 ---
 

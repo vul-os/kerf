@@ -1,9 +1,9 @@
 /**
- * Page-object model for /workshop (cloud-only Workshop listing).
- *
- * Workshop is a cloud-enabled feature (gated behind `cloudEnabled`). These
- * selectors are scaffolded for future specs — the actual workshop tests are
- * marked test.skip() until cloud mode is wired into the e2e environment.
+ * Page-object model for /workshop (the distributed DMTAP-PUB Workshop
+ * browser — a core MIT node capability present unconditionally, not gated
+ * behind any flag). These selectors are scaffolded for future specs; the
+ * live coverage today is `tests/e2e/specs/workshop.spec.ts`, which drives
+ * the page directly rather than through this object.
  */
 
 import { Page, Locator, expect } from '@playwright/test'

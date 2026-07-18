@@ -1,8 +1,8 @@
 """
 kerf-tess plugin entry point.
 
-Registers the /run-tess HTTP route and (when cloud_enabled and not local_mode)
-registers the AutoTessWorker with the WorkerRegistry.
+Registers the /run-tess HTTP route and (when not local_mode) registers the
+AutoTessWorker with the WorkerRegistry.
 
 Entry-point (pyproject.toml):
     [project.entry-points."kerf.plugins"]
@@ -37,7 +37,6 @@ except ImportError:
         tools = None
         workers = None
         logger = logging.getLogger("kerf_tess.ctx")
-        cloud_enabled: bool = False
         local_mode: bool = True
 
 
@@ -52,7 +51,7 @@ async def register(app, ctx: "PluginContext") -> "PluginManifest":
     """Plugin entry-point.
 
     1. Mounts the /run-tess route.
-    2. When cloud_enabled and not local_mode, registers AutoTessWorker.
+    2. When not local_mode, registers AutoTessWorker.
     3. Returns manifest; provides list is empty when pythonOCC is absent.
     """
     # ── mount route ───────────────────────────────────────────────────────────
@@ -61,10 +60,9 @@ async def register(app, ctx: "PluginContext") -> "PluginManifest":
     logger.info("kerf-tess: /run-tess route mounted")
 
     # ── worker registration ───────────────────────────────────────────────────
-    cloud_enabled = getattr(ctx, "cloud_enabled", False)
     local_mode = getattr(ctx, "local_mode", True)
 
-    if cloud_enabled and not local_mode:
+    if not local_mode:
         try:
             from kerf_tess.worker import AutoTessWorker
 
@@ -91,8 +89,7 @@ async def register(app, ctx: "PluginContext") -> "PluginManifest":
             logger.exception("kerf-tess: failed to register AutoTessWorker: %s", exc)
     else:
         logger.info(
-            "kerf-tess: cloud worker skipped (cloud_enabled=%s local_mode=%s)",
-            cloud_enabled,
+            "kerf-tess: auto-tess worker skipped (local_mode=%s)",
             local_mode,
         )
 

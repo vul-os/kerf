@@ -70,9 +70,6 @@ vi.mock('react-router-dom', () => ({
 }))
 
 vi.mock('../../components/ShareModal.jsx', () => ({ default: null }))
-vi.mock('../../cloud/useCloudConfig.js', () => ({
-  useCloudConfig: () => ({ cloudEnabled: false }),
-}))
 vi.mock('../../lib/projectTags.js', () => ({
   STARTER_OPTIONS: [],
   DEFAULT_STARTER: 'empty',

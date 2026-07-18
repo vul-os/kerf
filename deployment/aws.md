@@ -166,8 +166,7 @@ Save the following as `task-definition.json`, replacing placeholders:
         {"name": "ENV", "value": "cloud"},
         {"name": "PORT", "value": "8080"},
         {"name": "STORAGE_BACKEND", "value": "s3"},
-        {"name": "KERF_STORAGE_S3_REGION", "value": "af-south-1"},
-        {"name": "CLOUD_ENABLED", "value": "true"}
+        {"name": "KERF_STORAGE_S3_REGION", "value": "af-south-1"}
       ],
       "secrets": [
         {"name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:af-south-1:<ACCOUNT>:secret:kerf/prod:DATABASE_URL::"},
@@ -267,8 +266,7 @@ aws apprunner create-service \
         "RuntimeEnvironmentVariables": {
           "ENV": "cloud",
           "STORAGE_BACKEND": "s3",
-          "KERF_STORAGE_S3_REGION": "af-south-1",
-          "CLOUD_ENABLED": "true"
+          "KERF_STORAGE_S3_REGION": "af-south-1"
         },
         "RuntimeEnvironmentSecrets": {
           "DATABASE_URL": "arn:aws:secretsmanager:...",

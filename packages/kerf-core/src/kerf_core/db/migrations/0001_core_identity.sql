@@ -30,8 +30,6 @@ create table if not exists users (
     avatar_updated_at timestamptz,
     -- folded from 017_user_preferences.sql (0003)
     preferences jsonb not null default '{}'::jsonb,
-    -- folded from 051_billing_buckets.sql (0008)
-    prefer_byo boolean not null default false,
     -- folded from 061_user_github_id.sql (0009)
     github_id text,
     created_at timestamptz not null default now()

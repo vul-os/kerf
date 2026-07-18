@@ -106,7 +106,6 @@ class PluginContext:
     tools: ToolRegistry
     workers: WorkerRegistry
     logger: Any  # structlog.BoundLogger
-    cloud_enabled: bool
     local_mode: bool
 
 

@@ -97,22 +97,22 @@ const GmatViewer = lazy(() => import('./routes/GmatViewer.jsx'))
 const SchematicEditor = lazy(() => import('./routes/SchematicEditor.jsx'))
 
 // Node-capability surface — Workshop (distributed DMTAP-PUB feeds) is a
-// core MIT capability and is never gated on cloudEnabled; only AdminEmail
-// still is. useCloudConfig stays eager (we need it before any route
-// renders) but is imported from its own file so the rest of cloud/ doesn't
-// end up in the initial chunk; the route components themselves lazy-import
-// their own modules and become their own chunks.
+// core MIT capability present unconditionally, like every other route
+// below; there is no "cloud edition" to gate anything behind. useCloudConfig
+// stays eager (we need it before any route renders) but is imported from
+// its own file so the rest of cloud/ doesn't end up in the initial chunk;
+// the route components themselves lazy-import their own modules and
+// become their own chunks.
 import { useCloudConfig } from './cloud/useCloudConfig.js'
 const Workshop = lazy(() =>
   import('./cloud/Workshop.jsx').then((m) => ({ default: m.Workshop })),
 )
-const AdminEmail = lazy(() => import('./cloud/AdminEmail.jsx'))
 
 import { useAuth } from './store/auth.js'
 import { api } from './lib/api.js'
 
 export default function App() {
-  const { cloudEnabled, localMode, ready: cloudConfigReady } = useCloudConfig()
+  const { localMode, ready: cloudConfigReady } = useCloudConfig()
   const tryBootstrap = useAuth((s) => s.tryBootstrap)
   const tryBootstrapLocal = useAuth((s) => s.tryBootstrapLocal)
   const setSession = useAuth((s) => s.setSession)
@@ -227,7 +227,7 @@ export default function App() {
       {/* Cross-tool domain matrix pages */}
       <Route path="/compare/by-domain/:slug" element={<CompareByDomain />} />
       {/* Workshop is the distributed DMTAP-PUB feed browser — a core MIT
-          node capability, never gated behind cloudEnabled. */}
+          node capability, present unconditionally on every node. */}
       <Route path="/workshop" element={<Workshop />} />
       <Route path="/domains/jewelry" element={<JewelryDomainPage />} />
       <Route path="/jewelry-configurator" element={<JewelryConfigurator />} />
@@ -272,13 +272,12 @@ export default function App() {
         <Route path="/projects/:projectId/files/:fileId" element={<Editor />} />
         <Route path="/projects/:projectId/bom" element={<BOMPage />} />
         {/* Library (parts catalog) is a design capability, not a hosted
-            convenience — never gated behind cloudEnabled (it's backed by
-            the MIT kerf-api /api/library/parts route). */}
+            convenience — present unconditionally (it's backed by the MIT
+            kerf-api /api/library/parts route). */}
         <Route path="/library" element={<Library />} />
         <Route path="/library/:slug" element={<LibraryPart />} />
         <Route path="/admin/distributors" element={<AdminDistributors />} />
         <Route path="/admin/publishers" element={<AdminPublishers />} />
-        {cloudEnabled && <Route path="/admin/email" element={<AdminEmail />} />}
       </Route>
 
       <Route path="/pathtracer" element={<PathTracer />} />

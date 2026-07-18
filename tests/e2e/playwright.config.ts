@@ -51,9 +51,10 @@ export default defineConfig({
 
   // Two project profiles against two server stacks:
   //   local — LOCAL_MODE singleton auto-login (:5174 → :8081)
-  //   cloud — CLOUD_ENABLED, real signup/login + Workshop/Library (:5175 → :8082)
-  // Specs that need the public auth surface / cloud features run under
-  // `cloud`; everything else under `local`.
+  //   cloud — LOCAL_MODE=false, real signup/login + Workshop/Library (:5175 → :8082)
+  // Specs that need the public auth surface run under `cloud`; everything
+  // else under `local`. "cloud" here just means "server mode" — Workshop
+  // and Library are core MIT node capabilities present in both projects.
   projects: [
     {
       name: 'local',
@@ -120,13 +121,11 @@ export default defineConfig({
       stderr: 'pipe',
     },
     {
-      // Cloud backend on :8082 — CLOUD_ENABLED, no local auto-login, so the
-      // real /signup + /login surface and Workshop/Library routes exist.
-      // CLOUD_BETA=true keeps billing dormant (no Paystack needed for e2e).
+      // Cloud backend on :8082 — LOCAL_MODE=false, no local auto-login, so
+      // the real /signup + /login surface exists. Workshop/Library are
+      // unconditional node capabilities in every mode.
       command:
         'KERF_PORT=8082 KERF_LOCAL_MODE=false LOCAL_MODE=false ' +
-        'CLOUD_ENABLED=true KERF_CLOUD_ENABLED=true ' +
-        'CLOUD_BETA=true KERF_CLOUD_BETA=true ' +
         'CORS_ORIGIN=http://localhost:5175 ' +
         (process.env.DATABASE_URL
           ? `KERF_DATABASE_URL=${process.env.DATABASE_URL} ` +

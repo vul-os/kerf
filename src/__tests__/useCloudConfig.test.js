@@ -44,7 +44,6 @@ afterEach(() => {
 describe('/api/config OAuth fields — full server response', () => {
   it('googleEnabled is true when google_enabled=true in response', async () => {
     mockConfigFetch({
-      cloud_enabled: true,
       local_mode: false,
       google_client_id: 'goog-abc.apps.googleusercontent.com',
       google_enabled: true,
@@ -60,7 +59,6 @@ describe('/api/config OAuth fields — full server response', () => {
 
   it('googleEnabled is false when google_enabled=false in response', async () => {
     mockConfigFetch({
-      cloud_enabled: true,
       local_mode: false,
       google_client_id: '',
       google_enabled: false,
@@ -76,7 +74,6 @@ describe('/api/config OAuth fields — full server response', () => {
 
   it('githubEnabled is true when github_enabled=true in response', async () => {
     mockConfigFetch({
-      cloud_enabled: true,
       local_mode: false,
       google_enabled: false,
       github_enabled: true,
@@ -91,7 +88,6 @@ describe('/api/config OAuth fields — full server response', () => {
 
   it('githubEnabled is false when github_enabled=false', async () => {
     mockConfigFetch({
-      cloud_enabled: false,
       local_mode: true,
       github_enabled: false,
       github_client_id: '',
@@ -107,7 +103,6 @@ describe('/api/config OAuth fields — full server response', () => {
     // The response we parse should not propagate any secret-named key into
     // the store. We verify by checking none of these keys land on the store.
     mockConfigFetch({
-      cloud_enabled: true,
       local_mode: false,
       google_client_id: 'goog-abc.apps.googleusercontent.com',
       google_enabled: true,
@@ -125,9 +120,8 @@ describe('/api/config OAuth fields — full server response', () => {
     expect(s).not.toHaveProperty('githubClientSecret')
   })
 
-  it('existing fields (cloudEnabled, localMode) are unchanged', async () => {
+  it('existing field (localMode) is unchanged', async () => {
     mockConfigFetch({
-      cloud_enabled: true,
       local_mode: false,
       google_enabled: false,
       github_enabled: false,
@@ -135,7 +129,6 @@ describe('/api/config OAuth fields — full server response', () => {
     const { getCloudConfig } = await freshStore()
     await getCloudConfig().fetch()
     const s = getCloudConfig()
-    expect(s.cloudEnabled).toBe(true)
     expect(s.localMode).toBe(false)
     expect(s.ready).toBe(true)
   })
@@ -145,7 +138,6 @@ describe('/api/config OAuth fields — backwards-compat (older server)', () => {
   it('googleEnabled falls back to whether google_client_id is non-empty', async () => {
     // Older binary: no google_enabled / github_enabled fields in response.
     mockConfigFetch({
-      cloud_enabled: true,
       local_mode: false,
       google_client_id: 'goog-abc.apps.googleusercontent.com',
     })
@@ -159,7 +151,6 @@ describe('/api/config OAuth fields — backwards-compat (older server)', () => {
 
   it('googleEnabled is false when google_client_id absent in older response', async () => {
     mockConfigFetch({
-      cloud_enabled: false,
       local_mode: true,
     })
     const { getCloudConfig } = await freshStore()
@@ -179,6 +170,6 @@ describe('/api/config failure handling', () => {
     expect(s.ready).toBe(true)
     expect(s.googleEnabled).toBe(false)
     expect(s.githubEnabled).toBe(false)
-    expect(s.cloudEnabled).toBe(false)
+    expect(s.localMode).toBe(true)
   })
 })

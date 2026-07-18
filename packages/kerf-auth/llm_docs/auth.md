@@ -35,7 +35,7 @@ async def register(app, ctx) -> PluginManifest:
 | GET | `/auth/me` | Return the authenticated user + default workspace. |
 | GET | `/auth/google` | Redirect to Google OAuth consent screen. |
 | GET | `/auth/google/callback` | Exchange Google code for user. Auto-creates account on first sign-in. |
-| GET | `/auth/github/login` | Redirect to GitHub OAuth (cloud-only, requires `cloud_enabled`). |
+| GET | `/auth/github/login` | Redirect to GitHub OAuth (requires `cloud_github_client_id`/`cloud_github_client_secret` to be configured — a node feature, any self-hoster can supply their own app). |
 | GET | `/auth/github/callback` | Exchange GitHub code. Saves encrypted GitHub token to DB. |
 
 ### `/api/api-tokens` — long-lived API tokens
@@ -102,9 +102,9 @@ def hash_password(password: str) -> str:
 
 ---
 
-## GitHub OAuth flow (cloud)
+## GitHub OAuth flow
 
-GitHub OAuth is only mounted when `cloud_enabled=True`. The flow:
+GitHub OAuth routes are always mounted; they 503 until `cloud_github_client_id`/`cloud_github_client_secret` are configured — any self-hoster can supply their own GitHub OAuth app, the same way they'd supply their own Postgres. The flow:
 
 1. `GET /auth/github/login` — redirect to `github.com/login/oauth/authorize`
 2. User authorises → GitHub redirects to `/auth/github/callback?code=…`

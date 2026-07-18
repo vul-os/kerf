@@ -237,7 +237,6 @@ az containerapp create \
     ENV=cloud \
     PORT=8080 \
     STORAGE_BACKEND=s3 \
-    CLOUD_ENABLED=true \
   --secrets \
     database-url=keyvaultref:https://${KV_NAME}.vault.azure.net/secrets/database-url,identityref:${IDENTITY_ID} \
     jwt-secret=keyvaultref:https://${KV_NAME}.vault.azure.net/secrets/jwt-secret,identityref:${IDENTITY_ID} \
@@ -303,7 +302,6 @@ az containerapp create \
   --env-vars \
     KERF_WORKERS_ONLY=true \
     STORAGE_BACKEND=s3 \
-    CLOUD_ENABLED=true \
   --secrets \
     database-url=keyvaultref:https://${KV_NAME}.vault.azure.net/secrets/database-url,identityref:${IDENTITY_ID} \
   --env-vars DATABASE_URL=secretref:database-url \

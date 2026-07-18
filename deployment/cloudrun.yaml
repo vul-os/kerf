@@ -75,8 +75,6 @@ spec:
                   key: anthropic-api-key
             - name: LOCAL_MODE
               value: "false"
-            - name: CLOUD_ENABLED
-              value: "true"
           resources:
             limits:
               cpu: "2"

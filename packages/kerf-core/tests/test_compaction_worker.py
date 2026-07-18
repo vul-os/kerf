@@ -6,7 +6,6 @@ that handles the compaction worker's queries.  No Postgres required.
 
 Covers:
   - CompactionWorker raises RuntimeError when local_mode=True.
-  - CompactionWorker raises RuntimeError when cloud_enabled=False.
   - run_one returns False when no chains exceed the threshold.
   - run_one returns True and compacts when a chain is long enough.
   - After compaction the old diff rows are removed and a new base is written.
@@ -303,12 +302,7 @@ def run(coro):
 def test_compaction_worker_refuses_local_mode():
     import pytest
     with pytest.raises(RuntimeError, match="local_mode"):
-        CompactionWorker(pool=None, cloud_enabled=True, local_mode=True)
-
-
-def test_compaction_worker_refuses_cloud_disabled():
-    with pytest.raises(RuntimeError, match="cloud_enabled"):
-        CompactionWorker(pool=None, cloud_enabled=False, local_mode=False)
+        CompactionWorker(pool=None, local_mode=True)
 
 
 def test_run_one_returns_false_when_no_work():
@@ -316,7 +310,7 @@ def test_run_one_returns_false_when_no_work():
     file_id = uuid.uuid4()
     # Only a base row — no diffs exceeding threshold.
     run(write_revision(pool, file_id, "initial content\n", "tool"))
-    worker = CompactionWorker(pool=pool, cloud_enabled=True, local_mode=False, threshold=5)
+    worker = CompactionWorker(pool=pool, local_mode=False, threshold=5)
     result = run(worker.run_one())
     assert result is False, "run_one should return False when no chain exceeds threshold"
 
@@ -339,7 +333,7 @@ def test_run_one_compacts_long_chain():
     diff_count_before = sum(1 for r in rows_before if r["kind"] == "diff")
     assert diff_count_before > threshold
 
-    worker = CompactionWorker(pool=pool, cloud_enabled=True, local_mode=False, threshold=threshold)
+    worker = CompactionWorker(pool=pool, local_mode=False, threshold=threshold)
     result = run(worker.run_one())
     assert result is True, "run_one should return True when a chain was compacted"
 
@@ -362,7 +356,7 @@ def test_run_one_returns_false_after_compaction():
     for i in range(threshold + 1):
         run(write_revision(pool, file_id, f"diff {i}\n", "tool"))
 
-    worker = CompactionWorker(pool=pool, cloud_enabled=True, local_mode=False, threshold=threshold)
+    worker = CompactionWorker(pool=pool, local_mode=False, threshold=threshold)
     first = run(worker.run_one())
     assert first is True
 

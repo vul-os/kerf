@@ -1,11 +1,10 @@
 // Barrel exports for the node-capability bundle: the distributed Workshop
-// (DMTAP-PUB feeds), the local git panel, and operator email admin. Workshop
-// and git are core MIT node capabilities and are never gated behind
-// useCloudConfig().cloudEnabled — only email admin still is.
+// (DMTAP-PUB feeds) and the local git panel. Both are core MIT node
+// capabilities present unconditionally on every node — there is no
+// "cloud edition" flag left to gate anything behind.
 
 export { Workshop } from './Workshop.jsx'
 export { PublishButton } from './PublishButton.jsx'
 export { GitPanel } from './GitPanel.jsx'
-export { default as AdminEmail } from './AdminEmail.jsx'
 export { useCloudConfig } from './useCloudConfig.js'
-export { git as gitApi, pub as pubApi, adminEmail } from './api.js'
+export { git as gitApi, pub as pubApi } from './api.js'

@@ -4,8 +4,8 @@
 // docs/distributed-workshop.md: there is no central Workshop server. A
 // workshop is client-side state — the set of author feeds ("follows") you
 // choose to follow — crawled and rendered here as a browsable, derived
-// index (GET /api/pub/workshop). This is a core MIT node capability and is
-// never gated behind useCloudConfig().cloudEnabled.
+// index (GET /api/pub/workshop). This is a core MIT node capability,
+// present unconditionally on every node.
 //
 // Two views:
 //   Browse  — cards for every announcement visible across followed feeds,

@@ -152,8 +152,6 @@ services:
         value: https://lon1.digitaloceanspaces.com
       - key: KERF_STORAGE_S3_REGION
         value: lon1
-      - key: CLOUD_ENABLED
-        value: "true"
       - key: DATABASE_URL
         value: "postgresql://kerf_app:<password>@..."
         type: SECRET
@@ -192,8 +190,6 @@ workers:
         value: "true"
       - key: STORAGE_BACKEND
         value: s3
-      - key: CLOUD_ENABLED
-        value: "true"
       - key: DATABASE_URL
         value: "postgresql://kerf_app:<password>@..."
         type: SECRET

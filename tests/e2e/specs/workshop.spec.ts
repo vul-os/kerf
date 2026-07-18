@@ -1,7 +1,7 @@
 /**
  * workshop.spec.ts — a public project with a Part appears in /workshop.
  *
- * Runs under the `cloud` Playwright project (CLOUD_ENABLED). The Workshop
+ * Runs under the `cloud` Playwright project (LOCAL_MODE=false). The Workshop
  * index lists parts (kind='part') from projects with visibility='public'
  * (kerf_core.db.queries.library.list_public_parts). We seed that state via
  * the API, then assert the listing renders in the browser.

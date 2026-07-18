@@ -185,7 +185,6 @@ class TestRoundTripMockedPool:
         call_args = pool.execute.call_args
         sql = call_args[0][0]
         assert "firmware_flash_jobs" in sql
-        assert "billing_bucket" in sql
 
 
 # ── F15 plugin provides ───────────────────────────────────────────────────────

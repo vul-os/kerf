@@ -99,7 +99,6 @@ async def test_plugin_register_mounts_route():
 
     app = FastAPI()
     ctx = MagicMock()
-    ctx.cloud_enabled = False
     ctx.local_mode = True
     ctx.workers = None
 
@@ -115,13 +114,12 @@ async def test_plugin_register_mounts_route():
 
 
 @pytest.mark.asyncio
-async def test_plugin_register_cloud_mode_registers_worker():
+async def test_plugin_register_server_mode_registers_worker():
     from fastapi import FastAPI
     from kerf_tess.plugin import register
 
     app = FastAPI()
     ctx = MagicMock()
-    ctx.cloud_enabled = True
     ctx.local_mode = False
     ctx.workers = MagicMock()
     ctx.workers.register = MagicMock()
@@ -142,7 +140,6 @@ async def test_plugin_register_local_mode_skips_worker():
 
     app = FastAPI()
     ctx = MagicMock()
-    ctx.cloud_enabled = False
     ctx.local_mode = True
     ctx.workers = MagicMock()
     ctx.workers.register = MagicMock()

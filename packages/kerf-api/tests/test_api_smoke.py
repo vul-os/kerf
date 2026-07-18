@@ -342,9 +342,7 @@ def test_smoke_config(client: TestClient):
     assert r.status_code < 500, f"/api/config {r.status_code}: {r.text}"
     assert r.status_code == 200
     body = r.json()
-    assert "local_mode" in body or "cloud_enabled" in body, (
-        f"config missing expected keys: {body}"
-    )
+    assert "local_mode" in body, f"config missing expected keys: {body}"
 
 
 # ── 2. GET /api/models — chat/models group ────────────────────────────────

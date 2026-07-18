@@ -13,18 +13,20 @@ from kerf_cam.worker import CAMWorker
 
 logger = logging.getLogger(__name__)
 
-# ── CompactionWorker (cloud-tier only; import lazily to avoid hard dep) ─────
+# ── CompactionWorker (server-mode only; import lazily to avoid hard dep) ────
 
-def _maybe_compaction_worker(pool, cloud_enabled: bool, local_mode: bool, count: int):
+def _maybe_compaction_worker(pool, local_mode: bool, count: int):
     """
-    Instantiate CompactionWorker instances if cloud_enabled and not local_mode.
-    Returns an empty list when not in cloud mode so the caller can skip cleanly.
+    Instantiate CompactionWorker instances when not local_mode.
+    Returns an empty list in local mode so the caller can skip cleanly —
+    OSS local-install users have small revision sets that never need
+    background compaction.
     """
-    if not cloud_enabled or local_mode or count <= 0:
+    if local_mode or count <= 0:
         return []
     try:
         from kerf_core.workers.compaction_worker import CompactionWorker  # type: ignore
-        return [CompactionWorker(pool=pool, cloud_enabled=cloud_enabled, local_mode=local_mode) for _ in range(count)]
+        return [CompactionWorker(pool=pool, local_mode=local_mode) for _ in range(count)]
     except ImportError:
         logger.warning("kerf-workers: kerf_core not installed; skipping CompactionWorker")
         return []
@@ -54,8 +56,8 @@ def _maybe_firmware_flash_workers(pool, storage_getter):
 
     Lazy import so a missing kerf-workers sub-module does not hard-fail the
     worker set on installs that do not have firmware tooling.
-    BYO billing short-circuit: billing_bucket='byo' is set at job-creation
-    time; this worker never writes a billing record.
+    Kerf has no billing anywhere; every job runs on the caller's own
+    hardware and this worker never writes a billing record.
     """
     try:
         from kerf_workers.firmware_flash_worker import FirmwareFlashWorker  # type: ignore
@@ -120,7 +122,6 @@ async def start_all_workers(
     tess_timeout: int = 300,
     cam_timeout: int = 300,
     auto_tess_timeout: int = 300,
-    cloud_enabled: bool = False,
     local_mode: bool = True,
 ):
     own_pool = pool is None
@@ -135,7 +136,7 @@ async def start_all_workers(
         cycles_count=cycles_count,
         fem_timeout=fem_timeout, sim_timeout=sim_timeout,
         tess_timeout=tess_timeout, cam_timeout=cam_timeout,
-        cloud_enabled=cloud_enabled, local_mode=local_mode,
+        local_mode=local_mode,
     )
 
     if not workers:
@@ -183,7 +184,6 @@ def _build_workers(
     sim_timeout: int = 300,
     tess_timeout: int = 300,
     cam_timeout: int = 300,
-    cloud_enabled: bool = False,
     local_mode: bool = True,
 ) -> list:
     """Construct the configured worker instances (no lifecycle)."""
@@ -202,8 +202,8 @@ def _build_workers(
     for _ in range(cam_count):
         workers.append(CAMWorker(pool=pool, storage_getter=storage_getter,
                                  pyworker_url=pyworker_url, timeout=cam_timeout))
-    # CompactionWorker: cloud-tier only; _maybe_compaction_worker gates it.
-    workers.extend(_maybe_compaction_worker(pool, cloud_enabled, local_mode, compaction_count))
+    # CompactionWorker: server-mode only; _maybe_compaction_worker gates it.
+    workers.extend(_maybe_compaction_worker(pool, local_mode, compaction_count))
     # RateLimitGCWorker: prunes rate_limit_buckets rows older than 24h.
     workers.extend(_maybe_rate_limit_gc_worker(pool))
     # CyclesQueueWorker: drains render_jobs table (kerf-render); lazy import.
@@ -279,7 +279,6 @@ async def run_workers():
     def get_storage():
         return DummyStorage()
 
-    _cloud_enabled = os.getenv("CLOUD_ENABLED", "false").lower() in ("1", "true", "yes")
     _local_mode = os.getenv("LOCAL_MODE", "true").lower() in ("1", "true", "yes")
 
     try:
@@ -292,7 +291,6 @@ async def run_workers():
             cam_count=int(os.getenv("CAM_WORKERS", "0")),
             compaction_count=int(os.getenv("COMPACTION_WORKERS", "1")),
             cycles_count=int(os.getenv("CYCLES_WORKERS", "1")),
-            cloud_enabled=_cloud_enabled,
             local_mode=_local_mode,
         )
     finally:

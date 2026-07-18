@@ -131,9 +131,6 @@ vi.mock('../store/auth.js', () => ({
 vi.mock('../store/workspaces.js', () => ({
   useWorkspaces: (selector) => selector({ currentSlug: null }),
 }))
-vi.mock('../cloud/useCloudConfig.js', () => ({
-  useCloudConfig: () => ({ cloudEnabled: false }),
-}))
 vi.mock('../lib/api.js', () => ({
   api: { me: () => Promise.resolve(null), logout: () => Promise.resolve() },
 }))

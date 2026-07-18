@@ -83,9 +83,8 @@ def _pool(conn):
     return pool
 
 
-def _fake_settings(*, cloud_enabled=False, step_max_bytes=200_000_000):
+def _fake_settings(*, step_max_bytes=200_000_000):
     s = MagicMock()
-    s.cloud_enabled = cloud_enabled
     s.step_max_bytes = step_max_bytes
     return s
 

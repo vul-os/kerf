@@ -57,7 +57,6 @@ def _patches(*, default_ws, role="owner"):
     gdw = AsyncMock(return_value=default_ws)
     gwbs = AsyncMock(return_value=None)
     fake_settings = MagicMock()
-    fake_settings.cloud_enabled = False
 
     cms = [
         patch("kerf_api.routes.get_pool_required", AsyncMock(return_value=_pool(conn))),

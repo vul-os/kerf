@@ -27,7 +27,6 @@ primary_region = "fra"
   # R2 endpoint is account-specific — set via the shared KERF_STORAGE_S3_ENDPOINT
   # secret (https://<ACCOUNT_ID>.r2.cloudflarestorage.com), not hardcoded.
   KERF_STORAGE_S3_REGION = "auto"
-  CLOUD_ENABLED = "true"
   KERF_WORKERS_ONLY = "true"   # picks the worker entry-point at boot
 
 # Secrets are shared with the main app — set via:

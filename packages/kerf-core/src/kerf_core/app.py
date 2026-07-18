@@ -166,7 +166,6 @@ async def _maybe_start_inprocess_workers(app: FastAPI):
     try:
         from kerf_workers.runner import InProcessWorkers
 
-        cloud_enabled = os.getenv("CLOUD_ENABLED", "false").lower() in ("1", "true", "yes")
         local_mode = os.getenv("LOCAL_MODE", "true").lower() in ("1", "true", "yes")
         handle = await InProcessWorkers.start(
             pool=pool,
@@ -176,7 +175,6 @@ async def _maybe_start_inprocess_workers(app: FastAPI):
             tess_count=int(os.getenv("TESS_WORKERS", "1")),
             cam_count=int(os.getenv("CAM_WORKERS", "0")),
             compaction_count=int(os.getenv("COMPACTION_WORKERS", "1")),
-            cloud_enabled=cloud_enabled,
             local_mode=local_mode,
         )
         logger.info("inprocess_workers_started")
@@ -280,7 +278,6 @@ async def _load_plugins(app: FastAPI, config: Config) -> None:
             tools=tools,
             workers=workers,
             logger=plugin_logger,
-            cloud_enabled=config.cloud_enabled,
             local_mode=config.local_mode,
         )
         try:

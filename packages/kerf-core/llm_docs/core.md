@@ -66,7 +66,6 @@ async def register(app: FastAPI, ctx: PluginContext) -> PluginManifest:
 | `tools` | `ToolRegistry` | Mutable LLM tool registry |
 | `workers` | `WorkerRegistry` | Mutable background-worker registry |
 | `logger` | `structlog.BoundLogger` | Plugin-scoped logger |
-| `cloud_enabled` | `bool` | Whether cloud mode is active |
 | `local_mode` | `bool` | Whether running as single-user local install |
 
 ### ToolRegistry
@@ -105,8 +104,7 @@ STORAGE_BACKEND       "local" | "s3"
 LOCAL_STORAGE_PATH    ./kerf-storage (default)
 S3_BUCKET / S3_REGION / S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY
 S3_ENDPOINT           custom endpoint (Tigris, MinIO, …)
-CLOUD_ENABLED         false (OSS) | true (cloud deploy)
-LOCAL_MODE            true (single user) | false (cloud)
+LOCAL_MODE            true (single user) | false (server mode)
 PYWORKER_URL          http://localhost:8090
 DEFAULT_MODEL         claude-opus-4-7
 ANTHROPIC_PROMPT_CACHE  true (default)

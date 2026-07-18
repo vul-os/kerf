@@ -8,8 +8,12 @@ sync (Mouser/DigiKey/LCSC/McMaster) — a node feature (self-hosters supply
 their own distributor API credentials), plus a handful of unrelated
 production-ops features (job traveler, share links, CRDT collab seed, PLM).
 
-Cloud-gated: when ctx.cloud_enabled is False, returns an empty manifest and
-no routes are mounted (the distributor registry needs a DB pool).
+Distributor sync mounts unconditionally on every node — there is no
+"cloud edition" to gate it behind. Its only real requirement is a DB pool
+(distributor credentials live in the ``distributor_credentials`` table,
+encrypted at rest); a node with zero distributor credentials configured
+simply runs the registry with everything disabled, exactly like a node
+with zero GitHub remotes configured still runs its git panel.
 """
 from __future__ import annotations
 
@@ -21,25 +25,22 @@ PLUGIN_DEPENDS = ["kerf-auth", "kerf-api"]
 
 
 async def register(app: FastAPI, ctx) -> PluginManifest:
-    if not ctx.cloud_enabled:
-        ctx.logger.info("kerf-cloud: cloud_enabled=False — plugin dormant")
-        return PluginManifest(
-            name="kerf-cloud",
-            version="0.1.0",
-            provides=[],
-            depends=["kerf-auth", "kerf-api"],
-        )
-
     # -------------------------------------------------------------------------
-    # Distributor registry (needs encrypted creds + DB)
+    # Distributor registry (needs encrypted creds + DB — its only actual
+    # requirement). No pool means no distributor_credentials table to read;
+    # every other node capability here is unconditional.
     # -------------------------------------------------------------------------
-    if not ctx.local_mode:
+    if ctx.pool is not None:
         await _init_distributor_registry(ctx)
+        provides = ["cloud.distributors"]
+    else:
+        ctx.logger.info("kerf-cloud: no DB pool — distributor registry dormant")
+        provides = []
 
     return PluginManifest(
         name="kerf-cloud",
         version="0.1.0",
-        provides=["cloud.distributors"],
+        provides=provides,
         depends=["kerf-auth", "kerf-api"],
     )
 

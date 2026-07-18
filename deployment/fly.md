@@ -91,7 +91,6 @@ fly secrets set NAME="VALUE" --app kerf-prod
 | `EMAIL_FROM` | `EMAIL_FROM` | Sender address, e.g. `noreply@kerf.sh` |
 | `RUNPOD_API_KEY` | `RUNPOD_API_KEY` | RunPod API key (GPU renders — see note below) |
 | `KERF_INPROCESS_WORKERS` | `KERF_INPROCESS_WORKERS` | Set `true` — workers run in-process |
-| `CLOUD_ENABLED` | `CLOUD_ENABLED` | Set `true` for hosted deployments |
 | `KERF_LOCAL_MODE` | `KERF_LOCAL_MODE` | Set `false` for hosted deployments |
 | `BLOB_GC_DRY_RUN` | `BLOB_GC_DRY_RUN` | Set `false` — enables physical blob deletion |
 

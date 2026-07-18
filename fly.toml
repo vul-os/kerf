@@ -30,7 +30,6 @@ primary_region = "fra"
   ENV = "production"
   KERF_PORT = "8080"
   KERF_FRONTEND_DIST = "/app/dist"
-  CLOUD_ENABLED = "true"
   KERF_LOCAL_MODE = "false"
   KERF_INPROCESS_WORKERS = "true"
   # Object storage — Cloudflare R2 (S3-compatible). Bucket/keys/endpoint are

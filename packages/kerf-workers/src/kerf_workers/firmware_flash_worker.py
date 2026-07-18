@@ -18,7 +18,8 @@ Job lifecycle
 
 Billing
 -------
-``billing_bucket = 'byo'`` on every row — no credits are consumed.
+Kerf has no billing anywhere — every job runs on the caller's own
+hardware and no credits are ever consumed.
 
 Board-target → tool mapping
 --------------------------------------------------------------------
@@ -124,8 +125,8 @@ class FirmwareFlashWorker:
     worker CLI can claim them via ``GET /api/firmware/flash-jobs/claim``.
 
     In local-CLI mode the worker shells out to the flash tool directly.
-    ``billing_bucket='byo'`` is enforced at job-creation time (server side);
-    this worker never writes a billing record.
+    Kerf has no billing anywhere; this worker never writes a billing
+    record.
     """
 
     POLL_INTERVAL = float(os.getenv("FIRMWARE_FLASH_POLL_INTERVAL", "5"))

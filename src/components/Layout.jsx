@@ -270,9 +270,9 @@ export default function Layout({ children, wide = false, padded = true }) {
               </Link>
             </nav>
             {/* Top-nav: Workshop is the distributed DMTAP-PUB feed browser —
-                a core MIT node capability, never gated on `cloudEnabled`.
+                a core MIT node capability, present unconditionally.
                 Library hosts the parts catalog, a design capability that is
-                also never gated — both work identically self-hosted. */}
+                also unconditional — both work identically self-hosted. */}
             {accessToken && (
               <nav className="hidden sm:flex items-center gap-1 mr-1">
                 <Link

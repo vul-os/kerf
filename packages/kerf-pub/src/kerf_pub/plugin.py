@@ -1,7 +1,7 @@
 """kerf-pub plugin entry point — DMTAP-PUB gateway + local pin store.
 
 This is an OSS-node plugin: it mounts the §22.5.1 gateway endpoints
-UNCONDITIONALLY (never behind ``cloud_enabled`` / billing). kerf's hosted
+UNCONDITIONALLY — there is no flag or billing tier gating it. kerf's hosted
 gateway is "one gateway among equals" (§23 Appendix A); serving public objects
 is core to the decentralized Workshop, not a paid feature.
 
@@ -32,7 +32,6 @@ except ImportError:
 
     class PluginContext:  # type: ignore[no-redef]
         pool = None
-        cloud_enabled = False
         local_mode = True
 
 

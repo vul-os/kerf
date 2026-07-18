@@ -260,19 +260,20 @@ async def get_config():
     user is authenticated. No auth required — no secrets are returned here.
     """
     payload = {
-        "cloud_enabled": settings.cloud_enabled,
         "local_mode": settings.local_mode,
     }
-    if settings.cloud_enabled:
-        # OAuth availability — public client IDs + bool flags only, no
-        # secrets. The frontend renders the Google/GitHub buttons from
-        # these runtime values (Vite can't inline per-env build-time vars).
-        payload["google_enabled"] = bool(settings.google_client_id)
-        payload["github_enabled"] = bool(settings.cloud_github_client_id)
-        if settings.google_client_id:
-            payload["google_client_id"] = settings.google_client_id
-        if settings.cloud_github_client_id:
-            payload["github_client_id"] = settings.cloud_github_client_id
+    # OAuth availability — public client IDs + bool flags only, no secrets.
+    # The frontend renders the Google/GitHub buttons from these runtime
+    # values (Vite can't inline per-env build-time vars). OAuth sign-in is
+    # a node feature: any self-hoster can supply their own Google/GitHub
+    # OAuth app credentials, so availability is driven purely by whether
+    # those credentials are configured — never by a "cloud edition" flag.
+    payload["google_enabled"] = bool(settings.google_client_id)
+    payload["github_enabled"] = bool(settings.cloud_github_client_id)
+    if settings.google_client_id:
+        payload["google_client_id"] = settings.google_client_id
+    if settings.cloud_github_client_id:
+        payload["github_client_id"] = settings.cloud_github_client_id
     return payload
 
 

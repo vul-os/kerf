@@ -1,11 +1,13 @@
 // Lightweight bootstrap config hook. Hits /api/config exactly once per page
-// load and caches the result in a tiny zustand store. Safe to call from
-// either the OSS frontend (will just see cloudEnabled=false defaults) or
-// the cloud bundle.
+// load and caches the result in a tiny zustand store. Every kerf node runs
+// the same software (there is no "cloud edition" to detect) — this hook
+// just surfaces the two things that legitimately vary per node: whether
+// it's running in local_mode (single-user, auto-login) or server mode, and
+// which OAuth providers the operator has configured credentials for.
 //
 // Shape returned by /api/config (per CONTRACT.md):
 //   {
-//     cloud_enabled: bool,
+//     local_mode: bool,
 //     google_client_id?: string,
 //     google_enabled?: bool,
 //     github_enabled?: bool,
@@ -28,7 +30,6 @@ const BUILD_GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
 const DEFAULTS = {
   ready: false,
-  cloudEnabled: false,
   // localMode default is true so an OSS build that fails to fetch
   // /api/config (e.g. CORS misconfigured) still skips /login, matching
   // server-side defaults. The cloud build always overrides via the
@@ -64,11 +65,10 @@ const useStore = create((set, get) => ({
         const githubClientId = data.github_client_id || ''
         set({
           ready: true,
-          cloudEnabled: !!data.cloud_enabled,
-          // local_mode is the single source of truth for "skip the
-          // login screen". Fall back to !cloud_enabled when the
-          // backend hasn't surfaced the flag yet (older binary).
-          localMode: data.local_mode != null ? !!data.local_mode : !data.cloud_enabled,
+          // local_mode is the single source of truth for "skip the login
+          // screen". Fall back to the OSS default (true) when an older
+          // binary hasn't surfaced the field yet.
+          localMode: data.local_mode != null ? !!data.local_mode : true,
           googleClientId,
           googleEnabled,
           githubEnabled,
@@ -95,7 +95,6 @@ export function useCloudConfig() {
   }, [])
   return {
     ready: state.ready,
-    cloudEnabled: state.cloudEnabled,
     localMode: state.localMode,
     googleClientId: state.googleClientId,
     googleEnabled: state.googleEnabled,

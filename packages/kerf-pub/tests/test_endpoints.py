@@ -89,7 +89,6 @@ async def test_plugin_registers_router_not_gated_by_cloud():
 
     class Ctx:
         pool = None
-        cloud_enabled = False   # OSS node — must still mount
         local_mode = True
 
     app = FastAPI()

@@ -145,7 +145,7 @@ gcloud run deploy kerf \
   --platform=managed \
   --service-account="${SA}" \
   --add-cloudsql-instances="${PROJECT_ID}:africa-south1:kerf-pg" \
-  --set-env-vars="ENV=cloud,PORT=8080,STORAGE_BACKEND=s3,CLOUD_ENABLED=true" \
+  --set-env-vars="ENV=cloud,PORT=8080,STORAGE_BACKEND=s3" \
   --set-env-vars="KERF_STORAGE_S3_REGION=africa-south1" \
   --set-env-vars="KERF_STORAGE_S3_ENDPOINT=https://storage.googleapis.com" \
   --set-secrets="DATABASE_URL=kerf-database-url:latest" \
@@ -234,7 +234,7 @@ gcloud run jobs create kerf-worker \
   --region=africa-south1 \
   --service-account="${SA}" \
   --add-cloudsql-instances="${PROJECT_ID}:africa-south1:kerf-pg" \
-  --set-env-vars="KERF_WORKERS_ONLY=true,STORAGE_BACKEND=s3,CLOUD_ENABLED=true" \
+  --set-env-vars="KERF_WORKERS_ONLY=true,STORAGE_BACKEND=s3" \
   --set-secrets="DATABASE_URL=kerf-database-url:latest" \
   --set-secrets="KERF_STORAGE_S3_BUCKET=kerf-gcs-bucket:latest" \
   --set-secrets="KERF_STORAGE_S3_ACCESS_KEY=kerf-gcs-hmac-access:latest" \
@@ -257,7 +257,7 @@ gcloud run deploy kerf-workers \
   --region=africa-south1 \
   --service-account="${SA}" \
   --add-cloudsql-instances="${PROJECT_ID}:africa-south1:kerf-pg" \
-  --set-env-vars="KERF_WORKERS_ONLY=true,STORAGE_BACKEND=s3,CLOUD_ENABLED=true" \
+  --set-env-vars="KERF_WORKERS_ONLY=true,STORAGE_BACKEND=s3" \
   --set-secrets="DATABASE_URL=kerf-database-url:latest" \
   --min-instances=1 \
   --no-allow-unauthenticated \

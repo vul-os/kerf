@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 #
-# dev-cloud.sh — run the FULL system locally in CLOUD mode against a
-# local Postgres + local API. Same surface as the Fly.io "dev" deployment
-# (real signup/login, Workshop, Library, billing-dormant) but everything
-# on your machine.
+# dev-cloud.sh — run the FULL system locally in SERVER mode (local_mode=false)
+# against a local Postgres + local API. Same surface as the Fly.io "dev"
+# deployment (real signup/login, Workshop, Library — every node runs the
+# same MIT software, there is no separate cloud edition) but everything on
+# your machine.
 #
-#   API : http://localhost:8080   (kerf-server, CLOUD_ENABLED, no auto-login)
+#   API : http://localhost:8080   (kerf-server, LOCAL_MODE=false, no auto-login)
 #   Web : http://localhost:5173   (Vite; proxies /api + /auth → :8080)
 #
 # The browser talks to the API same-origin via the Vite proxy, so no
 # CORS config is needed (VITE_API_URL is deliberately left unset).
 #
-# Cloud mode has NO singleton auto-login — create an account at
+# Server mode has NO singleton auto-login — create an account at
 # http://localhost:5173/signup the first time.
 #
 # Usage:
@@ -44,11 +45,11 @@ export GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}"
 export GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET:-}"
 export GOOGLE_REDIRECT_URL="${GOOGLE_REDIRECT_URL:-http://localhost:8080/auth/google/callback}"
 
-# Cloud surface (Workshop + hosted git). Kerf has no billing anywhere.
-# kerf_core.config.Settings has NO env prefix — these UNPREFIXED names
-# are what it actually reads.
+# Server mode (multi-user, no auto-login). Kerf has no billing anywhere
+# and no separate cloud edition — this only flips local_mode off so you
+# can exercise the login/signup flow. kerf_core.config.Settings has NO
+# env prefix — these UNPREFIXED names are what it actually reads.
 export LOCAL_MODE=false
-export CLOUD_ENABLED=true
 export CORS_ORIGIN="http://localhost:5173"
 
 echo "▸ DATABASE_URL : ${DATABASE_URL%%\?*}  (cloud mode)"

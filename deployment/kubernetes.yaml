@@ -74,8 +74,6 @@ spec:
               value: ""
             - name: LOCAL_MODE
               value: "false"
-            - name: CLOUD_ENABLED
-              value: "true"
           resources:
             requests:
               cpu: 250m

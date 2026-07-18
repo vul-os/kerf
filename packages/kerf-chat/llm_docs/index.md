@@ -25,9 +25,9 @@ match, then `read_file('/docs/llm/<page>.md')` to load the full text.
   `[{id, geom}]` return shape, namespaced calls (`extrusions.X`,
   `booleans.X`, `transforms.X`, `hulls.X`), Object identity for assembly
   references.
-- `email.md` — transactional email subsystem (cloud-only). When the
-  user asks "did I get a receipt", "why didn't the welcome email
-  arrive", point them at `/admin/email` and the cloud_email_log.
+- `email.md` — transactional email is retired (kerf sends no email
+  anywhere). Read this before answering any user question about
+  receipts, welcome emails, or account verification.
 - `configurations.md` — per-file parameter overrides (M3/M4/M5
   variants of one Part / Feature / Sketch); how `default_config` and
   `configurations[]` round-trip; how assembly components pin via

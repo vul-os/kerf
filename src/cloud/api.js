@@ -78,8 +78,8 @@ async function request(path, { method = 'GET', body, headers = {}, auth = true }
 // The Workshop is no longer a hosted listings service — it is a client-side
 // view over feeds you follow, per decisions.md's 2026-07-17 "Final form"
 // ADR and docs/distributed-workshop.md. All endpoints sit under /api/pub.
-// This is a core MIT node capability (kerf-pub), never gated on
-// `cloudEnabled`. Contract (frontend wave 2, coded against a parallel
+// This is a core MIT node capability (kerf-pub), present unconditionally
+// on every node. Contract (frontend wave 2, coded against a parallel
 // backend build):
 //   GET  /api/pub/identity                 -> { pub: string|null }
 //   POST /api/pub/identity                 -> { pub: string }
@@ -424,49 +424,4 @@ export const git = {
       method: 'POST',
       body: { remote, branch },
     }),
-}
-
-// ---- Admin: transactional email ----
-// Mirrors the shape of api.admin.* in src/lib/api.js but lives here
-// because the backend endpoints are cloud-only (built behind the
-// `cloud` Go build tag). All routes require account_role='admin'.
-export const adminEmail = {
-  // GET /api/admin/email/providers
-  // → { providers: [{provider, enabled, has_secret, rate_limit_per_minute,
-  //                  last_used_at?, updated_at, active}], active }
-  listProviders: () => request('/api/admin/email/providers'),
-
-  // PUT /api/admin/email/providers/:provider
-  // body: { enabled, rate_limit_per_minute, secret: { api_key?, from_email,
-  //          from_name?, region?, smtp_host?, smtp_port?, smtp_username?,
-  //          smtp_password? } }
-  upsertProvider: (provider, payload) =>
-    request(`/api/admin/email/providers/${encodeURIComponent(provider)}`, {
-      method: 'PUT',
-      body: payload,
-    }),
-
-  // DELETE /api/admin/email/providers/:provider — idempotent.
-  deleteProvider: (provider) =>
-    request(`/api/admin/email/providers/${encodeURIComponent(provider)}`, {
-      method: 'DELETE',
-    }),
-
-  // POST /api/admin/email/test  { to, template, vars? }
-  // Renders + enqueues a single send. Returns { status: "queued" }.
-  testSend: ({ to, template, vars }) =>
-    request('/api/admin/email/test', {
-      method: 'POST',
-      body: { to, template, vars: vars || {} },
-    }),
-
-  // GET /api/admin/email/log?limit=50&before=<iso>
-  // → { entries: [{id, user_id?, template, to_email, provider?, status,
-  //                error?, sent_at?, created_at}] }
-  log: ({ limit = 50, before } = {}) => {
-    const q = new URLSearchParams()
-    if (limit) q.set('limit', String(limit))
-    if (before) q.set('before', before)
-    return request(`/api/admin/email/log?${q.toString()}`)
-  },
 }

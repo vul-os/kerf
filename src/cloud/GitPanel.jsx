@@ -1,7 +1,7 @@
 // GitPanel — right-side drawer surfacing a project's local git repo.
-// Mounted in src/routes/Editor.jsx as a core MIT node capability (no longer
-// gated behind useCloudConfig().cloudEnabled — see decisions.md's
-// 2026-07-17 "local git only; no OAuth" addendum).
+// Mounted in src/routes/Editor.jsx as a core MIT node capability, present
+// unconditionally on every node (see decisions.md's 2026-07-17
+// "local git only; no OAuth" addendum).
 //
 // Drives the local git API directly (src/cloud/api.js `git`): init if not
 // initialized, status/branch/dirty, commit with a message, a flat commit

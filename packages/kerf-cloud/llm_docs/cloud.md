@@ -1,8 +1,10 @@
 # kerf-cloud — distributor sync + production-ops extras
 
-`kerf-cloud` is a cloud-gated plugin (needs a DB pool). When `CLOUD_ENABLED=false`
-(local install or OSS self-host) its `register()` function returns an empty
-manifest and mounts nothing.
+`kerf-cloud` mounts unconditionally on every node — there is no "cloud
+edition" to gate it behind. Its distributor registry needs a DB pool
+(distributor credentials live in the encrypted `distributor_credentials`
+table); when no pool is available its `register()` function returns an
+empty manifest and mounts nothing.
 
 Per the 2026-07-17 decentralization ADRs, hosted git serving, GitHub/GitLab
 OAuth sync, transactional email, and the centralized Workshop were all
@@ -27,15 +29,15 @@ Depends on `kerf-auth` and `kerf-api`.
 PLUGIN_DEPENDS = ["kerf-auth", "kerf-api"]
 
 async def register(app, ctx) -> PluginManifest:
-    if not ctx.cloud_enabled:
-        return PluginManifest(name="kerf-cloud", provides=[], ...)
-
-    if not ctx.local_mode:
+    if ctx.pool is not None:
         await _init_distributor_registry(ctx)   # needs a DB pool
+        provides = ["cloud.distributors"]
+    else:
+        provides = []
 
     return PluginManifest(
         name="kerf-cloud",
-        provides=["cloud.distributors"],
+        provides=provides,
         ...
     )
 ```

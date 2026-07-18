@@ -3,8 +3,9 @@ firmware_flash_via_worker — LLM tool that dispatches a firmware flash job
 to a registered BYO worker.
 
 When no local CLI is present the cloud relay path submits a
-``firmware_flash_jobs`` row with ``billing_bucket='byo'`` so no credits are
-consumed.  Any enrolled BYO worker that advertises
+``firmware_flash_jobs`` row. Kerf has no billing anywhere, so no credits
+are ever consumed — the job always runs on the caller's own hardware.
+Any enrolled BYO worker that advertises
 ``capabilities.firmware_flash=true`` will pick it up, download the artifact,
 run the appropriate flash tool (esptool/avrdude/openocd), and upload the log.
 
@@ -133,10 +134,10 @@ async def _submit_flash_job(
         """
         INSERT INTO firmware_flash_jobs
             (id, project_id, user_id, artifact_key, board_target,
-             kind, billing_bucket, status, created_at, updated_at)
+             kind, status, created_at, updated_at)
         VALUES
             ($1, $2, $3, $4, $5,
-             'firmware_flash', 'byo', 'queued', now(), now())
+             'firmware_flash', 'queued', now(), now())
         """,
         job_id,
         pid,

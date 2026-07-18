@@ -15,11 +15,11 @@
 port = "8080"
 env = "local"                         # "local" | "dev" | "main"
 cors_origin = "http://localhost:5173"
-# local_mode collapses the OSS auth wall: when true (the default), the
+# local_mode collapses the auth wall: when true (the default), the
 # frontend auto-creates a singleton user via POST /auth/bootstrap-local
 # on first paint and never shows /login. Set to false to run a multi-user
-# OSS deploy (the regular register/login flow renders). Cloud builds
-# (cloud.enabled = true) ignore this and force multi-user.
+# deploy (the regular register/login flow renders) — every kerf node runs
+# the same software; there is no separate "cloud build."
 # Override at runtime with KERF_LOCAL_MODE=true|false.
 local_mode = true
 
@@ -166,22 +166,15 @@ name = "Kerf System"
 password = ""
 
 # ---------------------------------------------------------------------------
-# Cloud — only honored when the binary is built with `-tags=cloud`.
-# Ignored by OSS builds.
+# Git
+#
+# Every kerf project is a plain local git repo — there is no "cloud edition"
+# flag that turns this on or off, and no kerf-operated GitHub OAuth app.
+# A node MAY additionally serve its own repos over standard git HTTP/SSH
+# (self-hosting, not a service); collaboration is otherwise git push/pull
+# to whatever remote you configure (a teammate's node, GitHub, Gitea, a
+# homelab box). GitHub sign-in (as opposed to git remotes) uses its own
+# OAuth app credentials — see CLOUD_GITHUB_CLIENT_ID / CLOUD_GITHUB_CLIENT_SECRET
+# in .env.z.example; any self-hoster can supply their own app the same way
+# they'd supply their own Postgres.
 # ---------------------------------------------------------------------------
-[cloud]
-enabled = false
-
-  # Real git integration (cloud-only). Bare repos are stored as S3 objects
-  # under `<prefix>/<project_id>/...` in the same bucket as `[storage.s3]`,
-  # so the service is fully stateless and safe on ephemeral filesystems
-  # (Fly.io, Cloud Run, etc.). Requires `storage.backend = "s3"` and
-  # a configured `[storage.s3]`. GitHub sync (push/pull/import) requires
-  # the OAuth app below.
-  [cloud.git]
-  prefix = "git"                        # S3 key prefix under the same bucket as `[storage.s3]`
-
-    [cloud.git.github]
-    client_id = ""
-    client_secret = ""
-    redirect_url = "http://localhost:8080/auth/github/callback"

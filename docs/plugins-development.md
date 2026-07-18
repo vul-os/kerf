@@ -86,7 +86,6 @@ class PluginContext:
     tools: ToolRegistry         # shared LLM tool registry
     workers: WorkerRegistry     # shared background-worker registry
     logger: structlog.BoundLogger
-    cloud_enabled: bool         # True when [cloud].enabled = true
     local_mode: bool            # True when [server].local_mode = true
 ```
 

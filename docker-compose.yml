@@ -31,7 +31,6 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - DEFAULT_MODEL=${DEFAULT_MODEL:-claude-sonnet-4-20250514}
       - LOCAL_MODE=${LOCAL_MODE:-true}
-      - CLOUD_ENABLED=${CLOUD_ENABLED:-false}
     volumes:
       - storage-data:/data/storage
     depends_on:

@@ -1,7 +1,7 @@
 /**
  * library.spec.ts — browse the Library catalog and open a Library Part.
  *
- * Runs under the `cloud` Playwright project (CLOUD_ENABLED). The Library
+ * Runs under the `cloud` Playwright project (LOCAL_MODE=false). The Library
  * catalog (GET /api/library/parts → list_public_parts) lists files of
  * kind='part' from projects with visibility='public' — no verified-publisher
  * requirement for the default (non-verified-only) listing. We seed that

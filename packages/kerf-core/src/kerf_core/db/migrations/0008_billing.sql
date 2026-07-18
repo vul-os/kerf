@@ -36,7 +36,12 @@ create table if not exists user_provider_keys (
 create index if not exists user_provider_keys_user_idx
     on user_provider_keys(user_id);
 
--- users.prefer_byo folded into CREATE TABLE users in 0001_core_identity.sql.
+-- users.prefer_byo dropped 2026-07-18: zero readers/writers anywhere in the
+-- app (only ever set to its default via CREATE TABLE, never read back or
+-- assigned by any route/tool). _prefer_byo_provider (kerf_api.routes) is a
+-- same-named but unrelated function — it swaps in a saved user_provider_keys
+-- row unconditionally, with no branch on this column. Removed along with
+-- the dead column rather than kept as an unread flag.
 
 -- usage_events.payer folded into CREATE TABLE usage_events in 0002_project_ingestion.sql.
 -- It remains purely descriptive local telemetry (e.g. 'byo', 'operator') —

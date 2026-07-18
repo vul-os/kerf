@@ -19,6 +19,7 @@ Run:
 """
 from __future__ import annotations
 
+import contextlib
 import sys
 import types
 
@@ -51,6 +52,42 @@ def _make_monitor_result(ok, status, port=None, lines=None, errors=None):
     MR = namedtuple("MonitorResult", ["ok", "status", "port", "lines", "errors"])
     return MR(ok=ok, status=status, port=port,
               lines=lines or [], errors=errors or [])
+
+
+_FIRMWARE_STUB_KEYS = (
+    "kerf_firmware",
+    "kerf_firmware.gcc_orchestrator",
+    "kerf_firmware.upload",
+    "kerf_firmware.upload.router",
+    "kerf_firmware.serial_monitor",
+)
+
+
+@contextlib.contextmanager
+def _firmware_stubs(**kwargs):
+    """Inject stub kerf_firmware.* modules for the duration of the `with` block,
+    then restore whatever was in sys.modules beforehand.
+
+    Without this restore, `_inject_firmware_stubs` permanently replaces the
+    real `kerf_firmware` package in sys.modules with a bare stub
+    `types.ModuleType("kerf_firmware")` (no __path__), which has no
+    submodules. Any test that runs later in the same pytest-xdist worker
+    process (e.g. test_routes_ota.py, which does
+    `from kerf_firmware.ota.sign import OTASigner`) then fails with
+    `ModuleNotFoundError: No module named 'kerf_firmware.ota';
+    'kerf_firmware' is not a package` — an order-dependent cross-file
+    pollution bug, not a real missing dependency.
+    """
+    saved = {key: sys.modules.get(key) for key in _FIRMWARE_STUB_KEYS}
+    _inject_firmware_stubs(**kwargs)
+    try:
+        yield
+    finally:
+        for key, mod in saved.items():
+            if mod is None:
+                sys.modules.pop(key, None)
+            else:
+                sys.modules[key] = mod
 
 
 def _inject_firmware_stubs(
@@ -139,26 +176,26 @@ def _build_app():
 
 @pytest.fixture(scope="function")
 def client():
-    _inject_firmware_stubs()
-    app = _build_app()
-    with TestClient(app) as c:
-        yield c
+    with _firmware_stubs():
+        app = _build_app()
+        with TestClient(app) as c:
+            yield c
 
 
 @pytest.fixture(scope="function")
 def client_no_compiler():
-    _inject_firmware_stubs(no_compiler=True)
-    app = _build_app()
-    with TestClient(app) as c:
-        yield c
+    with _firmware_stubs(no_compiler=True):
+        app = _build_app()
+        with TestClient(app) as c:
+            yield c
 
 
 @pytest.fixture(scope="function")
 def client_no_port():
-    _inject_firmware_stubs(no_port=True)
-    app = _build_app()
-    with TestClient(app) as c:
-        yield c
+    with _firmware_stubs(no_port=True):
+        app = _build_app()
+        with TestClient(app) as c:
+            yield c
 
 
 # ---------------------------------------------------------------------------

@@ -33,7 +33,7 @@ from kerf_api.routes import import_project_zip, _kind_from_ext, _IMPORT_MAX_FILE
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 class _Tx:

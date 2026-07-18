@@ -709,7 +709,7 @@ class TestLocalStorageSignedPutUrl:
             store = LocalStorage(root=tmpdir)
             import asyncio
 
-            url = asyncio.get_event_loop().run_until_complete(
+            url = asyncio.run(
                 store.signed_put_url("worker-results/abc-123.bin", ttl_seconds=3600)
             )
 

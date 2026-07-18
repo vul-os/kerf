@@ -136,7 +136,7 @@ class TestEventGeneratorOrdering:
     """
 
     def _run(self, coro):
-        return asyncio.get_event_loop().run_until_complete(coro)
+        return asyncio.run(coro)
 
     def test_full_tool_turn_ordering(self):
         """
@@ -304,7 +304,7 @@ class TestEventGeneratorOrdering:
 
 class TestProviderStreamNotImplemented:
     def _run(self, coro):
-        return asyncio.get_event_loop().run_until_complete(coro)
+        return asyncio.run(coro)
 
     def test_openai_stream_raises_not_implemented(self):
         _oi = types.ModuleType("openai")

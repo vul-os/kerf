@@ -332,20 +332,30 @@ def test_identical_content_repatch_does_not_bump_version(client: TestClient):
 
 
 async def _insert_revision(db_url: str, file_id: str, content: str, sha_hex: str) -> None:
-    """Insert a revision row. content_sha256 is bytea — pass as bytes."""
-    pool = await asyncpg.create_pool(db_url, min_size=1, max_size=2)
+    """Insert a revision row. content_sha256 is bytea — pass as bytes.
+
+    Uses a single direct connection rather than asyncpg.create_pool(): the
+    idempotency check this feeds (test_identical_content_repatch_does_not_bump_version)
+    has only a 5s window (_IDEMPOTENCY_WINDOW_SECS in kerf_api.routes) between
+    this insert and the follow-up PATCH. Under `pytest -n auto` with the full
+    suite hammering the same local Postgres instance, pool bootstrap (opening
+    min_size connections + health checks) adds latency that create_pool()
+    doesn't need for a single INSERT — that extra time occasionally ate
+    enough of the 5s window to flip the test from flaky-pass to flaky-fail.
+    A bare connect() is strictly faster and removes that variance.
+    """
+    conn = await asyncpg.connect(db_url)
     try:
-        async with pool.acquire() as conn:
-            sha_bytes = bytes.fromhex(sha_hex)
-            await conn.execute(
-                """
-                INSERT INTO file_revisions (file_id, content, source, content_sha256)
-                VALUES ($1, $2, 'user', $3)
-                """,
-                uuid.UUID(file_id), content, sha_bytes,
-            )
+        sha_bytes = bytes.fromhex(sha_hex)
+        await conn.execute(
+            """
+            INSERT INTO file_revisions (file_id, content, source, content_sha256)
+            VALUES ($1, $2, 'user', $3)
+            """,
+            uuid.UUID(file_id), content, sha_bytes,
+        )
     finally:
-        await pool.close()
+        await conn.close()
 
 
 # ── Spec 6: 409 response shape is JSON-stable ─────────────────────────────────

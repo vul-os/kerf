@@ -16,7 +16,7 @@ from kerf_api.routes import get_workspace, workspace_member_to_response
 
 
 def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 def test_member_serializer_shape():

@@ -181,6 +181,31 @@ async def _create_fixtures(db_url: str) -> dict:
     }
 
 
+async def _reset_rate_limit_buckets(db_url: str) -> None:
+    """Clear the forgot-password rate-limit bucket this suite exercises.
+
+    /auth/forgot-password is rate-limited to 5 calls / hour, keyed on caller
+    IP (`auth:forgot_password:testclient` — TestClient always reports
+    "testclient" as the client host, and this suite doesn't set
+    X-Forwarded-For). That bucket lives in the real, non-reset Postgres DB
+    (see DB SAFETY above), so repeated runs of this file within the same
+    hour accumulate hits and the two forgot-password tests below start
+    getting a real 429 instead of the 501 they assert — an order-dependent
+    failure across pytest *invocations*, not just within one. Clearing only
+    this specific bucket_key before the session keeps every other run's
+    rate-limit state untouched.
+    """
+    pool = await asyncpg.create_pool(db_url, min_size=1, max_size=2)
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "DELETE FROM rate_limit_buckets WHERE bucket_key = $1",
+                "auth:forgot_password:testclient",
+            )
+    finally:
+        await pool.close()
+
+
 async def _delete_fixtures(db_url: str, ids: dict) -> None:
     """Delete smoke test rows (best-effort; FK order)."""
     pool = await asyncpg.create_pool(db_url, min_size=1, max_size=2)
@@ -243,6 +268,7 @@ def _get_fixture_ids() -> dict:
 @pytest.fixture(scope="session", autouse=True)
 def session_fixtures() -> Generator[dict, None, None]:
     """Create DB rows before the session; tear down after."""
+    asyncio.run(_reset_rate_limit_buckets(_DB_URL))
     ids = _get_fixture_ids()
     yield ids
     asyncio.run(_delete_fixtures(_DB_URL, ids))

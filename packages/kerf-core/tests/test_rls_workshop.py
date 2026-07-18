@@ -494,10 +494,13 @@ def test_routes_has_no_select_from_project_workshop_images():
 
 
 # ===========================================================================
-# Case 11 — _project_to_workshop_row uses cover_storage_key, not gallery table
+# Case 11 — RETIRED 2026-07-18: _project_to_workshop_row was deleted with the
+# hosted/centralized Workshop routes (the distributed DMTAP-PUB Workshop in
+# kerf-pub replaced them); the cover-from-storage-key rule it guarded died
+# with that code path.
 # ===========================================================================
 
-def test_project_to_workshop_row_cover_from_storage_key():
+def _retired_test_project_to_workshop_row_cover_from_storage_key():
     """_project_to_workshop_row must derive cover_url from projects.cover_storage_key.
 
     The retired project_workshop_images gallery must NOT be the source of

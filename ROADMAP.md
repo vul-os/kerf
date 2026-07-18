@@ -90,6 +90,7 @@ Compare-manifest saturation at time of writing: **1235 yes / 29 partial / 1 no**
 - HVAC plant simulation: chiller / boiler / VAV + AHRI-certified equipment catalogue (`kerf-hvac/`).
 - Civil 3D dynamic TIN (Bowyer-Watson Delaunay) + Manning gravity pipes + Hazen-Williams pressure pipes (Hardy-Cross) (`packages/kerf-cad-core/src/kerf_cad_core/civil/tin_surface.py`, `packages/kerf-cad-core/src/kerf_cad_core/civil/gravity_pipe_network.py`).
 - Civil parcel subdivision + plan-and-profile sheet generator (`packages/kerf-cad-core/src/kerf_cad_core/civil/parcels.py`, `packages/kerf-cad-core/src/kerf_cad_core/civil/plan_profile_sheet.py`).
+- `kerf-civil` LandXML 1.2 import/export + Todini-Pilati GGA pressurised pipe network (HW/DW headloss) + Manning circular/trapezoidal sewer capacity + rational-method peak runoff + HDS-5 inlet-control culvert capacity (`packages/kerf-civil/src/kerf_civil/landxml.py`, `packages/kerf-civil/src/kerf_civil/tools_hydraulics.py`).
 - Multi-discipline plant federation (`packages/kerf-cad-core/src/kerf_cad_core/piping/multi_discipline_federation.py`).
 - AVEVA piping ASME B16 component catalogue (`packages/kerf-cad-core/src/kerf_cad_core/piping/component_catalogue.py`).
 
@@ -250,6 +251,7 @@ Full list of 139+ GK modules in `packages/kerf-cad-core/src/kerf_cad_core/geom/`
 
 **Architecture / BIM**
 - Full structural tool suite: 18 arch_* tools (beam, slab, wind, footing, connections, walls) per AISC 360-22, ACI 318-19, ASCE 7-22, TMS 402-22, IBC 2021.
+- `kerf-structural` package: AISI S100-16 cold-formed steel (effective-width, flexure, compression, web-crippling) + TMS 402-16 masonry ASD (flexure/shear/axial) (`packages/kerf-structural/src/kerf_structural/cold_formed_steel.py`, `packages/kerf-structural/src/kerf_structural/masonry.py`).
 - 8760-hr ASHRAE energy sim + Title 24 (16 CA zones) + LEED v4 EAp2.
 - HVAC: AHRI catalogue, plant simulation (chiller/boiler/VAV), duct sizing, equipment selection.
 - BIM: COBie 2.4, BCF issue manager, drawing-list manager, BIMcloud-lite element locks, IFC import, AVEVA piping ASME B16 catalogue, multi-discipline plant federation.

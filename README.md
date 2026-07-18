@@ -78,11 +78,17 @@ This builds the `full` persona image and starts Kerf alongside its own Postgres 
 ```sh
 git clone https://github.com/kerf-sh/kerf
 cd kerf
-pip install -e .[mech]   # or .[full] for everything — see docs/persona-bundles.md
+
+# Install the Python workspace packages (choose your persona):
+uv sync --extra mech              # uv users — resolves the workspace
+./scripts/dev-install.sh mech     # pip users — editable install helper
+
 npm install
 ```
 
 You'll need Python 3.11+, Node 22+, and Postgres 14+.
+
+> **Note:** a bare `pip install -e .[mech]` fails — the repo is a `uv` workspace, so the local `kerf-*` packages are wired up via `[tool.uv.sources]`, which only `uv` reads. Use `uv sync` or `./scripts/dev-install.sh`. The `mech`/`full` solver extras (pythonOCC, dolfinx) are conda-only; see [docs/local-install.md](./docs/local-install.md#solver-dependencies-dolfinx--pythonocc).
 
 ```sh
 export DATABASE_URL=postgres://<your-pg-user>@localhost:5432/kerf?sslmode=disable

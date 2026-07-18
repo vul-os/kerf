@@ -45,7 +45,28 @@ import time
 from dataclasses import dataclass
 from typing import Iterable
 
-import pygit2
+# pygit2 is only needed by the S3-backed git storer (cloud tier); it is declared
+# as a dependency of kerf-cloud, not kerf-core. Import it lazily so OSS / local
+# installs — which construct LocalStorage or S3Storage and never touch this
+# storer — can boot without the pygit2 wheel. `from __future__ import
+# annotations` keeps the `pygit2.Repository` return annotation a string, so the
+# module still imports cleanly when pygit2 is absent.
+try:
+    import pygit2
+except ImportError:  # pragma: no cover — OSS install without cloud deps
+    pygit2 = None
+
+
+def _require_pygit2():
+    """Return the pygit2 module or raise a clear error if it is not installed."""
+    if pygit2 is None:
+        raise RuntimeError(
+            "pygit2 is required for the S3-backed git storer but is not "
+            "installed. It ships with the cloud (`full`) persona; install it "
+            "with `pip install pygit2` (or `conda install -c conda-forge pygit2`)."
+        )
+    return pygit2
+
 
 logger = logging.getLogger(__name__)
 
@@ -200,7 +221,7 @@ class S3GitStorer:
                     self._prefix, local_dir,
                 )
             else:
-                pygit2.init_repository(local_dir, bare=True)
+                _require_pygit2().init_repository(local_dir, bare=True)
                 logger.info(
                     "S3GitStorer.clone_to_local: prefix=%s empty; initialized fresh bare repo at %s",
                     self._prefix, local_dir,
@@ -350,12 +371,13 @@ class S3GitStorer:
         return deleted
 
     def open_repo(self, local_dir: str) -> pygit2.Repository:
+        pg = _require_pygit2()
         if not os.path.isdir(local_dir):
             raise FileNotFoundError(
                 f"{local_dir} does not exist as a directory. Call clone_to_local first."
             )
         try:
-            return pygit2.Repository(local_dir)
+            return pg.Repository(local_dir)
         except Exception as e:
             raise FileNotFoundError(
                 f"{local_dir} is not a git repository. Call clone_to_local first."

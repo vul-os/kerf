@@ -5,26 +5,37 @@
  *   ifc_base64  {string}  Base64-encoded .ifc binary (from compile_bim_to_ifc)
  *   className   {string}  Extra CSS classes for the container div
  *
- * web-ifc (npm web-ifc@0.0.77) is the standard browser-side IFC loader.
- * Install: npm install web-ifc three
- *
- * If the package is absent, a stub card with install instructions is shown.
+ * web-ifc (npm web-ifc@0.0.77) is the standard browser-side IFC loader. Both it
+ * and three are hard dependencies, imported dynamically only to keep the IFC
+ * stack out of the initial bundle — so a load failure here means the chunk or
+ * its WASM couldn't be fetched, not that the package is missing.
  */
 import { useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { snapshotCanvas } from '../lib/snapshotHelpers.js'
 
+// web-ifc's emscripten glue resolves its .wasm relative to the executing script,
+// which breaks under a hashed bundle. `?url` emits the binary as a static asset
+// and hands us its final URL; we feed that to Init()'s locateFile hook below so
+// the viewer works offline / air-gapped instead of reaching for a CDN.
+import wasmUrl from 'web-ifc/web-ifc.wasm?url'
+
+// Camera framing. FIT_MARGIN pulls back past the exact fit so the model doesn't
+// touch the viewport edges.
+const FOV_DEG = 60
+const FIT_MARGIN = 1.6
+
 // ---------------------------------------------------------------------------
-// Lazy dep loader — dynamic import so the bundle still works without web-ifc
+// Lazy dep loader — dynamic import so the IFC stack chunks separately
 // ---------------------------------------------------------------------------
 async function tryLoadDeps() {
   try {
     const [webifc, three] = await Promise.all([
-      /* @vite-ignore */ import('web-ifc'),
+      import('web-ifc'),
       import('three'),
     ])
-    return { IfcAPI: webifc.IfcAPI, THREE: three }
-  } catch {
-    return null
+    return { deps: { IfcAPI: webifc.IfcAPI, THREE: three } }
+  } catch (err) {
+    return { loadError: err.message || String(err) }
   }
 }
 
@@ -36,7 +47,7 @@ export default function BIMView({ ifc_base64, className = '', viewRef }) {
   const canvasRef = useRef(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [depsAvailable, setDepsAvailable] = useState(null)
+  const [depsError, setDepsError] = useState(null)
 
   // Editor thumbnail capture: pull whatever's currently on the WebGL
   // canvas. We don't force a render here because the IFC scene already
@@ -55,9 +66,9 @@ export default function BIMView({ ifc_base64, className = '', viewRef }) {
       setLoading(true)
       setError(null)
 
-      const deps = await tryLoadDeps()
+      const { deps, loadError } = await tryLoadDeps()
       if (cancelled) return
-      setDepsAvailable(deps !== null)
+      setDepsError(loadError ?? null)
 
       if (!deps || !ifc_base64) {
         setLoading(false)
@@ -74,8 +85,11 @@ export default function BIMView({ ifc_base64, className = '', viewRef }) {
 
         // Initialise IfcAPI
         const api = new IfcAPI()
-        api.SetWasmPath('https://cdn.jsdelivr.net/npm/web-ifc@0.0.77/')
-        await api.Init()
+        // forceSingleThread: when the page is crossOriginIsolated, Init() would
+        // otherwise pick the multi-threaded build and ask for web-ifc-mt.wasm —
+        // a different binary we don't bundle. Pin the single-threaded one so the
+        // locateFile hook below always hands back a matching module.
+        await api.Init(() => wasmUrl, true)
         const modelId = api.OpenModel(bytes)
 
         // Three.js scene
@@ -90,17 +104,14 @@ export default function BIMView({ ifc_base64, className = '', viewRef }) {
         scene.background = new THREE.Color(0x0a0a0f)
 
         const camera = new THREE.PerspectiveCamera(
-          60,
+          FOV_DEG,
           canvas.clientWidth / canvas.clientHeight,
-          1,
-          500000,
+          0.1,
+          1000,
         )
-        camera.position.set(8000, 8000, 10000)
-        camera.lookAt(2500, 0, 1500)
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.5))
         const dir = new THREE.DirectionalLight(0xffffff, 0.9)
-        dir.position.set(10000, 15000, 8000)
         scene.add(dir)
 
         // Stream all meshes from the IFC model
@@ -126,12 +137,50 @@ export default function BIMView({ ifc_base64, className = '', viewRef }) {
             bufGeom.computeVertexNormals()
 
             const mesh3 = new THREE.Mesh(bufGeom, mat)
+            // GetVertexArray returns geometry in the element's LOCAL space, in
+            // the file's length unit (mm here). placedGeom.flatTransformation is
+            // the 4x4 that puts it in the world: it carries the placement, the
+            // unit scale (0.001 for mm→m) and the IFC Z-up → three.js Y-up axis
+            // swap. Dropping it — as this component did while web-ifc was never
+            // actually installed — renders every element 1000x oversized, on its
+            // side, and stacked on the origin.
+            mesh3.matrix.fromArray(placedGeom.flatTransformation)
+            mesh3.matrixAutoUpdate = false
             scene.add(mesh3)
             ifcGeom.delete()
           }
         })
 
         api.CloseModel(modelId)
+
+        // Frame the model. World units come out of flatTransformation as metres,
+        // but a fixed camera would still mis-frame anything that isn't a small
+        // building, so fit to the actual bounds instead of hardcoding a pose.
+        const box = new THREE.Box3().setFromObject(scene)
+        if (!box.isEmpty()) {
+          const center = box.getCenter(new THREE.Vector3())
+          const size = box.getSize(new THREE.Vector3())
+          const extent = Math.max(size.x, size.y, size.z) || 1
+          // Distance at which `extent` fills the vertical FOV, with headroom.
+          const dist =
+            (extent / (2 * Math.tan((FOV_DEG * Math.PI) / 360))) * FIT_MARGIN
+
+          camera.position.set(
+            center.x + dist,
+            center.y + dist * 0.6,
+            center.z + dist,
+          )
+          camera.near = Math.max(extent / 1000, 0.01)
+          camera.far = dist * 10 + extent * 10
+          camera.updateProjectionMatrix()
+          camera.lookAt(center)
+
+          dir.position.set(
+            center.x + extent,
+            center.y + extent * 2,
+            center.z + extent,
+          )
+        }
 
         function animate() {
           if (cancelled) return
@@ -156,8 +205,10 @@ export default function BIMView({ ifc_base64, className = '', viewRef }) {
     }
   }, [ifc_base64])
 
-  // Stub — shown when web-ifc is not installed
-  if (depsAvailable === false) {
+  // The IFC stack (web-ifc + three) failed to load — a missing chunk, a blocked
+  // WASM fetch, or an offline CDN. Nothing the model or the file can fix, so we
+  // show the underlying reason rather than a retry the user can't act on.
+  if (depsError) {
     return (
       <div
         className={`flex flex-col items-center justify-center gap-3 rounded-lg border border-ink-700 bg-ink-900/50 p-8 text-ink-400 ${className}`}
@@ -170,12 +221,13 @@ export default function BIMView({ ifc_base64, className = '', viewRef }) {
             d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
           />
         </svg>
-        <p className="text-sm font-medium">IFC viewer</p>
+        <p className="text-sm font-medium">IFC viewer unavailable</p>
         <p className="text-xs text-center max-w-xs opacity-70">
-          Run{' '}
-          <code className="font-mono bg-ink-800 px-1 rounded">npm install web-ifc three</code> to
-          enable the 3D IFC viewer.
+          The 3D viewer failed to load. Check your network connection and reload the page.
         </p>
+        <code className="font-mono text-[11px] bg-ink-800 px-2 py-1 rounded max-w-xs truncate">
+          {depsError}
+        </code>
       </div>
     )
   }
@@ -198,7 +250,12 @@ export default function BIMView({ ifc_base64, className = '', viewRef }) {
           </div>
         </div>
       )}
-      <canvas ref={canvasRef} className="w-full h-full block" style={{ minHeight: 320 }} />
+      <canvas
+        ref={canvasRef}
+        data-testid="bim-canvas"
+        className="w-full h-full block"
+        style={{ minHeight: 320 }}
+      />
     </div>
   )
 }

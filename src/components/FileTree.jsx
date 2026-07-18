@@ -217,6 +217,7 @@ function Node({ file, depth, byParent, expanded, toggle, currentFileId, onSelect
         {isRenaming ? (
           <input
             ref={inputRef}
+            data-testid="rename-input"
             defaultValue={file.name}
             className="flex-1 bg-ink-950 border border-kerf-300/50 rounded px-1 text-xs font-mono outline-none text-ink-100 min-w-0"
             onBlur={commitRename}

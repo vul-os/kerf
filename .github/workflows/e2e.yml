@@ -54,16 +54,26 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      # `pip install -e .[full]` CANNOT work here: the repo is a uv workspace and
+      # the kerf-* requirements are wired to packages/* via [tool.uv.sources],
+      # which only uv reads. Plain pip goes to PyPI, where kerf-core et al. are
+      # unpublished, and dies with "No matching distribution found for kerf-cli".
+      # The per-package fallback failed for the same reason one level down
+      # (kerf-api requires kerf-auth). dev-install.sh installs the persona's
+      # packages editable in a SINGLE pip invocation so the inter-package
+      # requirements resolve from the local checkout.
       - name: Install Python dependencies (full persona)
-        run: |
-          pip install --quiet -e ".[full]" 2>/dev/null || \
-            for d in packages/kerf-*/; do pip install --quiet -e "$d"; done
+        run: ./scripts/dev-install.sh full
 
       # -----------------------------------------------------------------------
       # Database migrations
       # -----------------------------------------------------------------------
+      # The runner reads sys.argv[1] or $DATABASE_URL — NOT $KERF_DATABASE_URL
+      # (kerf_core.config.Settings has no env prefix). Passing only the KERF_*
+      # name would leave it with no DSN.
       - name: Run DB migrations
         env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/${{ env.E2E_DB }}
           KERF_DATABASE_URL: postgres://postgres:postgres@localhost:5432/${{ env.E2E_DB }}
           PGHOST: localhost
           PGPORT: 5432
@@ -98,13 +108,23 @@ jobs:
         env:
           CI: "true"
           KERF_LOCAL_MODE: "true"
+          LOCAL_MODE: "true"
+          # playwright.config.ts forwards $DATABASE_URL into the kerf-server it
+          # boots; without the unprefixed name the server would fall back to its
+          # default DSN and never see the migrated e2e database.
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/${{ env.E2E_DB }}
           KERF_DATABASE_URL: postgres://postgres:postgres@localhost:5432/${{ env.E2E_DB }}
           # Tell the playwright.config.ts webServer commands which ports to use.
           # The playwright.config.ts picks these up directly via the hardcoded
           # port values (:8081 / :5174); we also export them here for clarity.
           E2E_BASE_URL: http://localhost:${{ env.E2E_VITE_PORT }}
           E2E_API_URL: http://localhost:${{ env.E2E_API_PORT }}
-          VITE_API_URL: http://localhost:${{ env.E2E_API_PORT }}
+          # DELIBERATELY NOT SET: VITE_API_URL. Vite exposes any VITE_-prefixed
+          # var from the environment to the client bundle, so setting it here
+          # would make the browser call the API cross-origin and trip the
+          # index.html CSP (connect-src 'self') — every spec would then fail on
+          # the sign-in page. The dev server proxies to the API instead; see
+          # KERF_API_PROXY_TARGET in playwright.config.ts.
         run: cd tests/e2e && npm test
 
       # -----------------------------------------------------------------------

@@ -54,11 +54,23 @@ pip install "kerf[full]"          # everything
 ```sh
 git clone https://github.com/kerf-sh/kerf
 cd kerf
-pip install -e .[mech]    # choose your persona
+
+# uv users — resolves the workspace automatically:
+uv sync --extra mech
+# pip users — installs the persona's workspace packages editable:
+./scripts/dev-install.sh mech    # choose your persona
+
 npm install
 ```
 
-See [getting-started.md](./getting-started.md) for the full from-source walkthrough.
+> A bare `pip install -e .[mech]` does **not** work: the repo is a `uv`
+> workspace and `[tool.uv.sources]` (which maps `kerf-*` to `packages/*`) is
+> only understood by `uv`. Plain pip tries PyPI and fails. Use `uv sync` or the
+> `scripts/dev-install.sh` helper.
+
+See [getting-started.md](./getting-started.md) for the full from-source walkthrough,
+and [solver dependencies](#solver-dependencies-dolfinx--pythonocc) below for the
+conda-only compute stack.
 
 ## Persona bundles
 
@@ -75,6 +87,36 @@ have lighter runtime footprints.
 | `compute-only` | Heavy workers behind an internal load balancer; no auth or REST | all compute deps |
 
 Full breakdown: [persona-bundles.md](./persona-bundles.md).
+
+## Solver dependencies (dolfinx + pythonOCC)
+
+The `mech`, `full`, and `compute-only` personas list heavy compute extras —
+pythonOCC (B-rep CAD, `kerf-cad-core[occ]`) and FEniCSx/dolfinx (FEM,
+`kerf-fem[fenicsx]`). **These are distributed through conda-forge only — they are
+not on PyPI for any Python version**, so `pip install` cannot provide them. The
+server still boots without them; the CAD and FEM plugins detect the missing
+solver and register a reduced capability set.
+
+To get the solvers, install them into a conda environment and install the Kerf
+packages into that same environment:
+
+```sh
+# 1. A conda env with the solver stack (conda-forge builds target Python 3.12):
+conda create -n kerf -c conda-forge \
+  python=3.12 fenics-dolfinx pythonocc-core python-gmsh meshio slepc4py scipy pygit2
+conda activate kerf
+
+# 2. The Kerf workspace packages, editable, into that env:
+PIP="$(command -v pip)" ./scripts/dev-install.sh mech
+```
+
+Notes:
+
+- conda-forge splits gmsh: the Python binding is `python-gmsh`, separate from the
+  `gmsh` app package.
+- `scipy` is needed by several `kerf-cad-core` geometry tools.
+- `pygit2` is only required if you use the cloud S3-backed git storer; it is
+  harmless to include and keeps `[full]` happy.
 
 ## Postgres setup
 
@@ -183,7 +225,7 @@ version:
 
 ```sh
 git pull
-pip install -e .[mech]    # pick up any new deps
+uv sync --extra mech             # or: ./scripts/dev-install.sh mech
 kerf-server --migrate
 kerf-server
 ```

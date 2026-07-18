@@ -28,23 +28,6 @@ Parametric sketching &amp; modeling · drawings · FEM/CFD · CAM · electronics
 
 Kerf is a complete CAD system — sketcher, B-rep modeling kernel, drawings, assemblies, FEM/CFD, CAM, electronics/PCB, BIM, and manufacturing prep across 37 engineering domains — that installs and runs entirely on your own machine, MIT-licensed, with no account required. Every design lives in plain files (JSCAD, `.feature` JSON, `.circuit.tsx`, `.sketch`, `.drawing`) so an LLM chat panel can read, diff, and edit your project directly instead of guessing at pixels. When you want to share a part, publish it to the **Workshop** — a distributed catalog of parts built on the open **DMTAP-PUB** protocol: signed, content-addressed, no accounts, no central server, and still browsable offline once pinned.
 
-## Part of VulOS
-
-**Vulos = free, open-source software + two paid services.** The **Vulos OS**, all its apps, and the app store are OSS and free — you self-host them. Users **self-provision and self-pay their own box** (Fly / Hetzner / any VPS / home server); Vulos does not host or provision boxes. Vulos bills for only two things — **Vulos Relay** (reachability) and **backup storage** (buckets) — there is no compute/box billing, no mail billing, and no app-store subscription.
-
-VulOS is an open, self-hostable web OS + app suite. The **Vulos OS** is the shell (launcher, windows, dock, assistant) that hosts the apps; each product is also independently self-hostable on its own:
-
-- **Vulos OS** — the web-native desktop shell that hosts the apps
-- **Vulos Office** — documents: docs, sheets, slides, PDF, and whiteboards (an Office document type — there is no separate Board product)
-- **Vulos Files** — file storage + P2P sharing, built into the OS
-- **Vulos Relay** — sovereign connectivity / reachability fabric, one of the two paid services
-- **llmux** — sovereign AI gateway
-- **kerf** — CAD: parametric design, simulation, manufacturing, and the distributed parts Workshop
-
-PIM is bring-your-own via **lilmail**; comms are third-party open protocols (Matrix/Element, Element Call / Jitsi) — Vulos builds neither.
-
-Kerf **runs standalone and is hosted as an app by the Vulos OS.** There is nothing to buy in Kerf itself, ever — no billing, no paid tiers, no cloud product. If you want an always-on, publicly-reachable node, you bring your own box; VulOS tooling helps you provision it, and Vulos Relay (a VulOS service, not a Kerf one) can make a loopback-bound node reachable without a static IP.
-
 ## Features
 
 - **Two real kernels** — JSCAD for fast iteration; OpenCascade B-rep (`.feature` files) for fillets, shells, and lossless STEP export. Pick per file.

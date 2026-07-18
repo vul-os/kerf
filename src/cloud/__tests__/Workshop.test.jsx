@@ -24,7 +24,7 @@ import { dirname, join } from 'node:path'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import {
-  AvailabilityBadge, WorkshopCard, BrowseEmptyState, FollowsPanel,
+  AvailabilityBadge, WorkshopCard, BrowseEmptyState, FollowsPanel, BomTable,
 } from '../Workshop.jsx'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -148,6 +148,170 @@ describe('WorkshopCard', () => {
 })
 
 // ---------------------------------------------------------------------------
+// 2b. WorkshopCard — BOM action + pin/hydration notes
+// ---------------------------------------------------------------------------
+
+describe('WorkshopCard — BOM action', () => {
+  it('shows a BOM button for assembly-kind items', () => {
+    const item = { ...baseItem, meta: { ...baseItem.meta, artifact_kind: 'assembly' } }
+    const html = renderToStaticMarkup(
+      <WorkshopCard item={item} onTogglePin={() => {}} pinBusy={false} onOpenBom={() => {}} />,
+    )
+    expect(html).toContain('data-testid="bom-button"')
+  })
+
+  it('does not show a BOM button for non-assembly items', () => {
+    const html = renderToStaticMarkup(
+      <WorkshopCard item={baseItem} onTogglePin={() => {}} pinBusy={false} />,
+    )
+    expect(html).not.toContain('data-testid="bom-button"')
+  })
+})
+
+describe('WorkshopCard — pin hydration states', () => {
+  it('shows a success note once hydrated:true', () => {
+    const html = renderToStaticMarkup(
+      <WorkshopCard
+        item={baseItem}
+        onTogglePin={() => {}}
+        pinBusy={false}
+        pinNote={{ kind: 'success' }}
+      />,
+    )
+    expect(html).toContain('data-testid="pin-success-note"')
+    expect(html).toContain('now serving from this node')
+  })
+
+  it('shows a partial state with a Retry fetch button when pinned but not hydrated', () => {
+    const html = renderToStaticMarkup(
+      <WorkshopCard
+        item={baseItem}
+        onTogglePin={() => {}}
+        pinBusy={false}
+        pinNote={{ kind: 'partial', missingChunks: 3 }}
+        onRetryHydrate={() => {}}
+        hydrateBusy={false}
+      />,
+    )
+    expect(html).toContain('data-testid="pin-partial-note"')
+    expect(html).toContain('3 chunks not yet fetched')
+    expect(html).toContain('data-testid="hydrate-retry-button"')
+  })
+
+  it('singularizes "chunk" when exactly one is missing', () => {
+    const html = renderToStaticMarkup(
+      <WorkshopCard
+        item={baseItem}
+        onTogglePin={() => {}}
+        pinBusy={false}
+        pinNote={{ kind: 'partial', missingChunks: 1 }}
+        onRetryHydrate={() => {}}
+        hydrateBusy={false}
+      />,
+    )
+    expect(html).toContain('1 chunk not yet fetched')
+    expect(html).not.toContain('1 chunks')
+  })
+
+  it('the retry button is disabled while a hydrate retry is in flight', () => {
+    const html = renderToStaticMarkup(
+      <WorkshopCard
+        item={baseItem}
+        onTogglePin={() => {}}
+        pinBusy={false}
+        pinNote={{ kind: 'partial', missingChunks: 2 }}
+        onRetryHydrate={() => {}}
+        hydrateBusy
+      />,
+    )
+    expect(html).toMatch(/disabled="?"?[^>]*data-testid="hydrate-retry-button"/)
+  })
+
+  it('shows an error note when the pin response reports an error', () => {
+    const html = renderToStaticMarkup(
+      <WorkshopCard
+        item={baseItem}
+        onTogglePin={() => {}}
+        pinBusy={false}
+        pinNote={{ kind: 'error', message: 'gateway unreachable' }}
+      />,
+    )
+    expect(html).toContain('data-testid="pin-error-note"')
+    expect(html).toContain('gateway unreachable')
+  })
+
+  it('shows no pin note at all when pinNote is undefined', () => {
+    const html = renderToStaticMarkup(
+      <WorkshopCard item={baseItem} onTogglePin={() => {}} pinBusy={false} />,
+    )
+    expect(html).not.toContain('data-testid="pin-success-note"')
+    expect(html).not.toContain('data-testid="pin-partial-note"')
+    expect(html).not.toContain('data-testid="pin-error-note"')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 2c. BomTable — BOM view (§23.6.3)
+// ---------------------------------------------------------------------------
+
+describe('BomTable', () => {
+  it('shows a loading state', () => {
+    const html = renderToStaticMarkup(<BomTable loading error={null} bom={null} />)
+    expect(html).toContain('Loading BOM')
+  })
+
+  it('shows an error state', () => {
+    const html = renderToStaticMarkup(<BomTable loading={false} error="Could not load the BOM." bom={null} />)
+    expect(html).toContain('data-testid="bom-error"')
+    expect(html).toContain('Could not load the BOM.')
+  })
+
+  it('renders one row per part with ref, kind, resolved announce, and quantity', () => {
+    const bom = {
+      announce_id: 'ann-top',
+      parts: [
+        { ref: 'ref-aaaaaaaaaaaaaaaaaaaa', ref_kind: 'track', resolved_announce: 'ann-resolved-bbbbbbbbbbbbbbbb', quantity_total: 4 },
+        { ref: 'ref-cccccccccccccccccccc', ref_kind: 'pin', resolved_announce: null, quantity_total: 1 },
+      ],
+      cycles: [],
+    }
+    const html = renderToStaticMarkup(<BomTable loading={false} error={null} bom={bom} />)
+    expect(html).toContain('data-testid="bom-table"')
+    expect(html.match(/data-testid="bom-row"/g)).toHaveLength(2)
+    expect(html).toContain('track')
+    expect(html).toContain('pin')
+    expect(html).toContain('4')
+    expect(html).toContain('—') // no resolved_announce for the pin leaf
+  })
+
+  it('shows an empty state when there are no resolvable parts and no cycles', () => {
+    const html = renderToStaticMarkup(<BomTable loading={false} error={null} bom={{ parts: [], cycles: [] }} />)
+    expect(html).toContain('data-testid="bom-empty"')
+  })
+
+  it('shows a prominent cycle warning naming the offending ref and path', () => {
+    const bom = {
+      parts: [],
+      cycles: [{ ref: 'ref-loop-aaaaaaaaaaaaaaaa', ref_kind: 'track', path: ['ref-loop-aaaaaaaaaaaaaaaa', 'ref-mid-bbbbbbbbbbbbbbbb'] }],
+    }
+    const html = renderToStaticMarkup(<BomTable loading={false} error={null} bom={bom} />)
+    expect(html).toContain('data-testid="bom-cycle-warning"')
+    expect(html).toContain('Cycle detected')
+    expect(html).toContain('this subtree&#x27;s BOM is not computable')
+  })
+
+  it('shows both a cycle warning and a table when the BOM has some resolvable parts alongside a cycle', () => {
+    const bom = {
+      parts: [{ ref: 'ref-ok', ref_kind: 'track', resolved_announce: 'ann-ok', quantity_total: 1 }],
+      cycles: [{ ref: 'ref-loop', ref_kind: 'pin', path: ['ref-loop'] }],
+    }
+    const html = renderToStaticMarkup(<BomTable loading={false} error={null} bom={bom} />)
+    expect(html).toContain('data-testid="bom-cycle-warning"')
+    expect(html).toContain('data-testid="bom-table"')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // 3. BrowseEmptyState
 // ---------------------------------------------------------------------------
 
@@ -237,5 +401,20 @@ describe('Workshop.jsx — retired account-based model is gone', () => {
     expect(workshopSrc).toContain("from './api.js'")
     expect(workshopSrc).toContain('pub.listWorkshop')
     expect(workshopSrc).toContain('pub.listFollows')
+  })
+
+  it('drives the BOM view and pin-hydration retry through the pub client', () => {
+    expect(workshopSrc).toContain('pub.bom')
+    expect(workshopSrc).toContain('pub.hydratePin')
+  })
+
+  it('refreshes the workshop list after a pin/hydrate action so badges catch up', () => {
+    // applyPinResult() is the shared handler behind pin() and hydratePin();
+    // it must call loadAll() so availability badges (server-derived) update.
+    const applyBody = workshopSrc.slice(
+      workshopSrc.indexOf('const applyPinResult'),
+      workshopSrc.indexOf('const onTogglePin'),
+    )
+    expect(applyBody).toContain('loadAll()')
   })
 })

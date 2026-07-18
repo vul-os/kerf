@@ -71,9 +71,52 @@ describe('pub API client — matches the /api/pub contract', () => {
     })
   })
 
+  it('publish: assembly kind includes a children array {ref_kind, manifest_root|announce_id, quantity}', async () => {
+    await pub.publish({
+      projectId: 'proj-1',
+      metadata: { name: 'Gearbox', description: '', artifact_kind: 'assembly', license: 'MIT', units: 'mm', tags: [] },
+      children: [
+        { ref_kind: 'track', announce_id: 'ann-child-1', quantity: 2 },
+        { ref_kind: 'pin', manifest_root: 'manifest-root-1', quantity: 1 },
+      ],
+    })
+    expect(calls[0].url).toBe('/api/pub/publish')
+    expect(calls[0].method).toBe('POST')
+    expect(JSON.parse(calls[0].body).children).toEqual([
+      { ref_kind: 'track', announce_id: 'ann-child-1', quantity: 2 },
+      { ref_kind: 'pin', manifest_root: 'manifest-root-1', quantity: 1 },
+    ])
+  })
+
+  it('publish: omits `children` entirely for non-assembly publishes', async () => {
+    await pub.publish({
+      projectId: 'proj-1',
+      metadata: { name: 'Bracket', description: '', artifact_kind: 'part', license: 'MIT', units: 'mm', tags: [] },
+    })
+    expect(JSON.parse(calls[0].body)).not.toHaveProperty('children')
+  })
+
+  it('assemblyCandidates: GET /api/pub/assembly-candidates/:project_id', async () => {
+    await pub.assemblyCandidates('proj-1')
+    expect(calls[0].url).toBe('/api/pub/assembly-candidates/proj-1')
+    expect(calls[0].method ?? 'GET').toBe('GET')
+  })
+
+  it('bom: GET /api/pub/bom/:announce_id', async () => {
+    await pub.bom('ann-1')
+    expect(calls[0].url).toBe('/api/pub/bom/ann-1')
+    expect(calls[0].method ?? 'GET').toBe('GET')
+  })
+
   it('pin: POST /api/pub/pin/:announce_id', async () => {
     await pub.pin('ann-1')
     expect(calls[0].url).toBe('/api/pub/pin/ann-1')
+    expect(calls[0].method).toBe('POST')
+  })
+
+  it('hydratePin: POST /api/pub/pin/:announce_id/hydrate', async () => {
+    await pub.hydratePin('ann-1')
+    expect(calls[0].url).toBe('/api/pub/pin/ann-1/hydrate')
     expect(calls[0].method).toBe('POST')
   })
 

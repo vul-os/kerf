@@ -24,6 +24,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import {
   IdentityStep, IdentityCreatedStep, MetadataStep, ConfirmStep, SuccessStep,
+  ChildrenStep, emptyChildRow, isChildRowValid, buildChildrenPayload,
 } from '../PublishButton.jsx'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -133,6 +134,201 @@ describe('MetadataStep — required fields gate Continue', () => {
 })
 
 // ---------------------------------------------------------------------------
+// 2b. Assembly children (§23.6.2) — pin/track picker
+// ---------------------------------------------------------------------------
+
+describe('emptyChildRow / isChildRowValid / buildChildrenPayload', () => {
+  it('a fresh row defaults to track with quantity 1', () => {
+    expect(emptyChildRow()).toEqual({ refKind: 'track', announceId: '', manifestRoot: '', quantity: 1 })
+  })
+
+  it('a track row is valid only once an announce is chosen', () => {
+    expect(isChildRowValid({ refKind: 'track', announceId: '', manifestRoot: '', quantity: 1 })).toBe(false)
+    expect(isChildRowValid({ refKind: 'track', announceId: 'ann-1', manifestRoot: '', quantity: 1 })).toBe(true)
+  })
+
+  it('a pin row is valid only once a manifest_root is filled in', () => {
+    expect(isChildRowValid({ refKind: 'pin', announceId: '', manifestRoot: '  ', quantity: 1 })).toBe(false)
+    expect(isChildRowValid({ refKind: 'pin', announceId: '', manifestRoot: 'root-1', quantity: 1 })).toBe(true)
+  })
+
+  it('quantity must be a positive integer', () => {
+    expect(isChildRowValid({ refKind: 'track', announceId: 'ann-1', manifestRoot: '', quantity: 0 })).toBe(false)
+    expect(isChildRowValid({ refKind: 'track', announceId: 'ann-1', manifestRoot: '', quantity: -1 })).toBe(false)
+    expect(isChildRowValid({ refKind: 'track', announceId: 'ann-1', manifestRoot: '', quantity: 1.5 })).toBe(false)
+    expect(isChildRowValid({ refKind: 'track', announceId: 'ann-1', manifestRoot: '', quantity: 2 })).toBe(true)
+  })
+
+  it('builds the exact publish payload shape: track sends announce_id, pin sends manifest_root', () => {
+    const rows = [
+      { refKind: 'track', announceId: 'ann-child-1', manifestRoot: '', quantity: 2 },
+      { refKind: 'pin', announceId: '', manifestRoot: '  root-xyz  ', quantity: '3' },
+    ]
+    expect(buildChildrenPayload(rows)).toEqual([
+      { ref_kind: 'track', announce_id: 'ann-child-1', quantity: 2 },
+      { ref_kind: 'pin', manifest_root: 'root-xyz', quantity: 3 },
+    ])
+  })
+})
+
+describe('ChildrenStep', () => {
+  const candidates = [
+    { announce_id: 'ann-1', name: 'M3 Bracket', kind: 'part' },
+    { announce_id: 'ann-2', name: 'Gearbox v1', kind: 'assembly' },
+  ]
+
+  it('requires at least one child — Continue is disabled with zero rows', () => {
+    const html = renderToStaticMarkup(
+      <ChildrenStep
+        rows={[]}
+        setRows={() => {}}
+        candidates={candidates}
+        candidatesLoading={false}
+        candidatesError={null}
+        error={null}
+        onBack={() => {}}
+        onContinue={() => {}}
+      />,
+    )
+    expect(html).toContain('data-testid="no-children-hint"')
+    expect(html).toMatch(/disabled=""[^>]*data-testid="children-continue-button"/)
+  })
+
+  it('an incomplete track row (no announce chosen) keeps Continue disabled', () => {
+    const html = renderToStaticMarkup(
+      <ChildrenStep
+        rows={[emptyChildRow()]}
+        setRows={() => {}}
+        candidates={candidates}
+        candidatesLoading={false}
+        candidatesError={null}
+        error={null}
+        onBack={() => {}}
+        onContinue={() => {}}
+      />,
+    )
+    expect(html).toMatch(/disabled=""[^>]*data-testid="children-continue-button"/)
+  })
+
+  it('a valid track row (announce chosen, quantity set) enables Continue', () => {
+    const html = renderToStaticMarkup(
+      <ChildrenStep
+        rows={[{ refKind: 'track', announceId: 'ann-1', manifestRoot: '', quantity: 1 }]}
+        setRows={() => {}}
+        candidates={candidates}
+        candidatesLoading={false}
+        candidatesError={null}
+        error={null}
+        onBack={() => {}}
+        onContinue={() => {}}
+      />,
+    )
+    expect(html).not.toMatch(/disabled=""[^>]*data-testid="children-continue-button"/)
+  })
+
+  it('the picker lists candidate name + kind for track rows', () => {
+    const html = renderToStaticMarkup(
+      <ChildrenStep
+        rows={[emptyChildRow()]}
+        setRows={() => {}}
+        candidates={candidates}
+        candidatesLoading={false}
+        candidatesError={null}
+        error={null}
+        onBack={() => {}}
+        onContinue={() => {}}
+      />,
+    )
+    expect(html).toContain('M3 Bracket')
+    expect(html).toContain('Gearbox v1')
+    expect(html).toContain('data-testid="child-announce-select"')
+  })
+
+  it('a pin row (advanced) shows a free-text manifest-root input instead of the picker', () => {
+    const html = renderToStaticMarkup(
+      <ChildrenStep
+        rows={[{ refKind: 'pin', announceId: '', manifestRoot: '', quantity: 1 }]}
+        setRows={() => {}}
+        candidates={candidates}
+        candidatesLoading={false}
+        candidatesError={null}
+        error={null}
+        onBack={() => {}}
+        onContinue={() => {}}
+      />,
+    )
+    expect(html).toContain('data-testid="child-manifest-root-input"')
+    expect(html).not.toContain('data-testid="child-announce-select"')
+    expect(html).toContain('Pin (advanced)')
+  })
+
+  it('explains pin vs track in one line each', () => {
+    const trackHtml = renderToStaticMarkup(
+      <ChildrenStep
+        rows={[emptyChildRow()]}
+        setRows={() => {}}
+        candidates={candidates}
+        candidatesLoading={false}
+        candidatesError={null}
+        error={null}
+        onBack={() => {}}
+        onContinue={() => {}}
+      />,
+    )
+    expect(trackHtml).toContain('Track = follows the author&#x27;s latest revision')
+
+    const pinHtml = renderToStaticMarkup(
+      <ChildrenStep
+        rows={[{ refKind: 'pin', announceId: '', manifestRoot: '', quantity: 1 }]}
+        setRows={() => {}}
+        candidates={candidates}
+        candidatesLoading={false}
+        candidatesError={null}
+        error={null}
+        onBack={() => {}}
+        onContinue={() => {}}
+      />,
+    )
+    expect(pinHtml).toContain('Pin = exact bytes forever')
+  })
+
+  it('surfaces a candidates-fetch error without blocking the pin row option', () => {
+    const html = renderToStaticMarkup(
+      <ChildrenStep
+        rows={[emptyChildRow()]}
+        setRows={() => {}}
+        candidates={[]}
+        candidatesLoading={false}
+        candidatesError="Could not load your published artifacts."
+        error={null}
+        onBack={() => {}}
+        onContinue={() => {}}
+      />,
+    )
+    expect(html).toContain('Could not load your published artifacts.')
+    expect(html).toContain('Pin (advanced)')
+  })
+
+  it('renders one row per entry with a remove button and an add-child button', () => {
+    const html = renderToStaticMarkup(
+      <ChildrenStep
+        rows={[emptyChildRow(), emptyChildRow()]}
+        setRows={() => {}}
+        candidates={candidates}
+        candidatesLoading={false}
+        candidatesError={null}
+        error={null}
+        onBack={() => {}}
+        onContinue={() => {}}
+      />,
+    )
+    expect(html.match(/data-testid="assembly-child-row"/g)).toHaveLength(2)
+    expect(html.match(/data-testid="remove-child-row"/g)).toHaveLength(2)
+    expect(html).toContain('data-testid="add-child-row"')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // 3. Irrevocability confirmation step
 // ---------------------------------------------------------------------------
 
@@ -190,5 +386,10 @@ describe('PublishButton.jsx — irrevocable, no takedown', () => {
     expect(publishSrc).toContain('pub.createIdentity')
     expect(publishSrc).not.toContain('workshop.publish')
     expect(publishSrc).not.toContain('generateReadme')
+  })
+
+  it('fetches assembly-candidates for the children picker and sends children on publish', () => {
+    expect(publishSrc).toContain('pub.assemblyCandidates')
+    expect(publishSrc).toContain('buildChildrenPayload(childRows)')
   })
 })

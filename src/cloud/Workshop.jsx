@@ -15,13 +15,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  AlertTriangle, CheckCircle2, CircleDot, Loader2, Pin, PinOff,
-  Plus, Radio, Sparkles, Tag, Trash2, Users, WifiOff,
+  AlertTriangle, CheckCircle2, CircleDot, ListTree, Loader2, Pin, PinOff,
+  Plus, Radio, RefreshCw, Sparkles, Tag, Trash2, Users, WifiOff,
 } from 'lucide-react'
 import Layout from '../components/Layout.jsx'
 import Card from '../components/Card.jsx'
 import Button from '../components/Button.jsx'
 import Input from '../components/Input.jsx'
+import Modal from '../components/Modal.jsx'
 import { ApiError } from '../lib/api.js'
 import { pub } from './api.js'
 
@@ -57,6 +58,119 @@ function truncatePub(key) {
   if (!key) return ''
   if (key.length <= 14) return key
   return `${key.slice(0, 8)}…${key.slice(-6)}`
+}
+
+// ---------------------------------------------------------------------------
+// BOM view (§23.6.3) — a simple table + a prominent cycle warning. Used from
+// an assembly-kind card's "BOM" action.
+// ---------------------------------------------------------------------------
+
+export function BomTable({ loading, error, bom }) {
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-ink-400 py-6 justify-center">
+        <Loader2 size={16} className="animate-spin" /> Loading BOM…
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div
+        className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200"
+        role="alert"
+        data-testid="bom-error"
+      >
+        <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+        <span>{error}</span>
+      </div>
+    )
+  }
+
+  const parts = (bom && bom.parts) || []
+  const cycles = (bom && bom.cycles) || []
+
+  return (
+    <div className="flex flex-col gap-4">
+      {cycles.length > 0 && (
+        <div
+          className="flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2.5 text-xs text-red-200"
+          role="alert"
+          data-testid="bom-cycle-warning"
+        >
+          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+          <div className="min-w-0">
+            <p className="font-medium">
+              Cycle detected — this subtree&apos;s BOM is not computable.
+            </p>
+            <ul className="mt-1.5 flex flex-col gap-1 font-mono text-[10px] text-red-300">
+              {cycles.map((c, i) => (
+                <li key={i} className="break-all">
+                  {c.ref_kind}:{truncatePub(c.ref)} — path: {(c.path || []).map(truncatePub).join(' → ')}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {parts.length === 0 ? (
+        <p className="text-sm text-ink-400" data-testid="bom-empty">No resolvable parts.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs" data-testid="bom-table">
+            <thead>
+              <tr className="text-left text-ink-500 border-b border-ink-800">
+                <th className="py-1.5 pr-3 font-medium">Ref</th>
+                <th className="py-1.5 pr-3 font-medium">Kind</th>
+                <th className="py-1.5 pr-3 font-medium">Resolved</th>
+                <th className="py-1.5 pr-3 font-medium text-right">Qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              {parts.map((p, i) => (
+                <tr key={i} className="border-b border-ink-800/60" data-testid="bom-row">
+                  <td className="py-1.5 pr-3 font-mono text-ink-200" title={p.ref}>{truncatePub(p.ref)}</td>
+                  <td className="py-1.5 pr-3 text-ink-300">{p.ref_kind}</td>
+                  <td className="py-1.5 pr-3 font-mono text-ink-200" title={p.resolved_announce || ''}>
+                    {p.resolved_announce ? truncatePub(p.resolved_announce) : '—'}
+                  </td>
+                  <td className="py-1.5 pr-3 text-right text-ink-100">{p.quantity_total}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function BomModal({ open, onClose, announceId, title }) {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [bom, setBom] = useState(null)
+
+  useEffect(() => {
+    if (!open || !announceId) return
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    pub.bom(announceId)
+      .then((res) => { if (!cancelled) setBom(res) })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof ApiError ? err.message : 'Could not load the BOM.')
+      })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [open, announceId])
+
+  if (!open) return null
+
+  return (
+    <Modal open={open} onClose={onClose} title={`BOM — ${title || 'Assembly'}`} widthClass="max-w-2xl">
+      <BomTable loading={loading} error={error} bom={bom} />
+    </Modal>
+  )
 }
 
 // AvailabilityBadge — the four honest states from docs/distributed-workshop.md.
@@ -104,10 +218,14 @@ export function AvailabilityBadge({ availability }) {
   )
 }
 
-export function WorkshopCard({ item, publisherLabel, superseded, onTogglePin, pinBusy }) {
+export function WorkshopCard({
+  item, publisherLabel, superseded, onTogglePin, pinBusy,
+  pinNote, onRetryHydrate, hydrateBusy, onOpenBom,
+}) {
   const meta = item.meta || {}
   const deprecated = !!meta.deprecated
   const tags = Array.isArray(meta.tags) ? meta.tags : []
+  const isAssembly = meta.artifact_kind === 'assembly'
 
   return (
     <Card className="flex flex-col overflow-hidden" data-testid="workshop-card">
@@ -183,18 +301,78 @@ export function WorkshopCard({ item, publisherLabel, superseded, onTogglePin, pi
 
         <AvailabilityBadge availability={item.availability} />
 
-        <Button
-          size="sm"
-          variant={item.pinned ? 'secondary' : 'ghost'}
-          disabled={pinBusy}
-          onClick={() => onTogglePin(item)}
-          data-testid="pin-toggle"
-        >
-          {pinBusy
-            ? <Loader2 size={13} className="animate-spin" />
-            : item.pinned ? <PinOff size={13} /> : <Pin size={13} />}
-          {item.pinned ? 'Unpin' : 'Pin'}
-        </Button>
+        {pinNote?.kind === 'success' && (
+          <div
+            className="flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-2 text-[11px] text-emerald-200"
+            data-testid="pin-success-note"
+          >
+            <CheckCircle2 size={12} className="mt-0.5 shrink-0" />
+            <span>Fetched and verified — now serving from this node.</span>
+          </div>
+        )}
+
+        {pinNote?.kind === 'partial' && (
+          <div
+            className="flex flex-col gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-200"
+            data-testid="pin-partial-note"
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+              <span>
+                Pinned — {pinNote.missingChunks} chunk{pinNote.missingChunks === 1 ? '' : 's'} not yet fetched.
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={hydrateBusy}
+              onClick={() => onRetryHydrate(item.announce_id)}
+              className="self-start"
+              data-testid="hydrate-retry-button"
+            >
+              {hydrateBusy
+                ? <Loader2 size={12} className="animate-spin" />
+                : <RefreshCw size={12} />}
+              Retry fetch
+            </Button>
+          </div>
+        )}
+
+        {pinNote?.kind === 'error' && (
+          <div
+            className="flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-200"
+            role="alert"
+            data-testid="pin-error-note"
+          >
+            <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+            <span>{pinNote.message}</span>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant={item.pinned ? 'secondary' : 'ghost'}
+            disabled={pinBusy}
+            onClick={() => onTogglePin(item)}
+            data-testid="pin-toggle"
+          >
+            {pinBusy
+              ? <Loader2 size={13} className="animate-spin" />
+              : item.pinned ? <PinOff size={13} /> : <Pin size={13} />}
+            {item.pinned ? 'Unpin' : 'Pin'}
+          </Button>
+          {isAssembly && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onOpenBom(item)}
+              data-testid="bom-button"
+            >
+              <ListTree size={13} /> BOM
+            </Button>
+          )}
+        </div>
       </div>
     </Card>
   )
@@ -381,6 +559,14 @@ export function Workshop() {
   const [followsError, setFollowsError] = useState(null)
   const [loading, setLoading] = useState(true)
   const [pinBusy, setPinBusy] = useState({})
+  // Per-announce_id note surfaced under the availability badge after a pin
+  // or hydrate-retry call: { kind: 'success' } once hydrated:true,
+  // { kind: 'partial', missingChunks } when pinned but not fully fetched
+  // yet, { kind: 'error', message } on failure. Keyed by announce_id so it
+  // survives the loadAll() refresh that follows every pin/hydrate call.
+  const [pinNotes, setPinNotes] = useState({})
+  const [hydrateBusy, setHydrateBusy] = useState({})
+  const [bomItem, setBomItem] = useState(null)
 
   const loadAll = useCallback(() => {
     setLoading(true)
@@ -415,20 +601,77 @@ export function Workshop() {
     return s
   }, [items])
 
-  const onTogglePin = useCallback(async (item) => {
-    setPinBusy((b) => ({ ...b, [item.announce_id]: true }))
-    const wasPinned = !!item.pinned
-    setItems((list) => list.map((i) => (
-      i.announce_id === item.announce_id ? { ...i, pinned: !wasPinned } : i
+  const setPinNote = useCallback((announceId, note) => {
+    setPinNotes((n) => {
+      if (note == null) {
+        if (!(announceId in n)) return n
+        const rest = { ...n }
+        delete rest[announceId]
+        return rest
+      }
+      return { ...n, [announceId]: note }
+    })
+  }, [])
+
+  // Applies a pin()/hydratePin() response — { pinned, hydrated,
+  // missing_chunks, error? } — to both the item's pinned flag and the note
+  // shown under its availability badge, then refreshes the list so the
+  // badge itself (server-derived availability) catches up too.
+  const applyPinResult = useCallback((announceId, res) => {
+    const hydrated = !!res?.hydrated
+    const pinned = !!res?.pinned
+    setItems((list) => (list || []).map((i) => (
+      i.announce_id === announceId ? { ...i, pinned } : i
     )))
-    try {
-      if (wasPinned) await pub.unpin(item.announce_id)
-      else await pub.pin(item.announce_id)
-    } catch (err) {
-      // revert
+    if (hydrated) {
+      setPinNote(announceId, { kind: 'success' })
+      setTimeout(() => {
+        setPinNotes((n) => {
+          if (n[announceId]?.kind !== 'success') return n
+          const rest = { ...n }
+          delete rest[announceId]
+          return rest
+        })
+      }, 4000)
+    } else if (pinned) {
+      setPinNote(announceId, { kind: 'partial', missingChunks: res?.missing_chunks || 0 })
+    } else {
+      setPinNote(announceId, { kind: 'error', message: res?.error || 'Pin did not complete.' })
+    }
+    loadAll()
+  }, [loadAll, setPinNote])
+
+  const onTogglePin = useCallback(async (item) => {
+    const wasPinned = !!item.pinned
+    setPinBusy((b) => ({ ...b, [item.announce_id]: true }))
+
+    if (wasPinned) {
       setItems((list) => list.map((i) => (
-        i.announce_id === item.announce_id ? { ...i, pinned: wasPinned } : i
+        i.announce_id === item.announce_id ? { ...i, pinned: false } : i
       )))
+      setPinNote(item.announce_id, null)
+      try {
+        await pub.unpin(item.announce_id)
+        loadAll()
+      } catch (err) {
+        setItems((list) => list.map((i) => (
+          i.announce_id === item.announce_id ? { ...i, pinned: true } : i
+        )))
+        setError(err instanceof ApiError ? err.message : 'Pin action failed.')
+      } finally {
+        setPinBusy((b) => {
+          const n = { ...b }
+          delete n[item.announce_id]
+          return n
+        })
+      }
+      return
+    }
+
+    try {
+      const res = await pub.pin(item.announce_id)
+      applyPinResult(item.announce_id, res)
+    } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Pin action failed.')
     } finally {
       setPinBusy((b) => {
@@ -437,7 +680,23 @@ export function Workshop() {
         return n
       })
     }
-  }, [])
+  }, [applyPinResult, loadAll, setPinNote])
+
+  const onRetryHydrate = useCallback(async (announceId) => {
+    setHydrateBusy((b) => ({ ...b, [announceId]: true }))
+    try {
+      const res = await pub.hydratePin(announceId)
+      applyPinResult(announceId, res)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Hydration retry failed.')
+    } finally {
+      setHydrateBusy((b) => {
+        const n = { ...b }
+        delete n[announceId]
+        return n
+      })
+    }
+  }, [applyPinResult])
 
   const onAddFollow = useCallback(async ({ pub: pubKey, label, gatewayUrl }) => {
     await pub.addFollow({ pub: pubKey, label, gatewayUrl })
@@ -544,6 +803,10 @@ export function Workshop() {
                   superseded={supersededIds.has(item.announce_id)}
                   onTogglePin={onTogglePin}
                   pinBusy={!!pinBusy[item.announce_id]}
+                  pinNote={pinNotes[item.announce_id]}
+                  onRetryHydrate={onRetryHydrate}
+                  hydrateBusy={!!hydrateBusy[item.announce_id]}
+                  onOpenBom={setBomItem}
                 />
               ))}
             </div>
@@ -567,6 +830,13 @@ export function Workshop() {
           onRemove={onRemoveFollow}
         />
       )}
+
+      <BomModal
+        open={!!bomItem}
+        onClose={() => setBomItem(null)}
+        announceId={bomItem?.announce_id}
+        title={bomItem?.meta?.name}
+      />
     </Layout>
   )
 }

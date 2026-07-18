@@ -88,8 +88,11 @@ async function request(path, { method = 'GET', body, headers = {}, auth = true }
 //   DELETE /api/pub/follows/:pub
 //   GET  /api/pub/workshop -> [{ announce_id, pub, meta, roots, ts,
 //     supersedes, availability: { status, holders, last_verified }, pinned }]
-//   POST /api/pub/publish { project_id, metadata } -> { announce_id }
+//   POST /api/pub/publish { project_id, metadata, children? } -> { announce_id }
+//   GET  /api/pub/assembly-candidates/:project_id -> [{ announce_id, name, kind }]
+//   GET  /api/pub/bom/:announce_id -> { announce_id, parts: [...], cycles: [...] }
 //   POST/DELETE /api/pub/pin/:announce_id
+//   POST /api/pub/pin/:announce_id/hydrate
 export const pub = {
   // GET /api/pub/identity — the local node's Ed25519 publishing keypair,
   // or {pub: null} if one hasn't been created yet.
@@ -131,20 +134,53 @@ export const pub = {
     return request('/api/pub/workshop')
   },
 
-  // POST /api/pub/publish { project_id, metadata } -> { announce_id }.
+  // POST /api/pub/publish { project_id, metadata, children? } -> { announce_id }.
   // Irrevocable once any other node holds a copy — the UI must confirm this
   // explicitly before calling. `metadata` is { name, description,
-  // artifact_kind, license, units, tags }.
-  publish({ projectId, metadata }) {
+  // artifact_kind, license, units, tags }. `children` is only sent for
+  // artifact_kind: "assembly" — an array of { ref_kind: "pin"|"track",
+  // manifest_root?, announce_id?, quantity }; pin→manifest_root,
+  // track→announce_id. The backend 400s naming any ref it can't resolve.
+  publish({ projectId, metadata, children }) {
+    const body = { project_id: projectId, metadata }
+    if (children) body.children = children
     return request('/api/pub/publish', {
       method: 'POST',
-      body: { project_id: projectId, metadata },
+      body,
     })
   },
 
+  // GET /api/pub/assembly-candidates/:project_id -> [{ announce_id, name,
+  // kind }] — the node owner's own published announces, for the assembly
+  // "children" picker. v1 only lists announce_ids (usable for `track`
+  // children); `pin` children need a manifest_root, which this endpoint
+  // doesn't carry, so the UI collects those via free-text entry instead.
+  assemblyCandidates(projectId) {
+    return request(`/api/pub/assembly-candidates/${encodeURIComponent(projectId)}`)
+  },
+
+  // GET /api/pub/bom/:announce_id -> { announce_id,
+  //   parts: [{ ref, ref_kind, resolved_announce, quantity_total }],
+  //   cycles: [{ ref, ref_kind, path }] }
+  // The §23.6.3 BOM walk from an assembly-kind announce. A non-empty
+  // `cycles` means that subtree's BOM could not be fully computed — the UI
+  // must surface it, not silently drop the affected parts.
+  bom(announceId) {
+    return request(`/api/pub/bom/${encodeURIComponent(announceId)}`)
+  },
+
   // POST /api/pub/pin/:announce_id — fetch + durably keep + start serving.
+  // Returns { pinned, hydrated, missing_chunks, error? }: `pinned` alone
+  // does not mean the bytes are all local — check `hydrated`.
   pin(announceId) {
     return request(`/api/pub/pin/${encodeURIComponent(announceId)}`, { method: 'POST' })
+  },
+
+  // POST /api/pub/pin/:announce_id/hydrate — retry hydration of a pin that
+  // came back incomplete (pinned: true, hydrated: false). Same request/
+  // response shape as pin().
+  hydratePin(announceId) {
+    return request(`/api/pub/pin/${encodeURIComponent(announceId)}/hydrate`, { method: 'POST' })
   },
 
   // DELETE /api/pub/pin/:announce_id — stop serving locally. Never implies

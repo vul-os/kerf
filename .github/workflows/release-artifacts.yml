@@ -298,8 +298,9 @@ jobs:
             MISSING+=("SBOM (kerf-python-sbom-${VERSION}.json or fallback)")
           fi
 
-          # At least one wheel (spot-check)
-          if ! echo "$ASSETS" | grep -qE "\.whl$"; then
+          # At least one wheel (spot-check). ASSETS is a single-line JSON
+          # array, so match the quoted name boundary — never an EOL anchor.
+          if ! echo "$ASSETS" | grep -qE '\.whl"'; then
             MISSING+=("Python wheels (*.whl)")
           fi
 

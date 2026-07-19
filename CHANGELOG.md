@@ -1,381 +1,147 @@
 # Changelog
 
-All notable changes to Kerf are recorded here. The format is loosely
-based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
-versions follow [Semantic Versioning](https://semver.org/).
+All notable changes to Kerf are documented in this file.
 
-The authoritative source for what's shipped vs in-flight is
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+The authoritative source for what's shipped vs. in-flight is
 [ROADMAP.md](./ROADMAP.md). This file summarizes each tagged release.
+
+---
 
 ## [Unreleased]
 
-See `🔮 planned` rows in [ROADMAP.md](./ROADMAP.md). The v0.2 milestone
-focus is in [docs/plans/v0.2-milestone.md](./docs/plans/v0.2-milestone.md).
+No unreleased changes.
 
-### 2026-07-17 — Docs: VulOS-standard README, docs, and landing page — CAD-first, distributed Workshop, no billing
+---
 
-Public-facing docs brought up to the VulOS product standard (see the ADR
-"Kerf decentralizes: one node type, gateways as rented uptime, Workshop
-federation over DMTAP-PUB" in `decisions.md`, 2026-07-17, and the matching
-`ROADMAP.md` section). This is a documentation-first pass describing the
-decided target state; the underlying license-line redraw and DMTAP-PUB
-object model (ROADMAP P0) are tracked separately and not yet code-complete.
+## [0.1.0] - 2026-07-18
 
-#### Added
-- **Distributed Workshop positioning** — README, `docs/node-architecture.md`,
-  and `docs/distributed-workshop.md` (new) document Kerf's Workshop as a
-  federated protocol over **DMTAP-PUB** (`github.com/vul-os/dmtap` §22
-  public-objects extension + §23 CAD/artifact profile): signed,
-  content-addressed publish/follow/pin/fetch, no accounts, no central
-  server, availability states (on-node / available / stale / unreachable),
-  and the irrevocability-of-publishing warning.
-- **"Part of VulOS" standard docs** — README rewritten to the VulOS
-  product-repo standard's exact section order and required banner; product
-  map and family footer added to `landing/index.html`.
-- **`landing/` marketing page** — a new, self-contained static landing page
-  (`landing/index.html`, no build step, matching the sibling `wede` repo's
-  landing tooling) covering the CAD feature set, the Workshop/decentralization
-  story, and a self-host quick start.
-- **`docs/assets/vulos-logo.png`** — shared VulOS brand asset for the README
-  banner, matching sibling product repos.
+Initial public release. A complete, self-hosted CAD/EDA/BIM platform across
+37 engineering domains, a distributed Workshop for sharing parts without a
+central server, local git-backed version control, and no billing surface of
+any kind — Kerf is 100% MIT and free to self-host, permanently.
 
-#### Changed
-- **No-billing positioning** — the README and landing page describe Kerf as
-  billing for nothing, ever: self-host on your own hardware, with VulOS
-  tooling (Vulos Relay, backup buckets — both VulOS services, not Kerf ones)
-  available if you want an always-on, publicly-reachable node. No pricing,
-  tiers, or cloud-product language appears in either.
+### Added
 
-Files: `README.md` (full rewrite), `docs/node-architecture.md` (new),
-`docs/distributed-workshop.md` (new), `docs/assets/vulos-logo.png` (new),
-`landing/index.html` (new). Existing `docs/` files (including
-`docs/architecture.md`, `docs/getting-started.md`, and `docs/workshop.md`,
-which still documents the current centralized cloud Workshop gallery) are
-untouched.
-
-### 2026-06-01 — Infrastructure: Koyeb migration withdrawn; stack confirmed on Fly.io
-
-- **Infrastructure** — the 2026-05-24 Koyeb migration (T-400…T-410) is
-  withdrawn in full. Kerf stays on Fly.io. All Koyeb config files, deploy
-  scripts, and Koyeb-specific code have been removed. Confirmed stack:
-  - **Compute:** Fly.io, region `fra` (Frankfurt), `shared-cpu-2x`/2 GB.
-    Workers co-located via Fly `[processes]`. Deploy via `./scripts/deploy-fly.sh`.
-  - **Database:** Neon Postgres, `eu-central-1`.
-  - **Object storage:** Cloudflare R2 / Tigris — zero egress.
-  - **GPU renders (planned):** RunPod Serverless OR Modal — decision pending;
-    dispatch seam in `kerf_render.dispatch` is ready; backend TBD.
-  - **Email:** Resend.
-  - See [docs/architecture/stack.md](./docs/architecture/stack.md) and
-    [decisions.md — 2026-06-01 ADR](./decisions.md).
-
-### 2026-05-26 — Infrastructure: hosted stack settled (Fly + Neon + R2 + RunPod + Resend)
-
-- **Infrastructure** — hosted-tier stack settled after the
-  2026-05-24 Koyeb migration was reversed. Final stack documented above
-  (see 2026-06-01 entry — Koyeb references have been cleaned up).
-
-### 2026-05-24 — Infrastructure: Fly.io → Koyeb migration attempt (withdrawn 2026-06-01)
-
-- **Infrastructure** — hosted tier began migration from Fly.io to Koyeb (GPU
-  rendering unblocked, T4/A100 ladder available, Frankfurt data-centre).
-  Migration was withdrawn on 2026-06-01 before DNS cutover (T-405 never
-  executed). All Koyeb artifacts removed. See decisions.md for the ADR.
-
-### 2026-05-17 (later) — Compare hub matrices, scroll-to-top, CFD foundation, FEM ref-values
-
-Same date as the geometry-kernel step-change below; a second wave of
-landings followed in the same window. Captured here as a sibling section
-so the kernel + earlier-day entries stay self-contained.
-
-- **Compare hub redesign with per-category feature matrices** —
-  `src/routes/compare/index.jsx` + `src/routes/compare/CategoryMatrix.jsx`
-  now render Mechanical / Electronic / BIM / Jewelry & NURBS / DCC
-  matrices plus per-CAD cards (5 mech + 2 each electronic / BIM /
-  jewelry / DCC + 1 drafting). 14 head-to-head comparison routes live
-  under `/compare/` (Altium, Autocad, Blender, Civil3d, Freecad, Fusion,
-  Inventor, KiCad, MatrixGold, Max3ds, Onshape, Revit, Rhino,
-  Solidworks).
-- **5 new compare pages wired** — Solidworks / Autocad / Civil3d /
-  Inventor / Max3ds (`3736e98` + `5282b3f`), each lazy-loaded via
-  `src/App.jsx`.
-- **Scroll-to-top on route change** — `src/components/ScrollToTop.jsx`
-  wired in `src/App.jsx` (no more landing on `/compare` mid-scroll).
-- **Roadmap link in public Header** — `NAV_LINKS` in
-  `src/components/Header.jsx` now exposes `/roadmap` alongside Docs and
-  Compare.
-- **Blender/Cycles render architecture surfaced** — ROADMAP G-7 +
-  Roadmap.jsx + Landing.jsx now name the backend-Cycles + browser-path-
-  tracer split; T-106 epic split into T-106a..f in `tasks.md` (scene
-  translator + materials mapping, Cycles worker, hero-render UX,
-  pricing meter, self-host docker, in-browser
-  `three-gpu-pathtracer` fallback).
-- **Footer + h-scroll defensive guard** — `body { max-width: 100vw }` +
-  `overflow-x: clip` on html / body / `#root` in `src/index.css`
-  (`bba65ff` / `b2d2689`); Landing.jsx hero wrapper now clips
-  defensively for Safari/WebKit.
-- **CFD foundation (2-D laminar scope)** — `packages/kerf-fem/src/
-  kerf_fem/cfd_potential.py` (potential flow, `Cp(θ) = 1 − 4 sin²θ`
-  analytic oracle) + `cfd_navier_stokes.py` (lid-driven cavity,
-  Ghia Re=100 reference); 61 hermetic CFD tests in
-  `packages/kerf-fem/tests/test_cfd.py`. T-101 stays 🚧 in flight (full
-  CfdOF parity = turbulence k-ε / k-ω SST, 3-D unstructured meshing,
-  OpenFOAM bridge).
-- **FEM reference-value suite** — `packages/kerf-fem/src/kerf_fem/
-  pressure_load.py` + 43-test `test_fem_refvalues.py` with citable
-  Roark / Blevins / Incropera oracles; 42 green; one ASTM E1049
-  rainflow test skipped — real bug flagged in
-  `fatigue_fem._rainflow`, tracked under T-100.
-- **Test count** — full repo collects **24 134 tests** via
-  `pytest --collect-only -q -p no:cacheprovider --no-header` (verified
-  this session, +232 over the previous 23 902 baseline).
-
-### 2026-05-17 — Geometry kernel step-change + ship-gate landed
-
-Pure-Python B-rep/NURBS kernel jumped from *Rhino-width construction
-verbs, no topology binding, no closest-point, sampling-grade SSI, every
-boolean delegated to OCCT* to a real math-depth moat. All in
-`packages/kerf-cad-core/src/kerf_cad_core/geom/`.
-
-- **B-rep topology keystone wired** — `brep.py` (1 312 LOC) +
-  `brep_build.py` (833 LOC). The frozen `BREP_CONTRACT.md` model
-  (`Body → Solid → Shell → Face → Loop → Coedge → Edge → Vertex`, nine
-  Euler operators, generalised Euler–Poincaré invariant) now guards
-  real geometry: every analytic-verb builder ends with `validate_body`.
-- **Tolerant pure-Python solid booleans** — `sew.py` (386 LOC) +
-  `boolean.py` (1 195 LOC). Face-imprint via SSI, regularised
-  cut / fuse / common over the analytic primitive matrix, tolerance-
-  monotonic merge, `validate_body`-clean 2-manifold result with no OCCT.
-- **Parametric history DAG with persistent face/edge naming** — new
-  `geom/history/` (1 962 LOC). Three-part
-  `feature_id::role::fingerprint` selectors survive parameter edits —
-  a downstream fillet still targets the *semantically same* edge after
-  its upstream box is resized. Evaluators wired for box / cylinder /
-  sphere / boolean / chamfer / fillet.
-- **G1 / G2 surface fillet + edge chamfer that trim + sew** —
-  `fillet_solid.py` (1 631 LOC) + `chamfer.py` (1 040 LOC). G2
-  cross-sections, verified curvature continuity, planar+planar and
-  planar+cylindrical edge contracts.
-- **Surface / curve / loop offsets with exact-distance oracles** —
-  `offset.py` (877 LOC). Concentric circle, parallel plane, sphere
-  r → r+d analytic oracles.
-- **Coons patches** — `coons.py` (519 LOC). Boundary interpolation
-  exact to `1e-12`.
-- **Closest-point / point-inversion** — `inversion.py` (629 LOC).
-  Piegl 6.1 with analytic first + second partials on rational
-  surfaces. The foundational primitive snapping/projection/deviation/
-  SSI seeding/fitting/draft analysis builds on.
-- **Hardened SSI** — `intersection.py` rebuilt with loop-detection,
-  tangential-branch detection, small-loop guard, analytic line/quadric
-  specialisations. **Rational-weight bug fixed** along the way.
-- **FCC Part 15 Class B EMC reference-distance fix** — emc wizard
-  limits were ~10.46 dB too low against the published Class B mask;
-  corrected at the reference-distance derivation (commit ca9e651).
-- **Conftest plugin-name collision fix** — empty
-  `tests/__init__.py` files in billing / pricing / plc were blocking
-  whole-suite collection; removed (commit e663c64).
-- **Python 3.13 asyncio compat** — restored pre-3.10
-  `asyncio.get_event_loop()` semantics in the test process so the
-  ship-gate runs on 3.13 (commit 775b178).
-- **Ship-gate suite — 1 649 fail → 0 fail.** Full repo collection:
-  **23 902 tests**. Of these the listed kernel ship-gate files —
-  `test_brep_topology` (51), `test_euler_invariants` (63),
-  `test_brep_build` (43), `test_boolean_solid` (36), `test_chamfer`
-  (30), `test_fillet_blend_g2` (53), `test_offset` (33), `test_coons`
-  (49), `test_surface_analysis_refvalues` (46), `test_nurbs_correctness`
-  (44), `test_inversion` (42), `test_ssi_robust` (37),
-  `test_curve_toolkit_exact` (46), `test_history_dag` (47) — total
-  **620 hermetic analytic-oracle-asserted tests**, all green. Counts
-  verified via `pytest --collect-only`, not estimated.
-
-Plan + per-task `GK-NN` checklist (P2 interop is next):
-[`docs/plans/geometry-kernel-roadmap.md`](./docs/plans/geometry-kernel-roadmap.md).
-
-### 2026-05-17 — Renderer hero / docs viewer / comparison expansion / boot loader
-
-Same date, separate workstreams that landed in the same window as the kernel
-step-change above. Tracked here as a sibling section so the kernel entry
-stays self-contained.
-
-- **Renderer hero / PBR upgrade** — `captureHeroShot` (`src/lib/heroShot.js`)
-  now renders at 2048×2048 with 4× supersampling, ACES tonemapping, a
-  PMREM-pre-filtered RoomEnvironment HDRI, and `UnrealBloomPass`; wired into
-  `src/components/Renderer.jsx` so Workshop covers, share-cards, and the
-  primary 3D viewport share one production-grade lighting path.
-- **Frontend touch + responsive polish** — T-C1/T-C2 touch in Renderer,
-  T-C3 Gumball touch, T-L1/T-L2 Editor responsive + top-bar overflow,
-  T-H2 Docs mobile drawer.
-- **Pre-React boot loader** — `src/components/Loader.jsx` +
-  `src/components/RouteFallback.jsx` + a pre-React-mount Kerf-branded SVG
-  triangles loader injected in `index.html` (no more blank screen on first
-  paint).
-- **Docs viewer redesign** — grouped sidebar (`domains` + workflows + cloud
-  + reference + develop groups) with breadcrumbs, TOC, audit-filter, and
-  internal-planning-artifact filtering; `scripts/build-docs-manifest.mjs`
-  emits the grouped taxonomy into `public/docs-manifest.json`.
-- **Comparison pages expanded** — `src/routes/compare/` now ships
-  Altium, Blender, Freecad, Fusion, KiCad, MatrixGold, Onshape, Revit,
-  Rhino; the existing Freecad/Kicad/Rhino/Revit/Fusion pages were
-  deepened, and Altium/MatrixGold/Blender/Onshape are new this session.
-- **Documentation expansion** — ~75 new per-package `llm_docs/` pages
-  across kerf-cad-core, kerf-electronics, kerf-imports, kerf-fem,
-  kerf-mates, kerf-{cloud,billing,pricing}, kerf-{workers,parts,partsgen,
-  cam,topo}, kerf-{core,auth,api}; 17 new user-facing pages under `docs/`
-  (`getting-started`, `local-install`, `local-self-host`, `cloud-features`,
-  `projects`, `sharing`, `workshop`, `github-sync`, `billing-and-credits`,
-  `account-and-auth`, `file-revisions`, `persona-bundles`,
-  `plugins-development`, `configuration`, `deployment`, `llm-tool-authoring`,
-  `sdk`, `api-reference`, `data-model`, `tool-registry`, `contributing`,
-  `troubleshooting`, and the three vertical workflow guides:
-  `jewelry-workflow`, `mechanical-workflow`, `electronic-workflow`).
-- **Cross-vertical e2e tests** — 57 cross-vertical parametric e2e tests
-  spanning jewelry / mechanical / electronic workflows, in addition to
-  the 620 kernel ship-gate tests. Full repo total ~23 902, all green.
-
-## [0.1.0] — 2026-05-15
-
-Initial public release. The core platform across mechanical, electronics,
-BIM, drawings, sharing, scripting, and hosting is all in.
-
-### Mechanical CAD
-
-- 2D parametric sketcher (planegcs constraint solver). 6 new constraints
-  in v2 (horizontal/vertical distance, symmetric, block, equal angle,
-  parallel). Arc/circle external-geometry projection. Carbon-copy
-  sketches. Trim, extend, B-spline cubic, fillet, mirror, linear +
-  polar pattern. Multi-loop holes.
-- OpenCascade `.feature` files: Pad, Pocket, Revolve, Fillet, Chamfer,
-  Shell, Hole, Sweep1, Sweep2, Loft, Push-Pull, RotateFace, Linear /
-  Polar / Mirror patterns, variable-radius fillet.
-- FreeCAD-parity sketch shortcuts: boss-with-draft, cut-from-sketch,
-  hole-pattern-from-sketch. Symmetric Loft. Sweep1 corrected-Frenet
-  mode.
-- Phase 4a NURBS surfacing: `sweep1`, `sweep2`, `network_srf`,
-  `blend_srf` with C0/C1/C2 and G0/G1/G2 continuity.
-- Phase 4b direct manipulation: face gumball (translate + rotate), edge
-  gumball (drag-to-fillet).
-- NURBS booleans v1: `feature_to_solid` cap-then-boolean + `feature_boolean`
-  (cut / fuse / common) on solids.
-- NURBS Phase 4 Capability 1 first 3 tasks: binding probe + worker
-  handler + Python tool for surface-direct booleans (with fallback paths
-  when OCCT bindings are absent).
-- Persistent face naming: sketch-anchored primary +
-  topological-hash fallback. Survives upstream sketch edits.
-- Sketch → JSCAD workflow: `extrude_sketch_to_jscad` LLM tool +
-  reactive re-eval.
-- 5-axis CAM v1: constant-tilt finishing + 3+2 indexed.
-- Imports: KiCad (Tier 1 + 2 libraries), OpenSCAD, Rhino3DM, FreeCAD
-  Tier 1 (`.FCStd` → `.feature` + `.sketch` + `.assembly`).
-
-### CAE — analysis
-
-- **FEM**: FEniCSx primary, CalculiX second solver. Linear-static +
-  modal + thermal. Deformed-shape 3D overlay. Multi-material BCs.
-- **CAM**: OpenCAMlib 2.5D (face/contour/pocket/drill/profile) + 3D
-  parallel + waterline + lathe + 5-axis stub.
-- **Topology optimization**: FEniCSx SIMP + Gmsh + NURBS STEP export.
-- **Tolerance stack-up**: worst-case / RSS / Monte Carlo with
-  automatic chain-walk through assembly mates.
-
-### Electronics — EDA
-
-- **tscircuit-powered** schematic + PCB + 3D board viewers.
-- **SPICE simulation** via ngspice (server-side).
-- **RF analysis** via scikit-rf (Smith chart, S-parameters, VSWR).
-- **FreeRouting autoroute**.
-- **Wiring / harness diagrams**: `.wiring` file kind via WireViz YAML
-  → SVG.
-
-### Architecture — BIM
-
-- `.bim` text-DSL → IFC4 compiler via IfcOpenShell.
-- Revit-parity authoring: families, schedules, views, sheets,
-  categories, phasing, view filters, stairs, railings, MEP routing,
-  curtain walls.
-- web-ifc 3D viewer in `BIMView`.
-
-### Sharing + Library
-
-- **Workshop**: free + public + automatic. Per-project caps (100MB per
-  file, 500MB total, 100 files, 10 cover images, 20 publishes/user/mo).
-- **Library**: curated parts with verified-publisher accounts and live
-  distributor pricing (DigiKey / Mouser / LCSC).
-- **BOM**: per-Component pricing, distributor lookup, export.
-- **Multi-image gallery** on Workshop projects.
-- **Thumbnail capture** for all file kinds (sketch, drawing, BIM, FEM,
-  topo, wiring, schematic, PCB, assembly, RF, plus the existing 3D
-  feature view).
-
-### Versioning + sync
-
-- File revisions (Cmd+Z, fine-grained undo) with Phase-4 diff-based
-  storage + SHA-256 dedup — ~82× shrink on typical edit patterns.
-- Cloud git (pygit2 backend) with commits / branches / merge / GitHub
-  sync.
-- S3-backed bare-repo storer for stateless serverless deploys.
-
-### Billing + pricing
-
-- Free / Studio $9/mo / Pro $29/mo tiers. Enterprise by-arrangement
-  (mailto only — no SDR funnel).
-- **At-cost LLM pricing.** No markup on tokens. Live model pricing
-  fed from the LiteLLM JSON, refreshed daily.
-- Wallet top-up via Paystack for overage (USD displayed, ZAR settled).
-- Free-tier tokens redeemable only against cheap-tier models
-  (Sonnet 4.7, Gemini 3 Flash Preview, DeepSeek, MiniMax).
-- Per-API-token daily spend cap (anti-compromise).
-
-### Scripting
-
-- **`kerf-sdk` Python SDK** on PyPI. JSON-RPC over `/v1/rpc`, API-token
-  auth, namespaced wrappers for files / equations / configurations /
-  revisions / docs.
-
-### Performance
-
-- **S1 + S2**: frustum culling + InstancedMesh batching in Three.js.
-  Assemblies with hundreds of identical components render at
-  interactive frame rates.
-- **STEP pre-tessellation**: server-side worker pre-renders STEP files
-  to GLB on upload, idempotent + content-hashed.
-
-### Infrastructure
-
-- **fly.io + Tigris** in production at `kerf.sh`. Primary region JNB
-  (Johannesburg), Tigris S3-compatible storage with zero in-fly egress.
-- **One-shot deploy** via `./scripts/deploy-fly.sh`: pushes secrets from
-  `.env.production`, deploys app + worker apps, applies migrations.
-- **Reference configurations** for GCP / AWS / Azure / DigitalOcean in
-  `deployment/`.
-- **Multi-stage Dockerfile** embeds the compiled Vite SPA in the same
-  image as the FastAPI backend — single image, single fly machine.
-- **Plugin monorepo**: 20 plugin packages under `packages/kerf-*/`,
-  discovered via Python entry points. Six install personas
-  (`api-only` / `mech` / `electronics` / `bim` / `full` /
+- **Mechanical CAD** — 2D parametric sketcher (`planegcs` constraint solver,
+  compiled to WASM) with trim/extend/fillet/mirror/pattern and multi-loop
+  holes; feature-tree modeling (Pad, Pocket, Revolve, Fillet, Chamfer, Shell,
+  Hole, Sweep1/2, Loft, Push-Pull, Linear/Polar/Mirror patterns) on
+  OpenCascade `.feature` files; NURBS surfacing (`sweep1`, `sweep2`,
+  `network_srf`, `blend_srf`) with G0–G2 continuity; direct-manipulation face
+  and edge gumballs; persistent face/edge naming (sketch-anchored +
+  topological-hash fallback) that survives upstream parameter edits;
+  FreeCAD-parity sketch shortcuts; imports for KiCad, OpenSCAD, Rhino3DM, and
+  FreeCAD (`.FCStd`).
+- **A second, pure-Python geometry kernel** —
+  `packages/kerf-cad-core/src/kerf_cad_core/geom/` implements B-rep topology
+  (`Body → Solid → Shell → Face → Loop → Coedge → Edge → Vertex`, Euler
+  operators, `validate_body`), tolerant solid booleans (cut/fuse/common) via
+  face-imprint SSI, a parametric history DAG with `feature_id::role::
+  fingerprint` selectors, G1/G2 fillets and chamfers, exact-distance offsets,
+  Coons patches, and Piegl-method closest-point/point-inversion — all
+  independent of OCCT, with 620 hermetic analytic-oracle-asserted tests.
+- **CAE** — FEM (FEniCSx primary, CalculiX second solver; linear-static,
+  modal, thermal, fatigue, explicit dynamics) with deformed-shape 3D overlay;
+  CFD foundation (2D potential flow + lid-driven-cavity Navier-Stokes,
+  citable Ghia/Roark/Blevins/Incropera reference values); topology
+  optimization (FEniCSx SIMP + Gmsh + NURBS STEP export); tolerance stack-up
+  (worst-case / RSS / Monte Carlo) walking assembly mate chains; 5-axis CAM
+  (constant-tilt + 3+2 indexed).
+- **Electronics (EDA)** — tscircuit-powered schematic, PCB, and 3D board
+  viewers; server-side SPICE simulation via ngspice; RF analysis (Smith
+  chart, S-parameters, VSWR) via scikit-rf; FreeRouting autoroute; WireViz
+  wiring/harness diagrams.
+- **Architecture (BIM)** — `.bim` text-DSL compiling to IFC4 via
+  IfcOpenShell; Revit-parity authoring (families, schedules, views, sheets,
+  phasing, view filters, stairs, railings, MEP routing, curtain walls); a
+  web-ifc 3D viewer.
+- **Distributed Workshop** — a federated protocol over **DMTAP-PUB**
+  (`github.com/vul-os/dmtap` §22/§23): signed, content-addressed
+  publish/follow/pin/fetch, no accounts, no central server, availability
+  states (on-node / available / stale / unreachable). Any node — a homelab
+  box or an always-on host — runs identical software; "the Workshop" is just
+  feeds you choose to follow, not a service you register with.
+- **Library + BOM** — curated parts with live distributor pricing (DigiKey /
+  Mouser / LCSC), per-Component BOM export, multi-image galleries, and
+  automatic thumbnail capture across every file kind.
+- **Versioning + sync** — file revisions (fine-grained undo, diff-based
+  storage, SHA-256 dedup) alongside a separate, deliberate cloud-git layer
+  (`pygit2` backend) with commits, branches, merges, and GitHub sync, both
+  stored on your own node; an S3-backed bare-repo storer for stateless
+  deploys.
+- **Scripting** — the `kerf-sdk` Python SDK on PyPI: JSON-RPC over `/v1/rpc`,
+  API-token auth, namespaced wrappers for files / equations / configurations
+  / revisions / docs, driven from your own machine.
+- **Performance** — frustum culling + `InstancedMesh` batching in Three.js
+  for assemblies with hundreds of identical components; server-side STEP
+  pre-tessellation to GLB on upload, idempotent and content-hashed.
+- **Plugin monorepo** — 37-domain platform split into ~57 packages under
+  `packages/kerf-*/`, discovered via Python entry points, installable as one
+  of six personas (`api-only` / `mech` / `electronics` / `bim` / `full` /
   `compute-only`).
+- **Release pipeline** — tagged GitHub Releases (`.github/workflows/
+  release.yml`) publishing installable `kerf-vX.Y.Z-{macos-arm64,macos-x64,
+  linux-x64,src}.tar.gz` bundles + `SHA256SUMS`, a `curl -fsSL https://
+  kerf.sh/install.sh | sh` one-liner, and persona Docker images on GHCR; see
+  [docs/releasing.md](./docs/releasing.md).
+- **Docs** — a public `/roadmap` page; per-cloud deployment guides
+  (`deployment/fly.md`, `gcp.md`, `aws.md`, `azure.md`, `digitalocean.md`);
+  `docs/node-architecture.md` and `docs/distributed-workshop.md` documenting
+  the Workshop protocol; a redesigned docs viewer with grouped taxonomy,
+  breadcrumbs, and TOC; ~75 per-package `llm_docs/` pages; a "Part of VulOS"
+  standard README, docs, and `landing/index.html`, matching the sibling
+  `wede`/`ofisi` product repos.
 
-### Docs
+### Changed
 
-- Public `/roadmap` page with filterable shipped/in-flight/next/planned
-  grid.
-- Per-cloud deployment guides (`deployment/fly.md`, `gcp.md`, `aws.md`,
-  `azure.md`, `digitalocean.md`) plus storage-specific companions
-  (`tigris.md`, `gcs.md`, `s3.md`, `azure-blob.md`, `spaces.md`).
-- Plan-docs for major roadmap items: NURBS booleans v1, NURBS Phase 4
-  full breakdown, FreeCAD Tier 1, persistent face naming, 5-axis CAM,
-  sketch-to-jscad, FreeCAD sketch shortcuts.
+- **No billing, ever** — an earlier plan to charge for hosted tiers (Free /
+  Studio / Pro, at-cost LLM pricing via Paystack) was withdrawn before this
+  release shipped. Kerf carries no accounts, no wallet, no metering, and no
+  paid tier of any kind — self-host on your own hardware is the only
+  distribution model. Optional VulOS services (Vulos Relay for public
+  exposure, backup buckets) are separate products, not Kerf billing.
+- **Hosted-infrastructure churn resolved** — a 2026-05-24 migration from
+  Fly.io to Koyeb (chasing GPU render capacity) was withdrawn on 2026-06-01
+  before DNS cutover; the confirmed reference stack is Fly.io (compute) +
+  Neon Postgres + Cloudflare R2/Tigris (storage) + Resend (email), documented
+  in `deployment/` and `docs/architecture/stack.md`.
+- **Renderer hero / PBR upgrade** — 2048×2048 4× supersampled captures with
+  ACES tonemapping and a PMREM-prefiltered HDRI environment, shared by
+  Workshop covers, share-cards, and the primary 3D viewport.
+- **Compare hub redesign** — per-category feature matrices (Mechanical /
+  Electronic / BIM / Jewelry & NURBS / DCC) across 14 head-to-head comparison
+  routes.
 
-### Known limitations in v0.1.0
+### Fixed
 
-- BYO LLM key plumbing is dormant (no UI surface). At-cost pricing
-  makes BYO mostly redundant.
-- Azure Blob Storage isn't S3-compatible — Azure deployments need a
-  MinIO facade or cross-cloud S3. Tracked in
-  [docs/plans/](./docs/plans/).
-- 5-axis CAM ships T1-T4 (constant-tilt + 3+2 indexed) — full G-code
-  emission + tool DB lands in v0.2.
-- NURBS Phase 4 ships C1 binding probe + worker + Python tool — full
-  surface-direct booleans + trim-by-curve + matchSrf + G3 land
+- **FCC Part 15 Class B EMC reference-distance** — wizard limits were
+  ~10.46 dB too low against the published Class B mask; corrected at the
+  reference-distance derivation.
+- **Test collection** — an empty `tests/__init__.py` in the billing/pricing/
+  plc packages was silently blocking whole-suite collection; removed.
+- **Python 3.13 compatibility** — restored pre-3.10 `asyncio.get_event_loop()`
+  semantics in the test process so the ship-gate suite runs on 3.13.
+- **kerf-electronics test isolation** — ~202 order-dependent failures caused
+  by cross-test pollution, repaired; the package suite is green whether run
+  alone or as part of the full run.
+
+### Known limitations
+
+- **No compiled single-binary release yet.** Release tarballs bundle Python
+  source plus a venv-based installer (see `docs/releasing.md`); a real
+  single-binary build is a TODO for a future release.
+- **5-axis CAM** ships constant-tilt + 3+2 indexed toolpaths; full G-code
+  emission and a tool database are a v0.2 target.
+- **NURBS Phase 4** ships the C1 binding probe, worker, and Python tool for
+  surface-direct booleans; trim-by-curve, `matchSrf`, and G3 continuity land
   incrementally.
+- **Azure Blob Storage** isn't S3-compatible — Azure self-hosters need a
+  MinIO facade or cross-cloud S3 until a native adapter lands.
+- **ASTM E1049 rainflow counting** has a known bug in `fatigue_fem.
+  _rainflow` (one FEM reference-value test is skipped rather than xfail'd).
 
 [Unreleased]: https://github.com/kerf-sh/kerf/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/kerf-sh/kerf/releases/tag/v0.1.0

@@ -4,15 +4,26 @@
 # trigger packages/kerf-sdk/.github/workflows/publish.yml instead).
 #
 # What this does:
-#   1. Builds a Docker image for each persona (full, mech, electronics, bim)
-#      using the repo-root Dockerfile and the KERF_PERSONA build-arg.
-#   2. Pushes to GitHub Container Registry (ghcr.io/kerf-sh/kerf).
-#      :latest and :<version> point to the "full" persona.
-#      :<version>-mech / -electronics / -bim are the persona variants.
-#   3. Creates a GitHub Release with auto-generated notes from commits since
-#      the previous v* tag.
+#   1. `docker`    — builds a Docker image for each persona (full, mech,
+#                    electronics, bim) using the repo-root Dockerfile and the
+#                    KERF_PERSONA build-arg, and pushes to GitHub Container
+#                    Registry (ghcr.io/kerf-sh/kerf). :latest and :<version>
+#                    point to the "full" persona; :<version>-<persona> are
+#                    the persona variants.
+#   2. `artifacts` — builds the frontend once and assembles installable
+#                    tarballs: kerf-<tag>-macos-arm64.tar.gz,
+#                    -macos-x64.tar.gz, -linux-x64.tar.gz (identical
+#                    contents — Kerf is Python + Node, not a compiled
+#                    binary, so there's nothing to cross-compile per OS yet;
+#                    see install.sh's comment and docs/releasing.md for the
+#                    single-binary TODO) plus a universal -src.tar.gz
+#                    (`git archive` of the tag), and a SHA256SUMS file.
+#   3. `publish`   — creates ONE GitHub Release for the tag, using the
+#                    matching section of CHANGELOG.md as the release notes,
+#                    and attaches every tarball + SHA256SUMS from `artifacts`.
 #
 # Usage:
+#   ./scripts/bump-version.sh 0.2.0   # or: make release VERSION=0.2.0
 #   git tag v0.2.0 && git push origin v0.2.0
 
 name: Release
@@ -25,12 +36,13 @@ on:
                           # sdk workflow only fires on sdk-v* anyway)
 
 permissions:
-  contents: write      # create GitHub Release
+  contents: write      # create GitHub Release + upload assets
   packages: write      # push to ghcr.io
 
 jobs:
-  release:
-    name: Build, push, and release
+  # ── Docker images (GHCR) ─────────────────────────────────────────────────
+  docker:
+    name: Build, push Docker images
     runs-on: ubuntu-latest
 
     strategy:
@@ -45,9 +57,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # needed so `gh release create --generate-notes`
-                           # can walk commits back to the previous tag
 
       # Strip the leading 'v' for Docker tags (v0.1.0 → 0.1.0)
       - name: Derive version string
@@ -56,7 +65,6 @@ jobs:
           RAW="${GITHUB_REF_NAME}"          # e.g. v0.1.0
           VERSION="${RAW#v}"                # e.g. 0.1.0
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "tag=${RAW}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -98,44 +106,146 @@ jobs:
           cache-from: type=gha,scope=full
           cache-to:   type=gha,mode=max,scope=full
 
-      # ── GitHub Release (only once — run in the "full" matrix leg) ──────
-      - name: Create GitHub Release
-        if: matrix.persona == 'full'
+  # ── Installable tarballs (frontend + Python source + venv installer) ────
+  artifacts:
+    name: Build release tarballs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VITE_APP_VERSION: ${{ github.ref_name }}
+
+      - name: Assemble release bundle + tarballs
+        shell: bash
         run: |
-          VERSION="${{ steps.ver.outputs.version }}"
-          TAG="${{ steps.ver.outputs.tag }}"
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"                 # e.g. v0.1.0
+          STAGE="kerf-${TAG}"
+          mkdir -p "release/${STAGE}"
 
-          gh release create "$TAG" \
-            --generate-notes \
-            --title "Kerf ${TAG}" \
-            --notes-start-tag "$(git tag --sort=-version:refname | grep '^v' | grep -v "^${TAG}$" | head -1 || echo '')" \
-            --notes "## Container image
+          # Pre-built frontend
+          cp -r dist "release/${STAGE}/dist"
 
-          Pull the full persona:
-          \`\`\`
-          docker pull ghcr.io/kerf-sh/kerf:${VERSION}
-          \`\`\`
+          # Python plugin packages (source only, no kerf-sdk — it has its
+          # own PyPI release cadence via sdk-v* tags) and repo metadata the
+          # bundled setup.sh / a self-hoster needs.
+          mkdir -p "release/${STAGE}/packages"
+          for pkg_dir in packages/kerf-*/; do
+            pkg="$(basename "$pkg_dir")"
+            [ "$pkg" = "kerf-sdk" ] && continue
+            rsync -a \
+              --exclude '__pycache__' --exclude '*.pyc' \
+              --exclude '.pytest_cache' --exclude '.mypy_cache' \
+              --exclude 'node_modules' --exclude '.venv' --exclude 'dist' \
+              --exclude '*.egg-info' \
+              "$pkg_dir" "release/${STAGE}/packages/${pkg}/"
+          done
 
-          Run it:
-          \`\`\`
-          docker run -e KERF_DATABASE_URL=postgres://user:pass@host/kerf \\
-                     -e KERF_CONFIG=/etc/kerf/config.toml \\
-                     -p 8080:8080 \\
-                     ghcr.io/kerf-sh/kerf:${VERSION}
-          \`\`\`
+          cp pyproject.toml kerf.example.toml README.md LICENSE CHANGELOG.md VERSION \
+            "release/${STAGE}/"
+          cp scripts/bundled-setup.sh "release/${STAGE}/setup.sh"
+          chmod +x "release/${STAGE}/setup.sh"
 
-          **Persona variants:**
-          | Tag | Persona |
-          |-----|---------|
-          | \`ghcr.io/kerf-sh/kerf:${VERSION}\` | full (everything) |
-          | \`ghcr.io/kerf-sh/kerf:${VERSION}-mech\` | mechanical CAD stack |
-          | \`ghcr.io/kerf-sh/kerf:${VERSION}-electronics\` | EDA / PCB stack |
-          | \`ghcr.io/kerf-sh/kerf:${VERSION}-bim\` | BIM stack |
+          # Identical contents per OS label — see the header comment in
+          # install.sh and the "single-binary TODO" note in docs/releasing.md.
+          mkdir -p release-out
+          ( cd release && for os in macos-arm64 macos-x64 linux-x64; do
+              tar -czf "../release-out/kerf-${TAG}-${os}.tar.gz" "${STAGE}"
+            done )
 
-          See [docs/capabilities.md](https://github.com/kerf-sh/kerf/blob/main/docs/capabilities.md) for what each persona includes.
-          " 2>/dev/null || true
-          # `|| true` so a duplicate-release error on re-run doesn't fail CI.
-          # `gh release create --generate-notes` appends auto-generated commit
-          # notes on top of the manual body above.
+          # Universal source tarball straight from the tagged commit (for
+          # anyone who wants the full monorepo, incl. kerf-sdk, tests/, etc.)
+          git archive --format=tar.gz --prefix="${STAGE}-src/" -o "release-out/kerf-${TAG}-src.tar.gz" "$TAG"
+
+          ( cd release-out && sha256sum kerf-* > SHA256SUMS && cat SHA256SUMS )
+
+      - name: Upload tarballs as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-tarballs
+          path: release-out/*
+          retention-days: 1
+
+  # ── Create the GitHub Release ────────────────────────────────────────────
+  publish:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: [docker, artifacts]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download tarballs
+        uses: actions/download-artifact@v4
+        with:
+          name: release-tarballs
+          path: release-out
+
+      # Pull the "## [X.Y.Z] - ..." section out of CHANGELOG.md (strict
+      # Keep a Changelog headers) and use it verbatim as the release body.
+      - name: Extract CHANGELOG section for this version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { found=1; print; next }
+            found && /^## \[/ { exit }
+            found && /^\[/ { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+
+          if [ ! -s notes.md ]; then
+            echo "::warning::No CHANGELOG.md section found for ${VERSION} — falling back to a minimal note."
+            {
+              echo "## [${VERSION}]"
+              echo ""
+              echo "See [CHANGELOG.md](https://github.com/kerf-sh/kerf/blob/main/CHANGELOG.md)."
+            } > notes.md
+          fi
+
+          {
+            echo ""
+            echo "---"
+            echo ""
+            echo "## Container images"
+            echo ""
+            echo '```'
+            echo "docker pull ghcr.io/kerf-sh/kerf:${VERSION}"
+            echo '```'
+            echo ""
+            echo "| Tag | Persona |"
+            echo "|-----|---------|"
+            echo "| \`ghcr.io/kerf-sh/kerf:${VERSION}\` | full (everything) |"
+            echo "| \`ghcr.io/kerf-sh/kerf:${VERSION}-mech\` | mechanical CAD stack |"
+            echo "| \`ghcr.io/kerf-sh/kerf:${VERSION}-electronics\` | EDA / PCB stack |"
+            echo "| \`ghcr.io/kerf-sh/kerf:${VERSION}-bim\` | BIM stack |"
+            echo ""
+            echo "## Install script"
+            echo ""
+            echo '```'
+            echo "curl -fsSL https://kerf.sh/install.sh | sh"
+            echo '```'
+          } >> notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: notes.md
+          files: |
+            release-out/kerf-*
+            release-out/SHA256SUMS

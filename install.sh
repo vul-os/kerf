@@ -1,191 +1,149 @@
 #!/usr/bin/env bash
 # install.sh — Kerf installer
 #
-# Usage (latest):  curl -fsSL https://kerf.sh/install.sh | sh
-# Usage (pinned):  curl -fsSL https://github.com/kerf-sh/kerf/releases/download/v0.1.0/kerf-install-v0.1.0.sh | sh
+#   curl -fsSL https://kerf.sh/install.sh | sh
 #
-# Checks Docker + Postgres, pulls ghcr.io/kerf-sh/kerf:<version>,
-# writes ~/.config/kerf/config.toml if absent, then prints next steps.
-# Idempotent — safe to re-run for updates.
-# Requirements: bash 4+, curl, Docker Engine >= 24
-# ---------------------------------------------------------------------------
+# Downloads the latest (or pinned) Kerf release tarball from GitHub Releases,
+# unpacks it, and runs the bundled setup.sh (creates a Python venv, installs
+# the Kerf packages, writes a default config).
+#
+# Kerf is Python + Node, not a compiled binary — there is nothing to "install"
+# beyond a versioned source + pre-built-frontend bundle plus a venv. The
+# per-OS tarballs (macos-arm64 / macos-x64 / linux-x64) are identical in
+# content and exist for naming-convention parity with a future single-binary
+# build (TODO); today they differ only in the label you download.
+#
+# Env overrides:
+#   KERF_VERSION  — tag to install, e.g. v0.1.0 (default: latest release)
+#   KERF_HOME     — install location (default: ~/.local/share/kerf/<version>)
+#   KERF_REPO     — GitHub repo to install from (default: kerf-sh/kerf)
+#
+# Requirements: bash, curl, tar, python3 3.11+ (checked by the bundled setup)
 set -euo pipefail
 
-# ── Version placeholder (stamped by release-artifacts.yml) ─────────────────
-KERF_VERSION="${KERF_VERSION:-__KERF_VERSION__}"
-# If the placeholder wasn't replaced (e.g. running from a git checkout),
-# resolve the latest GitHub release tag.
-if [[ "$KERF_VERSION" == "__KERF_VERSION__" ]]; then
-  if command -v curl >/dev/null 2>&1; then
-    KERF_VERSION=$(curl -fsSL \
-      "https://api.github.com/repos/kerf-sh/kerf/releases/latest" \
-      2>/dev/null | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
-  fi
-  KERF_VERSION="${KERF_VERSION:-latest}"
-fi
+REPO="${KERF_REPO:-kerf-sh/kerf}"
 
-KERF_IMAGE="ghcr.io/kerf-sh/kerf:${KERF_VERSION}"
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/kerf"
-CONFIG_FILE="$CONFIG_DIR/config.toml"
-
-# ── Colours ────────────────────────────────────────────────────────────────
 if [ -t 1 ]; then
   RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'
-  BLUE='\033[0;34m'; BOLD='\033[1m'; RESET='\033[0m'
+  BLUE='\033[0;34m'; RESET='\033[0m'
 else
-  RED=''; YELLOW=''; GREEN=''; BLUE=''; BOLD=''; RESET=''
+  RED=''; YELLOW=''; GREEN=''; BLUE=''; RESET=''
 fi
 
-info()  { printf "${BLUE}[kerf]${RESET} %s\n" "$*"; }
-ok()    { printf "${GREEN}[kerf]${RESET} %s\n" "$*"; }
-warn()  { printf "${YELLOW}[kerf]${RESET} WARNING: %s\n" "$*" >&2; }
-fail()  { printf "${RED}[kerf]${RESET} ERROR: %s\n" "$*" >&2; exit 1; }
+info() { printf "${BLUE}[kerf]${RESET} %s\n" "$*"; }
+ok()   { printf "${GREEN}[kerf]${RESET} %s\n" "$*"; }
+warn() { printf "${YELLOW}[kerf]${RESET} WARNING: %s\n" "$*" >&2; }
+fail() { printf "${RED}[kerf]${RESET} ERROR: %s\n" "$*" >&2; exit 1; }
 
-# ── Platform detection ─────────────────────────────────────────────────────
-detect_platform() {
-  OS="$(uname -s)"
-  ARCH="$(uname -m)"
+# ── Dependency check ─────────────────────────────────────────────────────────
+command -v curl >/dev/null 2>&1 || fail "curl is required but not installed."
+command -v tar  >/dev/null 2>&1 || fail "tar is required but not installed."
 
-  case "$OS" in
-    Linux*)  PLATFORM="linux" ;;
-    Darwin*) PLATFORM="macos" ;;
-    *)       fail "Unsupported OS: $OS. Kerf supports Linux and macOS." ;;
-  esac
+# ── Platform detection ───────────────────────────────────────────────────────
+OS="$(uname -s)"
+ARCH="$(uname -m)"
 
-  case "$ARCH" in
-    x86_64|amd64) ARCH_LABEL="x86_64" ;;
-    arm64|aarch64) ARCH_LABEL="arm64" ;;
-    *) fail "Unsupported architecture: $ARCH. Kerf supports x86_64 and arm64." ;;
-  esac
+case "$OS" in
+  Darwin*)
+    case "$ARCH" in
+      arm64)          ASSET_OS="macos-arm64" ;;
+      x86_64)         ASSET_OS="macos-x64" ;;
+      *) fail "Unsupported macOS architecture: $ARCH" ;;
+    esac
+    ;;
+  Linux*)
+    case "$ARCH" in
+      x86_64|amd64)   ASSET_OS="linux-x64" ;;
+      *)
+        warn "No prebuilt tarball for linux/$ARCH — falling back to the universal source tarball."
+        ASSET_OS="src"
+        ;;
+    esac
+    ;;
+  MINGW*|MSYS*|CYGWIN*)
+    fail "Native Windows isn't supported. Install Windows Subsystem for Linux (WSL2) with Ubuntu, then re-run this script inside WSL."
+    ;;
+  *)
+    fail "Unsupported OS: $OS. Kerf supports macOS and Linux (or Windows via WSL2)."
+    ;;
+esac
 
-  info "Platform: ${PLATFORM}/${ARCH_LABEL}"
-}
+info "Platform: ${ASSET_OS}"
 
-# ── Prerequisite checks ────────────────────────────────────────────────────
-check_docker() {
-  if ! command -v docker >/dev/null 2>&1; then
-    fail "Docker is required but not installed.\n\n  Install Docker Desktop: https://docs.docker.com/get-docker/\n  Then re-run this installer."
-  fi
+# ── Resolve version ──────────────────────────────────────────────────────────
+KERF_VERSION="${KERF_VERSION:-}"
+if [ -z "$KERF_VERSION" ]; then
+  info "Resolving latest release..."
+  KERF_VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null \
+    | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+  [ -n "$KERF_VERSION" ] || fail "Could not resolve the latest release from https://github.com/${REPO}/releases. Set KERF_VERSION=vX.Y.Z to pin a version."
+fi
+info "Version: ${KERF_VERSION}"
 
-  if ! docker info >/dev/null 2>&1; then
-    fail "Docker daemon is not running. Start Docker Desktop (or: sudo systemctl start docker) then re-run."
-  fi
+VERSION_NO_V="${KERF_VERSION#v}"
+KERF_HOME="${KERF_HOME:-$HOME/.local/share/kerf/${VERSION_NO_V}}"
 
-  DOCKER_VERSION=$(docker version --format '{{.Server.Version}}' 2>/dev/null || echo "0.0.0")
-  info "Docker ${DOCKER_VERSION} — ok"
-}
+# ── Already installed? ───────────────────────────────────────────────────────
+if [ -d "$KERF_HOME" ] && [ -x "$KERF_HOME/setup.sh" ]; then
+  info "Kerf ${KERF_VERSION} is already downloaded at ${KERF_HOME}."
+  info "Re-running its setup.sh to make sure the venv + config are up to date..."
+  "$KERF_HOME/setup.sh"
+  ln -sfn "$KERF_HOME" "$HOME/.local/share/kerf/current"
+  ok "Done. See next steps above."
+  exit 0
+fi
 
-check_postgres() {
-  local pg_url="${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/kerf}"
-  if command -v psql >/dev/null 2>&1; then
-    psql "$pg_url" -c "SELECT 1;" >/dev/null 2>&1 \
-      && ok "Postgres reachable at $pg_url" \
-      || warn "Postgres not reachable at $pg_url — edit $CONFIG_FILE before starting."
+# ── Download + unpack ────────────────────────────────────────────────────────
+ASSET="kerf-${KERF_VERSION}-${ASSET_OS}.tar.gz"
+DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${KERF_VERSION}/${ASSET}"
+
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+info "Downloading ${DOWNLOAD_URL} ..."
+if ! curl -fsSL -o "${TMP_DIR}/${ASSET}" "$DOWNLOAD_URL"; then
+  fail "Download failed. Check that ${KERF_VERSION} exists at https://github.com/${REPO}/releases"
+fi
+
+info "Verifying checksum..."
+CHECKSUMS_URL="https://github.com/${REPO}/releases/download/${KERF_VERSION}/SHA256SUMS"
+if curl -fsSL -o "${TMP_DIR}/SHA256SUMS" "$CHECKSUMS_URL" 2>/dev/null; then
+  EXPECTED=$(grep " ${ASSET}\$" "${TMP_DIR}/SHA256SUMS" | awk '{print $1}')
+  if [ -n "$EXPECTED" ]; then
+    if command -v sha256sum >/dev/null 2>&1; then
+      ACTUAL=$(sha256sum "${TMP_DIR}/${ASSET}" | awk '{print $1}')
+    else
+      ACTUAL=$(shasum -a 256 "${TMP_DIR}/${ASSET}" | awk '{print $1}')
+    fi
+    [ "$EXPECTED" = "$ACTUAL" ] || fail "Checksum mismatch for ${ASSET} — expected ${EXPECTED}, got ${ACTUAL}. Aborting."
+    ok "Checksum verified."
   else
-    warn "psql not found — ensure Postgres is running before starting kerf-server."
+    warn "Asset not listed in SHA256SUMS — skipping verification."
   fi
-}
+else
+  warn "Could not fetch SHA256SUMS — skipping verification."
+fi
 
-check_python() {
-  if command -v python3 >/dev/null 2>&1; then
-    PY_VER=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null || echo "0.0")
-    PY_MINOR=$(echo "$PY_VER" | cut -d. -f2)
-    [ "$(echo "$PY_VER" | cut -d. -f1)" -ge 3 ] && [ "$PY_MINOR" -ge 11 ] \
-      && info "Python ${PY_VER} — ok (kerf-sdk scripting)" \
-      || warn "Python ${PY_VER} found; 3.11+ recommended for kerf-sdk."
-  else
-    warn "python3 not found. Install 3.11+ for kerf-sdk scripting."
+mkdir -p "$KERF_HOME"
+info "Unpacking to ${KERF_HOME} ..."
+tar -xzf "${TMP_DIR}/${ASSET}" -C "$KERF_HOME"
+
+# Tarballs contain their content at the top level OR under one wrapper dir
+# (kerf-vX.Y.Z/) depending on how they were produced; handle both.
+if [ ! -x "$KERF_HOME/setup.sh" ]; then
+  INNER="$(find "$KERF_HOME" -maxdepth 1 -type d -name 'kerf-*' | head -1)"
+  if [ -n "$INNER" ] && [ -x "$INNER/setup.sh" ]; then
+    shopt -s dotglob 2>/dev/null || true
+    mv "$INNER"/* "$KERF_HOME"/
+    rmdir "$INNER"
   fi
-}
+fi
 
-check_node() {
-  if command -v node >/dev/null 2>&1; then
-    NODE_VER=$(node --version 2>/dev/null | sed 's/v//')
-    [ "$(echo "$NODE_VER" | cut -d. -f1)" -ge 22 ] \
-      && info "Node.js v${NODE_VER} — ok (optional: self-build frontend)" \
-      || warn "Node.js v${NODE_VER}; v22+ recommended for frontend self-build."
-  else
-    info "Node.js not found — optional (Docker deploy doesn't need it)."
-  fi
-}
+[ -x "$KERF_HOME/setup.sh" ] || fail "Unpacked archive doesn't contain an executable setup.sh — this release looks broken."
 
-# ── Pull Docker image ──────────────────────────────────────────────────────
-pull_image() {
-  info "Pulling ${KERF_IMAGE} ..."
-  docker pull "$KERF_IMAGE" && ok "Image pulled: ${KERF_IMAGE}" \
-    || fail "Failed to pull ${KERF_IMAGE}. Login with: docker login ghcr.io"
-}
+# ── Run the bundled setup ────────────────────────────────────────────────────
+info "Running bundled setup..."
+"$KERF_HOME/setup.sh"
 
-# ── Write default config ───────────────────────────────────────────────────
-write_config() {
-  mkdir -p "$CONFIG_DIR"
-  [[ -f "$CONFIG_FILE" ]] && { info "Config already exists at $CONFIG_FILE — skipping."; return; }
-
-  cat > "$CONFIG_FILE" <<'TOML'
-# Kerf config — see https://github.com/kerf-sh/kerf/blob/main/kerf.example.toml
-[server]
-port = "8080"
-env = "local"
-cors_origin = "http://localhost:5173"
-local_mode = true
-
-[database]
-url = "postgres://postgres:postgres@localhost:5432/kerf?sslmode=disable"
-
-[auth]
-jwt_secret = "CHANGE_ME"
-access_ttl = "15m"
-refresh_ttl = "720h"
-password_pepper = "CHANGE_ME"
-
-[storage]
-backend = "local"
-local_path = "~/.local/share/kerf/storage"
-
-[llm]
-default_model = "claude-opus-4-7"
-  [llm.anthropic]
-  api_key = ""
-
-[system_user]
-email = "me@kerf.local"
-name = "Kerf User"
-password = ""
-TOML
-
-  ok "Config written to $CONFIG_FILE"
-  warn "Edit $CONFIG_FILE: set database.url and llm.anthropic.api_key before starting."
-}
-
-# ── Print next steps ───────────────────────────────────────────────────────
-print_next_steps() {
-  printf "\n${BOLD}Kerf %s installed.${RESET}\n\nNext steps:\n\n" "$KERF_VERSION"
-  printf "  1. Edit config if needed:\n       %s\n\n" "$CONFIG_FILE"
-  printf "  2. Run migrations:\n"
-  printf "       docker run --rm -e KERF_CONFIG=/config/config.toml \\\n"
-  printf "         -v \"%s:/config:ro\" %s kerf-server --migrate\n\n" "$CONFIG_DIR" "$KERF_IMAGE"
-  printf "  3. Start the server:\n"
-  printf "       docker run -d --name kerf -p 8080:8080 \\\n"
-  printf "         -e KERF_CONFIG=/config/config.toml \\\n"
-  printf "         -v \"%s:/config:ro\" %s\n\n" "$CONFIG_DIR" "$KERF_IMAGE"
-  printf "  4. Open http://localhost:8080\n\n"
-  printf "  Docs: https://kerf.sh/docs\n"
-}
-
-# ── Main ───────────────────────────────────────────────────────────────────
-main() {
-  echo ""
-  echo -e "${BOLD}Kerf Installer — ${KERF_VERSION}${RESET}"
-  echo "─────────────────────────────────"
-
-  detect_platform
-  check_docker
-  check_postgres
-  check_python
-  check_node
-  pull_image
-  write_config
-  print_next_steps
-}
-
-main "$@"
+ln -sfn "$KERF_HOME" "$HOME/.local/share/kerf/current"
+ok "Kerf ${KERF_VERSION} installed at ${KERF_HOME} (symlinked as ~/.local/share/kerf/current)."

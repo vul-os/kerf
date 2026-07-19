@@ -11,11 +11,12 @@ Parametric sketching &amp; modeling · drawings · FEM/CFD · CAM · electronics
 <sub><img src="docs/assets/vulos-logo.png" height="14" alt="VulOS"> Part of <strong><a href="https://vulos.org">VulOS</a></strong> — the open, self-hostable web OS &amp; app suite. Runs standalone, or as an app hosted by the Vulos OS.</sub>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-FFD633.svg?style=flat-square)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/kerf-sh/kerf?style=flat-square&color=FFD633&label=release)](https://github.com/kerf-sh/kerf/releases/latest)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB.svg?style=flat-square&logo=python&logoColor=white)](pyproject.toml)
 [![Node 22+](https://img.shields.io/badge/Node-22+-339933.svg?style=flat-square&logo=node.js&logoColor=white)](package.json)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-FFD633.svg?style=flat-square)](#contributing)
 
-[Website](https://kerf.sh) · [Docs](https://kerf.sh/docs) · [Roadmap](./ROADMAP.md) · [Contributing](#contributing)
+[Website](https://kerf.sh) · [Docs](https://kerf.sh/docs) · [Releases](https://github.com/kerf-sh/kerf/releases) · [Roadmap](./ROADMAP.md) · [Contributing](#contributing)
 
 <!-- Hero screenshot pending — drop the real capture at docs/screenshots/hero.png; this reference resolves once it lands. -->
 <img src="docs/screenshots/hero.png" alt="The Kerf editor: file tree, 3D viewport, and the LLM chat panel" width="900">
@@ -63,7 +64,15 @@ Kerf is a complete CAD system — sketcher, B-rep modeling kernel, drawings, ass
 
 Kerf runs **by itself** — no account, no cloud, no external service required beyond a Postgres database.
 
-### Docker (one-liner)
+### Install (one-liner)
+
+```sh
+curl -fsSL https://kerf.sh/install.sh | sh
+```
+
+Downloads the latest [GitHub release](https://github.com/kerf-sh/kerf/releases/latest), unpacks it, and sets up a Python venv with everything installed — no Docker, no `git clone` required. Every tag also ships `kerf-vX.Y.Z-{macos-arm64,macos-x64,linux-x64,src}.tar.gz` and a `SHA256SUMS` manifest if you'd rather download and verify a specific asset by hand. See [docs/releasing.md](./docs/releasing.md) for the full artifact matrix and what CI builds.
+
+### Docker
 
 ```sh
 git clone https://github.com/kerf-sh/kerf

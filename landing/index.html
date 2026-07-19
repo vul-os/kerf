@@ -101,7 +101,7 @@ a:hover { color: var(--text); }
   max-width: 620px; margin: 0 auto 2.5rem;
   line-height: 1.7;
 }
-.hero-actions { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; margin-bottom: 3.5rem; }
+.hero-actions { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1.1rem; }
 .btn {
   display: inline-flex; align-items: center; gap: .5rem;
   font-family: var(--mono); font-size: .82rem; font-weight: 600;
@@ -120,6 +120,13 @@ a:hover { color: var(--text); }
   font-family: var(--mono); font-size: .75rem; color: var(--text-3);
 }
 .hero-strip b { color: var(--text-2); font-weight: 600; }
+
+.os-hint {
+  display: flex; justify-content: center; flex-wrap: wrap; gap: .5rem 1.5rem;
+  font-family: var(--mono); font-size: .72rem; color: var(--text-4);
+  margin: 0 0 3.5rem;
+}
+.os-hint span { display: inline-flex; align-items: center; gap: .4rem; }
 
 /* ── Section shared ── */
 section { padding: 5.5rem 0; }
@@ -276,11 +283,21 @@ footer.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; }
     <h1>Real CAD.<br>On <span>your</span> machine.<br>Shared without a server.</h1>
     <p>Kerf is a complete, free, open-source CAD — parametric modeling, drawings, FEM/CFD, CAM, electronics, and 37 engineering domains — that runs entirely on your own hardware. When you want to share a part, publish it to a distributed Workshop over an open protocol: signed, content-addressed, no accounts, no central server.</p>
     <div class="hero-actions">
-      <a href="#install" class="btn btn-primary">get started</a>
+      <a href="#install" class="btn btn-primary">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a.75.75 0 01.75.75v6.69l2.22-2.22a.75.75 0 111.06 1.06l-3.5 3.5a.75.75 0 01-1.06 0l-3.5-3.5a.75.75 0 111.06-1.06l2.22 2.22V1.75A.75.75 0 018 1zM2.75 12.5a.75.75 0 000 1.5h10.5a.75.75 0 000-1.5H2.75z"/></svg>
+        download
+      </a>
       <a href="https://github.com/kerf-sh/kerf" target="_blank" class="btn btn-secondary">
         <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
         star on github
       </a>
+    </div>
+    <div class="os-hint">
+      <span>macOS (Apple Silicon &amp; Intel)</span>
+      <span>·</span>
+      <span>Linux (x86_64)</span>
+      <span>·</span>
+      <span>Windows via WSL2</span>
     </div>
     <div class="hero-strip">
       <div><b>37</b> engineering domains</div>
@@ -389,20 +406,32 @@ footer.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; }
 <section id="install">
   <div class="container">
     <div class="section-head">
-      <div class="section-tag">get started</div>
+      <div class="section-tag">download</div>
       <h2>Self-host in minutes</h2>
       <p>No account, no cloud, no external service beyond a Postgres database you already control.</p>
     </div>
     <div class="install-box">
       <div class="install-header">
-        <span>docker</span>
+        <span>install</span>
+        <button onclick="navigator.clipboard.writeText('curl -fsSL https://kerf.sh/install.sh | sh');this.textContent='copied';setTimeout(()=>this.textContent='copy',2000)">copy</button>
+      </div>
+      <div class="install-code"><span class="p">$ </span><span class="cmd">curl</span> -fsSL <span class="str">https://kerf.sh/install.sh</span> | <span class="cmd">sh</span></div>
+    </div>
+    <p class="install-note">
+      Downloads the latest <a href="https://github.com/kerf-sh/kerf/releases/latest" target="_blank">GitHub release</a>, unpacks it, and sets up a Python venv. Then open <code>http://localhost:8080</code>.
+      Prefer a specific asset? Browse <a href="https://github.com/kerf-sh/kerf/releases" target="_blank">all releases</a> — every tag ships <code>kerf-vX.Y.Z-macos-arm64.tar.gz</code>, <code>-macos-x64.tar.gz</code>, <code>-linux-x64.tar.gz</code>, a universal <code>-src.tar.gz</code>, and a <code>SHA256SUMS</code> manifest.
+    </p>
+
+    <div class="install-box" style="margin-top:1.5rem;">
+      <div class="install-header">
+        <span>or, docker</span>
         <button onclick="navigator.clipboard.writeText('git clone https://github.com/kerf-sh/kerf\ncd kerf\ndocker compose up');this.textContent='copied';setTimeout(()=>this.textContent='copy',2000)">copy</button>
       </div>
       <div class="install-code"><span class="p">$ </span><span class="cmd">git</span> clone <span class="str">https://github.com/kerf-sh/kerf</span>
 <span class="p">$ </span><span class="cmd">cd</span> kerf
 <span class="p">$ </span><span class="cmd">docker</span> compose up  <span class="cm"># app + postgres + redis, builds the full persona</span></div>
     </div>
-    <p class="install-note">Then open <code>http://localhost:8080</code>. Prefer running from source? See <code>docs/getting-started.md</code> for the pip + npm walkthrough.</p>
+    <p class="install-note">Prefer running from source? See <code>docs/getting-started.md</code> for the pip + npm walkthrough.</p>
   </div>
 </section>
 

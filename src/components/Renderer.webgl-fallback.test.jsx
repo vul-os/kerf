@@ -130,7 +130,7 @@ describe('Renderer — WebGL fallback (T-C4)', () => {
     const html = renderToStaticMarkup(
       React.createElement(Renderer, { parts: [] }),
     )
-    expect(html).toContain('data-icon="monitor-x"')
+    expect(html).toContain('data-icon="MonitorX"')
   })
 
   it('does NOT render the normal canvas mount div when WebGL is unavailable', () => {

@@ -7,7 +7,7 @@
 #   1. `docker`    — builds a Docker image for each persona (full, mech,
 #                    electronics, bim) using the repo-root Dockerfile and the
 #                    KERF_PERSONA build-arg, and pushes to GitHub Container
-#                    Registry (ghcr.io/kerf-sh/kerf). :latest and :<version>
+#                    Registry (ghcr.io/vul-os/kerf). :latest and :<version>
 #                    point to the "full" persona; :<version>-<persona> are
 #                    the persona variants.
 #   2. `artifacts` — builds the frontend once and assembles installable
@@ -87,7 +87,7 @@ jobs:
           build-args: |
             KERF_PERSONA=${{ matrix.persona }}
           tags: |
-            ghcr.io/kerf-sh/kerf:${{ steps.ver.outputs.version }}-${{ matrix.persona }}
+            ghcr.io/vul-os/kerf:${{ steps.ver.outputs.version }}-${{ matrix.persona }}
           cache-from: type=gha,scope=${{ matrix.persona }}
           cache-to:   type=gha,mode=max,scope=${{ matrix.persona }}
 
@@ -101,8 +101,8 @@ jobs:
           build-args: |
             KERF_PERSONA=full
           tags: |
-            ghcr.io/kerf-sh/kerf:${{ steps.ver.outputs.version }}
-            ghcr.io/kerf-sh/kerf:latest
+            ghcr.io/vul-os/kerf:${{ steps.ver.outputs.version }}
+            ghcr.io/vul-os/kerf:latest
           cache-from: type=gha,scope=full
           cache-to:   type=gha,mode=max,scope=full
 
@@ -121,7 +121,7 @@ jobs:
           cache: npm
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund  # npm install (not ci): lockfiles written on macOS drop platform-conditional optional deps (npm/cli#4828)
 
       - name: Build frontend
         run: npm run build
@@ -224,15 +224,15 @@ jobs:
             echo "## Container images"
             echo ""
             echo '```'
-            echo "docker pull ghcr.io/kerf-sh/kerf:${VERSION}"
+            echo "docker pull ghcr.io/vul-os/kerf:${VERSION}"
             echo '```'
             echo ""
             echo "| Tag | Persona |"
             echo "|-----|---------|"
-            echo "| \`ghcr.io/kerf-sh/kerf:${VERSION}\` | full (everything) |"
-            echo "| \`ghcr.io/kerf-sh/kerf:${VERSION}-mech\` | mechanical CAD stack |"
-            echo "| \`ghcr.io/kerf-sh/kerf:${VERSION}-electronics\` | EDA / PCB stack |"
-            echo "| \`ghcr.io/kerf-sh/kerf:${VERSION}-bim\` | BIM stack |"
+            echo "| \`ghcr.io/vul-os/kerf:${VERSION}\` | full (everything) |"
+            echo "| \`ghcr.io/vul-os/kerf:${VERSION}-mech\` | mechanical CAD stack |"
+            echo "| \`ghcr.io/vul-os/kerf:${VERSION}-electronics\` | EDA / PCB stack |"
+            echo "| \`ghcr.io/vul-os/kerf:${VERSION}-bim\` | BIM stack |"
             echo ""
             echo "## Install script"
             echo ""

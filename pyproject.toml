@@ -206,6 +206,7 @@ members = [
     "packages/kerf-partsgen",
     "packages/kerf-piping",
     "packages/kerf-plc",
+    "packages/kerf-pub",
     "packages/kerf-render",
     "packages/kerf-rules",
     "packages/kerf-sdk",
@@ -264,6 +265,7 @@ kerf-parts = { workspace = true }
 kerf-partsgen = { workspace = true }
 kerf-piping = { workspace = true }
 kerf-plc = { workspace = true }
+kerf-pub = { workspace = true }
 kerf-render = { workspace = true }
 kerf-rules = { workspace = true }
 kerf-sdk = { workspace = true }

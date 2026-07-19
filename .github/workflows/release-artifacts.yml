@@ -52,6 +52,8 @@ jobs:
             pkg=$(basename "$pkg_dir")
             # kerf-sdk has its own PyPI publish flow; skip here
             [[ "$pkg" == "kerf-sdk" ]] && continue
+            # non-Python SDK bindings (kerf-sdk-go/-rs/-lua/-ts) have no pyproject
+            [[ -f "$pkg_dir/pyproject.toml" || -f "$pkg_dir/setup.py" ]] || continue
 
             echo "::group::Building $pkg"
             (
@@ -94,7 +96,7 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund  # npm install (not ci): lockfiles written on macOS drop platform-conditional optional deps (npm/cli#4828)
 
       - name: Build frontend
         run: npm run build
@@ -170,10 +172,14 @@ jobs:
 
       - name: Install Python packages for SBOM scan
         run: |
-          # Install all workspace packages so cyclonedx-py can see the full
-          # dependency graph. Use hatchling extras to get everything.
-          pip install --quiet -e ".[full]" 2>/dev/null || \
-            for d in packages/kerf-*/; do pip install --quiet -e "$d"; done
+          # Install all workspace packages in ONE pip invocation so the
+          # kerf-* cross-dependencies resolve against each other locally
+          # instead of being looked up (and not found) on PyPI.
+          args=()
+          for d in packages/kerf-*/; do
+            [ -f "${d}pyproject.toml" ] && args+=(-e "$d")
+          done
+          pip install --quiet "${args[@]}"
 
       - name: Generate Python SBOM (CycloneDX)
         shell: bash
@@ -199,7 +205,7 @@ jobs:
           echo "Python SBOM: ${PYTHON_SBOM}"
 
       - name: Install npm dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund  # npm install (not ci): lockfiles written on macOS drop platform-conditional optional deps (npm/cli#4828)
 
       - name: Generate npm SBOM (CycloneDX)
         shell: bash

@@ -126,15 +126,16 @@ git clone https://github.com/vul-os/kerf
 cd kerf
 
 # Install the Python workspace packages (choose your persona):
-uv sync --extra mech              # uv users — resolves the workspace
-./scripts/dev-install.sh mech     # pip users — editable install helper
+./scripts/dev-install.sh mech     # editable install helper — works with plain pip
 
 npm install
 ```
 
 You'll need Python 3.11+, Node 22+, and Postgres 14+.
 
-> **Note:** a bare `pip install -e .[mech]` fails — the repo is a `uv` workspace, so the local `kerf-*` packages are wired up via `[tool.uv.sources]`, which only `uv` reads. Use `uv sync` or `./scripts/dev-install.sh`. The `mech`/`full` solver extras (pythonOCC, dolfinx) are conda-only; see [docs/local-install.md](./docs/local-install.md#solver-dependencies-dolfinx--pythonocc).
+> **Note:** a bare `pip install -e .[mech]` fails — the repo is a `uv` workspace, so the local `kerf-*` packages are wired up via `[tool.uv.sources]`, which only `uv` reads. `./scripts/dev-install.sh` works around that by installing every persona package editable in one `pip install` call.
+>
+> **`uv sync` currently doesn't work for *any* persona** (not just `mech`/`full`) — `kerf-cad-core`, `kerf-cam`, `kerf-fem`, and `kerf-topo` each declare a conda-forge-only extra (pythonOCC, FEniCSx/dolfinx), and uv resolves one lockfile for the whole workspace, so it always tries to satisfy those extras regardless of which `--extra` you pass. Even `uv sync --extra api-only` or a bare `uv sync` fails with "No solution found ... requirements are unsatisfiable." Use `./scripts/dev-install.sh` until that's untangled. Either way, the `mech`/`full` solver stack (pythonOCC, dolfinx) is conda-only; see [docs/local-install.md](./docs/local-install.md#solver-dependencies-dolfinx--pythonocc).
 
 ```sh
 export DATABASE_URL=postgres://<your-pg-user>@localhost:5432/kerf?sslmode=disable

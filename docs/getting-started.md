@@ -27,21 +27,27 @@ cd kerf
 Choose the smallest persona that covers your work. `mech` is a good default for
 mechanical CAD; use `full` if you want everything.
 
-The repo is a [`uv`](https://docs.astral.sh/uv/) workspace, so the install path
-depends on your tooling:
+The repo is a [`uv`](https://docs.astral.sh/uv/) workspace, but for now use the
+pip-based helper script — see the heads-up below for why:
 
 ```sh
-# uv users — resolves the workspace automatically:
-uv sync --extra mech        # or --extra full
-
-# pip users — installs every workspace package a persona needs, editable:
+# installs every workspace package a persona needs, editable, with plain pip:
 ./scripts/dev-install.sh mech      # or: full | electronics | bim | api-only
 ```
 
 > **Heads up:** a bare `pip install -e .[mech]` does **not** work. `[tool.uv.sources]`
 > maps the `kerf-*` requirements to the local `packages/*` dirs, but only `uv`
 > understands that mapping — plain pip tries to fetch `kerf-core` etc. from PyPI
-> (where they are unpublished) and fails. Use `uv sync` or `./scripts/dev-install.sh`.
+> (where they are unpublished) and fails. `./scripts/dev-install.sh` works around
+> that by installing every persona package editable in one `pip install` call.
+>
+> **`uv sync` does not currently work, for any persona** (not just `mech`/`full`).
+> `kerf-cad-core`, `kerf-cam`, `kerf-fem`, and `kerf-topo` each declare a
+> conda-forge-only extra (pythonOCC, FEniCSx/dolfinx), and uv resolves one
+> lockfile for the whole workspace — so it always tries to satisfy those
+> extras regardless of which `--extra` you pass. Even `uv sync --extra
+> api-only` or a bare `uv sync` fails with "No solution found ... requirements
+> are unsatisfiable." Use `./scripts/dev-install.sh` until that's untangled.
 
 > **Solvers:** the `mech`/`full` compute extras — pythonOCC and FEniCSx/dolfinx —
 > are conda-forge-only and are not installed by either command above. See

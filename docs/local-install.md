@@ -55,9 +55,7 @@ pip install "kerf[full]"          # everything
 git clone https://github.com/vul-os/kerf
 cd kerf
 
-# uv users — resolves the workspace automatically:
-uv sync --extra mech
-# pip users — installs the persona's workspace packages editable:
+# installs the persona's workspace packages editable, with plain pip:
 ./scripts/dev-install.sh mech    # choose your persona
 
 npm install
@@ -65,8 +63,18 @@ npm install
 
 > A bare `pip install -e .[mech]` does **not** work: the repo is a `uv`
 > workspace and `[tool.uv.sources]` (which maps `kerf-*` to `packages/*`) is
-> only understood by `uv`. Plain pip tries PyPI and fails. Use `uv sync` or the
-> `scripts/dev-install.sh` helper.
+> only understood by `uv`. Plain pip tries PyPI and fails. `scripts/dev-install.sh`
+> works around that by installing every persona package editable in one `pip
+> install` call.
+>
+> **`uv sync` does not currently work, for any persona.** `kerf-cad-core`,
+> `kerf-cam`, `kerf-fem`, and `kerf-topo` each declare a conda-forge-only extra
+> (pythonOCC, FEniCSx/dolfinx — see below), and uv resolves a single lockfile
+> for the entire workspace, so it always tries to satisfy those extras no
+> matter which `--extra` you request. `uv sync --extra mech`, `--extra full`,
+> `--extra api-only`, and even a bare `uv sync` all fail with "No solution
+> found ... requirements are unsatisfiable." Use `./scripts/dev-install.sh`
+> until that's untangled.
 
 See [getting-started.md](./getting-started.md) for the full from-source walkthrough,
 and [solver dependencies](#solver-dependencies-dolfinx--pythonocc) below for the
@@ -225,7 +233,7 @@ version:
 
 ```sh
 git pull
-uv sync --extra mech             # or: ./scripts/dev-install.sh mech
+./scripts/dev-install.sh mech    # uv sync doesn't currently work, see above
 kerf-server --migrate
 kerf-server
 ```

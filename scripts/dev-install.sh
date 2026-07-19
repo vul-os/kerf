@@ -12,11 +12,16 @@
 # from PyPI (where they are unpublished) and fails with
 # "No matching distribution found for kerf-core".
 #
-# Two working paths from source:
-#   • uv users:  uv sync --extra <persona>   (uv resolves the workspace)
-#   • pip users: this script, which installs every package a persona needs
-#     editable in a SINGLE `pip install` invocation so pip satisfies the
-#     inter-package `kerf-* >= 0.1.0` requirements from the local checkout.
+# The working path from source, today, is this script: it installs every
+# package a persona needs editable in a SINGLE `pip install` invocation so
+# pip satisfies the inter-package `kerf-* >= 0.1.0` requirements from the
+# local checkout. `uv sync --extra <persona>` does NOT currently work for any
+# persona — kerf-cad-core, kerf-cam, kerf-fem, and kerf-topo each declare a
+# conda-forge-only extra (see below), and uv resolves one lockfile for the
+# whole workspace, so it always tries to satisfy those extras regardless of
+# which `--extra` you request, failing with "No solution found ...
+# requirements are unsatisfiable" even for `--extra api-only` or a bare
+# `uv sync`.
 #
 # Heavy solver deps are NOT handled here
 # --------------------------------------

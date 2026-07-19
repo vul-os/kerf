@@ -1,0 +1,250 @@
+{
+  "format": "dmtap-conformance-vectors/1",
+  "suite": "DMTAP-PUB (\u00a722) + CAD/artifact profile (\u00a723) \u2014 suite 0x01 (classical): Ed25519 / BLAKE3-256",
+  "generated_by": "conformance/vectors/gen_pub_vectors.py (this repo) \u2014 NOT the dmtap-core reference crate, which does not yet implement the DMTAP-PUB extension (ROADMAP.md). Independently cross-checked by conformance/vectors/verify_pub_vectors.py, a from-scratch second implementation of the same formulas that does not import this script.",
+  "methodology": "All values computed from FIXED seeds/inputs by this script; no randomness, no wall-clock reads. Ed25519 is deterministic (RFC 8032); BLAKE3-256 and CBOR are deterministic. CBOR here is the same \u00a718-canonical, integer-keyed (COSE/CWT-style) deterministic encoding (RFC 8949 \u00a74.2) used by conformance/vectors/vectors.json \u2014 a second implementer following \u00a718.1.1/\u00a718.1.2 and \u00a722 alone reproduces these bytes without running this script.",
+  "vectors": [
+    {
+      "name": "pub_manifest_single_chunk",
+      "operation": "pub_manifest_root",
+      "input": {
+        "plaintext_chunks_hex": [
+          "646d7461702d7075623a206f6e65207075626c6973686564206368756e6b"
+        ]
+      },
+      "expected": {
+        "chunk_hashes_hex": [
+          "1e458cd8409c3b46d1e59eebedaab232ae9054e51d2cc01e3a0ef7447017301eaf"
+        ],
+        "id_hex": "1ea74194f80ea2c6c6d52f8de31300613f75341413f10fda061c063c660989db7e"
+      },
+      "note": "PubManifest.id over a single plaintext chunk (n=1): MTH([h_0]) = leaf(h_0), leaf(h)=BLAKE3-256(DS||0x00||h), DS='DMTAP-PUB-v0/manifest'||0x00 (\u00a722.2.2). id = 0x1e || MTH(...)."
+    },
+    {
+      "name": "pub_manifest_three_chunks",
+      "operation": "pub_manifest_root",
+      "input": {
+        "plaintext_chunks_hex": [
+          "6368756e6b2d302d6f662d333a20646d7461702d707562206172746966616374206279746573",
+          "6368756e6b2d312d6f662d333a20646d7461702d707562206172746966616374206279746573",
+          "6368756e6b2d322d6f662d333a20646d7461702d707562206172746966616374206279746573"
+        ]
+      },
+      "expected": {
+        "chunk_hashes_hex": [
+          "1ed05624f0d4ec1a79f25d095591bc89945532a00c71232b19664c8c41b10f17fc",
+          "1e7e458601f67eeefdf879baf940b61272e4cf4ce91c27db4b311b459eb6b666a6",
+          "1e609e5ba5844b77afa5f9c6852f0675cf490b0f0ee6a9bcd9d52985e126d40e78"
+        ],
+        "id_hex": "1ebc3469f4fea824d224a14b01f8da10bb2a326a4c577585342f255cd93ea64bb5"
+      },
+      "note": "PubManifest.id over 3 ordered plaintext chunks (n=3, RFC 6962 split k=2): MTH(h0,h1,h2) = node(node(leaf(h0),leaf(h1)), leaf(h2)), DS-tag folded into every leaf/node (\u00a722.2.2)."
+    },
+    {
+      "name": "pub_manifest_type_incompatibility",
+      "operation": "pub_manifest_type_mismatch",
+      "input": {
+        "chunk_hashes_hex": [
+          "1ed05624f0d4ec1a79f25d095591bc89945532a00c71232b19664c8c41b10f17fc",
+          "1e7e458601f67eeefdf879baf940b61272e4cf4ce91c27db4b311b459eb6b666a6",
+          "1e609e5ba5844b77afa5f9c6852f0675cf490b0f0ee6a9bcd9d52985e126d40e78"
+        ]
+      },
+      "expected": {
+        "public_root_hex": "1ebc3469f4fea824d224a14b01f8da10bb2a326a4c577585342f255cd93ea64bb5",
+        "sealed_style_root_hex": "1efbcedd64dffb0196ff9c49e13bc9d3e10ba16296273bc96e0a08fa71cb2ed700",
+        "roots_differ": true
+      },
+      "note": "Same ordered chunk-hash list (h0,h1,h2 from pub_manifest_three_chunks), rooted two ways: 'public_root' folds DS-tag 'DMTAP-PUB-v0/manifest'||0x00 into every leaf/node (\u00a722.2.2); 'sealed_style_root' uses the \u00a718.9.5 bare tree (leaf=BLAKE3-256(0x00||h), node=BLAKE3-256(0x01||l||r), no DS fold) over the identical h_i list. The two MUST be different values (\u00a722.2.3 type-incompatibility) \u2014 demonstrates the DS-tag alone prevents a sealed/public root collision even before considering that real sealed h_i are additionally over ciphertext, not plaintext."
+    },
+    {
+      "name": "pub_manifest_key5_forbidden",
+      "operation": "det_cbor_decode_pub_manifest",
+      "input": {
+        "cbor_hex": "a60158211ea74194f80ea2c6c6d52f8de31300613f75341413f10fda061c063c660989db7e02181e03190400048158211e458cd8409c3b46d1e59eebedaab232ae9054e51d2cc01e3a0ef7447017301eaf05582000000000000000000000000000000000000000000000000000000000000000000601",
+        "derivation": "the pub_manifest_single_chunk PubManifest (keys 1,2,3,4,6) with a forbidden key 5 (32 zero bytes) inserted in sorted position",
+        "valid_cbor_hex_for_reference": "a50158211ea74194f80ea2c6c6d52f8de31300613f75341413f10fda061c063c660989db7e02181e03190400048158211e458cd8409c3b46d1e59eebedaab232ae9054e51d2cc01e3a0ef7447017301eaf0601"
+      },
+      "expected": {
+        "outcome": "reject",
+        "error_code": "0x0902",
+        "error_name": "ERR_PUB_MANIFEST_KEY_PRESENT",
+        "action": "FAIL_CLOSED_BLOCK"
+      },
+      "note": "\u00a722.2.1: a PubManifest MUST NOT carry key 5 (no AEAD, no per-file key by construction). A decoder that finds key 5 MUST reject, never use it."
+    },
+    {
+      "name": "pub_announce_signing_preimage",
+      "operation": "ed25519_sign",
+      "input": {
+        "domain_hex": "444d5441502d5055422d76302f616e6e6f756e636500",
+        "msg_hex": "a701000201035820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58048158211ea74194f80ea2c6c6d52f8de31300613f75341413f10fda061c063c660989db7e05a0071b0000018bcfe62b50085820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58",
+        "seed_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "expected": {
+        "pubkey_hex": "e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58",
+        "sig_hex": "4e2ac80c0ac66668b4efdb058dc1c4c92ffad16f0db73e84118f6c9b7baeb10f0194daad7cff28669e0a9efbccd20057126abb929c69576853e779162cec1202"
+      },
+      "note": "\u00a722.3.1: PubAnnounce.sig = Ed25519(signer_seed).sign(DS || det_cbor(PubAnnounce minus key 9)), DS='DMTAP-PUB-v0/announce'||0x00. msg_hex is det_cbor of the genesis announce A0 (v=0,suite=1,pub=PK_A,roots=[pub_manifest_single_chunk.id],meta={},ts=1700000050000,signer=PK_A), keys 1,2,3,4,5,7,8 ascending (key 6 supersedes absent; key 9 sig excluded from the preimage by construction)."
+    },
+    {
+      "name": "pub_announce_id",
+      "operation": "content_address",
+      "input": {
+        "bytes_hex": "a801000201035820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58048158211ea74194f80ea2c6c6d52f8de31300613f75341413f10fda061c063c660989db7e05a0071b0000018bcfe62b50085820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b580958404e2ac80c0ac66668b4efdb058dc1c4c92ffad16f0db73e84118f6c9b7baeb10f0194daad7cff28669e0a9efbccd20057126abb929c69576853e779162cec1202"
+      },
+      "expected": {
+        "id_hex": "1e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd30"
+      },
+      "note": "\u00a722.3.1: announce_id = 0x1e || BLAKE3-256(det_cbor(PubAnnounce)) over the COMPLETE, SIGNED object (including key 9 sig) \u2014 the derived-anchor rule of \u00a718.9.4, applied to announce A0 above (full CBOR bytes = det_cbor with keys 1,2,3,4,5,7,8,9 ascending)."
+    },
+    {
+      "name": "pub_announce_supersede_same_author_valid",
+      "operation": "pub_supersede_check",
+      "input": {
+        "predecessor_pub_hex": "e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58",
+        "predecessor_announce_id_hex": "1e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd30",
+        "successor_cbor_hex": "a901000201035820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58048158211ea74194f80ea2c6c6d52f8de31300613f75341413f10fda061c063c660989db7e05a00658211e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd30071b0000018bcfe62f38085820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58095840bade02ab594251615a7341432f0726cfb4156396170308170792e46e81d2af6324f396909704067e57cb37faa2bdda9a6f6ccb87bad39bca4f29f32cd199ba05",
+        "successor_pub_hex": "e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58",
+        "successor_supersedes_hex": "1e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd30"
+      },
+      "expected": {
+        "outcome": "accept",
+        "note": "successor.pub == predecessor.pub \u2014 a valid same-author revision"
+      },
+      "note": "\u00a722.3.3 step 5, \u00a722.3.4: announce A1 (publisher A) supersedes announce A0 (also publisher A) \u2014 same-author, MUST be accepted as a valid revision link."
+    },
+    {
+      "name": "pub_announce_supersede_cross_author_invalid",
+      "operation": "pub_supersede_check",
+      "input": {
+        "predecessor_pub_hex": "e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58",
+        "predecessor_announce_id_hex": "1e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd30",
+        "successor_cbor_hex": "a9010002010358207d59c5623dd40a74aa4d5a32ac645d3b3f95daeae4c22be25476dd6a486f7382048158211ea74194f80ea2c6c6d52f8de31300613f75341413f10fda061c063c660989db7e05a00658211e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd30071b0000018bcfe633200858207d59c5623dd40a74aa4d5a32ac645d3b3f95daeae4c22be25476dd6a486f7382095840976f5a0c84264d0ac5ef395927b1735197535943b93e897ea78280ba098defc45331ed49c6de85b6710f7494eb0e3b6d585e7b9c4201a9e17b71d65fded8e405",
+        "successor_pub_hex": "7d59c5623dd40a74aa4d5a32ac645d3b3f95daeae4c22be25476dd6a486f7382",
+        "successor_supersedes_hex": "1e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd30"
+      },
+      "expected": {
+        "outcome": "reject",
+        "error_code": "0x090B",
+        "error_name": "ERR_PUB_SUPERSEDE_INVALID",
+        "action": "FAIL_CLOSED_BLOCK"
+      },
+      "note": "\u00a722.3.3 step 5, \u00a722.3.4: announce B0 (publisher B) attempts to supersede announce A0 (publisher A) \u2014 different pub \u2014 MUST be rejected; a publisher may only supersede its own announcements."
+    },
+    {
+      "name": "pub_feed_entry_chain",
+      "operation": "pub_feed_entry_root",
+      "input": {
+        "entries_cbor_hex": [
+          "a301000258211e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd30041b0000018bcfe62b50",
+          "a401010258211e93b2a0f58389a40c269021b596b16e104fa486d7560a32022569725c1c3dfcb30358211ebb9bb7604544aed78ee40bc1949cb8cb06b49946aaf0f41f88d59e7eeb9ae591041b0000018bcfe62f38",
+          "a401020258211e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd300358211e7c793c9de9a7e7beddaf08c291787845f5145c6b8d41bbd4fb8b9e00aebcc4b2041b0000018bcfe63320"
+        ]
+      },
+      "expected": {
+        "entry_ids_hex": [
+          "1ebb9bb7604544aed78ee40bc1949cb8cb06b49946aaf0f41f88d59e7eeb9ae591",
+          "1e7c793c9de9a7e7beddaf08c291787845f5145c6b8d41bbd4fb8b9e00aebcc4b2",
+          "1e5b1ed9cb2801ffab0e62900292e4239838694dfcf8ce59209c8d680c5710dd44"
+        ],
+        "prev_chain_valid": true
+      },
+      "note": "\u00a722.4.1 prev-chain: entry0 (seq=0, genesis, no prev) -> entry1 (seq=1, prev=entry0_id) -> entry2 (seq=2, prev=entry1_id). FeedEntry_id = 0x1e || BLAKE3-256(det_cbor(FeedEntry)) (generic \u00a72.2 rule; see NOTE above \u2014 \u00a722.4.1 does not spell this formula out explicitly the way \u00a722.3.1 does for announce_id). A verifier walks prev from a signed FeedHead.tip and checks each link."
+    },
+    {
+      "name": "pub_feed_head_signing_preimage",
+      "operation": "ed25519_sign",
+      "input": {
+        "domain_hex": "444d5441502d5055422d76302f6665656400",
+        "msg_hex": "a701000201035820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b5804010558211e7c793c9de9a7e7beddaf08c291787845f5145c6b8d41bbd4fb8b9e00aebcc4b2061b0000018bcfe6312c075820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58",
+        "seed_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "expected": {
+        "pubkey_hex": "e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58",
+        "sig_hex": "51bdb93c2b0094534f7376254d679c76ccb7d0160a9dfcd960aaf6028b2d559096ef59127c7779b48969caf7eb2c4d301c41cf8a72f1d6f528a0c157a8b89707"
+      },
+      "note": "\u00a722.4.1: FeedHead.sig = Ed25519(signer_seed).sign(DS || det_cbor(FeedHead minus key 8)), DS='DMTAP-PUB-v0/feed'||0x00. FeedHead: v=0,suite=1,pub=PK_A,seq=1,tip=entry1_id (from pub_feed_entry_chain),ts=1700000051500,signer=PK_A. Because entry1.prev=entry0_id, signing tip=entry1_id transitively commits to entry0 too (\u00a722.4.1's 'tip transitively commits to the entire log')."
+    },
+    {
+      "name": "pub_feed_rollback_strict_less_than",
+      "operation": "pub_feed_anti_rollback",
+      "input": {
+        "last_accepted_seq": 1,
+        "presented_seq": 0,
+        "presented_tip_hex": "1ebb9bb7604544aed78ee40bc1949cb8cb06b49946aaf0f41f88d59e7eeb9ae591"
+      },
+      "expected": {
+        "outcome": "reject",
+        "error_code": "0x0907",
+        "error_name": "ERR_PUB_FEED_ROLLBACK",
+        "action": "FAIL_CLOSED_BLOCK"
+      },
+      "note": "\u00a722.4.2: a reader that has already accepted seq=1 for this pub MUST reject a FeedHead presenting seq=0 (strictly less than) \u2014 stale-replay / suppression."
+    },
+    {
+      "name": "pub_feed_equal_seq_identical_tip_idempotent",
+      "operation": "pub_feed_anti_rollback",
+      "input": {
+        "last_accepted_seq": 1,
+        "last_accepted_tip_hex": "1e7c793c9de9a7e7beddaf08c291787845f5145c6b8d41bbd4fb8b9e00aebcc4b2",
+        "presented_seq": 1,
+        "presented_tip_hex": "1e7c793c9de9a7e7beddaf08c291787845f5145c6b8d41bbd4fb8b9e00aebcc4b2"
+      },
+      "expected": {
+        "outcome": "accept",
+        "note": "equal seq, identical tip: idempotent re-fetch, not an error"
+      },
+      "note": "\u00a722.4.2: equal seq is NOT a rollback. Re-presenting the SAME tip at the SAME seq (a reader legitimately re-fetching a cacheable FeedHead) MUST be accepted as a no-op."
+    },
+    {
+      "name": "pub_feed_equal_seq_different_tip_fork",
+      "operation": "pub_feed_anti_rollback",
+      "input": {
+        "last_accepted_seq": 1,
+        "last_accepted_tip_hex": "1e7c793c9de9a7e7beddaf08c291787845f5145c6b8d41bbd4fb8b9e00aebcc4b2",
+        "presented_seq": 1,
+        "presented_tip_hex": "1e24b7f5c8891b690e1f438cba3990f80a6481fa4a8a1c40fba232a17c13dcfd8b",
+        "presented_tip_cbor_hex": "a401010258211e434792801f41be5a1b4acd8959bbf38c0abef083d5e485610994b20cd72b89a30358211ebb9bb7604544aed78ee40bc1949cb8cb06b49946aaf0f41f88d59e7eeb9ae591041b0000018bcfe62f38"
+      },
+      "expected": {
+        "outcome": "reject",
+        "error_code": "0x0908",
+        "error_name": "ERR_PUB_FEED_CHAIN_BROKEN",
+        "action": "HALT_ALERT",
+        "note": "equivocation, NEVER treated as ERR_PUB_FEED_ROLLBACK (0x0907)"
+      },
+      "note": "\u00a722.4.2: two distinct FeedEntry values at the SAME seq=1 (entry1_id from pub_feed_entry_chain vs entry1_alt_id here, both with prev=entry0_id) is equivocation/fork \u2014 the author's own log was rewritten. Handled HALT_ALERT, the same posture as a committer fork (0x0404) / cluster-journal break (0x0412)."
+    },
+    {
+      "name": "pub_feed_genesis_carries_prev_malformed",
+      "operation": "det_cbor_decode_feed_entry",
+      "input": {
+        "cbor_hex": "a401000258211e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd300358211ebb9bb7604544aed78ee40bc1949cb8cb06b49946aaf0f41f88d59e7eeb9ae591041b0000018bcfe62b50",
+        "derivation": "the genesis entry0 (seq=0) with a `prev` field (key 3) wrongly present"
+      },
+      "expected": {
+        "outcome": "reject",
+        "error_code": "0x0908",
+        "error_name": "ERR_PUB_FEED_CHAIN_BROKEN",
+        "action": "HALT_ALERT"
+      },
+      "note": "\u00a722.4.1: `prev` is present for every entry EXCEPT genesis (seq=0); a genesis entry carrying one is malformed."
+    },
+    {
+      "name": "pub_feed_nongenesis_missing_prev_malformed",
+      "operation": "det_cbor_decode_feed_entry",
+      "input": {
+        "cbor_hex": "a301010258211e93b2a0f58389a40c269021b596b16e104fa486d7560a32022569725c1c3dfcb3041b0000018bcfe62f38",
+        "derivation": "entry at seq=1 with `prev` (key 3) omitted"
+      },
+      "expected": {
+        "outcome": "reject",
+        "error_code": "0x0908",
+        "error_name": "ERR_PUB_FEED_CHAIN_BROKEN",
+        "action": "HALT_ALERT"
+      },
+      "note": "\u00a722.4.1: a non-genesis entry (seq != 0) lacking `prev` is malformed."
+    }
+  ]
+}

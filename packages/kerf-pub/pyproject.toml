@@ -14,6 +14,11 @@ dependencies = [
     "cryptography>=42.0.0",
     "asyncpg>=0.29",
     "kerf-core",
+    # DMTAP-PUB v0 addresses content under BLAKE3-256 (§18.1.5, prefix 0x1e).
+    # This is the fast path only: kerf_pub.blake3_pure is a byte-identical
+    # dependency-free implementation that takes over if the wheel is missing,
+    # so a platform without a prebuilt binary loses speed, never interop.
+    "blake3>=0.4",
 ]
 
 [project.optional-dependencies]

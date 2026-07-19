@@ -94,6 +94,38 @@ def check_fork(a: FeedEntry, b: FeedEntry) -> None:
         )
 
 
+def check_head_watermark(accepted_seq: int | None, accepted_tip: bytes | None,
+                         presented_seq: int, presented_tip: bytes) -> None:
+    """Apply the §22.4.2 anti-rollback rule to a presented ``FeedHead``.
+
+    Three outcomes, and the distinction between the last two matters:
+
+    * ``presented_seq < accepted_seq`` — a stale head cannot suppress
+      announcements already accepted → ``ERR_PUB_FEED_ROLLBACK`` (0x0907),
+      FAIL_CLOSED_BLOCK.
+    * ``presented_seq == accepted_seq`` with the SAME tip — an idempotent
+      re-fetch of a cacheable head. Equal seq is NOT a rollback; accept.
+    * ``presented_seq == accepted_seq`` with a DIFFERENT tip — the author
+      presented two histories at one position. That is equivocation, not
+      staleness, and is deliberately NOT reported as 0x0907: it is
+      ``ERR_PUB_FEED_CHAIN_BROKEN`` (0x0908), HALT_ALERT.
+    """
+    if accepted_seq is None:
+        return
+    if presented_seq < accepted_seq:
+        raise PubError(
+            ERR_PUB_FEED_ROLLBACK,
+            f"head seq {presented_seq} < accepted {accepted_seq}",
+        )
+    if (presented_seq == accepted_seq and accepted_tip is not None
+            and presented_tip != accepted_tip):
+        raise PubError(
+            ERR_PUB_FEED_CHAIN_BROKEN,
+            f"fork: two distinct tips at seq {presented_seq} "
+            "(a publisher cannot present two histories)",
+        )
+
+
 class PubClient:
     def __init__(self, store: PubStore | None = None, identity=None,
                  gateways: Iterable[str] | None = None,
@@ -217,12 +249,15 @@ class PubClient:
             raise PubError(ERR_PUB_FEED_SIG_INVALID, "head.pub != requested author")
 
         accepted = await self.store.get_accepted_seq(pub_key)
-        if accepted is not None and head.seq < accepted:
-            # A stale head cannot suppress announcements already accepted (§22.4.2).
-            raise PubError(
-                ERR_PUB_FEED_ROLLBACK,
-                f"head seq {head.seq} < accepted {accepted}",
-            )
+        # The tip we already accepted at that seq, read back from our own pinned
+        # entries — so equal-seq equivocation is caught, not silently accepted.
+        # No schema column is needed: the watermark seq indexes an entry we hold.
+        accepted_tip: bytes | None = None
+        if accepted is not None:
+            raw = await self.store.get_feed_entry_by_seq(pub_key, accepted)
+            if raw is not None:
+                accepted_tip = FeedEntry.from_cbor(raw).id
+        check_head_watermark(accepted, accepted_tip, head.seq, head.tip)
 
         entries = await self._walk_and_verify(pub_key, head)
 

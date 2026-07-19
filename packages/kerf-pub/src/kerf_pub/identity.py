@@ -3,12 +3,14 @@
 The identity's public key IS the DMTAP ``IK`` carried in the clear in every
 ``PubAnnounce.pub`` / ``FeedHead.pub`` — authenticity, not anonymity (§22.3).
 
-**v1 limitation (TODO).** DMTAP allows an operational ``signer`` key distinct
-from the cold root ``pub``, chained by a ``DeviceCert`` (§1.2, §22.3.1 field 8).
-kerf-pub v1 signs directly with the root key: ``signer == pub`` always, and no
-``DeviceCert`` chains are built or verified. Keeping ``IK`` cold behind a
-revocable device key (§1.2a) is a later addition; until then a key compromise
-has the full blast radius of the root identity (§22.9 item 5).
+**Known limitation (TODO).** DMTAP allows an operational ``signer`` key
+distinct from the cold root ``pub``, chained by a ``DeviceCert`` (§1.2,
+§22.3.1 field 8). kerf-pub signs directly with the root key: ``signer == pub``
+always, and no ``DeviceCert`` chains are built or verified — see the
+:mod:`kerf_pub.objects` module docstring for exactly what that leaves
+unimplemented on the verify side. Keeping ``IK`` cold behind a revocable device
+key (§1.2a) is a later addition; until then a key compromise has the full blast
+radius of the root identity (§22.9 item 5).
 
 Storage follows kerf's config/data-dir convention: the raw 32-byte Ed25519 seed
 is written to ``$KERF_DATA_DIR/pub/identity.key`` (0600), defaulting to

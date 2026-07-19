@@ -8,18 +8,19 @@ kerf-pub bytes, it is just another place the *same*, independently-verified
 bytes might be sitting).
 
 **Why a kerf-pub chunk hash is already (almost) a multihash.** A kerf-pub
-chunk address ``h_i`` (§22.2.2) is ``HASH_PREFIX ‖ digest`` — for the
-shipped SHA2-256 build, ``HASH_PREFIX = 0x12``. The multiformats `multihash
-table <https://github.com/multiformats/multicodec>`_ assigns SHA2-256 the
-*same* code, ``0x12``. That is not a coincidence kerf relies on by accident —
-§23 Appendix A of the DMTAP-PUB spec explicitly sanctions the SHA2-256 prefix
-as the interop seam with external content-addressed stores (Git-LFS, and by
-the same construction, IPFS). A real multihash is:
+chunk address ``h_i`` (§22.2.2) is ``prefix ‖ digest`` — ``0x1e`` for the
+shipped BLAKE3-256 write path, ``0x12`` for a legacy SHA2-256 pin still being
+read (see :mod:`kerf_pub.hashing`). DMTAP's hash-agility prefixes are drawn
+from the multiformats `multihash table
+<https://github.com/multiformats/multicodec>`_ and carry the *same* codes
+there: BLAKE3 is ``0x1e``, SHA2-256 is ``0x12``. That alignment is what lets a
+single 33-byte address serve as both a DMTAP address and (nearly) a multihash,
+and it survives the digest cut-over untouched. A real multihash is:
 
     multihash = varint(code) ‖ varint(digest_length) ‖ digest
 
 which is ``h_i`` with exactly one thing missing: the digest-length varint.
-For SHA2-256 that length is a constant 32 (``0x20``), so completing the
+For both digests that length is a constant 32 (``0x20``), so completing the
 multihash is a pure, lossless, deterministic insertion — no information is
 invented, nothing about the digest is reinterpreted.
 
@@ -43,10 +44,10 @@ variant itself (no ``base64`` module dependency) since it is the one
 multibase encoding kerf-pub needs.
 
 Every value produced by :func:`cid_for_chunk` happens to need only
-single-byte varints (version 1, codec 0x55, multihash code 0x12, and length
-32 are all < 0x80) — but :func:`_varint` is implemented as general unsigned
-LEB128 so a future digest choice (e.g. BLAKE3, prefix ``0x1e`` — also < 0x80,
-so still single-byte) keeps working without a second look at this file.
+single-byte varints (version 1, codec 0x55, multihash code 0x1e or 0x12, and
+length 32 are all < 0x80) — but :func:`_varint` is implemented as general
+unsigned LEB128 so a future digest choice keeps working without a second look
+at this file.
 """
 
 from __future__ import annotations
@@ -98,8 +99,8 @@ MULTIBASE_BASE32 = "b"  # RFC 4648 base32, lowercase, no padding
 def cid_for_chunk(h: bytes) -> str:
     """CIDv1 (raw codec, base32 multibase) naming the kerf-pub chunk ``h``.
 
-    ``h`` is a kerf-pub chunk hash (``HASH_PREFIX ‖ digest``, §22.2.2,
-    33 bytes for the shipped SHA2-256 build) — exactly the value carried in
+    ``h`` is a kerf-pub chunk hash (``prefix ‖ digest``, §22.2.2, 33 bytes;
+    the multihash code is read off ``h`` itself) — exactly the value carried in
     ``PubManifest.chunks``. Chunk-bytes addressing ONLY: manifests,
     announces, and feed entries are kerf-object deterministic CBOR, not
     IPLD, and are never given a CID (see :mod:`kerf_pub.ipfs`).

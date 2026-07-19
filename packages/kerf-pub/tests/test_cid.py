@@ -11,26 +11,39 @@ import base64
 import hashlib
 
 from kerf_pub.cid import cid_for_chunk
-from kerf_pub.hashing import HASH_PREFIX, mhash
+from kerf_pub.hashing import (
+    HASH_PREFIX,
+    PREFIX_BLAKE3_256,
+    PREFIX_SHA2_256,
+    mhash,
+    mhash_under,
+)
 from kerf_pub.ipfs import IPFSGatewayFetcher, default_ipfs_gateway_url, ENV_IPFS_GATEWAY_URL
 
 
 # ── cid_for_chunk: known-good vectors, derived by hand ──────────────────────
 #
-# kerf ships HASH_PREFIX = 0x12 (SHA2-256, hashing.py). A kerf-pub chunk hash
-# is `h = HASH_PREFIX ‖ SHA2-256(plaintext)` (33 bytes). Deriving its CIDv1:
+# kerf WRITES HASH_PREFIX = 0x1e (BLAKE3-256, hashing.py) and still READS the
+# legacy 0x12 (SHA2-256) prefix. Both are real multihash codes, so the same
+# derivation works for either — which is the whole point of carrying the
+# prefix byte in every address. A kerf-pub chunk hash is
+# `h = prefix ‖ digest(plaintext)` (33 bytes). Deriving its CIDv1:
 #
-#   1. multihash = varint(code=0x12) ‖ varint(digest_len=32=0x20) ‖ digest
+#   1. multihash = varint(code=prefix) ‖ varint(digest_len=32=0x20) ‖ digest
 #      Both varints are < 0x80 so each is exactly one raw byte:
-#      multihash = 0x12 0x20 ‖ digest                              (34 bytes)
+#      multihash = <prefix> 0x20 ‖ digest                          (34 bytes)
 #   2. cid_bytes = varint(version=1) ‖ varint(codec=raw=0x55) ‖ multihash
 #      Both are again single-byte varints:
 #      cid_bytes = 0x01 0x55 ‖ multihash                           (36 bytes)
 #   3. textual CID = multibase-prefix 'b' ‖ base32(cid_bytes), RFC 4648
 #      lowercase alphabet, NO padding.
 #
-# Vector 1 — plaintext = b"" (the empty chunk PubManifest.split_chunks()
-# produces for a zero-length blob, objects.py:split_chunks):
+# Vector 1 — plaintext = b"" under the LEGACY 0x12 prefix. Retained verbatim
+# because it is the one value here cross-checkable against the outside world:
+# it is the well-known real-world CID of an empty raw-codec IPFS object, so it
+# pins the encoder against a third party, not just against itself. It now also
+# exercises the legacy read path (mhash_under), which must keep naming
+# pre-cut-over pins exactly as it always did.
 #
 #   SHA2-256("") = e3b0c442 98fc1c14 9afbf4c8 996fb924 27ae41e4 6649b934
 #                  ca495991 b7852b85                       (well-known value)
@@ -47,9 +60,8 @@ from kerf_pub.ipfs import IPFSGatewayFetcher, default_ipfs_gateway_url, ENV_IPFS
 _EMPTY_CID = "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"
 
 
-def test_cid_for_chunk_empty_chunk_vector():
-    assert HASH_PREFIX == 0x12, "vector assumes the shipped SHA2-256 prefix"
-    h = mhash(b"")
+def test_cid_for_chunk_empty_chunk_vector_legacy_sha2_prefix():
+    h = mhash_under(PREFIX_SHA2_256, b"")
     assert cid_for_chunk(h) == _EMPTY_CID
 
     # independent cross-check of the same 36 bytes via stdlib base32.
@@ -61,12 +73,31 @@ def test_cid_for_chunk_empty_chunk_vector():
 
 def test_cid_for_chunk_nonempty_vector_matches_stdlib_cross_check():
     payload = b"hello-kerf-pub"
-    h = mhash(payload)
+    h = mhash_under(PREFIX_SHA2_256, payload)
     digest = hashlib.sha256(payload).digest()
     cid_bytes = bytes([0x01, 0x55, 0x12, 0x20]) + digest
     expected = "b" + base64.b32encode(cid_bytes).decode().lower().rstrip("=")
     assert cid_for_chunk(h) == expected
     assert cid_for_chunk(h).startswith("bafkrei")  # CIDv1 raw+sha256 signature prefix
+
+
+def test_cid_for_chunk_uses_the_blake3_multihash_code_for_new_chunks():
+    """The write path: a freshly minted chunk address is a BLAKE3 multihash.
+
+    0x1e is BLAKE3-256's multihash code as well as DMTAP's hash-agility prefix
+    (that alignment is what lets one address serve both roles), so a kerf-pub
+    chunk CID stays a well-formed CIDv1 across the digest cut-over.
+    """
+    assert HASH_PREFIX == PREFIX_BLAKE3_256
+    payload = b"hello-kerf-pub"
+    h = mhash(payload)
+    assert h[0] == 0x1E
+
+    cid_bytes = bytes([0x01, 0x55, 0x1E, 0x20]) + h[1:]
+    expected = "b" + base64.b32encode(cid_bytes).decode().lower().rstrip("=")
+    assert cid_for_chunk(h) == expected
+    # Different digest ⇒ different CID than the legacy naming of the same bytes.
+    assert cid_for_chunk(h) != cid_for_chunk(mhash_under(PREFIX_SHA2_256, payload))
 
 
 def test_cid_for_chunk_is_deterministic_and_injective_over_distinct_inputs():

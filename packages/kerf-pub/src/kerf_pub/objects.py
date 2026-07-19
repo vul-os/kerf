@@ -5,8 +5,35 @@ addresses and signing preimages are computed with :mod:`kerf_pub.cbor` and
 :mod:`kerf_pub.hashing`, so they are byte-reproducible across implementations.
 
 Signatures are Ed25519 (suite 0x01); digests ride under the shipped multihash
-prefix (see :mod:`kerf_pub.hashing`). All fail-closed checks raise
-:class:`kerf_pub.errors.PubError` with the exact §22.10 code.
+prefix (BLAKE3-256 / 0x1e — see :mod:`kerf_pub.hashing`). All fail-closed
+checks raise :class:`kerf_pub.errors.PubError` with the exact §22.10 code.
+Every content address and signing preimage this module produces is held to the
+shared cross-implementation vectors by ``tests/test_conformance_vectors.py``.
+
+**Known gap: DeviceCert chains (§22.3.3 step 4).** The spec authorizes a
+``signer`` either by ``signer == pub`` OR by a ``DeviceCert`` (§1.2) that
+``pub`` signed over ``signer`` and that is not revoked (§1.5). kerf-pub
+implements only the first arm and rejects the second. Precisely what is
+missing, so a later pass knows its scope:
+
+* no ``DeviceCert`` CBOR decode/encode, and no field on any §22 object to
+  carry one (the spec does not place it inside the announce, so it must be
+  resolved out of band);
+* no Identity-document resolution to find the authorized device set for a
+  ``pub``, and no revocation check (§1.5) — an unrevoked-at-signing-time cert
+  is worthless without a way to learn it was later revoked, so shipping the
+  signature check alone would be a fail-OPEN half-measure;
+* no delegated *signing*: :class:`~kerf_pub.identity.Identity` signs with the
+  root key, so kerf-pub never emits an object another implementation would
+  need a chain to verify. Its output is universally verifiable; only its input
+  is narrower than the spec allows.
+
+Consequence, stated plainly: kerf-pub REJECTS a spec-legal announce or feed
+head signed by a DeviceCert-delegated key (``0x0904`` / ``0x0906``). This is
+strictly conservative — it never accepts anything a conformant verifier would
+refuse — but it is a real interop limitation against publishers that keep
+``IK`` cold (§1.2a), which §22.9 item 5 RECOMMENDS. §22 makes DeviceCert
+support a SHOULD, not a MUST, so this remains conformant v0 behaviour.
 """
 
 from __future__ import annotations
@@ -226,11 +253,18 @@ class PubAnnounce:
         # 3. signature under signer
         if not ed25519_verify(self.signer, self.sig, self._signing_preimage()):
             raise PubError(ERR_PUB_ANNOUNCE_SIG_INVALID, "sig verify failed")
-        # 4. signer authorized by pub. v1: no DeviceCert chains, so signer == pub.
+        # 4. signer authorized by pub (§22.3.3 step 4). That step permits EITHER
+        #    signer == pub OR a DeviceCert (§1.2) chain from pub to signer.
+        #    kerf-pub implements only the first arm — see the module note on
+        #    the DeviceCert gap. Enforcing signer == pub is the STRICTER of the
+        #    two readings: it can never accept an announce a fully conformant
+        #    verifier would reject, only reject one it would accept. That is a
+        #    fail-closed interop limitation, never a security hole.
         if self.signer != self.pub:
             raise PubError(
                 ERR_PUB_ANNOUNCE_SIG_INVALID,
-                "signer != pub and DeviceCert chains are unimplemented in v1",
+                "signer != pub; DeviceCert chains (§22.3.3 step 4, second arm) "
+                "are not implemented — see kerf_pub.objects module docstring",
             )
 
     def verify_supersedes(self, predecessor: "PubAnnounce") -> None:
@@ -360,10 +394,12 @@ class FeedHead:
             raise PubError(ERR_PUB_FEED_SIG_INVALID, "unsigned head")
         if not ed25519_verify(self.signer, self.sig, self._signing_preimage()):
             raise PubError(ERR_PUB_FEED_SIG_INVALID, "sig verify failed")
+        # Same §22.3.3 step-4 restriction as PubAnnounce.verify (see there).
         if self.signer != self.pub:
             raise PubError(
                 ERR_PUB_FEED_SIG_INVALID,
-                "signer != pub and DeviceCert chains are unimplemented in v1",
+                "signer != pub; DeviceCert chains (§22.3.3 step 4, second arm) "
+                "are not implemented — see kerf_pub.objects module docstring",
             )
 
 

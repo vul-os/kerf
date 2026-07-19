@@ -36,7 +36,7 @@ from .objects import (
     validate_artifact_metadata,
 )
 from .store import InMemoryPubStore, PostgresPubStore, PubStore, Availability
-from .client import PubClient, check_fork, HydrationResult
+from .client import PubClient, check_fork, check_head_watermark, HydrationResult
 
 __all__ = [
     "PubError",
@@ -60,6 +60,7 @@ __all__ = [
     "Availability",
     "PubClient",
     "check_fork",
+    "check_head_watermark",
     "HydrationResult",
     "cid_for_chunk",
     "IPFSGatewayFetcher",

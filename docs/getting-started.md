@@ -8,8 +8,12 @@ From a fresh clone to a running Kerf server in about five minutes.
 |------|-----------------|
 | Python | 3.11 |
 | Node.js | 22 |
-| Postgres | 14 |
 | npm | 10 (ships with Node 22) |
+
+> **No database to install.** kerf uses an embedded **SQLite** database by
+> default (`~/.kerf/kerf.db`, created automatically) — there is nothing to set
+> up for a local install. Postgres is an optional **scale backend** for teams
+> and always-on nodes; see [Scale mode: Postgres](#scale-mode-postgres) below.
 
 ## 1. Clone the repo
 
@@ -18,21 +22,7 @@ git clone https://github.com/vul-os/kerf
 cd kerf
 ```
 
-## 2. Create the database
-
-```sh
-# Postgres must already be running locally.
-createdb kerf
-```
-
-If your local Postgres role differs from your system username (e.g. you connect
-as `pc` not `postgres`), set the URL before proceeding:
-
-```sh
-export DATABASE_URL=postgres://pc@localhost:5432/kerf?sslmode=disable
-```
-
-## 3. Install Python dependencies
+## 2. Install Python dependencies
 
 Choose the smallest persona that covers your work. `mech` is a good default for
 mechanical CAD; use `full` if you want everything.
@@ -61,13 +51,13 @@ uv sync --extra mech        # or --extra full
 
 See [persona-bundles.md](./persona-bundles.md) for the full menu and what each persona installs.
 
-## 4. Install Node dependencies
+## 3. Install Node dependencies
 
 ```sh
 npm install
 ```
 
-## 5. Initialise configuration
+## 4. Initialise configuration
 
 ```sh
 npm run init    # writes kerf.toml from kerf.example.toml (skip if it already exists)
@@ -80,10 +70,11 @@ Open `kerf.toml` and set at least one LLM API key:
 api_key = "sk-ant-..."   # or [llm.openai], [llm.moonshot], [llm.gemini]
 ```
 
-The config defaults (`local_mode = true`, `storage.backend = "local"`) are
-correct for a local dev run — you do not need to change anything else.
+The config defaults (`local_mode = true`, `storage.backend = "local"`, embedded
+SQLite database) are correct for a local dev run — you do not need to change
+anything else.
 
-## 6. Run database migrations
+## 5. Run database migrations
 
 ```sh
 kerf-server --migrate
@@ -91,10 +82,13 @@ kerf-server --migrate
 npm run migrate
 ```
 
-This applies every SQL migration under
-`packages/kerf-core/src/kerf_core/db/migrations/` in order.
+With no `DATABASE_URL` set this creates `~/.kerf/kerf.db` and applies the SQLite
+migration set (`packages/kerf-core/src/kerf_core/db/migrations_sqlite/`). If
+you have pointed kerf at Postgres (see [Scale mode](#scale-mode-postgres)), it
+applies the Postgres set (`.../migrations/`) instead. Either way the command is
+idempotent — safe to re-run.
 
-## 7. Start the server
+## 6. Start the server
 
 **Development mode** (Vite dev server on `:5173` + kerf-server on `:8080`,
 both with hot-reload):
@@ -135,7 +129,7 @@ The full schema is in `kerf.example.toml`. The most useful knobs for local dev:
 |---------|---------|-------|
 | `[server].local_mode` | `true` | Auto-login; no register/login screen |
 | `[server].port` | `8080` | HTTP port |
-| `[database].url` | `postgres://postgres:postgres@localhost:5432/kerf` | Override via `DATABASE_URL` env var |
+| `[database].url` | _(unset → embedded `~/.kerf/kerf.db`)_ | Set to `postgres://…` for scale mode; override via `DATABASE_URL` env var |
 | `[llm.anthropic].api_key` | _(empty)_ | Set this to activate the default model |
 | `[storage].backend` | `"local"` | `"local"` / `"s3"` / `"filesystem"` |
 | `[limits].file_revisions_max` | `200` | Per-file undo history cap |
@@ -156,6 +150,33 @@ kerf-server [--config PATH] [--host HOST] [--port PORT] [--reload] [--workers N]
 | `--port` | `8080` | `KERF_PORT` |
 | `--reload` | off | — |
 | `--workers` | `1` | — |
+
+## Scale mode: Postgres
+
+The embedded SQLite default is ideal for a local, single-user install. Switch to
+Postgres when you need a **team / always-on / multi-node** deployment — it adds
+multi-worker job-queue fan-out (`FOR UPDATE SKIP LOCKED`), `LISTEN/NOTIFY`
+instant worker wakeups, and horizontal scale.
+
+It is a one-line change — set `DATABASE_URL` (or `[database].url`) to a
+`postgres://` DSN before running migrations:
+
+```sh
+# Postgres must be running; create the database once:
+createdb kerf
+export DATABASE_URL=postgres://postgres:postgres@localhost:5432/kerf?sslmode=disable
+# (if your local role differs, e.g. `pc`: postgres://pc@localhost:5432/kerf?sslmode=disable)
+
+kerf-server --migrate   # applies the Postgres migration set
+kerf-server             # now serving on Postgres
+```
+
+Everything else — the API, the frontend, every plugin — is identical across the
+two backends; only the `DATABASE_URL` scheme differs. On SQLite the Postgres-only
+capabilities degrade gracefully (job queues run single-writer, `LISTEN/NOTIFY`
+wakeups fall back to polling); kerf logs a one-line notice naming them at
+startup. See [architecture/database.md](./architecture/database.md) for the full
+design.
 
 ## Next steps
 

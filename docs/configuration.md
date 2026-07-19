@@ -53,17 +53,26 @@ local_mode = true
 
 ```toml
 [database]
-url = "postgres://postgres:postgres@localhost:5432/kerf?sslmode=disable"
+# Leave unset for the embedded SQLite default (~/.kerf/kerf.db).
+# Set a postgres:// URL to opt into the Postgres scale backend.
+# url = "postgres://postgres:postgres@localhost:5432/kerf?sslmode=disable"
 ```
 
-`url` is a standard Postgres connection string. Override with `DATABASE_URL`
-environment variable — the env var takes precedence when set.
+When `url` is unset kerf uses an **embedded SQLite** database at `~/.kerf/kerf.db`
+(created automatically, WAL mode, foreign keys on). This is the zero-dependency
+default for a local install — nothing else to install or run.
 
-For a local install where the Postgres role matches your system username:
+Set `url` to a standard `postgres://` connection string to switch to the
+**Postgres scale backend** (teams / always-on / multi-node). Override either way
+with the `DATABASE_URL` environment variable — it takes precedence when set.
 
 ```
+# Scale mode; if the Postgres role matches your system username:
 DATABASE_URL=postgres://pc@localhost:5432/kerf?sslmode=disable
 ```
+
+See [architecture/database.md](./architecture/database.md) for the two-backend
+design and exactly which capabilities are Postgres-only.
 
 ## [auth]
 

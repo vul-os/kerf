@@ -115,50 +115,52 @@ class TestParserSmoke:
 
 
 # ---------------------------------------------------------------------------
-# Fail-fast: missing DATABASE_URL
+# Default backend: missing DATABASE_URL -> embedded SQLite (zero-dependency)
+#
+# `kerf serve` no longer fails when DATABASE_URL is unset — it falls back to an
+# embedded SQLite database under ~/.kerf/kerf.db so a local install needs no
+# external services.  Postgres becomes a one-line opt-in (see the reachability
+# tests below, which still guard the Postgres path).
 # ---------------------------------------------------------------------------
 
-class TestServeMissingDatabaseUrl:
-    def test_missing_url_exits_nonzero(self, monkeypatch):
+class TestServeMissingDatabaseUrlUsesSqlite:
+    def _run_serve_stubbed(self, monkeypatch):
+        """Run run_serve() with migrations + uvicorn stubbed so it returns
+        instead of blocking, capturing the DATABASE_URL it selected."""
         monkeypatch.delenv("DATABASE_URL", raising=False)
-        from kerf_cli.serve import run_serve
+        import kerf_cli.serve as serve_mod
 
-        with pytest.raises(SystemExit) as exc_info:
-            run_serve()
-        assert exc_info.value.code == 1
+        seen = {}
 
-    def test_missing_url_prints_docker_oneliner(self, monkeypatch, capsys):
-        monkeypatch.delenv("DATABASE_URL", raising=False)
-        from kerf_cli.serve import run_serve, DOCKER_ONE_LINER, EXPORT_LINE
+        async def _fake_migrate(url):
+            seen["migrated_url"] = url
 
-        with pytest.raises(SystemExit):
-            run_serve()
+        def _fake_uvicorn_run(*a, **k):
+            seen["served"] = True
 
-        captured = capsys.readouterr()
-        err = captured.err
-        assert "DATABASE_URL" in err
-        assert DOCKER_ONE_LINER in err
-        assert EXPORT_LINE in err
+        monkeypatch.setattr(
+            "kerf_core.db.migrations.runner.run_migrations", _fake_migrate)
+        import uvicorn
+        monkeypatch.setattr(uvicorn, "run", _fake_uvicorn_run)
+        serve_mod.run_serve()
+        return seen
 
-    def test_missing_url_message_contains_rerun_hint(self, monkeypatch, capsys):
-        monkeypatch.delenv("DATABASE_URL", raising=False)
-        from kerf_cli.serve import run_serve
+    def test_missing_url_does_not_exit(self, monkeypatch):
+        # No SystemExit — the embedded default just works.
+        seen = self._run_serve_stubbed(monkeypatch)
+        assert seen.get("served") is True
 
-        with pytest.raises(SystemExit):
-            run_serve()
+    def test_missing_url_selects_sqlite(self, monkeypatch):
+        seen = self._run_serve_stubbed(monkeypatch)
+        assert seen["migrated_url"].startswith("sqlite://")
+        # DATABASE_URL is exported for the child app process too.
+        assert os.environ.get("DATABASE_URL", "").startswith("sqlite://")
 
-        err = capsys.readouterr().err
-        assert "kerf serve" in err
-
-    def test_missing_url_full_message(self, monkeypatch, capsys):
-        monkeypatch.delenv("DATABASE_URL", raising=False)
-        from kerf_cli.serve import run_serve, MISSING_URL_MESSAGE
-
-        with pytest.raises(SystemExit):
-            run_serve()
-
-        err = capsys.readouterr().err
-        assert err == MISSING_URL_MESSAGE
+    def test_missing_url_prints_sqlite_notice(self, monkeypatch, capsys):
+        self._run_serve_stubbed(monkeypatch)
+        out = capsys.readouterr().out
+        assert "SQLite" in out
+        assert "postgres://" in out  # points users at the scale opt-in
 
 
 # ---------------------------------------------------------------------------
@@ -205,15 +207,23 @@ class TestServeUnreachableDatabaseUrl:
         assert EXPORT_LINE in msg
         assert "kerf serve" in msg
 
-    def test_empty_database_url_treated_as_missing(self, monkeypatch, capsys):
-        """An empty string DATABASE_URL must trigger the same missing-URL path."""
+    def test_empty_database_url_falls_back_to_sqlite(self, monkeypatch, capsys):
+        """A blank DATABASE_URL is treated as unset -> embedded SQLite default,
+        NOT a Postgres pre-flight failure."""
         monkeypatch.setenv("DATABASE_URL", "   ")
-        from kerf_cli.serve import run_serve, MISSING_URL_MESSAGE
+        import kerf_cli.serve as serve_mod
 
-        with pytest.raises(SystemExit) as exc_info:
-            run_serve()
-        assert exc_info.value.code == 1
-        assert "DATABASE_URL" in capsys.readouterr().err
+        async def _fake_migrate(url):
+            _fake_migrate.url = url
+
+        monkeypatch.setattr(
+            "kerf_core.db.migrations.runner.run_migrations", _fake_migrate)
+        import uvicorn
+        monkeypatch.setattr(uvicorn, "run", lambda *a, **k: None)
+
+        serve_mod.run_serve()  # no SystemExit
+        assert _fake_migrate.url.startswith("sqlite://")
+        assert "SQLite" in capsys.readouterr().out
 
 
 # ---------------------------------------------------------------------------

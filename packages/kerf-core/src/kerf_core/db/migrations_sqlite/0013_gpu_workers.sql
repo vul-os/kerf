@@ -1,0 +1,55 @@
+-- AUTO-GENERATED from ../migrations/0013_gpu_workers.sql by scripts/gen_sqlite_migrations.py — DO NOT EDIT BY HAND.
+-- SQLite dialect of the Postgres baseline for kerf's embedded backend.
+
+-- 0013_gpu_workers.sql
+-- GPU worker enrollment + BYO dispatch tables.
+--
+-- gpu_workers: one row per enrolled worker machine.  Users enroll their
+--   own GPU machine by calling POST /api/workers/enroll; the API mints a
+--   token (stored as a bcrypt hash) returned ONCE in plaintext.  The worker
+--   daemon uses this token to authenticate heartbeat + claim-job calls.
+--
+-- gpu_worker_jobs: join table linking a worker to the render jobs it ran.
+--   Used for COGS attribution and per-worker utilisation reporting.
+--
+-- render_jobs: preferred_worker_id is added inline so a
+--   SelfHostedWorkerBackend-submitted job is only claimable by that worker.
+--   (A billing_bucket column also lived here; dropped 2026-07-18 as dead —
+--   see 0010_github_app_render.sql.)
+--
+-- All DDL is CREATE IF NOT EXISTS / ADD COLUMN IF NOT EXISTS — fully idempotent.
+
+CREATE TABLE IF NOT EXISTS gpu_workers (
+    id              text        PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab',abs(random())%4+1,1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+    user_id         text        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name            text        NOT NULL,
+    token_hash      text        NOT NULL DEFAULT '',
+    capabilities    text       NOT NULL DEFAULT '{}',
+    status          text        NOT NULL DEFAULT 'offline'
+                    CHECK (status IN ('online', 'offline', 'busy', 'revoked')),
+    last_seen_at    text,
+    created_at      text NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS gpu_workers_user_id_idx ON gpu_workers (user_id);
+CREATE INDEX IF NOT EXISTS gpu_workers_status_idx  ON gpu_workers (status);
+
+CREATE TABLE IF NOT EXISTS gpu_worker_jobs (
+    worker_id       text        NOT NULL REFERENCES gpu_workers(id) ON DELETE CASCADE,
+    render_job_id   text        NOT NULL REFERENCES render_jobs(id) ON DELETE CASCADE,
+    picked_up_at    text NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    completed_at    text,
+    PRIMARY KEY (worker_id, render_job_id)
+);
+
+CREATE INDEX IF NOT EXISTS gpu_worker_jobs_worker_id_idx
+    ON gpu_worker_jobs (worker_id);
+CREATE INDEX IF NOT EXISTS gpu_worker_jobs_render_job_id_idx
+    ON gpu_worker_jobs (render_job_id);
+
+-- render_jobs.preferred_worker_id is defined in 0010_github_app_render.sql
+-- (folded into the render_jobs baseline per the clean-baseline directive —
+-- no ALTER shims).
+CREATE INDEX IF NOT EXISTS render_jobs_preferred_worker_idx
+    ON render_jobs (preferred_worker_id)
+    WHERE preferred_worker_id IS NOT NULL;

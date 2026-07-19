@@ -1,0 +1,20 @@
+-- AUTO-GENERATED from ../migrations/0012_cloud_git.sql by scripts/gen_sqlite_migrations.py — DO NOT EDIT BY HAND.
+-- SQLite dialect of the Postgres baseline for kerf's embedded backend.
+
+-- 0012_cloud_git.sql
+-- Tombstone (2026-07-18): hosted git is retired as a product (decisions.md
+-- 2026-07-18 "local git only; no OAuth; accounts shrink to the box"). This
+-- file used to create cloud_git_repos, cloud_git_branches, and
+-- cloud_git_commits — the hosted-git-substrate tables for the cloud-git
+-- commit handler at POST /projects/{pid}/git/commit in the now-retired
+-- kerf-cloud routes. A repo-wide grep found zero readers/writers left for
+-- all three: the only in-tree reference was kerf_core.storage.materialize's
+-- auto_commit_if_idle(), which itself had zero callers anywhere (dead code
+-- referencing dead schema). auto_commit_if_idle() was removed alongside
+-- these tables rather than rewired, since nothing invoked it.
+--
+-- A kerf project is a plain local git repo now (see
+-- kerf_core.storage.git_storer / materialize.py, wired through
+-- kerf-api's routes_git_local.py and routes_git_diff.py) — no DB-tracked
+-- commit ledger; git itself is the ledger. Since DBs are reset, the tables
+-- are dropped from this baseline rather than left as dead schema.

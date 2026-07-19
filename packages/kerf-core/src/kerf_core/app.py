@@ -219,8 +219,24 @@ async def _load_plugins(app: FastAPI, config: Config) -> None:
     if config.database_url:
         try:
             from kerf_core.db.connection import create_pool_from_config
+            from kerf_core.db.dialect import is_sqlite_url
             pool = await create_pool_from_config(config)
             app.state.pool = pool
+            if is_sqlite_url(config.database_url):
+                logger.info(
+                    "db_backend_sqlite",
+                    url=config.database_url,
+                    note=(
+                        "Embedded SQLite backend (zero-dependency default). "
+                        "Postgres-only capabilities degrade gracefully: "
+                        "multi-worker job queues (FEM/CAM/SPICE/tessellation/"
+                        "render/firmware) run single-writer instead of "
+                        "FOR UPDATE SKIP LOCKED fan-out; LISTEN/NOTIFY instant "
+                        "wake falls back to polling; horizontal multi-node scale "
+                        "is unavailable. Set DATABASE_URL=postgres://… for the "
+                        "scale backend."
+                    ),
+                )
         except Exception as exc:
             logger.warning("db_pool_failed", error=str(exc))
 

@@ -4,8 +4,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from kerf_core.db.config import default_database_url
 
 _REPO_ROOT_ENV = str(Path(__file__).resolve().parent.parent / ".env")
 
@@ -14,7 +16,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=_REPO_ROOT_ENV, env_file_encoding='utf-8', extra='ignore')
     env: str = "local"
     port: str = "8080"
-    database_url: str = "postgres://postgres:postgres@localhost:5432/kerf"
+    # Embedded SQLite by default (zero-dependency local install); set
+    # DATABASE_URL=postgres://… to opt into the Postgres scale backend.
+    database_url: str = Field(default_factory=default_database_url)
     jwt_secret: str = "dev-secret-change-in-production"
     jwt_access_ttl_minutes: int = 15
     jwt_refresh_ttl_days: int = 30

@@ -38,7 +38,65 @@ CREATE TABLE IF NOT EXISTS {_LEDGER} (
 _ALREADY_APPLIED = (asyncpg.PostgresError,)
 
 
+async def run_sqlite_migrations(database_url: str):
+    """Apply the checked-in SQLite migration set (``../migrations_sqlite``).
+
+    The embedded backend always starts from a clean, kerf-owned schema, so this
+    path is simple: create the ledger, then apply each unseen ``*.sql`` file in
+    order inside its own transaction and stamp it.  No legacy back-stamping is
+    needed (that machinery exists only for the historical Postgres DBs).
+    """
+    import aiosqlite
+
+    from kerf_core.db.dialect import sqlite_path_from_url
+    from kerf_core.db.sqlite_backend import _open_connection  # WAL + FK pragmas
+
+    path = sqlite_path_from_url(database_url)
+    if path != ":memory:":
+        Path(path).expanduser().parent.mkdir(parents=True, exist_ok=True)
+        path = str(Path(path).expanduser())
+
+    sqlite_conn = await _open_connection(path)
+    conn = sqlite_conn._conn  # raw aiosqlite connection for executescript
+    try:
+        await conn.execute(
+            f"CREATE TABLE IF NOT EXISTS {_LEDGER} ("
+            "filename text PRIMARY KEY, "
+            "applied_at text NOT NULL DEFAULT CURRENT_TIMESTAMP)"
+        )
+        cur = await conn.execute(f"SELECT filename FROM {_LEDGER}")
+        applied = {r[0] for r in await cur.fetchall()}
+        await cur.close()
+
+        migrations_dir = Path(__file__).parent.parent / "migrations_sqlite"
+        ran = 0
+        for migration_file in sorted(migrations_dir.glob("*.sql")):
+            name = migration_file.name
+            if name in applied:
+                continue
+            sql = migration_file.read_text()
+            # executescript runs the DDL (autocommit); the DDL is IF-NOT-EXISTS
+            # idempotent so a re-run after a partial failure is safe.
+            await conn.executescript(sql)
+            await conn.execute(
+                f"INSERT INTO {_LEDGER} (filename) VALUES (?) "
+                "ON CONFLICT DO NOTHING",
+                (name,),
+            )
+            print(f"  ✓ {name}")
+            ran += 1
+        print(f"\nSQLite migrations up to date ({ran} applied) at {path}.")
+    finally:
+        await conn.close()
+
+
 async def run_migrations(database_url: str):
+    # Embedded SQLite backend gets its own clean-baseline applier.
+    from kerf_core.db.dialect import is_sqlite_url
+    if is_sqlite_url(database_url):
+        await run_sqlite_migrations(database_url)
+        return
+
     conn = await asyncpg.connect(database_url)
     try:
         await conn.execute(_LEDGER_DDL)
@@ -117,9 +175,11 @@ if __name__ == "__main__":
     # interpolating them into the command string).
     dsn = sys.argv[1] if len(sys.argv) >= 2 else os.environ.get("DATABASE_URL")
     if not dsn:
-        print(
-            "Usage: python -m kerf_core.db.migrations.runner [<database_url>]\n"
-            "       Or set DATABASE_URL in the environment."
-        )
-        sys.exit(1)
+        # Zero-config default: no DSN given and DATABASE_URL unset -> the
+        # embedded SQLite database at ~/.kerf/kerf.db.  This makes
+        # `python -m kerf_core.db.migrations.runner` / `npm run migrate` work
+        # with no external database, matching the app's default backend.
+        from kerf_core.db.config import default_database_url
+        dsn = default_database_url()
+        print(f"No DATABASE_URL set — using embedded SQLite ({dsn}).")
     asyncio.run(run_migrations(dsn))

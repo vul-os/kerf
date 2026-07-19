@@ -88,23 +88,35 @@ def run_serve(
 ) -> None:
     """Entry point for `kerf serve`.
 
-    Performs two pre-flight checks before handing off to uvicorn:
-      1. DATABASE_URL must be set (env var).
-      2. DATABASE_URL must be reachable (5-second TCP+auth check).
+    Backend selection is by DATABASE_URL scheme:
+      * unset            -> embedded SQLite at ~/.kerf/kerf.db (zero-dependency
+                            default; no pre-flight, the file is auto-created).
+      * ``sqlite://…``   -> that SQLite file.
+      * ``postgres://…`` -> the Postgres scale backend, with the two historical
+                            pre-flight checks (set + reachable).
 
-    Fails with sys.exit(1) on any error.
+    Fails with sys.exit(1) only on a Postgres pre-flight error.
     """
-    # --- Pre-flight: missing DATABASE_URL -----------------------------------
-    db_url = os.environ.get("DATABASE_URL", "").strip()
-    if not db_url:
-        sys.stderr.write(MISSING_URL_MESSAGE)
-        sys.exit(1)
+    from kerf_core.db.config import default_database_url  # noqa: PLC0415
+    from kerf_core.db.dialect import is_sqlite_url  # noqa: PLC0415
 
-    # --- Pre-flight: unreachable DATABASE_URL --------------------------------
-    error = asyncio.run(_check_db(db_url))
-    if error:
-        sys.stderr.write(error)
-        sys.exit(1)
+    # --- Resolve backend: default to embedded SQLite when unset --------------
+    db_url = os.environ.get("DATABASE_URL", "").strip() or default_database_url()
+
+    if is_sqlite_url(db_url):
+        # Embedded default — no server to reach, nothing to fail on.
+        os.environ["DATABASE_URL"] = db_url
+        print(f"Using embedded SQLite database ({db_url}).")
+        print(
+            "  (Zero-dependency default. For teams / always-on nodes, set "
+            "DATABASE_URL=postgres://… to use the Postgres scale backend.)"
+        )
+    else:
+        # --- Pre-flight: unreachable DATABASE_URL (Postgres) -----------------
+        error = asyncio.run(_check_db(db_url))
+        if error:
+            sys.stderr.write(error)
+            sys.exit(1)
 
     # --- Optional: run migrations -------------------------------------------
     if not skip_migrate:

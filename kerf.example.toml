@@ -24,10 +24,25 @@ cors_origin = "http://localhost:5173"
 local_mode = true
 
 # ---------------------------------------------------------------------------
-# Database (Postgres)
+# Database
+#
+# kerf ships with an embedded SQLite database as the zero-dependency default:
+# leave `url` unset (or omit this whole section) and kerf creates and uses
+# ~/.kerf/kerf.db automatically (WAL mode, foreign keys on) — nothing else to
+# install. This is the recommended setup for a local, single-user install.
+#
+# Postgres is the opt-in SCALE backend for teams / always-on / multi-node
+# deployments (multi-worker job queues, LISTEN/NOTIFY wakeups, horizontal
+# scale). To use it, set `url` to a postgres:// DSN (or the DATABASE_URL env
+# var) — that one line switches the backend, no other change required.
+#
+#   url = "sqlite:///home/you/.kerf/kerf.db"                     # explicit SQLite
+#   url = "postgres://postgres:postgres@localhost:5432/kerf?sslmode=disable"  # scale
+#
+# Override at runtime with the DATABASE_URL env var (takes precedence).
 # ---------------------------------------------------------------------------
 [database]
-url = "postgres://postgres:postgres@localhost:5432/kerf?sslmode=disable"
+# url = "postgres://postgres:postgres@localhost:5432/kerf?sslmode=disable"
 
 # ---------------------------------------------------------------------------
 # Auth

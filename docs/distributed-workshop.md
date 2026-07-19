@@ -138,32 +138,82 @@ you can register a **Web Push subscription** for one of their feeds instead of
 polling it:
 
 ```
+GET    /.well-known/dmtap-pub/wake-key                 -> {public_key}  (503 if unconfigured)
 POST   /.well-known/dmtap-pub/feed/{pub}/subscribe   {endpoint, keys: {p256dh, auth}}
 DELETE /.well-known/dmtap-pub/feed/{pub}/subscribe   {endpoint}
 ```
 
 `{p256dh, auth}` is exactly what a browser's `PushManager.subscribe()`
-returns — no kerf-specific client is required to generate them. When that
-publisher next publishes, their node sends your endpoint an **opaque,
-content-free "sync now" ping** — never the artifact, never even the announce
-id or the publisher's identity, just a fresh encrypted token a push service
-can't read either (RFC 8291/8292 Web Push). Your client then does the exact
-same verified pull it always does — either the next full `GET
-/api/pub/workshop` re-crawl, or a **targeted refresh of just that one feed**
-(`POST /api/pub/follows/{pub}/refresh`) so "new revision" can light up in the
-UI without waiting on every other followed feed's poll interval too.
+returns — no kerf-specific client is required to generate them. `wake-key`
+hands back the node's own VAPID public key (RFC 8292), the one piece of
+state a browser needs before it can call `PushManager.subscribe({
+applicationServerKey})` in the first place; it 503s with no body worth
+parsing when the node has no VAPID keypair configured, which is exactly how
+the Workshop UI's toggle (below) tells "not supported here" apart from a
+transient failure. When that publisher next publishes, their node sends your
+endpoint an **opaque, content-free "sync now" ping** — never the artifact,
+never even the announce id or the publisher's identity, just a fresh
+encrypted token a push service can't read either (RFC 8291/8292 Web Push).
+Your client then does the exact same verified pull it always does — either
+the next full `GET /api/pub/workshop` re-crawl, or a **targeted refresh of
+just that one feed** (`POST /api/pub/follows/{pub}/refresh`) so "new
+revision" can light up in the UI without waiting on every other followed
+feed's poll interval too.
 
 A dead or unreachable subscriber endpoint never affects the publisher's
 `publish` call — wake is fire-and-forget, best-effort, and the publish always
 succeeds regardless of whether any ping was delivered.
 
-**What's implemented today:** the subscription registry, the send path on
-publish, and the single-feed refresh trigger. A minimal "notify me about new
-revisions" toggle in the Workshop UI (the browser-side
-`PushManager.subscribe()` call + wiring it to the subscribe endpoint above) is
-a follow-up — until then, the subscribe/unsubscribe endpoints are reachable
-directly by anything that can make an HTTP request (a script, a browser
-extension, or a future UI control).
+### Enabling wake notifications
+
+**As a follower**, open the Workshop's "Feeds" tab and click the bell icon
+next to a feed you follow ("Notify me"). The toggle:
+
+- registers a service worker (`public/sw.js`) and a browser Push
+  subscription, then calls the `subscribe` endpoint above so this node's
+  publish path knows to ping you;
+- shows **disabled with a tooltip explaining why**, never hidden, when it
+  can't work: no Push API support in this browser, no VAPID key configured
+  on this node, or (v1's scope) the follow's `gateway_url` names a
+  *different* node than the one serving this page — a browser can only hold
+  one Push subscription per origin at a time, keyed to a single VAPID
+  identity, so Wake only works for follows resolved through this node's own
+  gateway. Following a foreign node's feed still works exactly as before;
+  it just can't wake you yet.
+- respects the browser's notification permission prompt — declining it, or
+  having previously blocked notifications for the site, disables the toggle
+  with that reason surfaced, rather than silently failing.
+- degrades to "off" gracefully: turning it off (or a failed subscribe/
+  unsubscribe call) never blocks unfollowing or breaks the ordinary
+  pull-based refresh, per Wake's fire-and-forget posture above.
+
+A push arriving with no Workshop tab open runs a **best-effort background
+refresh** of just the feeds you've enabled Wake for (`public/sw.js`'s `push`
+handler, using an access token the open tab last handed it via Cache
+Storage — see `src/lib/wakeState.js`) and shows one quiet, silent,
+coalesced notification; clicking it (or an already-open tab receiving the
+push) just re-triggers that same targeted refresh. None of this ever
+guesses at *what* changed — the push payload carries nothing to guess from
+— it only ever triggers the same verified pull the Workshop always does.
+
+**As a publisher (node operator)**, Wake is off until you set two
+environment variables (see
+[configuration.md](./configuration.md#environment-variable-overrides) for
+where `kerf-server` reads env vars from) and restart:
+
+```
+KERF_PUB_VAPID_PRIVATE_KEY   base64url, the raw 32-byte P-256 private scalar
+KERF_PUB_VAPID_SUBJECT       a contact URI, e.g. "mailto:ops@example.com"
+```
+
+Generate a keypair once with `kerf_pub.wake.generate_vapid_private_key_b64()`
+— there's no CLI wrapper for it today; run it from a Python shell with
+`kerf-pub` installed. With both set, `GET .../wake-key` starts returning your
+public key, `POST .../subscribe` starts accepting subscriptions, and
+`publish()` starts sending wake pings on every publish. Leave either unset
+and the node behaves exactly as it does without Wake at all — the subscribe
+endpoint 503s and `publish()` skips the notify step, matching
+`kerf_pub.ipfs`'s same zero-socket-by-default convention.
 
 ## Publishing over plain HTTPS
 

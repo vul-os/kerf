@@ -211,13 +211,13 @@ real-time collaborative editing, it should build on that spec instead of
 reviving the pruned seed.
 
 **Wake (push notifications for the Workshop).** See
-[distributed-workshop.md](./distributed-workshop.md) and
-[node-architecture.md](./node-architecture.md) for kerf-pub's optional Web
-Push wake path (substrate capability ⑤, `dmtap/substrate/ROLES.md` §8) — a
-content-free "new revision" ping that lets a follower skip re-crawl polling.
-Frontend UI (browser `PushManager` subscription flow, a small "notify me"
-toggle in the Workshop view) is a follow-up; the server-side subscription
-registry and send path are implemented.
+[distributed-workshop.md](./distributed-workshop.md#wake-optional-new-revision-pings)
+and [node-architecture.md](./node-architecture.md) for kerf-pub's optional
+Web Push wake path (substrate capability ⑤, `dmtap/substrate/ROLES.md` §8) —
+a content-free "new revision" ping that lets a follower skip re-crawl
+polling. Both halves are implemented: the server-side subscription registry
++ send path, and the frontend (`public/sw.js`'s service worker + `src/lib/
+wake.js`'s `PushManager` orchestration + the Workshop's "Notify me" toggle).
 
 ---
 

@@ -28,6 +28,26 @@ features:
       note: "Stairs and ramps in kerf-bim engine; viewer wired"
       evidence: "packages/kerf-bim/src/kerf_bim/tools/bim.py"
   - domain: D13
+    feature: "Automatic stair code check (IBC / ADA / ICC A117.1)"
+    competitor:
+      status: partial
+      note: "Stair Maker shows warnings for non-compliant risers/treads but does not report specific code clause references or generate a code-review summary"
+      source: "https://help.graphisoft.com/AC/27/INT/_AC27_Help/content/020_elemtools/020_elemtools-20.htm"
+    kerf:
+      status: yes
+      note: "arch_check_stair_codes tool: per-clause pass/fail for IBC 2024 §1011, ADA §504, ICC A117.1 §504, Ontario OBC; violations table with code_ref/requirement/actual; Blondel 2R+T check; one-click code-summary sticker export"
+      evidence: "packages/kerf-cad-core/src/kerf_cad_core/arch/stair_code_check.py"
+  - domain: D13
+    feature: "Stair tool with code compliance"
+    competitor:
+      status: partial
+      note: "Graphisoft Stair Maker includes dimensional validation but no structured code-clause reporting or jurisdiction switching"
+      source: "https://help.graphisoft.com/AC/27/INT/_AC27_Help/content/020_elemtools/020_elemtools-20.htm"
+    kerf:
+      status: yes
+      note: "StairView editor + integrated code-check card: riser/tread sliders, jurisdiction dropdown (IBC/ADA/ICC/OBC), per-category badges, violations table, and downloadable code-review sticker; all checks are pure-JS with no backend round-trip"
+      evidence: "src/components/StairView.jsx"
+  - domain: D13
     feature: "BIM doors / windows"
     competitor:
       status: yes
@@ -277,7 +297,7 @@ ArchiCAD pioneered BIM — Kerf brings engineering-grade precision to teams buil
 
 ## Summary
 
-Kerf saturates **100%** of Graphisoft ArchiCAD's feature surface (26 yes, 0 partial, 0 no out of 26 features tracked here). Kerf covers the full tracked feature set for Graphisoft ArchiCAD; gaps may exist in workflow depth, ecosystem maturity, and community support.
+Kerf saturates **100%** of Graphisoft ArchiCAD's feature surface (28 yes, 0 partial, 0 no out of 28 features tracked here). Kerf covers the full tracked feature set for Graphisoft ArchiCAD; gaps may exist in workflow depth, ecosystem maturity, and community support.
 
 ## Feature comparison
 
@@ -285,6 +305,8 @@ Kerf saturates **100%** of Graphisoft ArchiCAD's feature surface (26 yes, 0 part
 |---------|------|---------------------|-------|
 | BIM walls / slabs / framing | ✅ | Yes | kerf-bim walls/slabs/framing wired; parametric engine + IFC viewer |
 | BIM stairs / ramps | ✅ | Yes | Stairs and ramps in kerf-bim engine; viewer wired |
+| Automatic stair code check (IBC / ADA / ICC A117.1) | ✅ | Partial | arch_check_stair_codes tool: per-clause pass/fail for IBC 2024 §1011, ADA §504, ICC A117.1 §504, Ontario OBC; violati... |
+| Stair tool with code compliance | ✅ | Partial | StairView editor + integrated code-check card: riser/tread sliders, jurisdiction dropdown (IBC/ADA/ICC/OBC), per-cate... |
 | BIM doors / windows | ✅ | Yes | Parametric doors/windows in kerf-bim; wired in viewer |
 | BIM roof generator | ✅ | Yes | Parametric hip / gable / shed / mono-pitch roof B-rep generator with IFC IfcRoof export |
 | IFC 4 authoring and export | ✅ | Yes | IFC4 export wired (walls/slabs/doors/windows/spaces/stairs/openings/site); Tier 2 import; not yet buildingSMART certi... |

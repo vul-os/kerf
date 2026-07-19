@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-07-19T11:12:54.272Z",
+  "generatedAt": "2026-07-18T12:12:25.237Z",
   "items": [
     {
       "slug": "revit",
@@ -995,6 +995,34 @@
             "notes": "Stairs and ramps in kerf-bim engine; viewer wired"
           },
           "name": "BIM stairs / ramps"
+        },
+        {
+          "domain": "D13",
+          "competitor": {
+            "status": "partial",
+            "source": "https://help.graphisoft.com/AC/27/INT/_AC27_Help/content/020_elemtools/020_elemtools-20.htm",
+            "notes": "Stair Maker shows warnings for non-compliant risers/treads but does not report specific code clause references or generate a code-review summary"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "packages/kerf-cad-core/src/kerf_cad_core/arch/stair_code_check.py",
+            "notes": "arch_check_stair_codes tool: per-clause pass/fail for IBC 2024 §1011, ADA §504, ICC A117.1 §504, Ontario OBC; violations table with code_ref/requirement/actual; Blondel 2R+T check; one-click code-summary sticker export"
+          },
+          "name": "Automatic stair code check (IBC / ADA / ICC A117.1)"
+        },
+        {
+          "domain": "D13",
+          "competitor": {
+            "status": "partial",
+            "source": "https://help.graphisoft.com/AC/27/INT/_AC27_Help/content/020_elemtools/020_elemtools-20.htm",
+            "notes": "Graphisoft Stair Maker includes dimensional validation but no structured code-clause reporting or jurisdiction switching"
+          },
+          "kerf": {
+            "status": "yes",
+            "evidence": "src/components/StairView.jsx",
+            "notes": "StairView editor + integrated code-check card: riser/tread sliders, jurisdiction dropdown (IBC/ADA/ICC/OBC), per-category badges, violations table, and downloadable code-review sticker; all checks are pure-JS with no backend round-trip"
+          },
+          "name": "Stair tool with code compliance"
         },
         {
           "domain": "D13",

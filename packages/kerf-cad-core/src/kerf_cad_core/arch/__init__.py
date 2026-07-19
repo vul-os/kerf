@@ -2,7 +2,8 @@
 kerf_cad_core.arch — Parametric architectural BIM primitives.
 
 Pure-Python parametric model layer for architectural elements.  No OCC
-dependency.  All units are millimetres throughout.
+dependency.  All units are millimetres throughout (except stair_code_check
+which uses inches to match IBC/ADA source publications).
 
 Submodules:
   primitives        — Wall, Door, Window, Slab, Opening dataclasses + builders
@@ -51,6 +52,7 @@ To avoid collision this package re-exports the structural one as ``SlabDeflSpec`
   slab_on_grade_tools — LLM tool arch_check_slab_on_grade
   stair_stringer    — IBC §1011 + AWC NDS-2018 §3.3 + AISC 360-22 §F2 stair stringer bending check
   stair_stringer_tools — LLM tool arch_design_stair_stringer
+  stair_code_check  — IBC/ADA/ICC A117.1/OBC stair code-compliance checker
 """
 from __future__ import annotations
 
@@ -282,4 +284,8 @@ __all__ = [
     "StringerSpec",
     "StringerReport",
     "design_stair_stringer",
+    # Stair code compliance
+    "StairCodeSpec",
+    "StairCodeReport",
+    "check_stair_codes",
 ]

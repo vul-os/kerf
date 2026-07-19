@@ -5513,6 +5513,47 @@ const FEATURE_KINDS = [
       { key: 'target_gap_max_mm', kind: 'number', label: 'Max acceptable gap (mm)', min: 0 },
     ],
   },
+
+  // arch_check_stair_codes — IBC / ADA / ICC A117.1 / OBC stair code check
+  {
+    op: 'arch_check_stair_codes',
+    label: 'Stair Code Check',
+    icon: Shield,
+    caption: (
+      'Automated stair code-compliance check per IBC 2024 §1011, ADA §504, ' +
+      'ICC A117.1 §504, or Ontario OBC Part 9. ' +
+      'All dimensions in inches. Checks riser, tread, width, handrail, headroom, ' +
+      'landing, Blondel 2R+T formula, and max vertical rise between landings.'
+    ),
+    defaults: {
+      tread_depth_in: 11.0,
+      riser_height_in: 7.0,
+      stair_width_in: 44.0,
+      handrail_height_in: 36.0,
+      headroom_clearance_in: 80.0,
+      num_risers: 14,
+      has_landing: false,
+      landing_depth_in: 44.0,
+      jurisdiction: 'ibc_2024',
+    },
+    fields: [
+      { key: 'jurisdiction', kind: 'select', label: 'Jurisdiction', options: [
+        { value: 'ibc_2024',     label: 'IBC 2024 §1011' },
+        { value: 'ada_504',      label: 'ADA §504' },
+        { value: 'icc_a117_1',   label: 'ICC A117.1 §504' },
+        { value: 'ontario_obc',  label: 'Ontario OBC Part 9' },
+      ] },
+      { key: 'riser_height_in',      kind: 'number', label: 'Riser height (in)', min: 0.5, max: 12, step: 0.25 },
+      { key: 'tread_depth_in',       kind: 'number', label: 'Tread depth (in)',  min: 0.5, max: 24, step: 0.25 },
+      { key: 'stair_width_in',       kind: 'number', label: 'Stair width (in)',  min: 12, max: 120, step: 1 },
+      { key: 'handrail_height_in',   kind: 'number', label: 'Handrail height above nosing (in)', min: 20, max: 50, step: 0.5 },
+      { key: 'headroom_clearance_in',kind: 'number', label: 'Headroom clearance (in)', min: 60, max: 120, step: 1 },
+      { key: 'num_risers',           kind: 'number', label: 'Number of risers', min: 1, max: 200, step: 1 },
+      { key: 'has_landing',          kind: 'bool',   label: 'Has intermediate landing' },
+      { key: 'landing_depth_in',     kind: 'number', label: 'Landing depth (in)', min: 12, max: 120, step: 1,
+        showWhen: (n) => n.has_landing },
+    ],
+  },
 ]
 
 const KIND_BY_OP = Object.fromEntries(FEATURE_KINDS.map((k) => [k.op, k]))
@@ -5620,7 +5661,7 @@ const FEATURE_CATEGORIES = [
     'tolstack_analyze',
   ] },
   { id: 'weldment',  label: 'Weldment',     ops: ['gusset_plate', 'cope_notch'] },
-  { id: 'bim',       label: 'BIM',          ops: ['bim_make_grid', 'bim_make_framing', 'bim_make_wall', 'bim_make_slab'] },
+  { id: 'bim',       label: 'BIM',          ops: ['bim_make_grid', 'bim_make_framing', 'bim_make_wall', 'bim_make_slab', 'arch_check_stair_codes'] },
   { id: 'cam', label: 'CAM / Manufacturing', ops: [
     // G-code emission
     'cam_emit_gcode', 'cam_emit_lathe_gcode',

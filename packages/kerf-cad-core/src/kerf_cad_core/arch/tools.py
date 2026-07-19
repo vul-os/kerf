@@ -1,7 +1,7 @@
 """
 kerf_cad_core.arch.tools — LLM tool wrappers for parametric BIM primitives.
 
-Registers six tools with the Kerf tool registry:
+Registers seven tools with the Kerf tool registry:
 
   arch_wall               — parametric wall (baseline + height + optional layers)
   arch_door               — door hosted in a wall
@@ -9,9 +9,11 @@ Registers six tools with the Kerf tool registry:
   arch_slab               — horizontal slab from polygon outline + thickness
   arch_opening            — generic rectangular or arched void in a wall
   arch_wall_with_openings — compose a wall + hosted doors/windows; compute net volume
+  arch_check_stair_codes  — IBC/ADA/ICC A117.1/OBC stair code-compliance check
 
 All tools are **pure-Python**; no OCC dependency, no DB write required.
-All dimensions are in **millimetres** throughout.
+All dimensions are in **millimetres** throughout (except arch_check_stair_codes
+which uses **inches** to match IBC/ADA source publications).
 Returns {ok: bool, errors: [...]} on bad input; never raises.
 """
 from __future__ import annotations
@@ -28,6 +30,10 @@ from kerf_cad_core.arch.primitives import (
     build_slab,
     build_opening,
     compose_wall_with_openings,
+)
+from kerf_cad_core.arch.stair_code_check import (  # noqa: E402
+    StairCodeSpec,
+    check_stair_codes,
 )
 
 
@@ -540,3 +546,161 @@ async def run_arch_wall_with_openings(ctx: ProjectCtx, args: bytes) -> str:
     if not result["ok"]:
         return err_payload("; ".join(result["errors"]), "BAD_ARGS")
     return ok_payload(result)
+
+
+# ---------------------------------------------------------------------------
+# Tool: arch_check_stair_codes
+# ---------------------------------------------------------------------------
+
+_arch_check_stair_codes_spec = ToolSpec(
+    name="arch_check_stair_codes",
+    description=(
+        "Automated stair code-compliance check per IBC 2024 §1011, ADA §504, "
+        "ICC A117.1 §504, or Ontario OBC Part 9. "
+        "All dimensions must be supplied in **inches** (to match the code references). "
+        "Checks: riser height, tread depth, stair width, handrail height, headroom "
+        "clearance, landing depth, Blondel ergonomic formula (24 ≤ 2R+T ≤ 25 in), "
+        "and max vertical rise between landings (IBC §1011.8). "
+        "Returns per-category pass/fail booleans, a structured violations table "
+        "(code_ref / requirement / actual), and an honest_caveat for inclusion in "
+        "code-review packages. "
+        "Never raises — bad inputs produce violation entries instead."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "tread_depth_in": {
+                "type": "number",
+                "description": (
+                    "Horizontal tread depth, measured nose-to-nose in inches "
+                    "(IBC §1011.5.3). Typical: 11\"."
+                ),
+            },
+            "riser_height_in": {
+                "type": "number",
+                "description": (
+                    "Vertical riser height in inches (IBC §1011.5.2). "
+                    "IBC range: 4\"–7\"."
+                ),
+            },
+            "stair_width_in": {
+                "type": "number",
+                "description": (
+                    "Clear width between handrails (or wall faces) in inches. "
+                    "IBC minimum: 44\" (occ. load ≥ 50) or 36\" (occ. load < 50)."
+                ),
+            },
+            "handrail_height_in": {
+                "type": "number",
+                "description": (
+                    "Height of handrail gripping surface above stair tread nosing "
+                    "in inches (ADA §505.4 / IBC §1012.2). Range: 34\"–38\"."
+                ),
+            },
+            "headroom_clearance_in": {
+                "type": "number",
+                "description": (
+                    "Minimum vertical headroom measured from the tread nosing line "
+                    "in inches (IBC §1011.3). Minimum: 80\" (6 ft 8 in)."
+                ),
+            },
+            "num_risers": {
+                "type": "integer",
+                "description": (
+                    "Number of risers in the flight. Used to compute total vertical "
+                    "rise for the IBC §1011.8 max-rise-between-landings check."
+                ),
+                "minimum": 1,
+            },
+            "has_landing": {
+                "type": "boolean",
+                "description": (
+                    "True if an intermediate landing is provided. When True, "
+                    "landing_depth_in is checked against code minima."
+                ),
+            },
+            "landing_depth_in": {
+                "type": "number",
+                "description": (
+                    "Depth of the landing in the direction of travel in inches "
+                    "(IBC §1011.7). Required when has_landing is True."
+                ),
+            },
+            "jurisdiction": {
+                "type": "string",
+                "enum": ["ibc_2024", "ada_504", "icc_a117_1", "ontario_obc"],
+                "description": (
+                    "Code edition to enforce: "
+                    "'ibc_2024' (IBC 2024 §1011), "
+                    "'ada_504' (ADA Standards for Accessible Design §504), "
+                    "'icc_a117_1' (ICC A117.1-2017 §504), "
+                    "'ontario_obc' (Ontario Building Code Part 9 §9.8)."
+                ),
+            },
+        },
+        "required": [
+            "tread_depth_in",
+            "riser_height_in",
+            "stair_width_in",
+            "handrail_height_in",
+            "headroom_clearance_in",
+            "num_risers",
+            "has_landing",
+            "landing_depth_in",
+            "jurisdiction",
+        ],
+    },
+)
+
+
+@register(_arch_check_stair_codes_spec, write=False)
+async def run_arch_check_stair_codes(ctx: ProjectCtx, args: bytes) -> str:
+    try:
+        a = json.loads(args)
+    except Exception as exc:
+        return err_payload(f"invalid args JSON: {exc}", "BAD_ARGS")
+
+    required = [
+        "tread_depth_in", "riser_height_in", "stair_width_in",
+        "handrail_height_in", "headroom_clearance_in",
+        "num_risers", "has_landing", "landing_depth_in", "jurisdiction",
+    ]
+    missing = [k for k in required if k not in a]
+    if missing:
+        return err_payload(f"missing required fields: {missing}", "BAD_ARGS")
+
+    try:
+        spec = StairCodeSpec(
+            tread_depth_in=float(a["tread_depth_in"]),
+            riser_height_in=float(a["riser_height_in"]),
+            stair_width_in=float(a["stair_width_in"]),
+            handrail_height_in=float(a["handrail_height_in"]),
+            headroom_clearance_in=float(a["headroom_clearance_in"]),
+            num_risers=int(a["num_risers"]),
+            has_landing=bool(a["has_landing"]),
+            landing_depth_in=float(a["landing_depth_in"]),
+            jurisdiction=str(a["jurisdiction"]),
+        )
+    except (TypeError, ValueError) as exc:
+        return err_payload(f"invalid field value: {exc}", "BAD_ARGS")
+
+    report = check_stair_codes(spec)
+
+    payload = {
+        "ok": True,
+        "all_compliant": report.all_compliant,
+        "riser_compliant": report.riser_compliant,
+        "tread_compliant": report.tread_compliant,
+        "width_compliant": report.width_compliant,
+        "handrail_compliant": report.handrail_compliant,
+        "headroom_compliant": report.headroom_compliant,
+        "landing_compliant": report.landing_compliant,
+        "ratio_2r_plus_t_compliant": report.ratio_2r_plus_t_compliant,
+        "turning_compliant": report.turning_compliant,
+        "violations": [
+            {"code_ref": v[0], "requirement": v[1], "actual": v[2]}
+            for v in report.violations
+        ],
+        "honest_caveat": report.honest_caveat,
+    }
+    return ok_payload(payload)

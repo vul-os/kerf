@@ -18,7 +18,6 @@ Parametric sketching &amp; modeling · drawings · FEM/CFD · CAM · electronics
 
 [Website](https://kerf.sh) · [Docs](https://kerf.sh/docs) · [Releases](https://github.com/vul-os/kerf/releases) · [Roadmap](./ROADMAP.md) · [Contributing](#contributing)
 
-<!-- Hero screenshot pending — drop the real capture at docs/screenshots/hero.png; this reference resolves once it lands. -->
 <img src="docs/screenshots/hero.png" alt="The Kerf editor: file tree, 3D viewport, and the LLM chat panel" width="900">
 
 </div>
@@ -48,16 +47,14 @@ Kerf is a complete CAD system — sketcher, B-rep modeling kernel, drawings, ass
 
 ## Screenshots
 
-<!-- Gallery pending real captures — paths resolve once the files land in public/screenshots/. -->
-
 <p align="center">
   <img src="public/screenshots/editor.png" alt="The Kerf editor: file tree, 3D viewport, chat panel" width="100%">
   <em>The editor — file tree, 3D viewport, and the LLM chat panel side by side.</em>
 </p>
 
 <p align="center">
-  <img src="public/screenshots/sketcher-features.png" alt="Sketcher with constraints driving an OCCT feature timeline" width="100%">
-  <em>2D parametric sketcher driving an OpenCascade B-rep feature timeline.</em>
+  <img src="public/screenshots/sketcher-features.png" alt="2D parametric sketch with constraints, ready to drive an OCCT feature timeline" width="100%">
+  <em>The 2D parametric sketcher — constrained geometry that feeds the OpenCascade B-rep feature tree via "New feature from sketch".</em>
 </p>
 
 ## Quick start (standalone)

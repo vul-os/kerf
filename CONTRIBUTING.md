@@ -17,7 +17,10 @@ git clone https://github.com/vul-os/kerf.git
 cd kerf
 
 # Backend (Python 3.11+ required)
-pip install -e .[full]
+# The repo is a uv workspace; a bare `pip install -e .[full]` can't resolve the
+# local kerf-* packages. Use one of:
+uv sync --extra full              # uv users
+./scripts/dev-install.sh full     # pip users (editable install helper)
 createdb kerf  # local Postgres
 python -m kerf_core.db.migrations.runner postgres://localhost/kerf
 

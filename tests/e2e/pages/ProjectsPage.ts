@@ -131,8 +131,16 @@ export class ProjectsPage {
     await dialog.getByRole('button', { name: 'Save' }).click()
   }
 
-  /** Click "Delete project" in the confirm dialog (assumes it is already open). */
-  async confirmDelete() {
-    await this.page.getByRole('button', { name: 'Delete project' }).click()
+  /**
+   * Confirm deletion in the open dialog.
+   *
+   * The dialog is a type-to-confirm gate: the "Delete project" button stays
+   * disabled until the typed text matches the project name exactly
+   * (`confirmed = nameInput === project.name` in Projects.jsx). Clicking it
+   * without typing just hangs on a disabled button.
+   */
+  async confirmDelete(projectName: string) {
+    await this.page.getByTestId('delete-project-name-input').fill(projectName)
+    await this.page.getByTestId('delete-project-confirm-btn').click()
   }
 }

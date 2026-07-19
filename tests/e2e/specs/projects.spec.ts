@@ -82,7 +82,7 @@ test.describe('Projects page (local mode)', () => {
     await pp.expectProjectVisible(name)
 
     await pp.openProjectMenu(name, 'Delete')
-    await pp.confirmDelete()
+    await pp.confirmDelete(name)
 
     await pp.expectProjectGone(name)
   })

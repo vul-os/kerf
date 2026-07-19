@@ -9,6 +9,10 @@ import CodeEditor from '../components/CodeEditor.jsx'
 import ChatPanel from '../components/ChatPanel.jsx'
 import ShareModal from '../components/ShareModal.jsx'
 import ObjectsPanel from '../components/ObjectsPanel.jsx'
+import ViewportContextMenu from '../components/ViewportContextMenu.jsx'
+import { parseAppearance, stripAppearance } from '../lib/appearance.js'
+import { duplicateObject, deleteObject } from '../lib/jscadObjectOps.js'
+import { exportParts, downloadBlob } from '../lib/exporters.js'
 import CircuitComponentsPanel from '../components/CircuitComponentsPanel.jsx'
 import ExportButton from '../components/ExportButton.jsx'
 import MeasureToolbar from '../components/MeasureToolbar.jsx'
@@ -991,6 +995,9 @@ export default function Editor() {
   // errors are stashed on the store so they survive across component-level
   // re-renders without a setState-in-effect.
   const runTimerRef = useRef(null)
+  // Source of the last JSCAD run, with the appearance marker stripped and keyed
+  // by file id — lets us skip re-running the model for appearance-only edits.
+  const lastRunKeyRef = useRef(null)
   useEffect(() => {
     if (isStepFile(w.currentFile)) return
     if (isAssemblyFile(w.currentFile)) return
@@ -1039,6 +1046,16 @@ export default function Editor() {
     if (isDentalGuideFile(w.currentFile)) return
     if (runTimerRef.current) clearTimeout(runTimerRef.current)
     const code = w.currentFileContent
+
+    // Appearance edits rewrite a `// kerf:appearance=` COMMENT. JSCAD's output
+    // cannot depend on a comment, so re-running the model would produce
+    // identical geometry — but it hands the renderer a fresh `parts` array,
+    // which tears down and rebuilds every mesh and flashes the viewport. Skip
+    // the run when the source is unchanged with the marker stripped out.
+    const codeKey = `${w.currentFileId} ${stripAppearance(code)}`
+    if (lastRunKeyRef.current === codeKey) return
+    lastRunKeyRef.current = codeKey
+
     const delay = runDebounceFor(code)
     runTimerRef.current = setTimeout(async () => {
       // Cache hit → skip the worker entirely. Same SHA-256 keyspace the
@@ -1420,6 +1437,45 @@ export default function Editor() {
   const hiddenIds = useMemo(() => {
     return w.hiddenPartIds.get(w.currentFileId) || new Set()
   }, [w.hiddenPartIds, w.currentFileId])
+
+  // ----- Per-object appearance -----
+  // The source's `// kerf:appearance=` marker is the source of truth for files
+  // we can write to; STEP/mesh imports fall back to the store's session map.
+  // Reading straight off currentFileContent means an undo (which rewinds the
+  // content) also rewinds the appearance, for free.
+  const appearance = useMemo(() => {
+    const fromSource = parseAppearance(w.currentFileContent)
+    const fromSession = w.sessionAppearance.get(w.currentFileId) || {}
+    return { ...fromSource, ...fromSession }
+  }, [w.currentFileContent, w.sessionAppearance, w.currentFileId])
+
+  // Right-click menu for a 3D object: {partId, x, y}.
+  const [objectMenu, setObjectMenu] = useState(null)
+
+  const handleContextPick = useCallback((partId, x, y) => {
+    // Right-click on empty space just dismisses.
+    if (!partId) {
+      setObjectMenu(null)
+      return
+    }
+    // Materials are fetched lazily, on first open.
+    useWorkspace.getState().loadMaterials()
+    setObjectMenu({ partId, x, y })
+  }, [])
+
+  // Duplicate/Delete rewrite the JSCAD source, exactly as the Objects panel's
+  // kebab does — so they land in file_revisions and Cmd+Z undoes them.
+  const applyObjectOp = useCallback(async (nextSource) => {
+    const ws = useWorkspace.getState()
+    // duplicateObject/deleteObject return null when they can't locate the part's
+    // expression in the source — say so rather than failing silently.
+    if (typeof nextSource !== 'string') {
+      ws.setToast("Couldn't edit the source automatically — edit the code or ask chat")
+      return
+    }
+    ws.editContent(nextSource)
+    await ws.saveFile()
+  }, [])
 
   // Per-part topologies. Lazy: nothing computes until a consumer (measure
   // tool, FeatureInspector, distance chip) calls `.get(id)`. The shape is
@@ -2675,9 +2731,55 @@ export default function Editor() {
               mode={w.measureMode}
               selectedFeatures={w.selectedFeatures}
               onPickFeature={handlePickFeature}
+              onContextPick={handleContextPick}
+              appearance={appearance}
               assemblyComponents={assemblyComponents}
               className="w-full h-full"
             />
+            {objectMenu && (
+              <ViewportContextMenu
+                x={objectMenu.x}
+                y={objectMenu.y}
+                partId={objectMenu.partId}
+                isHidden={hiddenIds.has(objectMenu.partId)}
+                appearance={appearance[objectMenu.partId] || {}}
+                materials={w.materials}
+                // STEP is read-only: its source is a binary ref, so colour /
+                // opacity / duplicate / delete all have nowhere to go.
+                canEdit={!stepFile}
+                onClose={() => setObjectMenu(null)}
+                onToggleVisibility={() =>
+                  w.togglePartVisibility(w.currentFileId, objectMenu.partId)
+                }
+                onIsolate={() => w.isolatePart(w.currentFileId, objectMenu.partId)}
+                onShowAll={() => w.showAllParts(w.currentFileId)}
+                onSetAppearance={(patch) => w.setPartAppearance(objectMenu.partId, patch)}
+                onPreviewAppearance={(patch) =>
+                  w.previewPartAppearance(objectMenu.partId, patch)
+                }
+                onResetAppearance={() => w.resetPartAppearance(objectMenu.partId)}
+                onZoomTo={() => rendererRef.current?.zoomToPart?.(objectMenu.partId)}
+                onDuplicate={() =>
+                  applyObjectOp(duplicateObject(w.currentFileContent, objectMenu.partId))
+                }
+                onDelete={() =>
+                  applyObjectOp(deleteObject(w.currentFileContent, objectMenu.partId))
+                }
+                onExport={async (fmt) => {
+                  const part = w.parts.find((p) => p.id === objectMenu.partId)
+                  if (!part) return
+                  try {
+                    const { blob, filename } = await exportParts([part], fmt, {
+                      baseName: w.currentFile?.name || 'export',
+                      singlePartId: objectMenu.partId,
+                    })
+                    downloadBlob(blob, filename)
+                  } catch (err) {
+                    w.setToast(err?.message || 'Export failed')
+                  }
+                }}
+              />
+            )}
             {w.partsError && (
               <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center pt-4 z-10">
                 <div className="max-w-lg w-full mx-4 px-4 py-3 rounded-lg bg-red-950/90 border border-red-700/70 text-red-300 text-[11px] font-mono shadow-lg backdrop-blur">

@@ -79,13 +79,19 @@ test.describe('Mechanical persona (T-96)', () => {
     const dialogTitle = page.getByRole('heading', { name: /import freecad project/i })
     await expect(dialogTitle).toBeVisible({ timeout: 10_000 })
 
-    // A5 — dialog describes .FCStd support text
+    // A5 — dialog describes .FCStd support text.
+    // Anchor on the full description sentence: the dialog mentions "FreeCAD
+    // 0.19+" twice (the blurb and the drop-zone's format hint), so the bare
+    // version string is a strict-mode violation.
     await expect(
-      page.getByText(/FreeCAD 0\.19\+/i),
+      page.getByText(/Imports FreeCAD 0\.19\+ files \(\.FCStd\)/i),
     ).toBeVisible()
 
-    // A6 — drop-zone role="button" is accessible
-    const dropZone = page.getByRole('button', { name: /drop a \.fcstd file/i })
+    // A6 — drop-zone role="button" is accessible.
+    // Match its aria-label ("Drop .FCStd file or click to browse"), which is what
+    // gives the element its accessible name — the visible text inside it ("Drop a
+    // .FCStd file here") is overridden by the label and never matches.
+    const dropZone = page.getByRole('button', { name: /drop \.fcstd file/i })
     await expect(dropZone).toBeVisible()
 
     // Close the dialog — click Cancel / outside the modal.

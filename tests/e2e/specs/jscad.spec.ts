@@ -60,13 +60,11 @@ test.describe('JSCAD editor (local mode)', () => {
     const monacoContainer = page.locator('.monaco-editor').first()
     await expect(monacoContainer).toBeVisible({ timeout: 20_000 })
 
-    // 4. Type the cube source into the editor.
-    //    We use keyboard.press + type via the textarea that Monaco exposes.
-    //    Select-all first to replace any default content.
-    const textarea = page.locator('.monaco-editor textarea').first()
-    await textarea.focus()
-    await page.keyboard.press('ControlOrMeta+a')
-    await page.keyboard.type(CUBE_JSCAD)
+    // 4. Put the cube source into the editor.
+    //    Via the page object: focusing '.monaco-editor textarea' and typing does
+    //    NOT work — this Monaco build uses the native EditContext API, so that
+    //    textarea receives nothing and the file silently stays empty.
+    await ep.typeInMonaco(CUBE_JSCAD)
 
     // 5. Wait for the Three.js canvas to appear and show a non-trivial render.
     //    The JSCAD worker runs in a Worker thread; on slow CI this can take

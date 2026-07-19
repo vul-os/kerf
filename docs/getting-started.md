@@ -35,13 +35,29 @@ export DATABASE_URL=postgres://pc@localhost:5432/kerf?sslmode=disable
 ## 3. Install Python dependencies
 
 Choose the smallest persona that covers your work. `mech` is a good default for
-mechanical CAD; use `full` if you want everything:
+mechanical CAD; use `full` if you want everything.
+
+The repo is a [`uv`](https://docs.astral.sh/uv/) workspace, so the install path
+depends on your tooling:
 
 ```sh
-pip install -e .[mech]      # mechanical CAD stack (CAD, FEM, CAM, topology, mates)
-# or
-pip install -e .[full]      # everything: mech + electronics + bim + cloud plugins
+# uv users — resolves the workspace automatically:
+uv sync --extra mech        # or --extra full
+
+# pip users — installs every workspace package a persona needs, editable:
+./scripts/dev-install.sh mech      # or: full | electronics | bim | api-only
 ```
+
+> **Heads up:** a bare `pip install -e .[mech]` does **not** work. `[tool.uv.sources]`
+> maps the `kerf-*` requirements to the local `packages/*` dirs, but only `uv`
+> understands that mapping — plain pip tries to fetch `kerf-core` etc. from PyPI
+> (where they are unpublished) and fails. Use `uv sync` or `./scripts/dev-install.sh`.
+
+> **Solvers:** the `mech`/`full` compute extras — pythonOCC and FEniCSx/dolfinx —
+> are conda-forge-only and are not installed by either command above. See
+> [local-install.md](./local-install.md#solver-dependencies-dolfinx--pythonocc)
+> for the conda setup. The server boots without them; solver-backed tools just
+> report themselves unavailable.
 
 See [persona-bundles.md](./persona-bundles.md) for the full menu and what each persona installs.
 

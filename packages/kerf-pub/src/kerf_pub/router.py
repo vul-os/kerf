@@ -32,6 +32,7 @@ from .wake import (
     PushSubscription,
     default_wake_config,
     validate_subscription,
+    vapid_public_key_b64,
 )
 
 CBOR_MEDIA = "application/cbor"
@@ -144,6 +145,24 @@ class SubscribeRequest(BaseModel):
 
 class UnsubscribeRequest(BaseModel):
     endpoint: str
+
+
+@router.get("/wake-key")
+async def wake_key() -> dict:
+    """Anonymous — this node's own VAPID public key (RFC 8292 application
+    server key), the piece of state a browser needs before it can call
+    `PushManager.subscribe({applicationServerKey})` and then `POST
+    .../subscribe` below. Same fail-safe-off posture as that endpoint: 503
+    when this node has no VAPID keypair configured, so a caller (the
+    Workshop UI's "Notify me" toggle) can tell "not supported here" apart
+    from a transient failure and disable itself accordingly."""
+    config = default_wake_config()
+    if config is None:
+        raise HTTPException(
+            status_code=503,
+            detail="wake is not configured on this node (no VAPID keypair)",
+        )
+    return {"public_key": vapid_public_key_b64(config)}
 
 
 @router.post("/feed/{pub}/subscribe")

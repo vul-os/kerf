@@ -128,6 +128,17 @@ def default_wake_config() -> VapidConfig | None:
     return VapidConfig(private_key=private_key, public_key_raw=public_key_raw, subject=subject)
 
 
+def vapid_public_key_b64(config: VapidConfig) -> str:
+    """This node's own VAPID public key (RFC 8292 application server key),
+    base64url-encoded — the one piece of state a prospective subscriber's
+    browser needs before it can call `PushManager.subscribe({
+    applicationServerKey})` (`kerf_pub.router`'s anonymous ``GET
+    /.well-known/dmtap-pub/wake-key``, docs/distributed-workshop.md's Wake
+    section). Same bytes embedded in :func:`vapid_headers`'s ``Crypto-Key``
+    header — this just exposes them to a caller ahead of time."""
+    return _b64url_encode(config.public_key_raw)
+
+
 def _jwt_es256(header: dict, claims: dict, private_key: ec.EllipticCurvePrivateKey) -> str:
     def _seg(obj: dict) -> str:
         return _b64url_encode(json.dumps(obj, separators=(",", ":")).encode("utf-8"))

@@ -256,6 +256,29 @@ def _app(store) -> TestClient:
     return TestClient(app)
 
 
+class TestWakeKeyEndpoint:
+    def test_fails_safe_off_when_unconfigured(self, monkeypatch):
+        monkeypatch.delenv(wake.ENV_VAPID_PRIVATE_KEY, raising=False)
+        monkeypatch.delenv(wake.ENV_VAPID_SUBJECT, raising=False)
+        tc = _app(InMemoryPubStore())
+        r = tc.get("/.well-known/dmtap-pub/wake-key")
+        assert r.status_code == 503
+
+    def test_returns_public_key_when_configured(self, monkeypatch):
+        raw = wake.generate_vapid_private_key_b64()
+        monkeypatch.setenv(wake.ENV_VAPID_PRIVATE_KEY, raw)
+        monkeypatch.setenv(wake.ENV_VAPID_SUBJECT, "mailto:ops@example.com")
+        tc = _app(InMemoryPubStore())
+        r = tc.get("/.well-known/dmtap-pub/wake-key")
+        assert r.status_code == 200
+        body = r.json()
+        config = wake.default_wake_config()
+        assert body == {"public_key": wake.vapid_public_key_b64(config)}
+        # The exposed key really is usable as a P-256 applicationServerKey —
+        # 65 raw uncompressed-point bytes once base64url-decoded.
+        assert len(_b64u(body["public_key"])) == 65
+
+
 class TestSubscribeEndpoint:
     def test_fails_safe_off_when_unconfigured(self, monkeypatch):
         monkeypatch.delenv(wake.ENV_VAPID_PRIVATE_KEY, raising=False)

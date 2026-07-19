@@ -25,6 +25,8 @@ import InjectionFillPanel   from '../../../components/InjectionFillPanel.jsx'
 import QuantitySchedulePanel from '../../../components/QuantitySchedulePanel.jsx'
 import MoldCoolingWarpagePanel from '../../../components/MoldCoolingWarpagePanel.jsx'
 import PartingCavityPanel   from '../../../components/PartingCavityPanel.jsx'
+import CAMProbingPanel      from '../../../components/CAMProbingPanel.jsx'
+import AMProcessSimPanel    from '../../../components/AMProcessSimPanel.jsx'
 
 // ---------------------------------------------------------------------------
 // 1. Fragment shape — all 12 entries must be present
@@ -33,9 +35,12 @@ import PartingCavityPanel   from '../../../components/PartingCavityPanel.jsx'
 const EXPECTED_IDS = [
   'cam_verify',
   'cam_machine_sim',
+  'cam_probing',
   'injection_fill',
   'parting_cavity',
   'mold_cooling_warpage',
+  'am_process_sim',
+  'am_thermomechanical',
   'packaging_prepress',
   'packaging_material_yield',
   'quote_to_delivery',
@@ -80,9 +85,12 @@ describe('mfg fragment — structure', () => {
 const KIND_SAMPLES = [
   ['cam_verify',             'cam_verify'],
   ['cam_machine_sim',        'cam_machine_sim'],
+  ['cam_probing',            'cam_probing'],
   ['injection_fill',         'injection_fill'],
   ['parting_cavity',         'parting_cavity'],
   ['mold_cooling_warpage',   'mold_cooling'],
+  ['am_process_sim',         'am_process_sim'],
+  ['am_thermomechanical',    'am_thermomechanical'],
   ['packaging_prepress',     'packaging_prepress'],
   ['packaging_material_yield','packaging_yield'],
   ['quote_to_delivery',      'quote_to_delivery'],
@@ -141,6 +149,24 @@ describe('resolvePanelEntry — extension lookup', () => {
     const result = resolvePanelEntry({ name: 'shaft.gdnt' })
     expect(result).not.toBeNull()
     expect(result.id).toBe('gdnt_pmi')
+  })
+
+  it('resolves .probe_plan extension', () => {
+    const result = resolvePanelEntry({ name: 'bore.probe_plan' })
+    expect(result).not.toBeNull()
+    expect(result.id).toBe('cam_probing')
+  })
+
+  it('resolves .am_result extension', () => {
+    const result = resolvePanelEntry({ name: 'build.am_result' })
+    expect(result).not.toBeNull()
+    expect(result.id).toBe('am_process_sim')
+  })
+
+  it('resolves .am_tm_result extension', () => {
+    const result = resolvePanelEntry({ name: 'build.am_tm_result' })
+    expect(result).not.toBeNull()
+    expect(result.id).toBe('am_thermomechanical')
   })
 
   it('returns null for unknown kind', () => {
@@ -344,5 +370,46 @@ describe('PartingCavityPanel — mount with sample content', () => {
       <PartingCavityPanel parsedContent="" />
     )
     expect(html).toContain('No parting-line result')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 4. CAMProbingPanel — on-machine probing cycle planner (no content prop;
+//    fetches on user action only, so a bare mount is a safe smoke test).
+// ---------------------------------------------------------------------------
+
+describe('CAMProbingPanel — mount', () => {
+  it('renders without throwing', () => {
+    const html = renderToStaticMarkup(<CAMProbingPanel projectId="p1" fileId="f1" />)
+    expect(html.length).toBeGreaterThan(0)
+  })
+
+  it('shows On-Machine Probing header', () => {
+    const html = renderToStaticMarkup(<CAMProbingPanel projectId="p1" fileId="f1" />)
+    expect(html).toContain('On-Machine Probing')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 5. AMProcessSimPanel — inherent-strain / thermo-mechanical AM sim viewer
+// ---------------------------------------------------------------------------
+
+const AM_PROCESS_SAMPLE = JSON.stringify({
+  ok: true,
+  max_deviation_mm: 0.18,
+  layer_max_disp_mm: [0.01, 0.02, 0.03],
+  max_von_mises_mpa: 180,
+  warnings: [],
+})
+
+describe('AMProcessSimPanel — mount', () => {
+  it('renders empty state with no content', () => {
+    const html = renderToStaticMarkup(<AMProcessSimPanel />)
+    expect(html).toContain('No AM simulation result loaded')
+  })
+
+  it('renders with sample process-sim content', () => {
+    const html = renderToStaticMarkup(<AMProcessSimPanel parsedContent={AM_PROCESS_SAMPLE} />)
+    expect(html).toContain('AM Process Simulation')
   })
 })

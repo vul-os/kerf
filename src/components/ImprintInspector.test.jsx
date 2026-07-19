@@ -111,17 +111,15 @@ describe('ImprintCurve inspector — FeatureView.jsx (G-5)', () => {
 // Smoke-render test: FeatureView with imprint_curve node must not throw
 // ---------------------------------------------------------------------------
 
-vi.mock('lucide-react', () => {
+vi.mock('lucide-react', async () => {
   const stub = (name) => () => React.createElement('span', { 'data-icon': name })
-  const icons = [
-    'Trash2','ChevronUp','ChevronDown','Box','Circle','RotateCcw','Disc','Layers',
-    'Drill','Sigma','AlertTriangle','Loader2','Play','Move','Crosshair','GitBranch',
-    'Repeat','FlipHorizontal','PencilLine','Pointer','Waves','Layers3','Aperture',
-    'Plus','X','ChevronRight','LayoutGrid','Combine','Scissors','Grid3x3',
-    'MoreHorizontal','SlidersHorizontal','Zap','Eye','Shield','Wrench','AlignLeft',
-    'Activity',
-  ]
-  return Object.fromEntries(icons.map((n) => [n, stub(n)]))
+  // FeatureView.jsx's icon import list grows with every new feature kind.
+  // A hand-maintained allowlist here goes stale every time a feature is
+  // added and its icon isn't in the list ("No X export is defined on the
+  // lucide-react mock"). Deriving the stub set from the real package's own
+  // export list (vi.importActual) means it can never drift.
+  const actual = await vi.importActual('lucide-react')
+  return Object.fromEntries(Object.keys(actual).map((name) => [name, stub(name)]))
 })
 
 vi.mock('./FeatureRenderer.jsx', () => ({

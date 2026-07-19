@@ -17,9 +17,9 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import AERO_ENTRIES from '../aero.js'
 
 describe('aero.js fragment — shape', () => {
-  it('exports an array of 10 entries', () => {
+  it('exports an array of 11 entries', () => {
     expect(Array.isArray(AERO_ENTRIES)).toBe(true)
-    expect(AERO_ENTRIES).toHaveLength(10)
+    expect(AERO_ENTRIES).toHaveLength(11)
   })
 
   it('every entry has id, kinds, exts, load, label', () => {
@@ -43,6 +43,7 @@ describe('aero.js fragment — shape', () => {
     { id: 'seakeeping_rao',      kind: 'marine_rao',            ext: '.rao' },
     { id: 'hull_form',           kind: 'marine_hull',           ext: '.hullform' },
     { id: 'hull_exchange',       kind: 'marine_hull_exchange',  ext: '.hullx' },
+    { id: 'scantling_check',     kind: 'marine_scantling_check', ext: '.scantling' },
   ]
 
   for (const { id, kind, ext } of EXPECTED) {
@@ -88,6 +89,7 @@ describe('resolvePanelEntry — aero/marine kinds', () => {
     { kind: 'marine_rao',           expectedId: 'seakeeping_rao' },
     { kind: 'marine_hull',          expectedId: 'hull_form' },
     { kind: 'marine_hull_exchange', expectedId: 'hull_exchange' },
+    { kind: 'marine_scantling_check', expectedId: 'scantling_check' },
   ]
 
   for (const { kind, expectedId } of KINDS) {
@@ -113,6 +115,7 @@ import HullFormPanel from '../../../components/HullFormPanel.jsx'
 import HullExchangePanel from '../../../components/HullExchangePanel.jsx'
 import ReentryHeatFluxPanel from '../../../components/ReentryHeatFluxPanel.jsx'
 import SixDOFPanel from '../../../components/SixDOFPanel.jsx'
+import ScantlingCheckPanel from '../../../components/ScantlingCheckPanel.jsx'
 
 // Flutter — full result
 const FLUTTER_CONTENT = JSON.stringify({
@@ -319,6 +322,23 @@ describe('SixDOFPanel — content prop', () => {
   it('renders max altitude from content', () => {
     const html = renderToStaticMarkup(<SixDOFPanel content={SIXDOF_CONTENT} />)
     expect(html).toContain('3050') // max_altitude_m shown in Alt Range card
+  })
+})
+
+describe('ScantlingCheckPanel — result/loading/error prop', () => {
+  // ScantlingCheckPanel predates the content-string convention used by the
+  // other 10 aero/marine panels — it takes `result` / `loading` / `error`
+  // directly (mirrors its LLM-tool call shape) rather than a JSON `content`
+  // string, so its smoke test exercises that prop API instead.
+  it('mounts without throwing (idle state)', () => {
+    expect(() =>
+      renderToStaticMarkup(<ScantlingCheckPanel result={null} loading={false} error={null} />)
+    ).not.toThrow()
+  })
+
+  it('renders Scantling heading', () => {
+    const html = renderToStaticMarkup(<ScantlingCheckPanel result={null} loading={false} error={null} />)
+    expect(html).toMatch(/Scantling/i)
   })
 })
 

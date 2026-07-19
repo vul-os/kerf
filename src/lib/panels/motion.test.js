@@ -46,11 +46,19 @@ describe('motion panel registry fragment', () => {
     expect(entries[0].label).toBeTruthy()
   })
 
-  it('load() returns a thenable (Promise-like)', () => {
-    // We don't actually resolve the import to avoid loading Three.js;
-    // just verify the return value is a Promise.
+  it('load() returns a thenable that resolves to a module with a default export', async () => {
+    // AssemblyMotionStudioPanel.jsx (the module behind this entry) imports
+    // only react/lucide-react/zustand — no Three.js — so awaiting it here is
+    // cheap. This used to fire the import and NOT await it ("to avoid
+    // loading Three.js"), but that left the dynamic import in flight after
+    // the test (and its vitest environment) finished; when it settled later
+    // it surfaced as an "EnvironmentTeardownError" unhandled rejection that
+    // fails the overall `vitest run` exit code even though every test
+    // passes. Awaiting it lets it settle inside the test's own lifetime.
     const result = entries[0].load()
     expect(typeof result.then).toBe('function')
+    const mod = await result
+    expect(typeof mod.default).toBe('function')
   })
 
   it('no duplicate ids', () => {

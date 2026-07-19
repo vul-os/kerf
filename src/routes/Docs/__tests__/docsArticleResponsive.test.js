@@ -65,13 +65,20 @@ describe('Docs Article — markdown pre/code block overflow handling', () => {
   })
 
   it('pre and overflow-x-auto appear together in the pre component', () => {
-    const preTestidIdx = articleSrc.indexOf('data-testid="docs-pre-scroll"')
-    expect(preTestidIdx).toBeGreaterThan(-1)
-    const window = 120
-    const start = Math.max(0, preTestidIdx - window)
-    const end = Math.min(articleSrc.length, preTestidIdx + window)
-    const snippet = articleSrc.slice(start, end)
-    expect(snippet).toContain('overflow-x-auto')
+    // Scope the search to the CodePre component's own function body (from its
+    // declaration to the next top-level function declaration) rather than a
+    // fixed character window: CodePre grew a hover-reveal copy button and
+    // language label between the `data-testid="docs-pre-scroll"` wrapper
+    // <div> and the inner <pre className="overflow-x-auto ...">, so a narrow
+    // fixed window breaks every time that markup grows — the function-body
+    // boundary tracks the actual component regardless of internal layout.
+    const fnStart = articleSrc.indexOf('function CodePre(')
+    expect(fnStart).toBeGreaterThan(-1)
+    const nextFnMatch = articleSrc.slice(fnStart + 1).match(/\nfunction [A-Za-z]/)
+    const fnEnd = nextFnMatch ? fnStart + 1 + nextFnMatch.index : articleSrc.length
+    const componentBody = articleSrc.slice(fnStart, fnEnd)
+    expect(componentBody).toContain('data-testid="docs-pre-scroll"')
+    expect(componentBody).toContain('overflow-x-auto')
   })
 })
 

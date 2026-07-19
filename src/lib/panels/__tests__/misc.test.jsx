@@ -12,6 +12,8 @@
  *   RFView                 rf_analysis       / .rfresult
  *   SimulationView         simulation_view   / .simulation
  *   WiringView             wiring_view       / .wiring
+ *   ICPackagePanel         ic_package        / .icpkg
+ *   ConstraintManagerPanel constraint_manager / .constraints
  *
  * Strategy
  * --------
@@ -119,6 +121,10 @@ import LayoutViewerWrapper   from '../misc-wrappers/LayoutViewerWrapper.jsx'
 import RFViewWrapper         from '../misc-wrappers/RFViewWrapper.jsx'
 import SimulationViewWrapper from '../misc-wrappers/SimulationViewWrapper.jsx'
 import WiringViewWrapper     from '../misc-wrappers/WiringViewWrapper.jsx'
+import ICPackagePanel        from '../../../components/electronics/ICPackagePanel.jsx'
+import ConstraintManagerPanel from '../../../components/electronics/ConstraintManagerPanel.jsx'
+import ICPackageWrapper        from '../misc-wrappers/ICPackageWrapper.jsx'
+import ConstraintManagerWrapper from '../misc-wrappers/ConstraintManagerWrapper.jsx'
 
 // ===========================================================================
 // 1. Fragment structure
@@ -130,8 +136,8 @@ describe('misc fragment — structure', () => {
     expect(ENTRIES.length).toBeGreaterThan(0)
   })
 
-  it('contains exactly 8 entries', () => {
-    expect(ENTRIES).toHaveLength(8)
+  it('contains exactly 10 entries', () => {
+    expect(ENTRIES).toHaveLength(10)
   })
 
   it('every entry has id, kinds, exts, load, label', () => {
@@ -175,6 +181,11 @@ describe('resolvePanelEntry — kind resolution', () => {
     ['spice_simulation',     'simulation_view'],
     ['wiring',               'wiring_view'],
     ['wireviz_harness',      'wiring_view'],
+    ['ic_package',           'ic_package'],
+    ['ic_substrate',         'ic_package'],
+    ['bga_package',          'ic_package'],
+    ['constraint_manager',   'constraint_manager'],
+    ['pcb_constraints',      'constraint_manager'],
   ]
 
   for (const [kind, expectedId] of cases) {
@@ -210,6 +221,10 @@ describe('resolvePanelEntry — extension resolution', () => {
     ['antenna.sparam',           'rf_analysis'],
     ['circuit.simulation',       'simulation_view'],
     ['harness.wiring',           'wiring_view'],
+    ['chip.icpkg',                'ic_package'],
+    ['chip.icsubstrate',          'ic_package'],
+    ['board.constraints',         'constraint_manager'],
+    ['board.cmgr',                'constraint_manager'],
   ]
 
   for (const [filename, expectedId] of cases) {
@@ -233,6 +248,7 @@ describe('resolvePanelEntry — load() returns a thenable', () => {
   const kinds = [
     'bim_phase', 'cfd_viewport', 'firmware_debug', 'kicad_roundtrip',
     'ic_layout', 'rf_analysis', 'simulation', 'wiring',
+    'ic_package', 'constraint_manager',
   ]
 
   for (const kind of kinds) {
@@ -527,5 +543,63 @@ connections:
       <WiringViewWrapper content="" projectId="proj-1" fileId="file-1" />
     )
     expect(html.length).toBeGreaterThan(0)
+  })
+})
+
+// ── 5i. ICPackagePanel / ICPackageWrapper ───────────────────────────────────
+// ICPackagePanel manages its own demo state internally (no fetch/hooks on
+// external stores) — safe for renderToStaticMarkup.
+
+describe('ICPackagePanel — mount', () => {
+  it('is a React function component', () => {
+    expect(typeof ICPackagePanel).toBe('function')
+  })
+
+  it('renders without crashing (no content)', () => {
+    expect(() => renderToStaticMarkup(<ICPackageWrapper />)).not.toThrow()
+  })
+
+  it('renders IC Package / Substrate Designer header', () => {
+    const html = renderToStaticMarkup(<ICPackageWrapper />)
+    expect(html).toMatch(/IC Package|Substrate/i)
+  })
+
+  it('gracefully ignores invalid JSON content', () => {
+    expect(() =>
+      renderToStaticMarkup(<ICPackageWrapper content="INVALID{{JSON" />)
+    ).not.toThrow()
+  })
+})
+
+// ── 5j. ConstraintManagerPanel / ConstraintManagerWrapper ───────────────────
+// ConstraintManagerPanel takes a plain circuitJson prop (no fetch/hooks on
+// external stores) — safe for renderToStaticMarkup.
+
+describe('ConstraintManagerPanel — mount', () => {
+  it('is a React function component', () => {
+    expect(typeof ConstraintManagerPanel).toBe('function')
+  })
+
+  it('renders without crashing (no content → null circuitJson)', () => {
+    expect(() => renderToStaticMarkup(<ConstraintManagerWrapper />)).not.toThrow()
+  })
+
+  it('renders Constraint Manager header', () => {
+    const html = renderToStaticMarkup(<ConstraintManagerWrapper />)
+    expect(html).toContain('Constraint Manager')
+  })
+
+  it('renders with circuit_json from content', () => {
+    const content = JSON.stringify({
+      circuit_json: { nets: [{ name: 'VCC', pins: ['U1.1', 'U2.1'] }] },
+    })
+    const html = renderToStaticMarkup(<ConstraintManagerWrapper content={content} />)
+    expect(html.length).toBeGreaterThan(0)
+  })
+
+  it('gracefully ignores invalid JSON content', () => {
+    expect(() =>
+      renderToStaticMarkup(<ConstraintManagerWrapper content="INVALID{{JSON" />)
+    ).not.toThrow()
   })
 })

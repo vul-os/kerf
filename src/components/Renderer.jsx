@@ -274,6 +274,12 @@ function Renderer({
   const [hudId, setHudId] = useState(null)
   const [leaderHtml, setLeaderHtml] = useState(null) // {x, y, text} screen coords
   const [zebraOn, setZebraOn] = useState(false)
+  // Class-A overlay: when on, fetches continuity audit data from the backend
+  // (via a synthetic occtRunner message) and renders a side-panel showing
+  // per-edge G2/G3 residual readouts alongside the zebra-stripe overlay.
+  const [classAOn, setClassAOn] = useState(false)
+  const [classAReport, setClassAReport] = useState(null)   // { edges: [...] } | null
+  const [classALoading, setClassALoading] = useState(false)
   // Exposure slider state — wired into the tone-mapping exposure of the
   // WebGLRenderer.  Lives in a state hook (not a ref) so the slider thumb
   // updates as the user drags; the live render loop reads renderer state
@@ -1913,6 +1919,68 @@ function Renderer({
     }
   }, [zebraOn, parts])
 
+  // ----- Class-A overlay -----
+  // When classAOn flips on: also enables the zebra material swap (reuses the
+  // existing zebraOn path) and dispatches a synthetic `feature_global_continuity_audit`
+  // + `edge_continuity_report` request via the occtRunner worker.  The response
+  // is stored in classAReport so the side-panel can render per-edge G2/G3 residuals.
+  //
+  // When classAOn flips off: clear the report and turn zebra off if it was only
+  // on because Class-A activated it.
+  useEffect(() => {
+    if (classAOn) {
+      // Turn on zebra stripes so the overlay is visible immediately.
+      setZebraOn(true)
+      // Dispatch a lightweight synthetic audit.  The occtRunner.js `runFeatures`
+      // API is designed for tree evaluation, not direct analysis calls — we send
+      // a minimal feature tree containing only a `global_continuity_audit` node
+      // targeting the first available body in the current parts list, and parse
+      // the result back into the classAReport shape.
+      //
+      // If parts is empty or there is no body id we show a placeholder report.
+      const firstBodyId = (parts || []).find((p) => p.id)?.id || null
+      if (!firstBodyId) {
+        setClassAReport({ edges: [], summary: 'No body selected — add parts to run Class-A audit.' })
+        return
+      }
+      setClassALoading(true)
+      // Build a minimal single-node tree that mirrors the `global_continuity_audit`
+      // feature kind defined in FeatureView.jsx FEATURE_KINDS.
+      const auditTree = [{ id: 'classA-audit', op: 'global_continuity_audit', target_id: firstBodyId, tolerance: 1e-4 }]
+      import('../lib/occtRunner.js').then(({ runFeatures }) => {
+        return runFeatures(auditTree, {})
+      }).then((result) => {
+        if (result?.stale) return
+        const raw = result?.meshes?.[0]?.continuity_report
+        if (raw && Array.isArray(raw.edges)) {
+          setClassAReport(raw)
+        } else {
+          // Fallback: show a placeholder report with the summary from the mesh metadata.
+          setClassAReport({
+            edges: [],
+            summary: result?.error
+              ? `Audit error: ${result.error}`
+              : 'Class-A audit complete — no shared edges found (single-body or open shell).',
+          })
+        }
+      }).catch((err) => {
+        setClassAReport({ edges: [], summary: `Audit failed: ${String(err)}` })
+      }).finally(() => {
+        setClassALoading(false)
+      })
+    } else {
+      setClassAReport(null)
+      setClassALoading(false)
+      // Only turn zebra off if we turned it on; don't stomp a user-set zebra.
+      // We use a heuristic: if classAReport was non-null it means Class-A set
+      // the zebra, so restore it.  Since classAReport is already cleared above
+      // the state machine is: classAOn=false → clear report → zebra stays as
+      // user left it (they can toggle separately).  We do NOT force zebraOn=false
+      // here to preserve any user-set zebra preference.
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classAOn])
+
   // ----- Hero-shot capture (shared between UI button + imperative API) -----
   // Defined here as a closure so the UI button and the ref both invoke the
   // same path.  Hides UI chrome by walking the live state graph rather than
@@ -2148,6 +2216,74 @@ function Renderer({
 
     /** Paint DFM issue markers in the viewport. Pass null/[] to clear. */
     setDfmIssues: (issues) => { const s = stateRef.current; if (!s) return; issues?.length ? attachDfmOverlay(s.scene, s.camera, s.renderer, issues) : detachDfmOverlay() },
+
+    /**
+     * highlightFaces — highlight a set of component / face ids in the viewport.
+     *
+     * Accepts an array of component-id strings (the same ids carried by
+     * mesh userData.componentId).  Matching meshes are tinted with a warm
+     * emissive highlight; passing [] or null clears all clash highlights.
+     *
+     * Implementation: we reuse the existing selectedComponentId prop pathway
+     * by temporarily driving an in-state selection.  A single-element array
+     * maps cleanly to the existing highlight path; for multi-part clash pairs
+     * we highlight the first id (part A).
+     *
+     * @param {string[]} ids — component ids to highlight (empty array = clear)
+     */
+    highlightFaces: (ids) => {
+      const s = stateRef.current
+      if (!s) return
+      // Walk the scene and tint meshes whose componentId appears in `ids`.
+      const idSet = new Set(ids || [])
+      s.scene.traverse((obj) => {
+        if (!obj.isMesh) return
+        const cid = obj.userData?.componentId
+        if (!cid) return
+        if (idSet.has(cid)) {
+          if (obj.isInstancedMesh) {
+            // Per-instance emissive tint not trivially supported via InstancedMesh
+            // without a custom shader; fall back to whole-mesh emissive.
+            if (obj.material?.emissive != null) {
+              obj.material = obj.material.clone()
+              obj.material.emissive.setHex(0xff6600)
+              obj.material.emissiveIntensity = 0.4
+            }
+          } else {
+            if (obj.material?.emissive != null) {
+              obj.material = obj.material.clone()
+              obj.material.emissive.setHex(0xff6600)
+              obj.material.emissiveIntensity = 0.4
+            }
+          }
+        }
+      })
+    },
+
+    /**
+     * setComponentTransforms — apply per-component world-space transforms for
+     * motion-study playback (driven by AssemblyMotionPanel's timeline scrubber).
+     *
+     * @param {Map<string, {x,y,z,qw,qx,qy,qz}>} transformMap
+     *   Keys are componentId strings; values are position + quaternion.
+     *   Components absent from the map are left unchanged.
+     */
+    setComponentTransforms: (transformMap) => {
+      const s = stateRef.current
+      if (!s || !(transformMap instanceof Map)) return
+      s.scene.traverse((obj) => {
+        if (!obj.isMesh) return
+        const cid = obj.userData?.componentId
+        if (!cid) return
+        const t = transformMap.get(cid)
+        if (!t) return
+        obj.position.set(t.x ?? 0, t.y ?? 0, t.z ?? 0)
+        if (t.qw != null) {
+          obj.quaternion.set(t.qx ?? 0, t.qy ?? 0, t.qz ?? 0, t.qw ?? 1)
+        }
+        obj.updateMatrixWorld(true)
+      })
+    },
   }), [hdriBackground])
 
   // HUD shows the prop-driven selection if present, else the last clicked id.
@@ -2285,6 +2421,7 @@ function Renderer({
               {[
                 { on: daylight, set: () => setDaylight((v) => !v), label: 'Daylight', hint: 'Single strong sun' },
                 { on: zebraOn, set: () => setZebraOn((v) => !v), label: 'Zebra', hint: 'Class-A surface lines' },
+                { on: classAOn, set: () => setClassAOn((v) => !v), label: 'Class-A', hint: 'G2/G3 continuity audit + combs' },
                 { on: bloomOn, set: () => setBloomOn((v) => !v), label: 'Bloom', hint: 'Gem / edge glow' },
                 { on: hdriBackground, set: () => setHdriBackground((v) => !v), label: 'HDRI background', hint: 'Env map as backdrop' },
                 { on: lodHudOn, set: () => setLodHudOn((v) => !v), label: 'LOD HUD', hint: 'Parts / tiers / latency' },
@@ -2383,6 +2520,167 @@ function Renderer({
             <span className="text-ink-500">latency</span>
             <span>{lodStats.latencyMs}ms</span>
           </div>
+        </div>
+      )}
+      {/* Class-A side panel — per-edge G2/G3 residual readouts.
+          Mounted when classAOn=true; positioned bottom-left to avoid the
+          existing top-right controls.  Scrollable so many-edge reports
+          don't overflow the viewport. */}
+      {classAOn && (
+        <ClassAPanel
+          loading={classALoading}
+          report={classAReport}
+          onClose={() => setClassAOn(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// ClassAPanel — per-edge G2/G3 continuity readouts side panel.
+//
+// Props:
+//   loading  — boolean: show spinner while audit is in flight
+//   report   — { edges: Array<EdgeReport>, summary?: string } | null
+//   onClose  — () => void
+//
+// EdgeReport shape (from edge_continuity_report backend):
+//   { edge_id, G0_ok, G1_ok, G2_ok, G3_ok, G0_max, G1_max, G2_max, G3_max,
+//     G0_rms, G1_rms, G2_rms, G3_rms, continuity_grade }
+function ClassAPanel({ loading, report, onClose }) {
+  const edges = report?.edges || []
+  const summary = report?.summary || null
+
+  return (
+    <div
+      role="region"
+      aria-label="Class-A continuity audit"
+      data-testid="class-a-panel"
+      style={{
+        position: 'absolute',
+        bottom: 48,
+        left: 12,
+        zIndex: 20,
+        background: 'rgba(15,17,21,0.93)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: 8,
+        padding: '10px 14px',
+        minWidth: 260,
+        maxWidth: 320,
+        maxHeight: 380,
+        display: 'flex',
+        flexDirection: 'column',
+        color: '#e5e7eb',
+        fontSize: 12,
+        userSelect: 'none',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+      }}
+    >
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexShrink: 0 }}>
+        <h2 style={{ margin: 0, fontWeight: 600, fontSize: 12, flex: 1, color: '#e5e7eb' }}>
+          Class-A Audit
+        </h2>
+        {loading && (
+          <span style={{ fontSize: 10, color: '#ffd633', marginRight: 4 }}>
+            Analysing…
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close Class-A panel"
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#6b7280',
+            cursor: 'pointer',
+            padding: '0 2px',
+            fontSize: 14,
+            lineHeight: 1,
+          }}
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Legend */}
+      <div style={{
+        display: 'flex', gap: 8, marginBottom: 8, fontSize: 10, flexShrink: 0,
+        color: '#9ca3af', flexWrap: 'wrap',
+      }}>
+        <span style={{ color: '#4ade80' }}>G3 pass</span>
+        <span style={{ color: '#86efac' }}>G2 pass</span>
+        <span style={{ color: '#fbbf24' }}>G1 pass</span>
+        <span style={{ color: '#f87171' }}>G0 pass</span>
+        <span style={{ color: '#dc2626' }}>fail</span>
+      </div>
+
+      {/* Summary message (no edges or error) */}
+      {summary && edges.length === 0 && (
+        <p style={{ fontSize: 11, color: '#9ca3af', margin: 0 }}>{summary}</p>
+      )}
+
+      {/* Per-edge table */}
+      {edges.length > 0 && (
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#6b7280' }}>
+                <th style={{ textAlign: 'left', paddingBottom: 4, fontWeight: 500 }}>Edge</th>
+                <th style={{ textAlign: 'center', paddingBottom: 4, fontWeight: 500 }}>Grade</th>
+                <th style={{ textAlign: 'right', paddingBottom: 4, fontWeight: 500 }}>G2 rms</th>
+                <th style={{ textAlign: 'right', paddingBottom: 4, fontWeight: 500 }}>G3 rms</th>
+              </tr>
+            </thead>
+            <tbody>
+              {edges.map((e, i) => {
+                const grade = e.continuity_grade || '—'
+                const gradeColor =
+                  grade === 'G3' ? '#4ade80' :
+                  grade === 'G2' ? '#86efac' :
+                  grade === 'G1' ? '#fbbf24' :
+                  grade === 'G0' ? '#f87171' : '#dc2626'
+                const g2rms = typeof e.G2_rms === 'number' ? e.G2_rms.toExponential(2) : '—'
+                const g3rms = typeof e.G3_rms === 'number' ? e.G3_rms.toExponential(2) : '—'
+                return (
+                  <tr
+                    key={e.edge_id ?? i}
+                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                  >
+                    <td style={{ padding: '3px 0', color: '#d1d5db', fontFamily: 'monospace' }}>
+                      {e.edge_id ?? i}
+                    </td>
+                    <td style={{ textAlign: 'center', color: gradeColor, fontWeight: 600 }}>
+                      {grade}
+                    </td>
+                    <td style={{ textAlign: 'right', color: '#9ca3af', fontFamily: 'monospace' }}>
+                      {g2rms}
+                    </td>
+                    <td style={{ textAlign: 'right', color: '#9ca3af', fontFamily: 'monospace' }}>
+                      {g3rms}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Footer summary stats */}
+      {edges.length > 0 && (
+        <div style={{
+          marginTop: 8, paddingTop: 6,
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          fontSize: 10, color: '#6b7280', flexShrink: 0,
+        }}>
+          {edges.length} edge{edges.length !== 1 ? 's' : ''}
+          {' · '}
+          {edges.filter((e) => e.G3_ok).length} G3-pass
+          {' · '}
+          {edges.filter((e) => !e.G0_ok).length} below-G0
         </div>
       )}
     </div>

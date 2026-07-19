@@ -43,7 +43,7 @@ async function callTool(toolName, args, token) {
 // CLTD/RTS cooling load engine (client-side approximation using ASHRAE method)
 // ---------------------------------------------------------------------------
 
-function computeCoolingLoad(inputs) {
+export function computeCoolingLoad(inputs) {
   const {
     wallArea, wallUValue, roofArea, roofUValue,
     glazingArea, solarHeatGainCoeff, uValueGlazing,
@@ -99,7 +99,7 @@ function computeCoolingLoad(inputs) {
   return { totalCoolingW: Math.round(totalCoolingW), breakdown }
 }
 
-function computeHeatingLoad(inputs) {
+export function computeHeatingLoad(inputs) {
   const {
     wallArea, wallUValue, roofArea, roofUValue,
     glazingArea, uValueGlazing,
@@ -120,6 +120,18 @@ function computeHeatingLoad(inputs) {
   const totalHeatingW = qWall + qRoof + qGlazing + qInf
 
   return { totalHeatingW: Math.round(Math.max(totalHeatingW, 0)) }
+}
+
+/**
+ * buildSensibleLoadArgs — args for the `hvac_cfm_from_sensible_load` tool
+ * call, pulled out of `calculate()` as a pure function so the exact request
+ * shape is independently unit-testable (this repo has no jsdom/
+ * @testing-library/react install; see HVACLoadPanel.test.jsx).
+ */
+export function buildSensibleLoadArgs({ wallArea, wallUValue, outdoorSummer, indoor }) {
+  const sensibleLoad_BTUh = wallArea * wallUValue * 5.678 *
+    Math.max(outdoorSummer - indoor, 1) * 3.412
+  return { Q_btuh: Math.max(sensibleLoad_BTUh, 100), delta_T_F: 20 }
 }
 
 // Monthly cooling profile — simplified hourly peak scaled by month factor
@@ -265,12 +277,13 @@ export default function HVACLoadPanel() {
       // Try backend tool call first — falls back to client-side
       let coolingKW, heatingKW, breakdown
       try {
-        const sensibleLoad_BTUh = inputs.wallArea * inputs.wallUValue * 5.678 *
-          Math.max(parseFloat(outdoorSummer) - parseFloat(indoor), 1) * 3.412
-        const resp = await callTool('hvac_cfm_from_sensible_load', {
-          Q_btuh: Math.max(sensibleLoad_BTUh, 100),
-          delta_T_F: 20,
-        }, accessToken)
+        const args = buildSensibleLoadArgs({
+          wallArea: inputs.wallArea,
+          wallUValue: inputs.wallUValue,
+          outdoorSummer: parseFloat(outdoorSummer),
+          indoor: parseFloat(indoor),
+        })
+        const resp = await callTool('hvac_cfm_from_sensible_load', args, accessToken)
         // cfm result confirms backend is alive; compute loads client-side
         void resp
       } catch {
@@ -367,55 +380,67 @@ export default function HVACLoadPanel() {
         </div>
       )}
 
-      {result && (
-        <div className="border border-ink-800 rounded-md overflow-hidden">
-          <div className="bg-ink-900 px-3 py-2 text-[10px] font-semibold text-ink-300 uppercase tracking-wider">
-            Results
+      {result && <ResultsPanel result={result} />}
+    </div>
+  )
+}
+
+/**
+ * ResultsPanel — the post-calculation results card (peak cooling/heating,
+ * load breakdown, monthly profiles). Pulled out as its own component (like
+ * BarSparkline / Section above) so it can be exercised directly with a
+ * fixed `result` object via renderToStaticMarkup, since
+ * @testing-library/react isn't installed and `result` is only reachable
+ * through internal `calculate()` state otherwise.
+ */
+export function ResultsPanel({ result }) {
+  return (
+    <div className="border border-ink-800 rounded-md overflow-hidden">
+      <div className="bg-ink-900 px-3 py-2 text-[10px] font-semibold text-ink-300 uppercase tracking-wider">
+        Results
+      </div>
+      <div className="p-3 bg-ink-950 flex flex-col gap-3">
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col gap-0.5 p-2 rounded bg-blue-950/30 border border-blue-700/30">
+            <span className="text-[10px] text-blue-400">Peak cooling</span>
+            <span className="text-lg font-bold text-blue-300">{result.coolingKW} kW</span>
+            <span className="text-[10px] text-ink-500">{(result.coolingKW * 0.2843).toFixed(1)} TR</span>
           </div>
-          <div className="p-3 bg-ink-950 flex flex-col gap-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex flex-col gap-0.5 p-2 rounded bg-blue-950/30 border border-blue-700/30">
-                <span className="text-[10px] text-blue-400">Peak cooling</span>
-                <span className="text-lg font-bold text-blue-300">{result.coolingKW} kW</span>
-                <span className="text-[10px] text-ink-500">{(result.coolingKW * 0.2843).toFixed(1)} TR</span>
-              </div>
-              <div className="flex flex-col gap-0.5 p-2 rounded bg-orange-950/30 border border-orange-700/30">
-                <span className="text-[10px] text-orange-400">Peak heating</span>
-                <span className="text-lg font-bold text-orange-300">{result.heatingKW} kW</span>
-              </div>
-            </div>
-
-            <div>
-              <p className="text-[10px] text-ink-500 uppercase tracking-wider mb-1.5">Cooling load breakdown (W)</p>
-              <div className="flex flex-col gap-0.5">
-                {Object.entries(result.breakdown).map(([k, v]) => (
-                  <div key={k} className="flex items-center gap-2">
-                    <div
-                      className="h-2 bg-blue-600/60 rounded-r"
-                      style={{ width: `${(v / result.coolingKW / 1000 * 100).toFixed(1)}%`, minWidth: 2 }}
-                    />
-                    <span className="text-[10px] text-ink-400 flex-1">{k.replace(/([A-Z])/g, ' $1').toLowerCase()}</span>
-                    <span className="text-[10px] font-mono text-ink-300">{v} W</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <BarSparkline
-              values={result.coolingProfile}
-              color="bg-blue-600/70"
-              unit="kW"
-              label="Monthly cooling profile"
-            />
-            <BarSparkline
-              values={result.heatingProfile}
-              color="bg-orange-600/70"
-              unit="kW"
-              label="Monthly heating profile"
-            />
+          <div className="flex flex-col gap-0.5 p-2 rounded bg-orange-950/30 border border-orange-700/30">
+            <span className="text-[10px] text-orange-400">Peak heating</span>
+            <span className="text-lg font-bold text-orange-300">{result.heatingKW} kW</span>
           </div>
         </div>
-      )}
+
+        <div>
+          <p className="text-[10px] text-ink-500 uppercase tracking-wider mb-1.5">Cooling load breakdown (W)</p>
+          <div className="flex flex-col gap-0.5">
+            {Object.entries(result.breakdown).map(([k, v]) => (
+              <div key={k} className="flex items-center gap-2">
+                <div
+                  className="h-2 bg-blue-600/60 rounded-r"
+                  style={{ width: `${(v / result.coolingKW / 1000 * 100).toFixed(1)}%`, minWidth: 2 }}
+                />
+                <span className="text-[10px] text-ink-400 flex-1">{k.replace(/([A-Z])/g, ' $1').toLowerCase()}</span>
+                <span className="text-[10px] font-mono text-ink-300">{v} W</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <BarSparkline
+          values={result.coolingProfile}
+          color="bg-blue-600/70"
+          unit="kW"
+          label="Monthly cooling profile"
+        />
+        <BarSparkline
+          values={result.heatingProfile}
+          color="bg-orange-600/70"
+          unit="kW"
+          label="Monthly heating profile"
+        />
+      </div>
     </div>
   )
 }

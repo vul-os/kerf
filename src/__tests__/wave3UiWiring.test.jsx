@@ -19,25 +19,15 @@ import { renderToStaticMarkup } from 'react-dom/server'
 // Mocks for FeatureView deps
 // ---------------------------------------------------------------------------
 
-vi.mock('lucide-react', () => {
+vi.mock('lucide-react', async () => {
   const stub = (name) => () => React.createElement('span', { 'data-icon': name })
-  // Explicit list of every icon used by FeatureView + the three new panels.
-  return {
-    Trash2: stub('Trash2'), ChevronUp: stub('ChevronUp'), ChevronDown: stub('ChevronDown'),
-    Box: stub('Box'), Circle: stub('Circle'), RotateCcw: stub('RotateCcw'),
-    Disc: stub('Disc'), Layers: stub('Layers'), Drill: stub('Drill'),
-    Sigma: stub('Sigma'), AlertTriangle: stub('AlertTriangle'), Loader2: stub('Loader2'),
-    Play: stub('Play'), Move: stub('Move'), Crosshair: stub('Crosshair'),
-    GitBranch: stub('GitBranch'), Repeat: stub('Repeat'), FlipHorizontal: stub('FlipHorizontal'),
-    PencilLine: stub('PencilLine'), Pointer: stub('Pointer'), Waves: stub('Waves'),
-    Layers3: stub('Layers3'), Aperture: stub('Aperture'), Plus: stub('Plus'),
-    X: stub('X'), ChevronRight: stub('ChevronRight'), LayoutGrid: stub('LayoutGrid'),
-    Combine: stub('Combine'), Scissors: stub('Scissors'), Grid3x3: stub('Grid3x3'),
-    MoreHorizontal: stub('MoreHorizontal'), SlidersHorizontal: stub('SlidersHorizontal'),
-    Zap: stub('Zap'), Eye: stub('Eye'), Shield: stub('Shield'),
-    Wrench: stub('Wrench'), AlignLeft: stub('AlignLeft'), Activity: stub('Activity'),
-    CheckCircle: stub('CheckCircle'), XCircle: stub('XCircle'), Wrench2: stub('Wrench2'),
-  }
+  // FeatureView.jsx's icon import list grows with every new feature kind.
+  // A hand-maintained allowlist here goes stale every time a feature is
+  // added and its icon isn't in the list ("No X export is defined on the
+  // lucide-react mock"). Deriving the stub set from the real package's own
+  // export list (vi.importActual) means it can never drift.
+  const actual = await vi.importActual('lucide-react')
+  return Object.fromEntries(Object.keys(actual).map((name) => [name, stub(name)]))
 })
 
 vi.mock('../components/FeatureRenderer.jsx', () => ({

@@ -42,7 +42,7 @@ async function callTool(toolName, args, token) {
 // ASHRAE roughness catalogue
 // ---------------------------------------------------------------------------
 
-const MATERIAL_OPTIONS = [
+export const MATERIAL_OPTIONS = [
   { key: 'galvanised_steel', label: 'Galvanised steel',    roughness_mm: 0.09 },
   { key: 'aluminium',        label: 'Aluminium (flexible)', roughness_mm: 0.2  },
   { key: 'fibreglass_liner', label: 'Fibreglass liner',    roughness_mm: 0.9  },
@@ -97,7 +97,7 @@ function sizeRect(q_m3s, v_max_ms, maxAR = 4) {
   return best
 }
 
-function computeDuctSegment(seg, roughness_mm) {
+export function computeDuctSegment(seg, roughness_mm) {
   const { airflow_cfm, max_velocity_fpm, shape, length_m, fittings } = seg
   const q_m3s  = airflow_cfm * 4.719474432e-4
   const v_max  = max_velocity_fpm * 0.00508
@@ -138,8 +138,54 @@ function computeDuctSegment(seg, roughness_mm) {
 }
 
 // ---------------------------------------------------------------------------
+// Backend tool-call payload builders — pulled out of `calculate()` as pure
+// functions so the exact request shape is independently unit-testable
+// (this repo has no jsdom/@testing-library/react install, so these can't be
+// exercised via simulated clicks; see DuctDesignPanel.test.jsx).
+// ---------------------------------------------------------------------------
+
+/** Build the args object for the `hvac.size_duct` tool call from a segment. */
+export function buildSizeDuctArgs(seg) {
+  return {
+    airflow_cfm: parseFloat(seg.airflow_cfm),
+    max_velocity_fpm: parseFloat(seg.max_velocity_fpm),
+    shape: seg.shape,
+  }
+}
+
+/**
+ * Build the args object for the `hvac.pressure_drop` tool call from the
+ * `hvac.size_duct` response + the originating segment + duct roughness.
+ */
+export function buildPressureDropArgs(sizeResp, seg, roughness_mm) {
+  return {
+    velocity_m_s:          sizeResp.actual_velocity_m_s,
+    hydraulic_diameter_mm: sizeResp.hydraulic_diameter_mm,
+    length_m:              parseFloat(seg.length_m),
+    roughness_mm,
+    fittings: seg.fittings || [],
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Segment row
 // ---------------------------------------------------------------------------
+
+/**
+ * TotalPressureDisplay — the "Total system pressure" summary row.
+ * Pulled out as its own component (like SegmentRow below) so it can be
+ * exercised directly with a fixed value via renderToStaticMarkup, since
+ * @testing-library/react isn't installed and the total is only reachable
+ * through internal `calculate()` state otherwise.
+ */
+export function TotalPressureDisplay({ total }) {
+  return (
+    <div className="flex items-center justify-between p-2.5 rounded-md bg-kerf-300/5 border border-kerf-300/30">
+      <span className="text-[11px] text-ink-300 font-medium">Total system pressure</span>
+      <span className="text-base font-bold text-kerf-300 font-mono">{total} Pa</span>
+    </div>
+  )
+}
 
 function SegmentRow({ seg, idx, onChange, onRemove, result }) {
   const [expanded, setExpanded] = useState(false)
@@ -288,19 +334,13 @@ export default function DuctDesignPanel() {
         // Try backend first
         let segResult = null
         try {
-          const sizeResp = await callTool('hvac.size_duct', {
-            airflow_cfm: q_cfm,
-            max_velocity_fpm: v_fpm,
-            shape: seg.shape,
-          }, accessToken)
+          const sizeResp = await callTool('hvac.size_duct', buildSizeDuctArgs(seg), accessToken)
 
-          const dpResp = await callTool('hvac.pressure_drop', {
-            velocity_m_s:          sizeResp.actual_velocity_m_s,
-            hydraulic_diameter_mm: sizeResp.hydraulic_diameter_mm,
-            length_m:              L,
-            roughness_mm,
-            fittings: seg.fittings || [],
-          }, accessToken)
+          const dpResp = await callTool(
+            'hvac.pressure_drop',
+            buildPressureDropArgs(sizeResp, seg, roughness_mm),
+            accessToken,
+          )
 
           segResult = {
             w_mm:   sizeResp.width_mm,
@@ -399,12 +439,7 @@ export default function DuctDesignPanel() {
         </div>
       )}
 
-      {results._total != null && (
-        <div className="flex items-center justify-between p-2.5 rounded-md bg-kerf-300/5 border border-kerf-300/30">
-          <span className="text-[11px] text-ink-300 font-medium">Total system pressure</span>
-          <span className="text-base font-bold text-kerf-300 font-mono">{results._total} Pa</span>
-        </div>
-      )}
+      {results._total != null && <TotalPressureDisplay total={results._total} />}
 
       <div className="text-[10px] text-ink-600 pt-1">
         Darcy-Weisbach / Colebrook-White · ASHRAE HoF 2021 Ch. 21

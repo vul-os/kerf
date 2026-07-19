@@ -20,7 +20,7 @@ import { useAuth } from '../../store/auth.js'
 // Equipment catalogue (ASHRAE 90.1-2022 minimum-efficiency basis + common OEM)
 // ---------------------------------------------------------------------------
 
-const EQUIPMENT_CATALOGUE = [
+export const EQUIPMENT_CATALOGUE = [
   // ---- Air Handling Units ----
   {
     id: 'ahu-01', category: 'ahu', manufacturer: 'Generic AHU',
@@ -126,7 +126,7 @@ const EQUIPMENT_CATALOGUE = [
   },
 ]
 
-const CATEGORIES = [
+export const CATEGORIES = [
   { key: 'all',       label: 'All' },
   { key: 'ahu',       label: 'AHU' },
   { key: 'chiller',   label: 'Chiller' },
@@ -179,7 +179,7 @@ function PartLoadCurve({ values }) {
 // Equipment card
 // ---------------------------------------------------------------------------
 
-function EquipmentCard({ eq, selected, onSelect }) {
+export function EquipmentCard({ eq, selected, onSelect }) {
   return (
     <button
       type="button"
@@ -221,6 +221,92 @@ function EquipmentCard({ eq, selected, onSelect }) {
   )
 }
 
+/**
+ * filterEquipment — pure filter predicate over the equipment catalogue.
+ * Pulled out of the panel's useMemo so the filtering logic is independently
+ * unit-testable (this repo has no jsdom/@testing-library/react install; see
+ * EquipmentSelectPanel.test.jsx).
+ */
+export function filterEquipment(catalogue, { category, minCap, maxCap, minEff }) {
+  return catalogue.filter(eq => {
+    if (category !== 'all' && eq.category !== category) return false
+    if (minCap && eq.capacity_kW < parseFloat(minCap)) return false
+    if (maxCap && eq.capacity_kW > parseFloat(maxCap)) return false
+    if (minEff && eq.efficiency_rated < parseFloat(minEff)) return false
+    return true
+  })
+}
+
+/**
+ * ResultsCount — "N units match · 1 selected" summary line. Pulled out as
+ * its own component so it can be exercised directly via renderToStaticMarkup
+ * (see filterEquipment doc above for why).
+ */
+export function ResultsCount({ count, hasSelection }) {
+  return (
+    <div className="text-[10px] text-ink-500">
+      {count} unit{count !== 1 ? 's' : ''} match
+      {hasSelection && (
+        <span className="ml-2 text-kerf-300">· 1 selected</span>
+      )}
+    </div>
+  )
+}
+
+/**
+ * SelectedUnitDetail — the "Selected unit" detail card (spec table + part-
+ * load curve). Pulled out as its own component so it can be exercised
+ * directly via renderToStaticMarkup, since `selected` is only reachable
+ * through internal EquipmentSelectPanel state otherwise.
+ */
+export function SelectedUnitDetail({ eq }) {
+  return (
+    <div className="border border-kerf-300/40 rounded-md overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 bg-kerf-300/10">
+        <Settings2 size={11} className="text-kerf-300" />
+        <span className="text-[10px] font-semibold text-kerf-200 uppercase tracking-wider">
+          Selected unit
+        </span>
+      </div>
+      <div className="p-3 bg-ink-950 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px]">
+        {[
+          ['Model',             eq.model],
+          ['Manufacturer',      eq.manufacturer],
+          ['Category',          eq.category.replace('_', ' ')],
+          ['Capacity',          `${eq.capacity_kW} kW`],
+          [eq.efficiency_metric, String(eq.efficiency_rated)],
+          ['Refrigerant',       eq.refrigerant || 'N/A'],
+          ['Standard',          eq.source],
+          ['Notes',             eq.notes],
+        ].map(([k, v]) => (
+          <div key={k}>
+            <span className="text-ink-600">{k}: </span>
+            <span className="text-ink-200">{v}</span>
+          </div>
+        ))}
+
+        <div className="col-span-2 mt-1">
+          <div className="flex items-center gap-1 mb-1">
+            <TrendingUp size={10} className="text-kerf-300" />
+            <span className="text-ink-400 text-[10px]">Part-load efficiency (normalised)</span>
+          </div>
+          <PartLoadCurve values={eq.part_load} />
+          <div className="flex justify-between">
+            {PLF_LABELS.map((l, i) => (
+              <div key={l} className="text-center">
+                <div className="text-[8px] text-ink-600">{l}</div>
+                <div className="text-[9px] text-ink-400 font-mono">
+                  {(eq.efficiency_rated * eq.part_load[i]).toFixed(1)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // EquipmentSelectPanel
 // ---------------------------------------------------------------------------
@@ -233,15 +319,10 @@ export default function EquipmentSelectPanel() {
   const [minEff,      setMinEff]      = useState('')
   const [selected,    setSelected]    = useState(null)
 
-  const filtered = useMemo(() => {
-    return EQUIPMENT_CATALOGUE.filter(eq => {
-      if (category !== 'all' && eq.category !== category) return false
-      if (minCap && eq.capacity_kW < parseFloat(minCap)) return false
-      if (maxCap && eq.capacity_kW > parseFloat(maxCap)) return false
-      if (minEff && eq.efficiency_rated < parseFloat(minEff)) return false
-      return true
-    })
-  }, [category, minCap, maxCap, minEff])
+  const filtered = useMemo(
+    () => filterEquipment(EQUIPMENT_CATALOGUE, { category, minCap, maxCap, minEff }),
+    [category, minCap, maxCap, minEff],
+  )
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-3 text-xs">
@@ -303,12 +384,7 @@ export default function EquipmentSelectPanel() {
       </div>
 
       {/* Results count */}
-      <div className="text-[10px] text-ink-500">
-        {filtered.length} unit{filtered.length !== 1 ? 's' : ''} match
-        {selected && (
-          <span className="ml-2 text-kerf-300">· 1 selected</span>
-        )}
-      </div>
+      <ResultsCount count={filtered.length} hasSelection={!!selected} />
 
       {/* Equipment grid */}
       <div className="flex flex-col gap-2">
@@ -328,51 +404,7 @@ export default function EquipmentSelectPanel() {
       </div>
 
       {/* Selected unit detail */}
-      {selected && (
-        <div className="border border-kerf-300/40 rounded-md overflow-hidden">
-          <div className="flex items-center gap-2 px-3 py-2 bg-kerf-300/10">
-            <Settings2 size={11} className="text-kerf-300" />
-            <span className="text-[10px] font-semibold text-kerf-200 uppercase tracking-wider">
-              Selected unit
-            </span>
-          </div>
-          <div className="p-3 bg-ink-950 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px]">
-            {[
-              ['Model',             selected.model],
-              ['Manufacturer',      selected.manufacturer],
-              ['Category',          selected.category.replace('_', ' ')],
-              ['Capacity',          `${selected.capacity_kW} kW`],
-              [selected.efficiency_metric, String(selected.efficiency_rated)],
-              ['Refrigerant',       selected.refrigerant || 'N/A'],
-              ['Standard',          selected.source],
-              ['Notes',             selected.notes],
-            ].map(([k, v]) => (
-              <div key={k}>
-                <span className="text-ink-600">{k}: </span>
-                <span className="text-ink-200">{v}</span>
-              </div>
-            ))}
-
-            <div className="col-span-2 mt-1">
-              <div className="flex items-center gap-1 mb-1">
-                <TrendingUp size={10} className="text-kerf-300" />
-                <span className="text-ink-400 text-[10px]">Part-load efficiency (normalised)</span>
-              </div>
-              <PartLoadCurve values={selected.part_load} />
-              <div className="flex justify-between">
-                {PLF_LABELS.map((l, i) => (
-                  <div key={l} className="text-center">
-                    <div className="text-[8px] text-ink-600">{l}</div>
-                    <div className="text-[9px] text-ink-400 font-mono">
-                      {(selected.efficiency_rated * selected.part_load[i]).toFixed(1)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {selected && <SelectedUnitDetail eq={selected} />}
 
       <div className="text-[10px] text-ink-600 pt-1">
         Efficiency data per ASHRAE 90.1-2022 minimum-efficiency tables.

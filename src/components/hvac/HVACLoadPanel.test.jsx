@@ -1,79 +1,128 @@
 /**
- * HVACLoadPanel.test.jsx — Mount and verify dispatch payload shape.
+ * HVACLoadPanel.test.jsx — structural + payload-shape tests.
+ *
+ * @testing-library/react is NOT installed in this repo (see the project-wide
+ * convention documented in Loader.test.jsx / SpiceRunPanel.test.jsx — adding
+ * it would violate the "no new npm deps" constraint, and there's no jsdom
+ * either so click-driven DOM interaction can't be simulated). Instead:
+ *
+ *   1. Static structure (headings) is verified with react-dom/server's
+ *      renderToStaticMarkup, same as the rest of the repo.
+ *   2. The `hvac_cfm_from_sensible_load` request-payload shape is verified
+ *      directly against buildSensibleLoadArgs, the pure function
+ *      HVACLoadPanel.jsx exports for exactly this purpose.
+ *   3. The cooling/heating engine (computeCoolingLoad / computeHeatingLoad)
+ *      is exercised directly to prove it always produces a result — this is
+ *      what backs "results appear even when the backend call fails", since
+ *      calculate() always falls through to these pure functions regardless
+ *      of whether hvac_cfm_from_sensible_load succeeded.
+ *   4. The Results card (only reachable through internal `calculate()` state
+ *      in the live component) is verified via the extracted ResultsPanel
+ *      sub-component, rendered directly with a computed result object.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import HVACLoadPanel from './HVACLoadPanel.jsx'
+import { describe, it, expect } from 'vitest'
+import { renderToStaticMarkup } from 'react-dom/server'
+import HVACLoadPanel, {
+  computeCoolingLoad,
+  computeHeatingLoad,
+  buildSensibleLoadArgs,
+  ResultsPanel,
+} from './HVACLoadPanel.jsx'
 
-// --- Mock useAuth ---
-vi.mock('../../store/auth.js', () => ({
-  useAuth: () => ({ accessToken: 'test-token' }),
-}))
+const SAMPLE_INPUTS = {
+  wallArea: 120, wallUValue: 0.35, roofArea: 80, roofUValue: 0.25,
+  glazingArea: 24, solarHeatGainCoeff: 0.4, uValueGlazing: 1.8,
+  occupantCount: 10, lightingWatts: 1200, equipmentWatts: 2000,
+  infiltrationACH: 0.5, floorArea: 80, ceilingHeight: 3.0,
+  outdoorDesignTemp: 35, indoorTemp: 22,
+}
 
-// --- Mock fetch ---
-const fetchMock = vi.fn()
-beforeEach(() => {
-  fetchMock.mockReset()
-  global.fetch = fetchMock
+describe('HVACLoadPanel — static structure', () => {
+  it('mounts and renders section headings', () => {
+    const html = renderToStaticMarkup(<HVACLoadPanel />)
+    expect(html).toMatch(/ASHRAE CLTD/i)
+    expect(html).toMatch(/Opaque construction/i)
+    expect(html).toMatch(/Glazing/i)
+    expect(html).toMatch(/Occupancy/i)
+    expect(html).toMatch(/Design conditions/i)
+  })
+
+  it('renders the "Calculate loads" action button', () => {
+    const html = renderToStaticMarkup(<HVACLoadPanel />)
+    expect(html).toMatch(/Calculate loads/i)
+  })
+
+  it('does not show a Results card before any calculation', () => {
+    const html = renderToStaticMarkup(<HVACLoadPanel />)
+    expect(html).not.toMatch(/Peak cooling/i)
+  })
 })
 
-describe('HVACLoadPanel', () => {
-  it('mounts and renders section headings', () => {
-    render(<HVACLoadPanel />)
-    expect(screen.getByText(/ASHRAE CLTD/i)).toBeDefined()
-    expect(screen.getByText(/Opaque construction/i)).toBeDefined()
-    expect(screen.getByText(/Glazing/i)).toBeDefined()
-    expect(screen.getByText(/Occupancy/i)).toBeDefined()
-    expect(screen.getByText(/Design conditions/i)).toBeDefined()
+describe('buildSensibleLoadArgs — hvac_cfm_from_sensible_load payload shape', () => {
+  it('has Q_btuh and delta_T_F fields, both numbers', () => {
+    const args = buildSensibleLoadArgs({
+      wallArea: 120, wallUValue: 0.35, outdoorSummer: 35, indoor: 22,
+    })
+    expect(args).toHaveProperty('Q_btuh')
+    expect(args).toHaveProperty('delta_T_F')
+    expect(typeof args.Q_btuh).toBe('number')
+    expect(typeof args.delta_T_F).toBe('number')
   })
 
-  it('dispatches POST /api/tools/call with correct tool name', async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({ cfm: 500 }),
+  it('floors Q_btuh at 100 even for a tiny/negative delta-T', () => {
+    const args = buildSensibleLoadArgs({
+      wallArea: 1, wallUValue: 0.01, outdoorSummer: 20, indoor: 22,
     })
+    expect(args.Q_btuh).toBeGreaterThanOrEqual(100)
+  })
+})
 
-    render(<HVACLoadPanel />)
-    const btn = screen.getByRole('button', { name: /Calculate loads/i })
-    fireEvent.click(btn)
-
-    await waitFor(() => {
-      const calls = fetchMock.mock.calls
-      const toolCall = calls.find(c => c[0]?.includes?.('/api/tools/call'))
-      expect(toolCall).toBeDefined()
-      const body = JSON.parse(toolCall[1].body)
-      expect(body.tool).toBe('hvac_cfm_from_sensible_load')
-      expect(body.args).toHaveProperty('Q_btuh')
-      expect(body.args).toHaveProperty('delta_T_F')
-      expect(typeof body.args.Q_btuh).toBe('number')
-    })
+describe('computeCoolingLoad / computeHeatingLoad — always produce a result', () => {
+  // The live component tries the backend `hvac_cfm_from_sensible_load` call
+  // first, but calculate() *always* falls through to these two pure
+  // functions to build the displayed result — the backend call only
+  // confirms liveness. So results appearing "even when the backend call
+  // fails" is a property of these functions never throwing, not of any
+  // DOM-level retry logic.
+  it('computeCoolingLoad returns a totalCoolingW number and a breakdown', () => {
+    const { totalCoolingW, breakdown } = computeCoolingLoad(SAMPLE_INPUTS)
+    expect(typeof totalCoolingW).toBe('number')
+    expect(totalCoolingW).toBeGreaterThan(0)
+    expect(breakdown).toHaveProperty('wall')
+    expect(breakdown).toHaveProperty('roof')
+    expect(breakdown).toHaveProperty('solar')
+    expect(breakdown).toHaveProperty('occupants')
   })
 
-  it('shows peak cooling and heating kW results after calculation', async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({ cfm: 500 }),
-    })
+  it('computeHeatingLoad returns a non-negative totalHeatingW number', () => {
+    const { totalHeatingW } = computeHeatingLoad({ ...SAMPLE_INPUTS, outdoorDesignTemp: -5 })
+    expect(typeof totalHeatingW).toBe('number')
+    expect(totalHeatingW).toBeGreaterThanOrEqual(0)
+  })
+})
 
-    render(<HVACLoadPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /Calculate loads/i }))
+describe('ResultsPanel — shows peak cooling and heating kW results', () => {
+  const cooling = computeCoolingLoad(SAMPLE_INPUTS)
+  const heating = computeHeatingLoad({ ...SAMPLE_INPUTS, outdoorDesignTemp: -5 })
+  const result = {
+    coolingKW: +(cooling.totalCoolingW / 1000).toFixed(2),
+    heatingKW: +(heating.totalHeatingW / 1000).toFixed(2),
+    breakdown: cooling.breakdown,
+    coolingProfile: Array(12).fill(cooling.totalCoolingW),
+    heatingProfile: Array(12).fill(heating.totalHeatingW),
+  }
 
-    await waitFor(() => {
-      expect(screen.getByText(/Peak cooling/i)).toBeDefined()
-      expect(screen.getByText(/Peak heating/i)).toBeDefined()
-    })
+  it('renders Peak cooling and Peak heating labels with kW values', () => {
+    const html = renderToStaticMarkup(<ResultsPanel result={result} />)
+    expect(html).toMatch(/Peak cooling/i)
+    expect(html).toMatch(/Peak heating/i)
+    expect(html).toContain(`${result.coolingKW} kW`)
+    expect(html).toContain(`${result.heatingKW} kW`)
   })
 
-  it('shows error banner when fetch fails', async () => {
-    fetchMock.mockRejectedValue(new Error('network error'))
-
-    render(<HVACLoadPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /Calculate loads/i }))
-
-    await waitFor(() => {
-      // Panel falls back to client-side calc on backend failure — results should still appear
-      expect(screen.getByText(/Peak cooling/i)).toBeDefined()
-    })
+  it('renders the cooling load breakdown', () => {
+    const html = renderToStaticMarkup(<ResultsPanel result={result} />)
+    expect(html).toMatch(/Cooling load breakdown/i)
   })
 })

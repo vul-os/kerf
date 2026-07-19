@@ -1,9 +1,11 @@
 /**
  * civilbim.test.jsx
  *
- * Vitest tests for the civilbim panel-registry fragment and the ten panels
- * it wires:
+ * Vitest tests for the civilbim panel-registry fragment and the twelve
+ * panels it wires:
  *
+ *   PointCloudWrapper          plant_pointcloud / .pointcloud
+ *   DryUtilityNetworkPanel     civil_dry_utility / .dryutil
  *   CorridorModelPanel         civil_corridor  / .corridor
  *   IrrigationPanel            civil_irrigation / .irrigation
  *   PlantSchedulePanel         civil_plantschedule / .plantschedule
@@ -64,6 +66,8 @@ function resolvePanelEntry(file) {
 // Panel imports (static — no lazy() in tests)
 // ---------------------------------------------------------------------------
 
+import PointCloudWrapper            from '../misc-wrappers/PointCloudWrapper.jsx'
+import DryUtilityNetworkPanel       from '../../../components/civil/DryUtilityNetworkPanel.jsx'
 import CorridorModelPanel           from '../../../components/civil/CorridorModelPanel.jsx'
 import IrrigationPanel              from '../../../components/civil/IrrigationPanel.jsx'
 import PlantSchedulePanel           from '../../../components/civil/PlantSchedulePanel.jsx'
@@ -84,8 +88,8 @@ describe('civilbim fragment', () => {
     expect(Array.isArray(ENTRIES)).toBe(true)
   })
 
-  it('contains exactly 10 entries', () => {
-    expect(ENTRIES).toHaveLength(10)
+  it('contains exactly 12 entries', () => {
+    expect(ENTRIES).toHaveLength(12)
   })
 
   it('every entry has id, kinds, exts, load', () => {
@@ -119,6 +123,8 @@ describe('resolvePanelEntry — kind resolution', () => {
     ['bim_family',        'bim_family'],
     ['bim_terrain',       'bim_terrain'],
     ['piping_design',     'piping_design'],
+    ['plant_pointcloud',  'plant_pointcloud'],
+    ['civil_dry_utility', 'civil_dry_utility'],
   ]
 
   for (const [kind, expectedId] of cases) {
@@ -150,6 +156,8 @@ describe('resolvePanelEntry — extension resolution', () => {
     ['curtainwall.bimfamily',   'bim_family'],
     ['site.bimterrain',         'bim_terrain'],
     ['plant.piping',            'piping_design'],
+    ['scan.pointcloud',         'plant_pointcloud'],
+    ['site.dryutil',            'civil_dry_utility'],
   ]
 
   for (const [filename, expectedId] of cases) {
@@ -449,6 +457,57 @@ describe('PipingDesignPanel — mount', () => {
     const entry = resolvePanelEntry({ kind: 'piping_design' })
     expect(entry).not.toBeNull()
     // load() must return a thenable (Promise / dynamic import)
+    const result = entry.load()
+    expect(typeof result.then).toBe('function')
+  })
+})
+
+// ── 4k. PointCloudWrapper (plant_pointcloud) ────────────────────────────────
+
+describe('PointCloudWrapper — mount', () => {
+  it('renders without crashing (no props)', () => {
+    expect(() => renderToStaticMarkup(<PointCloudWrapper />)).not.toThrow()
+  })
+
+  it('renders with content JSON (points + stats)', () => {
+    const content = JSON.stringify({
+      points: [[0, 0, 0], [1, 0, 0], [0, 1, 0]],
+      deviations: [0.001, -0.002, 0.0005],
+      stats: { n_points: 3, density_per_m2: 120 },
+    })
+    expect(() => renderToStaticMarkup(<PointCloudWrapper content={content} />)).not.toThrow()
+  })
+
+  it('registry entry for plant_pointcloud has load fn that returns a Promise', () => {
+    const entry = resolvePanelEntry({ kind: 'plant_pointcloud' })
+    expect(entry).not.toBeNull()
+    const result = entry.load()
+    expect(typeof result.then).toBe('function')
+  })
+})
+
+// ── 4l. DryUtilityNetworkPanel (civil_dry_utility) ──────────────────────────
+
+describe('DryUtilityNetworkPanel — mount', () => {
+  it('renders without crashing (no props)', () => {
+    expect(() => renderToStaticMarkup(<DryUtilityNetworkPanel />)).not.toThrow()
+  })
+
+  it('renders nodes/links JSON via data-testid="dry-utility-panel"', () => {
+    const nodes = [
+      { id: 'n1', x: 0, y: 0, kind: 'manhole', invert_elev_m: 100.0 },
+      { id: 'n2', x: 20, y: 0, kind: 'manhole', invert_elev_m: 99.5 },
+    ]
+    const links = [
+      { id: 'l1', from: 'n1', to: 'n2', utility: 'storm', diameter_mm: 300 },
+    ]
+    const html = renderToStaticMarkup(<DryUtilityNetworkPanel nodes={nodes} links={links} />)
+    expect(html).toContain('dry-utility-panel')
+  })
+
+  it('registry entry for civil_dry_utility has load fn that returns a Promise', () => {
+    const entry = resolvePanelEntry({ kind: 'civil_dry_utility' })
+    expect(entry).not.toBeNull()
     const result = entry.load()
     expect(typeof result.then).toBe('function')
   })

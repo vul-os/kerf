@@ -31,6 +31,17 @@ export default defineConfig(({ mode }) => {
     // surfaces their e2e specs as spurious "@playwright/test not found" fails).
     test: {
       exclude: [...configDefaults.exclude, 'tests/e2e/**', '.claude/**'],
+      // A handful of tests dynamically `import()` heavy route/page modules
+      // (compare pages, domain sector pages, PCBInteractiveEditor, ...) just
+      // to assert they have a default export. Each is fast in isolation, but
+      // under the full parallel suite — dozens of worker threads competing
+      // for CPU during Vite's transform pass — a cold dynamic import can
+      // occasionally exceed vitest's 5000ms default and fail with "Test
+      // timed out in 5000ms", non-deterministically and on a different file
+      // each run. Raising the default gives those imports room to finish
+      // under contention without masking a real hang (a genuinely broken
+      // import still fails, just after 20s instead of 5s).
+      testTimeout: 20000,
     },
     server: {
       port: 5173,

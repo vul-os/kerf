@@ -32,13 +32,19 @@ def _run(env: dict, args: list[str]) -> tuple[int, str, str]:
     return proc.returncode, proc.stdout, proc.stderr
 
 
-def test_no_args_and_no_env_prints_usage_and_exits_nonzero():
-    """No argv[1] and no $DATABASE_URL → usage message, exit 1."""
-    env = {"PATH": "/usr/bin:/bin"}  # deliberately strip DATABASE_URL
-    code, out, _ = _run(env, [])
-    assert code != 0
-    assert "Usage" in out
-    assert "DATABASE_URL" in out
+def test_no_args_and_no_env_falls_back_to_sqlite_default(tmp_path):
+    """No argv[1] and no $DATABASE_URL → embedded-SQLite default, exit 0.
+
+    Since the zero-dependency-install change, a missing DSN is no longer an
+    error: the runner migrates the embedded SQLite database at
+    ~/.kerf/kerf.db (HOME-scoped here so the test never touches real state).
+    """
+    env = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)}
+    code, out, err = _run(env, [])
+    assert code == 0, f"expected SQLite fallback success, got {code}: {err[:300]}"
+    combined = (out + err).lower()
+    assert "sqlite" in combined
+    assert (tmp_path / ".kerf" / "kerf.db").exists()
 
 
 def test_database_url_env_is_picked_up():

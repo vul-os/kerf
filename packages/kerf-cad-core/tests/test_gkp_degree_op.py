@@ -44,7 +44,14 @@ import sys as _sys
 import types as _types
 
 # Inject our loaded nurbs module so degree_op's "from kerf_cad_core.geom.nurbs import ..."
-# resolves against it.
+# resolves against it. sys.modules is process-global and shared across the
+# whole pytest session, so leaving these stand-in entries in place would
+# shadow the real `kerf_cad_core`/`kerf_cad_core.geom` packages for every test
+# file collected afterward — snapshot and restore once the aliases below are
+# captured.
+_SNAPSHOT_KEYS = ("kerf_cad_core", "kerf_cad_core.geom", "kerf_cad_core.geom.nurbs")
+_snapshot = {k: _sys.modules.get(k) for k in _SNAPSHOT_KEYS}
+
 _sys.modules.setdefault("kerf_cad_core", _types.ModuleType("kerf_cad_core"))
 _sys.modules.setdefault("kerf_cad_core.geom", _types.ModuleType("kerf_cad_core.geom"))
 _sys.modules["kerf_cad_core.geom.nurbs"] = _nurbs_mod
@@ -60,6 +67,16 @@ degree_raise_surface = _deg_mod.degree_raise_surface
 degree_lower_curve = _deg_mod.degree_lower_curve
 degree_lower_surface = _deg_mod.degree_lower_surface
 elevate_to_match = _deg_mod.elevate_to_match
+
+# Restore whatever was in sys.modules before this file patched it (nothing,
+# in the normal case) so later test files still see the real
+# `kerf_cad_core.geom` package rather than these transient stubs.
+for _k, _v in _snapshot.items():
+    if _v is None:
+        _sys.modules.pop(_k, None)
+    else:
+        _sys.modules[_k] = _v
+del _snapshot, _k, _v
 
 
 # ---------------------------------------------------------------------------

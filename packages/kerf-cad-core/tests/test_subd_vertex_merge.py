@@ -56,10 +56,8 @@ from kerf_cad_core.subd.vertex_merge import (
     VertexMergeResult,
     merge_vertices,
 )
-from kerf_cad_core.subd.edge_collapse import (
-    collapse_edge,
-    _build_ordered_edges,
-)
+from kerf_cad_core.subd.edge_collapse import collapse_edge
+from kerf_cad_core.subd.edge_flip import _build_ordered_edges
 
 
 # ---------------------------------------------------------------------------

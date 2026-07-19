@@ -18,9 +18,10 @@ cd kerf
 
 # Backend (Python 3.11+ required)
 # The repo is a uv workspace; a bare `pip install -e .[full]` can't resolve the
-# local kerf-* packages. Use one of:
-uv sync --extra full              # uv users
-./scripts/dev-install.sh full     # pip users (editable install helper)
+# local kerf-* packages, and `uv sync` doesn't currently work for any persona
+# (kerf-cad-core/kerf-cam/kerf-fem/kerf-topo pull in conda-forge-only extras
+# that uv's single-lockfile resolve can't satisfy). Use the pip-based helper:
+./scripts/dev-install.sh full     # editable install helper — works with plain pip
 createdb kerf  # local Postgres
 python -m kerf_core.db.migrations.runner postgres://localhost/kerf
 

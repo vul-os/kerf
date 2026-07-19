@@ -43,6 +43,22 @@ def _load(rel_path, module_name):
     spec.loader.exec_module(mod)
     return mod
 
+# These loads register stand-in entries under `kerf_cad_core.*` in the
+# process-global sys.modules so the loaded files' internal relative imports
+# resolve. That cache is shared by the whole pytest session, so any stub left
+# behind here — a `kerf_cad_core.geom` that isn't a real package — shadows the
+# genuine package for every test file collected afterward. Snapshot and
+# restore sys.modules once the local aliases below are captured; nothing past
+# this block needs the stubs to remain installed.
+_SNAPSHOT_KEYS = (
+    "kerf_cad_core",
+    "kerf_cad_core.geom",
+    "kerf_cad_core.geom.nurbs",
+    "kerf_cad_core.geom.brep",
+    "kerf_cad_core.geom.auto_lightweight",
+)
+_snapshot = {k: sys.modules.get(k) for k in _SNAPSHOT_KEYS}
+
 # Load in dependency order
 _nurbs_mod = _load("geom/nurbs.py", "kerf_cad_core.geom.nurbs")
 _brep_mod  = _load("geom/brep.py",  "kerf_cad_core.geom.brep")
@@ -58,6 +74,17 @@ _kcc_pkg = types.ModuleType("kerf_cad_core")
 sys.modules.setdefault("kerf_cad_core", _kcc_pkg)
 
 _lw_mod = _load("geom/auto_lightweight.py", "kerf_cad_core.geom.auto_lightweight")
+
+# Undo the sys.modules patching now that the module objects we need are
+# captured directly (see aliases below) — restore whatever was there before
+# (nothing, in the normal case) so later test files still see the real
+# `kerf_cad_core.geom` package.
+for _k, _v in _snapshot.items():
+    if _v is None:
+        sys.modules.pop(_k, None)
+    else:
+        sys.modules[_k] = _v
+del _snapshot, _k, _v
 
 # Aliases
 NurbsCurve   = _nurbs_mod.NurbsCurve

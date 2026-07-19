@@ -355,13 +355,17 @@ export default function EnergyReportPanel({ projectId, onClose, embedded = false
             return typeof useAuth !== 'undefined' ? useAuth.getState().accessToken : null
           } catch { return null }
         })()
-        const res = await fetch(`${API_URL}/api/projects/${projectId}/energy/compliance-report`, {
+        const res = await fetch(`${API_URL}/api/tools/call`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          body: JSON.stringify(spec),
+          body: JSON.stringify({
+            tool: 'bim_compute_energy_compliance_report',
+            args: spec,
+            project_id: projectId,
+          }),
         })
         if (!res.ok) {
           const txt = await res.text()

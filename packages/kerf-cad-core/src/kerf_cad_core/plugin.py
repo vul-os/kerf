@@ -675,6 +675,8 @@ _TOOL_MODULES = [
     "kerf_cad_core.optics.advanced_optics_tools",  # optics_design_metalens + optics_metalens_chromatic_efficiency + optics_stop_analysis + optics_thermal_expansion
     # Wave 9D: 8760-hr ASHRAE compliance + Title 24 + LEED v4 EAp2 + HVAC plant
     "kerf_cad_core.buildingenergy.compliance_8760_tools",  # be_simulate_8760, be_check_title24, be_evaluate_leed_eap2, be_simulate_hvac_plant
+    # EcoDesigner report: whole-project ASHRAE 90.1 energy-compliance report (EnergyReportPanel backend)
+    "kerf_cad_core.buildingenergy.compliance_tools",  # bim_compute_energy_compliance_report
     # Wave 9D: FiberSim AFP/ATL composite paths + laser projection
     "kerf_cad_core.composites.afp_atl_tools",  # composites_generate_afp_paths + composites_export_apt_cl + composites_laser_projection + composites_develop_flat_pattern + composites_export_flat_dxf
     # Wave 10C: GMAT libration orbits + orbit determination

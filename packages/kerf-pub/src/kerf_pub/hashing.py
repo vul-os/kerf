@@ -35,18 +35,24 @@ Set :data:`LEGACY_READ_PREFIXES` to ``()`` to run BLAKE3-only (a fresh
 deployment with no pre-cut-over pins should; it costs nothing and narrows the
 accepted surface).
 
-**BLAKE3 without a wheel.** The optional ``blake3`` extension module is used
-when importable; otherwise :mod:`kerf_pub.blake3_pure` — a dependency-free
-BLAKE3 in the same house style as :mod:`kerf_pub.cbor` — takes over. The two
-are byte-identical, so a missing binary wheel degrades speed, never
-correctness or interop.
+**BLAKE3 without a wheel.** The ``blake3`` extension module is used when
+importable; otherwise :mod:`kerf_pub.blake3_pure` — a dependency-free BLAKE3 in
+the same house style as :mod:`kerf_pub.cbor` — takes over. The two are
+byte-identical, so a missing binary wheel degrades speed, never correctness or
+interop. Be clear about the size of that degradation, though: measured on the
+1 MiB default chunk, the extension runs ~0.8 ms/MiB and the pure-Python path
+~1.4 s/MiB — about 1700x. The fallback exists so a node can still *verify* what
+it holds on a platform with no prebuilt wheel; it is not a serving posture. A
+gateway hashing real artifacts wants ``blake3`` installed (it is declared as a
+dependency, so it normally is), and ``BLAKE3_BACKEND`` reports which path is
+live.
 """
 
 from __future__ import annotations
 
 import hashlib
 
-try:  # fast path: the optional `blake3` wheel (~100x the pure-Python speed)
+try:  # fast path: the `blake3` wheel (~1700x the pure-Python speed, see above)
     from blake3 import blake3 as _blake3_ext
 
     def _blake3_256(data: bytes) -> bytes:

@@ -237,6 +237,43 @@ exactly as valid a way to publish or follow as using the default one. A
 native mesh transport is a later, additive phase on top of this, not a
 precondition for it.
 
+## Protocol conformance
+
+A distributed workshop is only distributed if other people's software can read
+what your node publishes. That is not something an implementation can assert
+about itself, so kerf's is measured against the DMTAP spec's **frozen shared
+conformance vectors** — the same known-answer file every other §22
+implementation is held to, vendored at
+`packages/kerf-pub/tests/vectors/pub_vectors.json` and replayed by
+`tests/test_conformance_vectors.py` on every CI run.
+
+**kerf-pub passes 15 of the 15 shared DMTAP-PUB §22 vectors.** No skips: all
+fifteen apply to a Python gateway/client implementation and all fifteen are
+replayed through kerf-pub's ordinary public API, not a test-only path. Covered:
+manifest Merkle roots (§22.2.2), the public-vs-sealed tree type-incompatibility
+rule (§22.2.3), the forbidden manifest key 5, announce signing preimages and
+`announce_id` derivation (§22.3.1), same-author and cross-author `supersedes`
+(§22.3.4), feed-entry `prev` chains and `FeedHead` signing preimages (§22.4.1),
+and all three anti-rollback outcomes — stale-seq rejection, idempotent
+re-fetch, and equal-seq equivocation (§22.4.2).
+
+Content is addressed with **BLAKE3-256 under multihash prefix `0x1e`**, the v0
+requirement (§18.1.5). Earlier kerf-pub builds used SHA-256 (`0x12`) under the
+§23 Appendix A interop dispensation; that is now a read-only compatibility
+path, so a node that pinned or published before the change keeps verifying and
+serving its existing objects — including already-signed announces, which cannot
+be re-derived — while everything newly published is `0x1e` and interoperable.
+Nothing needs to be re-hashed, re-signed, or migrated.
+
+**One known gap, stated plainly.** §22.3.3 step 4 lets a publisher sign with an
+operational device key that a `DeviceCert` chains back to its identity key.
+kerf-pub does not implement that: it requires `signer == pub`. This is the
+stricter of the two behaviours — kerf-pub can never *accept* something a
+conformant verifier would reject — but it means kerf-pub will refuse an
+otherwise-valid announce from a publisher that keeps its identity key cold.
+The spec makes `DeviceCert` support a SHOULD, so this remains conformant; it is
+tracked as a limitation, not a defect.
+
 ## Related pages
 
 - [node-architecture.md](./node-architecture.md) — the node model and the `pub` module

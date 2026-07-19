@@ -10,10 +10,11 @@ dependency-free BLAKE3 whose *only* job is to be byte-identical to the
 reference implementation.
 
 :mod:`kerf_pub.hashing` prefers the ``blake3`` extension module when it is
-importable (roughly two orders of magnitude faster, which matters for a gateway
-hashing 1 MiB chunks) and silently falls back here otherwise. Both paths are
-covered by the shared DMTAP conformance vectors, so a divergence between them
-is a test failure, not a silent interop break.
+importable and falls back here otherwise. The gap is large — roughly 1.4 s/MiB
+here against 0.8 ms/MiB there — so this is a correctness backstop for a
+platform with no prebuilt wheel, not a way to serve traffic. Both paths are
+checked against each other and against the shared DMTAP conformance vectors, so
+a divergence is a test failure, not a silent interop break.
 
 Scope: unkeyed hashing with a 32-byte output (``blake3_256``). The keyed-hash
 and derive-key modes, and extendable output beyond 32 bytes, are not needed by

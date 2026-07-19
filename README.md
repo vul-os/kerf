@@ -231,9 +231,17 @@ npm test             # vitest (frontend)
 npm run test:e2e     # Playwright end-to-end
 
 # Backend — run from repo root so the root conftest loads
-PYTHONHASHSEED=0 pytest packages/ -n auto        # full suite
+make test                                        # default tier — expected GREEN (~3 min)
 pytest packages/kerf-api/tests/                  # one plugin
+make test-kernel                                 # kerf-cad-core geometry kernel (~75 min)
+make test-domains                                # the 22 engineering domains — experimental, currently RED
 ```
+
+`make test` (equivalently a bare `pytest`) runs the load-bearing packages and
+is the tier CI gates on — if it is red, that is a regression. The kernel and
+domain tiers have known failures and are **not** a gate. See
+[docs/TESTING.md](./docs/TESTING.md) for what each tier covers, the measured
+per-package numbers, and the known root causes.
 
 See [docs/contributing.md](./docs/contributing.md) for the full dev-setup guide, and [docs/architecture.md](./docs/architecture.md) for the plugin system and monorepo layout.
 

@@ -102,13 +102,26 @@ Schema in `kerf.example.toml`. Notable knobs:
 
 ## Testing
 
-Tests are auto-discovered from every plugin's `tests/` directory. Top-level
-`pytest` runs the whole suite:
+Tests are split into tiers. A bare `pytest` runs the **default tier** — the
+load-bearing product packages — which is expected to be green and is what CI
+gates on:
 
 ```sh
-pytest                                 # all plugin tests
+make test                              # default tier — expected GREEN (~5.0k tests, ~3 min)
 pytest packages/kerf-api/tests/        # one plugin
+make test-kernel                       # kerf-cad-core geometry kernel (~38.8k tests, ~75 min)
+make test-domains                      # the 22 engineering domains — experimental, currently RED
 ```
+
+The kernel and domain tiers have known, documented failures and must not be
+used as a release gate. Before assuming a failure there is yours, read
+[TESTING.md](./TESTING.md) — it records the real numbers and the handful of
+shared root causes behind them.
+
+One rule worth internalising: **never assign to `sys.modules` at test-module
+scope without restoring it.** `sys.modules` is process-global, and a stub left
+behind by one test file silently corrupts every file collected after it. That
+single mistake accounted for the bulk of a 1563-failure full-suite run.
 
 Frontend has no automated test suite yet — assume manual smoke testing
 plus the OpenSCAD vitest suite (`vitest run src/lib/openscadToJscad.test.js`).

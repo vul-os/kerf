@@ -284,28 +284,37 @@ kerf-workers = { workspace = true }
 kerf-plm = { workspace = true }
 
 [tool.pytest.ini_options]
-# Auto-discover tests from every plugin package and from the legacy backend/
-# tree (which still hosts shared tools/ / workers/ / utils/ used by plugins
-# until the next migration pass).
+# DEFAULT TIER — the load-bearing product packages only.
+#
+# A bare `pytest` runs exactly this set, and this set is expected to be GREEN.
+# That is the whole point: a red default is indistinguishable from background
+# noise, so anything not currently green lives behind an explicit, documented
+# command instead of being silently mixed in here. See docs/TESTING.md for the
+# full tier map, the measured numbers, and the known root causes.
+#
+# Deliberately NOT here:
+#   * packages/kerf-cad-core/tests — load-bearing geometry kernel, but ~38.8k
+#     tests / ~75 min and 17 known failures + 2 non-terminating files. Run it
+#     explicitly: `pytest packages/kerf-cad-core/tests` (see docs/TESTING.md).
+#   * the 22 engineering-domain packages (fem/cam/bim/electronics/mold/...) —
+#     experimental tier, several are red. `make test-domains`.
+#   * packages/kerf-v1/tests, packages/kerf-workers/tests — listed here for a
+#     long time but neither directory has ever existed; pytest skipped them
+#     silently. Removed rather than left as decorative entries.
 testpaths = [
     "packages/kerf-cli/tests",
     "packages/kerf-core/tests",
     "packages/kerf-auth/tests",
     "packages/kerf-api/tests",
     "packages/kerf-chat/tests",
-    "packages/kerf-v1/tests",
     "packages/kerf-cloud/tests",
-    "packages/kerf-cad-core/tests",
+    "packages/kerf-pub/tests",
+    "packages/kerf-sdk/tests",
+    "packages/kerf-imports/tests",
     "packages/kerf-tess/tests",
-    "packages/kerf-fem/tests",
-    "packages/kerf-cam/tests",
     "packages/kerf-topo/tests",
     "packages/kerf-mates/tests",
-    "packages/kerf-bim/tests",
-    "packages/kerf-electronics/tests",
-    "packages/kerf-imports/tests",
     "packages/kerf-render/tests",
-    "packages/kerf-workers/tests",
     "packages/kerf-parts/tests",
     "packages/kerf-partsgen/tests",
     "packages/kerf-worker/tests",

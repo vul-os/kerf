@@ -94,6 +94,15 @@ class PubStore:
     async def list_follows(self) -> list[dict]: ...
     async def delete_follow(self, pub: bytes) -> None: ...
 
+    # Wake push subscriptions (kerf_pub.wake — substrate capability ⑤). A
+    # subscription is keyed by (pub, endpoint): one follower endpoint may
+    # subscribe to many feeds, and a feed may have many subscriber endpoints.
+    async def put_wake_subscription(self, pub: bytes, endpoint: str, p256dh: str,
+                                    auth: str, added_ts: int) -> None: ...
+    async def list_wake_subscriptions(self, pub: bytes) -> list[dict]: ...
+    async def count_wake_subscriptions(self, pub: bytes) -> int: ...
+    async def delete_wake_subscription(self, pub: bytes, endpoint: str) -> None: ...
+
 
 # ── in-memory backend ─────────────────────────────────────────────────────────
 
@@ -108,6 +117,8 @@ class InMemoryPubStore(PubStore):
         self._accepted_seq: dict[bytes, int] = {}
         self._avail: dict[bytes, Availability] = {}
         self._follows: dict[bytes, dict] = {}
+        # wake subscriptions: pub -> {endpoint: {p256dh, auth, added_ts}}
+        self._wake_subs: dict[bytes, dict[str, dict]] = {}
 
     async def put_chunk(self, h: bytes, data: bytes) -> None:
         self._chunks[bytes(h)] = bytes(data)
@@ -175,6 +186,25 @@ class InMemoryPubStore(PubStore):
 
     async def delete_follow(self, pub: bytes) -> None:
         self._follows.pop(bytes(pub), None)
+
+    async def put_wake_subscription(self, pub: bytes, endpoint: str, p256dh: str,
+                                    auth: str, added_ts: int) -> None:
+        self._wake_subs.setdefault(bytes(pub), {})[endpoint] = {
+            "p256dh": p256dh, "auth": auth, "added_ts": added_ts,
+        }
+
+    async def list_wake_subscriptions(self, pub: bytes) -> list[dict]:
+        subs = self._wake_subs.get(bytes(pub), {})
+        return [
+            {"pub": bytes(pub), "endpoint": endpoint, **rec}
+            for endpoint, rec in sorted(subs.items(), key=lambda kv: kv[1]["added_ts"])
+        ]
+
+    async def count_wake_subscriptions(self, pub: bytes) -> int:
+        return len(self._wake_subs.get(bytes(pub), {}))
+
+    async def delete_wake_subscription(self, pub: bytes, endpoint: str) -> None:
+        self._wake_subs.get(bytes(pub), {}).pop(endpoint, None)
 
 
 # ── postgres backend ──────────────────────────────────────────────────────────
@@ -329,3 +359,37 @@ class PostgresPubStore(PubStore):
 
     async def delete_follow(self, pub: bytes) -> None:
         await self._pool.execute("DELETE FROM pub_follows WHERE pub = $1", bytes(pub))
+
+    async def put_wake_subscription(self, pub: bytes, endpoint: str, p256dh: str,
+                                    auth: str, added_ts: int) -> None:
+        await self._pool.execute(
+            "INSERT INTO pub_wake_subscriptions (pub, endpoint, p256dh, auth, added_ts) "
+            "VALUES ($1, $2, $3, $4, $5) ON CONFLICT (pub, endpoint) DO UPDATE SET "
+            "p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth",
+            bytes(pub), endpoint, p256dh, auth, added_ts,
+        )
+
+    async def list_wake_subscriptions(self, pub: bytes) -> list[dict]:
+        rows = await self._pool.fetch(
+            "SELECT pub, endpoint, p256dh, auth, added_ts FROM pub_wake_subscriptions "
+            "WHERE pub = $1 ORDER BY added_ts",
+            bytes(pub),
+        )
+        return [
+            {
+                "pub": bytes(r["pub"]), "endpoint": r["endpoint"],
+                "p256dh": r["p256dh"], "auth": r["auth"], "added_ts": int(r["added_ts"]),
+            }
+            for r in rows
+        ]
+
+    async def count_wake_subscriptions(self, pub: bytes) -> int:
+        row = await self._pool.fetchrow(
+            "SELECT count(*) AS n FROM pub_wake_subscriptions WHERE pub = $1", bytes(pub))
+        return int(row["n"]) if row else 0
+
+    async def delete_wake_subscription(self, pub: bytes, endpoint: str) -> None:
+        await self._pool.execute(
+            "DELETE FROM pub_wake_subscriptions WHERE pub = $1 AND endpoint = $2",
+            bytes(pub), endpoint,
+        )

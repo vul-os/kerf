@@ -49,6 +49,7 @@ from .client import PubClient, HydrationResult
 from .errors import PubError, ProfileError
 from .identity import Identity, default_key_path
 from .ipfs import default_ipfs_gateway_url
+from .wake import PushSubscription, default_wake_config, notify_subscribers
 from .objects import (
     ArtifactFormat,
     ArtifactMetadata,
@@ -194,6 +195,65 @@ def _availability_out(avail, now_ms: int) -> dict:
     }
 
 
+async def _resolve_follow_listings(store: PubStore, follow: dict, now_ms: int) -> list[dict]:
+    """Resolve one followed feed (verified head + chain walk, §22.4) into
+    Workshop listing dicts. Shared by the full re-crawl (``GET /workshop``,
+    every follow) and the single-feed refresh (``POST /follows/{pub}/refresh``
+    — the targeted pull a Wake ping's receiver triggers instead of waiting for
+    the next full re-crawl, :mod:`kerf_pub.wake`)."""
+    gateways = [follow["gateway_url"]] if follow.get("gateway_url") else []
+    client = PubClient(store=store, identity=None, gateways=gateways)
+
+    try:
+        entries = await client.resolve(follow["pub"])
+    except PubError as exc:
+        logger.warning("pub-workshop: resolve failed for %s: %s", _b64url(follow["pub"]), exc)
+        return []
+
+    out: list[dict] = []
+    for entry in entries:
+        raw = await store.get_announce(entry.announce)
+        if raw is None and client.online:
+            raw = await client._gateway_get(f"announce/{_b64url(entry.announce)}")
+        if raw is None:
+            continue
+        try:
+            announce = PubAnnounce.from_cbor(raw)
+            announce.verify(expected_id=entry.announce)
+        except PubError as exc:
+            logger.warning("pub-workshop: invalid announce %s: %s", _b64url(entry.announce), exc)
+            continue
+
+        artifact = extract_artifact(announce.meta)
+        if artifact is None:
+            # Not a CAD/artifact announce (§23) — not a Workshop listing.
+            continue
+
+        avail = await store.get_availability(entry.announce)
+        out.append({
+            "announce_id": _b64url(entry.announce),
+            "pub": _b64url(announce.pub),
+            "meta": {
+                "name": artifact.name,
+                "description": artifact.description,
+                "artifact_kind": artifact.artifact_kind,
+                "license": artifact.license,
+                "units": {
+                    "length_unit": artifact.units.length_unit,
+                    "angle_unit": artifact.units.angle_unit,
+                    "mass_unit": artifact.units.mass_unit,
+                },
+                "tags": artifact.tags or [],
+            },
+            "roots": [_b64url(r) for r in announce.roots],
+            "ts": announce.ts,
+            "supersedes": _b64url(announce.supersedes) if announce.supersedes else None,
+            "availability": _availability_out(avail, now_ms),
+            "pinned": avail.local_pinned,
+        })
+    return out
+
+
 @router.get("/workshop")
 async def workshop_feed(request: Request, payload: dict = Depends(require_auth)):
     store = _store(request)
@@ -202,57 +262,32 @@ async def workshop_feed(request: Request, payload: dict = Depends(require_auth))
 
     out: list[dict] = []
     for follow in follows:
-        gateways = [follow["gateway_url"]] if follow.get("gateway_url") else []
-        client = PubClient(store=store, identity=None, gateways=gateways)
-
-        try:
-            entries = await client.resolve(follow["pub"])
-        except PubError as exc:
-            logger.warning("pub-workshop: resolve failed for %s: %s", _b64url(follow["pub"]), exc)
-            continue
-
-        for entry in entries:
-            raw = await store.get_announce(entry.announce)
-            if raw is None and client.online:
-                raw = await client._gateway_get(f"announce/{_b64url(entry.announce)}")
-            if raw is None:
-                continue
-            try:
-                announce = PubAnnounce.from_cbor(raw)
-                announce.verify(expected_id=entry.announce)
-            except PubError as exc:
-                logger.warning("pub-workshop: invalid announce %s: %s", _b64url(entry.announce), exc)
-                continue
-
-            artifact = extract_artifact(announce.meta)
-            if artifact is None:
-                # Not a CAD/artifact announce (§23) — not a Workshop listing.
-                continue
-
-            avail = await store.get_availability(entry.announce)
-            out.append({
-                "announce_id": _b64url(entry.announce),
-                "pub": _b64url(announce.pub),
-                "meta": {
-                    "name": artifact.name,
-                    "description": artifact.description,
-                    "artifact_kind": artifact.artifact_kind,
-                    "license": artifact.license,
-                    "units": {
-                        "length_unit": artifact.units.length_unit,
-                        "angle_unit": artifact.units.angle_unit,
-                        "mass_unit": artifact.units.mass_unit,
-                    },
-                    "tags": artifact.tags or [],
-                },
-                "roots": [_b64url(r) for r in announce.roots],
-                "ts": announce.ts,
-                "supersedes": _b64url(announce.supersedes) if announce.supersedes else None,
-                "availability": _availability_out(avail, now_ms),
-                "pinned": avail.local_pinned,
-            })
-
+        out.extend(await _resolve_follow_listings(store, follow, now_ms))
     return out
+
+
+# ---------------------------------------------------------------------------
+# POST /api/pub/follows/{pub}/refresh
+# ---------------------------------------------------------------------------
+#
+# A targeted re-crawl of exactly ONE followed feed — the "light up without
+# re-crawl polling" half of Wake (:mod:`kerf_pub.wake`, substrate capability
+# ⑤): a browser Service Worker that receives a content-free WakePing for this
+# feed calls this instead of waiting for the next full ``GET /workshop`` pass
+# over every follow. Pull remains authoritative either way (DMTAP: "push is a
+# latency optimization, not delivery") — this endpoint does the exact same
+# verified resolve+chain-walk as ``GET /workshop``, just scoped to one `pub`.
+
+
+@router.post("/follows/{pub}/refresh")
+async def refresh_follow(pub: str, request: Request, payload: dict = Depends(require_auth)):
+    pub_bytes = _b64url_decode(pub)
+    store = _store(request)
+    follows = await store.list_follows()
+    follow = next((f for f in follows if f["pub"] == pub_bytes), None)
+    if follow is None:
+        raise HTTPException(status_code=404, detail="not following this feed")
+    return await _resolve_follow_listings(store, follow, _now_ms())
 
 
 # ---------------------------------------------------------------------------
@@ -298,6 +333,24 @@ class PublishRequest(BaseModel):
     project_id: str
     metadata: PublishMetadata
     children: Optional[list[AssemblyChildIn]] = None
+
+
+async def _notify_wake_subscribers(store: PubStore, pub: bytes) -> None:
+    """Best-effort Wake fan-out (:mod:`kerf_pub.wake`, substrate capability
+    ⑤) after a new revision lands on OUR OWN feed. Fail-safe off (a no-op
+    when this node has no VAPID keypair configured) and never raises — a dead
+    push endpoint or a misconfigured node must never fail the publish that
+    triggered it; the Workshop's pull-only re-crawl remains authoritative
+    regardless of whether any wake was sent."""
+    config = default_wake_config()
+    if config is None:
+        return
+    try:
+        rows = await store.list_wake_subscriptions(pub)
+        subs = [PushSubscription(endpoint=r["endpoint"], p256dh=r["p256dh"], auth=r["auth"]) for r in rows]
+        await notify_subscribers(subs, config)
+    except Exception:
+        logger.warning("kerf-pub: wake fan-out failed after publish", exc_info=True)
 
 
 async def _project_and_role(pid: str, user_id: str) -> tuple[dict, str]:
@@ -489,6 +542,7 @@ async def publish(request: Request, body: PublishRequest, payload: dict = Depend
         except PubError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
 
+        await _notify_wake_subscribers(store, identity.pub)
         return {"announce_id": _b64url(announce_id)}
 
     files = await _collect_project_files(body.project_id)
@@ -532,6 +586,7 @@ async def publish(request: Request, body: PublishRequest, payload: dict = Depend
     except PubError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
+    await _notify_wake_subscribers(store, identity.pub)
     return {"announce_id": _b64url(announce_id)}
 
 

@@ -123,6 +123,48 @@ independent holders' choices. If keeping something around matters to you,
 **pin** it: pinning is the only thing that turns "available because someone
 happens to be serving it" into "available because you chose to keep it."
 
+## Wake (optional: "new revision" pings)
+
+Following a feed is pull-only today: your client re-crawls a followed
+publisher's feed head to notice a new revision. That stays true no matter
+what — **pull is the source of truth; Wake is only a latency optimization on
+top of it**, exactly the DMTAP posture that "push is a latency optimization,
+not delivery." Nothing below changes what pull already does; it just lets you
+skip waiting for the next poll.
+
+If a publisher's node has Wake configured (self-hostable, off by default —
+see [node-architecture.md](./node-architecture.md#wake--optional-push-never-a-fifth-verb)),
+you can register a **Web Push subscription** for one of their feeds instead of
+polling it:
+
+```
+POST   /.well-known/dmtap-pub/feed/{pub}/subscribe   {endpoint, keys: {p256dh, auth}}
+DELETE /.well-known/dmtap-pub/feed/{pub}/subscribe   {endpoint}
+```
+
+`{p256dh, auth}` is exactly what a browser's `PushManager.subscribe()`
+returns — no kerf-specific client is required to generate them. When that
+publisher next publishes, their node sends your endpoint an **opaque,
+content-free "sync now" ping** — never the artifact, never even the announce
+id or the publisher's identity, just a fresh encrypted token a push service
+can't read either (RFC 8291/8292 Web Push). Your client then does the exact
+same verified pull it always does — either the next full `GET
+/api/pub/workshop` re-crawl, or a **targeted refresh of just that one feed**
+(`POST /api/pub/follows/{pub}/refresh`) so "new revision" can light up in the
+UI without waiting on every other followed feed's poll interval too.
+
+A dead or unreachable subscriber endpoint never affects the publisher's
+`publish` call — wake is fire-and-forget, best-effort, and the publish always
+succeeds regardless of whether any ping was delivered.
+
+**What's implemented today:** the subscription registry, the send path on
+publish, and the single-feed refresh trigger. A minimal "notify me about new
+revisions" toggle in the Workshop UI (the browser-side
+`PushManager.subscribe()` call + wiring it to the subscribe endpoint above) is
+a follow-up — until then, the subscribe/unsubscribe endpoints are reachable
+directly by anything that can make an HTTP request (a script, a browser
+extension, or a future UI control).
+
 ## Publishing over plain HTTPS
 
 Nothing about publishing or following requires a peer-to-peer mesh client.

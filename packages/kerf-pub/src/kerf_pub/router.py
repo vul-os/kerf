@@ -8,16 +8,31 @@ client's job — this gateway is a convenience, not a trust root.
 
 A missing object is a 404 (the holder does not serve it, ``ERR_PUB_NOT_SERVED``
 §22.6.2); a fetcher rotates to another holder.
+
+Also mounts the Wake subscribe/unsubscribe endpoints (:mod:`kerf_pub.wake`,
+substrate capability ⑤) at the bottom of this router. Wake is a kerf-local
+extension, not part of §22.5.1 itself, but it lives on the SAME anonymous
+gateway prefix because it is the same "any node may talk to my node's public
+surface about one of my feeds" relationship as the four §22.5.1 endpoints
+above — a follower node, not this node's own owner, is the caller.
 """
 
 from __future__ import annotations
 
 import base64
+import time
 
 from fastapi import APIRouter, Request, Response, HTTPException
+from pydantic import BaseModel
 
 from . import cbor
 from .store import InMemoryPubStore, PubStore
+from .wake import (
+    MAX_SUBSCRIPTIONS_PER_FEED,
+    PushSubscription,
+    default_wake_config,
+    validate_subscription,
+)
 
 CBOR_MEDIA = "application/cbor"
 _IMMUTABLE = "public, immutable, max-age=31536000"
@@ -99,3 +114,72 @@ async def chunk(h: str, request: Request) -> Response:
         raise HTTPException(status_code=404, detail="chunk not served")
     # Raw plaintext bytes (§22.5.1), self-verifying against h.
     return _immutable(data, h, media="application/octet-stream")
+
+
+# ---------------------------------------------------------------------------
+# Wake subscribe / unsubscribe (kerf-local extension, substrate capability ⑤)
+# ---------------------------------------------------------------------------
+#
+# Anonymous by design — a follower on ANOTHER node has no account or session
+# here, exactly like the four §22.5.1 reads above. The abuse surface of an
+# open "register a URL for me to POST to" endpoint is bounded by: requiring
+# https (kerf_pub.wake.validate_subscription — no SSRF to plaintext-http-only
+# internal services), capping live subscriptions per feed
+# (MAX_SUBSCRIPTIONS_PER_FEED), and the send path itself never carrying
+# content (a malicious subscriber can only make this node waste a POST, never
+# exfiltrate anything — the payload is a random nonce). Fail-safe off: with no
+# VAPID keypair configured, this endpoint refuses every subscription rather
+# than accepting one it can never actually use to send a wake.
+
+
+class SubscribeKeys(BaseModel):
+    p256dh: str
+    auth: str
+
+
+class SubscribeRequest(BaseModel):
+    endpoint: str
+    keys: SubscribeKeys
+
+
+class UnsubscribeRequest(BaseModel):
+    endpoint: str
+
+
+@router.post("/feed/{pub}/subscribe")
+async def subscribe_feed(pub: str, body: SubscribeRequest, request: Request) -> dict:
+    if default_wake_config() is None:
+        raise HTTPException(
+            status_code=503,
+            detail="wake is not configured on this node (no VAPID keypair) — "
+                   "the Workshop's pull-only re-crawl still applies",
+        )
+    pub_bytes = _b64url_decode(pub)
+    if len(pub_bytes) != 32:
+        raise HTTPException(status_code=400, detail="pub must be a 32-byte Ed25519 key (base64url)")
+
+    sub = PushSubscription(endpoint=body.endpoint, p256dh=body.keys.p256dh, auth=body.keys.auth)
+    try:
+        validate_subscription(sub)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    store = _store(request)
+    existing = await store.count_wake_subscriptions(pub_bytes)
+    already_subscribed = any(
+        s["endpoint"] == sub.endpoint for s in await store.list_wake_subscriptions(pub_bytes)
+    )
+    if not already_subscribed and existing >= MAX_SUBSCRIPTIONS_PER_FEED:
+        raise HTTPException(status_code=429, detail="this feed has reached its wake-subscriber cap")
+
+    await store.put_wake_subscription(
+        pub_bytes, sub.endpoint, sub.p256dh, sub.auth, int(time.time() * 1000),
+    )
+    return {"pub": pub, "subscribed": True}
+
+
+@router.delete("/feed/{pub}/subscribe")
+async def unsubscribe_feed(pub: str, body: UnsubscribeRequest, request: Request) -> dict:
+    pub_bytes = _b64url_decode(pub)
+    await _store(request).delete_wake_subscription(pub_bytes, body.endpoint)
+    return {"pub": pub, "subscribed": False}

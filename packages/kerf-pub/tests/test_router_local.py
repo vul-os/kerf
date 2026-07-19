@@ -32,6 +32,7 @@ from kerf_pub.objects import (
     ArtifactFormat, ArtifactMetadata, FMT_NATIVE, KIND_PART, ROLE_CANONICAL, Units,
 )
 from kerf_pub.router_local import router as local_router
+from kerf_pub import wake
 
 
 def _b64(b: bytes) -> str:
@@ -181,6 +182,75 @@ class TestWorkshopFeed:
         r = tc.get("/api/pub/workshop")
         assert r.status_code == 200
         assert r.json() == []
+
+
+# ---------------------------------------------------------------------------
+# single-feed refresh (the "light up without re-crawl polling" half of Wake,
+# kerf_pub.wake — a Wake ping's receiver calls this instead of the full
+# GET /workshop re-crawl over every follow)
+# ---------------------------------------------------------------------------
+
+class TestFollowRefresh:
+    def test_refresh_one_followed_feed_returns_same_listing_as_workshop(self):
+        store = InMemoryPubStore()
+        publisher = Identity.generate()
+        client = PubClient(store=store, identity=publisher)
+        artifact = ArtifactMetadata(
+            name="Bracket", description="A simple bracket", artifact_kind=KIND_PART,
+            formats=[ArtifactFormat(format_id=FMT_NATIVE, manifest_root=mhash(b"placeholder"), role=ROLE_CANONICAL)],
+            units=Units(length_unit="mm"), license="MIT", tags=["bracket"],
+        )
+        aid = asyncio.run(client.publish({"part.native": b"geometry bytes"}, artifact))
+
+        follow_pub_b64 = _b64(publisher.pub)
+        tc = _app(store)
+        tc.post("/api/pub/follows", json={"pub": follow_pub_b64, "label": "Publisher", "gateway_url": ""})
+
+        r = tc.post(f"/api/pub/follows/{follow_pub_b64}/refresh")
+        assert r.status_code == 200
+        rows = r.json()
+        assert len(rows) == 1
+        assert rows[0]["announce_id"] == _b64(aid)
+        assert rows[0]["pub"] == follow_pub_b64
+
+        # Matches what a full workshop re-crawl would have returned.
+        assert tc.get("/api/pub/workshop").json() == rows
+
+    def test_refresh_unknown_follow_is_404(self):
+        tc = _app(InMemoryPubStore())
+        unknown = _b64(Identity.generate().pub)
+        r = tc.post(f"/api/pub/follows/{unknown}/refresh")
+        assert r.status_code == 404
+
+    def test_refresh_one_follow_does_not_touch_other_follows(self):
+        store = InMemoryPubStore()
+        a, b = Identity.generate(), Identity.generate()
+        asyncio.run(PubClient(store=store, identity=a).publish(
+            {"a.native": b"a-bytes"},
+            ArtifactMetadata(
+                name="A", description="d", artifact_kind=KIND_PART,
+                formats=[ArtifactFormat(format_id=FMT_NATIVE, manifest_root=mhash(b"x"), role=ROLE_CANONICAL)],
+                units=Units(length_unit="mm"), license="MIT",
+            ),
+        ))
+        asyncio.run(PubClient(store=store, identity=b).publish(
+            {"b.native": b"b-bytes"},
+            ArtifactMetadata(
+                name="B", description="d", artifact_kind=KIND_PART,
+                formats=[ArtifactFormat(format_id=FMT_NATIVE, manifest_root=mhash(b"y"), role=ROLE_CANONICAL)],
+                units=Units(length_unit="mm"), license="MIT",
+            ),
+        ))
+
+        tc = _app(store)
+        a_b64, b_b64 = _b64(a.pub), _b64(b.pub)
+        tc.post("/api/pub/follows", json={"pub": a_b64, "label": "", "gateway_url": ""})
+        tc.post("/api/pub/follows", json={"pub": b_b64, "label": "", "gateway_url": ""})
+
+        r = tc.post(f"/api/pub/follows/{a_b64}/refresh")
+        rows = r.json()
+        assert len(rows) == 1
+        assert rows[0]["meta"]["name"] == "A"
 
 
 # ---------------------------------------------------------------------------
@@ -558,3 +628,130 @@ class TestPublish:
             headers=_auth_headers(data["user_id"]),
         )
         assert r.status_code == 400
+
+
+# ===========================================================================
+# publish -> Wake fan-out (kerf_pub.wake, substrate capability ⑤)
+# ===========================================================================
+#
+# End-to-end through the REAL authenticated /api/pub/publish endpoint (same
+# Postgres-backed fixtures as TestPublish above) — proves the wiring in
+# router_local.publish() actually calls kerf_pub.wake.notify_subscribers with
+# this node's own identity.pub after a successful publish, and that it stays
+# a true no-op (no network attempted) when wake is unconfigured.
+
+# A fixed, well-formed (but otherwise arbitrary) P-256 public key + 16-byte
+# auth secret — seal_wake_token() validates shape/curve-membership before
+# these tests' fake_poster is ever reached, so they must be real, not
+# placeholder strings.
+_VALID_P256DH = (
+    "BHFgUSRtgLtXUfMlbeeCyOMgNytHDaGNolLkMMXoF9PsWHcfQRdyf3yPswY5LuWk-bGD8Gb9ROmG6TvunfLF9Do"
+)
+_VALID_AUTH = "7N0ORC00UpcVLQzabxpXeA"
+
+
+class TestPublishWake:
+    def test_publish_triggers_wake_when_subscribed_and_configured(
+        self, publish_client: TestClient, tmp_path, monkeypatch,
+    ):
+        monkeypatch.setenv("KERF_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv(wake.ENV_VAPID_PRIVATE_KEY, wake.generate_vapid_private_key_b64())
+        monkeypatch.setenv(wake.ENV_VAPID_SUBJECT, "mailto:ops@example.com")
+
+        identity = Identity.load_or_create()
+        store: InMemoryPubStore = publish_client.app.state.pub_store
+        asyncio.run(store.put_wake_subscription(
+            identity.pub, "https://push.example.net/ep/subscriber-1",
+            _VALID_P256DH, _VALID_AUTH, 1,
+        ))
+
+        calls: list[str] = []
+
+        def fake_poster(url, headers, body):
+            calls.append(url)
+            return True
+
+        monkeypatch.setattr(wake, "_http_post", fake_poster)
+
+        data = _get_fixture_data()
+        r = publish_client.post(
+            "/api/pub/publish",
+            json={
+                "project_id": data["project_id"],
+                "metadata": {
+                    "name": "Wake Bracket", "description": "d", "artifact_kind": "part",
+                    "license": "MIT", "units": {"length_unit": "mm"},
+                },
+            },
+            headers=_auth_headers(data["user_id"]),
+        )
+        assert r.status_code == 200, r.text
+        assert calls == ["https://push.example.net/ep/subscriber-1"]
+
+    def test_publish_skips_wake_silently_when_unconfigured(
+        self, publish_client: TestClient, tmp_path, monkeypatch,
+    ):
+        monkeypatch.setenv("KERF_DATA_DIR", str(tmp_path))
+        monkeypatch.delenv(wake.ENV_VAPID_PRIVATE_KEY, raising=False)
+        monkeypatch.delenv(wake.ENV_VAPID_SUBJECT, raising=False)
+
+        identity = Identity.load_or_create()
+        store: InMemoryPubStore = publish_client.app.state.pub_store
+        asyncio.run(store.put_wake_subscription(
+            identity.pub, "https://push.example.net/ep/subscriber-2",
+            _VALID_P256DH, _VALID_AUTH, 1,
+        ))
+
+        calls: list[str] = []
+        monkeypatch.setattr(wake, "_http_post", lambda url, headers, body: calls.append(url) or True)
+
+        data = _get_fixture_data()
+        r = publish_client.post(
+            "/api/pub/publish",
+            json={
+                "project_id": data["project_id"],
+                "metadata": {
+                    "name": "Quiet Bracket", "description": "d", "artifact_kind": "part",
+                    "license": "MIT", "units": {"length_unit": "mm"},
+                },
+            },
+            headers=_auth_headers(data["user_id"]),
+        )
+        assert r.status_code == 200, r.text
+        assert calls == []  # no VAPID keys configured -> zero network attempts
+
+    def test_publish_survives_a_dead_wake_endpoint(
+        self, publish_client: TestClient, tmp_path, monkeypatch,
+    ):
+        """A publish must succeed even if every registered wake subscriber is
+        unreachable — wake is a best-effort latency optimization, never a
+        publish precondition (ROLES.md §8)."""
+        monkeypatch.setenv("KERF_DATA_DIR", str(tmp_path))
+        monkeypatch.setenv(wake.ENV_VAPID_PRIVATE_KEY, wake.generate_vapid_private_key_b64())
+        monkeypatch.setenv(wake.ENV_VAPID_SUBJECT, "mailto:ops@example.com")
+
+        identity = Identity.load_or_create()
+        store: InMemoryPubStore = publish_client.app.state.pub_store
+        asyncio.run(store.put_wake_subscription(
+            identity.pub, "https://push.example.net/ep/dead",
+            _VALID_P256DH, _VALID_AUTH, 1,
+        ))
+
+        def raising_poster(url, headers, body):
+            raise ConnectionError("simulated push-service outage")
+
+        monkeypatch.setattr(wake, "_http_post", raising_poster)
+
+        data = _get_fixture_data()
+        r = publish_client.post(
+            "/api/pub/publish",
+            json={
+                "project_id": data["project_id"],
+                "metadata": {
+                    "name": "Resilient Bracket", "description": "d", "artifact_kind": "part",
+                    "license": "MIT", "units": {"length_unit": "mm"},
+                },
+            },
+            headers=_auth_headers(data["user_id"]),
+        )
+        assert r.status_code == 200, r.text

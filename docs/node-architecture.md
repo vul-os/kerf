@@ -45,7 +45,10 @@ explicit, opt-in acts:
 - you click **Publish** on a project (§22.7's explicit-publish-act rule — see
   [distributed-workshop.md](./distributed-workshop.md)),
 - you follow a workshop feed or fetch a part someone else published,
-- you configure S3/R2 storage, GitHub sync, or a public-facing bind address.
+- you configure S3/R2 storage, GitHub sync, or a public-facing bind address,
+- you configure a **Wake** VAPID keypair and a follower registers a push
+  subscription against one of your feeds (see below) — off by default, and
+  even when configured it never carries any content, only an opaque ping.
 
 Every one of these is a deliberate action taken through the UI or config
 file — none of them happen by default, and none of them happen silently.
@@ -66,6 +69,39 @@ These four verbs are the entire product-facing surface. There is no
 "upload to a server" step distinct from `publish`, and no "download" step
 distinct from `fetch` — a workshop is just the set of feeds you `follow`,
 and durability is just what you choose to `pin`.
+
+## Wake — optional push, never a fifth verb
+
+The Workshop is **pull-only by design**: `follow` re-crawls a feed's head to
+notice a new revision, and that re-crawl is always correct on its own — DMTAP's
+posture is "push is a latency optimization, not delivery." **Wake**
+(`kerf_pub.wake`, substrate capability ⑤ — see the shared substrate spec's
+`ROLES.md` §8) is an optional, self-hostable way to skip waiting for the next
+poll, layered strictly on top of `follow`/`fetch`, never a replacement for
+either:
+
+1. A follower registers a **Web Push subscription** (an endpoint + P-256
+   public key + auth secret — the exact object a browser's
+   `PushManager.subscribe()` returns) against a feed it follows:
+   `POST /.well-known/dmtap-pub/feed/{pub}/subscribe` on the feed **author's**
+   node (mirrored by `DELETE .../subscribe` to unsubscribe).
+2. When that author calls `publish`, the node sends every registered
+   subscriber a **content-free "sync now" ping** — RFC 8291/8292 Web Push, an
+   opaque encrypted token and nothing else: no announce id, no artifact name,
+   no author identity.
+3. The receiver still `fetch`/`follow`s over the ordinary gateway HTTP
+   profile to find out what changed — wake only tells it *when* to look, the
+   same "wake-and-fetch, never deliver-in-push" discipline the substrate uses
+   for mailbox delivery.
+
+**Fail-safe off.** A node only sends or accepts a wake once its operator sets
+`KERF_PUB_VAPID_PRIVATE_KEY` + `KERF_PUB_VAPID_SUBJECT` (a fresh keypair per
+node, generated once via `kerf_pub.wake.generate_vapid_private_key_b64()`).
+With no VAPID keypair configured, the subscribe endpoint refuses new
+subscriptions and `publish` skips the notify step entirely — the Workshop
+behaves exactly as it does today. See
+[distributed-workshop.md](./distributed-workshop.md#wake-optional-new-revision-pings)
+for the follower-facing view.
 
 ## Why DMTAP-PUB
 

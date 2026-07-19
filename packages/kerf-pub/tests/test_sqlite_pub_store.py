@@ -72,3 +72,31 @@ async def test_feed_seq_and_watermark(sqlite_pool):
 
     await store.set_accepted_seq(b"pub", 5)
     assert await store.get_accepted_seq(b"pub") == 5
+
+
+async def test_wake_subscriptions(sqlite_pool):
+    """kerf_pub.wake's subscription registry (migration 0016) round-trips on
+    the embedded SQLite backend exactly like the Postgres baseline."""
+    store = PostgresPubStore(sqlite_pool)
+    pub = b"\x01" * 32
+
+    assert await store.count_wake_subscriptions(pub) == 0
+
+    await store.put_wake_subscription(pub, "https://a.example/ep1", "p256dh-a", "auth-a", 100)
+    await store.put_wake_subscription(pub, "https://b.example/ep2", "p256dh-b", "auth-b", 200)
+    assert await store.count_wake_subscriptions(pub) == 2
+
+    rows = await store.list_wake_subscriptions(pub)
+    assert [r["endpoint"] for r in rows] == ["https://a.example/ep1", "https://b.example/ep2"]
+    assert rows[0]["pub"] == pub
+
+    # upsert on re-subscribe (same endpoint, new keys)
+    await store.put_wake_subscription(pub, "https://a.example/ep1", "p256dh-a-new", "auth-a-new", 150)
+    rows = await store.list_wake_subscriptions(pub)
+    assert len(rows) == 2
+    assert next(r for r in rows if r["endpoint"] == "https://a.example/ep1")["p256dh"] == "p256dh-a-new"
+
+    await store.delete_wake_subscription(pub, "https://a.example/ep1")
+    rows = await store.list_wake_subscriptions(pub)
+    assert len(rows) == 1
+    assert rows[0]["endpoint"] == "https://b.example/ep2"

@@ -6,7 +6,7 @@
 
 **A complete, free, open-source CAD that runs entirely on your machine.**
 
-Parametric sketching &amp; modeling · drawings · FEM/CFD · CAM · electronics · slicing · rendering — across 37 engineering domains, with an LLM that edits the underlying source for you. Browse and publish parts on a **distributed Workshop** with no accounts and no central server.
+Parametric sketching &amp; modeling across five geometry kernels · drawings · FEM/CFD · CAM · electronics · slicing · rendering — across 22 engineering domains, with an LLM that edits the underlying source for you. Browse and publish parts on a **distributed Workshop** with no accounts and no central server.
 
 <sub><img src="docs/assets/vulos-logo.png" height="14" alt="VulOS"> Part of <strong><a href="https://vulos.org">VulOS</a></strong> — the open, self-hostable web OS &amp; app suite. Runs standalone, or as an app hosted by the Vulos OS.</sub>
 
@@ -26,24 +26,64 @@ Parametric sketching &amp; modeling · drawings · FEM/CFD · CAM · electronics
 
 ## What is Kerf?
 
-Kerf is a complete CAD system — sketcher, B-rep modeling kernel, drawings, assemblies, FEM/CFD, CAM, electronics/PCB, BIM, and manufacturing prep across 37 engineering domains — that installs and runs entirely on your own machine, MIT-licensed, with no account required. Every design lives in plain files (JSCAD, `.feature` JSON, `.circuit.tsx`, `.sketch`, `.drawing`) so an LLM chat panel can read, diff, and edit your project directly instead of guessing at pixels. When you want to share a part, publish it to the **Workshop** — a distributed catalog of parts built on the open **DMTAP-PUB** protocol: signed, content-addressed, no accounts, no central server, and still browsable offline once pinned.
+Kerf is a complete CAD system — sketcher, five geometry kernels, drawings, assemblies, FEM/CFD, CAM, electronics/PCB, BIM, and manufacturing prep across 22 engineering domains — that installs and runs entirely on your own machine, MIT-licensed, with no account required. Every design lives in plain files (JSCAD, `.feature` JSON, `.circuit.tsx`, `.sketch`, `.drawing`) so an LLM chat panel can read, diff, and edit your project directly instead of guessing at pixels. When you want to share a part, publish it to the **Workshop** — a distributed catalog of parts built on the open **DMTAP-PUB** protocol: signed, content-addressed, no accounts, no central server, and still browsable offline once pinned.
 
 ## Features
 
-- **Two real kernels** — JSCAD for fast iteration; OpenCascade B-rep (`.feature` files) for fillets, shells, and lossless STEP export. Pick per file.
-- **2D parametric sketcher** — planegcs (FreeCAD's constraint solver, compiled to WASM), BREP face/edge picking, live length/angle dimensions.
-- **Feature-tree modeling** — Pad / Pocket / Revolve / Fillet / Chamfer / Shell / Hole / Patterns / Sweep / Loft / NURBS surfacing with G3 continuity.
-- **Drawings** — multi-sheet, GD&T, hatching, leaders, balloons, title blocks.
-- **Assemblies** — 3D mates (coincident / concentric / distance / angle / tangent), tolerance stack-up (worst-case / RSS / Monte Carlo).
-- **Electronics** — tscircuit JSX → schematic + PCB + 3D board viewer, SPICE simulation, RF s-parameters, autoroute.
-- **FEM + CFD** — linear/modal/nonlinear FEM, buckling, fatigue, thermal, explicit dynamics; k-ω SST CFD via OpenFOAM.
-- **CAM + manufacturing** — 2.5D/3D/lathe toolpaths and G-code posts, sheet metal, mold core/cavity split, 3D-print slicing.
-- **BIM** — walls, slabs, doors, windows, schedules, IFC4 round-trip.
-- **37 engineering domains** in one workspace — aerospace, silicon/IC, firmware, PLC, composites, dental, optics, jewelry, marine, civil, and more. See [`/domains`](https://kerf.sh/domains) for the full list.
-- **Chat-driven editing** — an LLM reads and edits your project's source files directly; every change is a diffable, reviewable commit.
-- **File revisions + git** — per-file undo history, commits, branches, and GitHub sync, all stored on your own node.
-- **Distributed Workshop** — publish and browse parts over DMTAP-PUB (§22/§23 of [`github.com/vul-os/dmtap`](https://github.com/vul-os/dmtap)): signed, content-addressed, no accounts, no central server. See [How it works](#how-it-works).
-- **Local-first** — no telemetry, no phone-home. With nothing configured, Kerf never opens a socket.
+### Kernels &amp; geometry
+
+Most CAD tools give you one kernel. Kerf gives you five, picked per file and mixed in one assembly:
+
+| Kernel | What it's for |
+|---|---|
+| **JSCAD (CSG)** | Fast boolean iteration, programmatic parts |
+| **OpenCascade B-rep** (`.feature` JSON, via `pythonocc-core`) | Fillets, shells, lossless STEP/IGES export |
+| **Analytic NURBS** | Curve/surface fit, boolean, G0–G3 continuity checking + curvature-comb visualization for Class-A surfacing |
+| **Catmull-Clark SubD** | Stam-limit evaluation, creases, quad-cage editing for organic forms |
+| **SDF / F-rep** | Smooth-min CSG, Lorensen–Cline marching cubes, TPMS lattices for generative geometry |
+
+Plus: a 2D parametric sketcher (planegcs — FreeCAD's constraint solver, compiled to WASM), a full feature tree (Pad / Pocket / Revolve / Fillet / Chamfer / Shell / Hole / Patterns / Sweep / Loft), multi-sheet drawings with GD&amp;T, and 3D assembly mates with tolerance stack-up (worst-case / RSS / Monte Carlo).
+
+### Simulation
+
+In-house solvers where it counts, and honest bridges to production tools where that's the right call:
+
+- **FEM** — linear/modal/nonlinear/buckling/fatigue/thermal/explicit dynamics, contact, and plasticity (J2, Drucker–Prager, Hill) run in-house. An optional [CalculiX bridge](./docs/fem-calculix-bridge.md) generates production-grade 3D solid FEA decks (tet/hex elements) and parses results back.
+- **CFD** — in-house RANS (k-ε, k-ω SST), compressible, VOF, and combustion solvers. An optional [OpenFOAM bridge](./docs/cfd-openfoam.md) generates complete, runnable case directories (simpleFoam / buoyantSimpleFoam / interFoam).
+- **Topology optimization** — SIMP via a FEniCSx bridge.
+- **Motion** — in-house multibody dynamics: joints, forces, inverse kinematics and dynamics.
+- **Optics** — in-house paraxial ABCD lens design + physical-optics propagation.
+- **1D systems** — in-house Modelica-class DAE solver and component library.
+
+### Electronics
+
+tscircuit JSX → schematic + PCB + 3D board viewer. SPICE simulation via a native `ngspice` subprocess, RF s-parameters, autoroute via a FreeRouting bridge, plus signal/power integrity (EMC, SI, PDN) and multi-board harness tools.
+
+### Manufacturing
+
+2.5D/3D/lathe/wire-EDM CAM toolpaths with Fanuc G-code posts, sheet metal, mold core/cavity splitting, nesting, GD&amp;T (ASME Y14.5) callouts, and 3D-print slicing via a CuraEngine bridge.
+
+### BIM &amp; AEC
+
+Walls, slabs, doors, windows, MEP families, schedules, and IFC round-trip; civil alignment/corridor/earthwork; structural RC/steel + rebar design; HVAC duct fabrication; material quantity takeoff and cost rollup.
+
+### Domains
+
+**22 dedicated engineering domains** — jewelry, mechanical, electronics, architecture, automotive, civil, composites, dental, optics, horology, piping, packaging, mold, woodworking, marine, silicon, firmware, aerospace, PLC, motion, FEM/CFD, textiles — each with its own workspace at [`/domains`](https://kerf.sh/domains). Under the hood, 58 Python plugins reach further still: apparel, energy, entertainment, LCA, microfluidics, PLM, wiring, and more.
+
+Measured against the industry, not just described: a public [feature-comparison matrix](https://kerf.sh/compare) tracks 1,397 features across 57 CAD/BIM/EDA packages — SolidWorks, Revit, Altium, KiCad, Rhino, and more.
+
+### Chat-driven editing
+
+An LLM reads and edits your project's source files directly — through a registry of 3,000+ purpose-built tools spanning every plugin. It searches an embedded docs corpus before acting, then edits like a fast, literal collaborator. Every change is a diffable, reviewable commit.
+
+### Distributed Workshop
+
+Publish and browse parts over DMTAP-PUB (§22/§23 of [`github.com/vul-os/dmtap`](https://github.com/vul-os/dmtap)): signed, content-addressed, no accounts, no central server. See [How it works](#how-it-works).
+
+### Your data
+
+File revisions (per-file undo history) + local git (commits, branches, GitHub sync), all stored on your own node. MIT licensed. No telemetry, no phone-home — with nothing configured, Kerf never opens a socket.
 
 ## Screenshots
 

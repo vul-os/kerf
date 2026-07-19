@@ -4,7 +4,7 @@
 // tests, no React needed.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { pub } from '../api.js'
+import { pub, wake } from '../api.js'
 
 describe('pub API client — matches the /api/pub contract', () => {
   let calls
@@ -133,5 +133,46 @@ describe('pub API client — matches the /api/pub contract', () => {
     const api = await import('../api.js')
     expect(api.workshop).toBeUndefined()
     expect(api.githubOAuth).toBeUndefined()
+  })
+})
+
+describe('wake API client — matches the anonymous .well-known/dmtap-pub/* wake contract', () => {
+  let calls
+  beforeEach(() => {
+    calls = []
+    global.fetch = vi.fn(async (url, opts) => {
+      calls.push({ url: String(url).replace(/^https?:\/\/[^/]+/, ''), ...opts })
+      return { ok: true, status: 200, json: async () => ({ public_key: 'fake-key' }) }
+    })
+  })
+  afterEach(() => {
+    delete global.fetch
+  })
+
+  it('getKey: GET /.well-known/dmtap-pub/wake-key', async () => {
+    const res = await wake.getKey()
+    expect(calls[0].url).toBe('/.well-known/dmtap-pub/wake-key')
+    expect(calls[0].method ?? 'GET').toBe('GET')
+    expect(res).toEqual({ public_key: 'fake-key' })
+  })
+
+  it('subscribe: POST /.well-known/dmtap-pub/feed/:pub/subscribe {endpoint, keys}', async () => {
+    await wake.subscribe('ed25519:abc', {
+      endpoint: 'https://push.example.net/ep/1',
+      keys: { p256dh: 'p256dh-value', auth: 'auth-value' },
+    })
+    expect(calls[0].url).toBe('/.well-known/dmtap-pub/feed/ed25519%3Aabc/subscribe')
+    expect(calls[0].method).toBe('POST')
+    expect(JSON.parse(calls[0].body)).toEqual({
+      endpoint: 'https://push.example.net/ep/1',
+      keys: { p256dh: 'p256dh-value', auth: 'auth-value' },
+    })
+  })
+
+  it('unsubscribe: DELETE /.well-known/dmtap-pub/feed/:pub/subscribe {endpoint}', async () => {
+    await wake.unsubscribe('ed25519:abc', 'https://push.example.net/ep/1')
+    expect(calls[0].url).toBe('/.well-known/dmtap-pub/feed/ed25519%3Aabc/subscribe')
+    expect(calls[0].method).toBe('DELETE')
+    expect(JSON.parse(calls[0].body)).toEqual({ endpoint: 'https://push.example.net/ep/1' })
   })
 })

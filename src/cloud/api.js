@@ -190,6 +190,43 @@ export const pub = {
   },
 }
 
+// ---- Wake (optional push, docs/distributed-workshop.md's "Wake" section) ----
+// The three endpoints below live on the anonymous DMTAP-PUB gateway prefix
+// (kerf_pub.router), not under /api — same origin as this frontend for a
+// follow with no gateway_url (or one pointing back at this node), which is
+// the only case the v1 "Notify me" toggle supports (see src/lib/wake.js).
+// `request()`'s auth:false just skips attaching a Bearer header; these
+// endpoints don't check it either way.
+export const wake = {
+  // GET /.well-known/dmtap-pub/wake-key -> { public_key } when this node has
+  // a VAPID keypair configured, or throws ApiError(503) when it doesn't
+  // (kerf_pub.wake's fail-safe-off posture). Never throws for "not
+  // configured" to the caller — see src/lib/wake.js's getWakeKeyInfo().
+  getKey() {
+    return request('/.well-known/dmtap-pub/wake-key', { auth: false })
+  },
+
+  // POST /.well-known/dmtap-pub/feed/:pub/subscribe {endpoint, keys} — the
+  // exact object browser's PushManager.subscribe() returns, JSON-serialized
+  // (subscription.toJSON()).
+  subscribe(pubKey, subscription) {
+    return request(`/.well-known/dmtap-pub/feed/${encodeURIComponent(pubKey)}/subscribe`, {
+      method: 'POST',
+      auth: false,
+      body: { endpoint: subscription.endpoint, keys: subscription.keys },
+    })
+  },
+
+  // DELETE /.well-known/dmtap-pub/feed/:pub/subscribe {endpoint}
+  unsubscribe(pubKey, endpoint) {
+    return request(`/.well-known/dmtap-pub/feed/${encodeURIComponent(pubKey)}/subscribe`, {
+      method: 'DELETE',
+      auth: false,
+      body: { endpoint },
+    })
+  },
+}
+
 // ---- Library ----
 // Canonical home for the parts catalog. The Library is the discovery
 // surface for individual Parts (M3 screws, 555 timers, etc.) — distinct

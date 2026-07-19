@@ -56,6 +56,7 @@ export default defineConfig(({ mode }) => {
         [
           '/api',
           '/auth',
+          '/.well-known/dmtap-pub',
           '/compile-ifc',
           '/compile-bim',
           '/import-ifc',

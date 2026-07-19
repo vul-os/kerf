@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  AlertTriangle, CheckCircle2, CircleDot, ListTree, Loader2, Pin, PinOff,
+  AlertTriangle, Bell, BellOff, CheckCircle2, CircleDot, ListTree, Loader2, Pin, PinOff,
   Plus, Radio, RefreshCw, Sparkles, Tag, Trash2, Users, WifiOff,
 } from 'lucide-react'
 import Layout from '../components/Layout.jsx'
@@ -24,6 +24,11 @@ import Button from '../components/Button.jsx'
 import Input from '../components/Input.jsx'
 import Modal from '../components/Modal.jsx'
 import { ApiError } from '../lib/api.js'
+import {
+  disableWakeNotifications, enableWakeNotifications, getWakeKeyInfo,
+  isWakeBrowserSupported, isWakeUsableForFollow, onWakeMessage, syncWakeStateOnChange,
+} from '../lib/wake.js'
+import { useWake } from '../store/wake.js'
 import { pub } from './api.js'
 
 const KIND_LABELS = {
@@ -416,7 +421,47 @@ export function BrowseEmptyState({ hasFollows, onGoToFeeds }) {
   )
 }
 
-export function FollowsPanel({ follows, loading, error, onAdd, onRemove }) {
+// WakeToggle — per-follow "Notify me" control (docs/distributed-workshop.md's
+// "Wake" section). Pure/prop-driven like WorkshopCard's pin toggle: all the
+// browser feature-detection and PushManager orchestration lives in
+// src/lib/wake.js and is decided by the caller, not here. Degrades to
+// disabled-with-tooltip — never hidden outright — so a user can always see
+// *why* wake isn't available for this feed (no support in this browser, not
+// configured on this node, or a foreign-node follow v1 doesn't support yet).
+export function WakeToggle({ enabled, disabledReason, busy, onToggle }) {
+  const disabled = !!disabledReason || busy
+  const title = disabledReason || (enabled ? 'Stop notifying me about new revisions' : 'Notify me about new revisions')
+  return (
+    <button
+      type="button"
+      data-testid="wake-toggle"
+      data-wake-enabled={enabled ? 'true' : 'false'}
+      aria-pressed={enabled}
+      title={title}
+      disabled={disabled}
+      onClick={onToggle}
+      className={
+        'p-1.5 rounded shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ' +
+        (enabled
+          ? 'text-kerf-300 hover:bg-kerf-300/10'
+          : 'text-ink-400 hover:bg-ink-800 hover:text-ink-200')
+      }
+    >
+      {busy
+        ? <Loader2 size={14} className="animate-spin" />
+        : enabled ? <Bell size={14} /> : <BellOff size={14} />}
+    </button>
+  )
+}
+
+export function FollowsPanel({
+  follows, loading, error, onAdd, onRemove,
+  wakeInfo = { supported: false, available: false },
+  wakeEnabledPubs = [],
+  wakeBusyPub = null,
+  wakeErrors = {},
+  onToggleWake = () => {},
+}) {
   const [pubKey, setPubKey] = useState('')
   const [label, setLabel] = useState('')
   const [gatewayUrl, setGatewayUrl] = useState('')
@@ -481,36 +526,55 @@ export function FollowsPanel({ follows, loading, error, onAdd, onRemove }) {
         )}
         {!loading && follows.length > 0 && (
           <ul className="flex flex-col gap-2" data-testid="follows-list">
-            {follows.map((f) => (
-              <li key={f.pub}>
-                <Card className="flex items-center gap-3 px-4 py-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm font-medium text-ink-100 truncate">
-                        {f.label || truncatePub(f.pub)}
-                      </span>
+            {follows.map((f) => {
+              let wakeDisabledReason = null
+              if (!wakeInfo.supported) wakeDisabledReason = "Push notifications aren't supported in this browser."
+              else if (!wakeInfo.available) wakeDisabledReason = 'Wake is not configured on this node.'
+              else if (!isWakeUsableForFollow(f)) wakeDisabledReason = "Wake isn't available yet for a feed on a different node."
+              const wakeEnabled = wakeEnabledPubs.includes(f.pub)
+              const wakeError = wakeErrors[f.pub]
+              return (
+                <li key={f.pub}>
+                  <Card className="flex flex-col gap-1.5 px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm font-medium text-ink-100 truncate">
+                            {f.label || truncatePub(f.pub)}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-[11px] font-mono text-ink-500 truncate" title={f.pub}>
+                          {truncatePub(f.pub)}
+                        </p>
+                        {f.gateway_url && (
+                          <p className="text-[11px] text-ink-500 truncate">{f.gateway_url}</p>
+                        )}
+                      </div>
+                      <WakeToggle
+                        enabled={wakeEnabled}
+                        disabledReason={wakeDisabledReason}
+                        busy={wakeBusyPub === f.pub}
+                        onToggle={() => onToggleWake(f)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => remove(f.pub)}
+                        disabled={removing === f.pub}
+                        className="p-1.5 rounded text-red-300 hover:bg-red-500/10 disabled:opacity-40 shrink-0"
+                        title={`Unfollow ${f.label || truncatePub(f.pub)}`}
+                      >
+                        {removing === f.pub
+                          ? <Loader2 size={14} className="animate-spin" />
+                          : <Trash2 size={14} />}
+                      </button>
                     </div>
-                    <p className="mt-0.5 text-[11px] font-mono text-ink-500 truncate" title={f.pub}>
-                      {truncatePub(f.pub)}
-                    </p>
-                    {f.gateway_url && (
-                      <p className="text-[11px] text-ink-500 truncate">{f.gateway_url}</p>
+                    {wakeError && (
+                      <p className="text-[11px] text-red-300" data-testid="wake-error">{wakeError}</p>
                     )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => remove(f.pub)}
-                    disabled={removing === f.pub}
-                    className="p-1.5 rounded text-red-300 hover:bg-red-500/10 disabled:opacity-40 shrink-0"
-                    title={`Unfollow ${f.label || truncatePub(f.pub)}`}
-                  >
-                    {removing === f.pub
-                      ? <Loader2 size={14} className="animate-spin" />
-                      : <Trash2 size={14} />}
-                  </button>
-                </Card>
-              </li>
-            ))}
+                  </Card>
+                </li>
+              )
+            })}
           </ul>
         )}
       </div>
@@ -568,6 +632,16 @@ export function Workshop() {
   const [hydrateBusy, setHydrateBusy] = useState({})
   const [bomItem, setBomItem] = useState(null)
 
+  // Wake ("Notify me") — docs/distributed-workshop.md's Wake section.
+  // wakeInfo is this browser+node's capability, resolved once (it can't
+  // change mid-session); wakeEnabledPubs is which follows have it on
+  // (src/store/wake.js, persisted locally); wakeBusyPub/wakeErrors track the
+  // in-flight toggle and any per-feed error, same shape as pinBusy/pinNotes.
+  const [wakeInfo, setWakeInfo] = useState({ supported: false, available: false })
+  const wakeEnabledPubs = useWake((s) => s.enabledPubs)
+  const [wakeBusyPub, setWakeBusyPub] = useState(null)
+  const [wakeErrors, setWakeErrors] = useState({})
+
   const loadAll = useCallback(() => {
     setLoading(true)
     Promise.all([
@@ -586,6 +660,29 @@ export function Workshop() {
   }, [])
 
   useEffect(() => { loadAll() }, [loadAll])
+
+  // Resolve Wake capability once: browser support + whether this node has a
+  // VAPID keypair configured. Never blocks the rest of the page — a slow or
+  // failed check just leaves every toggle disabled.
+  useEffect(() => {
+    let cancelled = false
+    if (!isWakeBrowserSupported()) return undefined
+    getWakeKeyInfo().then((info) => {
+      if (!cancelled) setWakeInfo({ supported: true, available: info.available })
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  // A push event's service worker handler postMessages open Workshop tabs
+  // (public/sw.js) — refresh immediately instead of waiting for a
+  // notification click.
+  useEffect(() => onWakeMessage(() => loadAll()), [loadAll])
+
+  // Keep the service worker's Cache Storage mirror (src/lib/wakeState.js)
+  // current whenever the enabled-pubs set changes, so a push arriving with
+  // no tab open still has a fresh access token to attempt the targeted
+  // refresh with.
+  useEffect(() => { syncWakeStateOnChange() }, [wakeEnabledPubs])
 
   const followsByPub = useMemo(() => {
     const m = new Map()
@@ -708,6 +805,25 @@ export function Workshop() {
     loadAll()
   }, [loadAll])
 
+  const onToggleWake = useCallback(async (follow) => {
+    const pubKey = follow.pub
+    setWakeBusyPub(pubKey)
+    const alreadyEnabled = wakeEnabledPubs.includes(pubKey)
+    const res = alreadyEnabled
+      ? await disableWakeNotifications(pubKey)
+      : await enableWakeNotifications(pubKey)
+    setWakeErrors((e) => {
+      if (res.ok) {
+        if (!(pubKey in e)) return e
+        const rest = { ...e }
+        delete rest[pubKey]
+        return rest
+      }
+      return { ...e, [pubKey]: res.error }
+    })
+    setWakeBusyPub(null)
+  }, [wakeEnabledPubs])
+
   const list = items || []
   const followsList = follows || []
 
@@ -828,6 +944,11 @@ export function Workshop() {
           error={followsError}
           onAdd={onAddFollow}
           onRemove={onRemoveFollow}
+          wakeInfo={wakeInfo}
+          wakeEnabledPubs={wakeEnabledPubs}
+          wakeBusyPub={wakeBusyPub}
+          wakeErrors={wakeErrors}
+          onToggleWake={onToggleWake}
         />
       )}
 

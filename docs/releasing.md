@@ -130,7 +130,7 @@ The server listens on `:8080`. Set `VITE_API_URL` (or the proxy config in
 
 After the workflow runs:
 
-- **Releases** — <https://github.com/kerf-sh/kerf/releases>
+- **Releases** — <https://github.com/vul-os/kerf/releases>
 - **Packages** — <https://github.com/orgs/kerf-sh/packages>
 
 ## Hotfix releases

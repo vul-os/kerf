@@ -13,7 +13,7 @@ open an issue first so we can align on scope and avoid duplication.
 ## Quick start
 
 ```sh
-git clone https://github.com/kerf-sh/kerf.git
+git clone https://github.com/vul-os/kerf.git
 cd kerf
 
 # Backend (Python 3.11+ required)
@@ -210,4 +210,4 @@ Keep it kind, technical, and on-topic.
   elsewhere in the tree.
 
 Questions? Open a discussion at
-[github.com/kerf-sh/kerf/discussions](https://github.com/kerf-sh/kerf/discussions).
+[github.com/vul-os/kerf/discussions](https://github.com/vul-os/kerf/discussions).

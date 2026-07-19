@@ -44,5 +44,5 @@ jobs:
           body: |
             TypeScript SDK for Kerf — `npm install kerf-sdk`
 
-            See [`packages/kerf-sdk-ts/README.md`](https://github.com/kerf-sh/kerf/tree/main/packages/kerf-sdk-ts) for usage.
+            See [`packages/kerf-sdk-ts/README.md`](https://github.com/vul-os/kerf/tree/main/packages/kerf-sdk-ts) for usage.
           generate_release_notes: true

@@ -25,9 +25,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kerf-sh/kerf.git",
+    "url": "git+https://github.com/vul-os/kerf.git",
     "directory": "packages/kerf-sdk-ts"
   },
-  "homepage": "https://github.com/kerf-sh/kerf/tree/main/packages/kerf-sdk-ts",
+  "homepage": "https://github.com/vul-os/kerf/tree/main/packages/kerf-sdk-ts",
   "keywords": ["kerf", "cad", "sdk"]
 }

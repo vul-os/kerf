@@ -143,5 +143,5 @@ any kind — Kerf is 100% MIT and free to self-host, permanently.
 - **ASTM E1049 rainflow counting** has a known bug in `fatigue_fem.
   _rainflow` (one FEM reference-value test is skipped rather than xfail'd).
 
-[Unreleased]: https://github.com/kerf-sh/kerf/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/kerf-sh/kerf/releases/tag/v0.1.0
+[Unreleased]: https://github.com/vul-os/kerf/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/vul-os/kerf/releases/tag/v0.1.0

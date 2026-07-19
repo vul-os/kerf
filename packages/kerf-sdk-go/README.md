@@ -5,7 +5,7 @@ Go SDK for [Kerf](https://kerf.sh) — the parametric CAD platform.
 ## Install
 
 ```bash
-go get github.com/kerf-sh/kerf-sdk-go
+go get github.com/vul-os/kerf-sdk-go
 ```
 
 Requires Go 1.22+. Zero third-party dependencies — standard library only.
@@ -15,7 +15,7 @@ Requires Go 1.22+. Zero third-party dependencies — standard library only.
 ```go
 import (
     "context"
-    kerf "github.com/kerf-sh/kerf-sdk-go"
+    kerf "github.com/vul-os/kerf-sdk-go"
 )
 
 k, err := kerf.FromEnv()   // reads KERF_API_TOKEN + KERF_API_URL
@@ -91,7 +91,7 @@ Sentinel errors: `kerf.ErrUnauthorized`, `kerf.ErrNotFound`, `kerf.ErrRateLimite
 
 ## Godoc
 
-[pkg.go.dev/github.com/kerf-sh/kerf-sdk-go](https://pkg.go.dev/github.com/kerf-sh/kerf-sdk-go)
+[pkg.go.dev/github.com/vul-os/kerf-sdk-go](https://pkg.go.dev/github.com/vul-os/kerf-sdk-go)
 
 ## License
 

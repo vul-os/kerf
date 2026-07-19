@@ -102,7 +102,7 @@ try {
 
 ## Source
 
-Part of the [Kerf monorepo](https://github.com/kerf-sh/kerf). SDK lives at `packages/kerf-sdk-ts/`.
+Part of the [Kerf monorepo](https://github.com/vul-os/kerf). SDK lives at `packages/kerf-sdk-ts/`.
 
 The Python SDK (`pip install kerf-sdk`) lives at `packages/kerf-sdk/` — both talk to the same `/v1/rpc` endpoint.
 

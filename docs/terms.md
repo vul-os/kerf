@@ -4,7 +4,7 @@
 
 These terms govern your use of the **hosted Kerf service at `kerf.sh`**
 (the "Service"). If you run Kerf locally from the open-source code, the
-[MIT License](https://github.com/kerf-sh/kerf/blob/main/LICENSE) applies
+[MIT License](https://github.com/vul-os/kerf/blob/main/LICENSE) applies
 to that copy and these terms do not.
 
 By creating an account or using the Service, you agree to these terms.
@@ -13,7 +13,7 @@ By creating an account or using the Service, you agree to these terms.
 
 Kerf provides a chat-driven CAD platform — mechanical, electronics,
 drawings, BIM — running on our infrastructure. Kerf is 100% MIT-licensed
-and available at [github.com/kerf-sh/kerf](https://github.com/kerf-sh/kerf).
+and available at [github.com/vul-os/kerf](https://github.com/vul-os/kerf).
 `kerf.sh` runs byte-identical software to what you can self-host; using it
 here is a convenience (rented uptime), not a paid subscription — Kerf has
 no paid product and charges nothing for storage, LLM usage, or compute.
@@ -140,7 +140,7 @@ The South African Consumer Protection Act applies where relevant.
 - **Support**: [support@kerf.sh](mailto:support@kerf.sh)
 - **Privacy**: [privacy@kerf.sh](mailto:privacy@kerf.sh)
 - **Security**: [security@kerf.sh](mailto:security@kerf.sh) (see
-  [SECURITY.md](https://github.com/kerf-sh/kerf/blob/main/SECURITY.md))
+  [SECURITY.md](https://github.com/vul-os/kerf/blob/main/SECURITY.md))
 - **Legal / business**: [hello@kerf.sh](mailto:hello@kerf.sh)
 
 Postal address available on request.

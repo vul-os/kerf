@@ -14,7 +14,7 @@ From a fresh clone to a running Kerf server in about five minutes.
 ## 1. Clone the repo
 
 ```sh
-git clone https://github.com/kerf-sh/kerf
+git clone https://github.com/vul-os/kerf
 cd kerf
 ```
 

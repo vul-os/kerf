@@ -52,7 +52,7 @@ pip install "kerf[full]"          # everything
 ### From source
 
 ```sh
-git clone https://github.com/kerf-sh/kerf
+git clone https://github.com/vul-os/kerf
 cd kerf
 pip install -e .[mech]    # choose your persona
 npm install

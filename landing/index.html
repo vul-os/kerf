@@ -269,7 +269,7 @@ footer.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; }
     <a href="#workshop">workshop</a>
     <a href="#install">install</a>
     <a href="#dev">dev</a>
-    <a href="https://github.com/kerf-sh/kerf" target="_blank" class="gh">
+    <a href="https://github.com/vul-os/kerf" target="_blank" class="gh">
       <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       github
     </a>
@@ -287,7 +287,7 @@ footer.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; }
         <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a.75.75 0 01.75.75v6.69l2.22-2.22a.75.75 0 111.06 1.06l-3.5 3.5a.75.75 0 01-1.06 0l-3.5-3.5a.75.75 0 111.06-1.06l2.22 2.22V1.75A.75.75 0 018 1zM2.75 12.5a.75.75 0 000 1.5h10.5a.75.75 0 000-1.5H2.75z"/></svg>
         download
       </a>
-      <a href="https://github.com/kerf-sh/kerf" target="_blank" class="btn btn-secondary">
+      <a href="https://github.com/vul-os/kerf" target="_blank" class="btn btn-secondary">
         <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
         star on github
       </a>
@@ -418,16 +418,16 @@ footer.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; }
       <div class="install-code"><span class="p">$ </span><span class="cmd">curl</span> -fsSL <span class="str">https://kerf.sh/install.sh</span> | <span class="cmd">sh</span></div>
     </div>
     <p class="install-note">
-      Downloads the latest <a href="https://github.com/kerf-sh/kerf/releases/latest" target="_blank">GitHub release</a>, unpacks it, and sets up a Python venv. Then open <code>http://localhost:8080</code>.
-      Prefer a specific asset? Browse <a href="https://github.com/kerf-sh/kerf/releases" target="_blank">all releases</a> — every tag ships <code>kerf-vX.Y.Z-macos-arm64.tar.gz</code>, <code>-macos-x64.tar.gz</code>, <code>-linux-x64.tar.gz</code>, a universal <code>-src.tar.gz</code>, and a <code>SHA256SUMS</code> manifest.
+      Downloads the latest <a href="https://github.com/vul-os/kerf/releases/latest" target="_blank">GitHub release</a>, unpacks it, and sets up a Python venv. Then open <code>http://localhost:8080</code>.
+      Prefer a specific asset? Browse <a href="https://github.com/vul-os/kerf/releases" target="_blank">all releases</a> — every tag ships <code>kerf-vX.Y.Z-macos-arm64.tar.gz</code>, <code>-macos-x64.tar.gz</code>, <code>-linux-x64.tar.gz</code>, a universal <code>-src.tar.gz</code>, and a <code>SHA256SUMS</code> manifest.
     </p>
 
     <div class="install-box" style="margin-top:1.5rem;">
       <div class="install-header">
         <span>or, docker</span>
-        <button onclick="navigator.clipboard.writeText('git clone https://github.com/kerf-sh/kerf\ncd kerf\ndocker compose up');this.textContent='copied';setTimeout(()=>this.textContent='copy',2000)">copy</button>
+        <button onclick="navigator.clipboard.writeText('git clone https://github.com/vul-os/kerf\ncd kerf\ndocker compose up');this.textContent='copied';setTimeout(()=>this.textContent='copy',2000)">copy</button>
       </div>
-      <div class="install-code"><span class="p">$ </span><span class="cmd">git</span> clone <span class="str">https://github.com/kerf-sh/kerf</span>
+      <div class="install-code"><span class="p">$ </span><span class="cmd">git</span> clone <span class="str">https://github.com/vul-os/kerf</span>
 <span class="p">$ </span><span class="cmd">cd</span> kerf
 <span class="p">$ </span><span class="cmd">docker</span> compose up  <span class="cm"># app + postgres + redis, builds the full persona</span></div>
     </div>
@@ -483,10 +483,10 @@ footer.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; }
         kerf
       </div>
       <div class="footer-links">
-        <a href="https://github.com/kerf-sh/kerf" target="_blank">github</a>
-        <a href="https://github.com/kerf-sh/kerf/blob/main/ROADMAP.md" target="_blank">roadmap</a>
-        <a href="https://github.com/kerf-sh/kerf/issues" target="_blank">issues</a>
-        <a href="https://github.com/kerf-sh/kerf/blob/main/LICENSE" target="_blank">license (MIT)</a>
+        <a href="https://github.com/vul-os/kerf" target="_blank">github</a>
+        <a href="https://github.com/vul-os/kerf/blob/main/ROADMAP.md" target="_blank">roadmap</a>
+        <a href="https://github.com/vul-os/kerf/issues" target="_blank">issues</a>
+        <a href="https://github.com/vul-os/kerf/blob/main/LICENSE" target="_blank">license (MIT)</a>
         <a href="https://vulos.org" target="_blank">vulos.org</a>
       </div>
       <div class="footer-right">made in south africa 🇿🇦</div>

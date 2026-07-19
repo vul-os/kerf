@@ -213,7 +213,7 @@ jobs:
             {
               echo "## [${VERSION}]"
               echo ""
-              echo "See [CHANGELOG.md](https://github.com/kerf-sh/kerf/blob/main/CHANGELOG.md)."
+              echo "See [CHANGELOG.md](https://github.com/vul-os/kerf/blob/main/CHANGELOG.md)."
             } > notes.md
           fi
 

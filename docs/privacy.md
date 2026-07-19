@@ -179,8 +179,8 @@ than posting publicly. We'll credit you in the release notes if you'd like.
 
 ## Open source
 
-Kerf is 100% [MIT licensed](https://github.com/kerf-sh/kerf) and the codebase
-is public on [GitHub](https://github.com/kerf-sh/kerf) — there is no
+Kerf is 100% [MIT licensed](https://github.com/vul-os/kerf) and the codebase
+is public on [GitHub](https://github.com/vul-os/kerf) — there is no
 proprietary sliver and no second secret repo. If you want to know exactly
 what gets logged when, the middleware lives in
 `packages/kerf-core/src/kerf_core/app.py`. If you want to see what context

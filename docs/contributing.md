@@ -7,7 +7,7 @@ there is no proprietary/cloud plugin split (see the "Final form" ADR in
 ## Quickstart
 
 ```sh
-git clone https://github.com/kerf-sh/kerf
+git clone https://github.com/vul-os/kerf
 cd kerf
 
 # Postgres on the default port

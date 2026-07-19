@@ -81,7 +81,7 @@ def _make_spec(**kwargs) -> CorePinSpec:
 
 def _run_tool(args: dict) -> dict:
     """Execute the LLM tool handler synchronously; return parsed JSON."""
-    raw = asyncio.get_event_loop().run_until_complete(
+    raw = asyncio.run(
         run_mold_design_core_pin_cooling(None, json.dumps(args).encode())
     )
     return json.loads(raw)

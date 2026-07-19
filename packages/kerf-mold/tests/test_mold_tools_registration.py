@@ -17,7 +17,7 @@ from kerf_mold.tools import (
 
 
 def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 class _Ctx:
@@ -84,7 +84,7 @@ class TestPluginRegistration:
         async def _go():
             return await register(app, ctx)
 
-        asyncio.get_event_loop().run_until_complete(_go())
+        asyncio.run(_go())
 
         for name in (
             "mold_check_moldability",

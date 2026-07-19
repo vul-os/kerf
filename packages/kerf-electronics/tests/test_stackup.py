@@ -857,7 +857,7 @@ class TestStackupImpedanceBudget:
 class TestToolHandlers:
     def test_microstrip_z0_tool_ok(self, event_loop_policy=None):
         import asyncio
-        r = asyncio.get_event_loop().run_until_complete(
+        r = asyncio.run(
             call(stackup_microstrip_z0_tool, W_mm=0.44, H_mm=0.2, er=4.3)
         )
         assert r["ok"] is True
@@ -865,7 +865,7 @@ class TestToolHandlers:
 
     def test_stripline_z0_symmetric_tool_ok(self):
         import asyncio
-        r = asyncio.get_event_loop().run_until_complete(
+        r = asyncio.run(
             call(stackup_stripline_sym_tool, W_mm=0.2, B_mm=0.4, er=4.3)
         )
         assert r["ok"] is True
@@ -873,7 +873,7 @@ class TestToolHandlers:
 
     def test_diff_microstrip_z0_tool_ok(self):
         import asyncio
-        r = asyncio.get_event_loop().run_until_complete(
+        r = asyncio.run(
             call(stackup_diff_ms_tool, W_mm=0.18, S_mm=0.2, H_mm=0.2, er=4.3)
         )
         assert r["ok"] is True
@@ -881,7 +881,7 @@ class TestToolHandlers:
 
     def test_trace_width_solver_tool_ok(self):
         import asyncio
-        r = asyncio.get_event_loop().run_until_complete(
+        r = asyncio.run(
             call(stackup_trace_width_tool, Z0_target=50.0, H_mm=0.2, er=4.3)
         )
         assert r["ok"] is True
@@ -889,7 +889,7 @@ class TestToolHandlers:
 
     def test_conductor_loss_tool_ok(self):
         import asyncio
-        r = asyncio.get_event_loop().run_until_complete(
+        r = asyncio.run(
             call(stackup_cond_loss_tool, freq_hz=1e9, W_mm=0.3, Z0=50.0)
         )
         assert r["ok"] is True
@@ -901,7 +901,7 @@ class TestToolHandlers:
         async def _bad():
             return await stackup_microstrip_z0_tool(None, b"not-json{{{")
 
-        r_str = asyncio.get_event_loop().run_until_complete(_bad())
+        r_str = asyncio.run(_bad())
         r = json.loads(r_str)
         assert r.get("ok") is False or "error" in r
 

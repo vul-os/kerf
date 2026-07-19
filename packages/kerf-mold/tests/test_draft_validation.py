@@ -101,7 +101,7 @@ def _bottom_face() -> FaceInput:
 
 
 def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 class _Ctx:
@@ -490,7 +490,7 @@ class TestPluginRegistration:
         async def _go():
             return await register(app, ctx)
 
-        asyncio.get_event_loop().run_until_complete(_go())
+        asyncio.run(_go())
 
         assert "mold_validate_draft" in ctx.tools.registered, (
             "mold_validate_draft not registered by plugin"

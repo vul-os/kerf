@@ -22,7 +22,7 @@ from kerf_mold.cooling_tool import run_mold_cooling_analysis
 
 
 def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 _SINGLE_CHANNEL = [{"diameter_mm": 10.0, "length_mm": 200.0}]

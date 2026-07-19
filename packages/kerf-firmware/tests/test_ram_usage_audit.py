@@ -508,7 +508,7 @@ class TestLlmToolAsync:
             "heap_max_bytes": 24 * 1024,
             "stack_max_bytes": 8 * 1024,
         }).encode()
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             run_firmware_audit_ram_usage_async(None, payload)
         )
         d = json.loads(result)
@@ -518,7 +518,7 @@ class TestLlmToolAsync:
         import asyncio
         from kerf_firmware.tools.firmware_audit_ram_usage import run_firmware_audit_ram_usage_async
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             run_firmware_audit_ram_usage_async(None, b"not-valid-json")
         )
         d = json.loads(result)

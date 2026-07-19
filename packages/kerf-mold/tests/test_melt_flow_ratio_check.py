@@ -476,7 +476,7 @@ def test_tool_dispatch_happy_path():
         "melt_temp_C": 240.0,
         "mold_temp_C": 60.0,
     }
-    result = asyncio.get_event_loop().run_until_complete(
+    result = asyncio.run(
         run_mold_check_melt_flow_ratio(args, ctx=None)
     )
     data = json.loads(result)
@@ -501,7 +501,7 @@ def test_tool_dispatch_missing_mfr_returns_error():
         "melt_temp_C": 230.0,
         "mold_temp_C": 40.0,
     }
-    result = asyncio.get_event_loop().run_until_complete(
+    result = asyncio.run(
         run_mold_check_melt_flow_ratio(args, ctx=None)
     )
     data = json.loads(result)
@@ -520,7 +520,7 @@ def test_tool_dispatch_bad_mfr_zero_returns_error():
         "melt_temp_C": 230.0,
         "mold_temp_C": 40.0,
     }
-    result = asyncio.get_event_loop().run_until_complete(
+    result = asyncio.run(
         run_mold_check_melt_flow_ratio(args, ctx=None)
     )
     data = json.loads(result)

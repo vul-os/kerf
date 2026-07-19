@@ -439,7 +439,7 @@ def test_tool_dispatch_happy_path():
         "post_eject_cooling_time_s": 45.0,
         "mold_temp_C": 80.0,
     }
-    result = asyncio.get_event_loop().run_until_complete(
+    result = asyncio.run(
         run_mold_compute_warpage_index(args, ctx=None)
     )
     data = json.loads(result)
@@ -458,7 +458,7 @@ def test_tool_dispatch_missing_arg_returns_error():
         "post_eject_cooling_time_s": 30.0,
         "mold_temp_C": 60.0,
     }
-    result = asyncio.get_event_loop().run_until_complete(
+    result = asyncio.run(
         run_mold_compute_warpage_index(args, ctx=None)
     )
     data = json.loads(result)
@@ -476,7 +476,7 @@ def test_tool_dispatch_bad_uniformity_returns_error():
         "post_eject_cooling_time_s": 30.0,
         "mold_temp_C": 60.0,
     }
-    result = asyncio.get_event_loop().run_until_complete(
+    result = asyncio.run(
         run_mold_compute_warpage_index(args, ctx=None)
     )
     data = json.loads(result)

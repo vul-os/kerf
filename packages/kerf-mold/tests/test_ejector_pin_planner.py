@@ -374,7 +374,10 @@ class TestEjectorPinTools:
 
     def setup_method(self):
         import asyncio
-        self._loop = asyncio.get_event_loop()
+        self._loop = asyncio.new_event_loop()
+
+    def teardown_method(self):
+        self._loop.close()
 
     def _run(self, coro):
         return self._loop.run_until_complete(coro)

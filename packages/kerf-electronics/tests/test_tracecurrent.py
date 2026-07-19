@@ -683,7 +683,7 @@ class TestLlmToolHandlers:
 
     def test_ipc2152_tool_bad_args_returns_error(self):
         import asyncio
-        raw = asyncio.get_event_loop().run_until_complete(
+        raw = asyncio.run(
             tracecurrent_ipc2152_tool(None, json.dumps({"width_mm": -5.0}).encode())
         )
         data = json.loads(raw)

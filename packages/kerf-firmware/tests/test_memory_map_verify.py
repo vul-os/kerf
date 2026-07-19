@@ -518,7 +518,7 @@ class TestLlmToolAsync:
             ],
         }).encode()
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             run_firmware_verify_memory_map_async(None, payload)
         )
         d = json.loads(result)
@@ -528,7 +528,7 @@ class TestLlmToolAsync:
         import asyncio
         from kerf_firmware.tools.firmware_verify_memory_map import run_firmware_verify_memory_map_async
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             run_firmware_verify_memory_map_async(None, b"not-json")
         )
         d = json.loads(result)

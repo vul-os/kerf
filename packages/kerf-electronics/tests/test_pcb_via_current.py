@@ -100,7 +100,7 @@ def _spec(D=0.3, t=25.0, L=1.6, dT=10.0, pad=1.0):
 
 
 def run_async(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 async def call_tool(**kwargs):

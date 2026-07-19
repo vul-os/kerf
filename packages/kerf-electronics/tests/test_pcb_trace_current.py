@@ -66,7 +66,7 @@ def _expected_current(width_mils: float, oz: float, dT: float, location: str) ->
 def _run_tool(args_dict: dict) -> dict:
     """Helper to run the LLM tool handler synchronously."""
     from kerf_electronics.tools.pcb_trace_current import electronics_compute_pcb_trace_current
-    raw = asyncio.get_event_loop().run_until_complete(
+    raw = asyncio.run(
         electronics_compute_pcb_trace_current(None, json.dumps(args_dict).encode())
     )
     return json.loads(raw)
@@ -424,7 +424,7 @@ def test_tool_handler_missing_required_param():
 def test_tool_handler_malformed_json():
     """LLM tool handler returns error for malformed JSON."""
     from kerf_electronics.tools.pcb_trace_current import electronics_compute_pcb_trace_current
-    raw = asyncio.get_event_loop().run_until_complete(
+    raw = asyncio.run(
         electronics_compute_pcb_trace_current(None, b"not valid json{{")
     )
     result = json.loads(raw)

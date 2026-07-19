@@ -78,7 +78,7 @@ def _fault(peak_A: float, dur_ms: float, scc_kA: float = 1.0) -> FaultSpec:
 
 
 def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    return asyncio.run(coro)
 
 
 # ---------------------------------------------------------------------------

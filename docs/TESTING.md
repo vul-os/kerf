@@ -13,7 +13,7 @@ honest result, including the parts that are red.
 ```bash
 make test          # DEFAULT — load-bearing packages. GREEN. ~5.0k tests, ~3 min.
 make test-kernel   # kerf-cad-core geometry kernel. ~38.8k tests, ~75 min, 17 known failures.
-make test-domains  # the 22 engineering domains. Experimental. Currently RED.
+make test-domains  # the 22 engineering domains. Experimental. Still RED (kerf-fem only).
 make test-all      # everything. ~90 min, RED by design.
 ```
 
@@ -35,12 +35,17 @@ An independent full-suite run on 2026-07-19 reported:
 That number was real but almost entirely **collateral**, not 1563 independent
 bugs. Re-measuring package by package after the fixes in `a800d09b` gives:
 
-| | full-suite run (2026-07-19) | measured per-package (after fixes) |
-|---|---|---|
-| failed | 1563 | **207** |
-| errors | 180 | **29** (4 of which are now fixed → **25**) |
+| | full-suite run (2026-07-19) | measured per-package (after `a800d09b`) | after root cause #2 fix |
+|---|---|---|---|
+| failed | 1563 | **207** | **20** |
+| errors | 180 | **29** (4 of which are now fixed → **25**) | **5** |
 
-The gap is explained by root cause #1 below: a `sys.modules` leak that only
+The remaining 20 failed / 5 errors are entirely `kerf-cad-core` (12 failed, 5
+errors, kernel tier) and `kerf-fem` (8 failed, domain tier) — see root cause
+#4 below.
+
+The gap between the full-suite run and the per-package measurement is
+explained by root cause #1 below: a `sys.modules` leak that only
 manifests when many packages share one pytest process, which is exactly how the
 full-suite run executed them. Running packages in isolation never showed it,
 which is why every per-package report was green and the suite was not.
@@ -91,16 +96,19 @@ kerf-landscape (150), kerf-lca (221), kerf-manufacturing (115), kerf-marine (478
 kerf-microfluidics (75), kerf-motion (166), kerf-optics (450), kerf-packaging (163),
 kerf-piping (414), kerf-plc (682), kerf-rules (69), kerf-silicon (1418),
 kerf-slicing (86), kerf-structural (409), kerf-systems (141), kerf-textiles (514),
-kerf-wiring (402), kerf-woodworking (298).
+kerf-wiring (402), kerf-woodworking (298), **kerf-mold (1269, fixed 2026-07-19),
+kerf-electronics (6813 passed, 187 skipped, fixed 2026-07-19), kerf-firmware
+(2555 passed, 1 skipped, fixed 2026-07-19)**.
 
 Red:
 
 | package | result |
 |---|---|
-| kerf-mold | 1104 passed, **145 failed, 20 errors** |
-| kerf-electronics | 6775 passed, 187 skipped, **38 failed** |
 | kerf-fem | 1306 passed, 15 skipped, **8 failed** |
-| kerf-firmware | 2551 passed, 1 skipped, **4 failed** |
+
+`kerf-mold`, `kerf-electronics` and `kerf-firmware` were all-`get_event_loop`
+(root cause #2) and are now fully green with zero genuine bugs found in any
+of the three — see that section below for the exact before/after counts.
 
 No Python tests at all (not a failure): kerf-billing, kerf-pricing,
 kerf-sdk-rs and kerf-sdk-ts (the latter two are Rust/TypeScript, covered by
@@ -132,13 +140,13 @@ This is why the full-suite number and the per-package numbers disagreed so
 wildly, and it is the single most important thing to not reintroduce. **Never
 write `sys.modules[...] = ...` at test-module scope without restoring it.**
 
-### 2. `asyncio.get_event_loop()` on Python 3.13 — ~187 failures
+### 2. `asyncio.get_event_loop()` on Python 3.13 — FIXED 2026-07-19
 
 Python 3.13 completed the long-running deprecation: `asyncio.get_event_loop()`
 now raises `RuntimeError: There is no current event loop in thread 'MainThread'`
 when no loop is running and none is set, instead of creating one.
 
-Test code using it in a synchronous context (typically `setup_method`) dies:
+Test code using it in a synchronous context (typically `setup_method`) died:
 
 ```
 packages/kerf-mold/tests/test_ejector_pin_planner.py:377: in setup_method
@@ -146,16 +154,44 @@ packages/kerf-mold/tests/test_ejector_pin_planner.py:377: in setup_method
 E   RuntimeError: There is no current event loop in thread 'MainThread'.
 ```
 
-Accounts for **145 failures + 20 errors in kerf-mold, 38 in kerf-electronics,
-and 4 in kerf-firmware** — i.e. every currently-red experimental package except
-kerf-fem. 272 test files across the repo use `get_event_loop`, concentrated in
+272 test files across the repo use `get_event_loop`, concentrated in
 kerf-cad-core (156), kerf-mold (23) and kerf-electronics (11); most are inside
-`async def` bodies where a loop is already running, so they are fine. Only the
-synchronous-context uses fail.
+`async def` bodies where a loop is already running, so those are fine and were
+deliberately left untouched. Only the synchronous-context uses failed —
+35 files with a module-level `_run(coro)` / `run_async(coro)` helper or an
+inline call chained directly as `asyncio.get_event_loop().run_until_complete(`,
+plus 2 files (`test_ejector_pin_planner.py`, `test_ejector_stroke_verify.py`)
+using a per-test `setup_method` that stashed `self._loop`.
 
-Fix (not yet applied — mechanical but touches many files): use
-`asyncio.new_event_loop()` explicitly in setup, or `asyncio.run()`, or the
-`pytest-asyncio` fixtures the repo already configures via `asyncio_mode = "auto"`.
+**Fix applied**, matched to each call site's shape:
+
+* The 35 one-shot call sites → `asyncio.get_event_loop().run_until_complete(`
+  became `asyncio.run(`. Each call already created and discarded its result
+  independently (no state carried between calls), so a fresh loop per call is
+  both correct and the simplest modern idiom — no `pytest-asyncio` fixtures
+  were introduced since nothing else in these files used them.
+* The 2 `setup_method`/`self._loop` files → `asyncio.new_event_loop()` in
+  `setup_method` (which pytest already re-runs per test, so the loop's
+  lifetime was always meant to be per-test) plus a new `teardown_method` that
+  calls `self._loop.close()`, since a loop created explicitly should be
+  closed explicitly.
+
+Verified: every failure and error in all three packages traced to this one
+`RuntimeError` (confirmed via `--tb=line`, no unrelated exception types mixed
+in) — **zero genuine bugs found in kerf-mold, kerf-electronics or
+kerf-firmware**; the ~20 genuine individual bugs the triage flagged live
+elsewhere (kerf-cad-core, kerf-fem — see #4).
+
+| package | before | after |
+|---|---|---|
+| kerf-mold | 1104 passed, 145 failed, 20 errors | **1269 passed** |
+| kerf-electronics | 6775 passed, 187 skipped, 38 failed | **6813 passed, 187 skipped** |
+| kerf-firmware | 2551 passed, 1 skipped, 4 failed | **2555 passed, 1 skipped** |
+
+Confirmed stable under `-n auto` too (10637 passed, 188 skipped across all
+three together). `make test` (the gate) is unaffected — these are
+domain-tier packages excluded from `testpaths` — reconfirmed at
+**4981 passed, 77 skipped, exit 0** after this fix.
 
 ### 3. Stale references to the deleted `backend/` tree — 4 errors, FIXED
 
@@ -247,8 +283,10 @@ silently. They have been removed rather than left as decorative entries.
 
 Highest value first:
 
-1. Root cause #2 (`get_event_loop`) — one mechanical pass clears ~187 of the
-   207 remaining failures and turns three domain packages green.
+1. ~~Root cause #2 (`get_event_loop`)~~ — **done 2026-07-19**, cleared 187
+   failures + 20 errors and turned kerf-mold, kerf-electronics and
+   kerf-firmware fully green. Remaining red: kerf-cad-core (kernel tier, 12
+   failed/5 errors) and kerf-fem (8 failed).
 2. The `step_reader` circular import — one bug, restores a whole test file.
 3. The two non-terminating kerf-cad-core files — until these are fixed, "run
    the whole suite" is not a thing anyone can actually do.

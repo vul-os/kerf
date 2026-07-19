@@ -402,7 +402,7 @@ class TestRoutes:
         import asyncio
         from kerf_firmware.routes import firmware_build_route
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             firmware_build_route({})
         )
         assert result["error"] == "BAD_ARGS"
@@ -413,7 +413,7 @@ class TestRoutes:
         import asyncio
         from kerf_firmware.routes import firmware_boards_route
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             firmware_boards_route()
         )
         assert "boards" in result
@@ -424,7 +424,7 @@ class TestRoutes:
         import asyncio
         from kerf_firmware.routes import firmware_monitor_route
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             firmware_monitor_route({})
         )
         assert result["error"] == "BAD_ARGS"
@@ -449,7 +449,7 @@ class TestRoutes:
             sketch_dir.mkdir()
             (sketch_dir / "main.ino").write_text(BLINK_INO)
 
-            result = asyncio.get_event_loop().run_until_complete(
+            result = asyncio.run(
                 firmware_build_route({"sketch_dir": str(sketch_dir), "board": "uno"})
             )
 

@@ -687,7 +687,7 @@ class TestToolHandlers:
 
     def _call(self, fn, payload: dict):
         import asyncio, json
-        return asyncio.get_event_loop().run_until_complete(fn(None, json.dumps(payload).encode()))
+        return asyncio.run(fn(None, json.dumps(payload).encode()))
 
     def test_pe_conductor_tool_ok(self):
         from kerf_electronics.elecsafety.tools import elecsafety_pe_conductor_size
@@ -722,7 +722,7 @@ class TestToolHandlers:
         from kerf_electronics.elecsafety.tools import elecsafety_pe_conductor_size
         import asyncio, json
         result = json.loads(
-            asyncio.get_event_loop().run_until_complete(
+            asyncio.run(
                 elecsafety_pe_conductor_size(None, b"not-json")
             )
         )

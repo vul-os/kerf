@@ -22,16 +22,15 @@ vi.mock('../lib/detectWebGL.js', () => ({
 }))
 
 // ── Stub lucide-react ─────────────────────────────────────────────────────────
-vi.mock('lucide-react', () => {
+// Mock every real lucide-react export so the icon set can never drift out of
+// sync with product code again (same convention as the other renderer tests).
+vi.mock('lucide-react', async (importOriginal) => {
+  const actual = await importOriginal()
   const make = (name) => ({ size, className }) =>
     React.createElement('svg', { 'data-icon': name, width: size, className: className ?? '' })
-  return {
-    Sun: make('sun'),
-    SlidersHorizontal: make('sliders'),
-    Check: make('check'),
-    ChevronDown: make('chevron-down'),
-    MonitorX: make('monitor-x'),
-  }
+  const mocked = {}
+  for (const key of Object.keys(actual)) mocked[key] = make(key)
+  return mocked
 })
 
 // ── Stub three (all usages guarded by early return, but module must resolve) ──

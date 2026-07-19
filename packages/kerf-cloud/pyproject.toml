@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "kerf-cloud"
 version = "0.1.0"
-description = "Kerf cloud plugin: distributor sync (node feature) + production-ops extras (job traveler, share links, collab, PLM)"
+description = "Kerf cloud plugin: distributor sync (node feature) + production-ops extras (job traveler, share links, PLM)"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = [

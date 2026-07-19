@@ -4018,11 +4018,12 @@ depth and listed in ROADMAP §3 P2 / §3.5.
 - **Tier:** B
 - **Money/reach rationale:** Real-time collaboration is a top conversion argument for professional teams (mechanical/architecture/ECAD). Every sector benefits simultaneously — pure platform multiplier. Justifies Pro/Enterprise tier uplift. P2 moat.
 - **Priority:** P2
-- **Status:** ✅ shipped
+- **Status:** ⛔ reverted (2026-07-19) — see note below
 - **Scope:** Implement a real-time collaborative editing layer for parametric files (`.feature`, `.bim`, `.circuit.tsx`, `.sketch`) using a CRDT or OT approach. Each connected user sees others' edits in near-real-time. Conflicts resolve deterministically without lock-out. Presence indicators (cursor / selection) are a UX bonus but not the gate. Scope: text-native file kinds first (`.sketch`, `.equations`); binary/OCCT-evaluated files deferred to a follow-on. Backend: Postgres LISTEN/NOTIFY or a lightweight WebSocket broadcast per project. Frontend: merge received ops into the live editor state.
-- **Target files/packages:** `packages/kerf-api/src/kerf_api/routes.py` (WebSocket collaboration endpoint), `packages/kerf-core/src/kerf_core/collab/` (new — OT/CRDT engine), `src/lib/collabClient.js` (new), `src/components/FileEditor.jsx` (op-merge wiring), tests.
+- **Target files/packages:** ~~`packages/kerf-api/src/kerf_api/routes.py` (WebSocket collaboration endpoint), `packages/kerf-core/src/kerf_core/collab/` (new — OT/CRDT engine), `src/lib/collabClient.js` (new), `src/components/FileEditor.jsx` (op-merge wiring), tests.~~
 - **Definition of Done:** two simulated users editing the same `.sketch` file concurrently converge to a consistent state (no lost edits, no divergence) after a simulated network round-trip; conflict resolution is deterministic; pytest + vitest on the merge logic.
 - **Depends-on:** none
+- **2026-07-19 note:** what actually shipped against this task was a pure-Python CRDT *seed* (`YMap`/`YArray`/`YDoc`/`PresenceChannel`) landing in `packages/kerf-cloud/src/kerf_cloud/collab/` instead of the planned `kerf-core` location — with no network transport and never wired into any router, WebSocket endpoint, or frontend client (`docs/architecture/runtime-state-audit.md` §1 flagged it as dead code). The suite-wide decision is that real-time CRDT sync will come from the shared substrate Sync spec (`/Users/pc/code/vulos/dmtap/substrate/SYNC.md`) with proper bindings, not a per-product hand-rolled engine, so the seed was pruned rather than wired up. Re-open a fresh task against the substrate Sync spec if/when kerf builds real-time collaborative editing.
 
 ### T-161 GD&T / PMI model-based definition + homologation documentation
 - **Tier:** A

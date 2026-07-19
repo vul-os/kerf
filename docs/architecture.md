@@ -194,6 +194,33 @@ kerf-server        # serves dist/ + API on :8080
 
 ---
 
+## Future work
+
+**Real-time multi-author sync (CRDT).** kerf does not ship a real-time
+collaborative-editing engine today (see [concurrent-editing.md](./concurrent-editing.md)
+for the optimistic-concurrency-control model kerf uses instead). A pure-Python
+CRDT seed (`YMap`/`YArray`/`YDoc`/`PresenceChannel`, no network transport) once
+lived at `packages/kerf-cloud/src/kerf_cloud/collab/` but was never wired into
+any router and was pruned 2026-07-19 as dead code. The suite-wide decision is
+that real-time CRDT sync — for kerf and for every other product in the suite —
+will come from the shared substrate **Sync** spec
+(`dmtap/substrate/SYNC.md`, capability ③: a signed, deterministic, multi-author
+CRDT operation algebra with range-Merkle reconciliation) with proper language
+bindings, rather than each product hand-rolling its own engine. When kerf adds
+real-time collaborative editing, it should build on that spec instead of
+reviving the pruned seed.
+
+**Wake (push notifications for the Workshop).** See
+[distributed-workshop.md](./distributed-workshop.md) and
+[node-architecture.md](./node-architecture.md) for kerf-pub's optional Web
+Push wake path (substrate capability ⑤, `dmtap/substrate/ROLES.md` §8) — a
+content-free "new revision" ping that lets a follower skip re-crawl polling.
+Frontend UI (browser `PushManager` subscription flow, a small "notify me"
+toggle in the Workshop view) is a follow-up; the server-side subscription
+registry and send path are implemented.
+
+---
+
 ## Deep dives
 
 - [capabilities.md](./capabilities.md) — capability tags + persona breakdown

@@ -14,6 +14,13 @@ Distributor sync mounts unconditionally on every node — there is no
 encrypted at rest); a node with zero distributor credentials configured
 simply runs the registry with everything disabled, exactly like a node
 with zero GitHub remotes configured still runs its git panel.
+
+The unwired CRDT collab seed (``kerf_cloud.collab`` — ``YMap``/``YArray``/
+``YDoc``/``PresenceChannel``, no network layer, never mounted on any router)
+was pruned 2026-07-19. Real-time multi-author sync for kerf is planned via the
+shared substrate Sync spec (``dmtap/substrate/SYNC.md``) with proper
+bindings, not a per-product hand-rolled engine — see docs/architecture.md
+future-work.
 """
 from __future__ import annotations
 

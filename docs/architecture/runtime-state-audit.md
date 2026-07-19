@@ -20,6 +20,14 @@ _Anchored at commit `ccb91c8` — 2026-05-19_
   > (see `decisions.md`). The multi-instance safety analysis below applies to any
   > horizontally-scaled container deployment, including Fly.
 
+  > **Note (2026-07-19):** `kerf_cloud/collab/` (the CRDT seed referenced in this
+  > section and in §1's table below) was pruned — it was never wired to any
+  > router and the multi-instance risk it describes never materialized in
+  > production. Real-time multi-author sync for kerf is now planned via the
+  > shared substrate Sync spec (`dmtap/substrate/SYNC.md`), not a per-product
+  > hand-rolled engine; see `docs/architecture.md` future-work. Left below as
+  > history (this audit is anchored at a past commit).
+
 - **IndexedDB save status: IMPLEMENTED but not wired to editors.** `localStash`,
   `autosaveScheduler`, and `dirtyStore` are fully coded and tested. `reconcile()` is
   called at app load (`main.jsx`) and `beforeunload` is guarded. But no editor
@@ -316,10 +324,11 @@ absent.
    (or a call to the `git_init` helper) inside the `create_project` transaction
    in `routes.py`. This is a one-liner; the endpoint is already idempotent.
 
-5. **Redis-back `PresenceChannel` before enabling presence** — when cursor-sharing
-   is added, replace the in-process `_slots`/`_subscribers` dicts with a Redis
-   pub/sub channel keyed by `project_id`. Do this before enabling auto-scale
-   beyond 1 machine on Fly.
+5. ~~**Redis-back `PresenceChannel` before enabling presence**~~ — moot: the
+   CRDT collab seed (`kerf_cloud/collab/`, including `PresenceChannel`) was
+   pruned 2026-07-19 as unwired dead code. If/when kerf adds real-time
+   cursor-sharing, it will build on the shared substrate Sync spec
+   (`dmtap/substrate/SYNC.md`), not a revived in-process stub.
 
 6. **Duplicate auto_commit/sweep_loop work on multi-instance** — if/when machine
    count is raised above 1 on Fly, consider a Postgres advisory lock to avoid N

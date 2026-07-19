@@ -126,12 +126,18 @@ LLM tools registered: `job_create_po`, `job_inventory_pick_list`.
 
 ---
 
-## CRDT collab seed (`kerf_cloud.collab`) and PLM (`kerf_cloud.plm`)
+## PLM (`kerf_cloud.plm`)
 
-Unrelated to the hosting/decentralization split — a pure-Python CRDT seed
-(`YDoc`/`YMap`/`YArray`/`PresenceChannel`) and a production-lifecycle layer
-(BOM 150, ECO, SysML trace, where-used). Left in place; out of scope for the
-2026-07-17 decentralization wave.
+Unrelated to the hosting/decentralization split — a production-lifecycle
+layer (BOM 150, ECO, SysML trace, where-used). Left in place; out of scope
+for the 2026-07-17 decentralization wave.
+
+**Pruned 2026-07-19:** the unwired CRDT collab seed (`kerf_cloud.collab` —
+`YDoc`/`YMap`/`YArray`/`PresenceChannel`, pure-Python, no network transport,
+never mounted on any router) was removed. Real-time multi-author sync for
+kerf is planned via the shared substrate Sync spec
+(`dmtap/substrate/SYNC.md`) with proper bindings, not a per-product
+hand-rolled engine — see `docs/architecture.md` future-work.
 
 ---
 

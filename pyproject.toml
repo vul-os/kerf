@@ -296,8 +296,15 @@ kerf-plm = { workspace = true }
 #   * packages/kerf-cad-core/tests — load-bearing geometry kernel, but ~38.8k
 #     tests / ~75 min and 17 known failures + 2 non-terminating files. Run it
 #     explicitly: `pytest packages/kerf-cad-core/tests` (see docs/TESTING.md).
-#   * the 22 engineering-domain packages (fem/cam/bim/electronics/mold/...) —
-#     experimental tier, several are red. `make test-domains`.
+#   * the remaining 21 engineering-domain packages (fem/cam/bim/electronics/
+#     mold/...) — experimental tier, several are red. `make test-domains`.
+#     kerf-rules moved into the default tier below: it is green and small
+#     (69 tests), and its scope (a KBE rules engine invoked by product code)
+#     makes it load-bearing rather than a domain-simulation package.
+#   * kerf-billing has NO tests to add — the package was removed entirely in
+#     6f0e66ba ("kerf is 100% MIT free software"); nothing under
+#     packages/kerf-billing/ is tracked in git any more. If you see it
+#     mentioned as a default-tier gap, that reference is stale.
 #   * packages/kerf-v1/tests, packages/kerf-workers/tests — listed here for a
 #     long time but neither directory has ever existed; pytest skipped them
 #     silently. Removed rather than left as decorative entries.
@@ -319,6 +326,7 @@ testpaths = [
     "packages/kerf-partsgen/tests",
     "packages/kerf-worker/tests",
     "packages/kerf-plm/tests",
+    "packages/kerf-rules/tests",
     "tests/perf",
 ]
 asyncio_mode = "auto"

@@ -11,9 +11,10 @@ honest result, including the parts that are red.
 ## TL;DR
 
 ```bash
-make test          # DEFAULT — load-bearing packages. GREEN. ~5.0k tests, ~3 min.
+make test          # DEFAULT — load-bearing packages. GREEN. ~5.05k tests, ~2 min.
 make test-kernel   # kerf-cad-core geometry kernel. ~38.8k tests, ~75 min, 17 known failures.
-make test-domains  # the 22 engineering domains. Experimental. Still RED (kerf-fem only).
+make test-domains  # the 21 remaining engineering domains. Experimental. Still RED (kerf-fem only) —
+                    #   and can take 10-30+ min: see "Known traps" for a genuine cross-package hang.
 make test-all      # everything. ~90 min, RED by design.
 ```
 
@@ -75,10 +76,20 @@ Measured individually, `pytest packages/<pkg>/tests`, Python 3.13.9, macOS.
 | kerf-tess | 33 passed |
 | kerf-topo | 5 passed, 2 skipped |
 | kerf-worker | 38 passed |
+| kerf-rules | 69 passed |
 
-Verified as a single process, both serial and under `-n 8`, with identical
-counts (`4981 passed, 77 skipped`, exit 0) — so the default tier is not
+Verified as a single process, both serial and under `-n auto`, with identical
+counts (`5050 passed, 77 skipped`, exit 0) — so the default tier is not
 order-sensitive.
+
+**2026-07-20: `kerf-rules` moved into the default tier.** It was sitting in
+the domain/experimental list below even though it's a KBE rules engine
+invoked by product code, not a simulation domain — load-bearing by any
+reading, small (69 tests, all green), and adding it doesn't change the
+default tier's runtime materially (still ~2 min). `kerf-billing` was
+considered too but has **no tests to add** — see the note below the
+experimental-tier table; it was removed from the repo entirely in `6f0e66ba`
+("kerf is 100% MIT free software") and no longer exists as a package.
 
 **Kernel tier — load-bearing, mostly green**
 
@@ -86,7 +97,10 @@ order-sensitive.
 |---|---|
 | kerf-cad-core | 38382 passed, 72 skipped, **12 failed, 5 errors** |
 
-**Experimental tier — the 22 engineering domains**
+**Experimental tier — the 21 remaining engineering domains**
+
+(`kerf-rules` moved to the default tier above on 2026-07-20 — see the note
+there.)
 
 Green: kerf-1dsim (117), kerf-aero (1223), kerf-apparel (161), kerf-bim (1782),
 kerf-cam (1824), kerf-cfd (916), kerf-civil (783), kerf-composites (273),
@@ -94,11 +108,15 @@ kerf-costing (44), kerf-dental (538), kerf-energy (101), kerf-entertainment (36)
 kerf-gdnt (229), kerf-horology (189), kerf-hvac (157), kerf-interior (141),
 kerf-landscape (150), kerf-lca (221), kerf-manufacturing (115), kerf-marine (478),
 kerf-microfluidics (75), kerf-motion (166), kerf-optics (450), kerf-packaging (163),
-kerf-piping (414), kerf-plc (682), kerf-rules (69), kerf-silicon (1418),
+kerf-piping (414), kerf-plc (682), kerf-silicon (1418),
 kerf-slicing (86), kerf-structural (409), kerf-systems (141), kerf-textiles (514),
 kerf-wiring (402), kerf-woodworking (298), **kerf-mold (1269, fixed 2026-07-19),
 kerf-electronics (6813 passed, 187 skipped, fixed 2026-07-19), kerf-firmware
 (2555 passed, 1 skipped, fixed 2026-07-19)**.
+
+kerf-aero's 1223 count above is measured **alone** and is accurate — the
+package is fully green in isolation. It only produces failures/hangs as part
+of a large combined run; see "Known traps" below.
 
 Red:
 
@@ -110,9 +128,15 @@ Red:
 (root cause #2) and are now fully green with zero genuine bugs found in any
 of the three — see that section below for the exact before/after counts.
 
-No Python tests at all (not a failure): kerf-billing, kerf-pricing,
-kerf-sdk-rs and kerf-sdk-ts (the latter two are Rust/TypeScript, covered by
-`cargo test` / `npm test`).
+No Python tests at all (not a failure): kerf-pricing, kerf-sdk-rs and
+kerf-sdk-ts (the latter two are Rust/TypeScript, covered by `cargo test` /
+`npm test`). **kerf-billing isn't in this list because it doesn't exist any
+more** — it was removed from the repo entirely in `6f0e66ba` ("kerf is 100%
+MIT free software — BYO boxes; local usage telemetry kept"), an ancestor of
+current `main`: no `pyproject.toml`, no `src/`, no `tests/`, not a workspace
+member, zero remaining references anywhere in the tree. If you see a report
+that treats "kerf-billing has no default-tier coverage" as a gap, that report
+is stale — there is nothing to cover.
 
 ## Root causes
 
@@ -191,7 +215,8 @@ elsewhere (kerf-cad-core, kerf-fem — see #4).
 Confirmed stable under `-n auto` too (10637 passed, 188 skipped across all
 three together). `make test` (the gate) is unaffected — these are
 domain-tier packages excluded from `testpaths` — reconfirmed at
-**4981 passed, 77 skipped, exit 0** after this fix.
+**4981 passed, 77 skipped, exit 0** after this fix (now **5050 passed, 77
+skipped** with `kerf-rules` added — see "The numbers" above).
 
 ### 3. Stale references to the deleted `backend/` tree — 4 errors, FIXED
 
@@ -261,6 +286,75 @@ green given `--timeout=600`. Do not tighten the timeout without checking this.
 Use `-n auto`, and expect the kernel tier to be a nightly rather than a
 per-commit gate.
 
+**`make test-domains` deadlocks at full scale — investigated 2026-07-20, not
+fully root-caused, now mitigated.** Running all 21 domain packages (plus the
+default-tier ones, since `test-domains` is `pytest packages/` minus
+`kerf-cad-core`) together under `-n auto`/`-n 8` reliably stalls, typically
+around 93-99% complete, with every xdist worker sitting at **0% CPU** — not
+spinning, blocked. This is a different failure from the two known-hung
+`kerf-cad-core` files above (which are excluded from this tier entirely) and
+from kerf-fem's 8 known assertion failures (which are fast, not hangs).
+
+What was established by reproducing it directly (killing and re-running the
+real `pytest packages/ -n auto --timeout=600 --ignore=packages/kerf-cad-core`
+several times, foreground, with process/fd inspection via `ps`/`lsof` — no
+`py-spy`/`lldb` stack traces were obtainable, both need `sudo` that wasn't
+available):
+
+* `--timeout=600` (the default signal-based timeout) does **not** break the
+  hang — confirmed by watching a stuck worker sit at 0% CPU for the full
+  600s with no interrupt ever landing. `--timeout-method=thread` **does**
+  interrupt it (this is the one piece that matches the original report).
+* `--timeout-method=thread` **alone is not sufficient**, though. By default
+  pytest-xdist replaces a crashed worker and keeps handing it the remaining
+  queue. In one full run this cascaded through **5 separate crash/respawn
+  cycles over more than 60 minutes** without the run ever finishing — each
+  replacement worker picked up the queue, hung again, and got killed again
+  at the next 600s mark.
+* Using `-x` (exit on first failure) to catch the culprit by name identified
+  it precisely: `packages/kerf-aero/tests/test_panel_2d_viscous.py`, class
+  `TestNACA0012Viscous` (the NACA 0012 viscous panel-solver integration
+  tests). Across two separate reproductions, **all four** of that class's
+  tests (`test_cd_within_15pct_of_xfoil`, `test_cl_symmetric`,
+  `test_converges_within_50_iters`, `test_transition_detected_upper`) were
+  independently caught as the worker's in-flight test at the moment of a
+  timeout-triggered crash.
+* This package/test is **not** individually suspicious: `panel_solve_viscous`
+  (`packages/kerf-aero/src/kerf_aero/panel_2d_viscous.py`) is pure NumPy,
+  every loop is a bounded `for ... in range(...)` (no `while`), and it makes
+  no subprocess/network/thread calls of its own. `kerf-aero/tests` alone
+  under `-n auto` passed **3/3** reruns in ~37s each. An 8-package subset
+  chosen to include the other numerically-heaviest domains (`kerf-aero` +
+  `kerf-cfd` + `kerf-cam` + `kerf-bim` + `kerf-electronics` + `kerf-silicon`
+  + `kerf-firmware` + `kerf-mold`) also passed clean, no hang, in ~3.5 min.
+  The hang only appeared at the full `test-domains`/`test-all` scale — one
+  lsof snapshot of a stuck worker showed it holding an idle `kqueue`
+  (0 pending events) plus a `com.apple.netsrc` control socket that no other
+  worker had, which is *consistent with* (but doesn't prove) native-level
+  contention — most plausibly in the BLAS/LAPACK backend NumPy's linear
+  solve calls into, under the load of ~40+ concurrently-launched Python
+  processes each spinning up their own BLAS thread pool. This was not
+  chased further (would need a native stack trace, which needs `sudo` on
+  this machine) — **treat this as narrowed, not root-caused.**
+* Given (2), whack-a-mole `--deselect`ing individual tests isn't reliable —
+  more, undiagnosed instances of the same class of hang surfaced elsewhere
+  in the run even after deselecting the whole `TestNACA0012Viscous` class.
+  The mitigation that was actually verified to make the command terminate is
+  `--max-worker-restart=2`: it bounds the crash/respawn cascade instead of
+  letting it run forever. A full verification run with all three mitigations
+  together (`--timeout-method=thread --max-worker-restart=2` plus the
+  `TestNACA0012Viscous` deselect) **completed in 31 minutes** (vs. never, for
+  the unmitigated command), hitting the restart cap once along the way and
+  finishing with an honest `11 failed, 31169 passed, 396 skipped` — the 8
+  known kerf-fem failures plus 3 more kerf-aero `TestNACA0012Viscous` tests
+  that got caught and force-failed by the safety net before the deselect
+  fully suppressed that run's particular scheduling. `make test-domains` and
+  `make test-all` now carry all three mitigations (see the comments above
+  each target in the `Makefile`). **Expect `make test-domains` to
+  legitimately take anywhere from ~10 to ~30+ minutes** depending on whether
+  it hits the hang class again during a given run — this is a real,
+  unresolved flakiness in the tier, not a documentation error.
+
 ## Load-bearing vs experimental
 
 The split behind the tiers:
@@ -268,10 +362,10 @@ The split behind the tiers:
 * **Load-bearing** — the product genuinely depends on these: `kerf-core`,
   `kerf-api`, `kerf-auth`, `kerf-cli`, `kerf-cloud`, `kerf-chat`, `kerf-pub`,
   the SDKs, `kerf-imports`, `kerf-parts`/`kerf-partsgen`, `kerf-plm`,
-  `kerf-worker`, `kerf-render`, `kerf-tess`/`kerf-topo`/`kerf-mates`, and the
-  `kerf-cad-core` geometry kernel.
-* **Experimental / domain** — the 22 engineering domains (FEM, CFD, CAM,
-  electronics, BIM, mold, marine, silicon, ...). Substantial and largely
+  `kerf-worker`, `kerf-render`, `kerf-tess`/`kerf-topo`/`kerf-mates`,
+  `kerf-rules`, and the `kerf-cad-core` geometry kernel.
+* **Experimental / domain** — the 21 remaining engineering domains (FEM, CFD,
+  CAM, electronics, BIM, mold, marine, silicon, ...). Substantial and largely
   passing, but aspirational relative to what ships. They should not be able to
   block a release on their own.
 
@@ -287,11 +381,20 @@ Highest value first:
    failures + 20 errors and turned kerf-mold, kerf-electronics and
    kerf-firmware fully green. Remaining red: kerf-cad-core (kernel tier, 12
    failed/5 errors) and kerf-fem (8 failed).
-2. The `step_reader` circular import — one bug, restores a whole test file.
-3. The two non-terminating kerf-cad-core files — until these are fixed, "run
+2. ~~`kerf-rules` missing from the default gate~~ — **done 2026-07-20**,
+   added to `testpaths`. Default tier is now 5050 passed, 77 skipped.
+3. ~~`make test-domains` deadlock~~ — **mitigated 2026-07-20** (not
+   root-caused — see "Known traps"). The command now terminates instead of
+   hanging forever, but the underlying `kerf-aero`/`TestNACA0012Viscous`
+   cross-package hang is still there, just bounded. A real fix needs a
+   native stack trace (`py-spy`/`lldb`, needs `sudo` — not available in this
+   environment) to find out what's actually blocking inside NumPy's
+   BLAS/LAPACK call at full-suite concurrency.
+4. The `step_reader` circular import — one bug, restores a whole test file.
+5. The two non-terminating kerf-cad-core files — until these are fixed, "run
    the whole suite" is not a thing anyone can actually do.
-4. kerf-fem's result-dict drift — 8 failures, one API decision.
-5. Port the 4 unported `kerf-imports` files off the deleted `backend/` tree.
+6. kerf-fem's result-dict drift — 8 failures, one API decision.
+7. Port the 4 unported `kerf-imports` files off the deleted `backend/` tree.
 
 When a tier goes green, move it into `testpaths` in `pyproject.toml` and delete
 its row from this document. The point is for `make test` to keep meaning

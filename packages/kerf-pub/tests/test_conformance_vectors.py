@@ -2,7 +2,9 @@
 
 ``tests/vectors/pub_vectors.json`` is a byte-for-byte copy of the frozen
 ``conformance/vectors/pub_vectors.json`` in the DMTAP spec repo — the same file
-the Rust implementation is held to. It is vendored (not read from a sibling
+the Rust implementation is held to. That claim is ENFORCED, not asserted: see
+``test_vendored_vectors_match_the_spec_repo_byte_for_byte`` at the end of this
+file. It was unenforced until 2026-07-21 and had already drifted. It is vendored (not read from a sibling
 checkout) so this suite is self-contained in CI; it is INPUT, never regenerated
 here. Its expectations were produced by the spec repo's generator and
 independently cross-checked there by a second from-scratch implementation.
@@ -311,4 +313,47 @@ def test_malformed_feed_entry_shapes_rejected(name):
         FeedEntry.from_cbor(bytes.fromhex(v["input"]["cbor_hex"]))
     assert ei.value.code == ERR_PUB_FEED_CHAIN_BROKEN == int(
         v["expected"]["error_code"], 16
+    )
+
+
+# ── vendored-copy drift guard ────────────────────────────────────────────────
+# The docstring above asserts this file is a byte-for-byte copy of the spec
+# repo's. Nothing enforced that, and it had already drifted: the spec corrected
+# the corpus's `generated_by` provenance string and the vendored copy kept the
+# old text. The 15 vectors themselves were identical, so no test failed and no
+# one noticed — which is exactly how a vendored artifact goes stale in a way that
+# eventually DOES matter, silently, one resync at a time.
+#
+# Vendoring is still right: the copy keeps this suite self-contained in CI, where
+# the sibling spec checkout does not exist. So the guard is conditional — it
+# asserts identity when the source is reachable and skips loudly when it is not,
+# rather than pretending a check ran.
+
+_SPEC_VECTORS_CANDIDATES = (
+    Path(__file__).resolve().parents[4] / "vulos" / "dmtap" / "conformance" / "vectors" / "pub_vectors.json",
+    Path(__file__).resolve().parents[5] / "vulos" / "dmtap" / "conformance" / "vectors" / "pub_vectors.json",
+)
+
+
+def _spec_vectors_path() -> Path | None:
+    for p in _SPEC_VECTORS_CANDIDATES:
+        if p.is_file():
+            return p
+    return None
+
+
+def test_vendored_vectors_match_the_spec_repo_byte_for_byte():
+    """The vendored copy MUST equal the spec repo's file exactly, when reachable."""
+    src = _spec_vectors_path()
+    if src is None:
+        pytest.skip(
+            "dmtap spec repo not found alongside this checkout — drift cannot be "
+            "checked here. This is a SKIP, not a pass: the vendored copy is "
+            "unverified in this environment."
+        )
+    assert VECTORS_PATH.read_bytes() == src.read_bytes(), (
+        f"vendored {VECTORS_PATH} has drifted from {src}.\n"
+        "Re-copy the spec repo's file verbatim — do NOT edit the vendored copy, "
+        "and do NOT regenerate it here: it is INPUT to this suite, and a corpus "
+        "that a client regenerates for itself tests nothing but its own arithmetic."
     )

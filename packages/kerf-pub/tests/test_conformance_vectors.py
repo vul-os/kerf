@@ -14,8 +14,9 @@ vector is asserted through kerf-pub's ORDINARY public API — ``hashing``,
 to satisfy the test.
 
 Applicability: all 15 vectors apply to kerf-pub and all 15 are replayed here.
-There is no gateway/client-UX vector in this suite to skip (contrast the Rust
-implementation's client-UX attestation skip, which lives in a different suite).
+There is no PUB-server/client-UX vector in this suite to skip (contrast the
+Rust implementation's client-UX attestation skip, which lives in a different
+suite).
 """
 
 from __future__ import annotations

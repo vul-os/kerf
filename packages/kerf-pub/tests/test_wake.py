@@ -8,7 +8,7 @@ Covers:
 * Fail-safe-off config loading (no env -> None, never touches the network).
 * Subscription validation (https-only, key-shape).
 * The subscription registry on InMemoryPubStore.
-* The anonymous subscribe/unsubscribe gateway endpoints.
+* The anonymous subscribe/unsubscribe public-object endpoints.
 * Best-effort send/notify semantics (never raises, config=None is a no-op).
 """
 from __future__ import annotations
@@ -245,7 +245,7 @@ class TestStoreRoundTrip:
 
 
 # ---------------------------------------------------------------------------
-# Anonymous subscribe/unsubscribe gateway endpoints
+# Anonymous subscribe/unsubscribe public-object endpoints
 # ---------------------------------------------------------------------------
 
 

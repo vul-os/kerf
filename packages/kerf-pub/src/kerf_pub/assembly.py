@@ -11,7 +11,7 @@ Three things live here:
 1. :func:`build_assembly_children` — turns the raw ``children`` array of a
    ``POST /api/pub/publish`` request into validated :class:`~kerf_pub.objects.AssemblyChild`
    entries, failing closed (naming the bad ref) when a pin's manifest or a
-   track's announce isn't resolvable locally or via a followed gateway.
+   track's announce isn't resolvable locally or via a followed PUB server.
 2. :func:`walk_bom` — the §23.6.3 BOM walk: resolves every child (pin
    directly, track via forward supersedes-resolution to the live head),
    recurses into sub-assemblies, dedups leaf quantities by content address,
@@ -60,7 +60,7 @@ def _b64url_decode(s: str) -> bytes:
 class UnresolvedChildRef(ValueError):
     """A publish-time assembly child ref that could not be validated (§23.6.1):
     a ``pin`` manifest_root or ``track`` announce_id absent from the local
-    store and not served by any followed gateway. Carries every offending
+    store and not served by any followed PUB server. Carries every offending
     child's description so the 400 names them all, not just the first."""
 
 
@@ -99,7 +99,7 @@ async def build_assembly_children(
     ``children`` array: ``[{ref_kind: "pin"|"track", manifest_root?, announce_id?,
     quantity}]``. ``pin`` children carry a base64url ``manifest_root``; ``track``
     children a base64url ``announce_id``. Every ref MUST resolve — locally, or
-    via a followed gateway — or the whole publish fails closed with every
+    via a followed PUB server — or the whole publish fails closed with every
     unresolvable ref named (§23.6, no silent partial assembly)."""
     if not children:
         raise UnresolvedChildRef("assembly publish requires a non-empty children array")
@@ -126,7 +126,7 @@ async def build_assembly_children(
                 continue
             if not await _manifest_exists(store, client, ref):
                 problems.append(
-                    f"children[{i}]: manifest_root {root_b64} not found locally or via followed gateways"
+                    f"children[{i}]: manifest_root {root_b64} not found locally or via followed PUB servers"
                 )
                 continue
             ref_kind = REF_PIN
@@ -142,7 +142,7 @@ async def build_assembly_children(
                 continue
             if not await _announce_exists(store, client, ref):
                 problems.append(
-                    f"children[{i}]: announce_id {aid_b64} not found locally or via followed gateways"
+                    f"children[{i}]: announce_id {aid_b64} not found locally or via followed PUB servers"
                 )
                 continue
             ref_kind = REF_TRACK
@@ -196,10 +196,10 @@ async def resolve_track_head(store: PubStore, announce_id: bytes) -> bytes:
     that author's feed to build the supersedes ``predecessor -> successor``
     map, and follow it forward from ``announce_id`` to the newest descendant.
 
-    Local-store only (no gateway fallback here — the caller's PubClient
-    already hydrated whatever a gateway could serve when validating refs at
-    publish time; a BOM walk over an already-published structure works from
-    what this node has pinned/followed)."""
+    Local-store only (no PUB-server fallback here — the caller's PubClient
+    already hydrated whatever a PUB server could serve when validating refs
+    at publish time; a BOM walk over an already-published structure works
+    from what this node has pinned/followed)."""
     raw = await store.get_announce(announce_id)
     if raw is None:
         raise PubError(ERR_PUB_NOT_SERVED, f"track ref announce not served: {_b64url(announce_id)}")

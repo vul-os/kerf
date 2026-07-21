@@ -11,7 +11,9 @@ follows; when that feed's author publishes, the node emits an **opaque,
 content-free "sync now" token** to every registered subscription — no
 announce id, no artifact name, no author identity, nothing beyond a fresh
 random nonce. The follower's client still pulls (resolves) the feed over the
-ordinary gateway HTTP profile to find out what actually changed.
+ordinary public-object HTTP endpoint (§22.5.1, the "PUB server" profile —
+distinct from the §7 legacy-mail gateway role) to find out what actually
+changed.
 
 **Fail-safe off.** A node with no VAPID keypair configured never touches
 this module beyond :func:`default_wake_config` returning ``None`` — same

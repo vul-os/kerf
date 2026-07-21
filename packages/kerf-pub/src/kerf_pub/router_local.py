@@ -1,10 +1,12 @@
 """kerf-pub node-local convenience API — the UI-facing layer over the
 four-verb DMTAP-PUB client (:mod:`kerf_pub.client`).
 
-Mounted (like :mod:`kerf_pub.router`, the anonymous §22.5.1 gateway) as an
-OSS-node plugin surface, but every endpoint here requires an authenticated
-session — this is the local node owner managing THEIR node's identity,
-followed feeds, and publishes, not an anonymous protocol endpoint.
+Mounted (like :mod:`kerf_pub.router`, the anonymous §22.5.1 public-object HTTP
+endpoint — the "PUB server" profile, distinct from the §7 legacy-mail
+gateway role) as an OSS-node plugin surface, but every endpoint here requires
+an authenticated session — this is the local node owner managing THEIR
+node's identity, followed feeds, and publishes, not an anonymous protocol
+endpoint.
 
 Identity and followed feeds are **node-local, not per-account** state: a
 single Ed25519 keypair per node (``kerf_pub.identity.Identity``) and one
@@ -16,12 +18,12 @@ here and checks workspace membership like any other project route.
 
 Zero-socket invariant: every read here serves from the local
 :class:`~kerf_pub.store.PubStore` first; a network call to a followed feed's
-``gateway_url`` is only attempted when that follow configured one (see
-``GET /api/pub/workshop``). Pin hydration (``POST /api/pub/pin/{id}``,
-``POST /api/pub/pin/{id}/hydrate``) extends the same invariant: with no
-gateway configured anywhere, pinning a non-local announce fails with a clear
-400 rather than a silent no-op (:func:`_do_hydrate`,
-:meth:`kerf_pub.client.PubClient.hydrate_pin`).
+``gateway_url`` (its followed PUB server) is only attempted when that follow
+configured one (see ``GET /api/pub/workshop``). Pin hydration
+(``POST /api/pub/pin/{id}``, ``POST /api/pub/pin/{id}/hydrate``) extends the
+same invariant: with no PUB server configured anywhere, pinning a non-local
+announce fails with a clear 400 rather than a silent no-op
+(:func:`_do_hydrate`, :meth:`kerf_pub.client.PubClient.hydrate_pin`).
 """
 
 from __future__ import annotations
@@ -99,7 +101,7 @@ def _b64url_decode(s: str) -> bytes:
 
 
 def _store(request: Request) -> PubStore:
-    """Same accessor the gateway router (router.py) uses — one store per app."""
+    """Same accessor the public-object router (router.py) uses — one store per app."""
     from .router import _store as _gateway_store
     return _gateway_store(request)
 
@@ -321,7 +323,7 @@ class AssemblyChildIn(BaseModel):
     """One entry of a ``POST /api/pub/publish`` assembly ``children`` array
     (§23.6.2). ``pin`` children carry ``manifest_root``; ``track`` children
     carry ``announce_id`` — both base64url, both validated against the local
-    store / followed gateways before the announce is signed."""
+    store / followed PUB servers before the announce is signed."""
 
     ref_kind: str  # "pin" | "track"
     announce_id: Optional[str] = None
@@ -665,8 +667,8 @@ async def assembly_candidates(project_id: str, request: Request, payload: dict =
 # ---------------------------------------------------------------------------
 #
 # Pinning is durable, not a flag flip: POST /pin walks the swarm — the
-# followed author's own gateway first, then every other followed gateway
-# (deduped), then the per-node IPFS fetch-adapter for chunk bytes if
+# followed author's own PUB server first, then every other followed PUB
+# server (deduped), then the per-node IPFS fetch-adapter for chunk bytes if
 # configured (kerf_pub.ipfs) — fetching and self-verifying every manifest and
 # chunk the announce names before it reports success (kerf_pub.client.
 # PubClient.hydrate_pin, §22.5.3). POST /pin/{id}/hydrate re-runs the exact
@@ -674,13 +676,13 @@ async def assembly_candidates(project_id: str, request: Request, payload: dict =
 
 
 async def _ordered_gateways_for(store: PubStore, announce_id: bytes) -> list[str]:
-    """Gateway URLs to try, in order: the followed author's OWN gateway_url
-    first (learned from a locally-known copy of the announce, if any), then
-    every other follow's non-empty gateway_url, deduplicated by URL. When the
-    announce isn't locally known yet, the author can't be identified without
-    fetching it first, so every followed gateway is offered in follow order —
-    hydrate_pin() still finds and verifies the announce through whichever one
-    happens to serve it."""
+    """PUB server URLs to try, in order: the followed author's OWN
+    ``gateway_url`` first (learned from a locally-known copy of the
+    announce, if any), then every other follow's non-empty ``gateway_url``,
+    deduplicated by URL. When the announce isn't locally known yet, the
+    author can't be identified without fetching it first, so every followed
+    PUB server is offered in follow order — hydrate_pin() still finds and
+    verifies the announce through whichever one happens to serve it."""
     follows = await store.list_follows()
     ordered: list[str] = []
 

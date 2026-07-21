@@ -1,20 +1,30 @@
 """The four-verb DMTAP-PUB client: publish / fetch / resolve / submit — plus
 pin hydration, the swarm-fetch machinery that makes a Pin durable.
 
+NOTE ON NAMING: the ``gateways``/``gateway_url`` identifiers below predate
+the spec narrowing "gateway" to mean only the §7 legacy-mail adapter. What
+they actually name is a followed **PUB server** (§22.5.1's public-object HTTP
+endpoint) — an unrelated, plain-HTTP, no-IP-reputation-needed surface. The
+identifiers are left as-is (they are consistent with the ``gateway_url`` JSON
+field this repo's local API and frontend already speak); this docstring and
+its comments use the spec's "PUB server" language when describing the
+concept in prose.
+
 **Zero-socket invariant.** A client constructed with no ``gateways`` NEVER
 opens a socket: ``publish`` and ``resolve`` operate on the local store, and
 ``fetch`` returns bytes assembled from local pins. A network call is attempted
-ONLY when at least one gateway is configured AND the object is not local
-(§22.5.1 gateway HTTP profile). ``submit`` (compute) is a stub (§22.5, compute
-is out of scope for v1). :meth:`PubClient.hydrate_pin` extends the same
-invariant to pinning: it raises rather than silently reporting success when
-an announce is neither local nor reachable through any configured gateway.
+ONLY when at least one PUB server is configured AND the object is not local
+(§22.5.1 public-object HTTP endpoint). ``submit`` (compute) is a stub (§22.5,
+compute is out of scope for v1). :meth:`PubClient.hydrate_pin` extends the
+same invariant to pinning: it raises rather than silently reporting success
+when an announce is neither local nor reachable through any configured PUB
+server.
 
 All verification is client-side and total (§22.5.1): every object is
-re-addressed and every signature re-checked against the bytes, so a gateway is
-a convenience, never a trust root. Chunk bytes fetched through the IPFS
-fetch-adapter (:mod:`kerf_pub.ipfs`) go through the exact same
-``verify_chunk`` gate as bytes from a kerf gateway (§22.2.2) — see
+re-addressed and every signature re-checked against the bytes, so a PUB
+server is a convenience, never a trust root. Chunk bytes fetched through the
+IPFS fetch-adapter (:mod:`kerf_pub.ipfs`) go through the exact same
+``verify_chunk`` gate as bytes from a kerf PUB server (§22.2.2) — see
 :meth:`PubClient._fetch_chunk_verified`.
 """
 
@@ -49,8 +59,8 @@ from .objects import (
 from .store import PubStore, InMemoryPubStore
 
 # Modest, deterministic concurrency for swarm chunk fetches (§22.5.3): high
-# enough to overlap network latency, low enough to keep test runs and gateway
-# load predictable — not a tuned production constant.
+# enough to overlap network latency, low enough to keep test runs and PUB
+# server load predictable — not a tuned production constant.
 DEFAULT_HYDRATE_CONCURRENCY = 4
 
 
@@ -73,7 +83,7 @@ class HydrationResult:
     the local store. Only when this is True does availability read
     ``on-node`` (§22.6).
     ``missing_chunks`` — count of chunks that could not be verified from any
-    reachable source (local store, configured kerf gateways, then the IPFS
+    reachable source (local store, configured kerf PUB servers, then the IPFS
     fetch-adapter if configured). Zero iff ``hydrated`` is True.
     ``error`` — a human-readable summary when ``hydrated`` is False; absent
     on full success.
@@ -141,7 +151,7 @@ class PubClient:
 
     @property
     def online(self) -> bool:
-        """True iff at least one kerf gateway (§22.5.1) is configured. Does
+        """True iff at least one kerf PUB server (§22.5.1) is configured. Does
         NOT count the IPFS fetch-adapter — IPFS never serves announces or
         manifests (kerf-object formats aren't IPLD, see kerf_pub.ipfs), so it
         can never make announce/manifest resolution "online" on its own."""
@@ -149,7 +159,7 @@ class PubClient:
 
     @property
     def chunk_fetch_capable(self) -> bool:
-        """True iff there is ANY configured source (kerf gateway or IPFS
+        """True iff there is ANY configured source (kerf PUB server or IPFS
         fetch-adapter) that could plausibly serve a missing chunk."""
         return self.online or self.ipfs_fetcher is not None
 
@@ -222,7 +232,7 @@ class PubClient:
         if raw is None and self.online:
             raw = await self._gateway_get(f"manifest/{_b64url(mid)}")
         if raw is None:
-            raise PubError(ERR_PUB_NOT_SERVED, "manifest not pinned and no gateway served it")
+            raise PubError(ERR_PUB_NOT_SERVED, "manifest not pinned and no PUB server served it")
         return raw
 
     async def _get_chunk(self, h: bytes) -> bytes | None:
@@ -236,8 +246,9 @@ class PubClient:
         """Resolve an author feed: verified head + full chain, with anti-rollback
         (§22.4.2) applied against the local watermark. Returns entries ascending.
 
-        Zero-socket: if no head is known locally and no gateway is configured,
-        returns [] (nothing published/pinned here for that author)."""
+        Zero-socket: if no head is known locally and no PUB server is
+        configured, returns [] (nothing published/pinned here for that
+        author)."""
         head_raw = await self.store.get_feed_head(pub_key)
         if head_raw is None and self.online:
             head_raw = await self._gateway_get(f"feed/{_b64url(pub_key)}/head")
@@ -295,7 +306,7 @@ class PubClient:
         if not rows and self.online:
             raw = await self._gateway_get(
                 f"feed/{_b64url(pub_key)}/range?from={from_seq}&to={to_seq}")
-            # gateway returns a CBOR array of entries; caller re-decodes per entry.
+            # PUB server returns a CBOR array of entries; caller re-decodes per entry.
             from . import cbor
             arr = cbor.decode(raw) if raw else []
             rows = [cbor.encode(x) for x in arr]
@@ -316,10 +327,10 @@ class PubClient:
         """Make a Pin durable: resolve ``announce_id`` (local store first,
         else ``self.gateways`` in order), fetch every ``PubManifest`` its
         ``roots`` name, then fetch and self-verify EVERY chunk each manifest
-        lists — rotating to the next gateway on a hash mismatch
+        lists — rotating to the next PUB server on a hash mismatch
         (``ERR_PUB_CHUNK_HASH_MISMATCH`` / 0x090A, ROTATE_RETRY, §22.5.3) and
         falling back to the IPFS fetch-adapter (:mod:`kerf_pub.ipfs`) after
-        every kerf gateway has failed a given chunk. All verified bytes are
+        every kerf PUB server has failed a given chunk. All verified bytes are
         persisted locally regardless of overall outcome.
 
         Availability is set ``on-node`` ONLY when hydration is complete
@@ -332,7 +343,7 @@ class PubClient:
         Raises :class:`~kerf_pub.errors.PubError`
         (``ERR_PUB_NOT_SERVED``) ONLY for the pure zero-socket case: the
         announce itself is neither local nor reachable through any
-        configured kerf gateway — "pin of a non-local announce" must fail
+        configured kerf PUB server — "pin of a non-local announce" must fail
         loudly, never silently no-op. Once the announce itself is resolved,
         every further shortfall (missing manifest, missing chunk) is
         reported through the returned :class:`HydrationResult`, not a raise.
@@ -373,7 +384,7 @@ class PubClient:
         self, announce_id: bytes,
     ) -> tuple[PubAnnounce, str | None]:
         """Resolve+verify the announce itself; persist it if fetched remotely.
-        Zero-socket: raises PubError if it is not local and no kerf gateway
+        Zero-socket: raises PubError if it is not local and no kerf PUB server
         is configured (never a silent no-op, per hydrate_pin's docstring)."""
         raw = await self.store.get_announce(announce_id)
         holder: str | None = None
@@ -381,6 +392,12 @@ class PubClient:
             if not self.online:
                 raise PubError(
                     ERR_PUB_NOT_SERVED,
+                    # NOTE: kept saying "gateway" here (not "PUB server") — a
+                    # kerf-pub test asserts this exact substring in the HTTP
+                    # 400 detail (tests/test_router_local.py,
+                    # test_pin_zero_socket_unknown_announce_is_a_clear_400).
+                    # Reword together with that test in a follow-up, not as
+                    # a silent side effect of a terminology-only change.
                     "pin target is not local and no gateway is configured "
                     "(zero-socket invariant: hydration cannot silently no-op)",
                 )
@@ -388,7 +405,7 @@ class PubClient:
             if raw is None:
                 raise PubError(
                     ERR_PUB_NOT_SERVED,
-                    "announce not found locally or on any configured gateway",
+                    "announce not found locally or on any configured PUB server",
                 )
         announce = PubAnnounce.from_cbor(raw)
         announce.verify(expected_id=announce_id)  # §22.3.3 — fail closed, propagates
@@ -455,8 +472,8 @@ class PubClient:
         return missing, holder
 
     async def _fetch_chunk_verified(self, h: bytes) -> tuple[bytes | None, str | None]:
-        """Try every configured kerf gateway in order, then the IPFS
-        fetch-adapter if configured. A gateway serving bytes that fail
+        """Try every configured kerf PUB server in order, then the IPFS
+        fetch-adapter if configured. A PUB server serving bytes that fail
         ``verify_chunk`` is ``ERR_PUB_CHUNK_HASH_MISMATCH`` (0x090A) —
         ROTATE_RETRY to the next source, never accepted (§22.5.3)."""
         for base in self.gateways:
@@ -472,7 +489,7 @@ class PubClient:
                 return raw, self.ipfs_fetcher.ipfs_gateway_url
         return None, None
 
-    # ── gateway HTTP (only reached when self.online) ───────────────────────────
+    # ── PUB server HTTP (only reached when self.online) ────────────────────────
     async def _gateway_get_one(self, base: str, path: str) -> bytes | None:
         url = f"{base.rstrip('/')}/.well-known/dmtap-pub/{path}"
         try:
@@ -488,7 +505,7 @@ class PubClient:
         return None
 
     async def _gateway_get_from(self, path: str) -> tuple[bytes | None, str | None]:
-        """Like :meth:`_gateway_get`, but also returns which gateway served
+        """Like :meth:`_gateway_get`, but also returns which PUB server served
         it — used by hydration to record a known holder (§22.6)."""
         for base in self.gateways:
             raw = await self._gateway_get_one(base, path)

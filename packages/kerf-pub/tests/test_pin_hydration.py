@@ -1,13 +1,15 @@
-"""Pin hydration (§22.5.3 swarm fetch over HTTPS gateways) —
+"""Pin hydration (§22.5.3 swarm fetch over HTTPS PUB servers) —
 :meth:`kerf_pub.client.PubClient.hydrate_pin` and the
 ``POST /api/pub/pin/{id}`` / ``POST /api/pub/pin/{id}/hydrate`` endpoints.
 
 The HTTP layer is mocked by monkeypatching ``PubClient._http_get`` (the one
-synchronous network call every gateway fetch funnels through, via
-``asyncio.to_thread``) with a small in-memory "fake gateway" that serves
-bytes straight out of a real :class:`~kerf_pub.store.InMemoryPubStore` —
-so served bytes are byte-identical to what the real §22.5.1 gateway router
-would return for the same store, without opening a socket in tests.
+synchronous network call every PUB-server fetch funnels through, via
+``asyncio.to_thread``) with a small in-memory "fake gateway" (``FakeGateway``
+below — named for the ``gateway_url``/``gateways`` identifiers it stands in
+for, not the §7 legacy-mail gateway role) that serves bytes straight out of
+a real :class:`~kerf_pub.store.InMemoryPubStore` — so served bytes are
+byte-identical to what the real §22.5.1 public-object router would return
+for the same store, without opening a socket in tests.
 """
 
 from __future__ import annotations
@@ -37,9 +39,9 @@ def _b64_decode(s: str) -> bytes:
 
 
 class FakeGateway:
-    """Stands in for one §22.5.1 HTTP gateway, backed by a real PubStore.
+    """Stands in for one §22.5.1 HTTP PUB server, backed by a real PubStore.
 
-    ``up=False`` simulates the gateway being entirely unreachable (connection
+    ``up=False`` simulates the PUB server being entirely unreachable (connection
     failure — caught and treated as ROTATE_RETRY by the client, same as a
     real network error). ``corrupt_chunks`` simulates a holder serving
     wrong-but-plausible bytes for specific chunk hashes (§22.5.3

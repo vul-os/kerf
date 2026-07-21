@@ -331,10 +331,10 @@ class TestPin:
         fake_aid = b"\x12" + secrets.token_bytes(32)
         aid_b64 = _b64(fake_aid)
         r = tc.post(f"/api/pub/pin/{aid_b64}/hydrate")
-        # A configured-but-unresponsive gateway is a network failure per
+        # A configured-but-unresponsive PUB server is a network failure per
         # object, not a zero-socket condition — PubClient.online is True
         # (len(gateways) > 0), so hydrate_pin resolves nothing and raises
-        # ERR_PUB_NOT_SERVED ("not found on any configured gateway"), which
+        # ERR_PUB_NOT_SERVED ("not found on any configured PUB server"), which
         # the endpoint still reports as a clear 400, not a fabricated 200.
         assert r.status_code == 400
 

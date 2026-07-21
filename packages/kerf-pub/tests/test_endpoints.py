@@ -1,4 +1,5 @@
-"""Gateway HTTP endpoints (§22.5.1) + plugin registration smoke tests."""
+"""Public-object HTTP endpoints (§22.5.1, the "PUB server" profile) + plugin
+registration smoke tests."""
 
 import base64
 

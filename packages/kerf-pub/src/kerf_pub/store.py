@@ -7,7 +7,7 @@ local store, in two interchangeable backends:
   one the tests and the zero-socket local node use.
 * :class:`PostgresPubStore` — asyncpg-backed, over the tables created by
   kerf-core migration ``0015_pub_objects.sql`` (clean-baseline CREATE TABLE, no
-  ALTER shims), for a persistent hosted gateway.
+  ALTER shims), for a persistent hosted PUB server.
 
 Both persist the four content-addressed object classes (chunk / manifest /
 announce / feed-entry) as raw bytes keyed by content address, the mutable

@@ -1,10 +1,18 @@
-"""Gateway HTTP profile (§22.5.1) — anonymous, content-addressed reads.
+"""Public-object HTTP endpoint (§22.5.1, the PUB serving profile) — anonymous,
+content-addressed reads.
+
+NOTE ON NAMING: DMTAP narrowed "gateway" to mean exactly one thing — the §7
+legacy-mail adapter, the sole role needing a reputable IP. This module is the
+*other*, unrelated concept §22.5.1 used to also call a "gateway": a plain-HTTP,
+no-mesh, no-IP-reputation-needed public-object surface. The spec now calls it
+the public-object HTTP endpoint / "PUB server"; this docstring and its
+comments follow that terminology. The wire is unchanged.
 
 Exposes the five well-known endpoints EXACTLY as §22.5.1 specifies, serving
 ONLY pinned/local objects from the store (§22.6.2). Reads are anonymous; the
 four content-addressed endpoints carry immutable-cache headers and a strong
 ETag equal to the content address (§22.5.1). Verification is always the
-client's job — this gateway is a convenience, not a trust root.
+client's job — this PUB server is a convenience, not a trust root.
 
 A missing object is a 404 (the holder does not serve it, ``ERR_PUB_NOT_SERVED``
 §22.6.2); a fetcher rotates to another holder.
@@ -12,9 +20,9 @@ A missing object is a 404 (the holder does not serve it, ``ERR_PUB_NOT_SERVED``
 Also mounts the Wake subscribe/unsubscribe endpoints (:mod:`kerf_pub.wake`,
 substrate capability ⑤) at the bottom of this router. Wake is a kerf-local
 extension, not part of §22.5.1 itself, but it lives on the SAME anonymous
-gateway prefix because it is the same "any node may talk to my node's public
-surface about one of my feeds" relationship as the four §22.5.1 endpoints
-above — a follower node, not this node's own owner, is the caller.
+public-object prefix because it is the same "any node may talk to my node's
+public surface about one of my feeds" relationship as the four §22.5.1
+endpoints above — a follower node, not this node's own owner, is the caller.
 """
 
 from __future__ import annotations

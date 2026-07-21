@@ -1,9 +1,10 @@
-"""kerf-pub plugin entry point — DMTAP-PUB gateway + local pin store.
+"""kerf-pub plugin entry point — DMTAP-PUB public-object HTTP endpoint + local
+pin store.
 
-This is an OSS-node plugin: it mounts the §22.5.1 gateway endpoints
+This is an OSS-node plugin: it mounts the §22.5.1 public-object endpoints
 UNCONDITIONALLY — there is no flag or billing tier gating it. kerf's hosted
-gateway is "one gateway among equals" (§23 Appendix A); serving public objects
-is core to the decentralized Workshop, not a paid feature.
+PUB server is "one server among equals" (§23 Appendix A); serving public
+objects is core to the decentralized Workshop, not a paid feature.
 
 Entry-point (pyproject.toml):
     [project.entry-points."kerf.plugins"]
@@ -36,11 +37,11 @@ except ImportError:
 
 
 async def register(app, ctx) -> "PluginManifest":
-    """Mount the DMTAP-PUB gateway router and wire the local pin store.
+    """Mount the DMTAP-PUB public-object router and wire the local pin store.
 
     Store backend selection:
       * a persistent :class:`~kerf_pub.store.PostgresPubStore` when a DB pool is
-        present (hosted gateway);
+        present (hosted PUB server);
       * an :class:`~kerf_pub.store.InMemoryPubStore` otherwise (dev / zero-DB).
     """
     from kerf_pub.router import router
@@ -58,11 +59,16 @@ async def register(app, ctx) -> "PluginManifest":
     app.state.pub_store = store
     app.include_router(router)
     app.include_router(local_router, prefix="/api")
-    logger.info("kerf-pub: DMTAP-PUB gateway + node-local /api/pub/* mounted (store backend=%s)", backend)
+    logger.info("kerf-pub: DMTAP-PUB public-object endpoint + node-local /api/pub/* mounted (store backend=%s)", backend)
 
     return PluginManifest(
         name="pub",
         version="0.1.0",
+        # NOTE: "pub.gateway" keeps its historical spelling — an internal plugin
+        # capability token, not the §22.5.1 wire or a public API — left as-is
+        # rather than risk an undiscovered external consumer over a rename with
+        # no user-visible benefit (see the §0.8 gateway/PUB-server terminology
+        # split this module's docstring now follows).
         provides=["pub.gateway", "pub.blob-store", "pub.author-feeds", "pub.local-api"],
         depends=["core"],
     )

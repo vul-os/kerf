@@ -43,7 +43,7 @@ interop. Be clear about the size of that degradation, though: measured on the
 1 MiB default chunk, the extension runs ~0.8 ms/MiB and the pure-Python path
 ~1.4 s/MiB — about 1700x. The fallback exists so a node can still *verify* what
 it holds on a platform with no prebuilt wheel; it is not a serving posture. A
-gateway hashing real artifacts wants ``blake3`` installed (it is declared as a
+node hashing real artifacts wants ``blake3`` installed (it is declared as a
 dependency, so it normally is), and ``BLAKE3_BACKEND`` reports which path is
 live.
 """

@@ -102,3 +102,71 @@ def test_fork_detection_same_seq_two_entries():
 def _h(seed: bytes = b"x"):
     from kerf_pub import hashing
     return hashing.mhash(seed)
+
+
+# ── §22.4.1 fixed-width `seq`/`ts` decode guards ──────────────────────────────
+# The §22 field tables type `seq` and `ts` as u64. Python ints are signed and
+# arbitrary-precision, so a bare `int(m[k])` admitted values no u64-typed
+# implementation (the Rust `dmtap-core::pubobj`) can represent — a cross-engine
+# disagreement about whether an object is well-formed at all. The monotonic-seq
+# rule of §22.4.2 is only meaningful over the totally-ordered domain the spec
+# defines, so the width is enforced at the decode boundary.
+
+def _neg_entry_cbor(seq: int) -> bytes:
+    from kerf_pub import cbor
+    return cbor.encode({1: seq, 2: _h(b"a"), 3: _h(b"b"), 4: 1234})
+
+
+@pytest.mark.parametrize("bad", [-1, -(2 ** 63)])
+def test_feed_entry_rejects_negative_seq(bad):
+    with pytest.raises(PubError) as ei:
+        FeedEntry.from_cbor(_neg_entry_cbor(bad))
+    assert ei.value.code == ERR_PUB_FEED_CHAIN_BROKEN
+
+
+def test_feed_entry_rejects_negative_ts():
+    from kerf_pub import cbor
+    raw = cbor.encode({1: 1, 2: _h(b"a"), 3: _h(b"b"), 4: -1})
+    with pytest.raises(PubError) as ei:
+        FeedEntry.from_cbor(raw)
+    assert ei.value.code == ERR_PUB_FEED_CHAIN_BROKEN
+
+
+def test_feed_entry_accepts_u64_max_seq():
+    """The boundary itself is legal — the guard rejects *outside* u64, not at it."""
+    from kerf_pub import cbor
+    raw = cbor.encode({1: 2 ** 64 - 1, 2: _h(b"a"), 3: _h(b"b"), 4: 1})
+    assert FeedEntry.from_cbor(raw).seq == 2 ** 64 - 1
+
+
+@pytest.mark.parametrize("bad", [-1, -5])
+def test_feed_head_rejects_negative_seq(bad):
+    from kerf_pub import cbor
+    raw = cbor.encode({1: 0, 2: 0x01, 3: b"\x02" * 32, 4: bad,
+                       5: _h(b"t"), 6: 1, 7: b"\x04" * 32, 8: b"\x05" * 64})
+    with pytest.raises(PubError) as ei:
+        FeedHead.from_cbor(raw)
+    assert ei.value.code == ERR_PUB_FEED_SIG_INVALID
+
+
+def test_feed_head_rejects_bool_seq():
+    """`bool` is an `int` subclass in Python; it is not a spec-legal u64."""
+    from kerf_pub import cbor
+    raw = cbor.encode({1: 0, 2: 0x01, 3: b"\x02" * 32, 4: True,
+                       5: _h(b"t"), 6: 1, 7: b"\x04" * 32, 8: b"\x05" * 64})
+    with pytest.raises(PubError) as ei:
+        FeedHead.from_cbor(raw)
+    assert ei.value.code == ERR_PUB_FEED_SIG_INVALID
+
+
+def test_manifest_rejects_negative_size_and_oversized_chunk_sz():
+    from kerf_pub import cbor
+    from kerf_pub import PubManifest
+    from kerf_pub.errors import ERR_PUB_UNSUPPORTED_VERSION
+    base = {1: _h(b"id"), 2: 10, 3: 4, 4: [_h(b"c")], 6: 0x01}
+    with pytest.raises(PubError) as ei:
+        PubManifest.from_cbor(cbor.encode({**base, 2: -1}))
+    assert ei.value.code == ERR_PUB_UNSUPPORTED_VERSION
+    with pytest.raises(PubError) as ei:  # chunk_sz is u32, not u64
+        PubManifest.from_cbor(cbor.encode({**base, 3: 2 ** 32}))
+    assert ei.value.code == ERR_PUB_UNSUPPORTED_VERSION

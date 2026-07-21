@@ -73,6 +73,35 @@ def _require_hash(h: Any, what: str) -> bytes:
     return bytes(h)
 
 
+def _require_uint(value: Any, what: str, bits: int, err: str) -> int:
+    """Decode a spec-typed unsigned integer, failing closed outside its width.
+
+    The §22 field tables type every counter and size as a **fixed-width
+    unsigned** integer (`u64` for `seq`/`size`/`ts`, `u32` for `chunk_sz`).
+    Python's ``int`` is arbitrary-precision and signed, so a bare ``int(m[k])``
+    silently admits values the type forbids — most importantly a **negative**
+    ``seq`` arriving as CBOR major type 1, which no u64-typed implementation
+    (e.g. the Rust reference ``dmtap-core::pubobj``) can represent at all.
+
+    That divergence matters even where a later check happens to catch the
+    value: two implementations that disagree about whether an object is
+    *well-formed* do not agree on what the feed is, which is precisely the
+    cross-engine ordering hazard the shared substrate exists to prevent. The
+    monotonic-``seq`` rule of §22.4.2 is only meaningful over a totally ordered
+    domain, and a domain that admits negatives (or unbounded bignums) is not
+    the one the spec defines. So the width is enforced here, at the decode
+    boundary, rather than being inferred from whatever downstream lookup
+    happens to reject it today.
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise PubError(err, f"{what} must be an unsigned integer")
+    if value < 0:
+        raise PubError(err, f"{what} must be unsigned, got {value}")
+    if value >= (1 << bits):
+        raise PubError(err, f"{what} exceeds u{bits} range: {value}")
+    return value
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # §22.2  Public blob profile — PubManifest
 # ════════════════════════════════════════════════════════════════════════════
@@ -140,8 +169,8 @@ class PubManifest:
         chunks = [_require_hash(h, "chunk hash") for h in chunks]
         return cls(
             id=_require_hash(m[1], "manifest id"),
-            size=int(m[2]),
-            chunk_sz=int(m[3]),
+            size=_require_uint(m[2], "size", 64, ERR_PUB_UNSUPPORTED_VERSION),
+            chunk_sz=_require_uint(m[3], "chunk_sz", 32, ERR_PUB_UNSUPPORTED_VERSION),
             chunks=chunks,
             suite=int(m[6]),
         )
@@ -233,7 +262,7 @@ class PubAnnounce:
             roots=[_require_hash(r, "root") for r in roots],
             meta=meta,
             supersedes=_require_hash(m[6], "supersedes") if 6 in m else None,
-            ts=int(m[7]),
+            ts=_require_uint(m[7], "ts", 64, ERR_PUB_ANNOUNCE_SIG_INVALID),
             signer=bytes(m[8]),
             sig=bytes(m[9]),
         )
@@ -307,9 +336,9 @@ class FeedEntry:
             if k not in m:
                 raise PubError(ERR_PUB_FEED_CHAIN_BROKEN, f"missing key {k}")
         entry = cls(
-            seq=int(m[1]),
+            seq=_require_uint(m[1], "seq", 64, ERR_PUB_FEED_CHAIN_BROKEN),
             announce=_require_hash(m[2], "announce"),
-            ts=int(m[4]),
+            ts=_require_uint(m[4], "ts", 64, ERR_PUB_FEED_CHAIN_BROKEN),
             prev=_require_hash(m[3], "prev") if 3 in m else None,
         )
         entry.check_shape()
@@ -378,9 +407,9 @@ class FeedHead:
             v=int(m[1]),
             suite=int(m[2]),
             pub=bytes(m[3]),
-            seq=int(m[4]),
+            seq=_require_uint(m[4], "seq", 64, ERR_PUB_FEED_SIG_INVALID),
             tip=_require_hash(m[5], "tip"),
-            ts=int(m[6]),
+            ts=_require_uint(m[6], "ts", 64, ERR_PUB_FEED_SIG_INVALID),
             signer=bytes(m[7]),
             sig=bytes(m[8]),
         )

@@ -32,10 +32,18 @@ dependencies = ["kerf-cli>=0.1.0"]
 
 [project.optional-dependencies]
 
-# `pip install 'kerf[server]'` — self-host install: CLI + full runtime stack.
-# Delegates to kerf-cli[server] so the dep list is defined in one place.
+# `pip install 'kerf[server]'` — self-host install: CLI + full runtime stack,
+# WITHOUT DMTAP-PUB (the "publish to the decentralized Workshop" feature,
+# §22). Delegates to kerf-cli[server] so the dep list is defined in one place.
 server = [
     "kerf-cli[server]>=0.1.0",
+]
+
+# `pip install 'kerf[server,pub]'` — self-host install + DMTAP-PUB. kerf-pub
+# registers under the "kerf.plugins" entry-point group, so kerf-core picks
+# it up automatically once installed; nothing else to wire.
+pub = [
+    "kerf-cli[pub]>=0.1.0",
 ]
 
 api-only = [
@@ -44,7 +52,6 @@ api-only = [
     "kerf-api",
     "kerf-chat",
     "kerf-v1",
-    "kerf-pub",
 ]
 
 mech = [

@@ -15,16 +15,28 @@ classifiers = ["License :: OSI Approved :: MIT License"]
 dependencies = []
 
 [project.optional-dependencies]
-# [server] pulls the full runtime stack required by `kerf serve`.
+# [server] pulls the runtime stack required by `kerf serve` — WITHOUT
+# DMTAP-PUB. kerf-core discovers plugins purely via the "kerf.plugins"
+# entry-point group (see kerf_core.app._discover_entry_points); it never
+# imports kerf_pub directly, so the server starts and runs fine with the
+# publish-to-Workshop feature simply absent (no /api/pub/* routes mounted).
 # Keep in sync with root pyproject.toml [server] extra.
 server = [
     "kerf-core>=0.1.0",
     "kerf-api>=0.1.0",
     "kerf-auth>=0.1.0",
-    "kerf-pub>=0.1.0",
     "kerf-cloud>=0.1.0",
     "asyncpg>=0.29.0",
     "uvicorn[standard]>=0.29.0",
+]
+# [pub] adds the DMTAP-PUB "publish to the decentralized Workshop" feature
+# (§22) on top of [server]. It is an add-on, not a requirement: install
+# `kerf-cli[server,pub]` (or `kerf[server,pub]` from the root package) to get
+# it. kerf-pub registers itself under the "kerf.plugins" entry-point group,
+# so kerf-core picks it up automatically once installed — no other wiring
+# needed.
+pub = [
+    "kerf-pub>=0.1.0",
 ]
 dev = [
     "pytest>=8.0.0",

@@ -82,12 +82,12 @@ jwt_secret = "change-me-in-production"
 access_ttl = "15m"
 refresh_ttl = "720h"
 password_pepper = "change-me-in-production"
-
-  [auth.google]
-  client_id = ""
-  client_secret = ""
-  redirect_url = "http://localhost:8080/auth/google/callback"
 ```
+
+These knobs cover a Kerf install's **own local** auth — the owner's session
+tokens and long-lived API tokens for the SDK / headless access. There is no
+central account system, no sign-up service, and no Google/OAuth login: a
+Kerf install is single-owner on your own box. Accounts shrink to the box.
 
 | Key | Notes |
 |-----|-------|
@@ -95,7 +95,6 @@ password_pepper = "change-me-in-production"
 | `access_ttl` | Access token lifetime. Short is safer. |
 | `refresh_ttl` | Refresh token lifetime. |
 | `password_pepper` | Static server-side pepper added to bcrypt hashes. |
-| `[auth.google]` | Leave `client_id` empty to disable Google OAuth. |
 
 ## [storage]
 
@@ -120,11 +119,11 @@ cdn_base_url = ""
 | `"local"` | Opaque blob store under `local_path`. Default. Auth-protected `/api/blobs/{key}` serves bytes. |
 | `"s3"` | AWS S3, Cloudflare R2, or MinIO. Blob downloads are presigned 302 redirects. Set `[storage.s3]` credentials. |
 | `"filesystem"` | Projects mirror to `filesystem_root` as real folders. Files are editable with any tool. |
-| `"git"` | Per-project git mirror in S3 — an ordinary MIT node capability, not cloud-only. Requires `[storage.s3]`. |
+| `"git"` | Per-project git mirror in S3 — an ordinary node capability. Requires `[storage.s3]`. |
 
 `cdn_base_url` — when set, `Storage.PublicURL` returns a CDN URL instead of
 routing through the backend. Recommended for production S3 deployments with
-a CDN in front (e.g. bunny.net). OSS-compatible; cloud not required.
+a CDN in front (e.g. bunny.net).
 
 ## [llm]
 

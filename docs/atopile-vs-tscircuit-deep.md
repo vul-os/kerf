@@ -232,7 +232,7 @@ Kerf does not currently import atopile projects natively, but a KiCad project ex
 | 60+ electronics tools | Limited | Extensive | LLM tool coverage |
 | Built-in (every save) | Git (external) | Git (external) | Revision history |
 | `.fw.config` linked_circuit | No | No | HMI / firmware link |
-| MIT open-core | Open source | Open source | Pricing |
+| 100% MIT/Apache-2.0, free | Open source | Open source | Pricing |
 
 ---
 

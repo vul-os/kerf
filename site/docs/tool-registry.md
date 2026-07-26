@@ -96,7 +96,7 @@ at `GET /health/capabilities`.
 | CAM toolpaths | `kerf-cam` | `mech`, `full` |
 | Topology optimisation | `kerf-topo` | `mech`, `full` |
 | Render scene | `kerf-render` | `full` |
-| Materials (cloud-hosted catalog) | `kerf-cloud` | cloud only |
+| Material catalogue (render + schedule props) | `kerf-bim` | `bim`, `full` |
 
 ---
 

@@ -6,7 +6,7 @@ Every Kerf project is a git repository from the moment it is created. There is n
 
 ## What happens when a project is created
 
-When you create a project in Kerf Cloud, the server automatically:
+When you create a project in Kerf, the server automatically:
 
 1. Creates a bare git repository for the project on the storage backend.
 2. Registers the project in `cloud_git_repos` so the Git panel can find it.
@@ -30,12 +30,12 @@ There is no "empty" state to navigate out of. The Staged Changes view, commit gr
 
 ## Relationship to file_revisions
 
-Auto git init creates the cloud git layer (L3). It does not affect the file-revision layer (L2), which runs unconditionally on every install — cloud or self-hosted — without any git initialisation at all.
+Auto git init creates the git layer (L3). It does not affect the file-revision layer (L2), which runs unconditionally on every install without any git initialisation at all.
 
 | Layer | What it is | When it starts |
 |---|---|---|
 | L2 — `file_revisions` | Per-file autosave and undo stack | Immediately, on every write |
-| L3 — Cloud git | Named commits, branches, GitHub sync | From project creation (auto-init) |
+| L3 — Git | Named commits, branches, GitHub/GitLab sync | From project creation (auto-init) |
 
 The two layers are complementary and coexist. See [save-and-recovery.md](/docs/save-and-recovery) for a full explanation of the three-layer model.
 

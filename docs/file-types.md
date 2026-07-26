@@ -131,8 +131,8 @@ Every file in a Kerf project has a **kind** constant that determines which edito
 
 | Extension(s) | Kind | Editor | Storage | Plugin |
 |-------------|------|--------|---------|--------|
-| `.part` | `part` | Part library card | inline | kerf-cloud |
-| `.material` | `material` | Material editor | inline | kerf-cloud |
+| `.part` | `part` | Part library card | inline | kerf-parts |
+| `.material` | `material` | Material editor | inline | kerf-bim |
 
 ---
 

@@ -101,8 +101,9 @@ any kind — Kerf is 100% MIT and free to self-host, permanently.
   Studio / Pro, at-cost LLM pricing via Paystack) was withdrawn before this
   release shipped. Kerf carries no accounts, no wallet, no metering, and no
   paid tier of any kind — self-host on your own hardware is the only
-  distribution model. Optional VulOS services (Vulos Relay for public
-  exposure, backup buckets) are separate products, not Kerf billing.
+  distribution model. Optional reachability via Ephor (self-host the broker
+  or use a hosted one) and your own backup buckets are separate concerns,
+  never Kerf billing.
 - **Hosted-infrastructure churn resolved** — a 2026-05-24 migration from
   Fly.io to Koyeb (chasing GPU render capacity) was withdrawn on 2026-06-01
   before DNS cutover; the confirmed reference stack is Fly.io (compute) +

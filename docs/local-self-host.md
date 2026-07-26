@@ -15,16 +15,17 @@ paid tier or a cloud-only build:
 - FEM, CAM, 3D-print slicing, topology optimisation
 - All LLM agent tools (~150 tools across 19 plugins)
 - [File revision history and undo](./file-revisions.md)
-- Parts library capability (you fetch the data yourself — see [oss-cloud-separation.md §4](./oss-cloud-separation.md))
+- Parts library capability (you fetch the data yourself — see [Parts library](#parts-library) below)
 - The distributed Workshop — publish, follow, pin over DMTAP-PUB (see [distributed-workshop.md](./distributed-workshop.md)); no account needed
 - Git — every project is a plain local git repo; add GitHub/GitLab/Gitea/any remote yourself (see [github-sync.md](./github-sync.md))
 
 There is no billing anywhere in kerf, no usage metering sold by kerf, and
 no transactional email tied to an account system (there are no kerf
-accounts beyond what a shared multi-user box defines locally). The only
-things anyone pays for, in this whole stack, are Vulos-standard Relay
-(rented uptime) and backup buckets (durable storage) — optional, sold at
-the Vulos layer, not by kerf.
+accounts beyond what a shared multi-user box defines locally). Kerf itself
+never bills for anything. The only optional external services you might
+arrange yourself are reachability through the **Ephor** broker (rented
+uptime for an always-on node) and backup storage buckets — neither is sold
+by kerf, and neither is required.
 
 ---
 
@@ -165,7 +166,7 @@ kerf-parts-fetch --heavy    # also pull kicad-packages3D (multi-GB, opt-in)
 kerf-seed-parts             # convert + upsert
 ```
 
-See [oss-cloud-separation.md §4](./oss-cloud-separation.md) for the attribution requirements.
+Consult each upstream project's own licence for the attribution requirements that travel with its data.
 
 ---
 
@@ -276,5 +277,5 @@ regardless of whether any remote is configured.
 - [file-revisions.md](./file-revisions.md) — revision history maintenance
 - [github-sync.md](./github-sync.md) — GitHub/GitLab/Gitea as ordinary git remotes
 - [distributed-workshop.md](./distributed-workshop.md) — publish, follow, pin over DMTAP-PUB
-- [oss-cloud-separation.md](./oss-cloud-separation.md) — canonical OSS/cloud model (historical)
+- [node-architecture.md](./node-architecture.md) — one node type; behaviour governed by config, not build
 - [architecture.md](./architecture.md) — full stack overview and plugin system

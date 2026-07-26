@@ -25,12 +25,12 @@ Browser (React + Three.js)  ←→  Python FastAPI server  ←→  Postgres
 ## One node type, not OSS vs Cloud
 
 There is no "cloud edition" versus "local edition" — Kerf is 100% MIT and
-every install (a laptop, a homelab box, or a Vulos-hosted instance like
+every install (a laptop, a homelab box, or an always-on instance like
 `kerf.sh`) runs byte-identical software. A node's behavior is governed
 entirely by config toggles (`publicly-reachable`, `relay-for-others`,
 `pin-storage`, `offer-compute`), never by a license gate or a proprietary
-package. See [node-architecture.md](./node-architecture.md) and
-[oss-cloud-separation.md](./oss-cloud-separation.md) for the current model.
+package. See [node-architecture.md](./node-architecture.md) for the current
+model.
 
 ---
 
@@ -161,7 +161,7 @@ Three concrete backends, one interface (`StorageBackend` ABC in
 | `local` | `storage.backend = "local"` | Local dev, single-machine self-host |
 | `s3` | `storage.backend = "s3"` | Production; works with AWS S3, R2, MinIO |
 | `filesystem` | `storage.backend = "filesystem"` | Edit files with your own tools on disk |
-| `git` | (cloud) | Per-project git mirror; GitHub sync via `kerf-cloud` |
+| `git` | `storage.backend = "git"` | Per-project local git mirror; push/pull to a GitHub/GitLab remote via [github-sync.md](./github-sync.md) |
 
 ---
 
@@ -227,5 +227,5 @@ wake.js`'s `PushManager` orchestration + the Workshop's "Notify me" toggle).
 - [llm-tools.md](./llm-tools.md) — full LLM tool reference
 - [tool-registry.md](./tool-registry.md) — AI workflow and extending the tool system
 - [render-pipeline.md](./render-pipeline.md) — Three.js + BVH + mesh caching
-- [cloud-operator.md](./cloud-operator.md) — running a Vulos-hosted node like `kerf.sh`
+- [cloud-operator.md](./cloud-operator.md) — running an always-on node like `kerf.sh`
 - [plugins-development.md](./plugins-development.md) — writing a plugin

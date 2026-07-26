@@ -2,8 +2,10 @@
 
 Thanks for the interest. Kerf is a chat-driven CAD platform — mechanical,
 electronics, BIM, drawings — built as a Python plugin monorepo with a
-React/Vite frontend. The same codebase runs locally (MIT) and on
-`kerf.sh` (the cloud plugins add billing + Workshop + git sync).
+React/Vite frontend. It is **100% MIT**: one byte-identical build runs on
+your own machine and, if you choose, on an always-on public node. There is
+no cloud tier, no proprietary sliver, and no billing anywhere — a public
+node is rented uptime, not a privileged capability.
 
 Most contributions are welcome. The fastest way to land a PR cleanly is
 to pick something off [ROADMAP.md](./ROADMAP.md) — items marked
@@ -45,9 +47,8 @@ packages/
 ├── kerf-api/          Core REST surface + ~50 LLM tools
 ├── kerf-chat/         LLM agent loop + tool dispatch
 ├── kerf-v1/           /v1/rpc JSON-RPC for the kerf-sdk
-├── kerf-billing/      Paystack billing (PROPRIETARY — cloud-only)
-├── kerf-cloud/        Workshop, git, GitHub sync, email (PROPRIETARY)
-├── kerf-pricing/      LiteLLM-fed live model pricing
+├── kerf-pub/          DMTAP-PUB Workshop: publish / fetch / resolve / submit
+├── kerf-cloud/        PLM, distributor sync, job-traveller, share links (MIT; legacy name)
 ├── kerf-cad-core/     pythonOCC: sketch, BREP, surfacing, .feature ops
 ├── kerf-tess/         STEP → GLB tessellation worker
 ├── kerf-fem/          FEM (FEniCSx + CalculiX)
@@ -67,8 +68,13 @@ src/
 ├── routes/            Landing, Editor, Projects, Library, Workshop, Docs
 ├── lib/               runners (JSCAD / OCCT / sketch / equations), API client
 ├── store/             Zustand stores
-└── cloud/             Cloud-tier UI (PROPRIETARY)
+└── cloud/             Git panel, Workshop publish/browse UI (MIT; legacy name)
 ```
+
+> **Legacy names.** `kerf-cloud` and `src/cloud/` predate the move to a single
+> MIT build and no longer hold anything "cloud-only" or proprietary — the
+> billing (`kerf-billing`) and pricing (`kerf-pricing`) packages and
+> `LICENSE-CLOUD` were removed. Everything in the tree is MIT.
 
 ## How to add a new feature
 
@@ -131,17 +137,19 @@ src/
 - New file kinds + the LLM tools to drive them.
 - Performance improvements with before/after numbers.
 - Doc improvements.
-- New CAD / EDA / BIM features that fit the open-core model.
+- New CAD / EDA / BIM features that fit the fully-MIT, self-hosted model.
 
 **Won't merge (or will push back hard on):**
 - Anything that breaks the local-install MIT story (e.g. requiring a
-  cloud service to use a core feature).
+  hosted service or account to use a core feature).
+- Anything that reintroduces billing, paid tiers, accounts/sign-up, or a
+  privileged "cloud" role — Kerf is deliberately 100% MIT, single-owner,
+  and decentralised.
 - Anything that requires a new heavy runtime dep without a strong
   motivation. Optional extras (`pip install kerf-foo[fem]`) are fine.
 - Features that look like LLM-wrapper plumbing rather than CAD value.
-- Changes that materially alter pricing-tier semantics in
-  `packages/kerf-billing/` or `kerf-cloud/` (those are proprietary —
-  see LICENSE-CLOUD).
+- Anything that breaks the zero-socket invariant — an unconfigured node
+  must open no outbound socket.
 
 ## Working with the plugin architecture
 
@@ -206,12 +214,10 @@ Keep it kind, technical, and on-topic.
 
 ## Licensing notes
 
-- All code outside `packages/kerf-billing/`, `packages/kerf-cloud/`, and
-  `src/cloud/` is MIT — see [LICENSE](./LICENSE).
-- Code in those three paths is proprietary — see [LICENSE-CLOUD](./LICENSE-CLOUD).
-  PRs to those paths are accepted but the resulting code stays
-  proprietary; if you'd rather your contribution be MIT, put it
-  elsewhere in the tree.
+- **All code in the tree is MIT** — see [LICENSE](./LICENSE). There is no
+  proprietary path, no `LICENSE-CLOUD`, and no dual-license split; the
+  former closed cloud/billing packages were removed when Kerf became a
+  single MIT build.
 
 Questions? Open a discussion at
 [github.com/vul-os/kerf/discussions](https://github.com/vul-os/kerf/discussions).

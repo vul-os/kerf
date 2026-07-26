@@ -18,7 +18,7 @@ workspace
 
 ### Projects
 
-A project belongs to a **workspace** (every user has a personal workspace created at sign-up). Projects have:
+A project belongs to a **workspace** (the box owner gets a personal workspace created on first run). Projects have:
 
 | Field | Description |
 |---|---|
@@ -80,7 +80,7 @@ A share link lets you invite someone to a specific project without adding them t
 
 Share links grant access to the specific project only, not the whole workspace. For persistent multi-user collaboration on a workspace, add workspace members instead.
 
-See [sharing.md](./sharing.md) for the full share-link flow.
+To publish a project for anyone to fetch (decentralised, key-signed, no account needed), see [distributed-workshop.md](./distributed-workshop.md).
 
 ---
 
@@ -113,8 +113,8 @@ DELETE /api/projects/:pid/share/links/:lid     — revoke a share link
 
 ## Related pages
 
-- [sharing.md](./sharing.md) — share-link flow, expiry, scopes
+- [distributed-workshop.md](./distributed-workshop.md) — publish, follow, pin over DMTAP-PUB
 - [file-revisions.md](./file-revisions.md) — fine-grained undo
-- [github-sync.md](./github-sync.md) — project-level git commits and GitHub sync (cloud)
+- [github-sync.md](./github-sync.md) — project-level git commits; add any git remote yourself (local git only)
 - [workshop.md](./workshop.md) — publishing and forking public projects
-- [account-and-auth.md](./account-and-auth.md) — workspaces and API tokens
+- [node-architecture.md](./node-architecture.md) — the single-owner box model, workspaces, local API tokens

@@ -175,7 +175,7 @@ a system user and signs you in without a login screen.
 | Setting | Behaviour |
 |---------|-----------|
 | `[server].local_mode = true` (default) | No login screen. A singleton user is bootstrapped automatically. Ideal for a personal workstation install. |
-| `[server].local_mode = false` | Standard register/login flow. Use for shared servers with multiple accounts. |
+| `[server].local_mode = false` | Login required. Local users are provisioned on the box for a shared team install. No central account system or public sign-up is involved. |
 
 A shared multi-user node (a team box, or a Vulos-hosted instance like
 `kerf.sh`) sets `[server].local_mode = false` explicitly — there is no

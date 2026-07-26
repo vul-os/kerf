@@ -161,7 +161,7 @@ Three concrete backends, one interface (`StorageBackend` ABC in
 | `local` | `storage.backend = "local"` | Local dev, single-machine self-host |
 | `s3` | `storage.backend = "s3"` | Production; works with AWS S3, R2, MinIO |
 | `filesystem` | `storage.backend = "filesystem"` | Edit files with your own tools on disk |
-| `git` | (cloud) | Per-project git mirror; GitHub sync via `kerf-cloud` |
+| `git` | `storage.backend = "git"` | Per-project git mirror to any ordinary remote — your own SSH key or PAT, no brokering |
 
 ---
 

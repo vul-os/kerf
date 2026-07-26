@@ -25,7 +25,7 @@ The single install path for end users is now **PyPI**. There is no Homebrew
 formula.
 
 ```sh
-pip install kerf          # cloud-default client + CLI
+pip install kerf          # client + CLI
 pip install 'kerf[server]'   # full self-host: bring-your-own Postgres + kerf serve
 ```
 
@@ -108,8 +108,6 @@ The Cycles-based render path is now end-to-end:
   scene hash.
 - **Hero render panel** — resolution presets (1 K / 2 K / 4 K), sample count,
   HDR environment selection, start / cancel / download.
-- **GPU pricing meter** — cloud installs meter GPU-seconds in the `kerf_paid`
-  bucket at cost + markup.
 - **In-browser fallback** — `three-gpu-pathtracer` progressive path tracer for
   offline and self-hosted use.
 
@@ -160,8 +158,8 @@ alongside Docs and Compare; scrolling to the top on every route change
 means no more landing mid-page on `/compare`. The Render pipeline's
 backend Blender Cycles + browser `three-gpu-pathtracer` architecture is
 now formally scoped in `tasks.md` as **T-106a..f** (scene translator,
-Cycles worker, hero-render UX, GPU-seconds → `kerf_paid` pricing meter,
-self-host docker, in-browser fallback). A **CFD foundation** landed —
+Cycles worker, hero-render UX, self-host docker, in-browser fallback). A
+**CFD foundation** landed —
 `kerf_fem.cfd_potential` (potential flow, `Cp(θ) = 1 − 4 sin²θ` analytic
 oracle) + `kerf_fem.cfd_navier_stokes` (lid-driven cavity, Ghia Re=100
 reference), 61 hermetic CFD tests in `test_cfd.py`, **2-D laminar
@@ -247,13 +245,6 @@ Replaces the previously-rejected TS Web Worker scripting plan.
 Single CLI entry-point: `kerf-server [--config ...] [--migrate]`. Drops in for
 `uvicorn backend.main:app`. Provided by `kerf-core`.
 
-### Cloud retired into plugins + root LICENSE-CLOUD
-
-The legacy `cloud/` and `backend/cloud/` trees collapsed into two proprietary
-plugin packages: `packages/kerf-billing/` and `packages/kerf-cloud/`.
-`LICENSE-CLOUD` sits at the repo root. Operator docs moved to
-[cloud-operator.md](./cloud-operator.md).
-
 ### FEM polish
 
 Deformed-mesh overlay in the viewport, SLEPc + CalculiX modal analysis,
@@ -321,8 +312,8 @@ IFC compiler (`POST /compile-ifc` → IFC4 via IfcOpenShell). `.family.json` par
 ### Electronics — KiCad Parity
 Manual trace routing, copper pours/ground planes, full layer stack. PCB DRC, ERC (electrical rules check), net classes. Length tuning + diff-pair match, via stitching + teardrops. Push-pull (shove) router. Hierarchical schematics, buses + differential pairs. Per-pad mask/paste overrides.
 
-### Workshop / Library / Cloud
-Workshop + Library endpoints ported into `kerf-cloud`. Cloud git → S3 Storer (stateless serverless). Large-file `.step-ref` Phase 1 (JSON pointer + object storage). GitHub OAuth. AES-GCM encrypt utility.
+### Workshop / Library
+Workshop + Library endpoints. Git-backed projects with object-storage Storer. Large-file `.step-ref` Phase 1 (JSON pointer + object storage). AES-GCM encrypt utility.
 
 ### Inspection / Misc
 Model comparison tool. Distributor catalog ported. Configurable layers + display modes.

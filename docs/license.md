@@ -1,8 +1,8 @@
 # License
 
 Kerf is open-source software. You can read, modify, and redistribute the entire
-codebase — including the bits that power our hosted service — under the MIT
-license.
+codebase — every byte of it, including the gateway code that runs a node like
+`kerf.sh` — under the MIT license.
 
 ## TL;DR
 
@@ -13,9 +13,10 @@ You can:
 - **Redistribute it.** Bundle Kerf into your own product, or run it as a
   service for your customers.
 - **Sell it.** You don't owe us a cut. Charge whatever you like.
-- **Self-host the cloud.** The code that runs `kerf.sh` is in the same public
-  repo, under the same license. If you want to operate your own hosted Kerf,
-  you can.
+- **Run your own node.** The code that runs `kerf.sh` is in the same public
+  repo, under the same license — `kerf.sh` is just one gateway among equals,
+  not a privileged central server. If you want to operate your own always-on
+  Kerf node, you can (see [node-architecture.md](./node-architecture.md)).
 
 You have to:
 
@@ -69,5 +70,5 @@ to embed parametric CAD. If you find yourself wishing the license said more,
 chances are MIT already lets you do the thing.
 
 If you're unsure whether a particular use is allowed: it almost certainly is.
-If you'd like to talk anyway, drop us a line at the contact address in
-[Privacy](/docs/privacy) or [Terms](/docs/terms).
+If you'd like to talk anyway, open an issue on the
+[GitHub repo](https://github.com/vul-os/kerf).

@@ -41,8 +41,9 @@ Anything in this repository:
 
 ## Out-of-scope
 
-- Third-party services Kerf depends on (Anthropic, Paystack, Resend,
-  Tigris, Fly.io, Neon, etc.) — report directly to those vendors.
+- Third-party services a deployment may depend on (Anthropic or your
+  chosen LLM provider, Tigris, Fly.io, Neon, etc.) — report directly to
+  those vendors.
 - Issues that require an attacker with physical access to a victim's
   unlocked machine.
 - Social-engineering attacks against Kerf staff.
@@ -57,7 +58,6 @@ We don't currently run a paid bounty program. We will:
 
 - Credit you publicly in the advisory.
 - Send Kerf-branded swag for high-quality reports.
-- Offer free Pro-tier credits on the hosted service.
 
 If we grow into bounty-paying territory we'll announce it here.
 
@@ -70,18 +70,21 @@ worth knowing if you're auditing:
   a singleton user account and skips login. It's intended for
   single-developer machines; **never expose a local-mode install to
   the public internet without first setting `KERF_LOCAL_MODE=false`**.
-- **API tokens** are stored hashed (not reversible). Lost tokens can be
-  rotated from `Profile → API Tokens`. Each token has a configurable
-  daily spend cap to bound stolen-credential blast radius.
-- **GitHub OAuth tokens** and **distributor credentials** are encrypted
-  at rest with AES-GCM (`packages/kerf-core/src/kerf_core/utils/encrypt.py`).
-- **LLM API keys** in the hosted tier are injected as Fly.io secrets
-  (`fly secrets set`), never stored in the database.
+- **API tokens** for your own install are stored hashed (not reversible).
+  Lost tokens can be rotated from `Profile → API Tokens`. Each token has a
+  configurable daily usage cap to bound stolen-credential blast radius
+  (e.g. runaway calls against your own LLM provider key).
+- **Git remote credentials** (e.g. GitHub personal-access tokens used to
+  sync local git to a remote) and **distributor credentials** are
+  encrypted at rest with AES-GCM
+  (`packages/kerf-core/src/kerf_core/utils/encrypt.py`).
+- **LLM API keys** are your own. In a server deployment they should be
+  supplied as environment secrets (e.g. `fly secrets set`), never
+  committed or stored in the database.
 - **The chat tool surface is wide.** The LLM can read project files,
   edit them, and call tools that hit storage / Postgres on behalf of
   the user. Tool calls are scoped to the calling user's projects and
-  workspaces. Tools that touch billing or admin surfaces require
-  matching role.
+  workspaces. Tools that touch admin surfaces require a matching role.
 
 If you find a tool call that escapes the user's project scope, that's a
 high-severity bug. Please report.

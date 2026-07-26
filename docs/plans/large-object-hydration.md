@@ -46,7 +46,7 @@ The `kerf` CLI detects stubs in two places:
    ```
    error: 'parts/housing.step' is a large-file pointer stub (14.1 MB).
    Run `kerf hydrate` (or `kerf hydrate parts/housing.step`) to fetch
-   the real bytes from Kerf cloud storage.
+   the real bytes from the node's object store.
    ```
 
 2. **On `kerf status` / `kerf ls`**: pointer stubs are flagged with a `[stub]`

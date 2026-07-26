@@ -6,7 +6,10 @@ All routes are mounted under `/api` by `kerf-core`. The router is defined in
 
 ## Authentication
 
-Kerf uses two token types carried in standard HTTP cookies:
+A Kerf install is **single-owner on your own box** — there is no central
+account system, no sign-up service, and no Google/OAuth login. The owner
+authenticates locally; in `local_mode` the single owner is auto-bootstrapped.
+A session uses two token types carried in standard HTTP cookies:
 
 | Cookie | Type | TTL |
 |--------|------|-----|
@@ -27,12 +30,9 @@ projects use `optional_auth`. Role enforcement (`owner` / `admin` / `member` /
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/auth/register` | none | Email+password signup. Returns `access_token` + `refresh_token` cookies and the created user + workspace. |
-| POST | `/api/auth/login` | none | Email+password login. Same cookie response. |
+| POST | `/api/auth/login` | none | Local owner login. Returns `access_token` + `refresh_token` cookies. |
 | POST | `/api/auth/refresh` | refresh cookie | Issue new access token from a valid refresh token. |
 | POST | `/api/auth/logout` | any | Revoke the current refresh token. |
-| GET | `/api/auth/google/start` | none | Begin Google OAuth. Redirects to Google. |
-| GET | `/api/auth/google/callback` | none | Handle Google OAuth callback. |
 | POST | `/api/auth/bootstrap-local` | none | Local-mode auto-login (only when `local_mode=true`). |
 
 ---
@@ -41,7 +41,7 @@ projects use `optional_auth`. Role enforcement (`owner` / `admin` / `member` /
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/config` | none | Public feature flags: `local_mode`, Google OAuth availability. No secrets returned. |
+| GET | `/api/config` | none | Public feature flags: `local_mode`. No secrets returned. |
 | GET | `/api/bootstrap` | none | Local-mode only. Returns persisted `refresh_token` from `~/.config/kerf/state.json`. |
 | GET | `/api/models` | none | Available LLM models (`claude-sonnet-4`, `claude-opus-4`, …). |
 
@@ -323,6 +323,12 @@ request. Viewer role cannot post messages.
 ---
 
 ## Sharing and members
+
+Sharing a project *beyond your own box* is not done with hosted share links —
+it goes through the decentralised, key-signed **Workshop** (DMTAP-PUB); see the
+Workshop section below and [distributed-workshop.md](./distributed-workshop.md).
+The endpoints below manage local project **members** and per-project access on
+your own install.
 
 | Method | Path | Notes |
 |--------|------|-------|

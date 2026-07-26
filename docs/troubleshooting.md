@@ -378,7 +378,7 @@ the element has `max-width: 100%` or is inside a container with
 
 **Symptom**
 
-Navigating from one route to another (e.g. from `/docs` to `/pricing`) leaves
+Navigating from one route to another (e.g. from `/docs` to `/settings`) leaves
 the scroll position at the bottom of the previous page.
 
 **Root cause**

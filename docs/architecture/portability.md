@@ -83,15 +83,16 @@ on-disk file matches the recorded OID, the round-trip is lossless.
 
 ---
 
-## Symmetric cloud / self-host
+## Symmetric across nodes
 
-Both commands work identically against:
+Every Kerf install runs byte-identical software, so both commands work
+identically against any node:
 
-- **Kerf Cloud** (`https://app.kerf.io`) — set `KERF_API_TOKEN` or run `kerf login`.
-- **Self-hosted instance** — pass `--url http://your-server:8080` and set `KERF_API_TOKEN`.
+- **Your own self-hosted node** — pass `--url http://your-server:8080` and set `KERF_API_TOKEN` (or run `kerf login`).
+- **A public gateway such as `kerf.sh`** — one gateway among equals, not a privileged hosted service; same `KERF_API_TOKEN` flow.
 
-There is no vendor-specific path.  An export from cloud can be imported to a
-self-hosted instance and vice versa.
+There is no vendor-specific path. An export from one node can be imported to
+any other node and vice versa.
 
 ---
 

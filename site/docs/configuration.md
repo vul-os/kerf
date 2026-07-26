@@ -82,12 +82,11 @@ jwt_secret = "change-me-in-production"
 access_ttl = "15m"
 refresh_ttl = "720h"
 password_pepper = "change-me-in-production"
-
-  [auth.google]
-  client_id = ""
-  client_secret = ""
-  redirect_url = "http://localhost:8080/auth/google/callback"
 ```
+
+There is no central account system, no sign-up service, and no Google/OAuth
+login: a Kerf install is single-owner on your own box. Accounts shrink to the
+box.
 
 | Key | Notes |
 |-----|-------|
@@ -95,7 +94,6 @@ password_pepper = "change-me-in-production"
 | `access_ttl` | Access token lifetime. Short is safer. |
 | `refresh_ttl` | Refresh token lifetime. |
 | `password_pepper` | Static server-side pepper added to bcrypt hashes. |
-| `[auth.google]` | Leave `client_id` empty to disable Google OAuth. |
 
 ## [storage]
 

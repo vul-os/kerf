@@ -34,9 +34,12 @@ users ─► api_tokens        (workspace-scoped)
 
 ### `users`
 
-Every person or service account. Created on first login (password or Google
-OAuth) or via `POST /api/auth/register`. GitHub OAuth sign-in is retired —
-GitHub is used only as an ordinary git remote, never an identity provider.
+Every person or service account. Under *"accounts shrink to the box"* Kerf is
+single-owner on your own box — there is no central sign-up and OAuth sign-in
+(Google and GitHub alike) is retired; GitHub is used only as an ordinary git
+remote, never an identity provider. The `password_hash` / `google_id` columns
+below are legacy identity-provider fields kept for schema history — OAuth login
+is no longer offered.
 
 | Column | Type | Notes |
 |--------|------|-------|

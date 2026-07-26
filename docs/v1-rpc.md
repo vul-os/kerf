@@ -10,16 +10,17 @@ scripting patterns. For a complete method listing see the
 
 ---
 
-## OSS vs Cloud
+## One protocol, every node
 
-The v1 RPC endpoint is part of the MIT `kerf-v1` plugin and works on both
-self-hosted and cloud instances. The URL is the only thing that changes:
+The v1 RPC endpoint is part of the MIT `kerf-v1` plugin and works identically
+on every node — Kerf is 100% MIT with no cloud edition. The URL is the only
+thing that changes:
 
 | Kerf install | Base URL |
 |--------------|----------|
 | Local dev (default) | `http://localhost:8080` |
 | Self-hosted server | Your server's URL |
-| Kerf Cloud | `https://kerf.sh` |
+| Public gateway (e.g. `kerf.sh`) | `https://kerf.sh` |
 
 There are no cloud-only methods — Kerf is 100% MIT and every node runs the
 same plugins. Workshop and git methods return a JSON-RPC error only if the

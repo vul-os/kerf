@@ -6,7 +6,7 @@
 
 **A complete, free, open-source CAD that runs entirely on your machine.**
 
-Parametric sketching &amp; modeling across five geometry kernels · drawings · FEM/CFD · CAM · electronics · slicing · rendering — across 22 engineering domains, with an LLM that edits the underlying source for you. Browse and publish parts on a **distributed Workshop** with no accounts and no central server.
+Parametric sketching &amp; modeling across five geometry kernels · drawings · FEM/CFD · CAM · electronics · slicing · rendering — across 37 engineering domains, with an LLM that edits the underlying source for you. Browse and publish parts on a **distributed Workshop** with no accounts and no central server.
 
 <sub><img src="docs/assets/vulos-logo.png" height="14" alt="VulOS"> Part of <strong><a href="https://vulos.org">VulOS</a></strong> — the open, self-hostable web OS &amp; app suite. Runs standalone, or as an app hosted by the Vulos OS.</sub>
 
@@ -26,7 +26,7 @@ Parametric sketching &amp; modeling across five geometry kernels · drawings · 
 
 ## What is Kerf?
 
-Kerf is a complete CAD system — sketcher, five geometry kernels, drawings, assemblies, FEM/CFD, CAM, electronics/PCB, BIM, and manufacturing prep across 22 engineering domains — that installs and runs entirely on your own machine, MIT-licensed, with no account required. Every design lives in plain files (JSCAD, `.feature` JSON, `.circuit.tsx`, `.sketch`, `.drawing`) so an LLM chat panel can read, diff, and edit your project directly instead of guessing at pixels. When you want to share a part, publish it to the **Workshop** — a distributed catalog of parts built on the open **DMTAP-PUB** protocol: signed, content-addressed, no accounts, no central server, and still browsable offline once pinned.
+Kerf is a complete CAD system — sketcher, five geometry kernels, drawings, assemblies, FEM/CFD, CAM, electronics/PCB, BIM, and manufacturing prep across 37 engineering domains — that installs and runs entirely on your own machine, MIT-licensed, with no account required. Every design lives in plain files (JSCAD, `.feature` JSON, `.circuit.tsx`, `.sketch`, `.drawing`) so an LLM chat panel can read, diff, and edit your project directly instead of guessing at pixels. When you want to share a part, publish it to the **Workshop** — a distributed catalog of parts built on the open **DMTAP-PUB** protocol: signed, content-addressed, no accounts, no central server, and still browsable offline once pinned.
 
 ## Features
 
@@ -69,7 +69,7 @@ Walls, slabs, doors, windows, MEP families, schedules, and IFC round-trip; civil
 
 ### Domains
 
-**22 dedicated engineering domains** — jewelry, mechanical, electronics, architecture, automotive, civil, composites, dental, optics, horology, piping, packaging, mold, woodworking, marine, silicon, firmware, aerospace, PLC, motion, FEM/CFD, textiles — each with its own workspace at [`/domains`](https://kerf.sh/domains). Under the hood, 58 Python plugins reach further still: apparel, energy, entertainment, LCA, microfluidics, PLM, wiring, and more.
+**37 engineering domains** — jewelry, mechanical, electronics, architecture, automotive, civil, composites, dental, optics, horology, piping, packaging, mold, woodworking, marine, silicon, firmware, aerospace, PLC, motion, FEM/CFD, textiles, and more — the most-used ones each with a dedicated workspace at [`/domains`](https://kerf.sh/domains). Under the hood, 50+ Python plugins reach further still: apparel, energy, entertainment, LCA, microfluidics, PLM, wiring, landscape, HVAC, and more.
 
 Measured against the industry, not just described: a public [feature-comparison matrix](https://kerf.sh/compare) tracks 1,397 features across 57 CAD/BIM/EDA packages — SolidWorks, Revit, Altium, KiCad, Rhino, and more.
 
@@ -235,7 +235,7 @@ npm run test:e2e     # Playwright end-to-end
 make test                                        # default tier — expected GREEN (~3 min)
 pytest packages/kerf-api/tests/                  # one plugin
 make test-kernel                                 # kerf-cad-core geometry kernel (~75 min)
-make test-domains                                # the 22 engineering domains — experimental, currently RED
+make test-domains                                # the engineering-domain plugins — experimental, currently RED
 ```
 
 `make test` (equivalently a bare `pytest`) runs the load-bearing packages and

@@ -245,5 +245,3 @@ for CAM or third-party CAD.
 ## Wire format
 
 Full schema in `packages/kerf-chat/llm_docs/drawing.md`.
-
-Next: [cloud.md](./cloud.md)

@@ -1,6 +1,6 @@
 # kerf sync
 
-Two-way folder mirror between a local directory and a Kerf cloud project.
+Two-way folder mirror between a local directory and a Kerf project.
 
 ## Synopsis
 
@@ -95,8 +95,10 @@ fails.
 2. `KERF_API_TOKEN` environment variable
 3. `~/.config/kerf/credentials` (written by `kerf login`)
 
-The `--url` flag (or `KERF_API_URL`) selects the server. Both Kerf cloud
-(`https://app.kerf.io`) and self-hosted instances use the same API surface.
+The `--url` flag (or `KERF_API_URL`) selects the node. Every Kerf install
+runs byte-identical software, so your own self-hosted node and a public
+gateway such as `kerf.sh` (one gateway among equals, not a privileged hosted
+service) expose the same API surface.
 
 ## Exit codes
 
@@ -111,7 +113,7 @@ The `--url` flag (or `KERF_API_URL`) selects the server. Both Kerf cloud
 ## Examples
 
 ```bash
-# One-shot sync, cloud project → local directory
+# One-shot sync, remote project → local directory
 kerf sync abc-123 ./my-cad-project
 
 # Dry-run: show what would happen without touching any files
@@ -126,7 +128,7 @@ kerf sync abc-123 ./project \
   --token kerf_sk_mytoken
 
 # Use environment variables
-export KERF_API_URL=https://app.kerf.io
+export KERF_API_URL=https://kerf.sh
 export KERF_API_TOKEN=kerf_sk_...
 kerf sync abc-123 ./project --watch
 ```

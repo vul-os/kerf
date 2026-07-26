@@ -46,11 +46,15 @@ gateway among equals," not a privileged central server.
 ## Nothing to bill, nothing to operate for others
 
 There is no billing anywhere in kerf — no Paystack, no credit ledger, no
-plan tiers, no usage metering sold by kerf. The only things anyone pays for
-in this stack are Vulos-standard **Relay** (rented uptime, if you don't
-want to run your own always-on box) and **backup buckets** (durable
-off-node storage) — both Vulos products, billed at the Vulos layer, not by
-kerf. A node with neither configured is a complete, fully-featured install.
+plan tiers, no subscriptions, no usage metering sold by kerf. The software
+is 100% free (MIT/Apache-2.0). A node with nothing extra configured is a
+complete, fully-featured install.
+
+If your box is behind NAT and you want it reachable without a public IP,
+point it at the **Ephor** reachability broker (see the `publicly-reachable`
+toggle above) — Ephor forwards traffic to your node, it does not host or
+own your data. Durable off-node backups are your own choice of storage
+(local disk, an S3/R2 bucket you control). None of this is billed by kerf.
 
 A node can still meter its own bytes / GPU-seconds / bandwidth for **its
 own owner's dashboard** — useful if a team shares one box and wants

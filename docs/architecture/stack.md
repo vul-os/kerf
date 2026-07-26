@@ -55,7 +55,7 @@ EU users.
 
 ## Background workers
 
-Background workers (FEM queue, render queue, rate-limit GC, etc.) run as a
+Background workers (FEM queue, render queue, etc.) run as a
 separate OS process on the same Fly machine via the
 `worker` entry in the `[processes]` table of `fly.toml`.
 

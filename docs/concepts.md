@@ -13,7 +13,10 @@ Project
                    └── Component  (an Assembly's instance of an Object at a transform)
 ```
 
-Everything else — chat threads, revisions, members, share links — hangs off the Project.
+Everything else — chat threads, revisions, members — hangs off the Project.
+Publishing and sharing a project happen through the decentralised, key-signed
+Workshop (DMTAP-PUB), not account-based share links — see
+[distributed-workshop.md](./distributed-workshop.md).
 Files cannot import across project boundaries; all geometry references stay within a project.
 
 ## 1. File kinds are first-class

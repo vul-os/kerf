@@ -32,4 +32,3 @@ underlying node/protocol model.
 - [distributed-workshop.md](./distributed-workshop.md) — the canonical Workshop doc
 - [node-architecture.md](./node-architecture.md) — node model, the `pub` module, zero-socket invariant
 - [projects.md](./projects.md) — project model
-- [sharing.md](./sharing.md) — share links for pre-publish review

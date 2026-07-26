@@ -167,6 +167,7 @@ filesystem_root = "~/kerf-projects"
 Every Kerf install is a full node: the app, your project store, and an optional gateway for publishing to (and reading from) the Workshop. Nothing talks to the network unless you configure it.
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'ui-monospace, SFMono-Regular, Menlo, monospace','primaryColor':'transparent','primaryBorderColor':'#14b8a6','primaryTextColor':'#8f969e','lineColor':'#8a8f98','nodeBorder':'#5f8f8a','edgeLabelBackground':'transparent','clusterBorder':'#3f8f86','clusterBkg':'transparent'}}}%%
 flowchart LR
   subgraph Node["Your machine — one kerf node"]
     App["kerf app<br/>sketch · model · simulate · CAM"]

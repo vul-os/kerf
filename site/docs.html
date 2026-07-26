@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kerf — Documentation</title>
+<meta name="description" content="Kerf documentation — concepts, file formats, modeling, CAM, electronics, the distributed Workshop, and the HTTP API. Free, open-source, self-hosted CAD.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0b0d'/%3E%3Crect x='7' y='6' width='3.5' height='20' fill='%23ffd633'/%3E%3Cpolygon points='10.5,16 26,6 26,13' fill='%23ffd633'/%3E%3Cpolygon points='10.5,16 26,19 26,26' fill='%23ffd633'/%3E%3C/svg%3E">
+
+<!-- SOVEREIGNTY: zero network requests. marked.umd.js is vendored locally; -->
+<!-- docs render straight from this repo's own markdown. No CDN, no analytics. -->
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0a0b0d; --surface: #111318; --elevated: #16181f; --panel: #0f1115;
+  --border: #23262f; --border-2: #1a1d24;
+  --text: #f5f3ee; --text-2: #a6a9b4; --text-3: #71747f; --text-4: #3a3d47;
+  --gold: #ffd633; --gold-dim: #cca82a; --gold-line: #8a7422;
+  --cyan: #6bd4ff;
+  --mono: 'SF Mono', 'JetBrains Mono', 'Menlo', 'Consolas', monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--sans); background: var(--bg); color: var(--text-2);
+  line-height: 1.65; -webkit-font-smoothing: antialiased;
+}
+body::before {
+  content:""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(1000px 520px at 88% -8%, rgba(255,214,51,.05), transparent 60%),
+    radial-gradient(760px 460px at -6% 4%, rgba(107,212,255,.03), transparent 55%);
+}
+a { color: var(--text-2); text-decoration: none; transition: color .15s; }
+a:hover { color: var(--text); }
+svg { display: block; }
+.mono { font-family: var(--mono); }
+
+/* Nav — same floating pill lockup as the landing */
+.nav {
+  position: fixed; top: 10px; left: 1rem; right: 1rem; z-index: 100;
+  max-width: 1180px; margin: 0 auto;
+  background: rgba(10, 11, 13, 0.85); backdrop-filter: blur(12px);
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 0 1.25rem; height: 54px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.nav-logo { display: flex; align-items: center; gap: .55rem; font-family: var(--mono); font-weight: 700; font-size: .95rem; color: var(--text); }
+.nav-logo svg { width: 24px; height: 24px; border-radius: 5px; }
+.nav-links { display: flex; align-items: center; gap: 1.6rem; }
+.nav-links a { font-family: var(--mono); font-size: .78rem; color: var(--text-3); letter-spacing: -.01em; }
+.nav-links a:hover { color: var(--text); }
+.nav-links a.here { color: var(--gold); }
+.nav-links .gh { display: flex; align-items: center; gap: .4rem; }
+.nav-links .gh svg { width: 14px; height: 14px; }
+.menu-btn {
+  display: none; font-family: var(--mono); font-size: .75rem; color: var(--text-2);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: .4rem .7rem; cursor: pointer; align-items: center; gap: .4rem;
+}
+
+/* Layout */
+.shell {
+  max-width: 1180px; margin: 0 auto; padding: 84px 1.5rem 5rem;
+  display: grid; grid-template-columns: 262px minmax(0,1fr); gap: 2.75rem; align-items: start;
+}
+
+/* Sidebar */
+.sidebar { position: sticky; top: 84px; max-height: calc(100vh - 104px); overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 14px; background: rgba(15,17,21,.6);
+  padding: .85rem; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.sidebar::-webkit-scrollbar { width: 8px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+.search { width: 100%; font-family: var(--mono); font-size: .76rem; color: var(--text);
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: .5rem .7rem; margin-bottom: .6rem; outline: none; }
+.search:focus { border-color: var(--gold-line); }
+.search::placeholder { color: var(--text-4); }
+.sidebar .grp { font-family: var(--mono); font-size: .64rem; text-transform: uppercase;
+  letter-spacing: .1em; color: var(--gold-dim); padding: .95rem .6rem .35rem; }
+.sidebar .grp:first-of-type { padding-top: .3rem; }
+.sidebar a { display: block; font-family: var(--mono); font-size: .78rem; color: var(--text-3);
+  padding: .38rem .6rem; border-radius: 7px; letter-spacing: -.01em; line-height: 1.4; }
+.sidebar a:hover { background: rgba(255,255,255,.04); color: var(--text); }
+.sidebar a.active { background: rgba(255,214,51,.1); color: var(--gold); box-shadow: inset 2px 0 0 var(--gold); }
+.sidebar .nores { font-family: var(--mono); font-size: .72rem; color: var(--text-4); padding: .6rem; display: none; }
+
+/* Content */
+.main { min-width: 0; }
+.crumb { font-family: var(--mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .12em;
+  color: var(--text-4); margin-bottom: 1rem; }
+.crumb b { color: var(--gold-dim); font-weight: 500; }
+.md { font-size: 1rem; color: var(--text-2); }
+.md > *:first-child { margin-top: 0; }
+.md h1, .md h2, .md h3, .md h4 { color: var(--text); line-height: 1.25; letter-spacing: -.02em; scroll-margin-top: 84px; }
+.md h1 { font-size: 2rem; margin: .2rem 0 1.1rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
+.md h2 { font-size: 1.4rem; margin: 2.2rem 0 .9rem; padding-bottom: .35rem; border-bottom: 1px solid var(--border-2); }
+.md h3 { font-size: 1.12rem; margin: 1.8rem 0 .7rem; }
+.md h4 { font-size: .98rem; margin: 1.5rem 0 .6rem; color: var(--text); }
+.md h1 .anchor, .md h2 .anchor, .md h3 .anchor, .md h4 .anchor {
+  opacity: 0; margin-left: .4rem; color: var(--gold-dim); font-weight: 400; text-decoration: none; font-size: .85em; }
+.md h1:hover .anchor, .md h2:hover .anchor, .md h3:hover .anchor, .md h4:hover .anchor { opacity: .8; }
+.md p, .md li { color: var(--text-2); }
+.md p { margin: .9rem 0; }
+.md ul, .md ol { margin: .9rem 0 .9rem 1.4rem; }
+.md li { margin: .35rem 0; }
+.md li::marker { color: var(--text-4); }
+.md a { color: var(--gold); }
+.md a:hover { color: var(--gold-dim); text-decoration: underline; }
+.md strong { color: var(--text); font-weight: 650; }
+.md code { font-family: var(--mono); font-size: .86em; background: rgba(255,214,51,.09);
+  color: #f4e3a6; padding: .12em .4em; border-radius: 5px; }
+.md pre { background: #0c0d11; border: 1px solid var(--border); border-radius: 11px;
+  padding: 1rem 1.15rem; overflow-x: auto; margin: 1.1rem 0; }
+.md pre code { background: none; color: var(--text-2); padding: 0; font-size: .82rem; line-height: 1.7; }
+.md blockquote { margin: 1.1rem 0; padding: .5rem 1rem; border-left: 3px solid var(--gold-line);
+  background: rgba(255,214,51,.04); color: var(--text-2); border-radius: 0 8px 8px 0; }
+.md blockquote p { margin: .3rem 0; }
+.md table { border-collapse: collapse; width: 100%; margin: 1.2rem 0; font-size: .86rem; display: block; overflow-x: auto; }
+.md th, .md td { border: 1px solid var(--border); padding: .55rem .8rem; text-align: left; vertical-align: top; }
+.md th { background: var(--surface); color: var(--text); font-weight: 600; font-family: var(--mono); font-size: .78rem; }
+.md td code { white-space: nowrap; }
+.md hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+.md img { max-width: 100%; border-radius: 10px; border: 1px solid var(--border); margin: 1rem 0; }
+.err { font-family: var(--mono); font-size: .82rem; color: #ffb3a6;
+  background: rgba(224,80,60,.08); border: 1px solid rgba(224,80,60,.25); padding: .9rem 1.1rem; border-radius: 10px; }
+.loading { font-family: var(--mono); font-size: .8rem; color: var(--text-4); }
+
+/* Footer */
+.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; margin-top: 2rem; }
+.footer-inner { max-width: 1180px; margin: 0 auto; padding: 0 1.5rem; display: flex;
+  justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+.footer-left { display: flex; align-items: center; gap: .5rem; font-family: var(--mono); font-size: .8rem; color: var(--text-4); }
+.footer-left svg { width: 16px; height: 16px; opacity: .5; border-radius: 3px; }
+.footer-links { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.footer-links a { font-family: var(--mono); font-size: .75rem; color: var(--text-4); }
+.footer-links a:hover { color: var(--text-2); }
+
+@media (max-width: 860px) {
+  .nav-links { display: none; }
+  .menu-btn { display: inline-flex; }
+  .shell { grid-template-columns: 1fr; gap: 1.25rem; padding-top: 78px; }
+  .sidebar { position: static; max-height: none; display: none; }
+  .sidebar.open { display: block; }
+  .md h1 { font-size: 1.6rem; }
+  .md h2 { font-size: 1.25rem; }
+}
+</style>
+<script src="./assets/vendor/marked.umd.js"></script>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="./index.html" class="nav-logo"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0a0b0d"/><rect x="7" y="6" width="3.5" height="20" fill="#ffd633"/><polygon points="10.5,16 26,6 26,13" fill="#ffd633"/><polygon points="10.5,16 26,19 26,26" fill="#ffd633"/></svg> kerf</a>
+  <div class="nav-links">
+    <a href="./index.html#domains">domains</a>
+    <a href="./index.html#features">features</a>
+    <a href="./index.html#workshop">workshop</a>
+    <a href="./index.html#install">install</a>
+    <a href="./docs.html" class="here">docs</a>
+    <a href="https://github.com/vul-os/kerf" target="_blank" class="gh"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg> github</a>
+  </div>
+  <button class="menu-btn" id="menuBtn" aria-label="Toggle docs menu">☰ menu</button>
+</nav>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <input class="search" id="search" type="text" placeholder="filter docs…" autocomplete="off" spellcheck="false">
+    <div class="grp">Get started</div>
+    <a data-slug="concepts" href="#concepts">Concepts</a>
+    <a data-slug="getting-started" href="#getting-started">Getting started</a>
+    <a data-slug="local-install" href="#local-install">Local install</a>
+    <a data-slug="configuration" href="#configuration">Configuration</a>
+    <a data-slug="persona-bundles" href="#persona-bundles">Persona bundles</a>
+    <div class="grp">Core concepts</div>
+    <a data-slug="architecture" href="#architecture">How Kerf is built</a>
+    <a data-slug="node-architecture" href="#node-architecture">Node architecture</a>
+    <a data-slug="capabilities" href="#capabilities">Capabilities</a>
+    <a data-slug="file-types" href="#file-types">File types</a>
+    <a data-slug="parametric" href="#parametric">Parametric design stack</a>
+    <a data-slug="render-pipeline" href="#render-pipeline">Render pipeline</a>
+    <div class="grp">The AI layer</div>
+    <a data-slug="tool-registry" href="#tool-registry">AI workflow & tools</a>
+    <a data-slug="llm-tools" href="#llm-tools">LLM tools (~150)</a>
+    <a data-slug="llm-tools-catalogue" href="#llm-tools-catalogue">LLM tools catalogue</a>
+    <a data-slug="llm-tool-authoring" href="#llm-tool-authoring">Authoring a tool</a>
+    <div class="grp">File formats</div>
+    <a data-slug="jscad-format" href="#jscad-format">.jscad parts</a>
+    <a data-slug="feature-format" href="#feature-format">.feature timeline</a>
+    <a data-slug="sketch-format" href="#sketch-format">.sketch tools</a>
+    <a data-slug="assembly-format" href="#assembly-format">.assembly constraints</a>
+    <a data-slug="drawing-format" href="#drawing-format">.drawing sheets</a>
+    <a data-slug="circuit-format" href="#circuit-format">.circuit.tsx</a>
+    <a data-slug="part-format" href="#part-format">.part library</a>
+    <div class="grp">Modeling & geometry</div>
+    <a data-slug="sketching" href="#sketching">Sketching</a>
+    <a data-slug="assemblies" href="#assemblies">Assemblies</a>
+    <a data-slug="drawings" href="#drawings">Drawings</a>
+    <a data-slug="sheet-metal" href="#sheet-metal">Sheet metal</a>
+    <a data-slug="surface-analysis" href="#surface-analysis">Surface analysis</a>
+    <a data-slug="nurbs-surface-ops" href="#nurbs-surface-ops">NURBS surfaces</a>
+    <div class="grp">CAM & manufacturing</div>
+    <a data-slug="cam-layered" href="#cam-layered">Layered CAM (HSM)</a>
+    <a data-slug="five-axis-cam" href="#five-axis-cam">Five-axis CAM</a>
+    <a data-slug="flat-pattern-dxf" href="#flat-pattern-dxf">Flat-pattern DXF</a>
+    <div class="grp">Simulation</div>
+    <a data-slug="fem-linear-static" href="#fem-linear-static">FEM linear static</a>
+    <a data-slug="cfd-simple-solver" href="#cfd-simple-solver">CFD (SIMPLE)</a>
+    <a data-slug="topology-optimization" href="#topology-optimization">Topology optimization</a>
+    <div class="grp">Electronics</div>
+    <a data-slug="electronics" href="#electronics">Electronics workflow</a>
+    <a data-slug="electronics-authoring" href="#electronics-authoring">Authoring circuits</a>
+    <a data-slug="schematic-editor" href="#schematic-editor">Schematic editor</a>
+    <a data-slug="electronics-drc-erc" href="#electronics-drc-erc">DRC & ERC</a>
+    <div class="grp">Domains</div>
+    <a data-slug="aerospace" href="#aerospace">Aerospace</a>
+    <a data-slug="silicon" href="#silicon">Silicon / chips</a>
+    <a data-slug="firmware" href="#firmware">Firmware</a>
+    <a data-slug="plc" href="#plc">PLC / controls</a>
+    <a data-slug="imports" href="#imports">Importing CAD</a>
+    <div class="grp">Workflows</div>
+    <a data-slug="mechanical-workflow" href="#mechanical-workflow">Mechanical</a>
+    <a data-slug="electronic-workflow" href="#electronic-workflow">Electronic</a>
+    <a data-slug="jewelry-workflow" href="#jewelry-workflow">Jewelry</a>
+    <div class="grp">The Workshop</div>
+    <a data-slug="distributed-workshop" href="#distributed-workshop">Distributed Workshop</a>
+    <a data-slug="distributors" href="#distributors">Distributor APIs</a>
+    <a data-slug="curation" href="#curation">Verified publishers</a>
+    <div class="grp">Automate</div>
+    <a data-slug="v1-rpc" href="#v1-rpc">HTTP / JSON-RPC API</a>
+    <a data-slug="sdk" href="#sdk">Python SDK</a>
+    <a data-slug="api-reference" href="#api-reference">REST API reference</a>
+    <div class="grp">Develop</div>
+    <a data-slug="contributing" href="#contributing">Contributing</a>
+    <a data-slug="plugins-development" href="#plugins-development">Plugin development</a>
+    <a data-slug="deployment" href="#deployment">Deployment</a>
+    <a data-slug="releasing" href="#releasing">Releasing Kerf</a>
+    <a data-slug="troubleshooting" href="#troubleshooting">Troubleshooting</a>
+    <div class="grp">What's new</div>
+    <a data-slug="whats-new" href="#whats-new">What's new</a>
+    <div class="nores" id="nores">no matches</div>
+  </aside>
+  <main class="main">
+    <div class="crumb" id="crumb"></div>
+    <article class="md" id="content"><span class="loading">Loading…</span></article>
+  </main>
+</div>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-left"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0a0b0d"/><rect x="7" y="6" width="3.5" height="20" fill="#ffd633"/><polygon points="10.5,16 26,6 26,13" fill="#ffd633"/><polygon points="10.5,16 26,19 26,26" fill="#ffd633"/></svg> kerf</div>
+    <div class="footer-links">
+      <a href="./index.html">home</a>
+      <a href="https://github.com/vul-os/kerf" target="_blank">github</a>
+      <a href="https://github.com/vul-os/kerf/blob/main/LICENSE" target="_blank">license (MIT)</a>
+      <a href="https://vulos.org" target="_blank">vulos.org</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+const DOCS = [
+  {"slug":"concepts","title":"Concepts"},
+  {"slug":"getting-started","title":"Getting started"},
+  {"slug":"local-install","title":"Local install"},
+  {"slug":"configuration","title":"Configuration"},
+  {"slug":"persona-bundles","title":"Persona bundles"},
+  {"slug":"architecture","title":"How Kerf is built"},
+  {"slug":"node-architecture","title":"Node architecture"},
+  {"slug":"capabilities","title":"Capabilities"},
+  {"slug":"file-types","title":"File types"},
+  {"slug":"parametric","title":"Parametric design stack"},
+  {"slug":"render-pipeline","title":"Render pipeline"},
+  {"slug":"tool-registry","title":"AI workflow & tools"},
+  {"slug":"llm-tools","title":"LLM tools (~150)"},
+  {"slug":"llm-tools-catalogue","title":"LLM tools catalogue"},
+  {"slug":"llm-tool-authoring","title":"Authoring a tool"},
+  {"slug":"jscad-format","title":".jscad parts"},
+  {"slug":"feature-format","title":".feature timeline"},
+  {"slug":"sketch-format","title":".sketch tools"},
+  {"slug":"assembly-format","title":".assembly constraints"},
+  {"slug":"drawing-format","title":".drawing sheets"},
+  {"slug":"circuit-format","title":".circuit.tsx"},
+  {"slug":"part-format","title":".part library"},
+  {"slug":"sketching","title":"Sketching"},
+  {"slug":"assemblies","title":"Assemblies"},
+  {"slug":"drawings","title":"Drawings"},
+  {"slug":"sheet-metal","title":"Sheet metal"},
+  {"slug":"surface-analysis","title":"Surface analysis"},
+  {"slug":"nurbs-surface-ops","title":"NURBS surfaces"},
+  {"slug":"cam-layered","title":"Layered CAM (HSM)"},
+  {"slug":"five-axis-cam","title":"Five-axis CAM"},
+  {"slug":"flat-pattern-dxf","title":"Flat-pattern DXF"},
+  {"slug":"fem-linear-static","title":"FEM linear static"},
+  {"slug":"cfd-simple-solver","title":"CFD (SIMPLE)"},
+  {"slug":"topology-optimization","title":"Topology optimization"},
+  {"slug":"electronics","title":"Electronics workflow"},
+  {"slug":"electronics-authoring","title":"Authoring circuits"},
+  {"slug":"schematic-editor","title":"Schematic editor"},
+  {"slug":"electronics-drc-erc","title":"DRC & ERC"},
+  {"slug":"aerospace","title":"Aerospace"},
+  {"slug":"silicon","title":"Silicon / chips"},
+  {"slug":"firmware","title":"Firmware"},
+  {"slug":"plc","title":"PLC / controls"},
+  {"slug":"imports","title":"Importing CAD"},
+  {"slug":"mechanical-workflow","title":"Mechanical"},
+  {"slug":"electronic-workflow","title":"Electronic"},
+  {"slug":"jewelry-workflow","title":"Jewelry"},
+  {"slug":"distributed-workshop","title":"Distributed Workshop"},
+  {"slug":"distributors","title":"Distributor APIs"},
+  {"slug":"curation","title":"Verified publishers"},
+  {"slug":"v1-rpc","title":"HTTP / JSON-RPC API"},
+  {"slug":"sdk","title":"Python SDK"},
+  {"slug":"api-reference","title":"REST API reference"},
+  {"slug":"contributing","title":"Contributing"},
+  {"slug":"plugins-development","title":"Plugin development"},
+  {"slug":"deployment","title":"Deployment"},
+  {"slug":"releasing","title":"Releasing Kerf"},
+  {"slug":"troubleshooting","title":"Troubleshooting"},
+  {"slug":"whats-new","title":"What's new"}
+];
+const bySlug = Object.fromEntries(DOCS.map(d => [d.slug, d]));
+const content = document.getElementById('content');
+const crumb = document.getElementById('crumb');
+const sidebar = document.getElementById('sidebar');
+
+if (window.marked && marked.setOptions) marked.setOptions({ gfm: true, breaks: false });
+
+function slugifyHeading(t) {
+  return t.toLowerCase().trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+}
+
+function setActive(slug) {
+  document.querySelectorAll('.sidebar a').forEach(a =>
+    a.classList.toggle('active', a.dataset.slug === slug));
+  const on = document.querySelector('.sidebar a.active');
+  if (on && sidebar.scrollHeight > sidebar.clientHeight) {
+    const r = on.getBoundingClientRect(), sr = sidebar.getBoundingClientRect();
+    if (r.top < sr.top || r.bottom > sr.bottom) on.scrollIntoView({ block: 'center' });
+  }
+}
+
+async function load(slug, heading) {
+  const doc = bySlug[slug] || DOCS[0];
+  setActive(doc.slug);
+  crumb.innerHTML = 'Docs <span style="opacity:.5">/</span> <b>' + doc.title + '</b>';
+  content.innerHTML = '<span class="loading">Loading…</span>';
+  try {
+    const res = await fetch('./docs/' + doc.slug + '.md', { cache: 'no-cache' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const md = await res.text();
+    content.innerHTML = marked.parse(md);
+    // heading anchors + ids
+    const seen = {};
+    content.querySelectorAll('h1,h2,h3,h4').forEach(h => {
+      let id = slugifyHeading(h.textContent);
+      if (!id) return;
+      if (seen[id] != null) { seen[id]++; id = id + '-' + seen[id]; } else seen[id] = 0;
+      h.id = id;
+      const a = document.createElement('a');
+      a.className = 'anchor'; a.href = '#' + doc.slug + '#' + id; a.textContent = '#';
+      a.setAttribute('aria-label', 'Link to this section');
+      h.appendChild(a);
+    });
+    // external links open in a new tab
+    content.querySelectorAll('a[href^="http"]').forEach(a => { a.target = '_blank'; a.rel = 'noopener'; });
+    if (heading) {
+      const el = document.getElementById(heading);
+      if (el) { el.scrollIntoView(); return; }
+    }
+    window.scrollTo({ top: 0 });
+  } catch (err) {
+    content.innerHTML = '<div class="err">Could not load <code>' + doc.slug + '.md</code> — ' + err.message + '</div>';
+  }
+}
+
+function route() {
+  const raw = (location.hash || '').replace(/^#/, '');
+  const parts = raw.split('#');
+  const slug = parts[0] || DOCS[0].slug;
+  if (bySlug[slug]) {
+    load(slug, parts[1]);
+  } else if (raw) {
+    // in-page anchor within the current doc
+    const el = document.getElementById(raw);
+    if (el) el.scrollIntoView(); else load(DOCS[0].slug);
+  } else {
+    load(DOCS[0].slug);
+  }
+  if (window.matchMedia('(max-width:860px)').matches) sidebar.classList.remove('open');
+}
+
+window.addEventListener('hashchange', route);
+route();
+
+// mobile menu + search filter
+document.getElementById('menuBtn').addEventListener('click', () => sidebar.classList.toggle('open'));
+const search = document.getElementById('search');
+const nores = document.getElementById('nores');
+search.addEventListener('input', () => {
+  const q = search.value.trim().toLowerCase();
+  let anyVisible = false;
+  const groups = [...sidebar.querySelectorAll('.grp')];
+  sidebar.querySelectorAll('a[data-slug]').forEach(a => {
+    const show = !q || a.textContent.toLowerCase().includes(q) || a.dataset.slug.includes(q);
+    a.style.display = show ? '' : 'none';
+    if (show) anyVisible = true;
+  });
+  // hide group headers with no visible items
+  groups.forEach(g => {
+    let n = g.nextElementSibling, vis = false;
+    while (n && !n.classList.contains('grp')) { if (n.matches('a') && n.style.display !== 'none') vis = true; n = n.nextElementSibling; }
+    g.style.display = vis ? '' : 'none';
+  });
+  nores.style.display = anyVisible ? 'none' : 'block';
+});
+</script>
+</body>
+</html>

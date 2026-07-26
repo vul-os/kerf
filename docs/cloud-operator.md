@@ -21,7 +21,7 @@ purely configuration:
 
 | Toggle | Off (default) | On |
 |---|---|---|
-| **publicly-reachable** | Bound to `127.0.0.1` — nothing outside your machine can reach it | Bound to a public interface / behind a reverse proxy or Vulos Relay |
+| **publicly-reachable** | Bound to `127.0.0.1` — nothing outside your machine can reach it | Bound to a public interface / behind a reverse proxy or Ephor |
 | **relay-for-others** | Serves only your own objects | Also relays/mirrors chunks for other nodes (a mesh holder) |
 | **pin-storage** | Keeps only what you actively use | Pins followed feeds' content for guaranteed offline availability |
 | **offer-compute** | Renders/simulates locally only | Accepts render/simulation jobs from other nodes you trust |

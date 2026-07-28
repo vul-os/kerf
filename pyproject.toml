@@ -334,6 +334,7 @@ testpaths = [
     "packages/kerf-worker/tests",
     "packages/kerf-plm/tests",
     "packages/kerf-rules/tests",
+    "tests/install",
     "tests/perf",
 ]
 asyncio_mode = "auto"

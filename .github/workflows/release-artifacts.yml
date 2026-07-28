@@ -7,7 +7,7 @@ name: Release Artifacts
 # Jobs:
 #   wheels        — Python wheels for all packages/* except kerf-sdk
 #   frontend      — Vite dist tarball
-#   install-sh    — pinned copy of install.sh
+#   install-sh    — tag-named copy of install.sh (verbatim, not version-pinned)
 #   sbom          — Software Bill of Materials (CycloneDX JSON or pip-freeze fallback)
 #   verify        — Assert all expected assets are present on the release
 
@@ -135,13 +135,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Stamp version into install.sh copy
+      - name: Copy install.sh under a tag-stamped name
         shell: bash
         run: |
+          set -euo pipefail
           VERSION="${GITHUB_REF_NAME}"   # keep the "v" prefix (e.g. v0.1.0)
+          # This is a verbatim copy, named for the tag it was published with —
+          # it is NOT pinned to that tag. install.sh resolves the latest release
+          # at run time unless KERF_VERSION is set. (A `sed` here substituted a
+          # `__KERF_VERSION__` placeholder that install.sh has never contained,
+          # so it rewrote nothing; removed rather than left as decoration.)
           cp install.sh "kerf-install-${VERSION}.sh"
-          # Substitute the placeholder __KERF_VERSION__ with the real tag
-          sed -i "s|__KERF_VERSION__|${VERSION}|g" "kerf-install-${VERSION}.sh"
           echo "INSTALL_SH=kerf-install-${VERSION}.sh" >> "$GITHUB_ENV"
 
       - name: Attach install.sh to GitHub Release

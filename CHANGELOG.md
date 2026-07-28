@@ -12,7 +12,58 @@ The authoritative source for what's shipped vs. in-flight is
 
 ## [Unreleased]
 
-No unreleased changes.
+### Fixed
+
+- **`install.sh` verifies checksums fail-closed.** A missing or empty
+  `SHA256SUMS`, or an asset the manifest does not list, is now a hard error.
+  It previously printed `WARNING: … skipping verification` and installed the
+  unverified bytes anyway — the common failure path reported safety it had not
+  checked. `release.yml` now also asserts, at the point of production, that
+  `SHA256SUMS` covers all four tarballs. Also fixed two latent installer bugs
+  found while testing it: the wrapper-directory unwrap silently did nothing
+  when `KERF_HOME`'s own basename began with `kerf-`, and the final
+  `ln -sfn … /current` failed when `~/.local/share/kerf` did not exist.
+- **The vendored DMTAP-PUB conformance corpus is guarded standalone.** The
+  byte-for-byte drift guard only ran when a sibling `dmtap` checkout happened
+  to exist, so it silently skipped in CI — the environment the vendored copy
+  exists *for*. It is now split: `test_vendored_vectors_are_the_pinned_bytes`
+  pins the file's sha256 and length and fails everywhere with no skip path,
+  and the cross-repo comparison stays a skip (it needs a second repository)
+  but warns loudly, names every path it searched, and states what it did not
+  check. Setting `KERF_PUB_SPEC_VECTORS` at a missing path is a hard error.
+- **Vector coverage is asserted, not assumed.** Every §22 vector is mapped to
+  the test that replays it, both directions are checked, the mapped tests must
+  exist, the corpus count is pinned, and duplicate vector names now fail at
+  load instead of silently shrinking the corpus.
+- `tests/unit/saving-doc.test.js` pointed at `docs/saving-your-work.md`, which
+  `bfdbd635` retired in favour of `docs/save-and-recovery.md` — it had been
+  failing on every vitest run. Retargeted at the successor doc.
+
+### Removed
+
+- `scripts/install.sh` — a stale second installer that downloaded a
+  `kerf-<os>-<arch>` single binary the release workflow has never produced,
+  with no checksum verification of any kind. Nothing referenced it; the root
+  `install.sh` is the real one.
+- Twelve unreferenced frontend modules (`LayerStackPreview`,
+  `ProjectLayersPanel`, `UncommittedBanner`, `pcbLayers`, `webSerialBridge`,
+  `ClashRoute`, `GeometryInspectorRoute`, `ToolsLanding`, `pcbThemes`) and two
+  unused BLAKE3 spec constants (`OUT_LEN`, `KEY_LEN`, the latter naming a keyed
+  mode `blake3_pure` deliberately does not implement). Also removed a `sed`
+  in `release-artifacts.yml` that substituted a `__KERF_VERSION__` placeholder
+  `install.sh` has never contained.
+
+### Changed
+
+- `src/routes/Editor.jsx` used a literal NUL byte as a cache-key separator,
+  which made `file(1)` classify the 139 KB module as binary and made every
+  `grep -r` (which defaults to `-I`) skip it entirely. Replaced with the
+  `\u0000` escape: same bytes at runtime, greppable at rest.
+- README and `docs/distributed-workshop.md` now state the Workshop's measured
+  scope. Publish / follow / verify / pin are built; *offline browsing* is not
+  (the browse index is a live crawl and remote feed heads are never cached
+  locally), and the Workshop ships as the opt-in `pub` extra rather than by
+  default.
 
 ---
 
@@ -93,7 +144,7 @@ any kind — Kerf is 100% MIT and free to self-host, permanently.
   the Workshop protocol; a redesigned docs viewer with grouped taxonomy,
   breadcrumbs, and TOC; ~75 per-package `llm_docs/` pages; a "Part of VulOS"
   standard README, docs, and `landing/index.html`, matching the sibling
-  `wede`/`ofisi` product repos.
+  `wede`/`diwan` product repos.
 
 ### Changed
 

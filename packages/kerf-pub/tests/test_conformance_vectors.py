@@ -23,7 +23,10 @@ suite).
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
+import warnings
 from pathlib import Path
 
 import pytest
@@ -53,10 +56,45 @@ VECTORS_PATH = Path(__file__).parent / "vectors" / "pub_vectors.json"
 def _load() -> dict[str, dict]:
     doc = json.loads(VECTORS_PATH.read_text())
     assert doc["format"] == "dmtap-conformance-vectors/1"
-    return {v["name"]: v for v in doc["vectors"]}
+    by_name = {v["name"]: v for v in doc["vectors"]}
+    # Keying by name silently collapses duplicates, which would under-report the
+    # corpus size to every count assertion below. Catch it at load time.
+    assert len(by_name) == len(doc["vectors"]), (
+        f"duplicate vector name(s) in {VECTORS_PATH}: "
+        f"{len(doc['vectors'])} entries collapsed to {len(by_name)}"
+    )
+    return by_name
 
 
 VECTORS = _load()
+
+# Every vector in the frozen suite, mapped to the test in THIS module that
+# replays it. Written out rather than derived so a vector cannot be added to
+# the corpus and quietly go unreplayed, and so a test cannot be deleted while
+# the vector it covered still reads as covered. Both directions are checked by
+# ``test_all_vectors_are_claimed_by_this_module``.
+REPLAYED_BY = {
+    "pub_manifest_single_chunk": "test_manifest_root",
+    "pub_manifest_three_chunks": "test_manifest_root",
+    "pub_manifest_type_incompatibility": "test_manifest_type_incompatibility_vs_sealed_tree",
+    "pub_manifest_key5_forbidden": "test_manifest_key5_is_rejected",
+    "pub_announce_signing_preimage": "test_announce_signing_preimage_and_signature",
+    "pub_announce_id": "test_announce_id_is_content_address_of_signed_object",
+    "pub_announce_supersede_same_author_valid": "test_supersede_same_author_accepted",
+    "pub_announce_supersede_cross_author_invalid": "test_supersede_cross_author_rejected",
+    "pub_feed_entry_chain": "test_feed_entry_ids_and_prev_chain",
+    "pub_feed_head_signing_preimage": "test_feed_head_signing_preimage_and_signature",
+    "pub_feed_rollback_strict_less_than": "test_feed_rollback_strict_less_than_rejected",
+    "pub_feed_equal_seq_identical_tip_idempotent": "test_feed_equal_seq_identical_tip_is_idempotent",
+    "pub_feed_equal_seq_different_tip_fork": "test_feed_equal_seq_different_tip_is_a_fork_not_a_rollback",
+    "pub_feed_genesis_carries_prev_malformed": "test_malformed_feed_entry_shapes_rejected",
+    "pub_feed_nongenesis_missing_prev_malformed": "test_malformed_feed_entry_shapes_rejected",
+}
+
+# The corpus size this module is written against. A count, not just a set
+# comparison: a resync that both adds and removes a vector keeps the set
+# assertion honest only because this number is also pinned.
+EXPECTED_VECTOR_COUNT = 15
 
 
 def vec(name: str) -> dict:
@@ -66,26 +104,30 @@ def vec(name: str) -> dict:
 
 
 def test_all_vectors_are_claimed_by_this_module():
-    """Fail loudly if the vendored suite grows a vector nobody replays."""
-    replayed = {
-        "pub_manifest_single_chunk",
-        "pub_manifest_three_chunks",
-        "pub_manifest_type_incompatibility",
-        "pub_manifest_key5_forbidden",
-        "pub_announce_signing_preimage",
-        "pub_announce_id",
-        "pub_announce_supersede_same_author_valid",
-        "pub_announce_supersede_cross_author_invalid",
-        "pub_feed_entry_chain",
-        "pub_feed_head_signing_preimage",
-        "pub_feed_rollback_strict_less_than",
-        "pub_feed_equal_seq_identical_tip_idempotent",
-        "pub_feed_equal_seq_different_tip_fork",
-        "pub_feed_genesis_carries_prev_malformed",
-        "pub_feed_nongenesis_missing_prev_malformed",
-    }
-    assert set(VECTORS) == replayed, "vendored vector suite changed — update this module"
-    assert len(VECTORS) == 15
+    """Fail loudly if the vendored suite grows a vector nobody replays.
+
+    Three assertions, because a growing corpus can under-run three ways: a new
+    vector nobody replays, a named replay test that no longer exists, and a
+    count that drifts while the set happens to still match.
+    """
+    missing = set(VECTORS) - set(REPLAYED_BY)
+    assert not missing, (
+        f"vendored suite grew vector(s) nobody replays: {sorted(missing)}. "
+        "Add a replay test and map it in REPLAYED_BY — do not just widen the map."
+    )
+    stale = set(REPLAYED_BY) - set(VECTORS)
+    assert not stale, (
+        f"REPLAYED_BY claims vector(s) the corpus no longer has: {sorted(stale)}"
+    )
+
+    for name, test_name in sorted(REPLAYED_BY.items()):
+        assert test_name in globals(), (
+            f"vector {name!r} is mapped to {test_name}(), which does not exist "
+            "in this module — the vector is unreplayed."
+        )
+
+    assert len(VECTORS) == EXPECTED_VECTOR_COUNT
+    assert len(REPLAYED_BY) == EXPECTED_VECTOR_COUNT
 
 
 # ── §18.1.5 content addressing ────────────────────────────────────────────────
@@ -325,9 +367,49 @@ def test_malformed_feed_entry_shapes_rejected(name):
 # eventually DOES matter, silently, one resync at a time.
 #
 # Vendoring is still right: the copy keeps this suite self-contained in CI, where
-# the sibling spec checkout does not exist. So the guard is conditional — it
-# asserts identity when the source is reachable and skips loudly when it is not,
-# rather than pretending a check ran.
+# the sibling spec checkout does not exist.
+#
+# The guard that was added after that incident only asserted identity when the
+# sibling checkout happened to be reachable, and skipped otherwise — which is to
+# say it did nothing in CI, in a release tarball, and on any machine that had not
+# also cloned the spec repo. A guard added because of a real incident and then
+# made skippable is not a guard.
+#
+# So it is split in two, by the only question that matters: can this check run
+# standalone, from this checkout alone?
+#
+#   1. ``test_vendored_vectors_are_the_pinned_bytes`` — YES, so it is a HARD
+#      ERROR, everywhere, with no skip path. It pins the exact digest and length
+#      of the vendored file. Any byte change fails it, including a change to a
+#      provenance string that leaves all 15 vectors identical — precisely the
+#      drift that actually happened and that nothing caught. Re-syncing from the
+#      spec is still a one-line edit here, but it is now a DELIBERATE one that
+#      shows up in review, instead of a file quietly becoming something else.
+#
+#   2. ``test_vendored_vectors_match_the_spec_repo_byte_for_byte`` — NO. It
+#      needs a second repository that by design is absent from CI and from every
+#      release artifact. Making its absence a hard error would fail kerf's
+#      default gate for a reason that is not about kerf, which trains people to
+#      ignore it — the same "guard nobody reads" failure by a different route.
+#      It is therefore a LOUD skip: it emits a warning that survives into
+#      pytest's default warnings summary, names every path it looked at, and
+#      states exactly what it did NOT check. It is fail-closed in the one case
+#      where intent is unambiguous: if ``KERF_PUB_SPEC_VECTORS`` is set, the
+#      path must exist and match, or the test fails.
+#
+# (1) is what makes (2)'s skip acceptable: the vendored copy is never unchecked,
+# only ever cross-checked-against-the-spec or not.
+
+# sha256 + length of tests/vectors/pub_vectors.json as vendored from the DMTAP
+# spec repo. UPDATE ONLY when deliberately re-syncing from that repo, in the
+# same commit as the re-copied file, and say so in the commit message:
+#   shasum -a 256 packages/kerf-pub/tests/vectors/pub_vectors.json
+VENDORED_VECTORS_SHA256 = (
+    "43a4ab54fee10fea3997f99605e01fb9b7dc9b465da32cd365cd3413c0be81f4"
+)
+VENDORED_VECTORS_BYTES = 16953
+
+ENV_SPEC_VECTORS = "KERF_PUB_SPEC_VECTORS"
 
 _SPEC_VECTORS_CANDIDATES = (
     Path(__file__).resolve().parents[4] / "vulos" / "dmtap" / "conformance" / "vectors" / "pub_vectors.json",
@@ -342,15 +424,55 @@ def _spec_vectors_path() -> Path | None:
     return None
 
 
+def test_vendored_vectors_are_the_pinned_bytes():
+    """Standalone drift guard: no sibling checkout, no network, no skip path."""
+    raw = VECTORS_PATH.read_bytes()
+    got = hashlib.sha256(raw).hexdigest()
+    assert (len(raw), got) == (VENDORED_VECTORS_BYTES, VENDORED_VECTORS_SHA256), (
+        f"vendored {VECTORS_PATH} is not the bytes this suite was written against.\n"
+        f"  expected {VENDORED_VECTORS_BYTES} bytes, sha256 {VENDORED_VECTORS_SHA256}\n"
+        f"  got      {len(raw)} bytes, sha256 {got}\n"
+        "This file is INPUT: re-copy it verbatim from the spec repo's "
+        "conformance/vectors/pub_vectors.json and update VENDORED_VECTORS_SHA256 / "
+        "VENDORED_VECTORS_BYTES in the same commit. Do NOT edit the vendored copy "
+        "in place, and do NOT regenerate it here — a corpus a client regenerates "
+        "for itself tests nothing but its own arithmetic."
+    )
+
+
 def test_vendored_vectors_match_the_spec_repo_byte_for_byte():
     """The vendored copy MUST equal the spec repo's file exactly, when reachable."""
-    src = _spec_vectors_path()
-    if src is None:
-        pytest.skip(
-            "dmtap spec repo not found alongside this checkout — drift cannot be "
-            "checked here. This is a SKIP, not a pass: the vendored copy is "
-            "unverified in this environment."
+    override = os.environ.get(ENV_SPEC_VECTORS)
+    if override:
+        src = Path(override)
+        # Explicitly pointed at a spec repo: absence is an error, not a skip.
+        assert src.is_file(), (
+            f"{ENV_SPEC_VECTORS}={override} does not name a readable file. It was "
+            "set deliberately, so this is a hard error rather than a skip."
         )
+    else:
+        src = _spec_vectors_path()
+
+    if src is None:
+        searched = "\n".join(f"    {p}" for p in _SPEC_VECTORS_CANDIDATES)
+        reason = (
+            "DRIFT CHECK NOT RUN: the DMTAP spec repo was not found alongside this "
+            "checkout, so the vendored conformance corpus was NOT compared against "
+            "its source.\n"
+            f"  not checked: {VECTORS_PATH} == <dmtap>/conformance/vectors/pub_vectors.json\n"
+            f"  searched:\n{searched}\n"
+            f"  to run it here: {ENV_SPEC_VECTORS}=/path/to/dmtap/conformance/vectors/"
+            "pub_vectors.json pytest ...\n"
+            "  what DID run: test_vendored_vectors_are_the_pinned_bytes pins the "
+            "vendored file's sha256, so the copy cannot change unnoticed — but "
+            "whether it still matches the spec repo is unverified here."
+        )
+        # A pytest skip is invisible without -rs; a warning lands in the default
+        # summary. This skip must be seen, because the guard exists on account of
+        # a drift that went unseen.
+        warnings.warn(reason, UserWarning, stacklevel=2)
+        pytest.skip(reason)
+
     assert VECTORS_PATH.read_bytes() == src.read_bytes(), (
         f"vendored {VECTORS_PATH} has drifted from {src}.\n"
         "Re-copy the spec repo's file verbatim — do NOT edit the vendored copy, "

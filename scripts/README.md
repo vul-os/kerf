@@ -84,5 +84,4 @@ Tests run against an in-memory SQLite database — no real Postgres required. Th
 | `deploy-fly.sh` | Deploy to Fly.io (production or dev environment) |
 | `loop_local.sh` | Drop + recreate schema, migrate, seed, run full test suite |
 | `test_all.sh` | Run full test harness |
-| `install.sh` | One-line installer for end users |
 | `bump-version.sh` | Bump the project version |

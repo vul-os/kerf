@@ -26,8 +26,10 @@ Reference: BLAKE3 specification (Aumasson, Neves, Wilcox-O'Hearn, Winnerlein),
 
 from __future__ import annotations
 
-OUT_LEN = 32
-KEY_LEN = 32
+# OUT_LEN/KEY_LEN from the BLAKE3 spec's constant table are deliberately absent:
+# nothing here read them, the 32-byte output is stated in the docstring and
+# produced by the 8-word root CV, and KEY_LEN named a keyed mode this module
+# does not implement.
 BLOCK_LEN = 64
 CHUNK_LEN = 1024
 

@@ -113,7 +113,7 @@ surfaces one of four states for anything you're viewing or have referenced:
 
 | State | Meaning |
 |---|---|
-| **on-node** | Pinned locally. Available even fully offline. |
+| **on-node** | Pinned locally: every manifest and chunk is in your store, so the part's bytes are fetchable fully offline. |
 | **available** | Verified as being served right now by at least one known holder. |
 | **stale** | You have an older revision pinned, or haven't re-checked the publisher's feed head recently — there may be a newer version. |
 | **unreachable** | No known holder answered. The object may still exist elsewhere; a later retry, or a different gateway, may find it. |
@@ -122,6 +122,14 @@ Availability is not a durability guarantee — it is the emergent sum of
 independent holders' choices. If keeping something around matters to you,
 **pin** it: pinning is the only thing that turns "available because someone
 happens to be serving it" into "available because you chose to keep it."
+
+> **`on-node` is about the bytes, not the catalog.** Browsing is a live
+> crawl: `GET /api/pub/workshop` re-resolves every followed feed each time,
+> and `PubClient.resolve()` does not persist a *remote* feed's head or
+> entries (only your own feed is written locally). So with the network down,
+> a pinned part is still fetchable and verifiable, but it will not appear in
+> the Workshop listing for a followed publisher you cannot reach. Caching
+> verified remote heads locally would close this; it is not built yet.
 
 ## Wake (optional: "new revision" pings)
 

@@ -88,6 +88,7 @@ if [ -d "$KERF_HOME" ] && [ -x "$KERF_HOME/setup.sh" ]; then
   info "Kerf ${KERF_VERSION} is already downloaded at ${KERF_HOME}."
   info "Re-running its setup.sh to make sure the venv + config are up to date..."
   "$KERF_HOME/setup.sh"
+  mkdir -p "$HOME/.local/share/kerf"
   ln -sfn "$KERF_HOME" "$HOME/.local/share/kerf/current"
   ok "Done. See next steps above."
   exit 0
@@ -105,24 +106,47 @@ if ! curl -fsSL -o "${TMP_DIR}/${ASSET}" "$DOWNLOAD_URL"; then
   fail "Download failed. Check that ${KERF_VERSION} exists at https://github.com/${REPO}/releases"
 fi
 
+# ── Verify checksum (FAIL-CLOSED) ────────────────────────────────────────────
+# Every path out of this block is either "verified" or "abort". This used to
+# warn-and-continue when SHA256SUMS 404'd or didn't list the asset, which meant
+# the common failure — no checksum file at all — installed unverified bytes
+# while printing a line that looked like a verification step had run. A
+# verifier that reports safety it did not check is worse than no verifier.
+#
+# There is deliberately no skip switch. SHA256SUMS is produced unconditionally
+# by .github/workflows/release.yml (`sha256sum kerf-* > SHA256SUMS`) and
+# attached to the release alongside the tarballs, so its absence means the
+# release is incomplete or the download was tampered with — neither is a
+# condition to shrug at. If you genuinely need unverified bytes, download the
+# tarball yourself and unpack it by hand; that is an explicit act, not a
+# silent default.
 info "Verifying checksum..."
 CHECKSUMS_URL="https://github.com/${REPO}/releases/download/${KERF_VERSION}/SHA256SUMS"
-if curl -fsSL -o "${TMP_DIR}/SHA256SUMS" "$CHECKSUMS_URL" 2>/dev/null; then
-  EXPECTED=$(grep " ${ASSET}\$" "${TMP_DIR}/SHA256SUMS" | awk '{print $1}')
-  if [ -n "$EXPECTED" ]; then
-    if command -v sha256sum >/dev/null 2>&1; then
-      ACTUAL=$(sha256sum "${TMP_DIR}/${ASSET}" | awk '{print $1}')
-    else
-      ACTUAL=$(shasum -a 256 "${TMP_DIR}/${ASSET}" | awk '{print $1}')
-    fi
-    [ "$EXPECTED" = "$ACTUAL" ] || fail "Checksum mismatch for ${ASSET} — expected ${EXPECTED}, got ${ACTUAL}. Aborting."
-    ok "Checksum verified."
-  else
-    warn "Asset not listed in SHA256SUMS — skipping verification."
-  fi
+
+curl -fsSL -o "${TMP_DIR}/SHA256SUMS" "$CHECKSUMS_URL" 2>/dev/null \
+  || fail "Could not fetch ${CHECKSUMS_URL} — refusing to install unverified bytes. Every Kerf release publishes SHA256SUMS; if it is missing, the release is incomplete. Report it at https://github.com/${REPO}/issues"
+
+[ -s "${TMP_DIR}/SHA256SUMS" ] \
+  || fail "${CHECKSUMS_URL} is empty — refusing to install unverified bytes."
+
+# Exact filename match on field 2 — not a regex over the line, so a `.` in the
+# asset name can never match a different asset.
+EXPECTED=$(awk -v want="$ASSET" '$2 == want || $2 == "*" want { print $1; exit }' "${TMP_DIR}/SHA256SUMS")
+[ -n "$EXPECTED" ] \
+  || fail "${ASSET} is not listed in SHA256SUMS — refusing to install an asset the release does not vouch for."
+
+if command -v sha256sum >/dev/null 2>&1; then
+  ACTUAL=$(sha256sum "${TMP_DIR}/${ASSET}" | awk '{print $1}')
+elif command -v shasum >/dev/null 2>&1; then
+  ACTUAL=$(shasum -a 256 "${TMP_DIR}/${ASSET}" | awk '{print $1}')
 else
-  warn "Could not fetch SHA256SUMS — skipping verification."
+  fail "Neither sha256sum nor shasum is available — cannot verify ${ASSET}. Install coreutils (Linux) or Perl's shasum (macOS ships it) and re-run."
 fi
+
+[ -n "$ACTUAL" ] || fail "Checksum computation produced no output for ${ASSET}. Aborting."
+[ "$EXPECTED" = "$ACTUAL" ] \
+  || fail "Checksum mismatch for ${ASSET} — expected ${EXPECTED}, got ${ACTUAL}. Aborting."
+ok "Checksum verified."
 
 mkdir -p "$KERF_HOME"
 info "Unpacking to ${KERF_HOME} ..."
@@ -131,7 +155,10 @@ tar -xzf "${TMP_DIR}/${ASSET}" -C "$KERF_HOME"
 # Tarballs contain their content at the top level OR under one wrapper dir
 # (kerf-vX.Y.Z/) depending on how they were produced; handle both.
 if [ ! -x "$KERF_HOME/setup.sh" ]; then
-  INNER="$(find "$KERF_HOME" -maxdepth 1 -type d -name 'kerf-*' | head -1)"
+  # -mindepth 1: without it `find` also yields $KERF_HOME itself, so a
+  # KERF_HOME whose own basename starts with "kerf-" (e.g. KERF_HOME=~/kerf-dev)
+  # matched first and the unwrap silently did nothing.
+  INNER="$(find "$KERF_HOME" -mindepth 1 -maxdepth 1 -type d -name 'kerf-*' | head -1)"
   if [ -n "$INNER" ] && [ -x "$INNER/setup.sh" ]; then
     shopt -s dotglob 2>/dev/null || true
     mv "$INNER"/* "$KERF_HOME"/
@@ -145,5 +172,7 @@ fi
 info "Running bundled setup..."
 "$KERF_HOME/setup.sh"
 
+mkdir -p "$HOME/.local/share/kerf"   # KERF_HOME may live elsewhere; the
+                                     # "current" symlink still goes here
 ln -sfn "$KERF_HOME" "$HOME/.local/share/kerf/current"
 ok "Kerf ${KERF_VERSION} installed at ${KERF_HOME} (symlinked as ~/.local/share/kerf/current)."

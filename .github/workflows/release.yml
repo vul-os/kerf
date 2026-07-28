@@ -170,7 +170,22 @@ jobs:
           # anyone who wants the full monorepo, incl. kerf-sdk, tests/, etc.)
           git archive --format=tar.gz --prefix="${STAGE}-src/" -o "release-out/kerf-${TAG}-src.tar.gz" "$TAG"
 
+          # SHA256SUMS is not optional: install.sh aborts the install when it is
+          # missing or does not list the asset it just downloaded (fail-closed,
+          # see the "Verify checksum" block there). So assert here, at the point
+          # of production, that it covers every tarball — a release that ships an
+          # asset SHA256SUMS does not vouch for is uninstallable, and that must
+          # surface as a red build, not as a 404 in a user's terminal.
           ( cd release-out && sha256sum kerf-* > SHA256SUMS && cat SHA256SUMS )
+
+          for os in macos-arm64 macos-x64 linux-x64 src; do
+            asset="kerf-${TAG}-${os}.tar.gz"
+            [ -f "release-out/${asset}" ] || { echo "::error::missing tarball ${asset}"; exit 1; }
+            awk -v want="$asset" '$2 == want || $2 == "*" want { found=1 } END { exit !found }' \
+              release-out/SHA256SUMS \
+              || { echo "::error::${asset} is not listed in SHA256SUMS"; exit 1; }
+          done
+          echo "SHA256SUMS covers all 4 tarballs."
 
       - name: Upload tarballs as workflow artifact
         uses: actions/upload-artifact@v4

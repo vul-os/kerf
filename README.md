@@ -26,7 +26,7 @@ Parametric sketching &amp; modeling across five geometry kernels · drawings · 
 
 ## What is Kerf?
 
-Kerf is a complete CAD system — sketcher, five geometry kernels, drawings, assemblies, FEM/CFD, CAM, electronics/PCB, BIM, and manufacturing prep across 37 engineering domains — that installs and runs entirely on your own machine, MIT-licensed, with no account required. Every design lives in plain files (JSCAD, `.feature` JSON, `.circuit.tsx`, `.sketch`, `.drawing`) so an LLM chat panel can read, diff, and edit your project directly instead of guessing at pixels. When you want to share a part, publish it to the **Workshop** — a distributed catalog of parts built on the open **DMTAP-PUB** protocol: signed, content-addressed, no accounts, no central server, and still browsable offline once pinned.
+Kerf is a complete CAD system — sketcher, five geometry kernels, drawings, assemblies, FEM/CFD, CAM, electronics/PCB, BIM, and manufacturing prep across 37 engineering domains — that installs and runs entirely on your own machine, MIT-licensed, with no account required. Every design lives in plain files (JSCAD, `.feature` JSON, `.circuit.tsx`, `.sketch`, `.drawing`) so an LLM chat panel can read, diff, and edit your project directly instead of guessing at pixels. When you want to share a part, publish it to the **Workshop** — a distributed catalog of parts built on the open **DMTAP-PUB** protocol: signed, content-addressed, no accounts, no central server. Publish, follow, verify, and pin are built and tested against the shared DMTAP conformance vectors; the Workshop itself ships as an opt-in extra (`pip install 'kerf[server,pub]'`), and *browsing* is not yet offline — a pinned part's bytes are local and readable with the network down, but the browse index is rebuilt from live feeds on each visit, so a followed publisher's feed has to be reachable to list it. See [the Workshop's current limits](#the-workshops-current-limits).
 
 ## Features
 
@@ -79,7 +79,7 @@ An LLM reads and edits your project's source files directly — through a regist
 
 ### Distributed Workshop
 
-Publish and browse parts over DMTAP-PUB (§22/§23 of [`github.com/vul-os/dmtap`](https://github.com/vul-os/dmtap)): signed, content-addressed, no accounts, no central server. See [How it works](#how-it-works).
+Publish and browse parts over DMTAP-PUB (§22/§23 of [`github.com/vul-os/dmtap`](https://github.com/vul-os/dmtap)): signed, content-addressed, no accounts, no central server. Opt-in — `pip install 'kerf[server,pub]'`; `kerf[server]` alone has no `/api/pub/*`. See [How it works](#how-it-works) and [its current limits](#the-workshops-current-limits).
 
 ### Your data
 
@@ -185,8 +185,23 @@ flowchart LR
 
 - **One node type.** A homelab box running Kerf and a hosted always-on node run identical software — the only difference is uptime, not capability.
 - **The Workshop is a set of feeds you follow**, not a server you register with. Publishing signs a `pub_announce` and appends it to your own append-only feed (DMTAP-PUB §22.4); "following" a workshop is just fetching feeds you chose. No central catalog is authoritative — any node can rebuild a browsable index from the feeds it knows about.
-- **Parts stay accessible offline** once pinned: every object is content-addressed and self-verifying, so any gateway — yours, a friend's, or a public one — can serve it without being trusted.
+- **A pinned part's bytes stay readable offline**: pinning hydrates every manifest and chunk into your own store, and every object is content-addressed and self-verifying, so any gateway — yours, a friend's, or a public one — can serve it without being trusted.
 - **Zero-socket by default.** An unconfigured Kerf install never dials out. Publishing and following are both explicit, opt-in acts.
+
+### The Workshop's current limits
+
+Honest scope, measured against the code rather than the design:
+
+| | Status |
+|---|---|
+| Publish (manifest + signed `pub_announce` + append to your own feed) | Built |
+| Follow / unfollow, verified feed resolve with the §22.4.2 anti-rollback and fork checks | Built |
+| Client-side verification of every object (re-addressed, signature re-checked) | Built — §22 conformance vectors replayed in `packages/kerf-pub/tests/` |
+| Pin + hydrate (fetch and self-verify every chunk; partial hydration never reads as `on-node`) | Built |
+| Assembly BOM DAG walk, cycle refusal | Built |
+| **Offline *browsing*** | **Not built.** `PubClient.resolve()` does not persist a followed feed's head or entries — only your own feed is written locally (`_append_own_feed`) — so `GET /api/pub/workshop` lists nothing for a followed publisher whose PUB server is unreachable, even when its parts are pinned. The pinned bytes are still fetchable; the catalog view is not. |
+| Ships by default | **No.** The Workshop is the `pub` extra: `pip install 'kerf[server,pub]'`. `kerf[server]` deliberately excludes DMTAP-PUB. |
+| `submit` (DMTAP-PUB compute) | Not built — out of scope for v1, raises `NotImplementedError`. |
 
 Full spec: [docs/node-architecture.md](./docs/node-architecture.md) · [docs/distributed-workshop.md](./docs/distributed-workshop.md).
 

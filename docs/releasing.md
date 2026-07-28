@@ -73,7 +73,7 @@ the release:
 **Honesty note:** Kerf is Python + Node, not a compiled binary, so there is
 nothing to cross-compile per platform (yet). The three OS-labeled tarballs
 today have byte-identical contents — the split exists for naming-convention
-parity with `wede`/`ofisi` (which ship real per-OS Go binaries) and so
+parity with `wede`/`diwan` (which ship real per-OS Go binaries) and so
 `install.sh` has a stable, predictable asset name to fetch. A real
 single-binary build (PyInstaller/Nuitka, or a thin Go launcher that embeds a
 Python runtime) is a TODO for a later release — see the "Known limitations"

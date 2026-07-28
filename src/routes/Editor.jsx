@@ -1052,7 +1052,11 @@ export default function Editor() {
     // identical geometry — but it hands the renderer a fresh `parts` array,
     // which tears down and rebuilds every mesh and flashes the viewport. Skip
     // the run when the source is unchanged with the marker stripped out.
-    const codeKey = `${w.currentFileId} ${stripAppearance(code)}`
+    // `\u0000`, not a literal NUL byte: the separator used to be embedded raw,
+    // which made `file` classify this 139 KB module as binary and made every
+    // `grep -I` (the default for `grep -r`) skip it silently. Same string, same
+    // separator — this one is greppable.
+    const codeKey = `${w.currentFileId}\u0000${stripAppearance(code)}`
     if (lastRunKeyRef.current === codeKey) return
     lastRunKeyRef.current = codeKey
 

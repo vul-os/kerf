@@ -61,6 +61,41 @@ We don't currently run a paid bounty program. We will:
 
 If we grow into bounty-paying territory we'll announce it here.
 
+## Verifying a downloaded release
+
+Every `v*` release publishes a `SHA256SUMS` manifest covering **every** asset
+attached to it — tarballs, the frontend bundle, the `install.sh` copy, the
+Python wheels and the dependency manifests — plus a sigstore **build
+provenance attestation** minted from the release workflow's OIDC identity (a
+short-lived certificate, not a long-lived key someone has to hold and rotate).
+
+`install.sh` verifies the tarball it downloaded against that manifest before
+unpacking anything, and every way that check can fail is fatal: no manifest,
+an empty manifest, no line for this asset, a digest mismatch, or no SHA-256
+tool on the machine. There is no skip flag. To check an asset you downloaded
+by hand:
+
+```sh
+curl -fsSLO https://raw.githubusercontent.com/vul-os/kerf/vX.Y.Z/scripts/verify.sh
+bash verify.sh --tag vX.Y.Z kerf-vX.Y.Z-linux-x64.tar.gz            # digest
+bash verify.sh --tag vX.Y.Z --attest kerf-vX.Y.Z-linux-x64.tar.gz   # + provenance
+```
+
+`verify.sh` needs only `curl` and `sha256sum`/`shasum`, and has two outcomes:
+verified, or a non-zero exit with a diagnostic naming what was wrong — a
+missing manifest (3), an HTML page where the manifest was expected (4), an
+empty or malformed manifest (5), no entry for the asset (6), an unfetchable
+artifact (7), a truncated download (8), a digest mismatch (9). A missing
+`SHA256SUMS` is never treated as "nothing to check": a verifier that shrugs at
+a 404 prints a line that looks like verification while checking nothing, which
+is worse than no verifier. `--attest` needs the `gh` CLI; a run without it
+prints that provenance was **not** checked, so a pass never implies more than
+it checked.
+
+Container images are addressed by their own registry digest
+(`docker pull ghcr.io/vul-os/kerf@sha256:...`) and are not listed in
+`SHA256SUMS`.
+
 ## Known security-relevant design notes
 
 For context, these are documented choices — not vulnerabilities — but

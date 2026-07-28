@@ -16,11 +16,41 @@
 #                    contents — Kerf is Python + Node, not a compiled
 #                    binary, so there's nothing to cross-compile per OS yet;
 #                    see install.sh's comment and docs/releasing.md for the
-#                    single-binary TODO) plus a universal -src.tar.gz
-#                    (`git archive` of the tag), and a SHA256SUMS file.
-#   3. `publish`   — creates ONE GitHub Release for the tag, using the
-#                    matching section of CHANGELOG.md as the release notes,
-#                    and attaches every tarball + SHA256SUMS from `artifacts`.
+#                    single-binary TODO), a universal -src.tar.gz (`git
+#                    archive` of the tag), the frontend dist tarball and a
+#                    tag-stamped copy of install.sh.
+#   3. `wheels`    — Python wheels for packages/kerf-* (except kerf-sdk,
+#                    which has its own PyPI cadence on sdk-v* tags).
+#   4. `sbom`      — CycloneDX SBOMs for the Python and npm dependency trees.
+#   5. `publish`   — stages EVERY asset from 2–4 into one directory, writes
+#                    SHA256SUMS over that directory, verifies it with the same
+#                    scripts/verify.sh a user runs, attaches a sigstore build
+#                    provenance attestation, and creates ONE GitHub Release
+#                    using the matching CHANGELOG.md section as the notes.
+#
+# ── Why every asset is built in THIS workflow ───────────────────────────────
+# Jobs 3 and 4 used to live in a second workflow (release-artifacts.yml) that
+# fired on the same tag and attached wheels, the frontend tarball, install.sh
+# and the SBOMs to the release directly. SHA256SUMS was written in this file,
+# over this file's tarballs only. The result was a release where four of the
+# nine assets were covered by the manifest and the rest were not — and nothing
+# said which was which, so `verify.sh <a wheel>` failed with "no entry" on a
+# file the project had in fact published. Two workflows racing to attach to one
+# release cannot share a manifest; one workflow with one staging directory can.
+#
+# The rule that keeps it true: everything published lands in `release-out/`
+# and nothing else does. The manifest covers that directory, so "published"
+# and "covered" are the same set by construction rather than two lists someone
+# keeps in sync by hand.
+#
+# ── Signing ─────────────────────────────────────────────────────────────────
+# `publish` attaches a sigstore BUILD PROVENANCE attestation over release-out/*
+# (actions/attest-build-provenance, signed with a short-lived certificate
+# minted from the job's OIDC token — no long-lived key, no repository secret,
+# nothing to rotate). It binds the bytes to "this repo's release workflow at
+# this commit"; a downloader checks it with `gh attestation verify` or
+# `verify.sh --attest`. It is NOT OS code-signing and NOT load-bearing for
+# integrity: verify.sh's digest path needs only curl and sha256sum.
 #
 # Usage:
 #   ./scripts/bump-version.sh 0.2.0   # or: make release VERSION=0.2.0
@@ -170,22 +200,28 @@ jobs:
           # anyone who wants the full monorepo, incl. kerf-sdk, tests/, etc.)
           git archive --format=tar.gz --prefix="${STAGE}-src/" -o "release-out/kerf-${TAG}-src.tar.gz" "$TAG"
 
-          # SHA256SUMS is not optional: install.sh aborts the install when it is
-          # missing or does not list the asset it just downloaded (fail-closed,
-          # see the "Verify checksum" block there). So assert here, at the point
-          # of production, that it covers every tarball — a release that ships an
-          # asset SHA256SUMS does not vouch for is uninstallable, and that must
-          # surface as a red build, not as a 404 in a user's terminal.
-          ( cd release-out && sha256sum kerf-* > SHA256SUMS && cat SHA256SUMS )
+          # Frontend dist tarball, from the SAME `npm run build` above — the
+          # second workflow used to rebuild it in a job of its own, which meant
+          # two builds of the same commit and no guarantee the bytes matched.
+          VERSION="${TAG#v}"
+          tar -czf "release-out/kerf-frontend-${VERSION}.tar.gz" -C dist .
 
+          # Verbatim, tag-stamped copy of install.sh. It is NOT pinned to the
+          # tag: install.sh resolves the latest release at run time unless
+          # KERF_VERSION is set.
+          cp install.sh "release-out/kerf-install-${TAG}.sh"
+
+          # Presence check only. SHA256SUMS is written once, in `publish`, over
+          # every asset from every job — writing a manifest here would cover
+          # this job's output and silently omit the wheels and SBOMs, which is
+          # the exact bug this workflow was restructured to remove.
           for os in macos-arm64 macos-x64 linux-x64 src; do
             asset="kerf-${TAG}-${os}.tar.gz"
             [ -f "release-out/${asset}" ] || { echo "::error::missing tarball ${asset}"; exit 1; }
-            awk -v want="$asset" '$2 == want || $2 == "*" want { found=1 } END { exit !found }' \
-              release-out/SHA256SUMS \
-              || { echo "::error::${asset} is not listed in SHA256SUMS"; exit 1; }
           done
-          echo "SHA256SUMS covers all 4 tarballs."
+          [ -f "release-out/kerf-frontend-${VERSION}.tar.gz" ] || { echo "::error::missing frontend tarball"; exit 1; }
+          [ -s "release-out/kerf-install-${TAG}.sh" ] || { echo "::error::missing install.sh copy"; exit 1; }
+          ls -la release-out
 
       - name: Upload tarballs as workflow artifact
         uses: actions/upload-artifact@v4
@@ -193,21 +229,277 @@ jobs:
           name: release-tarballs
           path: release-out/*
           retention-days: 1
+          if-no-files-found: error
+
+  # ── Python wheels ────────────────────────────────────────────────────────
+  # Moved here from release-artifacts.yml. It no longer attaches to the
+  # release itself: it hands its output to `publish`, which is the one job
+  # that writes the manifest and the one job that uploads.
+  wheels:
+    name: Build Python wheels
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tool
+        run: pip install --quiet build
+
+      - name: Build wheels for all packages (except kerf-sdk)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-wheels
+
+          for pkg_dir in packages/kerf-*/; do
+            pkg=$(basename "$pkg_dir")
+            # kerf-sdk has its own PyPI publish flow; skip here
+            [[ "$pkg" == "kerf-sdk" ]] && continue
+            # non-Python SDK bindings (kerf-sdk-go/-rs/-lua/-ts) have no pyproject
+            [[ -f "$pkg_dir/pyproject.toml" || -f "$pkg_dir/setup.py" ]] || continue
+
+            echo "::group::Building $pkg"
+            (
+              cd "$pkg_dir"
+              python -m build --wheel --outdir ../../release-wheels/
+            )
+            echo "::endgroup::"
+          done
+
+          # A wheels job that built no wheels must not be a green tick: the
+          # release would then quietly ship without them.
+          count=$(find release-wheels -maxdepth 1 -name '*.whl' | wc -l | tr -d ' ')
+          [ "$count" -gt 0 ] || { echo "::error::no wheels were built"; exit 1; }
+          echo "Built ${count} wheel(s):"
+          ls -lh release-wheels/
+
+      - name: Upload wheels as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-wheels
+          path: release-wheels/*.whl
+          retention-days: 1
+          if-no-files-found: error
+
+  # ── SBOMs ────────────────────────────────────────────────────────────────
+  # Moved here from release-artifacts.yml, same reason as `wheels`.
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install Python packages for SBOM scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Install all workspace packages in ONE pip invocation so the
+          # kerf-* cross-dependencies resolve against each other locally
+          # instead of being looked up (and not found) on PyPI.
+          args=()
+          for d in packages/kerf-*/; do
+            [ -f "${d}pyproject.toml" ] && args+=(-e "$d")
+          done
+          pip install --quiet "${args[@]}"
+
+      - name: Generate Python SBOM (CycloneDX)
+        shell: bash
+        run: |
+          set -uo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p release-sbom
+
+          # `sbom` is a plain shell variable, NOT read back from $GITHUB_ENV.
+          # A value written to $GITHUB_ENV is not visible to the step that
+          # wrote it, so the previous `if [[ -z "${PYTHON_SBOM:-}" ]]` test was
+          # ALWAYS true: the pip-freeze fallback ran even when CycloneDX had
+          # just succeeded, and its filename won the last-write-wins race in
+          # the env file. Releases advertised a CycloneDX SBOM and shipped a
+          # pip freeze under the name.
+          sbom=""
+          if pip install --quiet cyclonedx-py 2>/dev/null; then
+            if cyclonedx-py environment \
+                 --output-format JSON \
+                 --outfile "release-sbom/kerf-python-sbom-${VERSION}.json"; then
+              sbom="release-sbom/kerf-python-sbom-${VERSION}.json"
+            fi
+          fi
+
+          if [ -z "$sbom" ]; then
+            echo "::warning::cyclonedx-py unavailable or failed — publishing a pip-freeze manifest instead, which is NOT a CycloneDX SBOM."
+            pip freeze > "release-sbom/kerf-python-deps-${VERSION}.txt"
+            sbom="release-sbom/kerf-python-deps-${VERSION}.txt"
+          fi
+          echo "Python dependency manifest: ${sbom}"
+
+      - name: Install npm dependencies
+        run: npm install --no-audit --no-fund  # npm install (not ci): lockfiles written on macOS drop platform-conditional optional deps (npm/cli#4828)
+
+      - name: Generate npm SBOM (CycloneDX)
+        shell: bash
+        run: |
+          set -uo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          if npx --yes @cyclonedx/cyclonedx-npm \
+               --output-file "release-sbom/kerf-npm-sbom-${VERSION}.json" \
+               --output-format JSON; then
+            echo "npm SBOM: release-sbom/kerf-npm-sbom-${VERSION}.json"
+          else
+            echo "::warning::cyclonedx-npm failed — publishing 'npm ls' output instead, which is NOT a CycloneDX SBOM."
+            npm ls --json > "release-sbom/kerf-npm-deps-${VERSION}.json" || true
+            [ -s "release-sbom/kerf-npm-deps-${VERSION}.json" ] \
+              || { echo "::error::neither a CycloneDX SBOM nor an npm ls fallback could be produced"; exit 1; }
+          fi
+
+      - name: Upload SBOMs as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: release-sbom/*
+          retention-days: 1
+          if-no-files-found: error
 
   # ── Create the GitHub Release ────────────────────────────────────────────
   publish:
-    name: Publish GitHub Release
+    name: Publish GitHub Release (checksummed + attested)
     runs-on: ubuntu-latest
-    needs: [docker, artifacts]
+    needs: [docker, artifacts, wheels, sbom]
+    permissions:
+      contents: write       # create the Release and upload assets
+      packages: write       # inherited default kept explicit
+      id-token: write       # mint the OIDC token the attestation is signed with
+      attestations: write   # record the attestation against this repo
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download tarballs
+      # EVERY asset from every build job, merged into ONE directory. Nothing
+      # else writes here, and nothing else is uploaded to the release — that is
+      # what makes "published" and "covered by SHA256SUMS" the same set.
+      - name: Stage every published asset
         uses: actions/download-artifact@v4
         with:
-          name: release-tarballs
           path: release-out
+          pattern: "*"
+          merge-multiple: true
+
+      # The set that MUST be there. The manifest below covers whatever is in
+      # release-out/, which is necessary but not sufficient: a build job that
+      # produced nothing would yield a smaller release with a perfectly
+      # consistent manifest. This is the "did every job actually deliver"
+      # half, and it replaces the old cross-workflow `verify` job that asked
+      # the GitHub API which assets got attached after the fact.
+      - name: Assert every expected asset is staged
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          missing=()
+
+          for os in macos-arm64 macos-x64 linux-x64 src; do
+            [ -f "release-out/kerf-${TAG}-${os}.tar.gz" ] || missing+=("kerf-${TAG}-${os}.tar.gz")
+          done
+          [ -f "release-out/kerf-frontend-${VERSION}.tar.gz" ] || missing+=("kerf-frontend-${VERSION}.tar.gz")
+          [ -s "release-out/kerf-install-${TAG}.sh" ]         || missing+=("kerf-install-${TAG}.sh")
+
+          # `find | wc -l`, not a glob: an unmatched glob under `set -u` is a
+          # literal string, which `[ -f ]` then reports as merely absent.
+          [ "$(find release-out -maxdepth 1 -name '*.whl' | wc -l | tr -d ' ')" -gt 0 ] \
+            || missing+=("at least one Python wheel (*.whl)")
+          [ "$(find release-out -maxdepth 1 \( -name "kerf-python-sbom-${VERSION}.json" -o -name "kerf-python-deps-${VERSION}.txt" \) | wc -l | tr -d ' ')" -gt 0 ] \
+            || missing+=("a Python dependency manifest")
+          [ "$(find release-out -maxdepth 1 \( -name "kerf-npm-sbom-${VERSION}.json" -o -name "kerf-npm-deps-${VERSION}.json" \) | wc -l | tr -d ' ')" -gt 0 ] \
+            || missing+=("an npm dependency manifest")
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::release-out/ is missing expected asset(s):"
+            printf '  - %s\n' "${missing[@]}"
+            exit 1
+          fi
+          echo "All expected assets are staged:"
+          ls -la release-out
+
+      # ONE manifest, over the whole staging directory, written after every
+      # build job has delivered. install.sh and scripts/verify.sh both abort
+      # when SHA256SUMS is missing or does not list the asset they were asked
+      # about, so an asset the manifest omits is an asset nobody can install.
+      - name: Emit SHA256SUMS
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release-out
+
+          mapfile -t ASSETS < <(find . -maxdepth 1 -type f ! -name SHA256SUMS -exec basename {} \; | LC_ALL=C sort)
+
+          # FAIL CLOSED: a run where every build silently produced nothing must
+          # be a red release, not a green one with an empty manifest. An empty
+          # SHA256SUMS vouches for nothing while looking exactly like one that
+          # vouched for everything.
+          if [ "${#ASSETS[@]}" -eq 0 ]; then
+            echo "::error::release-out/ contains no assets — refusing to publish a release whose manifest would vouch for nothing."
+            exit 1
+          fi
+
+          : > SHA256SUMS
+          for a in "${ASSETS[@]}"; do
+            sha256sum "$a" >> SHA256SUMS
+          done
+
+          # COVERAGE ASSERTION. Without it the step is trivially satisfiable: a
+          # one-line manifest "covers" a nine-asset release and every later
+          # check still passes.
+          LINES="$(wc -l < SHA256SUMS | tr -d ' ')"
+          if [ "$LINES" -ne "${#ASSETS[@]}" ]; then
+            echo "::error::SHA256SUMS has ${LINES} line(s) for ${#ASSETS[@]} staged asset(s) — the manifest does not cover the release."
+            exit 1
+          fi
+
+          echo "SHA256SUMS covers ${#ASSETS[@]} asset(s):"
+          cat SHA256SUMS
+          printf '%s\n' "${ASSETS[@]}" > "${RUNNER_TEMP}/release-assets.txt"
+
+      # The producer checked by the consumer, before anything is public. If
+      # verify.sh and the emit step ever disagree about the manifest format,
+      # it surfaces here in a red release job rather than in a user's terminal.
+      - name: Verify SHA256SUMS with the same script users run
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t ASSETS < "${RUNNER_TEMP}/release-assets.txt"
+          bash scripts/verify.sh --dir release-out "${ASSETS[@]}"
+
+          # The other direction. verify.sh proves every asset it was NAMED
+          # matches; this proves nothing reached release-out/ after the
+          # manifest was written. Since the release step publishes the whole
+          # directory, an unlisted file would be attached under a manifest that
+          # says nothing about it, and install.sh/verify.sh would then refuse
+          # it — that has to be a red build here, not a dead end for a user.
+          diff <(find release-out -maxdepth 1 -type f ! -name SHA256SUMS -exec basename {} \; | LC_ALL=C sort) \
+               <(awk '{ n = $2; sub(/^\*/, "", n); print n }' release-out/SHA256SUMS | LC_ALL=C sort) \
+            || { echo "::error::release-out/ and SHA256SUMS disagree (< staged, > listed) — refusing to publish."; exit 1; }
+
+      # A verifier whose refusals are never exercised is a verifier that has
+      # probably stopped refusing. 24 synthetic-origin cases, asserting the
+      # exit code AND that a diagnostic was actually printed.
+      - name: Prove the verifier still refuses broken releases
+        run: bash scripts/verify.sh --selftest
 
       # Pull the "## [X.Y.Z] - ..." section out of CHANGELOG.md (strict
       # Keep a Changelog headers) and use it verbatim as the release body.
@@ -215,7 +507,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
           awk -v ver="$VERSION" '
             $0 ~ "^## \\[" ver "\\]" { found=1; print; next }
             found && /^## \[/ { exit }
@@ -254,13 +547,42 @@ jobs:
             echo '```'
             echo "curl -fsSL https://kerf.sh/install.sh | sh"
             echo '```'
+            echo ""
+            echo "The installer verifies the tarball against this release's"
+            echo "\`SHA256SUMS\` and aborts if the manifest is missing, does not"
+            echo "list the asset, or the digest differs. There is no skip flag."
+            echo ""
+            echo "## Verify a download by hand"
+            echo ""
+            echo '```'
+            echo "curl -fsSLO https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${TAG}/scripts/verify.sh"
+            echo "bash verify.sh --tag ${TAG} --attest kerf-${TAG}-linux-x64.tar.gz"
+            echo '```'
+            echo ""
+            echo "\`verify.sh\` fetches \`SHA256SUMS\`, looks up the exact entry for"
+            echo "the asset and compares digests; it exits non-zero, with a distinct"
+            echo "diagnostic, on a missing or malformed manifest, a missing entry, a"
+            echo "truncated download or a digest mismatch. \`--attest\` additionally"
+            echo "checks the sigstore build provenance (needs the \`gh\` CLI); without"
+            echo "it, provenance is NOT checked and the script says so."
           } >> notes.md
 
+      # Short-lived sigstore certificate minted from this job's OIDC identity —
+      # no long-lived key, no repository secret, nothing to rotate. Attests
+      # every file in release-out/ INCLUDING SHA256SUMS itself, so the
+      # attestation on the manifest transitively covers every asset it names.
+      - name: Attest build provenance (sigstore via OIDC — no long-lived key)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: "release-out/*"
+
+      # Publish the DIRECTORY, not a hand-listed set of names: the previous
+      # `release-out/kerf-*` glob would have silently dropped any asset whose
+      # name did not start with "kerf-", while SHA256SUMS still listed it.
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
           body_path: notes.md
           files: |
-            release-out/kerf-*
-            release-out/SHA256SUMS
+            release-out/*

@@ -12,6 +12,74 @@ The authoritative source for what's shipped vs. in-flight is
 
 ## [Unreleased]
 
+### Security
+
+- **One release, one manifest — `SHA256SUMS` now covers every published asset.**
+  `release-artifacts.yml` fired on the same `v*` tag as `release.yml` and
+  attached the Python wheels, the frontend tarball, the `install.sh` copy and
+  the SBOMs directly, while `SHA256SUMS` was written in the other workflow over
+  the four bundle tarballs alone. Four of nine published assets were covered and
+  five were not, with nothing to say which — `verify.sh <a wheel>` failed with
+  "no entry" on a file Kerf really had published. Those jobs moved into
+  `release.yml`; every asset is staged into one `release-out/` directory; the
+  manifest is written once, over that directory, after every build job has
+  delivered, with a coverage assertion (one manifest line per staged asset) and
+  a both-directions comparison of staged-vs-listed. The release step now
+  publishes the directory rather than a `kerf-*` glob that would have silently
+  dropped any asset not starting with `kerf-`.
+
+- **Releases carry a sigstore build-provenance attestation.**
+  `actions/attest-build-provenance` signs `release-out/*` — including
+  `SHA256SUMS` itself, so the attestation on the manifest transitively covers
+  every asset it names — with a short-lived certificate minted from the release
+  job's OIDC token. No long-lived key, no repository secret, nothing to rotate.
+  It is **not** OS code-signing and it is not load-bearing: the digest path in
+  `verify.sh` needs only `curl` and `sha256sum`, so if the action is removed no
+  verification silently becomes a no-op.
+
+- **Added `scripts/verify.sh`** — the fail-closed check a user runs before
+  executing downloaded bytes. Two outcomes: verified, or non-zero with a
+  distinct diagnostic and exit code per failure (missing manifest 3, HTML page
+  served as the manifest 4, empty/malformed manifest 5, no entry for the asset
+  6, unfetchable artifact 7, truncated download 8, digest mismatch 9, missing
+  tool 10, failed attestation 11, plaintext origin 12). There is no
+  `--skip-verify` and no path where an absent `SHA256SUMS` means "nothing to
+  check". Names are matched exactly against field 2 of the manifest, never as a
+  substring or regex, so `kerf-v1.2.3.tar.gz` cannot be satisfied by the digest
+  of `kerf-v1.2.3.tar.gz.sig`. `bash scripts/verify.sh --selftest` runs 24
+  synthetic-origin cases asserting the exit code **and** that a diagnostic was
+  printed; the new `release-guards.yml` workflow runs it on every push and PR,
+  and the release job runs it again before anything is published.
+
+### Fixed
+
+- **`install.sh` died silently when the release lookup failed.** Under
+  `set -e` + `pipefail`, `KERF_VERSION=$(curl … | grep … | head -1 | sed …)`
+  killed the script at the assignment whenever the GitHub API was unreachable,
+  rate-limited or the repo had no releases — so the `[ -n "$KERF_VERSION" ] ||
+  fail "Could not resolve the latest release…"` guard below it was unreachable
+  code and the user saw an exit with no message. The pipeline now ends in
+  `|| true` and the emptiness test decides; curl's own error is no longer sent
+  to `/dev/null`. The same `|| true` was applied to the digest computation and
+  the unwrap-directory lookup, whose guards had the same defect.
+
+- **`install.sh` defaulted to the wrong repository.** `KERF_REPO` defaulted to
+  `kerf-sh/kerf` (the website domain), which publishes no releases, so every
+  unpinned `curl … | sh` install resolved against a repo with nothing in it.
+  Now `vul-os/kerf`. `docs/releasing.md` likewise told readers to
+  `docker pull ghcr.io/kerf-sh/kerf:<version>`; the workflow pushes
+  `ghcr.io/vul-os/kerf`.
+
+- **The SBOM job always ran its own fallback.** It tested `${PYTHON_SBOM:-}`
+  after writing that name to `$GITHUB_ENV` — a value not visible to the step
+  that wrote it — so the condition was always true: the `pip freeze` fallback
+  ran even when CycloneDX had just succeeded, and won the last-write-wins race
+  in the env file. Releases advertised a CycloneDX SBOM and shipped a pip
+  freeze under that name. The step now tracks the result in a shell variable
+  and, when it does fall back, says so in a warning and publishes it under a
+  `-deps-` name rather than `-sbom-`.
+
+
 ### Fixed
 
 - **`announce_id` now excludes the signature (DMTAP §22.3.1, INTEROP-BREAKING).**

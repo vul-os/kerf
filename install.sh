@@ -16,12 +16,20 @@
 # Env overrides:
 #   KERF_VERSION  — tag to install, e.g. v0.1.0 (default: latest release)
 #   KERF_HOME     — install location (default: ~/.local/share/kerf/<version>)
-#   KERF_REPO     — GitHub repo to install from (default: kerf-sh/kerf)
+#   KERF_REPO     — GitHub repo to install from (default: vul-os/kerf)
 #
 # Requirements: bash, curl, tar, python3 3.11+ (checked by the bundled setup)
+#
+# Before running the bundled setup this verifies the downloaded tarball against
+# the release's SHA256SUMS, and every way that check can fail is fatal. See the
+# "Verify checksum" block below, and scripts/verify.sh for the same guarantee
+# as a standalone tool you can run against an asset you downloaded by hand.
 set -euo pipefail
 
-REPO="${KERF_REPO:-kerf-sh/kerf}"
+# vul-os/kerf, not kerf-sh/kerf: kerf-sh is the website domain, and the default
+# here pointed at a repo that publishes no releases — every unpinned install
+# would 404 at the download. (Releases: github.com/vul-os/kerf/releases.)
+REPO="${KERF_REPO:-vul-os/kerf}"
 
 if [ -t 1 ]; then
   RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'
@@ -74,9 +82,24 @@ info "Platform: ${ASSET_OS}"
 KERF_VERSION="${KERF_VERSION:-}"
 if [ -z "$KERF_VERSION" ]; then
   info "Resolving latest release..."
-  KERF_VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null \
-    | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
-  [ -n "$KERF_VERSION" ] || fail "Could not resolve the latest release from https://github.com/${REPO}/releases. Set KERF_VERSION=vX.Y.Z to pin a version."
+  # `|| true` is load-bearing, and so is dropping the `2>/dev/null`.
+  #
+  # Under `set -e` + `pipefail` this assignment used to be:
+  #     KERF_VERSION=$(curl ... 2>/dev/null | grep ... | head -1 | sed ...)
+  # When the API was unreachable, rate-limited, or the repo had no releases,
+  # curl (or the grep, which matches nothing) failed, pipefail propagated it,
+  # and `set -e` killed the script AT THIS LINE — before the `[ -n ... ] ||
+  # fail` guard below ever ran. The user got a silent exit with no message and
+  # no exit-status explanation, and the carefully worded diagnostic underneath
+  # was unreachable code. A guard has to be reachable to be a guard.
+  #
+  # Ending the pipeline in `|| true` makes the assignment always succeed, so
+  # control reaches the emptiness test, which is what actually decides. curl's
+  # own error text now goes to stderr rather than /dev/null, because "why"
+  # (DNS, 403 rate limit, no releases yet) is the part the user needs.
+  KERF_VERSION="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
+    | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/' || true)"
+  [ -n "$KERF_VERSION" ] || fail "Could not resolve the latest release from https://github.com/${REPO}/releases (see the curl error above). Set KERF_VERSION=vX.Y.Z to pin a version."
 fi
 info "Version: ${KERF_VERSION}"
 
@@ -123,7 +146,7 @@ fi
 info "Verifying checksum..."
 CHECKSUMS_URL="https://github.com/${REPO}/releases/download/${KERF_VERSION}/SHA256SUMS"
 
-curl -fsSL -o "${TMP_DIR}/SHA256SUMS" "$CHECKSUMS_URL" 2>/dev/null \
+curl -fsSL --show-error -o "${TMP_DIR}/SHA256SUMS" "$CHECKSUMS_URL" \
   || fail "Could not fetch ${CHECKSUMS_URL} — refusing to install unverified bytes. Every Kerf release publishes SHA256SUMS; if it is missing, the release is incomplete. Report it at https://github.com/${REPO}/issues"
 
 [ -s "${TMP_DIR}/SHA256SUMS" ] \
@@ -135,10 +158,13 @@ EXPECTED=$(awk -v want="$ASSET" '$2 == want || $2 == "*" want { print $1; exit }
 [ -n "$EXPECTED" ] \
   || fail "${ASSET} is not listed in SHA256SUMS — refusing to install an asset the release does not vouch for."
 
+# Both pipelines end in `|| true` for the same reason as the version lookup:
+# under `set -e` + `pipefail` a failing digest tool would kill the script here
+# and the "produced no output" guard below would never run.
 if command -v sha256sum >/dev/null 2>&1; then
-  ACTUAL=$(sha256sum "${TMP_DIR}/${ASSET}" | awk '{print $1}')
+  ACTUAL=$(sha256sum "${TMP_DIR}/${ASSET}" | awk '{print $1}' || true)
 elif command -v shasum >/dev/null 2>&1; then
-  ACTUAL=$(shasum -a 256 "${TMP_DIR}/${ASSET}" | awk '{print $1}')
+  ACTUAL=$(shasum -a 256 "${TMP_DIR}/${ASSET}" | awk '{print $1}' || true)
 else
   fail "Neither sha256sum nor shasum is available — cannot verify ${ASSET}. Install coreutils (Linux) or Perl's shasum (macOS ships it) and re-run."
 fi
@@ -158,7 +184,10 @@ if [ ! -x "$KERF_HOME/setup.sh" ]; then
   # -mindepth 1: without it `find` also yields $KERF_HOME itself, so a
   # KERF_HOME whose own basename starts with "kerf-" (e.g. KERF_HOME=~/kerf-dev)
   # matched first and the unwrap silently did nothing.
-  INNER="$(find "$KERF_HOME" -mindepth 1 -maxdepth 1 -type d -name 'kerf-*' | head -1)"
+  # `|| true`: `find | head -1` can leave find killed by SIGPIPE (exit 141),
+  # which pipefail turns into a fatal error for an assignment that is allowed
+  # to come back empty — the `[ -n "$INNER" ]` test below is what decides.
+  INNER="$(find "$KERF_HOME" -mindepth 1 -maxdepth 1 -type d -name 'kerf-*' | head -1 || true)"
   if [ -n "$INNER" ] && [ -x "$INNER/setup.sh" ]; then
     shopt -s dotglob 2>/dev/null || true
     mv "$INNER"/* "$KERF_HOME"/

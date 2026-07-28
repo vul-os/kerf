@@ -33,7 +33,14 @@ Pushing the tag fires `.github/workflows/release.yml`.
 
 ## What happens in GitHub Actions
 
-`.github/workflows/release.yml` has three jobs:
+`.github/workflows/release.yml` has five jobs. It is the *only* workflow
+that attaches assets to a release: `release-artifacts.yml` used to fire on the
+same tag and attach wheels, the frontend tarball, `install.sh` and the SBOMs
+directly, while `SHA256SUMS` was written over the tarballs alone. Four of the
+nine published assets were covered by the manifest and five were not, and
+nothing said which — `verify.sh <a wheel>` failed with "no entry" on a file
+Kerf really had published. Those jobs now live here, every asset is staged
+into one `release-out/` directory, and the manifest covers that directory.
 
 ### 1. `docker` — Docker images (GHCR)
 
@@ -42,11 +49,11 @@ Builds four Docker images in parallel via a matrix and pushes them to
 
 | Image tag | `KERF_PERSONA` | Contents |
 |-----------|----------------|---------|
-| `ghcr.io/kerf-sh/kerf:<version>` | `full` | everything |
-| `ghcr.io/kerf-sh/kerf:latest` | `full` | same, alias |
-| `ghcr.io/kerf-sh/kerf:<version>-mech` | `mech` | mechanical CAD |
-| `ghcr.io/kerf-sh/kerf:<version>-electronics` | `electronics` | EDA/PCB |
-| `ghcr.io/kerf-sh/kerf:<version>-bim` | `bim` | BIM |
+| `ghcr.io/vul-os/kerf:<version>` | `full` | everything |
+| `ghcr.io/vul-os/kerf:latest` | `full` | same, alias |
+| `ghcr.io/vul-os/kerf:<version>-mech` | `mech` | mechanical CAD |
+| `ghcr.io/vul-os/kerf:<version>-electronics` | `electronics` | EDA/PCB |
+| `ghcr.io/vul-os/kerf:<version>-bim` | `bim` | BIM |
 
 Access requires `permissions: packages: write` — already set in the workflow.
 
@@ -68,7 +75,14 @@ the release:
 - `kerf-vX.Y.Z-src.tar.gz` — universal `git archive` of the tag (full
   monorepo, including `kerf-sdk` and tests — for anyone building from source
   on an unlisted platform, e.g. Linux/arm64)
-- `SHA256SUMS`
+- `kerf-frontend-X.Y.Z.tar.gz` — the built frontend `dist/`, from the same
+  `npm run build` as the bundles above (it used to be rebuilt in a second
+  workflow, so nothing guaranteed the two builds agreed)
+- `kerf-install-vX.Y.Z.sh` — a verbatim, tag-stamped copy of `install.sh`. It
+  is *not* pinned to that tag: it resolves the latest release at run time
+  unless `KERF_VERSION` is set.
+
+`SHA256SUMS` is **not** written by this job — see `publish` below.
 
 **Honesty note:** Kerf is Python + Node, not a compiled binary, so there is
 nothing to cross-compile per platform (yet). The three OS-labeled tarballs
@@ -85,15 +99,50 @@ venv, editable-installs the bundled packages, and writes a default
 `curl -fsSL https://kerf.sh/install.sh | sh`, which does the download +
 unpack + `setup.sh` run for you (see root `install.sh`).
 
-### 3. `publish` — the GitHub Release
+### 3. `wheels` — Python wheels
 
-Needs both jobs above, then:
+Builds a wheel for every `packages/kerf-*` with a `pyproject.toml`/`setup.py`,
+except `kerf-sdk` (own PyPI cadence). A run that produces no wheel fails the
+job rather than quietly shipping a release without them.
+
+### 4. `sbom` — dependency manifests
+
+CycloneDX SBOMs for the Python environment and the npm tree. If CycloneDX is
+unavailable the job publishes a `pip freeze` / `npm ls` manifest **and says so
+in a warning** — those files are named `kerf-*-deps-*` rather than
+`kerf-*-sbom-*`, because a pip freeze is not an SBOM and should not be
+attached under a name that claims it is.
+
+### 5. `publish` — checksums, attestation, the GitHub Release
+
+Needs all four jobs above, then:
+
+- Stages every asset from `artifacts`, `wheels` and `sbom` into one
+  `release-out/` directory and asserts the expected set is complete (four
+  tarballs, frontend tarball, `install.sh` copy, ≥1 wheel, a Python and an npm
+  dependency manifest). A build job that silently produced nothing is a red
+  release.
+- Writes `SHA256SUMS` over **every** file in that directory, and asserts the
+  manifest has one line per staged asset — a one-line manifest "covering" a
+  nine-asset release would otherwise satisfy every later check.
+- Verifies the result with `scripts/verify.sh --dir`, the same script a user
+  runs, and cross-checks that the staged set and the listed set are identical
+  in both directions.
+- Runs `scripts/verify.sh --selftest` (24 synthetic-origin cases) so the
+  refusals are known to still fire on this runner, before anything is public.
+- Attaches a **sigstore build provenance attestation** over every asset,
+  signed with a short-lived certificate minted from the job's OIDC token — no
+  long-lived key, no repository secret, nothing to rotate. This is not OS
+  code-signing, and it is not load-bearing for integrity: the digest path in
+  `verify.sh` needs only `curl` and `sha256sum`.
 
 - Extracts the `## [X.Y.Z] - ...` section from `CHANGELOG.md` (strict
   [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) headers) and uses
   it verbatim as the release body, followed by a short Docker quick-start and
   the `curl | sh` one-liner.
-- Attaches all four tarballs + `SHA256SUMS`.
+- Attaches the whole `release-out/` directory — the directory, not a
+  hand-listed set of names, so "published" and "covered by `SHA256SUMS`"
+  cannot drift apart.
 
 **CHANGELOG.md discipline:** because the release notes are pulled straight
 from `CHANGELOG.md`, the `## [X.Y.Z] - YYYY-MM-DD` section for the version
@@ -110,17 +159,43 @@ new dated version section as part of the same commit `bump-version.sh` makes
 curl -fsSL https://kerf.sh/install.sh | sh
 ```
 
+`install.sh` downloads the tarball, fetches the release's `SHA256SUMS`, looks
+up the **exact** entry for the asset it downloaded and compares digests. Every
+way that can fail is fatal: no manifest, an empty manifest, no line for this
+asset, a digest mismatch, or no SHA-256 tool on the machine. There is no skip
+flag. If you need unverified bytes, download the tarball and unpack it by hand
+— that is an explicit act, not a silent default.
+
+### Verifying a download by hand
+
+```sh
+curl -fsSLO https://raw.githubusercontent.com/vul-os/kerf/vX.Y.Z/scripts/verify.sh
+bash verify.sh --tag vX.Y.Z kerf-vX.Y.Z-linux-x64.tar.gz          # digests
+bash verify.sh --tag vX.Y.Z --attest kerf-vX.Y.Z-linux-x64.tar.gz # + provenance
+bash verify.sh --dir ~/Downloads kerf-vX.Y.Z-linux-x64.tar.gz     # already downloaded
+```
+
+`verify.sh` needs only `curl` and `sha256sum`/`shasum`. It has two outcomes:
+verified, or a non-zero exit with a diagnostic naming what was wrong — a
+missing manifest (3), an HTML page served where the manifest was expected (4),
+an empty or malformed manifest (5), no entry for the asset (6), an
+unfetchable artifact (7), a truncated download (8), a digest mismatch (9). A
+missing `SHA256SUMS` is never treated as "nothing to check". `--attest` also
+verifies the sigstore build provenance (needs the `gh` CLI); a run *without*
+it prints that provenance was **not** checked, so a pass never implies more
+than it checked.
+
 **Docker:**
 
 ```sh
-docker pull ghcr.io/kerf-sh/kerf:0.2.0
+docker pull ghcr.io/vul-os/kerf:0.2.0
 
 docker run \
   -e KERF_DATABASE_URL=postgres://user:pass@host:5432/kerf \
   -e KERF_CONFIG=/etc/kerf/config.toml \
   -v /your/kerf.toml:/etc/kerf/config.toml:ro \
   -p 8080:8080 \
-  ghcr.io/kerf-sh/kerf:0.2.0
+  ghcr.io/vul-os/kerf:0.2.0
 ```
 
 The server listens on `:8080`. Set `VITE_API_URL` (or the proxy config in
@@ -131,7 +206,7 @@ The server listens on `:8080`. Set `VITE_API_URL` (or the proxy config in
 After the workflow runs:
 
 - **Releases** — <https://github.com/vul-os/kerf/releases>
-- **Packages** — <https://github.com/orgs/kerf-sh/packages>
+- **Packages** — <https://github.com/orgs/vul-os/packages>
 
 ## Hotfix releases
 

@@ -1,0 +1,55 @@
+# Release-integrity guards, run on every push and PR — NOT only on a tag.
+#
+# Two things a Kerf user runs against bytes they pulled off the internet:
+#
+#   install.sh        curl -fsSL https://kerf.sh/install.sh | sh
+#   scripts/verify.sh a standalone check of an asset downloaded by hand
+#
+# Both are fail-closed: a missing SHA256SUMS, a manifest with no entry for the
+# asset, or a digest mismatch aborts, and there is no skip flag in either. That
+# property is worth exactly as much as the last time it was exercised — a
+# checksum guard that has quietly stopped failing is, from a green CI run,
+# indistinguishable from one that works. So the refusals are asserted here,
+# every push, rather than discovered on a `v*` tag when the release is already
+# public.
+#
+# The verifier's selftest stands up a local HTTP origin that is wrong in 24
+# specific ways (manifest 404, HTML error page served as the manifest,
+# empty/garbage/truncated manifest, no entry for the asset, the two
+# name-matching traps where a substring or regex lookup would report VERIFIED
+# on an artifact nobody vouched for, artifact 404, artifact served as an HTML
+# page, truncated transfer, digest mismatch, missing tools, plaintext origin,
+# usage errors) and asserts, per case, the exit code AND that a diagnostic was
+# actually printed. "Aborted with no message" is asserted against explicitly:
+# that was the real bug — a guard that died at a pipeline before it could run.
+
+name: Release guards
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-script:
+    name: verify.sh — lint and failure matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax check
+        run: bash -n scripts/verify.sh
+
+      - name: ShellCheck
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          shellcheck scripts/verify.sh install.sh
+
+      - name: Failure matrix (synthetic origin)
+        run: bash scripts/verify.sh --selftest

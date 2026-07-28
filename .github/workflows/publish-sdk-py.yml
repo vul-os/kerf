@@ -50,8 +50,12 @@ jobs:
           packages-dir: packages/kerf-sdk/dist
 
       # Same workflow also cuts a GitHub Release for the sdk-py-v* tag and
-      # attaches the built sdist + wheel (mirrors release-artifacts.yml,
-      # which only fires on the app's v* tags — SDK tags are separate).
+      # attaches the built sdist + wheel. This release is SEPARATE from the
+      # app's `v*` release (release.yml) and carries no SHA256SUMS manifest and
+      # no build-provenance attestation: the authoritative distribution channel
+      # for the SDK is PyPI, which records its own hashes, and these assets are
+      # a convenience copy. Do not tell users to verify them with
+      # scripts/verify.sh — it would (correctly) find no manifest and refuse.
       - name: Create GitHub Release with artifacts
         uses: softprops/action-gh-release@v2
         with:

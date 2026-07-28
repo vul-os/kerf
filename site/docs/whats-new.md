@@ -30,7 +30,7 @@ pip install 'kerf[server]'   # full self-host: bring-your-own Postgres + kerf se
 ```
 
 `pip install 'kerf[server]'` followed by `kerf serve` brings up the full
-server stack. Requires Postgres. See [local-install.md](#local-install).
+server stack. Requires Postgres. See [local-install.md](./local-install.md).
 
 ### PLC: IEC 61131-3 Ladder Diagram editor
 
@@ -108,8 +108,6 @@ The Cycles-based render path is now end-to-end:
   scene hash.
 - **Hero render panel** — resolution presets (1 K / 2 K / 4 K), sample count,
   HDR environment selection, start / cancel / download.
-- **Local GPU usage meter** — a node can meter its own render GPU-seconds for a
-  local usage dashboard. Numbers stay on the machine; there is no billing.
 - **In-browser fallback** — `three-gpu-pathtracer` progressive path tracer for
   offline and self-hosted use.
 
@@ -160,8 +158,8 @@ alongside Docs and Compare; scrolling to the top on every route change
 means no more landing mid-page on `/compare`. The Render pipeline's
 backend Blender Cycles + browser `three-gpu-pathtracer` architecture is
 now formally scoped in `tasks.md` as **T-106a..f** (scene translator,
-Cycles worker, hero-render UX, GPU-seconds → local usage meter,
-self-host docker, in-browser fallback). A **CFD foundation** landed —
+Cycles worker, hero-render UX, self-host docker, in-browser fallback). A
+**CFD foundation** landed —
 `kerf_fem.cfd_potential` (potential flow, `Cp(θ) = 1 − 4 sin²θ` analytic
 oracle) + `kerf_fem.cfd_navier_stokes` (lid-driven cavity, Ghia Re=100
 reference), 61 hermetic CFD tests in `test_cfd.py`, **2-D laminar
@@ -220,7 +218,7 @@ hermetic analytic-oracle-asserted kernel tests are green; the full repository
 collects 23 902 tests, ship-gate clean.** Detail and the next P2 (pure-Python
 STEP/IGES + SubD↔NURBS + mesh→NURBS autosurface + 2D region boolean) step
 live in
-`docs/plans/geometry-kernel-roadmap.md`.
+[`docs/plans/geometry-kernel-roadmap.md`](./plans/geometry-kernel-roadmap.md).
 
 ## Sprint — May 2026
 
@@ -232,8 +230,8 @@ each advertising a `provides=[...]` capability list at boot. The previous
 `backend/` and `pyworker/` trees are retired; install personas
 (`api-only` / `mech` / `electronics` / `bim` / `full` / `compute-only`) pull the
 relevant subset. Runtime capability tags are inspectable at
-`GET /health/capabilities`. See [architecture.md](#architecture) and
-[capabilities.md](#capabilities).
+`GET /health/capabilities`. See [architecture.md](./architecture.md) and
+[capabilities.md](./capabilities.md).
 
 ### kerf-sdk (Python SDK)
 
@@ -246,12 +244,6 @@ Replaces the previously-rejected TS Web Worker scripting plan.
 
 Single CLI entry-point: `kerf-server [--config ...] [--migrate]`. Drops in for
 `uvicorn backend.main:app`. Provided by `kerf-core`.
-
-### Billing and the proprietary cloud removed
-
-The old billing and hosted-cloud code paths were removed entirely. Kerf is
-now 100% MIT with no billing anywhere, no accounts requirement, and no
-central server — every install runs the same open software.
 
 ### FEM polish
 
@@ -292,8 +284,10 @@ existing rows (idempotent, dry-runnable, prune-on-confirm).
 
 ### Planned designs landed in `docs/plans/`
 
+- [FreeCAD sketch → 3D shortcuts](./plans/freecad-sketch-shortcuts.md) —
   `feature_boss_with_draft`, `feature_cut_from_sketch`,
   `feature_hole_pattern_from_sketch`, symmetric loft, corrected-Frenet sweep.
+- [Sketch → JSCAD workflow](./plans/sketch-to-jscad.md) — mesh-side analog of
   the `.sketch → .feature` BRep path.
 
 ---
@@ -319,7 +313,7 @@ IFC compiler (`POST /compile-ifc` → IFC4 via IfcOpenShell). `.family.json` par
 Manual trace routing, copper pours/ground planes, full layer stack. PCB DRC, ERC (electrical rules check), net classes. Length tuning + diff-pair match, via stitching + teardrops. Push-pull (shove) router. Hierarchical schematics, buses + differential pairs. Per-pad mask/paste overrides.
 
 ### Workshop / Library
-Workshop + Library endpoints in `kerf-core`. Git-backed projects with object storage for blobs. Large-file `.step-ref` Phase 1 (JSON pointer + object storage). Optional GitHub/GitLab mirror connections. AES-GCM encrypt utility.
+Workshop + Library endpoints. Git-backed projects with object-storage Storer. Large-file `.step-ref` Phase 1 (JSON pointer + object storage). AES-GCM encrypt utility.
 
 ### Inspection / Misc
 Model comparison tool. Distributor catalog ported. Configurable layers + display modes.

@@ -28,10 +28,29 @@ def test_sign_verify_roundtrip():
     assert b.signer == idn.pub == b.pub
 
 
-def test_announce_id_is_derived_from_full_signed_object():
+def test_announce_id_is_derived_from_the_signature_excluded_body():
+    """§22.3.1: announce_id = 0x1e ‖ BLAKE3-256(det_cbor(PubAnnounce ∖ {9})).
+
+    Key 9 (``sig``) is EXCLUDED. This asserted the opposite until 2026-07-28,
+    matching kerf-pub's then-implementation of the formula the spec has since
+    withdrawn (§1.3: no identifier may be derived from a malleable signature).
+    """
     idn = Identity.generate()
     a = _announce(idn)
-    assert a.id == hashing.mhash(a.to_cbor())
+    body = cbor.encode(a._body_map())
+    assert 9 not in cbor.decode(body)
+    assert a.id == hashing.mhash(body)
+    assert a.id != hashing.mhash(a.to_cbor())  # NOT the complete signed object
+
+
+def test_announce_id_is_stable_across_a_different_signature():
+    """The §1.3 property the exclusion exists for: a second valid-shaped sig over
+    the same body must not mint a second announce_id."""
+    idn = Identity.generate()
+    a = _announce(idn)
+    before = a.id
+    a.sig = bytes(64)  # a different 64-byte sig value, same body
+    assert a.id == before
 
 
 def test_bad_signature_rejected():

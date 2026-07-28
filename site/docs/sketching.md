@@ -317,9 +317,10 @@ The imported function returns a fresh Geom2 each call, compatible with `extrudeL
 
 ## Related
 
-- [Assemblies](#assemblies) — placing extruded sketches in 3D scenes
-- [Parts & Objects](#concepts) — the JSCAD file model
-- [Drawings](#drawings) — 2D drawing output from 3D models
+- [Assemblies](./assemblies.md) — placing extruded sketches in 3D scenes
+- [Parts & Objects](./concepts.md) — the JSCAD file model
+- [Drawings](./drawings.md) — 2D drawing output from 3D models
+- [Sketch → JSCAD workflow (planned)](./plans/sketch-to-jscad.md) — mesh-side analog of `.sketch → .feature`
 
 The sketch solver and write-side tools are provided by `kerf-cad-core`
 (capability tag `cad.sketch`). The planegcs port runs both server-side

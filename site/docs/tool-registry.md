@@ -167,7 +167,7 @@ from a tool handler.
 
 ## See also
 
-- [llm-tools.md](#llm-tools) — full per-tool reference
-- [architecture.md](#architecture) — plugin system and boot sequence
-- [contributing.md](#contributing) — plugin development guide
-- [sdk.md](#sdk) — scripting Kerf from Python
+- [llm-tools.md](./llm-tools.md) — full per-tool reference
+- [architecture.md](./architecture.md) — plugin system and boot sequence
+- [contributing.md](./contributing.md) — plugin development guide
+- [sdk.md](./sdk.md) — scripting Kerf from Python

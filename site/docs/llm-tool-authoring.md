@@ -296,5 +296,5 @@ async def test_read_widget_not_found():
 
 ## See also
 
-- [plugins-development.md](#plugins-development) — plugin structure, entry-point, manifest
-- [architecture.md](#architecture) — tool registry and the AI loop
+- [plugins-development.md](./plugins-development.md) — plugin structure, entry-point, manifest
+- [architecture.md](./architecture.md) — tool registry and the AI loop

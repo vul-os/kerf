@@ -4,8 +4,8 @@ Kerf has a two-tier render path: a **backend render** for high-fidelity hero
 images and a **browser path tracer** for real-time previews and offline use.
 
 **Status:** Shipped — the full render path (T-106a through T-106f) is active.
-Scene translator, render worker, hero panel, local GPU usage meter,
-self-host Docker image, and in-browser path tracer fallback are all live.
+Scene translator, render worker, hero panel, local GPU usage meter, self-host
+Docker image, and in-browser path tracer fallback are all live.
 
 ---
 
@@ -64,19 +64,19 @@ Browser-side panel to configure and trigger a render job:
 
 Status polling uses the `/api/projects/:pid/files/:fid/render/status` endpoint.
 
-### T-106d — Local usage telemetry (shipped)
+### T-106d — Usage telemetry (shipped)
 
-Kerf has no billing anywhere. A node meters its own render GPU-seconds
-purely for a local usage dashboard (handy when a team shares one box) —
-the numbers never leave the machine, are never phoned home, and are never
-billed against anything.
+Kerf has no billing anywhere. What survives from the original "pricing
+meter" is local-first usage telemetry: a node meters its own render
+GPU-seconds for its own owner's usage dashboard (useful when a team shares
+one box), never phoned home and never billed.
 
 ### T-106e — Self-host Docker image + BYO path (shipped)
 
 A `Dockerfile.render` variant that bundles the renderer. Self-hosters who
 want the backend tier point `[render].backend_path` in `kerf.toml` at the
-executable. The self-host path mirrors the cloud path exactly — no feature
-difference, no metering.
+executable. Every install runs the same byte-identical build — there is no
+separate hosted render path, no feature difference, and no metering.
 
 ### T-106f — In-browser path tracer fallback (shipped)
 
@@ -131,5 +131,7 @@ tool that triggers a render job.
 
 ## Related pages
 
-- [architecture.md](#architecture) — plugin architecture; `kerf-render` plugin
-- [jewelry-workflow.md](#jewelry-workflow) — gem/metal PBR materials
+- [architecture.md](./architecture.md) — plugin architecture; `kerf-render` plugin
+- [workshop.md](./workshop.md) — hero cover images on publish
+- [jewelry-workflow.md](./jewelry-workflow.md) — gem/metal PBR materials
+- [local-self-host.md](./local-self-host.md) — BYO render path for self-hosters

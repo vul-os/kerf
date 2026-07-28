@@ -118,11 +118,50 @@ does not inherit §8.2's social-graph privacy and does not claim it.** If that
 property matters to you, leave Wake off — pull-only `follow` reveals nothing
 to any third party.
 
-Separately, none of §8.4's **device-side** gates exist: `public/sw.js` keeps
-no replay-nonce cache (`ERR_WAKEPING_REPLAY`) and enforces no inbound
-rate-limit backstop (`ERR_WAKEPING_RATE_LIMITED`), so a misbehaving push
-relay replaying wakes to drain a battery is not defended against at the
-receiver. The emitter does send a fresh 16-byte nonce per wake.
+### §8.4's device-side gates
+
+§8.4 gates wakes fail-closed at **both** ends, because a wake spends the
+target's battery. kerf's receiving end is the service worker in
+`public/sw.js`. Two of the three device-side gates are implemented; the third
+is blocked on a decision, stated below rather than left as a to-do.
+
+| §8.4 device-side gate | Status | Notes |
+|---|---|---|
+| **Replay-dedup** (`ERR_WAKEPING_REPLAY`, `0x0316`, DROP_SILENT) | **Implemented** | The emitter seals a fresh 16-byte nonce per wake (`kerf_pub.wake.send_wake`) and the browser hands the worker that plaintext, so the nonce is already on the wire. `public/sw.js` keeps a **bounded (256), newest-first replay cache persisted in Cache Storage** — persisted, not in-memory, because a worker woken purely for a push starts with an empty global scope and would otherwise forget every nonce between pushes. A nonce it has already accepted is dropped before any re-crawl, tab wake, or notification. |
+| **Content-free shape check** (`ERR_WAKEPING_CONTENT_PRESENT`, `0x0313`) | **Implemented** | kerf's wake payload is exactly the 16-byte token, so a push whose decrypted plaintext is absent, short, or long is not a conformant kerf `WakePing` and is dropped unread. |
+| **Inbound rate-limit backstop** (`ERR_WAKEPING_RATE_LIMITED`, `0x0315`) | **Not implemented — needs a protocol decision, see below** | §8.4 defines this as the device enforcing *the same* budget as the emitter. kerf's emitter has no budget to mirror. |
+
+**Why the rate-limit backstop is not built yet (and is not going to be
+half-built).** §8.4 words it as a two-ended agreement: *"the emitting node
+rate-limits per device (coalescing bursts); the receiving device enforces the
+same budget on inbound wakes as a fail-closed backstop."*
+`kerf_pub.wake.notify_subscribers` fans out **one unthrottled wake per
+subscriber per publish** — no per-device limiter, no coalescing window — so
+"the same budget" currently has no referent. A number invented at the receiver
+alone would not be §8.4's gate, and it would silently drop legitimate wakes
+from a prolific publisher: a correctness regression dressed as a security
+control. Three things have to be decided first, and they belong to the wake
+protocol, not to this service worker:
+
+1. **The emitter's per-device budget** — wakes per device per window, and the
+   window. This is the number the receiver mirrors; it does not exist yet.
+2. **The coalescing rule** at the emitter — §8.4 says bursts are coalesced, but
+   kerf's wake is publisher-driven and content-free, so N publishes in a burst
+   currently produce N indistinguishable wakes. Coalescing them is safe
+   precisely *because* they are indistinguishable (the receiver's reaction to
+   any wake is the same idempotent re-crawl), but "how long a burst is" is a
+   choice.
+3. **What the receiver does on exceed** — DROP_SILENT matches §8.4, but the
+   receiver cannot distinguish "abusive relay" from "author published ten
+   revisions in a minute", so an over-budget wake being dropped must be an
+   agreed, documented behaviour rather than a surprise.
+
+**What remains undefended, precisely.** The replay cache is bounded, so an
+adversary holding more than 256 distinct captured ciphertexts can cycle them to
+evict entries and re-land old wakes; the rate limiter is §8.4's backstop for
+exactly that residue. Everything else a misbehaving relay can do — replay one
+wake, replay a handful, inject undecryptable or wrong-shaped payloads — is
+stopped at the receiver today.
 
 Closing the first row means followers' own nodes holding their own
 subscriptions plus a node→node notify path — an architecture change rather

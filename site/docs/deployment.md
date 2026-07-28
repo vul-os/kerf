@@ -52,7 +52,7 @@ docker build --build-arg KERF_PERSONA=api-only -t kerf:api-only .
 ```
 
 Valid `KERF_PERSONA` values: `api-only` · `mech` · `electronics` · `bim` ·
-`full` · `compute-only`. See [persona-bundles.md](#persona-bundles).
+`full` · `compute-only`. See [persona-bundles.md](./persona-bundles.md).
 
 ### Run
 
@@ -181,11 +181,11 @@ initContainers:
 There is no proprietary/cloud-only feature set — Kerf is 100% MIT and every
 deploy runs the same software. What a given node does is governed by config
 toggles (`publicly-reachable`, `relay-for-others`, `pin-storage`,
-`offer-compute`; see [node-architecture.md](#node-architecture)),
+`offer-compute`; see [node-architecture.md](./node-architecture.md)),
 including:
 
 - Workshop (publish / fetch / resolve, via `packages/kerf-pub` — see
-  [distributed-workshop.md](#distributed-workshop))
+  [distributed-workshop.md](./distributed-workshop.md))
 - Per-project git — local by default; a node MAY serve its own repos over
   standard git HTTP/SSH if you configure it to
 - Distributor price sweeps (DigiKey / Mouser / LCSC)
@@ -196,7 +196,7 @@ credentials.
 
 ## See also
 
-- [configuration.md](#configuration) — full config schema
-- [persona-bundles.md](#persona-bundles) — choosing a persona
-- [local-install.md](#local-install) — local dev setup
+- [configuration.md](./configuration.md) — full config schema
+- [persona-bundles.md](./persona-bundles.md) — choosing a persona
+- [local-install.md](./local-install.md) — local dev setup
 - `deployment/` directory — Kubernetes + Cloud Run manifests

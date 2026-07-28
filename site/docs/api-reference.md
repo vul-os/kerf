@@ -8,8 +8,11 @@ All routes are mounted under `/api` by `kerf-core`. The router is defined in
 
 A Kerf install is **single-owner on your own box** — there is no central
 account system, no sign-up service, and no Google/OAuth login. The owner
-authenticates locally; in `local_mode` the single owner is auto-bootstrapped.
-A session uses two token types carried in standard HTTP cookies:
+authenticates locally; in `local_mode` the single owner is auto-bootstrapped
+with no login screen at all.
+
+The owner's local session uses two token types carried in standard HTTP
+cookies:
 
 | Cookie | Type | TTL |
 |--------|------|-----|
@@ -28,9 +31,14 @@ projects use `optional_auth`. Role enforcement (`owner` / `admin` / `member` /
 
 ## Auth endpoints (`/api/auth/…`)
 
+These are all **local** to your own install. There is no central sign-up
+service and no Google/OAuth login — those were retired when accounts shrank
+to the box.
+
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/auth/login` | none | Local owner login. Returns `access_token` + `refresh_token` cookies. |
+| POST | `/api/auth/register` | none | Create the local owner account on a fresh install (not a central sign-up service). Returns `access_token` + `refresh_token` cookies and the created user + workspace. |
+| POST | `/api/auth/login` | none | Local owner login. Same cookie response. |
 | POST | `/api/auth/refresh` | refresh cookie | Issue new access token from a valid refresh token. |
 | POST | `/api/auth/logout` | any | Revoke the current refresh token. |
 | POST | `/api/auth/bootstrap-local` | none | Local-mode auto-login (only when `local_mode=true`). |
@@ -322,23 +330,17 @@ request. Viewer role cannot post messages.
 
 ---
 
-## Sharing and members
+## Members
 
-Sharing a project *beyond your own box* is not done with hosted share links —
-it goes through the decentralised, key-signed **Workshop** (DMTAP-PUB); see the
-Workshop section below and [distributed-workshop.md](./distributed-workshop.md).
-The endpoints below manage local project **members** and per-project access on
-your own install.
+Local project collaboration. Publishing or sharing a project *outside* your
+box is not done with hosted share links — it goes through the decentralised,
+key-signed **Workshop** (DMTAP-PUB); see the Workshop section below and
+[distributed-workshop.md](./distributed-workshop.md).
 
 | Method | Path | Notes |
 |--------|------|-------|
-| POST | `/api/projects/{pid}/share/links` | Create share link |
-| GET | `/api/projects/{pid}/share/links` | List share links |
-| DELETE | `/api/projects/{pid}/share/links/{lid}` | Revoke share link |
-| GET | `/api/share/{token}` | Look up share link metadata (no auth) |
-| POST | `/api/share/{token}/accept` | Accept share link (auth required) |
 | GET | `/api/projects/{pid}/members` | List members |
-| POST | `/api/projects/{pid}/members` | Add member by email |
+| POST | `/api/projects/{pid}/members` | Add member |
 | PATCH | `/api/projects/{pid}/members/{uid}` | Change member role |
 | DELETE | `/api/projects/{pid}/members/{uid}` | Remove member |
 
@@ -355,11 +357,11 @@ your own install.
 
 ## Workshop
 
-Public project gallery, backed by DMTAP-PUB (see
-[distributed-workshop.md](#distributed-workshop)). No license or config
-flag gates it — every node mounts these endpoints; whether anything is
-actually published or fetched depends on the node's own toggles and the
-user's explicit publish/follow actions.
+Decentralised, key-signed publishing and following, backed by DMTAP-PUB
+(see [distributed-workshop.md](./distributed-workshop.md)) — not a hosted
+catalog or gallery. No license or config flag gates it — every node mounts
+these endpoints; whether anything is actually published or fetched depends
+on the node's own toggles and the user's explicit publish/follow actions.
 
 | Method | Path | Auth |
 |--------|------|------|
@@ -429,7 +431,7 @@ Mounted by `kerf-core`, not `kerf-api`.
 | 403 | Forbidden — authenticated but insufficient role |
 | 404 | Not found (also returned instead of 403 on resource isolation) |
 | 409 | Conflict — slug collision, duplicate entry |
-| 410 | Gone — share link exhausted |
+| 410 | Gone — resource retired or no longer available |
 | 500 | Unexpected server error |
 
 Tool-call errors inside the agent loop never return 500 — they return
@@ -437,4 +439,4 @@ Tool-call errors inside the agent loop never return 500 — they return
 
 ---
 
-See also: data-model.md · [v1-rpc.md](#v1-rpc) · [architecture.md](#architecture)
+See also: [data-model.md](./data-model.md) · [v1-rpc.md](./v1-rpc.md) · [architecture.md](./architecture.md)

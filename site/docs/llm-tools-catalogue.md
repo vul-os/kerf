@@ -6,7 +6,7 @@ order: 54
 
 # LLM tools catalogue
 
-This page indexes every domain-specialist LLM tool added by the `kerf-aero`, `kerf-silicon`, and `kerf-firmware` packages — 34 tools total. The complete set of Kerf LLM tools (including mechanical, BIM, electronics, and analysis) is documented in [llm-tools.md](#llm-tools).
+This page indexes every domain-specialist LLM tool added by the `kerf-aero`, `kerf-silicon`, and `kerf-firmware` packages — 34 tools total. The complete set of Kerf LLM tools (including mechanical, BIM, electronics, and analysis) is documented in [llm-tools.md](./llm-tools.md).
 
 Call any tool by describing the operation in the chat panel — the assistant will invoke the right tool automatically. All tool names are also callable from the `kerf-sdk` Python package.
 
@@ -31,7 +31,7 @@ The `kerf-aero` package contributes tools across six sub-disciplines. Each tool 
 | `adcs_design_controller` | adcs | `aero.adcs` | write | `(inertia_tensor: list, actuator_type: str, mode: str)` → `.adcs_config` path | "Design LQR nadir-pointing for a 3U CubeSat." |
 | `adcs_simulate` | adcs | `aero.adcs` | write | `(adcs_config_path: str, initial_rate_deg_s: list, duration_s: float)` → attitude time-series JSON | "Simulate detumble from 5 deg/s." |
 
-> Tools in the `thermal` and `flight_dynamics` sub-disciplines (`thermal_build_model`, `thermal_run_steady_state`, `thermal_run_transient`, `flight_sim_run`) are covered in aerospace-overview.md and are not counted in the 12 because they are in the `kerf-aero[thermal]` and `kerf-aero[flight_dynamics]` optional extras.
+> Tools in the `thermal` and `flight_dynamics` sub-disciplines (`thermal_build_model`, `thermal_run_steady_state`, `thermal_run_transient`, `flight_sim_run`) are covered in [aerospace-overview.md](./aerospace-overview.md) and are not counted in the 12 because they are in the `kerf-aero[thermal]` and `kerf-aero[flight_dynamics]` optional extras.
 
 ---
 
@@ -116,10 +116,13 @@ result = project.run_tool("aero_run_polar", {
 print(result["polar_path"])
 ```
 
-See [sdk.md](#sdk) for the full SDK reference.
+See [sdk.md](./sdk.md) for the full SDK reference.
 
 ---
 
 ## See also
 
-- [llm-tools.md](#llm-tools) — full tool reference including mechanical, BIM, and electronics
+- [aerospace-overview.md](./aerospace-overview.md) — aero workflow walkthrough
+- [silicon-overview.md](./silicon-overview.md) — chip design workflow
+- [firmware-overview.md](./firmware-overview.md) — embedded firmware workflow
+- [llm-tools.md](./llm-tools.md) — full tool reference including mechanical, BIM, and electronics

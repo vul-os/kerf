@@ -207,7 +207,7 @@ drills, reamers, taps) with geometry and recommended feeds.
 
 ## 9. Manufacturing drawings
 
-See [drawings.md](#drawings) for the full drawing workflow. Quick summary:
+See [drawings.md](./drawings.md) for the full drawing workflow. Quick summary:
 
 1. `create_drawing` (LLM tool) seeds a `.drawing` file with standard views
    (front, top, right, isometric) linked to the `.feature` geometry.
@@ -263,4 +263,4 @@ survive."
 
 ---
 
-See also: [parametric.md](#parametric) · [drawings.md](#drawings) · [llm-tools.md](#llm-tools) · [capabilities.md](#capabilities)
+See also: [parametric.md](./parametric.md) · [drawings.md](./drawings.md) · [llm-tools.md](./llm-tools.md) · [capabilities.md](./capabilities.md)

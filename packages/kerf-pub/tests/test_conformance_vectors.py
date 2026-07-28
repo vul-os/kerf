@@ -9,6 +9,19 @@ checkout) so this suite is self-contained in CI; it is INPUT, never regenerated
 here. Its expectations were produced by the spec repo's generator and
 independently cross-checked there by a second from-scratch implementation.
 
+The spec repo is ``kotva``. It was called ``dmtap`` when this guard was written,
+and the guard hardcoded that name — so from the rename until 2026-07-28 it found
+nothing and skipped on every machine, including the ones that DID have the spec
+checked out. Pointed at the real path it immediately failed: the corpus had been
+regenerated under a corrected §22.3.1 (``announce_id`` excludes the signature),
+and the vendored copy was months stale. The discovery is therefore no longer by
+hardcoded name — see ``_spec_vectors_path`` — and a sibling checkout that looks
+like the spec but sits under an unexpected name is a HARD FAILURE, not a skip.
+
+The vendored file's origin (repo, path, upstream commit, digest) is recorded in
+``tests/vectors/pub_vectors.provenance.json`` and that record is itself enforced
+by ``test_vendored_provenance_record_matches_the_vendored_bytes``.
+
 This is the two-implementations rule made mechanical: kerf-pub is a conformant
 §22 implementation only insofar as it reproduces these exact bytes. Every
 vector is asserted through kerf-pub's ORDINARY public API — ``hashing``,
@@ -213,6 +226,27 @@ def _announce_from_body(body: dict) -> PubAnnounce:
     )
 
 
+def _announce_a0() -> PubAnnounce:
+    """Announce A0, assembled from the two vectors that between them describe it.
+
+    Since the §22.3.1 correction, ``pub_announce_id``'s ``bytes_hex`` is the
+    signature-EXCLUDED body (keys 1,2,3,4,5,7,8) — it is no longer a complete
+    object that ``from_cbor`` can take. A0's signature lives in
+    ``pub_announce_signing_preimage``, over byte-identical body bytes. Rebuilding
+    A0 from both is not a convenience: it is the corpus asserting that the address
+    preimage and the signature preimage are the same bytes.
+    """
+    v_id, v_pre = vec("pub_announce_id"), vec("pub_announce_signing_preimage")
+    body = bytes.fromhex(v_id["input"]["bytes_hex"])
+    assert body == bytes.fromhex(v_pre["input"]["msg_hex"]), (
+        "the announce_id preimage and the signing preimage must be the same bytes "
+        "(§22.3.1: the address is taken over exactly what the sig covers)"
+    )
+    ann = _announce_from_body(cbor.decode(body))
+    ann.sig = bytes.fromhex(v_pre["expected"]["sig_hex"])
+    return ann
+
+
 def test_announce_signing_preimage_and_signature():
     v = vec("pub_announce_signing_preimage")
     seed = bytes.fromhex(v["input"]["seed_hex"])
@@ -231,12 +265,56 @@ def test_announce_signing_preimage_and_signature():
 
 
 def test_announce_id_is_content_address_of_signed_object():
+    """§22.3.1 (corrected): the address covers the body, key 9 (``sig``) EXCLUDED."""
     v = vec("pub_announce_id")
-    raw = bytes.fromhex(v["input"]["bytes_hex"])
-    ann = PubAnnounce.from_cbor(raw)
-    assert ann.to_cbor() == raw  # round-trips to the identical canonical bytes
+    body = bytes.fromhex(v["input"]["bytes_hex"])
+
+    m = cbor.decode(body)
+    assert sorted(m) == [1, 2, 3, 4, 5, 7, 8]  # ascending, and no key 9
+    assert 9 not in m
+
+    ann = _announce_a0()
+    # kerf-pub's own deterministic encoding of the body reproduces the vector's
+    # preimage bytes exactly — the address is not computed down a private path.
+    assert cbor.encode(ann._body_map()) == body
     assert ann.id.hex() == v["expected"]["id_hex"]
+
+    # And the complete signed object still round-trips through the ordinary API,
+    # addressing to the same id (the id is a property of the body, not of the
+    # bytes that happen to be stored).
+    full = ann.to_cbor()
+    assert full != body and len(full) > len(body)
+    round_tripped = PubAnnounce.from_cbor(full)
+    assert round_tripped.to_cbor() == full
+    assert round_tripped.id == ann.id
+
     ann.verify(expected_id=ann.id)  # full §22.3.3 chain incl. sig under signer
+
+
+def test_announce_id_does_not_depend_on_the_signature():
+    """§1.3: no identifier may be derived from a (malleable) signature.
+
+    This is the property the §22.3.1 correction exists to restore, asserted
+    directly rather than only via the id vector: §18.1.6 concedes hybrid
+    AND-composition is EUF-CMA and not SUF-CMA, so a second valid signature over
+    one body must not mint a second announce_id. Under the withdrawn
+    sig-INCLUDED formula this test fails.
+    """
+    ann = _announce_a0()
+    pinned = ann.id
+
+    other = bytearray(ann.sig)
+    other[0] ^= 0xFF  # a different 64-byte sig value over the same body
+    mauled = _announce_from_body(cbor.decode(bytes.fromhex(
+        vec("pub_announce_id")["input"]["bytes_hex"])))
+    mauled.sig = bytes(other)
+
+    assert mauled.sig != ann.sig
+    assert mauled.to_cbor() != ann.to_cbor()  # the stored bytes really do differ
+    assert mauled.id == pinned, (
+        "announce_id moved when only the signature changed — §1.3 forbids "
+        "deriving an identifier from a signature"
+    )
 
 
 def test_supersede_same_author_accepted():
@@ -246,7 +324,8 @@ def test_supersede_same_author_accepted():
     assert succ.pub.hex() == v["input"]["successor_pub_hex"]
     assert succ.supersedes.hex() == v["input"]["successor_supersedes_hex"]
 
-    pred = PubAnnounce.from_cbor(bytes.fromhex(vec("pub_announce_id")["input"]["bytes_hex"]))
+    pred = _announce_a0()
+    pred.verify()
     assert pred.id.hex() == v["input"]["predecessor_announce_id_hex"]
     succ.verify_supersedes(pred)  # accept
 
@@ -255,7 +334,8 @@ def test_supersede_cross_author_rejected():
     v = vec("pub_announce_supersede_cross_author_invalid")
     succ = PubAnnounce.from_cbor(bytes.fromhex(v["input"]["successor_cbor_hex"]))
     succ.verify()  # B's announce is itself well-formed and correctly signed
-    pred = PubAnnounce.from_cbor(bytes.fromhex(vec("pub_announce_id")["input"]["bytes_hex"]))
+    pred = _announce_a0()
+    assert pred.id.hex() == v["input"]["predecessor_announce_id_hex"]
     assert pred.pub != succ.pub
 
     with pytest.raises(PubError) as ei:
@@ -399,29 +479,82 @@ def test_malformed_feed_entry_shapes_rejected(name):
 #
 # (1) is what makes (2)'s skip acceptable: the vendored copy is never unchecked,
 # only ever cross-checked-against-the-spec or not.
+#
+# 2026-07-28 — (2) had a THIRD failure mode neither of those notes anticipated,
+# and it is the one that actually bit. The spec repo was renamed `dmtap` ->
+# `kotva`. The candidate list hardcoded `dmtap`, so `_spec_vectors_path()`
+# returned None even on machines with the spec checked out right next door, and
+# the guard took its loud-skip path every time. Loud-but-wrong is still wrong: the
+# warning said "the spec repo was not found alongside this checkout", which was
+# false, and it named two paths that had not existed for weeks. Nobody reads a
+# warning that fires unconditionally. Pointed at the real path the guard failed
+# instantly, on a genuine §22.3.1 protocol correction the vendored corpus had
+# missed entirely.
+#
+# So discovery no longer trusts a hardcoded repo name. It scans the checkout's
+# siblings for anything shaped like a spec repo (`*/conformance/vectors/
+# pub_vectors.json`), and:
+#
+#   * finds it under any name — a future rename cannot silence the guard;
+#   * if what it finds is NOT the expected name, that is a HARD FAILURE naming
+#     both, not a skip. A rename must be noticed once, deliberately, by a human;
+#   * it only skips when nothing spec-shaped exists at all — the one case where
+#     "the spec repo is not here" is actually true.
 
-# sha256 + length of tests/vectors/pub_vectors.json as vendored from the DMTAP
-# spec repo. UPDATE ONLY when deliberately re-syncing from that repo, in the
+# sha256 + length of tests/vectors/pub_vectors.json as vendored from the spec
+# repo. UPDATE ONLY when deliberately re-syncing from that repo, in the
 # same commit as the re-copied file, and say so in the commit message:
 #   shasum -a 256 packages/kerf-pub/tests/vectors/pub_vectors.json
+# Keep in step with tests/vectors/pub_vectors.provenance.json — the two records
+# are cross-checked by test_vendored_provenance_record_matches_the_vendored_bytes.
 VENDORED_VECTORS_SHA256 = (
-    "43a4ab54fee10fea3997f99605e01fb9b7dc9b465da32cd365cd3413c0be81f4"
+    "b0dfbff210d5ccf368de3f123ab390189393f16f38b6a91bf3d83ea5d9e895fc"
 )
-VENDORED_VECTORS_BYTES = 16953
+VENDORED_VECTORS_BYTES = 16883
+
+PROVENANCE_PATH = Path(__file__).parent / "vectors" / "pub_vectors.provenance.json"
 
 ENV_SPEC_VECTORS = "KERF_PUB_SPEC_VECTORS"
 
-_SPEC_VECTORS_CANDIDATES = (
-    Path(__file__).resolve().parents[4] / "vulos" / "dmtap" / "conformance" / "vectors" / "pub_vectors.json",
-    Path(__file__).resolve().parents[5] / "vulos" / "dmtap" / "conformance" / "vectors" / "pub_vectors.json",
+# The spec repo's name TODAY. It has been renamed once already (`dmtap` ->
+# `kotva`), which is exactly why this name is not the only way the guard can find
+# it — see _discover_spec_vectors below.
+SPEC_REPO_NAME = "kotva"
+SPEC_VECTORS_RELPATH = Path("conformance") / "vectors" / "pub_vectors.json"
+
+# Directories whose immediate children are searched for a spec-shaped checkout:
+# the parent of this repo, and its parent (kerf may be nested one deeper).
+_SEARCH_ROOTS = (
+    Path(__file__).resolve().parents[4],
+    Path(__file__).resolve().parents[5],
 )
 
 
-def _spec_vectors_path() -> Path | None:
-    for p in _SPEC_VECTORS_CANDIDATES:
-        if p.is_file():
-            return p
-    return None
+def _discover_spec_vectors() -> tuple[Path | None, list[Path], list[Path]]:
+    """Find the spec repo's corpus without trusting its directory name.
+
+    Returns ``(chosen, expected_name_hits, other_name_hits)``. ``chosen`` is the
+    match under :data:`SPEC_REPO_NAME` when there is one; otherwise ``None``, and
+    the caller decides whether ``other_name_hits`` is a rename (hard failure) or a
+    genuine absence (loud skip).
+    """
+    expected: list[Path] = []
+    others: list[Path] = []
+    seen: set[Path] = set()
+    for root in _SEARCH_ROOTS:
+        if not root.is_dir():
+            continue
+        try:
+            children = sorted(root.iterdir())
+        except OSError:
+            continue
+        for child in children:
+            cand = child / SPEC_VECTORS_RELPATH
+            if cand in seen or not cand.is_file():
+                continue
+            seen.add(cand)
+            (expected if child.name == SPEC_REPO_NAME else others).append(cand)
+    return (expected[0] if expected else None), expected, others
 
 
 def test_vendored_vectors_are_the_pinned_bytes():
@@ -440,9 +573,45 @@ def test_vendored_vectors_are_the_pinned_bytes():
     )
 
 
+def test_vendored_provenance_record_matches_the_vendored_bytes():
+    """The recorded origin of the vendored file must describe the file that is here.
+
+    A provenance record nobody checks is a comment. This makes the sidecar
+    load-bearing: its digest/length must agree BOTH with the bytes on disk and
+    with the constants above, so a re-sync cannot update one record and leave the
+    other describing the previous corpus.
+    """
+    prov = json.loads(PROVENANCE_PATH.read_text())
+    raw = VECTORS_PATH.read_bytes()
+
+    assert prov["vendored_file"] == VECTORS_PATH.name
+    assert prov["source_repo_name"] == SPEC_REPO_NAME, (
+        f"{PROVENANCE_PATH} names spec repo {prov['source_repo_name']!r} but the "
+        f"drift guard searches for {SPEC_REPO_NAME!r} — one of them is stale, and "
+        "a name mismatch here is precisely how this guard went blind before."
+    )
+    assert prov["source_path"] == str(Path(SPEC_REPO_NAME) / SPEC_VECTORS_RELPATH)
+    assert len(prov["source_commit"]) == 40  # full sha, not an abbreviation
+
+    assert (prov["sha256"], prov["bytes"]) == (VENDORED_VECTORS_SHA256, VENDORED_VECTORS_BYTES), (
+        f"{PROVENANCE_PATH} disagrees with the pins in this module.\n"
+        f"  provenance: {prov['bytes']} bytes, sha256 {prov['sha256']}\n"
+        f"  module pin: {VENDORED_VECTORS_BYTES} bytes, sha256 {VENDORED_VECTORS_SHA256}"
+    )
+    assert (len(raw), hashlib.sha256(raw).hexdigest()) == (prov["bytes"], prov["sha256"]), (
+        f"{PROVENANCE_PATH} does not describe the bytes actually vendored at {VECTORS_PATH}."
+    )
+
+
 def test_vendored_vectors_match_the_spec_repo_byte_for_byte():
-    """The vendored copy MUST equal the spec repo's file exactly, when reachable."""
+    """The vendored copy MUST equal the spec repo's file exactly, when reachable.
+
+    Fails — never skips — whenever a spec corpus is present and disagrees. Skips
+    only when no spec-shaped checkout exists at all, and says so loudly.
+    """
     override = os.environ.get(ENV_SPEC_VECTORS)
+    renamed: list[Path] = []
+    roots_note = ""
     if override:
         src = Path(override)
         # Explicitly pointed at a spec repo: absence is an error, not a skip.
@@ -451,21 +620,46 @@ def test_vendored_vectors_match_the_spec_repo_byte_for_byte():
             "set deliberately, so this is a hard error rather than a skip."
         )
     else:
-        src = _spec_vectors_path()
+        src, _expected, renamed = _discover_spec_vectors()
+        roots_note = "\n".join(f"    {r}/*/{SPEC_VECTORS_RELPATH}" for r in _SEARCH_ROOTS)
+
+    # A spec-shaped checkout under an unexpected directory name is the rename that
+    # silenced this guard for weeks. Never skip past it: comparing against it
+    # blindly could pin kerf to some unrelated fork, and skipping would repeat the
+    # original failure exactly. Stop, loudly, and make a human re-point the guard.
+    if src is None and renamed:
+        found = "\n".join(f"    {p}" for p in renamed)
+        pytest.fail(
+            "SPEC REPO FOUND UNDER AN UNEXPECTED NAME — refusing to skip.\n"
+            f"  this guard expects the spec repo to be a sibling directory named "
+            f"{SPEC_REPO_NAME!r}, and found no such directory.\n"
+            "  but these sibling checkouts DO carry a conformance corpus at the "
+            f"spec's path ({SPEC_VECTORS_RELPATH}):\n{found}\n"
+            "  the spec repo has been renamed once before (dmtap -> kotva) and this "
+            "guard skipped silently for weeks as a result, missing a real §22.3.1 "
+            "protocol correction. So this is a hard failure, not a skip.\n"
+            f"  fix: if one of the above IS the spec repo, update SPEC_REPO_NAME (and "
+            f"{PROVENANCE_PATH.name}) to its new name, re-vendor, and re-pin. If it is "
+            f"NOT, run with {ENV_SPEC_VECTORS} pointing at the real corpus."
+        )
 
     if src is None:
-        searched = "\n".join(f"    {p}" for p in _SPEC_VECTORS_CANDIDATES)
         reason = (
-            "DRIFT CHECK NOT RUN: the DMTAP spec repo was not found alongside this "
-            "checkout, so the vendored conformance corpus was NOT compared against "
-            "its source.\n"
-            f"  not checked: {VECTORS_PATH} == <dmtap>/conformance/vectors/pub_vectors.json\n"
-            f"  searched:\n{searched}\n"
-            f"  to run it here: {ENV_SPEC_VECTORS}=/path/to/dmtap/conformance/vectors/"
-            "pub_vectors.json pytest ...\n"
-            "  what DID run: test_vendored_vectors_are_the_pinned_bytes pins the "
-            "vendored file's sha256, so the copy cannot change unnoticed — but "
-            "whether it still matches the spec repo is unverified here."
+            "DRIFT CHECK NOT RUN: no DMTAP spec checkout was found alongside this "
+            "one, so the vendored conformance corpus was NOT compared against its "
+            "source.\n"
+            f"  NOT VERIFIED: {VECTORS_PATH} == {SPEC_REPO_NAME}/{SPEC_VECTORS_RELPATH}\n"
+            f"  (i.e. all {EXPECTED_VECTOR_COUNT} vectors were replayed against kerf-pub, "
+            "but were NOT confirmed to still be the spec's current bytes — a §22 "
+            "correction landing upstream would not be seen here)\n"
+            f"  searched, and found nothing carrying {SPEC_VECTORS_RELPATH}:\n{roots_note}\n"
+            f"  to run it here: {ENV_SPEC_VECTORS}=/path/to/{SPEC_REPO_NAME}/"
+            f"{SPEC_VECTORS_RELPATH} pytest ...\n"
+            "  what DID run: test_vendored_vectors_are_the_pinned_bytes and "
+            "test_vendored_provenance_record_matches_the_vendored_bytes pin the "
+            "vendored file's sha256 and its recorded origin, so the copy cannot "
+            "change unnoticed — but whether it still matches the spec repo is "
+            "unverified here."
         )
         # A pytest skip is invisible without -rs; a warning lands in the default
         # summary. This skip must be seen, because the guard exists on account of
@@ -473,9 +667,27 @@ def test_vendored_vectors_match_the_spec_repo_byte_for_byte():
         warnings.warn(reason, UserWarning, stacklevel=2)
         pytest.skip(reason)
 
-    assert VECTORS_PATH.read_bytes() == src.read_bytes(), (
+    spec_raw = src.read_bytes()
+    # Coverage assertion: prove we are comparing against a corpus of the shape this
+    # module was written against, not against an empty or truncated file that would
+    # make byte-equality vacuous.
+    spec_doc = json.loads(spec_raw)
+    assert spec_doc.get("format") == "dmtap-conformance-vectors/1", (
+        f"{src} is not a DMTAP conformance corpus (format="
+        f"{spec_doc.get('format')!r}) — refusing to treat it as the spec's file."
+    )
+    assert len(spec_doc["vectors"]) == EXPECTED_VECTOR_COUNT, (
+        f"{src} carries {len(spec_doc['vectors'])} vectors, this module is written "
+        f"against {EXPECTED_VECTOR_COUNT}."
+    )
+
+    assert VECTORS_PATH.read_bytes() == spec_raw, (
         f"vendored {VECTORS_PATH} has drifted from {src}.\n"
         "Re-copy the spec repo's file verbatim — do NOT edit the vendored copy, "
         "and do NOT regenerate it here: it is INPUT to this suite, and a corpus "
-        "that a client regenerates for itself tests nothing but its own arithmetic."
+        "that a client regenerates for itself tests nothing but its own arithmetic.\n"
+        "Then update VENDORED_VECTORS_SHA256 / VENDORED_VECTORS_BYTES and "
+        f"{PROVENANCE_PATH.name} in the same change, and check whether the drift is a "
+        "protocol correction kerf-pub's own code must follow (it was, in 2026-07: "
+        "§22.3.1 announce_id)."
     )

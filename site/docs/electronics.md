@@ -97,7 +97,7 @@ See `packages/kerf-chat/llm_docs/routing.md` for the full trace manipulation API
 
 ## 5. Linking to Library Parts
 
-A `.part` file (see [part.md](#part-format)) is Kerf's Library metadata format — manufacturer, MPN, distributor pricing, 3D model. The **LibraryPicker** modal links a `.circuit.tsx` component to a real catalog part.
+A `.part` file (see [part.md](./part.md)) is Kerf's Library metadata format — manufacturer, MPN, distributor pricing, 3D model. The **LibraryPicker** modal links a `.circuit.tsx` component to a real catalog part.
 
 **In the CircuitObjectsPanel** (or CircuitComponentsPanel), click **Add from Library**. LibraryPicker opens with:
 - Search by name, MPN, or manufacturer
@@ -283,7 +283,7 @@ Autoroute the board, then refine specific nets manually. The routing tools (`rou
 
 LLM tool: `autoroute_circuit`.
 
-See ROADMAP.md and `packages/kerf-electronics/src/kerf_electronics/routes_autoroute.py` for the full FreeRouting integration details.
+See [ROADMAP.md](../ROADMAP.md) and `packages/kerf-electronics/src/kerf_electronics/routes_autoroute.py` for the full FreeRouting integration details.
 
 ---
 
@@ -312,7 +312,7 @@ Kerf imports KiCad schematic and PCB files via the `kerf-imports` plugin (capabi
 
 LLM tool: `kicad_import_project` (or use the "Import KiCad" UI).
 
-See [imports.md](#imports) for the full KiCad import scope.
+See [imports.md](./imports.md) for the full KiCad import scope.
 
 ---
 
@@ -328,5 +328,5 @@ See [imports.md](#imports) for the full KiCad import scope.
 | BOM rollup                     | `packages/kerf-chat/llm_docs/bom.md`               |
 | `.part` file schema            | `packages/kerf-chat/llm_docs/part.md`              |
 | Library catalog                | `packages/kerf-chat/llm_docs/library.md`           |
-| KiCad import                   | [imports.md](#imports)                         |
-| LLM tool reference             | [llm-tools.md](#llm-tools)                     |
+| KiCad import                   | [imports.md](./imports.md)                         |
+| LLM tool reference             | [llm-tools.md](./llm-tools.md)                     |

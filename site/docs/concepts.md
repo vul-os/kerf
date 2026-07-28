@@ -13,7 +13,10 @@ Project
                    └── Component  (an Assembly's instance of an Object at a transform)
 ```
 
-Everything else — chat threads, revisions, members, share links — hangs off the Project.
+Everything else — chat threads, revisions, members — hangs off the Project.
+Publishing and sharing a project happen through the decentralised, key-signed
+Workshop (DMTAP-PUB), not account-based share links — see
+[distributed-workshop.md](./distributed-workshop.md).
 Files cannot import across project boundaries; all geometry references stay within a project.
 
 ## 1. File kinds are first-class
@@ -46,7 +49,7 @@ Binary files (STEP) keep a pointer in Postgres; bytes live in the configured Sto
 backend (local disk, S3/R2/MinIO, or filesystem mirror). Every text file edit
 appends a row to `file_revisions`, capped at 200 per file.
 
-See [architecture.md](#architecture) for the full table.
+See [architecture.md](./architecture.md) for the full table.
 
 ## 2. LLM as primary author
 
@@ -66,7 +69,7 @@ call. This doc-search loop is the reason the LLM can productively edit `.feature
 `.bim`, `.circuit`, and all the other domain-specific kinds without hallucinating
 schemas.
 
-See [llm-tools.md](#llm-tools) for the full tool surface.
+See [llm-tools.md](./llm-tools.md) for the full tool surface.
 
 ## 3. Two kernels in one project
 
@@ -158,9 +161,9 @@ GitHub is used as an ordinary git remote with your own SSH key or PAT — no
 OAuth brokering, no kerf-held tokens. Pluggable storage (local / S3/R2/MinIO
 / filesystem mirror / git mirror per-project).
 
-See [node-architecture.md](#node-architecture),
-[distributed-workshop.md](#distributed-workshop), and
-[capabilities.md](#capabilities).
+See [node-architecture.md](./node-architecture.md),
+[distributed-workshop.md](./distributed-workshop.md), and
+[capabilities.md](./capabilities.md).
 
 ## 8. Parametric stack — three layers
 
@@ -184,7 +187,7 @@ highest-level layer — it can invoke feature ops as nodes.
 Configurations (M3/M4/M5, long/short, engraved/blank) produce multiple flavors from a
 single source file by merging config params *over* the equations scope at eval time.
 
-See [parametric.md](#parametric), `packages/kerf-chat/llm_docs/equations.md`,
+See [parametric.md](./parametric.md), `packages/kerf-chat/llm_docs/equations.md`,
 `packages/kerf-chat/llm_docs/feature.md`, and `packages/kerf-imports/llm_docs/graph.md`.
 
 ## 9. Categories + hosted refs in .bim
@@ -256,4 +259,4 @@ See the per-plugin `llm_docs/` (e.g. `packages/kerf-fem/llm_docs/`,
 
 ---
 
-Next: [sketching.md](#sketching) · [assemblies.md](#assemblies) · [parametric.md](#parametric) · [electronics.md](#electronics) · [architecture.md](#architecture)
+Next: [sketching.md](./sketching.md) · [assemblies.md](./assemblies.md) · [parametric.md](./parametric.md) · [electronics.md](./electronics.md) · [architecture.md](./architecture.md)

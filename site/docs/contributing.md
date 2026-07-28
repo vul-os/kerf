@@ -68,7 +68,7 @@ box, or a Vulos-hosted instance like `kerf.sh`) runs byte-identical
 software. A node's behavior is governed entirely by config toggles
 (`publicly-reachable`, `relay-for-others`, `pin-storage`, `offer-compute`),
 never by which build you installed or a license gate. See
-[node-architecture.md](#node-architecture).
+[node-architecture.md](./node-architecture.md).
 
 PRs that change any file in this repo are welcome under the standard MIT
 contributor flow — there is no separate license arrangement to negotiate.
@@ -115,7 +115,7 @@ make test-domains                      # the 22 engineering domains — experime
 
 The kernel and domain tiers have known, documented failures and must not be
 used as a release gate. Before assuming a failure there is yours, read
-TESTING.md — it records the real numbers and the handful of
+[TESTING.md](./TESTING.md) — it records the real numbers and the handful of
 shared root causes behind them.
 
 One rule worth internalising: **never assign to `sys.modules` at test-module
@@ -136,7 +136,7 @@ plus the OpenSCAD vitest suite (`vitest run src/lib/openscadToJscad.test.js`).
 
 ## What to work on
 
-The roadmap (ROADMAP.md) flags every shipped, in-flight,
+The roadmap ([ROADMAP.md](../ROADMAP.md)) flags every shipped, in-flight,
 next, and planned item. Anything marked `📋 next` or `🔮 planned` is fair
 game for a PR — there's no proprietary tree to route around.
 
@@ -183,7 +183,7 @@ tests/
 5. If a test asserts `code == "BAD_ARGS"` for a specific argument value,
    document why that value is invalid. Stale sentinels (where another commit
    made the value valid) are a common source of spurious failures — see
-   [troubleshooting.md § Stale BAD_ARGS sentinel](#troubleshooting).
+   [troubleshooting.md § Stale BAD_ARGS sentinel](./troubleshooting.md).
 
 ## Plugin layout conventions
 
@@ -250,4 +250,4 @@ Library-only plugins (no routes, no tools) still register and return a
   `refactor`, `test`) + optional scope `(plugin-name)`.
 - Do not amend published commits. Create a new fixup commit instead.
 
-Next: [architecture.md](#architecture) · [capabilities.md](#capabilities) · [releasing.md](#releasing) · [troubleshooting.md](#troubleshooting)
+Next: [architecture.md](./architecture.md) · [capabilities.md](./capabilities.md) · [releasing.md](./releasing.md) · [troubleshooting.md](./troubleshooting.md)

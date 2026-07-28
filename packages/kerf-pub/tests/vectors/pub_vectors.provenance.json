@@ -1,0 +1,26 @@
+{
+  "vendored_file": "pub_vectors.json",
+  "source_repo_name": "kotva",
+  "source_repo_note": "The DMTAP specification repository. Renamed from 'dmtap' to 'kotva'; the drift guard's search is name-independent BECAUSE of that rename, and treats a spec-shaped sibling under an unexpected name as a hard failure rather than a skip.",
+  "source_path": "kotva/conformance/vectors/pub_vectors.json",
+  "source_commit": "cacd24cc135b59b12b9ad2b476b50a4db60dc72d",
+  "source_commit_subject": "core/pubobj: derive announce_id from the signature-EXCLUDED body (§22.3.1/§1.3)",
+  "sha256": "b0dfbff210d5ccf368de3f123ab390189393f16f38b6a91bf3d83ea5d9e895fc",
+  "bytes": 16883,
+  "vector_count": 15,
+  "vendored_at": "2026-07-28",
+  "vendored_by": "cp, verbatim. This file is INPUT to packages/kerf-pub/tests/test_conformance_vectors.py: never edited in place, never regenerated inside kerf.",
+  "supersedes": {
+    "sha256": "43a4ab54fee10fea3997f99605e01fb9b7dc9b465da32cd365cd3413c0be81f4",
+    "bytes": 16953,
+    "why": "Vendored under the withdrawn §22.3.1 formula announce_id = 0x1e || BLAKE3-256(det_cbor(PubAnnounce)) over the COMPLETE signed object. §1.3 forbids deriving an identifier from a signature and §18.1.6 concedes hybrid AND-composition is EUF-CMA and not SUF-CMA, so that formula let one semantic announce carry two announce_ids. The spec corrected it to exclude key 9 (sig) and regenerated the corpus; every announce_id, dependent supersedes reference, feed-entry id and feed-head tip/sig moved. kerf-pub's PubAnnounce.id was corrected to match in the same change.",
+    "undetected_because": "The drift guard searched for the spec repo under its pre-rename name 'dmtap' and therefore skipped on every machine, including ones with the spec checked out."
+  },
+  "how_to_resync": [
+    "cp <kotva>/conformance/vectors/pub_vectors.json packages/kerf-pub/tests/vectors/pub_vectors.json",
+    "shasum -a 256 packages/kerf-pub/tests/vectors/pub_vectors.json  # -> sha256 here AND VENDORED_VECTORS_SHA256",
+    "wc -c < packages/kerf-pub/tests/vectors/pub_vectors.json        # -> bytes here AND VENDORED_VECTORS_BYTES",
+    "git -C <kotva> log -1 --format=%H -- conformance/vectors/pub_vectors.json  # -> source_commit",
+    "Re-run the suite: a drift that is a protocol correction will fail the replay tests too, and kerf-pub's own code must then follow the spec."
+  ]
+}

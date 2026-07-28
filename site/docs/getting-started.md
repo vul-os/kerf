@@ -51,11 +51,11 @@ pip-based helper script — see the heads-up below for why:
 
 > **Solvers:** the `mech`/`full` compute extras — pythonOCC and FEniCSx/dolfinx —
 > are conda-forge-only and are not installed by either command above. See
-> [local-install.md](#local-install#solver-dependencies-dolfinx--pythonocc)
+> [local-install.md](./local-install.md#solver-dependencies-dolfinx--pythonocc)
 > for the conda setup. The server boots without them; solver-backed tools just
 > report themselves unavailable.
 
-See [persona-bundles.md](#persona-bundles) for the full menu and what each persona installs.
+See [persona-bundles.md](./persona-bundles.md) for the full menu and what each persona installs.
 
 ## 3. Install Node dependencies
 
@@ -181,14 +181,14 @@ Everything else — the API, the frontend, every plugin — is identical across 
 two backends; only the `DATABASE_URL` scheme differs. On SQLite the Postgres-only
 capabilities degrade gracefully (job queues run single-writer, `LISTEN/NOTIFY`
 wakeups fall back to polling); kerf logs a one-line notice naming them at
-startup. See architecture/database.md for the full
+startup. See [architecture/database.md](./architecture/database.md) for the full
 design.
 
 ## Next steps
 
-- Persona bundles explained — [persona-bundles.md](#persona-bundles)
-- Local self-hosting in depth — [local-install.md](#local-install)
-- Config file schema — [configuration.md](#configuration)
-- Docker / production deployment — [deployment.md](#deployment)
-- Writing a plugin — [plugins-development.md](#plugins-development)
-- Scripting with the Python SDK — [sdk.md](#sdk)
+- Persona bundles explained — [persona-bundles.md](./persona-bundles.md)
+- Local self-hosting in depth — [local-install.md](./local-install.md)
+- Config file schema — [configuration.md](./configuration.md)
+- Docker / production deployment — [deployment.md](./deployment.md)
+- Writing a plugin — [plugins-development.md](./plugins-development.md)
+- Scripting with the Python SDK — [sdk.md](./sdk.md)

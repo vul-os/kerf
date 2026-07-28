@@ -126,12 +126,21 @@ _RECORD_SIZE = 4096
 #   _SIG_INVALID   — unreachable; see divergence (2) in the module docstring
 #   _AUTH_FAILED   — receive-side gate, and kerf's receiver is a browser
 #                    service worker (public/sw.js), not this module
-#   _RATE_LIMITED  — §8.4's device-side backstop is not implemented (see
-#                    docs/node-architecture.md's divergence note)
-#   _REPLAY        — likewise device-side; the emitter already sends a fresh
-#                    16-byte nonce per wake (send_wake), but no receiver-side
-#                    replay cache exists
-# Deleting them would erase the record of which §8.4 gates are missing.
+#   _RATE_LIMITED  — §8.4's device-side backstop is NOT implemented, and is
+#                    blocked on a decision this module owns half of: §8.4 has
+#                    the device mirror "the same budget" the EMITTER enforces,
+#                    and notify_subscribers below enforces none (one unthrottled
+#                    wake per subscriber per publish, no coalescing window).
+#                    See docs/node-architecture.md, "§8.4's device-side gates".
+#   _CONTENT_PRESENT / _REPLAY
+#                  — device-side, and now ENFORCED there: public/sw.js drops a
+#                    push whose plaintext is not exactly this module's 16-byte
+#                    token, and keeps a bounded, Cache-Storage-persisted
+#                    replay-nonce cache. Still unreferenced HERE because kerf's
+#                    receiver is the service worker, not this module — the
+#                    emitter's half is send_wake's fresh os.urandom(16) per send.
+# Deleting them would erase the record of which §8.4 gates are missing, and of
+# where the ones that exist are actually enforced.
 ERR_PUSH_SUBSCRIPTION_SIG_INVALID = 0x0312
 ERR_WAKEPING_CONTENT_PRESENT = 0x0313
 ERR_WAKEPING_AUTH_FAILED = 0x0314

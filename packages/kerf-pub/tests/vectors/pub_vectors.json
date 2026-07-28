@@ -91,22 +91,22 @@
       "name": "pub_announce_id",
       "operation": "content_address",
       "input": {
-        "bytes_hex": "a801000201035820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58048158211ea74194f80ea2c6c6d52f8de31300613f75341413f10fda061c063c660989db7e05a0071b0000018bcfe62b50085820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b580958404e2ac80c0ac66668b4efdb058dc1c4c92ffad16f0db73e84118f6c9b7baeb10f0194daad7cff28669e0a9efbccd20057126abb929c69576853e779162cec1202"
+        "bytes_hex": "a701000201035820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58048158211ea74194f80ea2c6c6d52f8de31300613f75341413f10fda061c063c660989db7e05a0071b0000018bcfe62b50085820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58"
       },
       "expected": {
-        "id_hex": "1e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd30"
+        "id_hex": "1e88e7539fa0eb355e49a9f18406a13c26c2657c47002fcb538b8684476a38337f"
       },
-      "note": "\u00a722.3.1: announce_id = 0x1e || BLAKE3-256(det_cbor(PubAnnounce)) over the COMPLETE, SIGNED object (including key 9 sig) \u2014 the derived-anchor rule of \u00a718.9.4, applied to announce A0 above (full CBOR bytes = det_cbor with keys 1,2,3,4,5,7,8,9 ascending)."
+      "note": "\u00a722.3.1: announce_id = 0x1e || BLAKE3-256(det_cbor(PubAnnounce minus key 9)) over the SIGNATURE-EXCLUDED body (the same one the DS-tagged sig covers) \u2014 \u00a71.3 forbids deriving an id from a (malleable) signature; applied to announce A0 above (bytes_hex = det_cbor with keys 1,2,3,4,5,7,8 ascending, key 9 sig EXCLUDED)."
     },
     {
       "name": "pub_announce_supersede_same_author_valid",
       "operation": "pub_supersede_check",
       "input": {
         "predecessor_pub_hex": "e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58",
-        "predecessor_announce_id_hex": "1e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd30",
-        "successor_cbor_hex": "a901000201035820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58048158211ea74194f80ea2c6c6d52f8de31300613f75341413f10fda061c063c660989db7e05a00658211e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd30071b0000018bcfe62f38085820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58095840bade02ab594251615a7341432f0726cfb4156396170308170792e46e81d2af6324f396909704067e57cb37faa2bdda9a6f6ccb87bad39bca4f29f32cd199ba05",
+        "predecessor_announce_id_hex": "1e88e7539fa0eb355e49a9f18406a13c26c2657c47002fcb538b8684476a38337f",
+        "successor_cbor_hex": "a901000201035820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58048158211ea74194f80ea2c6c6d52f8de31300613f75341413f10fda061c063c660989db7e05a00658211e88e7539fa0eb355e49a9f18406a13c26c2657c47002fcb538b8684476a38337f071b0000018bcfe62f38085820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58095840bf7dfe971d3ba9e22ef8406545bbbf9ec56b8625e7044f2d05eec31a13ae1cdda966ae817522253f0dbc127530478e850c429834c208dccf9ef83784895c7c0e",
         "successor_pub_hex": "e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58",
-        "successor_supersedes_hex": "1e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd30"
+        "successor_supersedes_hex": "1e88e7539fa0eb355e49a9f18406a13c26c2657c47002fcb538b8684476a38337f"
       },
       "expected": {
         "outcome": "accept",
@@ -119,10 +119,10 @@
       "operation": "pub_supersede_check",
       "input": {
         "predecessor_pub_hex": "e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58",
-        "predecessor_announce_id_hex": "1e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd30",
-        "successor_cbor_hex": "a9010002010358207d59c5623dd40a74aa4d5a32ac645d3b3f95daeae4c22be25476dd6a486f7382048158211ea74194f80ea2c6c6d52f8de31300613f75341413f10fda061c063c660989db7e05a00658211e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd30071b0000018bcfe633200858207d59c5623dd40a74aa4d5a32ac645d3b3f95daeae4c22be25476dd6a486f7382095840976f5a0c84264d0ac5ef395927b1735197535943b93e897ea78280ba098defc45331ed49c6de85b6710f7494eb0e3b6d585e7b9c4201a9e17b71d65fded8e405",
+        "predecessor_announce_id_hex": "1e88e7539fa0eb355e49a9f18406a13c26c2657c47002fcb538b8684476a38337f",
+        "successor_cbor_hex": "a9010002010358207d59c5623dd40a74aa4d5a32ac645d3b3f95daeae4c22be25476dd6a486f7382048158211ea74194f80ea2c6c6d52f8de31300613f75341413f10fda061c063c660989db7e05a00658211e88e7539fa0eb355e49a9f18406a13c26c2657c47002fcb538b8684476a38337f071b0000018bcfe633200858207d59c5623dd40a74aa4d5a32ac645d3b3f95daeae4c22be25476dd6a486f73820958400cfc0bff898b1300edbacfce284f08df29283dfd1d65f7f1f6a0bd3d82f5c19f34397b8a0aaf3a63bfc1e02dca1e25fd8b132a2c4305f0be29ac29d20451170c",
         "successor_pub_hex": "7d59c5623dd40a74aa4d5a32ac645d3b3f95daeae4c22be25476dd6a486f7382",
-        "successor_supersedes_hex": "1e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd30"
+        "successor_supersedes_hex": "1e88e7539fa0eb355e49a9f18406a13c26c2657c47002fcb538b8684476a38337f"
       },
       "expected": {
         "outcome": "reject",
@@ -137,16 +137,16 @@
       "operation": "pub_feed_entry_root",
       "input": {
         "entries_cbor_hex": [
-          "a301000258211e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd30041b0000018bcfe62b50",
-          "a401010258211e93b2a0f58389a40c269021b596b16e104fa486d7560a32022569725c1c3dfcb30358211ebb9bb7604544aed78ee40bc1949cb8cb06b49946aaf0f41f88d59e7eeb9ae591041b0000018bcfe62f38",
-          "a401020258211e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd300358211e7c793c9de9a7e7beddaf08c291787845f5145c6b8d41bbd4fb8b9e00aebcc4b2041b0000018bcfe63320"
+          "a301000258211e88e7539fa0eb355e49a9f18406a13c26c2657c47002fcb538b8684476a38337f041b0000018bcfe62b50",
+          "a401010258211e0b173b023168f223c1ce0f2b9fa5610365387c6ff7acb20d45a76e3a4c4dc8e30358211e285cd94e439ba81e16c202cc62fd3c2064664597e6acd793849ae7ad4772afdc041b0000018bcfe62f38",
+          "a401020258211e88e7539fa0eb355e49a9f18406a13c26c2657c47002fcb538b8684476a38337f0358211e9981ab3edde575757958c949a8feecffd493492feba97c84973f97f3349c89e7041b0000018bcfe63320"
         ]
       },
       "expected": {
         "entry_ids_hex": [
-          "1ebb9bb7604544aed78ee40bc1949cb8cb06b49946aaf0f41f88d59e7eeb9ae591",
-          "1e7c793c9de9a7e7beddaf08c291787845f5145c6b8d41bbd4fb8b9e00aebcc4b2",
-          "1e5b1ed9cb2801ffab0e62900292e4239838694dfcf8ce59209c8d680c5710dd44"
+          "1e285cd94e439ba81e16c202cc62fd3c2064664597e6acd793849ae7ad4772afdc",
+          "1e9981ab3edde575757958c949a8feecffd493492feba97c84973f97f3349c89e7",
+          "1e274e1734af848fcac69cab72e3ed8b71cae912db8b184989c7ee99d4eb94e97b"
         ],
         "prev_chain_valid": true
       },
@@ -157,12 +157,12 @@
       "operation": "ed25519_sign",
       "input": {
         "domain_hex": "444d5441502d5055422d76302f6665656400",
-        "msg_hex": "a701000201035820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b5804010558211e7c793c9de9a7e7beddaf08c291787845f5145c6b8d41bbd4fb8b9e00aebcc4b2061b0000018bcfe6312c075820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58",
+        "msg_hex": "a701000201035820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b5804010558211e9981ab3edde575757958c949a8feecffd493492feba97c84973f97f3349c89e7061b0000018bcfe6312c075820e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58",
         "seed_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       },
       "expected": {
         "pubkey_hex": "e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58",
-        "sig_hex": "51bdb93c2b0094534f7376254d679c76ccb7d0160a9dfcd960aaf6028b2d559096ef59127c7779b48969caf7eb2c4d301c41cf8a72f1d6f528a0c157a8b89707"
+        "sig_hex": "629ea7ff94cbc9ced033c199e4a9fb6a1cec2d6c4db7baf69905ab0ba149b86cf532ff31e1d4482b897f3a26356f2f9d2a3df7cabb986c3901232ea196290407"
       },
       "note": "\u00a722.4.1: FeedHead.sig = Ed25519(signer_seed).sign(DS || det_cbor(FeedHead minus key 8)), DS='DMTAP-PUB-v0/feed'||0x00. FeedHead: v=0,suite=1,pub=PK_A,seq=1,tip=entry1_id (from pub_feed_entry_chain),ts=1700000051500,signer=PK_A. Because entry1.prev=entry0_id, signing tip=entry1_id transitively commits to entry0 too (\u00a722.4.1's 'tip transitively commits to the entire log')."
     },
@@ -172,7 +172,7 @@
       "input": {
         "last_accepted_seq": 1,
         "presented_seq": 0,
-        "presented_tip_hex": "1ebb9bb7604544aed78ee40bc1949cb8cb06b49946aaf0f41f88d59e7eeb9ae591"
+        "presented_tip_hex": "1e285cd94e439ba81e16c202cc62fd3c2064664597e6acd793849ae7ad4772afdc"
       },
       "expected": {
         "outcome": "reject",
@@ -187,9 +187,9 @@
       "operation": "pub_feed_anti_rollback",
       "input": {
         "last_accepted_seq": 1,
-        "last_accepted_tip_hex": "1e7c793c9de9a7e7beddaf08c291787845f5145c6b8d41bbd4fb8b9e00aebcc4b2",
+        "last_accepted_tip_hex": "1e9981ab3edde575757958c949a8feecffd493492feba97c84973f97f3349c89e7",
         "presented_seq": 1,
-        "presented_tip_hex": "1e7c793c9de9a7e7beddaf08c291787845f5145c6b8d41bbd4fb8b9e00aebcc4b2"
+        "presented_tip_hex": "1e9981ab3edde575757958c949a8feecffd493492feba97c84973f97f3349c89e7"
       },
       "expected": {
         "outcome": "accept",
@@ -202,10 +202,10 @@
       "operation": "pub_feed_anti_rollback",
       "input": {
         "last_accepted_seq": 1,
-        "last_accepted_tip_hex": "1e7c793c9de9a7e7beddaf08c291787845f5145c6b8d41bbd4fb8b9e00aebcc4b2",
+        "last_accepted_tip_hex": "1e9981ab3edde575757958c949a8feecffd493492feba97c84973f97f3349c89e7",
         "presented_seq": 1,
-        "presented_tip_hex": "1e24b7f5c8891b690e1f438cba3990f80a6481fa4a8a1c40fba232a17c13dcfd8b",
-        "presented_tip_cbor_hex": "a401010258211e434792801f41be5a1b4acd8959bbf38c0abef083d5e485610994b20cd72b89a30358211ebb9bb7604544aed78ee40bc1949cb8cb06b49946aaf0f41f88d59e7eeb9ae591041b0000018bcfe62f38"
+        "presented_tip_hex": "1ed43c652caf4f9b3ee37cc49c872c3fd29017f5b087900c726a009b7a2ab946b9",
+        "presented_tip_cbor_hex": "a401010258211ed70120cbc0a1114852ab795810614bb53473280fa3cf3241f8e38c5394b792470358211e285cd94e439ba81e16c202cc62fd3c2064664597e6acd793849ae7ad4772afdc041b0000018bcfe62f38"
       },
       "expected": {
         "outcome": "reject",
@@ -220,7 +220,7 @@
       "name": "pub_feed_genesis_carries_prev_malformed",
       "operation": "det_cbor_decode_feed_entry",
       "input": {
-        "cbor_hex": "a401000258211e5928d22f36318ece11ae4b307456a4dc120e63c4deb749c35a87cc12443ccd300358211ebb9bb7604544aed78ee40bc1949cb8cb06b49946aaf0f41f88d59e7eeb9ae591041b0000018bcfe62b50",
+        "cbor_hex": "a401000258211e88e7539fa0eb355e49a9f18406a13c26c2657c47002fcb538b8684476a38337f0358211e285cd94e439ba81e16c202cc62fd3c2064664597e6acd793849ae7ad4772afdc041b0000018bcfe62b50",
         "derivation": "the genesis entry0 (seq=0) with a `prev` field (key 3) wrongly present"
       },
       "expected": {
@@ -235,7 +235,7 @@
       "name": "pub_feed_nongenesis_missing_prev_malformed",
       "operation": "det_cbor_decode_feed_entry",
       "input": {
-        "cbor_hex": "a301010258211e93b2a0f58389a40c269021b596b16e104fa486d7560a32022569725c1c3dfcb3041b0000018bcfe62f38",
+        "cbor_hex": "a301010258211e0b173b023168f223c1ce0f2b9fa5610365387c6ff7acb20d45a76e3a4c4dc8e3041b0000018bcfe62f38",
         "derivation": "entry at seq=1 with `prev` (key 3) omitted"
       },
       "expected": {

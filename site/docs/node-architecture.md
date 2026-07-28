@@ -4,7 +4,7 @@ This page describes Kerf's node model: what a "node" is, the `pub` module that
 mediates everything Kerf publishes or fetches over the network, the
 zero-socket invariant an unconfigured install holds to, and how the whole
 thing sits on top of the open DMTAP-PUB protocol. It complements
-[architecture.md](#architecture) (API surface, data model, plugin
+[architecture.md](./architecture.md) (API surface, data model, plugin
 loader), which this page does not repeat.
 
 ## One node type
@@ -43,7 +43,7 @@ explicit, opt-in acts:
 
 - you set an LLM provider API key and send a chat message,
 - you click **Publish** on a project (§22.7's explicit-publish-act rule — see
-  [distributed-workshop.md](#distributed-workshop)),
+  [distributed-workshop.md](./distributed-workshop.md)),
 - you follow a workshop feed or fetch a part someone else published,
 - you configure S3/R2 storage, GitHub sync, or a public-facing bind address,
 - you configure a **Wake** VAPID keypair and a follower registers a push
@@ -78,11 +78,9 @@ posture is "push is a latency optimization, not delivery." **Wake**
 (`kerf_pub.wake`) is an optional, self-hostable way to skip waiting for the
 next poll, layered strictly on top of `follow`/`fetch`, never a replacement
 for either. It is *adapted from* the shared substrate spec's `ROLES.md` §8
-(part of capability ⑥, Roles & Wake) and reuses its wire crypto, but is
-**not a conformant profile of it**: kerf registers the subscription on the
-feed author's node rather than the subscriber's own, so §8.2's
-social-graph-privacy property does not carry over. See `docs/`'s copy of
-this page for the full divergence table.
+(part of capability ⑥, Roles & Wake) and reuses its wire crypto, but it is
+**not a conformant profile of it** — see "Where this diverges from ROLES.md
+§8.1" below.
 
 1. A follower registers a **Web Push subscription** (an endpoint + P-256
    public key + auth secret — the exact object a browser's
@@ -98,13 +96,84 @@ this page for the full divergence table.
    same "wake-and-fetch, never deliver-in-push" discipline the substrate uses
    for mailbox delivery.
 
+### Where this diverges from ROLES.md §8.1
+
+ROLES.md §8.1 describes a device waking *itself* through *its own* node.
+Kerf's Wake is a different shape — a publisher fanning out to its followers'
+devices — so three §8.1 requirements are unmet, deliberately and as yet
+unresolved:
+
+| ROLES.md §8.1 requires | Kerf does | Why |
+|---|---|---|
+| The device registers **with its own node**; the subscription is published **"only to the user's own node(s) — never to a directory, DHT, or relay"** | Registers on the feed **author's** node (step 1 above) | The Workshop's wake is publisher-driven; a follower has no node-side relationship with the author beyond the anonymous public-object surface |
+| The subscription is **signed by an `IK`-authorised device key** (§1.2), so it "cannot be forged to register/redirect a device's wakes" (`ERR_PUSH_SUBSCRIPTION_SIG_INVALID`, 0x0312, FAIL_CLOSED_BLOCK) | No signature; the subscribe endpoint is anonymous | Follows from the row above — there is no `IK` at the registration point to bind to. Bounded instead by https-only endpoints + a per-feed subscription cap |
+| The **provider kind** is recorded (§4.9.3's `PushSubscription.provider`; Web Push is `0x02`) | Only endpoint + p256dh + auth; Web Push assumed | Web Push is the only provider kerf speaks |
+
+**What this costs.** §8.2's privacy argument rests on the wake being a
+**self-edge** — "this user's node woke this user's own device". Because kerf
+inverts the topology, a push relay instead sees *this author's node woke this
+device*: a **follow edge**. The payload is still content-free and the relay
+still learns nothing about *what* changed or what is in it, but **kerf's Wake
+does not inherit §8.2's social-graph privacy and does not claim it.** If that
+property matters to you, leave Wake off — pull-only `follow` reveals nothing
+to any third party.
+
+### §8.4's device-side gates
+
+§8.4 gates wakes fail-closed at **both** ends, because a wake spends the
+target's battery. kerf's receiving end is the service worker in
+`public/sw.js`. Two of the three device-side gates are implemented; the third
+is blocked on a decision, stated below rather than left as a to-do.
+
+| §8.4 device-side gate | Status | Notes |
+|---|---|---|
+| **Replay-dedup** (`ERR_WAKEPING_REPLAY`, `0x0316`, DROP_SILENT) | **Implemented** | The emitter seals a fresh 16-byte nonce per wake (`kerf_pub.wake.send_wake`) and the browser hands the worker that plaintext, so the nonce is already on the wire. `public/sw.js` keeps a **bounded (256), newest-first replay cache persisted in Cache Storage** — persisted, not in-memory, because a worker woken purely for a push starts with an empty global scope and would otherwise forget every nonce between pushes. A nonce it has already accepted is dropped before any re-crawl, tab wake, or notification. |
+| **Content-free shape check** (`ERR_WAKEPING_CONTENT_PRESENT`, `0x0313`) | **Implemented** | kerf's wake payload is exactly the 16-byte token, so a push whose decrypted plaintext is absent, short, or long is not a conformant kerf `WakePing` and is dropped unread. |
+| **Inbound rate-limit backstop** (`ERR_WAKEPING_RATE_LIMITED`, `0x0315`) | **Not implemented — needs a protocol decision, see below** | §8.4 defines this as the device enforcing *the same* budget as the emitter. kerf's emitter has no budget to mirror. |
+
+**Why the rate-limit backstop is not built yet (and is not going to be
+half-built).** §8.4 words it as a two-ended agreement: *"the emitting node
+rate-limits per device (coalescing bursts); the receiving device enforces the
+same budget on inbound wakes as a fail-closed backstop."*
+`kerf_pub.wake.notify_subscribers` fans out **one unthrottled wake per
+subscriber per publish** — no per-device limiter, no coalescing window — so
+"the same budget" currently has no referent. A number invented at the receiver
+alone would not be §8.4's gate, and it would silently drop legitimate wakes
+from a prolific publisher: a correctness regression dressed as a security
+control. Three things have to be decided first, and they belong to the wake
+protocol, not to this service worker:
+
+1. **The emitter's per-device budget** — wakes per device per window, and the
+   window. This is the number the receiver mirrors; it does not exist yet.
+2. **The coalescing rule** at the emitter — §8.4 says bursts are coalesced, but
+   kerf's wake is publisher-driven and content-free, so N publishes in a burst
+   currently produce N indistinguishable wakes. Coalescing them is safe
+   precisely *because* they are indistinguishable (the receiver's reaction to
+   any wake is the same idempotent re-crawl), but "how long a burst is" is a
+   choice.
+3. **What the receiver does on exceed** — DROP_SILENT matches §8.4, but the
+   receiver cannot distinguish "abusive relay" from "author published ten
+   revisions in a minute", so an over-budget wake being dropped must be an
+   agreed, documented behaviour rather than a surprise.
+
+**What remains undefended, precisely.** The replay cache is bounded, so an
+adversary holding more than 256 distinct captured ciphertexts can cycle them to
+evict entries and re-land old wakes; the rate limiter is §8.4's backstop for
+exactly that residue. Everything else a misbehaving relay can do — replay one
+wake, replay a handful, inject undecryptable or wrong-shaped payloads — is
+stopped at the receiver today.
+
+Closing the first row means followers' own nodes holding their own
+subscriptions plus a node→node notify path — an architecture change rather
+than a patch. It is not scheduled.
+
 **Fail-safe off.** A node only sends or accepts a wake once its operator sets
 `KERF_PUB_VAPID_PRIVATE_KEY` + `KERF_PUB_VAPID_SUBJECT` (a fresh keypair per
 node, generated once via `kerf_pub.wake.generate_vapid_private_key_b64()`).
 With no VAPID keypair configured, the subscribe endpoint refuses new
 subscriptions and `publish` skips the notify step entirely — the Workshop
 behaves exactly as it does today. See
-[distributed-workshop.md](#distributed-workshop#wake-optional-new-revision-pings)
+[distributed-workshop.md](./distributed-workshop.md#wake-optional-new-revision-pings)
 for the follower-facing view.
 
 ## Why DMTAP-PUB
@@ -136,7 +205,7 @@ native BLAKE3 addressing via the protocol's hash-agility prefix (§18.1.5) —
 publishing a project you've already been version-controlling requires no
 re-hash of your files.
 
-See [distributed-workshop.md](#distributed-workshop) for the
+See [distributed-workshop.md](./distributed-workshop.md) for the
 publisher/consumer-facing view of all this, and
 [github.com/vul-os/dmtap](https://github.com/vul-os/dmtap) — specifically
 `22-public-objects.md` and `23-cad-artifact-profile.md` — for the normative
@@ -155,7 +224,7 @@ explicitly chosen to publish, addressed the DMTAP-PUB way.
 
 ## Related pages
 
-- [architecture.md](#architecture) — API surface, data model, plugin loader
-- [distributed-workshop.md](#distributed-workshop) — publish, follow, pin; availability and irrevocability
-- [local-install.md](#local-install) — install paths, persona bundles
-- [getting-started.md](#getting-started) — clone to running server
+- [architecture.md](./architecture.md) — API surface, data model, plugin loader
+- [distributed-workshop.md](./distributed-workshop.md) — publish, follow, pin; availability and irrevocability
+- [local-install.md](./local-install.md) — install paths, persona bundles
+- [getting-started.md](./getting-started.md) — clone to running server

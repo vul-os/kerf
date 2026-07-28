@@ -134,7 +134,7 @@ const { wall_thickness = 3 } = params   // fallback to 3 if no equations
 ```
 
 > For the full equations file syntax and where values flow (sketches,
-> features, JSCAD), see `equations.md`.
+> features, JSCAD), see [`equations.md`](equations.md).
 
 ## Choosing `.jscad` vs `.feature`
 

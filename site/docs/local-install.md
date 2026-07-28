@@ -76,7 +76,7 @@ npm install
 > found ... requirements are unsatisfiable." Use `./scripts/dev-install.sh`
 > until that's untangled.
 
-See [getting-started.md](#getting-started) for the full from-source walkthrough,
+See [getting-started.md](./getting-started.md) for the full from-source walkthrough,
 and [solver dependencies](#solver-dependencies-dolfinx--pythonocc) below for the
 conda-only compute stack.
 
@@ -94,7 +94,7 @@ have lighter runtime footprints.
 | `full` | All of the above + cloud plugins | everything |
 | `compute-only` | Heavy workers behind an internal load balancer; no auth or REST | all compute deps |
 
-Full breakdown: [persona-bundles.md](#persona-bundles).
+Full breakdown: [persona-bundles.md](./persona-bundles.md).
 
 ## Solver dependencies (dolfinx + pythonOCC)
 
@@ -175,7 +175,7 @@ a system user and signs you in without a login screen.
 | Setting | Behaviour |
 |---------|-----------|
 | `[server].local_mode = true` (default) | No login screen. A singleton user is bootstrapped automatically. Ideal for a personal workstation install. |
-| `[server].local_mode = false` | Standard register/login flow. Use for shared servers with multiple accounts. |
+| `[server].local_mode = false` | Login required. Local users are provisioned on the box for a shared team install. No central account system or public sign-up is involved. |
 
 A shared multi-user node (a team box, or a Vulos-hosted instance like
 `kerf.sh`) sets `[server].local_mode = false` explicitly — there is no
@@ -195,7 +195,7 @@ Kerf reads configuration from the first file found, in priority order:
 
 The server emits a starter `kerf.toml` on `npm run init` (source installs) or
 on `kerf-server --init`. Full schema: `kerf.example.toml` in the repo root, or
-[configuration.md](#configuration).
+[configuration.md](./configuration.md).
 
 ## Environment variables
 
@@ -260,11 +260,12 @@ kerf hydrate   # resolve large-file pointers and download binary assets
 ```
 
 GitHub and GitLab mirror connections are configured per-project in Settings →
-Git. See github-sync.md for the full mirror setup.
+Git. See [github-sync.md](./github-sync.md) for the full mirror setup.
 
 ## See also
 
-- [getting-started.md](#getting-started) — step-by-step first run
-- [configuration.md](#configuration) — full config schema
-- [persona-bundles.md](#persona-bundles) — which plugins each persona includes
-- [deployment.md](#deployment) — Docker + production deploy
+- [getting-started.md](./getting-started.md) — step-by-step first run
+- [configuration.md](./configuration.md) — full config schema
+- [persona-bundles.md](./persona-bundles.md) — which plugins each persona includes
+- [deployment.md](./deployment.md) — Docker + production deploy
+- [github-sync.md](./github-sync.md) — git mirror + CLI sync commands

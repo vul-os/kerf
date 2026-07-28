@@ -444,4 +444,4 @@ MIT with no proprietary package tree.
 
 ---
 
-See also: [contributing.md](#contributing) · [architecture.md](#architecture) · [getting-started.md](#getting-started)
+See also: [contributing.md](./contributing.md) · [architecture.md](./architecture.md) · [getting-started.md](./getting-started.md)

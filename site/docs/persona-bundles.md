@@ -94,7 +94,7 @@ DMTAP-PUB gateway — Workshop publish/fetch/resolve/submit) mounts its
 endpoints unconditionally; whether a given node is reachable from outside
 your machine, relays for others, pins content, or offers compute is
 governed by the node config toggles (see
-[node-architecture.md](#node-architecture)), not by which packages are
+[node-architecture.md](./node-architecture.md)), not by which packages are
 installed.
 
 ## compute-only
@@ -135,7 +135,7 @@ loaded the capabilities you expected.
 
 ## See also
 
-- [architecture.md](#architecture) — plugin boot sequence
-- [capabilities.md](#capabilities) — full capability tag taxonomy
-- [local-install.md](#local-install) — install and config
-- [deployment.md](#deployment) — Docker build-arg per persona
+- [architecture.md](./architecture.md) — plugin boot sequence
+- [capabilities.md](./capabilities.md) — full capability tag taxonomy
+- [local-install.md](./local-install.md) — install and config
+- [deployment.md](./deployment.md) — Docker build-arg per persona

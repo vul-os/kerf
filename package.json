@@ -6,6 +6,8 @@
   "scripts": {
     "init": "node ./scripts/init-config.mjs",
     "build:docs": "node ./scripts/build-docs-manifest.mjs",
+    "sync:site-docs": "node ./scripts/sync-site-docs.mjs",
+    "check:site-docs": "node ./scripts/sync-site-docs.mjs --check",
     "build:icons": "node ./scripts/build-icons.mjs",
     "prebuild:compare": "node ./scripts/build-compare-manifest.mjs",
     "prebuild:roadmap": "node ./scripts/build-roadmap-manifest.mjs",

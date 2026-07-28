@@ -164,6 +164,21 @@ svg { display: block; }
 </nav>
 
 <div class="shell">
+  <!--
+    This nav IS the curation: the `data-slug` list below decides which docs the
+    static site carries, and it is edited by hand. The markdown it fetches
+    (site/docs/<slug>.md) is NOT — those files are generated from the real docs
+    corpus by scripts/sync-site-docs.mjs and must never be edited in place.
+
+    Adding a page:   add the <a data-slug="…"> here, then `npm run sync:site-docs`.
+    Removing a page: delete the <a> here, then `npm run sync:site-docs` (the
+                     orphaned markdown is pruned for you).
+
+    scripts/sync-site-docs.test.mjs fails the suite if a mirrored file drifts
+    from its source, if a slug here resolves to no doc, or if site/docs holds a
+    file this nav does not reference. It went ungated once and 30 of 58 files
+    rotted, one of them still pointing readers at a doc deleted in bfdbd635.
+  -->
   <aside class="sidebar" id="sidebar">
     <input class="search" id="search" type="text" placeholder="filter docs…" autocomplete="off" spellcheck="false">
     <div class="grp">Get started</div>

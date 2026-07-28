@@ -332,4 +332,4 @@ run_pcb_drc        (verify no impedance violations)
 
 ---
 
-See also: [electronics.md](#electronics) · [llm-tools.md](#llm-tools) · [capabilities.md](#capabilities)
+See also: [electronics.md](./electronics.md) · [llm-tools.md](./llm-tools.md) · [capabilities.md](./capabilities.md)

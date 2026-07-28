@@ -4,7 +4,7 @@ Compose multiple Parts into a single placed scene, define mating relationships b
 
 ## Core concepts
 
-Read [concepts.md](#concepts) for the foundational vocabulary:
+Read [concepts.md](./concepts.md) for the foundational vocabulary:
 
 - **Part** — a `.jscad` file that default-exports a function returning an array of Objects
 - **Object** — one `{ id, geom }` entry from a Part, with click-handles in the viewport
@@ -223,6 +223,6 @@ Parts that do not define variants for a given `config_id` use their default para
 
 ## Related
 
-- [Sketching](#sketching) — 2D profiles that become 3D Parts
-- [Parts & Objects](#concepts) — the JSCAD file model
-- [Drawings](#drawings) — 2D drawing output from assemblies
+- [Sketching](./sketching.md) — 2D profiles that become 3D Parts
+- [Parts & Objects](./concepts.md) — the JSCAD file model
+- [Drawings](./drawings.md) — 2D drawing output from assemblies

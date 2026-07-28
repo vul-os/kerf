@@ -217,4 +217,8 @@ To check the kind of a file from the LLM: `read_file` returns a `kind` field in 
 
 ## See also
 
-- [llm-tools-catalogue.md](#llm-tools-catalogue) — tool index
+- [data-model.md](./data-model.md) — full database schema including the `files` table
+- [llm-tools-catalogue.md](./llm-tools-catalogue.md) — tool index
+- [silicon-overview.md](./silicon-overview.md) — chip design file types in context
+- [firmware-overview.md](./firmware-overview.md) — firmware file types in context
+- [aerospace-overview.md](./aerospace-overview.md) — aerospace file types in context

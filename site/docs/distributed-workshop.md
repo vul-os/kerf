@@ -10,7 +10,7 @@ host. This page explains what that means in practice: publishing, following,
 pinning, and what to expect around availability.
 
 If you want the underlying node/protocol model instead of the
-publisher-facing view, see [node-architecture.md](#node-architecture).
+publisher-facing view, see [node-architecture.md](./node-architecture.md).
 
 ## A workshop is a set of feeds you follow
 
@@ -113,7 +113,7 @@ surfaces one of four states for anything you're viewing or have referenced:
 
 | State | Meaning |
 |---|---|
-| **on-node** | Pinned locally. Available even fully offline. |
+| **on-node** | Pinned locally: every manifest and chunk is in your store, so the part's bytes are fetchable fully offline. |
 | **available** | Verified as being served right now by at least one known holder. |
 | **stale** | You have an older revision pinned, or haven't re-checked the publisher's feed head recently — there may be a newer version. |
 | **unreachable** | No known holder answered. The object may still exist elsewhere; a later retry, or a different gateway, may find it. |
@@ -122,6 +122,14 @@ Availability is not a durability guarantee — it is the emergent sum of
 independent holders' choices. If keeping something around matters to you,
 **pin** it: pinning is the only thing that turns "available because someone
 happens to be serving it" into "available because you chose to keep it."
+
+> **`on-node` is about the bytes, not the catalog.** Browsing is a live
+> crawl: `GET /api/pub/workshop` re-resolves every followed feed each time,
+> and `PubClient.resolve()` does not persist a *remote* feed's head or
+> entries (only your own feed is written locally). So with the network down,
+> a pinned part is still fetchable and verifiable, but it will not appear in
+> the Workshop listing for a followed publisher you cannot reach. Caching
+> verified remote heads locally would close this; it is not built yet.
 
 ## Wake (optional: "new revision" pings)
 
@@ -133,7 +141,7 @@ not delivery." Nothing below changes what pull already does; it just lets you
 skip waiting for the next poll.
 
 If a publisher's node has Wake configured (self-hostable, off by default —
-see [node-architecture.md](#node-architecture#wake--optional-push-never-a-fifth-verb)),
+see [node-architecture.md](./node-architecture.md#wake--optional-push-never-a-fifth-verb)),
 you can register a **Web Push subscription** for one of their feeds instead of
 polling it:
 
@@ -163,6 +171,18 @@ feed's poll interval too.
 A dead or unreachable subscriber endpoint never affects the publisher's
 `publish` call — wake is fire-and-forget, best-effort, and the publish always
 succeeds regardless of whether any ping was delivered.
+
+> **What Wake tells your push service.** The ping's *contents* are sealed and
+> content-free — your push service (Mozilla, Google, or whoever your browser
+> uses) cannot read it and never learns which feed changed or what is in it.
+> But it does see that *this publisher's node* pushed to *your device*, which
+> reveals **that you follow that publisher**. This is a known divergence from
+> the substrate spec's Wake design (`ROLES.md` §8.1–§8.2), where the ping
+> comes from your *own* node and so reveals only a self-edge — see
+> [node-architecture.md](./node-architecture.md#where-this-diverges-from-rolesmd-81).
+> Plain pull-based `follow` leaks nothing to any third party, so if that
+> matters to you, leave Wake off. Kerf's Wake is a latency convenience, not a
+> privacy-preserving one.
 
 ### Enabling wake notifications
 
@@ -198,7 +218,7 @@ guesses at *what* changed — the push payload carries nothing to guess from
 
 **As a publisher (node operator)**, Wake is off until you set two
 environment variables (see
-[configuration.md](#configuration#environment-variable-overrides) for
+[configuration.md](./configuration.md#environment-variable-overrides) for
 where `kerf-server` reads env vars from) and restart:
 
 ```
@@ -276,6 +296,6 @@ tracked as a limitation, not a defect.
 
 ## Related pages
 
-- [node-architecture.md](#node-architecture) — the node model and the `pub` module
+- [node-architecture.md](./node-architecture.md) — the node model and the `pub` module
 - `github.com/vul-os/dmtap` — `22-public-objects.md` (protocol) and `23-cad-artifact-profile.md` (this profile), the normative specs
-- [getting-started.md](#getting-started) — clone to running server
+- [getting-started.md](./getting-started.md) — clone to running server

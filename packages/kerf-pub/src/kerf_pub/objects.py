@@ -238,8 +238,24 @@ class PubAnnounce:
 
     @property
     def id(self) -> bytes:
-        # announce_id = HASH_PREFIX ‖ digest(det_cbor(full signed announce)) (§22.3.1)
-        return hashing.mhash(self.to_cbor())
+        # announce_id = HASH_PREFIX ‖ digest(det_cbor(PubAnnounce ∖ {9}))  (§22.3.1)
+        #
+        # Key 9 (`sig`) is EXCLUDED — the address is taken over exactly the body
+        # the DS-tagged signature already covers. §1.3 forbids deriving any
+        # identifier from a signature: §18.1.6 concedes hybrid AND-composition is
+        # EUF-CMA and not SUF-CMA, so a valid `sig` is malleable, and hashing the
+        # complete signed object would give one semantic announce two different
+        # announce_ids — splitting the content-address pin so that a `supersedes`
+        # reference (§22.3.4) or a fetch-by-id could miss a mauled copy.
+        #
+        # kerf-pub hashed the complete signed object until 2026-07-28. That was
+        # the withdrawn formula; the spec (kotva §22.3.1, "the signature (key 9)
+        # is EXCLUDED (normative, corrected)") and the regenerated conformance
+        # corpus both moved, and kerf follows. Consequence: every announce_id
+        # kerf-pub computes changed, and with it every feed-entry id and feed-head
+        # tip/sig that commits to one. Ids minted under the old formula do not
+        # re-derive; there is no v0 deployment of kerf-pub carrying them.
+        return hashing.mhash(cbor.encode(self._body_map()))
 
     @classmethod
     def from_cbor(cls, raw: bytes) -> "PubAnnounce":

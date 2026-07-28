@@ -105,7 +105,7 @@ class PluginManifest:
 ```
 
 `provides` is the source of truth for `GET /health/capabilities`. Use tags
-from the taxonomy in [capabilities.md](#capabilities) when they fit; invent
+from the taxonomy in [capabilities.md](./capabilities.md) when they fit; invent
 new namespaced tags for genuinely new capabilities.
 
 ## Minimal plugin.py
@@ -172,7 +172,7 @@ def _register_module_tools(ctx, mod, module_path: str) -> None:
 ## Capability tags
 
 Tags are dotted namespaced strings. Use the existing taxonomy from
-[capabilities.md](#capabilities) when a tag already fits. For a new plugin,
+[capabilities.md](./capabilities.md) when a tag already fits. For a new plugin,
 add new tags under a namespace that matches your plugin's domain:
 
 ```python
@@ -217,7 +217,7 @@ ctx.tools.register("my_tool", spec, my_handler)
 ```
 
 For the `@register` decorator pattern used by most tools, see
-[llm-tool-authoring.md](#llm-tool-authoring).
+[llm-tool-authoring.md](./llm-tool-authoring.md).
 
 ## Background workers
 
@@ -275,7 +275,7 @@ Tests run with `pytest` from the repo root.
 
 ## See also
 
-- [llm-tool-authoring.md](#llm-tool-authoring) — `@register` pattern, ok/err payloads
-- [capabilities.md](#capabilities) — full capability tag taxonomy
-- [architecture.md](#architecture) — boot sequence in detail
-- [persona-bundles.md](#persona-bundles) — adding a plugin to a persona
+- [llm-tool-authoring.md](./llm-tool-authoring.md) — `@register` pattern, ok/err payloads
+- [capabilities.md](./capabilities.md) — full capability tag taxonomy
+- [architecture.md](./architecture.md) — boot sequence in detail
+- [persona-bundles.md](./persona-bundles.md) — adding a plugin to a persona

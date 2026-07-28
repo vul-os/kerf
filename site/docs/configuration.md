@@ -71,7 +71,7 @@ with the `DATABASE_URL` environment variable — it takes precedence when set.
 DATABASE_URL=postgres://pc@localhost:5432/kerf?sslmode=disable
 ```
 
-See architecture/database.md for the two-backend
+See [architecture/database.md](./architecture/database.md) for the two-backend
 design and exactly which capabilities are Postgres-only.
 
 ## [auth]
@@ -84,9 +84,10 @@ refresh_ttl = "720h"
 password_pepper = "change-me-in-production"
 ```
 
-There is no central account system, no sign-up service, and no Google/OAuth
-login: a Kerf install is single-owner on your own box. Accounts shrink to the
-box.
+These knobs cover a Kerf install's **own local** auth — the owner's session
+tokens and long-lived API tokens for the SDK / headless access. There is no
+central account system, no sign-up service, and no Google/OAuth login: a
+Kerf install is single-owner on your own box. Accounts shrink to the box.
 
 | Key | Notes |
 |-----|-------|
@@ -118,11 +119,11 @@ cdn_base_url = ""
 | `"local"` | Opaque blob store under `local_path`. Default. Auth-protected `/api/blobs/{key}` serves bytes. |
 | `"s3"` | AWS S3, Cloudflare R2, or MinIO. Blob downloads are presigned 302 redirects. Set `[storage.s3]` credentials. |
 | `"filesystem"` | Projects mirror to `filesystem_root` as real folders. Files are editable with any tool. |
-| `"git"` | Per-project git mirror in S3 — an ordinary MIT node capability, not cloud-only. Requires `[storage.s3]`. |
+| `"git"` | Per-project git mirror in S3 — an ordinary node capability. Requires `[storage.s3]`. |
 
 `cdn_base_url` — when set, `Storage.PublicURL` returns a CDN URL instead of
 routing through the backend. Recommended for production S3 deployments with
-a CDN in front (e.g. bunny.net). OSS-compatible; cloud not required.
+a CDN in front (e.g. bunny.net).
 
 ## [llm]
 
@@ -192,14 +193,14 @@ a kerf-operated GitHub OAuth app — there is no billing anywhere and no
 "cloud edition." Every install is a full node whose behavior is governed by
 config toggles (`publicly-reachable`, `relay-for-others`, `pin-storage`,
 `offer-compute`), not by an `enabled` flag on a proprietary package. See
-[node-architecture.md](#node-architecture) for the current toggle model.
+[node-architecture.md](./node-architecture.md) for the current toggle model.
 
 GitHub is used as an ordinary git remote with your own SSH key or PAT — no
 client ID/secret, no OAuth redirect. See
-github-sync.md.
+[github-sync.md](./github-sync.md).
 
 ## See also
 
 - `kerf.example.toml` — annotated full schema in the repo root
-- [local-install.md](#local-install) — install paths and Postgres setup
-- [deployment.md](#deployment) — Docker and environment variable passing
+- [local-install.md](./local-install.md) — install paths and Postgres setup
+- [deployment.md](./deployment.md) — Docker and environment variable passing

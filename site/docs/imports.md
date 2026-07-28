@@ -123,7 +123,7 @@ Output via FreeCAD Draft workbench's `export_draft_dxf`. Input not yet implement
 
 **Status: planned, not started**
 
-Track progress in ROADMAP.
+Track progress in [ROADMAP](../ROADMAP.md).
 
 ## FreeCAD
 
@@ -133,7 +133,7 @@ The `kerf-imports` plugin advertises `imports.freecad` once the FreeCAD-side
 `.FCStd` reader lands (currently empty; see
 `packages/kerf-imports/src/kerf_imports/freecad.py`). Parity scope: PartDesign
 body imports → `.feature` tree; sketches imported alongside as their own
-`.sketch`. Track progress in ROADMAP.
+`.sketch`. Track progress in [ROADMAP](../ROADMAP.md).
 
 ## General tips
 

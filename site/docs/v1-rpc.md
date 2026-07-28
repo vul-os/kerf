@@ -2,7 +2,7 @@
 
 All Kerf operations are available over HTTP. The primary interface for
 scripting, automation, and third-party tooling is the JSON-RPC endpoint at
-`POST /v1/rpc`. A friendlier Python wrapper is the [kerf-sdk](#sdk).
+`POST /v1/rpc`. A friendlier Python wrapper is the [kerf-sdk](./sdk.md).
 
 This page focuses on **how to use the API** — from getting a token to common
 scripting patterns. For a complete method listing see the
@@ -10,19 +10,19 @@ scripting patterns. For a complete method listing see the
 
 ---
 
-## OSS vs Cloud
+## One protocol, every node
 
-The v1 RPC endpoint is part of the MIT `kerf-v1` plugin and works on every
-Kerf instance — they all run the same software. The URL is the only thing
-that changes:
+The v1 RPC endpoint is part of the MIT `kerf-v1` plugin and works identically
+on every node — Kerf is 100% MIT with no cloud edition. The URL is the only
+thing that changes:
 
 | Kerf install | Base URL |
 |--------------|----------|
 | Local dev (default) | `http://localhost:8080` |
 | Self-hosted server | Your server's URL |
-| Shared instance (e.g. `kerf.sh`) | `https://kerf.sh` |
+| Public gateway (e.g. `kerf.sh`) | `https://kerf.sh` |
 
-There are no privileged methods — Kerf is 100% MIT and every node runs the
+There are no cloud-only methods — Kerf is 100% MIT and every node runs the
 same plugins. Workshop and git methods return a JSON-RPC error only if the
 relevant node config toggle (e.g. `offer-compute`, or no feed followed) makes
 the operation inapplicable on that particular node — never because of a
@@ -152,7 +152,7 @@ rpc("revisions.restore", {
 
 ## Using the Python SDK instead
 
-For Python scripts the [kerf-sdk](#sdk) wraps every method above and
+For Python scripts the [kerf-sdk](./sdk.md) wraps every method above and
 handles auth, base URL, and error raising for you:
 
 ```sh
@@ -245,6 +245,6 @@ Returns the tool registry filtered to your role:
 
 ## See also
 
-- [sdk.md](#sdk) — Python SDK (higher-level wrapper)
-- [getting-started.md](#getting-started) — run a local server
-- [local-install.md](#local-install) — API token generation
+- [sdk.md](./sdk.md) — Python SDK (higher-level wrapper)
+- [getting-started.md](./getting-started.md) — run a local server
+- [local-install.md](./local-install.md) — API token generation

@@ -25,12 +25,12 @@ Browser (React + Three.js)  ←→  Python FastAPI server  ←→  Postgres
 ## One node type, not OSS vs Cloud
 
 There is no "cloud edition" versus "local edition" — Kerf is 100% MIT and
-every install (a laptop, a homelab box, or a Vulos-hosted instance like
+every install (a laptop, a homelab box, or an always-on instance like
 `kerf.sh`) runs byte-identical software. A node's behavior is governed
 entirely by config toggles (`publicly-reachable`, `relay-for-others`,
 `pin-storage`, `offer-compute`), never by a license gate or a proprietary
-package. See [node-architecture.md](#node-architecture) and
-oss-cloud-separation.md for the current model.
+package. See [node-architecture.md](./node-architecture.md) for the current
+model.
 
 ---
 
@@ -161,7 +161,7 @@ Three concrete backends, one interface (`StorageBackend` ABC in
 | `local` | `storage.backend = "local"` | Local dev, single-machine self-host |
 | `s3` | `storage.backend = "s3"` | Production; works with AWS S3, R2, MinIO |
 | `filesystem` | `storage.backend = "filesystem"` | Edit files with your own tools on disk |
-| `git` | `storage.backend = "git"` | Per-project git mirror to any ordinary remote — your own SSH key or PAT, no brokering |
+| `git` | `storage.backend = "git"` | Per-project local git mirror; push/pull to a GitHub/GitLab remote via [github-sync.md](./github-sync.md) |
 
 ---
 
@@ -172,13 +172,13 @@ Every text edit writes a row to `file_revisions` with a `source` tag of
 Soft-delete keeps the revision log readable after a file is deleted.
 
 `[limits].file_revisions_max` (default 200) prunes the oldest rows on each
-write. See file-revisions.md for the full model.
+write. See [file-revisions.md](./file-revisions.md) for the full model.
 
 ---
 
 ## Running a local server
 
-See [getting-started.md](#getting-started) for a step-by-step walkthrough.
+See [getting-started.md](./getting-started.md) for a step-by-step walkthrough.
 The one-liner for development:
 
 ```sh
@@ -197,7 +197,7 @@ kerf-server        # serves dist/ + API on :8080
 ## Future work
 
 **Real-time multi-author sync (CRDT).** kerf does not ship a real-time
-collaborative-editing engine today (see concurrent-editing.md
+collaborative-editing engine today (see [concurrent-editing.md](./concurrent-editing.md)
 for the optimistic-concurrency-control model kerf uses instead). A pure-Python
 CRDT seed (`YMap`/`YArray`/`YDoc`/`PresenceChannel`, no network transport) once
 lived at `packages/kerf-cloud/src/kerf_cloud/collab/` but was never wired into
@@ -211,8 +211,8 @@ real-time collaborative editing, it should build on that spec instead of
 reviving the pruned seed.
 
 **Wake (push notifications for the Workshop).** See
-[distributed-workshop.md](#distributed-workshop#wake-optional-new-revision-pings)
-and [node-architecture.md](#node-architecture) for kerf-pub's optional
+[distributed-workshop.md](./distributed-workshop.md#wake-optional-new-revision-pings)
+and [node-architecture.md](./node-architecture.md) for kerf-pub's optional
 Web Push wake path (kerf-local, adapted from substrate capability ⑥'s Wake,
 `dmtap/substrate/ROLES.md` §8) — a content-free "new revision" ping that lets
 a follower skip re-crawl polling. Both halves are implemented: the
@@ -221,14 +221,17 @@ server-side subscription registry + send path, and the frontend
 orchestration + the Workshop's "Notify me" toggle). It is **not** a
 conformant profile of ROLES.md §8.1 — kerf registers the subscription on the
 feed *author's* node rather than the subscriber's own, so §8.2's
-social-graph-privacy property does not carry over.
+social-graph-privacy property does not carry over; see
+[node-architecture.md](./node-architecture.md#wake--optional-push-never-a-fifth-verb)
+and `kerf_pub.wake`'s module docstring for the full list.
 
 ---
 
 ## Deep dives
 
-- [capabilities.md](#capabilities) — capability tags + persona breakdown
-- [llm-tools.md](#llm-tools) — full LLM tool reference
-- [tool-registry.md](#tool-registry) — AI workflow and extending the tool system
-- [render-pipeline.md](#render-pipeline) — Three.js + BVH + mesh caching
-- [plugins-development.md](#plugins-development) — writing a plugin
+- [capabilities.md](./capabilities.md) — capability tags + persona breakdown
+- [llm-tools.md](./llm-tools.md) — full LLM tool reference
+- [tool-registry.md](./tool-registry.md) — AI workflow and extending the tool system
+- [render-pipeline.md](./render-pipeline.md) — Three.js + BVH + mesh caching
+- [cloud-operator.md](./cloud-operator.md) — running an always-on node like `kerf.sh`
+- [plugins-development.md](./plugins-development.md) — writing a plugin

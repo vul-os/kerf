@@ -2,8 +2,7 @@
 
 `kerf-sdk` is a Python package (on PyPI) for automating Kerf from your own
 machine. It talks to a running Kerf server over HTTP/JSON-RPC — the server can
-be your local install or any other Kerf instance you can reach (for example a
-shared box on your network, or a self-hosted instance like `kerf.sh`).
+be your local install or the hosted cloud at kerf.sh.
 
 The SDK runs on your machine, not inside the server. You need a separate
 `pip install kerf-sdk` outside the server's virtualenv.
@@ -23,7 +22,7 @@ Generate an API token from your workspace settings
 
 ```sh
 export KERF_API_TOKEN=kerf_sk_...
-export KERF_API_URL=https://kerf.sh   # point at whichever instance you run
+export KERF_API_URL=https://kerf.sh   # omit to use the default cloud URL
 ```
 
 For a local server:
@@ -152,7 +151,7 @@ Error response:
 `kerf.KerfError` is raised when the server returns a JSON-RPC error object.
 `httpx.HTTPStatusError` is raised on non-2xx HTTP status.
 
-The full method reference is in [v1-rpc.md](#v1-rpc).
+The full method reference is in [v1-rpc.md](./v1-rpc.md).
 
 ## Method reference
 
@@ -191,7 +190,7 @@ Community and first-party SDKs in other languages are available:
 | _(planned)_ | TypeScript | — |
 
 All language SDKs target the same `/v1/rpc` JSON-RPC surface. The wire
-protocol is identical; see [v1-rpc.md](#v1-rpc) for the full spec.
+protocol is identical; see [v1-rpc.md](./v1-rpc.md) for the full spec.
 
 ## One node type
 
@@ -210,6 +209,6 @@ a license or plugin gate.
 
 ## See also
 
-- [v1-rpc.md](#v1-rpc) — full JSON-RPC wire protocol reference
-- [getting-started.md](#getting-started) — running a local server to point the SDK at
-- [local-install.md](#local-install) — API token generation
+- [v1-rpc.md](./v1-rpc.md) — full JSON-RPC wire protocol reference
+- [getting-started.md](./getting-started.md) — running a local server to point the SDK at
+- [local-install.md](./local-install.md) — API token generation

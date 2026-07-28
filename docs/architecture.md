@@ -213,11 +213,17 @@ reviving the pruned seed.
 **Wake (push notifications for the Workshop).** See
 [distributed-workshop.md](./distributed-workshop.md#wake-optional-new-revision-pings)
 and [node-architecture.md](./node-architecture.md) for kerf-pub's optional
-Web Push wake path (substrate capability ⑤, `dmtap/substrate/ROLES.md` §8) —
-a content-free "new revision" ping that lets a follower skip re-crawl
-polling. Both halves are implemented: the server-side subscription registry
-+ send path, and the frontend (`public/sw.js`'s service worker + `src/lib/
-wake.js`'s `PushManager` orchestration + the Workshop's "Notify me" toggle).
+Web Push wake path (kerf-local, adapted from substrate capability ⑥'s Wake,
+`dmtap/substrate/ROLES.md` §8) — a content-free "new revision" ping that lets
+a follower skip re-crawl polling. Both halves are implemented: the
+server-side subscription registry + send path, and the frontend
+(`public/sw.js`'s service worker + `src/lib/wake.js`'s `PushManager`
+orchestration + the Workshop's "Notify me" toggle). It is **not** a
+conformant profile of ROLES.md §8.1 — kerf registers the subscription on the
+feed *author's* node rather than the subscriber's own, so §8.2's
+social-graph-privacy property does not carry over; see
+[node-architecture.md](./node-architecture.md#wake--optional-push-never-a-fifth-verb)
+and `kerf_pub.wake`'s module docstring for the full list.
 
 ---
 

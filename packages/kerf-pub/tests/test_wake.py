@@ -1,5 +1,7 @@
-"""Wake — content-free push notifications for the Workshop (kerf_pub.wake,
-substrate capability ⑤, `dmtap/substrate/ROLES.md` §8).
+"""Wake — content-free push notifications for the Workshop (kerf_pub.wake;
+kerf-local, adapted from substrate capability ⑥'s Wake,
+`dmtap/substrate/ROLES.md` §8 — see that module's "Divergences from
+ROLES.md §8.1" note for what is deliberately NOT conformant).
 
 Covers:
 * RFC 8291 message encryption verified BYTE-FOR-BYTE against the RFC's own

@@ -1,5 +1,11 @@
-"""Wake — content-free, sender-blind push for the Workshop (substrate
-capability ⑤; `dmtap/substrate/ROLES.md` §8, profile of DMTAP core §4.9).
+"""Wake — content-free push for the Workshop (kerf-local; *adapted from*,
+NOT a conformant profile of, `dmtap/substrate/ROLES.md` §8 — Wake is part of
+substrate capability ⑥, Roles & Wake — which profiles DMTAP core §4.9).
+
+**Read §"Divergences from ROLES.md §8.1" below before treating anything here
+as substrate-conformant.** kerf-pub borrows §8's crypto and its
+wake-and-fetch discipline, but inverts §8.1's topology; that is a deliberate,
+recorded deviation, not an implementation of the spec.
 
 **What this is.** kerf-pub's Workshop is pull-only today: a node re-crawls
 every followed feed's head (`kerf_pub.router_local.workshop_feed`) to notice a
@@ -37,6 +43,48 @@ built on the `cryptography` library primitives kerf-pub already depends on
 — no extra dependency. :func:`seal_wake_token`'s HKDF/AES-GCM derivation is
 verified byte-for-byte against the RFC 8291 Appendix A worked example in
 ``tests/test_wake.py``.
+
+**Divergences from ROLES.md §8.1 (deliberate, unresolved).**
+
+ROLES.md §8.1 specifies Wake as a device waking *itself* via *its own* node.
+kerf-pub implements a different shape — a publisher fanning out to its
+followers' devices — so three §8.1 requirements are not met:
+
+1. *Registration target.* §8.1: "a device registers, **with its own node**
+   … published **only to the user's own node(s)** — never to a directory,
+   DHT, or relay". kerf-pub registers a follower's subscription on the feed
+   **author's** node (`kerf_pub.router.subscribe_feed`, mounted on the
+   anonymous public-object prefix), which is a third party to that follower.
+2. *No `IK`-authorised device-key signature.* §8.1 requires the whole
+   subscription be "signed by an `IK`-authorised device key (§1.2) so the
+   subscription is authenticated to the identity and cannot be forged to
+   register/redirect a device's wakes". kerf-pub's subscribe endpoint is
+   anonymous — a follower on another node has no identity here to sign with
+   — so ``ERR_PUSH_SUBSCRIPTION_SIG_INVALID`` (0x0312, FAIL_CLOSED_BLOCK in
+   §8.4) can never fire. This follows from (1): there is no `IK` at the
+   registration point to bind to. The abuse surface is bounded instead by
+   https-only endpoints + a per-feed subscription cap; see
+   :func:`validate_subscription` and ``MAX_SUBSCRIPTIONS_PER_FEED``.
+3. *No provider kind recorded.* §8.1 lists "the provider kind" among the
+   registered fields — DMTAP core §4.9.3's `PushSubscription.provider` tag
+   (§18.5.5), where Web Push is `0x02`. :class:`PushSubscription` carries
+   only endpoint + p256dh + auth, with Web Push assumed rather than tagged.
+   §8.3's "prefer an open provider" rule is satisfied only incidentally —
+   Web Push is the sole provider kerf speaks, so there is no APNs/FCM bridge
+   to prefer *away* from — but the preference is not expressible here.
+
+Consequence for §8.2 ("why the graph stays private"): §8.2's guarantee rests
+on the wake being a **self-edge** — "this user's node woke this user's own
+device". Under (1) the push relay instead observes *this author's node woke
+this device*, i.e. a **follow edge**. The payload stays content-free and the
+relay still learns nothing about *what* changed, but kerf-pub does NOT
+inherit §8.2's social-graph-privacy property and must not claim it.
+
+Closing (1) means followers' own nodes holding their own subscriptions and a
+node→node notify path — an architecture change, not a patch, and out of
+scope here. Until then this module is a kerf-local extension that reuses
+§8's wire crypto, and the §8.4 constants below are a traceability mirror
+(see their comment), not evidence of an enforced gate.
 """
 
 from __future__ import annotations
@@ -70,6 +118,20 @@ _RECORD_SIZE = 4096
 
 # ROLES.md §8.4 wake error codes (DMTAP core §4.9, already-registered — kerf
 # reuses the names/codes for traceability, not because kerf-pub owns them).
+#
+# DO NOT PRUNE AS DEAD CODE. Several of these are intentionally unreferenced:
+# they are a deliberate mirror of the DMTAP §4.9 / ROLES.md §8.4 registry so
+# that the codes kerf-pub does NOT yet enforce are visible here rather than
+# silently absent. Specifically unreferenced today, by design:
+#   _SIG_INVALID   — unreachable; see divergence (2) in the module docstring
+#   _AUTH_FAILED   — receive-side gate, and kerf's receiver is a browser
+#                    service worker (public/sw.js), not this module
+#   _RATE_LIMITED  — §8.4's device-side backstop is not implemented (see
+#                    docs/node-architecture.md's divergence note)
+#   _REPLAY        — likewise device-side; the emitter already sends a fresh
+#                    16-byte nonce per wake (send_wake), but no receiver-side
+#                    replay cache exists
+# Deleting them would erase the record of which §8.4 gates are missing.
 ERR_PUSH_SUBSCRIPTION_SIG_INVALID = 0x0312
 ERR_WAKEPING_CONTENT_PRESENT = 0x0313
 ERR_WAKEPING_AUTH_FAILED = 0x0314
@@ -91,9 +153,10 @@ def _b64url_encode(b: bytes) -> str:
 
 @dataclass(frozen=True)
 class VapidConfig:
-    """This node's own VAPID keypair (ROLES.md §8: "Node holds its own VAPID
-    keypair"). Never the subscriber's — that's the per-subscription P-256 key
-    + auth secret a browser's Push API generates, carried in `PushSubscription`."""
+    """This node's own VAPID keypair (ROLES.md §8.3's Web Push row: "the node
+    is the VAPID application server"). Never the subscriber's — that's the
+    per-subscription P-256 key + auth secret a browser's Push API generates,
+    carried in `PushSubscription`."""
 
     private_key: ec.EllipticCurvePrivateKey
     public_key_raw: bytes  # 65-byte uncompressed P-256 point
@@ -242,14 +305,16 @@ def seal_wake_token(
 
 @dataclass(frozen=True)
 class PushSubscription:
-    """The follower-supplied half of ROLES.md §8.1's `PushSubscription`
-    object — endpoint + P-256 public key + auth secret, exactly the shape a
-    browser's `PushManager.subscribe()` returns (`{endpoint, keys: {p256dh,
-    auth}}`). kerf-pub does not verify a device-key signature over this
-    object today (ROLES.md's `ERR_PUSH_SUBSCRIPTION_SIG_INVALID` gate is a
-    documented next-step, see docs/distributed-workshop.md) — the abuse
-    surface is bounded instead by requiring https + capping subscriptions
-    per feed (see `kerf_pub.router.subscribe_feed`)."""
+    """kerf's subscription record — endpoint + P-256 public key + auth
+    secret, exactly the shape a browser's `PushManager.subscribe()` returns
+    (`{endpoint, keys: {p256dh, auth}}`).
+
+    NOT ROLES.md §8.1's `PushSubscription`, which additionally carries a
+    provider kind and an `IK`-authorised device-key signature over the whole
+    object, and which is registered with the subscriber's OWN node rather
+    than — as here — the feed author's. See divergences (1)–(3) in the module
+    docstring; the abuse surface is bounded instead by requiring https +
+    capping subscriptions per feed (`kerf_pub.router.subscribe_feed`)."""
 
     endpoint: str
     p256dh: str

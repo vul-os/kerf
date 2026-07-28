@@ -75,10 +75,12 @@ and durability is just what you choose to `pin`.
 The Workshop is **pull-only by design**: `follow` re-crawls a feed's head to
 notice a new revision, and that re-crawl is always correct on its own — DMTAP's
 posture is "push is a latency optimization, not delivery." **Wake**
-(`kerf_pub.wake`, substrate capability ⑤ — see the shared substrate spec's
-`ROLES.md` §8) is an optional, self-hostable way to skip waiting for the next
-poll, layered strictly on top of `follow`/`fetch`, never a replacement for
-either:
+(`kerf_pub.wake`) is an optional, self-hostable way to skip waiting for the
+next poll, layered strictly on top of `follow`/`fetch`, never a replacement
+for either. It is *adapted from* the shared substrate spec's `ROLES.md` §8
+(part of capability ⑥, Roles & Wake) and reuses its wire crypto, but it is
+**not a conformant profile of it** — see "Where this diverges from ROLES.md
+§8.1" below.
 
 1. A follower registers a **Web Push subscription** (an endpoint + P-256
    public key + auth secret — the exact object a browser's
@@ -93,6 +95,38 @@ either:
    profile to find out what changed — wake only tells it *when* to look, the
    same "wake-and-fetch, never deliver-in-push" discipline the substrate uses
    for mailbox delivery.
+
+### Where this diverges from ROLES.md §8.1
+
+ROLES.md §8.1 describes a device waking *itself* through *its own* node.
+Kerf's Wake is a different shape — a publisher fanning out to its followers'
+devices — so three §8.1 requirements are unmet, deliberately and as yet
+unresolved:
+
+| ROLES.md §8.1 requires | Kerf does | Why |
+|---|---|---|
+| The device registers **with its own node**; the subscription is published **"only to the user's own node(s) — never to a directory, DHT, or relay"** | Registers on the feed **author's** node (step 1 above) | The Workshop's wake is publisher-driven; a follower has no node-side relationship with the author beyond the anonymous public-object surface |
+| The subscription is **signed by an `IK`-authorised device key** (§1.2), so it "cannot be forged to register/redirect a device's wakes" (`ERR_PUSH_SUBSCRIPTION_SIG_INVALID`, 0x0312, FAIL_CLOSED_BLOCK) | No signature; the subscribe endpoint is anonymous | Follows from the row above — there is no `IK` at the registration point to bind to. Bounded instead by https-only endpoints + a per-feed subscription cap |
+| The **provider kind** is recorded (§4.9.3's `PushSubscription.provider`; Web Push is `0x02`) | Only endpoint + p256dh + auth; Web Push assumed | Web Push is the only provider kerf speaks |
+
+**What this costs.** §8.2's privacy argument rests on the wake being a
+**self-edge** — "this user's node woke this user's own device". Because kerf
+inverts the topology, a push relay instead sees *this author's node woke this
+device*: a **follow edge**. The payload is still content-free and the relay
+still learns nothing about *what* changed or what is in it, but **kerf's Wake
+does not inherit §8.2's social-graph privacy and does not claim it.** If that
+property matters to you, leave Wake off — pull-only `follow` reveals nothing
+to any third party.
+
+Separately, none of §8.4's **device-side** gates exist: `public/sw.js` keeps
+no replay-nonce cache (`ERR_WAKEPING_REPLAY`) and enforces no inbound
+rate-limit backstop (`ERR_WAKEPING_RATE_LIMITED`), so a misbehaving push
+relay replaying wakes to drain a battery is not defended against at the
+receiver. The emitter does send a fresh 16-byte nonce per wake.
+
+Closing the first row means followers' own nodes holding their own
+subscriptions plus a node→node notify path — an architecture change rather
+than a patch. It is not scheduled.
 
 **Fail-safe off.** A node only sends or accepts a wake once its operator sets
 `KERF_PUB_VAPID_PRIVATE_KEY` + `KERF_PUB_VAPID_SUBJECT` (a fresh keypair per

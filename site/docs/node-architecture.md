@@ -75,10 +75,14 @@ and durability is just what you choose to `pin`.
 The Workshop is **pull-only by design**: `follow` re-crawls a feed's head to
 notice a new revision, and that re-crawl is always correct on its own — DMTAP's
 posture is "push is a latency optimization, not delivery." **Wake**
-(`kerf_pub.wake`, substrate capability ⑤ — see the shared substrate spec's
-`ROLES.md` §8) is an optional, self-hostable way to skip waiting for the next
-poll, layered strictly on top of `follow`/`fetch`, never a replacement for
-either:
+(`kerf_pub.wake`) is an optional, self-hostable way to skip waiting for the
+next poll, layered strictly on top of `follow`/`fetch`, never a replacement
+for either. It is *adapted from* the shared substrate spec's `ROLES.md` §8
+(part of capability ⑥, Roles & Wake) and reuses its wire crypto, but is
+**not a conformant profile of it**: kerf registers the subscription on the
+feed author's node rather than the subscriber's own, so §8.2's
+social-graph-privacy property does not carry over. See `docs/`'s copy of
+this page for the full divergence table.
 
 1. A follower registers a **Web Push subscription** (an endpoint + P-256
    public key + auth secret — the exact object a browser's

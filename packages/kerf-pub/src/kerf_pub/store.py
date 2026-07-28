@@ -94,7 +94,8 @@ class PubStore:
     async def list_follows(self) -> list[dict]: ...
     async def delete_follow(self, pub: bytes) -> None: ...
 
-    # Wake push subscriptions (kerf_pub.wake — substrate capability ⑤). A
+    # Wake push subscriptions (kerf_pub.wake — kerf-local, adapted from
+    # substrate capability ⑥'s Wake; diverges from ROLES.md §8.1). A
     # subscription is keyed by (pub, endpoint): one follower endpoint may
     # subscribe to many feeds, and a feed may have many subscriber endpoints.
     async def put_wake_subscription(self, pub: bytes, endpoint: str, p256dh: str,

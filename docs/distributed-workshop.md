@@ -172,6 +172,18 @@ A dead or unreachable subscriber endpoint never affects the publisher's
 `publish` call — wake is fire-and-forget, best-effort, and the publish always
 succeeds regardless of whether any ping was delivered.
 
+> **What Wake tells your push service.** The ping's *contents* are sealed and
+> content-free — your push service (Mozilla, Google, or whoever your browser
+> uses) cannot read it and never learns which feed changed or what is in it.
+> But it does see that *this publisher's node* pushed to *your device*, which
+> reveals **that you follow that publisher**. This is a known divergence from
+> the substrate spec's Wake design (`ROLES.md` §8.1–§8.2), where the ping
+> comes from your *own* node and so reveals only a self-edge — see
+> [node-architecture.md](./node-architecture.md#where-this-diverges-from-rolesmd-81).
+> Plain pull-based `follow` leaks nothing to any third party, so if that
+> matters to you, leave Wake off. Kerf's Wake is a latency convenience, not a
+> privacy-preserving one.
+
 ### Enabling wake notifications
 
 **As a follower**, open the Workshop's "Feeds" tab and click the bell icon

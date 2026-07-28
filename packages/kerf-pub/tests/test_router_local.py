@@ -631,7 +631,7 @@ class TestPublish:
 
 
 # ===========================================================================
-# publish -> Wake fan-out (kerf_pub.wake, substrate capability ⑤)
+# publish -> Wake fan-out (kerf_pub.wake, kerf-local; cf. capability ⑥ / §8)
 # ===========================================================================
 #
 # End-to-end through the REAL authenticated /api/pub/publish endpoint (same

@@ -1,5 +1,7 @@
 // Kerf service worker — Wake push receive-side only (RFC 8291/8292,
-// kerf_pub.wake, substrate capability ⑤). See docs/distributed-workshop.md's
+// kerf_pub.wake; kerf-local, adapted from substrate capability ⑥'s Wake —
+// note it implements none of ROLES.md §8.4's device-side gates: no inbound
+// rate-limit backstop and no replay-nonce cache). See docs/distributed-workshop.md's
 // "Wake" section for the full picture; this file is deliberately the ONLY
 // thing it does — Kerf has no offline cache / asset precache strategy here.
 //

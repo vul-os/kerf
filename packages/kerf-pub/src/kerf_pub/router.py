@@ -18,8 +18,10 @@ A missing object is a 404 (the holder does not serve it, ``ERR_PUB_NOT_SERVED``
 §22.6.2); a fetcher rotates to another holder.
 
 Also mounts the Wake subscribe/unsubscribe endpoints (:mod:`kerf_pub.wake`,
-substrate capability ⑤) at the bottom of this router. Wake is a kerf-local
-extension, not part of §22.5.1 itself, but it lives on the SAME anonymous
+adapted from substrate capability ⑥'s Wake, `ROLES.md` §8) at the bottom of
+this router. Wake is a kerf-local extension, not part of §22.5.1 itself, and
+its registration topology deliberately diverges from ROLES.md §8.1 (see
+:mod:`kerf_pub.wake`'s "Divergences" note), but it lives on the SAME anonymous
 public-object prefix because it is the same "any node may talk to my node's
 public surface about one of my feeds" relationship as the four §22.5.1
 endpoints above — a follower node, not this node's own owner, is the caller.
@@ -126,11 +128,14 @@ async def chunk(h: str, request: Request) -> Response:
 
 
 # ---------------------------------------------------------------------------
-# Wake subscribe / unsubscribe (kerf-local extension, substrate capability ⑤)
+# Wake subscribe / unsubscribe (kerf-local; adapted from capability ⑥ / §8)
 # ---------------------------------------------------------------------------
 #
 # Anonymous by design — a follower on ANOTHER node has no account or session
-# here, exactly like the four §22.5.1 reads above. The abuse surface of an
+# here, exactly like the four §22.5.1 reads above. That anonymity is exactly
+# why ROLES.md §8.1's `IK`-signed-subscription requirement cannot be enforced
+# on this endpoint (divergence (2) in kerf_pub.wake): there is no identity at
+# the registration point to bind the subscription to. The abuse surface of an
 # open "register a URL for me to POST to" endpoint is bounded by: requiring
 # https (kerf_pub.wake.validate_subscription — no SSRF to plaintext-http-only
 # internal services), capping live subscriptions per feed

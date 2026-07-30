@@ -88,3 +88,7 @@ billingmodel/
 # Rust build output (kerf-sdk-rs is the only cargo crate here; building it
 # otherwise leaves the tree permanently dirty, which hides real changes).
 target/
+# kerf-sdk-rs is a library crate (docs.rs, no [[bin]]) — Cargo.lock for
+# libraries is conventionally not committed (see cargo's own guidance);
+# building/testing it locally left an untracked, unignored lockfile.
+packages/kerf-sdk-rs/Cargo.lock

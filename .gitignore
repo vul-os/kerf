@@ -84,3 +84,7 @@ tests/e2e/playwright-report/
 # Internal sizing / pricing scratchpad (commercial — never commit)
 billingmodel/
 .claire/
+
+# Rust build output (kerf-sdk-rs is the only cargo crate here; building it
+# otherwise leaves the tree permanently dirty, which hides real changes).
+target/

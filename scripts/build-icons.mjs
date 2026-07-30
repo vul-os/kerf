@@ -64,8 +64,9 @@ function kerfMarkSvg({ size = 512, rounded = true, bg = COLORS.ink950, padding =
 <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" shape-rendering="geometricPrecision">
   <rect x="${inset}" y="${inset}" width="${inner}" height="${inner}" rx="${radius}" fill="${bg}"/>
   <g transform="translate(${inset} ${inset}) scale(${inner / 32})">
-    <path d="M5 5 H24 L5 24 Z" fill="${COLORS.kerf300}"/>
-    <path d="M27 8 V27 H8 Z" fill="${COLORS.kerf300}"/>
+    <rect x="7" y="6" width="3.5" height="20" fill="${COLORS.kerf300}"/>
+    <polygon points="10.5,16 26,6 26,13" fill="${COLORS.kerf300}"/>
+    <polygon points="10.5,16 26,19 26,26" fill="${COLORS.kerf300}"/>
   </g>
 </svg>`
 }
@@ -85,8 +86,9 @@ function maskableSvg(size = 512) {
   <g transform="translate(${pad} ${pad}) scale(${inner / 32})">
     <!-- On the yellow tile we invert: dark mark for contrast -->
     <rect width="32" height="32" rx="6" fill="${COLORS.ink950}"/>
-    <path d="M5 5 H24 L5 24 Z" fill="${COLORS.kerf300}"/>
-    <path d="M27 8 V27 H8 Z" fill="${COLORS.kerf300}"/>
+    <rect x="7" y="6" width="3.5" height="20" fill="${COLORS.kerf300}"/>
+    <polygon points="10.5,16 26,6 26,13" fill="${COLORS.kerf300}"/>
+    <polygon points="10.5,16 26,19 26,26" fill="${COLORS.kerf300}"/>
   </g>
 </svg>`
 }
@@ -100,8 +102,9 @@ function appleTouchSvg(size = 180) {
 <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" shape-rendering="geometricPrecision">
   <rect width="${size}" height="${size}" fill="${COLORS.ink950}"/>
   <g transform="translate(${pad} ${pad}) scale(${inner / 32})">
-    <path d="M5 5 H24 L5 24 Z" fill="${COLORS.kerf300}"/>
-    <path d="M27 8 V27 H8 Z" fill="${COLORS.kerf300}"/>
+    <rect x="7" y="6" width="3.5" height="20" fill="${COLORS.kerf300}"/>
+    <polygon points="10.5,16 26,6 26,13" fill="${COLORS.kerf300}"/>
+    <polygon points="10.5,16 26,19 26,26" fill="${COLORS.kerf300}"/>
   </g>
 </svg>`
 }
@@ -151,8 +154,9 @@ function socialCardSvg({ width = 1200, height = 630 } = {}) {
 
   <!-- Logomark (left half) -->
   <g transform="translate(${markX} ${markY}) scale(${markScale})">
-    <path d="M5 5 H24 L5 24 Z" fill="${COLORS.kerf300}"/>
-    <path d="M27 8 V27 H8 Z" fill="${COLORS.kerf300}"/>
+    <rect x="7" y="6" width="3.5" height="20" fill="${COLORS.kerf300}"/>
+    <polygon points="10.5,16 26,6 26,13" fill="${COLORS.kerf300}"/>
+    <polygon points="10.5,16 26,19 26,26" fill="${COLORS.kerf300}"/>
   </g>
 
   <!-- Hairline divider -->

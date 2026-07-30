@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" shape-rendering="geometricPrecision">
-  <title>kerf</title>
+  <title>Kerf</title>
   <rect width="32" height="32" rx="6" fill="#0a0b0d"/>
   <!-- K stem -->
   <rect x="7" y="6" width="3.5" height="20" fill="#ffd633"/>

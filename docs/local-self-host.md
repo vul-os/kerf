@@ -1,3 +1,8 @@
+<!-- no-broker-dep:allow-file: names Ephor once, as the optional reachability broker a user may
+     arrange for themselves — no dependency edge. This page is also republished verbatim into
+     public/docs-manifest.json by scripts/build-docs-manifest.mjs; the marker is placed on this
+     source file, not hand-added to the generated JSON, so regeneration carries it forward. -->
+
 # Local / self-host install
 
 Kerf can run entirely on your own machine. This page covers what you get, what you need, and how to configure it.

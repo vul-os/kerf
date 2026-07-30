@@ -1,3 +1,8 @@
+<!-- no-broker-dep:allow-file: names Ephor as the optional reachability broker for a
+     publicly-reachable node — no dependency edge. This page is also republished verbatim into
+     public/docs-manifest.json by scripts/build-docs-manifest.mjs; the marker is placed on this
+     source file, not hand-added to the generated JSON, so regeneration carries it forward. -->
+
 # Running an always-on kerf node
 
 There is no "Kerf Cloud operator" role anymore. There used to be a

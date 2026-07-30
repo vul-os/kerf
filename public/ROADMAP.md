@@ -1,3 +1,10 @@
+<!-- no-broker-dep:allow-file: names Ephor only as the optional, VulOS-layer-sold reachability
+     broker in the decentralization section below — no dependency edge. This file is already
+     exempt under DOC_PATHS (root-level ROADMAP.md); the marker is added here, rather than only
+     on the public/ mirror, because scripts/build-roadmap-manifest.mjs copies this file
+     byte-for-byte into public/ROADMAP.md and regenerating from the source (not hand-editing the
+     generated copy) is how that mirror should ever change. -->
+
 # Kerf — Roadmap
 
 *Last verified: 2026-06-04*

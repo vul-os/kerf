@@ -1,3 +1,9 @@
+<!-- no-broker-dep:allow-file: names Ephor once, in a table cell, as an example of a
+     publicly-reachable bind target — no dependency edge. This page is also republished
+     verbatim into public/docs-manifest.json by scripts/build-docs-manifest.mjs; the marker is
+     placed on this source file, not hand-added to the generated JSON, so regeneration carries
+     it forward. -->
+
 # Node architecture
 
 This page describes Kerf's node model: what a "node" is, the `pub` module that

@@ -32,8 +32,9 @@
 //   node scripts/sync-site-docs.mjs           # write the sync
 //   node scripts/sync-site-docs.mjs --check   # report drift, write nothing (exit 1 if drifted)
 
-import { readFileSync, writeFileSync, readdirSync, unlinkSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, readdirSync, unlinkSync, existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { join, dirname } from 'node:path'
+import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 
@@ -63,11 +64,37 @@ export function slugToPath(manifest) {
   return map
 }
 
-export function regenerateManifest() {
-  // Same call `predev` / `prebuild:web` make. The manifest is derived from the
-  // docs sources, so regenerating first is what makes "did site/docs drift"
-  // a question about the SOURCES rather than about a stale artifact.
-  execFileSync('node', ['scripts/build-docs-manifest.mjs'], { cwd: ROOT, stdio: 'pipe' })
+/**
+ * Regenerate the docs manifest so "did site/docs drift" is a question about
+ * the SOURCES on disk right now, not a stale build artifact — the same call
+ * `predev` / `prebuild:web` make. Returns the parsed manifest object.
+ *
+ * In --check mode this must not touch the tracked public/docs-manifest.json:
+ * that file embeds a `generatedAt` timestamp that changes on every run, so
+ * writing it unconditionally made a read-only check dirty the tree on every
+ * single invocation (confirmed live: two consecutive `--check` runs produced
+ * two different committed-file hashes with no source change — a mutation a
+ * check must not make). Instead it is regenerated into a throwaway temp file,
+ * read, and the temp file removed before returning — the real manifest is
+ * never opened for writing during a check.
+ */
+export function regenerateManifest({ check = false } = {}) {
+  if (!check) {
+    execFileSync('node', ['scripts/build-docs-manifest.mjs'], { cwd: ROOT, stdio: 'pipe' })
+    return JSON.parse(readFileSync(MANIFEST, 'utf8'))
+  }
+  const dir = mkdtempSync(join(tmpdir(), 'kerf-docs-manifest-'))
+  try {
+    const out = join(dir, 'docs-manifest.json')
+    execFileSync('node', ['scripts/build-docs-manifest.mjs'], {
+      cwd: ROOT,
+      stdio: 'pipe',
+      env: { ...process.env, DOCS_MANIFEST_OUT: out },
+    })
+    return JSON.parse(readFileSync(out, 'utf8'))
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 }
 
 // plan() -> { copies: [{slug, from, to, current, desired}], orphans: [], unresolved: [] }
@@ -98,9 +125,8 @@ export function plan({ html, manifest }) {
 
 function main() {
   const check = process.argv.includes('--check')
-  regenerateManifest()
+  const manifest = regenerateManifest({ check })
   const html = readFileSync(SITE_DOCS_HTML, 'utf8')
-  const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'))
   const { slugs, copies, orphans, unresolved } = plan({ html, manifest })
 
   if (unresolved.length) {

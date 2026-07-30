@@ -26,7 +26,6 @@ import { navSlugs, slugToPath, plan, regenerateManifest } from './sync-site-docs
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const SITE_DOCS_HTML = join(ROOT, 'site', 'docs.html')
 const SITE_DOCS_DIR = join(ROOT, 'site', 'docs')
-const MANIFEST = join(ROOT, 'public', 'docs-manifest.json')
 
 // The size of the curated subset. A count, not just a set comparison: a change
 // that both adds and removes a nav entry must still be a deliberate edit here.
@@ -38,10 +37,14 @@ let manifest
 beforeAll(() => {
   // Derive the slug map from the docs sources as they are on disk right now,
   // so "did site/docs drift" is a question about the sources and not about a
-  // stale build artifact. Same call predev/prebuild:web make.
-  regenerateManifest()
+  // stale build artifact — same call predev/prebuild:web make, but run in
+  // check mode: this is a test, running under `vitest`/CI, and must not write
+  // to the tracked public/docs-manifest.json as a side effect of merely being
+  // run (that file's `generatedAt` timestamp would dirty the tree on every
+  // test invocation otherwise — the same "check that mutates" bug this gate
+  // exists to catch elsewhere).
+  manifest = regenerateManifest({ check: true })
   html = readFileSync(SITE_DOCS_HTML, 'utf8')
-  manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'))
 }, 60_000)
 
 describe('site/docs — the gate has something to check', () => {

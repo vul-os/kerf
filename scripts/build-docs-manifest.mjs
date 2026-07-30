@@ -12,7 +12,7 @@
 // Wired into `predev` and `prebuild:web` so the SPA always has a fresh copy.
 
 import { readdirSync, readFileSync, writeFileSync, statSync, mkdirSync, existsSync } from 'node:fs'
-import { join, basename, relative, sep } from 'node:path'
+import { join, dirname, resolve, basename, relative, sep } from 'node:path'
 
 const ROOT = process.cwd()
 
@@ -477,9 +477,21 @@ const flatItems = entries.slice().sort((a, b) => {
 // Write
 // ----------------------------------------------------------------------------
 
+// Override the write target via DOCS_MANIFEST_OUT (used by
+// scripts/sync-site-docs.mjs --check, which regenerates the manifest to read
+// a slug map derived from the sources on disk right now, but must not write
+// to the tracked public/docs-manifest.json while running as a read-only
+// check — that file carries a `generatedAt` timestamp that changes on every
+// run, so writing it unconditionally would make a "check" dirty the tree on
+// every invocation). Every other caller (predev, prebuild:web, `npm run
+// build:docs`) is unaffected: the env var is unset for them, so outPath is
+// unchanged.
 const outDir = join(ROOT, 'public')
 mkdirSync(outDir, { recursive: true })
-const outPath = join(outDir, 'docs-manifest.json')
+const outPath = process.env.DOCS_MANIFEST_OUT
+  ? resolve(ROOT, process.env.DOCS_MANIFEST_OUT)
+  : join(outDir, 'docs-manifest.json')
+mkdirSync(dirname(outPath), { recursive: true })
 
 const payload = {
   version: 2,

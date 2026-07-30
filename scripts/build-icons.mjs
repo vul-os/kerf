@@ -1,34 +1,41 @@
 #!/usr/bin/env node
-// Generates the full Kerf icon + social-preview asset set from the source
-// SVGs in `public/`. Run manually (or via `npm run build:icons`) whenever the
-// brand mark changes — the rendered PNGs and ICO are committed to the repo
-// and served as static assets.
+// Generates the full Kerf icon + social-preview asset set from the SOURCE OF
+// TRUTH `brand/logo.svg`. Run manually (or via `npm run build:icons`)
+// whenever the brand mark changes — the rendered PNGs and ICO are committed
+// to the repo and served as static assets.
+//
+// IMPORTANT: this script does not hardcode the mark's geometry. It parses
+// `brand/logo.svg` at run time and reuses its actual shapes/colors, so if the
+// approved mark ever changes, regenerating these assets picks the change up
+// automatically instead of silently going stale (this repo has already shipped
+// a generator that hardcoded a RETIRED mark once — see git history at
+// efb20d2c — because it re-declared coordinates instead of reading the file).
 //
 // Inputs:
-//   public/favicon.svg     — 32×32 brand mark
-//   public/og-image.svg    — 1200×630 social card (read for color cues only;
-//                            we synthesise a purpose-built card here so the
-//                            text doesn't depend on any specific installed
-//                            font on the host that runs the script).
+//   brand/logo.svg         — 32×32 approved brand mark (READ, never edited)
 //
 // Outputs (all under public/):
+//   favicon.svg             (byte-for-byte copy of brand/logo.svg)
 //   favicon-16.png, favicon-32.png, favicon-48.png
 //   favicon.ico             (multi-res 16/32/48)
 //   apple-touch-icon.png    180×180 with inset margin (iOS rounds corners)
 //   icon-192.png            Android home-screen / PWA
 //   icon-512.png            PWA splash
 //   icon-maskable.png       512×512 with the mark inside the inner 80%
+//                           (a deliberate light/dark tile inversion — still
+//                           DERIVED from the parsed mark, not redrawn)
 //   og-image.png            1200×630 social-preview card
 //   twitter-card.png        1200×600 same card, tighter aspect
 //
-// Design constants reused from the brand:
-//   ink-950    #0a0b0d   page surface
-//   kerf-300   #ffd633   yellow mark / theme color
+// Design constants NOT sourced from the mark (page chrome only, no geometry):
+//   ink-900    #0e0f12   og-card gradient stop
 //   ink-200    #e2e6ee   light text
 //   ink-500    #8a93a6   muted text
 //   ink-700    #232730   hairline rules
+//   ink-300    #a3a8b3   secondary text
 
 import fs from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import url from 'node:url'
 import sharp from 'sharp'
@@ -36,37 +43,82 @@ import sharp from 'sharp'
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
 const PUBLIC = path.join(ROOT, 'public')
+const BRAND_LOGO = path.join(ROOT, 'brand', 'logo.svg')
 
 const COLORS = {
-  ink950: '#0a0b0d',
   ink900: '#0e0f12',
   ink700: '#232730',
   ink500: '#8a93a6',
   ink300: '#a3a8b3',
   ink200: '#e2e6ee',
-  kerf300: '#ffd633',
 }
 
 // ---------------------------------------------------------------------------
-// SVG helpers
+// Parse the approved mark out of brand/logo.svg — this is the ONE place
+// geometry/colour is read from disk. Everything below derives from this.
+// ---------------------------------------------------------------------------
+function parseBrandMark(svgPath) {
+  const src = readFileSync(svgPath, 'utf8')
+
+  const vb = src.match(/viewBox="0 0 (\d+(?:\.\d+)?) (\d+(?:\.\d+)?)"/)
+  if (!vb) throw new Error(`${svgPath}: could not find a viewBox`)
+  const unit = Number(vb[1])
+  if (unit !== Number(vb[2])) throw new Error(`${svgPath}: expected a square viewBox, got ${vb[1]}x${vb[2]}`)
+
+  // The background tile: the single top-level <rect> whose width/height equal
+  // the full viewBox unit (the rounded card the mark sits on).
+  const bgRe = new RegExp(`<rect width="${unit}" height="${unit}" rx="(\\d+(?:\\.\\d+)?)" fill="(#[0-9a-fA-F]{3,8})"\\s*/>`)
+  const bg = src.match(bgRe)
+  if (!bg) throw new Error(`${svgPath}: could not find the ${unit}x${unit} background tile <rect>`)
+  const bgFill = bg[2]
+  const rxRatio = Number(bg[1]) / unit
+
+  // Everything else that draws (rect/polygon/path), excluding the background
+  // tile, is "the mark" — the shapes we must never redraw by hand.
+  const shapeRe = /<(rect|polygon|path)\b[^>]*\/>/g
+  const shapes = [...src.matchAll(shapeRe)].map((m) => m[0]).filter((el) => el !== bg[0])
+  if (shapes.length === 0) throw new Error(`${svgPath}: found no mark shapes beyond the background tile`)
+
+  const fills = new Set(shapes.map((el) => (el.match(/fill="(#[0-9a-fA-F]{3,8})"/) || [])[1]).filter(Boolean))
+  if (fills.size !== 1) throw new Error(`${svgPath}: expected one uniform mark fill, found ${[...fills]}`)
+  const markFill = [...fills][0]
+
+  return { unit, bgFill, rxRatio, shapes, markFill }
+}
+
+const MARK = parseBrandMark(BRAND_LOGO)
+// Sanity: fail loudly rather than silently drawing a blank icon set if the
+// mark file ever loses its recognisable shape (renamed attrs, comments-only
+// diff, etc).
+console.log(
+  `[build-icons] parsed brand/logo.svg: viewBox 0 0 ${MARK.unit} ${MARK.unit}, ` +
+    `${MARK.shapes.length} mark shape(s), fill ${MARK.markFill} on ${MARK.bgFill} (rx ratio ${MARK.rxRatio.toFixed(4)})`,
+)
+
+function markGroup(fillOverride) {
+  const shapes = fillOverride
+    ? MARK.shapes.map((el) => el.replace(MARK.markFill, fillOverride))
+    : MARK.shapes
+  return shapes.join('\n    ')
+}
+
+// ---------------------------------------------------------------------------
+// SVG helpers — all derive from `MARK`, parsed above. None of these hardcode
+// a coordinate; they only decide layout (padding/scale/background).
 // ---------------------------------------------------------------------------
 
-// The Kerf mark, drawn at any scale. `viewBox` of the favicon is 32×32; the
-// mark is positioned so the rounded background card fills the box with a
-// 0px margin. For the maskable icon, we drop the rounded corners and let the
-// caller pad around it.
-function kerfMarkSvg({ size = 512, rounded = true, bg = COLORS.ink950, padding = 0 } = {}) {
-  // Inner viewBox is always 32 units; we just scale the wrapper.
-  const radius = rounded ? Math.round(size * (6 / 32)) : 0
+// The Kerf mark, drawn at any scale. The source viewBox is `MARK.unit` units;
+// we just scale the wrapper. For the maskable icon, we drop the rounded
+// corners and let the caller pad around it.
+function kerfMarkSvg({ size = 512, rounded = true, bg = MARK.bgFill, padding = 0 } = {}) {
+  const radius = rounded ? Math.round(size * MARK.rxRatio) : 0
   const inset = padding
   const inner = size - 2 * padding
   return `
 <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" shape-rendering="geometricPrecision">
   <rect x="${inset}" y="${inset}" width="${inner}" height="${inner}" rx="${radius}" fill="${bg}"/>
-  <g transform="translate(${inset} ${inset}) scale(${inner / 32})">
-    <rect x="7" y="6" width="3.5" height="20" fill="${COLORS.kerf300}"/>
-    <polygon points="10.5,16 26,6 26,13" fill="${COLORS.kerf300}"/>
-    <polygon points="10.5,16 26,19 26,26" fill="${COLORS.kerf300}"/>
+  <g transform="translate(${inset} ${inset}) scale(${inner / MARK.unit})">
+    ${markGroup()}
   </g>
 </svg>`
 }
@@ -75,20 +127,21 @@ function kerfMarkSvg({ size = 512, rounded = true, bg = COLORS.ink950, padding =
 // solid background tile filling the full square (so platforms can crop into
 // any shape — circle, squircle, rounded-rect — without revealing transparent
 // edges). Per spec: safe zone is the central circle of radius 40% of the
-// shortest edge. We pad by 10% on each side so the 32-unit mark lands
-// comfortably inside the inner 80×80% region.
+// shortest edge. We pad by 10% on each side so the mark lands comfortably
+// inside the inner 80×80% region. On the light tile we invert the mark's own
+// colour for contrast (a deliberate transform of the parsed shapes, not a
+// redraw): fill becomes the dark background colour and the tile becomes the
+// mark's own fill.
 function maskableSvg(size = 512) {
   const pad = Math.round(size * 0.18) // a touch more than 10% so the mark sits in the safe circle
   const inner = size - 2 * pad
   return `
 <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" shape-rendering="geometricPrecision">
-  <rect x="0" y="0" width="${size}" height="${size}" fill="${COLORS.kerf300}"/>
-  <g transform="translate(${pad} ${pad}) scale(${inner / 32})">
-    <!-- On the yellow tile we invert: dark mark for contrast -->
-    <rect width="32" height="32" rx="6" fill="${COLORS.ink950}"/>
-    <rect x="7" y="6" width="3.5" height="20" fill="${COLORS.kerf300}"/>
-    <polygon points="10.5,16 26,6 26,13" fill="${COLORS.kerf300}"/>
-    <polygon points="10.5,16 26,19 26,26" fill="${COLORS.kerf300}"/>
+  <rect x="0" y="0" width="${size}" height="${size}" fill="${MARK.markFill}"/>
+  <g transform="translate(${pad} ${pad}) scale(${inner / MARK.unit})">
+    <!-- On the light tile we invert: dark mark for contrast -->
+    <rect width="${MARK.unit}" height="${MARK.unit}" rx="${MARK.rxRatio * MARK.unit}" fill="${MARK.bgFill}"/>
+    ${markGroup(MARK.markFill)}
   </g>
 </svg>`
 }
@@ -100,11 +153,9 @@ function appleTouchSvg(size = 180) {
   const inner = size - 2 * pad
   return `
 <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" shape-rendering="geometricPrecision">
-  <rect width="${size}" height="${size}" fill="${COLORS.ink950}"/>
-  <g transform="translate(${pad} ${pad}) scale(${inner / 32})">
-    <rect x="7" y="6" width="3.5" height="20" fill="${COLORS.kerf300}"/>
-    <polygon points="10.5,16 26,6 26,13" fill="${COLORS.kerf300}"/>
-    <polygon points="10.5,16 26,19 26,26" fill="${COLORS.kerf300}"/>
+  <rect width="${size}" height="${size}" fill="${MARK.bgFill}"/>
+  <g transform="translate(${pad} ${pad}) scale(${inner / MARK.unit})">
+    ${markGroup()}
   </g>
 </svg>`
 }
@@ -123,7 +174,7 @@ function socialCardSvg({ width = 1200, height = 630 } = {}) {
   // viewBox of the mark is 32; we scale by 14 → 448px tall. Left/top at
   // (height - 448)/2 within the left half.
   const markScale = 14
-  const markPx = 32 * markScale
+  const markPx = MARK.unit * markScale
   const markX = (width / 2 - markPx) / 2
   const markY = (height - markPx) / 2
 
@@ -139,7 +190,7 @@ function socialCardSvg({ width = 1200, height = 630 } = {}) {
     </pattern>
     <linearGradient id="surface" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="${COLORS.ink900}"/>
-      <stop offset="100%" stop-color="${COLORS.ink950}"/>
+      <stop offset="100%" stop-color="${MARK.bgFill}"/>
     </linearGradient>
   </defs>
 
@@ -150,13 +201,11 @@ function socialCardSvg({ width = 1200, height = 630 } = {}) {
 
   <!-- Diagonal kerf-line accent across the whole card -->
   <line x1="-40" y1="${height + 60}" x2="${width + 40}" y2="-60"
-        stroke="${COLORS.kerf300}" stroke-width="1.5" opacity="0.18"/>
+        stroke="${MARK.markFill}" stroke-width="1.5" opacity="0.18"/>
 
   <!-- Logomark (left half) -->
   <g transform="translate(${markX} ${markY}) scale(${markScale})">
-    <rect x="7" y="6" width="3.5" height="20" fill="${COLORS.kerf300}"/>
-    <polygon points="10.5,16 26,6 26,13" fill="${COLORS.kerf300}"/>
-    <polygon points="10.5,16 26,19 26,26" fill="${COLORS.kerf300}"/>
+    ${markGroup()}
   </g>
 
   <!-- Hairline divider -->
@@ -173,7 +222,7 @@ function socialCardSvg({ width = 1200, height = 630 } = {}) {
           fill="${COLORS.ink300}">chat-driven CAD</text>
     <text x="${width / 2 + 64}" y="${height / 2 + 130}"
           font-family="ui-monospace, SFMono-Regular, Menlo, monospace"
-          font-size="20" fill="${COLORS.kerf300}" opacity="0.85">&gt; sketch · cut · refine</text>
+          font-size="20" fill="${MARK.markFill}" opacity="0.85">&gt; sketch · cut · refine</text>
   </g>
 
   <!-- Bottom-left: built in Durban -->
@@ -250,6 +299,9 @@ async function renderSvgToPng(svgString, outPath, { width, height, density = 768
 async function main() {
   const out = (name) => path.join(PUBLIC, name)
 
+  console.log('[build-icons] copying public/favicon.svg from brand/logo.svg (byte-identical)')
+  await fs.copyFile(BRAND_LOGO, out('favicon.svg'))
+
   console.log('[build-icons] writing favicon PNGs')
   await renderSvgToPng(kerfMarkSvg({ size: 16 }), out('favicon-16.png'), { width: 16, height: 16, density: 2048 })
   await renderSvgToPng(kerfMarkSvg({ size: 32 }), out('favicon-32.png'), { width: 32, height: 32, density: 1536 })
@@ -287,7 +339,7 @@ async function main() {
   console.log('[build-icons] writing twitter-card.png (1200×600)')
   await renderSvgToPng(socialCardSvg({ width: 1200, height: 600 }), out('twitter-card.png'), { width: 1200, height: 600, density: 192 })
 
-  console.log('[build-icons] done — wrote 11 assets to public/')
+  console.log('[build-icons] done — wrote 12 assets to public/')
 }
 
 main().catch((err) => {

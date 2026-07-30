@@ -1,4 +1,4 @@
---- kerf — Lua SDK for Kerf (https://kerf.sh).
+--- kerf — Lua SDK for Kerf (https://vulos.org/projects/kerf/).
 --
 -- Quickstart:
 --   local kerf = require "kerf"

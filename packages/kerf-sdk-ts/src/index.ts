@@ -1,5 +1,5 @@
 /**
- * kerf-sdk — TypeScript SDK for Kerf (https://kerf.sh).
+ * kerf-sdk — TypeScript SDK for Kerf (https://vulos.org/projects/kerf/).
  *
  * Quickstart:
  *   import { fromEnv } from 'kerf-sdk'

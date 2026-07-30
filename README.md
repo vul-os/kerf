@@ -16,7 +16,7 @@ Parametric sketching &amp; modeling across five geometry kernels · drawings · 
 [![Node 22+](https://img.shields.io/badge/Node-22+-339933.svg?style=flat-square&logo=node.js&logoColor=white)](package.json)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-FFD633.svg?style=flat-square)](#contributing)
 
-[Website](https://kerf.sh) · [Docs](https://kerf.sh/docs) · [Releases](https://github.com/vul-os/kerf/releases) · [Roadmap](./ROADMAP.md) · [Contributing](#contributing)
+[Website](https://vulos.org/projects/kerf/) · [Docs](https://vulos.org/projects/kerf/docs.html) · [Releases](https://github.com/vul-os/kerf/releases) · [Roadmap](./ROADMAP.md) · [Contributing](#contributing)
 
 <img src="docs/screenshots/hero.png" alt="The Kerf editor: file tree, 3D viewport, and the LLM chat panel" width="900">
 
@@ -69,7 +69,7 @@ Walls, slabs, doors, windows, MEP families, schedules, and IFC round-trip; civil
 
 ### Domains
 
-**37 engineering domains** — jewelry, mechanical, electronics, architecture, automotive, civil, composites, dental, optics, horology, piping, packaging, mold, woodworking, marine, silicon, firmware, aerospace, PLC, motion, FEM/CFD, textiles, and more — the most-used ones each with a dedicated workspace at [`/domains`](https://kerf.sh/domains). Under the hood, 50+ Python plugins reach further still: apparel, energy, entertainment, LCA, microfluidics, PLM, wiring, landscape, HVAC, and more.
+**37 engineering domains** — jewelry, mechanical, electronics, architecture, automotive, civil, composites, dental, optics, horology, piping, packaging, mold, woodworking, marine, silicon, firmware, aerospace, PLC, motion, FEM/CFD, textiles, and more — the most-used ones each with a dedicated workspace at [`/domains`](https://vulos.org/projects/kerf/#domains). Under the hood, 50+ Python plugins reach further still: apparel, energy, entertainment, LCA, microfluidics, PLM, wiring, landscape, HVAC, and more.
 
 Measured against the industry, not just described: a public [feature-comparison matrix](https://kerf.sh/compare) tracks 1,397 features across 57 CAD/BIM/EDA packages — SolidWorks, Revit, Altium, KiCad, Rhino, and more.
 

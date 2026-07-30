@@ -1,5 +1,5 @@
 """
-kerf — Python SDK for Kerf (https://kerf.sh).
+kerf — Python SDK for Kerf (https://vulos.org/projects/kerf/).
 
 Quickstart:
     import kerf

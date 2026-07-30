@@ -1,6 +1,6 @@
 # kerf-worker
 
-BYO GPU worker companion CLI for [Kerf](https://kerf.sh).
+BYO GPU worker companion CLI for [Kerf](https://vulos.org/projects/kerf/).
 
 Run Kerf render and simulation jobs on **your own GPU hardware** — zero credit consumption,
 billed at your hardware cost only.

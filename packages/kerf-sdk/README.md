@@ -1,6 +1,6 @@
 # kerf-sdk
 
-Python SDK for [Kerf](https://kerf.sh) — automate your CAD/EDA projects over HTTP/JSON-RPC.
+Python SDK for [Kerf](https://vulos.org/projects/kerf/) — automate your CAD/EDA projects over HTTP/JSON-RPC.
 
 ## Install
 

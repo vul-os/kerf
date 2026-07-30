@@ -41,7 +41,7 @@ command -v python3 >/dev/null 2>&1 || fail "python3 not found. Install Python 3.
 PY_MAJOR=$(python3 -c 'import sys; print(sys.version_info[0])')
 PY_MINOR=$(python3 -c 'import sys; print(sys.version_info[1])')
 if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 11 ]; }; then
-  fail "Python 3.11+ required (found $(python3 --version 2>&1)). See https://kerf.sh/docs for install help."
+  fail "Python 3.11+ required (found $(python3 --version 2>&1)). See https://vulos.org/projects/kerf/docs.html for install help."
 fi
 info "python3 $(python3 --version 2>&1 | awk '{print $2}') — ok"
 
@@ -94,4 +94,4 @@ printf "       KERF_FRONTEND_DIST=%s/dist \\\\\n" "$DIR"
 printf "       KERF_CONFIG=%s \\\\\n" "$CONFIG_FILE"
 printf "       %s/bin/kerf-server --host 0.0.0.0 --port 8080\n\n" "$VENV_DIR"
 printf "  5. Open http://localhost:8080\n\n"
-printf "  Docs: https://kerf.sh/docs\n"
+printf "  Docs: https://vulos.org/projects/kerf/docs.html\n"

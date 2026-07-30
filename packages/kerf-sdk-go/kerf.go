@@ -1,4 +1,4 @@
-// Package kerf is the Go SDK for Kerf (https://kerf.sh).
+// Package kerf is the Go SDK for Kerf (https://vulos.org/projects/kerf/).
 //
 // Quickstart:
 //

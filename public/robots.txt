@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /api/
 
-Sitemap: https://kerf.sh/sitemap.xml
+Sitemap: https://vulos.org/projects/kerf/sitemap.xml

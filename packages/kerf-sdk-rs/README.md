@@ -1,6 +1,6 @@
 # kerf-sdk
 
-Async Rust client for the [Kerf](https://kerf.sh) CAD platform JSON-RPC API.
+Async Rust client for the [Kerf](https://vulos.org/projects/kerf/) CAD platform JSON-RPC API.
 
 ```toml
 [dependencies]
@@ -61,4 +61,4 @@ for hit in hits {
 
 - [API docs on docs.rs](https://docs.rs/kerf-sdk)
 - [Python SDK (kerf-sdk on PyPI)](https://pypi.org/project/kerf-sdk/)
-- [Kerf documentation](https://kerf.sh/docs)
+- [Kerf documentation](https://vulos.org/projects/kerf/docs.html)

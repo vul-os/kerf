@@ -1,6 +1,6 @@
 # kerf-sdk-go
 
-Go SDK for [Kerf](https://kerf.sh) — the parametric CAD platform.
+Go SDK for [Kerf](https://vulos.org/projects/kerf/) — the parametric CAD platform.
 
 ## Install
 

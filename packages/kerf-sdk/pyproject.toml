@@ -22,7 +22,7 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://kerf.sh"
+Homepage = "https://vulos.org/projects/kerf/"
 Repository = "https://github.com/kerf-sh/kerf"
 
 [tool.hatch.build.targets.wheel]

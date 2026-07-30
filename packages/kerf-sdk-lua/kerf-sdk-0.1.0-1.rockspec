@@ -15,7 +15,7 @@ description = {
     or explicit token.  Returns (result, err) pairs using standard Lua
     idiom — no exceptions.
   ]],
-  homepage = "https://kerf.sh",
+  homepage = "https://vulos.org/projects/kerf/",
   license  = "MIT",
 }
 

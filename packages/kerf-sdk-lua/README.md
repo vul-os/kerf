@@ -1,6 +1,6 @@
 # kerf-sdk-lua
 
-Lua SDK for [Kerf](https://kerf.sh) — the parametric CAD platform.
+Lua SDK for [Kerf](https://vulos.org/projects/kerf/) — the parametric CAD platform.
 
 ## Install
 

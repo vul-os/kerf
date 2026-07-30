@@ -1,6 +1,6 @@
 //! # kerf-sdk
 //!
-//! Async Rust client for the [Kerf](https://kerf.sh) CAD platform JSON-RPC API.
+//! Async Rust client for the [Kerf](https://vulos.org/projects/kerf/) CAD platform JSON-RPC API.
 //!
 //! ## Quickstart
 //!

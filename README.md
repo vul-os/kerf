@@ -200,6 +200,7 @@ Honest scope, measured against the code rather than the design:
 | Pin + hydrate (fetch and self-verify every chunk; partial hydration never reads as `on-node`) | Built |
 | Assembly BOM DAG walk, cycle refusal | Built |
 | **Offline *browsing*** | **Not built.** `PubClient.resolve()` does not persist a followed feed's head or entries — only your own feed is written locally (`_append_own_feed`) — so `GET /api/pub/workshop` lists nothing for a followed publisher whose PUB server is unreachable, even when its parts are pinned. The pinned bytes are still fetchable; the catalog view is not. |
+| Wake (optional push "new revision" pings) | **Partly built, and one-ended.** *Receiver:* `public/sw.js` enforces all three of the substrate's §8.4 device-side gates fail-closed before it does any work — content-free shape check (`0x0313`), bounded persisted replay-nonce cache (`0x0316`), and an inbound rate-limit backstop holding DMTAP §16's budget of ≤ 1 wake / 60 s, ≈ 30 / h (`0x0315`). *Emitter:* **no** rate limit and no burst coalescing (one push per subscriber per publish), so §8.4's "rate-limited at both ends" is only half met. Kerf's topology also does not inherit §8.2's social-graph privacy — the push relay sees a follow edge, not a self-edge. Off entirely unless the node operator sets VAPID keys. |
 | Ships by default | **No.** The Workshop is the `pub` extra: `pip install 'kerf[server,pub]'`. `kerf[server]` deliberately excludes DMTAP-PUB. |
 | `submit` (DMTAP-PUB compute) | Not built — out of scope for v1, raises `NotImplementedError`. |
 

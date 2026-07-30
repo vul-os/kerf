@@ -216,6 +216,21 @@ push) just re-triggers that same targeted refresh. None of this ever
 guesses at *what* changed — the push payload carries nothing to guess from
 — it only ever triggers the same verified pull the Workshop always does.
 
+**Your device polices its own wakes, so not every ping becomes a refresh.**
+A wake spends your battery, and the push service that carries it could
+re-deliver a captured ping (or a burst of them) to drain it. So the service
+worker enforces the substrate's device-side gates (`ROLES.md` §8.4, budgets
+from DMTAP core §16) *before* it does any work: a ping whose payload is not
+the expected 16-byte token is dropped unread, a ping whose nonce this device
+already accepted is dropped as a replay, and pings beyond **1 per 60 s / ~30
+per hour** are dropped as over-budget. All three drop silently — no
+notification, no refresh, no network. In practice this means a publisher who
+lands ten revisions in a minute wakes you once, and if your device cannot
+evaluate the gates at all (private browsing, no Cache Storage) it drops the
+ping rather than trusting it. Nothing is lost either way: the Workshop
+re-crawls every followed feed when you open it, and pull remains the source
+of truth.
+
 **As a publisher (node operator)**, Wake is off until you set two
 environment variables (see
 [configuration.md](./configuration.md#environment-variable-overrides) for

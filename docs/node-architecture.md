@@ -122,50 +122,81 @@ to any third party.
 
 §8.4 gates wakes fail-closed at **both** ends, because a wake spends the
 target's battery. kerf's receiving end is the service worker in
-`public/sw.js`. Two of the three device-side gates are implemented; the third
-is blocked on a decision, stated below rather than left as a to-do.
+`public/sw.js`, and **all three of §8.4's device-side gates are enforced
+there**. The numbers they enforce are DMTAP core §16's, not invented ones — the
+parameter table's "Push wake rate limit" and "Push wake replay cache" rows,
+the first of which is explicitly marked *"emitter **and** receiver enforce
+(§4.9.4)"*.
 
 | §8.4 device-side gate | Status | Notes |
 |---|---|---|
-| **Replay-dedup** (`ERR_WAKEPING_REPLAY`, `0x0316`, DROP_SILENT) | **Implemented** | The emitter seals a fresh 16-byte nonce per wake (`kerf_pub.wake.send_wake`) and the browser hands the worker that plaintext, so the nonce is already on the wire. `public/sw.js` keeps a **bounded (256), newest-first replay cache persisted in Cache Storage** — persisted, not in-memory, because a worker woken purely for a push starts with an empty global scope and would otherwise forget every nonce between pushes. A nonce it has already accepted is dropped before any re-crawl, tab wake, or notification. |
+| **Replay-dedup** (`ERR_WAKEPING_REPLAY`, `0x0316`, DROP_SILENT) | **Implemented** | The emitter seals a fresh 16-byte nonce per wake (`kerf_pub.wake.send_wake`) and the browser hands the worker that plaintext, so the nonce is already on the wire. `public/sw.js` keeps a **bounded (1024 entries, 24 h TTL), newest-first replay cache persisted in Cache Storage** — persisted, not in-memory, because a worker woken purely for a push starts with an empty global scope and would otherwise forget every nonce between pushes. A nonce it has already accepted is dropped before any re-crawl, tab wake, or notification, and a replay costs a cache read and no write. |
 | **Content-free shape check** (`ERR_WAKEPING_CONTENT_PRESENT`, `0x0313`) | **Implemented** | kerf's wake payload is exactly the 16-byte token, so a push whose decrypted plaintext is absent, short, or long is not a conformant kerf `WakePing` and is dropped unread. |
-| **Inbound rate-limit backstop** (`ERR_WAKEPING_RATE_LIMITED`, `0x0315`) | **Not implemented — needs a protocol decision, see below** | §8.4 defines this as the device enforcing *the same* budget as the emitter. kerf's emitter has no budget to mirror. |
+| **Inbound rate-limit backstop** (`ERR_WAKEPING_RATE_LIMITED`, `0x0315`) | **Implemented** | A sliding window over the timestamps of *accepted* wakes enforces §16's budget — **≤ 1 wake / 60 s per device, ≈ 30 wakes / h** — persisted alongside the nonce cache so it survives the one-event lifetime a push-woken worker has. Over-budget wakes are dropped silently, before any re-crawl, tab wake, or notification. |
 
-**Why the rate-limit backstop is not built yet (and is not going to be
-half-built).** §8.4 words it as a two-ended agreement: *"the emitting node
-rate-limits per device (coalescing bursts); the receiving device enforces the
-same budget on inbound wakes as a fail-closed backstop."*
+**Why the receiver can enforce this without waiting on a protocol decision.**
+The two things such a gate needs are both available here:
+
+- **A budget with a referent.** §8.4's wording — *"the receiving device enforces
+  the same budget on inbound wakes"* — reads as if the number had to come from
+  kerf's emitter, which has none. It does not: §8.4 is a profile of core §4.9.4,
+  which sources the budget from **§16**, which states it numerically and assigns
+  it to both ends. The receiver mirrors the *spec's* budget, so nothing is
+  invented and nothing is blocked.
+- **A clock the attacker does not control.** The adversary is the push relay,
+  which chooses only *when* it delivers; it cannot move `Date.now()` on the
+  device, and no timestamp in this gate ever comes off the wire (the wake's
+  entire plaintext is a nonce). A device clock moved *backwards* is handled
+  conservatively — future-dated entries are clamped to now and persisted, so the
+  limiter stays closed for one window and then recovers instead of wedging.
+
+**Why dropping an over-budget wake cannot lose data.** kerf's wake is
+content-free, and the worker's reaction to *any* wake is the same idempotent
+re-crawl of every followed pub. A wake refused inside the window would have
+triggered work a wake seconds earlier already did; the cost is bounded latency —
+up to one window — on noticing the next revision, and pull remains the source of
+truth (the Workshop re-crawls when opened). This is why the receiver-side limiter
+is a real gate rather than "a correctness regression dressed as a security
+control".
+
+**What is still missing: §8.4's emitter half.**
 `kerf_pub.wake.notify_subscribers` fans out **one unthrottled wake per
-subscriber per publish** — no per-device limiter, no coalescing window — so
-"the same budget" currently has no referent. A number invented at the receiver
-alone would not be §8.4's gate, and it would silently drop legitimate wakes
-from a prolific publisher: a correctness regression dressed as a security
-control. Three things have to be decided first, and they belong to the wake
-protocol, not to this service worker:
+subscriber per publish** — no per-device limiter, no coalescing window — so kerf
+does *not* satisfy §8.4's "rate-limited at both ends" and §16's emitter column.
+The receiver-side backstop bounds the battery cost of that regardless of which
+relay delivers (that is precisely the job §8.4 gives the receiver), but it does
+not make the emitter conformant, and it is not a substitute for it. Building the
+emitter half means per-subscription state and a coalescing window on the
+publishing node; it is not built, and this row is the record of that.
 
-1. **The emitter's per-device budget** — wakes per device per window, and the
-   window. This is the number the receiver mirrors; it does not exist yet.
-2. **The coalescing rule** at the emitter — §8.4 says bursts are coalesced, but
-   kerf's wake is publisher-driven and content-free, so N publishes in a burst
-   currently produce N indistinguishable wakes. Coalescing them is safe
-   precisely *because* they are indistinguishable (the receiver's reaction to
-   any wake is the same idempotent re-crawl), but "how long a burst is" is a
-   choice.
-3. **What the receiver does on exceed** — DROP_SILENT matches §8.4, but the
-   receiver cannot distinguish "abusive relay" from "author published ten
-   revisions in a minute", so an over-budget wake being dropped must be an
-   agreed, documented behaviour rather than a surprise.
+**What remains undefended at the receiver, precisely.**
 
-**What remains undefended, precisely.** The replay cache is bounded, so an
-adversary holding more than 256 distinct captured ciphertexts can cycle them to
-evict entries and re-land old wakes; the rate limiter is §8.4's backstop for
-exactly that residue. Everything else a misbehaving relay can do — replay one
-wake, replay a handful, inject undecryptable or wrong-shaped payloads — is
-stopped at the receiver today.
+- **The process wakeup itself.** The user agent decides to run the worker before
+  a line of it executes, so a flood still costs whatever the platform spends
+  starting the worker and handing it the push. A receiver can refuse the *work*
+  — network, tab wake, notification — never the process start.
+- **Nonce-cache eviction, bounded by the limiter.** The cache is bounded (an
+  unbounded nonce cache would be its own denial of service), so entries do age
+  out at 24 h. Because only *accepted* nonces are recorded and acceptance is
+  itself capped at ≈30/h, 24 h of accepted wakes is at most ~720 entries — under
+  the 1024 ceiling — so under the limiter the TTL is what evicts, not the cap.
+  A nonce refused for budget was never accepted (§4.9.4 dedups
+  *recently-accepted* nonces), so a withheld ciphertext can land later — at the
+  budget's rate, which is the bound §8.4 asks for.
+- **Unauthenticated wakes** (`ERR_WAKEPING_AUTH_FAILED`, `0x0314`) are the user
+  agent's job, not this file's: RFC 8291 decryption happens before `push` fires,
+  and a payload that does not open is never delivered to the worker. A relay can
+  therefore only replay ciphertexts the emitter really produced — it cannot mint
+  new ones under the device's push key.
 
-Closing the first row means followers' own nodes holding their own
-subscriptions plus a node→node notify path — an architecture change rather
-than a patch. It is not scheduled.
+`src/lib/__tests__/serviceWorkerWakeGate.test.js` drives the shipped
+`public/sw.js` source (not a reimplementation) and asserts a replayed ping, a
+flood of distinct fresh nonces, an over-hour-budget series, a corrupt cache
+record and an unusable Cache Storage are all refused.
+
+Closing the **§8.1 divergence table's first row** above (registration target)
+means followers' own nodes holding their own subscriptions plus a node→node
+notify path — an architecture change rather than a patch. It is not scheduled.
 
 **Fail-safe off.** A node only sends or accepts a wake once its operator sets
 `KERF_PUB_VAPID_PRIVATE_KEY` + `KERF_PUB_VAPID_SUBJECT` (a fresh keypair per

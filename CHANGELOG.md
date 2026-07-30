@@ -107,20 +107,25 @@ The authoritative source for what's shipped vs. in-flight is
   `kotva@cacd24cc`, and its origin — source repo, path, upstream commit, digest,
   length — is now recorded in `pub_vectors.provenance.json` and enforced against
   both the file on disk and the module's pins.
-- **§8.4's device-side wake gates now exist at the receiver.** `public/sw.js`
-  accepted every push it was handed, so a relay replaying captured wakes to
-  drain a battery was undefended at the receiving end. It now drops a push whose
-  decrypted plaintext is not exactly the emitter's 16-byte token
-  (`ERR_WAKEPING_CONTENT_PRESENT`) and keeps a bounded (256), newest-first
-  **replay-nonce cache persisted in Cache Storage** (`ERR_WAKEPING_REPLAY`) —
-  persisted, because a worker woken purely for a push starts with an empty
-  global scope and an in-memory set would dedup nothing. Gates run before any
-  re-crawl, tab wake, or notification, and fail closed. §8.4's third gate, the
-  inbound rate-limit backstop (`ERR_WAKEPING_RATE_LIMITED`), is deliberately
-  **not** built: §8.4 defines it as mirroring the emitter's per-device budget
-  and kerf's emitter has none, so what must be decided first is written up in
-  `docs/node-architecture.md` rather than half-implemented with an invented
-  number.
+- **§8.4's device-side wake gates now exist at the receiver — all three.**
+  `public/sw.js` accepted every push it was handed, so a relay replaying or
+  flooding captured wakes to drain a battery was undefended at the receiving
+  end. It now drops a push whose decrypted plaintext is not exactly the
+  emitter's 16-byte token (`ERR_WAKEPING_CONTENT_PRESENT`), keeps a bounded
+  (1024 entries / 24 h), newest-first **replay-nonce cache persisted in Cache
+  Storage** (`ERR_WAKEPING_REPLAY`) — persisted, because a worker woken purely
+  for a push starts with an empty global scope and an in-memory set would dedup
+  nothing — and enforces an **inbound rate-limit backstop**
+  (`ERR_WAKEPING_RATE_LIMITED`) of DMTAP core §16's own budget: ≤ 1 wake / 60 s
+  per device, ≈ 30 wakes / h, measured against the device's clock and persisted
+  with the nonce cache. The budget is not invented: §16 states it numerically and
+  marks it "emitter **and** receiver enforce". Gates run before any re-crawl, tab
+  wake, or notification, and fail closed (an unreadable payload, an unusable
+  Cache Storage, or a nonce that cannot be durably recorded all drop the wake).
+  What is still missing is §8.4's **emitter** half — `notify_subscribers` fans
+  out one unthrottled wake per subscriber per publish with no coalescing window —
+  which is now recorded in `docs/node-architecture.md` and `kerf_pub/wake.py`
+  rather than implied by the receiver's gates.
 - **`install.sh` verifies checksums fail-closed.** A missing or empty
   `SHA256SUMS`, or an asset the manifest does not list, is now a hard error.
   It previously printed `WARNING: … skipping verification` and installed the

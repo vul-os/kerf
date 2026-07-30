@@ -84,7 +84,11 @@ Closing (1) means followers' own nodes holding their own subscriptions and a
 node→node notify path — an architecture change, not a patch, and out of
 scope here. Until then this module is a kerf-local extension that reuses
 §8's wire crypto, and the §8.4 constants below are a traceability mirror
-(see their comment), not evidence of an enforced gate.
+(see their comment), not evidence of a gate enforced *here*: §8.4's
+device-side gates live in ``public/sw.js`` (replay-dedup, content-free shape
+check, and the §16 inbound rate-limit backstop). §8.4's **emitter**-side rate
+limit — the half that would be this module's — is still missing; see
+:func:`notify_subscribers`.
 """
 
 from __future__ import annotations
@@ -126,19 +130,24 @@ _RECORD_SIZE = 4096
 #   _SIG_INVALID   — unreachable; see divergence (2) in the module docstring
 #   _AUTH_FAILED   — receive-side gate, and kerf's receiver is a browser
 #                    service worker (public/sw.js), not this module
-#   _RATE_LIMITED  — §8.4's device-side backstop is NOT implemented, and is
-#                    blocked on a decision this module owns half of: §8.4 has
-#                    the device mirror "the same budget" the EMITTER enforces,
-#                    and notify_subscribers below enforces none (one unthrottled
-#                    wake per subscriber per publish, no coalescing window).
+#   _RATE_LIMITED  — the DEVICE-side backstop IS enforced, in public/sw.js: a
+#                    sliding window over accepted wakes holding DMTAP §16's
+#                    budget (≤ 1 wake / 60 s per device, ≈ 30 wakes / h),
+#                    persisted in Cache Storage. What is missing is the EMITTER
+#                    half, which is this module's: notify_subscribers below fans
+#                    out one unthrottled wake per subscriber per publish, with no
+#                    per-device limiter and no coalescing window, so §8.4's
+#                    "rate-limited at both ends" is only half satisfied and §16's
+#                    emitter column is unmet. Closing it needs per-subscription
+#                    state plus a coalescing window on the publishing node.
 #                    See docs/node-architecture.md, "§8.4's device-side gates".
 #   _CONTENT_PRESENT / _REPLAY
-#                  — device-side, and now ENFORCED there: public/sw.js drops a
-#                    push whose plaintext is not exactly this module's 16-byte
-#                    token, and keeps a bounded, Cache-Storage-persisted
-#                    replay-nonce cache. Still unreferenced HERE because kerf's
-#                    receiver is the service worker, not this module — the
-#                    emitter's half is send_wake's fresh os.urandom(16) per send.
+#                  — device-side, and ENFORCED there: public/sw.js drops a push
+#                    whose plaintext is not exactly this module's 16-byte token,
+#                    and keeps a bounded, Cache-Storage-persisted replay-nonce
+#                    cache. Still unreferenced HERE because kerf's receiver is the
+#                    service worker, not this module — the emitter's half is
+#                    send_wake's fresh os.urandom(16) per send.
 # Deleting them would erase the record of which §8.4 gates are missing, and of
 # where the ones that exist are actually enforced.
 ERR_PUSH_SUBSCRIPTION_SIG_INVALID = 0x0312
@@ -419,7 +428,17 @@ async def notify_subscribers(
     silent no-op — kerf never sends an unauthenticated push, and a node
     operator who hasn't configured wake never has an outbound wake attempted.
     Returns the count of pings reported delivered (best-effort telemetry
-    only, never load-bearing)."""
+    only, never load-bearing).
+
+    **NOT rate-limited, and that is §8.4's missing emitter half.** §8.4 (and
+    DMTAP §16: "≤ 1 wake / 60 s per device …, ≈ 30 wakes / h", "emitter **and**
+    receiver enforce") requires the emitting node to rate-limit per device and
+    coalesce bursts. This fans out one wake per subscriber per publish, so ten
+    publishes in a minute are ten pushes. The device-side backstop in
+    ``public/sw.js`` bounds what that costs a *receiver* (it drops the
+    over-budget ones), but it does not make this emitter conformant: kerf still
+    hands the push relay more traffic than §16 allows. Fixing it needs
+    per-subscription send state plus a coalescing window here."""
     if config is None or not subscriptions:
         return 0
     import asyncio

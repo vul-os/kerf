@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="public/favicon.svg" width="84" height="84" alt="Kerf">
+<img src="brand/logo.svg" width="84" height="84" alt="Kerf">
 
 # Kerf
 
@@ -273,6 +273,16 @@ PRs welcome. Pick anything marked `📋 next` or `🔮 planned` in [ROADMAP.md](
 - **The LLM edits source files directly.** If you add a new file kind or feature, also add a `packages/kerf-chat/llm_docs/<topic>.md` so the model knows about it.
 
 See [docs/contributing.md](./docs/contributing.md) for the full checklist.
+
+## Brand
+
+The mark in [`brand/`](brand/) is the source of truth. Every icon this repo
+ships — favicon, PWA and app icons, the mark in the README and on the site — is
+rendered from `brand/logo.svg` rather than redrawn, so there is one approved
+drawing and no second copy to drift.
+
+Copy it outward, never edit a derived copy, and never edit `brand/` to match
+something downstream.
 
 ## License
 

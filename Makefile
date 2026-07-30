@@ -6,7 +6,11 @@
 # ---------------------------------------------------------------------------
 
 # DEFAULT TIER — load-bearing product packages. Expected GREEN; a failure here
-# is a real regression. ~5.0k tests, ~3 min. This is what CI gates on.
+# is a real regression. ~5.0k tests, ~3 min. NOTE: no GitHub Actions workflow
+# runs this (or ruff/eslint/vitest) today — .github/workflows/ only runs the
+# Playwright e2e suite and the release-guards/SDK-publish jobs. Run this
+# yourself before every merge until a CI job calls it; do not read "no CI
+# failure" as "this tier is green".
 test:
 	PYTHONHASHSEED=0 pytest -n auto
 

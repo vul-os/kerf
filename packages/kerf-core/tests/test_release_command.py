@@ -27,7 +27,7 @@ def _run(env: dict, args: list[str]) -> tuple[int, str, str]:
         [sys.executable, "-m", "kerf_core.db.migrations.runner", *args],
         capture_output=True,
         text=True,
-        env={**env, "PYTHONPATH": str(_RUNNER.parents[4])},
+        env={**env, "PYTHONPATH": str(_RUNNER.parents[3])},
     )
     return proc.returncode, proc.stdout, proc.stderr
 

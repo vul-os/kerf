@@ -399,6 +399,17 @@ footer.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; }
   section { padding: 3.25rem 0; }
   .footer-inner { flex-direction: column; text-align: center; }
 }
+
+  /* ── Vulos suite chrome — identical on every product landing ───────────────
+     Two elements, and only two: a logo-only home button in the top bar, and
+     one line in the footer. Deliberately free of repo variables so the block
+     is byte-identical across the suite and can be diffed as one thing. */
+  .vulos-home { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 9px; flex: 0 0 auto; opacity: .72; transition: opacity .15s ease, transform .15s ease; }
+  .vulos-home:hover, .vulos-home:focus-visible { opacity: 1; transform: translateY(-1px); }
+  .vulos-home img { display: block; width: 22px; height: 22px; border-radius: 6px; }
+  .vulos-foot { display: inline-flex; align-items: center; gap: 9px; font-size: 13.5px; line-height: 1.45; text-decoration: none; color: inherit; opacity: .85; transition: opacity .15s ease; }
+  .vulos-foot:hover { opacity: 1; text-decoration: none; }
+  .vulos-foot img { display: block; width: 18px; height: 18px; border-radius: 5px; flex: 0 0 auto; }
 </style>
 </head>
 <body>
@@ -419,6 +430,7 @@ footer.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; }
       github
     </a>
     <a href="#install" class="nav-cta">install</a>
+    <a class="vulos-home" href="https://vulos.org" target="_blank" rel="noopener" title="Vulos — open, self-hostable software" aria-label="Vulos — open, self-hostable software"><img src="./assets/vulos-logo.png" alt="" width="22" height="22"></a>
   </div>
 </nav>
 
@@ -430,7 +442,7 @@ footer.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; }
   <div class="container">
     <div class="hero-grid">
       <div class="hero-copy">
-        <div class="hero-badge"><span class="dot"></span>MIT · open-source · multi-discipline</div>
+        <div class="hero-badge"><span class="dot"></span><a href="https://github.com/vul-os/kerf/blob/main/LICENSE" target="_blank" rel="noreferrer">MIT</a> · open-source · multi-discipline</div>
         <h1>Design anything.<br><span class="mark">Chat</span> drives it all.</h1>
         <p class="lede">Mechanical, BIM, electronics, silicon, aerospace, jewelry, marine, composites — <strong style="color:var(--text-2)">37 engineering domains</strong> in one workspace, all driven by chat. A complete, free CAD that runs entirely on your own machine.</p>
         <ul class="trust">
@@ -1162,9 +1174,8 @@ docker compose up">copy</button></div>
         <a href="https://github.com/vul-os/kerf" target="_blank" rel="noreferrer">github</a>
         <a href="https://github.com/vul-os/kerf/blob/main/ROADMAP.md" target="_blank" rel="noreferrer">roadmap</a>
         <a href="https://github.com/vul-os/kerf/issues" target="_blank" rel="noreferrer">issues</a>
-        <a href="https://github.com/vul-os/kerf/blob/main/LICENSE" target="_blank" rel="noreferrer">license (MIT)</a>
-        <a href="https://vulos.org" target="_blank" rel="noreferrer">vulos.org</a>
       </div>
+      <a class="vulos-foot" href="https://vulos.org" target="_blank" rel="noopener"><img src="./assets/vulos-logo.png" alt="" width="18" height="18"><span>Part of <strong>Vulos</strong> — open, self-hostable software</span></a>
       <div class="footer-right">made in south africa 🇿🇦</div>
     </div>
   </div>

@@ -65,7 +65,7 @@ Revisions auto-number upward: `A → B → … Z → AA → AB → … ZZ`. Use
 writes any frame field (`title`, `author`, `date`, `scale_label`, `sheet_number`,
 `notes`, or any `extra` key):
 
-```
+```python
 update_title_block_field(sheet_id, field="revision", value="B")
 update_title_block_field(sheet_id, field="extra.material", value="6061-T6")
 ```

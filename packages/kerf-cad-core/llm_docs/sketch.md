@@ -112,7 +112,7 @@ participate in constraints but are not extruded.
 
 **Add a circle and constrain its diameter:**
 
-```
+```yaml
 sketch_add_entity
   file_path: "/proj/profile.sketch"
   entity: {type:"circle", center:"pt-1", radius:5.0}
@@ -126,7 +126,7 @@ sketch_add_constraint
 
 **Update a dimensional constraint value:**
 
-```
+```yaml
 sketch_set_constraint_value
   file_path: "/proj/profile.sketch"
   constraint_id: "d9e4f5a6"
@@ -136,7 +136,7 @@ sketch_set_constraint_value
 
 **Delete a point (cascade removes attached line):**
 
-```
+```yaml
 sketch_delete_entity
   file_path: "/proj/profile.sketch"
   entity_id: "pt-1"
@@ -145,7 +145,7 @@ sketch_delete_entity
 
 **Carbon-copy reference circle into another sketch:**
 
-```
+```yaml
 sketch_carbon_copy
   source_file_path: "/proj/profile.sketch"
   target_file_path: "/proj/path.sketch"

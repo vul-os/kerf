@@ -1,0 +1,15 @@
+{
+  "name": "kerf-site-checks",
+  "version": "1.0.0",
+  "description": "Playwright render gate for kerf's static site (site/index.html + site/docs.html)",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "check": "node check-render.mjs",
+    "check:selftest": "node check-render.mjs --selftest"
+  },
+  "dependencies": {
+    "playwright": "^1.44.0"
+  }
+}

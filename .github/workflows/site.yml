@@ -1,0 +1,33 @@
+name: Site
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  # The landing page and docs are rendered in a real browser at eight viewports
+  # in both colour schemes. None of what this catches survives a diff: a
+  # stretched screenshot, an off-theme capture, body copy under 12px, an element
+  # pushing the page sideways, a dead anchor, an unhighlighted code block.
+  site-render:
+    name: site/ renders correctly
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright
+        run: |
+          cd scripts
+          npm install --silent
+          npx --yes playwright install --with-deps chromium
+
+      # Self-test first: it breaks each invariant on purpose and demands the
+      # check notice. A gate that has stopped discriminating looks exactly like
+      # one that passes, so a silent gate must fail the build.
+      - name: Gate self-test
+        run: node scripts/check-render.mjs --selftest
+
+      - name: Render checks
+        run: node scripts/check-render.mjs

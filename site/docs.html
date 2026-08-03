@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en" class="scroll-smooth">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kerf — Documentation</title>
 <meta name="description" content="Kerf documentation — concepts, file formats, modeling, CAM, electronics, the distributed Workshop, and the HTTP API. Free, open-source, self-hosted CAD.">
   <link rel="canonical" href="https://vulos.org/projects/kerf/docs.html">
-  <meta name="color-scheme" content="dark light">
+  <meta name="color-scheme" content="dark">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Kerf">
   <meta property="og:title" content="Kerf — Documentation">
@@ -23,144 +23,364 @@
   <meta name="twitter:image" content="https://vulos.org/projects/kerf/assets/og-card.png">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0b0d'/%3E%3Crect x='7' y='6' width='3.5' height='20' fill='%23ffd633'/%3E%3Cpolygon points='10.5,16 26,6 26,13' fill='%23ffd633'/%3E%3Cpolygon points='10.5,16 26,19 26,26' fill='%23ffd633'/%3E%3C/svg%3E">
 
-<!-- SOVEREIGNTY: zero network requests. marked.umd.js is vendored locally; -->
-<!-- docs render straight from this repo's own markdown. No CDN, no analytics. -->
+<!-- SOVEREIGNTY: zero network requests. marked.umd.js and highlight.min.js are -->
+<!-- vendored locally; docs render straight from this repo's own markdown.      -->
+<!-- No CDN, no web fonts, no analytics.                                        -->
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
   --bg: #0a0b0d; --surface: #111318; --elevated: #16181f; --panel: #0f1115;
   --border: #23262f; --border-2: #1a1d24;
-  --text: #f5f3ee; --text-2: #a6a9b4; --text-3: #71747f; --text-4: #3a3d47;
-  --dim: #868a97; /* AA-safe muted tone for text (>=4.5:1 on bg/panel/surface); --text-4 kept for non-text/decorative use */
+  --text: #f5f3ee; --text-2: #a6a9b4; --text-3: #9aa0ad; --text-4: #3a3d47;
+  /* --text-3 is the quiet nav tone. It used to be #71747f, which measured
+     4.12:1 on the sidebar ground — every nav label on the page missed AA.
+     #9aa0ad measures 7.51:1 on --bg. --text-4 stays for rules and markers,
+     which are decoration and carry no text. */
+  --dim: #868a97;
   --gold: #ffd633; --gold-dim: #cca82a; --gold-line: #8a7422;
-  --cyan: #6bd4ff;
-  --mono: 'SF Mono', 'JetBrains Mono', 'Menlo', 'Consolas', monospace;
+  --cyan: #6bd4ff; --violet: #c8a2ff;
+  --code-bg: #0d0f14; --code-bar: #14161c;
+  --mono: 'SF Mono', 'JetBrains Mono', 'Menlo', 'Consolas', ui-monospace, monospace;
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --hdr: 58px;
 }
 html { scroll-behavior: smooth; }
 body {
   font-family: var(--sans); background: var(--bg); color: var(--text-2);
   line-height: 1.65; -webkit-font-smoothing: antialiased;
+  /* clamps only the axis that a stray wide child could break; `overflow:hidden`
+     would take the vertical axis with it and freeze the page. */
+  overflow-x: clip;
 }
 body::before {
   content:""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background:
-    radial-gradient(1000px 520px at 88% -8%, rgba(255,214,51,.05), transparent 60%),
-    radial-gradient(760px 460px at -6% 4%, rgba(107,212,255,.03), transparent 55%);
+    radial-gradient(900px 480px at 92% -10%, rgba(255,214,51,.045), transparent 62%),
+    radial-gradient(700px 420px at -8% 2%, rgba(107,212,255,.028), transparent 56%);
 }
 a { color: var(--text-2); text-decoration: none; transition: color .15s; }
 a:hover { color: var(--text); }
 svg { display: block; }
-.mono { font-family: var(--mono); }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
 
-/* Nav — same floating pill lockup as the landing */
-.nav {
-  position: fixed; top: 10px; left: 1rem; right: 1rem; z-index: 100;
-  max-width: 1180px; margin: 0 auto;
-  background: rgba(10, 11, 13, 0.85); backdrop-filter: blur(12px);
-  border: 1px solid var(--border); border-radius: 12px;
-  padding: 0 1.25rem; height: 54px;
-  display: flex; align-items: center; justify-content: space-between;
+/* ─────────────────────────────── top bar ─────────────────────────────────
+   Docs is an application surface, not a marketing page, so the bar spans the
+   window and pins to the top — the landing's floating pill left the reading
+   column boxed in and the sidebar swimming in dead space. Same mark, same
+   mono nav, same gold. */
+.topbar {
+  position: sticky; top: 0; z-index: 100; height: var(--hdr);
+  display: flex; align-items: center; gap: 1.25rem;
+  padding: 0 22px;
+  background: rgba(10,11,13,.86); backdrop-filter: saturate(1.3) blur(14px);
+  border-bottom: 1px solid var(--border);
 }
-.nav-logo { display: flex; align-items: center; gap: .55rem; font-family: var(--mono); font-weight: 700; font-size: .95rem; color: var(--text); }
-.nav-logo svg { width: 24px; height: 24px; border-radius: 5px; }
-.nav-links { display: flex; align-items: center; gap: 1.6rem; }
-.nav-links a { font-family: var(--mono); font-size: .78rem; color: var(--text-3); letter-spacing: -.01em; }
-.nav-links a:hover { color: var(--text); }
-.nav-links a.here { color: var(--gold); }
-.nav-links .gh { display: flex; align-items: center; gap: .4rem; }
-.nav-links .gh svg { width: 14px; height: 14px; }
+.brand { display: flex; align-items: center; gap: .55rem; font-family: var(--mono);
+  font-weight: 700; font-size: .95rem; color: var(--text); flex: 0 0 auto; }
+.brand svg { width: 24px; height: 24px; border-radius: 5px; }
+.brand .tag { font-weight: 500; font-size: .72rem; color: var(--gold-dim);
+  letter-spacing: .1em; text-transform: uppercase; padding-left: .5rem;
+  margin-left: .2rem; border-left: 1px solid var(--border); }
+.topbar .sp { flex: 1 1 auto; }
+.tnav { display: flex; align-items: center; gap: 1.4rem; }
+.tnav a { font-family: var(--mono); font-size: .78rem; color: var(--text-3); letter-spacing: -.01em; }
+.tnav a:hover { color: var(--text); }
+.tnav a.here { color: var(--gold); }
+.tnav .gh { display: flex; align-items: center; gap: .4rem; }
+.tnav .gh svg { width: 14px; height: 14px; }
 .menu-btn {
   display: none; font-family: var(--mono); font-size: .75rem; color: var(--text-2);
   background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-  padding: .4rem .7rem; cursor: pointer; align-items: center; gap: .4rem;
+  padding: .4rem .7rem; cursor: pointer; align-items: center; gap: .45rem;
 }
+.menu-btn:hover { color: var(--text); border-color: var(--gold-line); }
 
-/* Layout */
+/* reading progress */
+#progress { position: fixed; top: 0; left: 0; height: 2px; width: 0; z-index: 120;
+  background: linear-gradient(90deg, var(--gold-line), var(--gold)); transition: width .1s linear; }
+
+/* ────────────────────────────── shell ───────────────────────────────────
+   Explicit tracks packed LEFT. A `1fr` middle track would keep the prose
+   measured while the TRACK kept growing, which throws the on-this-page rail
+   metres away from the text it indexes; a centred max-width column pushes
+   the nav in from the window edge and leaves a dead gutter beside it. Only
+   past 1900px, where left-packing starts to look lopsided, do we centre. */
 .shell {
-  max-width: 1180px; margin: 0 auto; padding: 84px 1.5rem 5rem;
-  display: grid; grid-template-columns: 262px minmax(0,1fr); gap: 2.75rem; align-items: start;
+  display: grid;
+  grid-template-columns: 248px minmax(0, 830px) 200px;
+  gap: 0 36px; justify-content: start; align-items: start;
+  padding: 0 24px 90px;
+}
+/* 248 + 830 + 200 + 2×36 gap + 2×24 padding = 1398px. The rail is dropped at
+   1420 rather than 1440 so the three-track layout is never asked to fit in
+   less than it needs — fixed tracks under justify-content:start do not shrink,
+   they overflow. */
+@media (min-width: 1900px) { .shell { justify-content: center; } }
+
+/* ───────────────────────────── sidebar ──────────────────────────────────
+   The sticky element is the COLUMN, and it is given a real height so it has
+   room to slide inside its grid area. Sticking a child of an auto-height
+   wrapper does nothing: the wrapper is exactly as tall as the child, so
+   there is no travel and the whole thing scrolls away with the page. The
+   inner <nav> is the scroller. */
+.side-col {
+  position: sticky; top: var(--hdr); height: calc(100vh - var(--hdr));
+  display: flex; flex-direction: column; min-height: 0;
+  padding: 20px 0 14px; border-right: 1px solid var(--border-2);
+  margin-right: -20px; padding-right: 20px;
+}
+.side-col nav {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding-right: 6px; scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+  /* The list is 58 entries long and always mid-scroll, so both cut edges get a
+     short fade instead of a half-sliced line of type. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+}
+.side-col nav::-webkit-scrollbar { width: 8px; }
+.side-col nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+.side-col nav::-webkit-scrollbar-track { background: transparent; }
+
+.search { position: relative; flex: 0 0 auto; margin-bottom: 14px; padding-right: 6px; }
+.search input {
+  width: 100%; font-family: var(--mono); font-size: .78rem; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 9px;
+  padding: .52rem .7rem .52rem 2rem; outline: none; transition: border-color .15s, box-shadow .15s;
+}
+.search input:focus { border-color: var(--gold-line); box-shadow: 0 0 0 3px rgba(255,214,51,.09); }
+.search input::placeholder { color: var(--dim); }
+.search .ico { position: absolute; left: .65rem; top: 50%; transform: translateY(-50%);
+  width: 13px; height: 13px; color: var(--dim); pointer-events: none; }
+.search kbd { position: absolute; right: 1.05rem; top: 50%; transform: translateY(-50%);
+  font-family: var(--mono); font-size: 11px; color: var(--dim); background: var(--elevated);
+  border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px; }
+
+.side-col .grp { font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+  letter-spacing: .13em; color: var(--gold-dim); padding: 1.1rem .55rem .4rem; }
+.side-col .grp:first-of-type { padding-top: 0; }
+.side-col nav a {
+  display: block; font-family: var(--mono); font-size: 12.6px; color: var(--text-3);
+  padding: .36rem .55rem; border-radius: 7px; letter-spacing: -.01em; line-height: 1.45;
+  position: relative;
+}
+.side-col nav a:hover { background: rgba(255,255,255,.045); color: var(--text); }
+.side-col nav a.active { background: rgba(255,214,51,.1); color: var(--gold); font-weight: 600; }
+.side-col nav a.active::before { content: ""; position: absolute; left: -1px; top: 6px; bottom: 6px;
+  width: 2px; border-radius: 2px; background: var(--gold); }
+.side-col .nores { font-family: var(--mono); font-size: 12.5px; color: var(--dim); padding: .6rem .55rem; display: none; }
+
+/* ─────────────────────────── right rail ───────────────────────────────── */
+.rail {
+  position: sticky; top: var(--hdr); height: calc(100vh - var(--hdr));
+  display: flex; flex-direction: column; min-height: 0; padding: 26px 0 20px;
+}
+.rail .label { flex: 0 0 auto; font-family: var(--mono); font-size: 11px; letter-spacing: .13em;
+  text-transform: uppercase; color: var(--gold-dim); margin-bottom: 12px; }
+.rail .toc { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.rail .toc::-webkit-scrollbar { width: 6px; }
+.rail .toc::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+.rail a { display: block; font-size: 13px; line-height: 1.45; color: var(--text-3);
+  padding: 5px 0 5px 13px; border-left: 1.5px solid var(--border); }
+.rail a .clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; }
+.rail a.lvl3 { padding-left: 25px; font-size: 12.4px; }
+.rail a:hover { color: var(--text); border-color: var(--dim); }
+.rail a.active { color: var(--gold); border-color: var(--gold); }
+.rail .empty { font-size: 13px; color: var(--dim); }
+
+/* ─────────────────────────── article ──────────────────────────────────── */
+.main { min-width: 0; padding: 34px 0 0; }
+.doc-head { border-bottom: 1px solid var(--border); padding-bottom: 20px; margin-bottom: 30px; }
+.crumb { font-family: var(--mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: .13em;
+  color: var(--dim); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.crumb b { color: var(--gold-dim); font-weight: 500; }
+.crumb .sep { color: #7d818e; }   /* 5.07:1 on --bg — quieter than the crumb, still legible */
+.doc-head h1 { font-size: clamp(30px, 4vw, 42px); line-height: 1.12; letter-spacing: -.028em; color: var(--text); }
+
+.md { font-size: 16px; color: var(--text-2); overflow-wrap: break-word; }
+.md > *:first-child { margin-top: 0; }
+.md h1 { display: none; }   /* the doc's own H1 is promoted into .doc-head */
+.md h2, .md h3, .md h4, .md h5 { color: var(--text); line-height: 1.28; letter-spacing: -.02em;
+  scroll-margin-top: calc(var(--hdr) + 16px); }
+.md h2 { font-size: 25px; margin: 2.3rem 0 .85rem; padding-bottom: .38rem; border-bottom: 1px solid var(--border-2); }
+.md h3 { font-size: 19px; margin: 1.9rem 0 .65rem; }
+.md h4 { font-size: 16px; margin: 1.5rem 0 .55rem; }
+.md h5 { font-size: 14.5px; margin: 1.3rem 0 .5rem; color: var(--text-2); }
+.md .anchor { opacity: 0; margin-left: .45rem; color: var(--gold-dim); font-weight: 400;
+  font-family: var(--mono); font-size: .78em; transition: opacity .15s; vertical-align: middle; }
+.md h2:hover .anchor, .md h3:hover .anchor, .md h4:hover .anchor, .md .anchor:focus-visible { opacity: 1; }
+/* A hover-revealed control does not exist on a touch screen. This rule sits
+   AFTER the hover rules and matches at the same depth, so it actually wins. */
+/* .55 flattened #cca82a to 3.28:1 on --bg — the one control this page reveals
+   on touch was the one that failed AA. .78 measures 5.4:1 and still reads as
+   secondary next to the heading. */
+@media (hover: none) { .md .anchor { opacity: .78; } }
+
+.md p { margin: 1rem 0; }
+.md ul, .md ol { margin: 1rem 0; padding-left: 1.4rem; }
+.md li { margin: .34rem 0; }
+.md li::marker { color: var(--gold-line); }
+.md ol li::marker { font-family: var(--mono); font-size: .9em; }
+.md a { color: var(--gold); border-bottom: 1px solid rgba(255,214,51,.32); }
+.md a:hover { color: var(--gold-dim); border-bottom-color: var(--gold-dim); }
+.md h2 a, .md h3 a { color: inherit; border-bottom-color: var(--border); }
+.md strong { color: var(--text); font-weight: 650; }
+.md em { color: var(--text-2); }
+.md hr { border: none; border-top: 1px solid var(--border-2); margin: 2.2rem 0; }
+.md img { max-width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--border); margin: 1.2rem 0; }
+.md kbd { font-family: var(--mono); font-size: 12.5px; background: var(--elevated);
+  border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; padding: 1px 5px; color: var(--text); }
+
+/* inline code — wraps rather than pushing the page sideways. `nowrap` on a
+   long identifier is exactly how a page ends up 40px wider than the phone. */
+.md :not(pre) > code {
+  font-family: var(--mono); font-size: 13.5px; background: rgba(255,214,51,.10);
+  color: #ffe9a8; padding: .12em .4em; border-radius: 5px;
+  overflow-wrap: anywhere; word-break: break-word;
 }
 
-/* Sidebar */
-.sidebar { position: sticky; top: 84px; max-height: calc(100vh - 104px); overflow-y: auto;
-  border: 1px solid var(--border); border-radius: 14px; background: rgba(15,17,21,.6);
-  padding: .85rem; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
-.sidebar::-webkit-scrollbar { width: 8px; }
-.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
-.search { width: 100%; font-family: var(--mono); font-size: .76rem; color: var(--text);
-  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
-  padding: .5rem .7rem; margin-bottom: .6rem; outline: none; }
-.search:focus { border-color: var(--gold-line); }
-.search::placeholder { color: var(--text-4); }
-.sidebar .grp { font-family: var(--mono); font-size: .75rem; text-transform: uppercase;
-  letter-spacing: .08em; color: var(--gold-dim); padding: .95rem .6rem .35rem; }
-.sidebar .grp:first-of-type { padding-top: .3rem; }
-.sidebar a { display: block; font-family: var(--mono); font-size: .78rem; color: var(--text-3);
-  padding: .38rem .6rem; border-radius: 7px; letter-spacing: -.01em; line-height: 1.4; }
-.sidebar a:hover { background: rgba(255,255,255,.04); color: var(--text); }
-.sidebar a.active { background: rgba(255,214,51,.1); color: var(--gold); box-shadow: inset 2px 0 0 var(--gold); }
-.sidebar .nores { font-family: var(--mono); font-size: .8125rem; color: var(--dim); padding: .6rem; display: none; }
+.md blockquote { margin: 1.3rem 0; padding: .7rem 1.1rem; border-left: 3px solid var(--gold-line);
+  background: rgba(255,214,51,.05); color: #c9c5b6; border-radius: 0 9px 9px 0; }
+.md blockquote p { margin: .3rem 0; color: inherit; }
+.md blockquote strong { color: var(--text); }
 
-/* Content */
-.main { min-width: 0; }
-.crumb { font-family: var(--mono); font-size: .75rem; text-transform: uppercase; letter-spacing: .12em;
-  color: var(--dim); margin-bottom: 1rem; }
-.crumb b { color: var(--gold-dim); font-weight: 500; }
-.md { font-size: 1rem; color: var(--text-2); overflow-wrap: break-word; }
-.md > *:first-child { margin-top: 0; }
-.md h1, .md h2, .md h3, .md h4 { color: var(--text); line-height: 1.25; letter-spacing: -.02em; scroll-margin-top: 84px; }
-.md h1 { font-size: 2rem; margin: .2rem 0 1.1rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
-.md h2 { font-size: 1.4rem; margin: 2.2rem 0 .9rem; padding-bottom: .35rem; border-bottom: 1px solid var(--border-2); }
-.md h3 { font-size: 1.12rem; margin: 1.8rem 0 .7rem; }
-.md h4 { font-size: .98rem; margin: 1.5rem 0 .6rem; color: var(--text); }
-.md h1 .anchor, .md h2 .anchor, .md h3 .anchor, .md h4 .anchor {
-  opacity: 0; margin-left: .4rem; color: var(--gold-dim); font-weight: 400; text-decoration: none; font-size: .85em; }
-.md h1:hover .anchor, .md h2:hover .anchor, .md h3:hover .anchor, .md h4:hover .anchor { opacity: .8; }
-.md p, .md li { color: var(--text-2); }
-.md p { margin: .9rem 0; }
-.md ul, .md ol { margin: .9rem 0 .9rem 1.4rem; }
-.md li { margin: .35rem 0; }
-.md li::marker { color: var(--text-4); }
-.md a { color: var(--gold); }
-.md a:hover { color: var(--gold-dim); text-decoration: underline; }
-.md strong { color: var(--text); font-weight: 650; }
-.md code { font-family: var(--mono); font-size: .8125rem; background: rgba(255,214,51,.09);
-  color: #f4e3a6; padding: .12em .4em; border-radius: 5px; overflow-wrap: anywhere; }
-.md pre { background: #0c0d11; border: 1px solid var(--border); border-radius: 11px;
-  padding: 1rem 1.15rem; overflow-x: auto; margin: 1.1rem 0; }
-.md pre code { background: none; color: var(--text-2); padding: 0; font-size: .82rem; line-height: 1.7; }
-.md blockquote { margin: 1.1rem 0; padding: .5rem 1rem; border-left: 3px solid var(--gold-line);
-  background: rgba(255,214,51,.04); color: var(--text-2); border-radius: 0 8px 8px 0; }
-.md blockquote p { margin: .3rem 0; }
-.md table { border-collapse: collapse; width: 100%; margin: 1.2rem 0; font-size: .86rem; display: block; overflow-x: auto; }
-.md th, .md td { border: 1px solid var(--border); padding: .55rem .8rem; text-align: left; vertical-align: top; }
-.md th { background: var(--surface); color: var(--text); font-weight: 600; font-family: var(--mono); font-size: .78rem; }
-.md td code, .md th code { white-space: nowrap; font-size: 1em; }
-.md hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
-.md img { max-width: 100%; border-radius: 10px; border: 1px solid var(--border); margin: 1rem 0; }
-.err { font-family: var(--mono); font-size: .82rem; color: #ffb3a6;
-  background: rgba(224,80,60,.08); border: 1px solid rgba(224,80,60,.25); padding: .9rem 1.1rem; border-radius: 10px; }
-.loading { font-family: var(--mono); font-size: .8rem; color: var(--text-4); }
+/* tables scroll inside their own frame, never the page */
+.md .table-wrap { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border);
+  border-radius: 11px; background: var(--panel); scrollbar-width: thin; }
+.md table { border-collapse: collapse; width: 100%; font-size: 14px; }
+.md th, .md td { padding: .6rem .85rem; text-align: left; vertical-align: top;
+  border-bottom: 1px solid var(--border-2); }
+.md th { background: var(--surface); color: var(--text); font-weight: 600;
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; white-space: nowrap; }
+.md tbody tr:last-child td { border-bottom: none; }
+.md tbody tr:hover { background: rgba(255,255,255,.02); }
+.md td > code, .md th > code { white-space: nowrap; }
 
-/* Footer */
-.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; margin-top: 2rem; }
-.footer-inner { max-width: 1180px; margin: 0 auto; padding: 0 1.5rem; display: flex;
-  justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
-.footer-left { display: flex; align-items: center; gap: .5rem; font-family: var(--mono); font-size: .8rem; color: var(--dim); }
-.footer-left svg { width: 16px; height: 16px; opacity: .5; border-radius: 3px; }
-.footer-links { display: flex; gap: 1.5rem; flex-wrap: wrap; }
-.footer-links a { font-family: var(--mono); font-size: .8125rem; color: var(--dim); }
-.footer-links a:hover { color: var(--text-2); }
+/* ─────────────────────────── code blocks ──────────────────────────────── */
+.md .code { position: relative; margin: 1.4rem 0; background: var(--code-bg);
+  border: 1px solid var(--border); border-radius: 11px; overflow: hidden; }
+.md .code .bar { display: flex; align-items: center; gap: 10px; padding: 7px 12px;
+  background: var(--code-bar); border-bottom: 1px solid var(--border); }
+.md .code .lang { font-family: var(--mono); font-size: 11px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--gold); }
+.md .code .lang.plain { color: var(--dim); }
+.md .code .sp { flex: 1 1 auto; }
+.md .code .copy {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase;
+  color: #b9bdc9; background: rgba(255,255,255,.05); border: 1px solid var(--border);
+  border-radius: 999px; padding: 3px 10px; cursor: pointer; transition: .16s;
+  /* Always painted. It is never revealed by hover, so there is no touch-only
+     hole to patch — a hover-gated copy button simply does not exist on a phone. */
+  opacity: 1;
+}
+.md .code .copy:hover { color: var(--bg); background: var(--gold); border-color: var(--gold); }
+.md .code .copy.done { color: var(--gold); border-color: var(--gold-line); background: rgba(255,214,51,.12); }
+.md .code pre { margin: 0; padding: 14px 16px; overflow-x: auto; scrollbar-width: thin; }
+.md .code pre code { font-family: var(--mono); font-size: 13px; line-height: 1.7;
+  background: none; border: none; padding: 0; color: #dce0e8; white-space: pre; }
 
-@media (max-width: 860px) {
-  .nav-links { display: none; }
+/* ── highlight.js — "graphite & gold" ──────────────────────────────────────
+   Kerf's docs render dark only (so does its landing), so there is one
+   code ground to clear: --code-bg #0D0F14. Every colour below was computed
+   with the WCAG relative-luminance formula against that ground, not eyeballed;
+   the weakest is the comment grey at 6.37:1 and the rest run 8.6–14.9:1.
+
+   The classes are the ones KERF's own fences actually emit — taken from
+   hljs.highlight() over all 468 blocks in site/docs, not copied from a stock
+   theme. That measurement is why `hljs-punctuation` is styled at all: it is
+   the single most frequent token on the page (2479 occurrences, nearly all
+   JSON braces and colons) and stock themes leave it unstyled, which is what
+   makes a JSON block read as one flat run of grey. Same for
+   hljs-title.function_ / hljs-params, which carry Python and Go signatures. */
+.hljs-comment, .hljs-quote { color: #8d95a6; font-style: italic; }                            /* 6.37:1 */
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-section, .hljs-doctag,
+.hljs-name, .hljs-tag, .hljs-type { color: #ffb454; }                                         /* 10.87:1 */
+.hljs-string, .hljs-regexp, .hljs-symbol, .hljs-addition { color: #79d9a8; }                  /* 11.23:1 */
+.hljs-number, .hljs-bullet, .hljs-char.escape_, .hljs-selector-pseudo { color: #6bd4ff; }     /* 11.40:1 */
+.hljs-attr, .hljs-attribute, .hljs-property, .hljs-variable, .hljs-template-variable,
+.hljs-selector-id, .hljs-selector-class, .hljs-selector-attr { color: #ffe08a; }              /* 14.86:1 */
+.hljs-title, .hljs-title.class_, .hljs-title.function_, .hljs-function,
+.hljs-built_in { color: #c8a2ff; }                                                            /* 9.19:1 */
+.hljs-meta, .hljs-meta .hljs-keyword, .hljs-meta .hljs-string { color: #9fb0c4; }             /* 8.65:1 */
+.hljs-punctuation, .hljs-operator, .hljs-params, .hljs-subst { color: #adb4c2; }              /* 9.20:1 */
+.hljs-link { color: #79d9a8; text-decoration: underline; text-underline-offset: 2px; }
+.hljs-addition { background: rgba(110,220,140,.14); display: inline-block; width: 100%; }     /* 9.32:1 on the tinted row */
+.hljs-deletion { color: #ff9e8c; background: rgba(240,120,90,.15); display: inline-block; width: 100%; } /* 7.87:1 */
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 600; }
+
+/* ─────────────────────────── prev / next ──────────────────────────────── */
+.pager { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 56px;
+  padding-top: 26px; border-top: 1px solid var(--border-2); }
+.pager a { border: 1px solid var(--border); background: var(--panel); border-radius: 11px;
+  padding: 14px 17px; transition: .18s; }
+.pager a:hover { border-color: var(--gold-line); background: var(--surface); }
+.pager a span { display: block; font-family: var(--mono); font-size: 11px; letter-spacing: .13em;
+  text-transform: uppercase; color: var(--dim); margin-bottom: 4px; }
+.pager a b { font-size: 15.5px; color: var(--text); font-weight: 600; }
+.pager a.next { text-align: right; }
+.pager a.next:only-child { grid-column: 2; }
+
+.err { font-family: var(--mono); font-size: 13.5px; color: #ffb3a6;
+  background: rgba(224,80,60,.08); border: 1px solid rgba(224,80,60,.25);
+  padding: .9rem 1.1rem; border-radius: 10px; }
+.skeleton { display: grid; gap: 13px; max-width: 62ch; }
+.skeleton i { display: block; height: 13px; border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface), var(--elevated), var(--surface));
+  background-size: 220% 100%; animation: sk 1.3s linear infinite; }
+.skeleton i:nth-child(1) { width: 42%; height: 26px; }
+.skeleton i:nth-child(3) { width: 88%; }
+.skeleton i:nth-child(4) { width: 71%; }
+@keyframes sk { from { background-position: 120% 0 } to { background-position: -120% 0 } }
+
+.scrim { display: none; position: fixed; inset: var(--hdr) 0 0 0; z-index: 54;
+  background: rgba(4,5,7,.6); backdrop-filter: blur(2px); }
+.scrim.open { display: block; }
+/* Only while the drawer is open, and only set/cleared by openDrawer/closeDrawer
+   — which route() also calls, so a hash navigation can never strand it on. */
+body.drawer-open { overflow: hidden; }
+
+/* ───────────────────────── responsive ─────────────────────────────────────
+   Ordered last and at the same selector depth as the components they
+   override. A media query adds no specificity of its own: an earlier or
+   shallower rule would simply lose to `.side-col nav a { … }`. Every value
+   below was confirmed by reading getComputedStyle in the browser, not by
+   reading this file. */
+@media (max-width: 1420px) {
+  .shell { grid-template-columns: 246px minmax(0, 830px); gap: 0 34px; }
+  .rail { display: none; }
+}
+@media (max-width: 1120px) {
+  .shell { grid-template-columns: 228px minmax(0, 1fr); gap: 0 28px; }
+}
+@media (max-width: 1000px) {
+  .tnav { display: none; }
   .menu-btn { display: inline-flex; }
-  .shell { grid-template-columns: 1fr; gap: 1.25rem; padding-top: 78px; }
-  .sidebar { position: static; max-height: none; display: none; }
-  .sidebar.open { display: block; }
-  .md h1 { font-size: 1.6rem; }
-  .md h2 { font-size: 1.25rem; }
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0 20px 70px; }
+  .side-col {
+    position: fixed; inset: var(--hdr) auto 0 0; z-index: 55; width: min(320px, 86vw);
+    height: auto; background: var(--surface); border-right: 1px solid var(--border);
+    padding: 18px 16px 18px 20px; margin-right: 0;
+    transform: translateX(-102%); transition: transform .22s ease; visibility: hidden;
+  }
+  .side-col.open { transform: none; visibility: visible; }
+  .main { padding-top: 26px; }
+  .md { font-size: 15.5px; }
+  .md h2 { font-size: 22px; }
+  .md h3 { font-size: 18px; }
+}
+@media (max-width: 620px) {
+  .topbar { padding: 0 14px; gap: .7rem; }
+  .brand .tag { display: none; }
+  .shell { padding: 0 14px 60px; }
+  .pager { grid-template-columns: 1fr; }
+  .pager a.next:only-child { grid-column: 1; }
+  .doc-head h1 { font-size: 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  html { scroll-behavior: auto; }
 }
 
   /* ── Vulos suite chrome — identical on every product landing ───────────────
@@ -175,22 +395,32 @@ svg { display: block; }
   .vulos-foot img { display: block; width: 18px; height: 18px; border-radius: 5px; flex: 0 0 auto; }
 </style>
 <script src="./assets/vendor/marked.umd.js"></script>
+<script src="./assets/vendor/highlight.min.js"></script>
+<!-- Kerf fences 67 python and 7 ts/tsx blocks; neither grammar ships in the
+     suite's shared highlight bundle, so both are layered on here. Same
+     highlight.js 11.11.1, same esbuild recipe. -->
+<script src="./assets/vendor/highlight-extras.min.js"></script>
 </head>
 <body>
 
-<nav class="nav">
-  <a href="./index.html" class="nav-logo"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0a0b0d"/><rect x="7" y="6" width="3.5" height="20" fill="#ffd633"/><polygon points="10.5,16 26,6 26,13" fill="#ffd633"/><polygon points="10.5,16 26,19 26,26" fill="#ffd633"/></svg> kerf</a>
-  <div class="nav-links">
+<div id="progress"></div>
+
+<header class="topbar">
+  <a href="./index.html" class="brand"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0a0b0d"/><rect x="7" y="6" width="3.5" height="20" fill="#ffd633"/><polygon points="10.5,16 26,6 26,13" fill="#ffd633"/><polygon points="10.5,16 26,19 26,26" fill="#ffd633"/></svg> kerf<span class="tag">docs</span></a>
+  <button class="menu-btn" id="menuBtn" aria-label="Toggle docs menu" aria-expanded="false" aria-controls="sidebar">☰ menu</button>
+  <span class="sp"></span>
+  <div class="tnav">
     <a href="./index.html#domains">domains</a>
-    <a href="./index.html#features">features</a>
+    <a href="./index.html#capabilities">capabilities</a>
     <a href="./index.html#workshop">workshop</a>
     <a href="./index.html#install">install</a>
     <a href="./docs.html" class="here">docs</a>
-    <a href="https://github.com/vul-os/kerf" target="_blank" class="gh"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg> github</a>
+    <a href="https://github.com/vul-os/kerf" target="_blank" rel="noopener" class="gh"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg> github</a>
   </div>
-  <button class="menu-btn" id="menuBtn" aria-label="Toggle docs menu">☰ menu</button>
   <a class="vulos-home" href="https://vulos.org" target="_blank" rel="noopener" title="Vulos — open, self-hostable software" aria-label="Vulos — open, self-hostable software"><img src="./assets/vulos-logo.png" alt="" width="22" height="22"></a>
-</nav>
+</header>
+
+<div class="scrim" id="scrim"></div>
 
 <div class="shell">
   <!--
@@ -208,8 +438,13 @@ svg { display: block; }
     file this nav does not reference. It went ungated once and 30 of 58 files
     rotted, one of them still pointing readers at a doc deleted in bfdbd635.
   -->
-  <aside class="sidebar" id="sidebar">
-    <input class="search" id="search" type="text" placeholder="filter docs…" autocomplete="off" spellcheck="false">
+  <aside class="side-col" id="sidebar">
+    <div class="search">
+      <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
+      <input id="search" type="text" placeholder="filter docs…" autocomplete="off" spellcheck="false" aria-label="Filter documentation pages">
+      <kbd>/</kbd>
+    </div>
+    <nav aria-label="Documentation">
     <div class="grp">Get started</div>
     <a data-slug="concepts" href="#concepts">Concepts</a>
     <a data-slug="getting-started" href="#getting-started">Getting started</a>
@@ -224,7 +459,7 @@ svg { display: block; }
     <a data-slug="parametric" href="#parametric">Parametric design stack</a>
     <a data-slug="render-pipeline" href="#render-pipeline">Render pipeline</a>
     <div class="grp">The AI layer</div>
-    <a data-slug="tool-registry" href="#tool-registry">AI workflow & tools</a>
+    <a data-slug="tool-registry" href="#tool-registry">AI workflow &amp; tools</a>
     <a data-slug="llm-tools" href="#llm-tools">LLM tools (~150)</a>
     <a data-slug="llm-tools-catalogue" href="#llm-tools-catalogue">LLM tools catalogue</a>
     <a data-slug="llm-tool-authoring" href="#llm-tool-authoring">Authoring a tool</a>
@@ -236,14 +471,14 @@ svg { display: block; }
     <a data-slug="drawing-format" href="#drawing-format">.drawing sheets</a>
     <a data-slug="circuit-format" href="#circuit-format">.circuit.tsx</a>
     <a data-slug="part-format" href="#part-format">.part library</a>
-    <div class="grp">Modeling & geometry</div>
+    <div class="grp">Modeling &amp; geometry</div>
     <a data-slug="sketching" href="#sketching">Sketching</a>
     <a data-slug="assemblies" href="#assemblies">Assemblies</a>
     <a data-slug="drawings" href="#drawings">Drawings</a>
     <a data-slug="sheet-metal" href="#sheet-metal">Sheet metal</a>
     <a data-slug="surface-analysis" href="#surface-analysis">Surface analysis</a>
     <a data-slug="nurbs-surface-ops" href="#nurbs-surface-ops">NURBS surfaces</a>
-    <div class="grp">CAM & manufacturing</div>
+    <div class="grp">CAM &amp; manufacturing</div>
     <a data-slug="cam-layered" href="#cam-layered">Layered CAM (HSM)</a>
     <a data-slug="five-axis-cam" href="#five-axis-cam">Five-axis CAM</a>
     <a data-slug="flat-pattern-dxf" href="#flat-pattern-dxf">Flat-pattern DXF</a>
@@ -255,7 +490,7 @@ svg { display: block; }
     <a data-slug="electronics" href="#electronics">Electronics workflow</a>
     <a data-slug="electronics-authoring" href="#electronics-authoring">Authoring circuits</a>
     <a data-slug="schematic-editor" href="#schematic-editor">Schematic editor</a>
-    <a data-slug="electronics-drc-erc" href="#electronics-drc-erc">DRC & ERC</a>
+    <a data-slug="electronics-drc-erc" href="#electronics-drc-erc">DRC &amp; ERC</a>
     <div class="grp">Domains</div>
     <a data-slug="aerospace" href="#aerospace">Aerospace</a>
     <a data-slug="silicon" href="#silicon">Silicon / chips</a>
@@ -283,23 +518,23 @@ svg { display: block; }
     <div class="grp">What's new</div>
     <a data-slug="whats-new" href="#whats-new">What's new</a>
     <div class="nores" id="nores">no matches</div>
+    </nav>
   </aside>
-  <main class="main">
-    <div class="crumb" id="crumb"></div>
-    <article class="md" id="content"><span class="loading">Loading…</span></article>
-  </main>
-</div>
 
-<footer class="site-footer">
-  <div class="footer-inner">
-    <div class="footer-left"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0a0b0d"/><rect x="7" y="6" width="3.5" height="20" fill="#ffd633"/><polygon points="10.5,16 26,6 26,13" fill="#ffd633"/><polygon points="10.5,16 26,19 26,26" fill="#ffd633"/></svg> kerf</div>
-    <div class="footer-links">
-      <a href="./index.html">home</a>
-      <a href="https://github.com/vul-os/kerf" target="_blank">github</a>
-      <a class="vulos-foot" href="https://vulos.org" target="_blank" rel="noopener"><img src="./assets/vulos-logo.png" alt="" width="18" height="18"><span>Part of <strong>Vulos</strong> — open, self-hostable software</span></a>
+  <main class="main">
+    <div class="doc-head">
+      <div class="crumb" id="crumb">Docs</div>
+      <h1 id="docTitle">Documentation</h1>
     </div>
-  </div>
-</footer>
+    <article class="md" id="content"><div class="skeleton"><i></i><i></i><i></i><i></i></div></article>
+    <nav class="pager" id="pager" aria-label="Previous and next page"></nav>
+  </main>
+
+  <aside class="rail" id="rail" aria-label="On this page">
+    <div class="label">On this page</div>
+    <div class="toc" id="toc"></div>
+  </aside>
+</div>
 
 <script>
 const DOCS = [
@@ -362,103 +597,347 @@ const DOCS = [
   {"slug":"troubleshooting","title":"Troubleshooting"},
   {"slug":"whats-new","title":"What's new"}
 ];
-const bySlug = Object.fromEntries(DOCS.map(d => [d.slug, d]));
-const content = document.getElementById('content');
-const crumb = document.getElementById('crumb');
-const sidebar = document.getElementById('sidebar');
+const bySlug = Object.fromEntries(DOCS.map((d, i) => [d.slug, Object.assign({ index: i }, d)]));
+
+const content  = document.getElementById('content');
+const crumb    = document.getElementById('crumb');
+const docTitle = document.getElementById('docTitle');
+const sidebar  = document.getElementById('sidebar');
+const sideNav  = sidebar.querySelector('nav');
+const rail     = document.getElementById('rail');
+const tocBox   = document.getElementById('toc');
+const pager    = document.getElementById('pager');
+const scrim    = document.getElementById('scrim');
+const menuBtn  = document.getElementById('menuBtn');
+const progress = document.getElementById('progress');
 
 if (window.marked && marked.setOptions) marked.setOptions({ gfm: true, breaks: false });
 
-function slugifyHeading(t) {
-  return t.toLowerCase().trim()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
+/* ── language resolution ───────────────────────────────────────────────────
+   A fence name is not always a grammar name. The vendored highlight.js 11.11.1
+   registers most of these aliases itself, but the alias table is part of the
+   BUNDLE, not of highlight.js core — a future re-vendor that drops the
+   registerAliases() calls would silently un-highlight every `toml`, `sh` and
+   `jsonc` block on the site. This map makes the mapping the page's own
+   property, checked ahead of hljs so it holds either way.
+
+   `st` (IEC 61131-3 Structured Text, 2 blocks in plc.md) has no grammar in
+   any bundle. It stays plain, which is the correct rendering, not a gap. */
+const LANG_ALIAS = {
+  jsonc: 'json', json5: 'json',
+  toml: 'ini', cfg: 'ini', conf: 'ini', env: 'ini', dotenv: 'ini',
+  sh: 'bash', zsh: 'bash', shell: 'bash', console: 'bash', 'shell-session': 'bash',
+  yml: 'yaml',
+  html: 'xml', svg: 'xml', vue: 'xml',
+  js: 'javascript', mjs: 'javascript', cjs: 'javascript', jsx: 'javascript',
+  ts: 'typescript', tsx: 'typescript', mts: 'typescript',
+  py: 'python', python3: 'python',
+  golang: 'go', postgres: 'sql', psql: 'sql', docker: 'dockerfile', patch: 'diff',
+};
+function resolveLang(raw) {
+  if (!raw || !window.hljs) return null;
+  const l = raw.toLowerCase();
+  const mapped = LANG_ALIAS[l] || l;
+  const g = hljs.getLanguage(mapped);
+  if (!g) return null;
+  // `plaintext` is a registered grammar that emits no tokens, so running it
+  // produces markup identical to not highlighting at all. Treating it as
+  // "highlighted" would let a ```text fence claim colour it can never have,
+  // and would make the gate's tokenisation count unfalsifiable.
+  // Compared by IDENTITY, not by name: hljs registers `text` and `txt` as
+  // aliases of plaintext itself, so a string test on the fence name misses
+  // them and 8 blocks came back claiming a grammar they could never colour.
+  if (g === hljs.getLanguage('plaintext')) return null;
+  return mapped;
+}
+
+const slugify = s => s.toLowerCase().trim()
+  .replace(/[`*_~]/g, '').replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-');
+
+/* ── markdown post-processing ─────────────────────────────────────────────── */
+function enhance(root, slug) {
+  // 1 · heading ids + anchors, collected into the on-this-page rail
+  const toc = [], seen = new Set();
+  root.querySelectorAll('h2, h3').forEach(h => {
+    let id = slugify(h.textContent) || 'section';
+    let n = 2; while (seen.has(id)) id = (slugify(h.textContent) || 'section') + '-' + n++;
+    seen.add(id); h.id = id;
+    const a = document.createElement('a');
+    a.className = 'anchor'; a.href = '#' + slug + '/' + id; a.textContent = '#';
+    a.setAttribute('aria-label', 'Link to this section');
+    h.appendChild(a);
+    toc.push({ id, text: h.textContent.replace(/#$/, '').trim(), level: h.tagName === 'H3' ? 3 : 2 });
+  });
+  root.querySelectorAll('h4, h5, h6').forEach(h => {
+    if (!h.id) h.id = slugify(h.textContent) || '';
+  });
+
+  // 2 · code blocks — language chip, copy button, syntax highlighting
+  root.querySelectorAll('pre > code').forEach(code => {
+    const pre = code.parentElement;
+    const cls = [...code.classList].find(c => c.startsWith('language-')) || '';
+    const raw = cls.replace('language-', '').toLowerCase();
+    const lang = resolveLang(raw);
+    const box = document.createElement('div');
+    box.className = 'code';
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    const chip = document.createElement('span');
+    chip.className = 'lang' + (lang ? '' : ' plain');
+    chip.textContent = raw || 'text';
+    const sp = document.createElement('span'); sp.className = 'sp';
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'copy'; btn.textContent = 'Copy';
+    btn.setAttribute('aria-label', 'Copy this code block');
+    bar.append(chip, sp, btn);
+    pre.replaceWith(box);
+    box.append(bar, pre);
+    if (window.hljs) {
+      try {
+        if (lang) {
+          code.innerHTML = hljs.highlight(code.textContent, { language: lang, ignoreIllegals: true }).value;
+          code.classList.add('hljs');
+        } else {
+          code.classList.add('hljs');   // ground + default ink, no token colours
+        }
+      } catch (e) { code.classList.add('hljs'); }
+    }
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(code.innerText);
+        btn.textContent = 'Copied'; btn.classList.add('done');
+      } catch (e) { btn.textContent = 'Ctrl+C'; }
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('done'); }, 1600);
+    });
+  });
+
+  // 3 · tables scroll inside their own frame, never the page
+  root.querySelectorAll('table').forEach(t => {
+    const w = document.createElement('div'); w.className = 'table-wrap';
+    t.replaceWith(w); w.appendChild(t);
+  });
+
+  // 4 · cross-document links.
+  //     The corpus carries 164 relative `./thing.md` links. Left alone they
+  //     navigate the browser to a raw markdown file — or to a 404, for the
+  //     docs this site does not carry. Published targets become in-page
+  //     routes; unpublished ones go to the file on GitHub rather than
+  //     nowhere.
+  root.querySelectorAll('a[href]').forEach(a => {
+    const h = a.getAttribute('href') || '';
+    if (/^(https?:|#|mailto:)/i.test(h)) return;
+    const m = h.match(/([^\/]+)\.md(#.*)?$/i);
+    if (!m) return;
+    const target = bySlug[m[1].toLowerCase()];
+    if (target) {
+      a.setAttribute('href', '#' + target.slug + (m[2] ? '/' + m[2].slice(1) : ''));
+    } else {
+      a.setAttribute('href', 'https://github.com/vul-os/kerf/blob/main/docs/' + h.replace(/^\.\//, ''));
+      a.target = '_blank'; a.rel = 'noopener';
+    }
+  });
+  root.querySelectorAll('a[href^="http"]').forEach(a => { a.target = '_blank'; a.rel = 'noopener'; });
+
+  root.querySelectorAll('img').forEach(i => i.setAttribute('loading', 'lazy'));
+  return toc;
+}
+
+function buildToc(toc, slug) {
+  tocBox.innerHTML = '';
+  if (!toc.length) { tocBox.innerHTML = '<div class="empty">No sections</div>'; return; }
+  const frag = document.createDocumentFragment();
+  toc.forEach(t => {
+    const a = document.createElement('a');
+    a.href = '#' + slug + '/' + t.id;
+    /* The two-line clamp lives on this inner span, not on the <a>. On the <a>
+       it clipped at the PADDING box, so the 5px of bottom padding sat inside
+       the visible area and painted the ascenders of the third line under the
+       ellipsis — two entries on the Concepts chapter measured scrollHeight 67
+       against clientHeight 48. The span has no padding, so its clip edge and
+       its last line box coincide. */
+    const txt = document.createElement('span');
+    txt.className = 'clamp';
+    txt.textContent = t.text;
+    a.appendChild(txt);
+    a.title = t.text;
+    a.dataset.target = t.id;
+    if (t.level === 3) a.className = 'lvl3';
+    frag.appendChild(a);
+  });
+  tocBox.appendChild(frag);
+}
+
+function buildPager(doc) {
+  pager.innerHTML = '';
+  const prev = DOCS[doc.index - 1], next = DOCS[doc.index + 1];
+  const cell = (d, kind) => {
+    const a = document.createElement('a');
+    a.className = kind; a.href = '#' + d.slug;
+    a.innerHTML = '<span>' + (kind === 'prev' ? 'Previous' : 'Next') + '</span><b></b>';
+    a.querySelector('b').textContent = d.title;
+    return a;
+  };
+  if (prev) pager.appendChild(cell(prev, 'prev'));
+  if (next) pager.appendChild(cell(next, 'next'));
 }
 
 function setActive(slug) {
-  document.querySelectorAll('.sidebar a').forEach(a =>
+  sideNav.querySelectorAll('a[data-slug]').forEach(a =>
     a.classList.toggle('active', a.dataset.slug === slug));
-  const on = document.querySelector('.sidebar a.active');
-  if (on && sidebar.scrollHeight > sidebar.clientHeight) {
-    const r = on.getBoundingClientRect(), sr = sidebar.getBoundingClientRect();
-    if (r.top < sr.top || r.bottom > sr.bottom) on.scrollIntoView({ block: 'center' });
+  const on = sideNav.querySelector('a.active');
+  if (on && sideNav.scrollHeight > sideNav.clientHeight) {
+    const r = on.getBoundingClientRect(), sr = sideNav.getBoundingClientRect();
+    if (r.top < sr.top + 4 || r.bottom > sr.bottom - 4) {
+      sideNav.scrollTop += (r.top - sr.top) - sideNav.clientHeight / 2 + r.height / 2;
+    }
   }
 }
 
+/* YAML front matter is metadata for the docs build, not prose. Rendered it
+   came out as a horizontal rule followed by a paragraph of `title: "…"`. */
+const stripFrontMatter = md => md.replace(/^﻿?---\r?\n[\s\S]*?\r?\n---\r?\n/, '');
+
+let reqId = 0;
 async function load(slug, heading) {
-  const doc = bySlug[slug] || DOCS[0];
+  const doc = bySlug[slug] || bySlug[DOCS[0].slug];
+  const mine = ++reqId;
   setActive(doc.slug);
-  crumb.innerHTML = 'Docs <span style="opacity:.5">/</span> <b>' + doc.title + '</b>';
-  content.innerHTML = '<span class="loading">Loading…</span>';
+  /* `opacity:.45` flattened the separator to 2.03:1. It is a structural
+     delimiter, not decoration, so it gets a colour that clears AA on its own. */
+  crumb.innerHTML = 'Docs <span class="sep">/</span> <b></b>';
+  crumb.querySelector('b').textContent = doc.title;
+  docTitle.textContent = doc.title;
+  content.innerHTML = '<div class="skeleton"><i></i><i></i><i></i><i></i></div>';
+  tocBox.innerHTML = '';
   try {
     const res = await fetch('./docs/' + doc.slug + '.md', { cache: 'no-cache' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const md = await res.text();
+    let md = stripFrontMatter(await res.text());
+    if (mine !== reqId) return;                 // a newer navigation won
+    // Promote the document's own H1 into the page header.
+    const h1 = md.match(/^#\s+(.+?)\s*$/m);
+    if (h1) docTitle.textContent = h1[1].replace(/[`*]/g, '');
     content.innerHTML = marked.parse(md);
-    // heading anchors + ids
-    const seen = {};
-    content.querySelectorAll('h1,h2,h3,h4').forEach(h => {
-      let id = slugifyHeading(h.textContent);
-      if (!id) return;
-      if (seen[id] != null) { seen[id]++; id = id + '-' + seen[id]; } else seen[id] = 0;
-      h.id = id;
-      const a = document.createElement('a');
-      a.className = 'anchor'; a.href = '#' + doc.slug + '#' + id; a.textContent = '#';
-      a.setAttribute('aria-label', 'Link to this section');
-      h.appendChild(a);
-    });
-    // external links open in a new tab
-    content.querySelectorAll('a[href^="http"]').forEach(a => { a.target = '_blank'; a.rel = 'noopener'; });
+    const toc = enhance(content, doc.slug);
+    buildToc(toc, doc.slug);
+    buildPager(doc);
+    spy();
     if (heading) {
       const el = document.getElementById(heading);
       if (el) { el.scrollIntoView(); return; }
     }
     window.scrollTo({ top: 0 });
   } catch (err) {
+    if (mine !== reqId) return;
     content.innerHTML = '<div class="err">Could not load <code>' + doc.slug + '.md</code> — ' + err.message + '</div>';
+    buildToc([], doc.slug); buildPager(doc);
   }
 }
 
+/* ── routing: #slug and #slug/heading ─────────────────────────────────────── */
 function route() {
-  const raw = (location.hash || '').replace(/^#/, '');
-  const parts = raw.split('#');
+  const raw = decodeURIComponent((location.hash || '').replace(/^#/, ''));
+  const parts = raw.split('/');
   const slug = parts[0] || DOCS[0].slug;
   if (bySlug[slug]) {
+    if (currentSlug === slug && parts[1]) {
+      const el = document.getElementById(parts[1]);
+      if (el) { el.scrollIntoView(); currentHash = location.hash; return; }
+    }
+    currentSlug = slug;
     load(slug, parts[1]);
   } else if (raw) {
-    // in-page anchor within the current doc
     const el = document.getElementById(raw);
-    if (el) el.scrollIntoView(); else load(DOCS[0].slug);
+    if (el) el.scrollIntoView(); else { currentSlug = DOCS[0].slug; load(DOCS[0].slug); }
   } else {
+    currentSlug = DOCS[0].slug;
     load(DOCS[0].slug);
   }
-  if (window.matchMedia('(max-width:860px)').matches) sidebar.classList.remove('open');
+  closeDrawer();
 }
-
+let currentSlug = null, currentHash = null;
 window.addEventListener('hashchange', route);
 route();
 
-// mobile menu + search filter
-document.getElementById('menuBtn').addEventListener('click', () => sidebar.classList.toggle('open'));
+/* ── scroll spy + reading progress ────────────────────────────────────────── */
+let spyTargets = [];
+function spy() {
+  spyTargets = [...tocBox.querySelectorAll('a')].map(a => ({
+    a, el: document.getElementById(a.dataset.target),
+  })).filter(t => t.el);
+  onScroll();
+}
+function onScroll() {
+  const h = document.documentElement;
+  const max = h.scrollHeight - h.clientHeight;
+  progress.style.width = (max > 0 ? Math.min(100, (h.scrollTop / max) * 100) : 0) + '%';
+  if (!spyTargets.length) return;
+  const line = 110;
+  let best = spyTargets[0];
+  for (const t of spyTargets) { if (t.el.getBoundingClientRect().top <= line) best = t; else break; }
+  spyTargets.forEach(t => t.a.classList.toggle('active', t === best));
+  const on = tocBox.querySelector('a.active');
+  if (on && tocBox.scrollHeight > tocBox.clientHeight) {
+    const r = on.getBoundingClientRect(), br = tocBox.getBoundingClientRect();
+    if (r.top < br.top || r.bottom > br.bottom) {
+      tocBox.scrollTop += (r.top - br.top) - tocBox.clientHeight / 2 + r.height / 2;
+    }
+  }
+}
+window.addEventListener('scroll', onScroll, { passive: true });
+window.addEventListener('resize', onScroll, { passive: true });
+
+/* ── mobile drawer ────────────────────────────────────────────────────────── */
+/* The drawer is a fixed overlay with a scrim, and until this class the article
+   underneath still scrolled behind it: dragging anywhere on the scrim moved the
+   page, so closing the drawer landed you somewhere else in the chapter. */
+function openDrawer() {
+  sidebar.classList.add('open'); scrim.classList.add('open');
+  document.body.classList.add('drawer-open');
+  menuBtn.setAttribute('aria-expanded', 'true');
+}
+function closeDrawer() {
+  sidebar.classList.remove('open'); scrim.classList.remove('open');
+  document.body.classList.remove('drawer-open');
+  menuBtn.setAttribute('aria-expanded', 'false');
+}
+menuBtn.addEventListener('click', () =>
+  sidebar.classList.contains('open') ? closeDrawer() : openDrawer());
+scrim.addEventListener('click', closeDrawer);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeDrawer(); search.blur(); }
+  if (e.key === '/' && document.activeElement !== search) {
+    e.preventDefault();
+    if (window.matchMedia('(max-width:1000px)').matches) openDrawer();
+    search.focus(); search.select();
+  }
+});
+
+/* ── sidebar filter ───────────────────────────────────────────────────────── */
 const search = document.getElementById('search');
 const nores = document.getElementById('nores');
 search.addEventListener('input', () => {
   const q = search.value.trim().toLowerCase();
   let anyVisible = false;
-  const groups = [...sidebar.querySelectorAll('.grp')];
-  sidebar.querySelectorAll('a[data-slug]').forEach(a => {
+  sideNav.querySelectorAll('a[data-slug]').forEach(a => {
     const show = !q || a.textContent.toLowerCase().includes(q) || a.dataset.slug.includes(q);
     a.style.display = show ? '' : 'none';
     if (show) anyVisible = true;
   });
-  // hide group headers with no visible items
-  groups.forEach(g => {
+  sideNav.querySelectorAll('.grp').forEach(g => {
     let n = g.nextElementSibling, vis = false;
-    while (n && !n.classList.contains('grp')) { if (n.matches('a') && n.style.display !== 'none') vis = true; n = n.nextElementSibling; }
+    while (n && !n.classList.contains('grp')) {
+      if (n.matches('a') && n.style.display !== 'none') vis = true;
+      n = n.nextElementSibling;
+    }
     g.style.display = vis ? '' : 'none';
   });
   nores.style.display = anyVisible ? 'none' : 'block';
+});
+search.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const first = [...sideNav.querySelectorAll('a[data-slug]')].find(a => a.style.display !== 'none');
+  if (first) location.hash = '#' + first.dataset.slug;
 });
 </script>
 </body>

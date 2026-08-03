@@ -132,7 +132,7 @@ route_with_shove       — shove-router: push existing traces out of the way
 
 Set trace widths and clearances per net class:
 
-```
+```python
 define_net_class("Power", width_mils=40, clearance_mils=12)
 assign_net_to_class("VCC", "Power")
 assign_net_to_class("GND", "Power")
@@ -143,7 +143,7 @@ get_effective_net_rules   — verify which rules apply to a net
 
 For high-speed signals:
 
-```
+```python
 set_trace_target_length("USB_DP", target_mm=45.0, tolerance_mm=0.5)
 tune_trace_to_target      — meander the trace to hit the target length
 match_diff_pair           — equalise length within a differential pair
@@ -275,7 +275,7 @@ the file.
 
 A complete USB 2.0 differential pair workflow from chat:
 
-```
+```python
 add_differential_pair("USB_DP", "USB_DM")
 define_net_class("USB", width_mils=7, clearance_mils=7, diff_spacing_mils=7)
 assign_net_to_class("USB_DP", "USB")

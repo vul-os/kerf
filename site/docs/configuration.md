@@ -66,7 +66,7 @@ Set `url` to a standard `postgres://` connection string to switch to the
 **Postgres scale backend** (teams / always-on / multi-node). Override either way
 with the `DATABASE_URL` environment variable — it takes precedence when set.
 
-```
+```ini
 # Scale mode; if the Postgres role matches your system username:
 DATABASE_URL=postgres://pc@localhost:5432/kerf?sslmode=disable
 ```

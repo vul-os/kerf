@@ -21,7 +21,12 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (p) => readFileSync(join(root, p), 'utf8')
 
 const PAGE_SRC = read('components/GdsLayoutPage.jsx')
-const LOADER_SRC = read('lib/gdsLoader.js')
+// Source-text inspection reads the module off disk by literal path, so this
+// tracks the file's real extension. gdsLoader migrated to TypeScript in T-502.
+// (The `.js` import specifier asserted further down is unrelated and still
+// correct — importers keep `.js` specifiers, which resolve to `.ts` under
+// moduleResolution: bundler.)
+const LOADER_SRC = read('lib/gdsLoader.ts')
 
 // ---------------------------------------------------------------------------
 // Upload affordance

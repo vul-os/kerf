@@ -227,9 +227,26 @@ export const ST_LANGUAGE_CONFIG = {
 // ---------------------------------------------------------------------------
 
 /**
+ * The slice of the Monaco module surface `registerSTLanguage()` actually calls.
+ * Typed as a purpose-built interface (not `import('monaco-editor').Monaco`,
+ * the full module namespace) so both the real Monaco instance (passed through
+ * an untyped .jsx boundary — CodeEditor.jsx et al. aren't type-checked) and a
+ * minimal test double satisfy it structurally, without pulling in Monaco's
+ * entire ~20-member module surface for four method calls.
+ *
+ * @typedef {object} MonacoLanguagesLike
+ * @property {object} languages
+ * @property {(language: {id: string, extensions?: string[], aliases?: string[], mimetypes?: string[]}) => unknown} languages.register
+ * @property {() => Array<{id: string}>} languages.getLanguages
+ * @property {(languageId: string, provider: unknown) => unknown} languages.setMonarchTokensProvider
+ * @property {(languageId: string, configuration: unknown) => unknown} languages.setLanguageConfiguration
+ */
+
+/**
  * Register the IEC 61131-3 ST language with a Monaco instance.
  *
- * @param {import('monaco-editor')} monaco - The Monaco editor instance.
+ * @param {MonacoLanguagesLike} monaco - The Monaco editor instance (or a test double
+ *   implementing the same `languages.*` surface).
  * @param {object} [opts]
  * @param {string} [opts.languageId] - Override the language ID (default: 'iec61131-st').
  */

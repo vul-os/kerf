@@ -1,3 +1,6 @@
+// stMonacoLanguage.test.ts — Vitest suite for the IEC 61131-3 ST Monarch
+// tokenizer, language configuration, and Monaco registration helper.
+
 import { describe, it, expect } from 'vitest'
 import {
   ST_LANGUAGE_ID,
@@ -140,7 +143,6 @@ describe('ST_MONARCH_TOKENS', () => {
     const rootRules = ST_MONARCH_TOKENS.tokenizer.root
     const hasStringRule = rootRules.some((rule) => {
       if (!Array.isArray(rule)) return false
-      const pattern = rule[0]
       const token = rule[1]
       const isStringToken = token === 'string' || (typeof token === 'string' && token.startsWith('string'))
       return isStringToken
@@ -232,26 +234,34 @@ describe('ST_LANGUAGE_CONFIG', () => {
 // registerSTLanguage — smoke test with a mock Monaco instance
 // ---------------------------------------------------------------------------
 
+/** A registered language spec, as passed to `monaco.languages.register()`. */
+interface LanguageSpec {
+  id: string
+  extensions?: string[]
+  aliases?: string[]
+  mimetypes?: string[]
+}
+
+/** The mock Monaco instance's recorded-call surface, exposed for assertions via its `_*` fields. */
+interface MockMonaco {
+  languages: {
+    register(spec: LanguageSpec): number
+    getLanguages(): { id: string }[]
+    setMonarchTokensProvider(id: string, tokens: unknown): number
+    setLanguageConfiguration(id: string, cfg: unknown): number
+  }
+  _registrations: LanguageSpec[]
+  _monarchProviders: { id: string; tokens: unknown }[]
+  _langConfigs: { id: string; cfg: unknown }[]
+}
+
 describe('registerSTLanguage', () => {
-  function makeMockMonaco(preRegistered = false) {
-    const registrations = []
-    const monarchProviders = []
-    const langConfigs = []
+  function makeMockMonaco(preRegistered = false): MockMonaco {
+    const registrations: LanguageSpec[] = []
+    const monarchProviders: { id: string; tokens: unknown }[] = []
+    const langConfigs: { id: string; cfg: unknown }[] = []
 
-    const languages = [
-      { register: (spec) => registrations.push(spec) },
-      {
-        getLanguages: () => (preRegistered ? [{ id: ST_LANGUAGE_ID }] : []),
-      },
-      {
-        setMonarchTokensProvider: (id, tokens) => monarchProviders.push({ id, tokens }),
-      },
-      {
-        setLanguageConfiguration: (id, cfg) => langConfigs.push({ id, cfg }),
-      },
-    ]
-
-    const monaco = {
+    const monaco: MockMonaco = {
       languages: {
         register: (spec) => registrations.push(spec),
         getLanguages: () => (preRegistered ? [{ id: ST_LANGUAGE_ID }] : []),

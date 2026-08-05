@@ -254,6 +254,107 @@ def _teardrop_for_pad_via(pad_or_via, trace, radius_factor=1.5):
     ]
 
 
+# ─── T-536: canonical flat Circuit-JSON pour lookup ────────────────────────────
+#
+# Kerf's canonical pour shape (see kicad_io.py, fab/gerber.py, fab/odbpp/writer.py)
+# is a flat Circuit-JSON element — `pcb_copper_pour` (net-bound) or
+# `pcb_ground_plane` (no-net) — identified by `pcb_copper_pour_id` /
+# `pcb_ground_plane_id`, carrying `layer`/`polygon`/`clearance_mm`/etc. This
+# module previously only understood a structurally different convention:
+# `circuit_json['pcb_board']['copper_pour']`, a list keyed by `pour_id`. That
+# nested-dict shape is preserved below as a **shim** for existing callers (its
+# own registered ToolSpec + tests) but is no longer how pours are read
+# elsewhere in the codebase; new callers should pass the flat array.
+
+def _find_pour_polygon_flat(circuit_json: list, pour_id: str) -> list | None:
+    """Resolve *pour_id* against `pcb_copper_pour_id` / `pcb_ground_plane_id`
+    in a canonical flat Circuit-JSON array. Returns the polygon or None."""
+    for el in circuit_json:
+        if not isinstance(el, dict):
+            continue
+        t = el.get('type')
+        if t == 'pcb_copper_pour' and el.get('pcb_copper_pour_id') == pour_id:
+            return el.get('polygon', [])
+        if t == 'pcb_ground_plane' and el.get('pcb_ground_plane_id') == pour_id:
+            return el.get('polygon', [])
+    return None
+
+
+def _run_stitching_strategy(strategy, polygon, pitch_mm, via_spec_full, edge_offset_mm):
+    """Shared strategy dispatch. Returns (vias, error_message_or_None)."""
+    if strategy == 'grid':
+        return _grid_stitching(polygon, pitch_mm, via_spec_full, edge_offset_mm), None
+    elif strategy == 'perimeter':
+        return _perimeter_stitching(polygon, pitch_mm, via_spec_full, edge_offset_mm), None
+    elif strategy == 'hex':
+        return _hex_stitching(polygon, pitch_mm, via_spec_full, edge_offset_mm), None
+    return None, f"Unknown strategy: {strategy}"
+
+
+def _add_via_stitching_flat(circuit_json, pour_or_poly, pitch_mm, net_id,
+                             strategy, via_spec, edge_offset_mm):
+    """Canonical-shape (T-536) implementation: operates on the flat
+    Circuit-JSON array, resolving pours by `pcb_copper_pour_id` /
+    `pcb_ground_plane_id` and emitting stitching vias as ordinary `pcb_via`
+    elements plus one `pcb_via_stitching` metadata element (so
+    remove_via_stitching can undo the operation without a nested board dict).
+    """
+    import copy
+    circuit_json = copy.deepcopy(circuit_json)
+
+    if isinstance(pour_or_poly, str):
+        polygon = _find_pour_polygon_flat(circuit_json, pour_or_poly)
+        if polygon is None:
+            return err_payload(f"Copper pour {pour_or_poly} not found", "NOT_FOUND")
+    else:
+        polygon = pour_or_poly
+
+    via_spec_full = {
+        'diameter': via_spec.get('diameter', 0.8),
+        'drill': via_spec.get('drill', 0.4),
+        'net_id': net_id
+    }
+
+    vias, err = _run_stitching_strategy(strategy, polygon, pitch_mm, via_spec_full, edge_offset_mm)
+    if err:
+        return err_payload(err, "BAD_ARGS")
+
+    pour_id = pour_or_poly if isinstance(pour_or_poly, str) else None
+    existing_groups = sum(
+        1 for e in circuit_json
+        if isinstance(e, dict) and e.get('type') == 'pcb_via_stitching'
+    )
+    stitch_id = f"via_stitching_{pour_id or 'polygon'}_{existing_groups}"
+
+    via_ids = []
+    for i, v in enumerate(vias):
+        via_el_id = f"{stitch_id}_via{i}"
+        via_ids.append(via_el_id)
+        circuit_json.append({
+            'type': 'pcb_via',
+            'pcb_via_id': via_el_id,
+            'x': v['x'],
+            'y': v['y'],
+            'outer_diameter': v['diameter'],
+            'drill_diameter': v['drill'],
+            'net_id': v['net_id'],
+            'from_layer': 'top_copper',
+            'to_layer': 'bottom_copper',
+            'pour_id': pour_id,
+        })
+
+    circuit_json.append({
+        'type': 'pcb_via_stitching',
+        'pcb_via_stitching_id': stitch_id,
+        'pour_id': pour_id,
+        'strategy': strategy,
+        'pitch_mm': pitch_mm,
+        'via_ids': via_ids,
+    })
+
+    return ok_payload({'circuit_json': circuit_json})
+
+
 @register(ADD_VIA_STITCHING_SPEC, write=True)
 async def add_via_stitching(ctx, args):
     try:
@@ -272,6 +373,16 @@ async def add_via_stitching(ctx, args):
     if not circuit or not pour_or_poly or not pitch_mm or not net_id or not via_spec:
         return err_payload("Missing required fields", "BAD_ARGS")
 
+    # T-536: canonical flat Circuit-JSON array.
+    if isinstance(circuit, list):
+        return _add_via_stitching_flat(circuit, pour_or_poly, pitch_mm, net_id,
+                                        strategy, via_spec, edge_offset_mm)
+
+    # ── Shim: legacy `{'pcb_board': {'copper_pour': [...]}}` shape ──────────
+    # Kept for existing callers of this tool; not the canonical pour shape
+    # used elsewhere (kicad_io.py, fab/gerber.py, fab/odbpp/writer.py). See
+    # T-536 in tasks.md — deferred work: retire once callers move to the
+    # flat array.
     board = circuit.get('pcb_board') or circuit.get('board')
     if not board:
         return err_payload("No pcb_board found", "BAD_ARGS")
@@ -296,14 +407,9 @@ async def add_via_stitching(ctx, args):
         'net_id': net_id
     }
 
-    if strategy == 'grid':
-        vias = _grid_stitching(polygon, pitch_mm, via_spec_full, edge_offset_mm)
-    elif strategy == 'perimeter':
-        vias = _perimeter_stitching(polygon, pitch_mm, via_spec_full, edge_offset_mm)
-    elif strategy == 'hex':
-        vias = _hex_stitching(polygon, pitch_mm, via_spec_full, edge_offset_mm)
-    else:
-        return err_payload(f"Unknown strategy: {strategy}", "BAD_ARGS")
+    vias, err = _run_stitching_strategy(strategy, polygon, pitch_mm, via_spec_full, edge_offset_mm)
+    if err:
+        return err_payload(err, "BAD_ARGS")
 
     if 'via_stitching' not in board:
         board['via_stitching'] = []
@@ -387,6 +493,22 @@ async def remove_via_stitching(ctx, args):
 
     import copy
     circuit = copy.deepcopy(circuit)
+
+    # T-536: canonical flat Circuit-JSON array — undo via `pcb_via_stitching`
+    # metadata elements rather than a nested board dict.
+    if isinstance(circuit, list):
+        remove_ids = set()
+        for e in circuit:
+            if isinstance(e, dict) and e.get('type') == 'pcb_via_stitching' and e.get('pour_id') == pour_id:
+                remove_ids.update(e.get('via_ids', []))
+        circuit = [
+            e for e in circuit
+            if not (isinstance(e, dict) and e.get('type') == 'pcb_via' and e.get('pcb_via_id') in remove_ids)
+            and not (isinstance(e, dict) and e.get('type') == 'pcb_via_stitching' and e.get('pour_id') == pour_id)
+        ]
+        return ok_payload({'circuit_json': circuit})
+
+    # ── Shim: legacy `{'pcb_board': {'via_stitching': [...]}}` shape (T-536) ──
     board = circuit.get('pcb_board') or circuit.get('board')
     if not board:
         return err_payload("No pcb_board found", "BAD_ARGS")

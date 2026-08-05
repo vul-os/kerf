@@ -1,4 +1,4 @@
-// thermalNetworkLayout.js — Force-directed layout for thermal network graphs.
+// thermalNetworkLayout.ts — Force-directed layout for thermal network graphs.
 //
 // Usage:
 //   import { layoutNodes, temperatureToRgb } from './thermalNetworkLayout.js'
@@ -34,10 +34,9 @@ const DEFAULT_LINK_LENGTH = 120
  * mulberry32 — fast, good-quality 32-bit PRNG seeded with a single integer.
  * Returns a function `next()` that yields floats in [0, 1).
  *
- * @param {number} seed — unsigned 32-bit integer seed
- * @returns {() => number}
+ * @param seed — unsigned 32-bit integer seed
  */
-function mulberry32(seed) {
+function mulberry32(seed: number): () => number {
   let s = seed >>> 0
   return function next() {
     s += 0x6d2b79f5
@@ -52,6 +51,29 @@ function mulberry32(seed) {
 // layoutNodes
 // ---------------------------------------------------------------------------
 
+/** A thermal network node — only `id` is load-bearing here; callers attach whatever else they need. */
+export interface ThermalNode {
+  id: string
+  [key: string]: unknown
+}
+
+/** A thermal network link between two node ids, with an optional spring rest length. */
+export interface ThermalLink {
+  from_id: string
+  to_id: string
+  natural_length?: number
+  [key: string]: unknown
+}
+
+/** A single node's resolved 2D position (SVG pixel space). */
+export interface NodePosition {
+  x: number
+  y: number
+}
+
+/** `layoutNodes()`'s return: every input node's `id` mapped to its resolved position. */
+export type NodeLayout = Record<string, NodePosition>
+
 /**
  * layoutNodes — force-directed placement of thermal network nodes.
  *
@@ -63,24 +85,22 @@ function mulberry32(seed) {
  * The simulation is seeded so the same (nodes, links) input always produces
  * the same layout (deterministic).
  *
- * @param {Array<{id: string, [rest]: any}>} nodes
+ * @param nodes
  *   Array of node objects. Each must have a unique string `id`.
  *
- * @param {Array<{from_id: string, to_id: string, natural_length?: number, [rest]: any}>} links
+ * @param links
  *   Array of link objects. Each must have `from_id` and `to_id` matching node
  *   ids. An optional `natural_length` (SVG pixels) sets the spring rest length;
  *   defaults to DEFAULT_LINK_LENGTH.
  *
- * @param {number} [iterations=100]
+ * @param iterations
  *   Number of simulation steps. More iterations → better convergence but
  *   proportionally more work.
  *
- * @param {number} [seed=42]
+ * @param seed
  *   Seed for the initial position PRNG. Same seed → same output.
- *
- * @returns {{ [node_id: string]: { x: number, y: number } }}
  */
-export function layoutNodes(nodes, links, iterations = 100, seed = 42) {
+export function layoutNodes(nodes: ThermalNode[], links: ThermalLink[], iterations = 100, seed = 42): NodeLayout {
   if (!Array.isArray(nodes) || nodes.length === 0) return {}
   if (!Array.isArray(links)) links = []
 
@@ -89,8 +109,8 @@ export function layoutNodes(nodes, links, iterations = 100, seed = 42) {
 
   // Initialise positions in a small circle so nodes don't start too far apart.
   const R0 = 100
-  const pos = {}
-  const vel = {}
+  const pos: NodeLayout = {}
+  const vel: Record<string, { x: number; y: number }> = {}
   nodes.forEach((node, i) => {
     const angle = (2 * Math.PI * i) / n + rng() * 0.1
     pos[node.id] = {
@@ -112,7 +132,7 @@ export function layoutNodes(nodes, links, iterations = 100, seed = 42) {
   // Run simulation
   for (let iter = 0; iter < iterations; iter++) {
     // Accumulate forces
-    const force = {}
+    const force: Record<string, { x: number; y: number }> = {}
     nodes.forEach(nd => { force[nd.id] = { x: 0, y: 0 } })
 
     // 1. Repulsion — O(n²) Coulomb pairs
@@ -188,12 +208,12 @@ export function layoutNodes(nodes, links, iterations = 100, seed = 42) {
  * inherently lower perceptual luminance than yellow.  The sequence is
  * designed to be visually distinctive and unambiguous (cool→warm).
  *
- * @param {number} temperature — the node's temperature (any units)
- * @param {number} tMin        — temperature mapped to 0 (coolest)
- * @param {number} tMax        — temperature mapped to 1 (hottest)
- * @returns {{ r: number, g: number, b: number }} — integers in [0, 255]
+ * @param temperature — the node's temperature (any units)
+ * @param tMin        — temperature mapped to 0 (coolest)
+ * @param tMax        — temperature mapped to 1 (hottest)
+ * @returns integers in [0, 255]
  */
-export function temperatureToRgb(temperature, tMin, tMax) {
+export function temperatureToRgb(temperature: number, tMin: number, tMax: number): { r: number; g: number; b: number } {
   // Clamp normalised position to [0, 1]
   let t = tMax === tMin ? 0.5 : (temperature - tMin) / (tMax - tMin)
   t = Math.max(0, Math.min(1, t))

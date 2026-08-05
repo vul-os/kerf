@@ -1,4 +1,4 @@
-// thermalNetworkLayout.test.js — vitest unit tests for the force-directed
+// thermalNetworkLayout.test.ts — vitest unit tests for the force-directed
 // thermal network layout helper and temperature colour helper.
 
 import { describe, it, expect } from 'vitest'
@@ -143,7 +143,7 @@ describe('layoutNodes — edge cases', () => {
 
 describe('temperatureToRgb — basic mapping', () => {
   it('maps the coldest temperature to a blue-dominant colour', () => {
-    const { r, g, b } = temperatureToRgb(0, 0, 100)
+    const { r, b } = temperatureToRgb(0, 0, 100)
     // At t=0 the stop is deep blue (26, 26, 255)
     expect(b).toBeGreaterThan(r)
     expect(b).toBeGreaterThan(200)
@@ -197,7 +197,7 @@ describe('temperatureToRgb — basic mapping', () => {
 
 describe('temperatureToRgb — monotonic luminance property', () => {
   // Perceptual luminance (rec. 709): L ≈ 0.2126R + 0.7152G + 0.0722B
-  function luminance({ r, g, b }) {
+  function luminance({ r, g, b }: { r: number; g: number; b: number }) {
     return 0.2126 * r + 0.7152 * g + 0.0722 * b
   }
 

@@ -1,7 +1,7 @@
 // TODO(parent): mount activeStyle's effect chain into Renderer.jsx EffectComposer
 
 /**
- * renderStyles.js — Render-style preset registry for the viewport.
+ * renderStyles.ts — Render-style preset registry for the viewport.
  *
  * Defines the six visual styles that the user can switch between in the
  * RenderStylePicker toolbar. Each style maps to either:
@@ -26,10 +26,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 
 // ── Registry ──────────────────────────────────────────────────────────────────
 
-/**
- * Ordered list of all supported render style names.
- * @type {string[]}
- */
+/** Ordered list of all supported render style names. */
 export const RENDER_STYLES = [
   'realistic',
   'cel',
@@ -153,10 +150,8 @@ void main() {
 /**
  * Build a Three.js ShaderMaterial that quantises Lambert diffuse into 3 bands
  * (dark / mid / highlight) for the Cel / toon look.
- *
- * @returns {THREE.ShaderMaterial}
  */
-function buildCelMaterial() {
+function buildCelMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     side: THREE.FrontSide,
     lights: true,
@@ -219,23 +214,20 @@ function buildCelMaterial() {
 // ── Material-replacement pass (wireframe / hidden-line) ──────────────────────
 
 /**
- * A lightweight descriptor for a material-replacement pass.  Renderer.jsx is
+ * A lightweight descriptor for a material-replacement pass. Renderer.jsx is
  * expected to walk scene.traverse() and swap materials on Mesh objects.
- *
- * @typedef {Object} MaterialReplacePass
- * @property {'material-replace'} type
- * @property {THREE.Material}     material   - Material to apply to every mesh.
- * @property {boolean}            hiddenLine - When true, also render back-faces
- *   with a dashed / lower-opacity material to indicate hidden edges.
  */
+export interface MaterialReplacePass {
+  type: 'material-replace'
+  /** Material to apply to every mesh. */
+  material: THREE.Material
+  /** Second back-face pass material, present only when `hiddenLine` is true. */
+  backMaterial: THREE.Material | null
+  /** When true, also render back-facing edges with a dashed / lower-opacity material. */
+  hiddenLine: boolean
+}
 
-/**
- * Build a wireframe material-replacement pass descriptor.
- *
- * @param {{ hiddenLine?: boolean }} opts
- * @returns {MaterialReplacePass}
- */
-function buildWireframePass({ hiddenLine = false } = {}) {
+function buildWireframePass({ hiddenLine = false }: { hiddenLine?: boolean } = {}): MaterialReplacePass {
   return {
     type: 'material-replace',
     material: new THREE.MeshBasicMaterial({
@@ -258,20 +250,45 @@ function buildWireframePass({ hiddenLine = false } = {}) {
 
 // ── getStylePass ──────────────────────────────────────────────────────────────
 
+/** A full-scene RenderPass stage, optionally paired with a Cel material to apply to meshes. */
+export interface RenderPassDescriptor {
+  type: 'render'
+  pass: RenderPass | { isRenderPass: true }
+  celMaterial?: THREE.ShaderMaterial
+}
+
+/** A full-screen ShaderPass post-processing stage. */
+export interface ShaderPassDescriptor {
+  type: 'shader'
+  pass: ShaderPass
+  name: string
+}
+
+export type StylePassStage = RenderPassDescriptor | ShaderPassDescriptor
+
+/**
+ * Return value of `getStylePass()`:
+ *   - null                     for 'realistic'
+ *   - MaterialReplacePass      for 'wireframe' / 'hidden-line'
+ *   - StylePassStage[]         for shader-based styles (cel/sketch/blueprint)
+ */
+export type StylePass = null | MaterialReplacePass | StylePassStage[]
+
+export interface StylePassContext {
+  renderer?: THREE.WebGLRenderer
+  scene?: THREE.Scene
+  camera?: THREE.Camera
+}
+
 /**
  * Return the EffectComposer pass(es) for the given render style, or `null`
  * for 'realistic' (let the default Renderer.jsx pipeline run unchanged).
  *
- * The returned value is one of:
- *   - null                               for 'realistic'
- *   - MaterialReplacePass                for 'wireframe' / 'hidden-line'
- *   - Array of { type, pass } objects    for shader-based styles (cel/sketch/blueprint)
- *
- * @param {string} style - One of RENDER_STYLES.
- * @param {{ renderer?: THREE.WebGLRenderer, scene?: THREE.Scene, camera?: THREE.Camera }} [ctx]
- * @returns {null|object|object[]}
+ * `style` is typed as `string` (not the `RENDER_STYLES` union) because an
+ * unrecognized value is a valid, tested input — the `default` branch below
+ * throws at runtime rather than being ruled out at compile time.
  */
-export function getStylePass(style, ctx = {}) {
+export function getStylePass(style: string, ctx: StylePassContext = {}): StylePass {
   const { renderer, scene, camera } = ctx
 
   switch (style) {
@@ -292,7 +309,7 @@ export function getStylePass(style, ctx = {}) {
 
       const renderPass = (scene && camera)
         ? new RenderPass(scene, camera)
-        : { isRenderPass: true }
+        : { isRenderPass: true as const }
 
       const outlinePass = new ShaderPass({
         uniforms: {
@@ -318,7 +335,7 @@ export function getStylePass(style, ctx = {}) {
 
       const renderPass = (scene && camera)
         ? new RenderPass(scene, camera)
-        : { isRenderPass: true }
+        : { isRenderPass: true as const }
 
       const outlinePass = new ShaderPass({
         uniforms: {
@@ -356,7 +373,7 @@ export function getStylePass(style, ctx = {}) {
 
       const renderPass = (scene && camera)
         ? new RenderPass(scene, camera)
-        : { isRenderPass: true }
+        : { isRenderPass: true as const }
 
       const blueprintPass = new ShaderPass({
         uniforms: {

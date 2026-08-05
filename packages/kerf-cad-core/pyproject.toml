@@ -25,6 +25,14 @@ occ = [
 dev = [
     "pytest>=8",
     "pytest-asyncio>=0.23",
+    # Independent third-party ISO-10303-21 Part 21 grammar parser (MIT,
+    # unrelated to Kerf) used only by
+    # tests/test_step_ap242_writer.py::test_output_is_syntactically_valid_iso10303_21_per_third_party_parser
+    # to verify step_ap242_writer's output — including its complex entity
+    # instance syntax — parses as real Part 21, independent of Kerf's own
+    # reader/writer code. Test-only; the writer itself has no runtime
+    # dependency on it.
+    "steputils>=0.1",
 ]
 
 [project.entry-points."kerf.plugins"]

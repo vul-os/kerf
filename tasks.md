@@ -6141,7 +6141,15 @@ semantic reader simply never looks at them. This confirms the corrected G2 premi
 formalising Kerf's existing informal board extensions into typed fields. T-528 (conformance
 vectors) survives unchanged. T-529…T-535 shrink or disappear.
 
-**⛔ BLOCKER — `kiutils` is GPLv3 and Kerf is 100% MIT.** The analysis recommends routing the
+**✅ RESOLVED 2026-08-05 — stay MIT-clean.** Owner's decision: **do not** make `kiutils` the
+backbone. T-526/T-527 extend Kerf's **own** s-expression reader instead; `kiutils` stays exactly as
+it is today — an optional, lazily-guarded extra used for library import only. More engineering
+work than the `kiutils` route, but the probe script shows the existing lexer already tokenises the
+nodes correctly (it is the semantic layer that ignores them), so the gap is smaller than it looks.
+The headline "Kerf is 100% MIT" claim stays unambiguous, which is the point. **T-526/T-527 are
+unblocked under this constraint.** Do not add a GPL dependency to the interop path.
+
+**Original blocker, retained for context — `kiutils` is GPLv3 and Kerf is 100% MIT.** The analysis recommended routing the
 reader/writer through `kiutils`, which is a complete bidirectional KiCad parser. Verified
 2026-08-05: PyPI classifier is *"GNU General Public License v3 (GPLv3)"*, version 1.4.8, declared
 as the optional extra `kicad = ["kiutils"]` in `packages/kerf-imports/pyproject.toml`, and already

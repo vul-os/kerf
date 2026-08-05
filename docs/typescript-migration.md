@@ -45,6 +45,37 @@ Re-measure before claiming a delta. Do not quote these numbers as current.
 | `npm run build` | clean |
 | Largest file | `src/lib/occtWorker.js` — 7,957 lines |
 
+## Agent worktree base — read before launching a slice agent
+
+Agent worktrees branch from **`main`**, not from whatever integration branch you happen to be on.
+Two T-502/T-508 runs were launched against a base with no `tsconfig.json` and no `src/types/`,
+detected it, and correctly stopped without touching anything.
+
+**Rule:** after a slice is verified green, fast-forward `main` so the next worktree inherits it.
+**Every slice prompt must open with a base check** that stops the agent if the foundation is absent:
+
+```
+ls tsconfig.json tsconfig.strict.json        # T-500
+ls src/types/index.ts src/types/geometry.ts  # T-501
+```
+
+A cheap guard at the top of a prompt is worth far more than a late failure — it converted two
+wasted runs into two clean two-minute no-ops.
+
+## Known traps when verifying a slice
+
+1. **`npm run lint` is RED at baseline** — ~1,451 pre-existing errors in the un-migrated
+   `.js`/`.jsx` tree. That is real debt but it is not G1's. **Gate on `npm run lint:ts`**, scoped
+   to `.ts`/`.tsx`, which starts at zero and must stay at zero.
+2. **`npm test` intermittently exits 1 while reporting every test passed.** The cause is an
+   `EnvironmentTeardownError` unhandled rejection — a late dynamic import racing environment
+   teardown, observed in `src/lib/panels/__tests__/dcc.test.jsx` but not specific to it. It is
+   nondeterministic: a re-run passes clean. Check the pass counts, not just the exit code. Do not
+   try to fix it inside a slice.
+3. **Do not run full-package Python/pytest suites** from a frontend slice, and **do not spawn
+   sub-agents.** Both consumed large amounts of time earlier in this program for zero benefit. An
+   additive diff cannot regress a suite it does not touch.
+
 ## Conventions
 
 1. **Rename, don't rewrite.** A slice converts `.js` → `.ts` and adds types. Behaviour changes,

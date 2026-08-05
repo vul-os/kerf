@@ -17,23 +17,29 @@
 // Pruning: best-effort LRU. On `prune(maxBytes)` we sum `bytes` across all
 // entries and delete oldest-`lastAccess` rows until total ≤ maxBytes. Run on
 // app start (cheap) and after every put when the rolling estimate looks high.
+//
+// Typing note: the real part shape (`RenderablePart`) lives in
+// `src/store/workspace.ts`, and `src/lib` must not import from `src/store`.
+// `get`/`put` are generic over the part type instead, so callers supply their
+// own shape (e.g. `meshCache.get<RenderablePart>(key)`) without a cross-layer
+// import.
 
 const DB_NAME = 'kerf-mesh-cache'
 const DB_VERSION = 1
 const STORE = 'parts'
 const DEFAULT_MAX_BYTES = 100 * 1024 * 1024
 
-let dbPromise = null
+let dbPromise: Promise<IDBDatabase | null> | null = null
 
-function isAvailable() {
+function isAvailable(): boolean {
   return typeof indexedDB !== 'undefined'
 }
 
-function openDb() {
+function openDb(): Promise<IDBDatabase | null> {
   if (!isAvailable()) return Promise.resolve(null)
   if (dbPromise) return dbPromise
   dbPromise = new Promise((resolve) => {
-    let req
+    let req: IDBOpenDBRequest
     try {
       req = indexedDB.open(DB_NAME, DB_VERSION)
     } catch {
@@ -56,7 +62,7 @@ function openDb() {
 
 // SHA-256 of a string → hex. Same digest the STEP loader uses on binary input;
 // reusing the algorithm so cache keys are stable across reloads/sessions.
-export async function hashContent(content) {
+export async function hashContent(content: unknown): Promise<string> {
   const text = content == null ? '' : String(content)
   if (typeof crypto !== 'undefined' && crypto.subtle && crypto.subtle.digest) {
     const enc = new TextEncoder().encode(text)
@@ -70,10 +76,21 @@ export async function hashContent(content) {
   return `len-${text.length}`
 }
 
+/**
+ * Minimal structural shape `estimateBytes()`/`put()` need from a part: an
+ * optional `geom.polygons[].vertices` walk for the byte estimate. Real
+ * callers' part types (`JscadPart`, `RenderablePart`) satisfy this
+ * structurally — this stays a local subset rather than importing/redeclaring
+ * those types, since `src/lib` must not import from `src/store`.
+ */
+interface GeomLike {
+  geom?: { polygons?: Array<{ vertices?: unknown[] }> } | null
+}
+
 // Approximate byte count of a parts array. Walks polygons → vertices, charges
 // 24 bytes per vec3 (3×Float64). Cheap heuristic; we only need it for LRU
 // pruning, not exact accounting.
-function estimateBytes(parts) {
+function estimateBytes(parts: readonly GeomLike[] | null | undefined): number {
   let total = 0
   for (const p of parts || []) {
     total += 64 // {id, geom: {...}}
@@ -87,12 +104,12 @@ function estimateBytes(parts) {
   return total
 }
 
-function txStore(db, mode) {
+function txStore(db: IDBDatabase, mode: IDBTransactionMode): [IDBTransaction, IDBObjectStore] {
   const tx = db.transaction(STORE, mode)
   return [tx, tx.objectStore(STORE)]
 }
 
-function awaitTx(tx) {
+function awaitTx(tx: IDBTransaction): Promise<boolean> {
   return new Promise((resolve) => {
     tx.oncomplete = () => resolve(true)
     tx.onerror = () => resolve(false)
@@ -100,19 +117,32 @@ function awaitTx(tx) {
   })
 }
 
+/** Row shape as actually stored in the 'parts' object store. */
+interface StoredEntry<T> {
+  key: string
+  parts: T[]
+  bytes: number
+  lastAccess: number
+}
+
+/** Cache hit shape returned by `get()` — `null` on miss. */
+export interface MeshCacheEntry<T> {
+  parts: T[]
+}
+
 // Returns `{parts}` on hit, null on miss. Touches `lastAccess` so LRU pruning
 // keeps recently-opened files alive.
-export async function get(key) {
+export async function get<T = unknown>(key: string): Promise<MeshCacheEntry<T> | null> {
   if (!key) return null
   const db = await openDb()
   if (!db) return null
   return new Promise((resolve) => {
-    let entry = null
+    let entry: StoredEntry<T> | null = null
     try {
       const [tx, store] = txStore(db, 'readwrite')
       const req = store.get(key)
       req.onsuccess = () => {
-        entry = req.result || null
+        entry = (req.result as StoredEntry<T> | undefined) || null
         if (entry) {
           entry.lastAccess = Date.now()
           try { store.put(entry) } catch { /* ignore */ }
@@ -128,7 +158,7 @@ export async function get(key) {
   })
 }
 
-export async function put(key, parts) {
+export async function put<T extends GeomLike>(key: string, parts: T[]): Promise<boolean> {
   if (!key) return false
   const db = await openDb()
   if (!db) return false
@@ -136,12 +166,13 @@ export async function put(key, parts) {
   return new Promise((resolve) => {
     try {
       const [tx, store] = txStore(db, 'readwrite')
-      store.put({
+      const entry: StoredEntry<T> = {
         key,
         parts: parts || [],
         bytes,
         lastAccess: Date.now(),
-      })
+      }
+      store.put(entry)
       awaitTx(tx).then(resolve)
     } catch {
       resolve(false)
@@ -149,16 +180,23 @@ export async function put(key, parts) {
   })
 }
 
+/** Row shape read back during `prune()`'s cursor walk — bytes/lastAccess only. */
+interface PruneRow {
+  key: string
+  bytes: number
+  lastAccess: number
+}
+
 // Best-effort LRU prune: walk all entries by lastAccess ascending and delete
 // oldest until total bytes ≤ maxBytes. Tolerant of write failures (it's
 // best-effort — next prune sweeps anything we missed).
-export async function prune(maxBytes = DEFAULT_MAX_BYTES) {
+export async function prune(maxBytes: number = DEFAULT_MAX_BYTES): Promise<void> {
   const db = await openDb()
   if (!db) return
-  const entries = await new Promise((resolve) => {
+  const entries: PruneRow[] = await new Promise((resolve) => {
     try {
       const [tx, store] = txStore(db, 'readonly')
-      const out = []
+      const out: PruneRow[] = []
       const req = store.openCursor()
       req.onsuccess = () => {
         const c = req.result
@@ -178,20 +216,20 @@ export async function prune(maxBytes = DEFAULT_MAX_BYTES) {
   if (total <= maxBytes) return
   // Sort oldest first.
   entries.sort((a, b) => a.lastAccess - b.lastAccess)
-  const toDelete = []
+  const toDelete: string[] = []
   for (const e of entries) {
     if (total <= maxBytes) break
     toDelete.push(e.key)
     total -= e.bytes
   }
   if (toDelete.length === 0) return
-  await new Promise((resolve) => {
+  await new Promise<void>((resolve) => {
     try {
       const [tx, store] = txStore(db, 'readwrite')
       for (const k of toDelete) store.delete(k)
-      awaitTx(tx).then(resolve)
+      awaitTx(tx).then(() => resolve())
     } catch {
-      resolve(false)
+      resolve()
     }
   })
 }

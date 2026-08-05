@@ -1486,7 +1486,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       try {
         const content = file.content ?? ''
         const key = await meshCache.hashContent(content)
-        const cached = await meshCache.get(key)
+        const cached = await meshCache.get<RenderablePart>(key)
         if (cached && get().currentFileId === fileId) {
           set({ parts: cached.parts || [], partsError: null, loadingParts: false })
           return

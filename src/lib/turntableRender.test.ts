@@ -1,5 +1,5 @@
 /**
- * turntableRender.test.js — Vitest suite for the 360° turntable render module.
+ * turntableRender.test.ts — Vitest suite for the 360° turntable render module.
  *
  * All Three.js objects are stubbed in-process; no DOM or GPU required.
  */
@@ -14,24 +14,29 @@ import {
   previewMode,
   isMediaRecorderAvailable,
 } from './turntableRender.js'
+import type { OrbitCamera, OrbitRenderer } from './turntableRender.js'
 
 // ── Stub helpers ──────────────────────────────────────────────────────────────
 
-function makeCamera() {
+interface StubCamera extends OrbitCamera {
+  _lookAt: { x: number; y: number; z: number } | null
+}
+
+function makeCamera(): StubCamera {
   return {
-    position: { x: 80, y: 80, z: 80, set(x, y, z) { this.x = x; this.y = y; this.z = z } },
+    position: { x: 80, y: 80, z: 80, set(x: number, y: number, z: number) { this.x = x; this.y = y; this.z = z } },
     aspect: 1,
     _lookAt: null,
-    lookAt(x, y, z) { this._lookAt = { x, y, z } },
+    lookAt(x: number, y: number, z: number) { this._lookAt = { x, y, z } },
     updateProjectionMatrix: vi.fn(),
   }
 }
 
-function makeRenderer(frameIndex = { val: 0 }) {
+function makeRenderer(frameIndex: { val: number } = { val: 0 }): OrbitRenderer {
   const canvas = {
     width: 800,
     height: 600,
-    toDataURL(mime) {
+    toDataURL(mime?: string) {
       const i = frameIndex.val++
       // Return distinguishable data-URLs
       return `data:${mime || 'image/png'};base64,FRAME${String(i).padStart(4, '0')}`
@@ -40,11 +45,11 @@ function makeRenderer(frameIndex = { val: 0 }) {
   return {
     domElement: canvas,
     render: vi.fn(),
-    setSize: vi.fn((w, h) => { canvas.width = w; canvas.height = h }),
+    setSize: vi.fn((w: number, h: number) => { canvas.width = w; canvas.height = h }),
   }
 }
 
-function makeScene() {
+function makeScene(): { isScene: true } {
   return { isScene: true }
 }
 
@@ -190,16 +195,16 @@ describe('recordTurntable', () => {
   })
 
   it('camera angles cover the full 2π (unique azimuths per frame)', async () => {
-    const captured = []
+    const captured: { x: number; z: number }[] = []
     const cam = {
-      position: { x: 0, y: 50, z: 100, set(x, y, z) { this.x = x; this.y = y; this.z = z } },
-      _lookAts: [],
-      lookAt(x, y, z) { this._lookAts.push({ x, y, z }) },
+      position: { x: 0, y: 50, z: 100, set(x: number, y: number, z: number) { this.x = x; this.y = y; this.z = z } },
+      _lookAts: [] as { x: number; y: number; z: number }[],
+      lookAt(x: number, y: number, z: number) { this._lookAts.push({ x, y, z }) },
       updateProjectionMatrix: vi.fn(),
     }
     // Intercept position.set to capture azimuth-derived x/z values.
     const origSet = cam.position.set.bind(cam.position)
-    cam.position.set = (x, y, z) => { captured.push({ x, z }); origSet(x, y, z) }
+    cam.position.set = (x: number, y: number, z: number) => { captured.push({ x, z }); origSet(x, y, z) }
 
     const ren = makeRenderer()
     const n = 36
@@ -252,10 +257,10 @@ describe('recordTurntable', () => {
   })
 
   it('applies custom radius (camera placed at given distance from target)', async () => {
-    const positions = []
+    const positions: { x: number; y: number; z: number }[] = []
     const cam = makeCamera()
     const origSet = cam.position.set.bind(cam.position)
-    cam.position.set = (x, y, z) => { positions.push({ x, y, z }); origSet(x, y, z) }
+    cam.position.set = (x: number, y: number, z: number) => { positions.push({ x, y, z }); origSet(x, y, z) }
 
     const ren = makeRenderer()
     await recordTurntable(makeScene(), cam, ren, {
@@ -278,9 +283,9 @@ describe('recordTurntable', () => {
   })
 
   it('respects custom target offset', async () => {
-    const captured = []
+    const captured: { x: number; y: number; z: number }[] = []
     const cam = makeCamera()
-    cam.lookAt = (x, y, z) => captured.push({ x, y, z })
+    cam.lookAt = (x: number, y: number, z: number) => captured.push({ x, y, z })
 
     const ren = makeRenderer()
     await recordTurntable(makeScene(), cam, ren, {
@@ -331,7 +336,9 @@ describe('exportFrames', () => {
   })
 
   it('throws when frames is not an array', async () => {
-    await expect(exportFrames('not-an-array', 'png-zip')).rejects.toThrow('frames must be an array')
+    // Deliberately violates the `string[]` contract to exercise the runtime
+    // Array.isArray() guard against malformed input from untyped callers.
+    await expect(exportFrames('not-an-array' as unknown as string[], 'png-zip')).rejects.toThrow('frames must be an array')
   })
 
   it('handles empty frames array', async () => {
@@ -357,20 +364,25 @@ describe('isMediaRecorderAvailable', () => {
 
 // ── previewMode ───────────────────────────────────────────────────────────────
 
+interface RafCallback {
+  id: number
+  cb: (time: number) => void
+}
+
 describe('previewMode', () => {
   let rafId = 0
-  let rafCallbacks = []
+  let rafCallbacks: RafCallback[] = []
 
   beforeEach(() => {
     rafId = 0
     rafCallbacks = []
     // Stub requestAnimationFrame / cancelAnimationFrame.
-    vi.stubGlobal('requestAnimationFrame', (cb) => {
+    vi.stubGlobal('requestAnimationFrame', (cb: (time: number) => void) => {
       const id = ++rafId
       rafCallbacks.push({ id, cb })
       return id
     })
-    vi.stubGlobal('cancelAnimationFrame', (id) => {
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => {
       rafCallbacks = rafCallbacks.filter((r) => r.id !== id)
     })
   })
@@ -416,9 +428,9 @@ describe('previewMode', () => {
 
   it('advances the azimuth over multiple ticks', () => {
     const cam = makeCamera()
-    const positions = []
+    const positions: { x: number; y: number; z: number }[] = []
     const origSet = cam.position.set.bind(cam.position)
-    cam.position.set = (x, y, z) => { positions.push({ x, y, z }); origSet(x, y, z) }
+    cam.position.set = (x: number, y: number, z: number) => { positions.push({ x, y, z }); origSet(x, y, z) }
 
     previewMode(makeScene(), cam, makeRenderer(), { radius: 100, elevation: 0 })
 

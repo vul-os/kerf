@@ -1,5 +1,5 @@
 /**
- * turntableRender.js — 360° turntable / animation render helpers.
+ * turntableRender.ts — 360° turntable / animation render helpers.
  *
  * Uses the existing Three.js scene/camera/renderer from Renderer.jsx.
  * No geometry mutations; append-only to the renderer interface.
@@ -15,28 +15,64 @@
  *   previewMode(scene, camera, renderer) → { stop() }
  *     Start a continuous slow turntable loop for live preview.
  *     Returns a handle with stop() to cancel.
+ *
+ * Typing note: every Three.js object here is deliberately duck-typed rather
+ * than imported as `THREE.PerspectiveCamera`/`THREE.WebGLRenderer` — the
+ * Renderer.jsx caller passes real Three.js instances, but this module (and
+ * its test's hand-rolled stubs, which only implement a few fields each) only
+ * ever reads/calls the members declared below. Constraining to real Three.js
+ * types would reject those intentionally-minimal test stubs for no benefit,
+ * since nothing here needs the rest of those classes' surface.
  */
+
+/** World-space point; every axis defaults to 0 when omitted. */
+export interface OrbitTarget {
+  x?: number
+  y?: number
+  z?: number
+}
+
+/** Duck-typed Three.js camera surface this module actually touches. */
+export interface OrbitCamera {
+  position: {
+    x: number
+    y: number
+    z: number
+    set(x: number, y: number, z: number): void
+  }
+  aspect?: number
+  lookAt?(x: number, y: number, z: number): void
+  updateProjectionMatrix?(): void
+}
+
+/** Duck-typed Three.js renderer surface this module actually touches. */
+export interface OrbitRenderer {
+  domElement: {
+    width?: number
+    height?: number
+    toDataURL?(mime?: string): string
+  }
+  render(scene: unknown, camera: OrbitCamera): void
+  setSize?(width: number, height: number, updateStyle?: boolean): void
+}
 
 // ── Easing helpers ────────────────────────────────────────────────────────────
 
 /**
  * Linear progress — frame i of N maps to t in [0, 1).
- * @param {number} i   Frame index (0-based).
- * @param {number} n   Total frame count.
- * @returns {number}   Normalised progress in [0, 1).
+ * @param i   Frame index (0-based).
+ * @param n   Total frame count.
+ * @returns   Normalised progress in [0, 1).
  */
-export function easingLinear(i, n) {
+export function easingLinear(i: number, n: number): number {
   if (n <= 0) return 0
   return i / n
 }
 
 /**
  * Ease-in-out (smoothstep) — slow at start and end, fast in the middle.
- * @param {number} i
- * @param {number} n
- * @returns {number}
  */
-export function easingEaseInOut(i, n) {
+export function easingEaseInOut(i: number, n: number): number {
   if (n <= 0) return 0
   const t = i / n
   return t * t * (3 - 2 * t)
@@ -49,13 +85,19 @@ export function easingEaseInOut(i, n) {
  * radius, elevation angle (radians above XZ plane), and azimuth (radians
  * around Y-axis from +Z).
  *
- * @param {object} camera   Three.js PerspectiveCamera (duck-typed: position, lookAt).
- * @param {object} target   { x, y, z } world-space orbit centre.
- * @param {number} radius   Distance from target to camera.
- * @param {number} elevation  Angle above XZ plane in radians.
- * @param {number} azimuth    Angle around Y-axis in radians.
+ * @param camera   Three.js PerspectiveCamera (duck-typed: position, lookAt).
+ * @param target   world-space orbit centre.
+ * @param radius   Distance from target to camera.
+ * @param elevation  Angle above XZ plane in radians.
+ * @param azimuth    Angle around Y-axis in radians.
  */
-export function positionCameraOnOrbit(camera, target, radius, elevation, azimuth) {
+export function positionCameraOnOrbit(
+  camera: OrbitCamera,
+  target: OrbitTarget | null | undefined,
+  radius: number,
+  elevation: number,
+  azimuth: number,
+): void {
   if (!camera) throw new Error('camera is required')
   const { x: tx = 0, y: ty = 0, z: tz = 0 } = target || {}
   const cosEl = Math.cos(elevation)
@@ -73,6 +115,25 @@ export function positionCameraOnOrbit(camera, target, radius, elevation, azimuth
 
 // ── recordTurntable ───────────────────────────────────────────────────────────
 
+export type TurntableEasing = 'linear' | 'ease-in-out'
+
+export interface RecordTurntableOptions {
+  /** Number of frames (covers full 360°). */
+  frameCount?: number
+  /** Orbit radius; defaults to current distance. */
+  radius?: number
+  /** Elevation in radians; defaults to current. */
+  elevation?: number
+  /** Orbit centre; defaults to world origin. */
+  target?: OrbitTarget
+  /** Frame distribution. */
+  easing?: TurntableEasing
+  /** Render width in pixels (uses canvas size if omitted). */
+  width?: number
+  /** Render height in pixels. */
+  height?: number
+}
+
 /**
  * Orbit the camera 360° around the Y-axis through `frameCount` stops,
  * render each frame with the provided Three.js renderer, and return an
@@ -81,20 +142,14 @@ export function positionCameraOnOrbit(camera, target, radius, elevation, azimuth
  * The camera is temporarily re-positioned for each frame; its original
  * position and target are restored on completion (or on error).
  *
- * @param {object} scene     THREE.Scene
- * @param {object} camera    THREE.PerspectiveCamera
- * @param {object} renderer  THREE.WebGLRenderer (must have .render() and .domElement)
- * @param {object} [opts]
- * @param {number}   [opts.frameCount=36]     Number of frames (covers full 360°).
- * @param {number}   [opts.radius]            Orbit radius; defaults to current distance.
- * @param {number}   [opts.elevation]         Elevation in radians; defaults to current.
- * @param {{x,y,z}} [opts.target]            Orbit centre; defaults to world origin.
- * @param {'linear'|'ease-in-out'} [opts.easing='linear']  Frame distribution.
- * @param {number}   [opts.width]             Render width in pixels (uses canvas size if omitted).
- * @param {number}   [opts.height]            Render height in pixels.
- * @returns {Promise<string[]>}  Array of PNG data-URL strings, length === frameCount.
+ * @returns Array of PNG data-URL strings, length === frameCount.
  */
-export async function recordTurntable(scene, camera, renderer, opts = {}) {
+export async function recordTurntable(
+  scene: unknown,
+  camera: OrbitCamera,
+  renderer: OrbitRenderer,
+  opts: RecordTurntableOptions = {},
+): Promise<string[]> {
   if (!camera) throw new Error('camera is required for recordTurntable')
   if (!renderer) throw new Error('renderer is required for recordTurntable')
   if (!scene) throw new Error('scene is required for recordTurntable')
@@ -145,7 +200,7 @@ export async function recordTurntable(scene, camera, renderer, opts = {}) {
   }
 
   const easingFn = easing === 'ease-in-out' ? easingEaseInOut : easingLinear
-  const frames = []
+  const frames: string[] = []
 
   try {
     for (let i = 0; i < frameCount; i++) {
@@ -190,6 +245,19 @@ export async function recordTurntable(scene, camera, renderer, opts = {}) {
 
 // ── exportFrames ──────────────────────────────────────────────────────────────
 
+export type TurntableExportFormat = 'png-zip' | 'webm'
+
+export interface ExportFramesOptions {
+  /** Frames per second (used for WebM timing). */
+  fps?: number
+}
+
+export interface ExportFramesResult {
+  blob: Blob
+  ext: string
+  format: string
+}
+
 /**
  * Pack an array of PNG data-URL frames into a distributable format.
  *
@@ -197,14 +265,12 @@ export async function recordTurntable(scene, camera, renderer, opts = {}) {
  *   'png-zip' — ZIP archive of frame0000.png … frameNNNN.png (uses fflate).
  *   'webm'    — WebM video via MediaRecorder if available; falls back to
  *               'png-zip' if MediaRecorder is not supported.
- *
- * @param {string[]} frames  Array of PNG data-URL strings.
- * @param {'png-zip'|'webm'} [format='png-zip']
- * @param {object} [opts]
- * @param {number} [opts.fps=24]  Frames per second (used for WebM timing).
- * @returns {Promise<{ blob: Blob, ext: string, format: string }>}
  */
-export async function exportFrames(frames, format = 'png-zip', opts = {}) {
+export async function exportFrames(
+  frames: string[],
+  format: TurntableExportFormat = 'png-zip',
+  opts: ExportFramesOptions = {},
+): Promise<ExportFramesResult> {
   if (!Array.isArray(frames)) throw new Error('frames must be an array')
 
   const effectiveFormat = (format === 'webm' && !isMediaRecorderAvailable())
@@ -219,7 +285,7 @@ export async function exportFrames(frames, format = 'png-zip', opts = {}) {
 
 // ── WebM export ───────────────────────────────────────────────────────────────
 
-async function exportWebm(frames, opts = {}) {
+async function exportWebm(frames: string[], opts: ExportFramesOptions = {}): Promise<ExportFramesResult> {
   const fps = opts.fps ?? 24
   const interval = 1000 / fps
 
@@ -243,14 +309,14 @@ async function exportWebm(frames, opts = {}) {
 
       const stream = canvas.captureStream(fps)
       const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' })
-      const chunks = []
+      const chunks: Blob[] = []
 
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
       recorder.onstop = () => {
         const blob = new Blob(chunks, { type: 'video/webm' })
         resolve({ blob, ext: 'webm', format: 'webm' })
       }
-      recorder.onerror = reject
+      recorder.onerror = () => reject(new Error('MediaRecorder error'))
 
       recorder.start()
 
@@ -262,7 +328,7 @@ async function exportWebm(frames, opts = {}) {
         }
         const img = new Image()
         img.onload = () => {
-          ctx.drawImage(img, 0, 0)
+          ctx?.drawImage(img, 0, 0)
           idx++
           setTimeout(drawNext, interval)
         }
@@ -281,10 +347,10 @@ async function exportWebm(frames, opts = {}) {
 
 // ── PNG ZIP export ────────────────────────────────────────────────────────────
 
-async function exportPngZip(frames, _opts = {}) {
+async function exportPngZip(frames: string[], _opts: ExportFramesOptions = {}): Promise<ExportFramesResult> {
   // Dynamically import fflate (bundled in the project) so this module
   // stays side-effect-free when fflate is unavailable (e.g. test environments).
-  let zipSync
+  let zipSync: ((files: Record<string, Uint8Array>) => Uint8Array) | undefined
   try {
     const fflate = await import('fflate')
     zipSync = fflate.zipSync
@@ -295,7 +361,7 @@ async function exportPngZip(frames, _opts = {}) {
   }
 
   // Convert data-URLs to Uint8Array binary.
-  const files = {}
+  const files: Record<string, Uint8Array> = {}
   for (let i = 0; i < frames.length; i++) {
     const pad = String(i).padStart(4, '0')
     const name = `frame${pad}.png`
@@ -305,11 +371,11 @@ async function exportPngZip(frames, _opts = {}) {
   }
 
   const zipped = zipSync(files)
-  const blob = new Blob([zipped], { type: 'application/zip' })
+  const blob = new Blob([zipped as BlobPart], { type: 'application/zip' })
   return { blob, ext: 'zip', format: 'png-zip' }
 }
 
-function dataUrlToBytes(dataUrl) {
+function dataUrlToBytes(dataUrl: string): Uint8Array {
   if (typeof dataUrl !== 'string') return new Uint8Array(0)
   const comma = dataUrl.indexOf(',')
   if (comma < 0) return new Uint8Array(0)
@@ -318,6 +384,7 @@ function dataUrlToBytes(dataUrl) {
   try {
     const binary = typeof atob !== 'undefined'
       ? atob(base64)
+      // @ts-expect-error - no @types/node in this toolchain (Buffer is a Node-only fallback for non-browser environments; see iesLoader.test.ts for the established pattern).
       : Buffer.from(base64, 'base64').toString('binary')
     const bytes = new Uint8Array(binary.length)
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
@@ -329,6 +396,21 @@ function dataUrlToBytes(dataUrl) {
 
 // ── previewMode ───────────────────────────────────────────────────────────────
 
+export interface PreviewModeOptions {
+  /** Angular speed. */
+  degreesPerSecond?: number
+  /** Orbit centre; defaults to origin. */
+  target?: OrbitTarget
+  /** Distance; defaults to current. */
+  radius?: number
+  /** Elevation; defaults to current. */
+  elevation?: number
+}
+
+export interface PreviewModeHandle {
+  stop(): void
+}
+
 /**
  * Start a continuous slow-turntable loop for live preview in the viewport.
  *
@@ -336,18 +418,15 @@ function dataUrlToBytes(dataUrl) {
  * (30°/s). The camera is moved every animation frame; OrbitControls should
  * be disabled by the caller while preview mode is active to avoid fighting.
  *
- * @param {object} scene      THREE.Scene
- * @param {object} camera     THREE.PerspectiveCamera
- * @param {object} [renderer] Not used directly (Renderer.jsx drives the RAF loop),
- *                            but accepted for API symmetry and future use.
- * @param {object} [opts]
- * @param {number}   [opts.degreesPerSecond=30]  Angular speed.
- * @param {{x,y,z}} [opts.target]               Orbit centre; defaults to origin.
- * @param {number}   [opts.radius]               Distance; defaults to current.
- * @param {number}   [opts.elevation]            Elevation; defaults to current.
- * @returns {{ stop: () => void }}
+ * @param renderer Not used directly (Renderer.jsx drives the RAF loop),
+ *                 but accepted for API symmetry and future use.
  */
-export function previewMode(scene, camera, renderer, opts = {}) {
+export function previewMode(
+  scene: unknown,
+  camera: OrbitCamera,
+  renderer: OrbitRenderer | null | undefined,
+  opts: PreviewModeOptions = {},
+): PreviewModeHandle {
   if (!camera) throw new Error('camera is required for previewMode')
 
   const {
@@ -375,11 +454,11 @@ export function previewMode(scene, camera, renderer, opts = {}) {
   let azimuth = Math.atan2(dx, dz)
 
   const radiansPerMs = (degreesPerSecond * Math.PI / 180) / 1000
-  let lastTime = null
-  let rafId = null
+  let lastTime: number | null = null
+  let rafId: number | null = null
   let running = true
 
-  function tick(now) {
+  function tick(now: number) {
     if (!running) return
     if (lastTime !== null) {
       const dt = now - lastTime
@@ -410,9 +489,8 @@ export function previewMode(scene, camera, renderer, opts = {}) {
 
 /**
  * Return true if MediaRecorder is available and supports 'video/webm'.
- * @returns {boolean}
  */
-export function isMediaRecorderAvailable() {
+export function isMediaRecorderAvailable(): boolean {
   if (typeof MediaRecorder === 'undefined') return false
   try {
     return MediaRecorder.isTypeSupported('video/webm')

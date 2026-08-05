@@ -1,6 +1,14 @@
 const MAX_DEPTH = 64;
 
-const TOKENS = {
+// Typing note: only the keys below are ever actually assigned as a token's
+// `type`. Several call sites elsewhere in this file compare `token.type`
+// against `TOKENS.COLON` / `TOKENS.DOT` / `TOKENS.TRUE` / `TOKENS.FALSE`,
+// which this object has never declared — those comparisons have always
+// evaluated against `undefined` and so have always been dead branches. That
+// is pre-existing runtime behavior this pass must not change, so TOKENS is
+// typed as an open string->string dictionary (rather than adding the missing
+// keys, which would flip those branches live) and the unused keys stay absent.
+const TOKENS: Record<string, string> = {
   IDENT: 'IDENT',
   NUMBER: 'NUMBER',
   STRING: 'STRING',
@@ -26,30 +34,73 @@ const KEYWORDS = new Set([
   'true', 'false',
 ]);
 
+interface Token {
+  type: string;
+  value: string;
+  line: number;
+  col: number;
+}
+
+// A parsed parameter/object value: numbers, strings, idents (pass through as
+// their raw string), booleans, nested vectors, or nested param objects.
+export type OpenSCADValue =
+  | number
+  | string
+  | boolean
+  | null
+  | OpenSCADValue[]
+  | OpenSCADParams;
+
+export interface OpenSCADParams {
+  [key: string]: OpenSCADValue;
+}
+
+// Expression / statement AST node. The shapes below are heterogeneous by
+// design (this parser was never given a single discriminated-union contract),
+// so this stays a permissive "has a type tag, plus whatever fields that node
+// kind carries" shape rather than a hand-enumerated union — precise enough to
+// catch typos on `.type` while not fabricating structure the original code
+// never guaranteed.
+export interface OpenSCADNode {
+  type: string;
+  [key: string]: unknown;
+}
+
+export interface OpenSCADProgram {
+  type: 'program';
+  statements: OpenSCADNode[];
+  warnings: string[];
+}
+
 class Tokenizer {
-  constructor(src) {
+  src: string;
+  pos: number;
+  line: number;
+  col: number;
+
+  constructor(src: string) {
     this.src = src;
     this.pos = 0;
     this.line = 1;
     this.col = 0;
   }
 
-  peek(offset = 0) {
+  peek(offset = 0): string {
     return this.src[this.pos + offset] || '';
   }
 
-  advance() {
+  advance(): string {
     const ch = this.src[this.pos++];
     if (ch === '\n') { this.line++; this.col = 0; }
     else this.col++;
     return ch;
   }
 
-  skipWhitespace() {
+  skipWhitespace(): void {
     while (/\s/.test(this.peek()) && this.peek() !== '\n') this.advance();
   }
 
-  skipComment() {
+  skipComment(): void {
     if (this.peek() === '/' && this.peek(1) === '/') {
       while (this.peek() && this.peek() !== '\n') this.advance();
     } else if (this.peek() === '/' && this.peek(1) === '*') {
@@ -59,7 +110,7 @@ class Tokenizer {
     }
   }
 
-  skipWhitespaceAndComments() {
+  skipWhitespaceAndComments(): void {
     while (true) {
       const c = this.peek();
       if (c === '/' && (this.peek(1) === '/' || this.peek(1) === '*')) {
@@ -72,7 +123,7 @@ class Tokenizer {
     }
   }
 
-  next() {
+  next(): Token {
     this.skipWhitespaceAndComments();
     const startLine = this.line;
     const startCol = this.col;
@@ -137,27 +188,34 @@ class Tokenizer {
 }
 
 class Parser {
-  constructor(src) {
+  tokenizer: Tokenizer;
+  current: Token;
+  warnings: string[];
+  depth: number;
+  _pushedBack: Token | undefined;
+
+  constructor(src: string) {
     this.tokenizer = new Tokenizer(src);
-    this.current = null;
+    this.current = { type: TOKENS.EOF, value: '', line: 1, col: 0 };
     this.warnings = [];
     this.depth = 0;
+    this._pushedBack = undefined;
     this.advance();
   }
 
-  advance() {
+  advance(): Token {
     this.current = this.tokenizer.next();
     return this.current;
   }
 
-  expect(type_) {
+  expect(type_: string): Token {
     if (this.current.type === type_) {
       return this.advance();
     }
     throw new Error(`Expected ${type_} at line ${this.current.line}, got ${this.current.type} (${this.current.value})`);
   }
 
-  parseNumber() {
+  parseNumber(): number | string {
     if (this.current.type === TOKENS.NUMBER) {
       const v = parseFloat(this.current.value);
       this.advance();
@@ -169,8 +227,8 @@ class Parser {
     return 0;
   }
 
-  parseVector() {
-    const items = [];
+  parseVector(): OpenSCADValue[] {
+    const items: OpenSCADValue[] = [];
     this.expect(TOKENS.LBRACKET);
     while (this.current.type !== TOKENS.RBRACKET && this.current.type !== TOKENS.EOF) {
       if (this.current.type === TOKENS.NUMBER || this.current.type === TOKENS.IDENT) {
@@ -186,15 +244,15 @@ class Parser {
     return items;
   }
 
-  parseParams() {
-    const params = {};
+  parseParams(): OpenSCADParams {
+    const params: OpenSCADParams = {};
     if (this.current.type !== TOKENS.LPAREN) return params;
     this.advance();
     while (this.current.type !== TOKENS.RPAREN && this.current.type !== TOKENS.EOF) {
       if (this.current.type === TOKENS.IDENT) {
         const key = this.current.value;
         this.advance();
-        let value;
+        let value: OpenSCADValue;
         if (this.current.type === TOKENS.EQUALS) {
           this.advance();
           value = this.parseParamValue();
@@ -211,7 +269,7 @@ class Parser {
     return params;
   }
 
-  parseParamValue() {
+  parseParamValue(): OpenSCADValue {
     if (this.current.type === TOKENS.NUMBER) {
       return parseFloat(this.advance().value);
     }
@@ -227,18 +285,23 @@ class Parser {
     if (this.current.type === TOKENS.LBRACE) {
       return this.parseObject();
     }
+    // See the TOKENS comment above: TRUE/FALSE were never declared keys, so
+    // these have always been unreachable — preserved as-is.
     if (this.current.type === TOKENS.TRUE) { this.advance(); return true; }
     if (this.current.type === TOKENS.FALSE) { this.advance(); return false; }
     return null;
   }
 
-  parseObject() {
-    const obj = {};
+  parseObject(): OpenSCADParams {
+    const obj: OpenSCADParams = {};
     this.expect(TOKENS.LBRACE);
     while (this.current.type !== TOKENS.RBRACE && this.current.type !== TOKENS.EOF) {
       if (this.current.type === TOKENS.IDENT) {
         const key = this.current.value;
         this.advance();
+        // See the TOKENS comment above: COLON was never declared, so the
+        // `current.type === TOKENS.COLON` half of this condition has always
+        // been unreachable — preserved as-is.
         if (this.current.type === TOKENS.EQUALS || this.current.type === TOKENS.COLON) {
           if (this.current.type === TOKENS.COLON) this.advance();
           else this.advance();
@@ -251,7 +314,7 @@ class Parser {
     return obj;
   }
 
-  parseStatement() {
+  parseStatement(): OpenSCADNode {
     const token = this.current;
 
     if (token.type === TOKENS.IDENT) {
@@ -268,11 +331,11 @@ class Parser {
     return this.parseExpression();
   }
 
-  pushBack(token) {
+  pushBack(token: Token): void {
     this._pushedBack = token;
   }
 
-  parseExpression() {
+  parseExpression(): OpenSCADNode {
     this.depth++;
     if (this.depth > MAX_DEPTH) {
       this.warnings.push(`Recursion depth exceeded ${MAX_DEPTH} at line ${this.current.line}`);
@@ -285,7 +348,7 @@ class Parser {
     return result;
   }
 
-  parseBinaryExpr() {
+  parseBinaryExpr(): OpenSCADNode {
     let left = this.parseUnary();
 
     while (this.current.type === TOKENS.OPERATOR && ['+', '-', '*', '/', '<', '>', '<=', '>=', '==', '!=', '&&', '||'].includes(this.current.value)) {
@@ -297,7 +360,7 @@ class Parser {
     return left;
   }
 
-  parseUnary() {
+  parseUnary(): OpenSCADNode {
     if (this.current.type === TOKENS.OPERATOR && this.current.value === '!') {
       this.advance();
       return { type: 'unary', op: '!', arg: this.parseUnary() };
@@ -305,7 +368,7 @@ class Parser {
     return this.parsePostfix();
   }
 
-  parsePostfix() {
+  parsePostfix(): OpenSCADNode {
     let expr = this.parsePrimary();
 
     while (true) {
@@ -313,6 +376,8 @@ class Parser {
         const params = this.parseParams();
         expr = { type: 'call', func: expr, params };
       } else if (this.current.type === TOKENS.DOT) {
+        // See the TOKENS comment above: DOT was never declared, so this
+        // branch has always been unreachable — preserved as-is.
         this.advance();
         if (this.current.type === TOKENS.IDENT) {
           const method = this.current.value;
@@ -332,7 +397,7 @@ class Parser {
     return expr;
   }
 
-  parsePrimary() {
+  parsePrimary(): OpenSCADNode {
     const token = this.current;
 
     if (token.type === TOKENS.NUMBER) {
@@ -350,6 +415,8 @@ class Parser {
       return { type: 'ident', name: token.value };
     }
 
+    // See the TOKENS comment above: TRUE/FALSE were never declared, so these
+    // have always been unreachable — preserved as-is.
     if (token.type === TOKENS.TRUE) { this.advance(); return { type: 'bool', value: true }; }
     if (token.type === TOKENS.FALSE) { this.advance(); return { type: 'bool', value: false }; }
 
@@ -372,7 +439,7 @@ class Parser {
     return { type: 'null' };
   }
 
-  consumeSemicolon() {
+  consumeSemicolon(): void {
     while (this.current.type === TOKENS.SEMICOLON || this.current.type === TOKENS.EOF) {
       if (this.current.type === TOKENS.EOF) break;
       this.advance();
@@ -380,7 +447,7 @@ class Parser {
     }
   }
 
-  parseModuleCall(name) {
+  parseModuleCall(name: string): OpenSCADNode {
     this.consumeSemicolon();
     const params = this.parseParams();
 
@@ -421,8 +488,8 @@ class Parser {
     }
   }
 
-  parse() {
-    const statements = [];
+  parse(): OpenSCADProgram {
+    const statements: OpenSCADNode[] = [];
 
     while (this.current.type !== TOKENS.EOF) {
       try {
@@ -469,7 +536,8 @@ class Parser {
         this.consumeSemicolon();
         statements.push({ type: 'expr', value: expr });
       } catch (e) {
-        this.warnings.push(`Parse error: ${e.message} at line ${this.current.line}`);
+        const message = e instanceof Error ? e.message : String(e);
+        this.warnings.push(`Parse error: ${message} at line ${this.current.line}`);
         while (this.current.type !== TOKENS.SEMICOLON && this.current.type !== TOKENS.EOF) {
           this.advance();
         }
@@ -481,7 +549,7 @@ class Parser {
   }
 }
 
-export function parseOpenSCAD(src) {
+export function parseOpenSCAD(src: string): OpenSCADProgram {
   const parser = new Parser(src);
   return parser.parse();
 }

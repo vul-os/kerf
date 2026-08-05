@@ -125,13 +125,23 @@ delete_copper_pour_spec = ToolSpec(
     name="delete_copper_pour",
     description=(
         "Delete a copper pour from a CircuitJSON board. "
-        "Identify by pour_index (zero-based position in the copper_pours array) "
-        "or by net_id + layer combination."
+        "Identify by pour_id (the element's pcb_copper_pour_id / "
+        "pcb_ground_plane_id — T-536's canonical identifier), by pour_index "
+        "(zero-based position in the copper_pours array), or by net_id + "
+        "layer combination."
     ),
     input_schema={
         "type": "object",
         "properties": {
             "file_id": {"type": "string"},
+            "pour_id": {
+                "type": "string",
+                "description": (
+                    "Canonical pour identifier — the pcb_copper_pour_id or "
+                    "pcb_ground_plane_id of the element (T-536). Preferred "
+                    "over pour_index."
+                ),
+            },
             "pour_index": {
                 "type": "integer",
                 "description": "Zero-based index into the copper_pours array.",
@@ -160,16 +170,18 @@ async def delete_copper_pour(ctx: Any, args: bytes) -> str:
     if not a.get("file_id"):
         return err_payload("file_id is required", "BAD_ARGS")
 
+    has_pour_id = bool(a.get("pour_id"))
     has_index = a.get("pour_index") is not None
     has_net_layer = bool(a.get("net_id")) and bool(a.get("layer"))
-    if not has_index and not has_net_layer:
+    if not has_pour_id and not has_index and not has_net_layer:
         return err_payload(
-            "provide pour_index OR (net_id + layer) to identify the pour",
+            "provide pour_id, pour_index, OR (net_id + layer) to identify the pour",
             "BAD_ARGS",
         )
 
     return ok_payload({
         "deleted": True,
+        "pour_id": a.get("pour_id"),
         "pour_index": a.get("pour_index"),
         "net_id": a.get("net_id"),
         "layer": a.get("layer"),
@@ -189,6 +201,14 @@ set_pour_net_spec = ToolSpec(
         "type": "object",
         "properties": {
             "file_id": {"type": "string"},
+            "pour_id": {
+                "type": "string",
+                "description": (
+                    "Canonical pour identifier — the pcb_copper_pour_id or "
+                    "pcb_ground_plane_id of the element (T-536). Preferred "
+                    "over pour_index."
+                ),
+            },
             "pour_index": {
                 "type": "integer",
                 "description": "Zero-based index of the pour in copper_pours.",
@@ -212,13 +232,14 @@ async def set_pour_net(ctx: Any, args: bytes) -> str:
 
     if not a.get("file_id"):
         return err_payload("file_id is required", "BAD_ARGS")
-    if a.get("pour_index") is None:
-        return err_payload("pour_index is required", "BAD_ARGS")
+    if a.get("pour_index") is None and not a.get("pour_id"):
+        return err_payload("pour_id or pour_index is required", "BAD_ARGS")
     if not a.get("net_id"):
         return err_payload("net_id is required", "BAD_ARGS")
 
     return ok_payload({
         "updated": True,
+        "pour_id": a.get("pour_id"),
         "pour_index": a.get("pour_index"),
         "net_id": a.get("net_id"),
         "note": "Net updated. Trigger POST /compute-pour-fill to recompute fill.",
@@ -239,6 +260,14 @@ set_pour_clearance_spec = ToolSpec(
         "type": "object",
         "properties": {
             "file_id": {"type": "string"},
+            "pour_id": {
+                "type": "string",
+                "description": (
+                    "Canonical pour identifier — the pcb_copper_pour_id or "
+                    "pcb_ground_plane_id of the element (T-536). Preferred "
+                    "over pour_index."
+                ),
+            },
             "pour_index": {
                 "type": "integer",
                 "description": "Zero-based index of the pour in copper_pours.",
@@ -263,8 +292,8 @@ async def set_pour_clearance(ctx: Any, args: bytes) -> str:
 
     if not a.get("file_id"):
         return err_payload("file_id is required", "BAD_ARGS")
-    if a.get("pour_index") is None:
-        return err_payload("pour_index is required", "BAD_ARGS")
+    if a.get("pour_index") is None and not a.get("pour_id"):
+        return err_payload("pour_id or pour_index is required", "BAD_ARGS")
     clearance = a.get("clearance_mm")
     if clearance is None:
         return err_payload("clearance_mm is required", "BAD_ARGS")
@@ -273,6 +302,7 @@ async def set_pour_clearance(ctx: Any, args: bytes) -> str:
 
     return ok_payload({
         "updated": True,
+        "pour_id": a.get("pour_id"),
         "pour_index": a.get("pour_index"),
         "clearance_mm": float(clearance),
         "note": "Clearance updated. Trigger POST /compute-pour-fill to recompute fill.",

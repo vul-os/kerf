@@ -35,11 +35,40 @@
 // Tests under Node (vitest) override via `KERF_PLANEGCS_WASM` so the test
 // runner can point at the file inside `node_modules/`.
 import { substituteParams } from './equations.js'
+import type {
+  SketchJSON,
+  SketchPlane,
+  SketchEntity,
+  SketchFrame,
+  SketchDimValue,
+  SketchSolvedEntry,
+  Configuration,
+} from '@/types'
+// Type-only import: the real runtime module is loaded lazily via dynamic
+// `import()` in loadPlanegcs() below (kept as-is — see the module-header
+// note on why it's deferred). These types are erased at build time and add
+// no eager load.
+import type {
+  GcsWrapper,
+  SketchPoint as GcsPoint,
+  SketchLine as GcsLine,
+  SketchCircle as GcsCircle,
+  SketchArc as GcsArc,
+  Constraint as GcsConstraint,
+} from '@salusoft89/planegcs'
 
 const PLANEGCS_PUBLIC_URL = '/planegcs.wasm'
 
-let modulePromise = null
-let lastFailure = null
+interface PlanegcsModule {
+  mod: typeof import('@salusoft89/planegcs')
+  wasmUrl: string
+  make: (wasmPath?: string) => Promise<GcsWrapper>
+  Algorithm: typeof import('@salusoft89/planegcs').Algorithm
+  SolveStatus: typeof import('@salusoft89/planegcs').SolveStatus
+}
+
+let modulePromise: Promise<PlanegcsModule> | null = null
+let lastFailure: unknown = null
 
 // Equations injection — see store/workspace.js loadProject for the resolver
 // that walks the project tree, parses every `.equations` file, evaluates the
@@ -48,9 +77,11 @@ let lastFailure = null
 // distance_y / angle / radius / diameter). When no resolver is registered or
 // the value is a plain number, this collapses to a no-op `Number(v) || 0`.
 
-let equationsResolverSync = null
-export function setSketchEquationsResolverSync(fn) {
-  // fn: () => { values: { [name]: number } } | null
+/** `() => { values: { [name]: number } } | null` — see {@link setSketchEquationsResolverSync}. */
+type EquationsResolverSync = () => { values: Record<string, number> } | null
+
+let equationsResolverSync: EquationsResolverSync | null = null
+export function setSketchEquationsResolverSync(fn: EquationsResolverSync | null): void {
   // SYNC because the planegcs solver is sync and we don't want every constraint
   // value to await a fetch. The store calls this with a getter that returns
   // the cached scope built once per project load.
@@ -59,7 +90,7 @@ export function setSketchEquationsResolverSync(fn) {
 
 // numericValue resolves a constraint value that may be either a number or a
 // string with `${name}` placeholders. Falls back to 0 if the result is NaN.
-function numericValue(v) {
+function numericValue(v: SketchDimValue): number {
   if (typeof v === 'number') return v
   if (typeof v === 'string' && equationsResolverSync) {
     const scope = equationsResolverSync()?.values || {}
@@ -72,12 +103,12 @@ function numericValue(v) {
   return Number.isFinite(n) ? n : 0
 }
 
-async function loadPlanegcs() {
+async function loadPlanegcs(): Promise<PlanegcsModule> {
   if (modulePromise) return modulePromise
   modulePromise = (async () => {
     try {
       const mod = await import('@salusoft89/planegcs')
-      const proc = (typeof globalThis !== 'undefined' && globalThis.process) || null
+      const proc = (typeof globalThis !== 'undefined' && (globalThis as { process?: { env?: Record<string, string | undefined> } }).process) || null
       const envOverride = proc?.env?.KERF_PLANEGCS_WASM || null
       const wasmUrl = envOverride || PLANEGCS_PUBLIC_URL
       const make = mod.make_gcs_wrapper
@@ -98,7 +129,7 @@ async function loadPlanegcs() {
 export const SKETCH_VERSION = 1
 
 // Always-present default plane.
-export const DEFAULT_PLANE = { type: 'base', name: 'XY' }
+export const DEFAULT_PLANE: SketchPlane = { type: 'base', name: 'XY' }
 
 // ---------------------------------------------------------------------------
 // Face-anchored plane handling (Phase 3).
@@ -121,7 +152,7 @@ export const DEFAULT_PLANE = { type: 'base', name: 'XY' }
 //
 // The sketcher's 3D backdrop and the SketchView's view transform consume this
 // to draw the anchor face's neighborhood under the sketch as reference.
-export function planeFaceFrame(plane) {
+export function planeFaceFrame(plane: SketchPlane | null | undefined): SketchFrame | null {
   if (!plane || plane.type !== 'face') return null
   const f = plane.frame
   if (!f) return null
@@ -135,12 +166,15 @@ export function planeFaceFrame(plane) {
 // Bake a face frame onto a plane spec. Used by FeatureView before dispatch
 // to the OCCT worker — the worker is sandboxed and can't read other feature
 // files, so we resolve the frame on the main thread first.
-export function withFaceFrame(plane, frame) {
+export function withFaceFrame(
+  plane: SketchPlane | null | undefined,
+  frame: SketchFrame | null | undefined,
+): SketchPlane | null | undefined {
   if (!plane || plane.type !== 'face' || !frame) return plane
   return { ...plane, frame: { origin: frame.origin, normal: frame.normal, uDir: frame.uDir, vDir: frame.vDir } }
 }
 
-export function defaultSketch(plane = 'XY', name = '') {
+export function defaultSketch(plane = 'XY', name = ''): SketchJSON {
   return {
     version: SKETCH_VERSION,
     plane: { type: 'base', name: plane || 'XY' },
@@ -154,7 +188,7 @@ export function defaultSketch(plane = 'XY', name = '') {
   }
 }
 
-export function parseSketch(content) {
+export function parseSketch(content: string | null | undefined): SketchJSON {
   const text = (content || '').trim()
   if (!text) return defaultSketch()
   try {
@@ -176,7 +210,9 @@ export function parseSketch(content) {
       // actual merging.
       default_config: typeof obj.default_config === 'string' ? obj.default_config : '',
       configurations: Array.isArray(obj.configurations)
-        ? obj.configurations.map(normalizeSketchConfiguration).filter(Boolean)
+        ? obj.configurations
+          .map(normalizeSketchConfiguration)
+          .filter((c: Configuration | null): c is Configuration => c !== null)
         : [],
     }
   } catch {
@@ -184,23 +220,24 @@ export function parseSketch(content) {
   }
 }
 
-function normalizeSketchConfiguration(raw) {
+function normalizeSketchConfiguration(raw: unknown): Configuration | null {
   if (!raw || typeof raw !== 'object') return null
-  const id = typeof raw.id === 'string' ? raw.id.trim() : ''
+  const r = raw as Record<string, unknown>
+  const id = typeof r.id === 'string' ? r.id.trim() : ''
   if (!id) return null
   return {
     id,
-    label: typeof raw.label === 'string' && raw.label ? raw.label : id,
-    params: raw.params && typeof raw.params === 'object' && !Array.isArray(raw.params)
-      ? raw.params : {},
+    label: typeof r.label === 'string' && r.label ? r.label : id,
+    params: r.params && typeof r.params === 'object' && !Array.isArray(r.params)
+      ? r.params as Record<string, number> : {},
   }
 }
 
-export function serializeSketch(sketch) {
+export function serializeSketch(sketch: SketchJSON): string {
   // Stable key order for diffs. We deliberately omit `solved` from the
   // pretty form when empty so freshly-saved unsolved sketches don't carry a
   // useless empty cache through revision history.
-  const out = {
+  const out: SketchJSON = {
     version: sketch.version || SKETCH_VERSION,
     plane: sketch.plane || DEFAULT_PLANE,
     entities: Array.isArray(sketch.entities) ? sketch.entities : [],
@@ -230,7 +267,7 @@ export function serializeSketch(sketch) {
 // rank is harder to expose. Used only for the status badge "fully / under /
 // over" so the imprecision is OK; planegcs's conflict/redundant flags are the
 // authoritative signal.
-function estimateDof(sketch) {
+function estimateDof(sketch: SketchJSON): number {
   const ent = sketch.entities || []
   let dof = 0
   let hasOrigin = false
@@ -371,8 +408,13 @@ function estimateDof(sketch) {
 //
 // Arc mirroring reverses the start↔end pair because a reflection inverts
 // the winding: arc A's start maps to arc B's end and vice versa.
-function decomposeSymmetric(entA, entB, allEnts, resolve) {
-  const pairs = []
+function decomposeSymmetric(
+  entA: SketchEntity,
+  entB: SketchEntity,
+  _allEnts: SketchEntity[],
+  resolve: (id: string) => string,
+): Array<{ p1: string; p2: string }> {
+  const pairs: Array<{ p1: string; p2: string }> = []
   if (entA.type === 'point' && entB.type === 'point') {
     pairs.push({ p1: resolve(entA.id), p2: resolve(entB.id) })
   } else if (entA.type === 'line' && entB.type === 'line') {
@@ -406,22 +448,32 @@ function decomposeSymmetric(entA, entB, allEnts, resolve) {
   return pairs.filter((p) => p.p1 && p.p2 && p.p1 !== p.p2)
 }
 
+/** Return shape of {@link buildPlanegcsPrimitives} — the planegcs-side primitive/constraint lists for one solve. */
+interface PlanegcsPrimitives {
+  points: GcsPoint[]
+  lines: GcsLine[]
+  arcs: GcsArc[]
+  circles: GcsCircle[]
+  constraints: GcsConstraint[]
+  remap: Map<string, string>
+}
+
 // Map our Sketch → a planegcs primitives + constraints array. We add the
 // origin as fixed=true (so it pins the gauge), and any other point that is
 // referenced by a `coincident` constraint is collapsed onto a single id.
-function buildPlanegcsPrimitives(sketch) {
-  const points = []
-  const lines = []
-  const arcs = []
-  const circles = []
-  const constraints = []
+function buildPlanegcsPrimitives(sketch: SketchJSON): PlanegcsPrimitives {
+  const points: GcsPoint[] = []
+  const lines: GcsLine[] = []
+  const arcs: GcsArc[] = []
+  const circles: GcsCircle[] = []
+  const constraints: GcsConstraint[] = []
   // Coincident reduction: if A==B, all references to B become A.
-  const remap = new Map()
-  function resolve(id) {
+  const remap = new Map<string, string>()
+  function resolve(id: string): string {
     let cur = id
     let guard = 0
     while (remap.has(cur)) {
-      cur = remap.get(cur)
+      cur = remap.get(cur) as string
       if (++guard > 1024) break
     }
     return cur
@@ -438,7 +490,7 @@ function buildPlanegcsPrimitives(sketch) {
     }
   }
   const ent = sketch.entities || []
-  const used = new Set()
+  const used = new Set<string>()
   for (const e of ent) {
     if (e.type === 'point') {
       const eid = resolve(e.id)
@@ -470,9 +522,9 @@ function buildPlanegcsPrimitives(sketch) {
         radius: typeof e.radius === 'number' && e.radius > 0 ? e.radius : 10,
       })
     } else if (e.type === 'arc') {
-      const c = ent.find((p) => p.id === e.center)
-      const s = ent.find((p) => p.id === e.start)
-      const en = ent.find((p) => p.id === e.end)
+      const c = ent.find((p) => p.id === e.center) as (SketchEntity & { x?: number; y?: number }) | undefined
+      const s = ent.find((p) => p.id === e.start) as (SketchEntity & { x?: number; y?: number }) | undefined
+      const en = ent.find((p) => p.id === e.end) as (SketchEntity & { x?: number; y?: number }) | undefined
       const cx = c?.x ?? 0
       const cy = c?.y ?? 0
       const sa = s ? Math.atan2((s.y || 0) - cy, (s.x || 0) - cx) : 0
@@ -495,7 +547,7 @@ function buildPlanegcsPrimitives(sketch) {
   // (handled by the id-merge above) and emit numeric constraint ids prefixed
   // with `c:` so the planegcs id namespace can't collide with entity ids.
   let cIdx = 0
-  function nextId() { return `c:${++cIdx}` }
+  function nextId(): string { return `c:${++cIdx}` }
   for (const c of sketch.constraints || []) {
     switch (c.type) {
       case 'coincident':
@@ -653,7 +705,15 @@ function buildPlanegcsPrimitives(sketch) {
             (entB.type === 'circle' || entB.type === 'arc')) {
           const rType = (entA.type === 'arc' && entB.type === 'arc')
             ? 'equal_radius_aa' : 'equal_radius_cc'
-          constraints.push({ id: nextId(), type: rType, c1_id: c.entity_a_id, c2_id: c.entity_b_id })
+          // NOTE (found during T-503 typing, not fixed — out of migration scope):
+          // when rType is 'equal_radius_aa' the real EqualRadius_AA constraint
+          // wants a1_id/a2_id (verified against constraint_param_index.js), but
+          // this has always pushed c1_id/c2_id regardless of rType — a second
+          // pre-existing field-name mismatch, invisible because every test that
+          // exercises symmetric_over_line on two arcs mocks the planegcs module.
+          constraints.push({
+            id: nextId(), type: rType, c1_id: c.entity_a_id, c2_id: c.entity_b_id,
+          } as unknown as GcsConstraint)
         }
         break
       }
@@ -669,7 +729,10 @@ function buildPlanegcsPrimitives(sketch) {
             constraints.push({ id: nextId(), type: 'coordinate_x', p_id: resolve(e.id), x: Number(e.x) || 0 })
             constraints.push({ id: nextId(), type: 'coordinate_y', p_id: resolve(e.id), y: Number(e.y) || 0 })
           } else if (e.type === 'circle') {
-            const cp = ent.find((x) => x.id === e.center)
+            // Defensive like the source: read x/y off whatever entity `center`
+            // resolves to, even if malformed data means it isn't a 'point'
+            // (Number(undefined) || 0 → 0, same as the original untyped access).
+            const cp = ent.find((x) => x.id === e.center) as (SketchEntity & { x?: number; y?: number }) | undefined
             if (cp) {
               constraints.push({ id: nextId(), type: 'coordinate_x', p_id: resolve(cp.id), x: Number(cp.x) || 0 })
               constraints.push({ id: nextId(), type: 'coordinate_y', p_id: resolve(cp.id), y: Number(cp.y) || 0 })
@@ -677,14 +740,14 @@ function buildPlanegcsPrimitives(sketch) {
             constraints.push({ id: nextId(), type: 'circle_radius', c_id: e.id, radius: Number(e.radius) || 0 })
           } else if (e.type === 'line') {
             for (const pid of [e.p1, e.p2]) {
-              const cp = ent.find((x) => x.id === pid)
+              const cp = ent.find((x) => x.id === pid) as (SketchEntity & { x?: number; y?: number }) | undefined
               if (!cp) continue
               constraints.push({ id: nextId(), type: 'coordinate_x', p_id: resolve(cp.id), x: Number(cp.x) || 0 })
               constraints.push({ id: nextId(), type: 'coordinate_y', p_id: resolve(cp.id), y: Number(cp.y) || 0 })
             }
           } else if (e.type === 'arc') {
             for (const pid of [e.center, e.start, e.end]) {
-              const cp = ent.find((x) => x.id === pid)
+              const cp = ent.find((x) => x.id === pid) as (SketchEntity & { x?: number; y?: number }) | undefined
               if (!cp) continue
               constraints.push({ id: nextId(), type: 'coordinate_x', p_id: resolve(cp.id), x: Number(cp.x) || 0 })
               constraints.push({ id: nextId(), type: 'coordinate_y', p_id: resolve(cp.id), y: Number(cp.y) || 0 })
@@ -738,10 +801,11 @@ function buildPlanegcsPrimitives(sketch) {
         // would otherwise pull it. We emit two coordinate constraints — the
         // same primitive pair that `block` uses for points.
         const pid = resolve(c.point)
+        const pointEnt = ent.find((x) => x.id === c.point) as (SketchEntity & { x?: number; y?: number }) | undefined
         const px = typeof c.x === 'number' ? c.x
-          : (ent.find((x) => x.id === c.point)?.x ?? 0)
+          : (pointEnt?.x ?? 0)
         const py = typeof c.y === 'number' ? c.y
-          : (ent.find((x) => x.id === c.point)?.y ?? 0)
+          : (pointEnt?.y ?? 0)
         if (c.point) {
           constraints.push({ id: nextId(), type: 'coordinate_x', p_id: pid, x: Number(px) || 0 })
           constraints.push({ id: nextId(), type: 'coordinate_y', p_id: pid, y: Number(py) || 0 })
@@ -803,13 +867,25 @@ function buildPlanegcsPrimitives(sketch) {
       // constraints (p1 on p2-p3, and p2 on p1-p3), but one is the canonical form.
       case 'collinear': {
         if (c.p1 && c.p2 && c.p3) {
+          // NOTE (found during T-503 typing, not fixed — out of migration scope):
+          // the real @salusoft89/planegcs `PointOnLine_PPP` constraint expects
+          // `lp1_id`/`lp2_id` (verified against its shipped
+          // planegcs_dist/constraint_param_index.js, which keys the wasm
+          // dispatch by those exact names), but this call — and the
+          // 'bezier_tangent'/'bezier_g1'/'bezier_g2' cases below — have always
+          // pushed `p1_id`/`p2_id` instead. Every test that exercises this path
+          // mocks '@salusoft89/planegcs' wholesale (e.g. sketchGKP36.test.js),
+          // so the mismatch has never been caught: against the real wrapper
+          // this throws "unhandled parameter lp1_id type: object_id". Left
+          // as-is — fixing constraint semantics is a behaviour change outside
+          // a migration slice's scope.
           constraints.push({
             id: nextId(),
             type: 'point_on_line_ppp',
             p_id: resolve(c.p1),
             p1_id: resolve(c.p2),
             p2_id: resolve(c.p3),
-          })
+          } as unknown as GcsConstraint)
         }
         break
       }
@@ -835,7 +911,7 @@ function buildPlanegcsPrimitives(sketch) {
         const ellEnt = ent.find((x) => x.id === c.ellipse)
         const ptEnt  = ent.find((x) => x.id === c.point)
         if (ellEnt?.type === 'ellipse' && ptEnt?.type === 'point') {
-          const cptEnt = ent.find((x) => x.id === ellEnt.center)
+          const cptEnt = ent.find((x) => x.id === ellEnt.center) as (SketchEntity & { x?: number; y?: number }) | undefined
           const cx = cptEnt?.x ?? 0
           const cy = cptEnt?.y ?? 0
           const px = ptEnt.x ?? 0
@@ -915,13 +991,17 @@ function buildPlanegcsPrimitives(sketch) {
         if (c.p0 && c.p1 && c.p2) {
           // p1 (junction point) lies on the line through p0 and p2 (the
           // tangent-handle control points of the two adjacent Bezier segments).
+          // See the 'collinear' case above: this pushes `p1_id`/`p2_id`, but the
+          // real planegcs `point_on_line_ppp` reads `lp1_id`/`lp2_id` — the same
+          // pre-existing field-name mismatch, left unfixed (behaviour change,
+          // out of migration scope).
           constraints.push({
             id: nextId(),
             type: 'point_on_line_ppp',
             p_id: resolve(c.p1),
             p1_id: resolve(c.p0),
             p2_id: resolve(c.p2),
-          })
+          } as unknown as GcsConstraint)
         }
         break
       }
@@ -947,20 +1027,21 @@ function buildPlanegcsPrimitives(sketch) {
       // Bezier segments of equal degree and uniform parameterisation, but not for
       // arcs or NURBS. This is the best approximation achievable with planegcs v1.1.7.
       case 'bezier_g2': {
-        const { p_minus2, p_minus1, p_junction, p_plus1, p_plus2 } = c
+        const { p_minus2: _p_minus2, p_minus1, p_junction, p_plus1, p_plus2: _p_plus2 } = c
         if (p_minus1 && p_junction && p_plus1) {
           // G1: collinearity of p_minus1—p_junction—p_plus1.
+          // Same pre-existing p1_id/p2_id vs. lp1_id/lp2_id mismatch as above.
           constraints.push({
             id: nextId(),
             type: 'point_on_line_ppp',
             p_id: resolve(p_junction),
             p1_id: resolve(p_minus1),
             p2_id: resolve(p_plus1),
-          })
+          } as unknown as GcsConstraint)
           // C2 equal-chord: compute chord lengths from current geometry and pin both.
-          const m1 = ent.find((x) => x.id === p_minus1)
-          const jn = ent.find((x) => x.id === p_junction)
-          const p1 = ent.find((x) => x.id === p_plus1)
+          const m1 = ent.find((x) => x.id === p_minus1) as (SketchEntity & { x?: number; y?: number }) | undefined
+          const jn = ent.find((x) => x.id === p_junction) as (SketchEntity & { x?: number; y?: number }) | undefined
+          const p1 = ent.find((x) => x.id === p_plus1) as (SketchEntity & { x?: number; y?: number }) | undefined
           if (m1 && jn && p1) {
             const d1 = Math.hypot((jn.x ?? 0) - (m1.x ?? 0), (jn.y ?? 0) - (m1.y ?? 0))
             const d2 = Math.hypot((p1.x ?? 0) - (jn.x ?? 0), (p1.y ?? 0) - (jn.y ?? 0))
@@ -993,9 +1074,19 @@ function buildPlanegcsPrimitives(sketch) {
   return { points, lines, arcs, circles, constraints, remap }
 }
 
+/** Result of {@link solveSketch} / {@link solveWithDrag}. */
+export interface SketchSolveResult {
+  ok: boolean
+  status: 'fully' | 'under' | 'over' | 'conflict'
+  dofCount: number
+  solved: Record<string, SketchSolvedEntry>
+  sketch: SketchJSON
+  conflicts: string[]
+}
+
 // Run a solve. `temporary` is an optional planegcs constraint pushed alongside
 // the persistent ones (used by drag).
-async function runSolve(sketch, temporary = null) {
+async function runSolve(sketch: SketchJSON, temporary: GcsConstraint | null = null): Promise<SketchSolveResult> {
   const { make, Algorithm, SolveStatus, wasmUrl } = await loadPlanegcs()
   const wrapper = await make(wasmUrl)
   try {
@@ -1010,7 +1101,7 @@ async function runSolve(sketch, temporary = null) {
     if (temporary) wrapper.push_primitive(temporary)
 
     const status = wrapper.solve(Algorithm.DogLeg)
-    let okStatus = 'fully'
+    let okStatus: SketchSolveResult['status'] = 'fully'
     let ok = false
     if (status === SolveStatus.Success || status === SolveStatus.Converged) {
       ok = true
@@ -1020,14 +1111,14 @@ async function runSolve(sketch, temporary = null) {
     } else if (status === SolveStatus.SuccessfulSolutionInvalid) {
       okStatus = 'conflict'
     }
-    let conflicts = []
+    let conflicts: string[] = []
     if (wrapper.has_gcs_conflicting_constraints?.()) {
       okStatus = 'conflict'
       conflicts = wrapper.get_gcs_conflicting_constraints?.() || []
     }
 
     // Read back solved values into a flat map keyed by entity id.
-    const solved = {}
+    const solved: Record<string, SketchSolvedEntry> = {}
     for (const p of wrapper.sketch_index.get_primitives()) {
       if (p.type === 'point') {
         solved[p.id] = { x: p.x, y: p.y }
@@ -1050,14 +1141,14 @@ async function runSolve(sketch, temporary = null) {
     // canvas can render off the returned object directly.
     const nextEntities = (sketch.entities || []).map((e) => {
       if (e.type === 'point' && solved[e.id]) {
-        return { ...e, x: solved[e.id].x, y: solved[e.id].y }
+        return { ...e, x: solved[e.id].x ?? e.x, y: solved[e.id].y ?? e.y }
       }
       if (e.type === 'circle' && solved[e.id]) {
-        return { ...e, radius: solved[e.id].radius }
+        return { ...e, radius: solved[e.id].radius ?? e.radius }
       }
       return e
     })
-    const nextSketch = { ...sketch, entities: nextEntities, solved }
+    const nextSketch: SketchJSON = { ...sketch, entities: nextEntities, solved }
 
     // Estimate over/under.
     const dof = estimateDof(nextSketch)
@@ -1080,8 +1171,15 @@ async function runSolve(sketch, temporary = null) {
   }
 }
 
-export async function solveSketch(sketch) {
+export async function solveSketch(sketch: SketchJSON): Promise<SketchSolveResult> {
   return runSolve(sketch)
+}
+
+/** Drag spec for {@link solveWithDrag}: pin `pointId` to `(x, y)` for one solve. */
+export interface SketchDragSpec {
+  pointId: string
+  x: number
+  y: number
 }
 
 // Drag solve: pin a single point to (x,y) for the duration of one solve. We
@@ -1092,18 +1190,18 @@ export async function solveSketch(sketch) {
 // the cursor position with distance 0. Even simpler — two scalar `equal`
 // constraints. The cleanest is to push a temporary fixed coordinate via the
 // `coordinate_x` / `coordinate_y` constraints which planegcs also supports:
-export async function solveWithDrag(sketch, drag) {
+export async function solveWithDrag(sketch: SketchJSON, drag: SketchDragSpec | null | undefined): Promise<SketchSolveResult> {
   if (!drag) return solveSketch(sketch)
   // Two temporary constraints that pin the dragged point's x/y to the cursor
   // coordinates. planegcs has `coordinate_x` / `coordinate_y` for exactly this.
-  const tx = {
+  const tx: GcsConstraint = {
     id: 'c:drag_x',
     type: 'coordinate_x',
     p_id: drag.pointId,
     x: Number(drag.x) || 0,
     temporary: true,
   }
-  const ty = {
+  const ty: GcsConstraint = {
     id: 'c:drag_y',
     type: 'coordinate_y',
     p_id: drag.pointId,
@@ -1113,7 +1211,7 @@ export async function solveWithDrag(sketch, drag) {
   // We want both — but runSolve takes a single `temporary`. Stuff them as a
   // synthetic primitive: just push both into the constraints array via a
   // sketch-level mutation prior to solve.
-  const augmented = {
+  const augmented: SketchJSON = {
     ...sketch,
     constraints: [
       ...(sketch.constraints || []),
@@ -1128,7 +1226,7 @@ export async function solveWithDrag(sketch, drag) {
   return runSolveTwoTemp(augmented, [tx, ty])
 }
 
-async function runSolveTwoTemp(sketch, temps) {
+async function runSolveTwoTemp(sketch: SketchJSON, temps: GcsConstraint[]): Promise<SketchSolveResult> {
   const { make, Algorithm, SolveStatus, wasmUrl } = await loadPlanegcs()
   const wrapper = await make(wasmUrl)
   try {
@@ -1142,7 +1240,7 @@ async function runSolveTwoTemp(sketch, temps) {
     const status = wrapper.solve(Algorithm.DogLeg)
     const ok = status === SolveStatus.Success || status === SolveStatus.Converged
     if (ok) wrapper.apply_solution()
-    const solved = {}
+    const solved: Record<string, SketchSolvedEntry> = {}
     for (const p of wrapper.sketch_index.get_primitives()) {
       if (p.type === 'point') solved[p.id] = { x: p.x, y: p.y }
       else if (p.type === 'circle') solved[p.id] = { radius: p.radius }
@@ -1152,19 +1250,19 @@ async function runSolveTwoTemp(sketch, temps) {
       if (solved[dst] && !solved[src]) solved[src] = solved[dst]
     }
     const nextEntities = (sketch.entities || []).map((e) => {
-      if (e.type === 'point' && solved[e.id]) return { ...e, x: solved[e.id].x, y: solved[e.id].y }
-      if (e.type === 'circle' && solved[e.id]) return { ...e, radius: solved[e.id].radius }
+      if (e.type === 'point' && solved[e.id]) return { ...e, x: solved[e.id].x ?? e.x, y: solved[e.id].y ?? e.y }
+      if (e.type === 'circle' && solved[e.id]) return { ...e, radius: solved[e.id].radius ?? e.radius }
       return e
     })
-    const nextSketch = { ...sketch, entities: nextEntities, solved }
+    const nextSketch: SketchJSON = { ...sketch, entities: nextEntities, solved }
     const dof = estimateDof(nextSketch)
-    let okStatus = ok ? (dof > 0 ? 'under' : dof < 0 ? 'over' : 'fully') : 'conflict'
+    const okStatus: SketchSolveResult['status'] = ok ? (dof > 0 ? 'under' : dof < 0 ? 'over' : 'fully') : 'conflict'
     return { ok, status: okStatus, dofCount: dof, solved, sketch: nextSketch, conflicts: [] }
   } finally {
     try { wrapper.destroy_gcs_module() } catch { /* ignore */ }
   }
 }
 
-export function getSolverFailure() {
+export function getSolverFailure(): unknown {
   return lastFailure
 }

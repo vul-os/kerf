@@ -26,7 +26,7 @@ import { mergeEquationFiles } from '../lib/equations.js'
 import { parsePart, serializePart, defaultPart, getActiveConfig } from '../lib/part.js'
 import { parseLibraryMappings, setCircuitMapping as setCircuitMappingHelper } from '../lib/circuitMappings.js'
 import {
-  parseFeature, serializeFeature, DEFAULT_FEATURE, cancelFeatures, destroyOcct,
+  parseFeature, serializeFeature, cancelFeatures, destroyOcct,
 } from '../lib/occtRunner.js'
 import { runCircuit, cancelCircuit, DEFAULT_CIRCUIT } from '../lib/circuitRunner.js'
 import * as JSCADModeling from '@jscad/modeling'
@@ -34,8 +34,554 @@ import { extractBoardOutline } from '../lib/circuitOutline.js'
 import { sketchToGeom2 } from '../lib/sketchGeom2.js'
 import { meshCache } from '../lib/meshCache.js'
 import { subdToBufferGeometry, meshDocToBufferGeometry } from '../lib/subdToBufferGeometry.js'
-import { stash as l1Stash, markFlushed as l1MarkFlushed, listUnflushed as l1ListUnflushed } from '../lib/localStash.js'
+import { markFlushed as l1MarkFlushed, listUnflushed as l1ListUnflushed } from '../lib/localStash.js'
 import { markDirty as schedulerMarkDirty } from '../lib/autosaveScheduler.js'
+import type { BufferGeometry } from 'three'
+import type {
+  ApiProject, ApiFile, ApiThread, FileKind, FileRevision, ActivityEvent, BOMRow,
+} from '@/types'
+import type {
+  JscadPart, FeatureFile, SketchJSON, AssemblyDocument, Configuration, Mesh,
+} from '@/types'
+import type { CircuitElement, CircuitJson } from '@/types'
+
+// ---------------------------------------------------------------------------
+// T-508 locally-typed shapes.
+//
+// Everything in this block covers a store slice whose shape isn't in
+// src/types/ (T-501). Per docs/typescript-migration.md's T-501 conventions,
+// slice agents type a missing shape locally rather than editing src/types/
+// (that file's shape is its owner's call). Noted in the T-508 report:
+//   - FileKind (src/types/api.ts) is missing 'section' | 'cam_layered' |
+//     'tool' | 'plc_st' | 'quadmesh' — all createFile()'able kinds in this
+//     file — hence NewFileKind below.
+//   - ApiFile lacks `version` (OCC patch header) and `mesh_url` (Phase-3
+//     server-tessellated glb pointer) — both read directly off File rows
+//     here — hence WorkspaceFile below.
+//   - ApiThread lacks `is_starred`/`last_message_at` — hence WorkspaceThread.
+//   - There is no shared chat-message type richer than api.ts's
+//     ApiChatMessage (request/response shape only); the store's runtime
+//     message objects carry streaming/tool-chip UI state on top — hence
+//     WorkspaceMessage.
+//   - There is no shared "Part" (Library Part document) domain type — hence
+//     PartDocument, mined from src/lib/part.js's parsePart()/serializePart().
+//   - The Drawing document (src/store/workspace.js's own parseDrawing/
+//     serializeDrawing) has many per-kind ad hoc fields (8+ dimension kinds,
+//     view/annotation/symbol variants) that were never given a shared type.
+//     Modeled here loosely (known common fields + a `[key: string]: unknown`
+//     escape hatch) rather than inventing false per-kind precision in a
+//     rename-only migration.
+// ---------------------------------------------------------------------------
+
+/** kind values createFile() accepts that FileKind (src/types/api.ts) doesn't cover yet. */
+export type NewFileKind = FileKind | 'section' | 'cam_layered' | 'tool' | 'plc_st' | 'quadmesh'
+
+/** A File row as this store actually uses it — ApiFile plus two fields it reads but that aren't in the shared type. */
+export interface WorkspaceFile extends ApiFile {
+  version?: number
+  mesh_url?: string | null
+}
+
+export interface WorkspaceThread extends ApiThread {
+  is_starred?: boolean
+  last_message_at?: string
+}
+
+/** FileRevision (src/types/api.ts) lacks `file_id` — read directly here (undoLastRevision's
+ * "are these revisions still for the open file" guard) but not evidenced elsewhere in api.ts's
+ * FileRevision mining, so kept as a local extension rather than widening the shared type. */
+export interface WorkspaceRevision extends FileRevision {
+  file_id?: string
+}
+
+/** One tool-use chip rendered on a streaming assistant message (sendMessageStreaming). */
+export interface ToolChip {
+  tool_use_id: string
+  name: string
+  status: 'queued' | 'running' | 'done' | 'error'
+  input?: Record<string, unknown>
+  content_preview?: string
+}
+
+/**
+ * A chat message as it lives in store state — richer than api.ts's ApiChatMessage
+ * (which models only the request/response wire shape). The index signature tolerates
+ * the assorted server/optimistic fields (`_pending`, `_error`, `tool_name`, `tool_calls`,
+ * `is_starred`-adjacent bookkeeping, ...) touched across sendMessage/sendMessageStreaming.
+ */
+export interface WorkspaceMessage {
+  id: string
+  thread_id?: string
+  role: string
+  content?: string
+  part_refs?: PartRef[]
+  model?: string
+  created_at?: string
+  tool_calls?: unknown[]
+  tool_name?: string
+  _pending?: boolean
+  _streaming?: boolean
+  _toolChips?: ToolChip[]
+  _error?: string
+  [key: string]: unknown
+}
+
+/** pickedPart / pendingPartRefs entry — a reference to a part (or a part+feature) attachable to a chat message. */
+export interface PartRef {
+  file_id: string | null
+  part_id: string
+  label?: string
+  feature_kind?: string
+  feature_id?: string
+}
+
+/** parts / drawingSourceParts entries: JSCAD parts (Geom3-backed) or STEP/mesh/subd-loaded parts (BufferGeometry-backed, three.js — no @types/three in this repo, so the geom field there is a boundary this slice doesn't own). */
+export type RenderablePart = JscadPart | { id: string; geom: BufferGeometry; color?: number }
+
+/** Per-part appearance override patch (src/lib/appearance.js's mergeAppearance/writeAppearance). */
+export interface AppearancePatch {
+  color?: string | number | null
+  opacity?: number | null
+  material?: string | null
+  metalness?: number | null
+  roughness?: number | null
+}
+
+/** src/lib/part.js parsePart()'s normalized in-memory shape — no shared "Part" domain type exists yet (see header note). */
+export interface PartDistributor {
+  name: string
+  url: string
+  sku?: string
+  price_usd?: number
+  stock?: number
+  fetched_at?: string
+}
+export interface PartPhoto {
+  storage_key: string
+  mime_type: string
+  caption?: string
+  primary?: boolean
+  width?: number
+  height?: number
+  bytes?: number
+}
+export type PartVisibility = 'private' | 'unlisted' | 'public'
+export interface PartDocument {
+  version: number
+  name: string
+  description: string
+  category: string
+  manufacturer: string
+  mpn: string
+  value: string
+  datasheet_url: string
+  distributors: PartDistributor[]
+  model_storage_key: string
+  model_mime_type: string
+  symbol_file_id: string
+  footprint_file_id: string
+  metadata?: Record<string, unknown>
+  visibility: PartVisibility
+  photos: PartPhoto[]
+  default_config: string
+  configurations: Configuration[]
+}
+
+/** Drawing document — src/store/workspace.js's own parseDrawing/serializeDrawing (not owned by any other slice). Deliberately loose: see header note. */
+export interface DrawingFrame {
+  size?: string
+  orientation?: string
+  title?: string
+  template?: string
+  sheet_number?: string
+  [key: string]: unknown
+}
+export interface DrawingView {
+  id: string
+  source_file_id?: string
+  part_id?: string
+  projection?: string
+  scale?: number
+  position?: number[]
+  is_section?: boolean
+  show_hidden?: boolean
+  show_silhouette?: boolean
+  label?: string
+  [key: string]: unknown
+}
+export interface DrawingDimension {
+  id: string
+  kind: string
+  view_id?: string
+  [key: string]: unknown
+}
+export interface DrawingAnnotation {
+  id: string
+  kind?: string
+  view_id?: string
+  [key: string]: unknown
+}
+export interface DrawingCenterline {
+  id: string
+  view_id?: string
+  style?: string
+  [key: string]: unknown
+}
+export interface DrawingBreak {
+  id: string
+  view_id?: string
+  orientation?: string
+  style?: string
+  [key: string]: unknown
+}
+export interface DrawingSymbol {
+  id: string
+  kind?: string
+  view_id?: string
+  position?: { x: number; y: number }
+  params?: Record<string, unknown>
+  [key: string]: unknown
+}
+export interface DrawingSheet {
+  id: string
+  frame: DrawingFrame
+  views: DrawingView[]
+  dimensions: DrawingDimension[]
+  annotations: DrawingAnnotation[]
+  centerlines: DrawingCenterline[]
+  breaks: DrawingBreak[]
+  symbols: DrawingSymbol[]
+}
+export interface DrawingDoc {
+  sheets: DrawingSheet[]
+  currentSheet: number
+}
+
+export type FeaturePickMode = 'face' | 'edge' | 'pushpull' | 'sketch_on_face' | 'one_shot_face' | 'one_shot_edge'
+export interface FeaturePickTarget {
+  featureId: string
+  fieldKey: string
+  accept: 'face' | 'edge' | 'edge_multi'
+}
+
+/** currentCircuit — mirrors workers.ts's CircuitCompileResult success branch (circuitRunner.js splitCircuitJson()). */
+export interface WorkspaceCircuit {
+  raw: CircuitJson
+  schematic: CircuitElement[]
+  pcb: CircuitElement[]
+  threeD: CircuitElement[]
+  errors: CircuitElement[]
+}
+
+export interface BomState {
+  rows: BOMRow[]
+  total: number | null
+  warnings: string[]
+  loading: boolean
+  error: string | null
+}
+
+export interface EquationsScopeError {
+  file?: string
+  [key: string]: unknown
+}
+export interface EquationsScope {
+  values: Record<string, number>
+  errors: EquationsScopeError[]
+  duplicates: Array<{ name: string; files: string[] }>
+}
+
+export interface UploadProgress {
+  filename: string
+  received: number
+  total: number
+  bytes: number
+  totalBytes: number
+  status: 'hashing' | 'uploading' | 'error'
+  uploadId: string | null
+  abort: () => void
+  error: string | null
+}
+
+export interface ConflictFile {
+  file_id: string | null
+  current_version: number | null
+  current_content_preview: string
+}
+
+export interface UnsavedEntry {
+  path: string
+  bytes: Uint8Array
+  stashed_at: number
+  _error?: string
+}
+
+export interface MaterialMenuEntry {
+  id: string
+  name: string
+  color: string | null
+}
+
+export type RightDrawerTab = 'chat' | 'activity' | 'git' | 'history'
+
+/** File-kind discriminant this store's editor pipeline routes on (fileKindFor()). */
+export type EditorFileKind =
+  | 'folder' | 'assembly' | 'drawing' | 'sketch' | 'part' | 'feature' | 'circuit'
+  | 'equations' | 'script' | 'subd' | 'mesh' | 'text' | 'step' | 'jscad'
+
+// ---------------------------------------------------------------------------
+// The store shape itself.
+// ---------------------------------------------------------------------------
+
+export interface WorkspaceData {
+  projectId: string | null
+  project: ApiProject | null
+  files: WorkspaceFile[]
+  currentFileId: string | null
+  currentFile: WorkspaceFile | null
+  currentFileContent: string
+  dirty: boolean
+  saving: boolean
+  loadingProject: boolean
+  loadError: string | null
+
+  parts: RenderablePart[]
+  partsError: string | null
+  loadingParts: boolean
+
+  threads: WorkspaceThread[]
+  currentThreadId: string | null
+  messages: WorkspaceMessage[]
+  loadingMessages: boolean
+  sending: boolean
+  streamAbortController: AbortController | null
+
+  pickedPart: PartRef | null
+  pendingPartRefs: PartRef[]
+
+  hiddenPartIds: Map<string, Set<string>>
+
+  sessionAppearance: Map<string, Record<string, AppearancePatch>>
+
+  measureMode: 'object' | 'face' | 'edge' | 'vertex'
+  selectedFeatures: Array<{ partId: string; kind: string; featureId: string }>
+  toast: string | null
+
+  parsedAssembly: AssemblyDocument | null
+  selectedComponentId: string | null
+
+  parsedDrawing: DrawingDoc | null
+  drawingSourceParts: Map<string, RenderablePart[]>
+  selectedDimensionId: string | null
+  selectedAnnotationId: string | null
+
+  parsedSketch: SketchJSON | null
+  sketchStatus: 'fully' | 'under' | 'over' | 'conflict' | null
+  sketchDof: number
+  sketchConflicts: string[]
+
+  currentPart: PartDocument | null
+
+  currentFeature: FeatureFile | null
+  featureMeshes: Mesh[]
+  featureError: string | null
+  featureLoading: boolean
+
+  featureSelection: { faceIds: Set<string>; edgeIds: Set<string> }
+  featurePickMode: FeaturePickMode | null
+  featurePickTarget: FeaturePickTarget | null
+
+  currentCircuit: WorkspaceCircuit | null
+  circuitError: string | null
+  circuitLoading: boolean
+  selectedCircuitRefdes: string | null
+  selectedCircuitNet: string | null
+  selectedCircuitComponentId: string | null
+
+  bomState: BomState
+
+  currentConfigByFile: Record<string, string>
+
+  equationsScope: EquationsScope
+
+  uploadProgress: UploadProgress | null
+
+  revisionDrawerOpen: boolean
+  revisions: WorkspaceRevision[]
+  loadingRevisions: boolean
+  redoStack: Array<{ fileId: string | null; revisionId: string }>
+  editorFocused: boolean
+
+  rightDrawer: { open: boolean; tab: RightDrawerTab }
+
+  gitOpen: boolean
+
+  activityOpen: boolean
+  activityEvents: ActivityEvent[]
+  activityLoading: boolean
+  activityError: string | null
+  activityNextCursor: string | null
+
+  jscadSketchLinks: Map<string, string>
+
+  conflictFile: ConflictFile | null
+
+  unsavedEntries: UnsavedEntry[]
+
+  materials: MaterialMenuEntry[]
+}
+
+export interface WorkspaceActions {
+  loadProject: (id: string) => Promise<void>
+  selectFile: (fileId: string | null | undefined) => Promise<void>
+  loadFileForEditor: (fileId: string) => Promise<void>
+  setLiveParts: (parts: RenderablePart[] | null | undefined) => void
+  setPartsError: (msg: string | null) => void
+  compileCircuit: (source: string) => Promise<void>
+  editContent: (text: string) => void
+  editAssemblyContent: (text: string, opts?: { skipReresolve?: boolean }) => Promise<void>
+  selectComponent: (componentId: string | null) => void
+  selectCircuitRefdes: (refdes: string | null) => void
+  selectCircuitNet: (name: string | null) => void
+  selectCircuitComponent: (id: string | null) => void
+  circuitLibraryMappings: () => Record<string, string>
+  setCircuitLibraryMapping: (refdes: string, partFileId: string | null) => void
+  saveFile: () => Promise<void>
+  createSketchOnFace: (opts: {
+    parentId?: string | null
+    name?: string
+    featureFileId: string
+    featureNodeId?: string | null
+    faceId: number | string
+  }) => Promise<WorkspaceFile | null>
+  createFile: (parentId: string | null, kind: NewFileKind) => Promise<WorkspaceFile | undefined>
+  createFeatureFromSketch: (sketchFileId: string) => Promise<void>
+  createJscadFromSketch: (
+    sketchFileId: string, operation: string, params?: Record<string, unknown>,
+  ) => Promise<WorkspaceFile | null>
+  _rebuildJscadSketchLinks: (files?: WorkspaceFile[]) => void
+  uploadAsset: (
+    browserFile: File,
+    opts?: { kind?: string; parent_id?: string | null; signal?: AbortSignal },
+  ) => Promise<WorkspaceFile | null>
+  cancelUpload: () => Promise<void>
+  dismissUploadError: () => void
+  renameFile: (id: string, name: string) => Promise<void>
+  deleteFile: (id: string) => Promise<void>
+  updateProjectName: (name: string) => Promise<void>
+  pickPart: (partId: string | null) => void
+  attachPickedToChat: () => void
+  removePartRef: (idx: number) => void
+  clearPendingPartRefs: () => void
+  togglePartVisibility: (fileId: string, partId: string) => void
+  isolatePart: (fileId: string, partId: string) => void
+  showAllParts: (fileId: string) => void
+  hideOthers: (fileId: string, keepIds: string[] | null | undefined) => void
+  setPartAppearance: (partId: string, patch: AppearancePatch) => Promise<void>
+  previewPartAppearance: (partId: string, patch: AppearancePatch) => void
+  resetPartAppearance: (partId: string) => Promise<void>
+  loadMaterials: () => Promise<void>
+  setMeasureMode: (mode: 'object' | 'face' | 'edge' | 'vertex') => void
+  pickFeature: (
+    partId: string | null, kind: string | null, featureId: string | null, shift?: boolean,
+  ) => void
+  clearSelectedFeatures: () => void
+  attachFeatureToChat: (partId: string, kind: string, featureId: string) => void
+  recolorPart: (partId: string, rgb: number[]) => Promise<void>
+  movePart: (partId: string, deltaXYZ: number[]) => Promise<void>
+  setPartPosition: (partId: string, xyz: number[]) => Promise<void>
+  dismissToast: () => void
+  setToast: (msg: string | null) => void
+  selectThread: (threadId: string | null) => Promise<void>
+  createThread: (opts?: {
+    title?: string
+    file_id?: string | null
+    model?: string
+  }) => Promise<WorkspaceThread | undefined>
+  setThreadModel: (threadId: string, model: string) => Promise<void>
+  toggleStar: (threadId: string) => Promise<void>
+  deleteThread: (threadId: string) => Promise<void>
+  sendMessage: (content: string, opts?: { model?: string }) => Promise<void>
+  sendMessageStreaming: (content: string, opts?: { model?: string }) => Promise<void>
+  cancelStream: () => void
+  loadUnsavedEntries: () => Promise<void>
+  restoreUnsavedEntries: () => Promise<void>
+  discardUnsavedEntries: () => Promise<void>
+  reset: () => void
+  updateDrawing: (mutate: (doc: DrawingDoc) => DrawingDoc | null | undefined) => Promise<void>
+  updateSheet: (mutate: (sheet: DrawingSheet) => DrawingSheet | null | undefined) => Promise<void>
+  selectSheet: (idx: number) => void
+  addSheet: (opts?: {
+    size?: string; orientation?: string; template?: string; title?: string
+  }) => Promise<void>
+  removeSheet: (idx: number) => Promise<void>
+  resolveDrawingSources: () => Promise<void>
+  selectDimension: (id: string | null) => void
+  addDimension: (payload: Partial<DrawingDimension> | null | undefined) => Promise<void> | undefined
+  updateDimension: (id: string, patch: Partial<DrawingDimension> | null | undefined) => Promise<void> | undefined
+  deleteDimension: (id: string) => Promise<void>
+  updateFrame: (patch: Partial<DrawingFrame>) => Promise<void>
+  addView: (spec: {
+    source_file_id?: string
+    part_id?: string
+    projection?: string
+    position?: number[]
+    scale?: number
+    is_section?: boolean
+  }) => Promise<void>
+  addViews: (specs: Array<Partial<DrawingView>> | null | undefined) => Promise<void> | undefined
+  updateView: (viewId: string, patch: Partial<DrawingView>) => Promise<void>
+  removeView: (viewId: string) => Promise<void>
+  selectAnnotation: (id: string | null) => void
+  addAnnotation: (annotation: (Partial<DrawingAnnotation> & { kind: string }) | null | undefined) => Promise<void> | undefined
+  updateAnnotation: (id: string, patch: Partial<DrawingAnnotation> | null | undefined) => Promise<void> | undefined
+  removeAnnotation: (id: string | null | undefined) => Promise<void> | undefined
+  addCenterline: (payload: Partial<DrawingCenterline> | null | undefined) => Promise<void> | undefined
+  removeCenterline: (id: string) => Promise<void>
+  addBreak: (payload: Partial<DrawingBreak> | null | undefined) => Promise<void> | undefined
+  removeBreak: (id: string) => Promise<void>
+  addSymbol: (payload: (Partial<DrawingSymbol> & { kind: string }) | null | undefined) => Promise<void> | undefined
+  updateSymbol: (id: string, patch: Partial<DrawingSymbol> | null | undefined) => Promise<void> | undefined
+  removeSymbol: (id: string) => Promise<void>
+  updateSketch: (mutate: (sketch: SketchJSON) => SketchJSON | null | undefined) => Promise<void>
+  _reEvalJscadForSketch: (sketchAbsPath: string) => Promise<void>
+  updateFeature: (mutate: (feature: FeatureFile) => FeatureFile | null | undefined) => Promise<void>
+  setFeatureMeshes: (
+    meshes: Mesh[] | null | undefined, opts?: { error?: string | null; loading?: boolean },
+  ) => void
+  setFeatureSelection: (selection?: { faceIds?: Set<string>; edgeIds?: Set<string> } | null) => void
+  clearFeatureSelection: () => void
+  setFeaturePickMode: (mode: FeaturePickMode | null, target?: FeaturePickTarget | null) => void
+  updatePart: (patch: Partial<PartDocument> | null | undefined) => void
+  replacePartModel: (browserFile: File) => Promise<void>
+  refreshEquationsCache: () => Promise<EquationsScope>
+  setCurrentConfig: (fileId: string, configId: string | null) => void
+  getActiveConfigParams: (fileId: string) => Record<string, number> | null
+  loadBOM: (projectId?: string | null) => Promise<void>
+  setSketchSolved: (
+    next: SketchJSON,
+    status?: 'fully' | 'under' | 'over' | 'conflict' | null,
+    dofCount?: number,
+    conflicts?: string[],
+  ) => void
+  setEditorFocused: (focused: boolean) => void
+  openRevisionDrawer: () => void
+  closeRevisionDrawer: () => void
+  loadRevisions: (fileId: string) => Promise<void>
+  restoreRevision: (revisionId: string) => Promise<void>
+  undoLastRevision: () => Promise<void>
+  redoRevision: () => Promise<void>
+  openRightDrawer: (tab?: RightDrawerTab) => void
+  closeRightDrawer: () => void
+  setRightDrawerTab: (tab: RightDrawerTab) => void
+  openGitPanel: () => void
+  closeGitPanel: () => void
+  openActivity: () => void
+  closeActivity: () => void
+  loadActivity: (more?: boolean) => Promise<void>
+}
+
+export type WorkspaceState = WorkspaceData & WorkspaceActions
 
 // Prune the IndexedDB mesh cache on first store import (i.e. app start). Best-
 // effort: any failure is silently swallowed so a corrupted DB can't keep the
@@ -94,7 +640,7 @@ export const DEFAULT_DRAWING = JSON.stringify({
   annotations: [],
 }, null, 2)
 
-function fileKindFor(file) {
+function fileKindFor(file: WorkspaceFile | null | undefined): EditorFileKind {
   // Map a File row → {kind: 'jscad' | 'step' | 'assembly' | 'drawing' | 'sketch' | 'part' | 'circuit' | 'folder'}
   // for the editor pipeline. We sniff by extension since the DB `kind` is the
   // broader ('file', 'folder', 'assembly', 'drawing', 'sketch', 'part') taxonomy.
@@ -133,7 +679,7 @@ function fileKindFor(file) {
   return 'jscad'
 }
 
-const initial = {
+const initial: WorkspaceData = {
   projectId: null,
   project: null,
   files: [],
@@ -345,6 +891,11 @@ const initial = {
   //   { path, bytes, stashed_at, _error? }
   // The UnsavedRestoreBanner renders this slice and drives Restore / Discard.
   unsavedEntries: [],
+
+  // The project's .material library files, flattened to what the appearance UI
+  // needs. Loaded on demand (when the context menu opens) rather than eagerly —
+  // most sessions never assign a material, and each one costs a getFile.
+  materials: [],
 }
 
 // Tolerant JSON parse for drawing content. Empty/blank → defaults.
@@ -363,7 +914,7 @@ const initial = {
 // Back-compat: older angular dimensions stored {a:vertex, b:firstArm,
 // offset:degrees} (offset reused as fan-open angle, radius implicit). Migrate
 // those into the new {vertex, a, b, radius} shape on read.
-function defaultSheet(idx = 0) {
+function defaultSheet(_idx = 0) {
   return {
     id: shortId('sh'),
     frame: { size: 'A3', orientation: 'landscape', title: 'Untitled Drawing', template: 'default' },
@@ -486,15 +1037,15 @@ function shortId(prefix) {
 // Per-(file_id + content-hash) cache of {parts} produced by running a JSCAD
 // or STEP file. Module-scoped so it survives store resets and the editor
 // reusing the same source file across many assemblies.
-const componentResultCache = new Map()
-function cacheKey(fileId, contentSig) {
+const componentResultCache = new Map<string, { parts: RenderablePart[] }>()
+function cacheKey(fileId: string, contentSig: string): string {
   return `${fileId}::${contentSig}`
 }
 // Evict all cache entries whose key starts with `${fileId}::`. This is needed
 // for transitive sketch-change invalidation: when a .jscad is affected by a
 // sketch edit its content hasn't changed (only a dep has), so we can't rely on
 // the content-hash key changing — we must proactively evict by file_id prefix.
-export function evictComponentCacheForFile(fileId) {
+export function evictComponentCacheForFile(fileId: string | null | undefined): void {
   if (!fileId) return
   const prefix = `${fileId}::`
   for (const k of componentResultCache.keys()) {
@@ -504,7 +1055,7 @@ export function evictComponentCacheForFile(fileId) {
 // Tiny djb2 string hash; used to invalidate the cache when a referenced file's
 // content changes. updated_at would also work but isn't always available on
 // list-only File rows.
-function strHash(s) {
+function strHash(s: string | null | undefined): string {
   if (!s) return '0'
   let h = 5381
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0
@@ -513,13 +1064,13 @@ function strHash(s) {
 
 // Compute the absolute path (leading '/') for a file in the project tree by
 // walking its parent_id chain. Returns '' if the file is not found.
-export function fileAbsPath(files, fileId) {
+export function fileAbsPath(files: WorkspaceFile[] | null | undefined, fileId: string | null | undefined): string {
   if (!Array.isArray(files) || !fileId) return ''
   const byId = new Map(files.map((f) => [f.id, f]))
   const file = byId.get(fileId)
   if (!file) return ''
-  const segs = []
-  let cur = file
+  const segs: string[] = []
+  let cur: WorkspaceFile | undefined = file
   let safety = 0
   while (cur && safety++ < 64) {
     segs.unshift(cur.name)
@@ -532,7 +1083,7 @@ export function fileAbsPath(files, fileId) {
 // Return true if `jscadSource` contains an `import X from '...path'` line
 // whose path matches `sketchAbsPath`. The regex is reset before each use
 // because it's a stateful `/gm` pattern exported from jscadRunner.
-export function jscadImportsSketch(jscadSource, sketchAbsPath) {
+export function jscadImportsSketch(jscadSource: string | null | undefined, sketchAbsPath: string | null | undefined): boolean {
   if (!jscadSource || !sketchAbsPath) return false
   // Build a fresh copy of the regex to avoid stateful lastIndex issues.
   const re = new RegExp(SKETCH_IMPORT_RE.source, SKETCH_IMPORT_RE.flags)
@@ -551,7 +1102,7 @@ export function jscadImportsSketch(jscadSource, sketchAbsPath) {
   return false
 }
 
-export const useWorkspace = create((set, get) => ({
+export const useWorkspace = create<WorkspaceState>()((set, get) => ({
   ...initial,
 
   // ---- Project + files ----
@@ -682,7 +1233,7 @@ export const useWorkspace = create((set, get) => ({
           currentFileContent: file.content ?? '',
           dirty: false,
           parts: [],
-          parsedSketch: parseSketch(file.content ?? ''),
+          parsedSketch: parseSketch(file.content ?? '') as SketchJSON,
           sketchStatus: null,
           sketchDof: 0,
           sketchConflicts: [],
@@ -704,7 +1255,7 @@ export const useWorkspace = create((set, get) => ({
           currentFileContent: file.content ?? '',
           dirty: false,
           parts: [],
-          currentFeature: parseFeature(file.content ?? ''),
+          currentFeature: parseFeature(file.content ?? '') as FeatureFile,
           featureMeshes: [],
           featureError: null,
           featureLoading: false,
@@ -748,7 +1299,7 @@ export const useWorkspace = create((set, get) => ({
         // `parts` if the Part has a model_storage_key — the LibraryEditor's
         // 3D preview reuses the standard Renderer with a single-file scene,
         // and that scene needs a parts array.
-        const part = parsePart(file.content ?? '')
+        const part = parsePart(file.content ?? '') as PartDocument
         set({
           currentFile: file,
           currentFileContent: file.content ?? '',
@@ -841,7 +1392,7 @@ export const useWorkspace = create((set, get) => ({
           currentFileContent: file.content ?? '',
           dirty: false,
           parts: [],
-          parsedAssembly: parseAssembly(file.content ?? ''),
+          parsedAssembly: parseAssembly(file.content ?? '') as AssemblyDocument,
         })
         try {
           const parts = await resolveAssemblyParts(get, projectId, file.content ?? '')
@@ -1026,7 +1577,7 @@ export const useWorkspace = create((set, get) => ({
   // re-render cost when only stale serialized JSON differs (rare).
   editAssemblyContent: async (text, { skipReresolve = false } = {}) => {
     const { projectId, currentFileId } = get()
-    set({ currentFileContent: text, dirty: true, parsedAssembly: parseAssembly(text) })
+    set({ currentFileContent: text, dirty: true, parsedAssembly: parseAssembly(text) as AssemblyDocument })
     // Wire L1 stash for assembly edits (same path as editContent).
     if (projectId && currentFileId && text != null) {
       const bytes = new TextEncoder().encode(text)
@@ -1081,7 +1632,7 @@ export const useWorkspace = create((set, get) => ({
     set({ saving: true })
     try {
       // Include the version we last read so the server can detect conflicts.
-      const patch = { content: currentFileContent }
+      const patch: { content: string; expected_version?: number } = { content: currentFileContent }
       if (currentFile?.version != null) {
         patch.expected_version = currentFile.version
       }
@@ -1104,7 +1655,7 @@ export const useWorkspace = create((set, get) => ({
     } catch (err) {
       // 409 = version conflict: someone else edited this file.
       if (err?.status === 409) {
-        let detail = {}
+        let detail: { current_version?: number; current_content_preview?: string } = {}
         try {
           const parsed = JSON.parse(err.message)
           detail = parsed.detail || parsed
@@ -1648,10 +2199,6 @@ export const useWorkspace = create((set, get) => ({
       color: null, opacity: null, material: null, metalness: null, roughness: null,
     }),
 
-  // The project's .material library files, flattened to what the appearance UI
-  // needs. Loaded on demand (when the context menu opens) rather than eagerly —
-  // most sessions never assign a material, and each one costs a getFile.
-  materials: [],
   loadMaterials: async () => {
     const { projectId, files } = get()
     if (!projectId) return
@@ -2194,11 +2741,12 @@ export const useWorkspace = create((set, get) => ({
     )
 
     // Keep only the entries that failed; attach _error to each.
+    const values = results.map((r) => (r.status === 'fulfilled' ? r.value : undefined))
     set((s) => ({
-      unsavedEntries: s.unsavedEntries.reduce((acc, entry) => {
-        const result = results.find((r) => r.value?.path === entry.path)
-        if (result?.value?.ok) return acc  // Successfully restored — remove
-        const errorMsg = result?.value?.error || 'Failed to restore'
+      unsavedEntries: s.unsavedEntries.reduce<UnsavedEntry[]>((acc, entry) => {
+        const result = values.find((v) => v?.path === entry.path)
+        if (result?.ok) return acc  // Successfully restored — remove
+        const errorMsg = (!result?.ok && result?.error) || 'Failed to restore'
         return [...acc, { ...entry, _error: errorMsg }]
       }, []),
     }))
@@ -2390,7 +2938,7 @@ export const useWorkspace = create((set, get) => ({
   addDimension: (payload) => {
     if (!payload || !payload.kind) return
     const { kind } = payload
-    const base = {
+    const base: DrawingDimension = {
       id: shortId('d'),
       view_id: payload.view_id,
       kind,
@@ -2533,7 +3081,7 @@ export const useWorkspace = create((set, get) => ({
 
   addAnnotation: (annotation) => {
     if (!annotation || !annotation.kind) return
-    const ann = annotation.id ? annotation : { ...annotation, id: shortId('ann') }
+    const ann: DrawingAnnotation = { ...annotation, id: annotation.id || shortId('ann') }
     return get().updateSheet((s) => ({
       ...s,
       annotations: [...(s.annotations || []), ann],
@@ -2793,7 +3341,7 @@ export const useWorkspace = create((set, get) => ({
   // every click; the FeatureView watches `featureSelection` to drive the
   // edge-id field of the active inspector.
   setFeatureSelection: (selection) => {
-    const next = {
+    const next: { faceIds: Set<string>; edgeIds: Set<string> } = {
       faceIds: selection?.faceIds instanceof Set ? new Set(selection.faceIds) : new Set(),
       edgeIds: selection?.edgeIds instanceof Set ? new Set(selection.edgeIds) : new Set(),
     }
@@ -2933,7 +3481,9 @@ export const useWorkspace = create((set, get) => ({
         // Skip on fetch failure; the row's params just stay missing from the scope.
       }
     }
-    const scope = mergeEquationFiles(fetched)
+    // mergeEquationFiles is an un-migrated src/lib parser (boundary this slice doesn't
+    // own) — cast to the local EquationsScope shape T-508 derived from its actual return.
+    const scope = mergeEquationFiles(fetched) as EquationsScope
     set({ equationsScope: scope })
     return scope
   },
@@ -2995,7 +3545,7 @@ export const useWorkspace = create((set, get) => ({
     const file = state.files?.find?.((f) => f.id === fileId)
     // For the open file we rely on the parsed-* slots so this works even
     // for content the user has typed but not saved.
-    let parsed = null
+    let parsed: PartDocument | FeatureFile | SketchJSON | null = null
     if (state.currentFileId === fileId) {
       // The parsed slot for the OPEN file:
       if (state.currentPart) parsed = state.currentPart
@@ -3009,9 +3559,11 @@ export const useWorkspace = create((set, get) => ({
       const content = file.content
       if (content == null) return null
       const kind = fileKindFor(file)
-      if (kind === 'part') parsed = parsePart(content)
-      else if (kind === 'feature') parsed = parseFeature(content)
-      else if (kind === 'sketch') parsed = parseSketch(content)
+      // parsePart/parseFeature/parseSketch are un-migrated src/lib parsers (boundary this
+      // slice doesn't own) — cast to the shared/local parsed shape T-501 derived from them.
+      if (kind === 'part') parsed = parsePart(content) as PartDocument
+      else if (kind === 'feature') parsed = parseFeature(content) as FeatureFile
+      else if (kind === 'sketch') parsed = parseSketch(content) as SketchJSON
       else return null
     }
     if (!parsed) return null
@@ -3261,12 +3813,18 @@ async function resolveAssemblyParts(_get, projectId, contentJson) {
     // Cross-project external_ref dispatch (ROADMAP row 67 Phase 2/3). The
     // cache-aware wrapper (loadExternalParts from assembly.js) handles
     // lookup/encode/decode; loadExternalComponentParts is the recompile fn.
+    // src/lib/assembly.js's loadExternalParts destructures {ref, recompile, lookup, decodePayload,
+    // encodePayload, store, onStats} = {} — TS's untyped-JS inference for that signature only
+    // picks up `lookup`/`store` (the only params with inline defaults), so the other keys this
+    // (documented, see that function's header comment) contract accepts read as excess
+    // properties here. Boundary this slice doesn't own — `as any` rather than fighting inference
+    // for an un-migrated .js call shape.
     loadExternalParts: (ref) => loadExternalParts({
       ref,
       recompile: loadExternalComponentParts,
       encodePayload,
       decodePayload,
-    }),
+    } as any),
     onMissing: (componentId, partId) => {
       // Best-effort UI surface; the renderer will simply skip the component.
       try {
@@ -3417,7 +3975,7 @@ function buildCircuitBoardParts(circuitJson) {
   return parts
 }
 
-function componentColor(name) {
+function componentColor(name: string | null | undefined): [number, number, number] {
   const c = String(name || '').charAt(0).toUpperCase()
   switch (c) {
     case 'R': return [0.85, 0.30, 0.30]
@@ -3444,7 +4002,7 @@ function componentColor(name) {
 // running JSCAD. STEP-backed Parts ignore configurations for geometry
 // purposes (the STEP file is fixed) but their config_id still flows
 // through to the BOM aggregation backend.
-async function loadComponentParts(projectId, fileId, configId) {
+async function loadComponentParts(projectId, fileId, configId = null) {
   // First-pass: cheap content fetch (we always need the latest text/blob).
   const file = await api.getFile(projectId, fileId)
   const name = (file.name || '').toLowerCase()
@@ -3538,11 +4096,11 @@ async function loadComponentParts(projectId, fileId, configId) {
 // route. Returns an ArrayBuffer suitable for occt-import-js. We re-use the
 // auth-token plumbing of the api wrapper via a thin call — the blob route
 // is a standard authed GET.
-async function fetchStorageBlob(storageKey) {
+async function fetchStorageBlob(storageKey: string) {
   const url = `/api/blobs/${encodeURI(storageKey)}`
   const { useAuth } = await import('./auth.js')
   const token = useAuth.getState().accessToken
-  const headers = {}
+  const headers: Record<string, string> = {}
   if (token) headers.authorization = `Bearer ${token}`
   const res = await fetch(url, { headers })
   if (!res.ok) throw new Error(`blob fetch ${res.status}`)

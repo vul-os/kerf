@@ -31,7 +31,26 @@ export const PREF_DEFAULTS = Object.freeze({
   compact_mode: false,
 })
 
-export const useUserPrefs = create(
+/** No shared "user prefs" type exists in src/types/ (T-501) — the backend's allowed_pref_keys
+ * (see header comment) is a flat string/number/boolean bag, modeled locally here. */
+export type PrefValue = string | number | boolean
+export type Prefs = Record<string, PrefValue>
+
+export interface UserPrefsState {
+  prefs: Prefs
+  loaded: boolean
+  loading: boolean
+  saving: boolean
+  error: string | null
+  get: (key: string) => PrefValue | undefined
+  loadPrefs: () => Promise<void>
+  setPref: (key: string, value: PrefValue | null | undefined) => void
+  save: () => Promise<void>
+  setAndSave: (key: string, value: PrefValue | null | undefined) => Promise<void>
+  reset: () => void
+}
+
+export const useUserPrefs = create<UserPrefsState>()(
   persist(
     (set, get) => ({
       prefs: {},          // server-truth keys + values
@@ -43,7 +62,7 @@ export const useUserPrefs = create(
       // get(key) returns the user-set value or PREF_DEFAULTS[key].
       get: (key) => {
         const v = get().prefs?.[key]
-        if (v === undefined || v === null) return PREF_DEFAULTS[key]
+        if (v === undefined || v === null) return (PREF_DEFAULTS as Record<string, PrefValue>)[key]
         return v
       },
 
@@ -115,7 +134,7 @@ export const useUserPrefs = create(
 // We attach kerf-compact / kerf-reduce-motion to <body> so any component
 // can opt in with descendant selectors. Theme handling is a no-op today —
 // the app is dark-only.
-function applyPrefsToDOM(prefs) {
+function applyPrefsToDOM(prefs: Record<string, unknown>): void {
   if (typeof document === 'undefined') return
   const body = document.body
   if (!body) return

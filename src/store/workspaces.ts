@@ -1,19 +1,31 @@
 import { create } from 'zustand'
 import { api } from '../lib/api.js'
+import type { ApiWorkspace } from '@/types'
 
 const CURRENT_KEY = 'kerf:currentWorkspaceSlug'
 
-function loadStoredSlug() {
+function loadStoredSlug(): string | null {
   try { return localStorage.getItem(CURRENT_KEY) || null } catch { return null }
 }
-function persistSlug(slug) {
+function persistSlug(slug: string | null | undefined): void {
   try {
     if (slug) localStorage.setItem(CURRENT_KEY, slug)
     else localStorage.removeItem(CURRENT_KEY)
-  } catch {}
+  } catch { /* ignore */ }
 }
 
-export const useWorkspaces = create((set, get) => ({
+export interface WorkspacesState {
+  workspaces: ApiWorkspace[]
+  currentSlug: string | null
+  loading: boolean
+  loaded: boolean
+  error: string | null
+  loadAll: () => Promise<ApiWorkspace[]>
+  setCurrent: (slug: string | null | undefined) => void
+  create: (opts: { name: string; slug: string }) => Promise<ApiWorkspace>
+}
+
+export const useWorkspaces = create<WorkspacesState>()((set, get) => ({
   workspaces: [],
   currentSlug: loadStoredSlug(),
   loading: false,

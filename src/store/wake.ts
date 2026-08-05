@@ -12,7 +12,13 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export const useWake = create(
+export interface WakeState {
+  enabledPubs: string[]
+  isEnabled: (pubKey: string) => boolean
+  setEnabled: (pubKey: string, on: boolean) => void
+}
+
+export const useWake = create<WakeState>()(
   persist(
     (set, get) => ({
       enabledPubs: [],

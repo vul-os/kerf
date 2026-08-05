@@ -1,11 +1,31 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import type { ApiUser } from '@/types'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
+export interface AuthState {
+  accessToken: string | null
+  refreshToken: string | null
+  user: ApiUser | null
+  // bootstrapChecked is true once tryBootstrap has run (success OR
+  // explicit "no state file"). Routes can wait on it before deciding
+  // to redirect an unauthenticated user to /login.
+  bootstrapChecked: boolean
+  bootstrapInflight: Promise<void> | null
+
+  setSession: (session: { accessToken: string | null; refreshToken: string | null; user: ApiUser | null }) => void
+  setAccessToken: (accessToken: string | null) => void
+  setUser: (user: ApiUser | null) => void
+  logout: () => void
+  isAuthed: () => boolean
+  tryBootstrap: () => Promise<void>
+  tryBootstrapLocal: () => Promise<boolean>
+}
+
 // Single source of truth for tokens + current user. Persisted to localStorage so
 // reload survives. Tokens are short-lived; refresh logic lives in lib/api.js.
-export const useAuth = create(
+export const useAuth = create<AuthState>()(
   persist(
     (set, get) => ({
       accessToken: null,

@@ -29,19 +29,23 @@ function makeAsyncIterable(items) {
 
 const mockStreamMessage = vi.fn()
 const mockSendMessage = vi.fn()
-const mockListFiles = vi.fn(async () => [])
+const mockListFiles = vi.fn(async (..._args: any[]) => [])
 
+// vi.mock factory boundary: these forward whatever args the real (un-migrated) api.js
+// methods are called with to the vi.fn() spies above — `any[]` rather than typing api.js's
+// full call signatures here.
 vi.mock('../../lib/api.js', () => ({
   api: {
-    streamMessage: (...args) => mockStreamMessage(...args),
-    sendMessage: (...args) => mockSendMessage(...args),
-    listFiles: (...args) => mockListFiles(...args),
+    streamMessage: (...args: any[]) => mockStreamMessage(...args),
+    sendMessage: (...args: any[]) => mockSendMessage(...args),
+    listFiles: (...args: any[]) => mockListFiles(...args),
     listMessages: vi.fn(async () => []),
     listThreads: vi.fn(async () => []),
     createThread: vi.fn(async () => ({ id: 't-new' })),
   },
   ApiError: class ApiError extends Error {
-    constructor(status, message) { super(message); this.status = status }
+    status: number
+    constructor(status: number, message: string) { super(message); this.status = status }
   },
 }))
 
@@ -72,15 +76,6 @@ beforeEach(() => {
   vi.clearAllMocks()
   reset()
 })
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Wait for all microtasks to settle */
-async function flush() {
-  await new Promise((r) => setTimeout(r, 0))
-}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -161,8 +156,6 @@ describe('sendMessageStreaming — store state transitions', () => {
   })
 
   it('sets chip status to running on tool_executing', async () => {
-    let statusDuringExecuting = null
-
     const events = [
       { event: 'tool_use_start', data: { tool_use_id: 'tu_2', name: 'write_file' } },
       { event: 'tool_executing', data: { tool_use_id: 'tu_2', name: 'write_file' } },

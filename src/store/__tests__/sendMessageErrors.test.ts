@@ -27,7 +27,8 @@ vi.mock('../../lib/api.js', () => {
       createThread: vi.fn(async () => ({ id: 't-new' })),
     },
     ApiError: class ApiError extends Error {
-      constructor(status, message) { super(message); this.status = status }
+      status: number
+      constructor(status: number, message: string) { super(message); this.status = status }
     },
   }
 })
@@ -56,13 +57,13 @@ function reset() {
 }
 
 beforeEach(() => {
-  api.sendMessage.mockReset()
+  vi.mocked(api.sendMessage).mockReset()
   reset()
 })
 
 describe('sendMessage error handling', () => {
   it('clears `sending` when the backend rejects', async () => {
-    api.sendMessage.mockRejectedValueOnce(
+    vi.mocked(api.sendMessage).mockRejectedValueOnce(
       Object.assign(new Error('Request timed out after 180s. Please try again.'), { status: 0 }),
     )
     await useWorkspace.getState().sendMessage('hello', {})
@@ -71,7 +72,7 @@ describe('sendMessage error handling', () => {
   })
 
   it('attaches `_error` to the optimistic user message on failure', async () => {
-    api.sendMessage.mockRejectedValueOnce(
+    vi.mocked(api.sendMessage).mockRejectedValueOnce(
       Object.assign(new Error('Request timed out after 180s. Please try again.'), { status: 0 }),
     )
     await useWorkspace.getState().sendMessage('hello there', {})
@@ -84,16 +85,16 @@ describe('sendMessage error handling', () => {
   })
 
   it('keeps the optimistic message visible (does not silently drop it)', async () => {
-    api.sendMessage.mockRejectedValueOnce(new Error('network down'))
+    vi.mocked(api.sendMessage).mockRejectedValueOnce(new Error('network down'))
     await useWorkspace.getState().sendMessage('please render', {})
     const { messages, sending } = useWorkspace.getState()
     expect(sending).toBe(false)
     expect(messages.find((m) => m.content === 'please render')).toBeTruthy()
-    expect(messages.find((m) => m.content === 'please render')._error).toBe('network down')
+    expect(messages.find((m) => m.content === 'please render')?._error).toBe('network down')
   })
 
   it('falls back to a generic message when the error has none', async () => {
-    api.sendMessage.mockRejectedValueOnce({})  // no .message
+    vi.mocked(api.sendMessage).mockRejectedValueOnce({} as never)  // no .message
     await useWorkspace.getState().sendMessage('hi', {})
     const m = useWorkspace.getState().messages[0]
     expect(m._error).toBe('Failed to send')

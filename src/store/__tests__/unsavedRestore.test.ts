@@ -26,7 +26,8 @@ vi.mock('../../lib/api.js', () => ({
     updateFile: vi.fn(),
   },
   ApiError: class ApiError extends Error {
-    constructor(message, status) {
+    status: number
+    constructor(message: string, status: number) {
       super(message)
       this.status = status
     }
@@ -46,7 +47,7 @@ beforeEach(async () => {
   _resetForTest()
   _setIDBFactory(new IDBFactory())
   const { api } = await import('../../lib/api.js')
-  api.updateFile.mockReset()
+  vi.mocked(api.updateFile).mockReset()
 })
 
 // ── Action logic tests (pure) ──────────────────────────────────────────────
@@ -70,7 +71,7 @@ describe('loadUnsavedEntries logic', () => {
 describe('restoreUnsavedEntries logic', () => {
   it('calls api.updateFile per entry and markFlushed on success', async () => {
     const { api } = await import('../../lib/api.js')
-    api.updateFile.mockResolvedValue({ id: 'file-a', content: 'hello' })
+    vi.mocked(api.updateFile).mockResolvedValue({ id: 'file-a', content: 'hello' })
 
     await stash(WS, 'file-a', new TextEncoder().encode('hello'))
     const entries = await listUnflushed(WS)
@@ -90,7 +91,7 @@ describe('restoreUnsavedEntries logic', () => {
 
   it('leaves entries with errors in the slice (does NOT call markFlushed on failure)', async () => {
     const { api } = await import('../../lib/api.js')
-    api.updateFile.mockRejectedValue(new Error('network error'))
+    vi.mocked(api.updateFile).mockRejectedValue(new Error('network error'))
 
     await stash(WS, 'file-fail', new TextEncoder().encode('data'))
     const entries = await listUnflushed(WS)
@@ -114,7 +115,7 @@ describe('restoreUnsavedEntries logic', () => {
   it('409 conflict leaves the entry with a "Server has newer version" hint', async () => {
     const { api, ApiError } = await import('../../lib/api.js')
     const conflictErr = new ApiError('version conflict', 409)
-    api.updateFile.mockRejectedValue(conflictErr)
+    vi.mocked(api.updateFile).mockRejectedValue(conflictErr)
 
     await stash(WS, 'conflict-file', new TextEncoder().encode('my content'))
     const entries = await listUnflushed(WS)

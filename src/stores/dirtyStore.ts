@@ -14,7 +14,12 @@
 import { create } from 'zustand'
 import { listDirty, _addListener } from '../lib/localStash.js'
 
-const useDirtyStore = create((set) => ({
+interface DirtyStoreState {
+  count: number
+  _setCount: (count: number) => void
+}
+
+const useDirtyStore = create<DirtyStoreState>()((set) => ({
   count: 0,
   _setCount: (count) => set({ count }),
 }))

@@ -79,6 +79,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.5.0",
+    "kicad-to-circuit-json": "^0.0.51",
     "sharp": "^0.34.5",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.9.3",

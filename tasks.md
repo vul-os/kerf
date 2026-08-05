@@ -6119,6 +6119,46 @@ two models are less far apart than the adapter suggests.
   through read→write unchanged; ADR appended to `decisions.md` recording why KiCad-shaped and not
   Circuit-JSON-shaped; no consumer migrated yet (that is T-532/T-533)
 - **Depends-on:** —
+- **Status:** ✅ step 1 shipped (2026-08-05) — `docs/ecad-gap-analysis.md`, `scripts/t525_gap_probe.py`.
+  **Step 2 (design the IR) is NOT started and should probably never start — see below.**
+
+#### Findings (step 1)
+
+Gap table, 16 rows over the 12 required constructs:
+
+| Category | Count | Examples |
+|---|---|---|
+| **(a) adapter-only** | **10** | pour geometry, ground planes, thermal reliefs, single-shape custom pads, teardrops, net classes, hierarchical sheets (base case), 3D model links, free text, most footprint attributes |
+| **(b) small extension** | 6 | pour fill priority, composite multi-primitive pads, keepout granularity, multi-instance sheet paths, a `Group` type, remaining footprint-attribute flags |
+| **(c) genuine IR limit** | **0** | — |
+| ambiguous, not forced | 1 | KiCad's DRC rule-*engine* semantics (arguably not an IR question at all) |
+
+**Recommendation: shrink G2.** Zero constructs need a new IR. `kicad_io.py` hand-rolls a ~90-line
+s-expression lexer covering only footprint refs, net names and straight segments — and the probe
+script shows that lexer *does* tokenise zone/group/locked/dimension/gr_text nodes correctly; the
+semantic reader simply never looks at them. This confirms the corrected G2 premise empirically:
+**the loss is at the adapter, not the IR.** T-526/T-527 should become a better reader/writer plus
+formalising Kerf's existing informal board extensions into typed fields. T-528 (conformance
+vectors) survives unchanged. T-529…T-535 shrink or disappear.
+
+**⛔ BLOCKER — `kiutils` is GPLv3 and Kerf is 100% MIT.** The analysis recommends routing the
+reader/writer through `kiutils`, which is a complete bidirectional KiCad parser. Verified
+2026-08-05: PyPI classifier is *"GNU General Public License v3 (GPLv3)"*, version 1.4.8, declared
+as the optional extra `kicad = ["kiutils"]` in `packages/kerf-imports/pyproject.toml`, and already
+imported in four source files (`plugin.py`, `kicad.py`, `kicad_library.py`,
+`kerf_parts/adapters/kicad.py`) — all behind lazy `try/except ImportError` guards, so no GPL code
+is bundled in the MIT distribution today. That optional-extra arrangement is the defensible
+pattern. **Making `kiutils` the mandatory backbone of KiCad interop is a materially different
+exposure and is a licensing decision for the project owner, not an engineering one.** Do not start
+T-526/T-527 on a `kiutils`-backed design until that is settled. If the answer is "stay MIT-clean",
+the fallback is extending Kerf's own s-expression reader — more work, but the probe shows the
+lexer is already most of the way there.
+
+**Evidence quality — read before trusting a row.** No `.kicad_pcb`/`.kicad_sch` fixture in this
+repo contains a zone, group, locked object, dimension, hierarchical sheet or stackup, and there is
+**no `.kicad_sch` fixture at all**. Real-fixture evidence exists only for pour shape, custom pad
+shapes (roundrect) and 3D model links; everything else was corroborated synthetically against
+`kiutils`'s object model. Before acting on this table, run it against a real pcbnew-exported board.
 
 ### T-526 — KiCad reader → IR (zones, pours, passthrough)
 - **Scope:** Replace the narrow parse in `kicad_io.py` with a full reader into the IR. Zones/pours

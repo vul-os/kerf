@@ -17,9 +17,33 @@ import { Activity, AlertTriangle, CheckCircle, Loader2, Play } from 'lucide-reac
 import { useAuth } from '../../store/auth.js'
 import { submitFemJob, pollFemStatus } from './feaApi.js'
 import { s, badgeStyle } from './feaStyles.js'
+import type { FemPanelProps, FemJobStatus } from './femTypes'
+
+export type Props = FemPanelProps
+
+interface SNMaterial {
+  label: string
+  Su: number
+  Sy: number
+  Se: number
+  b: number
+  c: number
+  E: number
+  sf_prime?: number
+}
+
+interface SNCurvePoint {
+  N: number
+  sigma_a_mpa: number
+}
+
+interface HaighPoint {
+  sigma_m_mpa: number
+  sigma_a_mpa: number
+}
 
 // S-N curve presets — (Su, Se, b, c) from Shigley / Juvinall
-const SN_PRESETS = {
+const SN_PRESETS: Record<string, SNMaterial> = {
   steel_1045:  { label: 'Steel 1045 (Machined)',       Su: 690e6, Sy: 580e6, Se: 241.5e6, b: -0.085, c: -0.600, E: 207e9 },
   steel_4340:  { label: 'Steel 4340 (Q&T 600°F)',      Su: 1480e6, Sy: 1380e6, Se: 620e6, b: -0.073, c: -0.660, E: 207e9 },
   al_6061_t6:  { label: 'Aluminium 6061-T6',           Su: 310e6, Sy: 276e6, Se: 97e6,   b: -0.110, c: -0.664, E: 68.9e9 },
@@ -44,11 +68,11 @@ const DEFAULT_HISTORY = '-200,400,-200,350,-100,300,0,300,-100,200'
 // S-N curve generator (pure JS, Basquin equation — no fetch required)
 // σ_a = sf_prime · (2N)^b  (Shigley §6-7)
 // ---------------------------------------------------------------------------
-function generateSNCurve(mat, nPoints = 40) {
-  const { sf_prime, b, Se, Su } = mat
+function generateSNCurve(mat: SNMaterial, nPoints = 40): SNCurvePoint[] {
+  const { sf_prime, b, Su } = mat
   const sfp = sf_prime || 1.5 * Su
   const logMin = 2, logMax = 8
-  const pts = []
+  const pts: SNCurvePoint[] = []
   for (let i = 0; i < nPoints; i++) {
     const logN = logMin + (i / (nPoints - 1)) * (logMax - logMin)
     const N = Math.pow(10, logN)
@@ -59,9 +83,9 @@ function generateSNCurve(mat, nPoints = 40) {
 }
 
 // Goodman boundary at endurance limit: σ_a / Se + σ_m / Su = 1
-function generateHaighGoodman(mat, nPts = 40) {
+function generateHaighGoodman(mat: SNMaterial, nPts = 40): HaighPoint[] {
   const { Su, Se } = mat
-  const pts = []
+  const pts: HaighPoint[] = []
   for (let i = 0; i < nPts; i++) {
     const sigma_m = (i / (nPts - 1)) * Su
     const sigma_a = Math.max(Se * (1 - sigma_m / Su), 0)
@@ -70,17 +94,17 @@ function generateHaighGoodman(mat, nPts = 40) {
   return pts
 }
 
-export default function FatiguePanel({ projectId, fileId }) {
+export default function FatiguePanel({ projectId, fileId }: Props) {
   const [preset, setPreset]         = useState('steel_1045')
   const [correction, setCorrection] = useState('goodman')
   const [damageParam, setDamageParam] = useState('von_mises')
   const [targetLife, setTargetLife] = useState('1e6')
   const [loadHistory, setLoadHistory] = useState(DEFAULT_HISTORY)
   const [running, setRunning]       = useState(false)
-  const [status, setStatus]         = useState(null)
-  const [error, setError]           = useState(null)
+  const [status, setStatus]         = useState<FemJobStatus | null>(null)
+  const [error, setError]           = useState<string | null>(null)
   const [showHaigh, setShowHaigh]   = useState(false)
-  const pollRef = useRef(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   function stopPoll() {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
@@ -145,7 +169,7 @@ export default function FatiguePanel({ projectId, fileId }) {
         }
       }, 3000)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
       setRunning(false)
     }
   }
@@ -338,7 +362,12 @@ export default function FatiguePanel({ projectId, fileId }) {
 // ---------------------------------------------------------------------------
 // S-N curve SVG plot (log-log scale)
 // ---------------------------------------------------------------------------
-function SNcurvePlot({ pts, mat }) {
+interface SNcurvePlotProps {
+  pts: SNCurvePoint[]
+  mat: SNMaterial
+}
+
+function SNcurvePlot({ pts, mat }: SNcurvePlotProps) {
   const W = 240, H = 70, PAD = { l: 30, r: 8, t: 6, b: 18 }
   const inner = { w: W - PAD.l - PAD.r, h: H - PAD.t - PAD.b }
 
@@ -414,7 +443,12 @@ function SNcurvePlot({ pts, mat }) {
 // ---------------------------------------------------------------------------
 // Haigh (Goodman) diagram SVG
 // ---------------------------------------------------------------------------
-function HaighDiagramPlot({ pts, mat }) {
+interface HaighDiagramPlotProps {
+  pts: HaighPoint[]
+  mat: SNMaterial
+}
+
+function HaighDiagramPlot({ pts, mat }: HaighDiagramPlotProps) {
   const W = 240, H = 70, PAD = { l: 28, r: 8, t: 6, b: 18 }
   const inner = { w: W - PAD.l - PAD.r, h: H - PAD.t - PAD.b }
 
@@ -495,7 +529,11 @@ function HaighDiagramPlot({ pts, mat }) {
 // ---------------------------------------------------------------------------
 // Multiaxial proportionality summary badge row
 // ---------------------------------------------------------------------------
-function MultiaxialSummary({ flags }) {
+interface MultiaxialSummaryProps {
+  flags: Record<string, string>
+}
+
+function MultiaxialSummary({ flags }: MultiaxialSummaryProps) {
   const entries = Object.entries(flags)
   const npCount = entries.filter(([, v]) => v === 'non_proportional').length
   const total   = entries.length
@@ -515,7 +553,12 @@ function MultiaxialSummary({ flags }) {
 // ---------------------------------------------------------------------------
 // Life / damage contour bar chart
 // ---------------------------------------------------------------------------
-function LifeContourBar({ data, isLife }) {
+interface LifeContourBarProps {
+  data: number[]
+  isLife: boolean
+}
+
+function LifeContourBar({ data, isLife }: LifeContourBarProps) {
   const N = Math.min(data.length, 30)
   const slice = data.slice(0, N)
   const max = Math.max(...slice.map(Math.abs)) || 1
@@ -546,7 +589,11 @@ function LifeContourBar({ data, isLife }) {
 // ---------------------------------------------------------------------------
 // Simple load history plot
 // ---------------------------------------------------------------------------
-function LoadHistoryPlot({ values }) {
+interface LoadHistoryPlotProps {
+  values: number[]
+}
+
+function LoadHistoryPlot({ values }: LoadHistoryPlotProps) {
   const W = 240, H = 50
   if (!values.length) return null
   const max = Math.max(...values.map(Math.abs)) || 1

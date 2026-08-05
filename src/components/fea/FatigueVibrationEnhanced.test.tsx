@@ -130,7 +130,7 @@ describe('FatiguePanel enhanced', () => {
 describe('FatiguePanel S-N curve data contract', () => {
   // Mirror the generateSNCurve logic from the component
   function generateSNCurve(mat, nPoints = 40) {
-    const { sf_prime, b, Se, Su } = mat
+    const { sf_prime, b, Su } = mat
     const sfp = sf_prime || 1.5 * Su
     const logMin = 2, logMax = 8
     return Array.from({ length: nPoints }, (_, i) => {

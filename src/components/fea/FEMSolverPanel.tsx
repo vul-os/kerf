@@ -17,31 +17,44 @@
 // Props: { projectId, fileId }
 
 import { useState, useRef } from 'react'
+import type { ReactNode } from 'react'
 import {
   Activity, AlertTriangle, CheckCircle, Loader2, Play,
   Thermometer, Zap, BarChart3, Square, Waves,
   Wind, Layers, Cpu,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '../../store/auth.js'
 import { submitFemJob, pollFemStatus } from './feaApi.js'
-import { s, badgeStyle } from './feaStyles.js'
+import { s } from './feaStyles.js'
+import type { FemPanelProps, FemJobStatus } from './femTypes'
+
+export type Props = FemPanelProps
 
 // ── shared helpers ─────────────────────────────────────────────────────────────
 
-function fmtMPa(pa) {
+function fmtMPa(pa?: number | null): string {
   if (pa == null || !isFinite(pa)) return '—'
   return (pa / 1e6).toFixed(3) + ' MPa'
 }
-function fmtMm(m) {
+function fmtMm(m?: number | null): string {
   if (m == null || !isFinite(m)) return '—'
   return (m * 1000).toFixed(4) + ' mm'
 }
-function fmtSci(v, unit = '') {
+// `unknown` — several call sites pass a result field of uncertain shape (e.g. an S-param
+// value that may be a number or something else entirely); the existing `Number(v)`/`isFinite`
+// guard renders '—' for anything that doesn't coerce, same as pre-migration.
+function fmtSci(v?: unknown, unit = ''): string {
   if (v == null || !isFinite(Number(v))) return '—'
   return Number(v).toExponential(3) + (unit ? ' ' + unit : '')
 }
 
-function ResultRow({ label, value }) {
+interface ResultRowProps {
+  label: string
+  value: ReactNode
+}
+
+function ResultRow({ label, value }: ResultRowProps) {
   return (
     <tr>
       <td style={s.td}>{label}</td>
@@ -50,7 +63,13 @@ function ResultRow({ label, value }) {
   )
 }
 
-function StatusArea({ jobStatus, error, runningMsg }) {
+interface StatusAreaProps {
+  jobStatus?: string
+  error?: string | null
+  runningMsg?: string
+}
+
+function StatusArea({ jobStatus, error, runningMsg }: StatusAreaProps) {
   if (error) return (
     <div style={s.errorBox} role="alert">
       <AlertTriangle size={13} />
@@ -68,17 +87,17 @@ function StatusArea({ jobStatus, error, runningMsg }) {
 }
 
 // Generic run-button + poll hook
-function useFemJob({ projectId, fileId }) {
+function useFemJob({ projectId, fileId }: FemPanelProps) {
   const [running, setRunning]   = useState(false)
-  const [status, setStatus]     = useState(null)
-  const [error, setError]       = useState(null)
-  const pollRef = useRef(null)
+  const [status, setStatus]     = useState<FemJobStatus | null>(null)
+  const [error, setError]       = useState<string | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   function stopPoll() {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
   }
 
-  async function run(body) {
+  async function run(body: Record<string, unknown>) {
     if (!projectId || !fileId) return
     setError(null)
     setRunning(true)
@@ -98,7 +117,7 @@ function useFemJob({ projectId, fileId }) {
         }
       }, 3000)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
       setRunning(false)
     }
   }
@@ -108,7 +127,13 @@ function useFemJob({ projectId, fileId }) {
 
 // ── Section header ─────────────────────────────────────────────────────────────
 
-function SectionHeader({ icon: Icon, label, color }) {
+interface SectionHeaderProps {
+  icon: LucideIcon
+  label: string
+  color: string
+}
+
+function SectionHeader({ icon: Icon, label, color }: SectionHeaderProps) {
   return (
     <div style={{ ...s.header, marginBottom: 4 }}>
       <Icon size={15} style={{ color }} />
@@ -119,7 +144,15 @@ function SectionHeader({ icon: Icon, label, color }) {
 
 // ── Material presets shared ────────────────────────────────────────────────────
 
-const MATERIALS = {
+interface MaterialPreset {
+  label: string
+  E: number
+  nu: number
+  rho: number
+  yield_strength: number
+}
+
+const MATERIALS: Record<string, MaterialPreset> = {
   steel:     { label: 'Steel S275',       E: 200e9, nu: 0.3,   rho: 7850, yield_strength: 275e6 },
   al_6061:   { label: 'Aluminium 6061-T6', E: 68.9e9, nu: 0.33, rho: 2700, yield_strength: 276e6 },
   titanium:  { label: 'Ti-6Al-4V',         E: 113.8e9, nu: 0.342, rho: 4430, yield_strength: 880e6 },
@@ -129,7 +162,7 @@ const MATERIALS = {
 // NONLINEAR STATIC  — fem_nonlinear_static
 // ══════════════════════════════════════════════════════════════════════════════
 
-function NonlinearStaticCard({ projectId, fileId }) {
+function NonlinearStaticCard({ projectId, fileId }: FemPanelProps) {
   const { running, status, error, run } = useFemJob({ projectId, fileId })
   const [mat, setMat]               = useState('steel')
   const [nSteps, setNSteps]         = useState('10')
@@ -215,7 +248,7 @@ function NonlinearStaticCard({ projectId, fileId }) {
 // NONLINEAR BAR  — fem_nonlinear_bar
 // ══════════════════════════════════════════════════════════════════════════════
 
-function NonlinearBarCard({ projectId, fileId }) {
+function NonlinearBarCard({ projectId, fileId }: FemPanelProps) {
   const { running, status, error, run } = useFemJob({ projectId, fileId })
   const [E, setE]               = useState('200e9')
   const [sigY, setSigY]         = useState('275e6')
@@ -297,7 +330,12 @@ function NonlinearBarCard({ projectId, fileId }) {
   )
 }
 
-function HysteresisPlot({ stress, strain }) {
+interface HysteresisPlotProps {
+  stress: number[]
+  strain: number[]
+}
+
+function HysteresisPlot({ stress, strain }: HysteresisPlotProps) {
   const W = 200, H = 60
   if (!stress.length || !strain.length) return null
   const maxS  = Math.max(...stress.map(Math.abs)) || 1
@@ -323,7 +361,7 @@ function HysteresisPlot({ stress, strain }) {
 // EXPLICIT DYNAMICS  — fem_explicit_dynamics
 // ══════════════════════════════════════════════════════════════════════════════
 
-function ExplicitDynamicsCard({ projectId, fileId }) {
+function ExplicitDynamicsCard({ projectId, fileId }: FemPanelProps) {
   const { running, status, error, run } = useFemJob({ projectId, fileId })
   const [mat, setMat]         = useState('steel')
   const [tEnd, setTEnd]       = useState('0.001')
@@ -399,7 +437,7 @@ function ExplicitDynamicsCard({ projectId, fileId }) {
 // THERMAL  — analysis_type: thermal_steady / thermal_transient
 // ══════════════════════════════════════════════════════════════════════════════
 
-function ThermalCard({ projectId, fileId }) {
+function ThermalCard({ projectId, fileId }: FemPanelProps) {
   const { running, status, error, run } = useFemJob({ projectId, fileId })
   const [steady, setSteady]         = useState(true)
   const [k, setK]                   = useState('45')       // W/(m·K) — steel
@@ -498,8 +536,12 @@ function ThermalCard({ projectId, fileId }) {
   )
 }
 
-function ThermalGradientBar({ tMin, tMax }) {
-  const range = (tMax - tMin) || 1
+interface ThermalGradientBarProps {
+  tMin: number
+  tMax: number
+}
+
+function ThermalGradientBar({ tMin, tMax }: ThermalGradientBarProps) {
   const steps = 20
   return (
     <div aria-label="Thermal gradient bar">
@@ -524,7 +566,7 @@ function ThermalGradientBar({ tMin, tMax }) {
 // ACOUSTICS  — fem_acoustics
 // ══════════════════════════════════════════════════════════════════════════════
 
-function AcousticsCard({ projectId, fileId }) {
+function AcousticsCard({ projectId, fileId }: FemPanelProps) {
   const { running, status, error, run } = useFemJob({ projectId, fileId })
   const [fMin, setFMin]         = useState('20')
   const [fMax, setFMax]         = useState('2000')
@@ -621,7 +663,7 @@ function AcousticsCard({ projectId, fileId }) {
 // ELECTROSTATICS  — fem_electrostatics
 // ══════════════════════════════════════════════════════════════════════════════
 
-function ElectrostaticsCard({ projectId, fileId }) {
+function ElectrostaticsCard({ projectId, fileId }: FemPanelProps) {
   const { running, status, error, run } = useFemJob({ projectId, fileId })
   const [eps, setEps]     = useState('8.854e-12')
   const [v0, setV0]       = useState('100')
@@ -690,7 +732,7 @@ function ElectrostaticsCard({ projectId, fileId }) {
 // MAGNETOSTATICS  — fem_magnetostatics
 // ══════════════════════════════════════════════════════════════════════════════
 
-function MagnetostaticsCard({ projectId, fileId }) {
+function MagnetostaticsCard({ projectId, fileId }: FemPanelProps) {
   const { running, status, error, run } = useFemJob({ projectId, fileId })
   const [mu, setMu]           = useState('1.2566e-6')
   const [jCurr, setJCurr]     = useState('1e6')
@@ -751,7 +793,7 @@ function MagnetostaticsCard({ projectId, fileId }) {
 // HIGH-FREQUENCY EM  — fem_em_highfreq
 // ══════════════════════════════════════════════════════════════════════════════
 
-function EMHighFreqCard({ projectId, fileId }) {
+function EMHighFreqCard({ projectId, fileId }: FemPanelProps) {
   const { running, status, error, run } = useFemJob({ projectId, fileId })
   const [mode, setMode]       = useState('waveguide')
   const [fMin, setFMin]       = useState('1e9')
@@ -849,7 +891,7 @@ function EMHighFreqCard({ projectId, fileId }) {
 // CFD NAVIER-STOKES  — cfd_navier_stokes_steady
 // ══════════════════════════════════════════════════════════════════════════════
 
-function CFDNavierStokesCard({ projectId, fileId }) {
+function CFDNavierStokesCard({ projectId, fileId }: FemPanelProps) {
   const { running, status, error, run } = useFemJob({ projectId, fileId })
   const [nu, setNu]           = useState('1.5e-5')   // kinematic viscosity (air)
   const [uInlet, setUInlet]   = useState('1.0')
@@ -917,7 +959,7 @@ function CFDNavierStokesCard({ projectId, fileId }) {
 // CFD POTENTIAL  — cfd_potential_cylinder
 // ══════════════════════════════════════════════════════════════════════════════
 
-function CFDPotentialCard({ projectId, fileId }) {
+function CFDPotentialCard({ projectId, fileId }: FemPanelProps) {
   const { running, status, error, run } = useFemJob({ projectId, fileId })
   const [uInf, setUInf]   = useState('1.0')
   const [R, setR]         = useState('0.5')
@@ -982,7 +1024,11 @@ function CFDPotentialCard({ projectId, fileId }) {
   )
 }
 
-function CpPlot({ cp }) {
+interface CpPlotProps {
+  cp: number[]
+}
+
+function CpPlot({ cp }: CpPlotProps) {
   const W = 200, H = 60
   if (!cp.length) return null
   const minCp = Math.min(...cp)
@@ -1007,7 +1053,7 @@ function CpPlot({ cp }) {
 // PLATE / SHELL  — fem_plate_static_solve (MITC4)
 // ══════════════════════════════════════════════════════════════════════════════
 
-function PlateStaticCard({ projectId, fileId }) {
+function PlateStaticCard({ projectId, fileId }: FemPanelProps) {
   const { running, status, error, run } = useFemJob({ projectId, fileId })
   const [E, setE]           = useState('200e9')
   const [nu, setNu]         = useState('0.3')
@@ -1101,7 +1147,7 @@ function PlateStaticCard({ projectId, fileId }) {
 // UNCERTAINTY PROPAGATION  — fem_propagate_uncertainty
 // ══════════════════════════════════════════════════════════════════════════════
 
-function UncertaintyCard({ projectId, fileId }) {
+function UncertaintyCard({ projectId, fileId }: FemPanelProps) {
   const { running, status, error, run } = useFemJob({ projectId, fileId })
   const [nSamples, setNSamples]   = useState('200')
   const [eSigma, setESigma]       = useState('5e9')
@@ -1182,7 +1228,7 @@ function UncertaintyCard({ projectId, fileId }) {
 // TRUSS PLASTIC  — fem_truss_plastic
 // ══════════════════════════════════════════════════════════════════════════════
 
-function TrussPlasticCard({ projectId, fileId }) {
+function TrussPlasticCard({ projectId, fileId }: FemPanelProps) {
   const { running, status, error, run } = useFemJob({ projectId, fileId })
   const [E, setE]         = useState('200e9')
   const [A, setA]         = useState('1e-4')
@@ -1286,7 +1332,7 @@ const SECTIONS = [
  * Organised in 5 sections. Each section lazy-mounts its cards only when
  * the tab is active. Props: { projectId, fileId }
  */
-export default function FEMSolverPanel({ projectId, fileId }) {
+export default function FEMSolverPanel({ projectId, fileId }: Props) {
   const [activeSection, setActiveSection] = useState('nonlinear')
 
   return (

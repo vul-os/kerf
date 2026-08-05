@@ -1,7 +1,9 @@
-// feaStyles.js — shared style tokens for FEA solve panels.
+// feaStyles.ts — shared style tokens for FEA solve panels.
 // Consistent with FEMView.jsx palette.
 
-export const s = {
+import type { CSSProperties } from 'react'
+
+export const s: Record<string, CSSProperties> = {
   root: {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: 13,
@@ -132,14 +134,14 @@ export const s = {
   },
 }
 
-export const STATUS_COLORS = {
+export const STATUS_COLORS: Record<string, string> = {
   queued:  '#f59e0b',
   running: '#22d3ee',
   done:    '#34d399',
   error:   '#f87171',
 }
 
-export function badgeStyle(status) {
+export function badgeStyle(status: string): CSSProperties {
   const c = STATUS_COLORS[status] || '#6b7280'
   return {
     ...s.badge,

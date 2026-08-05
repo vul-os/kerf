@@ -13,26 +13,36 @@
 // Props: { projectId, fileId }
 
 import { useState, useRef } from 'react'
+import type { ReactNode } from 'react'
 import {
   Activity, AlertTriangle, CheckCircle, Loader2, Play,
   TrendingUp,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '../../store/auth.js'
 import { submitFemJob, pollFemStatus } from './feaApi.js'
 import { s, badgeStyle } from './feaStyles.js'
+import type { FemPanelProps, FemJobStatus, FemHyperelasticPathStep } from './femTypes'
+
+export type Props = FemPanelProps
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
-function fmtNum(v, digits = 4) {
+function fmtNum(v?: number | null, digits = 4): string {
   if (v == null || !isFinite(Number(v))) return '—'
   return Number(v).toFixed(digits)
 }
-function fmtSci(v, unit = '') {
+function fmtSci(v?: number | null, unit = ''): string {
   if (v == null || !isFinite(Number(v))) return '—'
   return Number(v).toExponential(3) + (unit ? ' ' + unit : '')
 }
 
-function ResultRow({ label, value }) {
+interface ResultRowProps {
+  label: string
+  value: ReactNode
+}
+
+function ResultRow({ label, value }: ResultRowProps) {
   return (
     <tr>
       <td style={s.td}>{label}</td>
@@ -41,7 +51,13 @@ function ResultRow({ label, value }) {
   )
 }
 
-function SectionHeader({ icon: Icon, label, color }) {
+interface SectionHeaderProps {
+  icon: LucideIcon
+  label: string
+  color: string
+}
+
+function SectionHeader({ icon: Icon, label, color }: SectionHeaderProps) {
   return (
     <div style={{ ...s.header, marginBottom: 4 }}>
       <Icon size={15} style={{ color }} />
@@ -51,17 +67,17 @@ function SectionHeader({ icon: Icon, label, color }) {
 }
 
 // Generic run/poll hook
-function useFemJob({ projectId, fileId }) {
+function useFemJob({ projectId, fileId }: FemPanelProps) {
   const [running, setRunning] = useState(false)
-  const [status, setStatus]   = useState(null)
-  const [error, setError]     = useState(null)
-  const pollRef = useRef(null)
+  const [status, setStatus]   = useState<FemJobStatus | null>(null)
+  const [error, setError]     = useState<string | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   function stopPoll() {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
   }
 
-  async function run(body) {
+  async function run(body: Record<string, unknown>) {
     if (!projectId || !fileId) return
     setError(null)
     setRunning(true)
@@ -81,7 +97,7 @@ function useFemJob({ projectId, fileId }) {
         }
       }, 3000)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
       setRunning(false)
     }
   }
@@ -92,7 +108,13 @@ function useFemJob({ projectId, fileId }) {
 // ── Stress-stretch SVG sparkline ───────────────────────────────────────────────
 // Renders FEM path points (circles) + analytic curve (dashed) on a simple SVG.
 
-function StressStretchChart({ path, materialType, matParams }) {
+interface StressStretchChartProps {
+  path: FemHyperelasticPathStep[]
+  materialType: string
+  matParams: Record<string, string>
+}
+
+function StressStretchChart({ path }: StressStretchChartProps) {
   if (!path || path.length < 2) return null
 
   // Extract λ and nominal stress P from path steps
@@ -110,15 +132,15 @@ function StressStretchChart({ path, materialType, matParams }) {
   const pMin = Math.min(0, ...reacts)
   const pMax = Math.max(...reacts, 1e-9)
 
-  function xScale(l)  { return pad.left + (l - lMin) / (lMax - lMin) * (width - pad.left - pad.right) }
-  function yScale(p)  { return pad.top + (1 - (p - pMin) / (pMax - pMin)) * (height - pad.top - pad.bottom) }
+  function xScale(l: number)  { return pad.left + (l - lMin) / (lMax - lMin) * (width - pad.left - pad.right) }
+  function yScale(p: number)  { return pad.top + (1 - (p - pMin) / (pMax - pMin)) * (height - pad.top - pad.bottom) }
 
   // FEM points polyline
   const femLine = reacts.map((p, i) => `${xScale(lambdas[i])},${yScale(p)}`).join(' ')
 
   // Analytic overlay (dashed)
   const analPts = analytics.filter(Boolean)
-  let analLine = null
+  let analLine: string | null = null
   if (analPts.length >= 2) {
     analLine = analytics
       .map((p, i) => p != null ? `${xScale(lambdas[i])},${yScale(p)}` : null)
@@ -199,7 +221,21 @@ function StressStretchChart({ path, materialType, matParams }) {
 
 // ── Material model defaults ────────────────────────────────────────────────────
 
-const MODEL_DEFAULTS = {
+interface HyperelasticParamField {
+  key: string
+  label: string
+  default: number
+}
+
+interface HyperelasticModelDefaults {
+  label: string
+  color: string
+  params: Record<string, unknown>
+  paramFields: HyperelasticParamField[]
+  hint: string
+}
+
+const MODEL_DEFAULTS: Record<string, HyperelasticModelDefaults> = {
   neo_hookean: {
     label: 'Neo-Hookean',
     color: '#10b981',
@@ -236,11 +272,11 @@ const MODEL_DEFAULTS = {
 
 // ── Main panel ─────────────────────────────────────────────────────────────────
 
-export default function HyperelasticSolverPanel({ projectId, fileId }) {
+export default function HyperelasticSolverPanel({ projectId, fileId }: Props) {
   const { running, status, error, run } = useFemJob({ projectId, fileId })
 
   const [modelType, setModelType]   = useState('neo_hookean')
-  const [params, setParams]         = useState({
+  const [params, setParams]         = useState<Record<string, Record<string, string>>>({
     neo_hookean:   { mu: '1e5', bulk: '3e7' },
     mooney_rivlin: { C10: '4e4', C01: '1e4', d: '0' },
     ogden:         { mu_p_0: '1e5', alpha_p_0: '2.0', kappa: '3e7' },
@@ -254,11 +290,11 @@ export default function HyperelasticSolverPanel({ projectId, fileId }) {
   const jobStatus = status?.status
   const mdl       = MODEL_DEFAULTS[modelType]
 
-  function updateParam(k, v) {
+  function updateParam(k: string, v: string) {
     setParams(prev => ({ ...prev, [modelType]: { ...prev[modelType], [k]: v } }))
   }
 
-  function buildMaterialDict() {
+  function buildMaterialDict(): Record<string, unknown> {
     const p = params[modelType]
     if (modelType === 'neo_hookean') {
       return { type: 'neo_hookean', mu: parseFloat(p.mu) || 1e5, bulk: parseFloat(p.bulk) || 3e7 }

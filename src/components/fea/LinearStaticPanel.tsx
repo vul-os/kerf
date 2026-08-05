@@ -13,8 +13,30 @@ import { Activity, AlertTriangle, CheckCircle, Loader2, Play, Plus, Trash2 } fro
 import { useAuth } from '../../store/auth.js'
 import { submitFemJob, pollFemStatus } from './feaApi.js'
 import { s, badgeStyle } from './feaStyles.js'
+import type { FemPanelProps, FemJobStatus } from './femTypes'
 
-const MATERIAL_PRESETS = {
+export type Props = FemPanelProps
+
+interface MaterialPreset {
+  label: string
+  E: number
+  nu: number
+  rho: number
+  yield_strength: number
+}
+
+interface BoundaryCondition {
+  type: string
+  face_tag: string
+}
+
+interface LoadEntry {
+  type: string
+  face_tag: string
+  value: string
+}
+
+const MATERIAL_PRESETS: Record<string, MaterialPreset> = {
   steel:     { label: 'Steel (S275)',         E: 200e9, nu: 0.3,   rho: 7850, yield_strength: 275e6 },
   aluminium: { label: 'Aluminium 6061-T6',    E: 68.9e9, nu: 0.33, rho: 2700, yield_strength: 276e6 },
   titanium:  { label: 'Titanium Ti-6Al-4V',   E: 113.8e9, nu: 0.342, rho: 4430, yield_strength: 880e6 },
@@ -24,25 +46,27 @@ const MATERIAL_PRESETS = {
 const BC_TYPES   = ['fixed', 'roller', 'symmetry']
 const LOAD_TYPES = ['force', 'pressure', 'distributed']
 
-function fmtMPa(pa) {
+function fmtMPa(pa?: number | null): string {
   if (pa == null || !isFinite(pa)) return '—'
   return (pa / 1e6).toFixed(2) + ' MPa'
 }
-function fmtMm(m) {
+function fmtMm(m?: number | null): string {
   if (m == null || !isFinite(m)) return '—'
   return (m * 1000).toFixed(4) + ' mm'
 }
 
-export default function LinearStaticPanel({ projectId, fileId }) {
-  const { accessToken } = useAuth()
+export default function LinearStaticPanel({ projectId, fileId }: Props) {
+  // Subscribing here (even though the token is read fresh via getState() below) keeps this
+  // component re-rendered on auth changes, matching the pre-migration behaviour.
+  const { accessToken: _accessToken } = useAuth()
   const [preset, setPreset]       = useState('steel')
-  const [bcs, setBcs]             = useState([{ type: 'fixed', face_tag: '1' }])
-  const [loads, setLoads]         = useState([{ type: 'pressure', face_tag: '2', value: '1e6' }])
+  const [bcs, setBcs]             = useState<BoundaryCondition[]>([{ type: 'fixed', face_tag: '1' }])
+  const [loads, setLoads]         = useState<LoadEntry[]>([{ type: 'pressure', face_tag: '2', value: '1e6' }])
   const [meshSize, setMeshSize]   = useState('0.01')
   const [running, setRunning]     = useState(false)
-  const [status, setStatus]       = useState(null)   // { status, result?, error? }
-  const [error, setError]         = useState(null)
-  const pollRef = useRef(null)
+  const [status, setStatus]       = useState<FemJobStatus | null>(null)
+  const [error, setError]         = useState<string | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   function stopPoll() {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
@@ -87,15 +111,15 @@ export default function LinearStaticPanel({ projectId, fileId }) {
         }
       }, 3000)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
       setRunning(false)
     }
   }
 
   function addBC()  { setBcs(prev   => [...prev,  { type: 'fixed',    face_tag: '1' }]) }
   function addLoad(){ setLoads(prev  => [...prev,  { type: 'pressure', face_tag: '2', value: '1e6' }]) }
-  function removeBC(i)   { setBcs(prev   => prev.filter((_, j) => j !== i)) }
-  function removeLoad(i) { setLoads(prev => prev.filter((_, j) => j !== i)) }
+  function removeBC(i: number)   { setBcs(prev   => prev.filter((_, j) => j !== i)) }
+  function removeLoad(i: number) { setLoads(prev => prev.filter((_, j) => j !== i)) }
 
   const result   = status?.result && typeof status.result === 'object' ? status.result : null
   const jobStatus = status?.status
@@ -253,8 +277,13 @@ export default function LinearStaticPanel({ projectId, fileId }) {
   )
 }
 
+interface VonMisesBarProps {
+  stresses: number[]
+  maxStress?: number
+}
+
 // Compact horizontal colour bar showing the von-Mises stress range.
-function VonMisesBar({ stresses, maxStress }) {
+function VonMisesBar({ stresses, maxStress }: VonMisesBarProps) {
   const max = maxStress || Math.max(...stresses) || 1
   // Build 20 buckets
   const N = 20

@@ -19,13 +19,22 @@ import { Activity, AlertTriangle, CheckCircle, Loader2, Play } from 'lucide-reac
 import { useAuth } from '../../store/auth.js'
 import { submitFemJob, pollFemStatus } from './feaApi.js'
 import { s, badgeStyle } from './feaStyles.js'
+import type { FemPanelProps, FemJobStatus, FemModeTableRow } from './femTypes'
+
+export type Props = FemPanelProps
+
+interface SdofPreviewPoint {
+  f: number
+  daf: number
+  phase: number
+}
 
 const ANALYSIS_MODES = [
   { id: 'harmonic',         label: 'Harmonic (FRF / mode-superposition)' },
   { id: 'random_vibration', label: 'Random Vibration (PSD / Miles)' },
 ]
 
-const PSD_PROFILES = [
+const PSD_PROFILES: Array<{ id: string; label: string; table: number[][] }> = [
   { id: 'mil_std_810g',  label: 'MIL-STD-810G (transportation)',
     table: [[10,0.04],[40,0.04],[500,0.0158],[2000,0.0158]] },
   { id: 'flat_0.04',     label: 'Flat 0.04 g²/Hz (10–2000 Hz)',
@@ -38,17 +47,17 @@ const PSD_PROFILES = [
 // SDOF analytical DAF for preview — no fetch needed
 // DAF = 1 / sqrt((1 - r²)² + (2ζr)²)   (Inman §3.4)
 // ---------------------------------------------------------------------------
-function sdofDaf(r, zeta) {
+function sdofDaf(r: number, zeta: number): number {
   const den = Math.sqrt(Math.pow(1 - r * r, 2) + Math.pow(2 * zeta * r, 2))
   return den < 1e-30 ? Infinity : 1 / den
 }
 
-function sdofPhaseDeg(r, zeta) {
+function sdofPhaseDeg(r: number, zeta: number): number {
   return (Math.atan2(2 * zeta * r, 1 - r * r) * 180) / Math.PI
 }
 
 // Generate SDOF preview FRF
-function generateSDOFPreview(fn, zeta, fMin, fMax, nPts = 120) {
+function generateSDOFPreview(fn: number, zeta: number, fMin: number, fMax: number, nPts = 120): SdofPreviewPoint[] {
   const d = (fMax - fMin) / (nPts - 1)
   return Array.from({ length: nPts }, (_, i) => {
     const f = fMin + i * d
@@ -57,7 +66,7 @@ function generateSDOFPreview(fn, zeta, fMin, fMax, nPts = 120) {
   })
 }
 
-export default function VibrationPanel({ projectId, fileId }) {
+export default function VibrationPanel({ projectId, fileId }: Props) {
   const [mode, setMode]           = useState('harmonic')
   const [zeta, setZeta]           = useState('0.02')   // damping ratio
   const [fMin, setFMin]           = useState('1')
@@ -66,17 +75,17 @@ export default function VibrationPanel({ projectId, fileId }) {
   const [fnPreview, setFnPreview] = useState('100')     // preview natural frequency [Hz]
   const [psdProfile, setPsdProfile] = useState('mil_std_810g')
   const [running, setRunning]     = useState(false)
-  const [status, setStatus]       = useState(null)
-  const [error, setError]         = useState(null)
-  const pollRef = useRef(null)
+  const [status, setStatus]       = useState<FemJobStatus | null>(null)
+  const [error, setError]         = useState<string | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   function stopPoll() {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
   }
 
-  function buildBody() {
+  function buildBody(): Record<string, unknown> {
     const psd = PSD_PROFILES.find(p => p.id === psdProfile) || PSD_PROFILES[0]
-    const base = {
+    const base: Record<string, unknown> = {
       analysis_type: mode,
       modal_damping: parseFloat(zeta) || 0.02,
       freq_range: {
@@ -120,7 +129,7 @@ export default function VibrationPanel({ projectId, fileId }) {
         }
       }, 3000)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
       setRunning(false)
     }
   }
@@ -327,7 +336,15 @@ export default function VibrationPanel({ projectId, fileId }) {
 // ---------------------------------------------------------------------------
 // Dual FRF plot: magnitude (top) + phase (bottom)
 // ---------------------------------------------------------------------------
-function FrfDualPlot({ freqs, magnitudes, phases, resonantHz, isPreview }) {
+interface FrfDualPlotProps {
+  freqs: number[]
+  magnitudes: number[]
+  phases: number[]
+  resonantHz?: number | null
+  isPreview?: boolean
+}
+
+function FrfDualPlot({ freqs, magnitudes, phases, resonantHz, isPreview }: FrfDualPlotProps) {
   const W = 240, H_mag = 50, H_phase = 30, PAD = { l: 6, r: 6, t: 4, b: 4 }
 
   const data = magnitudes && magnitudes.length > 0 ? magnitudes : []
@@ -412,7 +429,11 @@ function FrfDualPlot({ freqs, magnitudes, phases, resonantHz, isPreview }) {
 // ---------------------------------------------------------------------------
 // Mode table (fn, ζ, DAF at resonance)
 // ---------------------------------------------------------------------------
-function ModeTable({ modes }) {
+interface ModeTableProps {
+  modes: FemModeTableRow[]
+}
+
+function ModeTable({ modes }: ModeTableProps) {
   return (
     <div aria-label="Mode table">
       <div style={{ ...s.sectionTitle, marginBottom: 4 }}>Mode Table</div>

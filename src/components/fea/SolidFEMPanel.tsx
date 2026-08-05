@@ -11,30 +11,44 @@
 // Props: { projectId, fileId }
 
 import { useState, useRef } from 'react'
+import type { ReactNode } from 'react'
 import {
-  Activity, AlertTriangle, CheckCircle, Loader2,
+  AlertTriangle, CheckCircle, Loader2,
   Play, Grid3x3, BarChart2, Thermometer,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '../../store/auth.js'
 import { submitFemJob, pollFemStatus } from './feaApi.js'
-import { s, badgeStyle } from './feaStyles.js'
+import { s } from './feaStyles.js'
+import type { FemPanelProps, FemJobStatus } from './femTypes'
+
+export type Props = FemPanelProps
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
-function fmtMPa(pa) {
+function fmtMPa(pa?: number | null): string {
   if (pa == null || !isFinite(pa)) return '—'
   return (pa / 1e6).toFixed(3) + ' MPa'
 }
-function fmtMm(m) {
+function fmtMm(m?: number | null): string {
   if (m == null || !isFinite(m)) return '—'
   return (m * 1000).toFixed(4) + ' mm'
 }
-function fmtSci(v, unit = '') {
+// `unknown` rather than `number` — some call sites pass through a raw result field of
+// uncertain shape (e.g. a reaction entry that may be a bare number or `{ R }`) and rely on
+// this function's existing `Number(v)`/`isFinite` guard to render '—' for anything that
+// doesn't coerce cleanly, exactly as it did pre-migration.
+function fmtSci(v?: unknown, unit = ''): string {
   if (v == null || !isFinite(Number(v))) return '—'
   return Number(v).toExponential(3) + (unit ? ' ' + unit : '')
 }
 
-function ResultRow({ label, value }) {
+interface ResultRowProps {
+  label: string
+  value: ReactNode
+}
+
+function ResultRow({ label, value }: ResultRowProps) {
   return (
     <tr>
       <td style={s.td}>{label}</td>
@@ -43,7 +57,13 @@ function ResultRow({ label, value }) {
   )
 }
 
-function SectionHeader({ icon: Icon, label, color }) {
+interface SectionHeaderProps {
+  icon: LucideIcon
+  label: string
+  color: string
+}
+
+function SectionHeader({ icon: Icon, label, color }: SectionHeaderProps) {
   return (
     <div style={{ ...s.header, marginBottom: 4 }}>
       <Icon size={15} style={{ color }} />
@@ -53,17 +73,17 @@ function SectionHeader({ icon: Icon, label, color }) {
 }
 
 // Generic run/poll hook
-function useFemJob({ projectId, fileId }) {
+function useFemJob({ projectId, fileId }: FemPanelProps) {
   const [running, setRunning] = useState(false)
-  const [status, setStatus]   = useState(null)
-  const [error, setError]     = useState(null)
-  const pollRef = useRef(null)
+  const [status, setStatus]   = useState<FemJobStatus | null>(null)
+  const [error, setError]     = useState<string | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   function stopPoll() {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
   }
 
-  async function run(body) {
+  async function run(body: Record<string, unknown>) {
     if (!projectId || !fileId) return
     setError(null)
     setRunning(true)
@@ -83,7 +103,7 @@ function useFemJob({ projectId, fileId }) {
         }
       }, 3000)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
       setRunning(false)
     }
   }
@@ -93,7 +113,13 @@ function useFemJob({ projectId, fileId }) {
 
 // ── Von Mises stress contour bar ───────────────────────────────────────────────
 
-function VonMisesContour({ vmValues, maxVm, yieldStrength }) {
+interface VonMisesContourProps {
+  vmValues: number[]
+  maxVm?: number | null
+  yieldStrength?: number
+}
+
+function VonMisesContour({ vmValues, maxVm, yieldStrength }: VonMisesContourProps) {
   if (!Array.isArray(vmValues) || vmValues.length === 0) return null
   const max = maxVm || Math.max(...vmValues) || 1
   const N = 20
@@ -146,12 +172,17 @@ function VonMisesContour({ vmValues, maxVm, yieldStrength }) {
 
 // ── Displacement profile plot (1-D beam) ──────────────────────────────────────
 
-function DeflectionPlot({ x, w, label }) {
+interface DeflectionPlotProps {
+  x: number[]
+  w: number[]
+  label?: string
+}
+
+function DeflectionPlot({ x, w, label }: DeflectionPlotProps) {
   const W = 240, H = 64
   if (!Array.isArray(x) || x.length < 2 || !Array.isArray(w)) return null
   const maxAbs = Math.max(...w.map(Math.abs)) || 1
   const maxX = x[x.length - 1] || 1
-  const step = W / (x.length - 1 || 1)
   const pts = x.map((xi, i) => {
     const px = ((xi / maxX) * W).toFixed(1)
     const py = (H / 2 - (w[i] / maxAbs) * (H * 0.42)).toFixed(1)
@@ -175,7 +206,11 @@ function DeflectionPlot({ x, w, label }) {
 
 // ── Modal frequency spectrum ───────────────────────────────────────────────────
 
-function FrequencySpectrum({ freqs }) {
+interface FrequencySpectrumProps {
+  freqs: number[]
+}
+
+function FrequencySpectrum({ freqs }: FrequencySpectrumProps) {
   const W = 240, H = 48
   if (!Array.isArray(freqs) || freqs.length === 0) return null
   const max = Math.max(...freqs) || 1
@@ -192,7 +227,11 @@ function FrequencySpectrum({ freqs }) {
               <rect
                 x={x} y={H - barH - 4} width={barW} height={barH}
                 fill="#a78bfa" rx="1"
-                title={`Mode ${i + 1}: ${f.toFixed(1)} Hz`}
+                // `title` is a valid native SVG/DOM tooltip attribute, but @types/react's
+                // SVGProps<SVGRectElement> doesn't model it (a @types/react boundary this
+                // slice doesn't own). `any` here preserves the pass-through-to-DOM behavior
+                // unchanged rather than dropping the tooltip.
+                {...({ title: `Mode ${i + 1}: ${f.toFixed(1)} Hz` } as any)}
               />
               <text x={x + barW / 2} y={H - 1} textAnchor="middle"
                 fontSize="8" fill="#6b7280">
@@ -214,13 +253,15 @@ function FrequencySpectrum({ freqs }) {
 // SOLID STATIC  — fem_solid_static
 // ══════════════════════════════════════════════════════════════════════════════
 
-const ELEM_TYPES = ['tet4', 'tet10', 'hex8', 'hex20']
+// Not currently surfaced in the UI (no element-type selector control yet) but kept as
+// documentation of the supported `kind` values for `elemsStr`'s JSON.
+const _ELEM_TYPES = ['tet4', 'tet10', 'hex8', 'hex20']
 
 // Compact example mesh: 4-node tetrahedron (unit cube corner)
 const DEFAULT_NODES = '0,0,0\n1,0,0\n0,1,0\n0,0,1'
 const DEFAULT_ELEMS = '[{"kind":"tet4","node_indices":[0,1,2,3]}]'
 
-function SolidStaticCard({ projectId, fileId }) {
+function SolidStaticCard({ projectId, fileId }: FemPanelProps) {
   const { running, status, error, run } = useFemJob({ projectId, fileId })
   const [E, setE]               = useState('200e9')
   const [nu, setNu]             = useState('0.3')
@@ -236,11 +277,12 @@ function SolidStaticCard({ projectId, fileId }) {
   const jobStatus = status?.status
 
   function handleRun() {
-    let nodes, elements
+    let nodes: number[][] | undefined
+    let elements: unknown
     try {
       nodes    = nodesStr.split('\n').filter(l => l.trim()).map(l => l.split(',').map(Number))
       elements = JSON.parse(elemsStr)
-    } catch (e) {
+    } catch {
       return
     }
     const fixedNid = parseInt(fixNode, 10) || 0
@@ -360,7 +402,7 @@ function SolidStaticCard({ projectId, fileId }) {
 // MODAL BEAM  — fem_modal_beam
 // ══════════════════════════════════════════════════════════════════════════════
 
-function ModalBeamCard({ projectId, fileId }) {
+function ModalBeamCard({ projectId, fileId }: FemPanelProps) {
   const { running, status, error, run } = useFemJob({ projectId, fileId })
   const [mode, setMode]       = useState('beam')
   const [E, setE]             = useState('200e9')
@@ -380,7 +422,7 @@ function ModalBeamCard({ projectId, fileId }) {
   const result    = status?.result && typeof status.result === 'object' ? status.result : null
   const jobStatus = status?.status
 
-  const BC_PRESETS = {
+  const BC_PRESETS: Record<string, Array<{ type: string; x: number }>> = {
     cantilever:   [{ type: 'fixed', x: 0 }],
     'simply-supported': [{ type: 'pinned', x: 0 }, { type: 'pinned', x: parseFloat(L) || 1 }],
     'fixed-fixed': [{ type: 'fixed', x: 0 }, { type: 'fixed', x: parseFloat(L) || 1 }],
@@ -546,7 +588,9 @@ function ModalBeamCard({ projectId, fileId }) {
 // BEAM STATIC  — fem_linear_static_beam
 // ══════════════════════════════════════════════════════════════════════════════
 
-function BeamStaticCard({ projectId, fileId }) {
+type BeamSupport = { type: string; x: number }
+
+function BeamStaticCard({ projectId, fileId }: FemPanelProps) {
   const { running, status, error, run } = useFemJob({ projectId, fileId })
   const [analysis, setAnalysis] = useState('beam')
   const [E, setE]               = useState('200e9')
@@ -565,13 +609,13 @@ function BeamStaticCard({ projectId, fileId }) {
   const result    = status?.result && typeof status.result === 'object' ? status.result : null
   const jobStatus = status?.status
 
-  const BC_MAP = {
+  const BC_MAP: Record<string, BeamSupport[] | ((lv: number) => BeamSupport[])> = {
     cantilever:       [{ type: 'fixed', x: 0 }],
-    'simply-supported': (lv) => [{ type: 'pinned', x: 0 }, { type: 'roller', x: lv }],
-    'fixed-fixed':    (lv) => [{ type: 'fixed', x: 0 }, { type: 'fixed', x: lv }],
+    'simply-supported': (lv: number) => [{ type: 'pinned', x: 0 }, { type: 'roller', x: lv }],
+    'fixed-fixed':    (lv: number) => [{ type: 'fixed', x: 0 }, { type: 'fixed', x: lv }],
   }
 
-  function getSupports() {
+  function getSupports(): BeamSupport[] {
     const lv = parseFloat(L) || 1.0
     const bc = BC_MAP[bcPreset]
     return typeof bc === 'function' ? bc(lv) : bc
@@ -765,7 +809,7 @@ const SOLID_SECTIONS = [
  *
  * Props: { projectId, fileId }
  */
-export default function SolidFEMPanel({ projectId, fileId }) {
+export default function SolidFEMPanel({ projectId, fileId }: Props) {
   const [active, setActive] = useState('solid')
 
   return (

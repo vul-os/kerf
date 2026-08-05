@@ -23,6 +23,13 @@ import FatiguePanel      from './FatiguePanel.jsx'
 import VibrationPanel    from './VibrationPanel.jsx'
 import FEMSolverPanel    from './FEMSolverPanel.jsx'
 import SolidFEMPanel     from './SolidFEMPanel.jsx'
+import type { ApiFile } from '@/types'
+
+export interface Props {
+  /** Current workspace file; only `id` is read here. */
+  file: Pick<ApiFile, 'id'> | null
+  projectId?: string
+}
 
 const TABS = [
   { id: 'linear_static',    label: 'Linear Static', color: '#22d3ee' },
@@ -34,7 +41,7 @@ const TABS = [
   { id: 'advanced',         label: 'Advanced FEM',   color: '#fb923c' },
 ]
 
-export default function FEAView({ file, projectId }) {
+export default function FEAView({ file, projectId }: Props) {
   const [activeTab, setActiveTab] = useState('linear_static')
   const fileId = file?.id
 

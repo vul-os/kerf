@@ -9,25 +9,37 @@
 // Props: { projectId, fileId }
 
 import { useState, useRef } from 'react'
+import type { CSSProperties } from 'react'
 import { Activity, AlertTriangle, CheckCircle, Loader2, Play } from 'lucide-react'
 import { useAuth } from '../../store/auth.js'
 import { submitFemJob, pollFemStatus } from './feaApi.js'
 import { s, badgeStyle } from './feaStyles.js'
+import type { FemPanelProps, FemJobStatus } from './femTypes'
 
-const MATERIAL_PRESETS = {
+export type Props = FemPanelProps
+
+interface MaterialPreset {
+  label: string
+  E: number
+  nu: number
+  rho: number
+  yield_strength: number
+}
+
+const MATERIAL_PRESETS: Record<string, MaterialPreset> = {
   steel:     { label: 'Steel (S275)',       E: 200e9, nu: 0.3,   rho: 7850, yield_strength: 275e6 },
   aluminium: { label: 'Aluminium 6061-T6',  E: 68.9e9, nu: 0.33, rho: 2700, yield_strength: 276e6 },
   titanium:  { label: 'Titanium Ti-6Al-4V', E: 113.8e9, nu: 0.342, rho: 4430, yield_strength: 880e6 },
 }
 
-export default function ModalPanel({ projectId, fileId }) {
+export default function ModalPanel({ projectId, fileId }: Props) {
   const [preset, setPreset]   = useState('steel')
   const [nModes, setNModes]   = useState('6')
   const [faceTag, setFaceTag] = useState('1')   // fixed BC face
   const [running, setRunning] = useState(false)
-  const [status, setStatus]   = useState(null)
-  const [error, setError]     = useState(null)
-  const pollRef = useRef(null)
+  const [status, setStatus]   = useState<FemJobStatus | null>(null)
+  const [error, setError]     = useState<string | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   function stopPoll() {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
@@ -66,7 +78,7 @@ export default function ModalPanel({ projectId, fileId }) {
         }
       }, 3000)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
       setRunning(false)
     }
   }
@@ -139,7 +151,7 @@ export default function ModalPanel({ projectId, fileId }) {
               {freqs.map((f, i) => {
                 const shape = shapes[i]
                 const participation = shape
-                  ? Math.sqrt(shape.reduce((acc, v) => {
+                  ? Math.sqrt(shape.reduce<number>((acc, v) => {
                       const mag = Array.isArray(v) ? Math.sqrt(v.reduce((a, x) => a + x * x, 0)) : Math.abs(Number(v) || 0)
                       return acc + mag * mag
                     }, 0)).toExponential(2)
@@ -177,8 +189,12 @@ export default function ModalPanel({ projectId, fileId }) {
   )
 }
 
+interface ModeShapeBarProps {
+  freqs: number[]
+}
+
 // Simple frequency spectrum bar chart.
-function ModeShapeBar({ freqs }) {
+function ModeShapeBar({ freqs }: ModeShapeBarProps) {
   const max = Math.max(...freqs) || 1
   return (
     <div aria-label="Mode frequency spectrum">
@@ -190,8 +206,11 @@ function ModeShapeBar({ freqs }) {
             height: `${Math.max(4, (f / max) * 100)}%`,
             background: '#a78bfa',
             borderRadius: '2px 2px 0 0',
+            // `title` is not a CSSProperties key — pre-existing no-op left over from the
+            // original .jsx (the tooltip never rendered; not this slice's behavior to fix).
+            // Cast preserves the exact same runtime object rather than silently dropping it.
             title: `Mode ${i + 1}: ${f.toFixed(1)} Hz`,
-          }} />
+          } as CSSProperties} />
         ))}
       </div>
     </div>

@@ -13,6 +13,14 @@ import { Activity, AlertTriangle, CheckCircle, Loader2, Play } from 'lucide-reac
 import { useAuth } from '../../store/auth.js'
 import { submitFemJob, pollFemStatus } from './feaApi.js'
 import { s, badgeStyle } from './feaStyles.js'
+import type { FemPanelProps, FemJobStatus } from './femTypes'
+
+export type Props = FemPanelProps
+
+interface BucklingSupport {
+  type: 'pinned' | 'fixed'
+  x: number
+}
 
 const LOAD_CASES = [
   { id: 'axial_compression', label: 'Axial compression (column)' },
@@ -20,23 +28,23 @@ const LOAD_CASES = [
   { id: 'combined',          label: 'Combined (axial + shear)' },
 ]
 
-const BC_CONFIGS = [
+const BC_CONFIGS: Array<{ id: string; label: string; supports: BucklingSupport[] }> = [
   { id: 'pinned_pinned', label: 'Pinned-Pinned (K=1)',  supports: [{ type: 'pinned', x: 0 }, { type: 'pinned', x: 1 }] },
   { id: 'fixed_free',    label: 'Fixed-Free (K=2)',     supports: [{ type: 'fixed',  x: 0 }] },
   { id: 'fixed_fixed',   label: 'Fixed-Fixed (K=0.5)',  supports: [{ type: 'fixed',  x: 0 }, { type: 'fixed',  x: 1 }] },
   { id: 'fixed_pinned',  label: 'Fixed-Pinned (K=0.7)', supports: [{ type: 'fixed',  x: 0 }, { type: 'pinned', x: 1 }] },
 ]
 
-export default function BucklingPanel({ projectId, fileId }) {
+export default function BucklingPanel({ projectId, fileId }: Props) {
   const [loadCase, setLoadCase] = useState('axial_compression')
   const [bcConfig, setBcConfig] = useState('pinned_pinned')
   const [pRef, setPRef]         = useState('100000')    // N — reference compressive load
   const [L, setL]               = useState('1.0')       // m — column length
   const [nModes, setNModes]     = useState('3')
   const [running, setRunning]   = useState(false)
-  const [status, setStatus]     = useState(null)
-  const [error, setError]       = useState(null)
-  const pollRef = useRef(null)
+  const [status, setStatus]     = useState<FemJobStatus | null>(null)
+  const [error, setError]       = useState<string | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   function stopPoll() {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
@@ -88,7 +96,7 @@ export default function BucklingPanel({ projectId, fileId }) {
         }
       }, 3000)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
       setRunning(false)
     }
   }
@@ -211,7 +219,14 @@ export default function BucklingPanel({ projectId, fileId }) {
 }
 
 // Sinusoidal mode-shape sketches.
-function BucklingModeViz({ lambdas, pRef }) {
+interface BucklingModeVizProps {
+  lambdas: number[]
+  pRef: number
+}
+
+// `pRef` isn't read inside (kept in the props type since the call site still passes it;
+// pre-existing unused prop, not this slice's behavior to change).
+function BucklingModeViz({ lambdas }: BucklingModeVizProps) {
   const W = 200
   const H = 60
   const N_PTS = 40

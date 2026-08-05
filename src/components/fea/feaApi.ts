@@ -11,15 +11,19 @@
 // body as input_spec and passes it to the FEMWorker which calls the
 // appropriate engine function.
 
-const API_URL = import.meta.env.VITE_API_URL || ''
+import type { FemJobContext, FemJobStatus, FemSubmitResponse } from './femTypes'
+
+const API_URL: string = import.meta.env.VITE_API_URL || ''
 
 /**
  * Submit a FEM job.
- * @param {{ pid: string, fid: string, token: string }} ctx
- * @param {object} body — analysis payload merged into input_spec
- * @returns {Promise<{ job_id: string, status: string }>}
+ * @param body — analysis payload merged into input_spec. Shape varies per `analysis_type`
+ *   (~30 distinct backend tools), so it's a boundary this slice does not own; see femTypes.ts.
  */
-export async function submitFemJob(ctx, body) {
+export async function submitFemJob(
+  ctx: FemJobContext,
+  body: Record<string, unknown>,
+): Promise<FemSubmitResponse> {
   const { pid, fid, token } = ctx
   const res = await fetch(`${API_URL}/api/projects/${pid}/files/${fid}/fem`, {
     method: 'POST',
@@ -36,11 +40,8 @@ export async function submitFemJob(ctx, body) {
   return res.json()
 }
 
-/**
- * Poll job status once.
- * @returns {Promise<{ status: string, result?: object, error?: string }>}
- */
-export async function pollFemStatus(ctx) {
+/** Poll job status once. */
+export async function pollFemStatus(ctx: FemJobContext): Promise<FemJobStatus> {
   const { pid, fid, token } = ctx
   const res = await fetch(`${API_URL}/api/projects/${pid}/files/${fid}/fem/status`, {
     headers: { authorization: `Bearer ${token}` },
@@ -49,25 +50,34 @@ export async function pollFemStatus(ctx) {
   return res.json()
 }
 
+export interface RunAndPollOptions {
+  onStatus?: (status: FemJobStatus | { status: 'queued'; job_id?: string }) => void
+  intervalMs?: number
+}
+
 /**
  * Submit + poll until done/error. Returns a Promise that resolves with the
  * final status object. Pass `onStatus(s)` to receive intermediate updates.
  */
-export async function runAndPoll(ctx, body, { onStatus, intervalMs = 3000 } = {}) {
+export async function runAndPoll(
+  ctx: FemJobContext,
+  body: Record<string, unknown>,
+  { onStatus, intervalMs = 3000 }: RunAndPollOptions = {},
+): Promise<FemJobStatus> {
   const sub = await submitFemJob(ctx, body)
   onStatus?.({ status: 'queued', job_id: sub.job_id })
   return new Promise((resolve, reject) => {
     const id = setInterval(async () => {
       try {
-        const s = await pollFemStatus(ctx)
-        onStatus?.(s)
-        if (s.status === 'done' || s.status === 'error') {
+        const st = await pollFemStatus(ctx)
+        onStatus?.(st)
+        if (st.status === 'done' || st.status === 'error') {
           clearInterval(id)
-          resolve(s)
+          resolve(st)
         }
       } catch (e) {
         clearInterval(id)
-        reject(e)
+        reject(e instanceof Error ? e : new Error(String(e)))
       }
     }, intervalMs)
   })

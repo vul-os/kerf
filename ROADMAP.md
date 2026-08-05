@@ -65,7 +65,11 @@ A single theme connects G2, G3 and G4: **Kerf reads far more formats than it wri
 
 ### G2 — Unified ECAD IR, KiCad-interoperable (T-525 … T-539)
 
-The problem is not tscircuit-the-syntax; it is that **tscircuit's Circuit JSON is simultaneously the authoring format and the interchange IR**. KiCad fidelity is therefore capped by whatever Circuit JSON can express — and `kicad_io.py` has **no copper zone/pour handling at all**, plus no custom pad shapes, teardrops, rule areas, net-class DRC semantics, hierarchical sheet instances, stackup or 3D model links.
+The problem is not tscircuit-the-syntax; it is that **tscircuit's Circuit JSON is simultaneously the authoring format and the interchange IR**, and that the KiCad adapter on top of it is thin.
+
+**The measurable defect is the adapter** (verified 2026-08-05): `kicad_io.py` contains **zero** occurrences of zone, pour, thermal or keepout. Yet Circuit JSON models copper pours perfectly well — `pcb_copper_pour` in polygon/rect/BRep variants, plus `pcb_ground_plane` and `pcb_ground_plane_region` — and Kerf already consumes them in at least eight modules (`tools/pour.py`, `fab/gerber.py`, `fab/odbpp/writer.py`, `via_stitching.py`, `src/lib/copperPour.js`). So Kerf can *author* and *fabricate* a ground pour but cannot round-trip one through KiCad. The pour is dropped at the adapter, not at the IR.
+
+That distinction sets G2's first job: **measure the true gap before designing around it.** An earlier draft of this section blamed Circuit JSON's expressiveness for the pour gap; that was wrong, and the same caution applies to the other suspected gaps (custom pad primitives, teardrops, rule areas, net-class DRC semantics, hierarchical sheet instances, stackup, 3D model links). T-525 quantifies which of those are genuinely IR limits and which are merely adapter limits — the answer changes how much new IR is warranted versus how much is a better reader/writer over what already exists.
 
 **Shape:** a Kerf ECAD IR modeled on **KiCad's** data model (the richest open one, and the interop target), carrying a **passthrough bag** — every s-expression node the IR does not model is preserved verbatim and re-emitted in place. That is what makes round-trip lossless without modeling all of KiCad up front. tscircuit JSX and atopile both become *front-ends* that lower into the IR; Circuit JSON becomes an *export adapter*, not the core. No existing `.circuit.tsx` file breaks.
 

@@ -6080,21 +6080,39 @@ Flip `strict: true` and eliminate the resulting errors, per-directory, one direc
 ## G2 — Unified ECAD IR, KiCad-interoperable (T-525 … T-539)
 
 **Problem:** tscircuit's Circuit JSON is simultaneously the authoring format and the interchange
-IR, so KiCad fidelity is capped by what Circuit JSON can express. `kicad_io.py` has **no copper
-zone/pour handling at all** — verified by grep, 2026-08-05 — plus no custom pad shapes, teardrops,
-rule areas, net-class DRC semantics, hierarchical sheet instances, stackup/impedance or 3D model
-links. Its own docstring caps the guarantee at *"component refs, net names, and footprint names"*.
+IR, and the KiCad adapter on top of it is thin. `kicad_io.py`'s own docstring caps its round-trip
+guarantee at *"component refs, net names, and footprint names"*.
+
+**Verified 2026-08-05 — read this before designing:** `kicad_io.py` contains **zero** occurrences
+of zone/pour/thermal/keepout. But Circuit JSON **does** model pours (`pcb_copper_pour` in
+polygon/rect/BRep variants, `pcb_ground_plane`, `pcb_ground_plane_region`), and Kerf already
+consumes them in ≥8 modules (`tools/pour.py`, `fab/gerber.py`, `fab/odbpp/writer.py`,
+`via_stitching.py`, `src/lib/copperPour.js`). Kerf can author and fabricate a ground pour but
+cannot round-trip one through KiCad — **the pour is lost at the adapter, not at the IR.**
+
+An earlier draft of this epic blamed Circuit JSON's expressiveness for that gap. That was wrong,
+and the correction matters: the other suspected gaps (custom pad primitives, teardrops, rule areas,
+net-class DRC semantics, hierarchical sheet instances, stackup/impedance, 3D model links) are
+**also unverified** and must be measured, not assumed. Also relevant: circuit-json already ships
+KiCad-shaped types (`KicadFootprintPad`, `KicadSymbolMetadata`, `KicadAt`, `KicadEffects`), so the
+two models are less far apart than the adapter suggests.
 
 **Non-goal:** breaking `.circuit.tsx`. tscircuit becomes one front-end among several, not the core.
 
 ### T-525 🚧 BLOCKING — ECAD IR schema + passthrough design
 - **Tier:** A · **Priority:** P0 · **Status:** ⬜ not started
-- **Scope:** Define the IR modelled on **KiCad's** data model (richest open model + the interop
-  target), explicitly a superset of Circuit JSON. The load-bearing design element is the
-  **passthrough bag**: every s-expression node the IR does not model is retained verbatim, keyed by
-  position, and re-emitted on write. That is what buys lossless round-trip without modelling all of
-  KiCad up front. Must cover, as first-class: zones/pours, custom pad shapes, net classes with DRC
-  semantics, hierarchical sheet instances, stackup, 3D model links.
+- **Scope — step 1, measure before designing (do not skip):** produce a gap table over a corpus of
+  real `.kicad_pcb` / `.kicad_sch` files. For each KiCad construct, classify it as **(a)** already
+  representable in Circuit JSON and merely dropped by the adapter, **(b)** representable with a
+  modest Circuit JSON extension, or **(c)** a genuine IR limit needing new modelling. The pour case
+  is a worked example of (a). This table is a deliverable in its own right and decides how much of
+  the rest of G2 is warranted — if most constructs land in (a), the correct fix is a better
+  reader/writer, not a new IR, and this epic should shrink accordingly. Report that honestly.
+- **Scope — step 2, design to what step 1 found:** define the IR modelled on **KiCad's** data model,
+  as a superset of Circuit JSON. The load-bearing element is the **passthrough bag**: every
+  s-expression node the IR does not model is retained verbatim, keyed by position, and re-emitted on
+  write — lossless round-trip without modelling all of KiCad up front. Cover as first-class whatever
+  step 1 put in categories (b) and (c).
 - **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/ir/schema.py`,
   `ir/types.py`, `ir/passthrough.py`, `docs/ecad-ir.md`, JSON Schema in `docs/schemas/`
 - **Definition of Done:** schema documented with a worked example carrying an unmodelled node
@@ -6104,8 +6122,11 @@ links. Its own docstring caps the guarantee at *"component refs, net names, and 
 
 ### T-526 — KiCad reader → IR (zones, pours, passthrough)
 - **Scope:** Replace the narrow parse in `kicad_io.py` with a full reader into the IR. Zones/pours
-  are the headline gap. Everything unrecognised lands in the passthrough bag rather than being
-  dropped. Keep the existing pure-Python s-expression lexer.
+  are the headline gap **at the adapter** — Kerf and Circuit JSON both already model them
+  (`pcb_copper_pour`, `pcb_ground_plane`), so this is wiring an existing representation to an
+  existing consumer, not inventing one. Reuse `tools/pour.py` and `src/lib/copperPour.js` shapes
+  rather than defining a parallel pour model. Everything unrecognised lands in the passthrough bag
+  rather than being dropped. Keep the existing pure-Python s-expression lexer.
 - **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/ir/kicad_read.py`,
   tests + fixtures under `packages/kerf-electronics/tests/ir/`
 - **DoD:** a real-world board with a ground pour reads with zones intact; unmodelled nodes counted

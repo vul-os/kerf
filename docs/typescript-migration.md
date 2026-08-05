@@ -65,8 +65,26 @@ wasted runs into two clean two-minute no-ops.
 ## Known traps when verifying a slice
 
 1. **`npm run lint` is RED at baseline** — ~1,451 pre-existing errors in the un-migrated
-   `.js`/`.jsx` tree. That is real debt but it is not G1's. **Gate on `npm run lint:ts`**, scoped
-   to `.ts`/`.tsx`, which starts at zero and must stay at zero.
+   `.js`/`.jsx` tree. Real debt, but not G1's. **Gate on `npm run lint:ts:ratchet`.**
+
+   It is a **ratchet, not a hard zero** — and the reason matters. Migrating a file *renames* it,
+   so its pre-existing lint debt **moves** from the `lint` bucket into `lint:ts`; nothing new is
+   created. This was measured, not assumed: linting the pre-migration `.js` of a representative
+   file produced the identical error. A hard-zero gate would therefore fail a slice for problems
+   it did not cause.
+
+   The ratchet enforces the invariant that actually matters: **the count may never rise**, and
+   when it falls you must lower `BASELINE` in `scripts/lint-ts-ratchet.mjs` so the cleanup is
+   locked in. Current baseline: **78** inherited errors. Target is 0.
+
+   If your slice raises the count, you added the debt — fix it. Never raise the baseline.
+
+4. **Tests that read source by literal path will break on rename.** Several suites do
+   "source-text inspection" — e.g. `GdsLayoutPage.test.jsx` did `readFileSync('lib/gdsLoader.js')`.
+   Renaming the module broke it, and it is not caught by typecheck, only by running the suite.
+   After migrating, grep for literal `'lib/<name>.js'` style references and update them. Note the
+   distinction: an **import specifier** ending `.js` is still correct (it resolves to `.ts` under
+   `moduleResolution: bundler`); only literal filesystem paths need changing.
 2. **`npm test` intermittently exits 1 while reporting every test passed.** The cause is an
    `EnvironmentTeardownError` unhandled rejection — a late dynamic import racing environment
    teardown, observed in `src/lib/panels/__tests__/dcc.test.jsx` but not specific to it. It is

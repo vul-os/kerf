@@ -13,11 +13,19 @@ name: Frontend typecheck + lint
 #
 # Gate 2 is the ratchet: a directory added to tsconfig.strict.json can never silently regress.
 #
-# Gate 3 is scoped to .ts/.tsx on purpose. `npm run lint` over the whole repo reports thousands
-# of PRE-EXISTING errors in the un-migrated .js/.jsx tree — that is a real debt, but it is not
-# G1's, and gating on it would make this workflow red on every PR from day one, which trains
-# people to ignore it. `lint:ts` starts at zero and must stay at zero, so it grows into a full
-# gate as the migration proceeds. Cleaning up the JS tree is separate, deliberate work.
+# Gate 3 is scoped to .ts/.tsx on purpose. `npm run lint` over the whole repo reports ~1,451
+# PRE-EXISTING errors in the un-migrated .js/.jsx tree — real debt, but not G1's, and gating on
+# it would make this workflow red on every PR from day one, which trains people to ignore it.
+#
+# It is a RATCHET, not a hard zero. An earlier version of this file asserted lint:ts must be
+# exactly 0, assuming migrated files start clean. That was measured to be false: linting the
+# pre-migration .js of a representative file produced the identical error. A migration RENAMES a
+# file, so its existing lint debt MOVES from the `lint` bucket into `lint:ts` — nothing new is
+# created. A hard zero would fail CI for problems the slice did not cause.
+#
+# So the count may never rise (no slice may add debt), and when it falls the baseline in
+# scripts/lint-ts-ratchet.mjs must be lowered (cleanup is locked in). Target is 0, at which point
+# the ratchet can be replaced by a plain eslint call.
 
 on:
   pull_request:
@@ -51,8 +59,8 @@ jobs:
       - name: Typecheck (strict allow-list — the tightening ratchet)
         run: npm run typecheck:strict
 
-      - name: Lint (migrated TypeScript only — see header)
-        run: npm run lint:ts
+      - name: Lint ratchet (migrated TypeScript — see header)
+        run: npm run lint:ts:ratchet
 
       - name: Unit tests
         run: npm test

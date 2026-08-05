@@ -26,6 +26,7 @@
     "start": "kerf-server --host 0.0.0.0 --port 8080",
     "lint": "eslint .",
     "lint:ts": "eslint --no-error-on-unmatched-pattern \"src/**/*.ts\" \"src/**/*.tsx\"",
+    "lint:ts:ratchet": "node ./scripts/lint-ts-ratchet.mjs",
     "typecheck": "tsc --noEmit",
     "typecheck:strict": "tsc --noEmit -p tsconfig.strict.json",
     "preview": "vite preview",

@@ -40,8 +40,86 @@
 //
 // The backend mirrors this shape in backend/tools/material.py
 // (`PartDoc`); keep the two definitions in sync.
+//
+// Typing note: `src/store/workspace.ts` already declares an equivalent
+// `PartDocument`/`PartDistributor`/`PartPhoto` shape (mined from this file
+// before it was typed) and casts this module's untyped returns through it
+// (`parsePart(...) as PartDocument`). `src/lib` must not import from
+// `src/store`, so the shapes below are restated here rather than imported —
+// they are structurally identical, so those existing casts still typecheck
+// (now redundant-but-harmless) against what this file actually returns.
+// `Configuration` (id/label/params) IS a `src/types` shared shape (used by
+// `.feature`/`.sketch` configs too) and is imported, not redeclared.
 
-export const PART_VISIBILITY_VALUES = ['private', 'unlisted', 'public']
+import type { Configuration } from '@/types'
+
+export const PART_VISIBILITY_VALUES = ['private', 'unlisted', 'public'] as const
+export type PartVisibility = (typeof PART_VISIBILITY_VALUES)[number]
+
+export interface PartDistributor {
+  name: string
+  url: string
+  sku?: string
+  price_usd?: number
+  stock?: number
+  fetched_at?: string
+}
+
+export interface PartPhoto {
+  storage_key: string
+  mime_type: string
+  caption?: string
+  primary?: boolean
+  width?: number
+  height?: number
+  bytes?: number
+}
+
+export interface PartDocument {
+  version: 1
+  name: string
+  description: string
+  category: string
+  manufacturer: string
+  mpn: string
+  value: string
+  datasheet_url: string
+  distributors: PartDistributor[]
+  model_storage_key: string
+  model_mime_type: string
+  symbol_file_id: string
+  footprint_file_id: string
+  metadata?: Record<string, unknown>
+  visibility: PartVisibility
+  photos: PartPhoto[]
+  default_config: string
+  configurations: Configuration[]
+}
+
+/** Loosely-typed raw JSON as parsed from file content — every field is optional/untrusted. */
+interface RawPart {
+  name?: unknown
+  description?: unknown
+  category?: unknown
+  manufacturer?: unknown
+  mpn?: unknown
+  value?: unknown
+  datasheet_url?: unknown
+  distributors?: unknown
+  model_storage_key?: unknown
+  model_mime_type?: unknown
+  symbol_file_id?: unknown
+  footprint_file_id?: unknown
+  metadata?: unknown
+  visibility?: unknown
+  photos?: unknown
+  default_config?: unknown
+  configurations?: unknown
+}
+
+function isVisibility(v: unknown): v is PartVisibility {
+  return typeof v === 'string' && (PART_VISIBILITY_VALUES as readonly string[]).includes(v)
+}
 
 // Tolerant parse — invalid / missing JSON falls back to a defaulted Part with
 // `version=1` and an empty distributors array. Always succeeds.
@@ -64,14 +142,14 @@ export const PART_VISIBILITY_VALUES = ['private', 'unlisted', 'public']
 // scope (config wins on collision) and passed to the runner. Same shape
 // applies to `.feature` and `.jscad` files — `getActiveConfig()` here is
 // the canonical lookup.
-export function parsePart(content) {
-  let raw = null
+export function parsePart(content: unknown): PartDocument {
+  let raw: RawPart | null = null
   if (typeof content === 'string' && content.trim()) {
     try { raw = JSON.parse(content) } catch { raw = null }
   } else if (content && typeof content === 'object') {
-    raw = content
+    raw = content as RawPart
   }
-  const r = raw && typeof raw === 'object' ? raw : {}
+  const r: RawPart = raw && typeof raw === 'object' ? raw : {}
   return {
     version: 1,
     name: typeof r.name === 'string' ? r.name : '',
@@ -82,23 +160,23 @@ export function parsePart(content) {
     value: typeof r.value === 'string' ? r.value : '',
     datasheet_url: typeof r.datasheet_url === 'string' ? r.datasheet_url : '',
     distributors: Array.isArray(r.distributors)
-      ? r.distributors.map(normalizeDistributor).filter(Boolean)
+      ? r.distributors.map(normalizeDistributor).filter((d): d is PartDistributor => d !== null)
       : [],
     model_storage_key: typeof r.model_storage_key === 'string' ? r.model_storage_key : '',
     model_mime_type: typeof r.model_mime_type === 'string' ? r.model_mime_type : '',
     symbol_file_id: typeof r.symbol_file_id === 'string' ? r.symbol_file_id : '',
     footprint_file_id: typeof r.footprint_file_id === 'string' ? r.footprint_file_id : '',
     metadata: r.metadata && typeof r.metadata === 'object' && !Array.isArray(r.metadata)
-      ? r.metadata
+      ? (r.metadata as Record<string, unknown>)
       : undefined,
-    visibility: PART_VISIBILITY_VALUES.includes(r.visibility) ? r.visibility : 'private',
+    visibility: isVisibility(r.visibility) ? r.visibility : 'private',
     photos: Array.isArray(r.photos)
-      ? r.photos.map(normalizePhoto).filter(Boolean)
+      ? r.photos.map(normalizePhoto).filter((p): p is PartPhoto => p !== null)
       : [],
     default_config: typeof r.default_config === 'string' && r.default_config.trim()
       ? r.default_config.trim() : '',
     configurations: Array.isArray(r.configurations)
-      ? r.configurations.map(normalizeConfiguration).filter(Boolean)
+      ? r.configurations.map(normalizeConfiguration).filter((c): c is Configuration => c !== null)
       : [],
   }
 }
@@ -107,18 +185,22 @@ export function parsePart(content) {
 // required (string, non-empty); `label` falls back to `id`; `params` is a
 // plain object of param-name → number (we don't enforce shape so future
 // non-numeric params still round-trip).
-export function normalizeConfiguration(raw) {
+export function normalizeConfiguration(raw: unknown): Configuration | null {
   if (!raw || typeof raw !== 'object') return null
-  const id = typeof raw.id === 'string' ? raw.id.trim() : ''
+  const r = raw as { id?: unknown; label?: unknown; params?: unknown }
+  const id = typeof r.id === 'string' ? r.id.trim() : ''
   if (!id) return null
-  const out = { id }
-  out.label = typeof raw.label === 'string' && raw.label ? raw.label : id
-  if (raw.params && typeof raw.params === 'object' && !Array.isArray(raw.params)) {
-    out.params = raw.params
-  } else {
-    out.params = {}
-  }
-  return out
+  const label = typeof r.label === 'string' && r.label ? r.label : id
+  const params = (r.params && typeof r.params === 'object' && !Array.isArray(r.params)
+    ? r.params
+    : {}) as Record<string, number>
+  return { id, label, params }
+}
+
+/** Anything exposing `configurations`/`default_config` — Part, Feature, Sketch documents. */
+interface ConfigurableDocument {
+  configurations?: Configuration[]
+  default_config?: string
 }
 
 // getActiveConfig: pick the config matching `configId`; falls back to
@@ -128,7 +210,7 @@ export function normalizeConfiguration(raw) {
 // Works on any parsed object that exposes `configurations` and
 // `default_config` — Part, Sketch, Feature. Defensive against missing
 // fields.
-export function getActiveConfig(parsed, configId) {
+export function getActiveConfig(parsed: ConfigurableDocument | null | undefined, configId?: string | null): Configuration | null {
   if (!parsed || typeof parsed !== 'object') return null
   const list = Array.isArray(parsed.configurations) ? parsed.configurations : []
   if (list.length === 0) return null
@@ -145,39 +227,63 @@ export function getActiveConfig(parsed, configId) {
   return list[0] || null
 }
 
-function normalizePhoto(raw) {
+function normalizePhoto(raw: unknown): PartPhoto | null {
   if (!raw || typeof raw !== 'object') return null
-  const storage_key = typeof raw.storage_key === 'string' ? raw.storage_key : ''
+  const r = raw as Record<string, unknown>
+  const storage_key = typeof r.storage_key === 'string' ? r.storage_key : ''
   if (!storage_key) return null
-  const out = {
+  const out: PartPhoto = {
     storage_key,
-    mime_type: typeof raw.mime_type === 'string' ? raw.mime_type : 'image/jpeg',
+    mime_type: typeof r.mime_type === 'string' ? r.mime_type : 'image/jpeg',
   }
-  if (typeof raw.caption === 'string' && raw.caption) out.caption = raw.caption
-  if (raw.primary === true) out.primary = true
-  if (Number.isFinite(Number(raw.width))) out.width = Number(raw.width)
-  if (Number.isFinite(Number(raw.height))) out.height = Number(raw.height)
-  if (Number.isFinite(Number(raw.bytes))) out.bytes = Number(raw.bytes)
+  if (typeof r.caption === 'string' && r.caption) out.caption = r.caption
+  if (r.primary === true) out.primary = true
+  if (Number.isFinite(Number(r.width))) out.width = Number(r.width)
+  if (Number.isFinite(Number(r.height))) out.height = Number(r.height)
+  if (Number.isFinite(Number(r.bytes))) out.bytes = Number(r.bytes)
   return out
 }
 
-function normalizeDistributor(raw) {
+function normalizeDistributor(raw: unknown): PartDistributor | null {
   if (!raw || typeof raw !== 'object') return null
-  const name = typeof raw.name === 'string' ? raw.name : ''
+  const r = raw as Record<string, unknown>
+  const name = typeof r.name === 'string' ? r.name : ''
   if (!name) return null
-  const out = { name, url: typeof raw.url === 'string' ? raw.url : '' }
-  if (typeof raw.sku === 'string' && raw.sku) out.sku = raw.sku
-  if (Number.isFinite(Number(raw.price_usd))) out.price_usd = Number(raw.price_usd)
-  if (Number.isFinite(Number(raw.stock))) out.stock = Number(raw.stock)
-  if (typeof raw.fetched_at === 'string' && raw.fetched_at) out.fetched_at = raw.fetched_at
+  const out: PartDistributor = { name, url: typeof r.url === 'string' ? r.url : '' }
+  if (typeof r.sku === 'string' && r.sku) out.sku = r.sku
+  if (Number.isFinite(Number(r.price_usd))) out.price_usd = Number(r.price_usd)
+  if (Number.isFinite(Number(r.stock))) out.stock = Number(r.stock)
+  if (typeof r.fetched_at === 'string' && r.fetched_at) out.fetched_at = r.fetched_at
   return out
+}
+
+/** Serialized-JSON view of a Part — same fields as `PartDocument`, all optional so empties can be omitted. */
+interface SerializedPart {
+  version: 1
+  name: string
+  description?: string
+  category?: string
+  manufacturer?: string
+  mpn?: string
+  value?: string
+  datasheet_url?: string
+  distributors: Array<{ name: string; url: string; sku?: string; price_usd?: number; stock?: number; fetched_at?: string }>
+  model_storage_key?: string
+  model_mime_type?: string
+  visibility?: PartVisibility
+  photos?: Array<{ storage_key: string; mime_type: string; caption?: string; primary?: boolean; width?: number; height?: number; bytes?: number }>
+  symbol_file_id?: string
+  footprint_file_id?: string
+  metadata?: Record<string, unknown>
+  default_config?: string
+  configurations?: Configuration[]
 }
 
 // Stable, pretty-printed serialization. Drops empty optional fields so the
 // JSON view stays readable.
-export function serializePart(part) {
+export function serializePart(part: unknown): string {
   const p = parsePart(part)
-  const out = { version: 1, name: p.name }
+  const out: SerializedPart = { version: 1, name: p.name, distributors: [] }
   if (p.description) out.description = p.description
   if (p.category) out.category = p.category
   if (p.manufacturer) out.manufacturer = p.manufacturer
@@ -185,7 +291,7 @@ export function serializePart(part) {
   if (p.value) out.value = p.value
   if (p.datasheet_url) out.datasheet_url = p.datasheet_url
   out.distributors = (p.distributors || []).map((d) => {
-    const r = { name: d.name, url: d.url || '' }
+    const r: SerializedPart['distributors'][number] = { name: d.name, url: d.url || '' }
     if (d.sku) r.sku = d.sku
     if (Number.isFinite(d.price_usd)) r.price_usd = d.price_usd
     if (Number.isFinite(d.stock)) r.stock = d.stock
@@ -197,7 +303,7 @@ export function serializePart(part) {
   if (p.visibility && p.visibility !== 'private') out.visibility = p.visibility
   if (Array.isArray(p.photos) && p.photos.length > 0) {
     out.photos = p.photos.map((ph) => {
-      const r = { storage_key: ph.storage_key, mime_type: ph.mime_type || 'image/jpeg' }
+      const r: NonNullable<SerializedPart['photos']>[number] = { storage_key: ph.storage_key, mime_type: ph.mime_type || 'image/jpeg' }
       if (ph.caption) r.caption = ph.caption
       if (ph.primary === true) r.primary = true
       if (Number.isFinite(ph.width)) r.width = ph.width
@@ -220,10 +326,15 @@ export function serializePart(part) {
   return JSON.stringify(out, null, 2)
 }
 
+export interface PartValidationResult {
+  ok: boolean
+  errors?: string[]
+}
+
 // Validate: returns {ok:true} or {ok:false, errors:[...]} with human-readable
 // messages. Doesn't mutate; safe to call on every render.
-export function validatePart(part) {
-  const errors = []
+export function validatePart(part: unknown): PartValidationResult {
+  const errors: string[] = []
   const p = parsePart(part)
   if (p.version !== 1) errors.push('version must be 1')
   if (!p.name || !p.name.trim()) errors.push('name is required')
@@ -235,7 +346,7 @@ export function validatePart(part) {
     if (!d.name || !d.name.trim()) errors.push(`distributors[${i}].name is required`)
     if (!d.url || !isHttpURL(d.url)) errors.push(`distributors[${i}].url must be a valid http(s) URL`)
   }
-  if (p.visibility && !PART_VISIBILITY_VALUES.includes(p.visibility)) {
+  if (p.visibility && !isVisibility(p.visibility)) {
     errors.push(`visibility must be one of ${PART_VISIBILITY_VALUES.join('|')}`)
   }
   const primaries = (p.photos || []).filter((ph) => ph.primary === true).length
@@ -243,13 +354,19 @@ export function validatePart(part) {
   return errors.length === 0 ? { ok: true } : { ok: false, errors }
 }
 
-function isHttpURL(s) {
+function isHttpURL(s: string): boolean {
   try {
     const u = new URL(s)
     return u.protocol === 'http:' || u.protocol === 'https:'
   } catch {
     return false
   }
+}
+
+/** Minimal file shape `partThumbnailURL()`/`partLabel()` need. */
+interface PartFileLike {
+  content?: unknown
+  name?: string
 }
 
 // partThumbnailURL: returns the auth-protected blob URL for the Part's 3D
@@ -259,14 +376,21 @@ function isHttpURL(s) {
 //
 // `project` is unused today but reserved so we can move to a project-scoped
 // blob route in the future without breaking signatures.
-export function partThumbnailURL(file, _project) {
+export function partThumbnailURL(file: PartFileLike | null | undefined, _project?: unknown): string | null {
   const p = parsePart(file?.content || '')
   if (!p.model_storage_key) return null
   return `/api/blobs/${encodeURI(p.model_storage_key)}`
 }
 
+/** `defaultPart()`'s deliberately-sparse literal — only the fields the original always set.
+ * Every caller (`serializePart`, `validatePart`) runs it back through `parsePart()` first, which
+ * fills in the rest, so this stays the same shape as before rather than padding out every
+ * `PartDocument` field just to satisfy the full interface. */
+export type DefaultPartDocument =
+  Partial<PartDocument> & Pick<PartDocument, 'version' | 'name' | 'distributors' | 'visibility' | 'photos'>
+
 // defaultPart: a blank, valid Part document with the user-supplied name.
-export function defaultPart(name = 'New Part') {
+export function defaultPart(name = 'New Part'): DefaultPartDocument {
   return {
     version: 1,
     name,
@@ -277,7 +401,7 @@ export function defaultPart(name = 'New Part') {
 }
 
 // File-name → display label used in the UI (strips the .part extension).
-export function partLabel(file) {
+export function partLabel(file: PartFileLike | null | undefined): string {
   if (!file) return ''
   const name = file.name || ''
   return name.replace(/\.part$/i, '')

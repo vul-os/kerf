@@ -78,6 +78,32 @@ role, so they need an **explicit file manifest generated before those agents sta
 with `scripts/ts-slice-manifest.mjs` (T-513's first step) and paste the result here. Until that
 manifest exists, do not run T-513…T-517 concurrently.
 
+## Shared types (T-501)
+
+`src/types/` holds every domain contract a slice needs so agents don't each invent their own.
+Every type is derived from how the code actually behaves (JSDoc `@param`, header-comment
+protocols, canonical entity-creation call sites) — none are guessed. Where a shape was genuinely
+open-ended in the source, the file says so inline and narrows to `unknown` or a bounded record
+rather than `any`.
+
+| File | Contents |
+|---|---|
+| `src/types/geometry.ts` | `Vec3`/`Vec2`, `BBox`/`BBox2`, `Geom3`/`Geom2` (re-exported from `@jscad/modeling`, not redeclared), `Mesh`/`FaceMeta`/`EdgeMap`/`FaceNameMap` (the occtWorker triangulation wire format), `FaceDescriptor`/`ModifiedMap` (face naming), `SketchJSON` and its entity/constraint/plane unions, `FeatureNode` (discriminated by `op`, ~28 named CAD-op variants plus a bounded jewelry-domain catch-all) and `FeatureFile`, `AssemblyDocument` and its component/mate/override shapes |
+| `src/types/circuit.ts` | `CircuitElement`/`CircuitJson` — the **alias seam** over `circuit-json`'s `AnyCircuitElement`/`CircuitJson`. G2 repoints this one file when it replaces Circuit JSON with a Kerf-native ECAD IR; no other file should import from `circuit-json` directly |
+| `src/types/workers.ts` | Request/response discriminated unions for the occt, jscad and circuit Web Workers, plus the main-thread runner envelopes (`OcctRunFeaturesResult`, `JscadRunResult`, `CircuitCompileResult`) that wrap `stale`/`error` handling on top of the raw postMessage shapes |
+| `src/types/api.ts` | Response shapes for `src/lib/api.js`'s ~80 endpoint methods, grouped by resource (auth, workspaces, projects, files, threads, members/sharing, revisions, activity, BOM, uploads, admin, and the various domain-specific tool endpoints that document their own return shape in a source comment) |
+| `src/types/index.ts` | Barrel — slice agents should import from `src/types` (or `@/types`) rather than reaching into a sibling file directly |
+
+`src/types/global.d.ts` is **T-500**'s file (toolchain/ambient declarations) and is not
+re-exported from the barrel — see that file's own header comment.
+
+**Convention for adding a new shared type:** put it in the file matching its domain (geometry,
+circuit, worker protocol, or API response); export it from that file so the barrel picks it up
+automatically. Slice agents may **append** a new type as their slice needs it. *Changing* an
+existing shared type's shape is this task's owner's call — every other slice depends on it, so
+open a discussion rather than editing in place. Never redeclare a domain type locally in a slice
+file; if the shape you need is missing here, that's the gap to fill, not a local workaround.
+
 ## Tightening (T-521 / T-522)
 
 `tsconfig.strict.json`'s `include` list only ever grows, one directory per commit, each gated by

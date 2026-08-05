@@ -30,22 +30,27 @@ const {
   MockBufferGeometry,
 } = vi.hoisted(() => {
   class MockVector3 {
+    x: number
+    y: number
+    z: number
     constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z }
-    set(x, y, z) { this.x = x; this.y = y; this.z = z; return this }
+    set(x: number, y: number, z: number) { this.x = x; this.y = y; this.z = z; return this }
     clone() { return new MockVector3(this.x, this.y, this.z) }
-    copy(v) { this.x = v.x; this.y = v.y; this.z = v.z; return this }
-    distanceTo(v) {
+    copy(v: MockVector3) { this.x = v.x; this.y = v.y; this.z = v.z; return this }
+    distanceTo(v: MockVector3) {
       return Math.sqrt((this.x-v.x)**2 + (this.y-v.y)**2 + (this.z-v.z)**2)
     }
-    addScaledVector(v, s) {
+    addScaledVector(v: MockVector3, s: number) {
       this.x += v.x*s; this.y += v.y*s; this.z += v.z*s; return this
     }
-    sub(v) { this.x -= v.x; this.y -= v.y; this.z -= v.z; return this }
-    multiplyScalar(s) { this.x *= s; this.y *= s; this.z *= s; return this }
+    sub(v: MockVector3) { this.x -= v.x; this.y -= v.y; this.z -= v.z; return this }
+    multiplyScalar(s: number) { this.x *= s; this.y *= s; this.z *= s; return this }
     length() { return Math.sqrt(this.x**2 + this.y**2 + this.z**2) }
   }
 
   class MockSphere {
+    center: MockVector3
+    radius: number
     constructor() {
       this.center = new MockVector3()
       this.radius = 0
@@ -53,17 +58,22 @@ const {
   }
 
   class MockBox3 {
+    min: MockVector3
+    max: MockVector3
+    _empty: boolean
+    boundingBox?: MockBox3
+    boundingSphere?: MockSphere
     constructor() {
       this.min = new MockVector3(Infinity, Infinity, Infinity)
       this.max = new MockVector3(-Infinity, -Infinity, -Infinity)
       this._empty = true
     }
-    set(min, max) {
+    set(min: MockVector3, max: MockVector3) {
       this.min.copy(min); this.max.copy(max)
       this._empty = false; return this
     }
     isEmpty() { return this._empty }
-    getBoundingSphere(target) {
+    getBoundingSphere(target: MockSphere) {
       const cx = (this.min.x + this.max.x) / 2
       const cy = (this.min.y + this.max.y) / 2
       const cz = (this.min.z + this.max.z) / 2
@@ -73,7 +83,7 @@ const {
       )
       return target
     }
-    applyMatrix4(m) {
+    applyMatrix4(m: MockMatrix4) {
       const corners = [
         [this.min.x, this.min.y, this.min.z],
         [this.max.x, this.min.y, this.min.z],
@@ -103,10 +113,11 @@ const {
   }
 
   class MockMatrix4 {
+    elements: number[]
     constructor() {
       this.elements = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]
     }
-    set(n11,n12,n13,n14, n21,n22,n23,n24, n31,n32,n33,n34, n41,n42,n43,n44) {
+    set(n11: number,n12: number,n13: number,n14: number, n21: number,n22: number,n23: number,n24: number, n31: number,n32: number,n33: number,n34: number, n41: number,n42: number,n43: number,n44: number) {
       const e = this.elements
       e[0]=n11; e[4]=n12; e[8]=n13;  e[12]=n14
       e[1]=n21; e[5]=n22; e[9]=n23;  e[13]=n24
@@ -114,7 +125,7 @@ const {
       e[3]=n41; e[7]=n42; e[11]=n43; e[15]=n44
       return this
     }
-    multiplyMatrices(a, b) { return this }
+    multiplyMatrices(_a: unknown, _b: unknown) { return this }
   }
 
   class MockFrustum {
@@ -124,7 +135,10 @@ const {
   }
 
   class MockBufferAttribute {
-    constructor(array, itemSize) {
+    array: Float32Array | Uint32Array
+    itemSize: number
+    count: number
+    constructor(array: Float32Array | Uint32Array, itemSize: number) {
       this.array = array
       this.itemSize = itemSize
       this.count = array.length / itemSize
@@ -132,10 +146,14 @@ const {
   }
 
   class MockBufferGeometry {
+    _attrs: Record<string, MockBufferAttribute>
+    _index: MockBufferAttribute | null
+    boundingBox?: MockBox3
+    boundingSphere?: MockSphere
     constructor() { this._attrs = {}; this._index = null }
-    setAttribute(name, attr) { this._attrs[name] = attr; return this }
-    getAttribute(name) { return this._attrs[name] ?? null }
-    setIndex(attr) { this._index = attr; return this }
+    setAttribute(name: string, attr: MockBufferAttribute) { this._attrs[name] = attr; return this }
+    getAttribute(name: string) { return this._attrs[name] ?? null }
+    setIndex(attr: MockBufferAttribute) { this._index = attr; return this }
     getIndex() { return this._index }
     computeBoundingBox() { this.boundingBox = new MockBox3() }
     computeBoundingSphere() { this.boundingSphere = new MockSphere() }
@@ -166,8 +184,6 @@ import {
   buildLODProxy,
   angularSize,
   selectLOD,
-  LOD_ANGULAR_THRESHOLD,
-  LOD_PROXY_RATIO,
   LOD_THRESHOLD_COUNT,
 } from './lod.js'
 

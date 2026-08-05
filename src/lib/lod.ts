@@ -54,10 +54,8 @@ export const LOD_THRESHOLD_COUNT = 500
  * Compute a 4×4 quadric error matrix (as a flat 10-element symmetric tensor
  * stored as [a,b,c,d, e,f,g, h,i, j] = upper triangle of the 4×4 outer
  * product p·pᵀ of the plane equation p=[A,B,C,D]).
- *
- * @private
  */
-function _planeQuadric(A, B, C, D) {
+function _planeQuadric(A: number, B: number, C: number, D: number): number[] {
   return [
     A*A, A*B, A*C, A*D,
          B*B, B*C, B*D,
@@ -66,16 +64,15 @@ function _planeQuadric(A, B, C, D) {
   ]
 }
 
-function _qAdd(q1, q2) {
+function _qAdd(q1: number[], q2: number[]): number[] {
   return q1.map((v, i) => v + q2[i])
 }
 
 /**
  * QEM error for vertex position [x,y,z] against quadric q.
  * vᵀ Q v  (simplified for symmetric 4×4).
- * @private
  */
-function _qError(q, x, y, z) {
+function _qError(q: number[], x: number, y: number, z: number): number {
   // Quadric stored as upper-triangle of 4x4:
   // [ q[0] q[1] q[2] q[3] ]
   // [ q[1] q[4] q[5] q[6] ]
@@ -95,14 +92,21 @@ function _qError(q, x, y, z) {
 /**
  * Optimal collapse point: midpoint of the two vertices (simplified; a full
  * solution requires a 3×3 linear solve which is overkill for the LOD proxy).
- * @private
  */
-function _collapsePoint(verts, a, b) {
+function _collapsePoint(verts: Float32Array, a: number, b: number): [number, number, number] {
   return [
     (verts[3*a]   + verts[3*b])   * 0.5,
     (verts[3*a+1] + verts[3*b+1]) * 0.5,
     (verts[3*a+2] + verts[3*b+2]) * 0.5,
   ]
+}
+
+/** Result of {@link decimateBufferGeometry} — a fresh position/index pair plus tri-count bookkeeping. */
+export interface DecimateResult {
+  positions: Float32Array
+  indices: Uint32Array
+  originalCount: number
+  finalCount: number
 }
 
 /**
@@ -117,17 +121,20 @@ function _collapsePoint(verts, a, b) {
  * a proxy; accuracy is acceptable for LOD proxies which are shown at low angular
  * sizes and never in close-up.
  *
- * @param {Float32Array} posArr  Flat [x,y,z,...] position buffer.
- * @param {Uint32Array}  idxArr  Flat [a,b,c,...] index buffer (triangle list).
- * @param {number}       targetRatio  Target fraction of triangles to keep.
- * @returns {{ positions: Float32Array, indices: Uint32Array, originalCount: number, finalCount: number }}
+ * @param posArr  Flat [x,y,z,...] position buffer.
+ * @param idxArr  Flat [a,b,c,...] index buffer (triangle list).
+ * @param targetRatio  Target fraction of triangles to keep.
  */
-export function decimateBufferGeometry(posArr, idxArr, targetRatio = LOD_PROXY_RATIO) {
+export function decimateBufferGeometry(
+  posArr: Float32Array,
+  idxArr: Uint32Array,
+  targetRatio = LOD_PROXY_RATIO,
+): DecimateResult {
   const originalCount = idxArr.length / 3
 
   // Copy to mutable arrays.
   const verts = Float32Array.from(posArr)      // [x,y,z,...]
-  const faces = Array.from({ length: originalCount }, (_, i) => [
+  const faces: number[][] = Array.from({ length: originalCount }, (_, i) => [
     idxArr[3*i], idxArr[3*i+1], idxArr[3*i+2],
   ])
   const nVerts = verts.length / 3
@@ -141,7 +148,7 @@ export function decimateBufferGeometry(posArr, idxArr, targetRatio = LOD_PROXY_R
   }
 
   // Build per-vertex quadrics from face planes.
-  const Q = Array.from({ length: nVerts }, () => new Array(10).fill(0))
+  const Q: number[][] = Array.from({ length: nVerts }, () => new Array(10).fill(0))
   for (let fi = 0; fi < originalCount; fi++) {
     const [ia, ib, ic] = faces[fi]
     const ax = verts[3*ia], ay = verts[3*ia+1], az = verts[3*ia+2]
@@ -164,7 +171,7 @@ export function decimateBufferGeometry(posArr, idxArr, targetRatio = LOD_PROXY_R
   }
 
   // Build vert → face adjacency.
-  const vertFaces = Array.from({ length: nVerts }, () => new Set())
+  const vertFaces: Set<number>[] = Array.from({ length: nVerts }, () => new Set())
   for (let fi = 0; fi < originalCount; fi++) {
     for (const vi of faces[fi]) vertFaces[vi].add(fi)
   }
@@ -178,7 +185,7 @@ export function decimateBufferGeometry(posArr, idxArr, targetRatio = LOD_PROXY_R
     let bestErr = Infinity, bestA = -1, bestB = -1
 
     // Collect unique edges from active faces.
-    const seenEdges = new Set()
+    const seenEdges = new Set<number>()
     for (let fi = 0; fi < originalCount; fi++) {
       if (!activeFaces[fi]) continue
       const [a, b, c] = faces[fi]
@@ -221,7 +228,7 @@ export function decimateBufferGeometry(posArr, idxArr, targetRatio = LOD_PROXY_R
 
   // Compact vertices.
   const remap = new Int32Array(nVerts).fill(-1)
-  const newVerts = []
+  const newVerts: number[] = []
   let nextIdx = 0
   for (let i = 0; i < nVerts; i++) {
     if (!activeVerts[i]) continue
@@ -230,7 +237,7 @@ export function decimateBufferGeometry(posArr, idxArr, targetRatio = LOD_PROXY_R
   }
 
   // Compact faces.
-  const newIndices = []
+  const newIndices: number[] = []
   let finalCount = 0
   for (let fi = 0; fi < originalCount; fi++) {
     if (!activeFaces[fi]) continue
@@ -256,11 +263,10 @@ export function decimateBufferGeometry(posArr, idxArr, targetRatio = LOD_PROXY_R
  * The geometry's bounding box is computed immediately so callers can use it
  * for angular-size queries.
  *
- * @param {THREE.BufferGeometry} geometry  Source geometry (must have position + index).
- * @param {number} [ratio=LOD_PROXY_RATIO]  Target face retention fraction.
- * @returns {THREE.BufferGeometry}          Decimated proxy geometry.
+ * @param geometry  Source geometry (must have position + index).
+ * @param ratio  Target face retention fraction.
  */
-export function buildLODProxy(geometry, ratio = LOD_PROXY_RATIO) {
+export function buildLODProxy(geometry: THREE.BufferGeometry, ratio = LOD_PROXY_RATIO): THREE.BufferGeometry {
   const posAttr = geometry.getAttribute('position')
   const idxAttr = geometry.getIndex()
 
@@ -270,7 +276,7 @@ export function buildLODProxy(geometry, ratio = LOD_PROXY_RATIO) {
   }
 
   // Ensure we have an index buffer.
-  let idxArr
+  let idxArr: Uint32Array
   if (idxAttr) {
     idxArr = new Uint32Array(idxAttr.array)
   } else {
@@ -306,11 +312,11 @@ const _tmpVec     = new THREE.Vector3()
  * The angular size is 2·atan(r / d) where r is the bounding sphere radius and
  * d is the distance from the camera to the sphere centre.
  *
- * @param {THREE.Box3}    worldBBox  World-space AABB of the part.
- * @param {THREE.Camera}  camera     Active camera.
- * @returns {number}                 Angular size in radians.
+ * @param worldBBox  World-space AABB of the part.
+ * @param camera  Active camera.
+ * @returns Angular size in radians.
  */
-export function angularSize(worldBBox, camera) {
+export function angularSize(worldBBox: THREE.Box3 | null | undefined, camera: THREE.Camera): number {
   if (!worldBBox || worldBBox.isEmpty()) return 0
 
   worldBBox.getBoundingSphere(_tmpSphere)
@@ -321,6 +327,18 @@ export function angularSize(worldBBox, camera) {
   return 2 * Math.atan(r / Math.max(d, 1e-9))
 }
 
+/** Result of {@link selectLOD}: render the part at full quality, or as a decimated proxy. */
+export type LODLevel = 'full' | 'proxy'
+
+export interface SelectLODOptions {
+  /** 0-based position in visible list. Default 0. */
+  visibleIndex?: number
+  /** Default {@link LOD_ANGULAR_THRESHOLD}. */
+  angularThreshold?: number
+  /** Default {@link LOD_THRESHOLD_COUNT}. */
+  countThreshold?: number
+}
+
 /**
  * Decide whether to render a part at full quality or as a proxy.
  *
@@ -328,15 +346,14 @@ export function angularSize(worldBBox, camera) {
  *   1. The part's angular size < LOD_ANGULAR_THRESHOLD (too small to see detail).
  *   2. visibleIndex >= LOD_THRESHOLD_COUNT (budget exceeded; late components get proxy).
  *
- * @param {THREE.Box3}   worldBBox      World-space AABB of the part.
- * @param {THREE.Camera} camera         Active camera.
- * @param {object}       [opts]
- * @param {number}       [opts.visibleIndex=0]         0-based position in visible list.
- * @param {number}       [opts.angularThreshold=LOD_ANGULAR_THRESHOLD]
- * @param {number}       [opts.countThreshold=LOD_THRESHOLD_COUNT]
- * @returns {'full'|'proxy'}
+ * @param worldBBox  World-space AABB of the part.
+ * @param camera  Active camera.
  */
-export function selectLOD(worldBBox, camera, opts = {}) {
+export function selectLOD(
+  worldBBox: THREE.Box3 | null | undefined,
+  camera: THREE.Camera,
+  opts: SelectLODOptions = {},
+): LODLevel {
   const {
     visibleIndex      = 0,
     angularThreshold  = LOD_ANGULAR_THRESHOLD,

@@ -6353,6 +6353,45 @@ this repo as transitive tscircuit dependencies. Both carry
   with no per-consumer translation; a test asserts a pour read from `zones_keepout_board.kicad_pcb`
   reaches Gerber, ODB++ **and** via-stitching unchanged.
 - **Depends-on:** T-526 · **Blocks:** T-527 (the writer needs one shape to emit)
+- **Status:** ✅ shipped (2026-08-06) — `93df3861`, `37ae432a`, `70435cba`. **T-527 unblocked.**
+  - **Canonical shape:** the flat Circuit-JSON array (`type: "pcb_copper_pour" | "copper_pour_fill"`)
+    — what fab already reads and what `kicad_io.py` emits.
+  - **Migrated:** `fab/gerber.py` + `fab/odbpp/writer.py` now bucket `pcb_ground_plane` alongside
+    `pcb_copper_pour` (neither output cares about net assignment for a filled region), giving the
+    no-net zones a downstream reader for the first time. `tools/via_stitching.py` reads the flat
+    array, emitting stitching vias as ordinary `pcb_via` plus a `pcb_via_stitching` metadata
+    element so removal works without a nested board dict. `tools/pour.py` gained an additive
+    canonical `pour_id` alongside existing addressing.
+  - **`pcb_ground_plane` kept as a distinct type** rather than normalised into `pcb_copper_pour`
+    with a null net, since `kicad_io.py` already emits it that way and T-526's parser was frozen.
+  - **Shim (deferred):** `via_stitching.py` still honours the legacy nested
+    `board['copper_pour']` dict, which is its existing public contract. Retire once callers move.
+  - **VERIFIED:** 6833 → 6843 passed, 187 skipped, zero regressions. End-to-end proof in
+    `tests/test_t536_pour_reconciliation.py`: one pour read from `zones_keepout_board.kicad_pcb`
+    reaches Gerber, ODB++ **and** via-stitching with no per-consumer translation, for both the
+    net-bound and no-net cases.
+  - **Pre-existing gap found, not fixed:** `fab/odbpp/writer.py`'s `_LAYERS` has no inner-layer
+    entries, so an inner-layer ground plane never produces an ODB++ features file. That is an
+    ODB++ limitation, not a pour-shape issue — worth its own task.
+
+### T-537 — Frontend pour validator rejects every backend pour
+- **Tier:** A · **Priority:** P1 · **Status:** ⬜ not started
+- **Why:** found by T-536 and confirmed directly. `src/lib/copperPour.js:17` does
+  `if (pour.type !== 'copper_pour')` and errors with `'type must be "copper_pour"'`. The canonical
+  backend shape — emitted by `kicad_io.py`, consumed by Gerber/ODB++/via-stitching — is
+  **`pcb_copper_pour`**. So `validatePour` rejects every pour the backend actually produces. A
+  genuine cross-stack defect, not a naming preference.
+- **Scope:** align the frontend type check (accept `pcb_copper_pour`, and `pcb_ground_plane` for
+  no-net fills; alias the legacy `copper_pour` string if anything still emits it). Every other
+  field in that file already matches the canonical shape — `polygon`, `layer`, `net_id`,
+  `clearance_mm`, `min_thickness_mm`, `priority`, `thermal_relief{gap,spoke_width,spoke_count}` —
+  so this is narrow.
+- **Sequencing:** `src/lib/copperPour.js` belongs to **T-504**'s slice (electronics `src/lib`).
+  Either fold this in there, or do it after T-504 lands so it edits a `.ts` file. Do **not** run it
+  concurrently with T-504.
+- **Definition of Done:** a pour produced by `kicad_io.py` passes `validatePour` unchanged, with a
+  test asserting it against a fixture-derived pour rather than a hand-written literal.
+- **Depends-on:** T-536 · Coordinate with T-504
 
 ---
 

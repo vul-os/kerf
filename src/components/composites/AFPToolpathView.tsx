@@ -14,14 +14,21 @@
  */
 
 import { useCallback, useRef, useState, useEffect } from 'react'
+import type { CSSProperties } from 'react'
 import { useAuth } from '../../store/auth.js'
+import type { AfpResult, AfpCourse, CureCyclePoint, CureCycleParams } from './compositesTypes'
 
-const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+export interface Props {
+  file?: unknown
+  projectId?: string
+}
+
+const API_URL: string = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
 
 // ---------------------------------------------------------------------------
 // API calls
 // ---------------------------------------------------------------------------
-async function callAFPPathplan(params) {
+async function callAFPPathplan(params: CureCycleParams): Promise<AfpResult> {
   const token = useAuth.getState().accessToken
   const res = await fetch(`${API_URL}/api/composites/afp`, {
     method: 'POST',
@@ -35,7 +42,7 @@ async function callAFPPathplan(params) {
   return res.json()
 }
 
-async function callAFPExport(params, format) {
+async function callAFPExport(params: CureCycleParams, format: string): Promise<string> {
   const token = useAuth.getState().accessToken
   const res = await fetch(`${API_URL}/api/composites/afp?format=${format}`, {
     method: 'POST',
@@ -52,8 +59,8 @@ async function callAFPExport(params, format) {
 // ---------------------------------------------------------------------------
 // Cure cycle data generator
 // ---------------------------------------------------------------------------
-function buildCureCycle({ rampRate = 2, dwellTemp = 180, dwellTime = 60, coolRate = 3 }) {
-  const points = []
+function buildCureCycle({ rampRate = 2, dwellTemp = 180, dwellTime = 60, coolRate = 3 }: Partial<CureCycleParams>): CureCyclePoint[] {
+  const points: CureCyclePoint[] = []
   let t = 0, temp = 25
   // Ramp
   while (temp < dwellTemp) {
@@ -78,13 +85,21 @@ function buildCureCycle({ rampRate = 2, dwellTemp = 180, dwellTime = 60, coolRat
 // ---------------------------------------------------------------------------
 // AFP 2D canvas — draws grid + tow courses
 // ---------------------------------------------------------------------------
-function AFPCanvas({ courses, partWidth = 400, partHeight = 260, loading }) {
-  const canvasRef = useRef(null)
+interface AFPCanvasProps {
+  courses?: AfpCourse[] | null
+  partWidth?: number
+  partHeight?: number
+  loading?: boolean
+}
+
+function AFPCanvas({ courses, partWidth = 400, partHeight = 260, loading }: AFPCanvasProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
+    if (!ctx) return
     const W = canvas.width, H = canvas.height
 
     // Background
@@ -127,7 +142,7 @@ function AFPCanvas({ courses, partWidth = 400, partHeight = 260, loading }) {
       ? courses
       : buildDefaultCourses(px, py, pw, ph)
 
-    drawCourses.forEach(({ paths, color, angle }, ci) => {
+    drawCourses.forEach(({ paths, color }, ci) => {
       ctx.strokeStyle = color || `hsl(${45 + ci * 30}, 85%, 55%)`
       ctx.lineWidth = 2.5
       ctx.globalAlpha = 0.75
@@ -170,30 +185,15 @@ function AFPCanvas({ courses, partWidth = 400, partHeight = 260, loading }) {
   )
 }
 
-function buildDefaultCourses(px, py, pw, ph) {
+function buildDefaultCourses(px: number, py: number, pw: number, ph: number): AfpCourse[] {
   const angles = [0, 45, -45, 90]
   const colors = ['#4adeae', '#fbbf24', '#a78bfa', '#f97888']
   return angles.map((angle, ai) => {
     const rad = (angle * Math.PI) / 180
-    const cos = Math.cos(rad), sin = Math.sin(rad)
-    const paths = []
+    const paths: number[][] = []
     const step = 14
     for (let d = -pw; d < pw + ph; d += step) {
       // Clip to part bounds via parametric line + rect clipping
-      const cx = px + pw / 2, cy = py + ph / 2
-      const x1 = cx + d - ph * cos * 2
-      const y1 = cy - d * 0 + d * sin / (Math.abs(cos) + 0.01) - ph * sin * 2
-      const x2 = cx + d + ph * cos * 2
-      const y2 = cy - d * 0 + d * sin / (Math.abs(cos) + 0.01) + ph * sin * 2
-
-      // Simple rect clip
-      const cx1 = Math.max(px, Math.min(px + pw, px + ((d + pw / 2) % pw + pw) % pw))
-      const cy1 = py
-      const cx2 = cx1
-      const cy2 = py + ph
-
-      const lx1 = px + (d < 0 ? 0 : d > pw ? pw : d)
-      const lx2 = px + Math.min(pw, Math.max(0, d + step))
       if (angle === 0) {
         paths.push([px, py + d, px + pw, py + d])
       } else if (angle === 90) {
@@ -209,7 +209,11 @@ function buildDefaultCourses(px, py, pw, ph) {
 // ---------------------------------------------------------------------------
 // Cure Cycle SVG chart
 // ---------------------------------------------------------------------------
-function CureCyclePlot({ params }) {
+interface CureCyclePlotProps {
+  params: CureCycleParams
+}
+
+function CureCyclePlot({ params }: CureCyclePlotProps) {
   const data = buildCureCycle(params)
   if (!data.length) return null
 
@@ -319,8 +323,10 @@ function CureCyclePlot({ params }) {
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export default function AFPToolpathView({ file, projectId }) {
-  const [params, setParams] = useState({
+// `file`/`projectId` are accepted (callers pass them) but not read inside — pre-existing,
+// not this slice's behavior to change.
+export default function AFPToolpathView(_props: Props) {
+  const [params, setParams] = useState<CureCycleParams>({
     courseWidth: 6.35,
     minRadius: 600,
     towCount: 8,
@@ -330,10 +336,10 @@ export default function AFPToolpathView({ file, projectId }) {
     dwellTime: 60,
     coolRate: 3,
   })
-  const [courses, setCourses] = useState(null)
+  const [courses, setCourses] = useState<AfpCourse[] | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [result, setResult] = useState(null)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<AfpResult | null>(null)
   const [exporting, setExporting] = useState(false)
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
 
@@ -346,13 +352,13 @@ export default function AFPToolpathView({ file, projectId }) {
       // If backend returns path data, use it; else keep SVG illustration
       if (res?.courses) setCourses(res.courses)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
   }, [params])
 
-  const exportCNC = useCallback(async (format) => {
+  const exportCNC = useCallback(async (format: string) => {
     setExportMenuOpen(false)
     setExporting(true)
     setError(null)
@@ -369,18 +375,18 @@ export default function AFPToolpathView({ file, projectId }) {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch (e) {
-      setError(`Export failed: ${e.message}`)
+      setError(`Export failed: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setExporting(false)
     }
   }, [params])
 
-  const update = (field, val) => setParams((p) => ({
+  const update = (field: keyof CureCycleParams, val: string) => setParams((p) => ({
     ...p,
     [field]: parseFloat(val) || p[field],
   }))
 
-  const styles = {
+  const styles: Record<string, CSSProperties> = {
     root: {
       display: 'flex',
       flexDirection: 'column',
@@ -580,8 +586,8 @@ export default function AFPToolpathView({ file, projectId }) {
                   style={styles.exportMenuItem}
                   type="button"
                   onClick={() => exportCNC('gcode')}
-                  onMouseEnter={(e) => { e.target.style.background = '#1e293b'; e.target.style.color = '#fbbf24' }}
-                  onMouseLeave={(e) => { e.target.style.background = 'none'; e.target.style.color = '#cbd5e1' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#1e293b'; e.currentTarget.style.color = '#fbbf24' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#cbd5e1' }}
                 >
                   G-code (.gcode)
                 </button>
@@ -589,8 +595,8 @@ export default function AFPToolpathView({ file, projectId }) {
                   style={styles.exportMenuItem}
                   type="button"
                   onClick={() => exportCNC('apt')}
-                  onMouseEnter={(e) => { e.target.style.background = '#1e293b'; e.target.style.color = '#fbbf24' }}
-                  onMouseLeave={(e) => { e.target.style.background = 'none'; e.target.style.color = '#cbd5e1' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#1e293b'; e.currentTarget.style.color = '#fbbf24' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#cbd5e1' }}
                 >
                   APT / CL (.apt)
                 </button>
@@ -608,12 +614,12 @@ export default function AFPToolpathView({ file, projectId }) {
         <div style={styles.controls}>
           <div style={styles.ctrlGroup}>
             <div style={styles.ctrlGroupLabel}>AFP Parameters</div>
-            {[
+            {([
               { label: 'Course W (mm)', field: 'courseWidth', step: 0.1 },
               { label: 'Min R (mm)',    field: 'minRadius',  step: 10 },
               { label: 'Tow count',    field: 'towCount',   step: 1 },
               { label: 'Angle (°)',    field: 'angle',      step: 15 },
-            ].map(({ label, field, step }) => (
+            ] as Array<{ label: string; field: keyof CureCycleParams; step: number }>).map(({ label, field, step }) => (
               <div key={field} style={styles.ctrlRow}>
                 <span style={styles.ctrlLabel}>{label}</span>
                 <input
@@ -629,12 +635,12 @@ export default function AFPToolpathView({ file, projectId }) {
 
           <div style={styles.ctrlGroup}>
             <div style={styles.ctrlGroupLabel}>Cure Cycle</div>
-            {[
+            {([
               { label: 'Ramp (°C/min)', field: 'rampRate',  step: 0.5 },
               { label: 'Dwell (°C)',    field: 'dwellTemp', step: 5 },
               { label: 'Dwell (min)',   field: 'dwellTime', step: 5 },
               { label: 'Cool (°C/min)', field: 'coolRate',  step: 0.5 },
-            ].map(({ label, field, step }) => (
+            ] as Array<{ label: string; field: keyof CureCycleParams; step: number }>).map(({ label, field, step }) => (
               <div key={field} style={styles.ctrlRow}>
                 <span style={styles.ctrlLabel}>{label}</span>
                 <input

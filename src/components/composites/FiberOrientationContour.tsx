@@ -17,28 +17,36 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 import { useAuth } from '../../store/auth.js'
+import type { Ply, DrapeResult } from './compositesTypes'
 
-const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+export interface Props {
+  plies?: Ply[]
+  file?: unknown
+  projectId?: string
+}
+
+const API_URL: string = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
 
 // ---------------------------------------------------------------------------
 // Angle → color (HSL wheel, distinct from role colors)
 // Maps −90…+90 onto full hue range
 // ---------------------------------------------------------------------------
-function angleToHsl(deg) {
+function angleToHsl(deg: number): string {
   const normalized = ((deg + 90) / 180)  // 0 → 1
   const hue = normalized * 300            // 0° = 0° hue, 90° = 150° hue
   return `hsl(${hue.toFixed(0)}, 90%, 55%)`
 }
 
-function angleToRgb(deg) {
+function angleToRgb(deg: number): [number, number, number] {
   const normalized = ((deg + 90) / 180)
   const h = normalized * 300 / 360
   // HSL → RGB
   const s = 0.9, l = 0.55
   const q = l < 0.5 ? l * (1 + s) : l + s - l * s
   const p = 2 * l - q
-  const hue2rgb = (p, q, t) => {
+  const hue2rgb = (p: number, q: number, t: number): number => {
     if (t < 0) t += 1
     if (t > 1) t -= 1
     if (t < 1/6) return p + (q - p) * 6 * t
@@ -55,7 +63,7 @@ function angleToRgb(deg) {
 // ---------------------------------------------------------------------------
 // API call
 // ---------------------------------------------------------------------------
-async function callFiberMap(params) {
+async function callFiberMap(params: Record<string, unknown>): Promise<DrapeResult> {
   const token = useAuth.getState().accessToken
   const res = await fetch(`${API_URL}/api/composites/fiber_map`, {
     method: 'POST',
@@ -72,12 +80,26 @@ async function callFiberMap(params) {
 // ---------------------------------------------------------------------------
 // Contour canvas
 // ---------------------------------------------------------------------------
-function ContourCanvas({ plies, width = 480, height = 280, tooltip, onCellHover }) {
-  const canvasRef = useRef(null)
+interface CellTooltip {
+  col: number
+  row: number
+  angle: string
+}
+
+interface ContourCanvasProps {
+  plies: Ply[]
+  width?: number
+  height?: number
+  tooltip: CellTooltip | null
+  onCellHover: (info: CellTooltip | null) => void
+}
+
+function ContourCanvas({ plies, width = 480, height = 280, tooltip, onCellHover }: ContourCanvasProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const COLS = 32, ROWS = 20
 
   // Build angle field from ply stack (interpolate across plies per cell)
-  function angleAt(col, row, plies) {
+  function angleAt(col: number, row: number, plies: Ply[]): number {
     if (!plies || plies.length === 0) return 0
     // Vary angle spatially using a simple sinusoidal warp to simulate drape
     const tx = col / COLS, ty = row / ROWS
@@ -93,6 +115,7 @@ function ContourCanvas({ plies, width = 480, height = 280, tooltip, onCellHover 
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
+    if (!ctx) return
     const W = canvas.width, H = canvas.height
 
     ctx.fillStyle = '#06090f'
@@ -145,7 +168,7 @@ function ContourCanvas({ plies, width = 480, height = 280, tooltip, onCellHover 
     }
   }, [plies, tooltip])
 
-  const handleMouseMove = useCallback((e) => {
+  const handleMouseMove = useCallback((e: ReactMouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
     if (!canvas) return
     const rect = canvas.getBoundingClientRect()
@@ -178,13 +201,18 @@ function ContourCanvas({ plies, width = 480, height = 280, tooltip, onCellHover 
 // ---------------------------------------------------------------------------
 // Color legend bar
 // ---------------------------------------------------------------------------
-function AngleLegend({ width = 200 }) {
-  const canvasRef = useRef(null)
+interface AngleLegendProps {
+  width?: number
+}
+
+function AngleLegend({ width = 200 }: AngleLegendProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
+    if (!ctx) return
     const W = canvas.width, H = canvas.height
     // Gradient
     for (let x = 0; x < W; x++) {
@@ -207,7 +235,11 @@ function AngleLegend({ width = 200 }) {
 // ---------------------------------------------------------------------------
 // Exploded ply stack view (SVG)
 // ---------------------------------------------------------------------------
-function ExplodedPlyStack({ plies }) {
+interface ExplodedPlyStackProps {
+  plies: Ply[]
+}
+
+function ExplodedPlyStack({ plies }: ExplodedPlyStackProps) {
   if (!plies || plies.length === 0) return null
   const W = 200, plyH = 14, gap = 4, partW = 160, partX = 20, offsetX = 4
   const totalH = plies.length * (plyH + gap) + 20
@@ -284,8 +316,10 @@ function ExplodedPlyStack({ plies }) {
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export default function FiberOrientationContour({ plies: propPlies, file, projectId }) {
-  const defaultPlies = [
+// `file`/`projectId` are accepted (callers pass them) but not read inside — pre-existing,
+// not this slice's behavior to change.
+export default function FiberOrientationContour({ plies: propPlies }: Props) {
+  const defaultPlies: Ply[] = [
     { id: '1', angle: 0,   material: 'T300/Epoxy', thickness: 0.125 },
     { id: '2', angle: 45,  material: 'T300/Epoxy', thickness: 0.125 },
     { id: '3', angle: -45, material: 'T300/Epoxy', thickness: 0.125 },
@@ -297,15 +331,17 @@ export default function FiberOrientationContour({ plies: propPlies, file, projec
 
   const plies = propPlies || defaultPlies
 
-  const [tooltip, setTooltip] = useState(null)
-  const [tooltipPos, setTooltipPos] = useState(null)
+  const [tooltip, setTooltip] = useState<CellTooltip | null>(null)
+  // `_tooltipPos`/`_containerRef` are pre-existing dead state (assigned, never read) — kept
+  // rather than removed since that's a cleanup beyond this slice's rename-and-type scope.
+  const [_tooltipPos, setTooltipPos] = useState<unknown>(null)
   const [surface, setSurface] = useState('flat')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [drapeResult, setDrapeResult] = useState(null)
-  const containerRef = useRef(null)
+  const [error, setError] = useState<string | null>(null)
+  const [drapeResult, setDrapeResult] = useState<DrapeResult | null>(null)
+  const _containerRef = useRef<HTMLDivElement | null>(null)
 
-  const handleCellHover = useCallback((info) => {
+  const handleCellHover = useCallback((info: CellTooltip | null) => {
     if (!info) { setTooltip(null); setTooltipPos(null); return }
     setTooltip(info)
   }, [])
@@ -324,13 +360,13 @@ export default function FiberOrientationContour({ plies: propPlies, file, projec
       })
       setDrapeResult(result)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
   }, [surface])
 
-  const styles = {
+  const styles: Record<string, CSSProperties> = {
     root: {
       display: 'flex',
       flexDirection: 'column',

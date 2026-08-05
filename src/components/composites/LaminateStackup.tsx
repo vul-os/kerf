@@ -15,14 +15,30 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { DragEvent, CSSProperties } from 'react'
 import { useAuth } from '../../store/auth.js'
+import type { Ply, CltResult } from './compositesTypes'
 
-const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+export interface Props {
+  initialPlies?: Ply[]
+  onResult?: (result: CltResult) => void
+}
+
+const API_URL: string = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
 
 // ---------------------------------------------------------------------------
 // Default ply materials catalogue
 // ---------------------------------------------------------------------------
-const MATERIAL_PRESETS = {
+interface MaterialPreset {
+  E1: number
+  E2: number
+  G12: number
+  nu12: number
+  rho: number
+  costPerKg: number
+}
+
+const MATERIAL_PRESETS: Record<string, MaterialPreset> = {
   'T300/Epoxy': { E1: 181, E2: 10.3, G12: 7.17, nu12: 0.28, rho: 1.6, costPerKg: 45 },
   'IM7/Epoxy':  { E1: 164, E2:  8.9, G12: 5.6,  nu12: 0.32, rho: 1.58, costPerKg: 65 },
   'AS4/PEEK':   { E1: 138, E2:  9.0, G12: 5.5,  nu12: 0.30, rho: 1.60, costPerKg: 120 },
@@ -32,7 +48,7 @@ const MATERIAL_PRESETS = {
 
 const MAT_NAMES = Object.keys(MATERIAL_PRESETS)
 
-function defaultPly(i) {
+function defaultPly(i: number): Ply {
   const mat = MAT_NAMES[i % MAT_NAMES.length]
   return {
     id: crypto.randomUUID(),
@@ -43,12 +59,12 @@ function defaultPly(i) {
   }
 }
 
-const INITIAL_PLIES = [0, 1, 2, 3, 2, 1, 0].map(defaultPly)
+const INITIAL_PLIES: Ply[] = [0, 1, 2, 3, 2, 1, 0].map(defaultPly)
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-function isSymmetric(plies) {
+function isSymmetric(plies: Ply[]): boolean {
   const n = plies.length
   for (let i = 0; i < Math.floor(n / 2); i++) {
     const a = plies[i], b = plies[n - 1 - i]
@@ -58,8 +74,8 @@ function isSymmetric(plies) {
   return true
 }
 
-function isBalanced(plies) {
-  const counts = {}
+function isBalanced(plies: Ply[]): boolean {
+  const counts: Record<number, number> = {}
   for (const p of plies) {
     const key = Math.abs(p.angle)
     counts[key] = (counts[key] || 0) + Math.sign(p.angle || 1)
@@ -67,13 +83,13 @@ function isBalanced(plies) {
   return Object.values(counts).every((v) => v === 0)
 }
 
-function fmtNum(v, dp = 3) {
+function fmtNum(v?: number | null, dp = 3): string {
   if (v == null || !Number.isFinite(v)) return '—'
   return v.toFixed(dp)
 }
 
 // Hue rotation for fiber angle: 0°=teal, 45°=gold, 90°=rose, -45°=violet
-function angleColor(deg) {
+function angleColor(deg: number): string {
   const a = ((deg % 180) + 180) % 180
   if (a === 0)   return '#4adeae'
   if (a === 90)  return '#f97888'
@@ -90,7 +106,7 @@ function angleColor(deg) {
 // ---------------------------------------------------------------------------
 // API call
 // ---------------------------------------------------------------------------
-async function callCLT(plies) {
+async function callCLT(plies: Ply[]): Promise<CltResult> {
   const token = useAuth.getState().accessToken
   const body = {
     tool: 'layup_analysis',
@@ -121,7 +137,12 @@ async function callCLT(plies) {
 // ---------------------------------------------------------------------------
 // Stiffness matrix mini-display
 // ---------------------------------------------------------------------------
-function MatrixDisplay({ label, rows }) {
+interface MatrixDisplayProps {
+  label: string
+  rows?: number[][]
+}
+
+function MatrixDisplay({ label, rows }: MatrixDisplayProps) {
   if (!rows) return null
   return (
     <div style={{ marginBottom: 10 }}>
@@ -163,15 +184,17 @@ function MatrixDisplay({ label, rows }) {
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export default function LaminateStackup({ initialPlies, onResult }) {
-  const [plies, setPlies] = useState(initialPlies || INITIAL_PLIES)
-  const [selected, setSelected] = useState(null)
-  const [dragging, setDragging] = useState(null)
-  const [dragOver, setDragOver] = useState(null)
-  const [cltResult, setCltResult] = useState(null)
+export default function LaminateStackup({ initialPlies, onResult }: Props) {
+  const [plies, setPlies] = useState<Ply[]>(initialPlies || INITIAL_PLIES)
+  const [selected, setSelected] = useState<number | null>(null)
+  // `dragging` value itself isn't read anywhere (only `setDragging`) — pre-existing dead
+  // state, not this slice's behavior to change.
+  const [_dragging, setDragging] = useState<number | null>(null)
+  const [dragOver, setDragOver] = useState<number | null>(null)
+  const [cltResult, setCltResult] = useState<CltResult | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const dragRef = useRef(null)
+  const [error, setError] = useState<string | null>(null)
+  const dragRef = useRef<number | null>(null)
 
   // Rollup calculations
   const totalThickness = plies.reduce((s, p) => s + p.thickness, 0)
@@ -182,15 +205,15 @@ export default function LaminateStackup({ initialPlies, onResult }) {
   const balanced  = isBalanced(plies)
 
   // Drag-to-reorder
-  const handleDragStart = useCallback((e, i) => {
+  const handleDragStart = useCallback((e: DragEvent, i: number) => {
     setDragging(i)
     dragRef.current = i
     e.dataTransfer.effectAllowed = 'move'
   }, [])
 
-  const handleDragEnter = useCallback((i) => setDragOver(i), [])
+  const handleDragEnter = useCallback((i: number) => setDragOver(i), [])
 
-  const handleDrop = useCallback((e, target) => {
+  const handleDrop = useCallback((e: DragEvent, target: number) => {
     e.preventDefault()
     const src = dragRef.current
     if (src == null || src === target) { setDragging(null); setDragOver(null); return }
@@ -206,10 +229,10 @@ export default function LaminateStackup({ initialPlies, onResult }) {
 
   // Add / remove ply
   const addPly = () => setPlies((p) => [...p, defaultPly(p.length)])
-  const removePly = (i) => setPlies((p) => p.filter((_, k) => k !== i))
+  const removePly = (i: number) => setPlies((p) => p.filter((_, k) => k !== i))
 
   // Field edit
-  const updatePly = (i, field, val) => setPlies((p) => {
+  const updatePly = (i: number, field: keyof Ply, val: string) => setPlies((p) => {
     const next = [...p]
     const prev = next[i]
     const matPreset = MATERIAL_PRESETS[val] || {}
@@ -234,7 +257,7 @@ export default function LaminateStackup({ initialPlies, onResult }) {
       setCltResult(result)
       onResult?.(result)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
@@ -248,7 +271,30 @@ export default function LaminateStackup({ initialPlies, onResult }) {
     return () => clearTimeout(timerRef.current)
   }, [plies]) // eslint-disable-line
 
-  const styles = {
+  const styles: {
+    root: CSSProperties
+    header: CSSProperties
+    title: CSSProperties
+    badges: CSSProperties
+    badge: (ok: boolean) => CSSProperties
+    table: CSSProperties
+    tHead: CSSProperties
+    th: CSSProperties
+    tr: (i: number, selected: number | null, dragOver: number | null) => CSSProperties
+    td: CSSProperties
+    input: CSSProperties
+    select: CSSProperties
+    rollup: CSSProperties
+    rollupCell: CSSProperties
+    rollupLabel: CSSProperties
+    rollupValue: CSSProperties
+    rollupUnit: CSSProperties
+    resultPanel: CSSProperties
+    resultLabel: CSSProperties
+    addBtn: CSSProperties
+    removeBtn: CSSProperties
+    runBtn: CSSProperties
+  } = {
     root: {
       display: 'flex',
       flexDirection: 'column',

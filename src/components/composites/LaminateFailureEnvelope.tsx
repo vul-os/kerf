@@ -14,15 +14,27 @@
  * Design ref: Reddy (2004) Fig 6.8 — biaxial strength envelopes for CFRP laminates.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { useAuth } from '../../store/auth.js'
+import type { FailurePly, EnvelopeResult, EnvelopePoint } from './compositesTypes'
 
-const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+export interface Props {
+  plies?: FailurePly[]
+  onResult?: (result: EnvelopeResult) => void
+}
+
+const API_URL: string = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
 
 // ---------------------------------------------------------------------------
 // API call
 // ---------------------------------------------------------------------------
-async function callEnvelope(plies, nAngles = 36, F12star = -0.5, Nxy = 0) {
+async function callEnvelope(
+  plies: FailurePly[],
+  nAngles = 36,
+  F12star = -0.5,
+  Nxy = 0,
+): Promise<EnvelopeResult> {
   const token = useAuth.getState().accessToken
   const body = {
     tool: 'composites_failure_envelope',
@@ -43,7 +55,7 @@ async function callEnvelope(plies, nAngles = 36, F12star = -0.5, Nxy = 0) {
 // ---------------------------------------------------------------------------
 // Default T300/5208 [0/45/-45/90]_s quasi-isotropic laminate
 // ---------------------------------------------------------------------------
-const DEFAULT_PLIES = [0, 45, -45, 90, 90, -45, 45, 0].map((angle) => ({
+const DEFAULT_PLIES: FailurePly[] = [0, 45, -45, 90, 90, -45, 45, 0].map((angle) => ({
   angle,
   E1: 181, E2: 10.3, G12: 7.17, nu12: 0.28, thickness: 0.125,
   Xt: 1500, Xc: 1500, Yt: 40, Yc: 246, S12: 68,
@@ -52,7 +64,14 @@ const DEFAULT_PLIES = [0, 45, -45, 90, 90, -45, 45, 0].map((angle) => ({
 // ---------------------------------------------------------------------------
 // SVG failure envelope plot
 // ---------------------------------------------------------------------------
-function EnvelopePlot({ envelopePoints, operatingPoint, width = 480, height = 400 }) {
+interface EnvelopePlotProps {
+  envelopePoints?: EnvelopePoint[] | null
+  operatingPoint?: { Nx: number; Ny: number }
+  width?: number
+  height?: number
+}
+
+function EnvelopePlot({ envelopePoints, operatingPoint, width = 480, height = 400 }: EnvelopePlotProps) {
   if (!envelopePoints || envelopePoints.length === 0) {
     return (
       <svg width="100%" viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
@@ -184,13 +203,13 @@ function EnvelopePlot({ envelopePoints, operatingPoint, width = 480, height = 40
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export default function LaminateFailureEnvelope({ plies: propPlies, onResult }) {
+export default function LaminateFailureEnvelope({ plies: propPlies, onResult }: Props) {
   const plies = propPlies || DEFAULT_PLIES
 
-  const [envelopePoints, setEnvelopePoints] = useState(null)
+  const [envelopePoints, setEnvelopePoints] = useState<EnvelopePoint[] | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [result, setResult] = useState(null)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<EnvelopeResult | null>(null)
 
   // Operating point inputs
   const [opNx, setOpNx] = useState(0)
@@ -207,7 +226,7 @@ export default function LaminateFailureEnvelope({ plies: propPlies, onResult }) 
       setEnvelopePoints(res.envelope_points || [])
       onResult?.(res)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
@@ -234,7 +253,7 @@ export default function LaminateFailureEnvelope({ plies: propPlies, onResult }) 
     return envMag > 0 ? (envMag / opMag - 1) : null
   })()
 
-  const styles = {
+  const styles: Record<string, CSSProperties> = {
     root: {
       display: 'flex',
       flexDirection: 'column',

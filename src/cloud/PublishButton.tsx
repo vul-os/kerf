@@ -19,14 +19,37 @@
 // deprecating a mistake is a future publish, not a delete.
 
 import { useEffect, useState } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 import {
   AlertCircle, Check, Copy, Globe, KeyRound, Loader2, Plus, ShieldAlert, Trash2,
 } from 'lucide-react'
-import Modal from '../components/Modal.jsx'
-import Button from '../components/Button.jsx'
-import Input, { Textarea } from '../components/Input.jsx'
+import { Button, Input, Modal, Textarea } from './untypedUi.js'
 import { ApiError } from '../lib/api.js'
 import { pub } from './api.js'
+import type { PubAssemblyCandidate, PubPublishChild, PubPublishResult } from './api.js'
+import type { ApiProject } from '@/types'
+
+// A child row's `quantity` starts as the number 1 but the quantity <Input>
+// writes back e.target.value (a string) on every keystroke — see
+// isChildRowValid/buildChildrenPayload below, which both coerce via Number().
+export interface ChildRow {
+  refKind: 'track' | 'pin'
+  announceId: string
+  manifestRoot: string
+  quantity: number | string
+}
+
+export interface PublishFormState {
+  name: string
+  description: string
+  kind: string
+  units: string
+  licensePreset: string
+  licenseCustom: string
+  tagsRaw: string
+}
+
+type PublishStep = 'loading' | 'identity' | 'identity-created' | 'form' | 'children' | 'confirm' | 'success'
 
 const KIND_OPTIONS = [
   { value: 'part', label: 'Part' },
@@ -61,7 +84,11 @@ const UNIT_OPTIONS = ['mm', 'cm', 'm', 'in', 'ft']
 const IRREVOCABLE_WARNING =
   'Publishing is public and irrevocable — a published artifact cannot be unpublished.'
 
-export function IdentityStep({ identityError, creating, onCreate }) {
+export function IdentityStep({ identityError, creating, onCreate }: {
+  identityError: string | null
+  creating: boolean
+  onCreate: () => void
+}) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start gap-2.5 rounded-lg border border-ink-800 bg-ink-850/40 p-4">
@@ -87,7 +114,7 @@ export function IdentityStep({ identityError, creating, onCreate }) {
   )
 }
 
-export function IdentityCreatedStep({ pubKey, onContinue }) {
+export function IdentityCreatedStep({ pubKey, onContinue }: { pubKey: string; onContinue: () => void }) {
   const [copied, setCopied] = useState(false)
   const onCopy = async () => {
     try {
@@ -124,7 +151,12 @@ export function IdentityCreatedStep({ pubKey, onContinue }) {
   )
 }
 
-export function MetadataStep({ form, setForm, error, onContinue }) {
+export function MetadataStep({ form, setForm, error, onContinue }: {
+  form: PublishFormState
+  setForm: Dispatch<SetStateAction<PublishFormState>>
+  error: string | null
+  onContinue: () => void
+}) {
   const licenseIsCustom = form.licensePreset === CUSTOM_LICENSE
   const valid = form.name.trim() && (licenseIsCustom ? form.licenseCustom.trim() : form.licensePreset) && form.units
 
@@ -234,11 +266,17 @@ export function MetadataStep({ form, setForm, error, onContinue }) {
 //     pin as an "advanced" row with a free-text manifest-root field the
 //     publisher pastes in themselves. A future wave could add a
 //     manifest-root lookup by announce_id to upgrade this to a picker too.
-export function emptyChildRow() {
+// These three are plain helpers (not components) exported alongside components in this file —
+// pre-existing in PublishButton.jsx before this migration; PublishButton.test.tsx imports them
+// directly, so splitting them into a separate file is a structural change beyond this slice's
+// "rename and type" scope.
+// eslint-disable-next-line react-refresh/only-export-components
+export function emptyChildRow(): ChildRow {
   return { refKind: 'track', announceId: '', manifestRoot: '', quantity: 1 }
 }
 
-export function isChildRowValid(row) {
+// eslint-disable-next-line react-refresh/only-export-components
+export function isChildRowValid(row: ChildRow): boolean {
   const qty = Number(row.quantity)
   if (!Number.isInteger(qty) || qty < 1) return false
   if (row.refKind === 'track') return !!row.announceId
@@ -246,16 +284,17 @@ export function isChildRowValid(row) {
   return false
 }
 
-export function buildChildrenPayload(rows) {
+// eslint-disable-next-line react-refresh/only-export-components
+export function buildChildrenPayload(rows: ChildRow[]): PubPublishChild[] {
   return rows.map((row) => {
-    const base = { ref_kind: row.refKind, quantity: Number(row.quantity) || 1 }
+    const base: PubPublishChild = { ref_kind: row.refKind, quantity: Number(row.quantity) || 1 }
     if (row.refKind === 'pin') base.manifest_root = row.manifestRoot.trim()
     else base.announce_id = row.announceId
     return base
   })
 }
 
-function ChildRefKindToggle({ value, onChange }) {
+function ChildRefKindToggle({ value, onChange }: { value: 'track' | 'pin'; onChange: (value: 'track' | 'pin') => void }) {
   return (
     <div className="flex items-center gap-1 rounded-md bg-ink-900 border border-ink-700 p-0.5 w-fit">
       <button
@@ -286,9 +325,19 @@ function ChildRefKindToggle({ value, onChange }) {
 
 export function ChildrenStep({
   rows, setRows, candidates, candidatesLoading, candidatesError, error, onBack, onContinue,
+}: {
+  rows: ChildRow[]
+  setRows: Dispatch<SetStateAction<ChildRow[]>>
+  candidates: PubAssemblyCandidate[]
+  candidatesLoading: boolean
+  candidatesError: string | null
+  error: string | null
+  onBack: () => void
+  onContinue: () => void
 }) {
-  const updateRow = (i, patch) => setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
-  const removeRow = (i) => setRows((rs) => rs.filter((_, idx) => idx !== i))
+  const updateRow = (i: number, patch: Partial<ChildRow>) =>
+    setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
+  const removeRow = (i: number) => setRows((rs) => rs.filter((_, idx) => idx !== i))
   const addRow = () => setRows((rs) => [...rs, emptyChildRow()])
 
   const valid = rows.length > 0 && rows.every(isChildRowValid)
@@ -411,7 +460,16 @@ export function ChildrenStep({
   )
 }
 
-export function ConfirmStep({ form, submitting, error, onBack, onConfirm }) {
+// `form` is part of the real prop contract (PublishModal always passes the current form state)
+// but this step's body never reads it — pre-existing in PublishButton.jsx before this migration,
+// kept as-is (no behaviour change); `_form` marks the local binding as intentionally unused.
+export function ConfirmStep({ form: _form, submitting, error, onBack, onConfirm }: {
+  form: PublishFormState
+  submitting: boolean
+  error: string | null
+  onBack: () => void
+  onConfirm: () => void
+}) {
   const [ack, setAck] = useState(false)
   return (
     <div className="flex flex-col gap-4">
@@ -467,7 +525,7 @@ export function ConfirmStep({ form, submitting, error, onBack, onConfirm }) {
   )
 }
 
-export function SuccessStep({ announceId, onClose }) {
+export function SuccessStep({ announceId, onClose }: { announceId: string | null; onClose: () => void }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start gap-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
@@ -487,13 +545,18 @@ export function SuccessStep({ announceId, onClose }) {
   )
 }
 
-function PublishModal({ open, onClose, project, onPublished }) {
-  const [step, setStep] = useState('loading') // loading | identity | identity-created | form | children | confirm | success
-  const [identityError, setIdentityError] = useState(null)
+function PublishModal({ open, onClose, project, onPublished }: {
+  open: boolean
+  onClose: () => void
+  project: ApiProject | null | undefined
+  onPublished: (result: PubPublishResult | null) => void
+}) {
+  const [step, setStep] = useState<PublishStep>('loading')
+  const [identityError, setIdentityError] = useState<string | null>(null)
   const [creatingIdentity, setCreatingIdentity] = useState(false)
-  const [newPubKey, setNewPubKey] = useState(null)
+  const [newPubKey, setNewPubKey] = useState<string | null>(null)
 
-  const [form, setForm] = useState(() => ({
+  const [form, setForm] = useState<PublishFormState>(() => ({
     name: project?.name || '',
     description: '',
     kind: 'part',
@@ -502,22 +565,23 @@ function PublishModal({ open, onClose, project, onPublished }) {
     licenseCustom: '',
     tagsRaw: '',
   }))
-  const [formError, setFormError] = useState(null)
+  const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState(null)
-  const [announceId, setAnnounceId] = useState(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [announceId, setAnnounceId] = useState<string | null>(null)
 
   // Assembly-only: the children array (§23.6.2) plus the picker's candidate
   // list. Kept separate from `form` since it only applies to kind=assembly
   // and has its own loading/error lifecycle against a different endpoint.
-  const [childRows, setChildRows] = useState([])
-  const [childrenError, setChildrenError] = useState(null)
-  const [candidates, setCandidates] = useState([])
+  const [childRows, setChildRows] = useState<ChildRow[]>([])
+  const [childrenError, setChildrenError] = useState<string | null>(null)
+  const [candidates, setCandidates] = useState<PubAssemblyCandidate[]>([])
   const [candidatesLoading, setCandidatesLoading] = useState(false)
-  const [candidatesError, setCandidatesError] = useState(null)
+  const [candidatesError, setCandidatesError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- modal-open reset + identity check, pre-existing before this migration.
     setStep('loading')
     setIdentityError(null)
     setSubmitError(null)
@@ -551,6 +615,7 @@ function PublishModal({ open, onClose, project, onPublished }) {
   useEffect(() => {
     if (step !== 'children' || !project?.id) return
     let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- step-entry candidates fetch, pre-existing before this migration.
     setCandidatesLoading(true)
     setCandidatesError(null)
     pub.assemblyCandidates(project.id)
@@ -679,7 +744,12 @@ function PublishModal({ open, onClose, project, onPublished }) {
 // captureSnapshot is accepted for backward-compat with existing Editor.jsx
 // call sites but is unused: the distributed Workshop's publish metadata
 // (docs/distributed-workshop.md) has no thumbnail/cover field.
-export function PublishButton({ project, size = 'sm', variant = 'ghost' }) {
+export function PublishButton({ project, size = 'sm', variant = 'ghost' }: {
+  project: ApiProject | null | undefined
+  size?: 'sm' | 'md' | 'lg'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'outline' | 'danger'
+  captureSnapshot?: unknown
+}) {
   const [open, setOpen] = useState(false)
 
   if (!project?.id) return null

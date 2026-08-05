@@ -30,9 +30,10 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import {
   AvailabilityBadge, WorkshopCard, BrowseEmptyState, FollowsPanel, BomTable, WakeToggle,
 } from '../Workshop.jsx'
+import type { PubWorkshopItem } from '../api.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const workshopSrc = readFileSync(join(__dirname, '../Workshop.jsx'), 'utf8')
+const workshopSrc = readFileSync(join(__dirname, '../Workshop.tsx'), 'utf8')
 
 // ---------------------------------------------------------------------------
 // 1. AvailabilityBadge
@@ -86,7 +87,7 @@ describe('AvailabilityBadge', () => {
 // 2. WorkshopCard
 // ---------------------------------------------------------------------------
 
-const baseItem = {
+const baseItem: PubWorkshopItem = {
   announce_id: 'ann-1',
   pub: 'ed25519:abcdefghijklmnopqrstuvwxyz',
   meta: { name: 'M3 Bracket', description: 'A bracket.', artifact_kind: 'part', license: 'CERN-OHL-S-2.0', units: 'mm', tags: ['bracket'] },

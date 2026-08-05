@@ -13,6 +13,7 @@
 //   Feeds   — manage the set of feeds that make up "your workshop".
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle, Bell, BellOff, CheckCircle2, CircleDot, ListTree, Loader2, Pin, PinOff,
@@ -20,9 +21,7 @@ import {
 } from 'lucide-react'
 import Layout from '../components/Layout.jsx'
 import Card from '../components/Card.jsx'
-import Button from '../components/Button.jsx'
-import Input from '../components/Input.jsx'
-import Modal from '../components/Modal.jsx'
+import { Button, Input, Modal } from './untypedUi.js'
 import { ApiError } from '../lib/api.js'
 import {
   disableWakeNotifications, enableWakeNotifications, getWakeKeyInfo,
@@ -30,8 +29,21 @@ import {
 } from '../lib/wake.js'
 import { useWake } from '../store/wake.js'
 import { pub } from './api.js'
+import type { PubAvailability, PubBomResult, PubFollow, PubPinResult, PubWorkshopItem } from './api.js'
 
-const KIND_LABELS = {
+// Per-announce_id note surfaced under the availability badge after a pin
+// or hydrate-retry call — see the `pinNotes` state comment further down.
+type PinNote =
+  | { kind: 'success' }
+  | { kind: 'partial'; missingChunks: number }
+  | { kind: 'error'; message: string }
+
+interface WakeCapability {
+  supported: boolean
+  available: boolean
+}
+
+const KIND_LABELS: Record<string, string> = {
   part: 'Part',
   assembly: 'Assembly',
   pcb: 'PCB',
@@ -41,7 +53,7 @@ const KIND_LABELS = {
   doc: 'Doc',
 }
 
-function relativeTime(iso) {
+function relativeTime(iso: string | undefined | null): string {
   if (!iso) return 'never'
   const t = new Date(iso).getTime()
   if (Number.isNaN(t)) return ''
@@ -59,7 +71,7 @@ function relativeTime(iso) {
   return `${Math.round(mo / 12)}y ago`
 }
 
-function truncatePub(key) {
+function truncatePub(key: string | undefined | null): string {
   if (!key) return ''
   if (key.length <= 14) return key
   return `${key.slice(0, 8)}…${key.slice(-6)}`
@@ -70,7 +82,16 @@ function truncatePub(key) {
 // an assembly-kind card's "BOM" action.
 // ---------------------------------------------------------------------------
 
-export function BomTable({ loading, error, bom }) {
+// BomTable only ever reads `parts`/`cycles` off the BOM result — it doesn't
+// need (and BomModal doesn't pass through) `announce_id`, so its prop
+// contract is narrower than the full pub.bom() response shape.
+type BomTableData = Pick<PubBomResult, 'parts' | 'cycles'>
+
+export function BomTable({ loading, error, bom }: {
+  loading: boolean
+  error: string | null
+  bom: BomTableData | null
+}) {
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-ink-400 py-6 justify-center">
@@ -150,14 +171,20 @@ export function BomTable({ loading, error, bom }) {
   )
 }
 
-export function BomModal({ open, onClose, announceId, title }) {
+export function BomModal({ open, onClose, announceId, title }: {
+  open: boolean
+  onClose: () => void
+  announceId: string | null | undefined
+  title?: string
+}) {
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [bom, setBom] = useState(null)
+  const [error, setError] = useState<string | null>(null)
+  const [bom, setBom] = useState<PubBomResult | null>(null)
 
   useEffect(() => {
     if (!open || !announceId) return
     let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- modal-open BOM fetch, pre-existing before this migration.
     setLoading(true)
     setError(null)
     pub.bom(announceId)
@@ -181,7 +208,7 @@ export function BomModal({ open, onClose, announceId, title }) {
 // AvailabilityBadge — the four honest states from docs/distributed-workshop.md.
 // No fake availability (no spinner masquerading as "it's there"), no silent
 // disappearance (stale/unreachable stays visible with its real state).
-export function AvailabilityBadge({ availability }) {
+export function AvailabilityBadge({ availability }: { availability: PubAvailability | undefined }) {
   const status = availability?.status || 'unreachable'
   const holders = availability?.holders
   const verified = availability?.last_verified
@@ -226,6 +253,16 @@ export function AvailabilityBadge({ availability }) {
 export function WorkshopCard({
   item, publisherLabel, superseded, onTogglePin, pinBusy,
   pinNote, onRetryHydrate, hydrateBusy, onOpenBom,
+}: {
+  item: PubWorkshopItem
+  publisherLabel?: string
+  superseded?: boolean
+  onTogglePin: (item: PubWorkshopItem) => void
+  pinBusy: boolean
+  pinNote?: PinNote
+  onRetryHydrate?: (announceId: string) => void
+  hydrateBusy?: boolean
+  onOpenBom?: (item: PubWorkshopItem) => void
 }) {
   const meta = item.meta || {}
   const deprecated = !!meta.deprecated
@@ -383,7 +420,7 @@ export function WorkshopCard({
   )
 }
 
-export function BrowseEmptyState({ hasFollows, onGoToFeeds }) {
+export function BrowseEmptyState({ hasFollows, onGoToFeeds }: { hasFollows: boolean; onGoToFeeds: () => void }) {
   if (!hasFollows) {
     return (
       <Card className="p-10 text-center" data-testid="workshop-empty-no-follows">
@@ -428,7 +465,12 @@ export function BrowseEmptyState({ hasFollows, onGoToFeeds }) {
 // disabled-with-tooltip — never hidden outright — so a user can always see
 // *why* wake isn't available for this feed (no support in this browser, not
 // configured on this node, or a foreign-node follow v1 doesn't support yet).
-export function WakeToggle({ enabled, disabledReason, busy, onToggle }) {
+export function WakeToggle({ enabled, disabledReason, busy, onToggle }: {
+  enabled: boolean
+  disabledReason?: string | null
+  busy: boolean
+  onToggle: () => void
+}) {
   const disabled = !!disabledReason || busy
   const title = disabledReason || (enabled ? 'Stop notifying me about new revisions' : 'Notify me about new revisions')
   return (
@@ -461,15 +503,26 @@ export function FollowsPanel({
   wakeBusyPub = null,
   wakeErrors = {},
   onToggleWake = () => {},
+}: {
+  follows: PubFollow[]
+  loading: boolean
+  error: string | null
+  onAdd: (params: { pub: string; label: string; gatewayUrl: string }) => Promise<void>
+  onRemove: (pubKey: string) => Promise<void>
+  wakeInfo?: WakeCapability
+  wakeEnabledPubs?: string[]
+  wakeBusyPub?: string | null
+  wakeErrors?: Record<string, string>
+  onToggleWake?: (follow: PubFollow) => void
 }) {
   const [pubKey, setPubKey] = useState('')
   const [label, setLabel] = useState('')
   const [gatewayUrl, setGatewayUrl] = useState('')
   const [adding, setAdding] = useState(false)
-  const [addError, setAddError] = useState(null)
-  const [removing, setRemoving] = useState(null)
+  const [addError, setAddError] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<string | null>(null)
 
-  const submit = async (e) => {
+  const submit = async (e?: FormEvent<HTMLFormElement>) => {
     e?.preventDefault?.()
     if (!pubKey.trim() || !gatewayUrl.trim()) {
       setAddError('A publisher key and gateway URL are both required.')
@@ -489,7 +542,7 @@ export function FollowsPanel({
     }
   }
 
-  const remove = async (key) => {
+  const remove = async (key: string) => {
     setRemoving(key)
     try {
       await onRemove(key)
@@ -616,31 +669,31 @@ export function FollowsPanel({
 }
 
 export function Workshop() {
-  const [tab, setTab] = useState('browse') // 'browse' | 'feeds'
-  const [items, setItems] = useState(null)
-  const [follows, setFollows] = useState(null)
-  const [error, setError] = useState(null)
-  const [followsError, setFollowsError] = useState(null)
+  const [tab, setTab] = useState<'browse' | 'feeds'>('browse')
+  const [items, setItems] = useState<PubWorkshopItem[] | null>(null)
+  const [follows, setFollows] = useState<PubFollow[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [followsError, setFollowsError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [pinBusy, setPinBusy] = useState({})
+  const [pinBusy, setPinBusy] = useState<Record<string, boolean>>({})
   // Per-announce_id note surfaced under the availability badge after a pin
   // or hydrate-retry call: { kind: 'success' } once hydrated:true,
   // { kind: 'partial', missingChunks } when pinned but not fully fetched
   // yet, { kind: 'error', message } on failure. Keyed by announce_id so it
   // survives the loadAll() refresh that follows every pin/hydrate call.
-  const [pinNotes, setPinNotes] = useState({})
-  const [hydrateBusy, setHydrateBusy] = useState({})
-  const [bomItem, setBomItem] = useState(null)
+  const [pinNotes, setPinNotes] = useState<Record<string, PinNote>>({})
+  const [hydrateBusy, setHydrateBusy] = useState<Record<string, boolean>>({})
+  const [bomItem, setBomItem] = useState<PubWorkshopItem | null>(null)
 
   // Wake ("Notify me") — docs/distributed-workshop.md's Wake section.
   // wakeInfo is this browser+node's capability, resolved once (it can't
   // change mid-session); wakeEnabledPubs is which follows have it on
   // (src/store/wake.js, persisted locally); wakeBusyPub/wakeErrors track the
   // in-flight toggle and any per-feed error, same shape as pinBusy/pinNotes.
-  const [wakeInfo, setWakeInfo] = useState({ supported: false, available: false })
+  const [wakeInfo, setWakeInfo] = useState<WakeCapability>({ supported: false, available: false })
   const wakeEnabledPubs = useWake((s) => s.enabledPubs)
-  const [wakeBusyPub, setWakeBusyPub] = useState(null)
-  const [wakeErrors, setWakeErrors] = useState({})
+  const [wakeBusyPub, setWakeBusyPub] = useState<string | null>(null)
+  const [wakeErrors, setWakeErrors] = useState<Record<string, string>>({})
 
   const loadAll = useCallback(() => {
     setLoading(true)
@@ -659,6 +712,7 @@ export function Workshop() {
     }).finally(() => setLoading(false))
   }, [])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- mount data load, pre-existing before this migration.
   useEffect(() => { loadAll() }, [loadAll])
 
   // Resolve Wake capability once: browser support + whether this node has a
@@ -685,20 +739,20 @@ export function Workshop() {
   useEffect(() => { syncWakeStateOnChange() }, [wakeEnabledPubs])
 
   const followsByPub = useMemo(() => {
-    const m = new Map()
+    const m = new Map<string, PubFollow>()
     for (const f of follows || []) m.set(f.pub, f)
     return m
   }, [follows])
 
   const supersededIds = useMemo(() => {
-    const s = new Set()
+    const s = new Set<string>()
     for (const it of items || []) {
       if (it.supersedes) s.add(it.supersedes)
     }
     return s
   }, [items])
 
-  const setPinNote = useCallback((announceId, note) => {
+  const setPinNote = useCallback((announceId: string, note: PinNote | null) => {
     setPinNotes((n) => {
       if (note == null) {
         if (!(announceId in n)) return n
@@ -714,7 +768,7 @@ export function Workshop() {
   // missing_chunks, error? } — to both the item's pinned flag and the note
   // shown under its availability badge, then refreshes the list so the
   // badge itself (server-derived availability) catches up too.
-  const applyPinResult = useCallback((announceId, res) => {
+  const applyPinResult = useCallback((announceId: string, res: PubPinResult | null) => {
     const hydrated = !!res?.hydrated
     const pinned = !!res?.pinned
     setItems((list) => (list || []).map((i) => (
@@ -738,7 +792,7 @@ export function Workshop() {
     loadAll()
   }, [loadAll, setPinNote])
 
-  const onTogglePin = useCallback(async (item) => {
+  const onTogglePin = useCallback(async (item: PubWorkshopItem) => {
     const wasPinned = !!item.pinned
     setPinBusy((b) => ({ ...b, [item.announce_id]: true }))
 
@@ -779,7 +833,7 @@ export function Workshop() {
     }
   }, [applyPinResult, loadAll, setPinNote])
 
-  const onRetryHydrate = useCallback(async (announceId) => {
+  const onRetryHydrate = useCallback(async (announceId: string) => {
     setHydrateBusy((b) => ({ ...b, [announceId]: true }))
     try {
       const res = await pub.hydratePin(announceId)
@@ -795,17 +849,17 @@ export function Workshop() {
     }
   }, [applyPinResult])
 
-  const onAddFollow = useCallback(async ({ pub: pubKey, label, gatewayUrl }) => {
+  const onAddFollow = useCallback(async ({ pub: pubKey, label, gatewayUrl }: { pub: string; label: string; gatewayUrl: string }) => {
     await pub.addFollow({ pub: pubKey, label, gatewayUrl })
     loadAll()
   }, [loadAll])
 
-  const onRemoveFollow = useCallback(async (pubKey) => {
+  const onRemoveFollow = useCallback(async (pubKey: string) => {
     await pub.removeFollow(pubKey)
     loadAll()
   }, [loadAll])
 
-  const onToggleWake = useCallback(async (follow) => {
+  const onToggleWake = useCallback(async (follow: PubFollow) => {
     const pubKey = follow.pub
     setWakeBusyPub(pubKey)
     const alreadyEnabled = wakeEnabledPubs.includes(pubKey)

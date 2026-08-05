@@ -28,7 +28,25 @@ const API_URL = import.meta.env.VITE_API_URL || ''
 // workflow), treat Google as enabled without needing the runtime flag.
 const BUILD_GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
-const DEFAULTS = {
+// Raw /api/config response shape (per CONTRACT.md, see header comment).
+interface CloudConfigResponse {
+  local_mode?: boolean
+  google_client_id?: string
+  google_enabled?: boolean
+  github_enabled?: boolean
+  github_client_id?: string
+}
+
+interface CloudConfigValues {
+  ready: boolean
+  localMode: boolean
+  googleClientId: string
+  googleEnabled: boolean
+  githubEnabled: boolean
+  githubClientId: string
+}
+
+const DEFAULTS: CloudConfigValues = {
   ready: false,
   // localMode default is true so an OSS build that fails to fetch
   // /api/config (e.g. CORS misconfigured) still skips /login, matching
@@ -41,7 +59,12 @@ const DEFAULTS = {
   githubClientId: '',
 }
 
-const useStore = create((set, get) => ({
+interface CloudConfigStore extends CloudConfigValues {
+  _inflight: Promise<void> | null
+  fetch: () => Promise<void> | null
+}
+
+const useStore = create<CloudConfigStore>((set, get) => ({
   ...DEFAULTS,
   _inflight: null,
 
@@ -51,7 +74,7 @@ const useStore = create((set, get) => ({
     const p = fetch(`${API_URL}/api/config`, { credentials: 'omit' })
       .then(async (r) => {
         if (!r.ok) throw new Error(`config ${r.status}`)
-        return r.json()
+        return r.json() as Promise<CloudConfigResponse>
       })
       .then((data) => {
         // Runtime client ID takes precedence over build-time env.
@@ -76,7 +99,7 @@ const useStore = create((set, get) => ({
           _inflight: null,
         })
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         // Treat network/unreachable as "OSS defaults". Surface in console
         // so devs notice misconfigured proxies.
         console.warn('[useCloudConfig] /api/config failed:', err)
@@ -87,7 +110,7 @@ const useStore = create((set, get) => ({
   },
 }))
 
-export function useCloudConfig() {
+export function useCloudConfig(): CloudConfigValues {
   const state = useStore()
   useEffect(() => {
     if (!state.ready && !state._inflight) state.fetch()
@@ -104,6 +127,6 @@ export function useCloudConfig() {
 }
 
 // Imperative accessor for code that can't use hooks (e.g. router loaders).
-export function getCloudConfig() {
+export function getCloudConfig(): CloudConfigStore {
   return useStore.getState()
 }

@@ -8,20 +8,25 @@
 // GitHub, Gitea. There is no hosted-git product and no kerf-run OAuth app.
 
 import { useCallback, useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 import { AlertCircle, Link2, Loader2, Plus, Trash2, X } from 'lucide-react'
-import Button from '../components/Button.jsx'
-import Input from '../components/Input.jsx'
+import { Button, Input } from './untypedUi.js'
 import { ApiError } from '../lib/api.js'
 import { git } from './api.js'
+import type { GitRemote } from './api.js'
 
-export default function RemotesManager({ projectId, onClose, onChanged }) {
-  const [remotes, setRemotes] = useState(null) // null = loading
-  const [loadError, setLoadError] = useState(null)
+export default function RemotesManager({ projectId, onClose, onChanged }: {
+  projectId: string
+  onClose: () => void
+  onChanged?: () => void
+}) {
+  const [remotes, setRemotes] = useState<GitRemote[] | null>(null) // null = loading
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
   const [adding, setAdding] = useState(false)
-  const [addError, setAddError] = useState(null)
-  const [removing, setRemoving] = useState(null)
+  const [addError, setAddError] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!projectId) return
@@ -35,9 +40,10 @@ export default function RemotesManager({ projectId, onClose, onChanged }) {
     }
   }, [projectId])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- mount data load, pre-existing before this migration.
   useEffect(() => { load() }, [load])
 
-  const onAdd = useCallback(async (e) => {
+  const onAdd = useCallback(async (e?: FormEvent<HTMLFormElement>) => {
     e?.preventDefault?.()
     if (!name.trim() || !url.trim()) {
       setAddError('Name and URL are both required.')
@@ -58,7 +64,7 @@ export default function RemotesManager({ projectId, onClose, onChanged }) {
     }
   }, [projectId, name, url, load, onChanged])
 
-  const onRemove = useCallback(async (remoteName) => {
+  const onRemove = useCallback(async (remoteName: string) => {
     if (typeof window !== 'undefined' && !window.confirm(
       `Remove remote "${remoteName}"? This only forgets it locally — nothing changes on the remote itself.`,
     )) return

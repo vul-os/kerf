@@ -33,18 +33,21 @@ import RemotesManager from '../RemotesManager.jsx'
 import { git } from '../api.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const gitPanelSrc = readFileSync(join(__dirname, '../GitPanel.jsx'), 'utf8')
-const remotesSrc = readFileSync(join(__dirname, '../RemotesManager.jsx'), 'utf8')
+const gitPanelSrc = readFileSync(join(__dirname, '../GitPanel.tsx'), 'utf8')
+const remotesSrc = readFileSync(join(__dirname, '../RemotesManager.tsx'), 'utf8')
 
 // ---------------------------------------------------------------------------
 // 1. api.js `git` client — exact contract URLs/methods/bodies
 // ---------------------------------------------------------------------------
 
 describe('git API client — matches the /api/git/:project_id contract', () => {
-  let calls
+  let calls: Array<{ url: string; [key: string]: unknown }>
   beforeEach(() => {
     calls = []
-    global.fetch = vi.fn(async (url, opts) => {
+    // Cast: the mock only needs the {ok, status, json} shape `request()`
+    // actually reads, not the full Response interface — see the fetch-mock
+    // pattern note in pubApi.contract.test.ts.
+    globalThis.fetch = vi.fn(async (url: RequestInfo | URL, opts?: RequestInit) => {
       // Strip any VITE_API_URL origin a developer .env injects — the
       // contract under test is the path.
       calls.push({ url: String(url).replace(/^https?:\/\/[^/]+/, ''), ...opts })
@@ -53,10 +56,10 @@ describe('git API client — matches the /api/git/:project_id contract', () => {
         status: 200,
         json: async () => ({ ok: true }),
       }
-    })
+    }) as unknown as typeof fetch
   })
   afterEach(() => {
-    delete global.fetch
+    delete globalThis.fetch
   })
 
   it('status: GET /api/git/:pid/status', async () => {
@@ -75,7 +78,7 @@ describe('git API client — matches the /api/git/:project_id contract', () => {
     await git.commit('proj-1', 'first commit')
     expect(calls[0].url).toBe('/api/git/proj-1/commit')
     expect(calls[0].method).toBe('POST')
-    expect(JSON.parse(calls[0].body)).toEqual({ message: 'first commit' })
+    expect(JSON.parse(calls[0].body as string)).toEqual({ message: 'first commit' })
   })
 
   it('log: GET /api/git/:pid/log?limit=50', async () => {
@@ -93,7 +96,7 @@ describe('git API client — matches the /api/git/:project_id contract', () => {
     await git.addRemote('proj-1', 'origin', 'git@github.com:me/repo.git')
     expect(calls[0].url).toBe('/api/git/proj-1/remotes')
     expect(calls[0].method).toBe('POST')
-    expect(JSON.parse(calls[0].body)).toEqual({ name: 'origin', url: 'git@github.com:me/repo.git' })
+    expect(JSON.parse(calls[0].body as string)).toEqual({ name: 'origin', url: 'git@github.com:me/repo.git' })
   })
 
   it('removeRemote: DELETE /api/git/:pid/remotes/:name', async () => {
@@ -106,14 +109,14 @@ describe('git API client — matches the /api/git/:project_id contract', () => {
     await git.push('proj-1', 'origin', 'main')
     expect(calls[0].url).toBe('/api/git/proj-1/push')
     expect(calls[0].method).toBe('POST')
-    expect(JSON.parse(calls[0].body)).toEqual({ remote: 'origin', branch: 'main' })
+    expect(JSON.parse(calls[0].body as string)).toEqual({ remote: 'origin', branch: 'main' })
   })
 
   it('pull: POST /api/git/:pid/pull {remote,branch}', async () => {
     await git.pull('proj-1', 'origin', 'main')
     expect(calls[0].url).toBe('/api/git/proj-1/pull')
     expect(calls[0].method).toBe('POST')
-    expect(JSON.parse(calls[0].body)).toEqual({ remote: 'origin', branch: 'main' })
+    expect(JSON.parse(calls[0].body as string)).toEqual({ remote: 'origin', branch: 'main' })
   })
 
   it('has no leftover branches/merge/diff/provider/OAuth client methods', () => {
@@ -260,10 +263,10 @@ describe('GitPanel.jsx + RemotesManager.jsx — no OAuth, no hosted-git leftover
 
 describe('RemotesManager', () => {
   beforeEach(() => {
-    global.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => [] }))
+    globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => [] })) as unknown as typeof fetch
   })
   afterEach(() => {
-    delete global.fetch
+    delete globalThis.fetch
   })
 
   it('default render carries the required helper text verbatim', () => {

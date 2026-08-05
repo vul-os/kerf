@@ -16,28 +16,34 @@
 // untouched by this rewire.
 
 import { useCallback, useEffect, useState } from 'react'
+import type { FormEvent, KeyboardEvent } from 'react'
 import {
   AlertCircle, ArrowDownToLine, ArrowUpFromLine, GitBranch, GitCommit,
   Link2, Loader2, RefreshCw, X,
 } from 'lucide-react'
-import Button from '../components/Button.jsx'
+import { Button } from './untypedUi.js'
 import PurgeRevisionsModal from '../components/PurgeRevisionsModal.jsx'
 import { api, ApiError } from '../lib/api.js'
 import { git } from './api.js'
+import type { GitCommitEntry, GitRemote, GitStatus } from './api.js'
 import RemotesManager from './RemotesManager.jsx'
+import type { RevisionsSize } from '@/types'
 
-function shortSha(s) {
+type TransferMode = 'push' | 'pull'
+type BusyState = 'init' | TransferMode | null
+
+function shortSha(s: string | undefined): string {
   return (s || '').slice(0, 7)
 }
 
-function formatBytes(bytes) {
+function formatBytes(bytes: number): string {
   if (bytes >= 1073741824) return `${(bytes / 1073741824).toFixed(1)} GB`
   if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)} MB`
   if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${bytes} B`
 }
 
-function relativeTime(iso) {
+function relativeTime(iso: string | undefined): string {
   if (!iso) return ''
   const t = new Date(iso).getTime()
   if (Number.isNaN(t)) return ''
@@ -50,7 +56,7 @@ function relativeTime(iso) {
   return `${Math.round(mo / 12)}y`
 }
 
-export function ErrorBanner({ message, onDismiss }) {
+export function ErrorBanner({ message, onDismiss }: { message: string | null; onDismiss?: () => void }) {
   if (!message) return null
   return (
     <div
@@ -70,7 +76,14 @@ export function ErrorBanner({ message, onDismiss }) {
 
 // TransferPanel — shared inline form for Push and Pull. Both actions need a
 // remote + branch pair; the contract is POST {remote, branch} for each.
-export function TransferPanel({ mode, remotes, defaultBranch, busy, onSubmit, onCancel }) {
+export function TransferPanel({ mode, remotes, defaultBranch, busy, onSubmit, onCancel }: {
+  mode: TransferMode
+  remotes: GitRemote[]
+  defaultBranch?: string
+  busy?: boolean
+  onSubmit: (remote: string, branch: string) => void
+  onCancel: () => void
+}) {
   const [remote, setRemote] = useState(remotes[0]?.name || '')
   const [branch, setBranch] = useState(defaultBranch || '')
 
@@ -123,7 +136,7 @@ export function TransferPanel({ mode, remotes, defaultBranch, busy, onSubmit, on
   )
 }
 
-export function CommitLog({ commits, loading }) {
+export function CommitLog({ commits, loading }: { commits: GitCommitEntry[]; loading: boolean }) {
   if (loading && commits.length === 0) {
     return (
       <div className="p-4 flex items-center gap-2 text-xs text-ink-400">
@@ -164,7 +177,7 @@ export function CommitLog({ commits, loading }) {
   )
 }
 
-export function EmptyState({ busy, onInit }) {
+export function EmptyState({ busy, onInit }: { busy: BusyState; onInit: () => void }) {
   return (
     <div className="p-4 flex flex-col gap-3">
       <div className="rounded-lg border border-ink-800 bg-ink-850/40 p-4">
@@ -195,23 +208,28 @@ export function EmptyState({ busy, onInit }) {
   )
 }
 
-export function GitPanel({ projectId, onClose }) {
-  const [status, setStatus] = useState(null) // null = loading; {initialized, branch, dirty, ahead, behind, remotes}
-  const [log, setLog] = useState([])
+// onClose is part of the real prop contract (Editor.jsx passes it) but this component has no
+// close affordance in its own body today — pre-existing in GitPanel.jsx before this migration,
+// kept as-is (no behaviour change); `_onClose` marks the local binding as intentionally unused.
+export function GitPanel({ projectId, onClose: _onClose }: { projectId: string; onClose: () => void }) {
+  const [status, setStatus] = useState<GitStatus | null>(null) // null = loading
+  const [log, setLog] = useState<GitCommitEntry[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [committing, setCommitting] = useState(false)
-  const [busy, setBusy] = useState(null) // 'init' | 'push' | 'pull' | null
-  const [transfer, setTransfer] = useState(null) // null | 'push' | 'pull'
+  const [busy, setBusy] = useState<BusyState>(null)
+  const [transfer, setTransfer] = useState<TransferMode | null>(null)
   const [showRemotes, setShowRemotes] = useState(false)
   const [showPurge, setShowPurge] = useState(false)
-  const [revSize, setRevSize] = useState(null)
+  const [revSize, setRevSize] = useState<RevisionsSize | null>(null)
 
   const loadRevSize = useCallback(async () => {
     if (!projectId) return
     try {
-      const data = await api.getRevisionsSize(projectId)
+      // api.getRevisionsSize comes from the un-migrated src/lib/api.js
+      // (allowJs boundary); annotate its result with the shared type.
+      const data: RevisionsSize = await api.getRevisionsSize(projectId)
       setRevSize(data)
     } catch {
       // non-critical — badge simply won't render
@@ -245,6 +263,7 @@ export function GitPanel({ projectId, onClose }) {
 
   useEffect(() => {
     if (projectId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- mount/projectId-change data load, pre-existing before this migration.
       refreshStatus()
       loadRevSize()
     }
@@ -264,7 +283,7 @@ export function GitPanel({ projectId, onClose }) {
     }
   }, [projectId, refreshStatus])
 
-  const onCommit = useCallback(async (e) => {
+  const onCommit = useCallback(async (e?: FormEvent<HTMLFormElement> | KeyboardEvent<HTMLTextAreaElement>) => {
     e?.preventDefault?.()
     const msg = message.trim()
     if (!msg || committing) return
@@ -282,7 +301,7 @@ export function GitPanel({ projectId, onClose }) {
     }
   }, [projectId, message, committing, refreshStatus, loadRevSize])
 
-  const onTransfer = useCallback(async (mode, remote, branch) => {
+  const onTransfer = useCallback(async (mode: TransferMode, remote: string, branch: string) => {
     setBusy(mode)
     setError(null)
     try {
@@ -297,7 +316,7 @@ export function GitPanel({ projectId, onClose }) {
     }
   }, [projectId, refreshStatus])
 
-  const onKey = useCallback((e) => {
+  const onKey = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') onCommit(e)
   }, [onCommit])
 

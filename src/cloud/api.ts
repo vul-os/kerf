@@ -10,12 +10,21 @@
 
 import { useAuth } from '../store/auth.js'
 import { ApiError } from '../lib/api.js'
+import type { ApiUser } from '@/types'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
-let refreshing = null
+// Shape of the /auth/refresh response body — mirrors src/lib/api.js's own
+// refresh handler, which this file intentionally duplicates (see header).
+interface RefreshResponse {
+  access_token: string
+  refresh_token: string
+  user: ApiUser
+}
 
-async function refreshAccessToken() {
+let refreshing: Promise<string> | null = null
+
+async function refreshAccessToken(): Promise<string> {
   if (refreshing) return refreshing
   const { refreshToken, setSession, logout } = useAuth.getState()
   if (!refreshToken) throw new Error('no refresh token')
@@ -30,7 +39,7 @@ async function refreshAccessToken() {
       logout()
       throw new Error('refresh failed')
     }
-    const data = await res.json()
+    const data: RefreshResponse = await res.json()
     setSession({
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
@@ -42,9 +51,17 @@ async function refreshAccessToken() {
   return refreshing
 }
 
-async function request(path, { method = 'GET', body, headers = {}, auth = true } = {}) {
+interface RequestOptions {
+  method?: string
+  body?: unknown
+  headers?: Record<string, string>
+  auth?: boolean
+}
+
+async function request<T = unknown>(path: string, options: RequestOptions = {}): Promise<T | null> {
+  const { method = 'GET', body, headers = {}, auth = true } = options
   const url = path.startsWith('http') ? path : `${API_URL}${path}`
-  const h = { 'content-type': 'application/json', ...headers }
+  const h: Record<string, string> = { 'content-type': 'application/json', ...headers }
   if (auth) {
     const token = useAuth.getState().accessToken
     if (token) h.authorization = `Bearer ${token}`
@@ -71,7 +88,7 @@ async function request(path, { method = 'GET', body, headers = {}, auth = true }
     throw new ApiError(res.status, msg || res.statusText)
   }
   if (res.status === 204) return null
-  return res.json()
+  return res.json() as Promise<T>
 }
 
 // ---- Pub (distributed Workshop, DMTAP-PUB) ----
@@ -93,30 +110,131 @@ async function request(path, { method = 'GET', body, headers = {}, auth = true }
 //   GET  /api/pub/bom/:announce_id -> { announce_id, parts: [...], cycles: [...] }
 //   POST/DELETE /api/pub/pin/:announce_id
 //   POST /api/pub/pin/:announce_id/hydrate
+
+// Local shapes for the /api/pub/* contract — this is src/cloud's own surface,
+// distinct from src/lib/api.js's endpoints (which src/types/api.ts covers),
+// so these are typed here rather than appended to the shared barrel.
+export interface PubIdentity { pub: string | null }
+
+export interface PubFollow {
+  pub: string
+  label?: string
+  gateway_url?: string
+}
+
+export type PubAvailabilityStatus = 'on-node' | 'available' | 'stale' | 'unreachable'
+
+export interface PubAvailability {
+  status: PubAvailabilityStatus
+  holders?: number
+  last_verified?: string
+}
+
+export interface PubMeta {
+  name?: string
+  description?: string
+  artifact_kind?: string
+  license?: string
+  // Denormalized display string on a browsed workshop item (e.g. 'mm') —
+  // distinct from PubPublishMetadata.units, which the /publish endpoint
+  // requires as a { length_unit } struct (§23.3.3).
+  units?: string
+  tags?: string[]
+  deprecated?: boolean
+  deprecated_reason?: string
+}
+
+export interface PubWorkshopItem {
+  announce_id: string
+  pub: string
+  meta: PubMeta
+  roots?: unknown
+  ts: string
+  supersedes?: string | null
+  availability: PubAvailability
+  pinned: boolean
+}
+
+export interface PubPublishMetadata {
+  name: string
+  description: string
+  artifact_kind: string
+  license: string
+  units: { length_unit: string }
+  tags: string[]
+}
+
+export interface PubPublishChild {
+  ref_kind: 'pin' | 'track'
+  manifest_root?: string
+  announce_id?: string
+  quantity: number
+}
+
+export interface PubPublishParams {
+  projectId: string
+  metadata: PubPublishMetadata
+  children?: PubPublishChild[]
+}
+
+export interface PubPublishResult { announce_id: string }
+
+export interface PubAssemblyCandidate {
+  announce_id: string
+  name: string
+  kind: string
+}
+
+export interface PubBomPart {
+  ref: string
+  ref_kind: string
+  resolved_announce?: string | null
+  quantity_total: number
+}
+
+export interface PubBomCycle {
+  ref: string
+  ref_kind: string
+  path: string[]
+}
+
+export interface PubBomResult {
+  announce_id: string
+  parts: PubBomPart[]
+  cycles: PubBomCycle[]
+}
+
+export interface PubPinResult {
+  pinned: boolean
+  hydrated: boolean
+  missing_chunks?: number
+  error?: string
+}
+
 export const pub = {
   // GET /api/pub/identity — the local node's Ed25519 publishing keypair,
   // or {pub: null} if one hasn't been created yet.
-  getIdentity() {
-    return request('/api/pub/identity')
+  getIdentity(): Promise<PubIdentity | null> {
+    return request<PubIdentity>('/api/pub/identity')
   },
 
   // POST /api/pub/identity — creates the identity keypair the first time
   // this node publishes. Idempotent-ish from the UI's perspective: callers
   // should check getIdentity() first and only call this from the
   // "create your publishing identity" prompt.
-  createIdentity() {
-    return request('/api/pub/identity', { method: 'POST' })
+  createIdentity(): Promise<PubIdentity | null> {
+    return request<PubIdentity>('/api/pub/identity', { method: 'POST' })
   },
 
   // GET /api/pub/follows — the set of feeds that make up "your workshop".
-  listFollows() {
-    return request('/api/pub/follows')
+  listFollows(): Promise<PubFollow[] | null> {
+    return request<PubFollow[]>('/api/pub/follows')
   },
 
   // POST /api/pub/follows { pub, label, gateway_url } — follow a publisher.
   // Entirely local: no permission needed from the followed identity.
-  addFollow({ pub: pubKey, label, gatewayUrl }) {
-    return request('/api/pub/follows', {
+  addFollow({ pub: pubKey, label, gatewayUrl }: { pub: string; label?: string; gatewayUrl?: string }): Promise<PubFollow | null> {
+    return request<PubFollow>('/api/pub/follows', {
       method: 'POST',
       body: { pub: pubKey, label: label || '', gateway_url: gatewayUrl || '' },
     })
@@ -124,14 +242,14 @@ export const pub = {
 
   // DELETE /api/pub/follows/:pub — unfollow. Local only, changes nothing
   // on the publisher's end.
-  removeFollow(pubKey) {
+  removeFollow(pubKey: string): Promise<null> {
     return request(`/api/pub/follows/${encodeURIComponent(pubKey)}`, { method: 'DELETE' })
   },
 
   // GET /api/pub/workshop — the derived, rebuildable browse index built by
   // crawling followed feeds. Never authoritative; the feeds themselves are.
-  listWorkshop() {
-    return request('/api/pub/workshop')
+  listWorkshop(): Promise<PubWorkshopItem[] | null> {
+    return request<PubWorkshopItem[]>('/api/pub/workshop')
   },
 
   // POST /api/pub/publish { project_id, metadata, children? } -> { announce_id }.
@@ -141,10 +259,11 @@ export const pub = {
   // artifact_kind: "assembly" — an array of { ref_kind: "pin"|"track",
   // manifest_root?, announce_id?, quantity }; pin→manifest_root,
   // track→announce_id. The backend 400s naming any ref it can't resolve.
-  publish({ projectId, metadata, children }) {
-    const body = { project_id: projectId, metadata }
+  publish({ projectId, metadata, children }: PubPublishParams): Promise<PubPublishResult | null> {
+    const body: { project_id: string; metadata: PubPublishMetadata; children?: PubPublishChild[] } =
+      { project_id: projectId, metadata }
     if (children) body.children = children
-    return request('/api/pub/publish', {
+    return request<PubPublishResult>('/api/pub/publish', {
       method: 'POST',
       body,
     })
@@ -155,8 +274,8 @@ export const pub = {
   // "children" picker. v1 only lists announce_ids (usable for `track`
   // children); `pin` children need a manifest_root, which this endpoint
   // doesn't carry, so the UI collects those via free-text entry instead.
-  assemblyCandidates(projectId) {
-    return request(`/api/pub/assembly-candidates/${encodeURIComponent(projectId)}`)
+  assemblyCandidates(projectId: string): Promise<PubAssemblyCandidate[] | null> {
+    return request<PubAssemblyCandidate[]>(`/api/pub/assembly-candidates/${encodeURIComponent(projectId)}`)
   },
 
   // GET /api/pub/bom/:announce_id -> { announce_id,
@@ -165,29 +284,43 @@ export const pub = {
   // The §23.6.3 BOM walk from an assembly-kind announce. A non-empty
   // `cycles` means that subtree's BOM could not be fully computed — the UI
   // must surface it, not silently drop the affected parts.
-  bom(announceId) {
-    return request(`/api/pub/bom/${encodeURIComponent(announceId)}`)
+  bom(announceId: string): Promise<PubBomResult | null> {
+    return request<PubBomResult>(`/api/pub/bom/${encodeURIComponent(announceId)}`)
   },
 
   // POST /api/pub/pin/:announce_id — fetch + durably keep + start serving.
   // Returns { pinned, hydrated, missing_chunks, error? }: `pinned` alone
   // does not mean the bytes are all local — check `hydrated`.
-  pin(announceId) {
-    return request(`/api/pub/pin/${encodeURIComponent(announceId)}`, { method: 'POST' })
+  pin(announceId: string): Promise<PubPinResult | null> {
+    return request<PubPinResult>(`/api/pub/pin/${encodeURIComponent(announceId)}`, { method: 'POST' })
   },
 
   // POST /api/pub/pin/:announce_id/hydrate — retry hydration of a pin that
   // came back incomplete (pinned: true, hydrated: false). Same request/
   // response shape as pin().
-  hydratePin(announceId) {
-    return request(`/api/pub/pin/${encodeURIComponent(announceId)}/hydrate`, { method: 'POST' })
+  hydratePin(announceId: string): Promise<PubPinResult | null> {
+    return request<PubPinResult>(`/api/pub/pin/${encodeURIComponent(announceId)}/hydrate`, { method: 'POST' })
   },
 
   // DELETE /api/pub/pin/:announce_id — stop serving locally. Never implies
   // deletion for other holders (there is no protocol-level takedown).
-  unpin(announceId) {
-    return request(`/api/pub/pin/${encodeURIComponent(announceId)}`, { method: 'DELETE' })
+  unpin(announceId: string): Promise<PubPinResult | null> {
+    return request<PubPinResult>(`/api/pub/pin/${encodeURIComponent(announceId)}`, { method: 'DELETE' })
   },
+}
+
+export interface WakeKeyInfo { public_key: string }
+
+export interface WakePushKeys {
+  p256dh: string
+  auth: string
+}
+
+// Subset of the browser's PushSubscription shape (subscription.toJSON())
+// that the wake endpoints actually read.
+export interface WakeSubscriptionInit {
+  endpoint: string
+  keys: WakePushKeys
 }
 
 // ---- Wake (optional push, docs/distributed-workshop.md's "Wake" section) ----
@@ -202,14 +335,14 @@ export const wake = {
   // a VAPID keypair configured, or throws ApiError(503) when it doesn't
   // (kerf_pub.wake's fail-safe-off posture). Never throws for "not
   // configured" to the caller — see src/lib/wake.js's getWakeKeyInfo().
-  getKey() {
-    return request('/.well-known/dmtap-pub/wake-key', { auth: false })
+  getKey(): Promise<WakeKeyInfo | null> {
+    return request<WakeKeyInfo>('/.well-known/dmtap-pub/wake-key', { auth: false })
   },
 
   // POST /.well-known/dmtap-pub/feed/:pub/subscribe {endpoint, keys} — the
   // exact object browser's PushManager.subscribe() returns, JSON-serialized
   // (subscription.toJSON()).
-  subscribe(pubKey, subscription) {
+  subscribe(pubKey: string, subscription: WakeSubscriptionInit): Promise<null> {
     return request(`/.well-known/dmtap-pub/feed/${encodeURIComponent(pubKey)}/subscribe`, {
       method: 'POST',
       auth: false,
@@ -218,7 +351,7 @@ export const wake = {
   },
 
   // DELETE /.well-known/dmtap-pub/feed/:pub/subscribe {endpoint}
-  unsubscribe(pubKey, endpoint) {
+  unsubscribe(pubKey: string, endpoint: string): Promise<null> {
     return request(`/.well-known/dmtap-pub/feed/${encodeURIComponent(pubKey)}/subscribe`, {
       method: 'DELETE',
       auth: false,
@@ -239,17 +372,91 @@ export const wake = {
 //                            primary_photo_url?, author }],
 //                   limit, total }
 
+export interface LibraryPartRow {
+  file_id: string
+  project_id: string
+  slug?: string
+  name: string
+  manufacturer?: string
+  mpn?: string
+  category?: string
+  primary_photo_url?: string
+  author: string
+}
+
+export interface LibraryListResult {
+  rows: LibraryPartRow[]
+  limit: number
+  total: number
+}
+
+// Superset of LibraryPartRow — the detail row's exact shape isn't finalized
+// (Phase 4 backend handler hasn't landed yet, per the comment below), so the
+// Library-specific extra fields are typed loosely rather than guessed.
+export interface LibraryPartDetail extends LibraryPartRow {
+  content?: {
+    description?: string
+    datasheet_url?: string
+    photos?: string[]
+    distributors?: unknown[]
+  }
+  project_slug?: string
+}
+
+export interface LibrarySubmitResult { id: string }
+
+export interface DerivedArtifactLookupResult {
+  cached: boolean
+  derivedKind: string
+  payload: Uint8Array | null
+  error?: string
+}
+
+export interface DerivedArtifactStoreResult {
+  stored: boolean
+  payloadSize: number
+}
+
+export interface DiffFileResult {
+  componentsAdded: number
+  componentsRemoved: number
+  componentsDelta: number
+  bomTotalDeltaUsd: number | null
+  against: string | null
+}
+
+// Raw wire shapes for the two derived-artifact endpoints and the diff
+// endpoint — snake_case, as the backend sends them, before this file
+// re-cases them into the Result types above. Not exported: callers only
+// see the re-cased shape.
+interface DerivedArtifactLookupBody {
+  cached?: boolean
+  derived_kind?: string
+  payload_b64?: string
+}
+interface DerivedArtifactStoreBody {
+  stored?: boolean
+  payload_size_bytes?: number
+}
+interface DiffFileBody {
+  components_added?: number
+  components_removed?: number
+  components_delta?: number
+  bom_total_delta_usd?: number | string | null
+  against?: string | null
+}
+
 export const library = {
   // GET /api/library/parts?search=&category=&verified_only=
   // All filters are optional; an empty payload returns the
   // verified-first, recently-updated head of the catalog (capped at 100).
-  listParts({ search, category, verifiedOnly } = {}) {
+  listParts({ search, category, verifiedOnly }: { search?: string; category?: string; verifiedOnly?: boolean } = {}): Promise<LibraryListResult | null> {
     const q = new URLSearchParams()
     if (search) q.set('search', search)
     if (category) q.set('category', category)
     if (verifiedOnly) q.set('verified_only', 'true')
     const qs = q.toString()
-    return request(`/api/library/parts${qs ? `?${qs}` : ''}`)
+    return request<LibraryListResult>(`/api/library/parts${qs ? `?${qs}` : ''}`)
   },
 
   // GET /api/library/parts/:slug — single Part detail row. Phase 3 of the
@@ -259,8 +466,8 @@ export const library = {
   // to be a superset of the listParts() row shape: same fields plus the
   // parsed JSON `content` (description, datasheet_url, photos[],
   // distributors[]) and the source project's slug for "view in workshop".
-  getPart(slug) {
-    return request(`/api/library/parts/${encodeURIComponent(slug)}`)
+  getPart(slug: string): Promise<LibraryPartDetail | null> {
+    return request<LibraryPartDetail>(`/api/library/parts/${encodeURIComponent(slug)}`)
   },
 
   // POST /api/library/submissions — manufacturer-PR submission flow
@@ -270,8 +477,8 @@ export const library = {
   // names the curated Library workspace the contribution targets (e.g.
   // 'kerf-system'); `payload` is a Part-shape JSON object with at minimum
   // {name, manufacturer, mpn, category, description}. Returns {id} on 201.
-  submitPart({ targetWorkspaceSlug, payload }) {
-    return request('/api/library/submissions', {
+  submitPart({ targetWorkspaceSlug, payload }: { targetWorkspaceSlug: string; payload: Record<string, unknown> }): Promise<LibrarySubmitResult | null> {
+    return request<LibrarySubmitResult>('/api/library/submissions', {
       method: 'POST',
       body: {
         target_workspace_slug: targetWorkspaceSlug,
@@ -286,10 +493,10 @@ export const library = {
    *  the documented "compile-on-demand-not-yet-wired" miss and is mapped to
    *  {cached:false, ...} (NOT thrown) so callers can fall through. Other
    *  failures (network/auth/4xx) throw an ApiError. */
-  async lookupDerivedArtifact({ projectId, fileId, derivedKind }) {
-    let body
+  async lookupDerivedArtifact({ projectId, fileId, derivedKind }: { projectId: string; fileId: string; derivedKind: string }): Promise<DerivedArtifactLookupResult> {
+    let body: DerivedArtifactLookupBody | null
     try {
-      body = await request(
+      body = await request<DerivedArtifactLookupBody>(
         `/api/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}/derived`,
         { method: 'POST', body: { derived_kind: derivedKind } },
       )
@@ -301,7 +508,7 @@ export const library = {
     }
     const cached = !!(body && body.cached)
     const kind = (body && body.derived_kind) || derivedKind
-    let payload = null
+    let payload: Uint8Array | null = null
     if (cached && body && typeof body.payload_b64 === 'string' && body.payload_b64) {
       try {
         const bin = atob(body.payload_b64)
@@ -324,13 +531,21 @@ export const library = {
    *  decoded payloads at 16 MiB and returns {stored:true, derived_kind,
    *  payload_size_bytes} on 200; non-200s throw ApiError so the caller's
    *  fire-and-forget try/catch can swallow them. */
-  async storeDerivedArtifact({ projectId, fileId, derivedKind, payload }) {
+  async storeDerivedArtifact({ projectId, fileId, derivedKind, payload }: { projectId: string; fileId: string; derivedKind: string; payload: Uint8Array }): Promise<DerivedArtifactStoreResult> {
     if (!(payload instanceof Uint8Array)) {
       throw new TypeError('storeDerivedArtifact: payload must be a Uint8Array')
     }
-    let payloadB64
-    if (typeof Buffer !== 'undefined') {
-      payloadB64 = Buffer.from(payload).toString('base64')
+    // Buffer is a Node global — not part of the browser DOM lib this frontend
+    // targets, and this project has no @types/node. The runtime typeof-guard
+    // below covers both the browser (Vite) and Node (vitest) environments;
+    // reach through globalThis with a narrow structural type for the one
+    // method actually used, rather than pulling in @types/node for it.
+    const nodeBuffer = (globalThis as {
+      Buffer?: { from: (data: Uint8Array) => { toString: (encoding: string) => string } }
+    }).Buffer
+    let payloadB64: string
+    if (nodeBuffer) {
+      payloadB64 = nodeBuffer.from(payload).toString('base64')
     } else {
       // Browser path: btoa over the byte string. Chunk to avoid blowing the
       // call stack on multi-MB payloads (apply()'s arg limit is ~64k on V8).
@@ -341,7 +556,7 @@ export const library = {
       }
       payloadB64 = btoa(bin)
     }
-    const body = await request(
+    const body = await request<DerivedArtifactStoreBody>(
       `/api/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}/derived/store`,
       { method: 'POST', body: { derived_kind: derivedKind, payload_b64: payloadB64 } },
     )
@@ -357,9 +572,9 @@ export const library = {
    *  tooltip (ROADMAP row 68 Phase 3). Returns { componentsAdded, componentsRemoved,
    *  componentsDelta, bomTotalDeltaUsd, against } — re-cased from the snake_case
    *  backend payload. Throws ApiError on non-200. */
-  async diffFile({ projectId, fileId, against }) {
+  async diffFile({ projectId, fileId, against }: { projectId: string; fileId: string; against?: string }): Promise<DiffFileResult> {
     const qs = against ? `?against=${encodeURIComponent(against)}` : ''
-    const body = await request(
+    const body = await request<DiffFileBody>(
       `/api/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}/diff${qs}`,
     )
     return {
@@ -372,6 +587,27 @@ export const library = {
   },
 }
 
+export type LibrarySubmissionStatus = 'pending' | 'approved' | 'rejected'
+
+// The submissions queue row's full shape isn't documented beyond id/status
+// in the source comments — `[key: string]: unknown` covers the remaining
+// fields (payload, target_workspace_slug, submitted_by, etc.) without
+// guessing at a shape this slice doesn't own.
+export interface AdminLibrarySubmission {
+  id: string
+  status: LibrarySubmissionStatus
+  [key: string]: unknown
+}
+
+export interface AdminLibrarySubmissionsPage {
+  submissions: AdminLibrarySubmission[]
+  page: number
+  page_size: number
+  has_more: boolean
+}
+
+export type LibrarySubmissionAction = 'approve' | 'reject'
+
 // ---- Admin: Library submissions queue ----
 // Library Phase 3 (ROADMAP row 73). All routes require account_role='admin'
 // or 'system' — the backend re-checks on every endpoint, the frontend just
@@ -379,24 +615,47 @@ export const library = {
 export const adminLibrary = {
   // GET /api/admin/library/submissions?status=pending&page=&page_size=
   // → { submissions: [...], page, page_size, has_more }
-  listSubmissions: ({ status = 'pending', page = 1, pageSize } = {}) => {
+  listSubmissions: ({ status = 'pending', page = 1, pageSize }: { status?: string; page?: number; pageSize?: number } = {}): Promise<AdminLibrarySubmissionsPage | null> => {
     const q = new URLSearchParams()
     if (status) q.set('status', status)
     if (page) q.set('page', String(page))
     if (pageSize) q.set('page_size', String(pageSize))
     const qs = q.toString()
-    return request(`/api/admin/library/submissions${qs ? `?${qs}` : ''}`)
+    return request<AdminLibrarySubmissionsPage>(`/api/admin/library/submissions${qs ? `?${qs}` : ''}`)
   },
 
   // PUT /api/admin/library/submissions/:id { action, review_note }
   // action ∈ 'approve'|'reject'. On approve, the payload is copied as a new
   // kind='part' file in the target workspace's library project.
-  reviewSubmission: (id, { action, reviewNote }) =>
+  reviewSubmission: (id: string, { action, reviewNote }: { action: LibrarySubmissionAction; reviewNote?: string }): Promise<null> =>
     request(`/api/admin/library/submissions/${encodeURIComponent(id)}`, {
       method: 'PUT',
       body: { action, review_note: reviewNote || '' },
     }),
 }
+
+export interface GitRemote {
+  name: string
+  url: string
+}
+
+export interface GitStatus {
+  initialized: boolean
+  branch: string
+  dirty: boolean
+  ahead: number
+  behind: number
+  remotes: GitRemote[]
+}
+
+export interface GitCommitEntry {
+  sha: string
+  message: string
+  author: string
+  ts: string
+}
+
+export interface GitCommitResult { sha: string }
 
 // ---- Git ----
 // Local git only, per decisions.md's 2026-07-17 "local git only; no OAuth"
@@ -409,54 +668,54 @@ export const adminLibrary = {
 export const git = {
   // GET /api/git/:pid/status
   // -> { initialized, branch, dirty, ahead, behind, remotes: [{name,url}] }
-  status: (projectId) =>
-    request(`/api/git/${encodeURIComponent(projectId)}/status`),
+  status: (projectId: string): Promise<GitStatus | null> =>
+    request<GitStatus>(`/api/git/${encodeURIComponent(projectId)}/status`),
 
   // POST /api/git/:pid/init — create an empty local repo for the project.
-  init: (projectId) =>
-    request(`/api/git/${encodeURIComponent(projectId)}/init`, { method: 'POST' }),
+  init: (projectId: string): Promise<GitStatus | null> =>
+    request<GitStatus>(`/api/git/${encodeURIComponent(projectId)}/init`, { method: 'POST' }),
 
   // POST /api/git/:pid/commit { message } -> { sha }. Stages + commits
   // everything in the working tree.
-  commit: (projectId, message) =>
-    request(`/api/git/${encodeURIComponent(projectId)}/commit`, {
+  commit: (projectId: string, message: string): Promise<GitCommitResult | null> =>
+    request<GitCommitResult>(`/api/git/${encodeURIComponent(projectId)}/commit`, {
       method: 'POST',
       body: { message },
     }),
 
   // GET /api/git/:pid/log?limit=50 -> [{ sha, message, author, ts }]
-  log: (projectId, limit = 50) => {
+  log: (projectId: string, limit = 50): Promise<GitCommitEntry[] | null> => {
     const q = new URLSearchParams()
     if (limit) q.set('limit', String(limit))
-    return request(`/api/git/${encodeURIComponent(projectId)}/log?${q.toString()}`)
+    return request<GitCommitEntry[]>(`/api/git/${encodeURIComponent(projectId)}/log?${q.toString()}`)
   },
 
   // GET /api/git/:pid/remotes -> [{ name, url }]
-  listRemotes: (projectId) =>
-    request(`/api/git/${encodeURIComponent(projectId)}/remotes`),
+  listRemotes: (projectId: string): Promise<GitRemote[] | null> =>
+    request<GitRemote[]>(`/api/git/${encodeURIComponent(projectId)}/remotes`),
 
   // POST /api/git/:pid/remotes { name, url } — add (or update) a remote.
-  addRemote: (projectId, name, url) =>
-    request(`/api/git/${encodeURIComponent(projectId)}/remotes`, {
+  addRemote: (projectId: string, name: string, url: string): Promise<GitRemote | null> =>
+    request<GitRemote>(`/api/git/${encodeURIComponent(projectId)}/remotes`, {
       method: 'POST',
       body: { name, url },
     }),
 
   // DELETE /api/git/:pid/remotes/:name
-  removeRemote: (projectId, name) =>
+  removeRemote: (projectId: string, name: string): Promise<null> =>
     request(`/api/git/${encodeURIComponent(projectId)}/remotes/${encodeURIComponent(name)}`, {
       method: 'DELETE',
     }),
 
   // POST /api/git/:pid/push { remote, branch }
-  push: (projectId, remote, branch) =>
+  push: (projectId: string, remote: string, branch: string): Promise<null> =>
     request(`/api/git/${encodeURIComponent(projectId)}/push`, {
       method: 'POST',
       body: { remote, branch },
     }),
 
   // POST /api/git/:pid/pull { remote, branch }
-  pull: (projectId, remote, branch) =>
+  pull: (projectId: string, remote: string, branch: string): Promise<null> =>
     request(`/api/git/${encodeURIComponent(projectId)}/pull`, {
       method: 'POST',
       body: { remote, branch },

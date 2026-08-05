@@ -26,9 +26,10 @@ import {
   IdentityStep, IdentityCreatedStep, MetadataStep, ConfirmStep, SuccessStep,
   ChildrenStep, emptyChildRow, isChildRowValid, buildChildrenPayload,
 } from '../PublishButton.jsx'
+import type { ChildRow } from '../PublishButton.jsx'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const publishSrc = readFileSync(join(__dirname, '../PublishButton.jsx'), 'utf8')
+const publishSrc = readFileSync(join(__dirname, '../PublishButton.tsx'), 'utf8')
 
 const emptyForm = {
   name: '', description: '', kind: 'part', units: 'mm',
@@ -160,7 +161,7 @@ describe('emptyChildRow / isChildRowValid / buildChildrenPayload', () => {
   })
 
   it('builds the exact publish payload shape: track sends announce_id, pin sends manifest_root', () => {
-    const rows = [
+    const rows: ChildRow[] = [
       { refKind: 'track', announceId: 'ann-child-1', manifestRoot: '', quantity: 2 },
       { refKind: 'pin', announceId: '', manifestRoot: '  root-xyz  ', quantity: '3' },
     ]

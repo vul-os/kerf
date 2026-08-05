@@ -5959,7 +5959,27 @@ Svelte rewrite.
 > weekly-limit error: it had renamed 232 files but carried 373 type errors, concentrated in 38 of
 > them (309 were TS2339). The clean 191 were kept and the rest reverted to `.js`.
 >
-> **Explicitly deferred, pick these up first when T-502 resumes:**
+> **✅ Deferred set completed 2026-08-06** (7 commits, `ed31f0c9`…`1eb5ee15`, cherry-picked as
+> `21041d24` and earlier). `src/lib` is now **201 `.ts` / 79 `.js`**; the remaining `.js` belongs to
+> T-503/T-504/T-505. Verified independently: typecheck 0, typecheck:strict 0, lint ratchet at
+> 78/78, vitest **477 files / 13,192 passed / 22 skipped**, exit 0, zero unhandled.
+>
+> Notable resolutions worth reusing:
+> - **`meshCache`** — `get<T = unknown>(key: string): Promise<MeshCacheEntry<T> | null>`. Generic
+>   because `RenderablePart` lives in `src/store/workspace.ts` and **`src/lib` must not import from
+>   `src/store`**; the store now calls `meshCache.get<RenderablePart>(key)`. One-line change at the
+>   call site, layering preserved. This is the pattern for any `src/lib` module whose element type
+>   is owned by a consumer.
+> - **`stMonacoLanguage`** — root cause was a JSDoc typing `monaco` as the whole
+>   `import('monaco-editor')` namespace, so a 4-method test mock failed against ~20 unrelated
+>   members. Fixed with a purpose-built `MonacoLanguagesLike` typedef rather than an `any` cast.
+> - **`openscadParser`** — typed, but found to be **dead code, unused anywhere in the tree**.
+>   Candidate for deletion in a separate task; not removed here since that is a behaviour change.
+>   `TOKENS` was deliberately left as `Record<string, string>` rather than adding `COLON`/`DOT`/
+>   `TRUE`/`FALSE` keys that some branches compare against — adding them would flip pre-existing
+>   dead branches live, which is a behaviour change, not a migration.
+>
+> **Original deferral list (all now done):**
 > - The 38 erroring files — worst are `openscadParser` (83 errors), `part` (37),
 >   `renderStyles.test` (31). The agent died mid-way through `openscadParser`.
 > - `stMonacoLanguage.test` — passes a mock where real monaco types are required.

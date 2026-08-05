@@ -6226,6 +6226,43 @@ shapes (roundrect) and 3D model links; everything else was corroborated syntheti
   and retained; existing `test_kicad_io.py` still green.
 - **Depends-on:** T-525
 
+#### ✅ DECIDED 2026-08-06 — parser strategy for all of G2
+
+The `kiutils`-is-GPL problem dissolved: **MIT-licensed KiCad parsers were already installed** in
+this repo as transitive tscircuit dependencies. Both carry
+`MIT License, Copyright (c) 2025 tscircuit Inc.` in their LICENSE files; their `package.json`
+`license` field is simply absent, which is why an earlier metadata scan missed them.
+
+| Package | Licence | Relevance |
+|---|---|---|
+| `kicadts` | MIT | Models every KiCad S-expression token as a class; reads **and** emits with deterministic formatting; covers `KicadPcb` incl. zones. Functionally an MIT `kiutils`. |
+| `kicad-to-circuit-json` | MIT | KiCad schematic/PCB → Circuit JSON directly; exports a literal `CollectZonesStage`. |
+| `sexpdata` | BSD-2 | Solid Python S-expression lexer (installed). |
+| `kicadcliwrapper` | MIT | Drives the official `kicad-cli` out-of-process (installed). |
+
+**Decision — the parser stays in Python:**
+
+1. **Python remains authoritative.** All ~20 consumers live there, and `pip install kerf` +
+   `kerf serve` has no Node at runtime (Node is build-time only). A TS-side parser would mean the
+   fab pipeline could not emit KiCad without Node — worse for T-527 than for T-526, since the
+   writer is what fab needs.
+2. **Swap the hand-rolled lexer for `sexpdata`.** Syntax is stable and solved; do not maintain a
+   bespoke tokeniser. T-526's semantic mapping sits above the lexer and is re-attachable, not a
+   rewrite.
+3. **Use `kicadts` as a reference blueprint,** not a dependency — MIT permits consulting and
+   porting its class model with attribution. Which fields each construct carries is the genuinely
+   hard knowledge; do not reverse-engineer it from fixtures.
+4. **Use `kicad-to-circuit-json` as a CI conformance oracle** — a dev-only dependency that converts
+   the same fixture and diffs against our output. This is the answer to the honest weakness that
+   our fixtures are hand-authored: an independent implementation disagreeing is far stronger
+   evidence than a fixture we wrote ourselves. It must be a **declared** dev dependency that fails
+   loudly if absent — never an `importorskip`, which reads as a pass when it silently skips (that
+   exact trap already bit T-550).
+5. **Passthrough bounds the work.** A complete KiCad model is never required: ~16 constructs matter,
+   everything else is retained verbatim and re-emitted.
+
+**No relicensing. No GPL dependency. No Node at runtime.**
+
 ### T-527 — KiCad writer: IR → `.kicad_pcb` / `.kicad_sch` / `.kicad_pro`
 - **Scope:** Emit from the IR, re-injecting passthrough nodes at their recorded positions.
 - **Target files/packages:** `ir/kicad_write.py`; supersedes the emit half of `kicad_io.py` and

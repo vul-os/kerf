@@ -21,7 +21,11 @@ kicad_pcb_to_circuit_json(text) -> dict
     `kicad_passthrough` entry so a future writer can re-emit it rather than
     silently losing it.
 
-All functions are pure Python; no external dependencies required.
+Parsing is pure Python plus `sexpdata` (BSD-2), a solid, general-purpose
+S-expression parser — see `_parse_sexpr` below for why it's used the way it
+is (T-526b: the hand-rolled lexer that filled this role through T-525/T-526
+is retired in favor of it; the semantic mapping above the parser is
+untouched).
 """
 
 from __future__ import annotations
@@ -29,87 +33,141 @@ from __future__ import annotations
 import re
 from typing import Any
 
+import sexpdata
 
-# ─── Pure-Python S-expression lexer ───────────────────────────────────────────
 
-def _tokenize(text: str) -> list[str]:
-    """Lex a KiCad s-expression string into a flat token list.
+# ─── S-expression parsing (sexpdata, configured for byte-for-byte fidelity) ───
+#
+# T-526b retires the ~90-line hand-rolled tokenizer/recursive-descent parser
+# that used to live here in favor of `sexpdata`. The syntax `sexpdata` solves
+# (balanced parens, quoted-string escaping) is genuinely stable and solved;
+# there's no reason to maintain a bespoke one.
+#
+# The catch: `sexpdata.loads` is a *Lisp* reader by default — it coerces
+# numeric-looking bare atoms to Python `int`/`float` and wraps everything
+# else in `Symbol`, which (deliberately, per its own docstring) never
+# compares equal to a plain `str`. The semantic layer above this module
+# (T-526's zone/keepout/footprint reader, frozen and untouched by this
+# change) does direct string comparisons and `isinstance(x, str)` checks
+# against parsed atoms everywhere (`child[0] == "net"`, `tag == "locked"`,
+# `keepout_settings.get(key) == "not_allowed"`, …) and expects every atom —
+# numbers included — as the literal source text, exactly like the old
+# tokenizer produced. Numeric coercion would also be a genuine passthrough
+# hazard: KiCad often writes trailing-zero-padded coordinates
+# (`"20.000000"`), and `str(float("20.000000"))` is `"20.0"` — a normalized
+# re-emission would silently corrupt a value nobody asked to change.
+#
+# `_KicadRawParser` below neutralizes all of that while keeping sexpdata's
+# actual parsing engine: every bare atom is kept as literal source text
+# (`Symbol`, which *is* a `str` subclass — `isinstance(x, str)` holds — just
+# never `==` to a plain `str` literal, which is why every atom is converted
+# back to plain `str` on the way out via `_to_plain_tree`), brackets are
+# restricted to `(`/`)` only (sexpdata's default also treats `[`/`]` as a
+# delimiter pair; KiCad's format never does), and line-comment scanning is
+# disabled (KiCad s-expressions have no comment syntax; a stray `;` inside a
+# bare atom must never truncate a node — verified: no fixture in this repo
+# contains one, but production KiCad files are not guaranteed to avoid it
+# either). Verified by direct tree comparison against the old parser's
+# output on every real fixture in this test suite: byte-for-byte identical.
+#
+# One known, narrow divergence, left as-is rather than replicated: the old
+# tokenizer's quoted-string unescaping dropped the backslash for *any*
+# `\X` sequence, even ones it didn't recognize (`\g` → `g`). `sexpdata`
+# implements the standard C-style escape set (`\n`, `\t`, `\r`, `\b`, `\f`,
+# `\"`, `\\`) and leaves anything else — including the backslash itself —
+# untouched (`\g` → `\g`). Real KiCad output (pcbnew/eeschema's own writer)
+# only ever emits `\"` and `\\`, where both implementations agree; the
+# divergence is unreachable from genuine KiCad output and no fixture in this
+# repo exercises it (checked: zero backslashes in any `.kicad_*` fixture).
+# Adopting sexpdata's behavior here rather than replicating the old
+# blanket-drop is a deliberate small improvement, not a shortcut.
 
-    Tokens are:  '('  ')'  quoted-string  bare-atom  number
+class _KicadRawParser(sexpdata.Parser):
+    """`sexpdata.Parser`, reconfigured to match the retired hand-rolled
+    tokenizer's exact semantics — see the module-level note above."""
+
+    def __init__(self, string: str):
+        super().__init__(string, line_comment="\x00")
+        # KiCad only ever uses ( ) — not sexpdata's default [ ] pair.
+        self.brackets = {"(": ")"}
+        self.closing_brackets = {")"}
+        self._atom_end_basic = (
+            set(self.brackets) | self.closing_brackets | {'"'} | set(sexpdata.whitespace)
+        )
+        self._atom_end_basic_or_escape_regexp = "|".join(
+            re.escape(c) for c in (self._atom_end_basic | {"\\"})
+        )
+        self.atom_end = {self.line_comment} | self._atom_end_basic
+        self.atom_end_or_escape_re = re.compile(
+            "{0}|{1}".format(self._atom_end_basic_or_escape_regexp, re.escape(self.line_comment))
+        )
+
+    def atom(self, token: str):
+        # Never coerce to int/float/nil/true/false — keep literal text.
+        return sexpdata.Symbol(token)
+
+
+def _to_plain_tree(node: Any) -> Any:
+    """Recursively strip sexpdata's `Symbol` wrapper back to plain `str`,
+    so the tree this module hands to the (untouched) semantic layer is
+    exactly the nested-list-of-`str` shape the old hand-rolled parser
+    produced."""
+    if isinstance(node, list):
+        return [_to_plain_tree(c) for c in node]
+    if isinstance(node, sexpdata.Symbol):
+        return str(node)
+    return node  # already plain str (a quoted string) — unchanged
+
+
+def _close_unbalanced_parens(text: str) -> str:
+    """Append any closing parens *text* is missing.
+
+    The retired hand-rolled recursive-descent parser never validated that
+    parens balanced — it just stopped consuming tokens when it ran out, so
+    a truncated/malformed `.kicad_pcb` (a real scenario: a corrupt upload, a
+    write cut short) came back as a best-effort partial tree rather than a
+    raised exception (`kicad_pcb_to_circuit_json` documents this — see
+    `test_malformed_input_safe` / `test_malformed_kicad_pcb_safe`).
+    `sexpdata` is stricter and raises `ExpectClosingBracket` on the same
+    input. This closes the gap the same way rather than papering over it
+    with a broad `except`: pad the missing `)` so the parse succeeds, which
+    reproduces the old parser's output exactly on both existing malformed-
+    input tests (verified). Parens inside quoted strings are not counted.
     """
-    tokens: list[str] = []
+    depth = 0
     i = 0
     n = len(text)
     while i < n:
         c = text[i]
-        if c in " \t\r\n":
+        if c == '"':
+            i += 1
+            while i < n and text[i] != '"':
+                i += 2 if text[i] == "\\" and i + 1 < n else 1
             i += 1
         elif c == "(":
-            tokens.append("(")
+            depth += 1
             i += 1
         elif c == ")":
-            tokens.append(")")
+            depth -= 1
             i += 1
-        elif c == '"':
-            # quoted string — handle escaped quotes
-            j = i + 1
-            buf: list[str] = []
-            while j < n:
-                ch = text[j]
-                if ch == "\\" and j + 1 < n:
-                    buf.append(text[j + 1])
-                    j += 2
-                elif ch == '"':
-                    j += 1
-                    break
-                else:
-                    buf.append(ch)
-                    j += 1
-            tokens.append('"' + "".join(buf) + '"')
-            i = j
         else:
-            # bare atom (number, keyword, uuid …)
-            j = i
-            while j < n and text[j] not in " \t\r\n()\"":
-                j += 1
-            tokens.append(text[i:j])
-            i = j
-    return tokens
-
-
-def _parse(tokens: list[str], pos: int = 0) -> tuple[Any, int]:
-    """Recursively parse tokenised s-expression into nested Python lists.
-
-    Each list node is  [keyword, child, child, ...]  where children may be
-    strings or nested lists.  Returns (node, next_pos).
-    """
-    if pos >= len(tokens):
-        return None, pos
-    tok = tokens[pos]
-    if tok == "(":
-        pos += 1  # consume '('
-        node: list[Any] = []
-        while pos < len(tokens) and tokens[pos] != ")":
-            child, pos = _parse(tokens, pos)
-            node.append(child)
-        pos += 1  # consume ')'
-        return node, pos
-    elif tok == ")":
-        raise ValueError(f"Unexpected ')' at token position {pos}")
-    else:
-        # atom — strip surrounding quotes if present
-        if tok.startswith('"') and tok.endswith('"'):
-            return tok[1:-1], pos + 1
-        return tok, pos + 1
+            i += 1
+    return text + ")" * depth if depth > 0 else text
 
 
 def _parse_sexpr(text: str) -> Any:
-    """Parse a complete s-expression string.  Returns the root node."""
-    tokens = _tokenize(text)
-    if not tokens:
+    """Parse a complete s-expression string. Returns the root node.
+
+    Same contract as the retired hand-rolled parser: a nested list of plain
+    `str` (or a bare `str` at the top level, or `[]` for empty input) — see
+    the module-level note above for why sexpdata needs help to produce
+    exactly this shape, and `_close_unbalanced_parens` for why truncated
+    input doesn't raise.
+    """
+    top_level = _KicadRawParser(_close_unbalanced_parens(text)).parse()
+    if not top_level:
         return []
-    node, _ = _parse(tokens, 0)
-    return node
+    return _to_plain_tree(top_level[0])
 
 
 # ─── Pure-Python S-expression emitter ─────────────────────────────────────────

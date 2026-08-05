@@ -21,7 +21,6 @@ import os
 import unittest
 
 from kerf_electronics.kicad_io import (
-    _tokenize,
     _parse_sexpr,
     circuit_json_to_kicad_pcb,
     circuit_json_to_kicad_sch,
@@ -38,34 +37,44 @@ with open(_FIXTURE_PATH, encoding="utf-8") as _f:
 
 
 # ─── Lexer tests ──────────────────────────────────────────────────────────────
+#
+# T-526b retired the hand-rolled `_tokenize`/flat-token-list lexer in favor
+# of `sexpdata`, which parses straight to a tree with no separate token-list
+# stage to test. These cases now exercise the same lexer-level concerns
+# (bare atoms, quoted strings, escaping, nesting, paren balance) directly
+# through `_parse_sexpr`'s tree output, which is verified byte-for-byte
+# identical to what the old tokenizer+parser pair produced.
 
-class TestTokenize(unittest.TestCase):
+class TestParseSexprLexing(unittest.TestCase):
 
     def test_empty_string(self):
-        self.assertEqual(_tokenize(""), [])
+        self.assertEqual(_parse_sexpr(""), [])
 
-    def test_parens(self):
-        self.assertEqual(_tokenize("()"), ["(", ")"])
+    def test_empty_parens(self):
+        self.assertEqual(_parse_sexpr("()"), [])
 
     def test_bare_atoms(self):
-        tokens = _tokenize("(kicad_pcb version 1)")
-        self.assertEqual(tokens, ["(", "kicad_pcb", "version", "1", ")"])
+        node = _parse_sexpr("(kicad_pcb version 1)")
+        self.assertEqual(node, ["kicad_pcb", "version", "1"])
+
+    def test_bare_atom_not_numerically_coerced(self):
+        # A real passthrough-fidelity requirement: "1" must stay the string
+        # "1", not become the int 1 — see kicad_io.py's module docstring.
+        node = _parse_sexpr("(width 20.000000)")
+        self.assertEqual(node[1], "20.000000")
+        self.assertIsInstance(node[1], str)
 
     def test_quoted_string(self):
-        tokens = _tokenize('(name "hello world")')
-        self.assertIn('"hello world"', tokens)
+        node = _parse_sexpr('(name "hello world")')
+        self.assertEqual(node[1], "hello world")
 
     def test_escaped_quote_in_string(self):
-        tokens = _tokenize(r'(x "a\"b")')
-        # The atom for the quoted string should contain the raw inner text
-        quoted = [t for t in tokens if t.startswith('"')]
-        self.assertEqual(len(quoted), 1)
-        self.assertIn("a", quoted[0])
+        node = _parse_sexpr(r'(x "a\"b")')
+        self.assertEqual(node[1], 'a"b')
 
     def test_nested(self):
-        tokens = _tokenize("(a (b c) d)")
-        self.assertEqual(tokens.count("("), 2)
-        self.assertEqual(tokens.count(")"), 2)
+        node = _parse_sexpr("(a (b c) d)")
+        self.assertEqual(node, ["a", ["b", "c"], "d"])
 
 
 class TestParseSexpr(unittest.TestCase):

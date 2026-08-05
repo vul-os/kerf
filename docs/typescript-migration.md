@@ -47,20 +47,33 @@ Re-measure before claiming a delta. Do not quote these numbers as current.
 
 ## Agent worktree base — read before launching a slice agent
 
-Agent worktrees branch from **`main`**, not from whatever integration branch you happen to be on.
-Two T-502/T-508 runs were launched against a base with no `tsconfig.json` and no `src/types/`,
-detected it, and correctly stopped without touching anything.
+Agent worktrees are **not reliably created from the current tip.** Observed behaviour: some
+worktrees branch from the live integration tip, others from the commit that was `HEAD` when the
+session started — even when `main` is well ahead of it. Three separate slice runs were launched
+against a base with no `tsconfig.json` and no `src/types/`.
 
-**Rule:** after a slice is verified green, fast-forward `main` so the next worktree inherits it.
-**Every slice prompt must open with a base check** that stops the agent if the foundation is absent:
+**Do not rely on the worktree's base being right. Have the agent fix it.** Because all worktrees
+share one repository, every branch ref is visible from inside them, so an agent can self-heal.
+Open every slice prompt with:
 
 ```
-ls tsconfig.json tsconfig.strict.json        # T-500
-ls src/types/index.ts src/types/geometry.ts  # T-501
+git merge main --no-edit                      # main is the integration branch and is ahead
+ls tsconfig.json tsconfig.strict.json         # T-500
+ls src/types/index.ts src/types/geometry.ts   # T-501
+ls scripts/lint-ts-ratchet.mjs                # the lint gate
 ```
 
-A cheap guard at the top of a prompt is worth far more than a late failure — it converted two
-wasted runs into two clean two-minute no-ops.
+The merge is a fast-forward whenever the stale base is an ancestor of `main`, which it has been in
+every case so far. Instruct the agent to **stop and report** if it is *not* a fast-forward, or if a
+path is still missing afterwards — that would mean the repo is not in the expected state, and
+building on it would be worse than pausing.
+
+**Corollary rule:** after any slice is verified green, fast-forward `main` immediately. `main` is
+the integration branch that worktrees heal against, so a stale `main` breaks every subsequent
+agent.
+
+The cheap base check at the top of a prompt has already converted three would-be wasted runs into
+clean sub-minute no-ops. It earns its lines.
 
 ## Known traps when verifying a slice
 

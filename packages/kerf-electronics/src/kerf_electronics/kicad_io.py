@@ -12,6 +12,14 @@ kicad_pcb_to_circuit_json(text) -> dict
     Parse a .kicad_pcb string and return a Circuit-JSON list.
     Round-trip guarantee: component refs, net names, and footprint names
     survive a circuit_json → kicad_pcb → circuit_json cycle.
+    Additionally recovers (T-526): copper zones as `pcb_copper_pour` (net-bound)
+    or `pcb_ground_plane` (no-net fill), zone-level keepouts as `pcb_keepout`
+    with per-restriction-type flags, free-floating `gr_text` as `pcb_text`,
+    the `locked` flag on footprints/zones, and KiCad footprint `attr` flags.
+    Anything else at the top level that this reader does not model (groups,
+    dimensions, vias, other graphic items) is retained verbatim in a single
+    `kicad_passthrough` entry so a future writer can re-emit it rather than
+    silently losing it.
 
 All functions are pure Python; no external dependencies required.
 """
@@ -200,10 +208,48 @@ def _index_by(items: list[dict], key: str) -> dict[str, dict]:
     return {item[key]: item for item in items if key in item}
 
 
+def _find_child(node: list, tag: str) -> list | None:
+    """Return the first child of *node* (an s-expr list) whose tag matches, or None."""
+    for child in node[1:]:
+        if isinstance(child, list) and child and child[0] == tag:
+            return child
+    return None
+
+
+def _parse_pts(pts_node: list) -> list[dict]:
+    """Parse a KiCad `(pts (xy x y) (xy x y) ...)` node into [{x, y}, ...].
+
+    KiCad v7 zone outlines can also carry `(arc (start ..)(mid ..)(end ..))`
+    segments inside `pts`; those are approximated by their endpoint rather
+    than tessellated, since Kerf's polygon shapes are straight-edge only.
+    """
+    points: list[dict] = []
+    if not isinstance(pts_node, list):
+        return points
+    for child in pts_node[1:]:
+        if not isinstance(child, list) or not child:
+            continue
+        if child[0] == "xy" and len(child) >= 3:
+            try:
+                points.append({"x": float(child[1]), "y": float(child[2])})
+            except (ValueError, TypeError):
+                continue
+        elif child[0] == "arc":
+            end = _find_child(child, "end")
+            if end and len(end) >= 3:
+                try:
+                    points.append({"x": float(end[1]), "y": float(end[2])})
+                except (ValueError, TypeError):
+                    continue
+    return points
+
+
 # KiCad layer name mapping (Circuit JSON layer → KiCad canonical name)
 _CJ_TO_KICAD_LAYER: dict[str, str] = {
     "top_copper":    "F.Cu",
     "bottom_copper": "B.Cu",
+    "inner_1":       "In1.Cu",
+    "inner_2":       "In2.Cu",
     "top_silkscreen": "F.SilkS",
     "bottom_silkscreen": "B.SilkS",
     "top_mask":      "F.Mask",
@@ -237,6 +283,13 @@ _KICAD_PCB_LAYERS = [
     (48, "B.Fab",      "user"),
     (49, "F.Fab",      "user"),
 ]
+
+# Top-level `.kicad_pcb` node tags with dedicated semantic handling in
+# kicad_pcb_to_circuit_json, and ones that are purely structural/boilerplate
+# (re-derived on write, not meaningfully "lost" on read). Anything else is
+# swept into the `kicad_passthrough` bag — see below.
+_KICAD_HANDLED_TOP_TAGS = {"net", "footprint", "segment", "zone", "gr_text"}
+_KICAD_IGNORED_TOP_TAGS = {"version", "generator", "general", "paper", "layers", "setup", "host"}
 
 
 # ─── circuit_json_to_kicad_pcb ─────────────────────────────────────────────────
@@ -558,6 +611,198 @@ def circuit_json_to_kicad_sch(circuit_json: list) -> str:
     return root.render(0)
 
 
+# ─── zone / keepout parsing (T-526) ────────────────────────────────────────────
+#
+# KiCad's `(zone ...)` node covers three Circuit-JSON-shaped concepts depending
+# on its contents:
+#   - a `(keepout ...)` child  -> `pcb_keepout` (rule area, no copper poured)
+#   - a net-bound zone         -> `pcb_copper_pour` (Kerf's existing shape,
+#                                  consumed by tools/pour.py, fab/gerber.py,
+#                                  fab/odbpp/writer.py, src/lib/copperPour.js)
+#   - a no-net catch-all zone  -> `pcb_ground_plane` (net index 0 / empty
+#                                  net_name — KiCad's own signal for a
+#                                  fill-everywhere plane rather than a
+#                                  specific-net pour)
+#
+# Anything inside the zone this reader does not model (e.g. `filled_polygon`
+# regions computed by KiCad's fill engine, `hatch`, `name`) is preserved
+# verbatim under `_kicad_passthrough` on the emitted dict rather than dropped.
+
+def _parse_zone_node(node: list, pour_idx: int, keepout_idx: int) -> dict:
+    """Parse one `(zone ...)` s-expr node into a Circuit-JSON dict.
+
+    Returns a `pcb_keepout`, `pcb_copper_pour`, or `pcb_ground_plane` dict.
+    *pour_idx*/*keepout_idx* are only used to synthesize a stable id when the
+    zone carries no `tstamp`/`uuid`.
+    """
+    net_idx = 0
+    net_name = ""
+    layer_kicad: str | None = None
+    priority: int | None = None
+    clearance_mm: float | None = None
+    min_thickness_mm: float | None = None
+    thermal_gap: float | None = None
+    thermal_bridge_width: float | None = None
+    locked = False
+    keepout_settings: dict[str, str] | None = None
+    outline_pts: list[dict] = []
+    tstamp = ""
+    passthrough: list = []
+
+    for child in node[1:]:
+        if not isinstance(child, list) or not child:
+            if child == "locked":
+                locked = True
+            continue
+        tag = child[0]
+
+        if tag == "net" and len(child) >= 2:
+            try:
+                net_idx = int(child[1])
+            except (ValueError, TypeError):
+                pass
+        elif tag == "net_name" and len(child) >= 2:
+            net_name = child[1] if isinstance(child[1], str) else ""
+        elif tag in ("layer", "layers") and len(child) >= 2:
+            # `layers` (KiCad 7 multi-layer zone) — take the first; the rest
+            # is preserved via passthrough below since we only model one.
+            layer_kicad = child[1] if isinstance(child[1], str) else None
+            if tag == "layers" and len(child) > 2:
+                passthrough.append(child)
+        elif tag == "priority" and len(child) >= 2:
+            try:
+                priority = int(child[1])
+            except (ValueError, TypeError):
+                pass
+        elif tag == "locked":
+            locked = True
+        elif tag in ("tstamp", "uuid") and len(child) >= 2:
+            tstamp = child[1] if isinstance(child[1], str) else ""
+        elif tag == "connect_pads":
+            clr = _find_child(child, "clearance")
+            if clr and len(clr) >= 2:
+                try:
+                    clearance_mm = float(clr[1])
+                except (ValueError, TypeError):
+                    pass
+        elif tag == "min_thickness" and len(child) >= 2:
+            try:
+                min_thickness_mm = float(child[1])
+            except (ValueError, TypeError):
+                pass
+        elif tag == "keepout":
+            keepout_settings = {}
+            for ko_child in child[1:]:
+                if isinstance(ko_child, list) and len(ko_child) >= 2:
+                    keepout_settings[ko_child[0]] = ko_child[1]
+        elif tag == "fill":
+            for f_child in child[1:]:
+                if not isinstance(f_child, list) or not f_child:
+                    continue
+                if f_child[0] == "thermal_gap" and len(f_child) >= 2:
+                    try:
+                        thermal_gap = float(f_child[1])
+                    except (ValueError, TypeError):
+                        pass
+                elif f_child[0] == "thermal_bridge_width" and len(f_child) >= 2:
+                    try:
+                        thermal_bridge_width = float(f_child[1])
+                    except (ValueError, TypeError):
+                        pass
+                else:
+                    passthrough.append(f_child)
+        elif tag == "polygon":
+            pts_node = _find_child(child, "pts")
+            if pts_node:
+                outline_pts = _parse_pts(pts_node)
+        else:
+            # filled_polygon (computed fill regions), hatch, name, etc. — keep
+            # verbatim rather than silently dropping.
+            passthrough.append(child)
+
+    layer_cj = _KICAD_TO_CJ_LAYER.get(layer_kicad, layer_kicad) if layer_kicad else None
+
+    if keepout_settings is not None:
+        def _not_allowed(key: str) -> bool:
+            return keepout_settings.get(key) == "not_allowed"
+
+        result: dict[str, Any] = {
+            "type": "pcb_keepout",
+            "pcb_keepout_id": tstamp or f"keepout_{keepout_idx}",
+            "layer": layer_cj,
+            "polygon": outline_pts,
+            "shape": "polygon",
+            "no_routing": _not_allowed("tracks"),
+            "no_components": _not_allowed("footprints"),
+            "no_tracks": _not_allowed("tracks"),
+            "no_vias": _not_allowed("vias"),
+            "no_pads": _not_allowed("pads"),
+            "no_copperpour": _not_allowed("copperpour"),
+            "no_footprints": _not_allowed("footprints"),
+        }
+    elif net_name:
+        result = {
+            "type": "pcb_copper_pour",
+            "pcb_copper_pour_id": tstamp or f"pour_{pour_idx}",
+            "layer": layer_cj,
+            "net_id": net_name,
+            "net_index": net_idx,
+            "polygon": outline_pts,
+        }
+    else:
+        result = {
+            "type": "pcb_ground_plane",
+            "pcb_ground_plane_id": tstamp or f"gndplane_{pour_idx}",
+            "layer": layer_cj,
+            "polygon": outline_pts,
+        }
+
+    if keepout_settings is None:
+        # Fill settings only apply to copper pours / ground planes, not
+        # keepouts (which never fill).
+        if priority is not None:
+            result["priority"] = priority
+        if clearance_mm is not None:
+            result["clearance_mm"] = clearance_mm
+        if min_thickness_mm is not None:
+            result["min_thickness_mm"] = min_thickness_mm
+        thermal_relief: dict[str, float] = {}
+        if thermal_gap is not None:
+            thermal_relief["gap"] = thermal_gap
+        if thermal_bridge_width is not None:
+            thermal_relief["spoke_width"] = thermal_bridge_width
+        if thermal_relief:
+            result["thermal_relief"] = thermal_relief
+
+    if locked:
+        result["locked"] = True
+    if passthrough:
+        result["_kicad_passthrough"] = passthrough
+
+    return result
+
+
+def _parse_footprint_attr(child: list) -> dict[str, bool]:
+    """Parse a footprint `(attr smd exclude_from_pos_files ...)` node.
+
+    KiCad encodes the mount type (`smd` / `through_hole` / `virtual`) and up
+    to five independent boolean flags as sibling bare atoms of one `attr`
+    node. Circuit JSON's `KicadFootprintAttributes` models four of the six
+    flags; `board_only` and `allow_missing_courtyard` are carried too since
+    they cost nothing extra as plain dict keys, but are beyond that type's
+    declared schema.
+    """
+    flags = {str(a) for a in child[1:] if not isinstance(a, list)}
+    return {
+        "smd": "smd" in flags,
+        "through_hole": "through_hole" in flags,
+        "exclude_from_pos_files": "exclude_from_pos_files" in flags,
+        "exclude_from_bom": "exclude_from_bom" in flags,
+        "allow_missing_courtyard": "allow_missing_courtyard" in flags,
+        "board_only": "board_only" in flags,
+    }
+
+
 # ─── kicad_pcb_to_circuit_json ─────────────────────────────────────────────────
 
 def kicad_pcb_to_circuit_json(text: str) -> list:
@@ -620,9 +865,13 @@ def kicad_pcb_to_circuit_json(text: str) -> list:
         rot = 0.0
         layer_kicad = "F.Cu"
         tstamp = ""
+        locked = False
+        fp_attrs: dict[str, bool] | None = None
 
         for child in node[2:]:
             if not isinstance(child, list) or not child:
+                if child == "locked":
+                    locked = True
                 continue
             tag = child[0]
 
@@ -640,6 +889,12 @@ def kicad_pcb_to_circuit_json(text: str) -> list:
 
             elif tag == "tstamp" and len(child) >= 2:
                 tstamp = child[1] if isinstance(child[1], str) else ""
+
+            elif tag == "locked":
+                locked = True
+
+            elif tag == "attr":
+                fp_attrs = _parse_footprint_attr(child)
 
             elif tag == "fp_text" and len(child) >= 3:
                 kind = child[1]
@@ -666,7 +921,7 @@ def kicad_pcb_to_circuit_json(text: str) -> list:
 
         layer_cj = _KICAD_TO_CJ_LAYER.get(layer_kicad, "top_copper")
         pcb_cid = tstamp if tstamp else f"pcb_{_slugify(ref)}_{pcb_comp_index}"
-        cj.append({
+        pcb_comp: dict[str, Any] = {
             "type": "pcb_component",
             "pcb_component_id": pcb_cid,
             "source_component_id": scid,
@@ -674,7 +929,12 @@ def kicad_pcb_to_circuit_json(text: str) -> list:
             "y": y,
             "rotation": rot,
             "layer": layer_cj,
-        })
+        }
+        if locked:
+            pcb_comp["locked"] = True
+        if fp_attrs is not None:
+            pcb_comp["kicad_footprint_attributes"] = fp_attrs
+        cj.append(pcb_comp)
         pcb_comp_index += 1
 
     # ── Segments ──────────────────────────────────────────────────────────────
@@ -762,6 +1022,77 @@ def kicad_pcb_to_circuit_json(text: str) -> list:
                 "connected_source_port_ids": [],
                 "connected_source_net_ids": net_ids,
             })
+
+    # ── Zones: copper pours, ground planes, keepouts ─────────────────────────
+    pour_idx = 0
+    keepout_idx = 0
+    for node in nodes:
+        if not isinstance(node, list) or not node or node[0] != "zone":
+            continue
+        zone_cj = _parse_zone_node(node, pour_idx, keepout_idx)
+        if zone_cj["type"] == "pcb_keepout":
+            keepout_idx += 1
+        else:
+            pour_idx += 1
+        cj.append(zone_cj)
+
+    # ── Free-floating board text (gr_text) ───────────────────────────────────
+    text_idx = 0
+    for node in nodes:
+        if not isinstance(node, list) or not node or node[0] != "gr_text":
+            continue
+        text = node[1] if len(node) > 1 and isinstance(node[1], str) else ""
+        gx = gy = 0.0
+        layer_kicad = "Cmts.User"
+        locked = False
+        for child in node[2:]:
+            if not isinstance(child, list) or not child:
+                if child == "locked":
+                    locked = True
+                continue
+            tag = child[0]
+            if tag == "at" and len(child) >= 3:
+                try:
+                    gx = float(child[1])
+                    gy = float(child[2])
+                except (ValueError, TypeError):
+                    pass
+            elif tag == "layer" and len(child) >= 2:
+                layer_kicad = child[1] if isinstance(child[1], str) else "Cmts.User"
+            elif tag == "locked":
+                locked = True
+
+        gr_text_entry: dict[str, Any] = {
+            "type": "pcb_text",
+            "pcb_text_id": f"text_{text_idx}",
+            "text": text,
+            "x": gx,
+            "y": gy,
+            "layer": _KICAD_TO_CJ_LAYER.get(layer_kicad, layer_kicad),
+        }
+        if locked:
+            gr_text_entry["locked"] = True
+        cj.append(gr_text_entry)
+        text_idx += 1
+
+    # ── Passthrough: anything else at the top level, preserved verbatim ─────
+    # (groups, dimensions, vias, other graphic items, stackup, etc.) so a
+    # future writer can re-emit them rather than silently losing them. See
+    # docs/ecad-gap-analysis.md rows 12/13/15 — groups in particular have no
+    # faithful Circuit-JSON-shaped home today (row 12: "don't overload
+    # pcb_group", which models a different, autoplacement-only concept), so
+    # they are deliberately *not* given a first-class type here.
+    passthrough_nodes = [
+        node for node in nodes
+        if isinstance(node, list) and node
+        and node[0] not in _KICAD_HANDLED_TOP_TAGS
+        and node[0] not in _KICAD_IGNORED_TOP_TAGS
+    ]
+    if passthrough_nodes:
+        cj.append({
+            "type": "kicad_passthrough",
+            "kicad_nodes": passthrough_nodes,
+        })
 
     return cj
 

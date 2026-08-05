@@ -1,7 +1,9 @@
 /**
  * PLC illustration — ladder logic diagram with rungs, contacts, and coil.
  */
-export default function PLCIllustration({ className = '', size = 120 }) {
+import type { IllustrationProps } from './types'
+
+export default function PLCIllustration({ className = '', size = 120 }: IllustrationProps) {
   return (
     <svg
       width={size}

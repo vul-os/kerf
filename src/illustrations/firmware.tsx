@@ -1,7 +1,9 @@
 /**
  * Firmware illustration — MCU development board with USB connector + LED indicator.
  */
-export default function FirmwareIllustration({ className = '', size = 120 }) {
+import type { IllustrationProps } from './types'
+
+export default function FirmwareIllustration({ className = '', size = 120 }: IllustrationProps) {
   return (
     <svg
       width={size}

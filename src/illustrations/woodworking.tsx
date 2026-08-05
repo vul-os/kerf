@@ -1,7 +1,9 @@
 /**
  * Woodworking illustration — dovetail joint (exploded view).
  */
-export default function WoodworkingIllustration({ className = '', size = 120 }) {
+import type { IllustrationProps } from './types'
+
+export default function WoodworkingIllustration({ className = '', size = 120 }: IllustrationProps) {
   return (
     <svg
       width={size}

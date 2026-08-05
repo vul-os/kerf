@@ -1,7 +1,9 @@
 /**
  * Composites illustration — ply stack-up with fiber direction arrows.
  */
-export default function CompositesIllustration({ className = '', size = 120 }) {
+import type { IllustrationProps } from './types'
+
+export default function CompositesIllustration({ className = '', size = 120 }: IllustrationProps) {
   return (
     <svg
       width={size}

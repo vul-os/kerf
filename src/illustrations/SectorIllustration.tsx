@@ -7,6 +7,7 @@
  *   size      {number}  — width/height in px (default 120)
  */
 
+import type { ComponentType } from 'react'
 import MechanicalIllustration from './mechanical.jsx'
 import ElectronicsIllustration from './electronics.jsx'
 import ArchitectureIllustration from './architecture.jsx'
@@ -24,9 +25,10 @@ import MarineIllustration from './marine.jsx'
 import WoodworkingIllustration from './woodworking.jsx'
 import TextilesIllustration from './textiles.jsx'
 import CivilIllustration from './civil.jsx'
+import type { IllustrationProps } from './types'
 
 /** Map of sector key → component */
-const MAP = {
+const MAP: Record<string, ComponentType<IllustrationProps>> = {
   mechanical: MechanicalIllustration,
   electronics: ElectronicsIllustration,
   architecture: ArchitectureIllustration,
@@ -50,7 +52,11 @@ const MAP = {
  * Renders the illustration for the given sector, or a plain empty SVG placeholder
  * when no match is found.
  */
-export default function SectorIllustration({ sector, className = '', size = 120 }) {
+export default function SectorIllustration({ sector, className = '', size = 120 }: {
+  sector: string
+  className?: string
+  size?: number
+}) {
   const Component = MAP[sector]
 
   if (!Component) {

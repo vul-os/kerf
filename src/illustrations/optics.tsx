@@ -1,7 +1,9 @@
 /**
  * Optics illustration — three-element lens system with ray traces.
  */
-export default function OpticsIllustration({ className = '', size = 120 }) {
+import type { IllustrationProps } from './types'
+
+export default function OpticsIllustration({ className = '', size = 120 }: IllustrationProps) {
   return (
     <svg
       width={size}

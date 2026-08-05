@@ -1,7 +1,9 @@
 /**
  * Mechanical illustration — wireframe gear + sketch construction line + extrude arrow.
  */
-export default function MechanicalIllustration({ className = '', size = 120 }) {
+import type { IllustrationProps } from './types'
+
+export default function MechanicalIllustration({ className = '', size = 120 }: IllustrationProps) {
   return (
     <svg
       width={size}

@@ -1,7 +1,9 @@
 /**
  * Marine illustration — hull cross-section with waterline and frame stations.
  */
-export default function MarineIllustration({ className = '', size = 120 }) {
+import type { IllustrationProps } from './types'
+
+export default function MarineIllustration({ className = '', size = 120 }: IllustrationProps) {
   return (
     <svg
       width={size}

@@ -1,7 +1,9 @@
 /**
  * Civil engineering illustration — Pratt bridge truss + horizontal alignment.
  */
-export default function CivilIllustration({ className = '', size = 120 }) {
+import type { IllustrationProps } from './types'
+
+export default function CivilIllustration({ className = '', size = 120 }: IllustrationProps) {
   return (
     <svg
       width={size}

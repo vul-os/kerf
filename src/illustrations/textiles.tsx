@@ -1,7 +1,9 @@
 /**
  * Textiles illustration — plain weave fabric pattern + sewing needle.
  */
-export default function TextilesIllustration({ className = '', size = 120 }) {
+import type { IllustrationProps } from './types'
+
+export default function TextilesIllustration({ className = '', size = 120 }: IllustrationProps) {
   return (
     <svg
       width={size}
@@ -33,7 +35,6 @@ export default function TextilesIllustration({ className = '', size = 120 }) {
       {/* Weft threads (horizontal) with over-under weave */}
       {[0, 1, 2, 3, 4, 5, 6].map((row) => {
         const y = 18 + row * 11
-        const offset = row % 2 === 0 ? 0 : 6
         return (
           <g key={`weft-${row}`}>
             {/* Continuous weft line */}

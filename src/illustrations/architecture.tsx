@@ -1,7 +1,9 @@
 /**
  * Architecture illustration — isometric wall section with door + window.
  */
-export default function ArchitectureIllustration({ className = '', size = 120 }) {
+import type { IllustrationProps } from './types'
+
+export default function ArchitectureIllustration({ className = '', size = 120 }: IllustrationProps) {
   return (
     <svg
       width={size}

@@ -1,7 +1,9 @@
 /**
  * Aerospace illustration — airfoil cross-section + orbit ellipse.
  */
-export default function AerospaceIllustration({ className = '', size = 120 }) {
+import type { IllustrationProps } from './types'
+
+export default function AerospaceIllustration({ className = '', size = 120 }: IllustrationProps) {
   return (
     <svg
       width={size}

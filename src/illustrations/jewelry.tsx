@@ -1,7 +1,9 @@
 /**
  * Jewelry illustration — gemstone facets (brilliant cut) + ring shank profile.
  */
-export default function JewelryIllustration({ className = '', size = 120 }) {
+import type { IllustrationProps } from './types'
+
+export default function JewelryIllustration({ className = '', size = 120 }: IllustrationProps) {
   return (
     <svg
       width={size}

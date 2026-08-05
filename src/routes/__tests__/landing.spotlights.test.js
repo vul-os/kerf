@@ -14,7 +14,7 @@
  * Intentionally no DOM rendering — tests run on source text for speed.
  */
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
 
 const SPOTLIGHTS_SRC = readFileSync(
@@ -22,8 +22,13 @@ const SPOTLIGHTS_SRC = readFileSync(
   'utf8',
 )
 
+// Source-text inspection reads the module off disk by literal path, so this
+// tracks the file's real extension. SectorIllustration migrated to TypeScript
+// in T-508. (Import specifiers ending .jsx/.js elsewhere in this suite are a
+// different thing and stay correct — they resolve to .tsx/.ts under
+// moduleResolution: bundler.)
 const SECTOR_SRC = readFileSync(
-  resolve(__dirname, '../../illustrations/SectorIllustration.jsx'),
+  resolve(__dirname, '../../illustrations/SectorIllustration.tsx'),
   'utf8',
 )
 
@@ -116,7 +121,9 @@ describe('SectorIllustration MAP coverage', () => {
   })
 
   it('MAP const is defined', () => {
-    expect(SECTOR_SRC).toMatch(/const MAP = \{/)
+    // Tolerates an optional TypeScript annotation — after T-508 this reads
+    // `const MAP: Record<string, ComponentType<IllustrationProps>> = {`.
+    expect(SECTOR_SRC).toMatch(/const MAP(?::[^=]+)? = \{/)
   })
 })
 
@@ -124,21 +131,27 @@ describe('SectorIllustration MAP coverage', () => {
 /* Per-sector illustration files exist and export a default function           */
 /* -------------------------------------------------------------------------- */
 
+// Source-text inspection reads modules off disk by literal path, so a
+// .jsx -> .tsx migration silently breaks it (typecheck cannot catch this;
+// only running the suite does). Rather than re-pinning to .tsx and breaking
+// again on the next slice, resolve whichever extension is present.
+function readIllustration(sector) {
+  for (const ext of ['tsx', 'jsx', 'ts', 'js']) {
+    const path = resolve(__dirname, `../../illustrations/${sector}.${ext}`)
+    if (existsSync(path)) return readFileSync(path, 'utf8')
+  }
+  throw new Error(`No illustration source found for sector "${sector}"`)
+}
+
 describe('Per-sector illustration files', () => {
   SECTORS.forEach((sector) => {
-    it(`src/illustrations/${sector}.jsx exports a default function`, () => {
-      const src = readFileSync(
-        resolve(__dirname, `../../illustrations/${sector}.jsx`),
-        'utf8',
-      )
+    it(`src/illustrations/${sector} exports a default function`, () => {
+      const src = readIllustration(sector)
       expect(src).toMatch(/export default function \w+Illustration/)
     })
 
-    it(`src/illustrations/${sector}.jsx has a non-empty aria-label`, () => {
-      const src = readFileSync(
-        resolve(__dirname, `../../illustrations/${sector}.jsx`),
-        'utf8',
-      )
+    it(`src/illustrations/${sector} has a non-empty aria-label`, () => {
+      const src = readIllustration(sector)
       const match = src.match(/aria-label="([^"]+)"/)
       expect(match).not.toBeNull()
       expect(match[1].length).toBeGreaterThan(5)

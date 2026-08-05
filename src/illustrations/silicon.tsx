@@ -1,7 +1,9 @@
 /**
  * Silicon illustration — IC die floorplan + standard-cell rows.
  */
-export default function SiliconIllustration({ className = '', size = 120 }) {
+import type { IllustrationProps } from './types'
+
+export default function SiliconIllustration({ className = '', size = 120 }: IllustrationProps) {
   return (
     <svg
       width={size}

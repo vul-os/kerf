@@ -1,7 +1,9 @@
 /**
  * Horology illustration — escapement wheel + pallet fork + gear train.
  */
-export default function HorologyIllustration({ className = '', size = 120 }) {
+import type { IllustrationProps } from './types'
+
+export default function HorologyIllustration({ className = '', size = 120 }: IllustrationProps) {
   return (
     <svg
       width={size}

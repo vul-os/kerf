@@ -1,7 +1,9 @@
 /**
  * Dental illustration — tooth cross-section with crown overlay.
  */
-export default function DentalIllustration({ className = '', size = 120 }) {
+import type { IllustrationProps } from './types'
+
+export default function DentalIllustration({ className = '', size = 120 }: IllustrationProps) {
   return (
     <svg
       width={size}

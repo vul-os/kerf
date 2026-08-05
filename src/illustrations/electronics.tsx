@@ -1,7 +1,9 @@
 /**
  * Electronics illustration — PCB trace routing + IC + resistor + capacitor components.
  */
-export default function ElectronicsIllustration({ className = '', size = 120 }) {
+import type { IllustrationProps } from './types'
+
+export default function ElectronicsIllustration({ className = '', size = 120 }: IllustrationProps) {
   return (
     <svg
       width={size}

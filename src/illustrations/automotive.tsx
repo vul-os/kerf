@@ -1,7 +1,9 @@
 /**
  * Automotive illustration — class-A surface with zebra stripe analysis lines.
  */
-export default function AutomotiveIllustration({ className = '', size = 120 }) {
+import type { IllustrationProps } from './types'
+
+export default function AutomotiveIllustration({ className = '', size = 120 }: IllustrationProps) {
   return (
     <svg
       width={size}

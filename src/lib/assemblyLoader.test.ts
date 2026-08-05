@@ -32,27 +32,33 @@ const {
   const _frustumIntersects = { value: true }
 
   class MockVector3 {
+    x: number
+    y: number
+    z: number
     constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z }
-    set(x, y, z) { this.x = x; this.y = y; this.z = z; return this }
+    set(x: number, y: number, z: number) { this.x = x; this.y = y; this.z = z; return this }
     clone() { return new MockVector3(this.x, this.y, this.z) }
-    copy(v) { this.x = v.x; this.y = v.y; this.z = v.z; return this }
+    copy(v: MockVector3) { this.x = v.x; this.y = v.y; this.z = v.z; return this }
   }
 
   class MockBox3 {
+    min: MockVector3
+    max: MockVector3
     constructor() {
       this.min = new MockVector3()
       this.max = new MockVector3()
     }
-    set(min, max) { this.min.copy(min); this.max.copy(max); return this }
-    applyMatrix4(m) { return this }
+    set(min: MockVector3, max: MockVector3) { this.min.copy(min); this.max.copy(max); return this }
+    applyMatrix4(_m: MockMatrix4) { return this }
   }
 
   class MockMatrix4 {
+    elements: number[]
     constructor() {
       this.elements = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]
     }
-    set(...args) { return this }
-    multiplyMatrices(a, b) { return this }
+    set(..._args: number[]) { return this }
+    multiplyMatrices(_a: unknown, _b: unknown) { return this }
   }
 
   class MockFrustum {
@@ -76,10 +82,11 @@ import {
   AssemblyLoader,
   createAssemblyLoader,
   STATUS_LOADED,
-  STATUS_PREFETCH,
   STATUS_UNLOADED,
   DEFAULT_PREFETCH_WINDOW,
+  type AssemblyLoaderComponent,
 } from './assemblyLoader.js'
+import type { BBox } from '@/types'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -92,10 +99,10 @@ function makeCamera() {
   }
 }
 
-function makeComponents(n, withBbox = false) {
+function makeComponents(n: number, withBbox = false): AssemblyLoaderComponent[] {
   return Array.from({ length: n }, (_, i) => ({
     id:        `c-${i}`,
-    bbox:      withBbox ? { min: [i, 0, 0], max: [i+1, 1, 1] } : null,
+    bbox:      withBbox ? { min: [i, 0, 0] as [number, number, number], max: [i+1, 1, 1] as [number, number, number] } : null,
     transform: null,
   }))
 }
@@ -164,7 +171,7 @@ describe('AssemblyLoader — frustum cull', () => {
 
   it('null-bbox components are always visible regardless of frustum flag', () => {
     _frustumIntersects.value = false  // frustum rejects bbox components
-    const comps = [
+    const comps: AssemblyLoaderComponent[] = [
       { id: 'null-bbox',  bbox: null, transform: null },  // always visible
       { id: 'has-bbox',   bbox: { min: [0,0,0], max: [1,1,1] }, transform: null },
     ]
@@ -300,7 +307,7 @@ describe('createAssemblyLoader', () => {
     const assembly = {
       components: [{ id: 'x', file_id: 'f1', object_id: 'b1', transform: null }],
     }
-    const bboxMap = new Map([['x', { min: [0,0,0], max: [1,1,1] }]])
+    const bboxMap: Map<string, BBox> = new Map([['x', { min: [0,0,0], max: [1,1,1] }]])
     const loader = createAssemblyLoader(assembly, bboxMap)
     expect(loader._components[0].bbox).toEqual({ min: [0,0,0], max: [1,1,1] })
   })

@@ -67,7 +67,16 @@ A single theme connects G2, G3 and G4: **Kerf reads far more formats than it wri
 
 The problem is not tscircuit-the-syntax; it is that **tscircuit's Circuit JSON is simultaneously the authoring format and the interchange IR**, and that the KiCad adapter on top of it is thin.
 
-**The measurable defect is the adapter** (verified 2026-08-05): `kicad_io.py` contains **zero** occurrences of zone, pour, thermal or keepout. Yet Circuit JSON models copper pours perfectly well — `pcb_copper_pour` in polygon/rect/BRep variants, plus `pcb_ground_plane` and `pcb_ground_plane_region` — and Kerf already consumes them in at least eight modules (`tools/pour.py`, `fab/gerber.py`, `fab/odbpp/writer.py`, `via_stitching.py`, `src/lib/copperPour.js`). So Kerf can *author* and *fabricate* a ground pour but cannot round-trip one through KiCad. The pour is dropped at the adapter, not at the IR.
+**The measurable defect is the adapter** (verified 2026-08-05): `kicad_io.py` contained **zero** occurrences of zone, pour, thermal or keepout. Yet Circuit JSON models copper pours perfectly well — `pcb_copper_pour` in polygon/rect/BRep variants, plus `pcb_ground_plane` and `pcb_ground_plane_region`, all verified directly in `circuit-json`'s type surface. So the pour was dropped at the adapter, not at the IR.
+
+**Correction (2026-08-06).** An earlier revision of this paragraph also claimed Kerf "already consumes them in at least eight modules." That was wrong — it came from a grep that matched files on *either* of two terms and was reported as though all matched the specific types. Measured properly:
+
+- `pcb_ground_plane` is consumed in the Python tree **nowhere** (0 occurrences).
+- `pcb_copper_pour` / `copper_pour_fill` are recognised in exactly **two** files — `fab/gerber.py` and `fab/odbpp/writer.py`.
+- `via_stitching.py` reads a *different*, board-level convention: `board['copper_pour']` keyed by `pour_id`.
+- `tools/pour.py` and `src/lib/copperPour.js` each carry their own shape again.
+
+So Kerf has **at least three incompatible in-repo pour conventions**, not one coherent model. That does not change T-525's finding — nothing here needs a new IR — but it reframes the work: alongside the adapter gap there is genuine *internal* fragmentation, tracked as T-536. Reconciling it is a precondition for the writer (T-527) emitting what the fab pipeline actually reads.
 
 **Measured 2026-08-05 (T-525) — the IR is probably unnecessary.** Across 12 KiCad constructs: **10 adapter-only, 6 small-extension, 0 genuine IR limits.** `kicad_io.py`'s hand-rolled ~90-line lexer already *tokenises* zone/group/locked/dimension nodes correctly; the semantic reader simply never reads them. G2 therefore **shrinks**: T-526/T-527 become a better reader/writer plus typed fields for Kerf's existing informal board extensions, T-528 (conformance vectors) survives, and T-529…T-535 mostly disappear. Caveat recorded honestly in `docs/ecad-gap-analysis.md`: no repo fixture contains a zone, group, locked object, dimension, hierarchical sheet or stackup, and there is no `.kicad_sch` fixture at all, so most rows rest on synthetic corroboration and should be re-run against a real pcbnew export.
 

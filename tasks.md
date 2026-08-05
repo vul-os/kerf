@@ -6111,12 +6111,29 @@ Flip `strict: true` and eliminate the resulting errors, per-directory, one direc
 IR, and the KiCad adapter on top of it is thin. `kicad_io.py`'s own docstring caps its round-trip
 guarantee at *"component refs, net names, and footprint names"*.
 
-**Verified 2026-08-05 — read this before designing:** `kicad_io.py` contains **zero** occurrences
-of zone/pour/thermal/keepout. But Circuit JSON **does** model pours (`pcb_copper_pour` in
-polygon/rect/BRep variants, `pcb_ground_plane`, `pcb_ground_plane_region`), and Kerf already
-consumes them in ≥8 modules (`tools/pour.py`, `fab/gerber.py`, `fab/odbpp/writer.py`,
-`via_stitching.py`, `src/lib/copperPour.js`). Kerf can author and fabricate a ground pour but
-cannot round-trip one through KiCad — **the pour is lost at the adapter, not at the IR.**
+**Verified 2026-08-05:** `kicad_io.py` contained **zero** occurrences of zone/pour/thermal/keepout,
+while Circuit JSON **does** model pours (`pcb_copper_pour` polygon/rect/BRep, `pcb_ground_plane`,
+`pcb_ground_plane_region` — confirmed in `circuit-json`'s type surface). **The pour was lost at the
+adapter, not at the IR.**
+
+**⚠️ Correction 2026-08-06 — an earlier version of this block was wrong.** It claimed Kerf "already
+consumes them in ≥8 modules." That came from a grep matching files on *either* of two terms,
+reported as if all matched the specific types. Measured properly:
+
+| Claim | Reality |
+|---|---|
+| `pcb_ground_plane` consumed | **0 occurrences** in the Python tree |
+| `pcb_copper_pour` / `copper_pour_fill` | exactly **2** files — `fab/gerber.py`, `fab/odbpp/writer.py` |
+| `via_stitching.py` | different convention entirely: `board['copper_pour']` keyed by `pour_id` |
+| `tools/pour.py`, `src/lib/copperPour.js` | each carry their own shape again |
+
+**Kerf has ≥3 incompatible in-repo pour conventions, not one model.** T-525's "0 IR limits" still
+holds — this is not a representability problem — but it means the writer (T-527) cannot simply
+emit "the" pour shape, because there isn't one. Tracked as **T-536**.
+
+*Method note for anyone extending this table: a `grep -l "a\|b"` lists files matching* either *term.
+Both of this epic's factual errors came from reading such output as though every file matched the
+specific thing being claimed. Grep for one term at a time and count occurrences, not files.*
 
 An earlier draft of this epic blamed Circuit JSON's expressiveness for that gap. That was wrong,
 and the correction matters: the other suspected gaps (custom pad primitives, teardrops, rule areas,
@@ -6255,6 +6272,30 @@ shapes (roundrect) and 3D model links; everything else was corroborated syntheti
 
 ### T-535 — KiCad symbol/footprint library ingest onto the IR
 - **Scope:** `packages/kerf-imports/src/kerf_imports/kicad_library.py` → IR. **Depends-on:** T-526
+
+### T-536 — Reconcile Kerf's ≥3 incompatible internal pour conventions
+- **Tier:** A · **Priority:** P1 · **Status:** ⬜ not started
+- **Why:** surfaced by T-526 (2026-08-06) and confirmed independently. Kerf does not have one pour
+  model, it has at least three, so the T-527 writer has no single shape to emit:
+  1. **Flat Circuit-JSON array** — `type: "pcb_copper_pour" | "copper_pour_fill"`, read by
+     `fab/gerber.py` and `fab/odbpp/writer.py`. This is the convention `kicad_io.py` now produces.
+  2. **Board-level dict** — `board['copper_pour']`, a list keyed by `pour_id`, read by
+     `tools/via_stitching.py`. Structurally incompatible with (1).
+  3. **Tool-schema and frontend shapes** — `tools/pour.py`'s own JSON schema and
+     `src/lib/copperPour.js`'s own object shape.
+  `pcb_ground_plane` is consumed by **none** of them, so the no-net zones T-526 now reads have no
+  downstream reader yet.
+- **Scope:** pick one canonical representation (the flat Circuit-JSON array is the obvious
+  candidate — it is what fab already reads and what KiCad import now emits), migrate the other
+  consumers onto it, and keep thin shims where an external contract depends on the old shape.
+  Field conventions already established and worth preserving: `layer`, `net_id` (net **name** as a
+  string, not an id reference), `polygon` (list of `{x,y}`, aliased `filled_polygon`/`outline` in
+  places), `clearance_mm`, `min_thickness_mm`, `priority`, `thermal_relief: {gap, spoke_width,
+  spoke_count}`.
+- **Definition of Done:** one pour shape flows KiCad import → fab output → via stitching → frontend
+  with no per-consumer translation; a test asserts a pour read from `zones_keepout_board.kicad_pcb`
+  reaches Gerber, ODB++ **and** via-stitching unchanged.
+- **Depends-on:** T-526 · **Blocks:** T-527 (the writer needs one shape to emit)
 
 ---
 

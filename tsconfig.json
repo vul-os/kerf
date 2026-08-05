@@ -1,0 +1,56 @@
+{
+  // Root tsconfig for the Kerf frontend — G1 TypeScript revamp (ROADMAP §Active program, T-500).
+  //
+  // This is the *gradual migration* config. Its job is to let `.ts`/`.tsx` and `.js`/`.jsx`
+  // coexist while slices migrate directory-by-directory, keeping the build green at every
+  // commit. That invariant is what makes concurrent agents on disjoint slices safe.
+  //
+  // Three flags carry the strategy and should not be flipped casually:
+  //   allowJs: true   — .ts files may import un-migrated .js files.
+  //   checkJs: false  — we do NOT typecheck the 366k lines of un-migrated JS. Turning this on
+  //                     before the slices land would bury the signal under thousands of errors.
+  //   strict:  false  — tightened per-directory in T-521/T-522 via tsconfig.strict.json, not here.
+  //
+  // noEmit: true — Vite/esbuild transpiles. `tsc` is a typechecker only; it never writes output.
+  //
+  // TypeScript is pinned to the 5.9 line deliberately: typescript-eslint@8 peers at
+  // `typescript >=4.8.4 <6.1.0`, so TS 7 would cost us type-aware linting. For a migration
+  // whose entire point is correctness, working lint beats a faster compiler.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+
+    "strict": false,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": false,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+
+    "types": ["vite/client", "vitest/globals"],
+
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "packages",
+    "tests/e2e",
+    "site",
+    "landing",
+    "public"
+  ]
+}

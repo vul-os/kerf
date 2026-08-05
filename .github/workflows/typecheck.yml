@@ -1,0 +1,52 @@
+name: Frontend typecheck + lint
+
+# G1 TypeScript revamp (ROADMAP §Active program, T-500).
+#
+# The migration invariant is that the build stays green at EVERY commit — that is what makes
+# concurrent agents on disjoint slices safe. This workflow is what enforces it.
+#
+# Three gates, in cheapest-first order:
+#   1. typecheck        — tsc over all migrated .ts/.tsx (root config, strict:false)
+#   2. typecheck:strict — tsc over the tightened allow-list (tsconfig.strict.json, strict:true)
+#   3. lint             — eslint over both the JS and TS trees
+#   4. test             — the existing vitest suite, so a slice cannot regress behaviour
+#
+# Gate 2 is the ratchet: a directory added to tsconfig.strict.json can never silently regress.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  typecheck:
+    name: Typecheck + lint + unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck (root — gradual, strict:false)
+        run: npm run typecheck
+
+      - name: Typecheck (strict allow-list — the tightening ratchet)
+        run: npm run typecheck:strict
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test

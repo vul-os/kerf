@@ -1,0 +1,22 @@
+{
+  // tsconfig.strict.json — the G1 tightening ratchet (T-521 / T-522).
+  //
+  // The root tsconfig runs `strict: false` so that migrating slices can land incrementally
+  // without the build going red. This config is the opposite end: `strict: true` over an
+  // explicit allow-list of directories that have already been tightened.
+  //
+  // The list only ever grows. `npm run typecheck:strict` gates it in CI, so a directory
+  // added here can never silently regress. T-521 adds src/lib, src/types, workers and stores;
+  // T-522 adds src/components and src/routes; at T-522's close the root config flips to
+  // `strict: true` and this file is retired.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true
+  },
+  "include": [
+    "src/types/**/*.ts",
+    "src/types/**/*.d.ts"
+  ]
+}

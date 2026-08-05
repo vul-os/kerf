@@ -45,6 +45,53 @@ The sector work only matters if you **own your work, are not locked in, and can 
 
 ---
 
+## Active program — G1…G4 (opened 2026-08-05)
+
+Four goals, sequenced by *start* order, not completion order. G1 must land its foundation before anything else forks; after that all four run concurrently against disjoint file sets. Task detail lives in [`tasks.md`](./tasks.md) under the ranges named below.
+
+A single theme connects G2, G3 and G4: **Kerf reads far more formats than it writes.** KiCad round-trip preserves only refs/nets/footprint names; FreeCAD import is deep but one-way; the STEP writer is AP214 while the reader handles AP242. Every goal below is, in part, closing a writer gap.
+
+### G1 — TypeScript revamp (T-500 … T-524)
+
+**Baseline measured 2026-08-05:** 1,194 files / 366,673 lines of `.js`/`.jsx` in `src/`; zero `.ts`/`.tsx`; no root `tsconfig`; 466 colocated test files; 99 `src/lib` files already carrying JSDoc `@param` annotations. `packages/kerf-sdk-ts/tsconfig.json` already runs `strict: true` and is the pattern to copy.
+
+**Decided — scope:** the frontend, **plus** a typed TS/WASM kernel path. The 2,596-file Python backend is **not** ported: it owns pythonocc/OCCT, numpy and scipy, and remains authoritative for geometry.
+
+**Decided — strategy:** gradual. Root `tsconfig` with `allowJs: true`, `checkJs: false`, `strict: false`; rename leaf-first; tighten to `strict` per-directory afterwards. The build stays green at every commit, which is what makes N agents on disjoint directories safe.
+
+**This is not a framework change.** "Frontend stays React" (see *Decentralized node model* below) still holds — G1 adds types to the existing React app and does not reopen the rejected rewrite.
+
+**The TS/WASM kernel is not from zero.** `src/lib/occtWorker.js` (7,957 lines) already runs OCCT in the browser via `opencascade.js`, alongside `public/planegcs.wasm` and `public/occt-import-js.wasm`. G1's kernel half is about giving that path *one typed interface with two backends* — browser WASM and Python server — not building a second kernel.
+
+### G2 — Unified ECAD IR, KiCad-interoperable (T-525 … T-539)
+
+The problem is not tscircuit-the-syntax; it is that **tscircuit's Circuit JSON is simultaneously the authoring format and the interchange IR**. KiCad fidelity is therefore capped by whatever Circuit JSON can express — and `kicad_io.py` has **no copper zone/pour handling at all**, plus no custom pad shapes, teardrops, rule areas, net-class DRC semantics, hierarchical sheet instances, stackup or 3D model links.
+
+**Shape:** a Kerf ECAD IR modeled on **KiCad's** data model (the richest open one, and the interop target), carrying a **passthrough bag** — every s-expression node the IR does not model is preserved verbatim and re-emitted in place. That is what makes round-trip lossless without modeling all of KiCad up front. tscircuit JSX and atopile both become *front-ends* that lower into the IR; Circuit JSON becomes an *export adapter*, not the core. No existing `.circuit.tsx` file breaks.
+
+### G3 — FreeCAD round-trip (T-540 … T-549)
+
+Import is already deep (tier 3: PartDesign bodies, sketches, assemblies, Spreadsheet → `.equations`, TechDraw → `.drawing`, materials, Draft). Two gaps: imported feature trees are **read-only BRep snapshots, not recomputable** (`import_freecad.md`: *"the imported feature-tree metadata is read-only — geometry is the lifted BRep, not a recompute"*), and there is **no FCStd writer anywhere** in the repo.
+
+### G4 — Engine: WebGPU + interop writers (T-550 … T-559)
+
+**WebGPU is currently one page.** `src/components/render/PathTracerCanvas.jsx` is the only `navigator.gpu` call site, and it uses `createRenderPipeline` — never `createComputePipeline`. Every CAD viewport (~12 separate `new THREE.WebGLRenderer` call sites) is WebGL2. No GPU library is imported anywhere in the Python packages.
+
+Highest-leverage items, in order:
+
+| # | Item | Why it ranks |
+|---|---|---|
+| 1 | **AP242 writer + semantic PMI** | The aerospace/space deliverable format; the reader already exists to round-trip against. |
+| 2 | **SDF marching cubes → WebGPU compute, + MC33** | `sdf/marching_cubes.py:197` is a triple-nested Python loop over the voxel grid — the F-rep/TPMS/jewelry-hollowing hot path. `polygonize_sdf_chernyaev` is a stub, so ambiguous cases are wrong on thin features (enamel margins, filigree, lattice struts). Fixes a correctness bug and the worst perf path together. |
+| 3 | **Rhino `.3dm` import** | Rhino/Matrix/RhinoGold *is* the jewelry industry; the 57,872-LOC jewelry module can't accept customer files. openNURBS is permissively licensed and the NURBS/SubD kernel can already represent its contents. |
+| 4 | **Zebra/isophote as viewport shaders** | Class-A analysis lives in `geom/surface_analysis.py` — a server round-trip. Surfacers expect to drag a control point and watch stripes move. |
+| 5 | **WebGPURenderer + one shared device** | ~12 WebGL contexts against a browser cap of roughly 8–16 is a real ceiling. |
+| 6 | **GPU-driven culling + ID-buffer picking** | Retires the 200 ms debounced server LOD round-trip (`Renderer.jsx`, `kerf-tess/adaptive_lod.py`) and the CPU raycast. |
+
+**Deferred, deliberately:** JT XT-B-rep (`jt_reader.py:922` — tessellation only) and CATIA native. Both are large, and automotive does not convert on geometry exchange alone.
+
+---
+
 ## What shipped
 
 ### 2026-06-03 / 2026-06-04 — Wave 8–12 comprehensive saturation push
@@ -292,6 +339,7 @@ Full list of 139+ GK modules in `packages/kerf-cad-core/src/kerf_cad_core/geom/`
 
 ## In flight / soon
 
+- **G1…G4 active program (T-500 … T-559)** — TypeScript revamp, unified ECAD IR, FreeCAD round-trip, WebGPU + interop writers. See *Active program* above; opened 2026-08-05.
 - **P0-8 testing / seeding / deploy-hardening** — broad test suites + realistic seed data + one-command local/dev loops.
 - **P1-8 Git-as-substrate with automatic large-file handling** — every project a stock-`git clone`-able repo; near-instant forks via shared content-addressed storage.
 - **P1-9 Unified `pip install kerf` client** — cloud-default, easy optional self-host.

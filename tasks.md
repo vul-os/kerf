@@ -5858,3 +5858,462 @@ compare-matrix rows.
 Every 30 min: collect completed SHAs → cherry-pick → re-audit (1-2 Explore
 agents) for new items → append to tasks.md → launch next 5 sonnet agents
 from queue → re-schedule.
+
+---
+
+# Active program G1…G4 — opened 2026-08-05
+
+Breakdown of ROADMAP §*Active program*. Designed for **parallel isolated agent runs**: every
+task below names a disjoint target file set, so any two tasks with satisfied `Depends-on` can
+run concurrently without merge conflicts. Two tasks are hard barriers and are marked
+**🚧 BLOCKING** — nothing in their goal forks until they land.
+
+**Baselines measured 2026-08-05** (re-measure before claiming a delta):
+
+| Metric | Value |
+|---|---|
+| `src/` JS+JSX | 1,194 files / 366,673 lines (`.js` 499/127,956 · `.jsx` 695/238,717) |
+| `src/` TS+TSX | 0 files |
+| Colocated test files in `src/` | 466 |
+| Python source (non-test) | 2,596 files |
+| Largest frontend file | `src/lib/occtWorker.js` — 7,957 lines |
+| Existing strict tsconfig to copy | `packages/kerf-sdk-ts/tsconfig.json` |
+
+---
+
+## G1 — TypeScript revamp (T-500 … T-524)
+
+**Decided scope:** frontend + a typed TS/WASM kernel path. Python backend is **not** ported —
+it owns pythonocc/OCCT, numpy, scipy and stays authoritative for geometry.
+
+**Decided strategy:** gradual. `allowJs: true` / `checkJs: false` / `strict: false` at root;
+rename leaf-first; tighten to `strict` per-directory afterwards. **The build must be green at
+every commit** — that invariant is what makes N concurrent agents safe.
+
+**Not a framework change.** "Frontend stays React" still holds; G1 does not reopen the rejected
+Svelte rewrite.
+
+### T-500 🚧 BLOCKING — TypeScript foundation: tsconfig + toolchain + CI gate
+- **Tier:** A
+- **Priority:** P0
+- **Status:** ✅ shipped (2026-08-05) · **Tier A · P0** — barrier cleared, G1 slices may now fork.
+  - **Landed:** `tsconfig.json` (gradual: `allowJs`/`checkJs:false`/`strict:false`/`noEmit`),
+    `tsconfig.strict.json` (append-only tightening ratchet), `npm run typecheck` +
+    `typecheck:strict`, `typescript-eslint` override with `ban-ts-comment` forcing
+    `@ts-expect-error` over `@ts-ignore`, `.d.ts` unused-vars override,
+    `.github/workflows/typecheck.yml` (typecheck → strict → lint → vitest),
+    `src/types/global.d.ts` (WebGPU `navigator.gpu` + Vite asset forms),
+    `docs/typescript-migration.md` (coordination surface + baseline).
+  - **VERIFIED:** `npm run typecheck` exit 0 · `typecheck:strict` exit 0 · `npm run build` exit 0 ·
+    `npm test` **477 files / 13,192 passed / 22 skipped** · eslint exit 0 on the TS tree.
+  - **Negative test:** an intentional `Type 'number' is not assignable to type 'string'` made
+    `typecheck` exit **2**; reverted, back to exit 0. The gate genuinely gates.
+  - **Probe:** a throwaway `.ts` + `.tsx` + `.test.ts` imported from existing `.js`, typechecked,
+    built and ran under vitest, then were deleted. Vite and vitest needed **no** config change.
+  - **Decision — TS pinned to `^5.9.3`:** `typescript@*` resolves to 7.0.2, but
+    `typescript-eslint@8` peers at `>=4.8.4 <6.1.0`. Type-aware linting is worth more than
+    compiler speed on a migration whose point is correctness. Revisit when tseslint supports 7.x.
+- **Scope:** Root `tsconfig.json` modelled on `packages/kerf-sdk-ts/tsconfig.json` but with the
+  gradual-migration flags (`allowJs: true`, `checkJs: false`, `strict: false`, `jsx: react-jsx`,
+  `noEmit: true` — Vite/esbuild already transpiles TS, so tsc is typecheck-only). Add `typescript`
+  + `typescript-eslint` devDeps, an `npm run typecheck` script, eslint flat-config override for
+  `*.ts`/`*.tsx`, and a CI job that fails on type errors. Verify Vite resolves `.ts`/`.tsx` with no
+  config change and that vitest picks up `*.test.ts`.
+- **Target files/packages:**
+  - `tsconfig.json` — new, root
+  - `package.json` — `typescript`, `typescript-eslint` devDeps; `typecheck` script
+  - `eslint.config.js` — TS override block
+  - `.github/workflows/` — typecheck gate
+  - `vite.config.js` — only if resolution needs it (prefer no change)
+- **Definition of Done:**
+  - `npm run typecheck` exits 0 against the untouched all-JS tree
+  - One throwaway `.ts` and one `.tsx` file import cleanly from existing `.js`, build and test, then are deleted
+  - `npm run build` clean; existing vitest suite unchanged in pass count
+  - CI fails on an intentionally-introduced type error (demonstrate, then revert)
+- **Depends-on:** —
+
+### T-501 🚧 BLOCKING — Shared domain types (`src/types/`)
+- **Tier:** A
+- **Priority:** P0
+- **Status:** ⬜ not started
+- **Scope:** The cross-cutting contracts every migrating slice needs, so agents don't each invent
+  their own. Derive from the 99 `src/lib` files already carrying JSDoc `@param`, plus the worker
+  message protocols documented at the head of `occtWorker.js`. Types only — no runtime code, so
+  this file set never conflicts with a slice task.
+- **Target files/packages:**
+  - `src/types/geometry.ts` — `FeatureNode`, `SketchJSON`, `Mesh`, `Geom3`, `BBox`, face/edge id maps
+  - `src/types/circuit.ts` — Circuit JSON element union (superseded by G2's IR later; keep the alias seam)
+  - `src/types/workers.ts` — request/response unions for occt / jscad / circuit workers
+  - `src/types/api.ts` — `src/lib/api.js` response shapes
+  - `src/types/index.ts` — barrel
+- **Definition of Done:**
+  - Every type compiles under `strict: true` in isolation (`tsc --strict --noEmit src/types/*.ts`)
+  - No runtime imports — `src/types/` emits nothing
+  - `docs/typescript-migration.md` records the naming convention and where to add new shared types
+- **Depends-on:** T-500
+
+### T-502 … T-505 — `src/lib` migration (280 files / 79,413 lines, 4 disjoint slices)
+Each slice: rename `.js` → `.ts`, add annotations, migrate the slice's colocated `*.test.js`
+alongside. Leaf-first within the slice. **DoD identical for all four:** slice fully `.ts`,
+`npm run typecheck` clean, `npm run build` clean, that slice's vitest pass count ≥ pre-migration,
+zero `@ts-ignore` without an inline justification comment.
+
+- **T-502** — slice 1, pure leaf utilities (no intra-`src/lib` imports). **Depends-on:** T-501
+- **T-503** — slice 2, geometry + sketch: `occtBridge.js` (1,928), `sketchSolver.js` (1,170),
+  `faceNaming.js` (981), `assembly.js` (955), `sketchEdit.js` (828), `geom3.js`, `lod.js`,
+  `assemblyLoader.js`. **Depends-on:** T-501, T-502
+- **T-504** — slice 3, electronics: `circuitRunner.js`, `circuitJsonPatch.js`, `circuitToSpice.js`,
+  `buses.js`. **Coordinate with G2** — import `src/types/circuit.ts` through the alias seam so the
+  IR swap in T-531 is a one-line change here. **Depends-on:** T-501, T-502
+- **T-505** — slice 4, remainder: `api.js` (963), `src/lib/panels/` (16 files), `src/lib/a11y/`
+  (6 files), `detectWebGL.js`, everything unclaimed. **Depends-on:** T-501, T-502
+
+### T-506 — `occtWorker.js` → TS with a typed message protocol
+- **Tier:** A · **Priority:** P0 · **Status:** ⬜ not started
+- **Scope:** The single largest frontend file (7,957 lines) and the browser OCCT kernel. Its
+  message protocol is already documented in the file header — encode it as discriminated unions
+  from `src/types/workers.ts` so `postMessage` boundaries are checked. Own task because its size
+  and centrality make it a conflict magnet.
+- **Target files/packages:** `src/lib/occtWorker.ts`, `src/lib/occtWorker.test.*`
+- **Definition of Done:** every `postMessage`/`onmessage` payload typed (no `any` at the boundary);
+  OCCT evaluate + `face_outline` round-trips verified in the existing suite; build clean.
+- **Depends-on:** T-501, T-503
+
+### T-507 — `jscadWorker` + `circuitWorker` → TS
+- **Tier:** A · **Priority:** P1 · **Status:** ⬜ not started
+- **Scope:** Same typed-protocol treatment, smaller surface. `circuitWorker.js` dynamically resolves
+  `@tscircuit/core` bindings — type the resolution seam, don't try to type tscircuit's internals.
+- **Target files/packages:** `src/lib/jscadWorker.ts`, `src/lib/circuitWorker.ts` + their tests
+- **Depends-on:** T-501, T-504
+
+### T-508 — `src/store`, `src/stores`, `src/cloud`, `src/illustrations`
+- **Tier:** A · **Priority:** P1 · **Status:** ⬜ not started
+- **Scope:** 4,023 + 112 + 2,458 lines plus `src/illustrations` (20 files). Store types are consumed
+  by nearly every component, so this lands before the component waves.
+- **Depends-on:** T-501
+
+### T-509 … T-512 — `src/components/<domain>/` subfolders (4 disjoint slices, ~180 files / ~60k lines)
+Whole-folder ownership per agent; no folder appears in two slices.
+
+- **T-509** — simulation: `fea/` (13), `structural/` (5), `composites/` (5), `motion/` (2),
+  `brep/` (2), `aerospace/` (5), `acoustics/` (2)
+- **T-510** — electronics: `electronics/` (12), `silicon/` (4), `firmware/` (4), `nodescript/` (7),
+  `CircuitCanvas/` (10), `energy/` (12). **Coordinate with G2** as per T-504.
+- **T-511** — built environment: `bim/` (13), `arch/` (2), `civil/` (16), `piping/` (5), `hvac/` (7),
+  `interior/` (2), `packaging/` (2), `plm/` (3)
+- **T-512** — visual + remainder: `dental/` (11), `dcc/` (6), `archviz/` (1), `optics/` (5),
+  `render/` (2), `drawings/` (4), `entertainment/` (2), `landing/` (2), `domains/` (1),
+  `Chat/` (4), `illustrations/` (26)
+- **Depends-on (all four):** T-501, T-508
+
+### T-513 … T-517 — `src/components/` top level (299 files / 112,141 lines, 5 disjoint slices)
+The largest surface. Sliced by role so each agent gets a coherent set. Each slice owns its
+colocated `*.test.jsx`. An explicit file manifest per slice goes in
+`docs/typescript-migration.md` before any agent starts, so ownership is unambiguous.
+
+- **T-513** — viewports/renderers: `Renderer.jsx`, `FeatureRenderer.jsx`, `SketchView.jsx`,
+  `PCBView.jsx`, `CfdViewport.jsx`, `TopoView.jsx`, `QuadMeshView.jsx`, `BIMView.jsx`,
+  `OrbitViewer.jsx`, `AttitudeViewer.jsx`, `FEMDeformedShape.jsx`, `RenderView.jsx`,
+  `SchematicView.jsx`, `SectionView.jsx`, `CurvatureCombOverlay.jsx`, `Gumball.jsx`,
+  `LightGizmos.jsx`, `Pmi3DOverlay.jsx`. **Coordinate with G4** — T-554's WebGPURenderer swap
+  touches this same set; land T-513 first, then T-554 edits typed files.
+- **T-514** — editors: `CircuitEditor`, `CodeEditor`, `FileEditor`, `SheetEditor`, `AssemblyEditor`,
+  `LadderEditor*`, `FbdEditor`, `ScriptEditor`, `ViewEditor`, `MaterialEditor`, `MaterialPbrEditor`,
+  `FamilyEditor`, `BimFamilyEditor`, `LibraryEditor`, `GraphEditor`, `EquationsEditor`,
+  `ScheduleEditor`, `AtopileEditor`
+- **T-515** — domain panels A–L (`*Panel.jsx`, alphabetical first half)
+- **T-516** — domain panels M–Z (alphabetical second half)
+- **T-517** — chrome + primitives: `Layout`, `Header`, `Footer`, `Button`, `Card`, `Input`, `Modal`,
+  `Loader`, `LoadingState`, `EmptyState`, `ToastBus`, `ErrorBoundary`, `FileTree`, `Logo`,
+  `ShortcutsModal`, `KeybindHelp`, `SkipToContent`, `ScrollToTop`, `ResponsiveContainer`,
+  `MobileNavSheet`, `TopBarMoreMenu`, `WorkspaceSwitcher`, remaining unclaimed files
+- **Depends-on (all five):** T-501, T-508
+
+### T-518 — `src/routes/` top level + `routes/Docs/` + `routes/compare/`
+- **Tier:** A · **Priority:** P1 · **Status:** ⬜ not started
+- **Scope:** 40 + 6 + 10 files (~19,878 lines). **Depends-on:** T-501, T-508
+
+### T-519 — `src/routes/domains/` (46 files / 9,992 lines)
+- **Tier:** A · **Priority:** P1 · **Status:** ⬜ not started · **Depends-on:** T-501, T-508
+
+### T-520 — `src/__tests__` + `src/components/__tests__` + residual test migration
+- **Tier:** A · **Priority:** P1 · **Status:** ⬜ not started
+- **Scope:** 132 + 42 + 13 + 4 + 3 standalone test files not colocated with a migrated slice.
+  Run last so it sweeps whatever the slice tasks left behind.
+- **Definition of Done:** `find src -name "*.js" -o -name "*.jsx"` returns **zero** files.
+- **Depends-on:** T-502 … T-519
+
+### T-521 / T-522 — `strict` tightening
+Flip `strict: true` and eliminate the resulting errors, per-directory, one directory per commit.
+- **T-521** — `src/lib`, `src/types`, workers, stores. **Depends-on:** T-506, T-507, T-508
+- **T-522** — `src/components`, `src/routes`. **Depends-on:** T-517, T-519, T-520
+- **DoD (both):** target dirs listed under `include` in a `tsconfig.strict.json` that CI runs;
+  `@ts-ignore` count is zero or each is justified inline; root `tsconfig` `strict: true` by T-522 close.
+
+### T-523 — Typed kernel interface: one contract, two backends
+- **Tier:** A · **Priority:** P0 · **Status:** ⬜ not started
+- **Scope:** `src/kernel/` — a single TS interface for geometry ops that **both** the browser WASM
+  path (`opencascade.js` via `occtWorker`, `planegcs.wasm`, `occt-import-js.wasm`) and the Python
+  server path implement. This is the architectural half of the "TS/WASM kernel" decision: not a
+  second kernel, one contract with a swappable backend and an explicit capability matrix for ops
+  only one side can do.
+- **Target files/packages:** `src/kernel/index.ts`, `src/kernel/types.ts`,
+  `src/kernel/backends/wasm.ts`, `src/kernel/backends/server.ts`, `src/kernel/capabilities.ts`,
+  `docs/kernel-interface.md`
+- **Definition of Done:** the same test suite runs green against both backends for every op in the
+  shared capability set; ops outside it fail with a typed `UnsupportedOperation`, never silently;
+  backend selection is one call site.
+- **Depends-on:** T-506, T-521
+
+### T-524 — TS/WASM kernel: SDF + marching cubes behind the interface
+- **Tier:** A · **Priority:** P1 · **Status:** ⬜ not started
+- **Scope:** First real op family on the browser side of T-523 — SDF CSG + isosurfacing in TS,
+  paired with G4's T-551 WebGPU compute path. Python `sdf/` stays authoritative and becomes the
+  oracle: same inputs must produce meshes within tolerance.
+- **Target files/packages:** `src/kernel/ops/sdf.ts`, `src/kernel/ops/marchingCubes.ts`, tests
+- **Definition of Done:** parity fixtures vs `kerf_cad_core.sdf` within stated tolerance; MC33
+  ambiguous cases correct (see T-551); documented in `docs/kernel-interface.md`
+- **Depends-on:** T-523, T-551
+
+---
+
+## G2 — Unified ECAD IR, KiCad-interoperable (T-525 … T-539)
+
+**Problem:** tscircuit's Circuit JSON is simultaneously the authoring format and the interchange
+IR, so KiCad fidelity is capped by what Circuit JSON can express. `kicad_io.py` has **no copper
+zone/pour handling at all** — verified by grep, 2026-08-05 — plus no custom pad shapes, teardrops,
+rule areas, net-class DRC semantics, hierarchical sheet instances, stackup/impedance or 3D model
+links. Its own docstring caps the guarantee at *"component refs, net names, and footprint names"*.
+
+**Non-goal:** breaking `.circuit.tsx`. tscircuit becomes one front-end among several, not the core.
+
+### T-525 🚧 BLOCKING — ECAD IR schema + passthrough design
+- **Tier:** A · **Priority:** P0 · **Status:** ⬜ not started
+- **Scope:** Define the IR modelled on **KiCad's** data model (richest open model + the interop
+  target), explicitly a superset of Circuit JSON. The load-bearing design element is the
+  **passthrough bag**: every s-expression node the IR does not model is retained verbatim, keyed by
+  position, and re-emitted on write. That is what buys lossless round-trip without modelling all of
+  KiCad up front. Must cover, as first-class: zones/pours, custom pad shapes, net classes with DRC
+  semantics, hierarchical sheet instances, stackup, 3D model links.
+- **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/ir/schema.py`,
+  `ir/types.py`, `ir/passthrough.py`, `docs/ecad-ir.md`, JSON Schema in `docs/schemas/`
+- **Definition of Done:** schema documented with a worked example carrying an unmodelled node
+  through read→write unchanged; ADR appended to `decisions.md` recording why KiCad-shaped and not
+  Circuit-JSON-shaped; no consumer migrated yet (that is T-532/T-533)
+- **Depends-on:** —
+
+### T-526 — KiCad reader → IR (zones, pours, passthrough)
+- **Scope:** Replace the narrow parse in `kicad_io.py` with a full reader into the IR. Zones/pours
+  are the headline gap. Everything unrecognised lands in the passthrough bag rather than being
+  dropped. Keep the existing pure-Python s-expression lexer.
+- **Target files/packages:** `packages/kerf-electronics/src/kerf_electronics/ir/kicad_read.py`,
+  tests + fixtures under `packages/kerf-electronics/tests/ir/`
+- **DoD:** a real-world board with a ground pour reads with zones intact; unmodelled nodes counted
+  and retained; existing `test_kicad_io.py` still green.
+- **Depends-on:** T-525
+
+### T-527 — KiCad writer: IR → `.kicad_pcb` / `.kicad_sch` / `.kicad_pro`
+- **Scope:** Emit from the IR, re-injecting passthrough nodes at their recorded positions.
+- **Target files/packages:** `ir/kicad_write.py`; supersedes the emit half of `kicad_io.py` and
+  `kicad_bridge.py` (keep both as thin shims until T-533 closes)
+- **Depends-on:** T-525, T-526
+
+### T-528 — Round-trip conformance vectors
+- **Scope:** Golden-fixture suite: read→write→read must be **semantically identical**, and
+  byte-identical wherever KiCad's own formatter is deterministic. Include a pour-heavy board, a
+  hierarchical-sheet design, and a board using KiCad features the IR deliberately does not model
+  (proving passthrough).
+- **Target files/packages:** `packages/kerf-electronics/tests/ir/test_roundtrip.py` + fixtures
+- **DoD:** the guarantee stated in `kicad_io.py`'s docstring is replaced by a measured one, written
+  into `docs/ecad-ir.md` — with the honest list of what still does not survive.
+- **Depends-on:** T-526, T-527
+
+### T-529 — tscircuit JSX → IR lowering (front-end #1)
+- **Depends-on:** T-525 · Existing `.circuit.tsx` files must produce identical boards.
+
+### T-530 — atopile → IR lowering (front-end #2); retire the one-way `to_tscircuit.py`
+- **Scope:** atopile currently lowers *into tscircuit JSX* (`atopile/to_tscircuit.py`), a one-way
+  hack that makes it a second-class citizen. Lower it straight into the IR instead.
+- **Depends-on:** T-525
+
+### T-531 — Circuit JSON demoted to an export adapter
+- **Scope:** IR → Circuit JSON emitter, so external tooling and the tscircuit ecosystem keep working
+  while the core stops depending on it. Flip `src/types/circuit.ts`'s alias seam (see T-504).
+- **Depends-on:** T-525, T-529
+
+### T-532 — Migrate fabrication consumers onto the IR
+- **Scope:** `fab/gerber.py`, `fab/odbpp/writer.py`, `fab/board_step.py`, `tools/idf_export.py`,
+  `fab/bundle.py`, `panelize`. Disjoint from T-533.
+- **Depends-on:** T-531
+
+### T-533 — Migrate analysis consumers onto the IR
+- **Scope:** `ratsnest.py`, `freerouting/`, DRC (`pcb_drc.py`, `drc_presets`), SPICE, SI/PI/EMC,
+  `pcb_3d_clearance.py`, `net_classes`, `length_tuning`, `via_stitching`. Disjoint from T-532.
+  Retire the `kicad_io.py` / `kicad_bridge.py` shims at close.
+- **Depends-on:** T-531
+
+### T-534 — Native schematic/PCB editor edits the IR directly
+- **Scope:** `CircuitCanvas/`, `SchematicView.jsx`, `PCBView.jsx` currently round-trip through
+  generated `.tsx`. Point them at the IR. **Depends-on:** T-531, T-510, T-513
+
+### T-535 — KiCad symbol/footprint library ingest onto the IR
+- **Scope:** `packages/kerf-imports/src/kerf_imports/kicad_library.py` → IR. **Depends-on:** T-526
+
+---
+
+## G3 — FreeCAD round-trip (T-540 … T-549)
+
+Import is already tier-3 deep. The two gaps are that imported trees are **read-only BRep
+snapshots** (`import_freecad.md`: *"the imported feature-tree metadata is read-only — geometry is
+the lifted BRep, not a recompute"*) and that **no FCStd writer exists anywhere** in the repo.
+
+### T-540 — Recomputable imported feature trees
+- **Scope:** Map FreeCAD PartDesign features onto Kerf `.feature` nodes that actually **recompute**
+  through OCCT, instead of lifting the cached BRep and marking the tree read-only. Where a feature
+  has no faithful Kerf equivalent, keep the lifted BRep for that node and mark **that node**
+  non-parametric — degrade per-node, not per-document.
+- **Target files/packages:** `packages/kerf-imports/src/kerf_imports/freecad/features.py`,
+  `parser.py`, `brep_importer.py`; `llm_docs/import_freecad.md`
+- **DoD:** a parameter change on an imported Pad/Pocket/Revolve/Fillet regenerates correct geometry;
+  per-node parametric/lifted status surfaced in the UI and in the tool result; the docstring's
+  read-only caveat replaced by a measured coverage table.
+- **Depends-on:** —
+
+### T-541 — FCStd writer
+- **Scope:** Write `Document.xml` + `GuiDocument.xml` + the BRep cache into a valid `.FCStd` zip.
+  Mirror G2's passthrough principle: retain unmodelled document nodes from an imported file so
+  import→export doesn't strip them.
+- **Target files/packages:** `packages/kerf-imports/src/kerf_imports/freecad/writer.py`, tools entry
+- **DoD:** written files open in real FreeCAD without repair prompts (record the version tested);
+  bodies, sketches, assemblies, materials survive.
+- **Depends-on:** T-540
+
+### T-542 — FreeCAD round-trip conformance fixtures
+- **Scope:** Extend `scripts/generate_freecad_fixtures.py` to cover import→edit→export→reopen.
+  State plainly what does not survive. **Depends-on:** T-541
+
+### T-543 — Sketch constraint round-trip (planegcs ↔ FreeCAD Sketcher)
+- **Scope:** Both sides use planegcs, so constraints should survive — verify and close gaps rather
+  than assume. **Depends-on:** T-541
+
+### T-544 — Spreadsheet / TechDraw / material write-back
+- **Scope:** The tier-2 import targets, in reverse: `.equations` → Spreadsheet, `.drawing` →
+  TechDraw, `.material` → App::MaterialObject. **Depends-on:** T-541
+
+---
+
+## G4 — Engine: WebGPU + interop writers (T-550 … T-559)
+
+**Measured 2026-08-05:** exactly one `navigator.gpu` call site in the repo
+(`src/components/render/PathTracerCanvas.jsx:145`), and it uses `createRenderPipeline` — never
+`createComputePipeline`. ~12 separate `new THREE.WebGLRenderer` call sites. **Zero** GPU library
+imports across all `packages/*/src` Python.
+
+### T-550 — STEP AP242 writer with semantic PMI
+- **Tier:** A · **Priority:** P0
+- **Scope:** `io/step_writer.py` is *"Pure-Python STEP AP214 Part 21 B-rep writer"* — no AP242, no
+  semantic PMI out. AP242 MBD is the aerospace/space contractual deliverable. `ap242_reader.py`
+  already parses PMI/GD&T/datums, so it is the round-trip oracle.
+- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/io/step_ap242_writer.py`,
+  tests vs `kerf_imports.ap242_reader`
+- **DoD:** GD&T authored in Kerf exports as semantic PMI and re-reads with tolerances, datums and
+  dimensional sizes intact; validated against a third-party STEP checker (name it in the DoD).
+- **Depends-on:** —
+
+### T-551 — SDF marching cubes → WebGPU compute, + MC33 correctness
+- **Tier:** A · **Priority:** P0
+- **Scope:** Two defects in one file. `sdf/marching_cubes.py:197-199` is a triple-nested Python loop
+  over the voxel grid — the hot path for F-rep, TPMS lattices, jewelry hollowing and dental DICOM
+  isosurfacing. And `polygonize_sdf_chernyaev` is a **stub** that redirects to the 256-case
+  Lorensen–Cline table, so ambiguous cases resolve wrongly on thin features (enamel margins,
+  filigree, lattice struts). Implement MC33 correctly, and add a WebGPU compute path in
+  `src/kernel/` (T-524) with Python retained as the correctness oracle.
+- **Target files/packages:** `packages/kerf-cad-core/src/kerf_cad_core/sdf/marching_cubes.py`,
+  `src/kernel/ops/marchingCubes.ts`, `src/kernel/shaders/marching_cubes.wgsl`
+- **DoD:** MC33 ambiguous-case fixtures produce manifold output where the 256-case table does not;
+  GPU and Python meshes agree within tolerance; benchmark recorded at several grid resolutions.
+- **Depends-on:** T-500 (for the TS half); Python half has no dependency
+
+### T-552 — Rhino `.3dm` import (openNURBS)
+- **Priority:** P0
+- **Scope:** Rhino/Matrix/RhinoGold *is* the jewelry industry, and the 57,872-LOC jewelry module
+  cannot accept customer files. openNURBS is permissively licensed; the existing NURBS + SubD
+  kernels can already represent its contents.
+- **Target files/packages:** `packages/kerf-imports/src/kerf_imports/rhino_3dm.py` + fixtures
+- **DoD:** NURBS surfaces, SubD, layers, blocks and object attributes import; round-trip vs
+  `mesh_to_nurbs`/`subd_to_nurbs` verified. **Depends-on:** —
+
+### T-553 — Zebra / isophote / curvature as viewport shaders
+- **Scope:** Class-A analysis lives in `geom/surface_analysis.py` — a Python request/response.
+  Zebra striping is intrinsically a fragment shader; surfacers expect to drag a control point and
+  watch the stripes move. Keep the Python analyzers as the numerical gate; add realtime shading.
+- **Target files/packages:** `src/components/CurvatureCombOverlay.tsx`, new
+  `src/components/render/shaders/zebra.wgsl`, `isophote.wgsl`
+- **Depends-on:** T-513, T-554
+
+### T-554 — three.js `WebGPURenderer` + one shared device
+- **Scope:** Migrate the ~12 `WebGLRenderer` call sites to a single shared WebGPU device with the
+  existing `detectWebGL` fallback retained (Safari 26 and Firefox-on-Windows shipped WebGPU, but
+  coverage is not universal). ~12 live WebGL contexts against a browser cap of roughly 8–16 is a
+  real ceiling, not a theoretical one.
+- **DoD:** every viewport renders identically under both backends; context count is 1; fallback
+  path exercised in CI. **Depends-on:** T-513
+
+### T-555 — GPU-driven culling + indirect draw; retire the server LOD round-trip
+- **Scope:** `Renderer.jsx` debounces the camera 200 ms then asks Python
+  (`kerf-tess/adaptive_lod.py`) for a plan under a 500k-triangle / 1,000-part budget. Do it
+  per-frame on-device instead. Keep the server planner for headless/non-WebGPU paths.
+- **Depends-on:** T-554
+
+### T-556 — ID-buffer GPU picking
+- **Scope:** Replace CPU raycasting (`Renderer.jsx:1037-1051`, `raycaster.intersectObjects` over the
+  visible set) with an ID buffer — O(1) in scene size and exact at face/edge granularity.
+- **Depends-on:** T-554
+
+### T-557 — Dental PLY reader (vertex colour)
+- **Scope:** Intraoral scanners emit PLY with per-vertex colour; there is no PLY reader. Also make
+  `pydicom`/`skimage` availability explicit in the UI rather than silently degrading to the
+  minimal pure-NumPy marching-cubes fallback.
+- **Target files/packages:** `packages/kerf-dental/src/kerf_dental/ply_ingest.py`,
+  `dicom_ingest.py` · **Depends-on:** —
+
+### T-558 — Path tracer → compute pipeline + progressive accumulation
+- **Scope:** `PathTracerCanvas.jsx` is a fullscreen fragment shader. Move to compute with an
+  accumulation buffer. Serves jewelry gem rendering (dispersion/caustics) directly.
+- **Depends-on:** T-554
+
+### T-559 — Order-independent transparency for assemblies
+- **Scope:** Section views and assembly ghosting need OIT; WebGL sorting artefacts are the current
+  limit. **Depends-on:** T-554
+
+---
+
+## G1…G4 parallel execution plan
+
+**Barriers.** Only two: **T-500** (nothing in G1 forks before it) and **T-525** (nothing in G2
+forks before it). G3 and G4 have no barrier and can start on day one.
+
+**Wave 0 (serial, ~2 tasks):** T-500, then T-501.
+Concurrent with these, since they share no files: T-540 (G3), T-550, T-551-python, T-552, T-557 (G4).
+
+**Wave 1 (high parallelism):** T-502…T-505 (lib slices) · T-508 · T-525 (G2 barrier) · T-541 ·
+T-553-prep. No two touch the same file.
+
+**Wave 2 (peak parallelism, ~12 agents):** T-506, T-507 · T-509…T-512 · T-513…T-517 ·
+T-526, T-527 · T-542, T-543, T-544.
+
+**Wave 3:** T-518, T-519, T-520 · T-528…T-531 · T-554.
+
+**Wave 4 (convergence):** T-521, T-522 · T-532, T-533 · T-555, T-556, T-558, T-559 · T-534.
+
+**Wave 5:** T-523, T-524, T-535, T-553.
+
+**Conflict rules for concurrent agents:**
+1. One agent owns a file. Slice manifests in `docs/typescript-migration.md` are authoritative; if
+   two slices both claim a file, the manifest is wrong — fix it before running, not during.
+2. `src/types/` is append-only for slice agents. Shared-type *changes* belong to T-501's owner.
+3. The build stays green at every commit. An agent that cannot land its slice green reverts and
+   reports rather than merging red.
+4. G2 and G1 overlap at `src/lib/circuit*` and `components/electronics` — T-504 and T-510 land the
+   type seam first; the IR swap in T-531/T-534 then edits already-typed files.
+5. Re-measure the baseline table at the top of this section before claiming any delta.

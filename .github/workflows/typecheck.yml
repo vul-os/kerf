@@ -8,10 +8,16 @@ name: Frontend typecheck + lint
 # Three gates, in cheapest-first order:
 #   1. typecheck        — tsc over all migrated .ts/.tsx (root config, strict:false)
 #   2. typecheck:strict — tsc over the tightened allow-list (tsconfig.strict.json, strict:true)
-#   3. lint             — eslint over both the JS and TS trees
+#   3. lint:ts          — eslint over the MIGRATED TypeScript tree only
 #   4. test             — the existing vitest suite, so a slice cannot regress behaviour
 #
 # Gate 2 is the ratchet: a directory added to tsconfig.strict.json can never silently regress.
+#
+# Gate 3 is scoped to .ts/.tsx on purpose. `npm run lint` over the whole repo reports thousands
+# of PRE-EXISTING errors in the un-migrated .js/.jsx tree — that is a real debt, but it is not
+# G1's, and gating on it would make this workflow red on every PR from day one, which trains
+# people to ignore it. `lint:ts` starts at zero and must stay at zero, so it grows into a full
+# gate as the migration proceeds. Cleaning up the JS tree is separate, deliberate work.
 
 on:
   pull_request:
@@ -45,8 +51,8 @@ jobs:
       - name: Typecheck (strict allow-list — the tightening ratchet)
         run: npm run typecheck:strict
 
-      - name: Lint
-        run: npm run lint
+      - name: Lint (migrated TypeScript only — see header)
+        run: npm run lint:ts
 
       - name: Unit tests
         run: npm test

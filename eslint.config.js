@@ -6,7 +6,11 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'backend/**']),
+  // `.claude/**` holds agent git worktrees — each is a FULL copy of this repo. Without this
+  // ignore, eslint lints every worktree in addition to the real tree (measured: 1,527 problem
+  // lines from worktree copies alone), and a file's problems get reported once per live agent.
+  // `vite.config.js` excludes the same path from vitest for the same reason.
+  globalIgnores(['dist', 'backend/**', '.claude/**']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
@@ -32,7 +36,14 @@ export default defineConfig([
     ],
     languageOptions: {
       globals: globals.browser,
-      parserOptions: { ecmaFeatures: { jsx: true } },
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+        // Required: agent worktrees under .claude/ each carry their own tsconfig.json, so the
+        // parser sees multiple candidate roots and errors with "No tsconfigRootDir was set"
+        // (measured: 70 such parsing errors, including on src/types/global.d.ts itself).
+        // Pinning the root to this file's directory makes resolution deterministic.
+        tsconfigRootDir: import.meta.dirname,
+      },
     },
     rules: {
       // Migration ergonomics: a slice may land an `any` at a boundary it does not own,

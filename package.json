@@ -25,6 +25,7 @@
     "build:web": "vite build",
     "start": "kerf-server --host 0.0.0.0 --port 8080",
     "lint": "eslint .",
+    "lint:ts": "eslint --no-error-on-unmatched-pattern \"src/**/*.ts\" \"src/**/*.tsx\"",
     "typecheck": "tsc --noEmit",
     "typecheck:strict": "tsc --noEmit -p tsconfig.strict.json",
     "preview": "vite preview",

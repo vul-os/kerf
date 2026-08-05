@@ -6374,6 +6374,29 @@ this repo as transitive tscircuit dependencies. Both carry
     entries, so an inner-layer ground plane never produces an ODB++ features file. That is an
     ODB++ limitation, not a pour-shape issue — worth its own task.
 
+### T-538 — 🐛 KiCad import never applies the Y-axis flip
+- **Tier:** A · **Priority:** **P0** · **Status:** ⬜ not started
+- **Found by:** the T-526b conformance oracle, on its first run — this is precisely the payoff the
+  oracle was built for, and no hand-written fixture would have caught it.
+- **The bug:** KiCad's coordinate system is **Y-down**; Circuit JSON's is **Y-up**.
+  `kicad_io.py` applies **no flip anywhere** — verified by direct inspection, there is no negation,
+  inversion or transform in the module. So every KiCad import is **vertically mirrored** relative
+  to Kerf's own authored boards, across *every* geometry path: component positions, traces, vias,
+  zones, silkscreen, courtyards.
+- **Why it went unnoticed:** the reader was only ever compared against fixtures written by the same
+  people who wrote the reader, so a consistent whole-file mirror is invisible. `kicad-to-circuit-json`
+  does apply the flip, which is how the disagreement surfaced. The divergence is currently pinned in
+  `test_component_position_agrees_modulo_y_axis_convention` so it cannot regress silently.
+- **Scope:** apply the flip once, at the boundary, for all geometry — not per-consumer. Needs the
+  board's Y extent (or KiCad page height) as the mirror axis; establish which and document it.
+  Update the oracle test to assert straight equality instead of equality-modulo-flip once fixed.
+- **Care required:** this is a **behavioural change across every imported board**. Anything that
+  previously "worked" against mirrored data — saved projects, downstream fixtures, golden files —
+  needs re-checking. Land it with a fixture asserting a known component lands at the correct
+  absolute position, not merely self-consistently.
+- **Depends-on:** T-526b (the oracle that found it) · **Blocks:** T-527 (a writer built on a
+  mirrored reader would bake the error in permanently)
+
 ### T-537 — Frontend pour validator rejects every backend pour
 - **Tier:** A · **Priority:** P1 · **Status:** ⬜ not started
 - **Why:** found by T-536 and confirmed directly. `src/lib/copperPour.js:17` does

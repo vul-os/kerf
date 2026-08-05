@@ -17,18 +17,28 @@
 // Props: none — standalone panel.
 
 import { useState, useCallback } from 'react'
+import type { CSSProperties } from 'react'
 import {
   Activity, BarChart2, AlertTriangle, CheckCircle,
-  Loader2, Play, ChevronDown, ChevronUp, Zap,
+  Loader2, Play, Zap,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import type {
+  SeismicSpectrumResult, SeismicSdofResult, SeismicMdofResult, SeismicNewmarkResult,
+} from './structuralTypes'
 
-const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+const API_URL: string = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+
+export interface Props {
+  /** JSON string optionally carrying persisted tab selection. */
+  content?: string
+}
 
 // ---------------------------------------------------------------------------
 // Shared styles
 // ---------------------------------------------------------------------------
 
-const s = {
+const s: Record<string, CSSProperties> = {
   root:         { background: '#111827', padding: '12px', fontSize: 12, color: '#e5e7eb', minHeight: 200 },
   header:       { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 },
   title:        { fontWeight: 600, fontSize: 14, color: '#f9fafb' },
@@ -63,7 +73,12 @@ const s = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function callTool(toolName, args) {
+// Generic over the specific tool's result shape — `/api/tools/call` dispatches to whichever
+// backend tool `toolName` names, so the return shape genuinely varies per call site.
+async function callTool<T = Record<string, unknown>>(
+  toolName: string,
+  args: Record<string, unknown>,
+): Promise<T> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -76,7 +91,9 @@ async function callTool(toolName, args) {
   return res.json()
 }
 
-function fmt(v, d = 4) {
+// `unknown` — formats whatever raw field a tool result happens to carry (a boundary this
+// slice does not own); the runtime typeof-narrowing below is the actual contract.
+function fmt(v?: unknown, d = 4): string {
   if (v == null) return '—'
   if (typeof v === 'boolean') return v ? 'yes' : 'no'
   if (typeof v === 'number') {
@@ -88,7 +105,16 @@ function fmt(v, d = 4) {
   return String(v)
 }
 
-function NumRow({ label, value, onChange, step = 'any', disabled, unit }) {
+interface NumRowProps {
+  label: string
+  value: string | number
+  onChange: (value: string) => void
+  step?: string | number
+  disabled?: boolean
+  unit?: string
+}
+
+function NumRow({ label, value, onChange, step = 'any', disabled, unit }: NumRowProps) {
   return (
     <div style={s.row}>
       <label style={s.label}>{label}{unit ? <span style={{ color: '#6b7280', marginLeft: 3 }}>({unit})</span> : null}</label>
@@ -97,7 +123,17 @@ function NumRow({ label, value, onChange, step = 'any', disabled, unit }) {
   )
 }
 
-function SelRow({ label, value, onChange, options, disabled }) {
+type SelRowOption = string | { value: string; label: string }
+
+interface SelRowProps {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: SelRowOption[]
+  disabled?: boolean
+}
+
+function SelRow({ label, value, onChange, options, disabled }: SelRowProps) {
   return (
     <div style={s.row}>
       <label style={s.label}>{label}</label>
@@ -112,7 +148,13 @@ function SelRow({ label, value, onChange, options, disabled }) {
   )
 }
 
-function RunBtn({ onClick, running, label = 'Run' }) {
+interface RunBtnProps {
+  onClick: () => void
+  running?: boolean
+  label?: string
+}
+
+function RunBtn({ onClick, running, label = 'Run' }: RunBtnProps) {
   return (
     <button onClick={onClick} disabled={running}
       style={{ ...s.button, background: '#1e40af', marginTop: 6, ...(running ? s.buttonDisabled : {}) }}>
@@ -123,7 +165,11 @@ function RunBtn({ onClick, running, label = 'Run' }) {
   )
 }
 
-function Warnings({ warnings }) {
+interface WarningsProps {
+  warnings?: string[]
+}
+
+function Warnings({ warnings }: WarningsProps) {
   if (!warnings || !warnings.length) return null
   return (
     <div style={{ ...s.infoBox, background: '#1c1a04', color: '#fde68a', marginTop: 4 }}>
@@ -136,7 +182,11 @@ function Warnings({ warnings }) {
 // ---------------------------------------------------------------------------
 // Mini spectrum ASCII chart
 // ---------------------------------------------------------------------------
-function SpectrumChart({ spectrum }) {
+interface SpectrumChartProps {
+  spectrum?: Array<[number, number]>
+}
+
+function SpectrumChart({ spectrum }: SpectrumChartProps) {
   if (!spectrum || !spectrum.length) return null
   // Display as a simple table of sampled points (every 10th point up to 20)
   const step = Math.max(1, Math.floor(spectrum.length / 20))
@@ -165,18 +215,18 @@ function SpectrumChart({ spectrum }) {
 
 function TabSpectrum() {
   const [spec, setSpec] = useState({ SDS: '1.0', SD1: '0.6', TL: '6', n_points: '100' })
-  const [specR, setSpecR] = useState(null)
-  const [specE, setSpecE] = useState(null)
+  const [specR, setSpecR] = useState<SeismicSpectrumResult | null>(null)
+  const [specE, setSpecE] = useState<string | null>(null)
   const [specRun, setSpecRun] = useState(false)
 
   const run = useCallback(async () => {
     setSpecRun(true); setSpecE(null); setSpecR(null)
     try {
-      const r = await callTool('seismic_build_asce7_spectrum', {
+      const r = await callTool<SeismicSpectrumResult>('seismic_build_asce7_spectrum', {
         SDS: +spec.SDS, SD1: +spec.SD1, TL: +spec.TL, n_points: +spec.n_points,
       })
       setSpecR(r)
-    } catch (e) { setSpecE(e.message) } finally { setSpecRun(false) }
+    } catch (e) { setSpecE(e instanceof Error ? e.message : String(e)) } finally { setSpecRun(false) }
   }, [spec])
 
   return (
@@ -242,27 +292,27 @@ function TabSpectrum() {
 
 function TabSDOF() {
   const [sdof, setSdof] = useState({ omega_n: '3.14', zeta: '0.05', m: '10000', SDS: '1.0', SD1: '0.6', TL: '6' })
-  const [sdofR, setSdofR] = useState(null)
-  const [sdofE, setSdofE] = useState(null)
+  const [sdofR, setSdofR] = useState<SeismicSdofResult | null>(null)
+  const [sdofE, setSdofE] = useState<string | null>(null)
   const [sdofRun, setSdofRun] = useState(false)
 
   const run = useCallback(async () => {
     setSdofRun(true); setSdofE(null); setSdofR(null)
     try {
       // Build a quick ASCE 7-22 spectrum first, then query it
-      const specRes = await callTool('seismic_build_asce7_spectrum', {
+      const specRes = await callTool<SeismicSpectrumResult>('seismic_build_asce7_spectrum', {
         SDS: +sdof.SDS, SD1: +sdof.SD1, TL: +sdof.TL,
       })
       if (!specRes.ok) throw new Error(specRes.reason || 'Spectrum build failed')
 
-      const r = await callTool('seismic_rsa_sdof', {
+      const r = await callTool<SeismicSdofResult>('seismic_rsa_sdof', {
         omega_n: +sdof.omega_n,
         zeta: +sdof.zeta,
         m: +sdof.m,
         spectrum_pts: specRes.spectrum,
       })
       setSdofR({ ...r, T0: specRes.T0, Ts: specRes.Ts })
-    } catch (e) { setSdofE(e.message) } finally { setSdofRun(false) }
+    } catch (e) { setSdofE(e instanceof Error ? e.message : String(e)) } finally { setSdofRun(false) }
   }, [sdof])
 
   return (
@@ -351,17 +401,17 @@ function TabMDOF() {
     SDS: '1.0', SD1: '0.6', TL: '6',
     method: 'CQC',
   })
-  const [mdofR, setMdofR] = useState(null)
-  const [mdofE, setMdofE] = useState(null)
+  const [mdofR, setMdofR] = useState<SeismicMdofResult | null>(null)
+  const [mdofE, setMdofE] = useState<string | null>(null)
   const [mdofRun, setMdofRun] = useState(false)
 
-  const parseFV = str => str.split(',').map(Number)
+  const parseFV = (str: string): number[] => str.split(',').map(Number)
 
   const run = useCallback(async () => {
     setMdofRun(true); setMdofE(null); setMdofR(null)
     try {
       // Build spectrum
-      const specRes = await callTool('seismic_build_asce7_spectrum', {
+      const specRes = await callTool<SeismicSpectrumResult>('seismic_build_asce7_spectrum', {
         SDS: +mdof.SDS, SD1: +mdof.SD1, TL: +mdof.TL,
       })
       if (!specRes.ok) throw new Error(specRes.reason || 'Spectrum build failed')
@@ -375,14 +425,14 @@ function TabMDOF() {
       // phi_list: rows separated by |, values within row by comma
       const phi_list = mdof.phi_list.split('|').map(row => parseFV(row.trim()))
 
-      const r = await callTool('seismic_rsa_mdof', {
+      const r = await callTool<SeismicMdofResult>('seismic_rsa_mdof', {
         omega_list, phi_list, gamma_list, zeta_list, m_list,
         spectrum_pts: specRes.spectrum,
         method: mdof.method,
         h_list,
       })
       setMdofR(r)
-    } catch (e) { setMdofE(e.message) } finally { setMdofRun(false) }
+    } catch (e) { setMdofE(e instanceof Error ? e.message : String(e)) } finally { setMdofRun(false) }
   }, [mdof])
 
   return (
@@ -518,8 +568,8 @@ function TabNewmark() {
     m: '10000', k: '3948803', zeta: '0.05', dt: '0.01',
     cycles: '5', ag_amp: '0.3',
   })
-  const [nmR, setNmR] = useState(null)
-  const [nmE, setNmE] = useState(null)
+  const [nmR, setNmR] = useState<SeismicNewmarkResult | null>(null)
+  const [nmE, setNmE] = useState<string | null>(null)
   const [nmRun, setNmRun] = useState(false)
 
   const run = useCallback(async () => {
@@ -531,19 +581,19 @@ function TabNewmark() {
       const T_exc = 0.5  // excitation period in seconds
       const duration = +nm.cycles * T_exc + 2 * T_exc  // a bit extra
       const N = Math.ceil(duration / dt) + 1
-      const ag_time = []
+      const ag_time: number[] = []
       const A = +nm.ag_amp * 9.80665  // convert g to m/s²
       for (let i = 0; i < N; i++) {
         const t = i * dt
         ag_time.push(A * Math.sin(2 * Math.PI * t / T_exc))
       }
 
-      const r = await callTool('seismic_newmark_sdof', {
+      const r = await callTool<SeismicNewmarkResult>('seismic_newmark_sdof', {
         m: +nm.m, k: +nm.k, zeta: +nm.zeta,
         ag_time, dt,
       })
       setNmR(r)
-    } catch (e) { setNmE(e.message) } finally { setNmRun(false) }
+    } catch (e) { setNmE(e instanceof Error ? e.message : String(e)) } finally { setNmRun(false) }
   }, [nm])
 
   return (
@@ -616,16 +666,16 @@ function TabNewmark() {
 // Root export
 // ---------------------------------------------------------------------------
 
-const TABS = [
+const TABS: Array<{ id: string; label: string; icon: LucideIcon }> = [
   { id: 'spectrum', label: 'ASCE 7-22 Spectrum', icon: BarChart2 },
   { id: 'sdof',     label: 'SDOF Response',       icon: Activity },
   { id: 'mdof',     label: 'Multi-Mode RSA',       icon: Zap },
   { id: 'newmark',  label: 'Newmark Time-History', icon: Activity },
 ]
 
-export default function SeismicRSAPanel({ content } = {}) {
+export default function SeismicRSAPanel({ content }: Props = {}) {
   // content prop: JSON string optionally carrying persisted tab selection.
-  const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
+  const _parsed: { tab?: string } = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
 
   const [tab, setTab] = useState(_parsed.tab || 'spectrum')
 

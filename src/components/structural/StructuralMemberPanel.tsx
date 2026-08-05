@@ -15,18 +15,29 @@
 // Props: none — standalone panel.
 
 import { useState, useCallback } from 'react'
+import type { CSSProperties } from 'react'
 import {
   Cpu, Layers, Ruler, AlertTriangle, CheckCircle,
-  Loader2, Play, ChevronDown, ChevronUp, TrendingDown,
+  Loader2, Play, TrendingDown,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import type {
+  AiscMemberCheckResult, AiscCompressionResult, AiscFlexureResult,
+  AciRcBeamResult, AciRebarResult,
+} from './structuralTypes'
 
-const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+const API_URL: string = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+
+export interface Props {
+  /** JSON string optionally carrying persisted tab selection. */
+  content?: string
+}
 
 // ---------------------------------------------------------------------------
 // Shared styles
 // ---------------------------------------------------------------------------
 
-const s = {
+const s: Record<string, CSSProperties> = {
   root:          { background: '#111827', padding: '12px', fontSize: 12, color: '#e5e7eb', minHeight: 200 },
   header:        { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 },
   title:         { fontWeight: 600, fontSize: 14, color: '#f9fafb' },
@@ -61,7 +72,12 @@ const s = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function callTool(toolName, args) {
+// Generic over the specific tool's result shape — `/api/tools/call` dispatches to whichever
+// backend tool `toolName` names, so the return shape genuinely varies per call site.
+async function callTool<T = Record<string, unknown>>(
+  toolName: string,
+  args: Record<string, unknown>,
+): Promise<T> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -74,7 +90,9 @@ async function callTool(toolName, args) {
   return res.json()
 }
 
-function fmt(v, decimals = 3) {
+// `unknown` — this formats whatever raw field a tool result happens to carry (a boundary
+// this slice does not own); the runtime typeof-narrowing below is the actual contract.
+function fmt(v?: unknown, decimals = 3): string {
   if (v == null) return '—'
   if (typeof v === 'boolean') return v ? 'yes' : 'no'
   if (typeof v === 'number') {
@@ -86,14 +104,23 @@ function fmt(v, decimals = 3) {
   return String(v)
 }
 
-function StatusChip({ ok, label }) {
+interface StatusChipProps {
+  ok?: boolean | null
+  label?: string
+}
+
+function StatusChip({ ok, label }: StatusChipProps) {
   if (ok == null) return null
   return ok
     ? <span style={s.passChip}>{label || 'PASS'}</span>
     : <span style={s.failChip}>{label || 'FAIL'}</span>
 }
 
-function InteractionRatio({ ratio }) {
+interface InteractionRatioProps {
+  ratio?: number | null
+}
+
+function InteractionRatio({ ratio }: InteractionRatioProps) {
   if (ratio == null) return null
   const pct = Math.min(ratio * 100, 100)
   const color = ratio <= 0.85 ? '#22c55e' : ratio <= 1.0 ? '#f59e0b' : '#ef4444'
@@ -114,7 +141,13 @@ function InteractionRatio({ ratio }) {
   )
 }
 
-function ResultTable({ data, skip = [], highlight = [] }) {
+interface ResultTableProps {
+  data?: Record<string, unknown> | null
+  skip?: string[]
+  highlight?: string[]
+}
+
+function ResultTable({ data, skip = [], highlight = [] }: ResultTableProps) {
   if (!data || typeof data !== 'object') return null
   const entries = Object.entries(data).filter(
     ([k, v]) => !skip.includes(k) && typeof v !== 'object' && !Array.isArray(v)
@@ -136,60 +169,13 @@ function ResultTable({ data, skip = [], highlight = [] }) {
   )
 }
 
-function ToolWidget({ title, icon: Icon, color = '#2563eb', children, result, error, running, passKey }) {
-  const [open, setOpen] = useState(true)
-  const ok = result && passKey != null
-    ? (passKey === '__ok__' ? Boolean(result.ok) : Boolean(result[passKey]))
-    : undefined
-
-  return (
-    <div style={{ ...s.section, borderLeft: `3px solid ${color}` }}>
-      <div
-        style={{ ...s.sectionTitle, justifyContent: 'space-between', cursor: 'pointer' }}
-        onClick={() => setOpen(o => !o)}
-      >
-        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          {Icon && <Icon size={12} style={{ color }} />}
-          {title}
-          {result && passKey != null && !running && (
-            <span style={{ marginLeft: 4 }}>
-              <StatusChip ok={ok} />
-            </span>
-          )}
-        </span>
-        {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-      </div>
-      {open && (
-        <>
-          {children}
-          {error && (
-            <div style={s.errorBox}>
-              <AlertTriangle size={12} />
-              <span>{error}</span>
-            </div>
-          )}
-          {running && (
-            <div style={s.infoBox}>
-              <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
-              <span>Computing…</span>
-            </div>
-          )}
-          {result && !running && !error && (
-            <div style={s.resultBox}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                <CheckCircle size={11} style={{ color: '#34d399' }} />
-                <span style={{ color: '#34d399', fontWeight: 600 }}>Result</span>
-              </div>
-              {children.__result ? null : null}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  )
+interface RunBtnProps {
+  onClick: () => void
+  running?: boolean
+  label?: string
 }
 
-function RunBtn({ onClick, running, label = 'Run' }) {
+function RunBtn({ onClick, running, label = 'Run' }: RunBtnProps) {
   return (
     <button
       onClick={onClick}
@@ -203,7 +189,16 @@ function RunBtn({ onClick, running, label = 'Run' }) {
   )
 }
 
-function NumRow({ label, value, onChange, step = 'any', disabled, unit }) {
+interface NumRowProps {
+  label: string
+  value: string | number
+  onChange: (value: string) => void
+  step?: string | number
+  disabled?: boolean
+  unit?: string
+}
+
+function NumRow({ label, value, onChange, step = 'any', disabled, unit }: NumRowProps) {
   return (
     <div style={s.row}>
       <label style={s.label}>{label}{unit ? <span style={{ color: '#6b7280', marginLeft: 3 }}>({unit})</span> : null}</label>
@@ -219,7 +214,17 @@ function NumRow({ label, value, onChange, step = 'any', disabled, unit }) {
   )
 }
 
-function SelRow({ label, value, onChange, options, disabled }) {
+type SelRowOption = string | { value: string; label: string }
+
+interface SelRowProps {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: SelRowOption[]
+  disabled?: boolean
+}
+
+function SelRow({ label, value, onChange, options, disabled }: SelRowProps) {
   return (
     <div style={s.row}>
       <label style={s.label}>{label}</label>
@@ -260,7 +265,7 @@ const PIPES = ['PIPE2STD','PIPE3STD','PIPE4STD','PIPE4XS','PIPE6STD']
 const CHANNELS = ['C6X10.5','C8X11.5','C10X20','C12X20.7','C15X33.9']
 const ANGLES = ['L3X3X1/4','L3X3X3/8','L4X4X1/4','L4X4X1/2','L6X4X3/8']
 
-function sectionOptions(type) {
+function sectionOptions(type: string): string[] {
   switch (type) {
     case 'W': return W_SHAPES
     case 'C': return CHANNELS
@@ -280,8 +285,8 @@ function TabSteelMember() {
     Pu: '200', Mux_kip_ft: '80', Muy_kip_ft: '0',
     Cb: '1.0', Fy: '50',
   })
-  const [mcR, setMcR] = useState(null)
-  const [mcE, setMcE] = useState(null)
+  const [mcR, setMcR] = useState<AiscMemberCheckResult | null>(null)
+  const [mcE, setMcE] = useState<string | null>(null)
   const [mcRun, setMcRun] = useState(false)
 
   // Compression only (Chapter E)
@@ -289,8 +294,8 @@ function TabSteelMember() {
     section_type: 'W', designation: 'W14X90',
     Lc_ft: '12', Lcy_ft: '0', Fy: '50',
   })
-  const [compR, setCompR] = useState(null)
-  const [compE, setCompE] = useState(null)
+  const [compR, setCompR] = useState<AiscCompressionResult | null>(null)
+  const [compE, setCompE] = useState<string | null>(null)
   const [compRun, setCompRun] = useState(false)
 
   // Flexure only (Chapter F)
@@ -298,48 +303,48 @@ function TabSteelMember() {
     section_type: 'W', designation: 'W18X50',
     Lb_ft: '10', Cb: '1.0', Fy: '50', axis: 'x',
   })
-  const [flexR, setFlexR] = useState(null)
-  const [flexE, setFlexE] = useState(null)
+  const [flexR, setFlexR] = useState<AiscFlexureResult | null>(null)
+  const [flexE, setFlexE] = useState<string | null>(null)
   const [flexRun, setFlexRun] = useState(false)
 
   const runMC = useCallback(async () => {
     setMcRun(true); setMcE(null); setMcR(null)
     try {
-      const r = await callTool('aisc_member_check', {
+      const r = await callTool<AiscMemberCheckResult>('aisc_member_check', {
         designation: mc.designation, section_type: mc.section_type,
         Lc_ft: +mc.Lc_ft, Lcy_ft: +mc.Lcy_ft, Lb_ft: +mc.Lb_ft,
         Pu: +mc.Pu, Mux_kip_ft: +mc.Mux_kip_ft, Muy_kip_ft: +mc.Muy_kip_ft,
         Cb: +mc.Cb, Fy: +mc.Fy,
       })
       setMcR(r)
-    } catch (e) { setMcE(e.message) } finally { setMcRun(false) }
+    } catch (e) { setMcE(e instanceof Error ? e.message : String(e)) } finally { setMcRun(false) }
   }, [mc])
 
   const runComp = useCallback(async () => {
     setCompRun(true); setCompE(null); setCompR(null)
     try {
-      const r = await callTool('aisc_compression', {
+      const r = await callTool<AiscCompressionResult>('aisc_compression', {
         designation: comp.designation, section_type: comp.section_type,
         Lc_ft: +comp.Lc_ft, Lcy_ft: +comp.Lcy_ft, Fy: +comp.Fy,
       })
       setCompR(r)
-    } catch (e) { setCompE(e.message) } finally { setCompRun(false) }
+    } catch (e) { setCompE(e instanceof Error ? e.message : String(e)) } finally { setCompRun(false) }
   }, [comp])
 
   const runFlex = useCallback(async () => {
     setFlexRun(true); setFlexE(null); setFlexR(null)
     try {
-      const r = await callTool('aisc_flexure', {
+      const r = await callTool<AiscFlexureResult>('aisc_flexure', {
         designation: flex.designation, section_type: flex.section_type,
         Lb_ft: +flex.Lb_ft, Cb: +flex.Cb, Fy: +flex.Fy, axis: flex.axis,
       })
       setFlexR(r)
-    } catch (e) { setFlexE(e.message) } finally { setFlexRun(false) }
+    } catch (e) { setFlexE(e instanceof Error ? e.message : String(e)) } finally { setFlexRun(false) }
   }, [flex])
 
-  const updateMcType = v => setMc(p => ({ ...p, section_type: v, designation: sectionOptions(v)[0] }))
-  const updateCompType = v => setComp(p => ({ ...p, section_type: v, designation: sectionOptions(v)[0] }))
-  const updateFlexType = v => setFlex(p => ({ ...p, section_type: v, designation: sectionOptions(v)[0] }))
+  const updateMcType = (v: string) => setMc(p => ({ ...p, section_type: v, designation: sectionOptions(v)[0] }))
+  const updateCompType = (v: string) => setComp(p => ({ ...p, section_type: v, designation: sectionOptions(v)[0] }))
+  const updateFlexType = (v: string) => setFlex(p => ({ ...p, section_type: v, designation: sectionOptions(v)[0] }))
 
   return (
     <div>
@@ -527,20 +532,20 @@ function TabRCBeam() {
     fc: '4000', fy: '60000',
     cover: '1.5', stirrup_dia: '0.375', bar_dia: '0.625',
   })
-  const [designR, setDesignR] = useState(null)
-  const [designE, setDesignE] = useState(null)
+  const [designR, setDesignR] = useState<AciRcBeamResult | null>(null)
+  const [designE, setDesignE] = useState<string | null>(null)
   const [designRun, setDesignRun] = useState(false)
 
   const runDesign = useCallback(async () => {
     setDesignRun(true); setDesignE(null); setDesignR(null)
     try {
-      const r = await callTool('structural_rc_beam', {
+      const r = await callTool<AciRcBeamResult>('structural_rc_beam', {
         b: +design.b, h: +design.h, Mu_kip_ft: +design.Mu_kip_ft,
         fc: +design.fc, fy: +design.fy,
         cover: +design.cover, stirrup_dia: +design.stirrup_dia, bar_dia: +design.bar_dia,
       })
       setDesignR(r)
-    } catch (e) { setDesignE(e.message) } finally { setDesignRun(false) }
+    } catch (e) { setDesignE(e instanceof Error ? e.message : String(e)) } finally { setDesignRun(false) }
   }, [design])
 
   return (
@@ -625,20 +630,20 @@ function TabRebar() {
     fc: '4000', fy: '60000',
     psi_t: '1.0', psi_e: '1.0', cb_Ktr_db: '2.5',
   })
-  const [rbR, setRbR] = useState(null)
-  const [rbE, setRbE] = useState(null)
+  const [rbR, setRbR] = useState<AciRebarResult | null>(null)
+  const [rbE, setRbE] = useState<string | null>(null)
   const [rbRun, setRbRun] = useState(false)
 
   const runRebar = useCallback(async () => {
     setRbRun(true); setRbE(null); setRbR(null)
     try {
-      const r = await callTool('structural_rebar', {
+      const r = await callTool<AciRebarResult>('structural_rebar', {
         bar_mark: +rb.bar_mark, splice_class: rb.splice_class,
         fc: +rb.fc, fy: +rb.fy,
         psi_t: +rb.psi_t, psi_e: +rb.psi_e, cb_Ktr_db: +rb.cb_Ktr_db,
       })
       setRbR(r)
-    } catch (e) { setRbE(e.message) } finally { setRbRun(false) }
+    } catch (e) { setRbE(e instanceof Error ? e.message : String(e)) } finally { setRbRun(false) }
   }, [rb])
 
   return (
@@ -700,16 +705,16 @@ function TabRebar() {
 // Root export
 // ---------------------------------------------------------------------------
 
-const TABS = [
+const TABS: Array<{ id: string; label: string; icon: LucideIcon }> = [
   { id: 'steel', label: 'Steel Member (AISC 360-22)', icon: Cpu },
   { id: 'rc',    label: 'RC Beam (ACI 318-19)',        icon: Layers },
   { id: 'rebar', label: 'Rebar Detailing',             icon: Ruler },
 ]
 
-export default function StructuralMemberPanel({ content } = {}) {
+export default function StructuralMemberPanel({ content }: Props = {}) {
   // content prop: JSON string optionally carrying persisted tab selection.
   // Parsed defensively — any parse error leaves defaults intact.
-  const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
+  const _parsed: { tab?: string } = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
 
   const [tab, setTab] = useState(_parsed.tab || 'steel')
 

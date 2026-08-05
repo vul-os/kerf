@@ -12,15 +12,33 @@
 //
 // Props: none — standalone panel.
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback } from 'react'
+import type { CSSProperties, ReactElement } from 'react'
 import { Layers, Grid3x3, FileText, AlertTriangle, CheckCircle, Loader2, Play } from 'lucide-react'
+import type {
+  RebarDetailResult, RebarScheduleResult, ShopDrawingResult, RebarBar,
+} from './structuralTypes'
 
-const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+const API_URL: string = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+
+export interface RebarDetailForm {
+  member_type: string
+  member_ref: string
+  length_mm: number
+  width_mm: number
+  depth_mm: number
+  cover_mm: number
+  long_bar_diameter_mm: number
+  n_bars_bottom: number
+  n_bars_top: number
+  stirrup_diameter_mm: number
+  stirrup_spacing_mm: number
+}
 
 // ---------------------------------------------------------------------------
 // Shared styles
 // ---------------------------------------------------------------------------
-const s = {
+const s: Record<string, CSSProperties> = {
   root:         { background: '#111827', padding: 12, fontSize: 12, color: '#e5e7eb', minHeight: 200 },
   header:       { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 },
   title:        { fontWeight: 600, fontSize: 14, color: '#f9fafb' },
@@ -48,7 +66,12 @@ const s = {
 // ---------------------------------------------------------------------------
 // API call helper
 // ---------------------------------------------------------------------------
-async function callTool(tool, args) {
+// Generic over the specific tool's result shape — `/api/tools/call` dispatches to whichever
+// backend tool `tool` names, so the return shape genuinely varies per call site.
+async function callTool<T = Record<string, unknown>>(
+  tool: string,
+  args: Record<string, unknown>,
+): Promise<T> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -61,7 +84,11 @@ async function callTool(tool, args) {
 // ---------------------------------------------------------------------------
 // Section SVG renderer
 // ---------------------------------------------------------------------------
-function SectionSVG({ detail }) {
+interface SectionSVGProps {
+  detail: RebarDetailResult | null
+}
+
+function SectionSVG({ detail }: SectionSVGProps) {
   if (!detail) return null
   const { section, longitudinal_bars, stirrups } = detail
   const { width_mm, depth_mm, cover_mm } = section
@@ -75,8 +102,8 @@ function SectionSVG({ detail }) {
   const W = width_mm * sc, H = depth_mm * sc
 
   // Render bar circles
-  const barEls = []
-  const allBars = [...(longitudinal_bars || []), ...(stirrups || [])]
+  const barEls: ReactElement[] = []
+  const allBars: RebarBar[] = [...(longitudinal_bars || []), ...(stirrups || [])]
   allBars.forEach((bar, bi) => {
     const cl = bar.centreline || []
     if (cl.length === 0) return
@@ -138,7 +165,11 @@ function SectionSVG({ detail }) {
 // ---------------------------------------------------------------------------
 // Schedule table
 // ---------------------------------------------------------------------------
-function ScheduleTable({ schedule }) {
+interface ScheduleTableProps {
+  schedule: RebarScheduleResult | null
+}
+
+function ScheduleTable({ schedule }: ScheduleTableProps) {
   if (!schedule || !schedule.rows || schedule.rows.length === 0) return null
   return (
     <div>
@@ -184,21 +215,26 @@ function ScheduleTable({ schedule }) {
 // ---------------------------------------------------------------------------
 // Shop drawing sheet preview
 // ---------------------------------------------------------------------------
-function DrawingSheetPreview({ drawing, sheetIdx = 0 }) {
+interface DrawingSheetPreviewProps {
+  drawing: ShopDrawingResult | null
+  sheetIdx?: number
+}
+
+function DrawingSheetPreview({ drawing, sheetIdx = 0 }: DrawingSheetPreviewProps) {
   if (!drawing || !drawing.sheets || drawing.sheets.length === 0) return null
   const sheet = drawing.sheets[sheetIdx]
   if (!sheet) return null
 
   const entities = sheet.entities || []
-  const SVG_W = 600, SVG_H = 400
+  const SVG_H = 400
 
   // Find bounding box to auto-scale
-  const xs = [], ys = []
+  const xs: number[] = [], ys: number[] = []
   entities.forEach(e => {
-    if ('x' in e) { xs.push(e.x); if (e.w) xs.push(e.x + e.w) }
+    if ('x' in e) { xs.push(e.x); if ('w' in e && e.w) xs.push(e.x + e.w) }
     if ('x1' in e) { xs.push(e.x1, e.x2) }
     if ('cx' in e) { xs.push(e.cx - e.r, e.cx + e.r) }
-    if ('y' in e) { ys.push(e.y); if (e.h) ys.push(e.y + e.h) }
+    if ('y' in e) { ys.push(e.y); if ('h' in e && e.h) ys.push(e.y + e.h) }
     if ('y1' in e) { ys.push(e.y1, e.y2) }
     if ('cy' in e) { ys.push(e.cy - e.r, e.cy + e.r) }
   })
@@ -276,7 +312,7 @@ export default function RebarDetailPanel() {
   const [tab, setTab] = useState('detail')
 
   // Form state
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<RebarDetailForm>({
     member_type: 'beam',
     member_ref: 'B1',
     length_mm: 6000,
@@ -291,14 +327,15 @@ export default function RebarDetailPanel() {
   })
 
   // Results
-  const [detail, setDetail]     = useState(null)
-  const [schedule, setSchedule] = useState(null)
-  const [drawing, setDrawing]   = useState(null)
+  const [detail, setDetail]     = useState<RebarDetailResult | null>(null)
+  const [schedule, setSchedule] = useState<RebarScheduleResult | null>(null)
+  const [drawing, setDrawing]   = useState<ShopDrawingResult | null>(null)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
   const [sheetIdx, setSheetIdx] = useState(0)
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const set = (k: keyof RebarDetailForm, v: string | number) =>
+    setForm(f => ({ ...f, [k]: v }))
 
   const runAll = useCallback(async () => {
     setLoading(true)
@@ -307,7 +344,7 @@ export default function RebarDetailPanel() {
 
     try {
       // 1) Detail member
-      const detailResult = await callTool('rebar_detail_member', {
+      const detailResult = await callTool<RebarDetailResult>('rebar_detail_member', {
         member_type: form.member_type,
         length_mm: +form.length_mm,
         width_mm: +form.width_mm,
@@ -323,14 +360,14 @@ export default function RebarDetailPanel() {
       setDetail(detailResult)
 
       // 2) Bending schedule
-      const schedResult = await callTool('rebar_bending_schedule', {
+      const schedResult = await callTool<RebarScheduleResult>('rebar_bending_schedule', {
         members: [{ member_ref: form.member_ref, all_bars: detailResult.all_bars }],
       })
       if (!schedResult.ok) throw new Error(schedResult.error || 'Schedule failed')
       setSchedule(schedResult)
 
       // 3) Shop drawing
-      const drawResult = await callTool('shop_drawing_generate', {
+      const drawResult = await callTool<ShopDrawingResult>('shop_drawing_generate', {
         mode: 'shop',
         member_ref: form.member_ref,
         member_type: form.member_type,
@@ -349,13 +386,13 @@ export default function RebarDetailPanel() {
       setDrawing(drawResult)
       setSheetIdx(0)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
   }, [form])
 
-  const inputRow = (label, key, type = 'number', options = null) => (
+  const inputRow = (label: string, key: keyof RebarDetailForm, type = 'number', options: string[] | null = null) => (
     <div style={s.row} key={key}>
       <span style={s.label}>{label}</span>
       {options

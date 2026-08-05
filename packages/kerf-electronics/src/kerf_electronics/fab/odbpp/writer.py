@@ -191,7 +191,11 @@ def _classify_elements(circuit_json: list[dict]) -> dict[str, list[dict]]:
             out["silk_text"].append(el)
         elif t in ("pcb_silkscreen_line", "pcb_silkscreen_path", "pcb_line"):
             out["silk_line"].append(el)
-        elif t in ("copper_pour_fill", "pcb_copper_pour"):
+        elif t in ("copper_pour_fill", "pcb_copper_pour", "pcb_ground_plane"):
+            # pcb_ground_plane (T-536): a no-net zone. Structurally identical
+            # to pcb_copper_pour for fab purposes (layer + polygon only —
+            # ODB++ surface records don't carry net assignment), so it is
+            # classified into the same bucket rather than dropped.
             out["copper_pour"].append(el)
         elif t in ("pcb_board", "board"):
             out["board"].append(el)

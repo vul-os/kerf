@@ -21,6 +21,8 @@ CircuitJSON element types handled:
   pcb_silkscreen_text / pcb_silkscreen_line / pcb_silkscreen_path → silk
   source_component (with footprint bbox)  → courtyard on silk (best-effort)
   copper_pour_fill (polygon)              → region pour on copper layers
+  pcb_copper_pour (net-bound zone, T-536 canonical shape) → region pour
+  pcb_ground_plane (no-net zone, T-536)   → region pour (net-less fill)
   pcb_board / board (outline)            → edge_cuts
 
 Units: millimetres. Gerber coordinate format 4.6 (integer, 1e-6 mm resolution).
@@ -223,7 +225,11 @@ def _classify_elements(circuit_json: list[dict]) -> dict[str, list[dict]]:
             out["silk_text"].append(el)
         elif t in ("pcb_silkscreen_line", "pcb_silkscreen_path", "pcb_line"):
             out["silk_line"].append(el)
-        elif t in ("copper_pour_fill", "pcb_copper_pour"):
+        elif t in ("copper_pour_fill", "pcb_copper_pour", "pcb_ground_plane"):
+            # pcb_ground_plane (T-536): a no-net zone. Structurally identical
+            # to pcb_copper_pour for fab purposes (layer + polygon only —
+            # neither Gerber nor ODB++ output cares about net assignment),
+            # so it is classified into the same bucket rather than dropped.
             out["copper_pour"].append(el)
         elif t in ("pcb_board", "board"):
             out["board"].append(el)

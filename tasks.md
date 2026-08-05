@@ -5953,6 +5953,25 @@ Svelte rewrite.
 - **Depends-on:** T-500
 
 ### T-502 … T-505 — `src/lib` migration (280 files / 79,413 lines, 4 disjoint slices)
+
+> **Progress 2026-08-06 — T-502 partial, commit `fd6b6aa8`.** 191 of `src/lib`'s top-level modules
+> are now `.ts`; 89 `.js` remain. Salvaged from an agent terminated mid-task by an account
+> weekly-limit error: it had renamed 232 files but carried 373 type errors, concentrated in 38 of
+> them (309 were TS2339). The clean 191 were kept and the rest reverted to `.js`.
+>
+> **Explicitly deferred, pick these up first when T-502 resumes:**
+> - The 38 erroring files — worst are `openscadParser` (83 errors), `part` (37),
+>   `renderStyles.test` (31). The agent died mid-way through `openscadParser`.
+> - `stMonacoLanguage.test` — passes a mock where real monaco types are required.
+> - `meshCache` and `localStash` — these typechecked *alone* but were renamed without being typed
+>   (`export async function get(key)`, no annotations), so their `new Promise(...)` inferred
+>   `unknown` and broke already-committed T-508 store code downstream. **Type their public
+>   surfaces properly rather than re-reverting**; `meshCache.get` is a cache and probably wants a
+>   type parameter, since `RenderablePart` lives in the store and `src/lib` must not import from it.
+>
+> **Lesson for every remaining slice:** renaming a module breaks any test that reads it by literal
+> filesystem path (`GdsLayoutPage.test.jsx` did `readFileSync('lib/gdsLoader.js')`). Typecheck
+> cannot catch this — only running the suite does. Import specifiers ending `.js` stay correct.
 Each slice: rename `.js` → `.ts`, add annotations, migrate the slice's colocated `*.test.js`
 alongside. Leaf-first within the slice. **DoD identical for all four:** slice fully `.ts`,
 `npm run typecheck` clean, `npm run build` clean, that slice's vitest pass count ≥ pre-migration,
@@ -5987,7 +6006,16 @@ zero `@ts-ignore` without an inline justification comment.
 - **Depends-on:** T-501, T-504
 
 ### T-508 — `src/store`, `src/stores`, `src/cloud`, `src/illustrations`
-- **Tier:** A · **Priority:** P1 · **Status:** ⬜ not started
+- **Tier:** A · **Priority:** P1 · **Status:** 🟡 partial — commit `57577f60`
+  - **Done:** `src/store/` (auth, userPrefs, wake, workspace, workspaces + 3 specs) and
+    `src/stores/` (dirtyStore + spec) — 10 files. Zustand shapes and selectors typed rather than
+    left to call-site inference, since the component slices build on them.
+  - **Outstanding:** `src/cloud/` (8 files) and `src/illustrations/` (20 files) — never started;
+    the agent was terminated by an account weekly-limit error before reaching them.
+  - **Note:** `workspace.ts` later surfaced 5 type errors once T-502 typed its `src/lib`
+    dependencies — precise upstream types revealing downstream imprecision, which is the migration
+    working as intended. Resolved for now by deferring `meshCache`/`localStash`; when those are
+    typed properly, re-check `workspace.ts`'s `parts` and `UnsavedEntry` handling.
 - **Scope:** 4,023 + 112 + 2,458 lines plus `src/illustrations` (20 files). Store types are consumed
   by nearly every component, so this lands before the component waves.
 - **Depends-on:** T-501

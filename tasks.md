@@ -6232,6 +6232,28 @@ imports across all `packages/*/src` Python.
 
 ### T-550 — STEP AP242 writer with semantic PMI
 - **Tier:** A · **Priority:** P0
+- **Status:** ✅ shipped (2026-08-05) — commit `e5708df6`
+  - **Landed:** `io/step_ap242_writer.py` (662 lines) over `kerf_cad_core.gdt`'s existing GD&T
+    model — no new GD&T representation invented. Emits genuine ISO 10303-21 **complex entity
+    instances** (`#N=(GEOMETRIC_TOLERANCE(...)POSITION_TOLERANCE()
+    GEOMETRIC_TOLERANCE_WITH_DATUM_REFERENCE((...)));`) with magnitude as a `MEASURE_WITH_UNIT`
+    reference. `ap242_reader.py` extended (+248 lines) with complex-instance splitting and measure
+    dereferencing. `steputils` declared as a test dep.
+  - **VERIFIED:** 1330 passed / 20 skipped (writer suite 38; `kerf-imports` 1292 — the reader has
+    other callers and they stay green).
+  - **Course-correction worth remembering:** the first iteration shaped output to satisfy
+    `ap242_reader`'s *regex* tokeniser and would have been flagged by any strict EXPRESS checker.
+    A file only Kerf can read does not move the wall. Fixed by **raising the reader, not lowering
+    the writer** — the general lesson when a round-trip oracle is weaker than the standard it
+    stands in for. Also caught: the sole third-party validation used `importorskip` on an
+    **undeclared** dependency, so it silently skipped in CI, where a skip reads as a pass.
+  - **Still divergent, documented in the module docstring (not silently):** `SHAPE_ASPECT` uses a
+    placeholder definitional chain rather than the full `product_definition` walk; dimensional
+    sizes keep inline literals; plus/minus asymmetry does not round-trip (a reader-schema limit).
+    `steputils` validates Part 21 **grammar**, not AP242 **schema** — schema conformance is
+    asserted by construction, as no EXPRESS validator is available in this environment. **A real
+    EXPRESS/schema validation pass against a third-party AP242 consumer remains outstanding** and
+    should be scheduled before this is described to users as aerospace-deliverable-ready.
 - **Scope:** `io/step_writer.py` is *"Pure-Python STEP AP214 Part 21 B-rep writer"* — no AP242, no
   semantic PMI out. AP242 MBD is the aerospace/space contractual deliverable. `ap242_reader.py`
   already parses PMI/GD&T/datums, so it is the round-trip oracle.

@@ -34,15 +34,30 @@
 //     Phase 2.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ComponentType, Ref } from 'react'
 import { Loader2, AlertTriangle, FileCode, CircuitBoard, Cpu, Box } from 'lucide-react'
 import * as JSCADModeling from '@jscad/modeling'
+import type { colors as JscadColors } from '@jscad/modeling'
 import CodeEditor from './CodeEditor.jsx'
 import Renderer from './Renderer.jsx'
 import SchematicView from './SchematicView.jsx'
 import PCBView from './PCBView.jsx'
 import { useWorkspace } from '../store/workspace.js'
+import type { WorkspaceCircuit } from '../store/workspace.js'
 import { parseLibraryMappings, resolveLibraryCadComponent, substituteComponentGeometry } from '../lib/circuitMappings.js'
+import type { LibraryMappings } from '../lib/circuitMappings.js'
 import { api } from '../lib/api.js'
+import type { CircuitJson } from '../types/circuit.js'
+import type { JscadPart } from '../types/geometry.js'
+
+// Renderer.jsx / SchematicView.jsx / PCBView.jsx (T-513, not yet migrated) declare several
+// props without destructure defaults, so allowJs infers them as required — but every call
+// site here already guards optional callbacks the way these components expect. Cast to a
+// permissive component type rather than fabricating no-op handlers that weren't there
+// before (same pattern as AtopileEditor.tsx's UntypedSchematicView).
+const UntypedRenderer = Renderer as unknown as ComponentType<Record<string, unknown>>
+const UntypedSchematicView = SchematicView as unknown as ComponentType<Record<string, unknown>>
+const UntypedPCBView = PCBView as unknown as ComponentType<Record<string, unknown>>
 
 const COMPILE_DEBOUNCE_MS = 500
 
@@ -64,13 +79,17 @@ const COMPILE_DEBOUNCE_MS = 500
 // rotated to the cad_component's pose and emitted in place of the teal
 // box. Any refdes not in the map (still resolving, or fall-through to
 // box) keeps the existing teal-tinted cuboid.
-function buildBoardParts(circuitJson, mappings, libraryGeoms) {
+function buildBoardParts(
+  circuitJson: CircuitJson | null | undefined,
+  mappings: LibraryMappings | null | undefined,
+  libraryGeoms: Map<string, JscadPart[]> | null | undefined,
+): JscadPart[] {
   if (!Array.isArray(circuitJson)) return []
-  const safeMappings = mappings && typeof mappings === 'object' && !Array.isArray(mappings)
+  const safeMappings: LibraryMappings = mappings && typeof mappings === 'object' && !Array.isArray(mappings)
     ? mappings
     : {}
   const { primitives, transforms, colors } = JSCADModeling
-  const parts = []
+  const parts: JscadPart[] = []
 
   // Board outline. We try, in order:
   //   1. pcb_board with a non-empty outline (poly extrude)
@@ -85,7 +104,7 @@ function buildBoardParts(circuitJson, mappings, libraryGeoms) {
     if (Array.isArray(board.outline) && board.outline.length >= 3) {
       // Build a 2D polygon from the outline points, then extrude.
       try {
-        const points = board.outline.map((p) => [Number(p.x) || 0, Number(p.y) || 0])
+        const points: [number, number][] = board.outline.map((p) => [Number(p.x) || 0, Number(p.y) || 0])
         const poly = primitives.polygon({ points })
         boardGeom = JSCADModeling.extrusions.extrudeLinear({ height: thickness }, poly)
       } catch {
@@ -192,7 +211,7 @@ function buildBoardParts(circuitJson, mappings, libraryGeoms) {
   return parts
 }
 
-function componentColor(name) {
+function componentColor(name: unknown): JscadColors.RGB {
   const c = String(name || '').charAt(0).toUpperCase()
   switch (c) {
     case 'R': return [0.85, 0.30, 0.30] // red — resistors
@@ -209,20 +228,32 @@ function componentColor(name) {
 
 // Tab definitions. Order is meaningful — Source first so the file reads as
 // "I'm editing a TSX file" before the visualisations.
-const TABS = [
+type TabId = 'source' | 'schematic' | 'pcb' | '3d'
+
+const TABS: { id: TabId; label: string; icon: typeof FileCode }[] = [
   { id: 'source',    label: 'Source',    icon: FileCode },
   { id: 'schematic', label: 'Schematic', icon: CircuitBoard },
   { id: 'pcb',       label: 'PCB',       icon: Cpu },
   { id: '3d',        label: '3D',        icon: Box },
 ]
 
-export default function CircuitEditor({ viewRef } = {}) {
+// The concrete handle is implemented by whichever sub-view is active (SchematicView /
+// PCBView's own `snapshot`); CircuitEditor only forwards the ref down.
+export interface CircuitEditorHandle {
+  snapshot: (opts?: { size?: number; quality?: number }) => Promise<Blob | null>
+}
+
+export interface CircuitEditorProps {
+  viewRef?: Ref<CircuitEditorHandle>
+}
+
+export default function CircuitEditor({ viewRef }: CircuitEditorProps = {}) {
   const w = useWorkspace()
-  const [tab, setTab] = useState('source')
+  const [tab, setTab] = useState<TabId>('source')
 
   // Compile loop. Mirrors Editor.jsx's JSCAD compile effect: debounce on the
   // current file content + id, kick off runCircuit, stash result in store.
-  const debounceRef = useRef(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     if (!w.currentFile || w.currentFile.kind === 'folder') return
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -250,10 +281,10 @@ export default function CircuitEditor({ viewRef } = {}) {
   // Cache key is `${refdes}::${fileId}::${contentSig}` so re-renders don't
   // refetch and Part edits invalidate cleanly. Stored as state so a
   // resolution triggers a re-build.
-  const [libraryGeoms, setLibraryGeoms] = useState(() => new Map())
+  const [libraryGeoms, setLibraryGeoms] = useState<Map<string, JscadPart[]>>(() => new Map())
   // Fetched-content cache — separate so a refdes pointing at an unchanged
   // Part doesn't refetch. Keyed by fileId → { sig, parts | null }.
-  const fetchCacheRef = useRef(new Map())
+  const fetchCacheRef = useRef(new Map<string, { sig: string; parts: JscadPart[] | null }>())
   // Project id is needed for api.getFile. It moves rarely.
   const projectId = w.projectId
 
@@ -279,7 +310,7 @@ export default function CircuitEditor({ viewRef } = {}) {
             // substituteComponentGeometry handles both JSCAD (model_3d) and
             // STEP (model_3d_paths) in priority order. The fetchStep injector
             // fetches a relative model path via the project blobs API.
-            const fetchStep = async (relPath) => {
+            const fetchStep = async (relPath: string) => {
               const resp = await api.fetchRaw(
                 `/api/projects/${projectId}/model3d?path=${encodeURIComponent(relPath)}&file_id=${encodeURIComponent(fileId)}`,
               )
@@ -315,6 +346,11 @@ export default function CircuitEditor({ viewRef } = {}) {
   // switching tabs back is instant and toggling a mapping recolours
   // immediately. When the async effect lands a resolved part, the geom map
   // identity changes and the 3D scene re-builds with the real geometry.
+  // Dependency is intentionally `w.currentCircuit?.raw` (narrower than the compiler's
+  // inferred `w.currentCircuit`) so a store update that doesn't touch `.raw` doesn't
+  // rebuild the 3D scene; pre-existing before this migration, only surfaced now that
+  // this is a .tsx file.
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- see above
   const threeDParts = useMemo(() => {
     if (!w.currentCircuit?.raw) return []
     try {
@@ -328,7 +364,7 @@ export default function CircuitEditor({ viewRef } = {}) {
   }, [w.currentCircuit?.raw, libraryMappings, libraryGeoms])
 
   const errors = useMemo(() => {
-    const list = []
+    const list: string[] = []
     if (w.circuitError) list.push(w.circuitError)
     return list
   }, [w.circuitError])
@@ -369,29 +405,29 @@ export default function CircuitEditor({ viewRef } = {}) {
         {tab === 'source' && (
           <CodeEditor
             value={w.currentFileContent}
-            onChange={(v) => w.editContent(v)}
+            onChange={(v: string) => w.editContent(v)}
             errors={errors}
             readOnly={!w.currentFileId || w.currentFile?.kind === 'folder'}
           />
         )}
         {tab === 'schematic' && (
-          <SchematicView
+          <UntypedSchematicView
             viewRef={viewRef}
             circuitJson={w.currentCircuit?.raw || []}
             highlightRefdes={w.selectedCircuitRefdes}
-            onSelectRefdes={(r) => useWorkspace.getState().selectCircuitRefdes(r)}
+            onSelectRefdes={(r: string | null) => useWorkspace.getState().selectCircuitRefdes(r)}
             currentSource={w.currentFileContent}
-            onEditSource={(next) => useWorkspace.getState().editContent(next)}
+            onEditSource={(next: string) => useWorkspace.getState().editContent(next)}
             selectedCircuitComponentId={w.selectedCircuitComponentId || null}
-            onSelectComponent={(id) => useWorkspace.getState().selectCircuitComponent(id)}
+            onSelectComponent={(id: string | null) => useWorkspace.getState().selectCircuitComponent(id)}
           />
         )}
         {tab === 'pcb' && (
-          <PCBView
+          <UntypedPCBView
             viewRef={viewRef}
             circuitJson={w.currentCircuit?.raw || []}
             highlightRefdes={w.selectedCircuitRefdes}
-            onSelectRefdes={(r) => useWorkspace.getState().selectCircuitRefdes(r)}
+            onSelectRefdes={(r: string | null) => useWorkspace.getState().selectCircuitRefdes(r)}
           />
         )}
         {tab === '3d' && (
@@ -401,7 +437,7 @@ export default function CircuitEditor({ viewRef } = {}) {
           // Falls through to a teal indicator cuboid when neither is present.
           // Geometry is cached per file-id in fetchCacheRef (STEP bytes cached
           // in stepLoader.js by SHA-256 of the buffer).
-          <Renderer
+          <UntypedRenderer
             parts={threeDParts}
             selectedId={
               w.selectedCircuitRefdes && libraryMappings[w.selectedCircuitRefdes]
@@ -409,7 +445,7 @@ export default function CircuitEditor({ viewRef } = {}) {
                 : w.selectedCircuitRefdes
             }
             hiddenIds={new Set()}
-            onPick={(id) => {
+            onPick={(id: string | null) => {
               const r = typeof id === 'string' && id.startsWith('lib:') ? id.slice(4) : id
               useWorkspace.getState().selectCircuitRefdes(r)
             }}
@@ -424,7 +460,13 @@ export default function CircuitEditor({ viewRef } = {}) {
   )
 }
 
-function CompileStatus({ loading, error, counts }) {
+interface CompileStatusProps {
+  loading: boolean
+  error: string | null
+  counts: WorkspaceCircuit | null
+}
+
+function CompileStatus({ loading, error, counts }: CompileStatusProps) {
   if (loading) {
     return (
       <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] text-ink-400">

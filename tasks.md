@@ -6565,6 +6565,26 @@ this repo as transitive tscircuit dependencies. Both carry
   fixture could not distinguish two transforms, and the passing test looked like confirmation of
   both. Fixture coverage is part of the oracle's validity, not separate from it.
 - **Depends-on:** T-538 · **Blocks:** T-527 (the writer must invert whichever transform is correct)
+- **Status:** ✅ settled (2026-08-06) — `d97d4123`, `696d794d`, `b0eab22f`. **T-527 unblocked.**
+  **Verdict: fixed origin is correct. T-538's choice stands, no transform change.**
+  - **Divergence measured, not derived.** New fixture `board_with_outline.kicad_pcb` has a real
+    `gr_line` Edge.Cuts rectangle, bbox `(50,50)-(150,120)`, centre `(100,85)` — deliberately
+    off-origin. The same footprint returns as Kerf's `(70.0, -60.0)` vs the oracle's `(-30.0, 25.0)`.
+    Pinned in `TestKicadOracleOutlineConvention`.
+  - **Decided from tscircuit's own authoring model**, not from either reader — verified directly:
+    `pcb_board.center` is a required but *descriptive* field; `@tscircuit/core` **derives** a board's
+    centre from component bboxes rather than recentring anything; and the real authored fixture
+    `@tscircuit/schematic-corpus/.../design036/circuit.json` has
+    `pcb_board.center = {x: 2.415, y: 0}` while a `pcb_component` sits at literal `{x: 0, y: 0}`.
+    Under a board-centred convention that component would be at `-2.415`. **Circuit JSON is
+    absolute, single-frame.**
+  - So `kicad-to-circuit-json`'s Edge.Cuts-bbox recentring is *that project's* import convenience,
+    not a format requirement. The oracle will legitimately differ from us on outline-bearing
+    boards; the test records that as expected rather than as a defect.
+  - **Bonus:** `kicad_bridge.py`'s identical latent no-flip bug fixed as a self-consistent
+    writer/reader pair, with `TestYAxisConvention` covering the write-side flip, an unmoved-footprint
+    round-trip, and a hand-routed track/via.
+  - **VERIFIED:** 6853 → 6858 passed, 187 skipped. Oracle checks ran for real, none skipped.
 
 ### T-537 — Frontend pour validator rejects every backend pour
 - **Tier:** A · **Priority:** P1 · **Status:** ⬜ not started

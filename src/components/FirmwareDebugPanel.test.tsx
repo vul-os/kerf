@@ -147,11 +147,6 @@ const MUTEX_SNAPSHOT = {
 //   a) Initial render (loading / no snapshot yet)
 //   b) With stub providing sentinel — check sentinel strings in HTML
 
-async function renderAsync(props = {}) {
-  // We render synchronously; the component starts in loading state.
-  return renderToStaticMarkup(<FirmwareDebugPanel {...props} />)
-}
-
 // ---------------------------------------------------------------------------
 // 1. Cloud / JTAG sentinel
 // ---------------------------------------------------------------------------

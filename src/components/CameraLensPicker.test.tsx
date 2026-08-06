@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import CameraLensPicker from './CameraLensPicker.jsx'
+import CameraLensPicker from './CameraLensPicker'
 
 // ── 1. Default render ─────────────────────────────────────────────────────────
 

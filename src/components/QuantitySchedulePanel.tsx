@@ -23,6 +23,59 @@
 import { AlertTriangle, Table2 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface CategoryLine {
+  category?: string
+  element_count?: number
+  total_area_m2?: number
+  total_volume_m3?: number
+  total_gross_mass_kg?: number
+  total_material_cost_usd?: number
+}
+
+export interface MaterialLine {
+  material?: string
+  element_count?: number
+  total_volume_m3?: number
+  total_gross_mass_kg?: number
+  total_material_cost_usd?: number
+}
+
+export interface ElementLine {
+  element_id?: string
+  element_name?: string
+  category?: string
+  material?: string
+  area_m2?: number | null
+  volume_m3?: number | null
+  length_m?: number | null
+  count?: number
+  gross_mass_kg?: number
+  material_cost_usd?: number
+  flagged?: boolean
+  flag_reason?: string
+}
+
+export interface ScheduleResult {
+  ok?: boolean
+  reason?: string
+  total_material_cost_usd?: number
+  by_category?: CategoryLine[]
+  by_material?: MaterialLine[]
+  element_lines?: ElementLine[]
+  warnings?: string[]
+}
+
+export interface ParsedScheduleFile {
+  kind: 'ok' | 'empty' | 'invalid'
+  result: ScheduleResult | null
+  hasCost: boolean
+  error?: string
+}
+
+// ---------------------------------------------------------------------------
 // Pure helpers (exported for tests)
 // ---------------------------------------------------------------------------
 
@@ -30,19 +83,19 @@ import { AlertTriangle, Table2 } from 'lucide-react'
  * Parse raw quantity schedule file content.
  * Returns { kind: 'ok'|'empty'|'invalid', result, hasCost, error? }
  */
-export function parseScheduleFile(content) {
+export function parseScheduleFile(content: string): ParsedScheduleFile {
   const raw = typeof content === 'string' ? content : ''
   if (!raw.trim()) return { kind: 'empty', result: null, hasCost: false }
-  let doc
+  let doc: { result?: ScheduleResult } | ScheduleResult
   try {
     doc = JSON.parse(raw)
   } catch (e) {
-    return { kind: 'invalid', result: null, hasCost: false, error: e.message }
+    return { kind: 'invalid', result: null, hasCost: false, error: (e as Error).message }
   }
   if (!doc || typeof doc !== 'object') {
     return { kind: 'invalid', result: null, hasCost: false, error: 'Expected JSON object' }
   }
-  const result = doc.result || doc
+  const result = (doc as { result?: ScheduleResult }).result || (doc as ScheduleResult)
   if (!result || typeof result !== 'object') {
     return { kind: 'invalid', result: null, hasCost: false, error: 'No result field' }
   }
@@ -57,7 +110,7 @@ export function parseScheduleFile(content) {
  * Format a quantity number with an optional unit label.
  * Returns "—" for nulls.
  */
-export function fmtQty(n, unit = '') {
+export function fmtQty(n: number | null | undefined, unit = ''): string {
   if (n == null || !Number.isFinite(n)) return '—'
   const s = Number.isInteger(n) ? String(n) : n.toFixed(3).replace(/\.?0+$/, '')
   return unit ? `${s} ${unit}` : s
@@ -67,7 +120,7 @@ export function fmtQty(n, unit = '') {
  * Format a number as a USD cost string (2 decimal places).
  * Returns "—" for non-finite values.
  */
-export function fmtCostUsd(n) {
+export function fmtCostUsd(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—'
   return '$' + n.toFixed(2)
 }
@@ -89,7 +142,7 @@ function EmptyState() {
   )
 }
 
-function ErrorState({ message }) {
+function ErrorState({ message }: { message: string }) {
   return (
     <div className="flex items-start gap-2 m-3 rounded bg-red-950/40 border border-red-800 px-3 py-2"
          data-testid="qty-error-state">
@@ -99,7 +152,15 @@ function ErrorState({ message }) {
   )
 }
 
-function SummaryRow({ label, value, highlight = false }) {
+function SummaryRow({
+  label,
+  value,
+  highlight = false,
+}: {
+  label: string
+  value: string
+  highlight?: boolean
+}) {
   return (
     <div className={`flex justify-between items-center py-1 px-2 rounded text-[11px] ${
       highlight ? 'bg-kerf-950/40 border border-kerf-800' : ''
@@ -112,7 +173,13 @@ function SummaryRow({ label, value, highlight = false }) {
   )
 }
 
-function CategoryTable({ categories, hasCost }) {
+function CategoryTable({
+  categories,
+  hasCost,
+}: {
+  categories?: CategoryLine[]
+  hasCost: boolean
+}) {
   if (!categories || categories.length === 0) return null
   return (
     <div data-testid="qty-category-table">
@@ -159,7 +226,13 @@ function CategoryTable({ categories, hasCost }) {
   )
 }
 
-function MaterialTable({ materials, hasCost }) {
+function MaterialTable({
+  materials,
+  hasCost,
+}: {
+  materials?: MaterialLine[]
+  hasCost: boolean
+}) {
   if (!materials || materials.length === 0) return null
   return (
     <div data-testid="qty-material-table">
@@ -210,7 +283,7 @@ function MaterialTable({ materials, hasCost }) {
   )
 }
 
-function WarningsList({ warnings }) {
+function WarningsList({ warnings }: { warnings?: string[] }) {
   if (!warnings || warnings.length === 0) return null
   return (
     <div className="mt-2 space-y-0.5" data-testid="qty-warnings">
@@ -236,7 +309,14 @@ function WarningsList({ warnings }) {
  *               bim_material_cost_rollup tool result (or { result: ... } wrapper)
  *   fileName  — optional file name shown in header
  */
-export default function QuantitySchedulePanel({ content = '', fileName = '' }) {
+export interface Props {
+  /** raw JSON string from a bim_quantity_schedule / bim_material_cost_rollup tool result (or { result: ... } wrapper) */
+  content?: string
+  /** optional file name shown in header */
+  fileName?: string
+}
+
+export default function QuantitySchedulePanel({ content = '', fileName = '' }: Props) {
   const { kind, result, hasCost, error } = parseScheduleFile(content)
 
   const displayName = fileName

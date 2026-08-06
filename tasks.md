@@ -6007,6 +6007,45 @@ zero `@ts-ignore` without an inline justification comment.
 - **T-505** — slice 4, remainder: `api.js` (963), `src/lib/panels/` (16 files), `src/lib/a11y/`
   (6 files), `detectWebGL.js`, everything unclaimed. **Depends-on:** T-501, T-502
 
+> **✅ T-503 complete, commits `3d3f9fad`…`89f9e352`.** All 8 modules migrated leaf-first
+> (`geom3` → `assemblyLoader` → `lod` → `sketchSolver` → `faceNaming` → `sketchEdit` → `assembly` →
+> `occtBridge`), one commit per module as instructed. Verified: typecheck 0, typecheck:strict 0,
+> lint ratchet at baseline (78/78), vitest **477 files / 13,192 passed / 22 skipped**, exit 0.
+>
+> - **`occtBridge.ts`** (1,928 lines, the largest file in the slice) — `opencascade.js` ships zero
+>   `.d.ts` at all, so `oc` and every OCCT object are a genuinely untyped boundary. Named the alias
+>   rather than scattering bare `any`: `OcInstance`/`OcHandle` (both `any`, justified once at
+>   declaration). Everything that IS Kerf domain data (Mesh, FaceMeta, EdgeMap, AxisRef, PlaneRef,
+>   SketchJSON) is typed exactly against `@/types` with zero mismatch — geometry.ts was mined
+>   directly from this file. `breptToMesh`/`_emptyMesh` return `BareMesh = Omit<Mesh, 'id' |
+>   'faceNames'>` since those two fields are only added later by occtWorker.js.
+> - **`sketchSolver.ts`** — `@salusoft89/planegcs` (unlike opencascade.js) ships a full `.d.ts`;
+>   typing `buildPlanegcsPrimitives` against its real `Constraint` union surfaced **two pre-existing
+>   field-name bugs** (not fixed — behavior change out of migration scope, documented inline with
+>   `as unknown as GcsConstraint` at each site): the `'collinear'`/`'bezier_tangent'`/`'bezier_g1'`/
+>   `'bezier_g2'` cases push `point_on_line_ppp` with `p1_id`/`p2_id`, but the real constraint wants
+>   `lp1_id`/`lp2_id` (verified against the package's own `constraint_param_index.js`, which drives
+>   the wasm dispatch) — against the real wrapper this throws `"unhandled parameter lp1_id"`; and
+>   `symmetric_over_line`'s equal-radius side-constraint pushes `c1_id`/`c2_id` even for
+>   `equal_radius_aa`, which wants `a1_id`/`a2_id`. Both invisible because every test that exercises
+>   these paths mocks `@salusoft89/planegcs` wholesale.
+> - **`sketchEdit.ts`** closed two real `@/types` gaps (append-only, per T-501's convention):
+>   `SketchConstraint`'s variants had no `id` field at all (every real constraint object carries
+>   one), and `SketchEntity` was missing `external_curve` (constructed by `addExternalCurve`,
+>   rendered by `SketchView.jsx`). `addConstraint` became generic —
+>   `addConstraint<T extends SketchConstraint['type']>(sketch, type: T, fields: Omit<Extract<...>>)`
+>   — the same "reach for a generic" pattern as T-502's `meshCache.get<T>`.
+> - **`assembly.ts`** — `resolveAssemblyParts`/`loadExternalParts` take a `loadParts`/
+>   `loadExternalParts`/`recompile` callback owned by the workspace store; made both generic over
+>   `TPart extends AssemblyLoadedPart` rather than assuming a fixed part shape (another meshCache-
+>   style generic). Verified workspace.ts, which calls both with its own untyped loader, still
+>   typechecks clean.
+> - **Known-trap casualties fixed** (literal `readFileSync('lib/<name>.js')` source-text probes,
+>   broken by the renames, none of them files this slice owns): `curvatureCombs.test.js`,
+>   `curvatureCombsProbe.test.js`, `trimByCurve.test.js` (all `occtBridge.js`), and
+>   `src/components/DerivedCacheOverlay.test.jsx` (`assembly.js`, ×2). Minimal string-literal fixes
+>   only, per the documented exception.
+
 ### T-506 — `occtWorker.js` → TS with a typed message protocol
 - **Tier:** A · **Priority:** P0 · **Status:** ⬜ not started
 - **Scope:** The single largest frontend file (7,957 lines) and the browser OCCT kernel. Its

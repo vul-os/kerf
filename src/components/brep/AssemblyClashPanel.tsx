@@ -12,19 +12,48 @@
 // All tools dispatch via POST /api/tools/call (routes_tools.py).
 // Props: { projectId?: string }
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useRef } from 'react'
+import type { CSSProperties } from 'react'
 import {
-  AlertTriangle, CheckCircle, ChevronDown, ChevronRight,
-  Play, Loader2, X, RotateCcw, Layers, Activity,
-  Ruler, Move3d, ZoomIn, ToggleLeft, ToggleRight,
-  ShieldAlert, ShieldCheck, Shield, Info,
+  AlertTriangle, CheckCircle,
+  Play, Loader2, X, RotateCcw, Layers,
+  Ruler, Move3d, ToggleLeft, ToggleRight,
+  ShieldAlert, ShieldCheck, Info,
 } from 'lucide-react'
+import type { InterferenceRow } from './brepTypes'
+
+export interface Props {
+  projectId?: string
+}
 
 // ---------------------------------------------------------------------------
 // Palette — dark mono matching GeometryInspector
 // ---------------------------------------------------------------------------
 
-const p = {
+interface Palette {
+  root: CSSProperties
+  pageHeader: CSSProperties
+  pageTitle: CSSProperties
+  pageSub: CSSProperties
+  tabBar: CSSProperties
+  tab: (active: boolean) => CSSProperties
+  panel: CSSProperties
+  fieldRow: CSSProperties
+  label: CSSProperties
+  input: CSSProperties
+  select: CSSProperties
+  textarea: CSSProperties
+  runBtn: (disabled: boolean) => CSSProperties
+  clearBtn: CSSProperties
+  btnRow: CSSProperties
+  errorBox: CSSProperties
+  infoBox: CSSProperties
+  divider: CSSProperties
+  sectionLabel: CSSProperties
+  toggle: (on: boolean) => CSSProperties
+}
+
+const p: Palette = {
   root: {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: 13,
@@ -211,8 +240,11 @@ const API_URL = typeof import.meta !== 'undefined' && import.meta.env
   ? (import.meta.env.VITE_API_URL || '')
   : ''
 
-async function callTool(toolName, args, projectId) {
-  const body = { tool: toolName, args }
+// Return type is a boundary this slice does not own: `brep_assembly_interference` /
+// `brep_check_clearance` each return their own result shape, and this helper additionally
+// unwraps a JSON-string-encoded result.
+async function callTool(toolName: string, args: Record<string, unknown>, projectId?: string): Promise<any> {
+  const body: Record<string, unknown> = { tool: toolName, args }
   if (projectId) body.project_id = projectId
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
@@ -230,19 +262,20 @@ async function callTool(toolName, args, projectId) {
   return data.result ?? data
 }
 
-function tryParseJson(str) {
+function tryParseJson(str: string): unknown {
   try { return JSON.parse(str) } catch { return str }
 }
 
-function fmtMm(val) {
+// `unknown` — formats whatever raw numeric-ish field a tool result happens to carry.
+function fmtMm(val?: unknown): string {
   if (val == null) return '—'
-  const n = parseFloat(val)
+  const n = parseFloat(String(val))
   return isNaN(n) ? String(val) : `${n.toFixed(4)} mm`
 }
 
-function fmtVol(val) {
+function fmtVol(val?: unknown): string {
   if (val == null) return '—'
-  const n = parseFloat(val)
+  const n = parseFloat(String(val))
   return isNaN(n) ? String(val) : `${n.toFixed(6)} mm³`
 }
 
@@ -250,8 +283,12 @@ function fmtVol(val) {
 // Severity badge
 // ---------------------------------------------------------------------------
 
-function SeverityBadge({ volume }) {
-  const v = parseFloat(volume)
+interface SeverityBadgeProps {
+  volume?: number | string
+}
+
+function SeverityBadge({ volume }: SeverityBadgeProps) {
+  const v = parseFloat(String(volume))
   if (isNaN(v) || v <= 0) {
     return (
       <span style={{
@@ -282,7 +319,11 @@ function SeverityBadge({ volume }) {
 // Clash SVG pair icon
 // ---------------------------------------------------------------------------
 
-function ClashIcon({ size = 32 }) {
+interface IconProps {
+  size?: number
+}
+
+function ClashIcon({ size = 32 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
       {/* Left body */}
@@ -298,7 +339,7 @@ function ClashIcon({ size = 32 }) {
   )
 }
 
-function ClearanceIcon({ size = 32 }) {
+function ClearanceIcon({ size = 32 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
       {/* Left body */}
@@ -317,7 +358,11 @@ function ClearanceIcon({ size = 32 }) {
 // Result table for interference list
 // ---------------------------------------------------------------------------
 
-function InterferenceTable({ rows }) {
+interface InterferenceTableProps {
+  rows?: InterferenceRow[] | null
+}
+
+function InterferenceTable({ rows }: InterferenceTableProps) {
   if (!rows || rows.length === 0) {
     return (
       <div style={{ ...p.infoBox, marginTop: 8 }}>
@@ -373,7 +418,11 @@ function InterferenceTable({ rows }) {
 // RawResult — fallback JSON viewer
 // ---------------------------------------------------------------------------
 
-function RawResult({ data }) {
+interface RawResultProps {
+  data?: unknown
+}
+
+function RawResult({ data }: RawResultProps) {
   if (!data) return null
   const text = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data)
   return (
@@ -392,13 +441,20 @@ function RawResult({ data }) {
 // Tab: Component Pairs
 // ---------------------------------------------------------------------------
 
-function ComponentPairsTab({ projectId }) {
+interface TabProps {
+  projectId?: string
+}
+
+function ComponentPairsTab({ projectId }: TabProps) {
   const [bodyAJson, setBodyAJson] = useState('')
   const [bodyBJson, setBodyBJson] = useState('')
   const [method, setMethod] = useState('boolean')
   const [running, setRunning] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  // `any` — this tab's result shape is whichever of several optional-field aliases
+  // `brep_assembly_interference` happens to return (a boundary this slice does not own); the
+  // code below narrows defensively with Array.isArray / `!= null` checks before use.
+  const [result, setResult] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
 
   async function run() {
     setRunning(true); setResult(null); setError(null)
@@ -410,7 +466,7 @@ function ComponentPairsTab({ projectId }) {
       }
       const res = await callTool('brep_assembly_interference', args, projectId)
       setResult(res)
-    } catch (e) { setError(e.message) }
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setRunning(false) }
   }
 
@@ -503,14 +559,15 @@ function ComponentPairsTab({ projectId }) {
 // Tab: Whole-Assembly Sweep
 // ---------------------------------------------------------------------------
 
-function WholeSweepTab({ projectId }) {
+function WholeSweepTab({ projectId }: TabProps) {
   const [fileId, setFileId] = useState('')
   const [method, setMethod] = useState('boolean')
   const [topN, setTopN] = useState('10')
   const [excludeFasteners, setExcludeFasteners] = useState(false)
   const [running, setRunning] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  // `any` — boundary this slice does not own; see ComponentPairsTab's `result` comment.
+  const [result, setResult] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
 
   async function run() {
     setRunning(true); setResult(null); setError(null)
@@ -523,7 +580,7 @@ function WholeSweepTab({ projectId }) {
       }
       const res = await callTool('brep_assembly_interference', args, projectId)
       setResult(res)
-    } catch (e) { setError(e.message) }
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setRunning(false) }
   }
 
@@ -642,13 +699,14 @@ function WholeSweepTab({ projectId }) {
 // Tab: Clearance Check
 // ---------------------------------------------------------------------------
 
-function ClearanceTab({ projectId }) {
+function ClearanceTab({ projectId }: TabProps) {
   const [bodyAJson, setBodyAJson] = useState('')
   const [bodyBJson, setBodyBJson] = useState('')
   const [minClearance, setMinClearance] = useState('0.5')
   const [running, setRunning] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  // `any` — boundary this slice does not own; see ComponentPairsTab's `result` comment.
+  const [result, setResult] = useState<any>(null)
+  const [error, setError] = useState<string | null>(null)
 
   async function run() {
     setRunning(true); setResult(null); setError(null)
@@ -660,7 +718,7 @@ function ClearanceTab({ projectId }) {
       }
       const res = await callTool('brep_check_clearance', args, projectId)
       setResult(res)
-    } catch (e) { setError(e.message) }
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setRunning(false) }
   }
 
@@ -805,7 +863,21 @@ function ClearanceTab({ projectId }) {
 // Tab: Motion Clash
 // ---------------------------------------------------------------------------
 
-function MotionClashTab({ projectId }) {
+/** One step of MotionClashTab's rotation sweep. */
+interface MotionClashFrame {
+  angle: string
+  // `any` — boundary this slice does not own; see ComponentPairsTab's `result` comment.
+  result?: any
+  vol: number
+  error?: string
+}
+
+interface SweepProgress {
+  current: number
+  total: number
+}
+
+function MotionClashTab({ projectId }: TabProps) {
   const [bodyAJson, setBodyAJson] = useState('')
   const [bodyBJson, setBodyBJson] = useState('')
   const [axis, setAxis] = useState('[1,0,0]')
@@ -813,9 +885,9 @@ function MotionClashTab({ projectId }) {
   const [rangeTo, setRangeTo] = useState('90')
   const [steps, setSteps] = useState('12')
   const [running, setRunning] = useState(false)
-  const [progress, setProgress] = useState(null)   // {current, total}
-  const [frames, setFrames] = useState([])          // per-frame results
-  const [error, setError] = useState(null)
+  const [progress, setProgress] = useState<SweepProgress | null>(null)
+  const [frames, setFrames] = useState<MotionClashFrame[]>([])
+  const [error, setError] = useState<string | null>(null)
   const cancelRef = useRef(false)
 
   async function run() {
@@ -826,7 +898,7 @@ function MotionClashTab({ projectId }) {
       const from = parseFloat(rangeFrom) || 0
       const to = parseFloat(rangeTo) || 90
       const axisVec = tryParseJson(axis)
-      const frameResults = []
+      const frameResults: MotionClashFrame[] = []
 
       for (let i = 0; i < nSteps; i++) {
         if (cancelRef.current) break
@@ -844,11 +916,15 @@ function MotionClashTab({ projectId }) {
           const vol = res?.overlap_volume ?? res?.penetration_volume ?? res?.volume ?? 0
           frameResults.push({ angle: angle.toFixed(2), result: res, vol: parseFloat(vol) || 0 })
         } catch (frameErr) {
-          frameResults.push({ angle: angle.toFixed(2), error: frameErr.message, vol: 0 })
+          frameResults.push({
+            angle: angle.toFixed(2),
+            error: frameErr instanceof Error ? frameErr.message : String(frameErr),
+            vol: 0,
+          })
         }
         setFrames([...frameResults])
       }
-    } catch (e) { setError(e.message) }
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setRunning(false); setProgress(null) }
   }
 
@@ -1072,15 +1148,17 @@ function MotionClashTab({ projectId }) {
 // AssemblyClashPanel — main export
 // ---------------------------------------------------------------------------
 
-const TABS = [
+type TabId = 'pairs' | 'sweep' | 'clearance' | 'motion'
+
+const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'pairs',    label: 'Component Pairs' },
   { id: 'sweep',    label: 'Whole-Assembly Sweep' },
   { id: 'clearance', label: 'Clearance Check' },
   { id: 'motion',   label: 'Motion Clash' },
 ]
 
-export default function AssemblyClashPanel({ projectId }) {
-  const [activeTab, setActiveTab] = useState('pairs')
+export default function AssemblyClashPanel({ projectId }: Props) {
+  const [activeTab, setActiveTab] = useState<TabId>('pairs')
 
   return (
     <div style={p.root} data-testid="assembly-clash-panel">

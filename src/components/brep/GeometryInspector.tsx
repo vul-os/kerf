@@ -9,18 +9,25 @@
 // All tools dispatch via POST /api/tools/call (routes_tools.py).
 // Props: { projectId?: string }
 
-import { useState, useCallback, useRef } from 'react'
+import { useState } from 'react'
+import type { CSSProperties } from 'react'
 import {
   Wrench, Shield, Search, BarChart2, ChevronDown, ChevronRight,
-  Play, Loader2, AlertTriangle, CheckCircle, Info, X,
+  Play, Loader2, AlertTriangle, CheckCircle,
   Layers, Scissors, Cpu, Activity, Eye, Sliders,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import type { ToolCardDef } from './brepTypes'
+
+export interface Props {
+  projectId?: string
+}
 
 // ---------------------------------------------------------------------------
 // Styles — dark mono palette matching feaStyles.js
 // ---------------------------------------------------------------------------
 
-const s = {
+const s: Record<string, CSSProperties> = {
   root: {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: 13,
@@ -211,8 +218,10 @@ const API_URL = typeof import.meta !== 'undefined' && import.meta.env
   ? (import.meta.env.VITE_API_URL || '')
   : ''
 
-async function callTool(toolName, args, projectId) {
-  const body = { tool: toolName, args }
+// Return type is a boundary this slice does not own: ~30 distinct `brep_*` tools each return
+// their own result shape, and this helper additionally unwraps a JSON-string-encoded result.
+async function callTool(toolName: string, args: Record<string, unknown>, projectId?: string): Promise<any> {
+  const body: Record<string, unknown> = { tool: toolName, args }
   if (projectId) body.project_id = projectId
 
   const res = await fetch(`${API_URL}/api/tools/call`, {
@@ -232,25 +241,23 @@ async function callTool(toolName, args, projectId) {
   return data
 }
 
-function fmt(v) {
-  if (v === null || v === undefined) return '—'
-  if (typeof v === 'object') return JSON.stringify(v, null, 2)
-  return String(v)
-}
-
 // ---------------------------------------------------------------------------
 // ToolCard — a single collapsible tool card
 // ---------------------------------------------------------------------------
 
-function ToolCard({ name, icon: Icon, color, desc, fields, buildArgs, projectId }) {
-  const [values, setValues] = useState(() =>
+interface ToolCardProps extends ToolCardDef {
+  projectId?: string
+}
+
+function ToolCard({ name, icon: Icon, color, desc, fields, buildArgs, projectId }: ToolCardProps) {
+  const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(fields.map((f) => [f.key, f.default ?? '']))
   )
   const [running, setRunning] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<unknown>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  function set(key, val) {
+  function set(key: string, val: string) {
     setValues((v) => ({ ...v, [key]: val }))
   }
 
@@ -263,7 +270,7 @@ function ToolCard({ name, icon: Icon, color, desc, fields, buildArgs, projectId 
       const res = await callTool(name, args, projectId)
       setResult(res)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setRunning(false)
     }
@@ -349,7 +356,16 @@ function ToolCard({ name, icon: Icon, color, desc, fields, buildArgs, projectId 
 // Section — collapsible section header + card grid
 // ---------------------------------------------------------------------------
 
-function Section({ title, icon: Icon, color, cards, projectId, defaultOpen = true }) {
+interface SectionProps {
+  title: string
+  icon: LucideIcon
+  color: string
+  cards: ToolCardDef[]
+  projectId?: string
+  defaultOpen?: boolean
+}
+
+function Section({ title, icon: Icon, color, cards, projectId, defaultOpen = true }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div style={s.section}>
@@ -376,17 +392,7 @@ function Section({ title, icon: Icon, color, cards, projectId, defaultOpen = tru
 // Tool definitions — 28 tools across 4 sections
 // ---------------------------------------------------------------------------
 
-function buildBodyArg(values) {
-  // Most heal/validate tools accept body_json as JSON text in the field.
-  // Try to parse it; fall back to passing as-is (string).
-  try {
-    return { body_json: JSON.parse(values.body_json), tol: parseFloat(values.tol) || undefined }
-  } catch {
-    return { body_json: values.body_json, tol: parseFloat(values.tol) || undefined }
-  }
-}
-
-function buildFacesArg(values) {
+function buildFacesArg(values: Record<string, string>): Record<string, unknown> {
   try {
     return { faces: JSON.parse(values.faces_json) }
   } catch {
@@ -394,7 +400,7 @@ function buildFacesArg(values) {
   }
 }
 
-function buildTopologyArg(values) {
+function buildTopologyArg(values: Record<string, string>): Record<string, unknown> {
   try {
     return { topology: JSON.parse(values.topology_json) }
   } catch {
@@ -402,7 +408,7 @@ function buildTopologyArg(values) {
   }
 }
 
-const HEALING_CARDS = [
+const HEALING_CARDS: ToolCardDef[] = [
   {
     name: 'brep_heal',
     icon: Wrench,
@@ -413,7 +419,7 @@ const HEALING_CARDS = [
       { key: 'tol', label: 'Tolerance', type: 'number', placeholder: '1e-5', default: '1e-5' },
     ],
     buildArgs: (v) => {
-      const args = {}
+      const args: Record<string, unknown> = {}
       try { args.body_json = JSON.parse(v.body_json) } catch { args.body_json = v.body_json }
       if (v.tol) args.tol = parseFloat(v.tol)
       return args
@@ -445,7 +451,7 @@ const HEALING_CARDS = [
       ]},
     ],
     buildArgs: (v) => {
-      const args = { target_continuity: v.target_continuity }
+      const args: Record<string, unknown> = { target_continuity: v.target_continuity }
       try { args.body_json = JSON.parse(v.body_json) } catch { args.body_json = v.body_json }
       return args
     },
@@ -460,7 +466,7 @@ const HEALING_CARDS = [
       { key: 'thickness', label: 'Thickness (mm)', type: 'number', placeholder: '2.0', default: '2.0' },
     ],
     buildArgs: (v) => {
-      const args = { thickness: parseFloat(v.thickness) || 2.0 }
+      const args: Record<string, unknown> = { thickness: parseFloat(v.thickness) || 2.0 }
       try { args.body_json = JSON.parse(v.body_json) } catch { args.body_json = v.body_json }
       return args
     },
@@ -475,7 +481,7 @@ const HEALING_CARDS = [
       { key: 'tol', label: 'Tolerance', type: 'number', placeholder: '1e-4', default: '1e-4' },
     ],
     buildArgs: (v) => {
-      const args = {}
+      const args: Record<string, unknown> = {}
       try { args.body_json = JSON.parse(v.body_json) } catch { args.body_json = v.body_json }
       if (v.tol) args.tol = parseFloat(v.tol)
       return args
@@ -495,7 +501,7 @@ const HEALING_CARDS = [
   },
 ]
 
-const VALIDATION_CARDS = [
+const VALIDATION_CARDS: ToolCardDef[] = [
   {
     name: 'brep_validate_body',
     icon: Shield,
@@ -572,7 +578,7 @@ const VALIDATION_CARDS = [
   },
 ]
 
-const FEATURE_RECOG_CARDS = [
+const FEATURE_RECOG_CARDS: ToolCardDef[] = [
   {
     name: 'brep_feature_recognition',
     icon: Search,
@@ -603,7 +609,7 @@ const FEATURE_RECOG_CARDS = [
       { key: 'pull_dir', label: 'Pull direction', type: 'text', placeholder: '[0,0,1]', default: '[0,0,1]' },
     ],
     buildArgs: (v) => {
-      const args = {}
+      const args: Record<string, unknown> = {}
       try { args.body_json = JSON.parse(v.body_json) } catch { args.body_json = v.body_json }
       try { args.pull_direction = JSON.parse(v.pull_dir) } catch { args.pull_direction = v.pull_dir }
       return args
@@ -619,7 +625,7 @@ const FEATURE_RECOG_CARDS = [
       { key: 'pull_dir', label: 'Pull direction', type: 'text', placeholder: '[0,0,1]', default: '[0,0,1]' },
     ],
     buildArgs: (v) => {
-      const args = {}
+      const args: Record<string, unknown> = {}
       try { args.body_json = JSON.parse(v.body_json) } catch { args.body_json = v.body_json }
       try { args.pull_direction = JSON.parse(v.pull_dir) } catch { args.pull_direction = v.pull_dir }
       return args
@@ -635,7 +641,7 @@ const FEATURE_RECOG_CARDS = [
       { key: 'n_candidates', label: 'Candidates', type: 'number', placeholder: '36', default: '36' },
     ],
     buildArgs: (v) => {
-      const args = { n_candidates: parseInt(v.n_candidates, 10) || 36 }
+      const args: Record<string, unknown> = { n_candidates: parseInt(v.n_candidates, 10) || 36 }
       try { args.body_json = JSON.parse(v.body_json) } catch { args.body_json = v.body_json }
       return args
     },
@@ -664,7 +670,7 @@ const FEATURE_RECOG_CARDS = [
   },
 ]
 
-const ANALYSIS_CARDS = [
+const ANALYSIS_CARDS: ToolCardDef[] = [
   {
     name: 'brep_analyze_wall_thickness',
     icon: BarChart2,
@@ -685,7 +691,7 @@ const ANALYSIS_CARDS = [
       ]},
     ],
     buildArgs: (v) => {
-      const args = { shape: v.shape, material: v.material }
+      const args: Record<string, unknown> = { shape: v.shape, material: v.material }
       try { args.size = JSON.parse(v.size) } catch { args.size = v.size }
       return args
     },
@@ -701,7 +707,7 @@ const ANALYSIS_CARDS = [
       { key: 'min_draft_deg', label: 'Min draft (°)', type: 'number', placeholder: '1.0', default: '1.0' },
     ],
     buildArgs: (v) => {
-      const args = { min_draft_deg: parseFloat(v.min_draft_deg) || 1.0 }
+      const args: Record<string, unknown> = { min_draft_deg: parseFloat(v.min_draft_deg) || 1.0 }
       try { args.body_json = JSON.parse(v.body_json) } catch { args.body_json = v.body_json }
       try { args.pull_direction = JSON.parse(v.pull_dir) } catch { args.pull_direction = v.pull_dir }
       return args
@@ -740,7 +746,7 @@ const ANALYSIS_CARDS = [
       ]},
     ],
     buildArgs: (v) => {
-      const args = { operation: v.operation }
+      const args: Record<string, unknown> = { operation: v.operation }
       try { args.body_a = JSON.parse(v.body_a) } catch { args.body_a = v.body_a }
       try { args.body_b = JSON.parse(v.body_b) } catch { args.body_b = v.body_b }
       return args
@@ -756,7 +762,7 @@ const ANALYSIS_CARDS = [
       { key: 'quad_order', label: 'Quad order', type: 'number', placeholder: '20', default: '20' },
     ],
     buildArgs: (v) => {
-      const args = { quad_order: parseInt(v.quad_order, 10) || 20 }
+      const args: Record<string, unknown> = { quad_order: parseInt(v.quad_order, 10) || 20 }
       try { args.body_json = JSON.parse(v.body_json) } catch { args.body_json = v.body_json }
       return args
     },
@@ -772,7 +778,7 @@ const ANALYSIS_CARDS = [
       { key: 'plane_normal', label: 'Plane normal', type: 'text', placeholder: '[0,0,1]', default: '[0,0,1]' },
     ],
     buildArgs: (v) => {
-      const args = {}
+      const args: Record<string, unknown> = {}
       try { args.body_json = JSON.parse(v.body_json) } catch { args.body_json = v.body_json }
       try { args.plane_point = JSON.parse(v.plane_point) } catch { args.plane_point = v.plane_point }
       try { args.plane_normal = JSON.parse(v.plane_normal) } catch { args.plane_normal = v.plane_normal }
@@ -794,7 +800,7 @@ const ANALYSIS_CARDS = [
       { key: 'n_sections', label: 'Sections', type: 'number', placeholder: '10', default: '10' },
     ],
     buildArgs: (v) => {
-      const args = { axis: v.axis, n_sections: parseInt(v.n_sections, 10) || 10 }
+      const args: Record<string, unknown> = { axis: v.axis, n_sections: parseInt(v.n_sections, 10) || 10 }
       try { args.body_json = JSON.parse(v.body_json) } catch { args.body_json = v.body_json }
       return args
     },
@@ -809,7 +815,7 @@ const ANALYSIS_CARDS = [
       { key: 'point', label: 'Point [x,y,z]', type: 'text', placeholder: '[0,0,0]', default: '[0,0,0]' },
     ],
     buildArgs: (v) => {
-      const args = {}
+      const args: Record<string, unknown> = {}
       try { args.body_json = JSON.parse(v.body_json) } catch { args.body_json = v.body_json }
       try { args.point = JSON.parse(v.point) } catch { args.point = v.point }
       return args
@@ -825,7 +831,7 @@ const ANALYSIS_CARDS = [
       { key: 'tol', label: 'Flatness tol', type: 'number', placeholder: '1e-4', default: '1e-4' },
     ],
     buildArgs: (v) => {
-      const args = {}
+      const args: Record<string, unknown> = {}
       try { args.body_json = JSON.parse(v.body_json) } catch { args.body_json = v.body_json }
       if (v.tol) args.tol = parseFloat(v.tol)
       return args
@@ -866,7 +872,7 @@ const ANALYSIS_CARDS = [
       ]},
     ],
     buildArgs: (v) => {
-      const args = { method: v.method }
+      const args: Record<string, unknown> = { method: v.method }
       try { args.body_json = JSON.parse(v.body_json) } catch { args.body_json = v.body_json }
       return args
     },
@@ -894,7 +900,7 @@ const ANALYSIS_CARDS = [
       { key: 'min_clearance', label: 'Min clearance', type: 'number', placeholder: '0.5', default: '0.5' },
     ],
     buildArgs: (v) => {
-      const args = { min_clearance: parseFloat(v.min_clearance) || 0.5 }
+      const args: Record<string, unknown> = { min_clearance: parseFloat(v.min_clearance) || 0.5 }
       try { args.body_a = JSON.parse(v.body_a) } catch { args.body_a = v.body_a }
       try { args.body_b = JSON.parse(v.body_b) } catch { args.body_b = v.body_b }
       return args
@@ -910,7 +916,7 @@ const ANALYSIS_CARDS = [
       { key: 'min_wall_mm', label: 'Min wall (mm)', type: 'number', placeholder: '1.0', default: '1.0' },
     ],
     buildArgs: (v) => {
-      const args = { min_wall_mm: parseFloat(v.min_wall_mm) || 1.0 }
+      const args: Record<string, unknown> = { min_wall_mm: parseFloat(v.min_wall_mm) || 1.0 }
       try { args.body_json = JSON.parse(v.body_json) } catch { args.body_json = v.body_json }
       return args
     },
@@ -925,7 +931,7 @@ const ANALYSIS_CARDS = [
       { key: 'resolution', label: 'Grid resolution', type: 'number', placeholder: '32', default: '32' },
     ],
     buildArgs: (v) => {
-      const args = { resolution: parseInt(v.resolution, 10) || 32 }
+      const args: Record<string, unknown> = { resolution: parseInt(v.resolution, 10) || 32 }
       try { args.body_json = JSON.parse(v.body_json) } catch { args.body_json = v.body_json }
       return args
     },
@@ -936,7 +942,7 @@ const ANALYSIS_CARDS = [
 // GeometryInspector — main page component
 // ---------------------------------------------------------------------------
 
-export default function GeometryInspector({ projectId }) {
+export default function GeometryInspector({ projectId }: Props) {
   const totalTools =
     HEALING_CARDS.length +
     VALIDATION_CARDS.length +

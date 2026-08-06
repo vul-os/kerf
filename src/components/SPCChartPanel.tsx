@@ -17,8 +17,57 @@
 //   flagColor(isOoc)         → CSS colour string
 //   oocCount(oocArray)       → integer count
 
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { Activity, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react'
+
+// ---------------------------------------------------------------------------
+// Domain types — no shared type exists for the spc_* tool outputs, so this
+// is a local, deliberately loose shape covering all chart-kind result keys.
+// ---------------------------------------------------------------------------
+
+export interface SPCResult {
+  ok?: boolean
+  reason?: string
+  grand_mean?: number
+  r_bar?: number
+  s_bar?: number
+  ucl_xbar?: number
+  lcl_xbar?: number
+  ucl_r?: number
+  lcl_r?: number
+  ucl_s?: number
+  lcl_s?: number
+  sigma?: number
+  subgroup_means?: number[]
+  subgroup_ranges?: number[]
+  subgroup_stdevs?: number[]
+  ooc_xbar?: unknown[]
+  ooc_r?: unknown[]
+  ooc_s?: unknown[]
+  target?: number
+  K?: number
+  H?: number
+  c_pos?: number[]
+  c_neg?: number[]
+  ooc_pos?: unknown[]
+  ooc_neg?: unknown[]
+  lam?: number
+  ucl?: number | number[]
+  lcl?: number | number[]
+  ewma?: number[]
+  ooc?: unknown[]
+  any_violation?: boolean
+  center?: number
+  violations?: Record<string, unknown[]>
+  [key: string]: unknown
+}
+
+interface ParsedSPCFile {
+  kind: 'empty' | 'invalid' | 'ok'
+  tool?: string | null
+  result?: SPCResult | null
+  error?: string
+}
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for tests)
@@ -28,14 +77,15 @@ import { Activity, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp } from 'l
  * Parse raw file content string into a usable SPC result object.
  * Returns { kind: 'ok'|'empty'|'invalid', tool, result, error? }
  */
-export function parseSPCFile(content) {
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper consumed directly by tests; not a component
+export function parseSPCFile(content: string): ParsedSPCFile {
   const raw = typeof content === 'string' ? content : ''
   if (!raw.trim()) return { kind: 'empty', tool: null, result: null }
   let doc
   try {
     doc = JSON.parse(raw)
   } catch (e) {
-    return { kind: 'invalid', error: e.message }
+    return { kind: 'invalid', error: (e as Error).message }
   }
   if (!doc || typeof doc !== 'object') return { kind: 'invalid', error: 'Expected JSON object' }
 
@@ -52,7 +102,8 @@ export function parseSPCFile(content) {
  * Format a number as a sigma string like "+1.50 σ" or "–2.03 σ".
  * Returns "—" for null/undefined/NaN.
  */
-export function fmtSigma(n) {
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper consumed directly by tests; not a component
+export function fmtSigma(n: number | null | undefined) {
   if (n == null || !Number.isFinite(n)) return '—'
   const sign = n >= 0 ? '+' : '−'
   return `${sign}${Math.abs(n).toFixed(2)} σ`
@@ -61,7 +112,8 @@ export function fmtSigma(n) {
 /**
  * Return a CSS colour string for out-of-control (OOC) flag.
  */
-export function flagColor(isOoc) {
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper consumed directly by tests; not a component
+export function flagColor(isOoc: boolean) {
   return isOoc ? '#f87171' : '#34d399'
 }
 
@@ -69,11 +121,16 @@ export function flagColor(isOoc) {
  * Count total OOC signals from an array of OOC point indices or
  * an object of rule→indices.
  */
-export function oocCount(ooc) {
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper consumed directly by tests; not a component
+export function oocCount(ooc: unknown[] | Record<string, unknown> | null | undefined): number {
   if (!ooc) return 0
   if (Array.isArray(ooc)) return ooc.length
   if (typeof ooc === 'object') {
-    return Object.values(ooc).reduce((s, v) => s + (Array.isArray(v) ? v.length : 0), 0)
+    let total = 0
+    for (const v of Object.values(ooc)) {
+      if (Array.isArray(v)) total += v.length
+    }
+    return total
   }
   return 0
 }
@@ -83,7 +140,12 @@ export function oocCount(ooc) {
 // ---------------------------------------------------------------------------
 
 /** Small metric card */
-function MetricCard({ label, value, mono, highlight }) {
+function MetricCard({ label, value, mono, highlight }: {
+  label: string
+  value: string | number | null | undefined
+  mono?: boolean
+  highlight?: string
+}) {
   return (
     <div style={styles.metricCard}>
       <div style={styles.metricLabel}>{label}</div>
@@ -97,7 +159,15 @@ function MetricCard({ label, value, mono, highlight }) {
 }
 
 /** Horizontal sparkline for a numeric series (UCL/LCL/CL bands optional) */
-function MiniChart({ data, ucl, lcl, cl, label, height = 70, color = '#818cf8' }) {
+function MiniChart({ data, ucl, lcl, cl, label, height = 70, color = '#818cf8' }: {
+  data: number[] | undefined
+  ucl?: number
+  lcl?: number
+  cl?: number
+  label?: string
+  height?: number
+  color?: string
+}) {
   if (!data || data.length < 2) return null
   const n    = data.length
   const mins = [Math.min(...data), ucl, lcl, cl].filter((v) => v != null)
@@ -109,8 +179,8 @@ function MiniChart({ data, ucl, lcl, cl, label, height = 70, color = '#818cf8' }
   const H = height
   const pad = 4
 
-  function yPos(v) { return H - pad - ((v - minY) / rangeY) * (H - pad * 2) }
-  function xPos(i) { return pad + (i / (n - 1)) * (W - pad * 2) }
+  function yPos(v: number) { return H - pad - ((v - minY) / rangeY) * (H - pad * 2) }
+  function xPos(i: number) { return pad + (i / (n - 1)) * (W - pad * 2) }
 
   const pts = data.map((v, i) => `${xPos(i).toFixed(1)},${yPos(v).toFixed(1)}`).join(' ')
 
@@ -155,7 +225,10 @@ function MiniChart({ data, ucl, lcl, cl, label, height = 70, color = '#818cf8' }
 }
 
 /** Collapsible run-rules violations section */
-function RunRulesSection({ violations, anyViolation }) {
+function RunRulesSection({ violations, anyViolation }: {
+  violations: Record<string, unknown[]> | undefined
+  anyViolation: boolean
+}) {
   const [open, setOpen] = useState(false)
   if (!violations) return null
   const rules = Object.entries(violations).filter(([, v]) => Array.isArray(v) && v.length > 0)
@@ -194,7 +267,7 @@ function RunRulesSection({ violations, anyViolation }) {
 // Chart-type renderers
 // ---------------------------------------------------------------------------
 
-function XBarRChart({ result }) {
+function XBarRChart({ result }: { result: SPCResult }) {
   const xbar = result.subgroup_means || []
   const r    = result.subgroup_ranges || []
   const totalOoc = (result.ooc_xbar?.length || 0) + (result.ooc_r?.length || 0)
@@ -216,7 +289,7 @@ function XBarRChart({ result }) {
   )
 }
 
-function XBarSChart({ result }) {
+function XBarSChart({ result }: { result: SPCResult }) {
   const xbar = result.subgroup_means || []
   const s    = result.subgroup_stdevs || []
   const totalOoc = (result.ooc_xbar?.length || 0) + (result.ooc_s?.length || 0)
@@ -238,7 +311,7 @@ function XBarSChart({ result }) {
   )
 }
 
-function CusumChart({ result }) {
+function CusumChart({ result }: { result: SPCResult }) {
   const cPos = result.c_pos || []
   const cNeg = result.c_neg || []
   const ooc  = (result.ooc_pos?.length || 0) + (result.ooc_neg?.length || 0)
@@ -258,7 +331,7 @@ function CusumChart({ result }) {
   )
 }
 
-function EwmaChart({ result }) {
+function EwmaChart({ result }: { result: SPCResult }) {
   const ewma = result.ewma || []
   const ucl  = Array.isArray(result.ucl) ? result.ucl[result.ucl.length - 1] : result.ucl
   const lcl  = Array.isArray(result.lcl) ? result.lcl[result.lcl.length - 1] : result.lcl
@@ -286,7 +359,7 @@ function EwmaChart({ result }) {
   )
 }
 
-function RunRulesResult({ result }) {
+function RunRulesResult({ result }: { result: SPCResult }) {
   const anyViolation = result.any_violation === true
   const totalViolations = oocCount(result.violations)
   return (
@@ -311,7 +384,7 @@ function RunRulesResult({ result }) {
 // Detect chart type from result keys
 // ---------------------------------------------------------------------------
 
-function detectChartType(tool, result) {
+function detectChartType(tool: string | null, result: SPCResult) {
   if (tool) {
     if (tool.includes('xbar_r'))   return 'xbar_r'
     if (tool.includes('xbar_s'))   return 'xbar_s'
@@ -327,7 +400,7 @@ function detectChartType(tool, result) {
   return 'unknown'
 }
 
-const CHART_TYPE_LABELS = {
+const CHART_TYPE_LABELS: Record<string, string> = {
   xbar_r:    'X̄-R Shewhart Chart',
   xbar_s:    'X̄-S Shewhart Chart',
   cusum:     'Tabular CUSUM Chart',
@@ -348,7 +421,16 @@ const CHART_TYPE_LABELS = {
  *   rawContent    — raw string content (used when parsedContent is absent).
  *   fileName      — display name.
  */
-export default function SPCChartPanel({ parsedContent, rawContent, fileName }) {
+export interface SPCChartPanelProps {
+  /** Already-parsed JSON of a `.spc` file, or null/undefined. */
+  parsedContent?: unknown
+  /** Raw string content (used when parsedContent is absent). */
+  rawContent?: string
+  /** Display name. */
+  fileName?: string
+}
+
+export default function SPCChartPanel({ parsedContent, rawContent, fileName }: SPCChartPanelProps) {
   const source = parsedContent ?? (rawContent ? (() => {
     try { return JSON.parse(rawContent) } catch { return null }
   })() : null)
@@ -403,7 +485,7 @@ export default function SPCChartPanel({ parsedContent, rawContent, fileName }) {
 // Header
 // ---------------------------------------------------------------------------
 
-function Header({ fileName, title, chartTypeLabel }) {
+function Header({ fileName, title, chartTypeLabel }: { fileName?: string; title: string; chartTypeLabel: string }) {
   return (
     <div style={styles.header}>
       <Activity size={14} style={{ color: '#818cf8', flexShrink: 0 }} />
@@ -422,7 +504,7 @@ function Header({ fileName, title, chartTypeLabel }) {
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   root: {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: 13,

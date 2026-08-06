@@ -19,7 +19,7 @@
  *   titleId     {string}     Optional id override for the title element.
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -29,10 +29,20 @@ const FOCUSABLE =
   'select:not([disabled]), textarea:not([disabled]), button:not([disabled]), ' +
   'iframe, object, embed, [tabindex]:not([tabindex="-1"]), [contenteditable]'
 
-function getFocusable(container) {
-  return Array.from(container.querySelectorAll(FOCUSABLE)).filter(
+function getFocusable(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
     (el) => !el.closest('[inert]') && el.offsetParent !== null,
   )
+}
+
+export interface ModalProps {
+  open: boolean
+  onClose: () => void
+  title: ReactNode
+  children?: ReactNode
+  footer?: ReactNode
+  widthClass?: string
+  titleId?: string
 }
 
 export default function Modal({
@@ -43,14 +53,14 @@ export default function Modal({
   footer,
   widthClass = 'max-w-md',
   titleId = 'modal-title',
-}) {
-  const dialogRef = useRef(null)
-  const previousFocusRef = useRef(null)
+}: ModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const previousFocusRef = useRef<HTMLElement | null>(null)
 
   // ── Focus return: capture trigger before opening ──────────────────────────
   useEffect(() => {
     if (open) {
-      previousFocusRef.current = document.activeElement
+      previousFocusRef.current = document.activeElement as HTMLElement | null
     } else {
       // Restore focus when closing.
       if (previousFocusRef.current && typeof previousFocusRef.current.focus === 'function') {
@@ -75,7 +85,7 @@ export default function Modal({
   useEffect(() => {
     if (!open) return
 
-    function handleKeyDown(e) {
+    function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         e.stopPropagation()
         onClose()
@@ -83,6 +93,7 @@ export default function Modal({
       }
       if (e.key !== 'Tab') return
 
+      if (!dialogRef.current) return
       const focusable = getFocusable(dialogRef.current)
       if (focusable.length === 0) {
         e.preventDefault()

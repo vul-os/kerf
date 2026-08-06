@@ -19,8 +19,46 @@
 //   formatTension(t)               → "+0.012" string
 //   interpretTension(mean)         → 'tight'|'good'|'loose' label
 
-import { useMemo } from 'react'
+import { useMemo, type ReactElement } from 'react'
 import { Shirt, CheckCircle, AlertTriangle } from 'lucide-react'
+
+// ---------------------------------------------------------------------------
+// Local domain types (no shared type exists for garment_drape_on_avatar output)
+// ---------------------------------------------------------------------------
+
+interface DrapeAvatar {
+  height_cm?: number
+  bust_cm?: number
+  waist_cm?: number
+  hip_cm?: number
+  sex?: string
+}
+
+export interface DrapeResultData {
+  ok?: boolean
+  error?: string
+  target_region?: string
+  panel_rows?: number
+  panel_cols?: number
+  converged?: boolean
+  steps_taken?: number
+  max_penetration_cm?: number
+  no_deep_penetration?: boolean
+  symmetry_error_cm?: number
+  fit_tension: number[]
+  fit_tension_mean?: number
+  fit_tension_max?: number
+  fit_tension_min?: number
+  fit_tension_rms?: number
+  vertices_3d: unknown[]
+  avatar?: DrapeAvatar
+  note?: string
+}
+
+export type ParsedDrapeResult =
+  | { kind: 'empty' }
+  | { kind: 'invalid'; error: string }
+  | { kind: 'ok'; data: DrapeResultData }
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for tests)
@@ -30,23 +68,24 @@ import { Shirt, CheckCircle, AlertTriangle } from 'lucide-react'
  * Parse raw garment_drape_on_avatar result.
  * Returns { kind: 'ok'|'empty'|'invalid', data, error? }
  */
-export function parseDrapeResult(raw) {
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper exported for tests, colocated by design.
+export function parseDrapeResult(raw: unknown): ParsedDrapeResult {
   if (raw == null) return { kind: 'empty' }
-  const obj =
+  const obj: Record<string, unknown> | null =
     typeof raw === 'string'
       ? (() => {
           try { return JSON.parse(raw) } catch { return null }
         })()
-      : raw
+      : (raw as Record<string, unknown>)
   if (!obj || typeof obj !== 'object') return { kind: 'invalid', error: 'Expected JSON object' }
-  if (obj.error) return { kind: 'invalid', error: obj.error }
-  if (obj.ok === false) return { kind: 'invalid', error: obj.error || 'Tool returned ok=false' }
+  if (obj.error) return { kind: 'invalid', error: String(obj.error) }
+  if (obj.ok === false) return { kind: 'invalid', error: obj.error ? String(obj.error) : 'Tool returned ok=false' }
   if (!Array.isArray(obj.fit_tension))
     return { kind: 'invalid', error: 'Missing fit_tension array in result' }
   if (!Array.isArray(obj.vertices_3d))
     return { kind: 'invalid', error: 'Missing vertices_3d array in result' }
 
-  return { kind: 'ok', data: obj }
+  return { kind: 'ok', data: obj as unknown as DrapeResultData }
 }
 
 /**
@@ -58,7 +97,8 @@ export function parseDrapeResult(raw) {
  * @param {number} t       tension value (dimensionless spring stretch ratio)
  * @param {number} scale   full-scale value (absolute tension at which pure red/blue appears)
  */
-export function tensionColor(t, scale = 0.05) {
+// eslint-disable-next-line react-refresh/only-export-components -- see parseDrapeResult above.
+export function tensionColor(t: number, scale = 0.05): string {
   if (!Number.isFinite(t) || scale <= 0) return '#888888'
   const clamped = Math.max(-1, Math.min(1, t / scale))
   if (clamped >= 0) {
@@ -80,18 +120,22 @@ export function tensionColor(t, scale = 0.05) {
 /**
  * Format a tension value as a signed string with 3 decimal places.
  */
-export function formatTension(t) {
-  if (!Number.isFinite(t)) return '—'
+// eslint-disable-next-line react-refresh/only-export-components -- see parseDrapeResult above.
+export function formatTension(t: number | null | undefined): string {
+  if (t == null || !Number.isFinite(t)) return '—'
   const sign = t >= 0 ? '+' : ''
   return `${sign}${t.toFixed(3)}`
 }
+
+export type TensionInterpretation = 'tight' | 'good' | 'loose' | 'unknown'
 
 /**
  * Interpret mean tension for garment fit.
  * Returns 'tight' | 'good' | 'loose'
  */
-export function interpretTension(mean) {
-  if (!Number.isFinite(mean)) return 'unknown'
+// eslint-disable-next-line react-refresh/only-export-components -- see parseDrapeResult above.
+export function interpretTension(mean: number | undefined): TensionInterpretation {
+  if (mean == null || !Number.isFinite(mean)) return 'unknown'
   if (mean > 0.02) return 'tight'
   if (mean < -0.01) return 'loose'
   return 'good'
@@ -105,7 +149,14 @@ export function interpretTension(mean) {
  * Render a 2D grid heatmap of per-vertex fit tension.
  * The cloth panel is a rows×cols grid; each cell is coloured by tension.
  */
-function FitTensionHeatmap({ fitTension, rows, cols, scale }) {
+interface FitTensionHeatmapProps {
+  fitTension: number[]
+  rows: number
+  cols: number
+  scale: number
+}
+
+function FitTensionHeatmap({ fitTension, rows, cols, scale }: FitTensionHeatmapProps) {
   if (!fitTension || fitTension.length === 0) return null
 
   const CELL = 16
@@ -113,7 +164,7 @@ function FitTensionHeatmap({ fitTension, rows, cols, scale }) {
   const W = cols * CELL + 2 * PAD
   const H = rows * CELL + 2 * PAD
 
-  const cells = []
+  const cells: ReactElement[] = []
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const idx = r * cols + c
@@ -154,12 +205,16 @@ function FitTensionHeatmap({ fitTension, rows, cols, scale }) {
 // Colour-scale legend
 // ---------------------------------------------------------------------------
 
-function TensionLegend({ scale }) {
+interface TensionLegendProps {
+  scale: number
+}
+
+function TensionLegend({ scale }: TensionLegendProps) {
   const stops = 20
   const W = 120
   const H = 12
 
-  const rects = []
+  const rects: ReactElement[] = []
   for (let i = 0; i < stops; i++) {
     const t = scale * (2 * i / (stops - 1) - 1)  // -scale → +scale
     const fill = tensionColor(t, scale)
@@ -196,16 +251,20 @@ function TensionLegend({ scale }) {
 // Main component
 // ---------------------------------------------------------------------------
 
+export interface Props {
+  /** garment_drape_on_avatar tool output */
+  result?: DrapeResultData | string | null
+  /** JSON string of the result, supplied by panelRegistry */
+  content?: string
+  className?: string
+}
+
 /**
  * GarmentDrapePanel — renders garment-on-avatar drape simulation results.
- *
- * @param {Object} props
- * @param {Object|string|null} props.result  — garment_drape_on_avatar output
- * @param {string} [props.className]
  */
-export default function GarmentDrapePanel({ result = null, content, className = '' }) {
+export default function GarmentDrapePanel({ result = null, content, className = '' }: Props) {
   // content prop (from panelRegistry) is a JSON string; parse and use as result
-  const effectiveResult = useMemo(() => {
+  const effectiveResult = useMemo<DrapeResultData | string | null | undefined>(() => {
     if (content != null) {
       try { return JSON.parse(content) } catch { return result }
     }
@@ -361,12 +420,14 @@ export default function GarmentDrapePanel({ result = null, content, className = 
           {/* Tension stats table */}
           <table className="text-[10px] font-mono w-full" data-testid="drape-tension-stats">
             <tbody>
-              {[
-                ['Mean', fit_tension_mean],
-                ['Max',  fit_tension_max],
-                ['Min',  fit_tension_min],
-                ['RMS',  fit_tension_rms],
-              ].map(([label, val]) => (
+              {(
+                [
+                  ['Mean', fit_tension_mean],
+                  ['Max',  fit_tension_max],
+                  ['Min',  fit_tension_min],
+                  ['RMS',  fit_tension_rms],
+                ] satisfies [string, number | undefined][]
+              ).map(([label, val]) => (
                 <tr key={label} className="border-b border-ink-800/30">
                   <td className="py-0.5 pr-3 text-ink-500">{label}</td>
                   <td className="py-0.5 text-right text-ink-200">{formatTension(val)}</td>

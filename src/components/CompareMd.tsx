@@ -17,7 +17,7 @@
  * "Kerf" header cell.
  */
 
-import React from 'react'
+import React, { type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -31,21 +31,43 @@ import CompareFeatureMatrix from './CompareFeatureMatrix.jsx'
 /* Verdict-glyph constants (mirrors Freecad.jsx)                               */
 /* -------------------------------------------------------------------------- */
 
-const VERDICT_CLASSES = {
+const VERDICT_CLASSES: Record<string, string> = {
   '✅': 'text-emerald-400',
   '⚠️': 'text-amber-400',
   '❌': 'text-red-400',
   '➖': 'text-ink-500',
 }
 
+// Local shape mirroring the CompareMeta doc-comment in
+// src/lib/compareMdParser.ts (parseCompareMd is not yet typed). `features`
+// is not part of that parser's output — CompareMdRoute.jsx attaches it
+// after merging the compare-features manifest, so it's optional here too.
+export interface CompareMeta {
+  slug?: string
+  competitor?: string
+  category?: string
+  hero_tagline?: string
+  left?: string
+  right?: string
+  reviewed_at?: string | null
+  order?: number | null
+  title?: string | null
+  body?: string
+  features?: unknown[]
+}
+
 /* -------------------------------------------------------------------------- */
 /* Custom react-markdown components                                             */
 /* -------------------------------------------------------------------------- */
 
+interface ChildrenProps {
+  children?: ReactNode
+}
+
 /**
  * Section heading — H2 gets a border-b treatment matching the JSX pages.
  */
-function H2({ children }) {
+function H2({ children }: ChildrenProps) {
   return (
     <h2 className="font-display text-xl sm:text-2xl font-semibold tracking-tight text-ink-100 mb-4 pb-2 border-b border-ink-800 mt-10">
       {children}
@@ -53,7 +75,7 @@ function H2({ children }) {
   )
 }
 
-function H3({ children }) {
+function H3({ children }: ChildrenProps) {
   return (
     <h3 className="font-display text-base font-semibold text-ink-100 mb-2 mt-6">
       {children}
@@ -61,7 +83,7 @@ function H3({ children }) {
   )
 }
 
-function P({ children }) {
+function P({ children }: ChildrenProps) {
   return (
     <p className="text-sm text-ink-300 leading-relaxed mb-4">
       {children}
@@ -69,7 +91,7 @@ function P({ children }) {
   )
 }
 
-function UL({ children }) {
+function UL({ children }: ChildrenProps) {
   return (
     <ul className="flex flex-col gap-3 mb-6">
       {children}
@@ -77,7 +99,7 @@ function UL({ children }) {
   )
 }
 
-function LI({ children }) {
+function LI({ children }: ChildrenProps) {
   return (
     <li className="flex items-start gap-2.5 text-sm text-ink-300 leading-relaxed">
       <span className="mt-2 w-1.5 h-1.5 rounded-full bg-kerf-300 shrink-0" />
@@ -86,11 +108,11 @@ function LI({ children }) {
   )
 }
 
-function Strong({ children }) {
+function Strong({ children }: ChildrenProps) {
   return <strong className="text-ink-100">{children}</strong>
 }
 
-function Code({ children }) {
+function Code({ children }: ChildrenProps) {
   return (
     <code className="font-mono text-kerf-300 text-xs bg-ink-900 px-1 py-0.5 rounded">
       {children}
@@ -98,7 +120,7 @@ function Code({ children }) {
   )
 }
 
-function BlockQuote({ children }) {
+function BlockQuote({ children }: ChildrenProps) {
   return (
     <blockquote className="border-l-2 border-kerf-300/40 pl-4 my-4 text-ink-400 italic text-sm">
       {children}
@@ -116,7 +138,7 @@ function BlockQuote({ children }) {
  * Kerf header gets data-testid="left-vendor" + kerf-300 accent.
  * Competitor header gets data-testid="right-vendor".
  */
-function Table({ children }) {
+function Table({ children }: ChildrenProps) {
   return (
     <div className="overflow-x-auto rounded-xl border border-ink-800 mb-6" data-testid="table-scroll-container">
       <table className="min-w-[640px] w-full text-sm">
@@ -130,7 +152,7 @@ function Table({ children }) {
  * Fenced code blocks in compare markdown — wrap in a scrollable container
  * so wide code samples don't blow out the layout on narrow viewports.
  */
-function Pre({ children }) {
+function Pre({ children }: ChildrenProps) {
   return (
     <pre
       className="overflow-x-auto bg-ink-900 rounded-md p-3 my-3 text-sm border border-ink-800 leading-[1.6]"
@@ -141,7 +163,7 @@ function Pre({ children }) {
   )
 }
 
-function THead({ children }) {
+function THead({ children }: ChildrenProps) {
   return (
     <thead className="border-b border-ink-800 bg-ink-900/60">
       {children}
@@ -149,11 +171,11 @@ function THead({ children }) {
   )
 }
 
-function TBody({ children }) {
+function TBody({ children }: ChildrenProps) {
   return <tbody>{children}</tbody>
 }
 
-function TR({ children, isHeader }) {
+function TR({ children, isHeader }: ChildrenProps & { isHeader?: boolean }) {
   if (isHeader) return <tr>{children}</tr>
   return (
     <tr className="border-b border-ink-800/50 transition-colors hover:bg-ink-900/30">
@@ -166,7 +188,7 @@ function TR({ children, isHeader }) {
  * TH — header cell.
  * variant: 'feature' | 'kerf' | 'competitor'
  */
-function TH({ children, variant }) {
+function TH({ children, variant }: ChildrenProps & { variant?: string }) {
   if (variant === 'kerf') {
     return (
       <th
@@ -195,7 +217,7 @@ function TH({ children, variant }) {
   )
 }
 
-function TD({ children, isFeature }) {
+function TD({ children, isFeature }: ChildrenProps & { isFeature?: boolean }) {
   return (
     <td className={`px-4 py-3 align-top ${isFeature ? 'text-ink-200 font-medium' : 'text-ink-300'}`}>
       {children}
@@ -429,7 +451,13 @@ function CTAStrip() {
  * @param {boolean} [props.loading] - show skeleton while fetching
  * @param {string} [props.error] - error message to display
  */
-export default function CompareMd({ meta, loading, error }) {
+export interface CompareMdProps {
+  meta: CompareMeta | null
+  loading?: boolean
+  error?: string | null
+}
+
+export default function CompareMd({ meta, loading, error }: CompareMdProps) {
   if (loading) {
     return (
       <div className="min-h-screen bg-ink-950 text-ink-100 flex items-center justify-center">

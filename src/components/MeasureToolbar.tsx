@@ -1,18 +1,34 @@
 import { MousePointer2, Square, Minus, Circle, Trash2 } from 'lucide-react'
+import type { ComponentType } from 'react'
 
-const MODES = [
+export type MeasureMode = 'object' | 'face' | 'edge' | 'vertex'
+
+interface ModeDef {
+  id: MeasureMode
+  icon: ComponentType<{ size?: number }>
+  label: string
+}
+
+const MODES: ModeDef[] = [
   { id: 'object', icon: MousePointer2, label: 'Pick (1)' },
   { id: 'face',   icon: Square,        label: 'Face (2)' },
   { id: 'edge',   icon: Minus,         label: 'Edge (3)' },
   { id: 'vertex', icon: Circle,        label: 'Vertex (4)' },
 ]
 
+export interface MeasureToolbarProps {
+  mode?: MeasureMode
+  onMode?: (id: MeasureMode) => void
+  onClear?: () => void
+  selectionCount?: number
+}
+
 export default function MeasureToolbar({
   mode = 'object',
   onMode,
   onClear,
   selectionCount = 0,
-}) {
+}: MeasureToolbarProps) {
   return (
     <div className="absolute top-3 left-3 z-10 flex flex-col gap-1 p-1 rounded-md bg-ink-900/80 border border-ink-700 backdrop-blur shadow-lg">
       {MODES.map(({ id, icon: Icon, label }) => {

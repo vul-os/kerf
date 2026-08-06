@@ -15,11 +15,16 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Atom, AlertTriangle } from 'lucide-react'
-import { useWorkspace } from '../store/workspace.js'
+import { useWorkspace, type WorkspaceFile } from '../store/workspace.js'
 import {
   parseMaterial, serializeMaterial, MATERIAL_FIELD_META,
 } from '../lib/material.js'
 import MaterialPbrEditor from './MaterialPbrEditor.jsx'
+
+// material.ts (already migrated, outside this slice) leaves parseMaterial's
+// return type untyped — its body shape is precise enough to reuse here
+// rather than redeclaring it by hand.
+type MaterialDoc = ReturnType<typeof parseMaterial>
 
 export default function MaterialEditor() {
   const currentFile = useWorkspace((s) => s.currentFile)
@@ -30,9 +35,10 @@ export default function MaterialEditor() {
   // source of truth; we re-parse on external changes (revision restore /
   // LLM tool edits) but otherwise let the user type freely against the
   // local copy and only commit serialized JSON to the store.
-  const [doc, setDoc] = useState(() => parseMaterial(currentFileContent || ''))
+  const [doc, setDoc] = useState<MaterialDoc>(() => parseMaterial(currentFileContent || ''))
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- content-prop sync, pre-existing before this migration.
     setDoc(parseMaterial(currentFileContent || ''))
   }, [currentFileContent])
 
@@ -41,10 +47,10 @@ export default function MaterialEditor() {
   const parseError = useMemo(() => {
     if (!currentFileContent) return null
     try { JSON.parse(currentFileContent); return null }
-    catch (e) { return e?.message || 'Invalid JSON' }
+    catch (e) { return e instanceof Error ? e.message : 'Invalid JSON' }
   }, [currentFileContent])
 
-  function commit(next) {
+  function commit(next: MaterialDoc) {
     setDoc(next)
     if (typeof editContent === 'function') {
       editContent(serializeMaterial(next))
@@ -53,10 +59,10 @@ export default function MaterialEditor() {
 
   const [pbrOpen, setPbrOpen] = useState(false)
 
-  function setTopField(key, value) {
+  function setTopField<K extends keyof MaterialDoc>(key: K, value: MaterialDoc[K]) {
     commit({ ...doc, [key]: value })
   }
-  function setGroupField(group, key, value) {
+  function setGroupField(group: 'mechanical' | 'thermal' | 'physical', key: string, value: number | null) {
     commit({ ...doc, [group]: { ...(doc[group] || {}), [key]: value } })
   }
 
@@ -64,9 +70,9 @@ export default function MaterialEditor() {
   // we fold the returned pbr object back into the current doc so the normal
   // autosave loop picks it up. We do NOT navigate — the fork just enriches the
   // current file with explicit PBR values.
-  function handlePbrSave(forked) {
+  function handlePbrSave(forked: (MaterialDoc & { pbr?: unknown }) | null | undefined) {
     if (forked && forked.pbr) {
-      commit({ ...doc, pbr: forked.pbr })
+      commit({ ...doc, pbr: forked.pbr } as MaterialDoc)
     }
   }
 
@@ -193,7 +199,12 @@ export default function MaterialEditor() {
 
 // -- Header --------------------------------------------------------------
 
-function Header({ file, doc }) {
+interface HeaderProps {
+  file: WorkspaceFile | null
+  doc: MaterialDoc
+}
+
+function Header({ file, doc }: HeaderProps) {
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-ink-800 bg-ink-900/40 flex-shrink-0">
       <div className="flex items-center gap-2 min-w-0">
@@ -221,7 +232,20 @@ function Header({ file, doc }) {
 
 // -- Numeric section -----------------------------------------------------
 
-function NumericSection({ title, fields, values, onChange }) {
+interface FieldMeta {
+  key: string
+  label: string
+  unit: string
+}
+
+interface NumericSectionProps {
+  title: string
+  fields: FieldMeta[]
+  values: Record<string, number | null>
+  onChange: (key: string, value: number | null) => void
+}
+
+function NumericSection({ title, fields, values, onChange }: NumericSectionProps) {
   return (
     <section>
       <SectionHeading>{title}</SectionHeading>
@@ -240,7 +264,7 @@ function NumericSection({ title, fields, values, onChange }) {
   )
 }
 
-function SectionHeading({ children }) {
+function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
     <div className="mb-2 text-[10px] uppercase tracking-wider text-ink-500 font-medium">
       {children}
@@ -250,14 +274,21 @@ function SectionHeading({ children }) {
 
 // valueToText: prop → input string. Null / undefined → '' so the input
 // renders the placeholder ("—") rather than the literal "null".
-function valueToText(v) {
+function valueToText(v: number | null | undefined): string {
   return v === null || v === undefined ? '' : String(v)
+}
+
+interface NumericFieldProps {
+  label: string
+  unit: string
+  value: number | null | undefined
+  onChange: (value: number | null) => void
 }
 
 // NumericField — string-backed numeric input. Empty / non-numeric values
 // commit as null (the canonical "unknown" representation in the file
 // shape) so consumers can render them as "—".
-function NumericField({ label, unit, value, onChange }) {
+function NumericField({ label, unit, value, onChange }: NumericFieldProps) {
   // Local string state so the user can type "1.7e-6" through intermediate
   // states like "1.7e-" without us reverting their input.
   const [draft, setDraft] = useState(() => valueToText(value))
@@ -267,10 +298,11 @@ function NumericField({ label, unit, value, onChange }) {
   // accept one extra render to absorb prop changes (revision restore /
   // LLM tool edits / undo).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- external-value sync, pre-existing before this migration.
     setDraft(valueToText(value))
   }, [value])
 
-  function commit(s) {
+  function commit(s: string) {
     setDraft(s)
     const trimmed = s.trim()
     if (trimmed === '') {
@@ -301,7 +333,13 @@ function NumericField({ label, unit, value, onChange }) {
 
 // -- Generic field primitives -------------------------------------------
 
-function Field({ label, required, children }) {
+interface FieldProps {
+  label: string
+  required?: boolean
+  children: React.ReactNode
+}
+
+function Field({ label, required, children }: FieldProps) {
   return (
     <label className="block">
       <div className="text-[10px] uppercase tracking-wider text-ink-500 font-medium mb-1">
@@ -312,7 +350,14 @@ function Field({ label, required, children }) {
   )
 }
 
-function Input({ value, onChange, placeholder, mono = false }) {
+interface InputProps {
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  mono?: boolean
+}
+
+function Input({ value, onChange, placeholder, mono = false }: InputProps) {
   return (
     <input
       type="text"
@@ -324,7 +369,14 @@ function Input({ value, onChange, placeholder, mono = false }) {
   )
 }
 
-function Textarea({ value, onChange, placeholder, rows = 4 }) {
+interface TextareaProps {
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  rows?: number
+}
+
+function Textarea({ value, onChange, placeholder, rows = 4 }: TextareaProps) {
   return (
     <textarea
       value={value}
@@ -336,9 +388,14 @@ function Textarea({ value, onChange, placeholder, rows = 4 }) {
   )
 }
 
+interface ColorRowProps {
+  value: string
+  onChange: (value: string) => void
+}
+
 // ColorRow — text input + adjacent native color picker. Both bind the
 // same hex string; the picker normalises to a `#rrggbb` value.
-function ColorRow({ value, onChange }) {
+function ColorRow({ value, onChange }: ColorRowProps) {
   const safe = /^#[0-9a-fA-F]{6}$/.test(value || '') ? value : '#7d8088'
   return (
     <div className="flex items-center gap-2">

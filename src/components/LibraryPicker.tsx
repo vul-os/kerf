@@ -33,6 +33,9 @@ type ProjectFile = Awaited<ReturnType<typeof api.listFiles>>[number]
 // this view-model type reflects the actual runtime shape rather than fighting
 // that pre-existing mismatch in a file outside this migration's scope.
 interface PickerRow {
+  /** Present on global library rows from the API; absent on project-local rows built by
+   *  normalizeProjectPart, which is why consumers read `id || file_id`. */
+  id?: string
   file_id: string
   project_id?: string
   name: string

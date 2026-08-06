@@ -18,7 +18,7 @@ import { describe, it, expect, vi, beforeAll } from 'vitest'
 // T-500's — see docs/typescript-migration.md), so these Node builtins (used only for this
 // file's source-inspection assertions) are untyped at this boundary.
 // @ts-expect-error - no @types/node in this toolchain
-import { readFileSync } from 'fs'
+import { readFileSync , existsSync } from 'fs'
 // @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
 // @ts-expect-error - no @types/node in this toolchain
@@ -36,7 +36,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // ── Read source for structural checks ────────────────────────────────────────
 
 const camViewSrc = readFileSync(
-  path.resolve(__dirname, 'CAMView.jsx'),
+  existsSync(path.resolve(__dirname, 'CAMView.tsx'))
+    ? path.resolve(__dirname, 'CAMView.tsx')
+    : path.resolve(__dirname, 'CAMView.jsx'),
   'utf8',
 )
 

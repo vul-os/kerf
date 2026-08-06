@@ -171,7 +171,11 @@ describe('T-H2: Esc key closes the drawer', () => {
 
 describe('T-H2: focus trap inside the drawer', () => {
   it('focus trap uses querySelectorAll on the drawer ref', () => {
-    expect(sidebarSrc).toContain('drawerRef.current.querySelectorAll(FOCUSABLE)')
+    // Tolerates the TypeScript type argument — after migration this reads
+    // `querySelectorAll<HTMLElement>(FOCUSABLE)`.
+    expect(sidebarSrc).toMatch(
+      /drawerRef\.current\.querySelectorAll(?:<[^>]+>)?\(FOCUSABLE\)/,
+    )
   })
 
   it('focus trap is activated only when drawerOpen is true', () => {

@@ -247,7 +247,12 @@ describe('Editor.jsx Build3DModal — uses canonical Modal', () => {
 })
 
 describe('Projects.jsx — uses shared Modal, local copy removed', () => {
-  const src = readFileSync(resolve(ROOT, 'src/routes/Projects.jsx'), 'utf8')
+  const src = readFileSync(
+    existsSync(resolve(ROOT, 'src/routes/Projects.tsx'))
+      ? resolve(ROOT, 'src/routes/Projects.tsx')
+      : resolve(ROOT, 'src/routes/Projects.jsx'),
+    'utf8',
+  )
 
   it('imports Modal from ../components/Modal.jsx', () => {
     expect(src).toMatch(/from ['"]\.\.\/components\/Modal\.jsx['"]/)

@@ -36,16 +36,19 @@ const API_URL = (typeof import.meta !== 'undefined' && (import.meta as unknown a
 // Pure helpers (exported for tests)
 // ---------------------------------------------------------------------------
 
+// Geometry fields are per-shape: a rectangular channel populates width/height, a trapezoid
+// populates width_top/width_bottom/trap_height, a circular one populates radius. Only the
+// shape-independent fields are required.
 interface PressureDropForm {
   shape: string
   length_um: string
   flow_rate_ul_min: string
-  width_um: string
-  height_um: string
-  width_top_um: string
-  width_bottom_um: string
-  trap_height_um: string
-  radius_um: string
+  width_um?: string
+  height_um?: string
+  width_top_um?: string
+  width_bottom_um?: string
+  trap_height_um?: string
+  radius_um?: string
 }
 
 interface DropletForm {

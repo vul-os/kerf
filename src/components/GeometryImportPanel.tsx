@@ -71,13 +71,13 @@ const SUPPORTED_EXTS: Record<string, GeometryFormat> = {
 
 const ALL_ACCEPT = '.step,.stp,.iges,.igs,.3dm,.dxf,.FCStd,.fcstd'
 
-export function detectGeometryFormat(fileOrName: File | string | null | undefined): GeometryFormat | null {
+export function detectGeometryFormat(fileOrName: Pick<File, 'name'> | string | null | undefined): GeometryFormat | null {
   const name = typeof fileOrName === 'string' ? fileOrName : fileOrName?.name || ''
   const ext = '.' + (name.split('.').pop() || '').toLowerCase()
   return SUPPORTED_EXTS[ext] || null
 }
 
-export function isGeometryFile(fileOrName: File | string | null | undefined): boolean {
+export function isGeometryFile(fileOrName: Pick<File, 'name'> | string | null | undefined): boolean {
   return detectGeometryFormat(fileOrName) !== null
 }
 

@@ -53,7 +53,9 @@ const EMPTY_FORM: MateForm = {
 
 interface MatesPanelProps {
   mates?: AssemblyMate[]
-  components?: AssemblyComponent[]
+  /** Context only — not read yet. Kept to the identifying fields so both AssemblyComponent
+   *  and AssemblyEditor's EditorRow satisfy it. */
+  components?: Pick<AssemblyComponent, 'id' | 'file_id' | 'object_id'>[]
   onChangeMates: (mates: AssemblyMate[]) => void
   onToast?: (msg: string) => void
   projectId?: string

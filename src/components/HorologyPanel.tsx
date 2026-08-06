@@ -62,8 +62,9 @@ interface EscapementForm {
 interface BalanceForm {
   I_gmm2: string
   k_Nmmrad: string
-  amp_min_deg: string
-  amp_max_deg: string
+  /** Amplitude sweep bounds — optional; the calculation falls back to defaults without them. */
+  amp_min_deg?: string
+  amp_max_deg?: string
 }
 
 interface ToothForm {

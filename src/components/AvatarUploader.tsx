@@ -85,13 +85,6 @@ export default function AvatarUploader({ user, onClose, onUpdated }: Props) {
     setBusy(true)
     setError(null)
     try {
-      // NOTE (found during T-517 migration, not fixed — behaviour preserved):
-      // api.deleteAvatar() is typed `Promise<void>` in lib/api.ts (the endpoint
-      // returns no body), so `updated` is always `undefined` here. The
-      // pre-existing runtime behaviour calls setUser(undefined)/onUpdated(undefined)
-      // rather than the actual post-removal user. Reported, not fixed, per
-      // migration convention (rename-only, no behaviour changes).
-      // @ts-expect-error -- api.deleteAvatar() returns Promise<void>, not Promise<ApiUser>; pre-existing mismatch, see NOTE above.
       const updated: ApiUser = await api.deleteAvatar()
       setUser(updated)
       onUpdated?.(updated)

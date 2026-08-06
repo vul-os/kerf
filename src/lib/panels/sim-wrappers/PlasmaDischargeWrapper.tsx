@@ -22,21 +22,14 @@
 //   voltage_V            : number
 //   model_notes          : string     — honest model limitations
 
-import Panel from '../../../components/PlasmaDischargePanel.jsx'
+import Panel, { type PaschenCurve } from '../../../components/PlasmaDischargePanel.jsx'
 
 export interface Props {
   content?: string
 }
 
-interface PaschenCurve {
-  pd_Pa_m?: number[]
-  V_bd_V?: number[]
-}
-
-// PlasmaDischargePanel.jsx is not yet migrated, so there's no Props type to
-// import; this mirrors the JSON fields documented above. Required here (not
-// optional) since DEFAULTS always supplies every key and the plain-JS panel's
-// inferred prop types are all required.
+// PaschenCurve comes from the panel now that it is migrated — a local copy diverged
+// (pd_Pa_m optional here, required there) and made the props un-assignable.
 interface PlasmaDischargeContent {
   x_m: number[] | null
   n_e_m3: number[] | null

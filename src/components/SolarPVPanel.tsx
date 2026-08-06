@@ -52,7 +52,7 @@ interface Mpp {
   i_a: number
 }
 
-interface IvData {
+export interface IvData {
   iv_curve: IvPoint[]
   isc_a?: number | null
   voc_v?: number | null
@@ -133,7 +133,7 @@ function Tooltip({ x, y, v, i, p, show }: TooltipProps) {
 // Main component
 // ---------------------------------------------------------------------------
 
-interface SolarPVPanelProps {
+export interface SolarPVPanelProps {
   ivData?: IvData | null
   title?: string
   showPV?: boolean

@@ -224,7 +224,7 @@ function SummaryCard({
 
 // ── Paschen Curve Chart ───────────────────────────────────────────────────────
 
-interface PaschenCurve {
+export interface PaschenCurve {
   pd_Pa_m: number[]
   V_bd_V: number[]
 }
@@ -335,7 +335,7 @@ function ModelNotesBanner({ notes }: { notes: string | null }) {
 
 // ── Main Panel ────────────────────────────────────────────────────────────────
 
-interface PlasmaDischargePanelProps {
+export interface PlasmaDischargePanelProps {
   x_m: number[] | null
   n_e_m3: number[] | null
   n_i_m3: number[] | null

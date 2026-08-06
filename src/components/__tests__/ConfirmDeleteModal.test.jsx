@@ -119,9 +119,12 @@ const SAMPLE_PROJECT = { id: 'proj-abc', name: 'Robot gripper' }
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('ConfirmDelete modal — source contracts', () => {
-  const { readFileSync } = require('fs')
+  const { readFileSync, existsSync } = require('fs')
   const { resolve } = require('path')
-  const src = readFileSync(resolve(__dirname, '../../routes/Projects.jsx'), 'utf8')
+  const projectsPath = existsSync(resolve(__dirname, '../../routes/Projects.tsx'))
+    ? resolve(__dirname, '../../routes/Projects.tsx')
+    : resolve(__dirname, '../../routes/Projects.jsx')
+  const src = readFileSync(projectsPath, 'utf8')
 
   it('disables confirm button until name matches (disabled={!confirmed})', () => {
     // The button must carry a disabled prop that depends on the typed name.

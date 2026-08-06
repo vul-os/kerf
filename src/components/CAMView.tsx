@@ -19,7 +19,7 @@
 //   Each layer is shown as a 2D SVG contour (same projection as SectionView).
 //   A "Generate G-code from layers" button POSTs to /api/.../cam/layered/gcode.
 
-import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type CSSProperties } from 'react'
 import { AlertTriangle, CheckCircle, Download, Loader2, Layers, Settings, ChevronLeft, ChevronRight, Wrench } from 'lucide-react'
 import { useAuth } from '../store/auth.js'
 import ToolDBPanel, { ToolPicker } from './ToolDBPanel.jsx'
@@ -63,7 +63,9 @@ export function fiveAxisBackendArgs(axisMode, strategy, tiltAxis, tiltAngle, lea
   const driveId = driveFaceId !== '' && driveFaceId != null ? parseInt(driveFaceId, 10) : undefined
   const kin = machineKinematic || 'head_table'
   if (axisMode === '5axis_indexed' || strategy === 'indexed_rough') {
-    const args = {
+    // Widened: the optional keys below are attached conditionally, so the inferred
+    // literal shape would reject them.
+    const args: Record<string, unknown> = {
       operation: '3plus2',
       indexed_op: 'face',
       kinematic_family: kin,
@@ -74,7 +76,7 @@ export function fiveAxisBackendArgs(axisMode, strategy, tiltAxis, tiltAngle, lea
   // Continuous: swarf uses tilt_deg=0 (tool axis = surface normal, side engage)
   // contour_tilted uses tilt_deg from user input
   const tilt = strategy === 'swarf' ? 0 : (parseFloat(tiltAngle) || 15)
-  const args = {
+  const args: Record<string, unknown> = {
     operation: '5axis_finish',
     tilt_deg: tilt,
     kinematic_family: kin,
@@ -150,6 +152,12 @@ export default function CAMView({ file, projectId, viewRef }) {
   const [projectTools, setProjectTools] = useState([])
   const [selectedToolId, setSelectedToolId] = useState(null)
 
+  // Declared above the effect below: its dependency array reads `pid`, and a dep array is
+  // evaluated during render. With these declarations underneath, `[pid]` hit the temporal dead
+  // zone and threw ReferenceError on mount.
+  const fid = file?.id
+  const pid = projectId
+
   // Fetch tool files whenever projectId changes.
   useEffect(() => {
     if (!pid) return
@@ -180,9 +188,6 @@ export default function CAMView({ file, projectId, viewRef }) {
     fetchTools()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pid])
-
-  const fid = file?.id
-  const pid = projectId
 
   // Autofill defaults when operation changes
   function handleOperationChange(op) {
@@ -887,7 +892,9 @@ function StatusBadge({ status }) {
   )
 }
 
-const styles = {
+// Typed so string literals like flexDirection:'column' keep their CSSProperties meaning;
+// without it they widen to `string` and every spread of a style entry fails.
+const styles: Record<string, CSSProperties> = {
   root: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 13, color: '#e5e7eb', background: '#111827', borderRadius: 8, padding: 16, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0, width: '100%', height: '100%', overflowY: 'auto', boxSizing: 'border-box' },
   header: { display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #1f2937', paddingBottom: 10 },
   title: { fontWeight: 600, fontSize: 14, color: '#f3f4f6' },

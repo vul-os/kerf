@@ -1,14 +1,9 @@
 // BIMPhaseWrapper.jsx
 // Wraps BIMPhasePanel for the panel registry.
 // content JSON shape: { elementPhases: [{element_id, primary_phase, demolish_phase?, notes?},...] }
-import Panel from '../../../components/BIMPhasePanel.jsx'
-
-export interface ElementPhase {
-  element_id: string
-  primary_phase: string
-  demolish_phase?: string | null
-  notes?: string
-}
+// ElementPhase is the panel's type — a local copy typed primary_phase as bare `string`,
+// which is not assignable to the panel's PhaseValue union.
+import Panel, { type ElementPhase } from '../../../components/BIMPhasePanel.jsx'
 
 interface BIMPhaseContent {
   elementPhases?: ElementPhase[]

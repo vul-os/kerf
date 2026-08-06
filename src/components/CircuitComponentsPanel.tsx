@@ -310,7 +310,7 @@ export default function CircuitComponentsPanel({
         <LibraryPicker
           currentProjectId={projectId}
           onClose={() => setPickFor(null)}
-          onSelect={(part: Record<string, unknown> | null | undefined) => {
+          onSelect={(part) => {
             // LibraryPicker emits a row payload; both project-local rows and
             // global library rows carry `id` (file_id) for the part file.
             const fid = (part?.id || part?.file_id) as string | undefined

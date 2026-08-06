@@ -44,8 +44,10 @@ describe('New file: dialog (not dropdown)', () => {
 })
 
 describe('New file: full kind catalog', () => {
-  const orderMatch = src.match(/const KIND_ORDER = \[([^\]]*)\]/)
-  const rowsMatch = src.match(/const KIND_ROWS = \{([\s\S]*?)\n\}/)
+  // Both tolerate a TypeScript annotation between the name and the `=`, and a trailing
+  // `as const satisfies ...` clause — the migrated source carries both.
+  const orderMatch = src.match(/const KIND_ORDER(?:\s*:[^=]+)? = \[([^\]]*)\]/)
+  const rowsMatch = src.match(/const KIND_ROWS(?:\s*:[^=]+)? = \{([\s\S]*?)\n\}/)
 
   it('KIND_ORDER and KIND_ROWS are present', () => {
     expect(orderMatch).toBeTruthy()

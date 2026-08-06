@@ -24,7 +24,7 @@ import type { ReactNode } from 'react'
 // Types
 // ---------------------------------------------------------------------------
 
-type PhaseValue = 'existing' | 'new_construction' | 'demolish' | 'future' | 'alternate_a' | 'alternate_b'
+export type PhaseValue = 'existing' | 'new_construction' | 'demolish' | 'future' | 'alternate_a' | 'alternate_b'
 
 interface PhaseTagInfo {
   value: PhaseValue
@@ -32,7 +32,7 @@ interface PhaseTagInfo {
   colour: string
 }
 
-interface ElementPhase {
+export interface ElementPhase {
   element_id: string
   primary_phase: PhaseValue
   demolish_phase?: PhaseValue | null

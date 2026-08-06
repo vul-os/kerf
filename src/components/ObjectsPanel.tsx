@@ -220,7 +220,10 @@ export default function ObjectsPanel({
           const isHidden = hidden.has(p.id)
           const isSelected = selectedId === p.id
           const isHover = hover === p.id
-          const swatchHex = p.color != null ? hex(p.color) : hex(PALETTE[i % PALETTE.length])
+          // AssemblyBBoxProxy is the one RenderablePart member with no color; it falls through
+          // to the palette like an uncoloured part.
+          const partColor = 'color' in p ? p.color : null
+          const swatchHex = partColor != null ? hex(partColor) : hex(PALETTE[i % PALETTE.length])
 
           return (
             <div

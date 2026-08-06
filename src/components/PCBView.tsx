@@ -59,7 +59,7 @@ function parseLibrarySvg(svgText) {
   } else {
     const ser = new XMLSerializer()
     let buf = ''
-    for (const c of Array.from(root.childNodes || [])) buf += ser.serializeToString(c)
+    for (const c of Array.from(root.childNodes || []) as ChildNode[]) buf += ser.serializeToString(c)
     innerHTML = buf
   }
   return { innerHTML, viewBox }
@@ -1124,7 +1124,18 @@ function DRCStatusChip({ errors, warnings, open, onToggle }) {
 // ---------------------------------------------------------------------------
 // DRCDrawer — side panel listing all DRC issues; each item pans/zooms on click.
 // ---------------------------------------------------------------------------
-function DRCDrawer({ errors, warnings, onFocus, onClose }) {
+interface DRCDrawerProps {
+  errors: any[]
+  warnings: any[]
+  onFocus: (x: number, y: number) => void
+  onClose: () => void
+  // Passed by the caller but currently unused inside this component.
+  viewBox?: number[] | null
+  view?: any
+  size?: any
+}
+
+function DRCDrawer({ errors, warnings, onFocus, onClose }: DRCDrawerProps) {
   const all = [
     ...errors.map((e) => ({ ...e, isError: true })),
     ...warnings.map((w) => ({ ...w, isError: false })),

@@ -121,17 +121,64 @@ const DEFAULT_STATE = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function num(v, fallback = 0) {
+type FormState = typeof DEFAULT_STATE
+
+interface EnergyBreakdown {
+  heating_kWh: number
+  cooling_kWh: number
+  lighting_kWh: number
+  plug_loads_kWh: number
+  hvac_fans_kWh: number
+}
+
+interface WallAssembly {
+  U: number
+  area_m2: number
+}
+
+interface WindowSpec {
+  U: number
+  area_m2: number
+  SHGC: number
+}
+
+interface EnergySpec {
+  building_type: string
+  floor_area_m2: number
+  climate_zone: string
+  wall_assemblies: WallAssembly[]
+  roof_assembly: { U: number; area_m2: number }
+  window_specs: WindowSpec[]
+  lighting_load_W_per_m2: number
+  plug_load_W_per_m2: number
+  hvac_system_type: string
+  annual_run_hours: number
+}
+
+interface EnergyReport {
+  ok: boolean
+  total_annual_energy_kWh: number
+  energy_use_intensity_kWh_per_m2: number
+  ashrae_90_1_compliance: boolean
+  ashrae_baseline_eui: number
+  percent_better_than_baseline: number
+  leed_credits_earned: number
+  recommendations: string[]
+  honest_caveat: string
+  energy_breakdown: EnergyBreakdown
+}
+
+function num(v: string, fallback = 0) {
   const n = parseFloat(v)
   return Number.isFinite(n) ? n : fallback
 }
 
-function fmtNum(v, dec = 1) {
+function fmtNum(v: number | string | null | undefined, dec = 1) {
   if (v == null || !Number.isFinite(Number(v))) return '—'
   return Number(v).toFixed(dec)
 }
 
-function fmtKWh(v) {
+function fmtKWh(v: number | string | null | undefined) {
   if (v == null || !Number.isFinite(Number(v))) return '—'
   const n = Number(v)
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)} GWh`
@@ -139,7 +186,15 @@ function fmtKWh(v) {
   return `${n.toFixed(0)} kWh`
 }
 
-function EnergyBar({ label, kWh, total, color, icon: Icon }) {
+interface EnergyBarProps {
+  label: string
+  kWh?: number
+  total?: number
+  color: string
+  icon?: React.ComponentType<{ size?: number; className?: string }>
+}
+
+function EnergyBar({ label, kWh, total, color, icon: Icon }: EnergyBarProps) {
   const pct = total > 0 ? Math.min(100, (kWh / total) * 100) : 0
   return (
     <div className="flex items-center gap-2 text-[11px]">
@@ -157,7 +212,7 @@ function EnergyBar({ label, kWh, total, color, icon: Icon }) {
   )
 }
 
-function LeedBadge({ credits }) {
+function LeedBadge({ credits }: { credits: number }) {
   if (credits <= 0) return (
     <span className="px-2 py-0.5 rounded bg-ink-800 text-ink-400 text-[10px] font-medium">0 credits</span>
   )
@@ -172,7 +227,14 @@ function LeedBadge({ credits }) {
   )
 }
 
-function ComplianceBanner({ compliant, eui, baseline, pct }) {
+interface ComplianceBannerProps {
+  compliant?: boolean | null
+  eui: number
+  baseline: number
+  pct: number
+}
+
+function ComplianceBanner({ compliant, eui, baseline, pct }: ComplianceBannerProps) {
   if (compliant == null) return null
   return (
     <div
@@ -207,7 +269,20 @@ function ComplianceBanner({ compliant, eui, baseline, pct }) {
 // Input components
 // ---------------------------------------------------------------------------
 
-function Field({ label, unit, value, onChange, type = 'number', min, step = '0.01', children, help }) {
+interface FieldProps {
+  label: string
+  unit?: string
+  value: string
+  onChange: (val: string) => void
+  type?: string
+  min?: string | number
+  max?: string | number
+  step?: string | number
+  children?: React.ReactNode
+  help?: string
+}
+
+function Field({ label, unit, value, onChange, type = 'number', min, step = '0.01', children, help }: FieldProps) {
   return (
     <div className="flex flex-col gap-0.5">
       <div className="flex items-center gap-1">
@@ -235,7 +310,20 @@ function Field({ label, unit, value, onChange, type = 'number', min, step = '0.0
   )
 }
 
-function Select({ label, value, onChange, options, help }) {
+interface SelectOption {
+  value: string
+  label: string
+}
+
+interface SelectProps {
+  label: string
+  value: string
+  onChange: (val: string) => void
+  options: SelectOption[]
+  help?: string
+}
+
+function Select({ label, value, onChange, options, help }: SelectProps) {
   return (
     <div className="flex flex-col gap-0.5">
       <div className="flex items-center gap-1">
@@ -255,7 +343,15 @@ function Select({ label, value, onChange, options, help }) {
   )
 }
 
-function WallRow({ label, U, area, onU, onArea }) {
+interface WallRowProps {
+  label: string
+  U: string
+  area: string
+  onU: (val: string) => void
+  onArea: (val: string) => void
+}
+
+function WallRow({ label, U, area, onU, onArea }: WallRowProps) {
   return (
     <div className="grid grid-cols-3 gap-2 items-center">
       <span className="text-[11px] text-ink-400">{label}</span>
@@ -283,22 +379,28 @@ function WallRow({ label, U, area, onU, onArea }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function EnergyReportPanel({ projectId, onClose, embedded = false }) {
+interface Props {
+  projectId?: string
+  onClose?: () => void
+  embedded?: boolean
+}
+
+export default function EnergyReportPanel({ projectId, onClose, embedded = false }: Props) {
   const [tab, setTab] = useState('setup')
-  const [form, setForm] = useState(DEFAULT_STATE)
+  const [form, setForm] = useState<FormState>(DEFAULT_STATE)
   const [simState, setSimState] = useState('idle') // idle | running | done | error
   const [simProgress, setSimProgress] = useState(0)
-  const [report, setReport] = useState(null)
-  const [simError, setSimError] = useState(null)
+  const [report, setReport] = useState<EnergyReport | null>(null)
+  const [simError, setSimError] = useState<string | null>(null)
   const [caveatsOpen, setCaveatsOpen] = useState(false)
-  const intervalRef = useRef(null)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  function setField(key) {
-    return (val) => setForm((f) => ({ ...f, [key]: val }))
+  function setField(key: keyof FormState) {
+    return (val: string) => setForm((f) => ({ ...f, [key]: val }))
   }
 
   // Build the spec payload from form state
-  function buildSpec() {
+  function buildSpec(): EnergySpec {
     return {
       building_type: form.building_type,
       floor_area_m2: num(form.floor_area_m2, 1000),
@@ -327,6 +429,73 @@ export default function EnergyReportPanel({ projectId, onClose, embedded = false
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Client-side demo report (no backend required)
+  // ---------------------------------------------------------------------------
+  function _clientSideMockReport(spec: EnergySpec): EnergyReport {
+    // Very simplified model for demo — mirrors the Python logic roughly
+    const BASELINE: Record<string, Record<number, number>> = {
+      office: { 1: 175, 2: 170, 3: 165, 4: 160, 5: 165, 6: 170, 7: 185, 8: 200 },
+      residential: { 1: 100, 2: 110, 3: 115, 4: 120, 5: 130, 6: 140, 7: 160, 8: 180 },
+      retail: { 1: 190, 2: 185, 3: 180, 4: 175, 5: 180, 6: 185, 7: 200, 8: 215 },
+      warehouse: { 1: 60, 2: 62, 3: 65, 4: 70, 5: 75, 6: 80, 7: 90, 8: 100 },
+      hospital: { 1: 400, 2: 420, 3: 430, 4: 440, 5: 460, 6: 480, 7: 500, 8: 520 },
+      education: { 1: 130, 2: 135, 3: 140, 4: 145, 5: 150, 6: 160, 7: 175, 8: 190 },
+    }
+    const CZ_NUM = parseInt(spec.climate_zone, 10) || 4
+    const baselineEUI = (BASELINE[spec.building_type] || BASELINE.office)[CZ_NUM] || 160
+
+    // Rough EUI estimate: lighting + plug + hvac factor
+    const lightKWh = spec.lighting_load_W_per_m2 * spec.floor_area_m2 * spec.annual_run_hours * 0.85 / 1000
+    const plugKWh = spec.plug_load_W_per_m2 * spec.floor_area_m2 * spec.annual_run_hours * 0.70 / 1000
+    // UA-based rough HVAC
+    const UA = spec.wall_assemblies.reduce((s, w) => s + w.U * w.area_m2, 0) +
+      spec.roof_assembly.U * spec.roof_assembly.area_m2 +
+      spec.window_specs.reduce((s, w) => s + w.U * w.area_m2, 0)
+    const HDD = [0, 200, 700, 900, 2500, 3500, 4500, 6000, 8000][CZ_NUM] || 2500
+    const CDD = [0, 2900, 2000, 1600, 700, 400, 200, 80, 10][CZ_NUM] || 700
+    const heatKWh = (UA * HDD * 24 / 1000) / 0.85
+    const coolKWh = (UA * CDD * 24 / 1000) / 3.0
+    const fanKWh = (heatKWh + coolKWh) * 0.18
+    const total = heatKWh + coolKWh + lightKWh + plugKWh + fanKWh
+    const eui = total / spec.floor_area_m2
+    const pctBetter = (baselineEUI - eui) / baselineEUI * 100
+
+    const LEED_TABLE = [
+      [50, 18], [46, 17], [42, 16], [38, 15], [34, 14], [30, 13], [28, 12],
+      [26, 11], [24, 10], [22, 9], [20, 8], [18, 7], [16, 6], [14, 5],
+      [12, 4], [10, 3], [8, 2], [6, 1],
+    ]
+    const leedCredits = LEED_TABLE.find(([p]) => pctBetter >= p)?.[1] ?? 0
+
+    const recs: string[] = []
+    if (eui > baselineEUI) recs.push(`EUI is ${(-pctBetter).toFixed(1)}% above baseline. Improve insulation and HVAC efficiency.`)
+    if (spec.lighting_load_W_per_m2 > 10) recs.push(`Lighting ${spec.lighting_load_W_per_m2} W/m² is above ASHRAE 90.1 target. Switch to LED with occupancy sensors.`)
+    if (spec.hvac_system_type === 'CRAC') recs.push('CRAC systems are inefficient outside data centres. Consider PTHP or VAV.')
+    if (!recs.length) recs.push('Building meets ASHRAE 90.1 baseline. Consider on-site PV to reduce net EUI further.')
+
+    return {
+      ok: true,
+      total_annual_energy_kWh: Math.round(total),
+      energy_use_intensity_kWh_per_m2: Math.round(eui * 10) / 10,
+      ashrae_90_1_compliance: eui <= baselineEUI,
+      ashrae_baseline_eui: baselineEUI,
+      percent_better_than_baseline: Math.round(pctBetter * 10) / 10,
+      leed_credits_earned: leedCredits,
+      recommendations: recs,
+      honest_caveat:
+        'Client-side demo estimate only — simplified UA×DD model. ' +
+        'Run with projectId for the full 8760-hour simulation via the Kerf backend.',
+      energy_breakdown: {
+        heating_kWh: Math.round(heatKWh),
+        cooling_kWh: Math.round(coolKWh),
+        lighting_kWh: Math.round(lightKWh),
+        plug_loads_kWh: Math.round(plugKWh),
+        hvac_fans_kWh: Math.round(fanKWh),
+      },
+    }
+  }
+
   const runSim = useCallback(async () => {
     setSimState('running')
     setSimProgress(0)
@@ -351,7 +520,7 @@ export default function EnergyReportPanel({ projectId, onClose, embedded = false
         const API_URL = import.meta.env?.VITE_API_URL || ''
         const token = (() => {
           try {
-            // eslint-disable-next-line no-undef
+            // @ts-expect-error -- useAuth is not imported/declared anywhere in this file; this branch is dead code, pre-existing before this migration.
             return typeof useAuth !== 'undefined' ? useAuth.getState().accessToken : null
           } catch { return null }
         })()
@@ -388,73 +557,6 @@ export default function EnergyReportPanel({ projectId, onClose, embedded = false
       setSimState('error')
     }
   }, [form, projectId]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ---------------------------------------------------------------------------
-  // Client-side demo report (no backend required)
-  // ---------------------------------------------------------------------------
-  function _clientSideMockReport(spec) {
-    // Very simplified model for demo — mirrors the Python logic roughly
-    const BASELINE = {
-      office: { 1: 175, 2: 170, 3: 165, 4: 160, 5: 165, 6: 170, 7: 185, 8: 200 },
-      residential: { 1: 100, 2: 110, 3: 115, 4: 120, 5: 130, 6: 140, 7: 160, 8: 180 },
-      retail: { 1: 190, 2: 185, 3: 180, 4: 175, 5: 180, 6: 185, 7: 200, 8: 215 },
-      warehouse: { 1: 60, 2: 62, 3: 65, 4: 70, 5: 75, 6: 80, 7: 90, 8: 100 },
-      hospital: { 1: 400, 2: 420, 3: 430, 4: 440, 5: 460, 6: 480, 7: 500, 8: 520 },
-      education: { 1: 130, 2: 135, 3: 140, 4: 145, 5: 150, 6: 160, 7: 175, 8: 190 },
-    }
-    const CZ_NUM = parseInt(spec.climate_zone, 10) || 4
-    const baselineEUI = (BASELINE[spec.building_type] || BASELINE.office)[CZ_NUM] || 160
-
-    // Rough EUI estimate: lighting + plug + hvac factor
-    const lightKWh = spec.lighting_load_W_per_m2 * spec.floor_area_m2 * spec.annual_run_hours * 0.85 / 1000
-    const plugKWh = spec.plug_load_W_per_m2 * spec.floor_area_m2 * spec.annual_run_hours * 0.70 / 1000
-    // UA-based rough HVAC
-    const UA = spec.wall_assemblies.reduce((s, w) => s + w.U * w.area_m2, 0) +
-      spec.roof_assembly.U * spec.roof_assembly.area_m2 +
-      spec.window_specs.reduce((s, w) => s + w.U * w.area_m2, 0)
-    const HDD = [0, 200, 700, 900, 2500, 3500, 4500, 6000, 8000][CZ_NUM] || 2500
-    const CDD = [0, 2900, 2000, 1600, 700, 400, 200, 80, 10][CZ_NUM] || 700
-    const heatKWh = (UA * HDD * 24 / 1000) / 0.85
-    const coolKWh = (UA * CDD * 24 / 1000) / 3.0
-    const fanKWh = (heatKWh + coolKWh) * 0.18
-    const total = heatKWh + coolKWh + lightKWh + plugKWh + fanKWh
-    const eui = total / spec.floor_area_m2
-    const pctBetter = (baselineEUI - eui) / baselineEUI * 100
-
-    const LEED_TABLE = [
-      [50, 18], [46, 17], [42, 16], [38, 15], [34, 14], [30, 13], [28, 12],
-      [26, 11], [24, 10], [22, 9], [20, 8], [18, 7], [16, 6], [14, 5],
-      [12, 4], [10, 3], [8, 2], [6, 1],
-    ]
-    const leedCredits = LEED_TABLE.find(([p]) => pctBetter >= p)?.[1] ?? 0
-
-    const recs = []
-    if (eui > baselineEUI) recs.push(`EUI is ${(-pctBetter).toFixed(1)}% above baseline. Improve insulation and HVAC efficiency.`)
-    if (spec.lighting_load_W_per_m2 > 10) recs.push(`Lighting ${spec.lighting_load_W_per_m2} W/m² is above ASHRAE 90.1 target. Switch to LED with occupancy sensors.`)
-    if (spec.hvac_system_type === 'CRAC') recs.push('CRAC systems are inefficient outside data centres. Consider PTHP or VAV.')
-    if (!recs.length) recs.push('Building meets ASHRAE 90.1 baseline. Consider on-site PV to reduce net EUI further.')
-
-    return {
-      ok: true,
-      total_annual_energy_kWh: Math.round(total),
-      energy_use_intensity_kWh_per_m2: Math.round(eui * 10) / 10,
-      ashrae_90_1_compliance: eui <= baselineEUI,
-      ashrae_baseline_eui: baselineEUI,
-      percent_better_than_baseline: Math.round(pctBetter * 10) / 10,
-      leed_credits_earned: leedCredits,
-      recommendations: recs,
-      honest_caveat:
-        'Client-side demo estimate only — simplified UA×DD model. ' +
-        'Run with projectId for the full 8760-hour simulation via the Kerf backend.',
-      energy_breakdown: {
-        heating_kWh: Math.round(heatKWh),
-        cooling_kWh: Math.round(coolKWh),
-        lighting_kWh: Math.round(lightKWh),
-        plug_loads_kWh: Math.round(plugKWh),
-        hvac_fans_kWh: Math.round(fanKWh),
-      },
-    }
-  }
 
   // ---------------------------------------------------------------------------
   // Export helpers

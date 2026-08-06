@@ -6,9 +6,10 @@
  */
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import CompareFeatureMatrix from './CompareFeatureMatrix.jsx'
+import type { ReactElement } from 'react'
+import CompareFeatureMatrix from './CompareFeatureMatrix'
 
-function render(ui) {
+function render(ui: ReactElement) {
   return renderToStaticMarkup(ui)
 }
 

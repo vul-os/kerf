@@ -5,9 +5,45 @@
 // and AHRI-certified part-load curve values.  Replaces the previous ASHRAE
 // 90.1-2022 minimum-efficiency catalogue.
 import { useState, useCallback } from 'react'
+import type { LucideIcon } from 'lucide-react'
 import { Search, Zap, Thermometer, Wind, Flame } from 'lucide-react'
 
-const CATEGORIES = [
+// Types for the hvac.equipment_select tool's response — not declared
+// elsewhere; this panel talks to /api/tools/call directly rather than
+// through api.ts, so the shape is captured here from usage.
+export interface EquipmentModel {
+  ahri_number: string | number
+  manufacturer: string
+  model_number: string
+  capacity_btu_hr: number
+  eer?: number
+  ieer?: number
+  cop_cooling?: number
+  cop_heating?: number
+  afue?: number
+  part_load_curve?: Record<string, number>
+  notes?: string
+}
+
+interface EquipmentSelectResult {
+  models?: EquipmentModel[]
+  total_matches?: number
+  source?: string
+  note?: string
+  error?: string
+}
+
+export interface EquipmentSelectPanelProps {
+  onSelect?: (model: EquipmentModel) => void
+}
+
+interface Category {
+  value: string
+  label: string
+  Icon: LucideIcon
+}
+
+const CATEGORIES: Category[] = [
   { value: 'rooftop_ac',   label: 'Rooftop AC',          Icon: Wind },
   { value: 'split_ac',     label: 'Split AC',             Icon: Wind },
   { value: 'water_chiller',label: 'Water-cooled Chiller', Icon: Thermometer },
@@ -16,7 +52,7 @@ const CATEGORIES = [
   { value: 'heat_pump',    label: 'Heat Pump',            Icon: Zap },
 ]
 
-const EFF_LABEL = {
+const EFF_LABEL: Record<string, string> = {
   rooftop_ac:    'EER / IEER',
   split_ac:      'EER / IEER',
   water_chiller: 'COP (cool)',
@@ -25,8 +61,8 @@ const EFF_LABEL = {
   heat_pump:     'COP (cool / heat)',
 }
 
-function effSummary(model) {
-  const parts = []
+function effSummary(model: EquipmentModel) {
+  const parts: string[] = []
   if (model.eer   != null) parts.push(`EER ${model.eer}`)
   if (model.ieer  != null) parts.push(`IEER ${model.ieer}`)
   if (model.cop_cooling != null) parts.push(`COP ${model.cop_cooling}`)
@@ -35,14 +71,14 @@ function effSummary(model) {
   return parts.join(' · ') || '—'
 }
 
-function PartLoadBar({ curve }) {
+function PartLoadBar({ curve }: { curve?: Record<string, number> }) {
   const loads = ['0.25', '0.5', '0.75', '1.0']
-  const vals = loads.map(k => curve?.[k] ?? null).filter(v => v != null)
+  const vals = loads.map(k => curve?.[k] ?? null).filter((v): v is number => v != null)
   if (!vals.length) return null
   const max = Math.max(...vals)
   return (
     <div className="flex items-end gap-1 h-8 mt-1">
-      {loads.map((k, i) => {
+      {loads.map((k, _i) => {
         const v = curve?.[k]
         if (v == null) return null
         const h = Math.round((v / max) * 28)
@@ -63,7 +99,13 @@ function PartLoadBar({ curve }) {
   )
 }
 
-function ModelCard({ model, onSelect, selected }) {
+interface ModelCardProps {
+  model: EquipmentModel
+  onSelect: (model: EquipmentModel) => void
+  selected: EquipmentModel | null
+}
+
+function ModelCard({ model, onSelect, selected }: ModelCardProps) {
   const isSelected = selected?.ahri_number === model.ahri_number
   return (
     <button
@@ -109,14 +151,14 @@ function ModelCard({ model, onSelect, selected }) {
   )
 }
 
-export default function EquipmentSelectPanel({ onSelect }) {
+export default function EquipmentSelectPanel({ onSelect }: EquipmentSelectPanelProps) {
   const [category, setCategory] = useState('rooftop_ac')
   const [capacityTon, setCapacityTon] = useState('')
   const [minEff, setMinEff] = useState('')
-  const [results, setResults] = useState(null)
+  const [results, setResults] = useState<EquipmentSelectResult | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [selected, setSelected] = useState(null)
+  const [error, setError] = useState<string | null>(null)
+  const [selected, setSelected] = useState<EquipmentModel | null>(null)
 
   const search = useCallback(async () => {
     const cap = parseFloat(capacityTon)
@@ -126,7 +168,7 @@ export default function EquipmentSelectPanel({ onSelect }) {
     setResults(null)
 
     try {
-      const toolArgs = {
+      const toolArgs: { category: string; capacity_btu_hr: number; min_efficiency?: number } = {
         category,
         capacity_btu_hr: cap > 0 ? cap * 12_000 : 0,
       }
@@ -140,17 +182,17 @@ export default function EquipmentSelectPanel({ onSelect }) {
       })
       if (!res.ok) throw new Error(`API error ${res.status}`)
       const body = await res.json()
-      const data = typeof body.result === 'string' ? JSON.parse(body.result) : body.result
+      const data: EquipmentSelectResult = typeof body.result === 'string' ? JSON.parse(body.result) : body.result
       if (data?.error) throw new Error(data.error)
       setResults(data)
     } catch (err) {
-      setError(err.message)
+      setError((err as Error)?.message)
     } finally {
       setLoading(false)
     }
   }, [category, capacityTon, minEff])
 
-  function handleSelect(model) {
+  function handleSelect(model: EquipmentModel) {
     setSelected(model)
     onSelect?.(model)
   }
@@ -158,7 +200,11 @@ export default function EquipmentSelectPanel({ onSelect }) {
   const iCls = 'w-full bg-ink-950 border border-ink-700 rounded px-2 py-1 text-[12px] text-ink-200 focus:outline-none focus:border-kerf-300/60'
   const sCls = 'w-full bg-ink-950 border border-ink-700 rounded px-2 py-1 text-[12px] text-ink-200 focus:outline-none focus:border-kerf-300/60'
 
-  const { Icon: ActiveIcon } = CATEGORIES.find(c => c.value === category) ?? {}
+  // NOTE (T-515): `ActiveIcon` is computed but never rendered anywhere below —
+  // looks like the category icon was meant to appear in the header and the
+  // JSX wiring was never finished. Left as dead code (pre-existing, not
+  // fixed here per migration scope) but renamed to satisfy the unused-var lint rule.
+  const { Icon: _ActiveIcon } = CATEGORIES.find(c => c.value === category) ?? {}
 
   return (
     <div className="flex flex-col gap-4 p-4 bg-ink-950 text-ink-100 min-h-0">

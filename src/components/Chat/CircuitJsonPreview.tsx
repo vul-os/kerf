@@ -10,28 +10,37 @@
 // The "Open in editor" button creates a new `.circuit.json` file in the
 // current project via the existing `files` API and navigates to it.
 //
-// Props:
-//   circuitJson  {Array}   — normalised circuit primitives array
-//   projectId    {string?} — current project id; "Open in editor" is hidden
-//                            when absent
-//
 // Note: the `api` import below is a placeholder that the parent will resolve
 // to `../../lib/api.js` once this component is wired into ChatMessage. It is
 // left as a direct import from the expected location so the build works now.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CircuitBoard, Cpu, AlertTriangle, Maximize2, RotateCcw, ExternalLink, Loader2 } from 'lucide-react'
+import type { MouseEvent as ReactMouseEvent } from 'react'
+import { CircuitBoard, Cpu, AlertTriangle, RotateCcw, ExternalLink, Loader2 } from 'lucide-react'
 import { convertCircuitJsonToSchematicSvg, convertCircuitJsonToPcbSvg } from 'circuit-to-svg'
 // placeholder import — parent will confirm path when wiring into ChatMessage
 import { api } from '../../lib/api.js'
+import type { CircuitElement } from '../../types'
+
+export interface Props {
+  /** normalised circuit primitives array */
+  circuitJson: CircuitElement[]
+  /** current project id; "Open in editor" is hidden when absent */
+  projectId?: string
+}
+
+interface ParsedSvg {
+  innerHTML: string
+  viewBox: number[] | null
+}
 
 // ---------------------------------------------------------------------------
 // SVG helpers (same approach as SchematicView / PCBView)
 // ---------------------------------------------------------------------------
 
-function parseLibrarySvg(svgText) {
+function parseLibrarySvg(svgText: unknown): ParsedSvg {
   if (!svgText || typeof svgText !== 'string') return { innerHTML: '', viewBox: null }
-  let doc
+  let doc: Document
   try {
     doc = new DOMParser().parseFromString(svgText, 'image/svg+xml')
   } catch {
@@ -41,7 +50,7 @@ function parseLibrarySvg(svgText) {
   if (!root || root.nodeName.toLowerCase() !== 'svg') return { innerHTML: '', viewBox: null }
   if (root.querySelector && root.querySelector('parsererror')) return { innerHTML: '', viewBox: null }
   const vbAttr = root.getAttribute('viewBox')
-  let viewBox = null
+  let viewBox: number[] | null = null
   if (vbAttr) {
     const parts = vbAttr.trim().split(/\s+/).map(Number)
     if (parts.length === 4 && parts.every((n) => Number.isFinite(n))) viewBox = parts
@@ -60,24 +69,26 @@ function parseLibrarySvg(svgText) {
 // Pan/zoom hook — mouse wheel to zoom, drag to pan
 // ---------------------------------------------------------------------------
 
+interface Transform { x: number; y: number; scale: number }
+
 function usePanZoom() {
-  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 })
+  const [transform, setTransform] = useState<Transform>({ x: 0, y: 0, scale: 1 })
   const dragging = useRef(false)
   const last = useRef({ x: 0, y: 0 })
 
-  const onWheel = useCallback((e) => {
+  const onWheel = useCallback((e: WheelEvent) => {
     e.preventDefault()
     const factor = e.deltaY < 0 ? 1.12 : 0.89
     setTransform((t) => ({ ...t, scale: Math.max(0.05, Math.min(40, t.scale * factor)) }))
   }, [])
 
-  const onMouseDown = useCallback((e) => {
+  const onMouseDown = useCallback((e: ReactMouseEvent) => {
     if (e.button !== 0) return
     dragging.current = true
     last.current = { x: e.clientX, y: e.clientY }
   }, [])
 
-  const onMouseMove = useCallback((e) => {
+  const onMouseMove = useCallback((e: ReactMouseEvent) => {
     if (!dragging.current) return
     const dx = e.clientX - last.current.x
     const dy = e.clientY - last.current.y
@@ -96,9 +107,9 @@ function usePanZoom() {
 // SvgCanvas — shared pan/zoom SVG pane
 // ---------------------------------------------------------------------------
 
-function SvgCanvas({ svgParsed, label }) {
+function SvgCanvas({ svgParsed, label }: { svgParsed: ParsedSvg | null; label: string }) {
   const { transform, onWheel, onMouseDown, onMouseMove, onMouseUp, reset } = usePanZoom()
-  const svgRef = useRef(null)
+  const svgRef = useRef<SVGSVGElement>(null)
 
   useEffect(() => {
     const el = svgRef.current
@@ -143,7 +154,6 @@ function SvgCanvas({ svgParsed, label }) {
       >
         <g
           style={groupStyle}
-          // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{ __html: svgParsed.innerHTML }}
         />
       </svg>
@@ -155,16 +165,18 @@ function SvgCanvas({ svgParsed, label }) {
 // CircuitJsonPreview
 // ---------------------------------------------------------------------------
 
-const TABS = [
+type TabId = 'schematic' | 'pcb'
+
+const TABS: { id: TabId; label: string; Icon: typeof Cpu }[] = [
   { id: 'schematic', label: 'Schematic', Icon: Cpu },
   { id: 'pcb', label: 'PCB', Icon: CircuitBoard },
 ]
 
-export default function CircuitJsonPreview({ circuitJson, projectId }) {
-  const [tab, setTab] = useState('schematic')
+export default function CircuitJsonPreview({ circuitJson, projectId }: Props) {
+  const [tab, setTab] = useState<TabId>('schematic')
   const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState(null)
-  const [savedFileId, setSavedFileId] = useState(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [savedFileId, setSavedFileId] = useState<string | null>(null)
 
   // Derive SVG strings — memoised on the circuitJson identity
   const schematicSvg = useMemo(() => {

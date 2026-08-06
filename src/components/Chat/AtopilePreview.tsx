@@ -4,7 +4,7 @@
 // The projectId prop comes from the nearest chat context / workspace store.
 
 /**
- * AtopilePreview.jsx
+ * AtopilePreview.tsx
  *
  * Chat-message renderer for inline `.ato` code snippets.
  *
@@ -19,11 +19,6 @@
  * error banner is rendered instead of the preview.  The raw source is
  * always accessible in the collapsed code block below the preview.
  *
- * Props:
- *   source     {string}   — raw atopile source text (with or without fence)
- *   projectId  {string?}  — current project id forwarded to CircuitJsonPreview
- *                           (enables the "Open in editor" button)
- *
  * Note: compile is triggered once on mount (and whenever `source` changes).
  * The AbortController is cleaned up on unmount to avoid state-setting on an
  * unmounted component.
@@ -34,25 +29,47 @@ import { AlertTriangle, Loader2, ChevronDown, ChevronRight, FileCode } from 'luc
 import { extractAtopileSource } from '../../lib/detectAtopile.js'
 import { compileAtopile } from '../../lib/atopileCompileBridge.js'
 import CircuitJsonPreview from './CircuitJsonPreview.jsx'
+import type { CircuitElement } from '../../types'
+
+export interface Props {
+  /**
+   * raw atopile source text (with or without fence). Nullable/undefined is tolerated —
+   * extractAtopileSource() and the render path both defend against it (see
+   * AtopilePreview.test.jsx's null/undefined/empty-string cases) — so the type reflects
+   * the actual accepted range rather than the narrower one in the original JSDoc.
+   */
+  source?: string | null
+  /** current project id forwarded to CircuitJsonPreview (enables the "Open in editor" button) */
+  projectId?: string
+}
+
+type Status = 'idle' | 'compiling' | 'ok' | 'error'
+
+interface AtopileCompileError {
+  message: string
+  line?: number | null
+  col?: number | null
+}
 
 // ---------------------------------------------------------------------------
 // AtopilePreview
 // ---------------------------------------------------------------------------
 
-export default function AtopilePreview({ source, projectId }) {
-  const [status, setStatus] = useState('idle') // 'idle' | 'compiling' | 'ok' | 'error'
-  const [circuit, setCircuit] = useState(null)
-  const [errors, setErrors] = useState([])
-  const [warnings, setWarnings] = useState([])
+export default function AtopilePreview({ source, projectId }: Props) {
+  const [status, setStatus] = useState<Status>('idle')
+  const [circuit, setCircuit] = useState<CircuitElement[] | null>(null)
+  const [errors, setErrors] = useState<AtopileCompileError[]>([])
+  const [warnings, setWarnings] = useState<string[]>([])
   const [sourceExpanded, setSourceExpanded] = useState(false)
 
-  const abortRef = useRef(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   // ── Compile on mount / source change ──────────────────────────────────
 
   useEffect(() => {
     const raw = extractAtopileSource(source)
     if (!raw) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- source-validation bail-out, pre-existing before this migration.
       setStatus('error')
       setErrors([{ message: 'Empty or invalid atopile source.' }])
       return

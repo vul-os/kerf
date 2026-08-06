@@ -12,14 +12,20 @@
 // so we still get a rendered shell. The SVG canvas falls back to the "No
 // primitives" empty state, which is the expected behaviour in jsdom.
 
-import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import CircuitJsonPreview from './CircuitJsonPreview.jsx'
+import type { CircuitElement } from '../../types'
 
 // ---------------------------------------------------------------------------
 // Minimal Circuit JSON fixture
 // ---------------------------------------------------------------------------
 
+// These fixtures are deliberately partial (they only carry the fields the component's
+// rendering path reads) and don't structurally satisfy circuit-json's real discriminated
+// union — see src/types/circuit.ts's header comment on the same impedance mismatch for
+// circuitJsonPatch.js's addFootprint(). Cast rather than fully populate every required
+// field of every real element shape.
 const MINIMAL_CIRCUIT_JSON = [
   {
     type: 'source_component',
@@ -49,7 +55,7 @@ const MINIMAL_CIRCUIT_JSON = [
     center: { x: 0, y: 0 },
     size: { width: 1, height: 0.5 },
   },
-]
+] as unknown as CircuitElement[]
 
 // Stub circuit-to-svg so we don't need the full tscircuit stack in the test
 // runner (workers / WASM / browser APIs). The component gracefully handles an
@@ -119,7 +125,7 @@ describe('CircuitJsonPreview — renders without crashing', () => {
   it('does not crash when circuitJson has only source_ items', () => {
     const sourceOnly = [
       { type: 'source_component', source_component_id: 'sc1', name: 'C1', ftype: 'simple_capacitor' },
-    ]
+    ] as unknown as CircuitElement[]
     const html = renderToStaticMarkup(
       <CircuitJsonPreview circuitJson={sourceOnly} />,
     )

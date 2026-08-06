@@ -11,6 +11,8 @@
 //   archviz_scatter_populate  — run the scatter engine (kerf_render.archviz_tools)
 //   archviz_asset_library     — browse the built-in proxy asset catalogue
 
+import type { PanelEntry } from '../panelRegistry.js'
+
 export default [
   // ── Archviz Scatter / Population ──────────────────────────────────────────
   {
@@ -20,4 +22,4 @@ export default [
     load: () => import('../../components/archviz/ArchvizScatterPanel.jsx'),
     label: 'Archviz Scatter',
   },
-]
+] satisfies PanelEntry[]

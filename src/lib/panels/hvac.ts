@@ -12,6 +12,8 @@
 //                            supply/return fans, duct static pressure, plant
 //                            coupling to chiller/boiler (.hvac.airside)
 
+import type { PanelEntry } from '../panelRegistry.js'
+
 export default [
   {
     id: 'hvac_duct',
@@ -43,4 +45,4 @@ export default [
     load: () => import('../../components/hvac/AirsideSystemPanel.jsx'),
     label: 'AHU Air-Side System (Coils + Fan + VAV + Economizer)',
   },
-]
+] satisfies PanelEntry[]

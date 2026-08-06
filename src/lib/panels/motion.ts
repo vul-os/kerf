@@ -20,6 +20,8 @@
 //   projectId {string}
 //   fileId    {string}
 
+import type { PanelEntry } from '../panelRegistry.js'
+
 export default [
   {
     id: 'motion_study',
@@ -28,4 +30,4 @@ export default [
     load: () => import('../../components/motion/AssemblyMotionStudioPanel.jsx'),
     label: 'Motion Study',
   },
-]
+] satisfies PanelEntry[]

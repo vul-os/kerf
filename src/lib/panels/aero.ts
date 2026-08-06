@@ -8,6 +8,8 @@
 // All panels accept a `content` string prop and JSON.parse it for backward-
 // compatible stand-alone usage (direct props still work).
 
+import type { PanelEntry } from '../panelRegistry.js'
+
 export default [
   // ── Aerospace ──────────────────────────────────────────────────────────────
 
@@ -100,4 +102,4 @@ export default [
     load: () => import('../../components/ScantlingCheckPanel.jsx'),
     label: 'Scantling Check (ISO 12215-5 / ABS / DNV)',
   },
-]
+] satisfies PanelEntry[]

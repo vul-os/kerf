@@ -22,6 +22,8 @@
  *     entertainment_rigging       → RiggingLoadPanel    (.rigging)
  */
 
+import type { PanelEntry } from '../panelRegistry.js'
+
 export default [
   // ── Lighting plot + DMX patch ────────────────────────────────────────────
 
@@ -42,4 +44,4 @@ export default [
     label: 'Rigging Load Analysis',
     load: () => import('../../components/entertainment/RiggingLoadPanel.jsx'),
   },
-]
+] satisfies PanelEntry[]

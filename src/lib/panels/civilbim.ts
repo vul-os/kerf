@@ -17,6 +17,8 @@
  *   pointcloud_fit_plane result → { planeResult, … }
  */
 
+import type { PanelEntry } from '../panelRegistry.js'
+
 export default [
   // ── Plant / Civil: Laser-scan Point Cloud ────────────────────────────────
   {
@@ -125,4 +127,4 @@ export default [
     label: 'Piping Design',
     load: () => import('../../components/piping/PipingDesignPanel.jsx'),
   },
-]
+] satisfies PanelEntry[]

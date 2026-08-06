@@ -9,6 +9,8 @@
 //   PipingCataloguePanel   — Spec-driven ASME B16.9/B16.5 3D component catalogue picker
 //                             (elbows 45/90 LR/SR, tees, reducers, flanges, valves, caps)
 
+import type { PanelEntry } from '../panelRegistry.js'
+
 export default [
   {
     id: 'piping_route_3d',
@@ -33,4 +35,4 @@ export default [
     load: () => import('../../components/piping/PlantCoordinationPanel.jsx'),
     label: 'Plant Coordination (Multi-Discipline)',
   },
-]
+] satisfies PanelEntry[]

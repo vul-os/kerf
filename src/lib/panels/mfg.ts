@@ -9,6 +9,8 @@
 //   kinds  — lower-cased file.kind values set by the backend
 //   exts   — lower-cased filename extensions (including the leading dot)
 
+import type { PanelEntry } from '../panelRegistry.js'
+
 export default [
   // ── CAM / machining ──────────────────────────────────────────────────────
 
@@ -181,26 +183,32 @@ export default [
       default: withGdnt(m.default),
     })),
   },
-]
+] satisfies PanelEntry[]
 
 // ---------------------------------------------------------------------------
 // Wrapper helpers
 // ---------------------------------------------------------------------------
+
+// These wrapper helpers reshape props for arbitrary lazily-loaded panel
+// components (dynamic `import(...)` of untyped .jsx files, called directly as
+// plain functions rather than rendered via JSX). `Panel`/its props and the
+// mapper's parsed-JSON shape are boundaries this slice does not own — `any` is
+// the deliberate choice here rather than modelling every panel's prop union.
+
+type AnyPanel = (props: any) => any
 
 /**
  * withContent — wraps a component so that when a `content` string prop is
  * passed the content is JSON.parse'd (try/catch) and the result is spread
  * over the props supplied by the caller (extra props win over parsed content).
  *
- * @param {React.ComponentType} Panel
- * @param {(parsed:object, raw:string) => object} mapper
- *   Maps the parsed JSON object to the props the wrapped Panel expects.
- *   Receives (parsedObject, rawString); rawString passed when JSON.parse fails.
- * @returns {React.ComponentType}
+ * @param mapper Maps the parsed JSON object to the props the wrapped Panel
+ *   expects. Receives (parsedObject, rawString); rawString passed when
+ *   JSON.parse fails.
  */
-function withContent(Panel, mapper) {
-  function ContentWrapper({ content, ...rest }) {
-    let extra = {}
+function withContent(Panel: AnyPanel & { displayName?: string; name?: string }, mapper: (parsed: any, raw: string) => Record<string, any>): AnyPanel {
+  function ContentWrapper({ content, ...rest }: { content?: string; [key: string]: any }) {
+    let extra: Record<string, any> = {}
     if (content && typeof content === 'string') {
       try {
         const parsed = JSON.parse(content)
@@ -221,8 +229,8 @@ function withContent(Panel, mapper) {
  * contentToField — simple case: map `content` → `{fieldName: content}`.
  * The wrapped panel receives the raw string in the named field.
  */
-function contentToField(Panel, fieldName) {
-  function FieldWrapper({ content, ...rest }) {
+function contentToField(Panel: AnyPanel, fieldName: string): AnyPanel {
+  function FieldWrapper({ content, ...rest }: { content?: string; [key: string]: any }) {
     const fieldProps = content !== undefined ? { [fieldName]: content } : {}
     return Panel({ ...fieldProps, ...rest })
   }
@@ -236,9 +244,8 @@ function contentToField(Panel, fieldName) {
  * The `content` prop is accepted and silently ignored so the registry contract
  * is satisfied without breaking the panel's self-contained behaviour.
  */
-function withContentPassthrough(Panel) {
-  // eslint-disable-next-line no-unused-vars
-  function PassthroughWrapper({ content, file, fileId, projectId, ...rest }) {
+function withContentPassthrough(Panel: AnyPanel & { displayName?: string; name?: string }): AnyPanel {
+  function PassthroughWrapper({ content: _content, file: _file, fileId: _fileId, projectId: _projectId, ...rest }: { content?: string; file?: any; fileId?: any; projectId?: any; [key: string]: any }) {
     return Panel(rest)
   }
   PassthroughWrapper.displayName = `ContentPassthrough(${Panel.displayName || Panel.name || 'Panel'})`
@@ -249,8 +256,8 @@ function withContentPassthrough(Panel) {
  * withGeomImport — GeometryImportPanel needs `projectId` from the file context.
  * Maps { file, content, projectId, fileId } → { projectId }.
  */
-function withGeomImport(Panel) {
-  function GeomWrapper({ content, file, projectId, fileId, ...rest }) { // eslint-disable-line no-unused-vars
+function withGeomImport(Panel: AnyPanel): AnyPanel {
+  function GeomWrapper({ content: _content, file: _file, projectId, fileId: _fileId, ...rest }: { content?: string; file?: any; projectId?: any; fileId?: any; [key: string]: any }) {
     return Panel({ projectId, ...rest })
   }
   GeomWrapper.displayName = 'WithGeomImport(GeometryImportPanel)'
@@ -260,8 +267,8 @@ function withGeomImport(Panel) {
 /**
  * withGdnt — GdntPmiPanel accepts `drawing` (parsed JSON) via `content`.
  */
-function withGdnt(Panel) {
-  function GdntWrapper({ content, file, projectId, fileId, ...rest }) { // eslint-disable-line no-unused-vars
+function withGdnt(Panel: AnyPanel): AnyPanel {
+  function GdntWrapper({ content, file: _file, projectId: _projectId, fileId: _fileId, ...rest }: { content?: string; file?: any; projectId?: any; fileId?: any; [key: string]: any }) {
     let drawing = null
     if (content && typeof content === 'string') {
       try { drawing = JSON.parse(content) } catch { /* non-JSON */ }
@@ -281,7 +288,7 @@ function withGdnt(Panel) {
  * Content format: { cl_points?, gcode?, stock_bounds, tool_diameter_mm?,
  *   tool_kind?, part_surface_z?, resolution_mm? }
  */
-function camVerifyMapper(parsed) {
+function camVerifyMapper(parsed: any): Record<string, any> {
   if (!parsed) return {}
   return {
     clPoints:      parsed.cl_points,
@@ -299,7 +306,7 @@ function camVerifyMapper(parsed) {
  * Content format: { toolpath_points?, tool_diameter_mm?, tool_length_mm?,
  *   holder_diameter_mm?, holder_length_mm?, stock_bounds?, table_pivot_z? }
  */
-function camMachineMapper(parsed) {
+function camMachineMapper(parsed: any): Record<string, any> {
   if (!parsed) return {}
   return {
     toolpathPoints:  parsed.toolpath_points,

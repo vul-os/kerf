@@ -12,6 +12,8 @@
 // Each panel receives from Editor.jsx:
 //   { file, content, projectId, fileId, callTool, onCallTool, onDispatch }
 
+import type { PanelEntry } from '../panelRegistry.js'
+
 export default [
   // ── Sculpt Studio ──────────────────────────────────────────────────────────
   {
@@ -39,4 +41,4 @@ export default [
     load: () => import('../../components/dcc/GeometryNodesPanel.jsx'),
     label: 'Geometry Nodes',
   },
-]
+] satisfies PanelEntry[]

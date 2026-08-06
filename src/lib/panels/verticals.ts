@@ -33,6 +33,8 @@
 //   ELECTRONICS
 //     electronics_vi_bench → VirtualInstrumentBench    (.vibench)
 
+import type { PanelEntry } from '../panelRegistry.js'
+
 export default [
   // ── TEXTILES ──────────────────────────────────────────────────────────────
 
@@ -163,4 +165,4 @@ export default [
     label: 'Virtual Instrument Bench',
     load: () => import('../../components/electronics/VirtualInstrumentBench.jsx'),
   },
-]
+] satisfies PanelEntry[]

@@ -14,6 +14,8 @@
 //     - "Insert into netlist" action (fires a kerf:spice-insert custom event)
 
 /** @type {Array<{id:string,kinds?:string[],exts?:string[],load:()=>Promise<any>,label?:string}>} */
+import type { PanelEntry } from '../panelRegistry.js'
+
 export default [
   // ── SPICE Component / Model Library Browser ──────────────────────────────
   {
@@ -23,4 +25,4 @@ export default [
     load: () => import('./elec-wrappers/SpiceComponentLibraryWrapper.jsx'),
     label: 'SPICE Component Library',
   },
-];
+] satisfies PanelEntry[]

@@ -22,6 +22,8 @@
 // This file stays JSX-free so the `.js` glob in panelRegistry.js picks it up.
 
 /** @type {Array<{id:string,kinds?:string[],exts?:string[],load:()=>Promise<any>,label?:string}>} */
+import type { PanelEntry } from '../panelRegistry.js'
+
 export default [
   // ── BIM: Renovation Phase Management ─────────────────────────────────────
   {
@@ -114,4 +116,4 @@ export default [
     load: () => import('./misc-wrappers/ConstraintManagerWrapper.jsx'),
     label: 'Constraint Manager',
   },
-]
+] satisfies PanelEntry[]

@@ -20,6 +20,8 @@
 //   SheetMetalPanel           — Flat pattern, corner relief, multi-flange
 //   HyperelasticSolverPanel   — Nonlinear hyperelastic FEM (NH/MR/Ogden, TL-NR)
 
+import type { PanelEntry } from '../panelRegistry.js'
+
 export default [
   {
     id: 'struct_member',
@@ -119,4 +121,4 @@ export default [
     load: () => import('../../components/fea/HyperelasticSolverPanel.jsx'),
     label: 'Hyperelastic FEM (Neo-Hookean / MR / Ogden)',
   },
-]
+] satisfies PanelEntry[]

@@ -20,6 +20,8 @@
  * actual Worksharing mechanism), NOT live real-time co-editing.
  */
 
+import type { PanelEntry } from '../panelRegistry.js'
+
 export default [
   // ── BIM: Worksharing Panel ───────────────────────────────────────────────
   {
@@ -38,4 +40,4 @@ export default [
     label: 'Federated XRef Manager',
     load: () => import('../../components/bim/XRefManagerPanel.jsx'),
   },
-]
+] satisfies PanelEntry[]

@@ -22,16 +22,63 @@ import { useMemo } from 'react'
 import { Grid3x3, Layers } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface TextilesFloatStats {
+  warp_mean_float?: number
+  weft_mean_float?: number
+  max_float?: number
+}
+
+interface TextilesDensityStats {
+  wales_per_cm?: number
+  courses_per_cm?: number
+  density_within_1pct?: boolean
+}
+
+interface TextilesRawResult {
+  error?: string
+  name?: string
+  svg?: string | null
+  float_stats?: TextilesFloatStats
+  analytic_warp_mean_float?: number
+  analytic_weft_mean_float?: number
+  density_stats?: TextilesDensityStats
+}
+
+type TextilesStats = Record<string, number | boolean | undefined>
+
+type ParsedTextilesResult =
+  | { kind: 'empty' }
+  | { kind: 'invalid'; error: string }
+  | { kind: 'ok'; type: 'weave' | 'knit' | 'unknown'; name: string; svg: string | null; stats: TextilesStats }
+
+// ---------------------------------------------------------------------------
 // Pure helpers (exported for tests)
 // ---------------------------------------------------------------------------
 
 /**
  * Parse raw textiles_generate result (string or object) into a display-ready
  * object. Returns { kind: 'ok'|'empty'|'invalid', type, name, svg, stats, error? }
+ *
+ * Exported alongside the default TextilesWeaveKnitPanel component (module's own
+ * pure helpers, exercised directly by vitest) — pre-existing; splitting into
+ * a separate module is a refactor out of scope for a rename-only migration (T-516).
  */
-export function parseTextilesResult(raw) {
+// eslint-disable-next-line react-refresh/only-export-components -- see comment above.
+export function parseTextilesResult(raw: TextilesRawResult | string | null | undefined): ParsedTextilesResult {
   if (raw == null) return { kind: 'empty' }
-  const obj = typeof raw === 'string' ? (() => { try { return JSON.parse(raw) } catch { return null } })() : raw
+  const obj: TextilesRawResult | null =
+    typeof raw === 'string'
+      ? (() => {
+          try {
+            return JSON.parse(raw)
+          } catch {
+            return null
+          }
+        })()
+      : raw
   if (!obj || typeof obj !== 'object') return { kind: 'invalid', error: 'Expected JSON object' }
   if (obj.error) return { kind: 'invalid', error: obj.error }
 
@@ -39,11 +86,11 @@ export function parseTextilesResult(raw) {
   const isWeave = 'float_stats' in obj || 'analytic_warp_mean_float' in obj
   const isKnit  = 'density_stats' in obj
 
-  const type  = isWeave ? 'weave' : isKnit ? 'knit' : 'unknown'
+  const type: 'weave' | 'knit' | 'unknown' = isWeave ? 'weave' : isKnit ? 'knit' : 'unknown'
   const name  = obj.name || '(unnamed)'
   const svg   = obj.svg || null
 
-  let stats = {}
+  let stats: TextilesStats = {}
   if (isWeave) {
     stats = {
       warp_mean_float: obj.analytic_warp_mean_float ?? obj.float_stats?.warp_mean_float,
@@ -64,7 +111,8 @@ export function parseTextilesResult(raw) {
 /**
  * Format a float-length number. Returns "—" for null/undefined/NaN.
  */
-export function fmtFloat(n) {
+// eslint-disable-next-line react-refresh/only-export-components -- see parseTextilesResult above.
+export function fmtFloat(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—'
   return n.toFixed(2)
 }
@@ -72,8 +120,9 @@ export function fmtFloat(n) {
 /**
  * Return a human-readable label for a weave/knit stat key.
  */
-export function weaveStatLabel(key) {
-  const labels = {
+// eslint-disable-next-line react-refresh/only-export-components -- see parseTextilesResult above.
+export function weaveStatLabel(key: string): string {
+  const labels: Record<string, string> = {
     warp_mean_float:       'Warp mean float',
     weft_mean_float:       'Weft mean float',
     max_float:             'Max float length',
@@ -88,7 +137,12 @@ export function weaveStatLabel(key) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function StatRow({ label, value }) {
+interface StatRowProps {
+  label: string
+  value: number | boolean | string | undefined
+}
+
+function StatRow({ label, value }: StatRowProps) {
   return (
     <div className="flex items-center justify-between py-1">
       <span className="text-xs text-ink-400">{label}</span>
@@ -99,7 +153,11 @@ function StatRow({ label, value }) {
   )
 }
 
-function WeaveStats({ stats }) {
+interface WeaveStatsProps {
+  stats: TextilesStats | undefined
+}
+
+function WeaveStats({ stats }: WeaveStatsProps) {
   if (!stats || Object.keys(stats).length === 0) return null
   return (
     <div
@@ -111,7 +169,7 @@ function WeaveStats({ stats }) {
           key={k}
           label={weaveStatLabel(k)}
           value={k === 'warp_mean_float' || k === 'weft_mean_float' || k === 'max_float'
-            ? fmtFloat(v)
+            ? fmtFloat(v as number | undefined)
             : v
           }
         />
@@ -120,7 +178,11 @@ function WeaveStats({ stats }) {
   )
 }
 
-function SVGPreview({ svg }) {
+interface SVGPreviewProps {
+  svg: string | null | undefined
+}
+
+function SVGPreview({ svg }: SVGPreviewProps) {
   if (!svg) return null
   return (
     <div
@@ -128,7 +190,8 @@ function SVGPreview({ svg }) {
       data-testid="textiles-svg-preview"
       // SVG content is generated by kerf-textiles (trusted backend); using
       // dangerouslySetInnerHTML is intentional here — same as other SVG panels.
-      // eslint-disable-next-line react/no-danger
+      // No eslint-disable needed: `react/no-danger` isn't registered in this
+      // project's eslint.config.js (see WiringView.tsx / T-513 migration report).
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   )
@@ -138,14 +201,16 @@ function SVGPreview({ svg }) {
 // Main component
 // ---------------------------------------------------------------------------
 
+export interface TextilesWeaveKnitPanelProps {
+  result?: TextilesRawResult | string | null
+  content?: string | null
+  className?: string
+}
+
 /**
  * TextilesWeaveKnitPanel — renders weave or knit structure results.
- *
- * @param {Object} props
- * @param {Object|string|null} props.result  — textiles_generate output
- * @param {string} [props.className]
  */
-export default function TextilesWeaveKnitPanel({ result = null, content, className = '' }) {
+export default function TextilesWeaveKnitPanel({ result = null, content, className = '' }: TextilesWeaveKnitPanelProps) {
   // content prop (from panelRegistry) is a JSON string; parse and use as result
   const effectiveResult = useMemo(() => {
     if (content != null) {

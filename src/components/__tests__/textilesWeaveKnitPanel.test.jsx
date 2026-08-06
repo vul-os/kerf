@@ -17,7 +17,7 @@ import {
 } from '../TextilesWeaveKnitPanel.jsx'
 
 const SRC = readFileSync(
-  resolve(__dirname, '../TextilesWeaveKnitPanel.jsx'),
+  resolve(__dirname, '../TextilesWeaveKnitPanel.tsx'),
   'utf8',
 )
 

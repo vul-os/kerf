@@ -13,10 +13,53 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, XCircle, CheckCircle2, X, RefreshCw } from 'lucide-react'
+import type { CircuitJson } from '../../types'
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface DrcViolation {
+  kind?: string
+  severity?: string
+  message: string
+  x?: number
+  y?: number
+}
+
+interface ErcItem {
+  kind?: string
+  severity?: string
+  message: string
+  net_id?: string
+  component_id?: string
+}
+
+interface DrcResult {
+  violations?: DrcViolation[]
+  error_count?: number
+  warning_count?: number
+}
+
+interface ErcResult {
+  errors?: ErcItem[]
+  warnings?: ErcItem[]
+}
+
+export interface MarkerClickEvent {
+  x?: number
+  y?: number
+  kind?: string
+  [key: string]: unknown
+}
+
+export interface DrcErcPanelProps {
+  circuitJson?: CircuitJson
+  onClose?: () => void
+  onMarkerClick?: (event: DrcViolation | ErcItem) => void
+}
 
 // ── severity colour helpers ───────────────────────────────────────────────────
 
-function SeverityIcon({ severity, size = 14 }) {
+function SeverityIcon({ severity, size = 14 }: { severity?: string; size?: number }) {
   if (severity === 'error')
     return <XCircle size={size} className="text-red-400 shrink-0" />
   return <AlertTriangle size={size} className="text-yellow-400 shrink-0" />
@@ -24,7 +67,7 @@ function SeverityIcon({ severity, size = 14 }) {
 
 // ── Individual violation row ─────────────────────────────────────────────────
 
-function ViolationRow({ v, onClick }) {
+function ViolationRow({ v, onClick }: { v: DrcViolation; onClick?: (v: DrcViolation) => void }) {
   return (
     <button
       className="w-full text-left flex items-start gap-2 px-2 py-1.5 hover:bg-white/5 rounded transition-colors"
@@ -49,7 +92,7 @@ function ViolationRow({ v, onClick }) {
 
 // ── ERC row ──────────────────────────────────────────────────────────────────
 
-function ErcRow({ item, onClick }) {
+function ErcRow({ item, onClick }: { item: ErcItem; onClick?: (item: ErcItem) => void }) {
   const severity = item.severity === 'error' ? 'error' : 'warning'
   return (
     <button
@@ -75,13 +118,13 @@ function ErcRow({ item, onClick }) {
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
-export default function DrcErcPanel({ circuitJson, onClose, onMarkerClick }) {
-  const [tab, setTab] = useState('drc')
-  const [drcResult, setDrcResult] = useState(null)
-  const [ercResult, setErcResult] = useState(null)
+export default function DrcErcPanel({ circuitJson, onClose, onMarkerClick }: DrcErcPanelProps) {
+  const [tab, setTab] = useState<'drc' | 'erc'>('drc')
+  const [drcResult, setDrcResult] = useState<DrcResult | null>(null)
+  const [ercResult, setErcResult] = useState<ErcResult | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const abortRef = useRef(null)
+  const [error, setError] = useState<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   const runChecks = useCallback(async () => {
     if (abortRef.current) abortRef.current.abort()
@@ -123,7 +166,7 @@ export default function DrcErcPanel({ circuitJson, onClose, onMarkerClick }) {
           setErcResult(null)
         }
       }
-    } catch (err) {
+    } catch {
       if (!ac.signal.aborted) {
         setError('Backend offline — DRC/ERC requires a running Kerf server.')
         // Show mock demo data
@@ -157,6 +200,7 @@ export default function DrcErcPanel({ circuitJson, onClose, onMarkerClick }) {
 
   // Run once on mount
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial DRC/ERC fetch on mount, pre-existing before this migration.
     runChecks()
     return () => abortRef.current?.abort()
   }, [runChecks])
@@ -226,10 +270,10 @@ export default function DrcErcPanel({ circuitJson, onClose, onMarkerClick }) {
 
       {/* Tabs */}
       <div className="flex border-b border-white/10">
-        {[
+        {([
           { key: 'drc', label: `DRC (${drcErrors + drcWarnings})` },
           { key: 'erc', label: `ERC (${ercErrorCnt + ercWarningCnt})` },
-        ].map(({ key, label }) => (
+        ] as const).map(({ key, label }) => (
           <button
             key={key}
             data-testid={`drc-erc-tab-${key}`}

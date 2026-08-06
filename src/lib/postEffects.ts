@@ -1,7 +1,7 @@
 // TODO(parent): mount makeEffectStack(settings).chain into Renderer.jsx's EffectComposer; pass focalDistance from a viewport-click reticle
 
 /**
- * postEffects.js — Post-effects stack: bloom, DoF, vignette, grain, SSAO, chromatic aberration.
+ * postEffects.ts — Post-effects stack: bloom, DoF, vignette, grain, SSAO, chromatic aberration.
  *
  * Exports:
  *   POST_EFFECTS          — ordered list of effect keys
@@ -17,19 +17,75 @@
  * lazily via the opts.three / opts.passes escape hatches so tests can inject fakes.
  */
 
+import type * as THREE from 'three'
+
 // ── Effect registry ───────────────────────────────────────────────────────────
 
 /** Canonical ordered list of effect keys. */
-export const POST_EFFECTS = ['bloom', 'dof', 'vignette', 'grain', 'ssao', 'chromatic']
+export const POST_EFFECTS = ['bloom', 'dof', 'vignette', 'grain', 'ssao', 'chromatic'] as const
+
+export type PostEffectKey = (typeof POST_EFFECTS)[number]
 
 // ── Default settings ──────────────────────────────────────────────────────────
+
+export interface BloomSettings {
+  enabled: boolean
+  threshold: number  // luminance threshold [0, 1]
+  strength: number   // bloom intensity
+  radius: number      // bloom spread
+}
+
+export interface DofSettings {
+  enabled: boolean
+  focal_distance: number // world-units focus distance (>= 0)
+  aperture: number       // bokeh aperture [0.001, 0.1]
+  maxblur: number        // bokeh max blur radius
+}
+
+export interface VignetteSettings {
+  enabled: boolean
+  intensity: number // darkness amount [0, 1]
+  offset: number     // radial offset (size of clear centre)
+}
+
+export interface GrainSettings {
+  enabled: boolean
+  intensity: number // film-grain intensity [0, 0.5]
+}
+
+export interface SsaoSettings {
+  enabled: boolean
+  radius: number    // sample hemisphere radius [0, 2]
+  intensity: number // occlusion strength [0, 2]
+}
+
+export interface ChromaticSettings {
+  enabled: boolean
+  amount: number // RGB channel shift amount [0, 0.05]
+  angle: number  // shift angle (radians)
+}
+
+/** Full post-effects settings object, keyed by {@link PostEffectKey}. */
+export interface PostEffectsSettings {
+  bloom: BloomSettings
+  dof: DofSettings
+  vignette: VignetteSettings
+  grain: GrainSettings
+  ssao: SsaoSettings
+  chromatic: ChromaticSettings
+}
+
+/** A caller may supply any subset of settings; each effect's own fields are also optional. */
+export type PostEffectsSettingsInput = {
+  [K in keyof PostEffectsSettings]?: Partial<PostEffectsSettings[K]>
+}
 
 /**
  * Sensible defaults for each effect.  Each entry has:
  *   enabled — whether the effect is on by default
  *   + the key parameter(s) used by clampSettings / makeEffectStack
  */
-export const DEFAULT_SETTINGS = {
+export const DEFAULT_SETTINGS: PostEffectsSettings = {
   bloom: {
     enabled: false,
     threshold: 0.85,   // luminance threshold [0, 1]
@@ -65,7 +121,7 @@ export const DEFAULT_SETTINGS = {
 
 // ── Clamp helpers ─────────────────────────────────────────────────────────────
 
-function clampNum(value, min, max, fallback) {
+function clampNum(value: unknown, min: number, max: number, fallback: number): number {
   if (typeof value !== 'number' || Number.isNaN(value)) return fallback
   return Math.min(max, Math.max(min, value))
 }
@@ -75,10 +131,9 @@ function clampNum(value, min, max, fallback) {
  * Out-of-range values are clamped; NaN snaps to the corresponding DEFAULT_SETTINGS value.
  * The original object is never mutated.
  *
- * @param {object} settings — partial or full settings object (same shape as DEFAULT_SETTINGS)
- * @returns {object} — complete clamped settings
+ * @param settings — partial or full settings object (same shape as DEFAULT_SETTINGS)
  */
-export function clampSettings(settings = {}) {
+export function clampSettings(settings: PostEffectsSettingsInput = {}): PostEffectsSettings {
   const s = settings || {}
 
   const bloom = { ...(DEFAULT_SETTINGS.bloom), ...(s.bloom || {}) }
@@ -126,26 +181,64 @@ export function clampSettings(settings = {}) {
 // ── makeEffectStack ───────────────────────────────────────────────────────────
 
 /**
+ * A constructed post-processing pass instance. Real Three.js passes (SSAOPass, BokehPass,
+ * ShaderPass, UnrealBloomPass, FilmPass — all from the untyped `examples/jsm/postprocessing`
+ * subpath) each expose a different, effect-specific instance shape (uniform maps, tuning fields
+ * like `kernelRadius`/`output`/`_kerfIntensity`), and tests inject minimal fake *classes* rather
+ * than object literals with a matching index signature. `any` is the deliberate boundary here:
+ * the pass constructors are foreign, shape-varying, and this module owns only the handful of
+ * property accesses below (each documented at its call site), not the passes' full shape.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- boundary type, see comment above
+export type Pass = any
+
+/**
+ * Pass-constructor overrides for testing (or for the real Three.js
+ * `examples/jsm/postprocessing` + `examples/jsm/shaders` constructors, wired up by the
+ * integration point described below). Every field is optional: an effect whose constructor
+ * is missing is simply skipped even when `enabled`.
+ */
+export interface PostEffectsPasses {
+  SSAOPass?: new (...args: Pass[]) => Pass
+  BokehPass?: new (...args: Pass[]) => Pass
+  UnrealBloomPass?: new (...args: Pass[]) => Pass
+  ShaderPass?: new (shader: Pass) => Pass
+  RGBShiftShader?: Pass
+  VignetteShader?: Pass
+  FilmPass?: new (...args: Pass[]) => Pass
+  Vector2?: new (x?: number, y?: number) => { x: number; y: number }
+}
+
+export interface MakeEffectStackOptions {
+  renderer: THREE.WebGLRenderer
+  scene: THREE.Scene
+  camera: THREE.Camera
+  settings?: PostEffectsSettingsInput
+  /** Pass-constructor overrides for testing — see {@link PostEffectsPasses}. */
+  _passes?: PostEffectsPasses | null
+}
+
+export interface EffectStack {
+  chain: Pass[]
+  dispose: () => void
+}
+
+declare global {
+  // eslint-disable-next-line no-var -- ambient integration-time injection point, see below
+  var THREE_PASSES: PostEffectsPasses | undefined
+}
+
+/**
  * Build an ordered chain of Three.js post-processing passes from `settings`.
  *
  * Pass order: SSAO → DoF → Bloom → ChromaticAberration → Vignette → Grain
- *
- * @param {object} opts
- * @param {object}  opts.renderer  — THREE.WebGLRenderer
- * @param {object}  opts.scene     — THREE.Scene
- * @param {object}  opts.camera    — THREE.PerspectiveCamera
- * @param {object}  [opts.settings] — post-effects settings (DEFAULT_SETTINGS used as fallback)
- * @param {object}  [opts._passes]  — optional pass-constructor overrides for testing:
- *                                    { SSAOPass, BokehPass, UnrealBloomPass, ShaderPass,
- *                                      RGBShiftShader, VignetteShader, FilmPass, Vector2 }
- * @returns {{ chain: Pass[], dispose(): void }}
  */
-export function makeEffectStack({ renderer, scene, camera, settings = {}, _passes = null }) {
+export function makeEffectStack({ renderer, scene, camera, settings = {}, _passes = null }: MakeEffectStackOptions): EffectStack {
   const clamped = clampSettings({ ...DEFAULT_SETTINGS, ...settings })
 
   // Resolve constructors — real Three.js imports or test stubs.
   let SSAOPass, BokehPass, UnrealBloomPass, ShaderPass,
-      RGBShiftShader, VignetteShader, FilmPass, Vector2
+      RGBShiftShader, VignetteShader, FilmPass, Vector2: PostEffectsPasses['Vector2']
 
   if (_passes) {
     ;({ SSAOPass, BokehPass, UnrealBloomPass, ShaderPass,
@@ -166,12 +259,12 @@ export function makeEffectStack({ renderer, scene, camera, settings = {}, _passe
     Vector2          = p.Vector2
   }
 
-  const chain = []
-  const disposables = []
+  const chain: Pass[] = []
+  const disposables: Pass[] = []
 
-  const size = renderer && renderer.getSize
-    ? renderer.getSize(new Vector2())
-    : new Vector2(512, 512)
+  const size = renderer && typeof renderer.getSize === 'function' && Vector2
+    ? renderer.getSize(new Vector2() as unknown as THREE.Vector2)
+    : Vector2 ? new Vector2(512, 512) : { x: 512, y: 512 }
   const w = (size && size.x) || 512
   const h = (size && size.y) || 512
 
@@ -199,7 +292,7 @@ export function makeEffectStack({ renderer, scene, camera, settings = {}, _passe
   }
 
   // 3. Bloom ─────────────────────────────────────────────────────────────────────
-  if (clamped.bloom.enabled && UnrealBloomPass) {
+  if (clamped.bloom.enabled && UnrealBloomPass && Vector2) {
     const res = new Vector2(w, h)
     const pass = new UnrealBloomPass(res, clamped.bloom.strength, clamped.bloom.radius, clamped.bloom.threshold)
     chain.push(pass)
@@ -232,7 +325,7 @@ export function makeEffectStack({ renderer, scene, camera, settings = {}, _passe
     disposables.push(pass)
   }
 
-  function dispose() {
+  function dispose(): void {
     for (const p of disposables) {
       if (p && typeof p.dispose === 'function') p.dispose()
     }

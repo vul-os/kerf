@@ -17,16 +17,26 @@ import {
   DEFAULT_SETTINGS,
   clampSettings,
   makeEffectStack,
+  type PostEffectsPasses,
 } from './postEffects.js'
 
 // ── Stub pass constructors ────────────────────────────────────────────────────
+//
+// These are lightweight test doubles for the untyped `three/examples/jsm/postprocessing` +
+// `.../shaders` constructors makeEffectStack accepts via its `_passes` injection point (see
+// postEffects.ts's `Pass` type doc). Typed loosely (`unknown`/`any`) to match — the fakes only
+// need to satisfy PostEffectsPasses structurally, not model Three.js's real pass classes.
 
 /**
  * Create a minimal fake Three.js Pass with a uniforms map and a dispose spy.
  */
-function makePass(name, uniformKeys = []) {
+function makePass(name: string, uniformKeys: string[] = []) {
   return class FakePass {
-    constructor(...args) {
+    _name: string
+    _args: unknown[]
+    uniforms: Record<string, { value: unknown }>
+    dispose: () => void
+    constructor(...args: unknown[]) {
       this._name = name
       this._args = args
       this.uniforms = {}
@@ -42,7 +52,10 @@ const FakeUnrealBloomPass = makePass('UnrealBloomPass')
 
 // ShaderPass copies the shader's uniforms on construction
 class FakeShaderPass {
-  constructor(shader) {
+  _shader: unknown
+  uniforms: Record<string, { value: unknown }>
+  dispose: () => void
+  constructor(shader: { uniforms?: Record<string, { value: unknown }> } | null | undefined) {
     this._shader = shader
     this.uniforms = {}
     if (shader && shader.uniforms) {
@@ -71,11 +84,13 @@ const FakeVignetteShader = {
 const FakeFilmPass = makePass('FilmPass')
 
 class FakeVector2 {
+  x: number
+  y: number
   constructor(x = 0, y = 0) { this.x = x; this.y = y }
 }
 
 /** Build a _passes injection object with all stubs. */
-const ALL_PASSES = {
+const ALL_PASSES: PostEffectsPasses = {
   SSAOPass:        FakeSSAOPass,
   BokehPass:       FakeBokehPass,
   UnrealBloomPass: FakeUnrealBloomPass,
@@ -89,7 +104,7 @@ const ALL_PASSES = {
 /** Build a minimal fake renderer that returns the given size. */
 function makeRenderer(w = 512, h = 512) {
   return {
-    getSize(v2) { v2.x = w; v2.y = h; return v2 },
+    getSize(v2: { x: number; y: number }) { v2.x = w; v2.y = h; return v2 },
   }
 }
 

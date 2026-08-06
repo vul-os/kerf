@@ -11,14 +11,45 @@ const CATEGORIES = [
 const PARAM_TYPES = ['number', 'string', 'boolean', 'enum']
 const DEBOUNCE_MS = 250
 
-function parse(content) {
+// family.js doesn't export types, so the doc/param/type shapes are declared
+// here to match what validateFamily expects.
+interface FamilyParam {
+  name?: string
+  type?: string
+  default?: number | string | boolean
+  min?: number
+  max?: number
+  unit?: string
+}
+
+interface FamilyType {
+  id?: string
+  name?: string
+  params?: Record<string, unknown>
+}
+
+interface FamilyDoc {
+  version?: number
+  name?: string
+  category?: string
+  params?: FamilyParam[]
+  types?: FamilyType[]
+}
+
+function parse(content?: string): FamilyDoc {
   try { return JSON.parse(content || '{}') } catch { return {} }
 }
 
-export default function FamilyEditor({ content, fileName, onContentChange }) {
-  const [family, setFamily] = useState(() => parse(content))
+export interface FamilyEditorProps {
+  content?: string
+  fileName?: string
+  onContentChange?: (content: string) => void
+}
+
+export default function FamilyEditor({ content, fileName, onContentChange }: FamilyEditorProps) {
+  const [family, setFamily] = useState<FamilyDoc>(() => parse(content))
   const lastEmittedRef = useRef(content)
-  const timerRef = useRef(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Resync if external content changes (LLM write / undo).
   useEffect(() => {
@@ -27,7 +58,7 @@ export default function FamilyEditor({ content, fileName, onContentChange }) {
     }
   }, [content])
 
-  const emit = useCallback((next) => {
+  const emit = useCallback((next: FamilyDoc) => {
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => {
       const s = JSON.stringify(next, null, 2)
@@ -37,7 +68,7 @@ export default function FamilyEditor({ content, fileName, onContentChange }) {
   }, [onContentChange])
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
 
-  function patch(delta) {
+  function patch(delta: Partial<FamilyDoc>) {
     setFamily((f) => {
       const next = { ...f, ...delta }
       emit(next)
@@ -56,7 +87,7 @@ export default function FamilyEditor({ content, fileName, onContentChange }) {
     })
   }
 
-  function removeParam(idx) {
+  function removeParam(idx: number) {
     setFamily((f) => {
       const params = (f.params || []).filter((_, i) => i !== idx)
       const next = { ...f, params }
@@ -65,7 +96,7 @@ export default function FamilyEditor({ content, fileName, onContentChange }) {
     })
   }
 
-  function patchParam(idx, delta) {
+  function patchParam(idx: number, delta: Partial<FamilyParam>) {
     setFamily((f) => {
       const params = (f.params || []).map((p, i) => i === idx ? { ...p, ...delta } : p)
       const next = { ...f, params }
@@ -86,7 +117,7 @@ export default function FamilyEditor({ content, fileName, onContentChange }) {
     })
   }
 
-  function removeType(idx) {
+  function removeType(idx: number) {
     setFamily((f) => {
       const types = (f.types || []).filter((_, i) => i !== idx)
       const next = { ...f, types }
@@ -95,7 +126,7 @@ export default function FamilyEditor({ content, fileName, onContentChange }) {
     })
   }
 
-  function patchType(idx, delta) {
+  function patchType(idx: number, delta: Partial<FamilyType>) {
     setFamily((f) => {
       const types = (f.types || []).map((t, i) => i === idx ? { ...t, ...delta } : t)
       const next = { ...f, types }

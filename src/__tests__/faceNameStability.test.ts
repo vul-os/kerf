@@ -30,12 +30,13 @@
 import { describe, it, expect } from 'vitest'
 import { buildFaceNamesForExtrude } from '../lib/faceNaming.js'
 import { resolveFaceRef } from '../lib/faceRef.js'
+import type { FaceDescriptor, Vec3 } from '../types/geometry.js'
 
 // ---------------------------------------------------------------------------
 // Synthetic geometry helpers (mirrors faceNaming.test.js)
 // ---------------------------------------------------------------------------
 
-function makeFace(index, normal, sketchEntityId, sharedEdgeIndices, overrides = {}) {
+function makeFace(index, normal, sketchEntityId, sharedEdgeIndices, overrides = {}): FaceDescriptor {
   return {
     index,
     surfaceKind: 'plane',
@@ -65,7 +66,7 @@ function makeRectBox6(topCapIndex = 0) {
   ]
 }
 
-const Z_UP = [0, 0, 1]
+const Z_UP: Vec3 = [0, 0, 1]
 const NODE_ID = 'Pad-A'
 
 // ---------------------------------------------------------------------------
@@ -204,7 +205,7 @@ describe('T7: carry-forward chain stability (Fillet → Pad name survives)', () 
     const filletModMap = {
       modified: { 0: [0], 1: [1], 2: [2], 3: [3], 4: [4], 5: [5] },
       generated: [6, 7],
-      deletedInputs: new Set(),
+      deletedInputs: new Set<number>(),
     }
 
     const namesAfterFillet = nameOpOutput('fillet', padNames, filletFaces, filletModMap, { nodeId: 'Fil-G' })

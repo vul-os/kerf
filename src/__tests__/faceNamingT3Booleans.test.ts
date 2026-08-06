@@ -28,12 +28,13 @@
 
 import { describe, it, expect } from 'vitest'
 import { traceBooleanResult } from '../lib/faceNaming.js'
+import type { FaceDescriptor, ModifiedMap } from '../types/geometry.js'
 
 // ---------------------------------------------------------------------------
 // Synthetic helpers
 // ---------------------------------------------------------------------------
 
-function makeFace(index, overrides = {}) {
+function makeFace(index, overrides = {}): FaceDescriptor {
   return {
     index,
     surfaceKind: 'plane',
@@ -46,11 +47,11 @@ function makeFace(index, overrides = {}) {
     isCap: false,
     isTop: false,
     ...overrides,
-  }
+  } as unknown as FaceDescriptor
 }
 
-function makeModifiedMap(modified = {}, generated = [], deletedInputs = new Set()) {
-  return { modified, generated, deletedInputs }
+function makeModifiedMap(modified = {}, generated = [], deletedInputs = new Set<number>()): ModifiedMap {
+  return { modified, generated, deletedInputs } as unknown as ModifiedMap
 }
 
 // ---------------------------------------------------------------------------

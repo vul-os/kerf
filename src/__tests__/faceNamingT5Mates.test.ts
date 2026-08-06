@@ -39,7 +39,9 @@ describe('mate-ref T5 round-trip', () => {
     const m = result[0]
     expect(m.a.feature_id).toBe('face-3')
     expect(m.b.feature_id).toBe('face-5')
-    expect(m.a.face_name).toBeUndefined()
+    // face_name is not a field on AssemblyMateRef — asserting the legacy
+    // (made-up) key never got written by addMate.
+    expect((m.a as unknown as { face_name?: string }).face_name).toBeUndefined()
   })
 
   // ---------------------------------------------------------------------------

@@ -116,7 +116,7 @@ describe('isSideFace (walkSideFaces classifier)', () => {
 
 describe('boss_with_draft node schema', () => {
   /** Build a minimal valid node as the Python tool does. */
-  function buildNode(overrides = {}) {
+  function buildNode(overrides: Record<string, unknown> = {}) {
     return {
       id: 'boss_with_draft-1',
       op: 'boss_with_draft',
@@ -159,7 +159,8 @@ describe('boss_with_draft node schema', () => {
   })
 
   it('stores optional name field', () => {
-    const node = buildNode({ name: 'lid_boss' })
+    // name is an override-only field not part of buildNode's base shape.
+    const node = buildNode({ name: 'lid_boss' }) as { name?: string }
     expect(node.name).toBe('lid_boss')
   })
 })

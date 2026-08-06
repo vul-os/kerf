@@ -15,6 +15,7 @@
 //   7. Collision resolution
 
 import { describe, it, expect } from 'vitest'
+import type { FaceDescriptor, Vec3 } from '../types/geometry.js'
 import {
   sha256hex8,
   topoHash,
@@ -37,7 +38,10 @@ import {
  * Build a minimal FaceDescriptor for the TOP cap of a Z-extrusion.
  * Normal points in the +Z direction (parallel to the extrusion axis).
  */
-function makeTopCap(index, overrides = {}) {
+// Partial fixture — these tests only read the fields they set; isCap/isTop
+// are derived by classifyFaceForExtrude/Pocket from the normal, not read off
+// the input descriptor.
+function makeTopCap(index, overrides = {}): FaceDescriptor {
   return {
     index,
     surfaceKind: 'plane',
@@ -48,13 +52,13 @@ function makeTopCap(index, overrides = {}) {
     sharedEdgeIndices: [0, 1, 2, 3],
     sketchEntityId: null,
     ...overrides,
-  }
+  } as unknown as FaceDescriptor
 }
 
 /**
  * Bottom cap — normal points in the -Z direction.
  */
-function makeBottomCap(index, overrides = {}) {
+function makeBottomCap(index, overrides = {}): FaceDescriptor {
   return makeTopCap(index, { normal: [0, 0, -1], sharedEdgeIndices: [4, 5, 6, 7], ...overrides })
 }
 
@@ -62,7 +66,7 @@ function makeBottomCap(index, overrides = {}) {
  * Side face with a normal perpendicular to Z-axis.
  * Each side face shares some edges with the caps.
  */
-function makeSideFace(index, normal, sketchEntityId, sharedEdgeIndices, overrides = {}) {
+function makeSideFace(index, normal, sketchEntityId, sharedEdgeIndices, overrides = {}): FaceDescriptor {
   return {
     index,
     surfaceKind: 'plane',
@@ -73,7 +77,7 @@ function makeSideFace(index, normal, sketchEntityId, sharedEdgeIndices, override
     sharedEdgeIndices,
     sketchEntityId,
     ...overrides,
-  }
+  } as unknown as FaceDescriptor
 }
 
 /**
@@ -98,7 +102,7 @@ function makeRectBoxFaces(sketchEntityIds = ['seg-0', 'seg-1', 'seg-2', 'seg-3']
   ]
 }
 
-const Z_UP = [0, 0, 1]
+const Z_UP: Vec3 = [0, 0, 1]
 
 // ===========================================================================
 // 1. sha256hex8
@@ -141,7 +145,7 @@ describe('topoHash determinism', () => {
   })
 
   it('changing surfaceKind changes the hash', () => {
-    const modified = { ...topCap, surfaceKind: 'cylinder' }
+    const modified = { ...topCap, surfaceKind: 'cylinder' as const }
     expect(topoHash(modified, faces)).not.toBe(topoHash(topCap, faces))
   })
 
@@ -152,7 +156,7 @@ describe('topoHash determinism', () => {
 
   it('changing neighbour face kind changes the hash', () => {
     // Make a modified face list where one side face is a cylinder instead of plane.
-    const modFaces = faces.map((f, i) => i === 2 ? { ...f, surfaceKind: 'cylinder' } : f)
+    const modFaces = faces.map((f, i) => i === 2 ? { ...f, surfaceKind: 'cylinder' as const } : f)
     // Top cap's neighbours include index-2; its hash should differ now.
     expect(topoHash(topCap, modFaces)).not.toBe(topoHash(topCap, faces))
   })
@@ -168,7 +172,7 @@ describe('topoHash stability', () => {
 
     // Modify the unrelated face — shouldn't affect topCap's hash.
     const facesWithModified = facesWithExtra.map((f) =>
-      f.index === 6 ? { ...f, surfaceKind: 'cylinder' } : f,
+      f.index === 6 ? { ...f, surfaceKind: 'cylinder' as const } : f,
     )
     const topCap = faces[0]
     expect(topoHash(topCap, facesWithExtra)).toBe(topoHash(topCap, facesWithModified))
@@ -468,12 +472,12 @@ describe('carryForward', () => {
   const inputNames = { 0: 'Pad-A.TopCap', 1: 'Pad-A.BottomCap', 2: 'Pad-A.Side.seg-0' }
 
   it('returns prior name when exactly one input maps to output', () => {
-    const modMap = { modified: { 0: [0] }, generated: [], deletedInputs: new Set() }
+    const modMap = { modified: { 0: [0] }, generated: [], deletedInputs: new Set<number>() }
     expect(carryForward(inputNames, 0, modMap)).toBe('Pad-A.TopCap')
   })
 
   it('returns null when output is listed as generated', () => {
-    const modMap = { modified: {}, generated: [3], deletedInputs: new Set() }
+    const modMap = { modified: {}, generated: [3], deletedInputs: new Set<number>() }
     expect(carryForward(inputNames, 3, modMap)).toBe(null)
   })
 
@@ -481,19 +485,19 @@ describe('carryForward', () => {
     const modMap = {
       modified: { 0: [5], 1: [5] },  // two inputs → one output
       generated: [],
-      deletedInputs: new Set(),
+      deletedInputs: new Set<number>(),
     }
     expect(carryForward(inputNames, 5, modMap)).toBe(null)
   })
 
   it('returns null when zero inputs map to output (also new)', () => {
-    const modMap = { modified: {}, generated: [], deletedInputs: new Set() }
+    const modMap = { modified: {}, generated: [], deletedInputs: new Set<number>() }
     expect(carryForward(inputNames, 7, modMap)).toBe(null)
   })
 
   it('prefers generated flag over modified list when both present', () => {
     // generated takes priority — the face is new even if it also appears in modified.
-    const modMap = { modified: { 0: [0] }, generated: [0], deletedInputs: new Set() }
+    const modMap = { modified: { 0: [0] }, generated: [0], deletedInputs: new Set<number>() }
     expect(carryForward(inputNames, 0, modMap)).toBe(null)
   })
 })
@@ -521,14 +525,14 @@ describe('nameOpOutput — fillet', () => {
     return {
       modified,
       generated: filletIndices,
-      deletedInputs: new Set(),
+      deletedInputs: new Set<number>(),
     }
   }
 
   const newFaces = makeRectBoxFaces()
   // Extend with 2 fillet surfaces (cylindrical faces).
-  const filletFace6 = { ...makeSideFace(6, [1, 1, 0], null, [16, 17, 18, 19]), surfaceKind: 'cylinder', isCap: false }
-  const filletFace7 = { ...makeSideFace(7, [-1, 1, 0], null, [20, 21, 22, 23]), surfaceKind: 'cylinder', isCap: false }
+  const filletFace6 = { ...makeSideFace(6, [1, 1, 0], null, [16, 17, 18, 19]), surfaceKind: 'cylinder' as const, isCap: false }
+  const filletFace7 = { ...makeSideFace(7, [-1, 1, 0], null, [20, 21, 22, 23]), surfaceKind: 'cylinder' as const, isCap: false }
   const allNewFaces = [...newFaces, filletFace6, filletFace7]
 
   const modMap = makeFilletModMap([6, 7])
@@ -566,7 +570,7 @@ describe('nameOpOutput — chamfer', () => {
   const modMap = {
     modified: { 0: [0], 1: [1] },
     generated: [2],
-    deletedInputs: new Set(),
+    deletedInputs: new Set<number>(),
   }
 
   it('generated chamfer face gets Chamfer role', () => {
@@ -583,7 +587,7 @@ describe('nameOpOutput — chamfer', () => {
   it('modified but not deleted face with no clear parent gets Adjacent.<hash>', () => {
     // Simulate: face 0 gets modified into face 0 but input face doesn't exist in oldNames.
     const partialOld = {}  // empty prior names
-    const modMap2 = { modified: { 0: [0] }, generated: [], deletedInputs: new Set() }
+    const modMap2 = { modified: { 0: [0] }, generated: [], deletedInputs: new Set<number>() }
     const names = nameOpOutput('chamfer', partialOld, [makeTopCap(0)], modMap2, { nodeId: 'Chm-H' })
     // carry returns null (no prior name), so Adjacent.<hash>
     expect(names['0']).toMatch(/^Chm-H\.Adjacent\.h[0-9a-f]{8}/)
@@ -610,7 +614,7 @@ describe('nameOpOutput — shell', () => {
   const outerFaces = makeRectBoxFaces().slice(1).map((f, i) => ({ ...f, index: i + 1 }))
   const innerFaces = Array.from({ length: 5 }, (_, i) => ({
     ...makeSideFace(i + 6, [0, 1, 0], null, [20 + i * 4, 21 + i * 4, 22 + i * 4, 23 + i * 4]),
-    surfaceKind: 'plane',
+    surfaceKind: 'plane' as const,
     isCap: false,
   }))
   const allNewFaces = [...outerFaces, ...innerFaces]
@@ -668,7 +672,7 @@ describe('nameOpOutput — cut_from_sketch', () => {
   const modMap = {
     modified: { 0: [0], 1: [1], 2: [2], 3: [3], 4: [4], 5: [5] },
     generated: [6, 7, 8],
-    deletedInputs: new Set(),
+    deletedInputs: new Set<number>(),
   }
   const sketchEntityIds = ['cut-seg-0', 'cut-seg-1']
 
@@ -719,7 +723,7 @@ describe('nameOpOutput — push_pull', () => {
   const modMap = {
     modified: { 0: [0], 1: [1], 2: [2], 3: [3], 4: [4], 5: [5] },
     generated: [6, 7],
-    deletedInputs: new Set(),
+    deletedInputs: new Set<number>(),
   }
 
   it('cap face gets PushPullCap role', () => {
@@ -768,12 +772,12 @@ describe('nameOpOutput — carry-forward chain: fillet after pad', () => {
     makeTopCap(0),
     makeBottomCap(1),
     makeSideFace(2, [1, 0, 0], 'seg-0', [0, 4, 8, 9]),
-    { ...makeSideFace(3, [0.7, 0.7, 0], null, [50, 51, 52, 53]), surfaceKind: 'cylinder', isCap: false },
+    { ...makeSideFace(3, [0.7, 0.7, 0], null, [50, 51, 52, 53]), surfaceKind: 'cylinder' as const, isCap: false },
   ]
   const modMapFillet = {
     modified: { 0: [0], 1: [1], 2: [2] },
     generated: [3],
-    deletedInputs: new Set(),
+    deletedInputs: new Set<number>(),
   }
 
   it('prior Pad names survive through a fillet op', () => {

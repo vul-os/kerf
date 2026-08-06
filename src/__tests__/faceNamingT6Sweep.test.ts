@@ -17,12 +17,13 @@
 
 import { describe, it, expect } from 'vitest'
 import { buildFaceNamesForSweep, buildFaceNamesForLoft } from '../lib/faceNaming.js'
+import type { FaceDescriptor, Vec3 } from '../types/geometry.js'
 
 // ---------------------------------------------------------------------------
 // Synthetic helpers
 // ---------------------------------------------------------------------------
 
-function makeFace(index, surfaceKind, normal, overrides = {}) {
+function makeFace(index, surfaceKind, normal, overrides = {}): FaceDescriptor {
   return {
     index,
     surfaceKind,
@@ -35,7 +36,7 @@ function makeFace(index, surfaceKind, normal, overrides = {}) {
     isCap: false,
     isTop: false,
     ...overrides,
-  }
+  } as unknown as FaceDescriptor
 }
 
 // ---------------------------------------------------------------------------
@@ -49,8 +50,8 @@ describe('buildFaceNamesForSweep', () => {
       makeFace(1, 'cylinder', [1, 0, 0]),  // swept surface
       makeFace(2, 'plane', [0, 0, 1]),     // end cap (normal ∥ +Z)
     ]
-    const pathStartDir = [0, 0, -1]
-    const pathEndDir   = [0, 0, 1]
+    const pathStartDir: Vec3 = [0, 0, -1]
+    const pathEndDir: Vec3   = [0, 0, 1]
     const names = buildFaceNamesForSweep('Swp-A', faces, pathStartDir, pathEndDir)
     expect(names['0']).toBe('Swp-A.start_cap')
     expect(names['1']).toBe('Swp-A.swept')
@@ -77,7 +78,7 @@ describe('buildFaceNamesForSweep', () => {
       makeFace(0, 'plane', [0, 0, -1]),
       makeFace(1, 'plane', [0, 0, -1]),
     ]
-    const pathStartDir = [0, 0, -1]
+    const pathStartDir: Vec3 = [0, 0, -1]
     const names = buildFaceNamesForSweep('Swp-A', faces, pathStartDir, null)
     const vals = Object.values(names)
     // One face should be start_cap, the other swept (or start_cap with suffix if both pass threshold)
@@ -126,8 +127,8 @@ describe('buildFaceNamesForLoft', () => {
       makeFace(2, 'bspline', [0, 1, 0]),  // lofted surface
       makeFace(3, 'plane', [0, 0, 1]),    // end cap
     ]
-    const startNormal = [0, 0, -1]
-    const endNormal   = [0, 0, 1]
+    const startNormal: Vec3 = [0, 0, -1]
+    const endNormal: Vec3   = [0, 0, 1]
     const names = buildFaceNamesForLoft('Lft-B', faces, startNormal, endNormal)
     expect(names['0']).toBe('Lft-B.start_cap')
     // Two bspline faces both get 'swept' with collision resolution suffix

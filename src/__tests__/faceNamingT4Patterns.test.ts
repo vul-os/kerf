@@ -15,12 +15,13 @@
 
 import { describe, it, expect } from 'vitest'
 import { buildFaceNamesForPattern, buildFaceNamesForMirror } from '../lib/faceNaming.js'
+import type { FaceDescriptor } from '../types/geometry.js'
 
 // ---------------------------------------------------------------------------
 // Synthetic helpers
 // ---------------------------------------------------------------------------
 
-function makeFace(index, overrides = {}) {
+function makeFace(index, overrides = {}): FaceDescriptor {
   return {
     index,
     surfaceKind: 'plane',
@@ -33,7 +34,7 @@ function makeFace(index, overrides = {}) {
     isCap: false,
     isTop: false,
     ...overrides,
-  }
+  } as unknown as FaceDescriptor
 }
 
 // Seed shape: Pad-A with 6 faces (TopCap, BottomCap, 4 side faces)

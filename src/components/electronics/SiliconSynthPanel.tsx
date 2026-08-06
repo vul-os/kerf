@@ -16,9 +16,26 @@
 import { useCallback, useState } from 'react'
 import { X, Cpu, CheckCircle2, XCircle, AlertTriangle, Loader } from 'lucide-react'
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type SynthStatus = 'running' | 'success' | 'error' | 'pending' | null
+
+interface SynthResult {
+  status?: SynthStatus
+  gds_path?: string
+  log_path?: string
+  returncode?: number
+  warnings?: string[]
+  error?: string
+}
+
+export interface SiliconSynthPanelProps {
+  onClose?: () => void
+}
+
 // ── Status badge ──────────────────────────────────────────────────────────────
 
-function StatusBadge({ status }) {
+function StatusBadge({ status }: { status: SynthStatus }) {
   if (status === 'success')
     return (
       <span data-testid="synth-status-success" className="flex items-center gap-1 text-emerald-400">
@@ -48,7 +65,7 @@ function StatusBadge({ status }) {
 
 // ── Warning list ──────────────────────────────────────────────────────────────
 
-function WarningList({ warnings }) {
+function WarningList({ warnings }: { warnings?: string[] }) {
   if (!warnings?.length) return null
   return (
     <div className="mt-2 flex flex-col gap-0.5">
@@ -64,16 +81,16 @@ function WarningList({ warnings }) {
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
-export default function SiliconSynthPanel({ onClose }) {
+export default function SiliconSynthPanel({ onClose }: SiliconSynthPanelProps) {
   const [designName, setDesignName] = useState('my_design')
   const [verilogText, setVerilogText] = useState(
     '// Paste Verilog RTL here\nmodule my_design (input clk, input rst, output reg q);\n  always @(posedge clk) q <= ~q;\nendmodule'
   )
   const [pdk, setPdk]               = useState('sky130A')
   const [clockPeriod, setClockPeriod] = useState('10')
-  const [result, setResult]         = useState(null)
-  const [status, setStatus]         = useState(null)  // 'running'|'success'|'error'|'pending'
-  const [error, setError]           = useState(null)
+  const [result, setResult]         = useState<SynthResult | null>(null)
+  const [status, setStatus]         = useState<SynthStatus>(null)
+  const [error, setError]           = useState<string | null>(null)
 
   const run = useCallback(async () => {
     setStatus('running')
@@ -110,7 +127,7 @@ export default function SiliconSynthPanel({ onClose }) {
         setStatus('error')
         setError('Unexpected response from backend.')
       }
-    } catch (err) {
+    } catch {
       // Backend offline or OpenLane not installed
       setStatus('pending')
       setResult({

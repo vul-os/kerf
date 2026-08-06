@@ -43,6 +43,22 @@
 
 import clsx from 'clsx'
 
+interface Action {
+  label: string
+  onClick?: () => void
+  href?: string
+  disabled?: boolean
+}
+
+interface Props {
+  icon?: React.ReactNode
+  title: string
+  description?: string
+  action?: Action
+  size?: 'sm' | 'md' | 'lg'
+  className?: string
+}
+
 const SIZES = {
   sm: {
     wrapper: 'gap-2 py-8 px-4',
@@ -74,7 +90,7 @@ export default function EmptyState({
   action,
   size = 'md',
   className,
-}) {
+}: Props) {
   const s = SIZES[size] ?? SIZES.md
 
   return (

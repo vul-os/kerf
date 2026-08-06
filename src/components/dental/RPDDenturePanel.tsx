@@ -21,8 +21,13 @@ import { useAuth } from '../../store/auth.js'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
+interface Tooth {
+  fdi: string
+  label: string
+}
+
 // FDI teeth grouped by arch
-const TEETH_MANDIBULAR = [
+const TEETH_MANDIBULAR: Tooth[] = [
   { fdi: '31', label: '31' }, { fdi: '32', label: '32' }, { fdi: '33', label: '33' },
   { fdi: '34', label: '34' }, { fdi: '35', label: '35' }, { fdi: '36', label: '36' },
   { fdi: '37', label: '37' }, { fdi: '38', label: '38' },
@@ -30,7 +35,7 @@ const TEETH_MANDIBULAR = [
   { fdi: '44', label: '44' }, { fdi: '45', label: '45' }, { fdi: '46', label: '46' },
   { fdi: '47', label: '47' }, { fdi: '48', label: '48' },
 ]
-const TEETH_MAXILLARY = [
+const TEETH_MAXILLARY: Tooth[] = [
   { fdi: '11', label: '11' }, { fdi: '12', label: '12' }, { fdi: '13', label: '13' },
   { fdi: '14', label: '14' }, { fdi: '15', label: '15' }, { fdi: '16', label: '16' },
   { fdi: '17', label: '17' }, { fdi: '18', label: '18' },
@@ -39,7 +44,9 @@ const TEETH_MAXILLARY = [
   { fdi: '27', label: '27' }, { fdi: '28', label: '28' },
 ]
 
-const KENNEDY_COLORS = {
+type KennedyClass = 'Class I' | 'Class II' | 'Class III' | 'Class IV' | 'complete'
+
+const KENNEDY_COLORS: Record<KennedyClass, string> = {
   'Class I': 'bg-red-500/15 border-red-400/50 text-red-200',
   'Class II': 'bg-orange-500/15 border-orange-400/50 text-orange-200',
   'Class III': 'bg-amber-500/15 border-amber-400/50 text-amber-200',
@@ -47,7 +54,7 @@ const KENNEDY_COLORS = {
   'complete': 'bg-emerald-500/15 border-emerald-400/50 text-emerald-200',
 }
 
-const KENNEDY_DESCRIPTIONS = {
+const KENNEDY_DESCRIPTIONS: Record<KennedyClass, string> = {
   'Class I': 'Bilateral free-end saddles — both sides, posterior missing',
   'Class II': 'Unilateral free-end saddle — one side, posterior missing',
   'Class III': 'Bounded saddle — teeth present on both sides of gap',
@@ -56,7 +63,7 @@ const KENNEDY_DESCRIPTIONS = {
 }
 
 // Client-side Kennedy classification (mirrors denture_v2.py logic)
-function classifyKennedy(selectedFdi, arch, type) {
+function classifyKennedy(selectedFdi: string[], _arch: string, type: string): KennedyClass {
   if (type === 'complete' || selectedFdi.length === 0) return 'complete'
 
   const quads = new Set(selectedFdi.map((fdi) => fdi[0]))
@@ -73,7 +80,25 @@ function classifyKennedy(selectedFdi, arch, type) {
   return 'Class III'
 }
 
-export default function RPDDenturePanel({ projectId, content }) {
+/** Response shape from dental_denture_design_v2, mined from fields this panel reads. */
+interface DentureResult {
+  kennedy_class?: string
+  modification_count?: number
+  teeth_replaced?: number
+  clasp_count?: number
+  bite_height_mm?: number
+  base_vertices?: number
+  base_triangles?: number
+  honest_caveat?: string
+  error?: string
+}
+
+export interface Props {
+  projectId?: string | null
+  content?: string | null
+}
+
+export default function RPDDenturePanel({ content }: Props) {
   const { accessToken } = useAuth()
   // Parse content string (from panelRegistry) to seed defaults
   const _defaults = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
@@ -83,14 +108,14 @@ export default function RPDDenturePanel({ projectId, content }) {
   const [selectedFdi, setSelectedFdi] = useState(['36', '46'])
   const [claspType, setClaspType]     = useState('circumferential')
   const [running, setRunning]         = useState(false)
-  const [result, setResult]           = useState(null)
-  const [error, setError]             = useState(null)
+  const [result, setResult]           = useState<DentureResult | null>(null)
+  const [error, setError]             = useState<string | null>(null)
 
   const teethList = arch === 'mandibular' ? TEETH_MANDIBULAR : TEETH_MAXILLARY
   const kennedyClass = useMemo(() => classifyKennedy(selectedFdi, arch, type), [selectedFdi, arch, type])
   const kennedyColor = KENNEDY_COLORS[kennedyClass] || KENNEDY_COLORS.complete
 
-  function toggleTooth(fdi) {
+  function toggleTooth(fdi: string) {
     setSelectedFdi((prev) =>
       prev.includes(fdi) ? prev.filter((f) => f !== fdi) : [...prev, fdi]
     )
@@ -124,7 +149,7 @@ export default function RPDDenturePanel({ projectId, content }) {
       if (!res.ok) setError(data?.error || `HTTP ${res.status}`)
       else setResult(data)
     } catch (err) {
-      setError(err?.message || String(err))
+      setError((err as { message?: string } | undefined)?.message || String(err))
     } finally {
       setRunning(false)
     }

@@ -66,6 +66,38 @@ function callTool(tool: string, args: Record<string, unknown>, accessToken: stri
   }).then((r) => r.json().catch(() => ({})))
 }
 
+function updatePos(setter: (fn: (prev: number[]) => number[]) => void, idx: number, val: string) {
+  setter((prev) => {
+    const next = [...prev]
+    next[idx] = parseFloat(val) || 0
+    return next
+  })
+}
+
+/** Hoisted to module scope (not defined inside the panel body) so React doesn't
+ *  recreate — and reset the state of — this component on every render. */
+function PosInput({ label, pos, setPos }: {
+  label: string
+  pos: number[]
+  setPos: (fn: (prev: number[]) => number[]) => void
+}) {
+  return (
+    <div className="flex items-center gap-1.5 text-[10px]">
+      <span className="text-ink-500 w-8">{label}</span>
+      {['x', 'y', 'z'].map((ax, i) => (
+        <label key={ax} className="flex items-center gap-0.5">
+          <span className="text-ink-600">{ax}</span>
+          <input
+            type="number" step="1" value={pos[i]}
+            onChange={(e) => updatePos(setPos, i, e.target.value)}
+            className="w-12 bg-ink-800 border border-ink-700 rounded px-1 py-0.5 font-mono text-ink-100 outline-none focus:border-teal-400/60"
+          />
+        </label>
+      ))}
+    </div>
+  )
+}
+
 export interface Props {
   projectId?: string | null
   content?: string | null
@@ -112,34 +144,6 @@ export default function ImplantPlanningPanel({ content }: Props) {
     if (data.error) setError(data.error)
     else setSpacing(data)
   }
-
-  function updatePos(setter: (fn: (prev: number[]) => number[]) => void, idx: number, val: string) {
-    setter((prev) => {
-      const next = [...prev]
-      next[idx] = parseFloat(val) || 0
-      return next
-    })
-  }
-
-  const PosInput = ({ label, pos, setPos }: {
-    label: string
-    pos: number[]
-    setPos: (fn: (prev: number[]) => number[]) => void
-  }) => (
-    <div className="flex items-center gap-1.5 text-[10px]">
-      <span className="text-ink-500 w-8">{label}</span>
-      {['x', 'y', 'z'].map((ax, i) => (
-        <label key={ax} className="flex items-center gap-0.5">
-          <span className="text-ink-600">{ax}</span>
-          <input
-            type="number" step="1" value={pos[i]}
-            onChange={(e) => updatePos(setPos, i, e.target.value)}
-            className="w-12 bg-ink-800 border border-ink-700 rounded px-1 py-0.5 font-mono text-ink-100 outline-none focus:border-teal-400/60"
-          />
-        </label>
-      ))}
-    </div>
-  )
 
   return (
     <div className="flex flex-col gap-4 p-4 text-ink-100" data-testid="implant-planning-panel">

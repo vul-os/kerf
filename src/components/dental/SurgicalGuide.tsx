@@ -2,11 +2,11 @@
  * SurgicalGuide — CBCT scan import + implant pose editor + drill sleeve setup
  * + final guide preview with milling-ready B-rep body rendering + STL export.
  *
- * Uses the existing point-cloud importer pattern (file input → parse as JSON
+ * Uses the existing point-cloud importer pattern (file input -> parse as JSON
  * or CSV xyz, builds jaw_surface_pts array). Dispatches `dental_surgical_guide`
  * via POST /api/tools/call.
  *
- * Backend tool: packages/kerf-dental/src/kerf_dental/tools.py → dental_surgical_guide
+ * Backend tool: packages/kerf-dental/src/kerf_dental/tools.py -> dental_surgical_guide
  *
  * Wave 4D caveat closed: backend now emits `body_stl_b64` (binary STL base64)
  * alongside the planning data.  This component renders the B-rep in a Three.js
@@ -14,15 +14,35 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import type { ChangeEvent } from 'react'
 import { useAuth } from '../../store/auth.js'
 import { buildSurgicalGuidePayload } from './dentalDispatch.js'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
+interface ImplantPose {
+  position: number[]
+  axis_direction: number[]
+  diameter_mm: number
+  length_mm: number
+}
+
+/** Response shape from dental_surgical_guide, mined from fields this panel reads. */
+interface SurgicalGuideResult {
+  error?: string
+  sleeve_count?: number
+  max_angular_error_deg?: number
+  angular_errors_deg?: number[]
+  all_validate_body_ok?: boolean
+  body_stl_b64?: string
+  body_stl_bytes?: number
+  plate_dims_mm?: number[]
+}
+
 // ---------------------------------------------------------------------------
 // STL export helper — decodes base64 binary STL and triggers a download
 // ---------------------------------------------------------------------------
-function exportStlFromB64(b64, filename = 'surgical_guide.stl') {
+function exportStlFromB64(b64: string, filename = 'surgical_guide.stl') {
   const binary = atob(b64)
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
@@ -40,32 +60,35 @@ function exportStlFromB64(b64, filename = 'surgical_guide.stl') {
 // ---------------------------------------------------------------------------
 // Three.js B-rep viewport — renders the guide body STL in a canvas
 // ---------------------------------------------------------------------------
-function GuideBrepViewport({ stlB64 }) {
-  const canvasRef = useRef(null)
-  const rendererRef = useRef(null)
-  const animRef = useRef(null)
+function GuideBrepViewport({ stlB64 }: { stlB64?: string }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  // `any` here is a boundary tool: these hold whatever three.js's dynamically-imported
+  // WebGLRenderer/animation-frame-cancel-closure produce, and this slice does not own
+  // the three.js type surface (imported dynamically, not a static dependency of this file).
+  const rendererRef = useRef<any>(null)
+  const animRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     if (!stlB64 || !canvasRef.current) return
 
-    let three, scene, camera, renderer, mesh, animId
+    let mesh: any
 
     async function init() {
       try {
-        three = await import('three')
+        const three = await import('three')
         const { STLLoader } = await import('three/examples/jsm/loaders/STLLoader.js')
 
-        const canvas = canvasRef.current
-        renderer = new three.WebGLRenderer({ canvas, antialias: true, alpha: true })
+        const canvas = canvasRef.current!
+        const renderer = new three.WebGLRenderer({ canvas, antialias: true, alpha: true })
         renderer.setSize(320, 180)
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
         rendererRef.current = renderer
 
-        scene = new three.Scene()
-        camera = new three.PerspectiveCamera(45, 320 / 180, 0.1, 1000)
+        const scene = new three.Scene()
+        const camera = new three.PerspectiveCamera(45, 320 / 180, 0.1, 1000)
 
         // Decode base64 STL
-        const binary = atob(stlB64)
+        const binary = atob(stlB64!)
         const buf = new ArrayBuffer(binary.length)
         const view = new Uint8Array(buf)
         for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i)
@@ -75,7 +98,7 @@ function GuideBrepViewport({ stlB64 }) {
         geometry.computeBoundingBox()
         geometry.computeVertexNormals()
 
-        const box = geometry.boundingBox
+        const box = geometry.boundingBox!
         const center = new three.Vector3()
         box.getCenter(center)
         geometry.translate(-center.x, -center.y, -center.z)
@@ -116,6 +139,7 @@ function GuideBrepViewport({ stlB64 }) {
         canvas.addEventListener('mouseup', () => { isDragging = false })
         canvas.addEventListener('mouseleave', () => { isDragging = false })
 
+        let animId: number
         function animate() {
           animId = requestAnimationFrame(animate)
           if (!isDragging) rotY += 0.005
@@ -160,7 +184,11 @@ function GuideBrepViewport({ stlB64 }) {
 // ---------------------------------------------------------------------------
 // SVG guide preview — draws jaw surface points + implant cylinders + sleeves
 // ---------------------------------------------------------------------------
-function GuidePreview({ jawPts, implants, result }) {
+function GuidePreview({ jawPts, implants, result }: {
+  jawPts: number[][]
+  implants: ImplantPose[]
+  result: SurgicalGuideResult | null
+}) {
   if (!jawPts || jawPts.length === 0) return null
 
   const W = 320
@@ -174,7 +202,7 @@ function GuidePreview({ jawPts, implants, result }) {
   const rangeX = (Math.max(...xs) - minX) || 1
   const rangeY = (Math.max(...ys) - minY) || 1
 
-  const toSvg = (x, y) => [
+  const toSvg = (x: number, y: number): [number, number] => [
     PAD + ((x - minX) / rangeX) * (W - 2 * PAD),
     PAD + ((y - minY) / rangeY) * (H - 2 * PAD),
   ]
@@ -200,7 +228,7 @@ function GuidePreview({ jawPts, implants, result }) {
         const [cx, cy] = toSvg(imp.position[0], imp.position[1])
         const r = (imp.diameter_mm / 2) * 4
         const len = imp.length_mm * 2
-        const placed = result && i < result.sleeve_count
+        const placed = !!result && i < (result.sleeve_count ?? 0)
         return (
           <g key={i}>
             <line
@@ -248,18 +276,23 @@ function GuidePreview({ jawPts, implants, result }) {
 // ---------------------------------------------------------------------------
 // ImplantPoseRow — editable row for one implant's position + axis
 // ---------------------------------------------------------------------------
-function ImplantPoseRow({ index, implant, onChange, onRemove }) {
-  function update(field, subfield, value) {
-    const next = JSON.parse(JSON.stringify(implant))
+function ImplantPoseRow({ index, implant, onChange, onRemove }: {
+  index: number
+  implant: ImplantPose
+  onChange: (index: number, next: ImplantPose) => void
+  onRemove: (index: number) => void
+}) {
+  function update(field: 'position' | 'axis_direction' | 'diameter_mm' | 'length_mm', subfield: number | null, value: string) {
+    const next: ImplantPose = JSON.parse(JSON.stringify(implant))
     if (subfield != null) {
-      next[field][subfield] = parseFloat(value) || 0
+      (next[field] as number[])[subfield] = parseFloat(value) || 0
     } else {
-      next[field] = parseFloat(value) || 0
+      (next[field] as number) = parseFloat(value) || 0
     }
     onChange(index, next)
   }
 
-  const AxisInput = ({ axis, si }) => (
+  const AxisInput = ({ axis, si }: { axis: 'position' | 'axis_direction'; si: number }) => (
     <input
       type="number"
       step="0.1"
@@ -330,14 +363,15 @@ function ImplantPoseRow({ index, implant, onChange, onRemove }) {
 // ---------------------------------------------------------------------------
 // Parse point cloud from .csv or .json string
 // ---------------------------------------------------------------------------
-function parsePointCloud(text) {
+function parsePointCloud(text: string): number[][] {
   text = text.trim()
   if (text.startsWith('[')) {
     const arr = JSON.parse(text)
     if (!Array.isArray(arr)) throw new Error('Expected JSON array')
-    return arr.map((row) => {
+    return arr.map((row: unknown) => {
       if (Array.isArray(row)) return row.slice(0, 3).map(Number)
-      return [Number(row.x || row[0] || 0), Number(row.y || row[1] || 0), Number(row.z || row[2] || 0)]
+      const r = row as { x?: number; y?: number; z?: number; 0?: number; 1?: number; 2?: number }
+      return [Number(r.x ?? r[0] ?? 0), Number(r.y ?? r[1] ?? 0), Number(r.z ?? r[2] ?? 0)]
     })
   }
   return text
@@ -353,40 +387,44 @@ const DEMO_JAW_PTS = [
   [15, 18, 0], [0, 15, 0], [-5, 8, 0],
 ]
 
+export interface Props {
+  projectId?: string | null
+}
+
 // ---------------------------------------------------------------------------
 // Main panel
 // ---------------------------------------------------------------------------
-export default function SurgicalGuide({ projectId }) {
+export default function SurgicalGuide(_props: Props) {
   const { accessToken } = useAuth()
-  const fileInputRef = useRef(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [jawPts, setJawPts]       = useState(DEMO_JAW_PTS)
+  const [jawPts, setJawPts]       = useState<number[][]>(DEMO_JAW_PTS)
   const [jawLabel, setJawLabel]   = useState('Demo jaw (7 pts)')
-  const [jawError, setJawError]   = useState(null)
+  const [jawError, setJawError]   = useState<string | null>(null)
 
-  const [implants, setImplants] = useState([
+  const [implants, setImplants] = useState<ImplantPose[]>([
     { position: [10, 8, 0], axis_direction: [0, 0, 1], diameter_mm: 4.1, length_mm: 10 },
   ])
 
   const [running, setRunning] = useState(false)
-  const [result, setResult]   = useState(null)
-  const [error, setError]     = useState(null)
+  const [result, setResult]   = useState<SurgicalGuideResult | null>(null)
+  const [error, setError]     = useState<string | null>(null)
 
   // ---- file import ----
-  function handleFileChange(e) {
+  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     setJawError(null)
     const reader = new FileReader()
     reader.onload = (ev) => {
       try {
-        const pts = parsePointCloud(ev.target.result || '')
+        const pts = parsePointCloud((ev.target?.result as string) || '')
         if (pts.length < 3) throw new Error('Need at least 3 points')
         setJawPts(pts)
         setJawLabel(`${file.name} (${pts.length} pts)`)
         setResult(null)
       } catch (err) {
-        setJawError(`Failed to parse "${file.name}": ${err.message}`)
+        setJawError(`Failed to parse "${file.name}": ${(err as Error).message}`)
       }
     }
     reader.readAsText(file)
@@ -401,11 +439,11 @@ export default function SurgicalGuide({ projectId }) {
     ])
   }
 
-  function updateImplant(idx, next) {
+  function updateImplant(idx: number, next: ImplantPose) {
     setImplants((prev) => prev.map((imp, i) => (i === idx ? next : imp)))
   }
 
-  function removeImplant(idx) {
+  function removeImplant(idx: number) {
     setImplants((prev) => prev.filter((_, i) => i !== idx))
   }
 
@@ -440,7 +478,7 @@ export default function SurgicalGuide({ projectId }) {
         setResult(data)
       }
     } catch (err) {
-      setError(err?.message || String(err))
+      setError((err as { message?: string } | undefined)?.message || String(err))
     } finally {
       setRunning(false)
     }

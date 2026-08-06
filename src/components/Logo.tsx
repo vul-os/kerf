@@ -3,7 +3,13 @@
  * currentColor lets callers tint via text-* utilities.
  */
 
-export function LogoMark({ size = 28, className = '', title = 'kerf' }) {
+interface LogoMarkProps {
+  size?: number
+  className?: string
+  title?: string
+}
+
+export function LogoMark({ size = 28, className = '', title = 'kerf' }: LogoMarkProps) {
   return (
     <svg
       width={size}
@@ -24,7 +30,12 @@ export function LogoMark({ size = 28, className = '', title = 'kerf' }) {
   )
 }
 
-export function LogoWordmark({ className = '', size = 22 }) {
+interface LogoWordmarkProps {
+  className?: string
+  size?: number
+}
+
+export function LogoWordmark({ className = '', size = 22 }: LogoWordmarkProps) {
   return (
     <span
       className={`inline-flex items-center gap-2 font-display leading-none ${className}`}

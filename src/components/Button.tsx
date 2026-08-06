@@ -25,7 +25,11 @@ const SIZES = {
   lg: 'h-12 px-6 text-base gap-2 rounded-lg',
 }
 
-interface Props extends React.ComponentProps<'button'> {
+// `as` makes this component polymorphic (e.g. `as={Link} to="/x"`), so the
+// prop shape must accept whatever the target element/component needs —
+// an index signature keeps arbitrary extra props (like react-router's `to`)
+// permissible without inventing a restrictive shape.
+type Props = React.ComponentProps<'button'> & Record<string, unknown> & {
   variant?: keyof typeof VARIANTS
   size?: keyof typeof SIZES
   as?: React.ElementType

@@ -1,6 +1,10 @@
 import clsx from 'clsx'
 
-interface Props extends React.ComponentProps<'div'> {
+// `as` makes this component polymorphic (e.g. `as={Link} to="/x"`), so the
+// prop shape must accept whatever the target element/component needs — an
+// index signature keeps arbitrary extra props (like react-router's `to`)
+// permissible without inventing a restrictive shape.
+type Props = React.ComponentProps<'div'> & Record<string, unknown> & {
   as?: React.ElementType
 }
 

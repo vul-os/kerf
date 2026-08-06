@@ -26,7 +26,7 @@ const HUB_SRC = readFileSync(
 )
 const APP_SRC = readFileSync(resolve(__dirname, '../App.jsx'), 'utf8')
 const HEADER_SRC = readFileSync(
-  resolve(__dirname, '../components/Header.jsx'),
+  resolve(__dirname, '../components/Header.tsx'),
   'utf8',
 )
 

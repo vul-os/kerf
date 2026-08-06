@@ -255,6 +255,19 @@ interface SketchEntityBase {
   id: string
   /** Construction geometry — reference-only, excluded from the solved profile walk. */
   construction?: boolean
+  /**
+   * Carbon-copy (driven reference) entity, appended by T-505 (sketchCarbonCopy.ts /
+   * sketchValidate.ts — not in the original T-501 mining pass). `carbonCopy()` deep-copies
+   * entities from a source sketch into a target sketch and marks the copies `is_reference:
+   * true`; they participate in constraints but are never extruded. `source_id` is the
+   * originating entity's id in the source sketch; `cc_source` is the source sketch id
+   * (keys `refEntitiesForSource`/`findCarbonCopyChain`); `unresolved` is set by
+   * `refreshCarbonCopies()` when the source sketch can no longer be found.
+   */
+  is_reference?: boolean
+  source_id?: string
+  cc_source?: string
+  unresolved?: boolean
 }
 
 export interface SketchPoint extends SketchEntityBase {
@@ -438,6 +451,12 @@ export interface SketchJSON {
   metadata: Record<string, unknown>
   default_config?: string
   configurations?: Configuration[]
+  /**
+   * Source sketch ids this sketch carbon-copies from (sketchCarbonCopy.ts `carbonCopy()`/
+   * `findCarbonCopyChain()`), appended by T-505 alongside {@link SketchEntityBase}'s
+   * `is_reference`/`cc_source` fields — same feature, not in the original T-501 mining pass.
+   */
+  cc_sources?: string[]
 }
 
 // ---------------------------------------------------------------------------

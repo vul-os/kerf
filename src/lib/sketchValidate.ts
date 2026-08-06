@@ -13,15 +13,58 @@
 //                             be found in the sketch's own entity list or is
 //                             explicitly marked unresolved.
 
-import { segSeg, segCircle, circleCircle, angleOnArc } from './sketchIntersect.js'
+import { segSeg } from './sketchIntersect.js'
+import type { SketchJSON, SketchEntity, SketchPoint } from '../types/geometry.js'
+
+export type IssueSeverity = 'error' | 'warning'
+
+export interface ValidateIssue {
+  kind: string
+  severity: IssueSeverity
+  message: string
+  entity_id?: string
+}
+
+export interface ValidateSketchResult {
+  errors: ValidateIssue[]
+  warnings: ValidateIssue[]
+}
+
+interface Point2 {
+  x: number
+  y: number
+}
+
+interface Seg {
+  a: Point2
+  b: Point2
+}
+
+interface PosedLine {
+  p1: Point2
+  p2: Point2
+}
+
+interface PosedCircle {
+  center: Point2
+  radius: number
+}
+
+interface PosedArc {
+  center: Point2
+  radius: number
+  startAngle: number
+  endAngle: number
+  ccw: boolean
+}
 
 const EPS = 1e-7
 
 // ---------------------------------------------------------------------------
 // Internal geometry helpers
 
-function pointById(sketch) {
-  const map = new Map()
+function pointById(sketch: SketchJSON): Map<string, SketchPoint> {
+  const map = new Map<string, SketchPoint>()
   for (const e of sketch.entities || []) {
     if (e.type === 'point') map.set(e.id, e)
   }
@@ -30,20 +73,20 @@ function pointById(sketch) {
 
 // Pose a line entity into {p1, p2} with world coords. Returns null if points
 // are missing.
-function poseLine(ent, pts) {
+function poseLine(ent: Extract<SketchEntity, { type: 'line' }>, pts: Map<string, SketchPoint>): PosedLine | null {
   const p1 = pts.get(ent.p1)
   const p2 = pts.get(ent.p2)
   if (!p1 || !p2) return null
   return { p1: { x: p1.x || 0, y: p1.y || 0 }, p2: { x: p2.x || 0, y: p2.y || 0 } }
 }
 
-function poseCircle(ent, pts) {
+function poseCircle(ent: Extract<SketchEntity, { type: 'circle' }>, pts: Map<string, SketchPoint>): PosedCircle | null {
   const c = pts.get(ent.center)
   if (!c) return null
   return { center: { x: c.x || 0, y: c.y || 0 }, radius: ent.radius || 0 }
 }
 
-function poseArc(ent, pts) {
+function poseArc(ent: Extract<SketchEntity, { type: 'arc' }>, pts: Map<string, SketchPoint>): PosedArc | null {
   const c = pts.get(ent.center)
   const s = pts.get(ent.start)
   const e = pts.get(ent.end)
@@ -64,7 +107,7 @@ function poseArc(ent, pts) {
 // DOF estimator (mirrors sketchSolver's estimateDof, kept local so this module
 // is hermetic and doesn't import the WASM-loaded solver).
 
-function estimateDof(sketch) {
+function estimateDof(sketch: SketchJSON): number {
   const ent = sketch.entities || []
   let dof = 0
   let hasOrigin = false
@@ -105,19 +148,18 @@ function estimateDof(sketch) {
 // appear in exactly 2 edges. We also check whether the sketch is intended to
 // produce a closed profile (heuristic: if ANY non-reference, non-construction
 // edge exists, we assume the user wants a closed loop).
-function checkOpenContour(sketch) {
-  const issues = []
-  const pts = pointById(sketch)
+function checkOpenContour(sketch: SketchJSON): ValidateIssue[] {
+  const issues: ValidateIssue[] = []
 
   // Gather all non-construction, non-reference edges.
   const edges = (sketch.entities || []).filter(
-    (e) => !e.construction && !e.is_reference && (e.type === 'line' || e.type === 'arc'),
+    (e): e is Extract<SketchEntity, { type: 'line' | 'arc' }> => !e.construction && !e.is_reference && (e.type === 'line' || e.type === 'arc'),
   )
   if (edges.length === 0) return issues
 
   // Count endpoint appearances.
-  const endpointCount = new Map()
-  function touch(pid) {
+  const endpointCount = new Map<string, number>()
+  function touch(pid: string) {
     endpointCount.set(pid, (endpointCount.get(pid) || 0) + 1)
   }
 
@@ -148,16 +190,17 @@ function checkOpenContour(sketch) {
 // ---------------------------------------------------------------------------
 // Self-intersection check
 
-function segmentsFromLine(posed) {
+function segmentsFromLine(posed: PosedLine | null): Seg[] {
   if (!posed) return []
   return [{ a: posed.p1, b: posed.p2 }]
 }
 
 // Discretise arc / circle into chord segments for intersection sampling.
-function segmentsFromCircularEdge(posed, isArc) {
+function segmentsFromCircularEdge(posed: PosedCircle | PosedArc | null, isArc: boolean): Seg[] {
   if (!posed) return []
-  const segs = []
-  const { center, radius, startAngle, endAngle, ccw } = posed
+  const segs: Seg[] = []
+  const { center, radius } = posed
+  const { startAngle = 0, endAngle = 0, ccw = false } = posed as Partial<PosedArc>
   let sweep
   if (!isArc) {
     sweep = Math.PI * 2
@@ -167,7 +210,7 @@ function segmentsFromCircularEdge(posed, isArc) {
     else { while (sweep > 0) sweep -= Math.PI * 2 }
   }
   const n = Math.max(8, Math.ceil(Math.abs(sweep) * 8))
-  let prev = null
+  let prev: Point2 | null = null
   for (let i = 0; i <= n; i++) {
     const t = i / n
     const a = startAngle + sweep * t
@@ -178,18 +221,18 @@ function segmentsFromCircularEdge(posed, isArc) {
   return segs
 }
 
-function edgeSegs(ent, pts) {
+function edgeSegs(ent: Extract<SketchEntity, { type: 'line' | 'circle' | 'arc' }>, pts: Map<string, SketchPoint>): Seg[] {
   if (ent.type === 'line') return segmentsFromLine(poseLine(ent, pts))
   if (ent.type === 'circle') return segmentsFromCircularEdge(poseCircle(ent, pts), false)
   if (ent.type === 'arc') return segmentsFromCircularEdge(poseArc(ent, pts), true)
   return []
 }
 
-function checkSelfIntersection(sketch) {
-  const issues = []
+function checkSelfIntersection(sketch: SketchJSON): ValidateIssue[] {
+  const issues: ValidateIssue[] = []
   const pts = pointById(sketch)
   const edges = (sketch.entities || []).filter(
-    (e) => !e.is_reference && !e.construction && (e.type === 'line' || e.type === 'arc' || e.type === 'circle'),
+    (e): e is Extract<SketchEntity, { type: 'line' | 'circle' | 'arc' }> => !e.is_reference && !e.construction && (e.type === 'line' || e.type === 'arc' || e.type === 'circle'),
   )
 
   // Build segment lists per edge.
@@ -223,20 +266,20 @@ function checkSelfIntersection(sketch) {
   return issues
 }
 
-function isAdjacentEdges(eA, eB) {
+function isAdjacentEdges(eA: SketchEntity, eB: SketchEntity): boolean {
   const aEnds = edgeEndpointIds(eA)
   const bEnds = edgeEndpointIds(eB)
   for (const a of aEnds) for (const b of bEnds) if (a === b) return true
   return false
 }
 
-function edgeEndpointIds(ent) {
+function edgeEndpointIds(ent: SketchEntity): string[] {
   if (ent.type === 'line') return [ent.p1, ent.p2].filter(Boolean)
   if (ent.type === 'arc') return [ent.start, ent.end].filter(Boolean)
   return []
 }
 
-function isSharedEndpoint(hit, sA, sB) {
+function isSharedEndpoint(hit: Point2, sA: Seg, sB: Seg): boolean {
   // If the hit is very close to one of the segment endpoints it's the shared
   // vertex — not a true intersection.
   for (const pt of [sA.a, sA.b, sB.a, sB.b]) {
@@ -248,7 +291,7 @@ function isSharedEndpoint(hit, sA, sB) {
 // ---------------------------------------------------------------------------
 // Redundant constraint check
 
-function checkRedundantConstraints(sketch) {
+function checkRedundantConstraints(sketch: SketchJSON): ValidateIssue[] {
   const dof = estimateDof(sketch)
   if (dof < 0) {
     return [{
@@ -263,12 +306,12 @@ function checkRedundantConstraints(sketch) {
 // ---------------------------------------------------------------------------
 // Dangling endpoint check
 
-function checkDanglingEndpoints(sketch) {
-  const issues = []
+function checkDanglingEndpoints(sketch: SketchJSON): ValidateIssue[] {
+  const issues: ValidateIssue[] = []
   const constraints = sketch.constraints || []
 
   // Build a set of point ids that have at least one coincident or fixed constraint.
-  const anchored = new Set()
+  const anchored = new Set<string>()
   for (const c of constraints) {
     if (c.type === 'coincident') {
       if (c.a) anchored.add(c.a)
@@ -279,7 +322,7 @@ function checkDanglingEndpoints(sketch) {
   }
 
   // Collect all endpoint point ids used by non-reference edges.
-  const edgePoints = new Set()
+  const edgePoints = new Set<string>()
   for (const e of sketch.entities || []) {
     if (e.is_reference || e.construction) continue
     if (e.type === 'line') { edgePoints.add(e.p1); edgePoints.add(e.p2) }
@@ -305,8 +348,8 @@ function checkDanglingEndpoints(sketch) {
 // ---------------------------------------------------------------------------
 // Unresolved external reference check
 
-function checkUnresolvedExternalRefs(sketch) {
-  const issues = []
+function checkUnresolvedExternalRefs(sketch: SketchJSON): ValidateIssue[] {
+  const issues: ValidateIssue[] = []
   const allIds = new Set((sketch.entities || []).map((e) => e.id))
 
   for (const e of sketch.entities || []) {
@@ -336,15 +379,12 @@ function checkUnresolvedExternalRefs(sketch) {
 
 /**
  * Validate a Sketch JSON object.
- *
- * @param {object} sketch  - parsed sketch object
- * @returns {{ errors: Array, warnings: Array }}
  */
-export function validateSketch(sketch) {
-  const errors = []
-  const warnings = []
+export function validateSketch(sketch: SketchJSON): ValidateSketchResult {
+  const errors: ValidateIssue[] = []
+  const warnings: ValidateIssue[] = []
 
-  function collect(items) {
+  function collect(items: ValidateIssue[]) {
     for (const item of items) {
       if (item.severity === 'error') errors.push(item)
       else warnings.push(item)

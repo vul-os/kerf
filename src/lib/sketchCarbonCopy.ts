@@ -1,4 +1,4 @@
-// sketchCarbonCopy.js — Carbon-copy (driven reference) geometry from a source
+// sketchCarbonCopy.ts — Carbon-copy (driven reference) geometry from a source
 // sketch into a target sketch. Copied entities are marked `is_reference: true`
 // and are read-only: they participate in constraints but are not extruded.
 //
@@ -11,10 +11,37 @@
 //     → re-sync reference entities from the current source geometry; preserve
 //       user-added constraints that reference those entities.
 
+import type { SketchJSON, SketchEntity, SketchPoint } from '../types/geometry.js'
+
+export interface CarbonCopyTransform {
+  x?: number
+  y?: number
+  rotation_deg?: number
+}
+
+export interface CarbonCopyOpts {
+  sourceSketch: SketchJSON
+  targetSketch: SketchJSON
+  entityIds?: string[]
+  transform?: CarbonCopyTransform | null
+  sourceSketchId?: string
+}
+
+export interface RefreshCarbonCopiesOpts {
+  targetSketch: SketchJSON
+  sourceById: Record<string, SketchJSON>
+  transformById?: Record<string, CarbonCopyTransform | null>
+}
+
+interface Point2 {
+  x: number
+  y: number
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 
-function applyTransform(x, y, transform) {
+function applyTransform(x: number, y: number, transform: CarbonCopyTransform | null | undefined): Point2 {
   if (!transform) return { x, y }
   const tx = typeof transform.x === 'number' ? transform.x : 0
   const ty = typeof transform.y === 'number' ? transform.y : 0
@@ -29,13 +56,18 @@ function applyTransform(x, y, transform) {
 }
 
 // Return the source_id for a reference entity (stored on the entity itself).
-function sourceId(ent) {
+//
+// Dead code, found during T-505 migration and left as-is per migration convention: not
+// called anywhere in this file or imported elsewhere in the repo (verified by grep).
+function _sourceId(ent: SketchEntity | null | undefined): string | null {
   return ent?.source_id || null
 }
 
 // Collect all entity ids that belong to a given source sketch reference (keyed
 // by `cc_source`).
-function refEntitiesForSource(sketch, ccSourceId) {
+//
+// Dead code, same as sourceId() above — unused outside its own declaration.
+function _refEntitiesForSource(sketch: SketchJSON, ccSourceId: string): SketchEntity[] {
   return (sketch.entities || []).filter(
     (e) => e.is_reference && e.cc_source === ccSourceId,
   )
@@ -44,9 +76,9 @@ function refEntitiesForSource(sketch, ccSourceId) {
 // Deep-copy a single entity from source into target coordinate space. Appends
 // auxiliary point entities for lines/arcs/circles that need them.
 // Returns an array of entities (points + the edge entity).
-function copyEntity(ent, sourceEntById, transform, prefix) {
-  const id = (raw) => `${prefix}${raw}`
-  const result = []
+function copyEntity(ent: SketchEntity, sourceEntById: Map<string, SketchEntity>, transform: CarbonCopyTransform | null | undefined, prefix: string): SketchEntity[] {
+  const id = (raw: string) => `${prefix}${raw}`
+  const result: SketchEntity[] = []
 
   if (ent.type === 'point') {
     const { x, y } = applyTransform(ent.x || 0, ent.y || 0, transform)
@@ -61,8 +93,10 @@ function copyEntity(ent, sourceEntById, transform, prefix) {
       construction: true,
     })
   } else if (ent.type === 'line') {
-    const p1Src = sourceEntById.get(ent.p1)
-    const p2Src = sourceEntById.get(ent.p2)
+    // p1/p2 reference `point` entities by construction (sketchEdit.js `addLine`) — the Map
+    // is keyed by id across all entity types, so this narrows what's otherwise SketchEntity.
+    const p1Src = sourceEntById.get(ent.p1) as SketchPoint | undefined
+    const p2Src = sourceEntById.get(ent.p2) as SketchPoint | undefined
     if (!p1Src || !p2Src) return result
     const np1 = applyTransform(p1Src.x || 0, p1Src.y || 0, transform)
     const np2 = applyTransform(p2Src.x || 0, p2Src.y || 0, transform)
@@ -83,7 +117,7 @@ function copyEntity(ent, sourceEntById, transform, prefix) {
       cc_source: prefix.replace(/_$/, ''), construction: true,
     })
   } else if (ent.type === 'circle') {
-    const cSrc = sourceEntById.get(ent.center)
+    const cSrc = sourceEntById.get(ent.center) as SketchPoint | undefined
     if (!cSrc) return result
     const nc = applyTransform(cSrc.x || 0, cSrc.y || 0, transform)
     result.push({
@@ -98,9 +132,9 @@ function copyEntity(ent, sourceEntById, transform, prefix) {
       cc_source: prefix.replace(/_$/, ''), construction: true,
     })
   } else if (ent.type === 'arc') {
-    const cSrc = sourceEntById.get(ent.center)
-    const sSrc = sourceEntById.get(ent.start)
-    const eSrc = sourceEntById.get(ent.end)
+    const cSrc = sourceEntById.get(ent.center) as SketchPoint | undefined
+    const sSrc = sourceEntById.get(ent.start) as SketchPoint | undefined
+    const eSrc = sourceEntById.get(ent.end) as SketchPoint | undefined
     if (!cSrc || !sSrc || !eSrc) return result
     const nc = applyTransform(cSrc.x || 0, cSrc.y || 0, transform)
     const ns = applyTransform(sSrc.x || 0, sSrc.y || 0, transform)
@@ -137,15 +171,12 @@ function copyEntity(ent, sourceEntById, transform, prefix) {
 /**
  * Copy entities from sourceSketch into targetSketch as driven reference geometry.
  *
- * @param {object} opts
- * @param {object} opts.sourceSketch  - source sketch JSON object
- * @param {object} opts.targetSketch  - target sketch JSON object
- * @param {string[]} [opts.entityIds] - entity ids to copy (default: all non-point edges)
- * @param {object} [opts.transform]   - { x?, y?, rotation_deg? } applied to coords
- * @param {string} [opts.sourceSketchId] - stable id for the source (used as cc_source key)
- * @returns {object} updated targetSketch
+ * @param opts.entityIds  entity ids to copy (default: all non-point edges)
+ * @param opts.transform  applied to copied point coords
+ * @param opts.sourceSketchId  stable id for the source (used as cc_source key)
+ * @returns updated targetSketch
  */
-export function carbonCopy({ sourceSketch, targetSketch, entityIds, transform, sourceSketchId }) {
+export function carbonCopy({ sourceSketch, targetSketch, entityIds, transform, sourceSketchId }: CarbonCopyOpts): SketchJSON {
   const srcId = sourceSketchId || 'cc0'
   const prefix = `${srcId}_`
 
@@ -164,8 +195,8 @@ export function carbonCopy({ sourceSketch, targetSketch, entityIds, transform, s
 
   // Build the new reference entities (may include duplicate point entries —
   // deduplicate by id, keeping first).
-  const newEnts = []
-  const seen = new Set()
+  const newEnts: SketchEntity[] = []
+  const seen = new Set<string>()
   for (const ent of toExport) {
     const copied = copyEntity(ent, srcEntById, transform, prefix)
     for (const ce of copied) {
@@ -195,21 +226,21 @@ export function carbonCopy({ sourceSketch, targetSketch, entityIds, transform, s
 // ---------------------------------------------------------------------------
 // Public: findCarbonCopyChain
 
+/** The subset of SketchJSON findCarbonCopyChain() actually reads. */
+export type CarbonCopySource = Pick<SketchJSON, 'entities'> & Partial<Pick<SketchJSON, 'cc_sources'>>
+
 /**
  * Return an ordered list of source sketch ids that this target directly
  * references (one level — not recursive). For deeper impact analysis,
  * callers walk the tree themselves.
- *
- * @param {object} targetSketch
- * @returns {string[]}
  */
-export function findCarbonCopyChain(targetSketch) {
+export function findCarbonCopyChain(targetSketch: CarbonCopySource): string[] {
   // Collect from explicit cc_sources metadata field.
-  const fromMeta = Array.isArray(targetSketch.cc_sources) ? [...targetSketch.cc_sources] : []
+  const fromMeta: string[] = Array.isArray(targetSketch.cc_sources) ? [...targetSketch.cc_sources] : []
 
   // Also scan entities for any cc_source values not yet in the metadata
   // (defensive, in case an older format stored only on entities).
-  const fromEnts = new Set()
+  const fromEnts = new Set<string>()
   for (const e of targetSketch.entities || []) {
     if (e.is_reference && e.cc_source) fromEnts.add(e.cc_source)
   }
@@ -226,14 +257,8 @@ export function findCarbonCopyChain(targetSketch) {
  * Re-sync reference entities in targetSketch from up-to-date source geometry.
  * Constraints in the target that reference the reference entities are preserved
  * (their entity-id references remain valid since ids are stable).
- *
- * @param {object} opts
- * @param {object} opts.targetSketch        - target sketch JSON object
- * @param {object} opts.sourceById          - map of sourceSketchId → sourceSketch
- * @param {object} [opts.transformById]     - map of sourceSketchId → transform (optional)
- * @returns {object} updated targetSketch
  */
-export function refreshCarbonCopies({ targetSketch, sourceById, transformById = {} }) {
+export function refreshCarbonCopies({ targetSketch, sourceById, transformById = {} }: RefreshCarbonCopiesOpts): SketchJSON {
   const chain = findCarbonCopyChain(targetSketch)
   let updated = targetSketch
 

@@ -1,17 +1,30 @@
 import { describe, it, expect } from 'vitest'
 import { validateSketch } from './sketchValidate.js'
+import type { SketchJSON } from '../types/geometry.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
 
-function buildRect(x0 = 0, y0 = 0, x1 = 10, y1 = 5) {
+// Fills in the SketchJSON fields validateSketch() never reads (plane/visible_3d/solved/
+// metadata) so fixtures below can specify only what each check actually exercises.
+function baseSketch(partial: Pick<SketchJSON, 'entities' | 'constraints'> & Partial<SketchJSON>): SketchJSON {
+  return {
+    version: 1,
+    plane: { type: 'base', name: 'XY' },
+    visible_3d: [],
+    solved: {},
+    metadata: {},
+    ...partial,
+  }
+}
+
+function buildRect(x0 = 0, y0 = 0, x1 = 10, y1 = 5): SketchJSON {
   // 4 points (8 DOF), origin fixed (-2), = 6 free.
   // 4 coincident constraints connecting the loop (-8 DOF) would over-constrain.
   // Use only enough constraints to reach DOF=0: horizontal + vertical + 2 distances.
   // For validation purposes the important thing is the loop is closed and endpoints
   // are anchored — we just need DOF >= 0.
-  return {
-    version: 1,
+  return baseSketch({
     entities: [
       { id: 'origin', type: 'point', x: x0, y: y0 },
       { id: 'p1', type: 'point', x: x1, y: y0 },
@@ -28,11 +41,11 @@ function buildRect(x0 = 0, y0 = 0, x1 = 10, y1 = 5) {
       { id: 'c2', type: 'coincident', a: 'p1', b: 'p2' },
       { id: 'c3', type: 'coincident', a: 'p2', b: 'p3' },
     ],
-  }
+  })
 }
 
-function emptySketch() {
-  return { version: 1, entities: [{ id: 'origin', type: 'point', x: 0, y: 0 }], constraints: [] }
+function emptySketch(): SketchJSON {
+  return baseSketch({ entities: [{ id: 'origin', type: 'point', x: 0, y: 0 }], constraints: [] })
 }
 
 // ---------------------------------------------------------------------------
@@ -69,8 +82,7 @@ describe('validateSketch — open_contour', () => {
 
 describe('validateSketch — self_intersection', () => {
   it('reports self_intersection when two lines cross', () => {
-    const sketch = {
-      version: 1,
+    const sketch = baseSketch({
       entities: [
         { id: 'a', type: 'point', x: 0, y: 0 },
         { id: 'b', type: 'point', x: 10, y: 10 },
@@ -80,14 +92,13 @@ describe('validateSketch — self_intersection', () => {
         { id: 'l2', type: 'line', p1: 'c', p2: 'd' },
       ],
       constraints: [],
-    }
+    })
     const result = validateSketch(sketch)
     expect(result.errors.some((e) => e.kind === 'self_intersection')).toBe(true)
   })
 
   it('does NOT report self_intersection for parallel non-crossing lines', () => {
-    const sketch = {
-      version: 1,
+    const sketch = baseSketch({
       entities: [
         { id: 'a', type: 'point', x: 0, y: 0 },
         { id: 'b', type: 'point', x: 10, y: 0 },
@@ -97,7 +108,7 @@ describe('validateSketch — self_intersection', () => {
         { id: 'l2', type: 'line', p1: 'c', p2: 'd' },
       ],
       constraints: [],
-    }
+    })
     const result = validateSketch(sketch)
     expect(result.errors.some((e) => e.kind === 'self_intersection')).toBe(false)
   })
@@ -128,22 +139,20 @@ describe('validateSketch — redundant_constraint', () => {
 
 describe('validateSketch — dangling_endpoint', () => {
   it('warns about edge endpoints with no coincident or fixed constraint', () => {
-    const sketch = {
-      version: 1,
+    const sketch = baseSketch({
       entities: [
         { id: 'p1', type: 'point', x: 0, y: 0 },
         { id: 'p2', type: 'point', x: 10, y: 0 },
         { id: 'l1', type: 'line', p1: 'p1', p2: 'p2' },
       ],
       constraints: [],
-    }
+    })
     const result = validateSketch(sketch)
     expect(result.warnings.some((w) => w.kind === 'dangling_endpoint')).toBe(true)
   })
 
   it('does NOT warn about endpoints that have a coincident constraint', () => {
-    const sketch = {
-      version: 1,
+    const sketch = baseSketch({
       entities: [
         { id: 'p1', type: 'point', x: 0, y: 0 },
         { id: 'p2', type: 'point', x: 10, y: 0 },
@@ -152,7 +161,7 @@ describe('validateSketch — dangling_endpoint', () => {
       constraints: [
         { id: 'c1', type: 'coincident', a: 'p1', b: 'p2' },
       ],
-    }
+    })
     const result = validateSketch(sketch)
     expect(result.warnings.some((w) => w.kind === 'dangling_endpoint')).toBe(false)
   })
@@ -169,7 +178,7 @@ describe('validateSketch — unresolved_external_ref', () => {
           is_reference: true, cc_source: 'src1', source_id: 'l1', unresolved: true, construction: true,
         },
       ],
-    }
+    } satisfies SketchJSON
     const result = validateSketch(sketch)
     expect(result.errors.some((e) => e.kind === 'unresolved_external_ref')).toBe(true)
   })
@@ -184,7 +193,7 @@ describe('validateSketch — unresolved_external_ref', () => {
           is_reference: true, cc_source: 'src1', source_id: 'l1', construction: true,
         },
       ],
-    }
+    } satisfies SketchJSON
     const result = validateSketch(sketch)
     expect(result.errors.some((e) => e.kind === 'unresolved_external_ref')).toBe(false)
   })

@@ -1,12 +1,26 @@
 import { describe, it, expect } from 'vitest'
 import { carbonCopy, findCarbonCopyChain, refreshCarbonCopies } from './sketchCarbonCopy.js'
+import type { SketchJSON, SketchPoint } from '../types/geometry.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
 
-function makeSource() {
+// Fills in the SketchJSON fields these functions never read (plane/visible_3d/solved/
+// metadata) so fixtures below can specify only what carbon-copy actually exercises.
+function baseSketch(partial: Pick<SketchJSON, 'entities' | 'constraints'> & Partial<SketchJSON>): SketchJSON {
   return {
     version: 1,
+    plane: { type: 'base', name: 'XY' },
+    visible_3d: [],
+    solved: {},
+    metadata: {},
+    cc_sources: [],
+    ...partial,
+  }
+}
+
+function makeSource(): SketchJSON {
+  return baseSketch({
     entities: [
       { id: 'origin', type: 'point', x: 0, y: 0 },
       { id: 'p1', type: 'point', x: 10, y: 0 },
@@ -18,17 +32,14 @@ function makeSource() {
       { id: 'l4', type: 'line', p1: 'p3', p2: 'origin' },
     ],
     constraints: [],
-    cc_sources: [],
-  }
+  })
 }
 
-function makeTarget() {
-  return {
-    version: 1,
+function makeTarget(): SketchJSON {
+  return baseSketch({
     entities: [{ id: 'origin', type: 'point', x: 0, y: 0 }],
     constraints: [],
-    cc_sources: [],
-  }
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -120,10 +131,10 @@ describe('carbonCopy — transform', () => {
       transform: { x: 20, y: 10 },
       sourceSketchId: 'src1',
     })
-    const p1 = result.entities.find((e) => e.id === 'src1_p1')
+    const p1 = result.entities.find((e) => e.id === 'src1_p1') as SketchPoint | undefined
     expect(p1).toBeTruthy()
-    expect(p1.x).toBeCloseTo(30)
-    expect(p1.y).toBeCloseTo(10)
+    expect(p1!.x).toBeCloseTo(30)
+    expect(p1!.y).toBeCloseTo(10)
   })
 
   it('applies rotation (90°) to copied point coordinates', () => {
@@ -135,31 +146,31 @@ describe('carbonCopy — transform', () => {
       sourceSketchId: 'src1',
     })
     // p1 was at (10, 0); after 90° CCW → (0, 10)
-    const p1 = result.entities.find((e) => e.id === 'src1_p1')
+    const p1 = result.entities.find((e) => e.id === 'src1_p1') as SketchPoint | undefined
     expect(p1).toBeTruthy()
-    expect(p1.x).toBeCloseTo(0, 4)
-    expect(p1.y).toBeCloseTo(10, 4)
+    expect(p1!.x).toBeCloseTo(0, 4)
+    expect(p1!.y).toBeCloseTo(10, 4)
   })
 })
 
 describe('carbonCopy — circle and arc copy', () => {
   it('copies a circle entity with its center point', () => {
-    const src = {
+    const src = baseSketch({
       entities: [
         { id: 'cp', type: 'point', x: 5, y: 5 },
         { id: 'circ', type: 'circle', center: 'cp', radius: 3 },
       ],
       constraints: [],
-    }
+    })
     const result = carbonCopy({
       sourceSketch: src,
       targetSketch: makeTarget(),
       sourceSketchId: 'src2',
     })
-    const circle = result.entities.find((e) => e.id === 'src2_circ')
+    const circle = result.entities.find((e) => e.id === 'src2_circ') as Extract<typeof result.entities[number], { type: 'circle' }> | undefined
     expect(circle).toBeTruthy()
-    expect(circle.radius).toBe(3)
-    expect(circle.is_reference).toBe(true)
+    expect(circle!.radius).toBe(3)
+    expect(circle!.is_reference).toBe(true)
   })
 })
 
@@ -181,7 +192,7 @@ describe('findCarbonCopyChain', () => {
   it('picks up cc_source from entities even if cc_sources metadata is missing', () => {
     const sketch = {
       entities: [
-        { id: 'x_l1', type: 'line', p1: 'x_p1', p2: 'x_p2', is_reference: true, cc_source: 'x' },
+        { id: 'x_l1', type: 'line' as const, p1: 'x_p1', p2: 'x_p2', is_reference: true, cc_source: 'x' },
       ],
     }
     const chain = findCarbonCopyChain(sketch)
@@ -201,7 +212,7 @@ describe('findCarbonCopyChain', () => {
 describe('refreshCarbonCopies', () => {
   it('updates coordinates when source geometry changes', () => {
     // Initial copy at original position.
-    let target = carbonCopy({
+    const target = carbonCopy({
       sourceSketch: makeSource(),
       targetSketch: makeTarget(),
       entityIds: ['l1'],
@@ -209,10 +220,10 @@ describe('refreshCarbonCopies', () => {
     })
 
     // Mutate source: move p1 to (20, 0).
-    const updatedSource = {
+    const updatedSource: SketchJSON = {
       ...makeSource(),
       entities: makeSource().entities.map((e) =>
-        e.id === 'p1' ? { ...e, x: 20 } : e,
+        e.id === 'p1' ? { ...e, x: 20 } as typeof e : e,
       ),
     }
 
@@ -221,13 +232,13 @@ describe('refreshCarbonCopies', () => {
       sourceById: { src1: updatedSource },
     })
 
-    const p1 = refreshed.entities.find((e) => e.id === 'src1_p1')
+    const p1 = refreshed.entities.find((e) => e.id === 'src1_p1') as SketchPoint | undefined
     expect(p1).toBeTruthy()
-    expect(p1.x).toBeCloseTo(20)
+    expect(p1!.x).toBeCloseTo(20)
   })
 
   it('marks reference entities as unresolved when source is missing', () => {
-    let target = carbonCopy({
+    const target = carbonCopy({
       sourceSketch: makeSource(),
       targetSketch: makeTarget(),
       entityIds: ['l1'],

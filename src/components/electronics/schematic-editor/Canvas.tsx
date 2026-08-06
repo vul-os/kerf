@@ -24,16 +24,90 @@
 //   onAddProbe      ({x,y,netLabel}) => void
 
 import { useCallback, useRef, useState } from 'react'
+import type { MouseEvent as ReactMouseEvent, KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { PARTS_MAP, GRID, VW, VH } from './parts_library.js'
 import { routeWire } from './wire_router.js'
+import type { Point } from './wire_router.js'
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+// parts_library.js is still untyped JS (migrated separately); these interfaces describe only
+// the fields this file actually reads off a part.
+
+type SymbolLine = number[]
+
+interface SymbolArc {
+  cx: number
+  cy: number
+  r: number
+  a1?: number
+  a2?: number
+}
+
+interface SymbolCircle {
+  cx: number
+  cy: number
+  r: number
+  fill?: string
+}
+
+interface PartSymbol {
+  lines?: SymbolLine[]
+  arcs?: SymbolArc[]
+  circles?: SymbolCircle[]
+}
+
+interface PartPin {
+  id: string
+  dx: number
+  dy: number
+  name: string
+}
+
+interface Part {
+  id: string
+  label: string
+  category: string
+  pins: PartPin[]
+  symbol: PartSymbol
+}
+
+export interface Device {
+  id: string
+  partId: string
+  x: number
+  y: number
+  props?: Record<string, string>
+  label?: string
+}
+
+export interface Wire {
+  id: string
+  points: Point[]
+}
+
+export type SchematicTool = 'select' | 'wire' | 'add' | 'probe' | 'delete'
+export type SchematicObjectType = 'part' | 'wire'
+
+export interface CanvasProps {
+  devices?: Device[]
+  wires?: Wire[]
+  activeTool?: SchematicTool
+  addingPartId?: string | null
+  selectedId?: string | null
+  onSelectObject?: (id: string | null, type: SchematicObjectType | null) => void
+  onAddDevice?: (event: { partId: string; x: number; y: number }) => void
+  onWireCommit?: (points: Point[]) => void
+  onDeleteObject?: (id: string, type: SchematicObjectType) => void
+  onAddProbe?: (event: { x: number; y: number; netLabel: string }) => void
+}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-function snapToGrid(v) {
+function snapToGrid(v: number) {
   return Math.round(v / GRID) * GRID
 }
 
-function svgPoint(svgEl, clientX, clientY) {
+function svgPoint(svgEl: SVGSVGElement, clientX: number, clientY: number) {
   const pt = svgEl.createSVGPoint()
   pt.x = clientX
   pt.y = clientY
@@ -65,7 +139,7 @@ function Grid() {
 
 // ── Arc path helper ───────────────────────────────────────────────────────────
 
-function arcPath(a) {
+function arcPath(a: SymbolArc) {
   const { cx, cy, r, a1 = 0, a2 = 180 } = a
   const toRad = (d) => (d * Math.PI) / 180
   const x1 = cx + r * Math.cos(toRad(a1))
@@ -78,7 +152,15 @@ function arcPath(a) {
 
 // ── Part symbol ───────────────────────────────────────────────────────────────
 
-function PartSymbol({ dev, partDef, selected, onClick, activeTool }) {
+interface PartSymbolProps {
+  dev: Device
+  partDef: Part
+  selected: boolean
+  onClick: (e: ReactMouseEvent<SVGGElement>) => void
+  activeTool?: SchematicTool
+}
+
+function PartSymbol({ dev, partDef, selected, onClick, activeTool }: PartSymbolProps) {
   const { symbol } = partDef
   const isDelete = activeTool === 'delete'
 
@@ -158,7 +240,14 @@ function PartSymbol({ dev, partDef, selected, onClick, activeTool }) {
 
 // ── Wire ──────────────────────────────────────────────────────────────────────
 
-function WireElement({ wire, selected, onClick, activeTool }) {
+interface WireElementProps {
+  wire: Wire
+  selected: boolean
+  onClick: (e: ReactMouseEvent<SVGGElement>) => void
+  activeTool?: SchematicTool
+}
+
+function WireElement({ wire, selected, onClick, activeTool }: WireElementProps) {
   if (!wire.points?.length) return null
   const pts = wire.points.map((p) => `${p.x},${p.y}`).join(' ')
   const isDelete = activeTool === 'delete'
@@ -186,8 +275,8 @@ function WireElement({ wire, selected, onClick, activeTool }) {
 
 // ── Ghost (placement preview) ─────────────────────────────────────────────────
 
-function GhostPart({ partId, x, y }) {
-  const partDef = PARTS_MAP[partId]
+function GhostPart({ partId, x, y }: { partId: string; x: number; y: number }) {
+  const partDef: Part | undefined = PARTS_MAP[partId]
   if (!partDef) return null
   const { symbol } = partDef
 
@@ -221,14 +310,14 @@ export default function Canvas({
   onWireCommit,
   onDeleteObject,
   onAddProbe,
-}) {
-  const svgRef = useRef(null)
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
-  const [wirePoints, setWirePoints] = useState([])   // points accumulated in wire mode
+}: CanvasProps) {
+  const svgRef = useRef<SVGSVGElement>(null)
+  const [mousePos, setMousePos] = useState<Point>({ x: 0, y: 0 })
+  const [wirePoints, setWirePoints] = useState<Point[]>([])   // points accumulated in wire mode
 
   // ── Pointer helpers ──────────────────────────────────────────────────────
 
-  const getSnapped = useCallback((e) => {
+  const getSnapped = useCallback((e: ReactMouseEvent<SVGSVGElement>) => {
     if (!svgRef.current) return { x: 0, y: 0 }
     const raw = svgPoint(svgRef.current, e.clientX, e.clientY)
     return { x: snapToGrid(raw.x), y: snapToGrid(raw.y) }
@@ -236,14 +325,14 @@ export default function Canvas({
 
   // ── Mouse move — update cursor ghost ────────────────────────────────────
 
-  const handleMouseMove = useCallback((e) => {
+  const handleMouseMove = useCallback((e: ReactMouseEvent<SVGSVGElement>) => {
     const p = getSnapped(e)
     setMousePos(p)
   }, [getSnapped])
 
   // ── Click on canvas background ────────────────────────────────────────
 
-  const handleBgClick = useCallback((e) => {
+  const handleBgClick = useCallback((e: ReactMouseEvent<SVGSVGElement>) => {
     if (e.defaultPrevented) return
     const p = getSnapped(e)
 
@@ -278,7 +367,7 @@ export default function Canvas({
 
   // ── Double-click finishes wire ────────────────────────────────────────
 
-  const handleDblClick = useCallback((e) => {
+  const handleDblClick = useCallback((e: ReactMouseEvent<SVGSVGElement>) => {
     if (activeTool !== 'wire' || wirePoints.length < 2) return
     e.preventDefault()
     onWireCommit?.(wirePoints)
@@ -288,13 +377,13 @@ export default function Canvas({
   // ── Escape during wire mode ────────────────────────────────────────────
   // (handled in parent via keydown; also cancel on Escape here)
 
-  const handleKeyDown = useCallback((e) => {
+  const handleKeyDown = useCallback((e: ReactKeyboardEvent<SVGSVGElement>) => {
     if (e.key === 'Escape') setWirePoints([])
   }, [])
 
   // ── Wire preview (rubber-band) ─────────────────────────────────────────
 
-  let previewPts = null
+  let previewPts: Point[] | null = null
   if (activeTool === 'wire' && wirePoints.length > 0) {
     const last = wirePoints[wirePoints.length - 1]
     const routed = routeWire(last, mousePos)

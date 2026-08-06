@@ -25,7 +25,7 @@ import rehypeHighlight from 'rehype-highlight'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import Button from './Button.jsx'
 import { ALLOWED_ELEMENTS, urlTransformer } from '../lib/markdownSanitize.js'
-import CompareFeatureMatrix from './CompareFeatureMatrix.jsx'
+import CompareFeatureMatrix, { type FeatureRow } from './CompareFeatureMatrix.jsx'
 
 /* -------------------------------------------------------------------------- */
 /* Verdict-glyph constants (mirrors Freecad.jsx)                               */
@@ -53,7 +53,7 @@ export interface CompareMeta {
   order?: number | null
   title?: string | null
   body?: string
-  features?: unknown[]
+  features?: FeatureRow[]
 }
 
 /* -------------------------------------------------------------------------- */

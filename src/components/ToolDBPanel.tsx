@@ -168,7 +168,7 @@ function ToolForm({ initial, onSubmit, onClose }) {
     return base
   })
 
-  const [errors, setErrors] = useState({})
+  const [errors, setErrors] = useState<Record<string, string>>({})
   const typeFields = TYPE_FIELDS[form.type] || []
 
   function set(k, v) {
@@ -177,7 +177,7 @@ function ToolForm({ initial, onSubmit, onClose }) {
   }
 
   function validate() {
-    const errs = {}
+    const errs: Record<string, string> = {}
     if (!form.id.trim()) errs.id = 'Required'
     if (!form.name.trim()) errs.name = 'Required'
     if (!form.diameter_mm || isNaN(parseFloat(form.diameter_mm)) || parseFloat(form.diameter_mm) <= 0) {
@@ -203,7 +203,8 @@ function ToolForm({ initial, onSubmit, onClose }) {
     e.preventDefault()
     const errs = validate()
     if (Object.keys(errs).length) { setErrors(errs); return }
-    const out = { id: form.id.trim(), name: form.name.trim(), type: form.type }
+    // Widened: diameter_mm and the per-type fields are attached conditionally below.
+    const out: Record<string, unknown> = { id: form.id.trim(), name: form.name.trim(), type: form.type }
     out.diameter_mm = parseFloat(form.diameter_mm)
     for (const f of typeFields) {
       out[f] = parseFloat(form[f])
@@ -219,7 +220,7 @@ function ToolForm({ initial, onSubmit, onClose }) {
     onSubmit(out)
   }
 
-  function Field({ fieldKey, required }) {
+  function Field({ fieldKey, required = false }: { fieldKey: string; required?: boolean }) {
     const meta = FIELD_META[fieldKey] || { label: fieldKey, type: 'text' }
     const err = errors[fieldKey]
     return (

@@ -2,12 +2,72 @@
 // Props: { content, fileName, onContentChange }
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import { AlertTriangle, Camera, Layers, Palette, Play, Settings2, Sun, X } from 'lucide-react'
 import { addLight, removeLight, setCameraFromOrbit, validateRender } from '../lib/render.js'
 
+// ── Types ──────────────────────────────────────────────────────────────────────
+//
+// src/lib/render.js (outside this slice — not part of src/components) is untyped
+// JSDoc-only JS, so its exports don't carry usable inferred types. The .render
+// document shape is modeled locally here and applied via casts at each boundary.
+
+export type RenderLightKind = 'sun' | 'area' | 'point' | 'spot'
+
+export interface RenderLight {
+  id: string
+  kind: RenderLightKind
+  direction?: [number, number, number]
+  position?: [number, number, number]
+  size_mm?: number
+  intensity?: number
+  color?: string
+}
+
+export interface RenderCamera {
+  position?: [number, number, number]
+  target?: [number, number, number]
+  up?: [number, number, number]
+  fov_deg?: number
+  type?: 'perspective' | 'ortho'
+}
+
+export interface RenderSettings {
+  resolution?: [number, number]
+  samples?: number
+  denoise?: boolean
+  output_format?: 'png' | 'exr'
+}
+
+export interface RenderMaterialOverride {
+  kind?: 'principled' | 'emission' | 'glass'
+  base_color?: string
+  roughness?: number
+  metallic?: number
+  [key: string]: unknown
+}
+
+export interface RenderDoc {
+  version: number
+  name?: string
+  scene_file_id: string
+  camera?: RenderCamera
+  lights?: RenderLight[]
+  materials_override?: Record<string, RenderMaterialOverride>
+  environment?: { kind: string; color?: string }
+  render_settings?: RenderSettings
+  last_output_url?: string
+}
+
+export interface RenderViewProps {
+  content?: RenderDoc | string | null
+  fileName?: string
+  onContentChange?: (doc: RenderDoc) => void
+}
+
 const DEBOUNCE_MS = 250
 
-function numInput(val, onChange, opts = {}) {
+function numInput(val: number | null | undefined, onChange: (v: number) => void, opts: { min?: number; max?: number; step?: number } = {}) {
   const { min, max, step = 1 } = opts
   return (
     <input type="number" value={val ?? ''} min={min} max={max} step={step}
@@ -16,11 +76,11 @@ function numInput(val, onChange, opts = {}) {
   )
 }
 
-function Lbl({ children }) {
+function Lbl({ children }: { children: ReactNode }) {
   return <div className="text-[10px] uppercase tracking-wider text-ink-500 font-medium mb-0.5">{children}</div>
 }
 
-function Heading({ icon: Icon, children }) {
+function Heading({ icon: Icon, children }: { icon?: ComponentType<{ size?: number; className?: string }>; children: ReactNode }) {
   return (
     <div className="flex items-center gap-1.5 mb-3 text-[10px] uppercase tracking-wider text-ink-400 font-semibold">
       {Icon && <Icon size={11} className="text-kerf-300 shrink-0" />}
@@ -29,13 +89,13 @@ function Heading({ icon: Icon, children }) {
   )
 }
 
-function XYZRow({ label, value, onChange }) {
-  const set = (i) => (v) => { const n = [...(value || [0, 0, 0])]; n[i] = isNaN(v) ? 0 : v; onChange(n) }
+function XYZRow({ label, value, onChange }: { label: string; value?: [number, number, number]; onChange: (v: [number, number, number]) => void }) {
+  const set = (i: number) => (v: number) => { const n = [...(value || [0, 0, 0])] as [number, number, number]; n[i] = isNaN(v) ? 0 : v; onChange(n) }
   return (
     <div>
       <Lbl>{label}</Lbl>
       <div className="grid grid-cols-3 gap-1">
-        {['X', 'Y', 'Z'].map((axis, i) => (
+        {(['X', 'Y', 'Z'] as const).map((axis, i) => (
           <div key={axis}>
             <span className="text-[9px] text-ink-600 block text-center">{axis}</span>
             {numInput((value || [0, 0, 0])[i], set(i), { step: 10 })}
@@ -46,11 +106,11 @@ function XYZRow({ label, value, onChange }) {
   )
 }
 
-function OrbitPopover({ render, onApply, onClose }) {
+function OrbitPopover({ render, onApply, onClose }: { render: RenderDoc; onApply: (next: RenderDoc) => void; onClose: () => void }) {
   const [dist, setDist] = useState(5000)
   const [az, setAz] = useState(45)
   const [el, setEl] = useState(35)
-  const apply = () => onApply(setCameraFromOrbit(render, render?.camera?.target || [0, 0, 500], dist, az, el))
+  const apply = () => onApply(setCameraFromOrbit(render, render?.camera?.target || [0, 0, 500], dist, az, el) as RenderDoc)
   return (
     <div className="absolute top-8 right-0 z-30 w-60 bg-ink-900 border border-ink-800 rounded-lg shadow-2xl p-3 text-xs">
       <div className="flex items-center justify-between mb-2">
@@ -58,7 +118,7 @@ function OrbitPopover({ render, onApply, onClose }) {
         <button type="button" onClick={onClose} className="text-ink-500 hover:text-ink-200"><X size={12} /></button>
       </div>
       <div className="space-y-2">
-        {[['Distance (mm)', dist, setDist, 100, 20000, 100], ['Azimuth (°)', az, setAz, 0, 360, 1], ['Elevation (°)', el, setEl, -89, 89, 1]].map(([lbl, v, setter, mn, mx, st]) => (
+        {([['Distance (mm)', dist, setDist, 100, 20000, 100], ['Azimuth (°)', az, setAz, 0, 360, 1], ['Elevation (°)', el, setEl, -89, 89, 1]] as Array<[string, number, (v: number) => void, number, number, number]>).map(([lbl, v, setter, mn, mx, st]) => (
           <div key={lbl}>
             <Lbl>{lbl}</Lbl>
             <input type="range" min={mn} max={mx} step={st} value={v}
@@ -75,15 +135,15 @@ function OrbitPopover({ render, onApply, onClose }) {
   )
 }
 
-const KINDS = ['sun', 'area', 'point', 'spot']
+const KINDS: RenderLightKind[] = ['sun', 'area', 'point', 'spot']
 
-function LightRow({ light, onChange, onRemove }) {
+function LightRow({ light, onChange, onRemove }: { light: RenderLight; onChange: (next: RenderLight) => void; onRemove: () => void }) {
   const useDir = light.kind === 'sun' || light.kind === 'spot'
-  const set = (key) => (val) => onChange({ ...light, [key]: val })
+  const set = <K extends keyof RenderLight>(key: K) => (val: RenderLight[K]) => onChange({ ...light, [key]: val })
   return (
     <div className="bg-ink-900 border border-ink-800 rounded p-2 space-y-2">
       <div className="flex items-center gap-2">
-        <select value={light.kind} onChange={(e) => set('kind')(e.target.value)}
+        <select value={light.kind} onChange={(e) => set('kind')(e.target.value as RenderLightKind)}
           className="bg-ink-950 border border-ink-800 rounded px-1.5 py-1 text-[11px] text-ink-100 outline-none">
           {KINDS.map((k) => <option key={k}>{k}</option>)}
         </select>
@@ -105,29 +165,33 @@ function LightRow({ light, onChange, onRemove }) {
   )
 }
 
-export default function RenderView({ content, fileName, onContentChange }) {
-  const [doc, setDoc] = useState(null)
-  const [runMsg, setRunMsg] = useState(null)
+export default function RenderView({ content, fileName, onContentChange }: RenderViewProps) {
+  const [doc, setDoc] = useState<RenderDoc | null>(null)
+  const [runMsg, setRunMsg] = useState<string | null>(null)
   const [orbitOpen, setOrbitOpen] = useState(false)
-  const debounceRef = useRef(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const parsed = typeof content === 'object' && content !== null
       ? content
-      : (() => { try { return JSON.parse(content || '{}') } catch { return null } })()
+      // The ternary's own condition already guarantees content is a string/null/undefined
+      // here (never a RenderDoc), but TS can't narrow a compound `&&` condition's else-branch
+      // that precisely — cast documents the invariant rather than restructuring the check.
+      : (() => { try { return JSON.parse((content as string | null | undefined) || '{}') as RenderDoc } catch { return null } })()
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- content-prop sync, pre-existing before this migration.
     setDoc(parsed)
   }, [content])
 
-  const emit = useCallback((next) => {
+  const emit = useCallback((next: RenderDoc) => {
     setDoc(next)
     if (!onContentChange) return
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => onContentChange(next), DEBOUNCE_MS)
   }, [onContentChange])
 
-  const setCamera = (patch) => emit({ ...doc, camera: { ...(doc?.camera || {}), ...patch } })
-  const setSettings = (patch) => emit({ ...doc, render_settings: { ...(doc?.render_settings || {}), ...patch } })
-  const setMat = (patch) => emit({ ...doc, materials_override: { ...(doc?.materials_override || {}), '*': { ...(doc?.materials_override?.['*'] || {}), ...patch } } })
+  const setCamera = (patch: Partial<RenderCamera>) => emit({ ...doc, camera: { ...(doc?.camera || {}), ...patch } } as RenderDoc)
+  const setSettings = (patch: Partial<RenderSettings>) => emit({ ...doc, render_settings: { ...(doc?.render_settings || {}), ...patch } } as RenderDoc)
+  const setMat = (patch: Partial<RenderMaterialOverride>) => emit({ ...doc, materials_override: { ...(doc?.materials_override || {}), '*': { ...(doc?.materials_override?.['*'] || {}), ...patch } } } as RenderDoc)
 
   if (!doc) {
     return (
@@ -137,7 +201,7 @@ export default function RenderView({ content, fileName, onContentChange }) {
     )
   }
 
-  const { ok, errors } = validateRender(doc)
+  const { ok, errors } = validateRender(doc) as { ok: boolean; errors: string[] }
   const cam = doc.camera || {}
   const rs = doc.render_settings || {}
   const mat = doc.materials_override?.['*'] || {}
@@ -183,10 +247,12 @@ export default function RenderView({ content, fileName, onContentChange }) {
               <XYZRow label="Position (mm)" value={cam.position} onChange={(v) => setCamera({ position: v })} />
               <XYZRow label="Target (mm)" value={cam.target} onChange={(v) => setCamera({ target: v })} />
               <div className="grid grid-cols-2 gap-3">
+                {/* eslint-disable-next-line react-hooks/refs -- pre-existing before this migration; the callback closes
+                    over emit()'s debounceRef.current but only runs on user input, never during render. */}
                 <div><Lbl>FOV (deg)</Lbl>{numInput(cam.fov_deg, (v) => setCamera({ fov_deg: v }), { min: 1, max: 179 })}</div>
                 <div>
                   <Lbl>Type</Lbl>
-                  <select value={cam.type || 'perspective'} onChange={(e) => setCamera({ type: e.target.value })}
+                  <select value={cam.type || 'perspective'} onChange={(e) => setCamera({ type: e.target.value as RenderCamera['type'] })}
                     className="w-full bg-ink-950 border border-ink-800 rounded px-2 py-1 text-xs text-ink-100 outline-none focus:border-kerf-300/60">
                     <option value="perspective">Perspective</option>
                     <option value="ortho">Orthographic</option>
@@ -208,7 +274,7 @@ export default function RenderView({ content, fileName, onContentChange }) {
             <div className="flex items-center justify-between mb-3">
               <Heading icon={Sun}>Lights</Heading>
               <button type="button"
-                onClick={() => emit(addLight(doc, { id: `light_${Date.now().toString(36)}`, kind: 'sun', direction: [-1, -1, -2], intensity: 3, color: '#ffffff' }))}
+                onClick={() => emit(addLight(doc, { id: `light_${Date.now().toString(36)}`, kind: 'sun', direction: [-1, -1, -2], intensity: 3, color: '#ffffff' }) as RenderDoc)}
                 className="text-[10px] px-2 py-0.5 rounded border border-ink-800 bg-ink-900 text-ink-400 hover:text-kerf-300 hover:border-kerf-300/40">
                 + Add
               </button>
@@ -218,7 +284,7 @@ export default function RenderView({ content, fileName, onContentChange }) {
               : <div className="space-y-2">{lights.map((light) => (
                   <LightRow key={light.id} light={light}
                     onChange={(next) => emit({ ...doc, lights: lights.map((l) => l.id === next.id ? next : l) })}
-                    onRemove={() => emit(removeLight(doc, light.id))} />
+                    onRemove={() => emit(removeLight(doc, light.id) as RenderDoc)} />
                 ))}</div>}
           </section>
 
@@ -229,9 +295,9 @@ export default function RenderView({ content, fileName, onContentChange }) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Lbl>Kind</Lbl>
-                  <select value={mat.kind || 'principled'} onChange={(e) => setMat({ kind: e.target.value })}
+                  <select value={mat.kind || 'principled'} onChange={(e) => setMat({ kind: e.target.value as RenderMaterialOverride['kind'] })}
                     className="w-full bg-ink-950 border border-ink-800 rounded px-2 py-1 text-xs text-ink-100 outline-none focus:border-kerf-300/60">
-                    {['principled', 'emission', 'glass'].map((k) => <option key={k}>{k}</option>)}
+                    {(['principled', 'emission', 'glass'] as const).map((k) => <option key={k}>{k}</option>)}
                   </select>
                 </div>
                 <div>
@@ -241,7 +307,7 @@ export default function RenderView({ content, fileName, onContentChange }) {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                {[['Roughness', 'roughness', 0.5], ['Metallic', 'metallic', 0]].map(([lbl, key, def]) => (
+                {([['Roughness', 'roughness', 0.5], ['Metallic', 'metallic', 0]] as Array<[string, 'roughness' | 'metallic', number]>).map(([lbl, key, def]) => (
                   <div key={key}>
                     <Lbl>{lbl}</Lbl>
                     <input type="range" min={0} max={1} step={0.01} value={mat[key] ?? def}
@@ -258,7 +324,9 @@ export default function RenderView({ content, fileName, onContentChange }) {
             <Heading icon={Settings2}>Render settings</Heading>
             <div className="bg-ink-900 border border-ink-800 rounded p-3 space-y-3">
               <div className="grid grid-cols-2 gap-3">
+                {/* eslint-disable-next-line react-hooks/refs -- pre-existing before this migration; see the FOV field above. */}
                 <div><Lbl>Width (px)</Lbl>{numInput(res[0], (v) => setSettings({ resolution: [v, res[1]] }), { min: 1, step: 1 })}</div>
+                {/* eslint-disable-next-line react-hooks/refs -- pre-existing before this migration; see the FOV field above. */}
                 <div><Lbl>Height (px)</Lbl>{numInput(res[1], (v) => setSettings({ resolution: [res[0], v] }), { min: 1, step: 1 })}</div>
               </div>
               <div>
@@ -274,7 +342,7 @@ export default function RenderView({ content, fileName, onContentChange }) {
               </div>
               <div>
                 <Lbl>Output format</Lbl>
-                <select value={rs.output_format || 'png'} onChange={(e) => setSettings({ output_format: e.target.value })}
+                <select value={rs.output_format || 'png'} onChange={(e) => setSettings({ output_format: e.target.value as RenderSettings['output_format'] })}
                   className="w-full bg-ink-950 border border-ink-800 rounded px-2 py-1 text-xs text-ink-100 outline-none focus:border-kerf-300/60">
                   <option value="png">PNG</option>
                   <option value="exr">EXR (HDR)</option>

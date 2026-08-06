@@ -8,16 +8,63 @@ const CATEGORIES = ['Wall', 'Door', 'Window', 'Room', 'Slab', 'Space', 'Opening'
 const FILTER_OPS = ['eq', 'ne', 'gt', 'lt', 'gte', 'lte', 'in', 'contains']
 const DEBOUNCE_MS = 250
 
-function parse(content) {
+// schedule.js doesn't export types, so the doc/filter/column/result shapes
+// are declared here to match what validateSchedule/runSchedule expect and
+// produce.
+interface ScheduleFilter {
+  field?: string
+  op?: string
+  value?: unknown
+}
+
+interface ScheduleColumn {
+  field?: string
+  label?: string
+  format?: string
+}
+
+interface ScheduleDoc {
+  version?: number
+  name?: string
+  target_category?: string
+  filters?: ScheduleFilter[]
+  columns?: ScheduleColumn[]
+  group_by?: string | null
+  sort_by?: string | null
+}
+
+interface RunResultColumn {
+  field: string
+  label: string
+  format: string | null
+}
+
+interface RunResultOk {
+  columns: RunResultColumn[]
+  rows: Record<string, unknown>[][]
+}
+
+interface RunResult {
+  error?: string
+  ok?: RunResultOk
+}
+
+function parse(content?: string): ScheduleDoc {
   try { return JSON.parse(content || '{}') } catch { return {} }
 }
 
-export default function ScheduleEditor({ content, fileName, onContentChange }) {
-  const [schedule, setSchedule] = useState(() => parse(content))
+export interface ScheduleEditorProps {
+  content?: string
+  fileName?: string
+  onContentChange?: (content: string) => void
+}
+
+export default function ScheduleEditor({ content, fileName, onContentChange }: ScheduleEditorProps) {
+  const [schedule, setSchedule] = useState<ScheduleDoc>(() => parse(content))
   const [bimText, setBimText] = useState('')
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState<RunResult | null>(null)
   const lastEmittedRef = useRef(content)
-  const timerRef = useRef(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (content !== lastEmittedRef.current) {
@@ -25,7 +72,7 @@ export default function ScheduleEditor({ content, fileName, onContentChange }) {
     }
   }, [content])
 
-  const emit = useCallback((next) => {
+  const emit = useCallback((next: ScheduleDoc) => {
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => {
       const s = JSON.stringify(next, null, 2)
@@ -35,7 +82,7 @@ export default function ScheduleEditor({ content, fileName, onContentChange }) {
   }, [onContentChange])
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
 
-  function patch(delta) {
+  function patch(delta: Partial<ScheduleDoc>) {
     setSchedule((s) => {
       const next = { ...s, ...delta }
       emit(next)
@@ -49,11 +96,11 @@ export default function ScheduleEditor({ content, fileName, onContentChange }) {
     patch({ filters: [...(schedule.filters || []), { field: '', op: 'eq', value: '' }] })
   }
 
-  function removeFilter(idx) {
+  function removeFilter(idx: number) {
     patch({ filters: (schedule.filters || []).filter((_, i) => i !== idx) })
   }
 
-  function patchFilter(idx, delta) {
+  function patchFilter(idx: number, delta: Partial<ScheduleFilter>) {
     const filters = (schedule.filters || []).map((f, i) => i === idx ? { ...f, ...delta } : f)
     patch({ filters })
   }
@@ -64,11 +111,11 @@ export default function ScheduleEditor({ content, fileName, onContentChange }) {
     patch({ columns: [...(schedule.columns || []), { field: '', label: '', format: '' }] })
   }
 
-  function removeColumn(idx) {
+  function removeColumn(idx: number) {
     patch({ columns: (schedule.columns || []).filter((_, i) => i !== idx) })
   }
 
-  function patchColumn(idx, delta) {
+  function patchColumn(idx: number, delta: Partial<ScheduleColumn>) {
     const columns = (schedule.columns || []).map((c, i) => i === idx ? { ...c, ...delta } : c)
     patch({ columns })
   }
@@ -85,7 +132,8 @@ export default function ScheduleEditor({ content, fileName, onContentChange }) {
       const r = runSchedule(schedule, bimDoc)
       setResult({ ok: r })
     } catch (err) {
-      setResult({ error: err.message || String(err) })
+      const message = err instanceof Error ? err.message : String(err)
+      setResult({ error: message })
     }
   }
 

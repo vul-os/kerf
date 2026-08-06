@@ -104,7 +104,7 @@ export default [
     id: 'mesh_repair',
     kinds: ['mesh_repair'],
     exts: ['.meshfix'],
-    load: () => import('../../components/MeshRepairPanel.jsx'),
+    load: () => import('../../components/MeshRepairPanel'),
     label: 'Mesh Repair & ShrinkWrap',
   },
   {

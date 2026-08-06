@@ -25,6 +25,12 @@ const SIZES = {
   lg: 'h-12 px-6 text-base gap-2 rounded-lg',
 }
 
+interface Props extends React.ComponentProps<'button'> {
+  variant?: keyof typeof VARIANTS
+  size?: keyof typeof SIZES
+  as?: React.ElementType
+}
+
 export default function Button({
   variant = 'primary',
   size = 'md',
@@ -33,7 +39,7 @@ export default function Button({
   as: Comp = 'button',
   children,
   ...rest
-}) {
+}: Props) {
   return (
     <Comp
       type={Comp === 'button' ? type : undefined}

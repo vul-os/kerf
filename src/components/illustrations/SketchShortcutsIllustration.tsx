@@ -6,7 +6,13 @@
  *
  * viewBox 320×200. Palette locked to ink-* / kerf-* (#ffd633 accent).
  */
-export default function SketchShortcutsIllustration({ className = '' }) {
+import type { ReactNode } from 'react'
+
+export interface Props {
+  className?: string
+}
+
+export default function SketchShortcutsIllustration({ className = '' }: Props) {
   return (
     <svg
       viewBox="0 0 320 200"
@@ -90,7 +96,16 @@ export default function SketchShortcutsIllustration({ className = '' }) {
   )
 }
 
-function OutcomeRow({ y, title, sub, active, children }) {
+function OutcomeRow({ y, title, sub, active, children }: {
+  y: number
+  title: string
+  sub: string
+  /** Passed by the one caller with `accent` set (see call site below) but never read here
+   *  — dead prop found during T-512 migration, left as-is (not a behavior change). */
+  accent?: boolean
+  active?: boolean
+  children?: ReactNode
+}) {
   return (
     <g transform={`translate(0, ${y})`}>
       <rect

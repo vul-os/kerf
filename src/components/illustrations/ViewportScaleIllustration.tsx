@@ -6,7 +6,13 @@
  *
  * viewBox 320×200. Palette locked.
  */
-export default function ViewportScaleIllustration({ className = '' }) {
+import type { ReactNode } from 'react'
+
+export interface Props {
+  className?: string
+}
+
+export default function ViewportScaleIllustration({ className = '' }: Props) {
   // Grid: 6 cols × 4 rows. Each cube drawn as a tiny axonometric.
   const cols = 6
   const rows = 4
@@ -25,11 +31,11 @@ export default function ViewportScaleIllustration({ className = '' }) {
 
   // Determine which cube is "inside" the frustum (rows 2–3, cols 1–4)
   // i.e. front rows, middle cols.
-  function isInside(r, c) {
+  function isInside(r: number, c: number) {
     return r >= 2 && c >= 1 && c <= 4
   }
 
-  const cubes = []
+  const cubes: ReactNode[] = []
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const inside = isInside(r, c)
@@ -126,7 +132,7 @@ export default function ViewportScaleIllustration({ className = '' }) {
 }
 
 /** Tiny axonometric cube. 12×12 footprint with a 4-unit iso skew. */
-function MiniCube({ cx, cy, bright }) {
+function MiniCube({ cx, cy, bright }: { cx: number; cy: number; bright: boolean }) {
   const s = 7 // half-side of the cube square
   const dx = 4 // iso skew x
   const dy = 3 // iso skew y (negative for upward)

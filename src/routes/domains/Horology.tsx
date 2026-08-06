@@ -6,6 +6,7 @@ import * as meta from './horology.meta.js'
 import { TolerancePlusMatesIllustration, FineGrainedUndoIllustration } from '../../components/illustrations/index.js'
 
 export const HERO_ILLUSTRATION = TolerancePlusMatesIllustration
+// eslint-disable-next-line react-refresh/only-export-components -- data export alongside the page component, pre-existing before this migration.
 export const CAPABILITY_ILLUSTRATIONS = [
   { Illustration: FineGrainedUndoIllustration, caption: 'Fine-grained revision history on every ply operation in the watch movement.' },
 ]

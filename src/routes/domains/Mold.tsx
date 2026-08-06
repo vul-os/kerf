@@ -6,6 +6,7 @@ import * as meta from './mold.meta.js'
 import { WorkshopIllustration, CamIllustration } from '../../components/illustrations/index.js'
 
 export const HERO_ILLUSTRATION = WorkshopIllustration
+// eslint-disable-next-line react-refresh/only-export-components -- data export alongside the page component, pre-existing before this migration.
 export const CAPABILITY_ILLUSTRATIONS = [
   { Illustration: CamIllustration, caption: 'CAM toolpaths for core and cavity machining from the mold base.' },
 ]

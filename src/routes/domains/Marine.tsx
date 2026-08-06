@@ -6,6 +6,7 @@ import * as meta from './marine.meta.js'
 import { ScriptingIllustration, PipelineIllustration } from '../../components/illustrations/index.js'
 
 export const HERO_ILLUSTRATION = ScriptingIllustration
+// eslint-disable-next-line react-refresh/only-export-components -- data export alongside the page component, pre-existing before this migration.
 export const CAPABILITY_ILLUSTRATIONS = [
   { Illustration: PipelineIllustration, caption: 'Resistance curve from Holtrop-Mennen feeding propeller selection and shaft sizing.' },
 ]

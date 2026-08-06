@@ -5,7 +5,7 @@
  * are made.  All tests are synchronous from the test runner's perspective.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { stepSim, loadFixture } from './plcSimBridge.js'
 
 // ---------------------------------------------------------------------------

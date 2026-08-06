@@ -18,17 +18,30 @@
 //   frameTensionStats(frame)    → { mean, max, min }
 
 import { useState, useMemo, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import { Shirt, User, ChevronLeft, ChevronRight, Play, Square, AlertTriangle, CheckCircle } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for testing)
 // ---------------------------------------------------------------------------
 
+// cloth_sim_on_rigged_character result payload — JSON boundary we don't own.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RiggedFrame = any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RiggedData = any
+
+interface ParsedRiggedResult {
+  kind: 'ok' | 'empty' | 'invalid'
+  data?: RiggedData
+  error?: string
+}
+
 /**
  * Parse raw cloth_sim_on_rigged_character result.
  * Returns { kind: 'ok'|'empty'|'invalid', data, error? }
  */
-export function parseRiggedResult(raw) {
+export function parseRiggedResult(raw: unknown): ParsedRiggedResult {
   if (raw == null) return { kind: 'empty' }
   const obj =
     typeof raw === 'string'
@@ -45,7 +58,7 @@ export function parseRiggedResult(raw) {
 /**
  * Get the frame data at index idx (clamped).
  */
-export function interpolateBodyFrame(frames, idx) {
+export function interpolateBodyFrame(frames: RiggedFrame[] | null | undefined, idx: number): RiggedFrame | null {
   if (!frames || frames.length === 0) return null
   const i = Math.max(0, Math.min(idx, frames.length - 1))
   return frames[i]
@@ -54,10 +67,10 @@ export function interpolateBodyFrame(frames, idx) {
 /**
  * Compute tension statistics for a single frame.
  */
-export function frameTensionStats(frame) {
+export function frameTensionStats(frame: RiggedFrame): { mean: number; max: number; min: number } {
   if (!frame || !Array.isArray(frame.fit_tension) || frame.fit_tension.length === 0)
     return { mean: 0, max: 0, min: 0 }
-  const t = frame.fit_tension
+  const t: number[] = frame.fit_tension
   const sum = t.reduce((a, b) => a + b, 0)
   return {
     mean: sum / t.length,
@@ -70,7 +83,7 @@ export function frameTensionStats(frame) {
 // Tension colour (same palette as GarmentDrapePanel)
 // ---------------------------------------------------------------------------
 
-function tensionColor(t, scale = 0.05) {
+function tensionColor(t: number, scale = 0.05): string {
   if (!Number.isFinite(t) || scale <= 0) return '#888888'
   const clamped = Math.max(-1, Math.min(1, t / scale))
   if (clamped >= 0) {
@@ -91,14 +104,21 @@ function tensionColor(t, scale = 0.05) {
 // Cloth heatmap: renders the cloth panel grid coloured by per-vertex tension
 // ---------------------------------------------------------------------------
 
-function ClothHeatmap({ fitTension, rows, cols, scale }) {
+interface ClothHeatmapProps {
+  fitTension: number[]
+  rows: number
+  cols: number
+  scale: number
+}
+
+function ClothHeatmap({ fitTension, rows, cols, scale }: ClothHeatmapProps) {
   if (!fitTension || fitTension.length === 0) return null
   const CELL = 14
   const PAD = 2
   const W = cols * CELL + 2 * PAD
   const H = rows * CELL + 2 * PAD
 
-  const cells = []
+  const cells: ReactNode[] = []
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const idx = r * cols + c
@@ -137,7 +157,12 @@ function ClothHeatmap({ fitTension, rows, cols, scale }) {
 // Body silhouette: XZ orthographic projection of body mesh as dots
 // ---------------------------------------------------------------------------
 
-function BodySilhouette({ bodyVerts, clothVerts }) {
+interface BodySilhouetteProps {
+  bodyVerts: number[][]
+  clothVerts: number[][] | null
+}
+
+function BodySilhouette({ bodyVerts, clothVerts }: BodySilhouetteProps) {
   // Very simple orthographic projection: X → svgX, Z (height) → inverted svgY
   if (!bodyVerts || bodyVerts.length === 0) return null
 
@@ -156,7 +181,7 @@ function BodySilhouette({ bodyVerts, clothVerts }) {
   const xRange = xMax - xMin || 1
   const zRange = zMax - zMin || 1
 
-  const toSvg = (x, z) => [
+  const toSvg = (x: number, z: number) => [
     PAD + ((x - xMin) / xRange) * (W - 2 * PAD),
     H - PAD - ((z - zMin) / zRange) * (H - 2 * PAD),  // invert Z for screen
   ]
@@ -191,7 +216,13 @@ function BodySilhouette({ bodyVerts, clothVerts }) {
 // Frame scrubber
 // ---------------------------------------------------------------------------
 
-function FrameScrubber({ frameIdx, totalFrames, onChange }) {
+interface FrameScrubberProps {
+  frameIdx: number
+  totalFrames: number
+  onChange: (idx: number) => void
+}
+
+function FrameScrubber({ frameIdx, totalFrames, onChange }: FrameScrubberProps) {
   return (
     <div className="flex items-center gap-2" data-testid="frame-scrubber">
       <button
@@ -234,7 +265,13 @@ function FrameScrubber({ frameIdx, totalFrames, onChange }) {
 // Metric chip
 // ---------------------------------------------------------------------------
 
-function Chip({ label, value, color = 'text-ink-300' }) {
+interface ChipProps {
+  label: string
+  value: ReactNode
+  color?: string
+}
+
+function Chip({ label, value, color = 'text-ink-300' }: ChipProps) {
   return (
     <div className="rounded border border-ink-800 bg-ink-950/50 px-2 py-1 text-center">
       <p className="text-[9px] font-mono uppercase tracking-wider text-ink-500">{label}</p>
@@ -247,10 +284,17 @@ function Chip({ label, value, color = 'text-ink-300' }) {
 // Main panel
 // ---------------------------------------------------------------------------
 
+interface ClothSimRiggedPanelProps {
+  /** Output from cloth_sim_on_rigged_character */
+  result?: RiggedData | string | null
+  content?: string
+  className?: string
+}
+
 /**
  * ClothSimRiggedPanel — renders cloth-on-rigged-character simulation results.
  */
-export default function ClothSimRiggedPanel({ result = null, content, className = '' }) {
+export default function ClothSimRiggedPanel({ result = null, content, className = '' }: ClothSimRiggedPanelProps) {
   const [frameIdx, setFrameIdx] = useState(0)
 
   const effectiveResult = useMemo(() => {

@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import SolarPVPanel from './SolarPVPanel.jsx'
+import SolarPVPanel from './SolarPVPanel'
 
 // ---------------------------------------------------------------------------
 // Fixtures — synthetic I-V data for a 60-cell STC module

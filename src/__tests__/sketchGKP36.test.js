@@ -87,8 +87,14 @@ describe('GK-P36 — collinear constraint', () => {
     const wrapper = await make_gcs_wrapper.mock.results[make_gcs_wrapper.mock.results.length - 1].value
     const polPrim = wrapper.primitives.find((p) => p.type === 'point_on_line_ppp')
     expect(polPrim).toBeDefined()
+    // T-560: these previously asserted `p1_id`/`p2_id`. Those were the WRONG
+    // parameter names — planegcs's real PointOnLine_PPP declares
+    // `p_id`/`lp1_id`/`lp2_id` (planegcs_dist/constraints.ts:109), and against
+    // the real wasm wrapper the old names throw "unhandled parameter lp1_id".
+    // This test passed anyway because it mocks @salusoft89/planegcs wholesale,
+    // so it was asserting the bug rather than the contract. Fixed with the code.
     expect(polPrim.p_id).toBe('pc')
-    expect(polPrim.p1_id).toBe('pa')
-    expect(polPrim.p2_id).toBe('pb')
+    expect(polPrim.lp1_id).toBe('pa')
+    expect(polPrim.lp2_id).toBe('pb')
   })
 })

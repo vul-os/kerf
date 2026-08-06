@@ -705,15 +705,20 @@ function buildPlanegcsPrimitives(sketch: SketchJSON): PlanegcsPrimitives {
             (entB.type === 'circle' || entB.type === 'arc')) {
           const rType = (entA.type === 'arc' && entB.type === 'arc')
             ? 'equal_radius_aa' : 'equal_radius_cc'
-          // NOTE (found during T-503 typing, not fixed — out of migration scope):
-          // when rType is 'equal_radius_aa' the real EqualRadius_AA constraint
-          // wants a1_id/a2_id (verified against constraint_param_index.js), but
-          // this has always pushed c1_id/c2_id regardless of rType — a second
-          // pre-existing field-name mismatch, invisible because every test that
-          // exercises symmetric_over_line on two arcs mocks the planegcs module.
-          constraints.push({
-            id: nextId(), type: rType, c1_id: c.entity_a_id, c2_id: c.entity_b_id,
-          } as unknown as GcsConstraint)
+          // T-560: EqualRadius_AA (arc/arc) declares a1_id/a2_id, while
+          // EqualRadius_CC (circle/circle) declares c1_id/c2_id (verified
+          // against planegcs_dist/constraints.ts:587-594,623-630) — the two
+          // constraint kinds use different field names for the same pair of
+          // entities, so the push must branch on rType.
+          if (rType === 'equal_radius_aa') {
+            constraints.push({
+              id: nextId(), type: 'equal_radius_aa', a1_id: c.entity_a_id, a2_id: c.entity_b_id,
+            })
+          } else {
+            constraints.push({
+              id: nextId(), type: 'equal_radius_cc', c1_id: c.entity_a_id, c2_id: c.entity_b_id,
+            })
+          }
         }
         break
       }
@@ -867,25 +872,16 @@ function buildPlanegcsPrimitives(sketch: SketchJSON): PlanegcsPrimitives {
       // constraints (p1 on p2-p3, and p2 on p1-p3), but one is the canonical form.
       case 'collinear': {
         if (c.p1 && c.p2 && c.p3) {
-          // NOTE (found during T-503 typing, not fixed — out of migration scope):
-          // the real @salusoft89/planegcs `PointOnLine_PPP` constraint expects
-          // `lp1_id`/`lp2_id` (verified against its shipped
-          // planegcs_dist/constraint_param_index.js, which keys the wasm
-          // dispatch by those exact names), but this call — and the
-          // 'bezier_tangent'/'bezier_g1'/'bezier_g2' cases below — have always
-          // pushed `p1_id`/`p2_id` instead. Every test that exercises this path
-          // mocks '@salusoft89/planegcs' wholesale (e.g. sketchGKP36.test.js),
-          // so the mismatch has never been caught: against the real wrapper
-          // this throws "unhandled parameter lp1_id type: object_id". Left
-          // as-is — fixing constraint semantics is a behaviour change outside
-          // a migration slice's scope.
+          // T-560: the real @salusoft89/planegcs `PointOnLine_PPP` constraint
+          // declares `lp1_id`/`lp2_id` (planegcs_dist/constraints.ts:109-117),
+          // not `p1_id`/`p2_id`.
           constraints.push({
             id: nextId(),
             type: 'point_on_line_ppp',
             p_id: resolve(c.p1),
-            p1_id: resolve(c.p2),
-            p2_id: resolve(c.p3),
-          } as unknown as GcsConstraint)
+            lp1_id: resolve(c.p2),
+            lp2_id: resolve(c.p3),
+          })
         }
         break
       }
@@ -991,17 +987,15 @@ function buildPlanegcsPrimitives(sketch: SketchJSON): PlanegcsPrimitives {
         if (c.p0 && c.p1 && c.p2) {
           // p1 (junction point) lies on the line through p0 and p2 (the
           // tangent-handle control points of the two adjacent Bezier segments).
-          // See the 'collinear' case above: this pushes `p1_id`/`p2_id`, but the
-          // real planegcs `point_on_line_ppp` reads `lp1_id`/`lp2_id` — the same
-          // pre-existing field-name mismatch, left unfixed (behaviour change,
-          // out of migration scope).
+          // T-560: real planegcs `point_on_line_ppp` reads `lp1_id`/`lp2_id`,
+          // not `p1_id`/`p2_id` — see the 'collinear' case above.
           constraints.push({
             id: nextId(),
             type: 'point_on_line_ppp',
             p_id: resolve(c.p1),
-            p1_id: resolve(c.p0),
-            p2_id: resolve(c.p2),
-          } as unknown as GcsConstraint)
+            lp1_id: resolve(c.p0),
+            lp2_id: resolve(c.p2),
+          })
         }
         break
       }
@@ -1030,14 +1024,14 @@ function buildPlanegcsPrimitives(sketch: SketchJSON): PlanegcsPrimitives {
         const { p_minus2: _p_minus2, p_minus1, p_junction, p_plus1, p_plus2: _p_plus2 } = c
         if (p_minus1 && p_junction && p_plus1) {
           // G1: collinearity of p_minus1—p_junction—p_plus1.
-          // Same pre-existing p1_id/p2_id vs. lp1_id/lp2_id mismatch as above.
+          // T-560: same lp1_id/lp2_id field-name fix as above.
           constraints.push({
             id: nextId(),
             type: 'point_on_line_ppp',
             p_id: resolve(p_junction),
-            p1_id: resolve(p_minus1),
-            p2_id: resolve(p_plus1),
-          } as unknown as GcsConstraint)
+            lp1_id: resolve(p_minus1),
+            lp2_id: resolve(p_plus1),
+          })
           // C2 equal-chord: compute chord lengths from current geometry and pin both.
           const m1 = ent.find((x) => x.id === p_minus1) as (SketchEntity & { x?: number; y?: number }) | undefined
           const jn = ent.find((x) => x.id === p_junction) as (SketchEntity & { x?: number; y?: number }) | undefined

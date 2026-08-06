@@ -18,16 +18,36 @@
  */
 
 import { useEffect } from 'react';
+import type { RefObject } from 'react';
 import * as THREE from 'three';
 import { dispatchGizmo } from '../lib/lightGizmoBuilders.js';
 
 /**
- * @param {object}   props
- * @param {object[]} props.lights    - Array of light objects from doc.lights.
- * @param {object}   props.groupRef  - React ref holding the THREE.Group to populate.
- * @param {Function} props.onSelect  - Callback (id: string) => void fired on click.
+ * A light entry from the render-doc `doc.lights` array. Not modeled in `src/types/` yet — the
+ * union of fields every `lightGizmoBuilders.ts` builder reads (`direction`/`position`/`size_mm`/
+ * `angle` are each only used by their own light `kind`, so all but `id`/`kind` are optional here).
  */
-export function LightGizmos({ lights = [], groupRef, onSelect }) {
+export interface GizmoLight {
+  id: string;
+  kind: 'sun' | 'area' | 'point' | 'spot';
+  direction?: [number, number, number];
+  position?: [number, number, number];
+  size_mm?: number;
+  angle?: number;
+}
+
+export interface LightGizmosProps {
+  /** Array of light objects from doc.lights. */
+  lights?: GizmoLight[];
+  /** React ref holding the THREE.Group to populate. */
+  groupRef: RefObject<THREE.Group | null>;
+  /** Callback fired on click with the selected light id. */
+  onSelect: (id: string) => void;
+}
+
+// `onSelect` is accepted but never read here (pre-existing; see hitTestGizmoGroup below, which is
+// the actual click-dispatch path — this component only manages the THREE.Group side-effect).
+export function LightGizmos({ lights = [], groupRef, onSelect: _onSelect }: LightGizmosProps) {
   useEffect(() => {
     const group = groupRef?.current;
     if (!group) return;
@@ -64,19 +84,33 @@ export function LightGizmos({ lights = [], groupRef, onSelect }) {
  * Raycasts against all gizmo objects in `group`, finds the closest hit,
  * and calls `onSelect(lightId)`.
  *
- * @param {THREE.Raycaster} raycaster
- * @param {THREE.Group}     group       - The group passed to LightGizmos.
- * @param {Function}        onSelect    - Callback (id: string) => void.
- * @returns {boolean} True if a gizmo was hit.
+ * The `raycaster` parameter only needs `intersectObjects` — narrowed to that instead of the full
+ * `THREE.Raycaster` class so tests can pass a minimal fake without satisfying every unrelated
+ * raycaster field.
+ * @param raycaster
+ * @param group       - The group passed to LightGizmos.
+ * @param onSelect    - Callback (id: string) => void.
+ * @returns True if a gizmo was hit.
  */
-export function hitTestGizmoGroup(raycaster, group, onSelect) {
+export interface GizmoRaycaster {
+  intersectObjects(objects: THREE.Object3D[], recursive?: boolean): THREE.Intersection[];
+}
+
+// Pre-existing: this file exports a non-component utility alongside the LightGizmos component,
+// which breaks Vite Fast Refresh for this module; not a behavior change for this slice.
+// eslint-disable-next-line react-refresh/only-export-components
+export function hitTestGizmoGroup(
+  raycaster: GizmoRaycaster | null | undefined,
+  group: THREE.Group | null | undefined,
+  onSelect: ((id: string) => void) | null | undefined,
+): boolean {
   if (!raycaster || !group) return false;
 
   const intersects = raycaster.intersectObjects(group.children, /* recursive */ true);
   if (intersects.length === 0) return false;
 
   // Walk up to find the gizmo root (which holds userData.lightId)
-  let obj = intersects[0].object;
+  let obj: THREE.Object3D | null = intersects[0].object;
   while (obj && !obj.userData?.lightId && obj.parent !== group) {
     obj = obj.parent;
   }

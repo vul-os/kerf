@@ -1,5 +1,5 @@
 /**
- * LightGizmos.test.jsx — Vitest assertions for the LightGizmos component
+ * LightGizmos.test.tsx — Vitest assertions for the LightGizmos component
  * and its hitTestGizmoGroup utility.
  *
  * Pure logic tests — no React DOM rendering required. The component itself
@@ -12,20 +12,20 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
-import { hitTestGizmoGroup } from './LightGizmos.jsx';
+import { hitTestGizmoGroup, type GizmoLight } from './LightGizmos.jsx';
 import { dispatchGizmo, buildSunGizmo, buildPointGizmo } from '../lib/lightGizmoBuilders.js';
 
 // ── fixture helpers ───────────────────────────────────────────────────────────
 
-function sunLight(id = 'sun-1') {
+function sunLight(id = 'sun-1'): GizmoLight & { intensity: number; color: string } {
   return { id, kind: 'sun', direction: [0, 0, -1], intensity: 5, color: '#ffffff' };
 }
 
-function pointLight(id = 'pt-1') {
+function pointLight(id = 'pt-1'): GizmoLight & { intensity: number; color: string } {
   return { id, kind: 'point', position: [0, 0, 0], intensity: 3, color: '#ffcc00' };
 }
 
-function makeGroupWithGizmos(lights) {
+function makeGroupWithGizmos(lights: GizmoLight[]): THREE.Group {
   const group = new THREE.Group();
   for (const light of lights) {
     group.add(dispatchGizmo(light));
@@ -144,7 +144,7 @@ describe('gizmo group population', () => {
   });
 
   it('each gizmo child is a THREE.Group', () => {
-    const lights = [
+    const lights: GizmoLight[] = [
       { id: 'a', kind: 'sun', direction: [1, 0, 0] },
       { id: 'b', kind: 'area', position: [0, 0, 0], size_mm: 500 },
       { id: 'c', kind: 'point', position: [0, 0, 0] },

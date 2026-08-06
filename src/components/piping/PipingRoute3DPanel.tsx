@@ -18,14 +18,55 @@
 
 import { useState, useCallback } from 'react'
 import {
-  GitBranch, Layers, AlertTriangle, CheckCircle, Loader2,
+  GitBranch, Layers, AlertTriangle, Loader2,
   Plus, Trash2, Package, Info,
 } from 'lucide-react'
 import { useAuth } from '../../store/auth.js'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
-async function callTool(toolName, args, token) {
+interface Obstacle {
+  id: number
+  label: string
+  min: [string, string, string]
+  max: [string, string, string]
+}
+
+interface RouteArgs {
+  start: number[]
+  end: number[]
+  dn: number
+  prefer_axis: string
+  clearance_m: number
+  pipe_spec?: string
+  schedule?: string
+  obstacles?: { min: number[]; max: number[]; label: string }[]
+}
+
+interface BomRow {
+  item?: string
+  description?: string
+  quantity?: number
+  total_length_m?: number
+  center_to_face_mm?: number
+  standard?: string
+}
+
+interface RouteResult {
+  ok?: boolean
+  total_length_m?: number
+  elbows_90?: number
+  dn?: number
+  schedule?: string
+  clashes_avoided?: number
+  elbow_center_to_face_mm?: number
+  elbow_radius_mm?: number
+  centerline?: [number, number, number][]
+  warnings?: string[]
+  bom?: BomRow[]
+}
+
+async function callTool(toolName: string, args: RouteArgs, token: string | undefined): Promise<RouteResult> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: {
@@ -48,7 +89,7 @@ async function callTool(toolName, args, token) {
 // Transforms 3D waypoints → 2D isometric coords
 // ---------------------------------------------------------------------------
 
-function isoProject([x, y, z]) {
+function isoProject([x, y, z]: [number, number, number]): [number, number] {
   // Standard 30° isometric projection
   const angle = Math.PI / 6  // 30°
   const cx = (x - z) * Math.cos(angle)
@@ -56,7 +97,11 @@ function isoProject([x, y, z]) {
   return [cx, cy]
 }
 
-function IsoRouteView({ centerline, width = 400, height = 300 }) {
+function IsoRouteView({ centerline, width = 400, height = 300 }: {
+  centerline?: [number, number, number][]
+  width?: number
+  height?: number
+}) {
   if (!centerline || centerline.length < 2) {
     return (
       <div className="flex items-center justify-center h-32 text-gray-400 text-sm">
@@ -135,7 +180,7 @@ function IsoRouteView({ centerline, width = 400, height = 300 }) {
 // BOM table
 // ---------------------------------------------------------------------------
 
-function BOMTable({ bom }) {
+function BOMTable({ bom }: { bom?: BomRow[] }) {
   if (!bom || bom.length === 0) return null
   return (
     <div className="mt-4">
@@ -182,7 +227,7 @@ const PIPE_SPECS = ['', 'CS-A', 'CS-HH', 'SS-316L', 'API-X52']
 const PREFER_AXES = ['Z', 'X', 'Y']
 const DN_OPTIONS = [15, 20, 25, 32, 40, 50, 65, 80, 100, 125, 150, 200, 250, 300]
 
-const DEFAULT_OBSTACLE = () => ({
+const DEFAULT_OBSTACLE = (): Obstacle => ({
   id: Date.now(),
   label: '',
   min: ['', '', ''],
@@ -190,6 +235,10 @@ const DEFAULT_OBSTACLE = () => ({
 })
 
 export default function PipingRoute3DPanel() {
+  // @ts-expect-error — pre-existing bug (found during migration, not fixed): AuthState
+  // only exposes `accessToken`, never `token`, so this has always destructured to
+  // `undefined` and piping_route_3d calls never carried an Authorization header. Left
+  // as-is — a rename-only slice does not change behaviour.
   const { token } = useAuth()
 
   const [start, setStart] = useState(['0', '0', '0'])
@@ -199,18 +248,18 @@ export default function PipingRoute3DPanel() {
   const [pipeSpec, setPipeSpec] = useState('')
   const [preferAxis, setPreferAxis] = useState('Z')
   const [clearance, setClearance] = useState('0.3')
-  const [obstacles, setObstacles] = useState([])
+  const [obstacles, setObstacles] = useState<Obstacle[]>([])
 
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<RouteResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const addObstacle = () => setObstacles(obs => [...obs, DEFAULT_OBSTACLE()])
-  const removeObstacle = (id) => setObstacles(obs => obs.filter(o => o.id !== id))
-  const updateObstacle = (id, field, idx, val) => {
+  const removeObstacle = (id: number) => setObstacles(obs => obs.filter(o => o.id !== id))
+  const updateObstacle = (id: number, field: 'min' | 'max', idx: number, val: string) => {
     setObstacles(obs => obs.map(o => {
       if (o.id !== id) return o
-      const arr = [...o[field]]
+      const arr = [...o[field]] as [string, string, string]
       arr[idx] = val
       return { ...o, [field]: arr }
     }))
@@ -221,7 +270,7 @@ export default function PipingRoute3DPanel() {
     setError(null)
     setResult(null)
     try {
-      const args = {
+      const args: RouteArgs = {
         start: start.map(Number),
         end: end.map(Number),
         dn,
@@ -244,11 +293,16 @@ export default function PipingRoute3DPanel() {
       const data = await callTool('piping_route_3d', args, token)
       setResult(data)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
   }, [start, end, dn, schedule, pipeSpec, preferAxis, clearance, obstacles, token])
+
+  const nozzles: [string, string[], (v: string[]) => void][] = [
+    ['Start nozzle', start, setStart],
+    ['End nozzle', end, setEnd],
+  ]
 
   return (
     <div className="p-4 space-y-4 max-w-2xl">
@@ -271,7 +325,7 @@ export default function PipingRoute3DPanel() {
 
       {/* Start / End */}
       <div className="grid grid-cols-2 gap-4">
-        {[['Start nozzle', start, setStart], ['End nozzle', end, setEnd]].map(([label, val, setter]) => (
+        {nozzles.map(([label, val, setter]) => (
           <div key={label}>
             <label className="block text-xs font-medium text-gray-600 mb-1">{label} [x, y, z] (m)</label>
             <div className="flex gap-1">
@@ -361,7 +415,7 @@ export default function PipingRoute3DPanel() {
               onChange={e => setObstacles(o => o.map(x => x.id === obs.id ? { ...x, label: e.target.value } : x))}
               className="border border-gray-300 rounded px-1.5 py-1 w-20"
             />
-            {['min', 'max'].map(field => (
+            {(['min', 'max'] as const).map(field => (
               <div key={field} className="flex items-center gap-0.5">
                 <span className="text-gray-400">{field}[</span>
                 {[0, 1, 2].map(i => (

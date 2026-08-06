@@ -13,10 +13,11 @@
  */
 
 import { useState, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import {
   Gauge, Layers, Activity, Package,
   Plus, Trash2, Calculator, Loader2, AlertTriangle,
-  ChevronDown, ChevronRight, CheckCircle, XCircle,
+  CheckCircle, XCircle,
 } from 'lucide-react'
 import { useAuth } from '../../store/auth.js'
 
@@ -26,7 +27,13 @@ const API_URL = import.meta.env.VITE_API_URL || ''
 // Tool dispatch
 // ---------------------------------------------------------------------------
 
-async function callTool(toolName, args, token) {
+/**
+ * Response shapes below are `Record<string, unknown>`-flavoured (`[key: string]: unknown`)
+ * rather than fully enumerated: these are `/api/tools/call` JSON responses this panel reads
+ * defensively (optional-chained) and the backend tool schemas live in the Python packages,
+ * out of this slice's scope. Enumerated the fields this file actually reads.
+ */
+async function callTool<T = unknown>(toolName: string, args: Record<string, unknown>, token: string | null | undefined): Promise<T> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: {
@@ -48,7 +55,7 @@ async function callTool(toolName, args, token) {
 // Client-side Colebrook-White (mirrors asme_pressure.py)
 // ---------------------------------------------------------------------------
 
-function colebrook(re, epsD) {
+function colebrook(re: number, epsD: number): number {
   if (re < 2100) return 64 / re
   // Swamee-Jain initial guess
   let f = 0.25 / (Math.log10(epsD / 3.7 + 5.74 / Math.pow(re, 0.9))) ** 2
@@ -74,14 +81,14 @@ const GPM_TO_FT3S = 0.133681 / 60
 const G_C = 32.174
 const PSF_TO_PSI = 1 / 144
 
-const FLUID_PROPS = {
+const FLUID_PROPS: Record<string, { rho: number; mu: number }> = {
   water: { rho: 62.37, mu: 6.720e-4 },
   oil:   { rho: 53.0,  mu: 2.016e-3 },
   air:   { rho: 0.0752, mu: 1.22e-5 },
   steam: { rho: 0.0372, mu: 6.60e-6 },
 }
 
-function darcyLoss(diam_in, len_ft, flow_gpm, fluid = 'water', roughness = 0.00015) {
+function darcyLoss(diam_in: number, len_ft: number, flow_gpm: number, fluid = 'water', roughness = 0.00015): number {
   if (!flow_gpm || !len_ft) return 0
   const { rho, mu } = FLUID_PROPS[fluid] || FLUID_PROPS.water
   const d_ft = diam_in / 12
@@ -95,7 +102,7 @@ function darcyLoss(diam_in, len_ft, flow_gpm, fluid = 'water', roughness = 0.000
   return dp_psf * PSF_TO_PSI
 }
 
-const FITTING_K = {
+const FITTING_K: Record<string, number> = {
   '90_elbow_welded': 0.30,
   '45_elbow_welded': 0.20,
   '90_elbow_threaded': 0.50,
@@ -108,7 +115,7 @@ const FITTING_K = {
   'butterfly_valve_open': 0.30,
 }
 
-function kToPsi(k, diam_in, flow_gpm, fluid = 'water') {
+function kToPsi(k: number, diam_in: number, flow_gpm: number, fluid = 'water'): number {
   if (!flow_gpm || !k) return 0
   const { rho } = FLUID_PROPS[fluid] || FLUID_PROPS.water
   const d_ft = diam_in / 12
@@ -122,11 +129,17 @@ function kToPsi(k, diam_in, flow_gpm, fluid = 'water') {
 // Shared UI atoms
 // ---------------------------------------------------------------------------
 
-function Label({ children }) {
+function Label({ children }: { children: ReactNode }) {
   return <span className="text-[10px] text-ink-500">{children}</span>
 }
 
-function NumInput({ value, onChange, step = 'any', min, placeholder }) {
+function NumInput({ value, onChange, step = 'any', min, placeholder }: {
+  value: string
+  onChange: (value: string) => void
+  step?: string | number
+  min?: string | number
+  placeholder?: string
+}) {
   return (
     <input
       type="number" value={value} step={step} min={min}
@@ -137,7 +150,11 @@ function NumInput({ value, onChange, step = 'any', min, placeholder }) {
   )
 }
 
-function Sel({ value, onChange, options }) {
+function Sel({ value, onChange, options }: {
+  value: string
+  onChange: (value: string) => void
+  options: [string, string][]
+}) {
   return (
     <select value={value} onChange={e => onChange(e.target.value)}
       className="bg-ink-900 border border-ink-700 rounded px-2 py-1 text-[11px] text-ink-100 w-full focus:outline-none focus:border-kerf-300/60">
@@ -146,7 +163,12 @@ function Sel({ value, onChange, options }) {
   )
 }
 
-function ResultRow({ label, value, unit, highlight }) {
+function ResultRow({ label, value, unit, highlight }: {
+  label: string
+  value: ReactNode
+  unit?: string
+  highlight?: boolean
+}) {
   return (
     <div className="flex justify-between items-center">
       <span className="text-[10px] text-ink-500">{label}</span>
@@ -157,14 +179,19 @@ function ResultRow({ label, value, unit, highlight }) {
   )
 }
 
-function ComplianceBadge({ compliant }) {
+function ComplianceBadge({ compliant }: { compliant?: boolean | null }) {
   if (compliant === undefined || compliant === null) return null
   return compliant
     ? <span className="flex items-center gap-1 text-[10px] text-green-400"><CheckCircle size={10} /> Pass</span>
     : <span className="flex items-center gap-1 text-[10px] text-red-400"><XCircle size={10} /> Fail</span>
 }
 
-function CalcBtn({ onClick, loading, disabled, label = 'Calculate' }) {
+function CalcBtn({ onClick, loading, disabled, label = 'Calculate' }: {
+  onClick: () => void
+  loading?: boolean
+  disabled?: boolean
+  label?: string
+}) {
   return (
     <button type="button" onClick={onClick}
       disabled={loading || disabled}
@@ -175,7 +202,7 @@ function CalcBtn({ onClick, loading, disabled, label = 'Calculate' }) {
   )
 }
 
-function ErrBox({ msg }) {
+function ErrBox({ msg }: { msg?: string | null }) {
   if (!msg) return null
   return (
     <div className="flex items-start gap-2 p-2 rounded bg-red-950/40 border border-red-700/40 text-red-300 text-[11px]">
@@ -189,24 +216,66 @@ function ErrBox({ msg }) {
 // Tab 1 — Pressure Drop
 // ---------------------------------------------------------------------------
 
+/** Prop shared by every tab: the auth access token (may be absent when logged out). */
+interface TabProps {
+  token: string | null
+}
+
+interface PipeSegmentInput {
+  id: number
+  diam_in: string
+  len_ft: string
+  roughness: string
+  fluid: string
+}
+
+interface FittingInput {
+  id: number
+  kind: string
+  diam_in: string
+  qty: string
+}
+
+interface SegmentDetail {
+  diameter_in: number
+  length_ft: number
+  dp_psi: number
+}
+
+interface FittingDetail {
+  fitting_kind: string
+  diameter_in: number
+  quantity: number
+  K: number
+  dp_psi: number
+}
+
+interface PressureDropResult {
+  total_dp_psi: number
+  pipe_dp_psi: number
+  fitting_dp_psi: number
+  segment_details?: SegmentDetail[]
+  fitting_details?: FittingDetail[]
+}
+
 let _segId = 0
 const mkId = () => ++_segId
 
-const DEFAULT_SEGMENT = () => ({
+const DEFAULT_SEGMENT = (): PipeSegmentInput => ({
   id: mkId(), diam_in: '4', len_ft: '100', roughness: '0.00015', fluid: '',
 })
-const DEFAULT_FITTING = () => ({
+const DEFAULT_FITTING = (): FittingInput => ({
   id: mkId(), kind: '90_elbow_welded', diam_in: '4', qty: '1',
 })
 
-function PressureDropTab({ token }) {
+function PressureDropTab({ token }: TabProps) {
   const [fluid,    setFluid]    = useState('water')
   const [flowGpm,  setFlowGpm]  = useState('100')
-  const [segments, setSegments] = useState([DEFAULT_SEGMENT()])
-  const [fittings, setFittings] = useState([])
-  const [result,   setResult]   = useState(null)
+  const [segments, setSegments] = useState<PipeSegmentInput[]>([DEFAULT_SEGMENT()])
+  const [fittings, setFittings] = useState<FittingInput[]>([])
+  const [result,   setResult]   = useState<PressureDropResult | null>(null)
   const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState(null)
+  const [error,    setError]    = useState<string | null>(null)
 
   const calc = useCallback(async () => {
     setLoading(true); setError(null)
@@ -223,7 +292,7 @@ function PressureDropTab({ token }) {
     }))
     try {
       // Backend first
-      const r = await callTool('piping_pressure_drop', {
+      const r = await callTool<PressureDropResult>('piping_pressure_drop', {
         segments: segs, fittings: fits,
         flow_gpm: parseFloat(flowGpm), fluid,
       }, token)
@@ -275,7 +344,7 @@ function PressureDropTab({ token }) {
             <Plus size={10} /> Add
           </button>
         </div>
-        {segments.map((seg, i) => (
+        {segments.map((seg) => (
           <div key={seg.id} className="grid grid-cols-4 gap-1.5 items-end border border-ink-800 rounded p-1.5">
             <label className="flex flex-col gap-0.5">
               <Label>ID (in)</Label>
@@ -362,7 +431,17 @@ function PressureDropTab({ token }) {
 // Tab 2 — Wall Thickness (ASME B31.1)
 // ---------------------------------------------------------------------------
 
-function WallThicknessTab({ token }) {
+interface WallThicknessResult {
+  error?: string
+  min_thickness_in?: number
+  ordered_min_thickness_in?: number
+  schedule_recommended?: string
+  design_pressure_max_psi?: number
+  allowable_stress_psi?: number
+  y_coefficient?: number
+}
+
+function WallThicknessTab({ token }: TabProps) {
   const [pressure, setPressure] = useState('300')
   const [diam,     setDiam]     = useState('4')
   const [material, setMaterial] = useState('A106-B')
@@ -370,14 +449,14 @@ function WallThicknessTab({ token }) {
   const [jointEff, setJointEff] = useState('1.0')
   const [corrAll,  setCorrAll]  = useState('0.0625')
   const [millTol,  setMillTol]  = useState('12.5')
-  const [result,   setResult]   = useState(null)
+  const [result,   setResult]   = useState<WallThicknessResult | null>(null)
   const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState(null)
+  const [error,    setError]    = useState<string | null>(null)
 
   const calc = useCallback(async () => {
     setLoading(true); setError(null)
     try {
-      const r = await callTool('piping_min_wall_thickness', {
+      const r = await callTool<WallThicknessResult>('piping_min_wall_thickness', {
         pressure_psi: parseFloat(pressure),
         diameter_in:  parseFloat(diam),
         material,
@@ -450,7 +529,31 @@ function WallThicknessTab({ token }) {
 // Tab 3 — Pipe Stress (ASME B31.1)
 // ---------------------------------------------------------------------------
 
-function PipeStressTab({ token }) {
+interface StressComponent {
+  compliant?: boolean
+  calculated_psi?: number
+  allowable_psi?: number
+  utilisation: number
+  details?: {
+    hoop_stress_psi?: number
+    bending_stress_psi?: number
+  }
+}
+
+interface ThermalComponent {
+  thermal_force_lbf?: number
+  thermal_stress_psi?: number
+  free_expansion_in_per_ft?: number
+  compliant_note?: string
+}
+
+interface PipeStressResult {
+  sustained?: StressComponent
+  thermal?: ThermalComponent
+  occasional?: StressComponent
+}
+
+function PipeStressTab({ token }: TabProps) {
   const [od,       setOd]       = useState('4.5')
   const [wall,     setWall]     = useState('0.237')
   const [pressure, setPressure] = useState('150')
@@ -460,14 +563,14 @@ function PipeStressTab({ token }) {
   const [code,     setCode]     = useState('B31.1')
   const [dT,       setDT]       = useState('0')
   const [mOcc,     setMOcc]     = useState('0')
-  const [result,   setResult]   = useState(null)
+  const [result,   setResult]   = useState<PipeStressResult | null>(null)
   const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState(null)
+  const [error,    setError]    = useState<string | null>(null)
 
   const calc = useCallback(async () => {
     setLoading(true); setError(null)
     try {
-      const r = await callTool('piping_pipe_stress', {
+      const r = await callTool<PipeStressResult>('piping_pipe_stress', {
         od_in: parseFloat(od),
         wall_in: parseFloat(wall),
         pressure_psi: parseFloat(pressure),
@@ -580,7 +683,29 @@ function PipeStressTab({ token }) {
 // Tab 4 — B16 Fittings (ASME B16.9 / B16.5)
 // ---------------------------------------------------------------------------
 
-function B16FittingsTab({ token }) {
+interface FlangeRating {
+  rating_psi?: number
+  rating_bar?: number
+  note?: string
+}
+
+interface FittingBomItem {
+  description?: string
+  fitting_type?: string
+  quantity?: number
+  center_to_face_mm?: number
+  overall_length_mm?: number
+  standard?: string
+  error?: string
+}
+
+interface B16FittingsResult {
+  flange_rating?: FlangeRating
+  total_weight_kg?: number
+  bom?: FittingBomItem[]
+}
+
+function B16FittingsTab({ token }: TabProps) {
   const [dn,         setDn]         = useState('100')
   const [e90lr,      setE90lr]      = useState('2')
   const [e45,        setE45]        = useState('0')
@@ -589,14 +714,14 @@ function B16FittingsTab({ token }) {
   const [flangeClass,setFlangeClass]= useState('150')
   const [flanges,    setFlanges]    = useState('2')
   const [tempF,      setTempF]      = useState('100')
-  const [result,     setResult]     = useState(null)
+  const [result,     setResult]     = useState<B16FittingsResult | null>(null)
   const [loading,    setLoading]    = useState(false)
-  const [error,      setError]      = useState(null)
+  const [error,      setError]      = useState<string | null>(null)
 
   const calc = useCallback(async () => {
     setLoading(true); setError(null)
     try {
-      const r = await callTool('piping_b16_fittings', {
+      const r = await callTool<B16FittingsResult>('piping_b16_fittings', {
         dn: parseInt(dn, 10),
         elbows_90lr: parseInt(e90lr, 10) || 0,
         elbows_45:   parseInt(e45, 10) || 0,
@@ -702,18 +827,20 @@ function B16FittingsTab({ token }) {
 // Main PipingDesignPanel
 // ---------------------------------------------------------------------------
 
-const TABS = [
+type TabId = 'pressure' | 'wall' | 'stress' | 'fittings'
+
+const TABS: { id: TabId; label: string; Icon: typeof Gauge }[] = [
   { id: 'pressure',  label: 'Pressure Drop',  Icon: Gauge   },
   { id: 'wall',      label: 'Wall Thickness', Icon: Layers  },
   { id: 'stress',    label: 'Pipe Stress',    Icon: Activity },
   { id: 'fittings',  label: 'B16 Fittings',  Icon: Package  },
 ]
 
-export default function PipingDesignPanel({ content }) { // eslint-disable-line no-unused-vars
+export default function PipingDesignPanel({ content: _content }: { content?: string }) {
   // content is accepted for registry compatibility (JSON string); this panel
   // is fully self-contained so content is currently not applied to state.
   const { accessToken } = useAuth()
-  const [activeTab, setActiveTab] = useState('pressure')
+  const [activeTab, setActiveTab] = useState<TabId>('pressure')
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0 text-xs">

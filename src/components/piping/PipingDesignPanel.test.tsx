@@ -12,7 +12,6 @@
  */
 
 import { describe, it, expect, vi } from 'vitest'
-import { renderToStaticMarkup } from 'react-dom/server'
 
 // ---------------------------------------------------------------------------
 // Mock auth store (required by PipingDesignPanel via useAuth hook)
@@ -37,12 +36,12 @@ const GPM_TO_FT3S = 0.133681 / 60
 const G_C = 32.174
 const PSF_TO_PSI = 1 / 144
 
-const FLUID_PROPS = {
+const FLUID_PROPS: Record<string, { rho: number; mu: number }> = {
   water: { rho: 62.37, mu: 6.720e-4 },
   oil:   { rho: 53.0,  mu: 2.016e-3 },
 }
 
-function colebrook(re, epsD) {
+function colebrook(re: number, epsD: number): number {
   if (re < 2100) return 64 / re
   let f = 0.25 / (Math.log10(epsD / 3.7 + 5.74 / Math.pow(re, 0.9))) ** 2
   for (let i = 0; i < 50; i++) {
@@ -63,7 +62,7 @@ function colebrook(re, epsD) {
   return f
 }
 
-function darcyLoss(diam_in, len_ft, flow_gpm, fluid = 'water', roughness = 0.00015) {
+function darcyLoss(diam_in: number, len_ft: number, flow_gpm: number, fluid = 'water', roughness = 0.00015): number {
   if (!flow_gpm || !len_ft) return 0
   const { rho, mu } = FLUID_PROPS[fluid]
   const d_ft = diam_in / 12
@@ -188,13 +187,13 @@ describe('PipingDesignPanel — Crane TP-410 K constants', () => {
   })
 
   it('all K values are positive', () => {
-    for (const [key, k] of Object.entries(FITTING_K)) {
+    for (const [, k] of Object.entries(FITTING_K)) {
       expect(k).toBeGreaterThan(0)
     }
   })
 
   it('all K values are finite', () => {
-    for (const [key, k] of Object.entries(FITTING_K)) {
+    for (const [, k] of Object.entries(FITTING_K)) {
       expect(isFinite(k)).toBe(true)
     }
   })

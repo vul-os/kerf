@@ -24,6 +24,7 @@
  */
 
 import { useState, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import {
   Layers, AlertTriangle, CheckCircle, Loader2, Plus, Trash2,
   Package, Info, Eye, BarChart3,
@@ -32,7 +33,76 @@ import { useAuth } from '../../store/auth.js'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
-async function callTool(toolName, args, token) {
+type Discipline = 'structural' | 'hvac' | 'piping' | 'civil' | 'equipment' | 'electrical' | 'instrument'
+
+interface Element {
+  element_id: string
+  discipline: Discipline
+  bbox_min: number[]
+  bbox_max: number[]
+  label?: string
+  system?: string
+  material?: string
+  quantity?: number
+  unit?: string
+  weight_kg?: number
+  unit_cost?: number
+}
+
+interface CoordinationArgs {
+  project_id: string
+  elements: {
+    element_id: string
+    discipline: Discipline
+    bbox_min: number[]
+    bbox_max: number[]
+    label?: string
+    material?: string
+    weight_kg: number
+    quantity: number
+    unit: string
+    unit_cost: number
+  }[]
+}
+
+interface Clash {
+  clash_type: 'hard' | 'soft'
+  severity?: 'critical' | 'major' | 'minor'
+  element_a: string
+  element_b: string
+  gap_m: number
+  overlap_volume_m3?: number
+  shortfall_m?: number
+  required_clearance_m: number
+  location_m?: number[]
+}
+
+interface BomItem {
+  label?: string
+  element_id?: string
+  material?: string
+  weight_kg?: number
+  quantity?: number
+  total_cost?: number
+}
+
+interface ZoneInfo {
+  element_count: number
+}
+
+interface CoordinationResult {
+  error?: string
+  total_elements?: number
+  hard_clash_count?: number
+  soft_clash_count?: number
+  clashes_by_pair?: Record<string, Clash[]>
+  bom_by_discipline?: Record<string, BomItem[]>
+  zone_summary?: Record<string, ZoneInfo>
+  warnings?: string[]
+  honest_gap?: string
+}
+
+async function callTool(toolName: string, args: CoordinationArgs, token: string | undefined): Promise<CoordinationResult> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: {
@@ -54,7 +124,13 @@ async function callTool(toolName, args, token) {
 // Discipline legend config
 // ---------------------------------------------------------------------------
 
-const DISCIPLINE_META = {
+interface DisciplineMeta {
+  color: string
+  bg: string
+  label: string
+}
+
+const DISCIPLINE_META: Record<Discipline, DisciplineMeta> = {
   structural:  { color: '#2563eb', bg: '#dbeafe', label: 'Structural' },
   hvac:        { color: '#16a34a', bg: '#dcfce7', label: 'HVAC' },
   piping:      { color: '#dc2626', bg: '#fee2e2', label: 'Piping' },
@@ -64,9 +140,9 @@ const DISCIPLINE_META = {
   instrument:  { color: '#4b5563', bg: '#f3f4f6', label: 'Instrument' },
 }
 
-const DISCIPLINE_OPTIONS = Object.keys(DISCIPLINE_META)
+const DISCIPLINE_OPTIONS = Object.keys(DISCIPLINE_META) as Discipline[]
 
-const SEVERITY_STYLE = {
+const SEVERITY_STYLE: Record<string, { color: string; bg: string; label: string }> = {
   critical: { color: '#dc2626', bg: '#fee2e2', label: 'CRITICAL' },
   major:    { color: '#d97706', bg: '#fef3c7', label: 'MAJOR' },
   minor:    { color: '#2563eb', bg: '#dbeafe', label: 'MINOR' },
@@ -76,7 +152,7 @@ const SEVERITY_STYLE = {
 // Discipline legend strip
 // ---------------------------------------------------------------------------
 
-function DisciplineLegend({ present = [] }) {
+function DisciplineLegend({ present = [] }: { present?: Discipline[] }) {
   return (
     <div className="flex flex-wrap gap-2 mb-4">
       {DISCIPLINE_OPTIONS.map(d => {
@@ -105,7 +181,7 @@ function DisciplineLegend({ present = [] }) {
 // Clash list by discipline pair
 // ---------------------------------------------------------------------------
 
-function ClashList({ clashesByPair }) {
+function ClashList({ clashesByPair }: { clashesByPair?: Record<string, Clash[]> }) {
   if (!clashesByPair || Object.keys(clashesByPair).length === 0) {
     return (
       <div className="flex items-center gap-2 text-green-700 text-sm py-3">
@@ -200,7 +276,7 @@ function ClashList({ clashesByPair }) {
 // Isometric SVG view of element AABBs
 // ---------------------------------------------------------------------------
 
-function isoProject([x, y, z]) {
+function isoProject([x, y, z]: number[]): [number, number] {
   // Standard dimetric isometric: 30° angle
   const a = Math.PI / 6
   const cx = (x - y) * Math.cos(a)
@@ -208,7 +284,11 @@ function isoProject([x, y, z]) {
   return [cx, cy]
 }
 
-function IsoPlantView({ elements = [], width = 400, height = 240 }) {
+function IsoPlantView({ elements = [], width = 400, height = 240 }: {
+  elements?: Element[]
+  width?: number
+  height?: number
+}) {
   if (elements.length === 0) {
     return (
       <div className="flex items-center justify-center h-36 text-gray-400 text-sm border border-dashed rounded-lg">
@@ -218,7 +298,7 @@ function IsoPlantView({ elements = [], width = 400, height = 240 }) {
   }
 
   // Collect all 8 corners of every AABB, project to 2D
-  const allPts2d = []
+  const allPts2d: [number, number][] = []
   const elemPts = elements.map(e => {
     const [lo, hi] = [e.bbox_min, e.bbox_max]
     const corners = [
@@ -243,7 +323,7 @@ function IsoPlantView({ elements = [], width = 400, height = 240 }) {
   const scaleY = yMax !== yMin ? (height - 2 * pad) / (yMax - yMin) : 1
   const scale = Math.min(scaleX, scaleY, 40)
 
-  function toSvg([px, py]) {
+  function toSvg([px, py]: [number, number]): [number, number] {
     return [
       pad + (px - xMin) * scale,
       pad + (py - yMin) * scale,
@@ -285,7 +365,7 @@ function IsoPlantView({ elements = [], width = 400, height = 240 }) {
 // BOM table
 // ---------------------------------------------------------------------------
 
-function BomTable({ bomByDiscipline }) {
+function BomTable({ bomByDiscipline }: { bomByDiscipline?: Record<string, BomItem[]> }) {
   if (!bomByDiscipline || Object.keys(bomByDiscipline).length === 0) {
     return <div className="text-sm text-gray-400 py-2">No BOM data</div>
   }
@@ -336,7 +416,7 @@ function BomTable({ bomByDiscipline }) {
 // Element editor row
 // ---------------------------------------------------------------------------
 
-const DEFAULT_ELEMENT = {
+const DEFAULT_ELEMENT: Element = {
   element_id: '',
   discipline: 'structural',
   bbox_min: [0, 0, 0],
@@ -350,17 +430,21 @@ const DEFAULT_ELEMENT = {
   unit_cost: 0,
 }
 
-function ElementRow({ elem, onChange, onRemove }) {
-  const handleField = (field, val) =>
+function ElementRow({ elem, onChange, onRemove }: {
+  elem: Element
+  onChange: (elem: Element) => void
+  onRemove: () => void
+}) {
+  const handleField = <K extends keyof Element>(field: K, val: Element[K]) =>
     onChange({ ...elem, [field]: val })
 
-  const handleBboxVal = (kind, idx, val) => {
+  const handleBboxVal = (kind: 'bbox_min' | 'bbox_max', idx: number, val: string) => {
     const next = [...(elem[kind] || [0, 0, 0])]
     next[idx] = parseFloat(val) || 0
     onChange({ ...elem, [kind]: next })
   }
 
-  const meta = DISCIPLINE_META[elem.discipline] || {}
+  const meta = DISCIPLINE_META[elem.discipline] || ({} as DisciplineMeta)
 
   return (
     <div
@@ -377,7 +461,7 @@ function ElementRow({ elem, onChange, onRemove }) {
         />
         <select
           value={elem.discipline}
-          onChange={e => handleField('discipline', e.target.value)}
+          onChange={e => handleField('discipline', e.target.value as Discipline)}
           className="border rounded px-2 py-1 text-xs font-semibold"
           style={{ color: meta.color }}
         >
@@ -461,7 +545,7 @@ function ElementRow({ elem, onChange, onRemove }) {
 // Main Panel
 // ---------------------------------------------------------------------------
 
-const DEMO_ELEMENTS = [
+const DEMO_ELEMENTS: Element[] = [
   {
     element_id: 'BEAM-01', discipline: 'structural',
     bbox_min: [0, 4.9, 3.0], bbox_max: [8.0, 5.1, 3.3],
@@ -494,15 +578,21 @@ const DEMO_ELEMENTS = [
   },
 ]
 
+type ResultTabId = 'clashes' | 'bom' | 'zones'
+
 export default function PlantCoordinationPanel() {
+  // @ts-expect-error — pre-existing bug (found during migration, not fixed): AuthState
+  // only exposes `accessToken`, never `token`, so this has always destructured to
+  // `undefined` and plant_coordination_check calls never carried an Authorization
+  // header. Left as-is — a rename-only slice does not change behaviour.
   const { token } = useAuth()
 
   const [projectId, setProjectId] = useState('PLANT-001')
-  const [elements, setElements] = useState(DEMO_ELEMENTS.map(e => ({ ...e })))
+  const [elements, setElements] = useState<Element[]>(DEMO_ELEMENTS.map(e => ({ ...e })))
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
-  const [activeTab, setActiveTab] = useState('clashes')
+  const [result, setResult] = useState<CoordinationResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<ResultTabId>('clashes')
 
   const addElement = useCallback(() => {
     setElements(prev => [
@@ -511,11 +601,11 @@ export default function PlantCoordinationPanel() {
     ])
   }, [])
 
-  const removeElement = useCallback((idx) => {
+  const removeElement = useCallback((idx: number) => {
     setElements(prev => prev.filter((_, i) => i !== idx))
   }, [])
 
-  const updateElement = useCallback((idx, updated) => {
+  const updateElement = useCallback((idx: number, updated: Element) => {
     setElements(prev => prev.map((e, i) => i === idx ? updated : e))
   }, [])
 
@@ -542,7 +632,7 @@ export default function PlantCoordinationPanel() {
       if (res.error) throw new Error(res.error)
       setResult(res)
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
     }
@@ -630,11 +720,11 @@ export default function PlantCoordinationPanel() {
 
           {/* Tabs */}
           <div className="flex border-b border-gray-200 bg-white">
-            {[
+            {([
               { id: 'clashes', icon: <AlertTriangle size={12} />, label: `Clashes (${totalClashes ?? 0})` },
               { id: 'bom', icon: <Package size={12} />, label: 'BOM' },
               { id: 'zones', icon: <BarChart3 size={12} />, label: 'Zones' },
-            ].map(tab => (
+            ] as { id: ResultTabId; icon: ReactNode; label: string }[]).map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}

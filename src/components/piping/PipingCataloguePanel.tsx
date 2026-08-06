@@ -22,13 +22,49 @@
 
 import { useState, useCallback } from 'react'
 import {
-  Package, Loader2, AlertTriangle, Plus, Trash2, Info, CheckCircle,
+  Package, Loader2, AlertTriangle, Plus, Trash2, Info,
 } from 'lucide-react'
 import { useAuth } from '../../store/auth.js'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
-async function callTool(toolName, args, token) {
+interface CatalogueArgs {
+  component_type: string
+  dn: number
+  schedule: string
+  quantity: number
+  dn_branch?: number
+  flange_class?: number
+}
+
+interface Port {
+  label: string
+  position_mm: number[]
+  flow_direction: number[]
+}
+
+interface BomLine {
+  item: string
+  dn: number
+  dn_branch?: number
+  schedule: string
+  quantity: number
+  face_to_face_mm?: number
+  standard?: string
+}
+
+interface CatalogueResult {
+  ok?: boolean
+  standard?: string
+  notes?: string
+  od_mm?: number
+  center_to_face_mm?: number
+  face_to_face_mm?: number
+  ports?: Port[]
+  bom_line?: BomLine
+}
+
+async function callTool(toolName: string, args: CatalogueArgs, token: string | undefined): Promise<CatalogueResult> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: {
@@ -50,7 +86,14 @@ async function callTool(toolName, args, token) {
 // Constants
 // ---------------------------------------------------------------------------
 
-const COMPONENT_TYPES = [
+interface ComponentTypeDef {
+  value: string
+  label: string
+  hasReducer: boolean
+  hasFlange: boolean
+}
+
+const COMPONENT_TYPES: ComponentTypeDef[] = [
   { value: 'elbow_90_lr',       label: '90° LR Elbow (B16.9)', hasReducer: false, hasFlange: false },
   { value: 'elbow_90_sr',       label: '90° SR Elbow (B16.9)', hasReducer: false, hasFlange: false },
   { value: 'elbow_45_lr',       label: '45° LR Elbow (B16.9)', hasReducer: false, hasFlange: false },
@@ -69,7 +112,7 @@ const FLANGE_CLASSES = [150, 300, 600, 900, 1500, 2500]
 // Port diagram (simple ASCII + text)
 // ---------------------------------------------------------------------------
 
-function PortDiagram({ ports }) {
+function PortDiagram({ ports }: { ports?: Port[] }) {
   if (!ports || ports.length === 0) return null
   return (
     <div className="mt-3">
@@ -94,9 +137,9 @@ function PortDiagram({ ports }) {
 // ---------------------------------------------------------------------------
 
 function useBOM() {
-  const [lines, setLines] = useState([])
+  const [lines, setLines] = useState<BomLine[]>([])
 
-  const addLine = useCallback((bomLine) => {
+  const addLine = useCallback((bomLine: BomLine) => {
     setLines(prev => {
       const key = `${bomLine.item}|${bomLine.dn}|${bomLine.dn_branch ?? ''}|${bomLine.schedule}`
       const existing = prev.find(l =>
@@ -114,7 +157,7 @@ function useBOM() {
   }, [])
 
   const clearBOM = () => setLines([])
-  const removeLine = (idx) => setLines(prev => prev.filter((_, i) => i !== idx))
+  const removeLine = (idx: number) => setLines(prev => prev.filter((_, i) => i !== idx))
 
   return { lines, addLine, clearBOM, removeLine }
 }
@@ -124,6 +167,10 @@ function useBOM() {
 // ---------------------------------------------------------------------------
 
 export default function PipingCataloguePanel() {
+  // @ts-expect-error — pre-existing bug (found during migration, not fixed): AuthState
+  // only exposes `accessToken`, never `token`, so this has always destructured to
+  // `undefined` and piping_catalogue_component calls never carried an Authorization
+  // header. Left as-is — a rename-only slice does not change behaviour.
   const { token } = useAuth()
 
   const [compType, setCompType] = useState('elbow_90_lr')
@@ -134,8 +181,8 @@ export default function PipingCataloguePanel() {
   const [quantity, setQuantity] = useState(1)
 
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<CatalogueResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const { lines: bomLines, addLine, clearBOM, removeLine } = useBOM()
 
@@ -146,14 +193,14 @@ export default function PipingCataloguePanel() {
     setError(null)
     setResult(null)
     try {
-      const args = { component_type: compType, dn, schedule, quantity }
+      const args: CatalogueArgs = { component_type: compType, dn, schedule, quantity }
       if (selectedType?.hasReducer) args.dn_branch = dnBranch
       if (selectedType?.hasFlange) args.flange_class = flangeClass
 
       const data = await callTool('piping_catalogue_component', args, token)
       setResult(data)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }

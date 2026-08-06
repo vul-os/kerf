@@ -62,8 +62,10 @@ function fmt(v, d = 3) {
   return v.toPrecision(d)
 }
 
-function pmvLabel(pmv) {
-  if (pmv == null) return '—'
+function pmvLabel(pmv: number | null | undefined): { text: string; color: string } | null {
+  // null rather than a '—' sentinel: the only caller reads `?.text || '—'`, so the rendered
+  // output is identical, and a string|object union cannot be probed with `?.`.
+  if (pmv == null) return null
   if (pmv < -2.5) return { text: 'Cold',   color: '#38bdf8' }
   if (pmv < -1.5) return { text: 'Cool',   color: '#7dd3fc' }
   if (pmv < -0.5) return { text: 'Sl.Cool',color: '#bae6fd' }
@@ -141,7 +143,13 @@ function Heatmap({ data, colorFn, title, xLabel, yLabel, unit, width = 240, heig
 
 // ── Summary cards ─────────────────────────────────────────────────────────────
 
-function SummaryCard({ label, value, unit, badge, badgeColor }) {
+function SummaryCard({ label, value, unit, badge, badgeColor }: {
+  label: string
+  value: string
+  unit?: string
+  badge?: string
+  badgeColor?: string
+}) {
   return (
     <div style={{
       flex: '1 1 140px',

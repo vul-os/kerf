@@ -11,7 +11,7 @@
 //
 // Props: none — standalone panel
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, type CSSProperties } from 'react'
 import {
   Layers,
   GitBranch,
@@ -65,7 +65,9 @@ function fmt(v) {
 // Styles
 // ---------------------------------------------------------------------------
 
-const s = {
+// Typed so literals like flexDirection:'column' keep their CSSProperties meaning rather
+// than widening to `string`.
+const s: Record<string, CSSProperties> = {
   root: {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: 13,
@@ -542,7 +544,12 @@ function LoftWithGuidesTool() {
 
 const TABS = ['Gordon', 'Skinning', 'Guide Rails']
 
-export default function SurfacingPanel({ content } = {}) {
+export interface SurfacingPanelProps {
+  /** JSON string optionally carrying persisted tab selection. */
+  content?: string
+}
+
+export default function SurfacingPanel({ content }: SurfacingPanelProps = {}) {
   // content prop: JSON string optionally carrying persisted tab selection.
   const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
   const [tab, setTab] = useState(_parsed.tab || 'Gordon')

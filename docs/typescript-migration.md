@@ -112,11 +112,26 @@ clean sub-minute no-ops. It earns its lines.
    After migrating, grep for literal `'lib/<name>.js'` style references and update them. Note the
    distinction: an **import specifier** ending `.js` is still correct (it resolves to `.ts` under
    `moduleResolution: bundler`); only literal filesystem paths need changing.
-2. **`npm test` intermittently exits 1 while reporting every test passed.** The cause is an
-   `EnvironmentTeardownError` unhandled rejection — a late dynamic import racing environment
-   teardown, observed in `src/lib/panels/__tests__/dcc.test.jsx` but not specific to it. It is
-   nondeterministic: a re-run passes clean. Check the pass counts, not just the exit code. Do not
-   try to fix it inside a slice.
+2. **`npm test` is flaky in two distinct ways. Neither is yours; both need a re-run, not a fix.**
+
+   **(a) Exit 1 with every test passing.** An `EnvironmentTeardownError` unhandled rejection — a
+   late dynamic import racing environment teardown, seen in
+   `src/lib/panels/__tests__/dcc.test.jsx` but not specific to it. Check pass counts, not exit code.
+
+   **(b) A genuine assertion failure that vanishes on re-run.** Observed in
+   `src/stores/dirtyStore.test.ts` (`expected 1 to be 2`): `dirtyStore` is a shared global store and
+   parallel workers can race on it. It passes in isolation and on a clean re-run.
+
+   **(b) is the dangerous one**, because it looks exactly like a real regression. Before treating any
+   failure as caused by your slice, ask whether the failing test has anything to do with the files
+   you touched — a Three.js viewport migration cannot plausibly break a dirty-flag store. Then run
+   the file in isolation, then re-run the full suite. Only after all three should you conclude you
+   broke something.
+
+   **Process rule that follows from this:** verify the suite result *before* integrating, as a
+   separate step. Chaining `npm test` and a `git merge` into one command means the merge runs
+   regardless of the result — which is how a red state reached the integration branch once. It was
+   a flake, but the sequencing was wrong either way.
 3. **Do not run full-package Python/pytest suites** from a frontend slice, and **do not spawn
    sub-agents.** Both consumed large amounts of time earlier in this program for zero benefit. An
    additive diff cannot regress a suite it does not touch.

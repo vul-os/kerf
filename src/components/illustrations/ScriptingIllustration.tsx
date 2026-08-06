@@ -13,7 +13,11 @@
  * alignment stays clean. Row content kept under 22 mono chars at 7.5pt to
  * stay inside the 156px Python pane (≈4.5px / char → ~99px max width).
  */
-export default function ScriptingIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function ScriptingIllustration({ className = '' }: Props) {
   const codeRows = [
     { y: 60, content: '$ pip install kerf-sdk', fill: '#5a6275' },
     { y: 74, content: 'from kerf import Kerf', fill: '#cbd0dc' },

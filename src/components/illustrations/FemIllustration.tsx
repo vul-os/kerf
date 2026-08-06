@@ -5,7 +5,11 @@
  *
  * viewBox 320×200, panel inset 8..312 × 14..186.
  */
-export default function FemIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function FemIllustration({ className = '' }: Props) {
   // Colour ramp: cool (cyan-edge) at fixed end, kerf-yellow mid,
   // warm (orange) at the free end where stress is highest.
   const ramp = ['#3a4150', '#4f6378', '#6bd4ff', '#9cd97a', '#ffd633', '#ff944d', '#e85a3c']

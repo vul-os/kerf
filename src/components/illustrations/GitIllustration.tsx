@@ -6,7 +6,11 @@
  *
  * viewBox 320×200. Palette locked.
  */
-export default function GitIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function GitIllustration({ className = '' }: Props) {
   const MAIN = '#ffd633'
   const FEAT_A = '#6bd4ff'
   const FEAT_B = '#ff6bd4'
@@ -155,7 +159,14 @@ export default function GitIllustration({ className = '' }) {
   )
 }
 
-function CommitDot({ cx, cy, color, head, merge, tip }) {
+function CommitDot({ cx, cy, color, head, merge, tip }: {
+  cx: number
+  cy: number
+  color: string
+  head?: boolean
+  merge?: boolean
+  tip?: boolean
+}) {
   const outerR = head ? 5.5 : merge ? 5 : 4
   return (
     <g>

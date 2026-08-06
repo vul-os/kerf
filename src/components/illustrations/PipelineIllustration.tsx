@@ -4,7 +4,11 @@
  * Sits between the capability tour and the recently-shipped strip;
  * displays full width with no border.
  */
-export default function PipelineIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function PipelineIllustration({ className = '' }: Props) {
   const nodes = [
     { x: 80, label: '.sketch', sub: '2D + constraints', glyph: 'sketch' },
     { x: 220, label: '.feature', sub: 'OCCT B-rep', glyph: 'feature' },
@@ -106,7 +110,7 @@ export default function PipelineIllustration({ className = '' }) {
   )
 }
 
-function NodeGlyph({ kind, cx, cy }) {
+function NodeGlyph({ kind, cx, cy }: { kind: string; cx: number; cy: number }) {
   const stroke = '#ffd633'
 
   if (kind === 'sketch') {

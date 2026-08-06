@@ -19,7 +19,7 @@
  * onToast    {Function}
  */
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback } from 'react'
 import {
   DollarSign,
   ChevronDown,
@@ -28,7 +28,6 @@ import {
   Trash2,
   BarChart3,
   TrendingUp,
-  Package,
 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
@@ -37,10 +36,9 @@ import {
 
 const CATEGORIES = ['Wall', 'Slab', 'Floor', 'Roof', 'Column', 'Beam', 'Door', 'Window', 'Stair', 'Railing', 'Ceiling', 'MEP', 'Generic']
 const TRADES = ['', 'structural', 'architectural', 'mep', 'civil', 'fit-out']
-const UNITS = ['m2', 'm3', 'each', 'lm', 'kg', 'm']
 
 // Indicative unit costs (USD, mirrors Python default_unit_cost_db)
-const BUILT_IN_RATES = {
+const BUILT_IN_RATES: Record<string, { unit: string; unit_cost: number }> = {
   Wall:       { unit: 'm2',   unit_cost: 220 },
   Slab:       { unit: 'm2',   unit_cost: 320 },
   Floor:      { unit: 'm2',   unit_cost: 280 },
@@ -56,7 +54,19 @@ const BUILT_IN_RATES = {
   Generic:    { unit: 'each', unit_cost: 200 },
 }
 
-const DEMO_ELEMENTS = [
+interface CostElement {
+  id: string
+  category: string
+  width?: number
+  height?: number
+  area?: number
+  volume?: number
+  length?: number
+  trade?: string
+  phase?: string
+}
+
+const DEMO_ELEMENTS: CostElement[] = [
   { id: 'wall-001', category: 'Wall',    width: 5.0,  height: 3.0, trade: 'architectural', phase: 'shell' },
   { id: 'wall-002', category: 'Wall',    width: 8.0,  height: 3.0, trade: 'architectural', phase: 'shell' },
   { id: 'slab-001', category: 'Slab',   area: 120.0,              trade: 'structural',     phase: 'shell' },
@@ -70,24 +80,44 @@ const DEMO_ELEMENTS = [
 // Helpers
 // ---------------------------------------------------------------------------
 
-function extractQty(el) {
+function extractQty(el: CostElement): [number, string] {
   const cat = el.category || 'Generic'
   const preferred = BUILT_IN_RATES[cat]?.unit || 'each'
   if (preferred === 'm2') {
-    if (el.area > 0) return [parseFloat(el.area), 'm2']
-    if (el.width > 0 && el.height > 0) return [el.width * el.height, 'm2']
+    if (el.area && el.area > 0) return [el.area, 'm2']
+    if (el.width && el.width > 0 && el.height && el.height > 0) return [el.width * el.height, 'm2']
   }
-  if (preferred === 'm3' && el.volume > 0) return [parseFloat(el.volume), 'm3']
-  if (preferred === 'lm' && el.length > 0) return [parseFloat(el.length), 'lm']
+  if (preferred === 'm3' && el.volume && el.volume > 0) return [el.volume, 'm3']
+  if (preferred === 'lm' && el.length && el.length > 0) return [el.length, 'lm']
   return [1.0, 'each']
 }
 
-function computeRollup(elements) {
-  const lineItems = []
-  const unpriced = []
-  const byPhase = {}
-  const byTrade = {}
-  const byCat = {}
+interface LineItem {
+  element_id: string
+  category: string
+  trade?: string
+  phase?: string
+  quantity: number
+  unit: string
+  unit_cost: number
+  total_cost: number
+}
+
+interface Rollup {
+  lineItems: LineItem[]
+  unpriced: string[]
+  total: number
+  byPhase: Record<string, number>
+  byTrade: Record<string, number>
+  byCat: Record<string, number>
+}
+
+function computeRollup(elements: CostElement[]): Rollup {
+  const lineItems: LineItem[] = []
+  const unpriced: string[] = []
+  const byPhase: Record<string, number> = {}
+  const byTrade: Record<string, number> = {}
+  const byCat: Record<string, number> = {}
   let total = 0
 
   for (const el of elements) {
@@ -107,7 +137,7 @@ function computeRollup(elements) {
   return { lineItems, unpriced, total: Math.round(total * 100) / 100, byPhase, byTrade, byCat }
 }
 
-function fmt(n) {
+function fmt(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
 }
 
@@ -115,7 +145,7 @@ function fmt(n) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function BreakdownBar({ data, total }) {
+function BreakdownBar({ data, total }: { data: Record<string, number>; total: number }) {
   const sorted = Object.entries(data).sort((a, b) => b[1] - a[1])
   const colors = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#a855f7', '#06b6d4', '#f97316']
   return (
@@ -139,12 +169,16 @@ let _nextElId = 20
 // Main panel
 // ---------------------------------------------------------------------------
 
-export default function CostEstimationPanel({ content, projectId, onToast }) {
+export default function CostEstimationPanel({ content, onToast }: {
+  content?: string
+  projectId?: string
+  onToast?: (msg: string) => void
+}) {
   // Accept a `content` string (JSON) from the panel registry; content.elements
   // can seed the initial element list.
-  const _cp = (() => { if (!content) return {}; try { return JSON.parse(content) } catch { return {} } })()
-  const [elements, setElements] = useState(_cp.elements ?? DEMO_ELEMENTS)
-  const [rollup, setRollup] = useState(null)
+  const _cp = (() => { if (!content) return {}; try { return JSON.parse(content) as { elements?: CostElement[] } } catch { return {} as { elements?: CostElement[] } } })()
+  const [elements, setElements] = useState<CostElement[]>(_cp.elements ?? DEMO_ELEMENTS)
+  const [rollup, setRollup] = useState<Rollup | null>(null)
   const [loading, setLoading] = useState(false)
   const [expanded, setExpanded] = useState(true)
   const [activeTab, setActiveTab] = useState('summary')
@@ -155,7 +189,7 @@ export default function CostEstimationPanel({ content, projectId, onToast }) {
       const result = computeRollup(elements)
       setRollup(result)
     } catch (err) {
-      onToast?.(err?.message || 'Cost computation failed')
+      onToast?.(err instanceof Error ? err.message : 'Cost computation failed')
     } finally {
       setLoading(false)
     }
@@ -166,11 +200,11 @@ export default function CostEstimationPanel({ content, projectId, onToast }) {
     setElements(prev => [...prev, { id, category: 'Wall', width: 3.0, height: 3.0, trade: '', phase: '' }])
   }, [])
 
-  const removeElement = useCallback((idx) => {
+  const removeElement = useCallback((idx: number) => {
     setElements(prev => prev.filter((_, i) => i !== idx))
   }, [])
 
-  const updateElement = useCallback((idx, field, value) => {
+  const updateElement = useCallback((idx: number, field: keyof CostElement, value: string | number) => {
     setElements(prev => prev.map((el, i) => i === idx ? { ...el, [field]: value } : el))
   }, [])
 
@@ -289,7 +323,7 @@ export default function CostEstimationPanel({ content, projectId, onToast }) {
                       <button onClick={() => removeElement(idx)} className="text-red-400 hover:text-red-600"><Trash2 className="h-3 w-3" /></button>
                     </div>
                     <div className="grid grid-cols-3 gap-1.5">
-                      {['width', 'height', 'area', 'volume', 'length'].slice(0, 3).map(f => (
+                      {(['width', 'height', 'area'] as (keyof CostElement)[]).map(f => (
                         <div key={f}>
                           <label className="text-ink-400 capitalize">{f}</label>
                           <input type="number" value={el[f] || ''} onChange={(e) => updateElement(idx, f, parseFloat(e.target.value) || 0)}

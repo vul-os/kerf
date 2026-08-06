@@ -45,7 +45,9 @@ describe('splitCircuitJson', () => {
       { type: 'source_net', id: 'D' },
     ]
     const r = splitCircuitJson(json)
-    expect(r.schematic.map((e) => e.id)).toEqual(['A', 'B', 'C', 'D'])
+    // Not every CircuitJSON record variant carries `id` (e.g. source_trace); the
+    // fixtures above always do, so cast for the assertion.
+    expect(r.schematic.map((e: any) => e.id)).toEqual(['A', 'B', 'C', 'D'])
   })
 
   it('routes pcb_* into the pcb bucket', () => {
@@ -75,7 +77,7 @@ describe('splitCircuitJson', () => {
     ]
     const r = splitCircuitJson(json)
     expect(r.errors).toHaveLength(1)
-    expect(r.errors[0].id).toBe('p1')
+    expect((r.errors[0] as any).id).toBe('p1')
     // error record still goes in its prefix bucket too:
     expect(r.pcb).toHaveLength(1)
   })
@@ -91,7 +93,7 @@ describe('splitCircuitJson', () => {
     ]
     const r = splitCircuitJson(json)
     expect(r.schematic).toHaveLength(1)
-    expect(r.schematic[0].id).toBe('ok')
+    expect((r.schematic[0] as any).id).toBe('ok')
     expect(r.pcb).toHaveLength(0)
     expect(r.threeD).toHaveLength(0)
   })

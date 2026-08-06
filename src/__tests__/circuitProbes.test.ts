@@ -29,7 +29,8 @@ describe('injectProbeRecords', () => {
       // @kerf-probe NAME=VOUT KIND=V PORT=src_port_abc
       // @kerf-probe NAME=IQ1 KIND=I PORT=simple_q1
     </board>`
-    const out = injectProbeRecords([], src)
+    // injectProbeRecords returns unknown[]; cast for the property assertions below.
+    const out: any[] = injectProbeRecords([], src)
     expect(out).toHaveLength(2)
     expect(out[0].kind).toBe('V')
     expect(out[0].source_port_id).toBe('src_port_abc')
@@ -41,7 +42,7 @@ describe('injectProbeRecords', () => {
 
   it('falls back to source_port_id for an I-probe whose token doesn\'t look like a component id', () => {
     const src = `// @kerf-probe NAME=IBR KIND=I PORT=src_port_xyz`
-    const out = injectProbeRecords([], src)
+    const out: any[] = injectProbeRecords([], src)
     expect(out[0].kind).toBe('I')
     expect(out[0].source_port_id).toBe('src_port_xyz')
     expect(out[0].source_component_id).toBeUndefined()
@@ -58,7 +59,7 @@ describe('injectProbeRecords', () => {
   })
 
   it('handles non-array circuitJson gracefully', () => {
-    const out = injectProbeRecords(null, `// @kerf-probe NAME=A KIND=V PORT=p1`)
+    const out: any[] = injectProbeRecords(null, `// @kerf-probe NAME=A KIND=V PORT=p1`)
     expect(out).toHaveLength(1)
     expect(out[0].name).toBe('A')
   })

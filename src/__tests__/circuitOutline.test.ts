@@ -189,7 +189,9 @@ describe('extractBoardOutline', () => {
     // serialise + parseSketch should round-trip the entity payload intact.
     const { parseSketch, serializeSketch } = await import('../lib/sketchSolver.js')
     const sk = extractBoardOutline([{ type: 'pcb_board', width: 8, height: 4 }])
-    const text = serializeSketch(sk)
+    // extractBoardOutline's inferred return type is looser (plane: string) than
+    // serializeSketch's SketchJSON param; cast at the boundary.
+    const text = serializeSketch(sk as any)
     const parsed = parseSketch(text)
     expect(parsed.entities).toHaveLength(sk.entities.length)
     expect(parsed.plane).toBe('xy')

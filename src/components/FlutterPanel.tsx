@@ -1,4 +1,4 @@
-// FlutterPanel.jsx — V-g / V-f flutter analysis panel for aeroelastic typical-section model.
+// FlutterPanel.tsx — V-g / V-f flutter analysis panel for aeroelastic typical-section model.
 //
 // Calls the aero_flutter_typical_section LLM tool and renders:
 //   - Flutter speed / frequency summary cards
@@ -12,6 +12,34 @@
 //   error   {string|null}  — error message, if any
 
 import { useMemo } from 'react'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+// Parsed JSON response from the aero_flutter_typical_section LLM tool. No
+// shared type exists for this domain-specific analysis payload.
+interface FlutterResult {
+  ok: boolean
+  flutter_speed_m_s: number | null
+  flutter_freq_hz: number | null
+  flutter_speed_nd: number | null
+  flutter_freq_rad_s: number | null
+  velocities_m_s: number[]
+  damping_mode0: (number | null)[]
+  damping_mode1: (number | null)[]
+  freq_mode0_rad_s: (number | null)[]
+  freq_mode1_rad_s: (number | null)[]
+  method: string
+  reference?: string
+}
+
+export interface FlutterPanelProps {
+  result?: FlutterResult | null
+  loading?: boolean
+  error?: string | null
+  content?: string
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -30,7 +58,7 @@ const FLUTTER_LINE_COLOR = '#ef4444'
 // Helpers
 // ---------------------------------------------------------------------------
 
-function scaleLinear(domain, range) {
+function scaleLinear(domain: [number, number], range: [number, number]): (v: number) => number {
   const [d0, d1] = domain
   const [r0, r1] = range
   const dSpan = d1 - d0 || 1
@@ -38,26 +66,34 @@ function scaleLinear(domain, range) {
   return v => r0 + ((v - d0) / dSpan) * rSpan
 }
 
-function buildPath(xs, ys, xScale, yScale) {
+function buildPath(
+  xs: number[],
+  ys: (number | null | undefined)[],
+  xScale: (v: number) => number,
+  yScale: (v: number) => number,
+): string {
   const pts = xs
     .map((x, i) => {
       const y = ys[i]
       if (y === null || y === undefined) return null
       return [xScale(x), yScale(y)]
     })
-    .filter(Boolean)
+    .filter((p): p is number[] => Boolean(p))
   if (pts.length === 0) return ''
   return pts
     .map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(2)},${p[1].toFixed(2)}`)
     .join(' ')
 }
 
-function axisTicks(min, max, n = 5) {
+function axisTicks(min: number, max: number, n = 5): number[] {
   const step = (max - min) / (n - 1)
   return Array.from({ length: n }, (_, i) => min + i * step)
 }
 
-function fmt(v) {
+// NOTE: dead code — _fmt() is defined but never called anywhere in this file.
+// Left as-is (migration is rename+type only); underscore-prefixed to satisfy
+// the unused-vars lint rule; flagged in the migration report.
+function _fmt(v: number | null | undefined): string {
   if (v === null || v === undefined) return '—'
   if (Math.abs(v) < 0.001 || Math.abs(v) >= 10000) return v.toExponential(2)
   return v.toFixed(2)
@@ -67,8 +103,17 @@ function fmt(v) {
 // SVG mini-chart (V-g or V-f)
 // ---------------------------------------------------------------------------
 
-function VgChart({ velocities, mode0, mode1, yLabel, yUnit, flutterSpeed }) {
-  const allY = [...(mode0 ?? []), ...(mode1 ?? [])].filter(y => y !== null && isFinite(y))
+interface VgChartProps {
+  velocities: number[]
+  mode0: (number | null)[]
+  mode1: (number | null)[]
+  yLabel: string
+  yUnit: string
+  flutterSpeed: number | null
+}
+
+function VgChart({ velocities, mode0, mode1, yLabel, yUnit, flutterSpeed }: VgChartProps) {
+  const allY = [...(mode0 ?? []), ...(mode1 ?? [])].filter((y): y is number => y !== null && isFinite(y))
   const yMin = allY.length ? Math.min(...allY) : -0.2
   const yMax = allY.length ? Math.max(...allY) : 0.2
   const yPad = (yMax - yMin) * 0.1 || 0.05
@@ -207,15 +252,17 @@ function Legend() {
 // FlutterPanel
 // ---------------------------------------------------------------------------
 
-export default function FlutterPanel({ result, loading, error, content }) {
+export default function FlutterPanel({ result, loading, error, content }: FlutterPanelProps) {
   // Backward-compatible content string: JSON.parse it and merge into result.
-  if (content != null && result == null) {
-    try { result = JSON.parse(content) } catch { /* ignore */ }
+  // (local variable, not a reassignment of the `result` prop.)
+  let resolvedResult = result
+  if (content != null && resolvedResult == null) {
+    try { resolvedResult = JSON.parse(content) as FlutterResult } catch { /* ignore */ }
   }
   const data = useMemo(() => {
-    if (!result || !result.ok) return null
-    return result
-  }, [result])
+    if (!resolvedResult || !resolvedResult.ok) return null
+    return resolvedResult
+  }, [resolvedResult])
 
   if (loading) {
     return (
@@ -316,7 +363,13 @@ export default function FlutterPanel({ result, loading, error, content }) {
   )
 }
 
-function SummaryCard({ label, value, highlight }) {
+interface SummaryCardProps {
+  label: string
+  value: string
+  highlight?: boolean
+}
+
+function SummaryCard({ label, value, highlight }: SummaryCardProps) {
   return (
     <div
       className={`rounded p-2 border text-center ${

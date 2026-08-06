@@ -17,7 +17,7 @@
  * onToast  (msg) => void  — optional
  */
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Zap, ChevronDown, ChevronRight, Loader2, AlertTriangle } from 'lucide-react'
 import { api } from '../lib/api.js'
 
@@ -27,19 +27,26 @@ import { api } from '../lib/api.js'
 
 /**
  * Format a number to `dp` decimal places; returns '—' for falsy/NaN/Infinity.
- * @param {number|null|undefined} v
- * @param {number} dp
  */
-export function fmtNum(v, dp = 3) {
+export function fmtNum(v: number | null | undefined, dp = 3): string {
   if (v == null || !isFinite(v)) return '—'
   return v.toFixed(dp)
 }
 
+interface ShaftDiamForm {
+  M: string
+  T: string
+  sigma_allow: string
+  method: string
+  Kf: string
+  Kfs: string
+  safety_factor: string
+}
+
 /**
  * Build the shaft_diameter params from form state.
- * @param {object} s
  */
-export function buildShaftDiamParams(s) {
+export function buildShaftDiamParams(s: ShaftDiamForm) {
   return {
     M: parseFloat(s.M) || 0,
     T: parseFloat(s.T) || 0,
@@ -51,11 +58,18 @@ export function buildShaftDiamParams(s) {
   }
 }
 
+interface CritSpeedForm {
+  length_m: string
+  mass_per_m: string
+  E: string
+  I: string
+  supports: string
+}
+
 /**
  * Build shaft_critical_speed params from form state.
- * @param {object} s
  */
-export function buildCritSpeedParams(s) {
+export function buildCritSpeedParams(s: CritSpeedForm) {
   return {
     length_m: parseFloat(s.length_m) || 0,
     mass_per_m: parseFloat(s.mass_per_m) || 0,
@@ -69,7 +83,7 @@ export function buildCritSpeedParams(s) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function FieldRow({ label, children, hint }) {
+function FieldRow({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return (
     <div className="flex items-center gap-2 py-0.5">
       <label className="text-[11px] text-ink-400 w-36 flex-shrink-0">{label}</label>
@@ -79,7 +93,16 @@ function FieldRow({ label, children, hint }) {
   )
 }
 
-function NumInput({ value, onChange, placeholder, min, step, 'data-testid': testid }) {
+interface NumInputProps {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  min?: number
+  step?: number
+  'data-testid'?: string
+}
+
+function NumInput({ value, onChange, placeholder, min, step, 'data-testid': testid }: NumInputProps) {
   return (
     <input
       type="number"
@@ -94,7 +117,14 @@ function NumInput({ value, onChange, placeholder, min, step, 'data-testid': test
   )
 }
 
-function SelectInput({ value, onChange, options, 'data-testid': testid }) {
+interface SelectInputProps {
+  value: string
+  onChange: (v: string) => void
+  options: [string, string][]
+  'data-testid'?: string
+}
+
+function SelectInput({ value, onChange, options, 'data-testid': testid }: SelectInputProps) {
   return (
     <select
       value={value}
@@ -109,7 +139,7 @@ function SelectInput({ value, onChange, options, 'data-testid': testid }) {
   )
 }
 
-function ResultKV({ label, value, unit }) {
+function ResultKV({ label, value, unit }: { label: string; value: ReactNode; unit?: string }) {
   return (
     <div className="flex items-center justify-between py-0.5 border-b border-ink-900">
       <span className="text-[11px] text-ink-400">{label}</span>
@@ -120,7 +150,7 @@ function ResultKV({ label, value, unit }) {
   )
 }
 
-function WarningList({ warnings }) {
+function WarningList({ warnings }: { warnings?: string[] }) {
   if (!warnings?.length) return null
   return (
     <div className="mt-2 space-y-0.5">
@@ -134,20 +164,25 @@ function WarningList({ warnings }) {
   )
 }
 
+interface ModeProps {
+  onToast?: (msg: string) => void
+}
+
 // ---------------------------------------------------------------------------
 // Mode: shaft_diameter
 // ---------------------------------------------------------------------------
 
-function StressMode({ onToast }) {
-  const [form, setForm] = useState({
+function StressMode({ onToast }: ModeProps) {
+  const [form, setForm] = useState<ShaftDiamForm>({
     M: '200', T: '150', sigma_allow: '200e6',
     method: 'DE-Goodman', Kf: '1.5', Kfs: '1.3', safety_factor: '1.5',
   })
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
+  // Tool result shape is dynamic per-tool and not modeled in shared types — boundary we don't own.
+  const [result, setResult] = useState<any>(null)
 
-  function set(k) {
-    return (v) => setForm((f) => ({ ...f, [k]: v }))
+  function set(k: keyof ShaftDiamForm) {
+    return (v: string) => setForm((f) => ({ ...f, [k]: v }))
   }
 
   async function run() {
@@ -155,8 +190,8 @@ function StressMode({ onToast }) {
     setResult(null)
     try {
       const data = await api.callTool('shaft_diameter', buildShaftDiamParams(form))
-      setResult(data?.result ?? data)
-    } catch (e) {
+      setResult((data as any)?.result ?? data)
+    } catch (e: any) {
       onToast?.(e?.message || 'shaft_diameter failed')
     } finally {
       setLoading(false)
@@ -220,16 +255,17 @@ function StressMode({ onToast }) {
 // Mode: shaft_critical_speed
 // ---------------------------------------------------------------------------
 
-function CritSpeedMode({ onToast }) {
-  const [form, setForm] = useState({
+function CritSpeedMode({ onToast }: ModeProps) {
+  const [form, setForm] = useState<CritSpeedForm>({
     length_m: '1.0', mass_per_m: '7.85', E: '200e9', I: '1e-7',
     supports: 'simply-supported',
   })
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
+  // Tool result shape is dynamic per-tool and not modeled in shared types — boundary we don't own.
+  const [result, setResult] = useState<any>(null)
 
-  function set(k) {
-    return (v) => setForm((f) => ({ ...f, [k]: v }))
+  function set(k: keyof CritSpeedForm) {
+    return (v: string) => setForm((f) => ({ ...f, [k]: v }))
   }
 
   async function run() {
@@ -237,8 +273,8 @@ function CritSpeedMode({ onToast }) {
     setResult(null)
     try {
       const data = await api.callTool('shaft_critical_speed', buildCritSpeedParams(form))
-      setResult(data?.result ?? data)
-    } catch (e) {
+      setResult((data as any)?.result ?? data)
+    } catch (e: any) {
       onToast?.(e?.message || 'shaft_critical_speed failed')
     } finally {
       setLoading(false)
@@ -295,16 +331,21 @@ function CritSpeedMode({ onToast }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-const MODES = [
+const MODES: [string, string][] = [
   ['stress', 'Stress & Sizing'],
   ['critical', 'Critical Speed'],
 ]
 
-export default function ShaftStressPanel({ onToast, content } = {}) {
+interface ShaftStressPanelProps {
+  onToast?: (msg: string) => void
+  content?: string
+}
+
+export default function ShaftStressPanel({ onToast, content }: ShaftStressPanelProps = {}) {
   // content prop: JSON string optionally pre-seeding mode/open state.
   const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
-  const [open, setOpen] = useState(_parsed.open ?? false)
-  const [mode, setMode] = useState(_parsed.mode || 'stress')
+  const [open, setOpen] = useState<boolean>(_parsed.open ?? false)
+  const [mode, setMode] = useState<string>(_parsed.mode || 'stress')
 
   return (
     <div className="border-t border-ink-800 flex-shrink-0" data-testid="shaft-stress-panel">

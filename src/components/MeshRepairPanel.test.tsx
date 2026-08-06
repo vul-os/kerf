@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import MeshRepairPanel from './MeshRepairPanel.jsx'
+import MeshRepairPanel from './MeshRepairPanel'
 
 // ---------------------------------------------------------------------------
 // Basic rendering

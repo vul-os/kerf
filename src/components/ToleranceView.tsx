@@ -3,15 +3,80 @@ import { Play, Loader2, AlertTriangle, GitBranch, X } from 'lucide-react'
 import { worstCaseStack, rssStack } from '../lib/tolerance.js'
 import { api } from '../lib/api.js'
 
-export function parseToleranceFile(content) {
+// ── Types ──────────────────────────────────────────────────────────────────────
+//
+// src/lib/tolerance.ts (already migrated, T-511) documents its shapes as JSDoc
+// @typedef, not exported TS types, so they aren't importable here — redeclared
+// locally from that file's ToleranceDim/WorstCaseResult/RSSResult/MonteCarloResult
+// JSDoc verbatim rather than trusting `any` from the untyped-JSDoc call sites.
+
+/** Mirrors src/lib/tolerance.ts's `ToleranceDim` typedef. */
+export interface ToleranceDim {
+  id?: string
+  nominal: number
+  plus?: number
+  minus?: number
+  upper?: number
+  lower?: number
+  grade?: string
+  distribution?: string
+  unit?: string
+}
+
+interface WorstCaseResult {
+  method: string
+  nominal: number
+  max: number
+  min: number
+}
+
+interface RSSResult {
+  method: string
+  nominal: number
+  band: number
+  k: number
+}
+
+interface MonteCarloResult {
+  method: string
+  samples: number
+  nominal: number
+  p01: number
+  p50: number
+  p99: number
+  mean: number
+  std_dev: number
+  histogram: number[]
+  bin_edges: number[]
+}
+
+/** A parsed `.tolerance` file — discriminated by `kind`, mirroring parseToleranceFile's returns. */
+export type ParsedToleranceFile =
+  | { kind: 'empty'; tolerances: ToleranceDim[] }
+  | { kind: 'invalid'; raw: string; error: string }
+  | { kind: 'unsupported'; raw: string }
+  | { kind: 'ok'; id?: string; name?: string; tolerances: ToleranceDim[] }
+
+/** One link of an auto-built assembly-mate dimension chain (AutoChainModal's onChain payload). */
+interface AutoChainLink {
+  name?: string
+  mate_id?: string
+  nominal: number
+  plus?: number
+  minus?: number
+  unit?: string
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- pre-existing before this migration.
+export function parseToleranceFile(content: string | null | undefined): ParsedToleranceFile {
   const raw = typeof content === 'string' ? content : ''
   if (!raw.trim()) {
     return { kind: 'empty', tolerances: [] }
   }
-  let doc
+  let doc: any
   try {
     doc = JSON.parse(raw)
-  } catch (e) {
+  } catch (e: any) {
     return { kind: 'invalid', raw, error: e.message }
   }
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
@@ -20,11 +85,11 @@ export function parseToleranceFile(content) {
   if (doc.kind && doc.kind !== 'tolerance') {
     return { kind: 'unsupported', raw }
   }
-  const tolerances = Array.isArray(doc.tolerances) ? doc.tolerances : []
+  const tolerances: ToleranceDim[] = Array.isArray(doc.tolerances) ? doc.tolerances : []
   return { kind: 'ok', id: doc.id, name: doc.name, tolerances }
 }
 
-function ItGradeChip({ grade }) {
+function ItGradeChip({ grade }: { grade?: string }) {
   if (!grade) return null
   return (
     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-kerf-300/10 text-kerf-300 border border-kerf-300/30">
@@ -33,7 +98,7 @@ function ItGradeChip({ grade }) {
   )
 }
 
-function DimensionTable({ tolerances }) {
+function DimensionTable({ tolerances }: { tolerances: ToleranceDim[] }) {
   if (!tolerances || tolerances.length === 0) {
     return (
       <div className="text-[11px] text-ink-500 italic py-4 text-center">
@@ -76,10 +141,10 @@ function DimensionTable({ tolerances }) {
   )
 }
 
-function SummaryCard({ dims }) {
+function SummaryCard({ dims }: { dims: ToleranceDim[] }) {
   if (!dims || dims.length === 0) return null
-  const wc = worstCaseStack(dims)
-  const rss = rssStack(dims, 3)
+  const wc: WorstCaseResult = worstCaseStack(dims)
+  const rss: RSSResult = rssStack(dims, 3)
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       <div className="bg-ink-900 border border-ink-800 rounded px-2 py-1.5">
@@ -102,7 +167,7 @@ function SummaryCard({ dims }) {
   )
 }
 
-function Histogram({ histogram, binEdges }) {
+function Histogram({ histogram, binEdges }: { histogram: number[]; binEdges: number[] }) {
   if (!histogram || !binEdges || histogram.length === 0) return null
   const maxCount = Math.max(...histogram, 1)
   const containerWidth = 600
@@ -161,14 +226,20 @@ function Histogram({ histogram, binEdges }) {
 // Auto-build from assembly modal
 // ---------------------------------------------------------------------------
 
-function AutoChainModal({ projectId, onChain, onClose }) {
+interface AutoChainModalProps {
+  projectId?: string
+  onChain: (chain: AutoChainLink[]) => void
+  onClose: () => void
+}
+
+function AutoChainModal({ projectId, onChain, onClose }: AutoChainModalProps) {
   const [assemblyFileId, setAssemblyFileId] = useState('')
   const [startCompId, setStartCompId] = useState('')
   const [startFeatId, setStartFeatId] = useState('')
   const [endCompId, setEndCompId] = useState('')
   const [endFeatId, setEndFeatId] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   const handleBuild = useCallback(async () => {
     setError(null)
@@ -178,6 +249,12 @@ function AutoChainModal({ projectId, onChain, onClose }) {
 
     setLoading(true)
     try {
+      // BUG (found during T-513, not fixed): `api.chat` does not exist on the api object
+      // exported by src/lib/api.ts — the only method matching a (name, args)-style tool-call
+      // shape is `api.callTool`. This call predates this migration (same shape in the original
+      // .jsx); clicking "Auto-build…" would throw `api.chat is not a function` at runtime.
+      // Left as-is per migration rules (report, don't fix) — see T-513's final report.
+      // @ts-expect-error - api.chat does not exist; pre-existing bug, not introduced here
       const result = await api.chat(projectId, {
         tool: 'tolerance_auto_chain',
         args: {
@@ -296,34 +373,44 @@ function AutoChainModal({ projectId, onChain, onClose }) {
 
 // ---------------------------------------------------------------------------
 
-export default function ToleranceView({ content, fileName, projectId, fileId }) {
+export interface ToleranceViewProps {
+  content?: string | null
+  fileName?: string
+  projectId?: string
+  fileId?: string
+}
+
+export default function ToleranceView({ content, fileName, projectId, fileId }: ToleranceViewProps) {
   const parsed = parseToleranceFile(content || '')
-  const [mcResult, setMcResult] = useState(null)
-  const [mcError, setMcError] = useState(null)
+  const [mcResult, setMcResult] = useState<MonteCarloResult | null>(null)
+  const [mcError, setMcError] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   const [showAutoChain, setShowAutoChain] = useState(false)
-  const [autoChain, setAutoChain] = useState(null)
+  const [autoChain, setAutoChain] = useState<AutoChainLink[] | null>(null)
 
   const handleRunMonteCarlo = useCallback(async () => {
     if (!projectId || !fileId) return
     setRunning(true)
     setMcError(null)
     try {
-      const result = await api.runTolerance(projectId, fileId, { method: 'monte_carlo', samples: 10000 })
+      // api.runTolerance's response shape is not modeled in src/types/api.ts (genuinely
+      // open-ended per api.ts's own comment there) — cast to this file's local
+      // MonteCarloResult, which mirrors tolerance.ts's JSDoc-only MonteCarloResult typedef.
+      const result = await api.runTolerance(projectId, fileId, { method: 'monte_carlo', samples: 10000 }) as MonteCarloResult
       setMcResult(result)
-    } catch (err) {
+    } catch (err: any) {
       setMcError(err.message || 'Failed to run Monte Carlo')
     } finally {
       setRunning(false)
     }
   }, [projectId, fileId])
 
-  const handleAutoChain = useCallback((chain) => {
+  const handleAutoChain = useCallback((chain: AutoChainLink[]) => {
     setAutoChain(chain)
   }, [])
 
   // Dimensions to display: prefer auto-built chain when present
-  const displayDims = autoChain
+  const displayDims: ToleranceDim[] = autoChain
     ? autoChain.map((e, i) => ({
         id: e.name || e.mate_id || `link-${i + 1}`,
         nominal: e.nominal,
@@ -331,7 +418,7 @@ export default function ToleranceView({ content, fileName, projectId, fileId }) 
         minus: e.minus,
         unit: e.unit || 'mm',
       }))
-    : parsed.tolerances || []
+    : ('tolerances' in parsed ? parsed.tolerances : []) || []
 
   if (parsed.kind === 'invalid' || parsed.kind === 'unsupported' || parsed.kind === 'empty') {
     return (

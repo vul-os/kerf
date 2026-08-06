@@ -1,8 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ChangeEvent, DragEvent, MouseEvent as ReactMouseEvent } from 'react'
 import { ChevronRight, ChevronDown, Eye, EyeOff, GripVertical, Layers } from 'lucide-react'
 import { getLayerStack, COLOR_PRESETS } from '../lib/layerStack.js'
 
-const TYPE_BADGE_COLORS = {
+// layerStack.ts (already migrated) leaves getLayerStack's param/return
+// untyped, so its result comes back as `any`. This panel's own usage
+// (name/type/color/visible/sublayer_order) is captured here and the
+// getLayerStack() call sites are cast to it below.
+export interface Layer {
+  name: string
+  type: string
+  color: string
+  visible: boolean
+  sublayer_order: number
+}
+
+export interface LayersPanelProps {
+  circuitJson?: { board?: unknown } | null
+  onLayerStackChange?: (layers: Layer[]) => void
+}
+
+type ToggleMode = 'solo' | 'toggle'
+
+const TYPE_BADGE_COLORS: Record<string, string> = {
   copper:     'bg-red-500/20 text-red-300 border-red-500/30',
   silkscreen: 'bg-stone-400/20 text-stone-300 border-stone-400/30',
   soldermask: 'bg-green-500/20 text-green-300 border-green-500/30',
@@ -11,11 +31,22 @@ const TYPE_BADGE_COLORS = {
   mechanical: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
 }
 
-function LayerRow({ layer, isSolo, onToggle, onColorChange, onDragStart, onDragOver, onDrop, isDragOver }) {
-  const [showPicker, setShowPicker] = useState(false)
-  const pickerRef = useRef(null)
+interface LayerRowProps {
+  layer: Layer
+  isSolo: boolean
+  onToggle: (name: string, mode: ToggleMode) => void
+  onColorChange: (name: string, color: string) => void
+  onDragStart: (evt: DragEvent<HTMLDivElement>, name: string) => void
+  onDragOver: (evt: DragEvent<HTMLDivElement>, name: string) => void
+  onDrop: (evt: DragEvent<HTMLDivElement>, name: string) => void
+  isDragOver: boolean
+}
 
-  const handleEyeClick = useCallback((evt) => {
+function LayerRow({ layer, isSolo, onToggle, onColorChange, onDragStart, onDragOver, onDrop, isDragOver }: LayerRowProps) {
+  const [showPicker, setShowPicker] = useState(false)
+  const pickerRef = useRef<HTMLDivElement>(null)
+
+  const handleEyeClick = useCallback((evt: ReactMouseEvent) => {
     if (evt.altKey) {
       onToggle(layer.name, 'solo')
     } else {
@@ -23,15 +54,15 @@ function LayerRow({ layer, isSolo, onToggle, onColorChange, onDragStart, onDragO
     }
   }, [layer.name, onToggle])
 
-  const handleColorChange = useCallback((evt) => {
+  const handleColorChange = useCallback((evt: ChangeEvent<HTMLInputElement>) => {
     onColorChange(layer.name, evt.target.value)
     setShowPicker(false)
   }, [layer.name, onColorChange])
 
   useEffect(() => {
     if (!showPicker) return
-    const handler = (evt) => {
-      if (pickerRef.current && !pickerRef.current.contains(evt.target)) {
+    const handler = (evt: Event) => {
+      if (pickerRef.current && !pickerRef.current.contains(evt.target as Node)) {
         setShowPicker(false)
       }
     }
@@ -99,16 +130,16 @@ function LayerRow({ layer, isSolo, onToggle, onColorChange, onDragStart, onDragO
   )
 }
 
-export default function LayersPanel({ circuitJson, onLayerStackChange }) {
+export default function LayersPanel({ circuitJson, onLayerStackChange }: LayersPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [theme, setTheme] = useState('kicad')
-  const [layers, setLayers] = useState(() => getLayerStack(null))
-  const [draggedName, setDraggedName] = useState(null)
-  const [dragOverName, setDragOverName] = useState(null)
-  const [soloLayer, setSoloLayer] = useState(null)
+  const [layers, setLayers] = useState<Layer[]>(() => getLayerStack(null))
+  const [draggedName, setDraggedName] = useState<string | null>(null)
+  const [dragOverName, setDragOverName] = useState<string | null>(null)
+  const [soloLayer, setSoloLayer] = useState<string | null>(null)
   const prevCircuitRef = useRef(circuitJson)
 
-  const freshLayers = useMemo(() => getLayerStack(circuitJson?.board || null), [circuitJson])
+  const freshLayers: Layer[] = useMemo(() => getLayerStack(circuitJson?.board || null), [circuitJson])
 
   useEffect(() => {
     if (prevCircuitRef.current === circuitJson) return
@@ -124,9 +155,9 @@ export default function LayersPanel({ circuitJson, onLayerStackChange }) {
     })
   }, [freshLayers, circuitJson])
 
-  const handleToggle = useCallback((name, mode) => {
+  const handleToggle = useCallback((name: string, mode: ToggleMode) => {
     setLayers((prev) => {
-      let next
+      let next: Layer[]
       if (mode === 'solo') {
         const target = prev.find((l) => l.name === name)
         if (!target) return prev
@@ -142,7 +173,7 @@ export default function LayersPanel({ circuitJson, onLayerStackChange }) {
     })
   }, [onLayerStackChange, soloLayer])
 
-  const handleColorChange = useCallback((name, color) => {
+  const handleColorChange = useCallback((name: string, color: string) => {
     setLayers((prev) => {
       const next = prev.map((l) => l.name === name ? { ...l, color } : l)
       onLayerStackChange?.(next)
@@ -150,27 +181,27 @@ export default function LayersPanel({ circuitJson, onLayerStackChange }) {
     })
   }, [onLayerStackChange])
 
-  const handleThemeChange = useCallback((preset) => {
+  const handleThemeChange = useCallback((preset: string) => {
     setTheme(preset)
     setLayers((prev) => {
-      const colors = COLOR_PRESETS[preset] || {}
+      const colors: Record<string, string> = (COLOR_PRESETS as Record<string, Record<string, string>>)[preset] || {}
       const next = prev.map((l) => ({ ...l, color: colors[l.name] || l.color }))
       onLayerStackChange?.(next)
       return next
     })
   }, [onLayerStackChange])
 
-  const handleDragStart = useCallback((evt, name) => {
+  const handleDragStart = useCallback((evt: DragEvent<HTMLDivElement>, name: string) => {
     setDraggedName(name)
     evt.dataTransfer.effectAllowed = 'move'
   }, [])
 
-  const handleDragOver = useCallback((evt, name) => {
+  const handleDragOver = useCallback((evt: DragEvent<HTMLDivElement>, name: string) => {
     evt.preventDefault()
     setDragOverName(name)
   }, [])
 
-  const handleDrop = useCallback((evt, targetName) => {
+  const handleDrop = useCallback((evt: DragEvent<HTMLDivElement>, targetName: string) => {
     evt.preventDefault()
     if (!draggedName || draggedName === targetName) {
       setDraggedName(null)

@@ -28,6 +28,9 @@
 import * as modeling from '@jscad/modeling'
 import { parseSketch } from './sketchSolver.js'
 import { sketchToGeom2 } from './sketchGeom2.js'
+import type { Geom3, JscadPart } from '../types/geometry.js'
+import type { JscadWorkerResponse, JscadRunResult } from '../types/workers.js'
+import type { EquationsScope } from '../store/workspace.js'
 
 // Equations injection — see store/workspace.js loadProject for the resolver
 // that walks the project tree, parses every `.equations` file, evaluates the
@@ -35,13 +38,13 @@ import { sketchToGeom2 } from './sketchGeom2.js'
 // evaluation so a user editing equations triggers a re-run via the standard
 // debounce pipeline (the workspace store touches the JSCAD source after the
 // equations file mutates).
-let equationsResolver = null
-export function setEquationsResolver(fn) {
-  // fn: () => Promise<{ values: { [name]: number }, errors, duplicates }> | null
+type EquationsResolver = () => Promise<EquationsScope> | EquationsScope | null | undefined
+let equationsResolver: EquationsResolver | null = null
+export function setEquationsResolver(fn: EquationsResolver | null): void {
   equationsResolver = fn || null
 }
 
-async function resolveEquationsScope() {
+async function resolveEquationsScope(): Promise<Record<string, number>> {
   if (!equationsResolver) return {}
   try {
     const res = await equationsResolver()
@@ -63,8 +66,13 @@ async function resolveEquationsScope() {
 //            import foo from "./path.sketch"  (resolved later)
 export const SKETCH_IMPORT_RE = /^[ \t]*import\s+([A-Za-z_$][\w$]*)\s+from\s+['"]([^'"\n]+\.sketch)['"];?[ \t]*$/gm
 
-function extractSketchImports(code) {
-  const imports = []
+interface SketchImport {
+  binding: string
+  path: string
+}
+
+function extractSketchImports(code: string): { stripped: string; imports: SketchImport[] } {
+  const imports: SketchImport[] = []
   const stripped = code.replace(SKETCH_IMPORT_RE, (_m, binding, path) => {
     imports.push({ binding, path })
     return `// resolved sketch import: ${binding} <- ${path}`
@@ -72,7 +80,7 @@ function extractSketchImports(code) {
   return { stripped, imports }
 }
 
-function transformSource(code) {
+function transformSource(code: string): string {
   // Remove top-level imports — the user's code shouldn't need them, but seeded
   // examples sometimes include `import * as modeling from '@jscad/modeling'`.
   // Sketch imports are removed by the caller before we land here.
@@ -98,9 +106,9 @@ function transformSource(code) {
 // stays decoupled from the workspace store; jscadRunner.js doesn't import
 // from store/workspace.js (which would create a cycle through the store's
 // own runJscad call).
-let sketchResolver = null
-export function setSketchResolver(fn) {
-  // fn: (path: string) => Promise<{ content: string } | null>
+type SketchResolver = (path: string) => Promise<{ content: string } | null>
+let sketchResolver: SketchResolver | null = null
+export function setSketchResolver(fn: SketchResolver | null): void {
   sketchResolver = fn || null
 }
 
@@ -108,20 +116,20 @@ export function setSketchResolver(fn) {
 // in the current project. Used to produce a helpful error message when a
 // referenced sketch can't be found. If not registered, the error still fires
 // but without the suggestions list.
-let sketchLister = null
-export function setSketchLister(fn) {
-  // fn: () => Promise<string[]>
+type SketchLister = () => Promise<string[]> | string[]
+let sketchLister: SketchLister | null = null
+export function setSketchLister(fn: SketchLister | null): void {
   sketchLister = fn || null
 }
 
-async function resolveSketchImports(imports) {
-  const out = {}
+async function resolveSketchImports(imports: SketchImport[]): Promise<Record<string, unknown>> {
+  const out: Record<string, unknown> = {}
   if (!imports || imports.length === 0) return out
   for (const { binding, path } of imports) {
     const file = sketchResolver ? await sketchResolver(path) : null
     if (!file) {
       // Collect available sketches for a diagnostic message.
-      let available = []
+      let available: string[] = []
       try {
         available = sketchLister ? await sketchLister() : []
       } catch { /* lister failure is non-fatal — still throw */ }
@@ -145,19 +153,23 @@ async function resolveSketchImports(imports) {
 // floats in 0..1. geom3ToBufferGeometry drops it, so unless we lift it onto the
 // part here it never reaches the renderer — which is why colorize() used to have
 // no visible effect and the viewport always fell back to the index palette.
-function geomColorToInt(geom) {
+function geomColorToInt(geom: (Geom3 & { color?: number[] }) | null | undefined): number | undefined {
   const c = geom && geom.color
   if (!Array.isArray(c) || c.length < 3) return undefined
-  const ch = (v) => Math.max(0, Math.min(255, Math.round((Number(v) || 0) * 255)))
+  const ch = (v: number) => Math.max(0, Math.min(255, Math.round((Number(v) || 0) * 255)))
   return (ch(c[0]) << 16) | (ch(c[1]) << 8) | ch(c[2])
 }
 
-function toPart(id, geom, explicitColor) {
+function toPart(id: string, geom: Geom3, explicitColor?: number): JscadPart {
   const color = explicitColor != null ? explicitColor : geomColorToInt(geom)
   return color != null ? { id, geom, color } : { id, geom }
 }
 
-function normalizeParts(out) {
+// The user's JSCAD code can return almost any shape — a bare Geom3, a `{id, geom, color}` part, or
+// arrays of either — so this boundary is intentionally loose (`any`) rather than modeled exactly;
+// mirrors jscadWorker.ts's own `normalizeParts`.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeParts(out: any): JscadPart[] {
   if (out == null) return []
   if (Array.isArray(out)) {
     if (out.length === 0) return []
@@ -176,9 +188,12 @@ const SCOPE_KEYS = [
   'primitives', 'transforms', 'booleans', 'extrusions', 'expansions',
   'measurements', 'colors', 'utils', 'maths', 'curves', 'geometries',
   'hulls', 'text',
-]
+] as const
 
-async function runJscadOnMainThread(code, configParams) {
+async function runJscadOnMainThread(
+  code: string,
+  configParams?: Record<string, number> | null,
+): Promise<JscadRunResult> {
   if (!code || !code.trim()) return { parts: [] }
   try {
     const { stripped, imports } = extractSketchImports(code)
@@ -210,19 +225,24 @@ async function runJscadOnMainThread(code, configParams) {
     const parts = normalizeParts(result)
     return { parts }
   } catch (err) {
-    return { error: err && err.message ? err.message : String(err) }
+    return { error: err && (err as Error).message ? (err as Error).message : String(err) }
   }
 }
 
 // ---- Worker plumbing --------------------------------------------------------
 
-let worker = null
+interface PendingEntry {
+  resolve: (value: JscadRunResult) => void
+  reject: (reason?: unknown) => void
+}
+
+let worker: Worker | null = null
 let workerBroken = false
 let nextRunId = 1
-const pending = new Map() // runId → { resolve, reject }
+const pending = new Map<number, PendingEntry>() // runId → { resolve, reject }
 let latestRunId = 0
 
-function ensureWorker() {
+function ensureWorker(): Worker | null {
   if (workerBroken) return null
   if (worker) return worker
   if (typeof Worker === 'undefined') {
@@ -231,9 +251,10 @@ function ensureWorker() {
   }
   try {
     worker = new Worker(new URL('./jscadWorker.js', import.meta.url), { type: 'module' })
-    worker.addEventListener('message', (ev) => {
-      const { type, runId } = ev.data || {}
-      const entry = pending.get(runId)
+    worker.addEventListener('message', (ev: MessageEvent<JscadWorkerResponse>) => {
+      const data = ev.data
+      const runId = data?.runId
+      const entry = runId != null ? pending.get(runId) : undefined
       if (!entry) return
       pending.delete(runId)
       if (runId !== latestRunId) {
@@ -242,10 +263,10 @@ function ensureWorker() {
         entry.resolve({ stale: true })
         return
       }
-      if (type === 'error') {
-        entry.resolve({ error: ev.data.error })
-      } else if (type === 'result') {
-        entry.resolve({ parts: ev.data.parts || [] })
+      if (data.type === 'error') {
+        entry.resolve({ error: data.error })
+      } else if (data.type === 'result') {
+        entry.resolve({ parts: data.parts || [] })
       } else {
         entry.resolve({ error: 'unknown worker message' })
       }
@@ -253,7 +274,7 @@ function ensureWorker() {
     worker.addEventListener('error', (ev) => {
       // Fatal worker error: tear it down and mark broken so subsequent calls
       // run inline. Reject any pending callers with an error so they fall back.
-      try { worker.terminate() } catch { /* ignore */ }
+      try { worker?.terminate() } catch { /* ignore */ }
       worker = null
       workerBroken = true
       for (const [, entry] of pending) entry.reject(new Error(ev.message || 'jscad worker error'))
@@ -275,7 +296,10 @@ function ensureWorker() {
 // configs always win on key collision. The workspace store passes it; the
 // public surface stays backwards compatible (one-arg callers behave as
 // before).
-export async function runJscad(code, configParams) {
+export async function runJscad(
+  code: string,
+  configParams?: Record<string, number> | null,
+): Promise<JscadRunResult> {
   const w = ensureWorker()
   // Pre-resolve any `.sketch` imports on the main thread so the worker only
   // ever evaluates pure JSCAD code with sketch profiles already converted to
@@ -283,11 +307,11 @@ export async function runJscad(code, configParams) {
   // arrays + numbers), so this round-trips cleanly. If there are no sketch
   // imports the work is essentially zero.
   const { stripped, imports } = extractSketchImports(code || '')
-  let sketchProfiles
+  let sketchProfiles: Record<string, unknown>
   try {
     sketchProfiles = imports.length > 0 ? await resolveSketchImports(imports) : {}
   } catch (err) {
-    return { error: err && err.message ? err.message : String(err) }
+    return { error: err && (err as Error).message ? (err as Error).message : String(err) }
   }
   const equationsValues = await resolveEquationsScope()
   const mergedParams = (configParams && typeof configParams === 'object')
@@ -304,9 +328,8 @@ export async function runJscad(code, configParams) {
   }
   const runId = ++nextRunId
   latestRunId = runId
-  let promise
   try {
-    promise = new Promise((resolve, reject) => {
+    const promise = new Promise<JscadRunResult>((resolve, reject) => {
       pending.set(runId, { resolve, reject })
       // The worker contract uses `equationsValues` as the param map; we send
       // the merged scope so the worker doesn't need to know about configs.
@@ -322,7 +345,7 @@ export async function runJscad(code, configParams) {
 
 // Invalidate all in-flight runs so their results are dropped. Called when the
 // user navigates away from a file or closes the editor.
-export function cancelJscad() {
+export function cancelJscad(): void {
   latestRunId = ++nextRunId
   for (const [, entry] of pending) entry.resolve({ stale: true })
   pending.clear()

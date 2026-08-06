@@ -44,6 +44,7 @@ import type {
   JscadPart, FeatureFile, SketchJSON, AssemblyDocument, Configuration, Mesh,
 } from '@/types'
 import type { CircuitElement, CircuitJson } from '@/types'
+import type { JscadRunResult } from '@/types'
 
 // ---------------------------------------------------------------------------
 // T-508 locally-typed shapes.
@@ -1062,6 +1063,19 @@ function strHash(s: string | null | undefined): string {
   return String(h >>> 0)
 }
 
+// runJscad()'s three-shape envelope ({parts}|{error}|{stale:true}, see
+// src/types/workers.ts JscadRunResult) isn't tagged by a common discriminant
+// field, so callers need an `in`-guarded unpack rather than direct property
+// access. Centralised here since every runJscad() call site in this file
+// follows the same stale/error/parts branching.
+function unpackJscadResult(res: JscadRunResult): { stale: boolean; error?: string; parts?: JscadPart[] } {
+  return {
+    stale: 'stale' in res,
+    error: 'error' in res ? res.error : undefined,
+    parts: 'parts' in res ? res.parts : undefined,
+  }
+}
+
 // Compute the absolute path (leading '/') for a file in the project tree by
 // walking its parent_id chain. Returns '' if the file is not found.
 export function fileAbsPath(files: WorkspaceFile[] | null | undefined, fileId: string | null | undefined): string {
@@ -1498,13 +1512,14 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
         // raw .jscad files in v1; the dropdown stays hidden).
         const res = await runJscad(content, null)
         if (get().currentFileId !== fileId) return
-        if (res?.stale) return
-        if (res.error) {
-          set({ partsError: res.error, loadingParts: false })
+        const { stale, error, parts } = unpackJscadResult(res)
+        if (stale) return
+        if (error) {
+          set({ partsError: error, loadingParts: false })
         } else {
-          set({ parts: res.parts || [], partsError: null, loadingParts: false })
+          set({ parts: parts || [], partsError: null, loadingParts: false })
           // Best-effort cache store; tolerate failure silently.
-          meshCache.put(key, res.parts || []).catch(() => {})
+          meshCache.put(key, parts || []).catch(() => {})
         }
       } catch (err) {
         if (get().currentFileId === fileId) {
@@ -3270,11 +3285,12 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
         const res = await runJscad(currentFileContent, cfgParams)
         // Guard: user may have navigated away while JSCAD was running.
         if (get().currentFileId !== currentFileId) return
-        if (res?.stale) return
-        if (res.error) {
-          set({ partsError: res.error, loadingParts: false })
+        const { stale, error, parts } = unpackJscadResult(res)
+        if (stale) return
+        if (error) {
+          set({ partsError: error, loadingParts: false })
         } else {
-          set({ parts: res.parts || [], partsError: null, loadingParts: false })
+          set({ parts: parts || [], partsError: null, loadingParts: false })
         }
       }
       return
@@ -3518,11 +3534,12 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
             const cfgParams = get().getActiveConfigParams(fileId)
             const res = await runJscad(state.currentFileContent || '', cfgParams)
             if (get().currentFileId !== fileId) return
-            if (res?.stale) return
-            if (res.error) {
-              set({ partsError: res.error })
+            const { stale, error, parts } = unpackJscadResult(res)
+            if (stale) return
+            if (error) {
+              set({ partsError: error })
             } else {
-              set({ parts: res.parts || [], partsError: null })
+              set({ parts: parts || [], partsError: null })
             }
           } catch { /* ignore */ }
         })()
@@ -4092,8 +4109,9 @@ async function loadComponentParts(projectId, fileId, configId = null) {
   const hit = componentResultCache.get(k)
   if (hit) return hit.parts
   const res = await runJscad(file.content || '', null)
-  if (res.error) throw new Error(res.error)
-  const parts = res.parts || []
+  const { error, parts: resolvedParts } = unpackJscadResult(res)
+  if (error) throw new Error(error)
+  const parts = resolvedParts || []
   componentResultCache.set(k, { parts })
   return parts
 }
@@ -4207,10 +4225,11 @@ async function applySourceEdit(set, get, nextSource) {
   try {
     // Run JSCAD locally first so the renderer updates without waiting on PATCH.
     const res = await runJscad(nextSource)
-    if (!res.error) {
-      set({ parts: res.parts || [], partsError: null })
+    const { error, parts } = unpackJscadResult(res)
+    if (!error) {
+      set({ parts: parts || [], partsError: null })
     } else {
-      set({ partsError: res.error })
+      set({ partsError: error })
     }
     const updated = await api.updateFile(projectId, currentFileId, { content: nextSource })
     set((s) => ({

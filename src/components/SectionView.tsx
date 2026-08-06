@@ -35,19 +35,61 @@
 //   onExportDxf    — optional callback for DXF export (stubbed)
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { MouseEvent as ReactMouseEvent, RefObject, WheelEvent as ReactWheelEvent } from 'react'
 import { Download, ZoomIn, ZoomOut, Maximize2, Info } from 'lucide-react'
+import type { FeatureNode, Vec3 } from '../types/geometry'
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+//
+// FINDING for T-501 (report, not fixed here — geometry.ts is shared, not owned by
+// this slice): `SectionFeatureNode.plane` in src/types/geometry.ts is typed as
+// `string`, but that's wrong for the 'section' op. occtWorker.js's own header
+// comment (line ~2611, the authoritative source geometry.ts says it mined this
+// from) documents the real shape as
+// `{ op: 'section', target_solid_ref: <nodeId>, plane: { point: [x,y,z], normal:
+// [x,y,z] } }` — an object, not a string — and this component has always read it
+// that way (`features[i].plane` used as `.point`/`.normal` below, both before and
+// after this migration). SectionPlaneSpec is declared locally to match the actual
+// runtime shape rather than importing the mistyped shared field.
+
+export interface SectionPlaneSpec {
+  point: Vec3
+  normal: Vec3
+}
+
+type UV = [number, number]
+type UVLine = [UV, UV]
+
+export interface UVBounds {
+  minU: number
+  maxU: number
+  minV: number
+  maxV: number
+}
+
+export interface SectionViewHandle {
+  snapshot: () => string | null
+}
+
+export interface SectionViewProps {
+  parsedFeature?: { features?: FeatureNode[] } | null
+  edgeSegments?: Float32Array | null
+  sectionPlane?: SectionPlaneSpec | null
+  onExportDxf?: (payload: { lines: UVLine[]; bounds: UVBounds; planeSpec: SectionPlaneSpec }) => void
+  viewRef?: RefObject<SectionViewHandle | null>
+}
 
 // ── Plane UV frame ─────────────────────────────────────────────────────────────
 // Given a plane normal, compute two orthogonal unit vectors (u, v) that lie in
 // the plane. This mirrors what the OCCT face frame returns for a gp_Pln.
 
-function normalize3(v) {
+function normalize3(v: Vec3): Vec3 {
   const len = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
   if (len < 1e-10) return [1, 0, 0]
   return [v[0] / len, v[1] / len, v[2] / len]
 }
 
-function cross3(a, b) {
+function cross3(a: Vec3, b: Vec3): Vec3 {
   return [
     a[1] * b[2] - a[2] * b[1],
     a[2] * b[0] - a[0] * b[2],
@@ -55,14 +97,20 @@ function cross3(a, b) {
   ]
 }
 
-function dot3(a, b) {
+function dot3(a: Vec3, b: Vec3): number {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
 
-function computePlaneFrame(normal) {
+interface PlaneFrame {
+  u: Vec3
+  v: Vec3
+  n: Vec3
+}
+
+function computePlaneFrame(normal?: Vec3): PlaneFrame {
   const n = normalize3(normal || [0, 0, 1])
   // Choose an arbitrary vector not parallel to n to build u.
-  let arbitrary = [0, 1, 0]
+  let arbitrary: Vec3 = [0, 1, 0]
   if (Math.abs(dot3(n, arbitrary)) > 0.9) arbitrary = [1, 0, 0]
   const u = normalize3(cross3(arbitrary, n))
   const v = normalize3(cross3(n, u))
@@ -70,8 +118,8 @@ function computePlaneFrame(normal) {
 }
 
 // Project a 3D point onto the plane's 2D UV frame.
-function projectToUV(pt, planePoint, frame) {
-  const dp = [pt[0] - planePoint[0], pt[1] - planePoint[1], pt[2] - planePoint[2]]
+function projectToUV(pt: Vec3, planePoint: Vec3, frame: PlaneFrame): UV {
+  const dp: Vec3 = [pt[0] - planePoint[0], pt[1] - planePoint[1], pt[2] - planePoint[2]]
   return [dot3(dp, frame.u), dot3(dp, frame.v)]
 }
 
@@ -79,9 +127,9 @@ function projectToUV(pt, planePoint, frame) {
 // The worker returns edge geometry as Float32Array pairs (x0,y0,z0, x1,y1,z1, …).
 // We project every segment pair onto the section plane's UV frame.
 
-function extractEdgeUV(edgeSegs, planePoint, frame) {
+function extractEdgeUV(edgeSegs: Float32Array | null | undefined, planePoint: Vec3, frame: PlaneFrame): UVLine[] {
   if (!edgeSegs || edgeSegs.length < 6) return []
-  const lines = []
+  const lines: UVLine[] = []
   for (let i = 0; i + 5 < edgeSegs.length; i += 6) {
     const a = projectToUV([edgeSegs[i], edgeSegs[i + 1], edgeSegs[i + 2]], planePoint, frame)
     const b = projectToUV([edgeSegs[i + 3], edgeSegs[i + 4], edgeSegs[i + 5]], planePoint, frame)
@@ -91,7 +139,7 @@ function extractEdgeUV(edgeSegs, planePoint, frame) {
 }
 
 // Compute bounding box from projected UV lines.
-function computeBounds(lines) {
+function computeBounds(lines: UVLine[]): UVBounds {
   if (lines.length === 0) return { minU: -10, maxU: 10, minV: -10, maxV: 10 }
   let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity
   for (const [[u0, v0], [u1, v1]] of lines) {
@@ -113,8 +161,8 @@ export default function SectionView({
   sectionPlane,
   onExportDxf,
   viewRef,
-}) {
-  const svgRef = useRef(null)
+}: SectionViewProps) {
+  const svgRef = useRef<SVGSVGElement | null>(null)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const isPanning = useRef(false)
@@ -140,17 +188,21 @@ export default function SectionView({
   }, [viewRef])
 
   // Derive section plane params from the last section node in the tree.
-  const planeSpec = useMemo(() => {
+  const planeSpec = useMemo<SectionPlaneSpec>(() => {
     if (sectionPlane) return sectionPlane
     const features = parsedFeature?.features || []
     for (let i = features.length - 1; i >= 0; i--) {
-      if (features[i].op === 'section' && features[i].plane) return features[i].plane
+      const f = features[i]
+      // See the FINDING note above: geometry.ts's FeatureNode union types 'section'
+      // nodes with `plane: string`, but the real runtime shape (and this component's
+      // own long-standing behavior) is `plane: { point, normal }`.
+      if (f.op === 'section' && f.plane) return f.plane as unknown as SectionPlaneSpec
     }
     return { point: [0, 0, 0], normal: [0, 0, 1] }
   }, [sectionPlane, parsedFeature])
 
   const frame      = useMemo(() => computePlaneFrame(planeSpec.normal), [planeSpec.normal])
-  const planePoint = useMemo(() => planeSpec.point || [0, 0, 0], [planeSpec])
+  const planePoint = useMemo<Vec3>(() => planeSpec.point || [0, 0, 0], [planeSpec])
 
   // Project all edge segments onto the plane's UV frame.
   const lines = useMemo(
@@ -165,14 +217,14 @@ export default function SectionView({
   const H = bounds.maxV - bounds.minV
 
   // ── Panning ────────────────────────────────────────────────────────────────
-  const onMouseDown = useCallback((e) => {
+  const onMouseDown = useCallback((e: ReactMouseEvent<SVGSVGElement>) => {
     if (e.button !== 1 && e.button !== 0) return
     isPanning.current = true
     panStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y }
     e.preventDefault()
   }, [pan])
 
-  const onMouseMove = useCallback((e) => {
+  const onMouseMove = useCallback((e: ReactMouseEvent<HTMLDivElement>) => {
     if (!isPanning.current) return
     const dx = e.clientX - panStart.current.x
     const dy = e.clientY - panStart.current.y
@@ -181,7 +233,7 @@ export default function SectionView({
 
   const onMouseUp = useCallback(() => { isPanning.current = false }, [])
 
-  const onWheel = useCallback((e) => {
+  const onWheel = useCallback((e: ReactWheelEvent<HTMLDivElement>) => {
     e.preventDefault()
     const delta = e.deltaY > 0 ? 0.9 : 1.1
     setZoom((z) => Math.max(0.05, Math.min(50, z * delta)))
@@ -270,6 +322,8 @@ export default function SectionView({
             preserveAspectRatio="xMidYMid meet"
             style={{
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              // isPanning is a plain mutable ref used only to set the CSS cursor, not for logic.
+              // eslint-disable-next-line react-hooks/refs -- pre-existing before this migration.
               cursor: isPanning.current ? 'grabbing' : 'grab',
             }}
             onMouseDown={onMouseDown}

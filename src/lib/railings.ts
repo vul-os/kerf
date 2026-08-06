@@ -1,17 +1,73 @@
 /**
- * railings.js — Pure JS parametric railing / handrail geometry.
+ * railings.ts — Pure JS parametric railing / handrail geometry.
  *
  * All dimensions in millimetres.
  */
+
+import type { Vec3 } from '@/types'
+
+// ── Shapes ─────────────────────────────────────────────────────────────────
+//
+// stairs.js/stairs.ts (outside this slice) exports no reusable types — its exports are all
+// implicit-`any` JSDoc. The shapes below are modeled locally from how defaultRailing/
+// railingFromStair actually read and produce data.
+
+/** A path point, as used throughout the railing path/post/baluster helpers. */
+export interface RailingPoint {
+  x: number
+  y: number
+  z: number
+}
+
+export interface RailingProfileSpec {
+  profile: string
+  size_mm: number
+  offset_mm?: number
+  height_mm?: number
+  spacing_mm?: number
+}
+
+export interface RailingDoc {
+  version: number
+  path: RailingPoint[]
+  height_mm: number
+  top_rail: RailingProfileSpec
+  posts: RailingProfileSpec
+  balusters: RailingProfileSpec
+}
+
+export interface DefaultRailingOptions {
+  path: RailingPoint[]
+  height_mm?: number
+}
+
+export interface RailingValidationResult {
+  ok: boolean
+  errors: string[]
+}
+
+/** The subset of a stair document (stairs.js) that railingFromStair reads. */
+export interface RailingStairFlight {
+  start_point: Vec3
+  direction: Vec3
+  step_count: number
+}
+
+export interface RailingStairSource {
+  riser_height_mm?: number
+  tread_depth_mm?: number
+  width_mm?: number
+  flights: RailingStairFlight[]
+}
+
+export type RailingSide = 'left' | 'right' | 'both'
 
 // ── defaults ───────────────────────────────────────────────────────────────
 
 /**
  * Build a default railing document.
- * @param {{ path: Array<{x,y,z}>, height_mm?: number }} opts
- * @returns {object}
  */
-export function defaultRailing({ path, height_mm = 1000 }) {
+export function defaultRailing({ path, height_mm = 1000 }: DefaultRailingOptions): RailingDoc {
   return {
     version: 1,
     path: path.map(p => ({ x: p.x, y: p.y, z: p.z })),
@@ -40,11 +96,9 @@ export function defaultRailing({ path, height_mm = 1000 }) {
 
 /**
  * Validate a railing document.
- * @param {object} railing
- * @returns {{ ok: boolean, errors: string[] }}
  */
-export function validateRailing(railing) {
-  const errors = []
+export function validateRailing(railing: Partial<RailingDoc>): RailingValidationResult {
+  const errors: string[] = []
 
   if (!Array.isArray(railing.path) || railing.path.length < 2) {
     errors.push('path must be an array with at least 2 points')
@@ -57,20 +111,20 @@ export function validateRailing(railing) {
 
   const validProfiles = ['round', 'square', 'flat']
 
-  const tr = railing.top_rail || {}
-  if (!validProfiles.includes(tr.profile)) {
+  const tr = railing.top_rail || ({} as Partial<RailingProfileSpec>)
+  if (!validProfiles.includes(tr.profile as string)) {
     errors.push(`top_rail.profile must be one of ${validProfiles.join(', ')}`)
   }
   if (typeof tr.size_mm !== 'number' || tr.size_mm <= 0) {
     errors.push('top_rail.size_mm must be a positive number')
   }
 
-  const posts = railing.posts || {}
+  const posts = railing.posts || ({} as Partial<RailingProfileSpec>)
   if (typeof posts.spacing_mm !== 'number' || posts.spacing_mm <= 0) {
     errors.push('posts.spacing_mm must be a positive number')
   }
 
-  const bal = railing.balusters || {}
+  const bal = railing.balusters || ({} as Partial<RailingProfileSpec>)
   if (typeof bal.spacing_mm !== 'number' || bal.spacing_mm <= 0) {
     errors.push('balusters.spacing_mm must be a positive number')
   }
@@ -82,10 +136,8 @@ export function validateRailing(railing) {
 
 /**
  * Compute total length of a polyline path.
- * @param {Array<{x,y,z}>} path
- * @returns {number}
  */
-function pathLength(path) {
+function pathLength(path: RailingPoint[]): number {
   let total = 0
   for (let i = 1; i < path.length; i++) {
     const dx = path[i].x - path[i - 1].x
@@ -98,11 +150,10 @@ function pathLength(path) {
 
 /**
  * Interpolate a point at distance `t` along a polyline.
- * @param {Array<{x,y,z}>} path
- * @param {number} t  distance from start
- * @returns {{x,y,z}}
+ *
+ * @param t - distance from start
  */
-function interpolatePath(path, t) {
+function interpolatePath(path: RailingPoint[], t: number): RailingPoint {
   let remaining = t
   for (let i = 1; i < path.length; i++) {
     const dx = path[i].x - path[i - 1].x
@@ -129,18 +180,16 @@ function interpolatePath(path, t) {
  * Compute post positions spaced evenly along path.
  * Always includes start and end points.
  *
- * @param {Array<{x,y,z}>} path
- * @param {number} post_spacing  — maximum distance between posts (mm)
- * @returns {Array<{x,y,z}>}
+ * @param post_spacing - maximum distance between posts (mm)
  */
-export function computePostPositions(path, post_spacing) {
+export function computePostPositions(path: RailingPoint[], post_spacing: number): RailingPoint[] {
   if (!path || path.length < 2) return []
   const total = pathLength(path)
   if (total <= 0) return [{ ...path[0] }]
 
   const count = Math.max(2, Math.ceil(total / post_spacing) + 1)
   const step = total / (count - 1)
-  const positions = []
+  const positions: RailingPoint[] = []
 
   for (let i = 0; i < count; i++) {
     positions.push(interpolatePath(path, i * step))
@@ -153,11 +202,9 @@ export function computePostPositions(path, post_spacing) {
  * Compute baluster positions spaced evenly along path.
  * Balusters are placed between posts (not at post positions).
  *
- * @param {Array<{x,y,z}>} path
- * @param {number} baluster_spacing  — maximum distance between balusters (mm)
- * @returns {Array<{x,y,z}>}
+ * @param baluster_spacing - maximum distance between balusters (mm)
  */
-export function computeBalusterPositions(path, baluster_spacing) {
+export function computeBalusterPositions(path: RailingPoint[], baluster_spacing: number): RailingPoint[] {
   if (!path || path.length < 2) return []
   const total = pathLength(path)
   if (total <= 0) return []
@@ -166,7 +213,7 @@ export function computeBalusterPositions(path, baluster_spacing) {
   if (count <= 0) return []
 
   const step = total / (count + 1)
-  const positions = []
+  const positions: RailingPoint[] = []
 
   for (let i = 1; i <= count; i++) {
     positions.push(interpolatePath(path, i * step))
@@ -183,15 +230,17 @@ export function computeBalusterPositions(path, baluster_spacing) {
  * Walks along the tread nosing edge of each flight. When side='both',
  * returns an array of two railing docs.
  *
- * @param {object} stair  — stair doc from stairs.js
- * @param {'left'|'right'|'both'} side
- * @param {object} [options]  — overrides for defaultRailing
- * @returns {object|object[]}
+ * @param stair - stair doc from stairs.js
+ * @param options - overrides for defaultRailing
  */
-export function railingFromStair(stair, side, options = {}) {
+export function railingFromStair(
+  stair: RailingStairSource,
+  side: RailingSide,
+  options: Partial<DefaultRailingOptions> = {},
+): RailingDoc | RailingDoc[] {
   const { riser_height_mm = 175, tread_depth_mm = 280, width_mm = 1000 } = stair
 
-  function pathForFlight(flight, offset) {
+  function pathForFlight(flight: RailingStairFlight, offset: number): RailingPoint[] {
     const { start_point, direction, step_count } = flight
     const [dx, dy] = direction
     const dLen = Math.sqrt(dx * dx + dy * dy) || 1
@@ -202,7 +251,7 @@ export function railingFromStair(stair, side, options = {}) {
     const px = -uy
     const py = ux
 
-    const path = []
+    const path: RailingPoint[] = []
     for (let i = 0; i <= step_count; i++) {
       path.push({
         x: start_point[0] + ux * tread_depth_mm * i + px * offset,
@@ -214,8 +263,8 @@ export function railingFromStair(stair, side, options = {}) {
   }
 
   // Merge paths from all flights
-  function buildPath(offset) {
-    const allPts = []
+  function buildPath(offset: number): RailingPoint[] {
+    const allPts: RailingPoint[] = []
     for (const flight of stair.flights) {
       const pts = pathForFlight(flight, offset)
       if (allPts.length === 0) {
@@ -243,11 +292,10 @@ export function railingFromStair(stair, side, options = {}) {
 
 /**
  * Build a railing doc from an explicit sketch path.
- *
- * @param {Array<{x,y,z}>} sketch_points
- * @param {object} [options]
- * @returns {object}
  */
-export function railingFromSketch(sketch_points, options = {}) {
+export function railingFromSketch(
+  sketch_points: RailingPoint[],
+  options: Partial<DefaultRailingOptions> = {},
+): RailingDoc {
   return defaultRailing({ path: sketch_points, ...options })
 }

@@ -6,6 +6,7 @@ import {
   computeBalusterPositions,
   railingFromStair,
   railingFromSketch,
+  type RailingDoc,
 } from './railings.js'
 import { straightStairFromAB, lShapeStair } from './stairs.js'
 
@@ -159,7 +160,7 @@ describe('railingFromStair', () => {
 
   it('returns a railing doc for side=right', () => {
     const stair = straightStairFromAB([0, 0, 0], [3360, 0, 2800], stairParams)
-    const rail = railingFromStair(stair, 'right')
+    const rail = railingFromStair(stair, 'right') as RailingDoc
     expect(rail.version).toBe(1)
     expect(Array.isArray(rail.path)).toBe(true)
     expect(rail.path.length).toBeGreaterThan(0)
@@ -167,7 +168,7 @@ describe('railingFromStair', () => {
 
   it('returns a railing doc for side=left', () => {
     const stair = straightStairFromAB([0, 0, 0], [3360, 0, 2800], stairParams)
-    const rail = railingFromStair(stair, 'left')
+    const rail = railingFromStair(stair, 'left') as RailingDoc
     expect(rail.version).toBe(1)
   })
 
@@ -180,7 +181,7 @@ describe('railingFromStair', () => {
 
   it('railing path length matches flight step count + 1', () => {
     const stair = straightStairFromAB([0, 0, 0], [3360, 0, 2800], stairParams)
-    const rail = railingFromStair(stair, 'left')
+    const rail = railingFromStair(stair, 'left') as RailingDoc
     const stepCount = stair.flights[0].step_count
     expect(rail.path).toHaveLength(stepCount + 1)
   })
@@ -188,7 +189,7 @@ describe('railingFromStair', () => {
   it('works for L-shaped stair', () => {
     const params = { riser_height_mm: 175, tread_depth_mm: 280, nosing_mm: 25, width_mm: 1000, total_rise_mm: 2100 }
     const stair = lShapeStair([0, 0, 0], 1680, 1680, [1200, 1000], params)
-    const rail = railingFromStair(stair, 'left')
+    const rail = railingFromStair(stair, 'left') as RailingDoc
     expect(Array.isArray(rail.path)).toBe(true)
     expect(rail.path.length).toBeGreaterThan(2)
   })

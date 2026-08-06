@@ -21,16 +21,51 @@
  *   partSurfaceZ — constant Z level of finished part surface for gouge check
  */
 
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { AlertTriangle, CheckCircle, Loader2, Activity, ZoomIn } from 'lucide-react'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
 // ---------------------------------------------------------------------------
+// Local domain types (no shared type exists for CAM verify results)
+// ---------------------------------------------------------------------------
+
+interface StockBounds {
+  x_min?: number
+  x_max?: number
+  y_min?: number
+  y_max?: number
+  stock_top?: number
+  stock_bottom?: number
+}
+
+interface ClPoint {
+  x: number
+  y: number
+  z: number
+}
+
+interface GougePoint {
+  x: number
+  y: number
+  z_part: number
+  z_actual: number
+  depth: number
+}
+
+interface VerifyResult {
+  removed_volume_mm3?: number
+  percent_cleared?: number
+  remaining_stock_mm3?: number
+  n_moves?: number
+  gouge_points?: GougePoint[]
+}
+
+// ---------------------------------------------------------------------------
 // Colour helpers
 // ---------------------------------------------------------------------------
 
-function depthToColor(depth, maxDepth) {
+function depthToColor(depth: number, maxDepth: number): string {
   if (maxDepth < 1e-9) return '#4ade80'
   const t = Math.min(1.0, depth / maxDepth)
   // Green → yellow → red
@@ -46,7 +81,13 @@ function depthToColor(depth, maxDepth) {
 // Z-slice heatmap
 // ---------------------------------------------------------------------------
 
-function DexelHeatmap({ gougePoints, stockBounds, resolution }) {
+interface DexelHeatmapProps {
+  gougePoints: GougePoint[]
+  stockBounds?: StockBounds
+  resolution?: number
+}
+
+function DexelHeatmap({ gougePoints, stockBounds, resolution }: DexelHeatmapProps) {
   if (!stockBounds) return null
   const { x_min = 0, x_max = 100, y_min = 0, y_max = 100 } = stockBounds
 
@@ -124,9 +165,19 @@ function DexelHeatmap({ gougePoints, stockBounds, resolution }) {
 // Main panel
 // ---------------------------------------------------------------------------
 
+export interface Props {
+  projectId?: string
+  fileId?: string
+  clPoints?: ClPoint[]
+  gcode?: string
+  stockBounds?: StockBounds
+  toolDiameter?: number
+  toolKind?: string
+  partSurfaceZ?: number
+  resolutionMm?: number
+}
+
 export default function CAMVerifyPanel({
-  projectId,
-  fileId,
   clPoints,
   gcode,
   stockBounds,
@@ -134,10 +185,10 @@ export default function CAMVerifyPanel({
   toolKind = 'flat',
   partSurfaceZ,
   resolutionMm = 0.5,
-}) {
+}: Props) {
   const [running, setRunning] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<VerifyResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   async function handleRun() {
     if (!clPoints && !gcode) {
@@ -153,7 +204,15 @@ export default function CAMVerifyPanel({
     setResult(null)
 
     try {
-      const body = {
+      const body: {
+        stock_bounds: StockBounds
+        tool_diameter_mm: number
+        tool_kind: string
+        resolution_mm: number
+        cl_points?: ClPoint[]
+        gcode?: string
+        part_surface_z_flat?: number
+      } = {
         stock_bounds: stockBounds,
         tool_diameter_mm: toolDiameter,
         tool_kind: toolKind,
@@ -173,10 +232,10 @@ export default function CAMVerifyPanel({
         const txt = await res.text()
         throw new Error(`${res.status}: ${txt}`)
       }
-      const data = await res.json()
+      const data: VerifyResult = await res.json()
       setResult(data)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setRunning(false)
     }
@@ -279,7 +338,13 @@ export default function CAMVerifyPanel({
   )
 }
 
-function StatCell({ label, value, accent = '#a78bfa' }) {
+interface StatCellProps {
+  label: string
+  value?: string | number
+  accent?: string
+}
+
+function StatCell({ label, value, accent = '#a78bfa' }: StatCellProps) {
   return (
     <div style={styles.statCell}>
       <span style={{ color: '#6b7280', fontSize: 10 }}>{label}</span>
@@ -290,7 +355,7 @@ function StatCell({ label, value, accent = '#a78bfa' }) {
   )
 }
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   root: {
     fontFamily: 'ui-monospace,SFMono-Regular,Menlo,monospace',
     fontSize: 12,

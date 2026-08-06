@@ -29,6 +29,33 @@ This is a **required** check, never a skip: `_run_oracle_converter` raises
 is unavailable. `pytest.importorskip`-style silent skipping is exactly what
 let T-550's only third-party check pass in CI while never running — see
 tasks.md T-550.
+
+T-539 addendum: `test_component_position_agrees_with_axis_convention` above
+only proves the two implementations agree on `zones_keepout_board.kicad_pcb`,
+which has **no `Edge.Cuts` outline geometry at all** (`Edge.Cuts` appears only
+as a layer *declaration*, line 13 of the fixture — grep it). The oracle's own
+transform (`node_modules/kicad-to-circuit-json/dist/index.js`,
+`InitializePcbContextStage`) is `compose(scale(1, -1), translate(-center.x,
+-center.y))` where `center` is the bbox midpoint of the board's `Edge.Cuts`
+graphics, falling back to `{0, 0}` only when none exist. So that agreement
+was degenerate: both fixed-origin (`cj = (kicad_x, -kicad_y)`) and
+board-centered (`cj = (kicad_x - center.x, center.y - kicad_y)`) collapse to
+the same formula when `center == {0, 0}`.
+
+`TestKicadOracleOutlineConvention` below uses a second fixture,
+`board_with_outline.kicad_pcb`, with a genuine `gr_line` rectangle outline on
+`Edge.Cuts` deliberately off-origin (bbox `(50,50)-(150,120)`, center
+`(100, 85)`) so the two transforms diverge and can actually be told apart.
+Verified directly by running `node scripts/kicad_oracle_convert.mjs` against
+this fixture: a footprint at KiCad `(70, 60)` comes back from the oracle at
+`(-30, 25)` (board-centered) while `kicad_io.py` reports `(70.0, -60.0)`
+(fixed-origin) — a real, visible divergence, not a rounding difference.
+
+That divergence is recorded as current behaviour; the *verdict* on which
+convention Circuit JSON actually means is decided from tscircuit's own
+authored output, not from either reader — see `TestKicadOracleOutlineConvention`'s
+class docstring for the evidence and the resulting decision to keep
+`kicad_io.py`'s fixed-origin flip unchanged.
 """
 
 from __future__ import annotations
@@ -44,11 +71,15 @@ from kerf_electronics.kicad_io import kicad_pcb_to_circuit_json
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _FIXTURE_PATH = os.path.join(_HERE, "fixtures", "zones_keepout_board.kicad_pcb")
+_OUTLINE_FIXTURE_PATH = os.path.join(_HERE, "fixtures", "board_with_outline.kicad_pcb")
 _REPO_ROOT = os.path.abspath(os.path.join(_HERE, "..", "..", ".."))
 _ORACLE_SCRIPT = os.path.join(_REPO_ROOT, "scripts", "kicad_oracle_convert.mjs")
 
 with open(_FIXTURE_PATH, encoding="utf-8") as _f:
     _FIXTURE_TEXT = _f.read()
+
+with open(_OUTLINE_FIXTURE_PATH, encoding="utf-8") as _f:
+    _OUTLINE_FIXTURE_TEXT = _f.read()
 
 # KiCad canonical layer name -> the oracle's Circuit JSON layer enum
 # ("top" | "bottom" | "inner1" | "inner2" | ...). kerf's own reader maps the
@@ -329,6 +360,107 @@ class TestKicadOracleConformance(unittest.TestCase):
 
         self.assertAlmostEqual(oracle["center"]["x"], ours["x"], places=6)
         self.assertAlmostEqual(oracle["center"]["y"], ours["y"], places=6)
+
+
+class TestKicadOracleOutlineConvention(unittest.TestCase):
+    """T-539: settles the T-538 axis choice against a board with a genuine
+    `Edge.Cuts` outline — `zones_keepout_board.kicad_pcb` has none (it's a
+    layer *declaration* only, line 13), so it cannot distinguish fixed-origin
+    from board-centered; both degenerate to the same formula there.
+
+    `board_with_outline.kicad_pcb` has a real `gr_line` rectangle outline,
+    bbox `(50,50)-(150,120)`, center `(100, 85)` — deliberately not at the
+    origin — and one footprint at KiCad `(70, 60)`. This is enough for the
+    two candidate transforms to disagree:
+
+    - fixed-origin (kerf, `_flip_kicad_y_to_circuit_json_y`):
+      `cj = (kicad_x, -kicad_y)` = `(70.0, -60.0)`
+    - board-centered (the oracle, `InitializePcbContextStage`:
+      `compose(scale(1, -1), translate(-center.x, -center.y))`):
+      `cj = (kicad_x - center.x, center.y - kicad_y)` = `(-30.0, 25.0)`
+
+    Both numbers below were independently verified by running
+    `node scripts/kicad_oracle_convert.mjs` and `kicad_pcb_to_circuit_json`
+    directly against this fixture, not derived from the formulas alone.
+
+    **The verdict — fixed-origin is correct, kept as-is:** Circuit JSON
+    itself is an absolute, single-coordinate-space format, not one where a
+    board's contents get recentered around its own outline. Evidence, not
+    assumption:
+
+    - `node_modules/circuit-json/dist/index.d.mts`, the `pcb_board` zod
+      schema (~line 7528): `center` is a **required** field of every
+      `pcb_board`, not a normalization target computed from the format's
+      rules — the schema lets a board sit anywhere.
+    - `node_modules/@tscircuit/core/dist/index.js`, `Board._getBoardCalcVariables`
+      (~line 21294) and `getResolvedPcbPositionProp` (~line 1339): when
+      tscircuit itself authors a board, `center` is *derived* from the
+      board's own `pcbX`/`pcbY`/`outlineOffset` props (defaulting to 0) or
+      from the auto-sized bounding box of its components — never the other
+      way around. Nothing recenters previously-placed component coordinates
+      once the board's extent is known.
+    - Directly confirmed against a real tscircuit-authored corpus fixture,
+      `node_modules/@tscircuit/schematic-corpus/dist/designs/design036/circuit.json`:
+      its `pcb_board.center` is `{x: 2.415, y: 0}` (board spans roughly
+      `x: -3.0 .. 7.83`), yet one of its `pcb_component` entries sits at
+      literal `x: 0` — nowhere near the board's own center. If Circuit JSON
+      meant board-centered coordinates, a component's position would be
+      relative to that `{2.415, 0}`, not the same absolute frame the board
+      itself is placed in.
+
+    So `kicad-to-circuit-json`'s `Edge.Cuts`-bbox recentering is that
+    project's own import-time convenience (presenting an imported board
+    centered near the viewport origin), not something Circuit JSON as a
+    format requires or implies. Kerf's fixed-origin flip — `cj_y = -kicad_y`,
+    x untouched — is the transform consistent with how tscircuit itself
+    treats the format: preserve the board's absolute coordinates, correct
+    only the Y-down/Y-up axis convention. No change to
+    `_flip_kicad_y_to_circuit_json_y` follows from this task; this class
+    exists to prove that holds even in the presence of an outline, which
+    `zones_keepout_board.kicad_pcb` could never test.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.ours = kicad_pcb_to_circuit_json(_OUTLINE_FIXTURE_TEXT)
+        cls.oracle = _run_oracle_converter(_OUTLINE_FIXTURE_TEXT)
+
+    def test_oracle_recenters_on_the_edge_cuts_bbox_when_one_exists(self):
+        """Unlike `zones_keepout_board.kicad_pcb`, this fixture gives the
+        oracle real Edge.Cuts geometry to recenter around, so its
+        `pcb_board` outline comes back centered near the origin rather than
+        matching the fixture's raw (50,50)-(150,120) KiCad coordinates."""
+        oracle_board = next(e for e in self.oracle if e["type"] == "pcb_board")
+        self.assertAlmostEqual(oracle_board["width"], 100.0, places=6)
+        self.assertAlmostEqual(oracle_board["height"], 70.0, places=6)
+        # Board-centered: outline recentered around (0, 0), not (100, 85).
+        xs = [p["x"] for p in oracle_board["outline"]]
+        ys = [p["y"] for p in oracle_board["outline"]]
+        self.assertAlmostEqual((min(xs) + max(xs)) / 2, 0.0, places=6)
+        self.assertAlmostEqual((min(ys) + max(ys)) / 2, 0.0, places=6)
+
+    def test_component_position_diverges_from_the_oracle_when_an_outline_exists(self):
+        """The actual, measured divergence this task exists to record: given
+        the same fixture, kerf (fixed-origin) and the oracle (board-centered)
+        now disagree, unlike on `zones_keepout_board.kicad_pcb`.
+
+        KiCad footprint position: `(at 70 60)` (Y-down).
+        """
+        ours = next(e for e in self.ours if e["type"] == "pcb_component")
+        oracle = next(e for e in self.oracle if e["type"] == "pcb_component")
+
+        # Fixed-origin (kerf): cj = (kicad_x, -kicad_y).
+        self.assertAlmostEqual(ours["x"], 70.0, places=6)
+        self.assertAlmostEqual(ours["y"], -60.0, places=6)
+
+        # Board-centered (oracle): cj = (kicad_x - center.x, center.y - kicad_y),
+        # center = (100, 85) from the Edge.Cuts bbox midpoint.
+        self.assertAlmostEqual(oracle["center"]["x"], -30.0, places=6)
+        self.assertAlmostEqual(oracle["center"]["y"], 25.0, places=6)
+
+        # The two genuinely disagree now — this is the point of the fixture.
+        self.assertNotAlmostEqual(oracle["center"]["x"], ours["x"], places=3)
+        self.assertNotAlmostEqual(oracle["center"]["y"], ours["y"], places=3)
 
 
 if __name__ == "__main__":

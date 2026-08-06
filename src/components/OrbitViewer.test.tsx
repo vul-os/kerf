@@ -1,5 +1,5 @@
 /**
- * OrbitViewer.test.jsx — Vitest assertions for OrbitViewer logic.
+ * OrbitViewer.test.tsx — Vitest assertions for OrbitViewer logic.
  *
  * Follows the project convention of pure data-layer / module-level tests
  * (no React DOM rendering overhead; Three.js is mocked so no WebGL needed).
@@ -13,19 +13,23 @@
  *  6. Three.js mock wiring — scene construction path exercised without GPU
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+import type { TrajectoryPoint } from './OrbitViewer.jsx'
 
 // ---------------------------------------------------------------------------
 // Three.js mock — hoisted so OrbitViewer.jsx import never hits real WebGL.
 // Must be at module top-level (vi.mock is statically hoisted by vitest).
 // ---------------------------------------------------------------------------
 vi.mock('three', () => {
-  const Vec3 = class {
+  class Vec3 {
+    x: number
+    y: number
+    z: number
     constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z }
-    set(x, y, z) { this.x = x; this.y = y; this.z = z; return this }
-    copy(v) { this.x = v.x; this.y = v.y; this.z = v.z; return this }
+    set(x: number, y: number, z: number) { this.x = x; this.y = y; this.z = z; return this }
+    copy(v: Vec3) { this.x = v.x; this.y = v.y; this.z = v.z; return this }
     clone() { return new Vec3(this.x, this.y, this.z) }
-    distanceTo(v) {
+    distanceTo(v: Vec3) {
       return Math.sqrt((this.x - v.x) ** 2 + (this.y - v.y) ** 2 + (this.z - v.z) ** 2)
     }
   }
@@ -34,22 +38,22 @@ vi.mock('three', () => {
   const fakeMesh = { rotation: { x: 0 }, position: new Vec3() }
   return {
     Scene: class {
-      constructor() { this.background = null }
+      background: unknown = null
       add() {}
     },
     PerspectiveCamera: class {
-      constructor() { this.position = new Vec3() }
+      position = new Vec3()
       lookAt() {}
     },
     WebGLRenderer: class {
-      constructor() { this.domElement = { addEventListener: noop, removeEventListener: noop } }
+      domElement = { addEventListener: noop, removeEventListener: noop }
       setSize() {}
       setPixelRatio() {}
       render() {}
       dispose() {}
     },
     AmbientLight: class { constructor() {} },
-    DirectionalLight: class { constructor() { this.position = new Vec3() } },
+    DirectionalLight: class { position = new Vec3() },
     SphereGeometry: class { constructor() {} },
     TorusGeometry: class { constructor() {} },
     MeshPhongMaterial: class { constructor() {} },
@@ -74,17 +78,17 @@ const MU_EARTH   = 398_600.4418
 // Pure math helpers (extracted from orbitBridge logic)
 // ---------------------------------------------------------------------------
 
-function orbitalPeriod(a_km, mu = MU_EARTH) {
+function orbitalPeriod(a_km: number, mu = MU_EARTH) {
   return 2 * Math.PI * Math.sqrt(a_km ** 3 / mu)
 }
 
 /** Rotate a point from perifocal frame to IJK — simplified (equatorial, i=0). */
-function circularPoint(a_km, nu_rad) {
+function circularPoint(a_km: number, nu_rad: number): TrajectoryPoint {
   return { x: a_km * Math.cos(nu_rad), y: a_km * Math.sin(nu_rad), z: 0 }
 }
 
 /** Generate n equally spaced points along a circular equatorial orbit. */
-function circularTrajectory(a_km, n) {
+function circularTrajectory(a_km: number, n: number): TrajectoryPoint[] {
   return Array.from({ length: n }, (_, k) => {
     const nu = (2 * Math.PI * k) / (n - 1)
     return circularPoint(a_km, nu)
@@ -209,13 +213,13 @@ describe('trajectory data shape', () => {
   })
 
   it('empty trajectory array does not throw in geometry logic', () => {
-    const traj = []
+    const traj: TrajectoryPoint[] = []
     // Simulates the guard in OrbitViewer: if (trajectory && trajectory.length >= 2)
     expect(traj.length >= 2).toBe(false)
   })
 
   it('single-point trajectory also skips line creation', () => {
-    const traj = [{ x: 7000, y: 0, z: 0 }]
+    const traj: TrajectoryPoint[] = [{ x: 7000, y: 0, z: 0 }]
     expect(traj.length >= 2).toBe(false)
   })
 })

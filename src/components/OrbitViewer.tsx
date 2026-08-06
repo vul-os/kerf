@@ -1,5 +1,5 @@
 /**
- * OrbitViewer.jsx — 3D orbital trajectory viewer using Three.js.
+ * OrbitViewer.tsx — 3D orbital trajectory viewer using Three.js.
  *
  * Renders a small Three.js scene containing:
  *   - A sphere representing Earth (radius = 6378 km in scene units)
@@ -26,6 +26,35 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 
+// ── Types ──────────────────────────────────────────────────────────────────────
+//
+// 'three' ships no .d.ts and this repo has no @types/three (see prior T-513
+// commits) — THREE.X positions resolve to `any` because noImplicitAny is off.
+
+export interface TrajectoryPoint {
+  x: number
+  y: number
+  z: number
+}
+
+export interface OrbitViewerProps {
+  trajectory?: TrajectoryPoint[]
+  width?: number
+  height?: number
+  earthColor?: string
+  orbitColor?: string
+}
+
+interface OrbitViewerState {
+  renderer: THREE.WebGLRenderer
+  animId: number
+  canvas: HTMLCanvasElement
+  onPointerDown: (e: PointerEvent) => void
+  onPointerMove: (e: PointerEvent) => void
+  onPointerUp: () => void
+  onWheel: (e: WheelEvent) => void
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -42,10 +71,10 @@ export default function OrbitViewer({
   height = 400,
   earthColor = '#1a6fa8',
   orbitColor = '#f0c040',
-}) {
-  const mountRef = useRef(null)
+}: OrbitViewerProps) {
+  const mountRef = useRef<HTMLDivElement | null>(null)
   // Keep a ref to the renderer so we can dispose on unmount / re-render
-  const stateRef = useRef(null)
+  const stateRef = useRef<OrbitViewerState | null>(null)
 
   useEffect(() => {
     const mount = mountRef.current
@@ -130,7 +159,7 @@ export default function OrbitViewer({
     // ------------------------------------------------------------------
     let isPointerDown = false
     let lastPointer = { x: 0, y: 0 }
-    let spherical = {
+    const spherical = {
       theta: 0,       // azimuth (rad)
       phi: Math.PI / 2, // polar (rad)  π/2 = equatorial view
       radius: R_EARTH_KM * 3,
@@ -146,12 +175,12 @@ export default function OrbitViewer({
       camera.lookAt(0, 0, 0)
     }
 
-    function onPointerDown(e) {
+    function onPointerDown(e: PointerEvent) {
       isPointerDown = true
       lastPointer = { x: e.clientX, y: e.clientY }
     }
 
-    function onPointerMove(e) {
+    function onPointerMove(e: PointerEvent) {
       if (!isPointerDown) return
       const dx = e.clientX - lastPointer.x
       const dy = e.clientY - lastPointer.y
@@ -168,7 +197,7 @@ export default function OrbitViewer({
       isPointerDown = false
     }
 
-    function onWheel(e) {
+    function onWheel(e: WheelEvent) {
       e.preventDefault()
       const factor = e.deltaY > 0 ? 1.1 : 0.9
       spherical.radius = Math.max(R_EARTH_KM * 1.05, spherical.radius * factor)
@@ -185,7 +214,7 @@ export default function OrbitViewer({
     // ------------------------------------------------------------------
     // Animation loop
     // ------------------------------------------------------------------
-    let animId
+    let animId: number
     function animate() {
       animId = requestAnimationFrame(animate)
       // Slow auto-rotation when not interacting

@@ -1,5 +1,5 @@
 /**
- * NodePalette.jsx — Left sidebar: searchable, collapsible node library.
+ * NodePalette.tsx — Left sidebar: searchable, collapsible node library.
  *
  * Props:
  *   onAddNode(def, position) — called when user clicks/drags a node entry
@@ -10,18 +10,25 @@
 import { useState, useCallback } from 'react'
 import { getNodesByCategory, CATEGORY_COLORS } from './node_library.js'
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import type { NodeDef, NodeCategory } from './nodescriptTypes'
+
+export interface Props {
+  onAddNode?: (def: NodeDef) => void
+  collapsed?: boolean
+  onToggleCollapse?: () => void
+}
 
 const GROUPS = getNodesByCategory()
 
-export default function NodePalette({ onAddNode, collapsed, onToggleCollapse }) {
+export default function NodePalette({ onAddNode, collapsed, onToggleCollapse }: Props) {
   const [search, setSearch]           = useState('')
-  const [openCats, setOpenCats]       = useState(() => {
-    const m = new Map()
+  const [openCats, setOpenCats]       = useState<Map<NodeCategory, boolean>>(() => {
+    const m = new Map<NodeCategory, boolean>()
     for (const cat of GROUPS.keys()) m.set(cat, true)
     return m
   })
 
-  const toggleCat = useCallback((cat) => {
+  const toggleCat = useCallback((cat: NodeCategory) => {
     setOpenCats((prev) => {
       const next = new Map(prev)
       next.set(cat, !prev.get(cat))
@@ -31,7 +38,7 @@ export default function NodePalette({ onAddNode, collapsed, onToggleCollapse }) 
 
   const query = search.trim().toLowerCase()
 
-  const filteredGroups = []
+  const filteredGroups: Array<[NodeCategory, NodeDef[]]> = []
   for (const [cat, nodes] of GROUPS) {
     const filtered = query
       ? nodes.filter((n) => n.label.toLowerCase().includes(query) || cat.toLowerCase().includes(query))

@@ -137,10 +137,10 @@ describe('disabled nodes', () => {
 
 describe('type checking', () => {
   it('connecting number output to geometry input throws TypeMismatchError', () => {
-    const { g, nodes: [numNode, sphereNode] } = makeGraph('number', 'sphere')
+    const { g: _g, nodes: [_numNode, _sphereNode] } = makeGraph('number', 'sphere')
     // number.value (number) → sphere.radius (number) is VALID — use sphere → union (geometry → geometry) instead
     // Let's do number → union.a (number → geometry) which IS a mismatch
-    const { g: g2, nodes: [, , unionNode] } = makeGraph('number', 'sphere', 'union')
+    const { g: g2, nodes: [, , _unionNode] } = makeGraph('number', 'sphere', 'union')
     // number.value (type: number) → union.a (type: geometry) → mismatch
     const numberNode2 = [...g2.nodes.values()][0]
     const unionNode2  = [...g2.nodes.values()][2]

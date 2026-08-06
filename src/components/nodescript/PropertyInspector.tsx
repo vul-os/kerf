@@ -1,5 +1,5 @@
 /**
- * PropertyInspector.jsx — Right sidebar for the selected node's parameters.
+ * PropertyInspector.tsx — Right sidebar for the selected node's parameters.
  *
  * Props:
  *   node       – selected node record (or null)
@@ -9,17 +9,32 @@
  */
 
 import { useCallback } from 'react'
+import type { ChangeEvent } from 'react'
 import { CATEGORY_COLORS } from './node_library.js'
-import { X } from 'lucide-react'
+import type { NodeDef, NodeRecord, PinDef, NodeResult } from './nodescriptTypes'
 
-function ParamRow({ pin, value, nodeId, onChange }) {
-  const handleChange = useCallback((e) => {
-    let v = e.target.value
+export interface Props {
+  node?: NodeRecord | null
+  def?: NodeDef | null
+  result?: NodeResult
+  onChange?: (nodeId: string, paramName: string, value: unknown) => void
+}
+
+interface ParamRowProps {
+  pin: PinDef
+  value: unknown
+  nodeId: string
+  onChange?: (nodeId: string, paramName: string, value: unknown) => void
+}
+
+function ParamRow({ pin, value, nodeId, onChange }: ParamRowProps) {
+  const handleChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    let v: string | number = e.target.value
     if (pin.type === 'number') {
       const n = parseFloat(v)
       if (!isNaN(n)) v = n
     }
-    onChange(nodeId, pin.name, v)
+    onChange?.(nodeId, pin.name, v)
   }, [pin, nodeId, onChange])
 
   return (
@@ -35,7 +50,7 @@ function ParamRow({ pin, value, nodeId, onChange }) {
         id={`param-${nodeId}-${pin.name}`}
         type={pin.type === 'number' ? 'number' : 'text'}
         step={pin.type === 'number' ? 'any' : undefined}
-        value={value ?? ''}
+        value={(value as string | number | undefined) ?? ''}
         onChange={handleChange}
         style={{
           flex: 1,
@@ -55,7 +70,7 @@ function ParamRow({ pin, value, nodeId, onChange }) {
   )
 }
 
-export default function PropertyInspector({ node, def, result, onChange }) {
+export default function PropertyInspector({ node, def, result, onChange }: Props) {
   if (!node || !def) {
     return (
       <aside
@@ -79,7 +94,7 @@ export default function PropertyInspector({ node, def, result, onChange }) {
   }
 
   const catColor = CATEGORY_COLORS[def.category] ?? '#6bd4ff'
-  const editableInputs = def.inputs.filter((pin) => {
+  const editableInputs = def.inputs.filter((_pin) => {
     // Only show params that are NOT currently wired (wired inputs show the connected value)
     return true
   })
@@ -200,7 +215,7 @@ export default function PropertyInspector({ node, def, result, onChange }) {
             style={{
               margin: 0,
               fontSize: 9,
-              color: result?.error ? '#ef4444' : '#34d399',
+              color: (result && typeof result === 'object' && 'error' in result && result.error) ? '#ef4444' : '#34d399',
               fontFamily: 'var(--font-mono)',
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-all',

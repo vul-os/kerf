@@ -1,5 +1,5 @@
 /**
- * Node.jsx — single node card rendered on the canvas.
+ * Node.tsx — single node card rendered on the canvas.
  *
  * Rendered as an SVG foreignObject so we can use HTML/Tailwind inside,
  * while the canvas itself remains SVG for pan/zoom.
@@ -17,8 +17,25 @@
  *   pinPositions   – ref map set by this component: { [nodeId_pinName_side]: {x,y} }
  */
 
-import { useRef, useLayoutEffect } from 'react'
+import { useRef } from 'react'
+import type { MouseEvent as ReactMouseEvent } from 'react'
 import { CATEGORY_COLORS } from './node_library.js'
+import type { NodeDef, NodeRecord, NodePosition, NodeResult } from './nodescriptTypes'
+
+type PinSide = 'in' | 'out'
+
+export interface Props {
+  node: NodeRecord
+  def: NodeDef | null
+  selected?: boolean
+  result?: NodeResult
+  onSelect?: (id: string) => void
+  onDragStart?: (id: string, e: ReactMouseEvent<SVGGElement>) => void
+  onPinMouseDown?: (nodeId: string, pinName: string, pinSide: PinSide, e: ReactMouseEvent<SVGCircleElement>) => void
+  onPinMouseUp?: (nodeId: string, pinName: string, pinSide: PinSide, e: ReactMouseEvent<SVGCircleElement>) => void
+  onContextMenu?: (id: string, e: ReactMouseEvent<SVGGElement>) => void
+  registerPinPosition?: (key: string, pos: NodePosition) => void
+}
 
 const NODE_WIDTH  = 180
 const PIN_RADIUS  = 5
@@ -26,7 +43,7 @@ const HEADER_H    = 28
 const ROW_H       = 22
 const PADDING     = 8
 
-function pinTypeColor(type) {
+function pinTypeColor(type?: string): string {
   switch (type) {
     case 'number':   return '#6bd4ff'
     case 'vec3':     return '#a78bfa'
@@ -47,22 +64,22 @@ export default function Node({
   onPinMouseUp,
   onContextMenu,
   registerPinPosition,
-}) {
+}: Props) {
   const inputs  = def?.inputs  ?? []
   const outputs = def?.outputs ?? []
   const rows    = Math.max(inputs.length, outputs.length, 1)
   const bodyH   = rows * ROW_H + PADDING * 2
   const totalH  = HEADER_H + bodyH
-  const catColor = CATEGORY_COLORS[def?.category] ?? '#6bd4ff'
+  const catColor = (def && CATEGORY_COLORS[def.category]) ?? '#6bd4ff'
 
   const { x, y } = node.position
 
   // Notify parent of pin world positions after first render
-  const groupRef = useRef(null)
+  const groupRef = useRef<SVGGElement | null>(null)
 
   // We compute pin positions based on SVG layout math (no DOM measurement needed)
   // so the canvas can draw wires without layout side-effects.
-  const pinPos = {}
+  const pinPos: Record<string, NodePosition> = {}
   inputs.forEach((pin, i) => {
     const py = y + HEADER_H + PADDING + i * ROW_H + ROW_H / 2
     pinPos[`${node.id}_${pin.name}_in`] = { x, y: py }
@@ -86,7 +103,7 @@ export default function Node({
       ref={groupRef}
       style={{ opacity, cursor: 'grab', userSelect: 'none' }}
       onMouseDown={(e) => {
-        if (e.target.classList.contains('pin-hit')) return
+        if ((e.target as Element).classList.contains('pin-hit')) return
         onSelect?.(node.id)
         onDragStart?.(node.id, e)
       }}
@@ -256,7 +273,11 @@ export default function Node({
           style={{ pointerEvents: 'none' }}
         >
           {typeof result === 'object'
-            ? (result.deferred ? '⏳ deferred' : result.error ? '⚠ error' : '✓')
+            ? ('deferred' in result && result.deferred
+                ? '⏳ deferred'
+                : 'error' in result && result.error
+                  ? '⚠ error'
+                  : '✓')
             : String(result).slice(0, 16)}
         </text>
       )}

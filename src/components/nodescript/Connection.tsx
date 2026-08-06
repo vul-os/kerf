@@ -1,5 +1,5 @@
 /**
- * Connection.jsx — SVG Bezier wire between two node pins.
+ * Connection.tsx — SVG Bezier wire between two node pins.
  *
  * Props:
  *   fromX, fromY  – start point (output pin world coords)
@@ -10,6 +10,17 @@
  *   id            – connection id passed to onClick
  */
 
+export interface Props {
+  fromX: number
+  fromY: number
+  toX: number
+  toY: number
+  selected?: boolean
+  color?: string
+  onClick?: (id: string) => void
+  id: string
+}
+
 export default function Connection({
   fromX,
   fromY,
@@ -19,7 +30,7 @@ export default function Connection({
   color = '#6bd4ff',
   onClick,
   id,
-}) {
+}: Props) {
   const dx = Math.abs(toX - fromX) * 0.6
   const cp1x = fromX + dx
   const cp2x = toX  - dx

@@ -1,5 +1,5 @@
 /**
- * NodeGraphCanvas.jsx — main SVG pan/zoom canvas for the node graph.
+ * NodeGraphCanvas.tsx — main SVG pan/zoom canvas for the node graph.
  *
  * Features:
  * - Pan: middle-mouse drag or space+left-drag
@@ -11,10 +11,60 @@
  */
 
 import { useCallback, useRef, useState, useEffect } from 'react'
+import type { MouseEvent as ReactMouseEvent, WheelEvent as ReactWheelEvent } from 'react'
 import Node from './Node.jsx'
 import Connection from './Connection.jsx'
-import { getNodeDef, CATEGORY_COLORS } from './node_library.js'
+import { getNodeDef } from './node_library.js'
 import { Graph, CycleError, TypeMismatchError } from './graph_engine.js'
+import type { GraphResults, NodePosition } from './nodescriptTypes'
+
+type PinSide = 'in' | 'out'
+interface PointerLike {
+  clientX: number
+  clientY: number
+}
+
+export interface Props {
+  graph: Graph
+  onGraphChange: (graph: Graph) => void
+  selectedNodeId: string | null
+  onSelectNode: (id: string | null) => void
+  results?: GraphResults
+}
+
+interface DragNodeState {
+  nodeId: string
+  startWorldX: number
+  startWorldY: number
+  origX: number
+  origY: number
+}
+
+interface PanState {
+  startX: number
+  startY: number
+  origVx: number
+  origVy: number
+}
+
+interface WireState {
+  fromNodeId: string
+  fromPin: string
+  fromSide: PinSide
+  fromX: number
+  fromY: number
+}
+
+interface WirePreview extends WireState {
+  toX: number
+  toY: number
+}
+
+interface CtxMenuState {
+  nodeId: string
+  x: number
+  y: number
+}
 
 export default function NodeGraphCanvas({
   graph,
@@ -22,39 +72,39 @@ export default function NodeGraphCanvas({
   selectedNodeId,
   onSelectNode,
   results,
-}) {
-  const svgRef = useRef(null)
+}: Props) {
+  const svgRef = useRef<SVGSVGElement | null>(null)
   const [viewport, setViewport] = useState({ x: 0, y: 0, scale: 1 })
 
   // Drag state
-  const dragNode  = useRef(null)   // { nodeId, startX, startY, origX, origY }
-  const panState  = useRef(null)   // { startX, startY, origVx, origVy }
+  const dragNode  = useRef<DragNodeState | null>(null)
+  const panState  = useRef<PanState | null>(null)
   const spaceDown = useRef(false)
 
   // Wire-drawing state
-  const wireState = useRef(null)   // { fromNodeId, fromPin, fromSide, curX, curY }
-  const [wirePreview, setWirePreview] = useState(null)
+  const wireState = useRef<WireState | null>(null)
+  const [wirePreview, setWirePreview] = useState<WirePreview | null>(null)
 
   // Context menu
-  const [ctxMenu, setCtxMenu] = useState(null) // { nodeId, x, y }
+  const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null)
 
   // Selected connection
-  const [selectedConnId, setSelectedConnId] = useState(null)
+  const [selectedConnId, setSelectedConnId] = useState<string | null>(null)
 
   // Pin position registry: key = `nodeId_pinName_side`
-  const pinPositions = useRef({})
-  const registerPinPosition = useCallback((key, pos) => {
+  const pinPositions = useRef<Record<string, NodePosition>>({})
+  const registerPinPosition = useCallback((key: string, pos: NodePosition) => {
     pinPositions.current[key] = pos
   }, [])
 
   // ── Viewport helpers ────────────────────────────────────────────────────
 
-  const svgToWorld = useCallback((svgX, svgY) => {
+  const svgToWorld = useCallback((svgX: number, svgY: number): NodePosition => {
     const { x, y, scale } = viewport
     return { x: (svgX - x) / scale, y: (svgY - y) / scale }
   }, [viewport])
 
-  const getSVGPoint = useCallback((e) => {
+  const getSVGPoint = useCallback((e: PointerLike): NodePosition => {
     const rect = svgRef.current?.getBoundingClientRect()
     if (!rect) return { x: 0, y: 0 }
     return { x: e.clientX - rect.left, y: e.clientY - rect.top }
@@ -63,7 +113,7 @@ export default function NodeGraphCanvas({
   // ── Keyboard ─────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    const onKeyDown = (e) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' && e.target === document.body) {
         spaceDown.current = true
         e.preventDefault()
@@ -81,7 +131,7 @@ export default function NodeGraphCanvas({
         } catch { /* ignore */ }
       }
     }
-    const onKeyUp = (e) => { if (e.code === 'Space') spaceDown.current = false }
+    const onKeyUp = (e: KeyboardEvent) => { if (e.code === 'Space') spaceDown.current = false }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
     return () => { window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp) }
@@ -89,7 +139,7 @@ export default function NodeGraphCanvas({
 
   // ── Mouse handlers ────────────────────────────────────────────────────────
 
-  const handleSVGMouseDown = useCallback((e) => {
+  const handleSVGMouseDown = useCallback((e: ReactMouseEvent<SVGSVGElement>) => {
     if (e.button === 1 || (e.button === 0 && spaceDown.current)) {
       // Pan
       const pt = getSVGPoint(e)
@@ -103,14 +153,14 @@ export default function NodeGraphCanvas({
     }
   }, [viewport, getSVGPoint, onSelectNode])
 
-  const handleMouseMove = useCallback((e) => {
+  const handleMouseMove = useCallback((e: ReactMouseEvent<HTMLDivElement>) => {
     const pt = getSVGPoint(e)
 
     // Panning
     if (panState.current) {
       const dx = pt.x - panState.current.startX
       const dy = pt.y - panState.current.startY
-      setViewport((v) => ({ ...v, x: panState.current.origVx + dx, y: panState.current.origVy + dy }))
+      setViewport((v) => ({ ...v, x: panState.current!.origVx + dx, y: panState.current!.origVy + dy }))
       return
     }
 
@@ -130,14 +180,14 @@ export default function NodeGraphCanvas({
     }
   }, [graph, getSVGPoint, svgToWorld, onGraphChange])
 
-  const handleMouseUp = useCallback((e) => {
+  const handleMouseUp = useCallback(() => {
     panState.current  = null
     dragNode.current  = null
     wireState.current = null
     setWirePreview(null)
   }, [])
 
-  const handleWheel = useCallback((e) => {
+  const handleWheel = useCallback((e: ReactWheelEvent<SVGSVGElement>) => {
     e.preventDefault()
     const pt = getSVGPoint(e)
     const delta = e.deltaY > 0 ? 0.9 : 1.1
@@ -152,7 +202,7 @@ export default function NodeGraphCanvas({
 
   // ── Node interaction ──────────────────────────────────────────────────────
 
-  const handleNodeDragStart = useCallback((nodeId, e) => {
+  const handleNodeDragStart = useCallback((nodeId: string, e: ReactMouseEvent<SVGGElement>) => {
     const pt = getSVGPoint(e)
     const world = svgToWorld(pt.x, pt.y)
     const node = graph.nodes.get(nodeId)
@@ -166,7 +216,7 @@ export default function NodeGraphCanvas({
     }
   }, [graph, getSVGPoint, svgToWorld])
 
-  const handlePinMouseDown = useCallback((nodeId, pinName, side, e) => {
+  const handlePinMouseDown = useCallback((nodeId: string, pinName: string, side: PinSide, e: ReactMouseEvent<SVGCircleElement>) => {
     if (side !== 'out') return  // only start wires from outputs
     e.stopPropagation()
     const pt = getSVGPoint(e)
@@ -178,7 +228,7 @@ export default function NodeGraphCanvas({
     wireState.current = { fromNodeId: nodeId, fromPin: pinName, fromSide: side, fromX: svgPos.x, fromY: svgPos.y }
   }, [getSVGPoint, viewport])
 
-  const handlePinMouseUp = useCallback((nodeId, pinName, side, e) => {
+  const handlePinMouseUp = useCallback((nodeId: string, pinName: string, side: PinSide, e: ReactMouseEvent<SVGCircleElement>) => {
     if (!wireState.current) return
     if (side !== 'in') return  // only land on inputs
     e.stopPropagation()
@@ -199,11 +249,10 @@ export default function NodeGraphCanvas({
 
   // ── Context menu ──────────────────────────────────────────────────────────
 
-  const handleContextMenu = useCallback((nodeId, e) => {
+  const handleContextMenu = useCallback((nodeId: string, e: ReactMouseEvent<SVGGElement>) => {
     e.preventDefault()
-    const pt = getSVGPoint(e)
     setCtxMenu({ nodeId, x: e.clientX, y: e.clientY })
-  }, [getSVGPoint])
+  }, [])
 
   const handleCtxDelete = useCallback(() => {
     if (!ctxMenu) return
@@ -215,7 +264,7 @@ export default function NodeGraphCanvas({
   const handleCtxDuplicate = useCallback(() => {
     if (!ctxMenu) return
     const node = graph.nodes.get(ctxMenu.nodeId)
-    const def  = getNodeDef(node?.defId)
+    const def  = node ? getNodeDef(node.defId) : null
     if (!node || !def) { setCtxMenu(null); return }
     onGraphChange(graph.addNode(def, { x: node.position.x + 30, y: node.position.y + 30 }, { ...node.params }))
     setCtxMenu(null)
@@ -272,6 +321,11 @@ export default function NodeGraphCanvas({
       >
         <g transform={`translate(${viewport.x},${viewport.y}) scale(${viewport.scale})`}>
           {/* Connections */}
+          {/* Pre-existing: reads pinPositions.current during render — Node's render pass
+              populates it via registerPinPosition earlier in this same pass, so it happens to
+              work, but it's a ref-read-during-render antipattern; not a behavior change for
+              this slice. */}
+          {/* eslint-disable-next-line react-hooks/refs */}
           {connections.map((conn) => {
             const fromKey = `${conn.fromNodeId}_${conn.fromPin}_out`
             const toKey   = `${conn.toNodeId}_${conn.toPin}_in`

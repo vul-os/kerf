@@ -1,5 +1,5 @@
 /**
- * graph_engine.js — DAG evaluation engine for Visual Node Scripting.
+ * graph_engine.ts — DAG evaluation engine for Visual Node Scripting.
  *
  * Public API
  * ----------
@@ -20,6 +20,10 @@
  */
 
 import { getNodeDef, pinsCompatible } from './node_library.js'
+import type {
+  NodeDef, NodeRecord, ConnectionRecord, NodePosition,
+  GraphJSON, GraphRunApi, GraphResults, NodeResult,
+} from './nodescriptTypes'
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -33,7 +37,7 @@ export class CycleError extends Error {
 }
 
 export class TypeMismatchError extends Error {
-  constructor(from, to) {
+  constructor(from: string, to: string) {
     super(`Type mismatch: cannot connect '${from}' → '${to}'`)
     this.name = 'TypeMismatchError'
   }
@@ -54,14 +58,11 @@ function newConnId()  { return `c${_connSeq++}` }
 // ---------------------------------------------------------------------------
 
 export class Graph {
-  /**
-   * @param {Map<string, NodeRecord>} nodes
-   * @param {Map<string, ConnectionRecord>} connections
-   */
-  constructor(nodes = new Map(), connections = new Map()) {
-    /** @type {Map<string, NodeRecord>} */
+  readonly nodes: Map<string, NodeRecord>
+  readonly connections: Map<string, ConnectionRecord>
+
+  constructor(nodes: Map<string, NodeRecord> = new Map(), connections: Map<string, ConnectionRecord> = new Map()) {
     this.nodes = nodes
-    /** @type {Map<string, ConnectionRecord>} */
     this.connections = connections
     Object.freeze(this)
   }
@@ -69,9 +70,9 @@ export class Graph {
   // ── Mutation helpers (return new Graph) ──────────────────────────────────
 
   /** Add a node instantiated from a node library definition. */
-  addNode(def, position = { x: 100, y: 100 }, params = {}) {
+  addNode(def: NodeDef, position: NodePosition = { x: 100, y: 100 }, params: Record<string, unknown> = {}): Graph {
     const id = newNodeId()
-    const record = {
+    const record: NodeRecord = {
       id,
       defId: def.id,
       label: def.label,
@@ -85,7 +86,7 @@ export class Graph {
   }
 
   /** Remove a node and all connections referencing it. */
-  removeNode(nodeId) {
+  removeNode(nodeId: string): Graph {
     if (!this.nodes.has(nodeId)) throw new Error(`Node '${nodeId}' not found`)
     const nextNodes = new Map(this.nodes)
     nextNodes.delete(nodeId)
@@ -97,7 +98,7 @@ export class Graph {
   }
 
   /** Toggle the disabled flag on a node. */
-  toggleDisabled(nodeId) {
+  toggleDisabled(nodeId: string): Graph {
     const node = this.nodes.get(nodeId)
     if (!node) throw new Error(`Node '${nodeId}' not found`)
     const nextNodes = new Map(this.nodes)
@@ -106,7 +107,7 @@ export class Graph {
   }
 
   /** Update params on a node (shallow merge). */
-  updateParams(nodeId, params) {
+  updateParams(nodeId: string, params: Record<string, unknown>): Graph {
     const node = this.nodes.get(nodeId)
     if (!node) throw new Error(`Node '${nodeId}' not found`)
     const nextNodes = new Map(this.nodes)
@@ -115,7 +116,7 @@ export class Graph {
   }
 
   /** Move a node to a new position. */
-  moveNode(nodeId, position) {
+  moveNode(nodeId: string, position: NodePosition): Graph {
     const node = this.nodes.get(nodeId)
     if (!node) throw new Error(`Node '${nodeId}' not found`)
     const nextNodes = new Map(this.nodes)
@@ -127,7 +128,7 @@ export class Graph {
    * Add a connection between two pins.
    * Throws TypeMismatchError if pin types are incompatible.
    */
-  addConnection(fromNodeId, fromPin, toNodeId, toPin) {
+  addConnection(fromNodeId: string, fromPin: string, toNodeId: string, toPin: string): Graph {
     // Resolve pin types from node defs
     const fromNode = this.nodes.get(fromNodeId)
     const toNode = this.nodes.get(toNodeId)
@@ -156,7 +157,7 @@ export class Graph {
   }
 
   /** Remove a connection by its id. */
-  removeConnection(connId) {
+  removeConnection(connId: string): Graph {
     if (!this.connections.has(connId)) throw new Error(`Connection '${connId}' not found`)
     const nextConns = new Map(this.connections)
     nextConns.delete(connId)
@@ -170,10 +171,10 @@ export class Graph {
    * Throws CycleError if the graph contains a cycle.
    * Disabled nodes are included in the sort (skipped later in run()).
    */
-  topoSort() {
+  topoSort(): string[] {
     // Build adjacency: from → [to]
-    const adj = new Map() // nodeId → Set<nodeId> (nodes that depend on it)
-    const inDeg = new Map()
+    const adj = new Map<string, Set<string>>() // nodeId → Set<nodeId> (nodes that depend on it)
+    const inDeg = new Map<string, number>()
 
     for (const id of this.nodes.keys()) {
       adj.set(id, new Set())
@@ -183,22 +184,22 @@ export class Graph {
     for (const { fromNodeId, toNodeId } of this.connections.values()) {
       // Only add edge if both endpoints exist (defensive)
       if (!this.nodes.has(fromNodeId) || !this.nodes.has(toNodeId)) continue
-      adj.get(fromNodeId).add(toNodeId)
+      adj.get(fromNodeId)!.add(toNodeId)
       inDeg.set(toNodeId, (inDeg.get(toNodeId) ?? 0) + 1)
     }
 
     // Kahn's algorithm
-    const queue = []
+    const queue: string[] = []
     for (const [id, deg] of inDeg) {
       if (deg === 0) queue.push(id)
     }
 
-    const order = []
+    const order: string[] = []
     while (queue.length > 0) {
-      const cur = queue.shift()
+      const cur = queue.shift()!
       order.push(cur)
-      for (const next of adj.get(cur)) {
-        const d = inDeg.get(next) - 1
+      for (const next of adj.get(cur)!) {
+        const d = inDeg.get(next)! - 1
         inDeg.set(next, d)
         if (d === 0) queue.push(next)
       }
@@ -215,12 +216,12 @@ export class Graph {
 
   /**
    * Evaluate the graph in topological order.
-   * @param {object} api — must expose: { callTool(toolName, params) → Promise<any> }
-   * @returns {Promise<{ [nodeId: string]: any }>} map of node id → result
+   * @param api — must expose: { callTool(toolName, params) → Promise<any> }
+   * @returns map of node id → result
    */
-  async run(api) {
+  async run(api: GraphRunApi | null): Promise<GraphResults> {
     const order = this.topoSort()
-    const results = {}  // nodeId → result
+    const results: GraphResults = {}  // nodeId → result
 
     for (const nodeId of order) {
       const node = this.nodes.get(nodeId)
@@ -234,7 +235,7 @@ export class Graph {
       }
 
       // Resolve inputs: wire-connected values override node params
-      const resolvedParams = { ...node.params }
+      const resolvedParams: Record<string, unknown> = { ...node.params }
       for (const conn of this.connections.values()) {
         if (conn.toNodeId !== nodeId) continue
         if (conn.fromNodeId in results) {
@@ -244,12 +245,13 @@ export class Graph {
 
       try {
         if (def.llm_tool_name && api?.callTool) {
-          results[nodeId] = await api.callTool(def.llm_tool_name, resolvedParams)
+          results[nodeId] = (await api.callTool(def.llm_tool_name, resolvedParams)) as NodeResult
         } else {
           results[nodeId] = _evaluateLocally(def, resolvedParams)
         }
       } catch (err) {
-        results[nodeId] = { error: String(err?.message ?? err) }
+        const e = err as { message?: string } | undefined
+        results[nodeId] = { error: String(e?.message ?? err) }
       }
     }
 
@@ -258,16 +260,16 @@ export class Graph {
 
   // ── Serialisation ─────────────────────────────────────────────────────────
 
-  toJSON() {
+  toJSON(): GraphJSON {
     return {
       nodes: Array.from(this.nodes.values()),
       connections: Array.from(this.connections.values()),
     }
   }
 
-  static fromJSON(json) {
-    const nodes = new Map()
-    const connections = new Map()
+  static fromJSON(json: GraphJSON): Graph {
+    const nodes = new Map<string, NodeRecord>()
+    const connections = new Map<string, ConnectionRecord>()
     for (const n of (json.nodes ?? [])) nodes.set(n.id, n)
     for (const c of (json.connections ?? [])) connections.set(c.id, c)
     return new Graph(nodes, connections)
@@ -278,7 +280,7 @@ export class Graph {
 // Local (client-side) evaluation for non-LLM nodes
 // ---------------------------------------------------------------------------
 
-function _evaluateLocally(def, params) {
+function _evaluateLocally(def: NodeDef, params: Record<string, unknown>): NodeResult {
   switch (def.id) {
     case 'number':
       return Number(params.value ?? 0)
@@ -293,7 +295,7 @@ function _evaluateLocally(def, params) {
       const start = Number(params.start ?? 0)
       const end   = Number(params.end   ?? 10)
       const step  = Number(params.step  ?? 1)
-      const arr = []
+      const arr: number[] = []
       if (step === 0) return arr
       const dir = step > 0 ? 1 : -1
       for (let v = start; dir * (v - end) < 0; v += step) arr.push(v)
@@ -305,11 +307,11 @@ function _evaluateLocally(def, params) {
 
     case 'preview':
       // No-op output node — pass through the geometry for display
-      return params.geometry ?? null
+      return (params.geometry as NodeResult) ?? null
 
     case 'export_stl':
       // Deferred to run() where api is present; locally just return a stub
-      return { deferred: true, filename: params.filename ?? 'model.stl' }
+      return { deferred: true, filename: (params.filename as string) ?? 'model.stl' }
 
     default:
       // All other nodes (geometry / boolean / nurbs) require the backend

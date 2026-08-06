@@ -4,6 +4,12 @@
 // The registry passes content as the raw file text (YAML, not JSON for .wiring files).
 import Panel from '../../../components/WiringView.jsx'
 
-export default function WiringViewWrapper({ content, projectId, fileId }) {
+export interface Props {
+  content?: string
+  projectId?: string
+  fileId?: string
+}
+
+export default function WiringViewWrapper({ content, projectId, fileId }: Props) {
   return <Panel source={content || ''} projectId={projectId} fileId={fileId} />
 }

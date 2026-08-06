@@ -6,14 +6,21 @@
 // The rfResult prop shape mirrors what the backend RF study returns.
 import { useRef } from 'react'
 import Panel from '../../../components/RFView.jsx'
+import type { RFViewHandle, RfStudyResult } from '../../../components/RFView.jsx'
 
-function parseContent(content) {
+export interface Props {
+  content?: string
+  fileId?: string
+  callTool?: (tool: string, params: Record<string, unknown>) => void
+}
+
+function parseContent(content: string | undefined): RfStudyResult {
   if (!content || typeof content !== 'string') return {}
   try { return JSON.parse(content) || {} } catch { return {} }
 }
 
-export default function RFViewWrapper({ content, fileId, callTool }) {
-  const viewRef = useRef(null)
+export default function RFViewWrapper({ content, fileId, callTool }: Props) {
+  const viewRef = useRef<RFViewHandle>(null)
   const rfResult = parseContent(content)
   const handleRunStudy = callTool
     ? () => callTool('rf_run_study', { file_id: fileId })

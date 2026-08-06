@@ -24,9 +24,18 @@
 // pointcloud_deviation_check, pointcloud_fit_plane,
 // pointcloud_detect_pipes, and pointcloud_asbuilt_overlay LLM tools.
 
+import type { ComponentProps } from 'react'
 import Panel from '../../../components/civil/PointCloudPanel.jsx'
 
-const DEFAULTS = {
+export interface Props {
+  content?: string
+}
+
+// PointCloudPanel's own Props type is not exported; borrow it via
+// ComponentProps rather than re-declaring its (fairly deep) field shapes.
+type PointCloudContent = ComponentProps<typeof Panel>
+
+const DEFAULTS: PointCloudContent = {
   points: null,
   deviations: null,
   heatmapColors: null,
@@ -41,12 +50,12 @@ const DEFAULTS = {
   height: 480,
 }
 
-function parseContent(content) {
+function parseContent(content: string | undefined): PointCloudContent {
   if (!content || typeof content !== 'string') return {}
   try { return JSON.parse(content) || {} } catch { return {} }
 }
 
-export default function PointCloudWrapper({ content }) {
+export default function PointCloudWrapper({ content }: Props) {
   const props = { ...DEFAULTS, ...parseContent(content) }
   return <Panel {...props} />
 }

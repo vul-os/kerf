@@ -677,7 +677,7 @@ function EstimateCard({ estimate, loading, error, onRetry }) {
   )
 }
 
-function Step5Review({ state, projectId }) {
+function Step5Review({ state, projectId }: { state: ReturnType<typeof initialState>; projectId?: string }) {
   const [loading, setLoading] = useState(false)
   const [apiEstimate, setApiEstimate] = useState(null)
   const [error, setError] = useState(null)
@@ -843,7 +843,13 @@ function ViewportPlaceholder() {
   )
 }
 
-export default function JewelryConfigurator({ projectId }) {
+export interface JewelryConfiguratorProps {
+  /** Optional — the /jewelry-configurator route renders this with no props, and the server
+   *  estimate is guarded on its presence throughout. */
+  projectId?: string
+}
+
+export default function JewelryConfigurator({ projectId }: JewelryConfiguratorProps) {
   const [step, setStep] = useState(0)
   const [state, setState] = useState(initialState)
   const [validationError, setValidationError] = useState(null)

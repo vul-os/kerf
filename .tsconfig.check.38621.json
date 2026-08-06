@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [],
+  "files": [
+    "./src/lib/panels/__tests__/civilbim.test.tsx",
+    "./src/lib/panels/__tests__/dcc.test.tsx",
+    "./src/lib/panels/__tests__/misc.test.tsx",
+    "./src/lib/panels/__tests__/sim.test.tsx",
+    "./src/lib/panels/__tests__/verticals.test.tsx",
+    "./src/lib/panels/misc-wrappers/SimulationViewWrapper.tsx"
+  ]
+}

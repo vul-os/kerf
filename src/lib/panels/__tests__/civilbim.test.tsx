@@ -499,7 +499,9 @@ describe('DryUtilityNetworkPanel — mount', () => {
       { id: 'n2', x: 20, y: 0, kind: 'manhole', invert_elev_m: 99.5 },
     ]
     const links = [
-      { id: 'l1', from: 'n1', to: 'n2', utility: 'storm', diameter_mm: 300 },
+      // node_from/node_to, not from/to — the panel reads the former (see its link
+      // rendering), so a from/to fixture never exercised the link path at all.
+      { id: 'l1', node_from: 'n1', node_to: 'n2', length_m: 12 },
     ]
     const html = renderToStaticMarkup(<DryUtilityNetworkPanel nodes={nodes} links={links} />)
     expect(html).toContain('dry-utility-panel')

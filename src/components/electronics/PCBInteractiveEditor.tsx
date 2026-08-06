@@ -14,7 +14,9 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Toolbar from './pcb-editor/Toolbar.jsx'
+import type { PcbTool, PcbLayer } from './pcb-editor/Toolbar.jsx'
 import Canvas from './pcb-editor/Canvas.jsx'
+import type { Pad, Trace, Keepout, RouteCommit, ShoveCommit, ObjectType, ActiveTool } from './pcb-editor/Canvas.jsx'
 import DrcErcPanel from './DrcErcPanel.jsx'
 import SIPanel from './SIPanel.jsx'
 import SiliconSynthPanel from './SiliconSynthPanel.jsx'
@@ -22,10 +24,44 @@ import MultiBoardPanel from './MultiBoardPanel.jsx'
 import PCB3DPanel from './PCB3DPanel.jsx'
 import EMCPanel from './EMCPanel.jsx'
 import PCBThermalPanel from './PCBThermalPanel.jsx'
+import type { CircuitJson } from '../../types'
+
+// ─── Domain types ─────────────────────────────────────────────────────────────
+
+interface BoardSnapshot {
+  pads: Pad[]
+  traces: Trace[]
+  keepouts: Keepout[]
+}
+
+interface BoardState extends BoardSnapshot {
+  past: BoardSnapshot[]
+  future: BoardSnapshot[]
+}
+
+type BoardAction =
+  | { type: 'LOAD_BOARD'; pads?: Pad[]; traces?: Trace[]; keepouts?: Keepout[] }
+  | { type: 'ADD_TRACE'; trace: Trace }
+  | { type: 'SHOVE_TRACES'; updatedTraces: Trace[]; newTrace?: Trace | null }
+  | { type: 'DELETE_OBJECT'; id: string; objType: ObjectType }
+  | { type: 'UNDO' }
+  | { type: 'REDO' }
+
+interface TuneResult {
+  error?: string
+  _demo?: boolean
+  message?: string
+  length_a_mm?: number
+  meanders_a?: number
+  length_b_mm?: number
+  meanders_b?: number
+  skew_mm?: number
+  is_skew_within_tolerance?: boolean
+}
 
 // ─── Mock fixture ─────────────────────────────────────────────────────────────
 
-const MOCK_PADS = [
+const MOCK_PADS: Pad[] = [
   { id: 'pad_u1_1', x: 150, y: 200, layer: 'top', net: 'VCC',  drill: 12, size: 24 },
   { id: 'pad_u1_2', x: 200, y: 200, layer: 'top', net: 'GND',  drill: 12, size: 24 },
   { id: 'pad_u1_3', x: 250, y: 200, layer: 'top', net: 'SDA',  drill: 12, size: 24 },
@@ -34,7 +70,7 @@ const MOCK_PADS = [
   { id: 'pad_c1_1', x: 500, y: 300, layer: 'top', net: 'GND',  drill: 10, size: 20 },
 ]
 
-const MOCK_TRACES = [
+const MOCK_TRACES: Trace[] = [
   {
     id: 'tr_vcc',
     points: [{ x: 150, y: 200 }, { x: 150, y: 100 }, { x: 600, y: 100 }],
@@ -58,13 +94,13 @@ const MOCK_TRACES = [
   },
 ]
 
-const MOCK_KEEPOUTS = [
+const MOCK_KEEPOUTS: Keepout[] = [
   { id: 'ko_mounting', x: 75, y: 75, w: 50, h: 50 },
 ]
 
 // ─── State machine ────────────────────────────────────────────────────────────
 
-function initialState() {
+function initialState(): BoardState {
   return {
     pads: MOCK_PADS,
     traces: MOCK_TRACES,
@@ -74,11 +110,11 @@ function initialState() {
   }
 }
 
-function snapshot(state) {
+function snapshot(state: BoardState): BoardSnapshot {
   return { pads: state.pads, traces: state.traces, keepouts: state.keepouts }
 }
 
-function reducer(state, action) {
+function reducer(state: BoardState, action: BoardAction): BoardState {
   switch (action.type) {
     case 'LOAD_BOARD':
       return {
@@ -156,13 +192,13 @@ export default function PCBInteractiveEditor() {
   const projectId = searchParams.get('project_id')
 
   const [boardState, dispatch] = useReducer(reducer, undefined, initialState)
-  const [tool, setTool] = useState('select')
-  const [layer, setLayer] = useState('top')
-  const [selectedId, setSelectedId] = useState(null)
-  const [drcOk, setDrcOk] = useState(null)
-  const [pushedTraceIds, setPushedTraceIds] = useState([])
+  const [tool, setTool] = useState<PcbTool>('select')
+  const [layer, setLayer] = useState<PcbLayer>('top')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [drcOk, setDrcOk] = useState<boolean | null>(null)
+  const [pushedTraceIds, setPushedTraceIds] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   // ── Panel visibility state ─────────────────────────────────────────────────
   const [showDrcPanel, setShowDrcPanel]               = useState(false)
@@ -178,15 +214,16 @@ export default function PCBInteractiveEditor() {
   const [tuneNetB, setTuneNetB] = useState('')
   const [tuneTargetMm, setTuneTargetMm] = useState('100')
   const [tunePattern, setTunePattern] = useState('arc')
-  const [tuneResult, setTuneResult] = useState(null)
+  const [tuneResult, setTuneResult] = useState<TuneResult | null>(null)
   const [tuneLoading, setTuneLoading] = useState(false)
 
-  const drcTimerRef = useRef(null)
+  const drcTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // ── Load board from project ────────────────────────────────────────────────
 
   useEffect(() => {
     if (!projectId) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- board-load kickoff on projectId change, pre-existing before this migration.
     setLoading(true)
     setError(null)
     fetch(`/api/projects/${projectId}/pcb`, {
@@ -201,7 +238,7 @@ export default function PCBInteractiveEditor() {
           keepouts: data?.keepouts,
         })
       })
-      .catch((err) => {
+      .catch((err: Error) => {
         console.warn('PCB load failed, using mock fixture:', err.message)
         // silently fall back to mock — the mock is already loaded
       })
@@ -230,8 +267,9 @@ export default function PCBInteractiveEditor() {
   // ── Keyboard shortcuts ─────────────────────────────────────────────────────
 
   useEffect(() => {
-    function onKey(e) {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+    function onKey(e: KeyboardEvent) {
+      const targetTag = (e.target as HTMLElement)?.tagName
+      if (targetTag === 'INPUT' || targetTag === 'TEXTAREA') return
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') {
         dispatch({ type: 'REDO' })
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
@@ -246,7 +284,7 @@ export default function PCBInteractiveEditor() {
 
   // ── Route commit ──────────────────────────────────────────────────────────
 
-  const handleRouteCommit = useCallback(async ({ start_pad, end_pad, layer: routeLayer, width }) => {
+  const handleRouteCommit = useCallback(async ({ start_pad, end_pad, layer: routeLayer, width }: RouteCommit) => {
     const startPad = boardState.pads.find((p) => p.id === start_pad)
     const endPad   = boardState.pads.find((p) => p.id === end_pad)
     if (!startPad || !endPad) return
@@ -283,7 +321,9 @@ export default function PCBInteractiveEditor() {
         body: JSON.stringify({ start_pad, end_pad, layer: routeLayer, width }),
       })
       if (res.ok) {
-        const data = await res.json()
+        // Response body intentionally unused today — electronics_route_trace's result isn't
+        // consulted before the push-shove call below. Pre-existing, flagging rather than fixing.
+        await res.json()
         const shoveRes = await fetch('/api/llm-tools/pcb_shove_trace', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
@@ -320,7 +360,7 @@ export default function PCBInteractiveEditor() {
 
   // ── Shove commit ──────────────────────────────────────────────────────────
 
-  const handleShoveCommit = useCallback(async ({ trace_id, push_vector }) => {
+  const handleShoveCommit = useCallback(async ({ trace_id, push_vector }: ShoveCommit) => {
     const trace = boardState.traces.find((t) => t.id === trace_id)
     if (!trace) return
 
@@ -351,7 +391,7 @@ export default function PCBInteractiveEditor() {
 
   // ── Delete ────────────────────────────────────────────────────────────────
 
-  const handleDeleteObject = useCallback(async (id, objType) => {
+  const handleDeleteObject = useCallback(async (id: string, objType: ObjectType) => {
     dispatch({ type: 'DELETE_OBJECT', id, objType })
     setSelectedId(null)
 
@@ -368,7 +408,7 @@ export default function PCBInteractiveEditor() {
 
   // ── Selection ─────────────────────────────────────────────────────────────
 
-  const handleSelectObject = useCallback((id) => {
+  const handleSelectObject = useCallback((id: string | null) => {
     setSelectedId(id)
   }, [])
 
@@ -387,7 +427,7 @@ export default function PCBInteractiveEditor() {
     }
 
     // Flatten all points from each net's traces (simple concatenation)
-    const toPath = (traces) => traces.flatMap((t) => t.points.map((p) => [p.x * 0.0254, p.y * 0.0254]))
+    const toPath = (traces: Trace[]) => traces.flatMap((t) => t.points.map((p) => [p.x * 0.0254, p.y * 0.0254]))
     const path_a = toPath(tracesA)
     const path_b = toPath(tracesB)
 
@@ -485,7 +525,11 @@ export default function PCBInteractiveEditor() {
           pads={boardState.pads}
           traces={boardState.traces}
           keepouts={boardState.keepouts}
-          activeTool={tool}
+          // Canvas's ActiveTool union predates the 'tune-length' mode (added to Toolbar's
+          // PcbTool only) — tune-length is handled entirely by the panel below, and Canvas
+          // treats an unrecognized tool the same as 'select'. Pre-existing type gap between
+          // Toolbar and Canvas, not introduced by this migration.
+          activeTool={tool as ActiveTool}
           activeLayer={layer}
           selectedId={selectedId}
           onSelectObject={handleSelectObject}
@@ -525,11 +569,15 @@ export default function PCBInteractiveEditor() {
           {showDrcPanel && (
             <div className="pointer-events-auto">
               <DrcErcPanel
+                // The editor's internal pad/trace/keepout shape is a simplified subset of the
+                // real circuit-json schema (see src/types/circuit.ts's note on this same gap in
+                // circuitJsonPatch.js) — DrcErcPanel only reads a handful of fields off these at
+                // runtime, so the cast is safe without reshaping the editor's state model.
                 circuitJson={[
                   ...boardState.pads.map((p) => ({ type: 'pcb_smtpad', ...p })),
                   ...boardState.traces.map((t) => ({ type: 'pcb_trace', ...t })),
                   ...boardState.keepouts.map((k) => ({ type: 'pcb_keepout', ...k })),
-                ]}
+                ] as unknown as CircuitJson}
                 onClose={() => setShowDrcPanel(false)}
                 onMarkerClick={null}
               />
@@ -553,10 +601,11 @@ export default function PCBInteractiveEditor() {
           {showPCB3DPanel && (
             <div className="pointer-events-auto">
               <PCB3DPanel
+                // See the DrcErcPanel cast above — same simplified editor-state shape.
                 circuitJson={[
                   ...boardState.pads.map((p) => ({ type: 'pcb_smtpad', ...p })),
                   ...boardState.traces.map((t) => ({ type: 'pcb_trace', ...t })),
-                ]}
+                ] as unknown as CircuitJson}
                 onClose={() => setShowPCB3DPanel(false)}
               />
             </div>

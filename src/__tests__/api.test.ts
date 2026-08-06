@@ -53,7 +53,9 @@ afterEach(() => {
   delete globalThis.fetch
 })
 
-function jsonRes(body, { status = 200 } = {}) {
+// These stub only the subset of Response used by src/lib/api.js; cast at the
+// boundary rather than modeling the full Response interface.
+function jsonRes(body: any, { status = 200 } = {}): Response {
   return {
     ok: status >= 200 && status < 300,
     status,
@@ -61,10 +63,10 @@ function jsonRes(body, { status = 200 } = {}) {
     json: async () => body,
     text: async () => JSON.stringify(body),
     arrayBuffer: async () => new ArrayBuffer(8),
-  }
+  } as unknown as Response
 }
 
-function errRes(status, payload) {
+function errRes(status: number, payload: any): Response {
   const text = typeof payload === 'string' ? payload : JSON.stringify(payload)
   return {
     ok: false,
@@ -72,7 +74,7 @@ function errRes(status, payload) {
     statusText: 'Error',
     json: async () => (typeof payload === 'string' ? null : payload),
     text: async () => text,
-  }
+  } as unknown as Response
 }
 
 describe('ApiError', () => {
@@ -86,10 +88,10 @@ describe('ApiError', () => {
 
 describe('URL builders + request shape', () => {
   it('login posts JSON to /auth/login with no auth header', async () => {
-    fetch.mockResolvedValueOnce(jsonRes({ access_token: 't', user: { id: 'u1' } }))
+    vi.mocked(fetch).mockResolvedValueOnce(jsonRes({ access_token: 't', user: { id: 'u1' } }))
     await api.login('alice@example.com', 'secret')
     expect(fetch).toHaveBeenCalledTimes(1)
-    const [url, init] = fetch.mock.calls[0]
+    const [url, init] = vi.mocked(fetch).mock.calls[0] as [string, any]
     expect(url).toBe(`${API_URL}/auth/login`)
     expect(init.method).toBe('POST')
     expect(init.headers.authorization).toBeUndefined()
@@ -97,9 +99,9 @@ describe('URL builders + request shape', () => {
   })
 
   it('me sends a Bearer token from the auth store', async () => {
-    fetch.mockResolvedValueOnce(jsonRes({ id: 'u1' }))
+    vi.mocked(fetch).mockResolvedValueOnce(jsonRes({ id: 'u1' }))
     await api.me()
-    const [url, init] = fetch.mock.calls[0]
+    const [url, init] = vi.mocked(fetch).mock.calls[0] as [string, any]
     expect(url).toBe(`${API_URL}/api/me`)
     expect(init.headers.authorization).toBe('Bearer tok-A')
   })
@@ -110,80 +112,80 @@ describe('URL builders + request shape', () => {
   })
 
   it('listProjects appends a single tag query param', async () => {
-    fetch.mockResolvedValueOnce(jsonRes([]))
+    vi.mocked(fetch).mockResolvedValueOnce(jsonRes([]))
     await api.listProjects('ws-1', { tag: 'fixture' })
-    const [url] = fetch.mock.calls[0]
+    const [url] = vi.mocked(fetch).mock.calls[0]
     expect(url).toBe(`${API_URL}/api/projects?workspace_id=ws-1&tag=fixture`)
   })
 
   it('listProjects ANDs multiple tag filters by repeating the param', async () => {
-    fetch.mockResolvedValueOnce(jsonRes([]))
+    vi.mocked(fetch).mockResolvedValueOnce(jsonRes([]))
     await api.listProjects(null, { tag: ['a', 'b'] })
-    const [url] = fetch.mock.calls[0]
+    const [url] = vi.mocked(fetch).mock.calls[0]
     // No workspace_id, two `tag=` params (in order).
     expect(url).toBe(`${API_URL}/api/projects?tag=a&tag=b`)
   })
 
   it('listProjects with no opts hits the bare endpoint', async () => {
-    fetch.mockResolvedValueOnce(jsonRes([]))
+    vi.mocked(fetch).mockResolvedValueOnce(jsonRes([]))
     await api.listProjects()
-    expect(fetch.mock.calls[0][0]).toBe(`${API_URL}/api/projects`)
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(`${API_URL}/api/projects`)
   })
 
   it('createProject accepts a positional (name, description) shape', async () => {
-    fetch.mockResolvedValueOnce(jsonRes({ id: 'p1' }))
+    vi.mocked(fetch).mockResolvedValueOnce(jsonRes({ id: 'p1' }))
     await api.createProject('hello', 'world')
-    const [, init] = fetch.mock.calls[0]
+    const [, init] = vi.mocked(fetch).mock.calls[0] as [string, any]
     expect(JSON.parse(init.body)).toEqual({ name: 'hello', description: 'world' })
   })
 
   it('createProject accepts a body-object shape verbatim', async () => {
-    fetch.mockResolvedValueOnce(jsonRes({ id: 'p1' }))
+    vi.mocked(fetch).mockResolvedValueOnce(jsonRes({ id: 'p1' }))
     await api.createProject({ workspace_id: 'w', name: 'n', tags: ['t1'] })
-    const [, init] = fetch.mock.calls[0]
+    const [, init] = vi.mocked(fetch).mock.calls[0] as [string, any]
     expect(JSON.parse(init.body)).toEqual({ workspace_id: 'w', name: 'n', tags: ['t1'] })
   })
 
   it('encodes workspace slugs in path params', async () => {
-    fetch.mockResolvedValueOnce(jsonRes({}))
+    vi.mocked(fetch).mockResolvedValueOnce(jsonRes({}))
     await api.getWorkspace('ws/with space')
-    expect(fetch.mock.calls[0][0]).toBe(`${API_URL}/api/workspaces/ws%2Fwith%20space`)
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(`${API_URL}/api/workspaces/ws%2Fwith%20space`)
   })
 
   it('inviteWorkspaceMember POSTs to the correct nested URL', async () => {
-    fetch.mockResolvedValueOnce(jsonRes({}))
+    vi.mocked(fetch).mockResolvedValueOnce(jsonRes({}))
     await api.inviteWorkspaceMember('acme', 'bob@x.com', 'editor')
-    const [url, init] = fetch.mock.calls[0]
+    const [url, init] = vi.mocked(fetch).mock.calls[0] as [string, any]
     expect(url).toBe(`${API_URL}/api/workspaces/acme/members`)
     expect(init.method).toBe('POST')
     expect(JSON.parse(init.body)).toEqual({ email: 'bob@x.com', role: 'editor' })
   })
 
   it('getActivity falls back to limit=50 when omitted and skips before= when null', async () => {
-    fetch.mockResolvedValueOnce(jsonRes({ events: [] }))
+    vi.mocked(fetch).mockResolvedValueOnce(jsonRes({ events: [] }))
     await api.getActivity('p1')
-    expect(fetch.mock.calls[0][0]).toBe(`${API_URL}/api/projects/p1/activity?limit=50`)
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(`${API_URL}/api/projects/p1/activity?limit=50`)
   })
 
   it('getActivity URL-encodes the before cursor', async () => {
-    fetch.mockResolvedValueOnce(jsonRes({ events: [] }))
+    vi.mocked(fetch).mockResolvedValueOnce(jsonRes({ events: [] }))
     await api.getActivity('p1', '2026-05-09T12:00:00Z', 25)
-    expect(fetch.mock.calls[0][0]).toBe(`${API_URL}/api/projects/p1/activity?limit=25&before=2026-05-09T12%3A00%3A00Z`)
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(`${API_URL}/api/projects/p1/activity?limit=25&before=2026-05-09T12%3A00%3A00Z`)
   })
 
   it('admin.listPublishers builds a multi-key query string', async () => {
-    fetch.mockResolvedValueOnce(jsonRes({ publishers: [] }))
+    vi.mocked(fetch).mockResolvedValueOnce(jsonRes({ publishers: [] }))
     await api.admin.listPublishers({ search: 'a&b', verifiedOnly: true, cursor: 'cur', limit: 20 })
-    expect(fetch.mock.calls[0][0]).toBe(
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(
       `${API_URL}/api/admin/publishers?search=a%26b&verified_only=true&cursor=cur&limit=20`,
     )
   })
 
   it('deleteMe encodes the confirm marker into the query string', async () => {
-    fetch.mockResolvedValueOnce({ ok: true, status: 204, statusText: 'No Content' })
+    vi.mocked(fetch).mockResolvedValueOnce({ ok: true, status: 204, statusText: 'No Content' })
     const res = await api.deleteMe()
-    expect(fetch.mock.calls[0][0]).toBe(`${API_URL}/api/me?confirm=DELETE`)
-    expect(fetch.mock.calls[0][1].method).toBe('DELETE')
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(`${API_URL}/api/me?confirm=DELETE`)
+    expect(vi.mocked(fetch).mock.calls[0][1].method).toBe('DELETE')
     // 204 → null per request()'s contract.
     expect(res).toBeNull()
   })
@@ -191,7 +193,7 @@ describe('URL builders + request shape', () => {
 
 describe('error mapping', () => {
   it('throws ApiError with the JSON-decoded `error` field', async () => {
-    fetch.mockResolvedValueOnce(errRes(409, { error: 'project name taken' }))
+    vi.mocked(fetch).mockResolvedValueOnce(errRes(409, { error: 'project name taken' }))
     await expect(api.createProject('dup')).rejects.toMatchObject({
       status: 409,
       message: 'project name taken',
@@ -199,7 +201,7 @@ describe('error mapping', () => {
   })
 
   it('falls back to raw text body when the response is not JSON', async () => {
-    fetch.mockResolvedValueOnce(errRes(500, 'boom'))
+    vi.mocked(fetch).mockResolvedValueOnce(errRes(500, 'boom'))
     await expect(api.me()).rejects.toMatchObject({ status: 500, message: 'boom' })
   })
 })
@@ -214,14 +216,14 @@ describe('401 refresh flow', () => {
     const me = await api.me()
     expect(me).toEqual({ id: 'u1', name: 'me' })
     expect(fetch).toHaveBeenCalledTimes(3)
-    expect(fetch.mock.calls[1][0]).toBe(`${API_URL}/auth/refresh`)
+    expect(vi.mocked(fetch).mock.calls[1][0]).toBe(`${API_URL}/auth/refresh`)
     expect(authState.setSession).toHaveBeenCalledWith({
       accessToken: 'tok-B',
       refreshToken: 'r-B',
       user: { id: 'u1' },
     })
     // The retry uses the new token.
-    expect(fetch.mock.calls[2][1].headers.authorization).toBe('Bearer tok-B')
+    expect(vi.mocked(fetch).mock.calls[2][1].headers.authorization).toBe('Bearer tok-B')
   })
 
   it('logs out + bubbles the original 401 when refresh itself fails', async () => {
@@ -246,7 +248,7 @@ describe('401 refresh flow', () => {
 describe('request timeouts', () => {
   it('aborts the fetch when it does not resolve within timeoutMs', async () => {
     // Simulate a fetch that resolves only when its AbortSignal fires.
-    fetch.mockImplementationOnce((url, init) => {
+    vi.mocked(fetch).mockImplementationOnce((url, init) => {
       return new Promise((_resolve, reject) => {
         init.signal.addEventListener('abort', () => {
           const e = new Error('aborted')
@@ -277,14 +279,14 @@ describe('request timeouts', () => {
   })
 
   it('passes an AbortSignal to fetch when timeoutMs > 0', async () => {
-    fetch.mockResolvedValueOnce(jsonRes({ id: 'u1' }))
+    vi.mocked(fetch).mockResolvedValueOnce(jsonRes({ id: 'u1' }))
     await api.me()
-    const init = fetch.mock.calls[0][1]
+    const init = vi.mocked(fetch).mock.calls[0][1]
     expect(init.signal).toBeInstanceOf(AbortSignal)
   })
 
   it('surfaces a generic network error as ApiError(0)', async () => {
-    fetch.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError('Failed to fetch'))
     await expect(api.me()).rejects.toMatchObject({
       status: 0,
       message: expect.stringMatching(/Failed to fetch|Network error/i),
@@ -292,7 +294,7 @@ describe('request timeouts', () => {
   })
 
   it('default timeout still applies to non-chat calls (≈60s)', async () => {
-    fetch.mockImplementationOnce((url, init) => {
+    vi.mocked(fetch).mockImplementationOnce((url, init) => {
       return new Promise((_resolve, reject) => {
         init.signal.addEventListener('abort', () => {
           const e = new Error('aborted')

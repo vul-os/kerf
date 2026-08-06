@@ -4,13 +4,16 @@
 // route/banner wiring at the source level.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { readFileSync, existsSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
+// @ts-expect-error - no @types/node in this toolchain
+import { readFileSync, existsSync } from 'fs'
+// @ts-expect-error - no @types/node in this toolchain
+import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
+import { dirname, join } from 'path'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 // Extension-agnostic: a .jsx -> .tsx migration must not break these probes.
-const read = (p) => {
+const read = (p: string) => {
   const ts = join(root, p.replace(/\.jsx$/, '.tsx').replace(/\.js$/, '.ts'))
   return readFileSync(existsSync(ts) ? ts : join(root, p), 'utf8')
 }

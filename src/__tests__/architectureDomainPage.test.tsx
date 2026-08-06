@@ -293,7 +293,8 @@ describe('COMPARISON_ROWS', () => {
     const row = COMPARISON_ROWS.find((r) => r.feature === 'Price')
     expect(row).toBeDefined()
     expect(typeof row.kerf).toBe('string')
-    expect(row.kerf.length).toBeGreaterThan(0)
+    // `expect(typeof ...)` above confirms the runtime type; cast for the length check.
+    expect((row.kerf as string).length).toBeGreaterThan(0)
     expect(typeof row.revit).toBe('string')
     expect(typeof row.archicad).toBe('string')
     expect(typeof row.autocad).toBe('string')

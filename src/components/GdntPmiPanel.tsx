@@ -26,7 +26,7 @@
 // utility classes matching the surrounding DrawingsView palette, and avoids any
 // global state import.
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type ReactNode } from 'react'
 import { Shield, Trash2, ChevronDown, ChevronUp, Play, Loader2, CheckCircle, XCircle } from 'lucide-react'
 import GdntToolbar from './GdntToolbar.jsx'
 import { GDT_SYMBOL_MAP, renderFcf, listFcfs, listDatumLabels } from '../lib/gdntAnnotations.js'
@@ -34,10 +34,50 @@ import { GDT_SYMBOL_MAP, renderFcf, listFcfs, listDatumLabels } from '../lib/gdn
 const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
 
 // ---------------------------------------------------------------------------
+// Local domain types — gdntAnnotations.ts exports no interfaces (T-521 not
+// yet run on src/lib), so the annotation/drawing shapes are declared here to
+// match its actual return values.
+// ---------------------------------------------------------------------------
+
+interface DatumRef {
+  label: string
+  modifier?: string | null
+}
+
+interface FcfAnnotation {
+  id: string
+  kind: 'fcf'
+  x: number
+  y: number
+  symbol_code: string
+  tolerance_value: number
+  diameter_zone: boolean
+  tolerance_modifier?: string | null
+  datum_refs: DatumRef[]
+  view_id?: string | null
+  rendered?: string
+}
+
+interface DatumAnnotation {
+  id: string
+  kind: 'gdt_datum'
+  x: number
+  y: number
+  label: string
+  params?: { label?: string }
+}
+
+// gdntAnnotations.ts (src/lib) exports no Drawing type and its shape varies
+// (multi-sheet vs. flat document) — mirror that looseness here rather than
+// invent a shared type the lib itself doesn't have.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- see comment above
+type Drawing = any
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function callTool(toolName, args) {
+async function callTool(toolName: string, args: Record<string, unknown>) {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -50,7 +90,7 @@ async function callTool(toolName, args) {
   return res.json()
 }
 
-function PassBadge({ value }) {
+function PassBadge({ value }: { value?: boolean | null }) {
   if (value === true) {
     return (
       <span className="inline-flex items-center gap-1 text-emerald-400 font-medium text-[10px]">
@@ -69,7 +109,7 @@ function PassBadge({ value }) {
 }
 
 // Collapsible section — matches GDTPanel.jsx CollapsibleSection pattern.
-function Section({ title, children, defaultOpen = true }) {
+function Section({ title, children, defaultOpen = true }: { title: string; children: ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div className="border border-ink-800 rounded-lg overflow-hidden">
@@ -94,7 +134,7 @@ function Section({ title, children, defaultOpen = true }) {
 // FCF list entry
 // ---------------------------------------------------------------------------
 
-function FcfListEntry({ ann, selected, onDelete }) {
+function FcfListEntry({ ann, selected, onDelete }: { ann: FcfAnnotation; selected: boolean; onDelete?: (id: string) => void }) {
   const sym = GDT_SYMBOL_MAP[ann.symbol_code]
   const rendered = ann.rendered || renderFcf(ann)
   return (
@@ -131,7 +171,7 @@ function FcfListEntry({ ann, selected, onDelete }) {
 // Datum list entry
 // ---------------------------------------------------------------------------
 
-function DatumListEntry({ ann, selected, onDelete }) {
+function DatumListEntry({ ann, selected, onDelete }: { ann: DatumAnnotation; selected: boolean; onDelete?: (id: string) => void }) {
   const label = ann.label || ann.params?.label || '?'
   return (
     <div
@@ -166,17 +206,24 @@ function DatumListEntry({ ann, selected, onDelete }) {
 // Quick-validate panel — runs gdt_validate_frame against a user-typed FCF string
 // ---------------------------------------------------------------------------
 
+interface ValidateResult {
+  valid?: boolean
+  violations?: string[]
+  error?: string
+  canonical_string?: string
+}
+
 function QuickValidatePanel() {
   const [fcfString, setFcfString] = useState('⌖|⌀0.5|A|B|C')
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState<ValidateResult | null>(null)
 
   async function handleValidate() {
     setLoading(true)
     setResult(null)
     try {
       const json = await callTool('gdt_validate_frame', { fcf_string: fcfString })
-      setResult(json?.result ?? json)
+      setResult((json?.result ?? json) as ValidateResult)
     } catch (err) {
       setResult({ error: String(err) })
     } finally {
@@ -238,6 +285,15 @@ function QuickValidatePanel() {
 // Main export
 // ---------------------------------------------------------------------------
 
+export interface Props {
+  drawing?: Drawing
+  tool?: string
+  onTool: (id: string) => void
+  selectedAnnId?: string | null
+  onDeleteAnn?: (id: string) => void
+  onAutoCallout?: () => void
+}
+
 export default function GdntPmiPanel({
   drawing = null,
   tool = '',
@@ -245,7 +301,7 @@ export default function GdntPmiPanel({
   selectedAnnId = null,
   onDeleteAnn,
   onAutoCallout,
-}) {
+}: Props) {
   // Derive placed FCF and datum annotations from the drawing document.
   const fcfs = useMemo(() => {
     if (!drawing) return []

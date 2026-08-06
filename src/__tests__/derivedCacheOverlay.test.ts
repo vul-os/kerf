@@ -11,6 +11,7 @@
 // the deeper suite in assembly.test.js.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import type { AssemblyExternalRef } from '../types/geometry.js'
 
 vi.mock('../lib/geom3.js', () => ({
   applyMatrixToGeom: (geom) => geom,
@@ -26,7 +27,7 @@ import {
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const REF = {
+const REF: AssemblyExternalRef = {
   project_id: 'proj-cache-test',
   file_id: 'file-cache-test',
   kind: 'board_3d',
@@ -232,7 +233,8 @@ describe('addDerivedCacheListener — module-level event bus', () => {
     const lookup = vi.fn(async () => ({ cached: false, derivedKind: 'jscad_mesh', payload: null }))
     const recompile = vi.fn(async () => [{ id: 'q', geom: {} }])
     await loadExternalParts({
-      ref: { ...REF, kind: 'mesh' },
+      // 'mesh' is deliberately not a valid ref kind — testing runtime fallback.
+      ref: { ...REF, kind: 'mesh' } as unknown as AssemblyExternalRef,
       recompile,
       lookup,
     })

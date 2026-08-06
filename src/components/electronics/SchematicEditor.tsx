@@ -19,20 +19,46 @@ import PartLibrary from './schematic-editor/PartLibrary.jsx'
 import PropertiesPanel from './schematic-editor/PropertiesPanel.jsx'
 import ProbeOverlay from './schematic-editor/probe_overlay.jsx'
 import { PARTS_MAP } from './schematic-editor/parts_library.js'
+import type { Device, Wire, SchematicTool, SchematicObjectType } from './schematic-editor/Canvas.jsx'
+import type { Waveform } from './schematic-editor/probe_overlay.jsx'
+import type { Point } from './schematic-editor/wire_router.js'
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+interface EditorSnapshot {
+  devices: Device[]
+  wires: Wire[]
+  refCounts: Record<string, number>
+}
+
+interface EditorState extends EditorSnapshot {
+  past: EditorSnapshot[]
+  future: EditorSnapshot[]
+}
+
+type EditorAction =
+  | { type: 'ADD_DEVICE'; partId: string; x: number; y: number }
+  | { type: 'ADD_WIRE'; points: Point[] }
+  | { type: 'UPDATE_PROPS'; deviceId: string; props: Record<string, string> }
+  | { type: 'UPDATE_LABEL'; deviceId: string; label: string }
+  | { type: 'DELETE_OBJECT'; id: string; objType: SchematicObjectType }
+  | { type: 'UNDO' }
+  | { type: 'REDO' }
+  | { type: 'CLEAR' }
 
 // ─── Netlist serializer ───────────────────────────────────────────────────────
 // Converts the schematic state into a SPICE netlist string suitable for
 // POST /run-spice. Node numbers are assigned by flood-fill from wires/pins.
 
-function buildNetlist(devices, wires, probes) {
+function buildNetlist(devices: Device[], wires: Wire[], probes: Device[]) {
   // 1. Assign net names based on connected wire segments
   //    Each wire gets a net; pins connected to the same wire share the net.
   //    Simple approach: label nets N1..Nn, with '0' reserved for GND.
 
-  const netMap = new Map() // pin-key → net-name
+  const netMap = new Map<string, string>() // pin-key → net-name
   let netCounter = 1
 
-  function pinKey(devId, pinId) { return `${devId}::${pinId}` }
+  function pinKey(devId: string, pinId: string) { return `${devId}::${pinId}` }
 
   // Assign GND nets first
   for (const dev of devices) {
@@ -78,7 +104,7 @@ function buildNetlist(devices, wires, probes) {
 
   // 2. Build SPICE lines
   const lines = ['* Kerf Schematic Export']
-  const refCounts = {}
+  const refCounts: Record<string, number> = {}
 
   for (const dev of devices) {
     const partDef = PARTS_MAP[dev.partId]
@@ -154,7 +180,7 @@ function buildNetlist(devices, wires, probes) {
 
 // ─── State machine ────────────────────────────────────────────────────────────
 
-function initialState() {
+function initialState(): EditorState {
   return {
     devices: [],
     wires: [],
@@ -164,16 +190,16 @@ function initialState() {
   }
 }
 
-function snapshot(state) {
+function snapshot(state: EditorState): EditorSnapshot {
   return { devices: state.devices, wires: state.wires, refCounts: state.refCounts }
 }
 
 let _nextId = 1
-function nextId(prefix) {
+function nextId(prefix: string) {
   return `${prefix}_${_nextId++}`
 }
 
-function reducer(state, action) {
+function reducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
     case 'ADD_DEVICE': {
       const snap = snapshot(state)
@@ -288,7 +314,7 @@ function reducer(state, action) {
 
 // ─── Toolbar ──────────────────────────────────────────────────────────────────
 
-const TOOLS = [
+const TOOLS: { id: SchematicTool; label: string; key: string; icon: string }[] = [
   { id: 'select', label: 'Select',    key: 'S', icon: '↖' },
   { id: 'wire',   label: 'Wire',      key: 'W', icon: '/' },
   { id: 'add',    label: 'Add Part',  key: 'A', icon: '+' },
@@ -296,7 +322,19 @@ const TOOLS = [
   { id: 'delete', label: 'Delete',    key: 'D', icon: '✕' },
 ]
 
-function Toolbar({ tool, onToolChange, canUndo, canRedo, onUndo, onRedo, onSimulate, simRunning, onClear }) {
+interface ToolbarProps {
+  tool: SchematicTool
+  onToolChange: (tool: SchematicTool) => void
+  canUndo: boolean
+  canRedo: boolean
+  onUndo: () => void
+  onRedo: () => void
+  onSimulate: () => void
+  simRunning: boolean
+  onClear: () => void
+}
+
+function Toolbar({ tool, onToolChange, canUndo, canRedo, onUndo, onRedo, onSimulate, simRunning, onClear }: ToolbarProps) {
   return (
     <div className="flex items-center gap-2 px-3 py-2 bg-[#0b1120] border-b border-white/10 flex-shrink-0">
       {/* Mode buttons */}
@@ -371,8 +409,16 @@ function Toolbar({ tool, onToolChange, canUndo, canRedo, onUndo, onRedo, onSimul
 
 // ─── Status bar ───────────────────────────────────────────────────────────────
 
-function StatusBar({ tool, devices, wires, simError, addingPartId }) {
-  const hints = {
+interface StatusBarProps {
+  tool: SchematicTool
+  devices: Device[]
+  wires: Wire[]
+  simError: string | null
+  addingPartId: string | null
+}
+
+function StatusBar({ tool, devices, wires, simError, addingPartId }: StatusBarProps) {
+  const hints: Record<SchematicTool, string> = {
     select: 'Click a component or wire to select it',
     wire:   'Click to start wire · click again to add bends · double-click to finish · Esc to cancel',
     add:    addingPartId ? `Placing ${addingPartId} — click to place` : 'Select a part from the sidebar first',
@@ -398,45 +444,45 @@ function StatusBar({ tool, devices, wires, simError, addingPartId }) {
 
 export default function SchematicEditor() {
   const [state, dispatch] = useReducer(reducer, undefined, initialState)
-  const [tool, setTool] = useState('select')
-  const [addingPartId, setAddingPartId] = useState(null)
-  const [selectedId, setSelectedId] = useState(null)
-  const [selectedType, setSelectedType] = useState(null)
+  const [tool, setTool] = useState<SchematicTool>('select')
+  const [addingPartId, setAddingPartId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedType, setSelectedType] = useState<SchematicObjectType | null>(null)
   const [simRunning, setSimRunning] = useState(false)
-  const [simError, setSimError] = useState(null)
-  const [waveforms, setWaveforms] = useState([])
+  const [simError, setSimError] = useState<string | null>(null)
+  const [waveforms, setWaveforms] = useState<Waveform[]>([])
 
   // Switch to add mode when a part is selected from the library
-  const handleSelectPart = useCallback((partId) => {
+  const handleSelectPart = useCallback((partId: string) => {
     setAddingPartId(partId)
     setTool('add')
   }, [])
 
-  const handleDragStart = useCallback((partId, e) => {
+  const handleDragStart = useCallback((partId: string, e: React.DragEvent) => {
     e.dataTransfer?.setData('partId', partId)
     setAddingPartId(partId)
   }, [])
 
   // Add a device at position
-  const handleAddDevice = useCallback(({ partId, x, y }) => {
+  const handleAddDevice = useCallback(({ partId, x, y }: { partId: string; x: number; y: number }) => {
     dispatch({ type: 'ADD_DEVICE', partId, x, y })
   }, [])
 
   // Commit a completed wire
-  const handleWireCommit = useCallback((points) => {
+  const handleWireCommit = useCallback((points: Point[]) => {
     if (points.length >= 2) {
       dispatch({ type: 'ADD_WIRE', points })
     }
   }, [])
 
   // Select object
-  const handleSelectObject = useCallback((id, type) => {
+  const handleSelectObject = useCallback((id: string | null, type: SchematicObjectType | null) => {
     setSelectedId(id)
     setSelectedType(type)
   }, [])
 
   // Delete object
-  const handleDeleteObject = useCallback((id, objType) => {
+  const handleDeleteObject = useCallback((id: string, objType: SchematicObjectType) => {
     dispatch({ type: 'DELETE_OBJECT', id, objType })
     if (selectedId === id) {
       setSelectedId(null)
@@ -445,26 +491,27 @@ export default function SchematicEditor() {
   }, [selectedId])
 
   // Update component props
-  const handleUpdateProps = useCallback((deviceId, props) => {
+  const handleUpdateProps = useCallback((deviceId: string, props: Record<string, string>) => {
     dispatch({ type: 'UPDATE_PROPS', deviceId, props })
   }, [])
 
   // Update label
-  const handleUpdateLabel = useCallback((deviceId, label) => {
+  const handleUpdateLabel = useCallback((deviceId: string, label: string) => {
     dispatch({ type: 'UPDATE_LABEL', deviceId, label })
   }, [])
 
   // Add probe device
-  const handleAddProbe = useCallback(({ x, y, netLabel }) => {
+  const handleAddProbe = useCallback(({ x, y }: { x: number; y: number; netLabel: string }) => {
     dispatch({ type: 'ADD_DEVICE', partId: 'Probe', x, y })
   }, [])
 
   // ── Keyboard shortcuts ─────────────────────────────────────────────────
 
   useEffect(() => {
-    const shortcutMap = { s: 'select', w: 'wire', a: 'add', p: 'probe', d: 'delete' }
-    function onKey(e) {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+    const shortcutMap: Record<string, SchematicTool> = { s: 'select', w: 'wire', a: 'add', p: 'probe', d: 'delete' }
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') {
         dispatch({ type: 'REDO' })
         return
@@ -479,7 +526,7 @@ export default function SchematicEditor() {
         return
       }
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedId) {
+        if (selectedId && selectedType) {
           handleDeleteObject(selectedId, selectedType)
         }
         return
@@ -531,7 +578,7 @@ export default function SchematicEditor() {
         setSimError('Simulation completed but returned no waveform data')
       }
     } catch (err) {
-      setSimError(err.message)
+      setSimError(err instanceof Error ? err.message : 'Simulation failed')
     } finally {
       setSimRunning(false)
     }
@@ -539,7 +586,7 @@ export default function SchematicEditor() {
 
   // ── Selected object for PropertiesPanel ───────────────────────────────
 
-  const selectedForPanel = selectedId
+  const selectedForPanel = selectedId && selectedType
     ? { id: selectedId, type: selectedType }
     : null
 

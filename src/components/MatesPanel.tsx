@@ -14,14 +14,30 @@
 //   onPendingPickFormConsumed — () => void; called once after merge
 
 import { useEffect, useState } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 import { ChevronDown, ChevronRight, Link2, Plus, Trash2, Loader2, Crosshair } from 'lucide-react'
 import { addMate, removeMate } from '../lib/assembly.js'
+import type { AssemblyMate, AssemblyMateRef, AssemblyComponent } from '../types/geometry'
 
 const MATE_TYPES = ['coincident', 'concentric', 'parallel', 'perpendicular', 'distance', 'angle', 'tangent']
-const FEATURE_TYPES = ['face', 'edge', 'vertex', 'axis']
+const FEATURE_TYPES: AssemblyMateRef['feature'][] = ['face', 'edge', 'vertex', 'axis']
 const DIMENSIONAL = new Set(['distance', 'angle'])
 
-const EMPTY_FORM = {
+interface MateForm {
+  type: string
+  a_component_id: string
+  a_feature: AssemblyMateRef['feature']
+  a_feature_id: string
+  a_feature_name: string // T5: persistent face name (dual-write alongside feature_id)
+  b_component_id: string
+  b_feature: AssemblyMateRef['feature']
+  b_feature_id: string
+  b_feature_name: string // T5: persistent face name
+  value: string
+  unit: string
+}
+
+const EMPTY_FORM: MateForm = {
   type: 'coincident',
   a_component_id: '',
   a_feature: 'face',
@@ -33,6 +49,20 @@ const EMPTY_FORM = {
   b_feature_name: '',  // T5: persistent face name
   value: '',
   unit: 'mm',
+}
+
+interface MatesPanelProps {
+  mates?: AssemblyMate[]
+  components?: AssemblyComponent[]
+  onChangeMates: (mates: AssemblyMate[]) => void
+  onToast?: (msg: string) => void
+  projectId?: string
+  fileId?: string
+  onRequestPick?: (side: 'a' | 'b') => void
+  pickingFor?: 'a' | 'b' | null
+  onPickCancel?: () => void
+  pendingPickForm?: Partial<MateForm> | null
+  onPendingPickFormConsumed?: () => void
 }
 
 export default function MatesPanel({
@@ -47,13 +77,13 @@ export default function MatesPanel({
   onPickCancel,
   pendingPickForm = null,
   onPendingPickFormConsumed,
-}) {
+}: MatesPanelProps) {
   const [open, setOpen] = useState(false)
   const [adding, setAdding] = useState(false)
-  const [form, setForm] = useState(EMPTY_FORM)
+  const [form, setForm] = useState<MateForm>(EMPTY_FORM)
   const [solving, setSolving] = useState(false)
-  const [solveResult, setSolveResult] = useState(null)
-  const [solveError, setSolveError] = useState(null)
+  const [solveResult, setSolveResult] = useState<{ solved: boolean; iterations?: number; error?: string } | null>(null)
+  const [solveError, setSolveError] = useState<string | null>(null)
 
   useEffect(() => {
     if (pickingFor) {
@@ -79,19 +109,19 @@ export default function MatesPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingPickForm])
 
-  function handleDelete(mateId) {
+  function handleDelete(mateId: string) {
     onChangeMates(removeMate(mates, mateId))
   }
 
   function handleAdd() {
     if (!form.a_component_id || !form.a_feature_id || !form.b_component_id || !form.b_feature_id) return
     // T5: dual-write face_name (persistent) + feature_id (legacy fallback).
-    const refA = {
+    const refA: AssemblyMateRef = {
       component_id: form.a_component_id,
       feature: form.a_feature,
       feature_id: form.a_feature_id,
     }
-    const refB = {
+    const refB: AssemblyMateRef = {
       component_id: form.b_component_id,
       feature: form.b_feature,
       feature_id: form.b_feature_id,
@@ -103,7 +133,7 @@ export default function MatesPanel({
     if (form.b_feature_name && form.b_feature_name !== form.b_feature_id) {
       refB.feature_name = form.b_feature_name
     }
-    const mate = {
+    const mate: Record<string, unknown> = {
       type: form.type,
       a: refA,
       b: refB,
@@ -171,7 +201,8 @@ export default function MatesPanel({
                 {m.a?.component_id || '?'}<span className="text-ink-600">.</span>{m.a?.feature_name || m.a?.feature_id || '?'}
                 <span className="text-ink-600 mx-1">→</span>
                 {m.b?.component_id || '?'}<span className="text-ink-600">.</span>{m.b?.feature_name || m.b?.feature_id || '?'}
-                {m.value != null && <span className="ml-1 text-ink-500">= {m.value} {m.unit || ''}</span>}
+                {/* shared AssemblyMate type has no `unit` field; runtime rows from addMate() may carry one */}
+                {m.value != null && <span className="ml-1 text-ink-500">= {m.value} {(m as AssemblyMate & { unit?: string }).unit || ''}</span>}
               </span>
               <button
                 type="button"
@@ -291,7 +322,16 @@ export default function MatesPanel({
   )
 }
 
-function RefRow({ label, prefix, form, setForm, isPicking, onRequestPick }) {
+interface RefRowProps {
+  label: string
+  prefix: 'a' | 'b'
+  form: MateForm
+  setForm: Dispatch<SetStateAction<MateForm>>
+  isPicking: boolean
+  onRequestPick: (() => void) | null
+}
+
+function RefRow({ label, prefix, form, setForm, isPicking, onRequestPick }: RefRowProps) {
   const filled = form[`${prefix}_component_id`] && form[`${prefix}_feature_id`]
   return (
     <div className="flex gap-1 items-start">

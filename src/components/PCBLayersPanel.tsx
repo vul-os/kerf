@@ -30,14 +30,31 @@ import {
   applyTheme,
 } from '../lib/layerStack.js'
 
+// ─── types ────────────────────────────────────────────────────────────────────
+// layerStack.js has no exported Layer/Board types (untyped helper module);
+// these local view-model types mirror DEFAULT_2_LAYER_STACK's shape.
+
+interface Layer {
+  name: string
+  type: 'copper' | 'silkscreen' | 'soldermask' | 'paste' | 'drill' | 'mechanical'
+  color: string
+  visible: boolean
+  sublayer_order: number
+}
+
+interface PCBBoard {
+  layer_stack?: Layer[]
+  [key: string]: unknown
+}
+
 // ─── constants ────────────────────────────────────────────────────────────────
 
 const THEMES = ['kicad', 'dark', 'highcontrast']
-const THEME_LABELS = { kicad: 'KiCad', dark: 'Dark', highcontrast: 'High-Contrast' }
+const THEME_LABELS: Record<string, string> = { kicad: 'KiCad', dark: 'Dark', highcontrast: 'High-Contrast' }
 
 const VALID_COPPER_COUNTS = [2, 4, 6, 8, 10, 12, 16, 20, 24, 30]
 
-const TYPE_BADGE = {
+const TYPE_BADGE: Record<string, string> = {
   copper:     'bg-red-500/20 text-red-300 border-red-500/30',
   silkscreen: 'bg-stone-400/20 text-stone-300 border-stone-400/30',
   soldermask: 'bg-green-500/20 text-green-300 border-green-500/30',
@@ -48,39 +65,50 @@ const TYPE_BADGE = {
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function stackFromBoard(board) {
+function stackFromBoard(board: PCBBoard | null | undefined): Layer[] {
   if (board?.layer_stack && Array.isArray(board.layer_stack) && board.layer_stack.length > 0) {
     return board.layer_stack
   }
-  return DEFAULT_2_LAYER_STACK
+  return DEFAULT_2_LAYER_STACK as unknown as Layer[]
 }
 
-function currentCopperCount(layers) {
+function currentCopperCount(layers: Layer[]) {
   return layers.filter((l) => l.type === 'copper').length
 }
 
 // ─── LayerRow ─────────────────────────────────────────────────────────────────
 
-function LayerRow({ layer, isSolo, onToggle, onColorChange, onPointerDragStart, onPointerDragOver, onPointerDrop, isDragOver }) {
-  const [showPicker, setShowPicker] = useState(false)
-  const pickerRef = useRef(null)
-  const dragHandleRef = useRef(null)
+interface LayerRowProps {
+  layer: Layer
+  isSolo: boolean
+  onToggle: (name: string, mode: 'solo' | 'toggle') => void
+  onColorChange: (name: string, color: string) => void
+  onPointerDragStart: (name: string) => void
+  onPointerDragOver: (name: string) => void
+  onPointerDrop: (name: string) => void
+  isDragOver: boolean
+}
 
-  const handleEye = useCallback((evt) => {
+function LayerRow({ layer, isSolo, onToggle, onColorChange, onPointerDragStart, onPointerDragOver, onPointerDrop, isDragOver }: LayerRowProps) {
+  const [showPicker, setShowPicker] = useState(false)
+  const pickerRef = useRef<HTMLDivElement>(null)
+  const dragHandleRef = useRef<HTMLSpanElement>(null)
+
+  const handleEye = useCallback((evt: React.MouseEvent) => {
     onToggle(layer.name, evt.altKey ? 'solo' : 'toggle')
   }, [layer.name, onToggle])
 
   useEffect(() => {
     if (!showPicker) return
-    const close = (e) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target)) setShowPicker(false)
+    const close = (e: PointerEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setShowPicker(false)
     }
     document.addEventListener('pointerdown', close)
     return () => document.removeEventListener('pointerdown', close)
   }, [showPicker])
 
   // Pointer-Events drag on the grip handle
-  const handleGripPointerDown = useCallback((e) => {
+  const handleGripPointerDown = useCallback((e: React.PointerEvent) => {
     e.stopPropagation()
     dragHandleRef.current?.setPointerCapture?.(e.pointerId)
     onPointerDragStart(layer.name)
@@ -171,7 +199,13 @@ function LayerRow({ layer, isSolo, onToggle, onColorChange, onPointerDragStart, 
 
 // ─── LayerCountModal ──────────────────────────────────────────────────────────
 
-function LayerCountModal({ current, onConfirm, onClose }) {
+interface LayerCountModalProps {
+  current: number
+  onConfirm: (n: number) => void
+  onClose: () => void
+}
+
+function LayerCountModal({ current, onConfirm, onClose }: LayerCountModalProps) {
   const [selected, setSelected] = useState(
     VALID_COPPER_COUNTS.includes(current) ? current : 4,
   )
@@ -238,13 +272,18 @@ function LayerCountModal({ current, onConfirm, onClose }) {
 
 // ─── PCBLayersPanel ───────────────────────────────────────────────────────────
 
-export default function PCBLayersPanel({ board, onBoardChange }) {
+interface PCBLayersPanelProps {
+  board: PCBBoard | null | undefined
+  onBoardChange?: (board: PCBBoard) => void
+}
+
+export default function PCBLayersPanel({ board, onBoardChange }: PCBLayersPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [theme, setTheme] = useState('kicad')
-  const [layers, setLayers] = useState(() => stackFromBoard(board))
-  const [soloLayer, setSoloLayerState] = useState(null)
-  const [draggedName, setDraggedName] = useState(null)
-  const [dragOverName, setDragOverName] = useState(null)
+  const [layers, setLayers] = useState<Layer[]>(() => stackFromBoard(board))
+  const [soloLayer, setSoloLayerState] = useState<string | null>(null)
+  const [draggedName, setDraggedName] = useState<string | null>(null)
+  const [dragOverName, setDragOverName] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const prevBoardRef = useRef(board)
 
@@ -264,11 +303,11 @@ export default function PCBLayersPanel({ board, onBoardChange }) {
     })
   }, [board])
 
-  const emit = useCallback((nextLayers) => {
+  const emit = useCallback((nextLayers: Layer[]) => {
     onBoardChange?.({ ...(board || {}), type: 'pcb_board', layer_stack: nextLayers })
   }, [board, onBoardChange])
 
-  const updateLayers = useCallback((updater) => {
+  const updateLayers = useCallback((updater: (prev: Layer[]) => Layer[]) => {
     setLayers((prev) => {
       const next = updater(prev)
       emit(next)
@@ -277,7 +316,7 @@ export default function PCBLayersPanel({ board, onBoardChange }) {
   }, [emit])
 
   // Visibility toggle / solo
-  const handleToggle = useCallback((name, mode) => {
+  const handleToggle = useCallback((name: string, mode: 'solo' | 'toggle') => {
     updateLayers((prev) => {
       if (mode === 'solo') {
         const next = setSoloLayer(prev, name)
@@ -291,26 +330,26 @@ export default function PCBLayersPanel({ board, onBoardChange }) {
     })
   }, [soloLayer, updateLayers])
 
-  const handleColorChange = useCallback((name, color) => {
+  const handleColorChange = useCallback((name: string, color: string) => {
     updateLayers((prev) => setLayerColor(prev, name, color))
   }, [updateLayers])
 
-  const handleTheme = useCallback((t) => {
+  const handleTheme = useCallback((t: string) => {
     setTheme(t)
     updateLayers((prev) => applyTheme(prev, t))
   }, [updateLayers])
 
   // Pointer-Events drag-to-reorder — replaces HTML5 DnD so it works on touch.
-  const handlePointerDragStart = useCallback((name) => {
+  const handlePointerDragStart = useCallback((name: string) => {
     setDraggedName(name)
   }, [])
 
-  const handlePointerDragOver = useCallback((name) => {
+  const handlePointerDragOver = useCallback((name: string) => {
     if (!draggedName || draggedName === name) return
     setDragOverName(name)
   }, [draggedName])
 
-  const handlePointerDrop = useCallback((targetName) => {
+  const handlePointerDrop = useCallback((targetName: string) => {
     if (!draggedName) return
     if (targetName === '__prev__' || targetName === '__next__') {
       // Keyboard reorder: move one position up/down
@@ -333,7 +372,7 @@ export default function PCBLayersPanel({ board, onBoardChange }) {
   }, [draggedName, updateLayers])
 
   // Modal: expand to N copper layers
-  const handleLayerCountConfirm = useCallback((n) => {
+  const handleLayerCountConfirm = useCallback((n: number) => {
     setShowModal(false)
     updateLayers((prev) => expandToNLayers(prev, n))
   }, [updateLayers])

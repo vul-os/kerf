@@ -25,19 +25,44 @@
  */
 
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { Droplets, Waves, Calculator, Loader2, AlertCircle, CheckCircle } from 'lucide-react'
 
-const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+// import.meta.env typing isn't configured project-wide yet (see baseline
+// ImportMeta.env errors elsewhere) — boundary this migration doesn't own.
+const API_URL = (typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL) || ''
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for tests)
 // ---------------------------------------------------------------------------
 
+interface PressureDropForm {
+  shape: string
+  length_um: string
+  flow_rate_ul_min: string
+  width_um: string
+  height_um: string
+  width_top_um: string
+  width_bottom_um: string
+  trap_height_um: string
+  radius_um: string
+}
+
+interface DropletForm {
+  geometry: string
+  q_continuous_ul_min: string
+  q_dispersed_ul_min: string
+  channel_width_um: string
+  channel_height_um: string
+  viscosity_pa_s: string
+  surface_tension: string
+}
+
 /**
  * Format a number for display with appropriate precision.
  * Returns '—' for null/undefined/NaN.
  */
-export function fmtNum(n, digits = 4) {
+export function fmtNum(n: number | null | undefined, digits = 4): string {
   if (n == null || !Number.isFinite(n)) return '—'
   if (Math.abs(n) === 0) return '0'
   if (Math.abs(n) < 0.001 || Math.abs(n) >= 1e6) {
@@ -49,7 +74,7 @@ export function fmtNum(n, digits = 4) {
 /**
  * Parse capillary number and classify regime.
  */
-export function classifyRegime(ca) {
+export function classifyRegime(ca: number | null | undefined): 'squeezing' | 'dripping' | null {
   if (ca == null || !Number.isFinite(ca)) return null
   return ca < 0.01 ? 'squeezing' : 'dripping'
 }
@@ -57,8 +82,8 @@ export function classifyRegime(ca) {
 /**
  * Build the args object for microfluidics_pressure_drop tool.
  */
-export function buildPressureDropArgs(form) {
-  const base = {
+export function buildPressureDropArgs(form: PressureDropForm): Record<string, unknown> {
+  const base: Record<string, unknown> = {
     shape: form.shape,
     length_um: parseFloat(form.length_um),
     flow_rate_ul_min: parseFloat(form.flow_rate_ul_min),
@@ -79,8 +104,8 @@ export function buildPressureDropArgs(form) {
 /**
  * Build the args object for microfluidics_droplet tool.
  */
-export function buildDropletArgs(form) {
-  const base = {
+export function buildDropletArgs(form: DropletForm): Record<string, unknown> {
+  const base: Record<string, unknown> = {
     geometry: form.geometry,
     q_continuous_ul_min: parseFloat(form.q_continuous_ul_min),
     q_dispersed_ul_min: parseFloat(form.q_dispersed_ul_min),
@@ -96,7 +121,9 @@ export function buildDropletArgs(form) {
 // API call helper
 // ---------------------------------------------------------------------------
 
-async function callTool(toolName, args) {
+// Tool response shape is opaque (server-defined LLM tool payload) — boundary
+// this migration doesn't own.
+async function callTool(toolName: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -115,7 +142,7 @@ async function callTool(toolName, args) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function ResultTable({ data }) {
+function ResultTable({ data }: { data: Record<string, unknown> | null }) {
   if (!data || typeof data !== 'object') return null
   const skip = new Set(['model', 'disclaimer', 'flow_regime', 'regime'])
   const rows = Object.entries(data).filter(([k]) => !skip.has(k))
@@ -137,19 +164,19 @@ function ResultTable({ data }) {
       </table>
       {notes.length > 0 && (
         <div className="px-3 py-1.5 bg-ink-900/40 text-ink-500 text-[10px] space-y-0.5">
-          {notes.map((n, i) => <div key={i}>{n}</div>)}
+          {notes.map((n, i) => <div key={i}>{String(n)}</div>)}
         </div>
       )}
       {data.disclaimer && (
         <div className="px-3 py-1.5 bg-amber-950/30 text-amber-400/70 text-[10px]">
-          {data.disclaimer}
+          {String(data.disclaimer)}
         </div>
       )}
     </div>
   )
 }
 
-function FieldRow({ label, children }) {
+function FieldRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-center gap-2 text-[11px]">
       <label className="text-ink-400 w-36 flex-shrink-0">{label}</label>
@@ -158,7 +185,7 @@ function FieldRow({ label, children }) {
   )
 }
 
-function NumInput({ value, onChange, placeholder, min }) {
+function NumInput({ value, onChange, placeholder, min }: { value: string; onChange: (v: string) => void; placeholder?: string; min?: string }) {
   return (
     <input
       type="number"
@@ -172,7 +199,7 @@ function NumInput({ value, onChange, placeholder, min }) {
   )
 }
 
-function Select({ value, onChange, options }) {
+function Select({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: [string, string][] }) {
   return (
     <select
       value={value}
@@ -186,7 +213,7 @@ function Select({ value, onChange, options }) {
   )
 }
 
-function RunButton({ loading, onClick, children }) {
+function RunButton({ loading, onClick, children }: { loading: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
       type="button"
@@ -200,7 +227,7 @@ function RunButton({ loading, onClick, children }) {
   )
 }
 
-function ErrorBanner({ error }) {
+function ErrorBanner({ error }: { error: string | null }) {
   if (!error) return null
   return (
     <div className="flex items-start gap-2 mt-2 px-3 py-2 bg-red-950/40 border border-red-900/50 rounded-lg text-[11px] text-red-300">
@@ -215,7 +242,7 @@ function ErrorBanner({ error }) {
 // ---------------------------------------------------------------------------
 
 function ChannelTab() {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<PressureDropForm>({
     shape: 'rectangular',
     length_um: '1000',
     flow_rate_ul_min: '1',
@@ -226,11 +253,11 @@ function ChannelTab() {
     trap_height_um: '50',
     radius_um: '25',
   })
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<Record<string, unknown> | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const set = (k) => (v) => setForm(f => ({ ...f, [k]: v }))
+  const set = (k: keyof PressureDropForm) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
   async function run() {
     setLoading(true)
@@ -241,7 +268,7 @@ function ChannelTab() {
       const data = await callTool('microfluidics_pressure_drop', args)
       setResult(data)
     } catch (e) {
-      setError(e.message)
+      setError((e as Error).message)
     } finally {
       setLoading(false)
     }
@@ -317,7 +344,7 @@ function ChannelTab() {
 // ---------------------------------------------------------------------------
 
 function DropletTab() {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<DropletForm>({
     geometry: 't_junction',
     q_continuous_ul_min: '2',
     q_dispersed_ul_min: '0.5',
@@ -326,11 +353,11 @@ function DropletTab() {
     viscosity_pa_s: '0.001',
     surface_tension: '0.04',
   })
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<Record<string, unknown> | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const set = (k) => (v) => setForm(f => ({ ...f, [k]: v }))
+  const set = (k: keyof DropletForm) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
   async function run() {
     setLoading(true)
@@ -341,7 +368,7 @@ function DropletTab() {
       const data = await callTool('microfluidics_droplet', args)
       setResult(data)
     } catch (e) {
-      setError(e.message)
+      setError((e as Error).message)
     } finally {
       setLoading(false)
     }
@@ -400,17 +427,23 @@ function DropletTab() {
 // Tab: Rayleigh-Plateau
 // ---------------------------------------------------------------------------
 
+interface RayleighForm {
+  thread_radius_um: string
+  density_kg_m3: string
+  surface_tension: string
+}
+
 function RayleighTab() {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<RayleighForm>({
     thread_radius_um: '25',
     density_kg_m3: '1000',
     surface_tension: '0.072',
   })
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<Record<string, unknown> | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const set = (k) => (v) => setForm(f => ({ ...f, [k]: v }))
+  const set = (k: keyof RayleighForm) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
   async function run() {
     setLoading(true)
@@ -425,7 +458,7 @@ function RayleighTab() {
       const data = await callTool('microfluidics_rayleigh_plateau', args)
       setResult(data)
     } catch (e) {
-      setError(e.message)
+      setError((e as Error).message)
     } finally {
       setLoading(false)
     }
@@ -468,7 +501,12 @@ const TABS = [
   { id: 'rayleigh', label: 'Jet / Thread', Icon: Calculator },
 ]
 
-export default function MicrofluidicsPanel({ className = '', content }) {
+interface MicrofluidicsPanelProps {
+  className?: string
+  content?: string
+}
+
+export default function MicrofluidicsPanel({ className = '', content }: MicrofluidicsPanelProps) {
   // Parse content string (from panelRegistry) to seed defaults (not yet used but accepted for compat)
   // eslint-disable-next-line no-unused-vars
   const _defaults = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()

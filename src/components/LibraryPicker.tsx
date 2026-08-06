@@ -22,6 +22,28 @@ import { ApiError } from '../lib/api.js'
 import { api } from '../lib/api.js'
 import { library } from '../cloud/api.js'
 
+// api.listFiles()'s element type isn't exported by lib/api.ts (ApiFileWithMesh
+// is module-private); derive it structurally instead of redeclaring it.
+type ProjectFile = Awaited<ReturnType<typeof api.listFiles>>[number]
+
+// The normalized shape both PartRow sources (project-local files and the
+// Library catalog) are coerced into for display. LibraryPartRow types
+// `author` as a plain string, but every call site (here, BOMTable, Library.jsx,
+// LibraryPart.jsx) treats it as an object with `name`/`is_verified_publisher` —
+// this view-model type reflects the actual runtime shape rather than fighting
+// that pre-existing mismatch in a file outside this migration's scope.
+interface PickerRow {
+  file_id: string
+  project_id?: string
+  name: string
+  manufacturer?: string
+  mpn?: string
+  category?: string
+  primary_photo_url?: string
+  author?: { user_id?: string; name?: string; is_verified_publisher?: boolean }
+  _local?: boolean
+}
+
 const CATEGORY_OPTIONS = [
   { id: 'all', label: 'All' },
   { id: 'fastener', label: 'Fasteners' },
@@ -48,8 +70,8 @@ function VerifiedBadge() {
 // /api/library/parts endpoint returns. The Part metadata lives in the
 // file's content blob as JSON; we parse defensively so a malformed
 // content string doesn't take the picker down.
-function normalizeProjectPart(file, projectId) {
-  let meta = {}
+function normalizeProjectPart(file: ProjectFile, projectId: string): PickerRow {
+  let meta: { name?: string; manufacturer?: string; mpn?: string; category?: string } = {}
   if (typeof file.content === 'string' && file.content.trim()) {
     try { meta = JSON.parse(file.content) || {} }
     catch { meta = {} }
@@ -67,7 +89,7 @@ function normalizeProjectPart(file, projectId) {
   }
 }
 
-function PartRow({ row, onSelect }) {
+function PartRow({ row, onSelect }: { row: PickerRow; onSelect: (row: PickerRow) => void }) {
   const verified = !!row.author?.is_verified_publisher
   return (
     <button
@@ -104,16 +126,22 @@ function PartRow({ row, onSelect }) {
   )
 }
 
-export default function LibraryPicker({ onSelect, onClose, currentProjectId }) {
+interface LibraryPickerProps {
+  onSelect: (row: PickerRow) => void
+  onClose: () => void
+  currentProjectId: string
+}
+
+export default function LibraryPicker({ onSelect, onClose, currentProjectId }: LibraryPickerProps) {
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [category, setCategory] = useState('all')
 
-  const [projectFiles, setProjectFiles] = useState(null)
-  const [projectErr, setProjectErr] = useState(null)
-  const [globalRows, setGlobalRows] = useState(null)
+  const [projectFiles, setProjectFiles] = useState<ProjectFile[] | null>(null)
+  const [projectErr, setProjectErr] = useState<string | null>(null)
+  const [globalRows, setGlobalRows] = useState<PickerRow[] | null>(null)
   const [globalLoading, setGlobalLoading] = useState(false)
-  const [globalErr, setGlobalErr] = useState(null)
+  const [globalErr, setGlobalErr] = useState<string | null>(null)
 
   // Esc-to-close.
   useEffect(() => {
@@ -138,7 +166,9 @@ export default function LibraryPicker({ onSelect, onClose, currentProjectId }) {
     api.listFiles(currentProjectId)
       .then((files) => {
         if (cancelled) return
-        const parts = (files || []).filter((f) => f.kind === 'part' && !f.deleted_at)
+        // `deleted_at` is a legacy soft-delete field absent from the ApiFile
+        // type (boundary this migration doesn't own).
+        const parts = (files || []).filter((f) => f.kind === 'part' && !(f as ProjectFile & { deleted_at?: string }).deleted_at)
         setProjectFiles(parts)
         setProjectErr(null)
       })
@@ -163,7 +193,10 @@ export default function LibraryPicker({ onSelect, onClose, currentProjectId }) {
       })
       .then((resp) => {
         if (cancelled) return
-        setGlobalRows(resp?.rows || [])
+        // LibraryPartRow types `author` as a string, but the API actually
+        // returns an object (see PickerRow comment above) — cast at this
+        // boundary rather than redeclaring the shared cloud/api.ts type.
+        setGlobalRows((resp?.rows as unknown as PickerRow[]) || [])
         setGlobalErr(null)
       })
       .catch((err) => {

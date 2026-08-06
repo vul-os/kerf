@@ -16,15 +16,63 @@
 // to enable in-place editing.
 
 import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Package, ExternalLink, Clock, Star, AlertTriangle } from 'lucide-react'
 import { useAuth } from '../store/auth.js'
+import type { BOMRow as ApiBOMRow, BOMPart as ApiBOMPart, BOMDistributor as ApiBOMDistributor } from '../types/api'
+import type { AssemblyBomOverride } from '../types/geometry'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
+
+// The shared BOMPart/BOMRow/BOMDistributor types (src/types/api.ts) cover the
+// fields the BOM CSV export cares about; this component also reads photos/
+// distributors/author (part) and config_label/config_id/material_path/author
+// (row) and moq/lead_time_days/price_min/price_max/fetched_at (distributor —
+// see pickCheapestDistributor's comment: backend only persists a subset
+// today, providers may grow the rest later). Extended locally rather than
+// widening the shared types out from under other callers.
+interface BOMPhoto {
+  storage_key?: string
+  primary?: boolean
+  caption?: string
+}
+
+interface BOMTableDistributor extends ApiBOMDistributor {
+  price_usd?: number
+  price_min?: number
+  price_max?: number
+  moq?: number | string
+  lead_time_days?: number | string
+  fetched_at?: string
+  stock?: unknown
+}
+
+interface BOMTablePart extends ApiBOMPart {
+  photos?: BOMPhoto[]
+  distributors?: BOMTableDistributor[]
+  author?: { name?: string; is_verified_publisher?: boolean }
+}
+
+interface BOMTableRow extends Omit<ApiBOMRow, 'part' | 'primary_distributor'> {
+  part?: BOMTablePart
+  primary_distributor?: BOMTableDistributor
+  config_label?: string
+  config_id?: string
+  material_path?: string
+  author?: { name?: string; is_verified_publisher?: boolean }
+}
+
+type OverridePatch = Partial<Omit<AssemblyBomOverride, 'part_file_id' | 'quantity_override'>> & {
+  quantity_override?: number | null
+}
 
 // Look up the override row for a given file_id. Overrides are keyed by
 // part_file_id (the row's underlying file id) so a single object lookup is
 // enough — we accept either an array or a Map.
-function findOverride(overrides, fileId) {
+function findOverride(
+  overrides: AssemblyBomOverride[] | Map<string, AssemblyBomOverride> | null | undefined,
+  fileId: string | undefined,
+): AssemblyBomOverride | null {
   if (!fileId) return null
   if (Array.isArray(overrides)) {
     return overrides.find((o) => o && o.part_file_id === fileId) || null
@@ -35,6 +83,15 @@ function findOverride(overrides, fileId) {
   return null
 }
 
+interface BOMTableProps {
+  rows?: BOMTableRow[]
+  onOpenRow?: (row: BOMTableRow) => void // clicking the part name (optional)
+  editable?: boolean    // when true, render the editable Qty / non-stocked / note controls
+  overrides?: AssemblyBomOverride[] | Map<string, AssemblyBomOverride>
+  onChangeOverride?: (fileId: string | undefined, patch: OverridePatch) => void
+  variant?: 'panel' | 'compact'   // 'panel' (full table) | 'compact' (denser, for inline mount)
+}
+
 export default function BOMTable({
   rows = [],
   onOpenRow,           // (row) => void — clicking the part name (optional)
@@ -42,7 +99,7 @@ export default function BOMTable({
   overrides,           // array of { part_file_id, quantity_override?, non_stocked?, note? } | Map
   onChangeOverride,    // (file_id, patch) => void — patch is a partial override row
   variant = 'panel',   // 'panel' (full table) | 'compact' (denser, for inline mount)
-}) {
+}: BOMTableProps) {
   if (!rows || rows.length === 0) {
     return (
       <div className="px-4 py-6 text-center text-[11px] text-ink-500">
@@ -102,7 +159,16 @@ export default function BOMTable({
 
 // -- Row -------------------------------------------------------------------
 
-function BOMRow({ row, editable, override, onChangeOverride, onOpen, compact }) {
+interface BOMRowProps {
+  row: BOMTableRow
+  editable: boolean
+  override: AssemblyBomOverride | null
+  onChangeOverride?: (fileId: string | undefined, patch: OverridePatch) => void
+  onOpen: () => void
+  compact: boolean
+}
+
+function BOMRow({ row, editable, override, onChangeOverride, onOpen, compact }: BOMRowProps) {
   const part = row.part || {}
   const photo = pickPrimaryPhoto(part.photos)
   const nonStocked = override?.non_stocked === true || row.non_stocked === true
@@ -280,7 +346,7 @@ function BOMRow({ row, editable, override, onChangeOverride, onOpen, compact }) 
 
 // -- Editable inputs ------------------------------------------------------
 
-function QtyOverrideInput({ count, override, onChange }) {
+function QtyOverrideInput({ count, override, onChange }: { count?: number; override?: number | null; onChange: (v: number | null) => void }) {
   // Local string state so users can type freely; commit on blur. Empty / blank
   // means "clear the override" — which makes the row revert to the rolled-up
   // count. Showing the rolled-up count as a placeholder makes the override
@@ -326,10 +392,10 @@ function QtyOverrideInput({ count, override, onChange }) {
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') e.target.blur()
+          if (e.key === 'Enter') e.currentTarget.blur()
           else if (e.key === 'Escape') {
             setDraft(override != null ? String(override) : '')
-            e.target.blur()
+            e.currentTarget.blur()
           }
         }}
         title={override != null
@@ -343,7 +409,7 @@ function QtyOverrideInput({ count, override, onChange }) {
   )
 }
 
-function NoteInput({ value, onChange }) {
+function NoteInput({ value, onChange }: { value?: string; onChange: (v: string | null) => void }) {
   const [draft, setDraft] = useState(value || '')
   // Same upstream-sync gate as QtyOverrideInput — only re-init the local draft
   // when `value` actually changes externally.
@@ -367,7 +433,7 @@ function NoteInput({ value, onChange }) {
       placeholder="—"
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
-      onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur() }}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
       className="w-32 bg-ink-950 border border-ink-800 rounded px-1.5 py-0.5 text-[11px] text-ink-100 outline-none focus:border-kerf-300/60"
     />
   )
@@ -375,13 +441,13 @@ function NoteInput({ value, onChange }) {
 
 // -- Subviews --------------------------------------------------------------
 
-function StaleBadge({ distributor, part }) {
+function StaleBadge({ distributor, part }: { distributor?: BOMTableDistributor; part?: BOMTablePart }) {
   if (!distributor || !part || !Array.isArray(part.distributors)) return null
   const entry = part.distributors.find((d) => d?.name === distributor.name)
   if (!entry || !entry.fetched_at) return null
   const t = new Date(entry.fetched_at).getTime()
   if (Number.isNaN(t)) return null
-  const nowRef = useRef(null)
+  const nowRef = useRef<number | null>(null)
   if (nowRef.current === null) {
     nowRef.current = Date.now()
   }
@@ -397,26 +463,26 @@ function StaleBadge({ distributor, part }) {
   )
 }
 
-function pickPrimaryPhoto(photos) {
+function pickPrimaryPhoto(photos?: BOMPhoto[]): BOMPhoto | null {
   if (!Array.isArray(photos) || photos.length === 0) return null
   return photos.find((p) => p?.primary === true) || photos[0]
 }
 
-function PartThumb({ photo }) {
-  const [src, setSrc] = useState(null)
+function PartThumb({ photo }: { photo: BOMPhoto | null }) {
+  const [src, setSrc] = useState<string | null>(null)
   useEffect(() => {
     if (!photo?.storage_key) {
       setSrc(null)
       return undefined
     }
     let cancelled = false
-    let url = null
+    let url: string | null = null
     ;(async () => {
       try {
         const token = useAuth.getState().accessToken
-        const headers = {}
+        const headers: Record<string, string> = {}
         if (token) headers.authorization = `Bearer ${token}`
-        const res = await fetch(`${API_URL}/api/blobs/${encodeURI(photo.storage_key)}`, { headers })
+        const res = await fetch(`${API_URL}/api/blobs/${encodeURI(photo.storage_key as string)}`, { headers })
         if (!res.ok) return
         const blob = await res.blob()
         if (cancelled) return
@@ -451,7 +517,7 @@ function PartThumb({ photo }) {
 
 // -- Helpers ---------------------------------------------------------------
 
-function Th({ children, className = '' }) {
+function Th({ children, className = '' }: { children?: ReactNode; className?: string }) {
   return (
     <th className={`text-left font-medium px-3 py-2 border-b border-ink-800 ${className}`}>
       {children}
@@ -459,7 +525,7 @@ function Th({ children, className = '' }) {
   )
 }
 
-function Td({ children, className = '' }) {
+function Td({ children, className = '' }: { children?: ReactNode; className?: string }) {
   return (
     <td className={`px-3 py-2 align-middle ${className}`}>
       {children}
@@ -467,7 +533,7 @@ function Td({ children, className = '' }) {
   )
 }
 
-export function formatUSD(n) {
+export function formatUSD(n: unknown): string {
   if (typeof n !== 'number' || !Number.isFinite(n)) return '—'
   if (Math.abs(n) < 1) return `$${n.toFixed(4)}`
   return `$${n.toFixed(2)}`
@@ -484,9 +550,9 @@ export function formatUSD(n) {
 // url/price_usd/stock/fetched_at today, but distributor providers may grow
 // `moq`, `lead_time_days`, `price_min`, `price_max` later — those are
 // passed through as-is when present.
-export function pickCheapestDistributor(distributors) {
+export function pickCheapestDistributor(distributors?: BOMTableDistributor[] | null): BOMTableDistributor | null {
   if (!Array.isArray(distributors) || distributors.length === 0) return null
-  let best = null
+  let best: BOMTableDistributor | null = null
   let bestPrice = Infinity
   for (const d of distributors) {
     if (!d || typeof d !== 'object') continue
@@ -513,9 +579,12 @@ export function pickCheapestDistributor(distributors) {
 //
 // Pure (no React) so the BOM helpers test can exercise the ranking logic
 // directly without rendering.
-export function pickAlternates(distributors, cheapest) {
+export function pickAlternates(
+  distributors?: BOMTableDistributor[] | null,
+  cheapest?: BOMTableDistributor | null,
+): { entry: BOMTableDistributor; price: number }[] {
   if (!Array.isArray(distributors) || distributors.length <= 1) return []
-  const out = []
+  const out: { entry: BOMTableDistributor; price: number }[] = []
   for (const d of distributors) {
     if (!d || typeof d !== 'object') continue
     if (d === cheapest) continue
@@ -535,7 +604,7 @@ export function pickAlternates(distributors, cheapest) {
 //   - First 3 alternates as `<name> <price>` separated by `•`.
 //   - 4+ collapses the tail to `+N more` with a tooltip listing the rest.
 //   - text-[10px] monospace, ink-500 muted palette.
-function AlternateDistributors({ distributors, cheapest }) {
+function AlternateDistributors({ distributors, cheapest }: { distributors?: BOMTableDistributor[] | null; cheapest?: BOMTableDistributor | null }) {
   const alternates = pickAlternates(distributors, cheapest)
   if (alternates.length === 0) {
     return <span className="text-ink-600">—</span>
@@ -569,13 +638,13 @@ function AlternateDistributors({ distributors, cheapest }) {
 // formatLeadTime — `5d` for ≤14 days, `12 wk` for longer periods. The cutoff
 // matches the canonical guidance in the task spec; weeks read better than
 // days once the lead time exceeds two-week supply windows.
-export function formatLeadTime(days) {
+export function formatLeadTime(days: number): string {
   if (!Number.isFinite(days) || days < 0) return '—'
   if (days <= 14) return `${Math.round(days)}d`
   return `${Math.round(days / 7)} wk`
 }
 
-export function totalQty(rows) {
+export function totalQty(rows: BOMTableRow[]): number {
   return rows.reduce((s, r) => s + (Number(r.count) || 0), 0)
 }
 

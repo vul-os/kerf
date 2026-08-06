@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Eye, EyeOff, Focus, Box, MoreVertical, Check, Copy, Trash2 } from 'lucide-react'
-import { useWorkspace } from '../store/workspace.js'
-import { exportParts, downloadBlob, FORMATS } from '../lib/exporters.js'
+import { useWorkspace, type RenderablePart } from '../store/workspace.js'
+import { exportParts, downloadBlob, FORMATS, type ExportPart } from '../lib/exporters.js'
 import { duplicateObject, deleteObject } from '../lib/jscadObjectOps.js'
 
 // Palette must match Renderer.jsx so swatches line up with what's drawn.
 const PALETTE = [0xc9a96b, 0x6b9bc9, 0xc96b89, 0x89c96b, 0xc9b86b, 0x9b6bc9]
-function hex(c) { return '#' + c.toString(16).padStart(6, '0') }
-function hexToRgb(h) {
+function hex(c: number) { return '#' + c.toString(16).padStart(6, '0') }
+function hexToRgb(h: string): [number, number, number] {
   const m = /^#?([0-9a-f]{6})$/i.exec(h)
   if (!m) return [1, 1, 1]
   const n = parseInt(m[1], 16)
@@ -16,6 +17,21 @@ function hexToRgb(h) {
 
 // Per-row export submenu is rendered inline below; the big "export all" button
 // lives in the top bar (ExportButton) — see Editor.jsx.
+
+interface ObjectsPanelProps {
+  parts?: RenderablePart[]
+  hiddenIds?: Set<string>
+  selectedId?: string | null
+  onToggleVisibility?: (id: string) => void
+  onSelect?: (id: string) => void
+  onIsolate?: (id: string) => void
+  onShowAll?: () => void
+  // New (optional; gracefully no-op for STEP):
+  onRecolorPart?: (id: string, rgb: [number, number, number]) => void
+  onMovePart?: (id: string, delta: [number, number, number]) => void
+  onSetPartPosition?: (id: string, pos: [number, number, number]) => void
+  isStepFile?: boolean
+}
 
 export default function ObjectsPanel({
   parts = [],
@@ -30,15 +46,15 @@ export default function ObjectsPanel({
   onMovePart,
   onSetPartPosition,
   isStepFile = false,
-}) {
-  const [hover, setHover] = useState(null)
-  const [openKebab, setOpenKebab] = useState(null)
-  const [openColor, setOpenColor] = useState(null)
-  const [openRowExport, setOpenRowExport] = useState(null)
-  const [exportError, setExportError] = useState(null)
-  const [opError, setOpError] = useState(null)
-  const colorInputRefs = useRef({})
-  const hidden = hiddenIds || new Set()
+}: ObjectsPanelProps) {
+  const [hover, setHover] = useState<string | null>(null)
+  const [openKebab, setOpenKebab] = useState<string | null>(null)
+  const [openColor, setOpenColor] = useState<string | null>(null)
+  const [openRowExport, setOpenRowExport] = useState<string | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
+  const [opError, setOpError] = useState<string | null>(null)
+  const colorInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const hidden = hiddenIds || new Set<string>()
 
   // Per-row export still uses the workspace store for project context.
   const currentFile = useWorkspace((s) => s.currentFile)
@@ -78,7 +94,7 @@ export default function ObjectsPanel({
   // through saveFile. The store's `editContent` flips the dirty flag; we
   // immediately call saveFile so the revision row is written without
   // waiting for the autosave timer.
-  async function applySourceMutation(nextSource) {
+  async function applySourceMutation(nextSource: unknown) {
     if (typeof nextSource !== 'string') return
     editContent(nextSource)
     // Flush the next save synchronously — saveFile reads currentFileContent
@@ -87,9 +103,9 @@ export default function ObjectsPanel({
     await saveFile()
   }
 
-  function handleDuplicate(partId) {
+  function handleDuplicate(partId: string) {
     if (isStepFile) return
-    const next = duplicateObject(currentFileContent, partId)
+    const next = duplicateObject(currentFileContent, partId, undefined)
     if (next == null) {
       setOpError("Couldn't auto-duplicate — edit the code by hand or ask chat.")
       return
@@ -97,7 +113,7 @@ export default function ObjectsPanel({
     applySourceMutation(next)
   }
 
-  function handleDeleteObject(partId) {
+  function handleDeleteObject(partId: string) {
     if (isStepFile) return
     const next = deleteObject(currentFileContent, partId)
     if (next == null) {
@@ -114,13 +130,13 @@ export default function ObjectsPanel({
     [isStepFile],
   )
 
-  function visibleParts() {
+  function visibleParts(): ExportPart[] {
     return parts.filter((p) => !hidden.has(p.id))
   }
 
-  async function doExport(format, partId = null) {
+  async function doExport(format: string, partId: string | null = null) {
     try {
-      const subset = partId
+      const subset: ExportPart[] = partId
         ? parts.filter((p) => p.id === partId)
         : visibleParts()
       if (subset.length === 0) {
@@ -133,7 +149,7 @@ export default function ObjectsPanel({
       })
       downloadBlob(blob, filename)
     } catch (err) {
-      setExportError(err?.message || 'Export failed')
+      setExportError((err as Error)?.message || 'Export failed')
     }
   }
 
@@ -238,7 +254,7 @@ export default function ObjectsPanel({
               {/* Hidden native color input — opened above. */}
               {!isStepFile && (
                 <input
-                  ref={(el) => { colorInputRefs.current[p.id] = el }}
+                  ref={(el: HTMLInputElement | null) => { colorInputRefs.current[p.id] = el }}
                   type="color"
                   defaultValue={swatchHex}
                   onClick={(e) => e.stopPropagation()}
@@ -376,7 +392,7 @@ export default function ObjectsPanel({
   )
 }
 
-function KebabItem({ children, onClick }) {
+function KebabItem({ children, onClick }: { children: ReactNode; onClick: () => void }) {
   return (
     <button
       type="button"

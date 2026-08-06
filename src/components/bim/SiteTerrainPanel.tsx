@@ -1,5 +1,5 @@
 /**
- * SiteTerrainPanel.jsx — Site Terrain / Mesh Modelling (ArchiCAD parity).
+ * SiteTerrainPanel.tsx — Site Terrain / Mesh Modelling (ArchiCAD parity).
  *
  * Builds TIN terrain meshes from XYZ survey points or contour sets,
  * analyses slope/aspect, generates contours, and computes earthwork
@@ -27,16 +27,51 @@ import {
   ChevronRight,
   Plus,
   Trash2,
-  BarChart3,
-  Layers,
-  ArrowUpDown,
 } from 'lucide-react'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type Point3 = [number, number, number]
+
+interface TerrainStats {
+  point_count: number
+  surface_area: number
+  plan_area: number
+  elevation: { min: number; max: number; range: number }
+}
+
+interface SlopeClasses {
+  flat: number
+  gentle: number
+  moderate: number
+  steep: number
+  total: number
+}
+
+interface Contour {
+  elevation: number
+  point_count: number
+}
+
+interface CutFillResult {
+  cut: number
+  fill: number
+  net: number
+}
+
+export interface SiteTerrainPanelProps {
+  content?: string
+  projectId?: string
+  onToast?: (msg: string) => void
+}
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const DEMO_POINTS = [
+const DEMO_POINTS: Point3[] = [
   [0,   0,   0.0],
   [10,  0,   0.5],
   [20,  0,   1.2],
@@ -52,7 +87,7 @@ const DEMO_POINTS = [
   [15,  15,  3.0],
 ]
 
-const DEMO_PROPOSED = [
+const DEMO_PROPOSED: Point3[] = [
   [0,   0,   0.5],
   [10,  0,   1.0],
   [20,  0,   1.5],
@@ -72,7 +107,7 @@ const DEMO_PROPOSED = [
 // Client-side TIN computation (mirrors Python Toposolid)
 // ---------------------------------------------------------------------------
 
-function computeStats(points) {
+function computeStats(points: Point3[]): TerrainStats | null {
   if (points.length < 3) return null
   const zs = points.map(p => p[2])
   const minZ = Math.min(...zs)
@@ -82,7 +117,6 @@ function computeStats(points) {
   const ys = points.map(p => p[1])
   const planArea = (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys))
   // Approximate surface area (slightly larger than plan due to slope)
-  const avgZ = zs.reduce((a, b) => a + b, 0) / zs.length
   const roughness = 1 + (maxZ - minZ) / Math.max(...xs, ...ys) * 0.3
   return {
     point_count: points.length,
@@ -92,7 +126,7 @@ function computeStats(points) {
   }
 }
 
-function computeSlopeClasses(points) {
+function computeSlopeClasses(points: Point3[]): SlopeClasses | null {
   if (points.length < 3) return null
   // Approximate slopes from neighbouring point differences
   let flat = 0, gentle = 0, moderate = 0, steep = 0
@@ -114,12 +148,12 @@ function computeSlopeClasses(points) {
   return { flat, gentle, moderate, steep, total }
 }
 
-function computeContours(points, interval) {
+function computeContours(points: Point3[], interval: number): Contour[] {
   if (points.length < 3 || interval <= 0) return []
   const zs = points.map(p => p[2])
   const minZ = Math.min(...zs)
   const maxZ = Math.max(...zs)
-  const contours = []
+  const contours: Contour[] = []
   let z = Math.ceil(minZ / interval) * interval
   while (z <= maxZ + 1e-9) {
     const near = points.filter(p => Math.abs(p[2] - z) < interval / 2)
@@ -131,11 +165,11 @@ function computeContours(points, interval) {
   return contours
 }
 
-function computeCutFill(existing, proposed) {
+function computeCutFill(existing: Point3[], proposed: Point3[]): CutFillResult | null {
   if (existing.length < 3 || proposed.length < 3) return null
   // Grid-sample both surfaces at integer coordinates
-  const existingMap = {}
-  const proposedMap = {}
+  const existingMap: Record<string, number> = {}
+  const proposedMap: Record<string, number> = {}
   existing.forEach(p => { existingMap[`${Math.round(p[0])},${Math.round(p[1])}`] = p[2] })
   proposed.forEach(p => { proposedMap[`${Math.round(p[0])},${Math.round(p[1])}`] = p[2] })
 
@@ -155,7 +189,14 @@ function computeCutFill(existing, proposed) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function StatCard({ label, value, unit, color = 'text-ink-700 dark:text-ink-300' }) {
+interface StatCardProps {
+  label: string
+  value: number | string
+  unit?: string
+  color?: string
+}
+
+function StatCard({ label, value, unit, color = 'text-ink-700 dark:text-ink-300' }: StatCardProps) {
   return (
     <div className="rounded-lg border border-ink-200 dark:border-ink-700 p-2 text-center">
       <div className={`text-lg font-bold ${color}`}>{value}</div>
@@ -165,7 +206,14 @@ function StatCard({ label, value, unit, color = 'text-ink-700 dark:text-ink-300'
   )
 }
 
-function SlopeBar({ label, count, total, color }) {
+interface SlopeBarProps {
+  label: string
+  count: number
+  total: number
+  color: string
+}
+
+function SlopeBar({ label, count, total, color }: SlopeBarProps) {
   const pct = total > 0 ? count / total * 100 : 0
   return (
     <div className="flex items-center gap-2 text-xs">
@@ -178,21 +226,21 @@ function SlopeBar({ label, count, total, color }) {
   )
 }
 
-let _nextPointId = 100
+const _nextPointId = 100
 
 // ---------------------------------------------------------------------------
 // Main panel
 // ---------------------------------------------------------------------------
 
-export default function SiteTerrainPanel({ content, projectId, onToast }) {
+export default function SiteTerrainPanel({ content, projectId: _projectId, onToast: _onToast }: SiteTerrainPanelProps) {
   // Accept a `content` string (JSON) from the panel registry.
   // content.points and content.proposedPoints can seed survey data.
-  const _cp = (() => { if (!content) return {}; try { return JSON.parse(content) } catch { return {} } })()
-  const [points, setPoints] = useState(_cp.points ?? DEMO_POINTS)
-  const [proposedPoints, setProposedPoints] = useState(_cp.proposedPoints ?? DEMO_PROPOSED)
+  const _cp = (() => { if (!content) return {} as { points?: Point3[]; proposedPoints?: Point3[] }; try { return JSON.parse(content) } catch { return {} } })()
+  const [points, setPoints] = useState<Point3[]>(_cp.points ?? DEMO_POINTS)
+  const [proposedPoints, _setProposedPoints] = useState<Point3[]>(_cp.proposedPoints ?? DEMO_PROPOSED)
   const [interval, setInterval] = useState(0.5)
   const [expanded, setExpanded] = useState(true)
-  const [activeTab, setActiveTab] = useState('terrain')
+  const [activeTab, setActiveTab] = useState<'terrain' | 'slope' | 'contours' | 'cutfill' | 'points'>('terrain')
 
   const stats = useMemo(() => computeStats(points), [points])
   const slopeClasses = useMemo(() => computeSlopeClasses(points), [points])
@@ -203,14 +251,14 @@ export default function SiteTerrainPanel({ content, projectId, onToast }) {
     setPoints(prev => [...prev, [0, 0, 0]])
   }, [])
 
-  const removePoint = useCallback((idx) => {
+  const removePoint = useCallback((idx: number) => {
     setPoints(prev => prev.filter((_, i) => i !== idx))
   }, [])
 
-  const updatePoint = useCallback((idx, axis, val) => {
+  const updatePoint = useCallback((idx: number, axis: number, val: string) => {
     setPoints(prev => prev.map((p, i) => {
       if (i !== idx) return p
-      const updated = [...p]
+      const updated = [...p] as Point3
       updated[axis] = parseFloat(val) || 0
       return updated
     }))
@@ -245,7 +293,9 @@ export default function SiteTerrainPanel({ content, projectId, onToast }) {
 
           {/* Tabs */}
           <div className="flex border-b border-ink-200 dark:border-ink-700 flex-wrap">
-            {[['terrain', 'Terrain'], ['slope', 'Slope'], ['contours', 'Contours'], ['cutfill', 'Cut/Fill'], ['points', 'Points']].map(([id, label]) => (
+            {(
+              [['terrain', 'Terrain'], ['slope', 'Slope'], ['contours', 'Contours'], ['cutfill', 'Cut/Fill'], ['points', 'Points']] as const
+            ).map(([id, label]) => (
               <button key={id} onClick={() => setActiveTab(id)}
                 className={`px-2.5 py-1.5 text-xs font-medium border-b-2 transition-colors ${
                   activeTab === id ? 'border-teal-500 text-teal-600 dark:text-teal-400' : 'border-transparent text-ink-500 hover:text-ink-700 dark:hover:text-ink-300'

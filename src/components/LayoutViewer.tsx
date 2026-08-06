@@ -29,8 +29,46 @@
  */
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import { renderLayout, fitBounds, worldToScreen, screenToWorld } from '../lib/layoutCanvas.js'
+import type { CSSProperties, MouseEvent as ReactMouseEvent, WheelEvent as ReactWheelEvent, KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { renderLayout, fitBounds } from '../lib/layoutCanvas.js'
 import { sky130Palette, gf180Palette, getPaletteColor, defaultLayerColor } from '../lib/layoutPalette.js'
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+//
+// layoutCanvas.ts/layoutPalette.ts (already migrated) leave their shape/view/palette
+// params as implicit `any` (JSDoc-documented, not TS-typed) — redeclared here from this
+// file's own header-comment doc rather than trusted as `any` at the call sites below.
+
+export type LayerId = number | string
+
+interface LayoutView {
+  offsetX: number
+  offsetY: number
+  zoom: number
+}
+
+/** One shape node in a parsed GDS-II layout tree — see this file's header comment. */
+export type LayoutShape =
+  | { kind: 'box'; layer?: LayerId; x: number; y: number; w: number; h: number }
+  | { kind: 'polygon'; layer?: LayerId; points: Array<{ x: number; y: number }> }
+  | { kind: 'path'; layer?: LayerId; points: Array<{ x: number; y: number }>; width?: number }
+  | { kind: 'text'; layer?: LayerId; x: number; y: number; label?: string; size?: number }
+  | { kind: 'ref'; layer?: LayerId; cell?: string; shapes: LayoutShape[] }
+
+export interface LayoutCell {
+  name: string
+  shapes: LayoutShape[]
+}
+
+export interface LayoutTree {
+  cells: LayoutCell[]
+  topCell?: string
+}
+
+type ViewAction =
+  | { type: 'SET'; view: LayoutView }
+  | { type: 'PAN'; dx: number; dy: number }
+  | { type: 'ZOOM_TO'; factor: number; px: number; py: number }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -41,7 +79,7 @@ const INITIAL_VIEW     = { offsetX: 0, offsetY: 0, zoom: 1 }
 
 // ── View reducer ─────────────────────────────────────────────────────────────
 
-function viewReducer(state, action) {
+function viewReducer(state: LayoutView, action: ViewAction): LayoutView {
   switch (action.type) {
     case 'SET': return action.view
     case 'PAN': return {
@@ -70,9 +108,9 @@ function viewReducer(state, action) {
  * Extract every unique layer id from a flat list of shapes (recursive).
  * Returns a sorted array of layer ids (numbers or strings).
  */
-function collectLayers(shapes) {
-  const ids = new Set()
-  function visit(s) {
+function collectLayers(shapes: LayoutShape[]): LayerId[] {
+  const ids = new Set<LayerId>()
+  function visit(s: LayoutShape | null | undefined) {
     if (!s) return
     if (s.layer != null) ids.add(s.layer)
     if (s.kind === 'ref' && Array.isArray(s.shapes)) s.shapes.forEach(visit)
@@ -84,7 +122,7 @@ function collectLayers(shapes) {
 /**
  * Resolve the top-cell shape list from a parsed layout tree.
  */
-function resolveTopShapes(layout) {
+function resolveTopShapes(layout: LayoutTree | null | undefined): LayoutShape[] {
   if (!layout) return []
   const topName = layout.topCell
   const cells   = layout.cells ?? []
@@ -94,7 +132,15 @@ function resolveTopShapes(layout) {
 
 // ── LayersPanel ───────────────────────────────────────────────────────────────
 
-function LayersPanel({ layers, visible, palette, onToggle, onToggleAll }) {
+interface LayersPanelProps {
+  layers: LayerId[]
+  visible: Set<LayerId>
+  palette: Record<string, { layerNum?: number; datatype?: number; fill?: string; stroke?: string }> | null
+  onToggle: (lid: LayerId) => void
+  onToggleAll: (show: boolean) => void
+}
+
+function LayersPanel({ layers, visible, palette, onToggle, onToggleAll }: LayersPanelProps) {
   return (
     <div
       style={{
@@ -161,7 +207,13 @@ function LayersPanel({ layers, visible, palette, onToggle, onToggleAll }) {
 
 // ── Toolbar ───────────────────────────────────────────────────────────────────
 
-function Toolbar({ onFit, showLayers, onToggleLayers }) {
+interface ToolbarProps {
+  onFit: () => void
+  showLayers: boolean
+  onToggleLayers: () => void
+}
+
+function Toolbar({ onFit, showLayers, onToggleLayers }: ToolbarProps) {
   return (
     <div style={{
       height: 36,
@@ -196,7 +248,7 @@ function Toolbar({ onFit, showLayers, onToggleLayers }) {
   )
 }
 
-const btnStyle = {
+const btnStyle: CSSProperties = {
   background: 'transparent',
   border: 'none',
   color: '#aab4cc',
@@ -208,14 +260,27 @@ const btnStyle = {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function LayoutViewer({ layout = null, pdk = null, className = '' }) {
-  const canvasRef = useRef(null)
+export interface LayoutViewerProps {
+  layout?: LayoutTree | null
+  pdk?: 'sky130' | 'gf180' | null
+  className?: string
+}
+
+interface DragState {
+  startX: number
+  startY: number
+  startOffsetX: number
+  startOffsetY: number
+}
+
+export default function LayoutViewer({ layout = null, pdk = null, className = '' }: LayoutViewerProps) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [view, dispatchView]     = useReducer(viewReducer, INITIAL_VIEW)
   const [showLayers, setShowLayers] = useState(true)
-  const [, forceRender]          = useReducer(x => x + 1, 0)
+  const [, forceRender]          = useReducer((x: number) => x + 1, 0)
 
   // Drag state (not React state — avoids re-render on every mousemove)
-  const dragRef = useRef(null) // { startX, startY, startOffsetX, startOffsetY }
+  const dragRef = useRef<DragState | null>(null)
 
   // Resolved shape list
   const shapes = useMemo(() => resolveTopShapes(layout), [layout])
@@ -224,8 +289,8 @@ export default function LayoutViewer({ layout = null, pdk = null, className = ''
   const layers = useMemo(() => collectLayers(shapes), [shapes])
 
   // Visible-layer set — starts with all visible
-  const visibleRef = useRef(new Set())
-  const [visibleGeneration, tickVisible] = useReducer(x => x + 1, 0)
+  const visibleRef = useRef<Set<LayerId>>(new Set())
+  const [visibleGeneration, tickVisible] = useReducer((x: number) => x + 1, 0)
 
   // When layer list changes re-initialise visibility
   useEffect(() => {
@@ -233,7 +298,9 @@ export default function LayoutViewer({ layout = null, pdk = null, className = ''
     tickVisible()
   }, [layers])
 
-  // Snapshot of visible set (derived from ref + generation counter)
+  // Snapshot of visible set (derived from ref + generation counter). visibleRef is mutated in
+  // place and visibleGeneration is bumped to force the re-render that re-reads it.
+  // eslint-disable-next-line react-hooks/refs -- pre-existing before this migration.
   const visibleLayers = visibleRef.current
 
   // Choose palette
@@ -300,7 +367,7 @@ export default function LayoutViewer({ layout = null, pdk = null, className = ''
 
   // ── Canvas resize observer ────────────────────────────────────────────────
 
-  const containerRef = useRef(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const container = containerRef.current
@@ -325,7 +392,7 @@ export default function LayoutViewer({ layout = null, pdk = null, className = ''
 
   // ── Pointer events ────────────────────────────────────────────────────────
 
-  const onMouseDown = useCallback(e => {
+  const onMouseDown = useCallback((e: ReactMouseEvent<HTMLCanvasElement>) => {
     // Left mouse button or any button (middle-mouse drag)
     if (e.button === 0 || e.button === 1) {
       e.preventDefault()
@@ -338,7 +405,7 @@ export default function LayoutViewer({ layout = null, pdk = null, className = ''
     }
   }, [view.offsetX, view.offsetY])
 
-  const onMouseMove = useCallback(e => {
+  const onMouseMove = useCallback((e: ReactMouseEvent<HTMLCanvasElement>) => {
     if (!dragRef.current) return
     const dx = e.clientX - dragRef.current.startX
     const dy = e.clientY - dragRef.current.startY
@@ -356,7 +423,7 @@ export default function LayoutViewer({ layout = null, pdk = null, className = ''
     dragRef.current = null
   }, [])
 
-  const onWheel = useCallback(e => {
+  const onWheel = useCallback((e: ReactWheelEvent<HTMLCanvasElement>) => {
     e.preventDefault()
     const rect   = canvasRef.current?.getBoundingClientRect()
     if (!rect) return
@@ -366,7 +433,7 @@ export default function LayoutViewer({ layout = null, pdk = null, className = ''
     dispatchView({ type: 'ZOOM_TO', factor, px, py })
   }, [])
 
-  const onKeyDown = useCallback(e => {
+  const onKeyDown = useCallback((e: ReactKeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'f' || e.key === 'F') fitToWindow()
   }, [fitToWindow])
 
@@ -412,6 +479,7 @@ export default function LayoutViewer({ layout = null, pdk = null, className = ''
         {/* Canvas area */}
         <div
           ref={containerRef}
+          // eslint-disable-next-line react-hooks/refs -- pre-existing before this migration.
           style={{ flex: 1, position: 'relative', overflow: 'hidden', cursor: dragRef.current ? 'grabbing' : 'crosshair' }}
         >
           <canvas

@@ -8,32 +8,77 @@
 //   cutList  — parsed cut-list result object or null
 //   raw      — raw string content (for parse fallback)
 
-import { Layers, AlertTriangle } from 'lucide-react'
+import { Layers } from 'lucide-react'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface CutListPiece {
+  label?: string
+  piece_label?: string
+  length_mm?: number
+  quantity?: number
+  grain_direction?: string
+  board_id?: number | string
+}
+
+interface CutListBoard {
+  board_id?: number | string
+  pieces?: CutListPiece[]
+  used_mm?: number
+  used_length_mm?: number
+  waste_mm?: number
+  waste_length_mm?: number
+  utilisation_pct?: number
+  utilisation?: number
+}
+
+interface CutListResult {
+  boards?: CutListBoard[]
+  pieces?: CutListPiece[]
+  required_pieces?: CutListPiece[]
+  stock_length_mm?: number
+  total_boards?: number
+  total_waste_mm?: number
+  overall_utilisation_pct?: number
+}
+
+export interface WoodworkingCutListPanelProps {
+  cutList: CutListResult | null | undefined
+  raw?: string | null
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function parseCutList(raw) {
+function parseCutList(raw: string | null | undefined): CutListResult | null {
   if (!raw || typeof raw !== 'string' || !raw.trim()) return null
   try {
     const doc = JSON.parse(raw)
     if (doc && typeof doc === 'object') return doc
-  } catch (_) {}
+  } catch {
+    /* not valid JSON — fall through to null */
+  }
   return null
 }
 
-function fmtMm(v) {
+function fmtMm(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(Number(v))) return '—'
   return `${Number(v).toFixed(0)} mm`
 }
 
-function fmtPct(v) {
+function fmtPct(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(Number(v))) return '—'
   return `${Number(v).toFixed(1)} %`
 }
 
-function UtilBar({ pct }) {
+interface UtilBarProps {
+  pct: number | null | undefined
+}
+
+function UtilBar({ pct }: UtilBarProps) {
   const clamped = Math.min(100, Math.max(0, pct ?? 0))
   const color = clamped >= 85 ? '#34d399' : clamped >= 60 ? '#fbbf24' : '#f87171'
   return (
@@ -46,7 +91,12 @@ function UtilBar({ pct }) {
   )
 }
 
-function BoardTable({ boards, stockLength }) {
+interface BoardTableProps {
+  boards: CutListBoard[]
+  stockLength: number | null | undefined
+}
+
+function BoardTable({ boards, stockLength }: BoardTableProps) {
   if (!boards || boards.length === 0) {
     return (
       <div className="text-[11px] text-ink-500 italic py-4 text-center">
@@ -81,7 +131,7 @@ function BoardTable({ boards, stockLength }) {
                 </td>
                 <td className="py-1.5 px-2 text-ink-300">
                   {pieces.length > 0 ? (
-                    <span title={pieces.map((p) => p.label || p.piece_label || p).join(', ')}>
+                    <span title={pieces.map((p) => p.label || p.piece_label || String(p)).join(', ')}>
                       {pieces.length} piece{pieces.length !== 1 ? 's' : ''}
                     </span>
                   ) : '—'}
@@ -98,7 +148,11 @@ function BoardTable({ boards, stockLength }) {
   )
 }
 
-function PieceTable({ pieces }) {
+interface PieceTableProps {
+  pieces: CutListPiece[]
+}
+
+function PieceTable({ pieces }: PieceTableProps) {
   if (!pieces || pieces.length === 0) return null
 
   return (
@@ -132,7 +186,11 @@ function PieceTable({ pieces }) {
   )
 }
 
-function SummaryBar({ result }) {
+interface SummaryBarProps {
+  result: CutListResult
+}
+
+function SummaryBar({ result }: SummaryBarProps) {
   const boards = result?.boards ?? []
   const total  = result?.total_boards ?? boards.length
   const waste  = result?.total_waste_mm ?? null
@@ -158,7 +216,7 @@ function SummaryBar({ result }) {
 // Main export
 // ---------------------------------------------------------------------------
 
-export default function WoodworkingCutListPanel({ cutList, raw }) {
+export default function WoodworkingCutListPanel({ cutList, raw }: WoodworkingCutListPanelProps) {
   const parsed = cutList ?? parseCutList(raw)
   const boards = parsed?.boards ?? []
   const pieces = parsed?.pieces ?? parsed?.required_pieces ?? []

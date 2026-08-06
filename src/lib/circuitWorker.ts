@@ -33,6 +33,8 @@
 import { transform as sucraseTransform } from 'sucrase'
 import * as React from 'react'
 import * as TSC from '@tscircuit/core'
+import type { CircuitJson } from '../types/circuit.js'
+import type { CircuitCompileRequest, CircuitWorkerResponse } from '../types/workers.js'
 
 // Build a binding map exposed to user code as the module's `exports`.
 // We import everything from @tscircuit/core eagerly inside the worker (the
@@ -43,9 +45,20 @@ const TSC_EXPORTS = TSC
 // The set of names users typically import from tscircuit/@tscircuit/core. We
 // pre-resolve every named import to its TSC value; unknown names fall back
 // to undefined so `new Function` can still bind them.
-const KNOWN_IMPORTS = TSC_EXPORTS && typeof TSC_EXPORTS === 'object'
+const KNOWN_IMPORTS: string[] = TSC_EXPORTS && typeof TSC_EXPORTS === 'object'
   ? Object.keys(TSC_EXPORTS)
   : []
+
+// The dynamic `new Function(...)` eval boundary below binds arbitrary
+// tscircuit/React exports and the user's own resolved imports by name — none
+// of that can be modeled more precisely than `unknown` without hand-rolling a
+// parallel type for every possible tscircuit export.
+type TscExportsBag = Record<string, unknown>
+
+interface NamespaceImportBinding { kind: 'namespace'; binding: string; source: string }
+interface DefaultImportBinding { kind: 'default'; binding: string; source: string }
+interface NamedImportBinding { kind: 'named'; orig: string; binding: string; source: string }
+type ImportBinding = NamespaceImportBinding | DefaultImportBinding | NamedImportBinding
 
 // Strip & collect import statements. Returns the rewritten JS body plus a
 // list of {binding, source, kind} so the caller knows which symbols it must
@@ -59,10 +72,10 @@ const KNOWN_IMPORTS = TSC_EXPORTS && typeof TSC_EXPORTS === 'object'
 const IMPORT_RE = /^[ \t]*import\s+([^;\n]+?)\s+from\s+['"]([^'"\n]+)['"];?[ \t]*$/gm
 const SIDE_EFFECT_IMPORT_RE = /^[ \t]*import\s+['"][^'"\n]+['"];?[ \t]*$/gm
 
-function parseImports(src) {
-  const bindings = []
+function parseImports(src: string): { stripped: string; bindings: ImportBinding[] } {
+  const bindings: ImportBinding[] = []
   const stripped = src
-    .replace(IMPORT_RE, (_match, clause, source) => {
+    .replace(IMPORT_RE, (_match, clause: string, source: string) => {
       const trimmed = clause.trim()
       // `* as NS`
       const ns = trimmed.match(/^\*\s+as\s+([A-Za-z_$][\w$]*)$/)
@@ -103,7 +116,6 @@ function parseImports(src) {
       // Anything we don't recognise: drop the line and warn via console.
       // The compile may still succeed if the user didn't actually need it.
       try {
-        // eslint-disable-next-line no-console
         console.warn('circuitWorker: unrecognised import clause, dropping:', trimmed)
       } catch { /* ignore */ }
       return ''
@@ -116,7 +128,7 @@ function parseImports(src) {
 // and `react` as the three known sources; other module specifiers fall through
 // to undefined (the user's code will hit a NameError if it tries to use them,
 // which surfaces as a clean compile error).
-function resolveBinding(b) {
+function resolveBinding(b: ImportBinding): unknown {
   const src = b.source
   const isTSC = src === 'tscircuit' || src === '@tscircuit/core'
   const isReact = src === 'react'
@@ -126,12 +138,12 @@ function resolveBinding(b) {
     return {}
   }
   if (b.kind === 'default') {
-    if (isReact) return React.default ?? React
+    if (isReact) return (React as unknown as { default?: unknown }).default ?? React
     if (isTSC) return TSC_EXPORTS // `import t from 'tscircuit'` → namespace-ish
     return undefined
   }
   // named
-  const ns = isReact ? React : isTSC ? TSC_EXPORTS : null
+  const ns: TscExportsBag | null = isReact ? (React as unknown as TscExportsBag) : isTSC ? (TSC_EXPORTS as unknown as TscExportsBag) : null
   if (!ns) return undefined
   return ns[b.orig]
 }
@@ -140,7 +152,7 @@ function resolveBinding(b) {
 // We support `export default <expr>` only; named exports of `circuit` / `board`
 // are still recognised for parity with tscircuit's CLI, but the v1 flow expects
 // a default export.
-function rewriteExport(src) {
+function rewriteExport(src: string): string {
   // Quick path: explicit default export (most common).
   if (/export\s+default\s+/.test(src)) {
     return src.replace(/export\s+default\s+/, 'return ')
@@ -163,7 +175,9 @@ function rewriteExport(src) {
   return src + '\n;return (typeof circuit !== "undefined" ? circuit : (typeof board !== "undefined" ? board : null));'
 }
 
-async function compileCircuitInWorker(source) {
+type CircuitCompileOutcome = { circuitJson: CircuitJson } | { error: string }
+
+async function compileCircuitInWorker(source: string): Promise<CircuitCompileOutcome> {
   if (!source || !source.trim()) {
     // Empty file → empty circuit JSON. Don't error.
     return { circuitJson: [] }
@@ -174,7 +188,7 @@ async function compileCircuitInWorker(source) {
   // 2. Compile TSX → JS via sucrase. We use `automatic` jsx so the user
   //    doesn't need an explicit `import React`. tscircuit's runtime supplies
   //    the JSX factory via React.createElement / Fragment.
-  let compiled
+  let compiled: string
   try {
     const out = sucraseTransform(stripped, {
       transforms: ['typescript', 'jsx'],
@@ -185,7 +199,7 @@ async function compileCircuitInWorker(source) {
     })
     compiled = out.code
   } catch (err) {
-    return { error: 'Compile error: ' + (err?.message || String(err)) }
+    return { error: 'Compile error: ' + ((err as Error)?.message || String(err)) }
   }
 
   // 3. Find the export and rewrite to a `return`.
@@ -199,15 +213,16 @@ async function compileCircuitInWorker(source) {
   //    Order matters: user imports win over the built-in TSC names, so
   //    `import { Resistor } from 'tscircuit'` shadows our default Resistor
   //    binding cleanly.
-  const argNames = ['React']
-  const argValues = [React]
+  const argNames: string[] = ['React']
+  const argValues: unknown[] = [React]
   // First, expose every TSC export as a top-level binding (so user code can
   // reference `<resistor ... />` lowercase tags too — tscircuit registers
   // those via JSX intrinsic lowercase names, no import needed).
+  const tscBag = TSC_EXPORTS as unknown as TscExportsBag
   for (const name of KNOWN_IMPORTS) {
     if (argNames.includes(name)) continue
     argNames.push(name)
-    argValues.push(TSC_EXPORTS[name])
+    argValues.push(tscBag[name])
   }
   // Then user imports — these can override TSC defaults (`import Resistor from
   // './my-r.tsx'` shadows ours). We dedupe by name.
@@ -222,13 +237,12 @@ async function compileCircuitInWorker(source) {
     argValues.push(resolveBinding(b))
   }
 
-  let exported
+  let exported: unknown
   try {
-    // eslint-disable-next-line no-new-func
     const factory = new Function(...argNames, body)
     exported = factory(...argValues)
   } catch (err) {
-    return { error: 'Eval error: ' + (err?.message || String(err)) }
+    return { error: 'Eval error: ' + ((err as Error)?.message || String(err)) }
   }
 
   // 5. The user's default export may be:
@@ -236,20 +250,20 @@ async function compileCircuitInWorker(source) {
   //    - a function returning a JSX element    → call, then wrap
   //    - a Circuit instance (already wrapped)  → use directly
   //    - null/undefined                        → empty circuit
-  let element = exported
+  let element: unknown = exported
   if (typeof element === 'function') {
-    try { element = element() }
-    catch (err) { return { error: 'Default export threw: ' + (err?.message || String(err)) } }
+    try { element = (element as () => unknown)() }
+    catch (err) { return { error: 'Default export threw: ' + ((err as Error)?.message || String(err)) } }
   }
-  if (element && typeof element.then === 'function') {
-    try { element = await element }
-    catch (err) { return { error: 'Default export rejected: ' + (err?.message || String(err)) } }
+  if (element && typeof (element as { then?: unknown }).then === 'function') {
+    try { element = await (element as Promise<unknown>) }
+    catch (err) { return { error: 'Default export rejected: ' + ((err as Error)?.message || String(err)) } }
   }
 
-  let circuitInstance
-  if (element && typeof element === 'object' && typeof element.getCircuitJson === 'function') {
+  let circuitInstance: { getCircuitJson: () => unknown; renderUntilSettled?: () => Promise<unknown>; render?: () => unknown; add?: (el: unknown) => void }
+  if (element && typeof element === 'object' && typeof (element as { getCircuitJson?: unknown }).getCircuitJson === 'function') {
     // Already a Circuit/RootCircuit/IsolatedCircuit-shaped object.
-    circuitInstance = element
+    circuitInstance = element as typeof circuitInstance
   } else if (element == null) {
     // Empty file or null export — return an empty CircuitJSON.
     return { circuitJson: [] }
@@ -260,10 +274,11 @@ async function compileCircuitInWorker(source) {
       if (!Ctor) {
         return { error: '@tscircuit/core did not expose a Circuit class' }
       }
-      circuitInstance = new Ctor()
-      circuitInstance.add(element)
+      const instance = new Ctor() as unknown as typeof circuitInstance
+      instance.add?.(element)
+      circuitInstance = instance
     } catch (err) {
-      return { error: 'Could not wrap in Circuit: ' + (err?.message || String(err)) }
+      return { error: 'Could not wrap in Circuit: ' + ((err as Error)?.message || String(err)) }
     }
   }
 
@@ -275,24 +290,24 @@ async function compileCircuitInWorker(source) {
       circuitInstance.render()
     }
   } catch (err) {
-    return { error: 'Render error: ' + (err?.message || String(err)) }
+    return { error: 'Render error: ' + ((err as Error)?.message || String(err)) }
   }
-  let circuitJson
+  let circuitJson: unknown
   try {
     circuitJson = circuitInstance.getCircuitJson()
   } catch (err) {
-    return { error: 'getCircuitJson failed: ' + (err?.message || String(err)) }
+    return { error: 'getCircuitJson failed: ' + ((err as Error)?.message || String(err)) }
   }
   // Strip non-cloneable fields defensively. We've seen tscircuit attach
   // function references to a few records; structuredClone refuses those.
   const cleaned = sanitiseForClone(circuitJson)
-  return { circuitJson: cleaned }
+  return { circuitJson: cleaned as CircuitJson }
 }
 
 // Recursively replace function values with `null` so structuredClone can
 // transit the result. We don't try to be clever about typed arrays — circuit
 // JSON is plain objects + numbers + strings.
-function sanitiseForClone(value, depth = 0) {
+function sanitiseForClone(value: unknown, depth = 0): unknown {
   if (depth > 12) return null
   if (value == null) return value
   const t = typeof value
@@ -301,28 +316,30 @@ function sanitiseForClone(value, depth = 0) {
   if (Array.isArray(value)) {
     return value.map((v) => sanitiseForClone(v, depth + 1))
   }
-  const out = {}
-  for (const k of Object.keys(value)) {
-    const v = value[k]
+  const out: Record<string, unknown> = {}
+  for (const k of Object.keys(value as Record<string, unknown>)) {
+    const v = (value as Record<string, unknown>)[k]
     out[k] = sanitiseForClone(v, depth + 1)
   }
   return out
 }
 
-self.addEventListener('message', async (ev) => {
-  const msg = ev.data || {}
+self.addEventListener('message', async (ev: MessageEvent<CircuitCompileRequest>) => {
+  const msg = ev.data || ({} as CircuitCompileRequest)
   if (msg.type === 'compile') {
     const { runId, source } = msg
-    let res
+    let res: CircuitCompileOutcome
     try {
       res = await compileCircuitInWorker(source)
     } catch (err) {
-      res = { error: err?.message || String(err) }
+      res = { error: (err as Error)?.message || String(err) }
     }
-    if (res.error) {
-      self.postMessage({ type: 'error', runId, message: res.error })
+    if ('error' in res) {
+      const response: CircuitWorkerResponse = { type: 'error', runId, message: res.error }
+      self.postMessage(response)
     } else {
-      self.postMessage({ type: 'result', runId, circuitJson: res.circuitJson || [] })
+      const response: CircuitWorkerResponse = { type: 'result', runId, circuitJson: res.circuitJson || [] }
+      self.postMessage(response)
     }
   }
 })

@@ -6,7 +6,11 @@
  *
  * viewBox 320×200.
  */
-export default function TopoIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function TopoIllustration({ className = '' }: Props) {
   // Design domain: 90×90 cells split into a 9×9 grid. Density values
   // chosen to evoke the canonical MBB-bracket result — a diagonal truss
   // forming under the load.

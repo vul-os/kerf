@@ -3,7 +3,13 @@
  * user message → tool call card → assistant reply → updated 3D viewport.
  * Connecting arrows between each stage.
  */
-export default function ChatLoopIllustration({ className = '' }) {
+import type { ReactNode } from 'react'
+
+export interface Props {
+  className?: string
+}
+
+export default function ChatLoopIllustration({ className = '' }: Props) {
   return (
     <svg
       viewBox="0 0 880 280"
@@ -101,7 +107,14 @@ export default function ChatLoopIllustration({ className = '' }) {
   )
 }
 
-function Stage({ x, y, w, h, label, children }) {
+function Stage({ x, y, w, h, label, children }: {
+  x: number
+  y: number
+  w: number
+  h: number
+  label: string
+  children?: ReactNode
+}) {
   return (
     <g transform={`translate(${x}, ${y})`}>
       <rect width={w} height={h} rx="8" fill="#0a0b0d" stroke="#1a1d24" />
@@ -114,7 +127,7 @@ function Stage({ x, y, w, h, label, children }) {
   )
 }
 
-function Arrow({ x1, x2, y }) {
+function Arrow({ x1, x2, y }: { x1: number; x2: number; y: number }) {
   return (
     <g>
       <line x1={x1} y1={y} x2={x2 - 8} y2={y} stroke="#ffd633" strokeWidth="1.5" markerEnd="url(#cl-arr)" />
@@ -123,7 +136,7 @@ function Arrow({ x1, x2, y }) {
   )
 }
 
-function ToolRow({ y, kind, arg, ok }) {
+function ToolRow({ y, kind, arg, ok }: { y: number; kind: string; arg: string; ok?: boolean }) {
   return (
     <g transform={`translate(14, ${y})`}>
       <rect width="182" height="22" rx="4" fill="#0f1115" stroke="#1a1d24" />

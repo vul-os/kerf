@@ -3,7 +3,11 @@
  * grid. Each card shows a stylised geometric thumbnail and footer with a
  * heart (likes) and fork icon, communicating the "publish + fork" loop.
  */
-export default function WorkshopIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function WorkshopIllustration({ className = '' }: Props) {
   return (
     <svg
       viewBox="0 0 320 200"
@@ -24,7 +28,15 @@ export default function WorkshopIllustration({ className = '' }) {
   )
 }
 
-function ProjectCard({ x, y, thumb, title, likes, forks, highlighted }) {
+function ProjectCard({ x, y, thumb, title, likes, forks, highlighted }: {
+  x: number
+  y: number
+  thumb: string
+  title: string
+  likes: number
+  forks: number
+  highlighted?: boolean
+}) {
   const stroke = highlighted ? '#ffd633' : '#232730'
   const strokeOp = highlighted ? 0.55 : 1
   return (
@@ -93,7 +105,7 @@ function ProjectCard({ x, y, thumb, title, likes, forks, highlighted }) {
   )
 }
 
-function Thumb({ kind }) {
+function Thumb({ kind }: { kind: string }) {
   const c = '#ffd633'
   if (kind === 'gear') {
     return (

@@ -3,7 +3,11 @@
  * publisher star badge in the top-right. Shows a mix of passives (R/C/L),
  * a 555 timer IC and a screw to communicate breadth.
  */
-export default function LibraryIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function LibraryIllustration({ className = '' }: Props) {
   return (
     <svg
       viewBox="0 0 320 200"
@@ -47,7 +51,13 @@ export default function LibraryIllustration({ className = '' }) {
   )
 }
 
-function PartTile({ x, y, kind, label, verified }) {
+function PartTile({ x, y, kind, label, verified }: {
+  x: number
+  y: number
+  kind: string
+  label: string
+  verified?: boolean
+}) {
   return (
     <g transform={`translate(${x}, ${y})`}>
       <rect width="84" height="56" rx="5" fill="#0f1115" stroke="#232730" />
@@ -76,7 +86,7 @@ function PartTile({ x, y, kind, label, verified }) {
   )
 }
 
-function PartGlyph({ kind }) {
+function PartGlyph({ kind }: { kind: string }) {
   const c = '#ffd633'
   if (kind === 'resistor') {
     return (

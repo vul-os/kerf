@@ -1,4 +1,4 @@
-// openscadToJscad.js — translates OpenSCAD source to .jscad (JSCAD ES module) source.
+// openscadToJscad.ts — translates OpenSCAD source to .jscad (JSCAD ES module) source.
 //
 // Scope (v1):
 //   Primitives:  cube, sphere, cylinder
@@ -38,10 +38,17 @@ const TK = {
   DOT: 'DOT',
   OP: 'OP',
   EOF: 'EOF',
+} as const
+
+type TokenType = (typeof TK)[keyof typeof TK]
+
+interface Token {
+  t: TokenType
+  v: string
 }
 
-function tokenize(src) {
-  const tokens = []
+function tokenize(src: string): Token[] {
+  const tokens: Token[] = []
   let i = 0
   const len = src.length
 
@@ -97,7 +104,7 @@ function tokenize(src) {
     // number (including leading minus handled as unary later)
     if (/[0-9]/.test(c) || (c === '-' && /[0-9]/.test(src[i + 1] || ''))) {
       let s = c; i++
-      while (i < len && /[0-9.eE+\-]/.test(src[i])) s += src[i++]
+      while (i < len && /[0-9.eE+-]/.test(src[i])) s += src[i++]
       tokens.push({ t: TK.NUMBER, v: s }); continue
     }
 
@@ -125,37 +132,60 @@ function tokenize(src) {
 
 // ─── Translator ───────────────────────────────────────────────────────────────
 
+interface ArgList {
+  named: Record<string, string>
+  positional: string[]
+  isNamed: boolean
+}
+
+interface Range {
+  start: string
+  step: string
+  end: string
+}
+
+interface TranslateResult {
+  lines: string[]
+  shapes: string[]
+  warnings: string[]
+}
+
 class Translator {
-  constructor(tokens) {
+  tokens: Token[]
+  pos: number
+  topShapes: string[] // track last top-level solid expr for main()
+  warnings: string[]
+
+  constructor(tokens: Token[]) {
     this.tokens = tokens
     this.pos = 0
-    this.topShapes = [] // track last top-level solid expr for main()
+    this.topShapes = []
     this.warnings = []
   }
 
-  peek() { return this.tokens[this.pos] || { t: TK.EOF, v: '' } }
-  peek2() { return this.tokens[this.pos + 1] || { t: TK.EOF, v: '' } }
+  peek(): Token { return this.tokens[this.pos] || { t: TK.EOF, v: '' } }
+  peek2(): Token { return this.tokens[this.pos + 1] || { t: TK.EOF, v: '' } }
 
-  advance() {
+  advance(): Token {
     const tok = this.tokens[this.pos]
     this.pos++
     return tok
   }
 
-  eat(type) {
+  eat(type: TokenType): Token {
     const tok = this.peek()
     if (tok.t !== type) throw new Error(`Expected ${type} got ${tok.t}(${tok.v})`)
     return this.advance()
   }
 
-  skipSemis() {
+  skipSemis(): void {
     while (this.peek().t === TK.SEMI) this.advance()
   }
 
   // Translate a vector literal [a, b, c]
-  translateVector() {
+  translateVector(): string {
     this.eat(TK.LBRACKET)
-    const items = []
+    const items: string[] = []
     while (this.peek().t !== TK.RBRACKET && this.peek().t !== TK.EOF) {
       if (this.peek().t === TK.LBRACKET) {
         items.push(this.translateVector())
@@ -169,9 +199,9 @@ class Translator {
   }
 
   // Translate a range [start:end] or [start:step:end]
-  translateRange() {
+  translateRange(): Range {
     // already consumed [
-    const parts = []
+    const parts: string[] = []
     while (this.peek().t !== TK.RBRACKET && this.peek().t !== TK.EOF) {
       parts.push(this.translateExpr())
       if (this.peek().t === TK.COLON) this.advance()
@@ -185,11 +215,10 @@ class Translator {
 
   // Translate a named-argument list (name=value, ...) into a JS object literal
   // OR a positional list into an array.
-  // Returns {named: bool, src: string, positional: string[]}
-  translateArgList() {
+  translateArgList(): ArgList {
     this.eat(TK.LPAREN)
-    const named = {}
-    const positional = []
+    const named: Record<string, string> = {}
+    const positional: string[] = []
     let isNamed = false
 
     while (this.peek().t !== TK.RPAREN && this.peek().t !== TK.EOF) {
@@ -209,9 +238,9 @@ class Translator {
   }
 
   // Translate a { body } block, returning array of translated statements
-  translateBlock() {
+  translateBlock(): string[] {
     this.eat(TK.LBRACE)
-    const stmts = []
+    const stmts: string[] = []
     this.skipSemis()
     while (this.peek().t !== TK.RBRACE && this.peek().t !== TK.EOF) {
       const s = this.translateStatement()
@@ -223,11 +252,11 @@ class Translator {
   }
 
   // Primary expression
-  translateExpr() {
+  translateExpr(): string {
     return this.translateBinary()
   }
 
-  translateBinary() {
+  translateBinary(): string {
     let left = this.translateUnary()
     while (this.peek().t === TK.OP || this.peek().t === TK.EQUALS) {
       const op = this.peek().v
@@ -241,7 +270,7 @@ class Translator {
     return left
   }
 
-  translateUnary() {
+  translateUnary(): string {
     if (this.peek().t === TK.OP && this.peek().v === '!') {
       this.advance()
       return `!${this.translateUnary()}`
@@ -253,7 +282,7 @@ class Translator {
     return this.translatePostfix()
   }
 
-  translatePostfix() {
+  translatePostfix(): string {
     let expr = this.translatePrimary()
     while (true) {
       if (this.peek().t === TK.LBRACKET) {
@@ -272,7 +301,7 @@ class Translator {
     return expr
   }
 
-  translatePrimary() {
+  translatePrimary(): string {
     const tok = this.peek()
 
     if (tok.t === TK.NUMBER) { this.advance(); return tok.v }
@@ -317,7 +346,7 @@ class Translator {
   }
 
   // Translate a call expression (name already consumed, LPAREN next)
-  translateCall(name) {
+  translateCall(name: string): string {
     const { named, positional, isNamed } = this.translateArgList()
 
     // Primitives
@@ -361,8 +390,8 @@ class Translator {
 
   // ── Primitive emitters ──────────────────────────────────────────────────────
 
-  emitCube(named, positional) {
-    let size
+  emitCube(named: Record<string, string>, positional: string[]): string {
+    let size: string
     if (named.size !== undefined) size = named.size
     else if (positional.length) size = positional[0]
     else size = '1'
@@ -370,8 +399,8 @@ class Translator {
     return `cube({size: ${size}${center}})`
   }
 
-  emitSphere(named, positional) {
-    let radius
+  emitSphere(named: Record<string, string>, positional: string[]): string {
+    let radius: string
     if (named.r !== undefined) radius = named.r
     else if (named.d !== undefined) radius = `(${named.d} / 2)`
     else if (positional.length) radius = positional[0]
@@ -379,17 +408,17 @@ class Translator {
     return `sphere({radius: ${radius}})`
   }
 
-  emitCylinder(named, positional) {
+  emitCylinder(named: Record<string, string>, positional: string[]): string {
     let radius = named.r || named.r1 || (named.d ? `(${named.d}/2)` : '1')
-    let height = named.h || positional[1] || '1'
+    const height = named.h || positional[1] || '1'
     if (!named.r && !named.r1 && positional.length >= 1) radius = positional[0]
     return `cylinder({radius: ${radius}, height: ${height}})`
   }
 
   // ── Transform emitters ──────────────────────────────────────────────────────
 
-  emitTransform(jscadName, named, positional) {
-    let vec
+  emitTransform(jscadName: string, named: Record<string, string>, positional: string[]): string {
+    let vec: string
     if (named.v !== undefined) vec = named.v
     else if (positional.length) vec = positional[0]
     else vec = '[0, 0, 0]'
@@ -398,8 +427,8 @@ class Translator {
     return `${jscadName}(${vec}, ${children.join(', ')})`
   }
 
-  emitRotate(named, positional) {
-    let vec
+  emitRotate(named: Record<string, string>, positional: string[]): string {
+    let vec: string
     if (named.v !== undefined) vec = named.v
     else if (named.a !== undefined) {
       // rotate(a=angle, v=[x,y,z]) form
@@ -417,7 +446,7 @@ class Translator {
   // Convert a vector expression like [x, y, z] from degrees to radians.
   // If it looks like a literal array, transform each element.
   // Otherwise wrap in a map.
-  degToRadVec(vecExpr) {
+  degToRadVec(vecExpr: string): string {
     const m = vecExpr.match(/^\[(.+)\]$/)
     if (m) {
       // split on top-level commas
@@ -435,14 +464,14 @@ class Translator {
 
   // ── Boolean emitters ────────────────────────────────────────────────────────
 
-  emitBoolean(jscadName, named, positional) {
+  emitBoolean(jscadName: string, _named: Record<string, string>, _positional: string[]): string {
     const children = this.collectChildren()
     if (children.length === 0) return `${jscadName}() /* no children */`
     return `${jscadName}(${children.join(', ')})`
   }
 
   // Collect a child block { ... } or a single statement child
-  collectChildren() {
+  collectChildren(): string[] {
     this.skipSemis()
     if (this.peek().t === TK.LBRACE) {
       const stmts = this.translateBlock()
@@ -458,7 +487,7 @@ class Translator {
 
   // ── Statement translator ────────────────────────────────────────────────────
 
-  translateStatement() {
+  translateStatement(): string | null {
     this.skipSemis()
     const tok = this.peek()
 
@@ -522,12 +551,12 @@ class Translator {
     return null
   }
 
-  translateModuleDef() {
+  translateModuleDef(): string {
     this.advance() // 'module'
     const name = this.eat(TK.IDENT).v
     // param list
     this.eat(TK.LPAREN)
-    const params = []
+    const params: string[] = []
     while (this.peek().t !== TK.RPAREN && this.peek().t !== TK.EOF) {
       const pname = this.eat(TK.IDENT).v
       if (this.peek().t === TK.EQUALS) {
@@ -547,11 +576,11 @@ class Translator {
     return `function ${name}({${params.join(', ')}}) {\n  ${bodyStr}\n}`
   }
 
-  translateFunctionDef() {
+  translateFunctionDef(): string {
     this.advance() // 'function'
     const name = this.eat(TK.IDENT).v
     this.eat(TK.LPAREN)
-    const params = []
+    const params: string[] = []
     while (this.peek().t !== TK.RPAREN && this.peek().t !== TK.EOF) {
       const pname = this.eat(TK.IDENT).v
       if (this.peek().t === TK.EQUALS) {
@@ -570,14 +599,14 @@ class Translator {
     return `const ${name} = (${params.join(', ')}) => ${body}`
   }
 
-  translateFor() {
+  translateFor(): string {
     this.advance() // 'for'
     this.eat(TK.LPAREN)
     const varName = this.eat(TK.IDENT).v
     this.eat(TK.EQUALS)
     // parse range [start:end] or [start:step:end]
     this.eat(TK.LBRACKET)
-    const parts = []
+    const parts: string[] = []
     while (this.peek().t !== TK.RBRACKET && this.peek().t !== TK.EOF) {
       parts.push(this.translateExpr())
       if (this.peek().t === TK.COLON) this.advance()
@@ -585,7 +614,7 @@ class Translator {
     this.eat(TK.RBRACKET)
     this.eat(TK.RPAREN)
 
-    let start, step, end
+    let start: string, step: string, end: string
     if (parts.length === 2) { start = parts[0]; step = '1'; end = parts[1] }
     else if (parts.length === 3) { start = parts[0]; step = parts[1]; end = parts[2] }
     else { start = '0'; step = '1'; end = parts[0] || '0' }
@@ -596,13 +625,13 @@ class Translator {
     return `...Array.from({length: Math.ceil((${end} - ${start}) / ${step}) + 1}, (_, _i) => { const ${varName} = ${start} + _i * ${step}; return ${bodyExpr}; }).filter(Boolean)`
   }
 
-  translateIf() {
+  translateIf(): string {
     this.advance() // 'if'
     this.eat(TK.LPAREN)
     const cond = this.translateExpr()
     this.eat(TK.RPAREN)
     const thenStmts = this.collectChildren()
-    let elseStmts = []
+    let elseStmts: string[] = []
     if (this.peek().t === TK.IDENT && this.peek().v === 'else') {
       this.advance()
       elseStmts = this.collectChildren()
@@ -612,10 +641,10 @@ class Translator {
     return `(${cond} ? ${t} : ${e})`
   }
 
-  translateLet() {
+  translateLet(): string {
     this.advance() // 'let'
     this.eat(TK.LPAREN)
-    const bindings = []
+    const bindings: string[] = []
     while (this.peek().t !== TK.RPAREN && this.peek().t !== TK.EOF) {
       const k = this.eat(TK.IDENT).v
       this.eat(TK.EQUALS)
@@ -629,9 +658,9 @@ class Translator {
 
   // ── Top-level translate ─────────────────────────────────────────────────────
 
-  translate() {
-    const lines = []
-    const shapes = []
+  translate(): TranslateResult {
+    const lines: string[] = []
+    const shapes: string[] = []
     this.skipSemis()
 
     while (this.peek().t !== TK.EOF) {
@@ -651,7 +680,7 @@ class Translator {
           }
         }
       } catch (e) {
-        this.warnings.push(`// translate error: ${e.message}`)
+        this.warnings.push(`// translate error: ${e instanceof Error ? e.message : String(e)}`)
         // skip to next semi
         while (this.peek().t !== TK.SEMI && this.peek().t !== TK.EOF) this.advance()
         this.skipSemis()
@@ -666,8 +695,8 @@ class Translator {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 // Split a string on top-level commas (not inside brackets/parens)
-function splitTopLevel(str) {
-  const parts = []
+function splitTopLevel(str: string): string[] {
+  const parts: string[] = []
   let depth = 0
   let cur = ''
   for (const c of str) {
@@ -687,10 +716,10 @@ function splitTopLevel(str) {
 /**
  * Translate OpenSCAD source to JSCAD ES module source.
  *
- * @param {string} scadSource - OpenSCAD source text
- * @returns {string} JSCAD ES module source
+ * @param scadSource - OpenSCAD source text
+ * @returns JSCAD ES module source
  */
-export function openscadToJscad(scadSource) {
+export function openscadToJscad(scadSource: string): string {
   const tokens = tokenize(scadSource)
   const translator = new Translator(tokens)
   const { lines, shapes, warnings } = translator.translate()
@@ -698,7 +727,7 @@ export function openscadToJscad(scadSource) {
   const body = lines.join('\n')
 
   // Build main() — last solid shape or union of all shapes
-  let mainExpr
+  let mainExpr: string
   if (shapes.length === 0) {
     mainExpr = 'cube({size: 1}) /* no shapes found */'
   } else if (shapes.length === 1) {

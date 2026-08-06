@@ -1,8 +1,14 @@
-// HullExchangePanel.test.jsx — vitest smoke tests for the hull exchange panel.
+// HullExchangePanel.test.tsx — vitest smoke tests for the hull exchange panel.
 
+import type { ComponentType } from 'react'
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import HullExchangePanel from './HullExchangePanel.jsx'
+import HullExchangePanelUntyped from './HullExchangePanel.jsx'
+
+// HullExchangePanel.jsx is not yet migrated (T-515); its destructured params
+// read as required by TS's structural inference even though both are
+// optional at runtime (no default value implies "required", not "absent").
+const HullExchangePanel = HullExchangePanelUntyped as unknown as ComponentType<Record<string, unknown>>
 
 // ---------------------------------------------------------------------------
 // Fixtures

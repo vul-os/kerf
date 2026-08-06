@@ -11,12 +11,25 @@
 // own its lazy-load + save-refresh lifecycle without bloating this page.)
 
 import { useEffect, useMemo, useState } from 'react'
+import type { ComponentType } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Package, Download, AlertTriangle } from 'lucide-react'
 import { useWorkspace } from '../store/workspace.js'
-import BOMTable, { formatUSD, totalQty } from './BOMTable.jsx'
+import BOMTableUntyped, { formatUSD, totalQty } from './BOMTable.jsx'
+import type { BOMRow } from '../types/api'
 
-export default function BOMPanel({ projectId, onClose }) {
+// BOMTable.jsx is owned by a sibling slice (T-516) and not yet migrated;
+// several of its props (onOpenRow, overrides, onChangeOverride) have no
+// defaults so TS's structural inference reads them as required. Cast to a
+// loose prop type until BOMTable itself gets typed.
+const BOMTable = BOMTableUntyped as unknown as ComponentType<Record<string, unknown>>
+
+export interface BOMPanelProps {
+  projectId?: string | null
+  onClose?: () => void
+}
+
+export default function BOMPanel({ projectId, onClose }: BOMPanelProps) {
   const bomState = useWorkspace((s) => s.bomState)
   const loadBOM = useWorkspace((s) => s.loadBOM)
   const navigate = useNavigate()
@@ -134,7 +147,7 @@ export default function BOMPanel({ projectId, onClose }) {
 
 // -- Subviews ------------------------------------------------------------
 
-function WarningStrip({ warnings }) {
+function WarningStrip({ warnings }: { warnings: string[] }) {
   const [expanded, setExpanded] = useState(false)
   const visible = expanded ? warnings : warnings.slice(0, 3)
   return (
@@ -184,7 +197,7 @@ function EmptyState() {
   )
 }
 
-function ErrorState({ error, onRetry }) {
+function ErrorState({ error, onRetry }: { error: string; onRetry: () => void }) {
   return (
     <div className="h-full flex items-center justify-center px-6 text-center">
       <div>
@@ -211,7 +224,7 @@ function ErrorState({ error, onRetry }) {
 // newlines (per the task spec). The file name is project-id-prefixed so a
 // user with several open BOMs doesn't end up with bom.csv (1).csv.
 
-function csvField(v) {
+function csvField(v: unknown) {
   if (v == null) return ''
   const s = String(v)
   if (/[",\n]/.test(s)) {
@@ -220,7 +233,7 @@ function csvField(v) {
   return s
 }
 
-function downloadCSV(rows, total, projectId) {
+function downloadCSV(rows: BOMRow[], total: number | null, projectId?: string | null) {
   const header = [
     'Name', 'Description', 'Category', 'Manufacturer', 'MPN', 'Value',
     'Quantity', 'Non-Stocked', 'Note',

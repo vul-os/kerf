@@ -4,7 +4,7 @@
 // without React render overhead.
 
 import { describe, it, expect } from 'vitest'
-import { getSubSheets, getSubSheetDisplay } from '../HierSheetPicker.jsx'
+import { getSubSheets, getSubSheetDisplay } from '../HierSheetPicker'
 
 // ── getSubSheets ──────────────────────────────────────────────────────────────
 

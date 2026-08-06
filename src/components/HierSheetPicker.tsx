@@ -1,14 +1,40 @@
-// HierSheetPicker.jsx — hierarchical-schematic sub-sheet navigator
+// HierSheetPicker.tsx — hierarchical-schematic sub-sheet navigator
 //
 // Props:
-//   circuitJson  — full circuit JSON (expected to contain board.sub_sheets)
+//   circuitJson  — wrapper object with a `board.sub_sheets` array (the
+//                  CircuitJSON `pcb_board` extension described in
+//                  src/lib/hierSchematic.ts), not the raw CircuitJson array.
 //   onOpenSubSheet(fileId) — called when a row is clicked
 
-export function getSubSheets(circuitJson) {
+export interface SubSheet {
+  id?: string
+  name?: string
+  sheet_id?: string
+  file_id?: string
+  position?: [number, number]
+  pins?: unknown[]
+}
+
+export interface HierCircuitJson {
+  board?: {
+    sub_sheets?: SubSheet[]
+  }
+}
+
+export interface SubSheetDisplay {
+  name: string
+  sheetId: string
+  pinCount: number
+  fileId: string
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- pure helpers consumed directly by tests; not components
+export function getSubSheets(circuitJson?: HierCircuitJson | null): SubSheet[] {
   return circuitJson?.board?.sub_sheets ?? []
 }
 
-export function getSubSheetDisplay(subSheet) {
+// eslint-disable-next-line react-refresh/only-export-components -- pure helpers consumed directly by tests; not components
+export function getSubSheetDisplay(subSheet: SubSheet): SubSheetDisplay {
   return {
     name: subSheet.name ?? 'Unnamed',
     sheetId: subSheet.sheet_id ?? subSheet.id ?? '',
@@ -17,7 +43,12 @@ export function getSubSheetDisplay(subSheet) {
   }
 }
 
-export default function HierSheetPicker({ circuitJson, onOpenSubSheet }) {
+export interface HierSheetPickerProps {
+  circuitJson?: HierCircuitJson | null
+  onOpenSubSheet?: (fileId: string) => void
+}
+
+export default function HierSheetPicker({ circuitJson, onOpenSubSheet }: HierSheetPickerProps) {
   const subSheets = getSubSheets(circuitJson)
 
   if (subSheets.length === 0) {

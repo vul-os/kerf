@@ -30,14 +30,42 @@ import {
 
 // ── Type label map ─────────────────────────────────────────────────────────────
 
-const TYPE_LABELS = {
+const TYPE_LABELS: Record<string, string> = {
   basic:    'Basic',
   pcf:      'PCF',
   pcf_soft: 'PCF Soft',
   vsm:      'VSM',
 }
 
+// ── Types ──────────────────────────────────────────────────────────────────────
+// No shared type exists for the shadow-settings document (shadowSettings.ts is
+// untyped JS-in-TS); declared locally per T-517 convention.
+
+export interface ShadowLightEntry {
+  id: string
+  cast_shadow: boolean
+  bias: number
+}
+
+export interface ShadowSettingsDoc {
+  version: number
+  type: string
+  map_size: number
+  lights: ShadowLightEntry[]
+}
+
+export interface SceneLight {
+  id: string
+  label?: string
+}
+
 // ── ShadowSettings ─────────────────────────────────────────────────────────────
+
+export interface Props {
+  settings?: ShadowSettingsDoc
+  lights?: SceneLight[]
+  onChange?: (next: ShadowSettingsDoc) => void
+}
 
 /**
  * @param {object}   props
@@ -45,18 +73,18 @@ const TYPE_LABELS = {
  * @param {object[]} [props.lights=[]] – Scene lights: [{ id: string, label?: string }].
  * @param {function} [props.onChange]  – (nextSettings: object) => void
  */
-export default function ShadowSettings({ settings, lights = [], onChange }) {
-  const doc = settings ?? defaultShadowSettings()
+export default function ShadowSettings({ settings, lights = [], onChange }: Props) {
+  const doc: ShadowSettingsDoc = settings ?? (defaultShadowSettings() as ShadowSettingsDoc)
 
   // ── helpers ────────────────────────────────────────────────────────────────
 
   const patch = useCallback(
-    (changes) => onChange?.({ ...doc, ...changes }),
+    (changes: Partial<ShadowSettingsDoc>) => onChange?.({ ...doc, ...changes }),
     [doc, onChange]
   )
 
   const patchLight = useCallback(
-    (id, changes) => {
+    (id: string, changes: Partial<ShadowLightEntry>) => {
       const existing = doc.lights.find((l) => l.id === id) ?? {
         id,
         cast_shadow: true,
@@ -69,7 +97,7 @@ export default function ShadowSettings({ settings, lights = [], onChange }) {
     [doc, onChange]
   )
 
-  const getLightEntry = (id) =>
+  const getLightEntry = (id: string) =>
     doc.lights.find((l) => l.id === id) ?? { id, cast_shadow: true, bias: 0 }
 
   // ── render ─────────────────────────────────────────────────────────────────

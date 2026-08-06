@@ -5,13 +5,13 @@ import { api } from '../lib/api.js'
 import { exportParts, downloadBlob, FORMATS, sanitizeFilename } from '../lib/exporters.js'
 
 // Click-outside hook (mirrors ChatPanel's).
-function useClickOutside(ref, onOutside, enabled) {
+function useClickOutside(ref: React.RefObject<HTMLElement | null>, onOutside: () => void, enabled: boolean) {
   useEffect(() => {
     if (!enabled) return
-    function handle(e) {
-      if (ref.current && !ref.current.contains(e.target)) onOutside()
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onOutside()
     }
-    function escListener(e) { if (e.key === 'Escape') onOutside() }
+    function escListener(e: KeyboardEvent) { if (e.key === 'Escape') onOutside() }
     document.addEventListener('mousedown', handle)
     document.addEventListener('keydown', escListener)
     return () => {
@@ -21,16 +21,20 @@ function useClickOutside(ref, onOutside, enabled) {
   }, [ref, onOutside, enabled])
 }
 
-function isStepFile(file) {
+function isStepFile(file: { name?: string | null } | null | undefined) {
   if (!file) return false
   const n = (file.name || '').toLowerCase()
   return n.endsWith('.step') || n.endsWith('.stp')
 }
 
+export interface Props {
+  onCaptureHero?: () => Promise<Blob | null | undefined>
+}
+
 // Export the visible 3D parts of the currently-open file. Pulls everything
 // from the workspace store so the top bar can mount this with no props.
 // Hides itself when there are no parts (e.g. drawing/folder/empty file).
-export default function ExportButton({ onCaptureHero }) {
+export default function ExportButton({ onCaptureHero }: Props) {
   const parts = useWorkspace((s) => s.parts)
   const hiddenIds = useWorkspace((s) => s.hiddenPartIds)
   const projectId = useWorkspace((s) => s.projectId)
@@ -38,9 +42,9 @@ export default function ExportButton({ onCaptureHero }) {
   const currentFileId = useWorkspace((s) => s.currentFileId)
 
   const [open, setOpen] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [heroBusy, setHeroBusy] = useState(false)
-  const wrapRef = useRef(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
   useClickOutside(wrapRef, () => setOpen(false), open)
 
   useEffect(() => {
@@ -64,7 +68,7 @@ export default function ExportButton({ onCaptureHero }) {
   // Hide entirely when nothing is renderable (drawings, folders, empty files).
   if (!parts || parts.length === 0) return null
 
-  async function doExport(formatId) {
+  async function doExport(formatId: string) {
     setOpen(false)
     try {
       if (visibleParts.length === 0) {
@@ -75,7 +79,7 @@ export default function ExportButton({ onCaptureHero }) {
       const { blob, filename } = await exportParts(visibleParts, formatId, { baseName })
       downloadBlob(blob, filename)
     } catch (err) {
-      setError(err?.message || 'Export failed')
+      setError((err as Error)?.message || 'Export failed')
     }
   }
 
@@ -91,7 +95,7 @@ export default function ExportButton({ onCaptureHero }) {
         setError('Nothing to capture')
       }
     } catch (err) {
-      setError(err?.message || 'Hero capture failed')
+      setError((err as Error)?.message || 'Hero capture failed')
     } finally {
       setHeroBusy(false)
     }
@@ -105,7 +109,7 @@ export default function ExportButton({ onCaptureHero }) {
       const filename = sanitizeFilename(currentFile?.name || 'model.step')
       downloadBlob(blob, filename)
     } catch (err) {
-      setError(err?.message || 'Download failed')
+      setError((err as Error)?.message || 'Download failed')
     }
   }
 
@@ -185,7 +189,7 @@ export default function ExportButton({ onCaptureHero }) {
   )
 }
 
-function ErrorToast({ message, onDismiss }) {
+function ErrorToast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
   return (
     <div className="absolute right-0 top-full mt-1.5 z-40 w-64 px-3 py-2 rounded-md border border-red-800/60 bg-red-950/80 text-[11px] text-red-200 shadow-xl flex items-center justify-between gap-2">
       <span className="truncate">{message}</span>

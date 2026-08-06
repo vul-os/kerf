@@ -6,12 +6,12 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import ShadowSettings from './ShadowSettings.jsx'
+import ShadowSettings, { type Props } from './ShadowSettings.jsx'
 import { defaultShadowSettings, SHADOW_TYPES, SHADOW_MAP_SIZES } from '../lib/shadowSettings.js'
 
 // ── Render helper ──────────────────────────────────────────────────────────────
 
-function render(props = {}) {
+function render(props: Props = {}) {
   return renderToStaticMarkup(<ShadowSettings {...props} />)
 }
 

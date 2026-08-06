@@ -1,5 +1,5 @@
 /**
- * AnimationTimelinePanel.test.jsx
+ * AnimationTimelinePanel.test.tsx
  * ================================
  * Tests for the DCC Animation Timeline panel.
  *
@@ -13,13 +13,19 @@
  */
 
 import { describe, it, expect, vi } from 'vitest'
+// @types/node isn't part of this project's toolchain (tsconfig.json's `types` array is
+// T-500's — see docs/typescript-migration.md), so these Node builtins (used only for this
+// file's source-inspection assertions) are untyped at this boundary.
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
+// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const src = readFileSync(path.resolve(__dirname, './AnimationTimelinePanel.jsx'), 'utf8')
+const src = readFileSync(path.resolve(__dirname, './AnimationTimelinePanel.tsx'), 'utf8')
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 

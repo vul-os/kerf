@@ -16,10 +16,56 @@ export const GRID = 25   // mil
 export const VW   = 1600 // canvas viewBox width (mil)
 export const VH   = 1000 // canvas viewBox height (mil)
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface PartPin {
+  id: string
+  dx: number
+  dy: number
+  name: string
+}
+
+// A plain number[] (not a fixed tuple) — the literal arrays below infer as
+// `number[][]`, which isn't assignable to a 4-tuple.
+export type SymbolLine = number[]
+
+export interface SymbolArc {
+  cx: number
+  cy: number
+  r: number
+  a1?: number
+  a2?: number
+}
+
+export interface SymbolCircle {
+  cx: number
+  cy: number
+  r: number
+  fill?: string
+  /** Unused by both renderers (Canvas.tsx, PartLibrary.tsx hardcode stroke colour) — kept as-authored. */
+  stroke?: boolean
+}
+
+export interface PartSymbol {
+  lines?: SymbolLine[]
+  arcs?: SymbolArc[]
+  circles?: SymbolCircle[]
+}
+
+export interface Part {
+  id: string
+  label: string
+  category: string
+  spicePrefix: string
+  pins: PartPin[]
+  defaultProps: Record<string, string>
+  symbol: PartSymbol
+}
+
 // ── Pin directions ────────────────────────────────────────────────────────────
 // dx/dy are in mils from part centre.  Convention: left pins have dx<0, etc.
 
-const PARTS = [
+const PARTS: Part[] = [
   // ── Passives ──────────────────────────────────────────────────────────────
   {
     id: 'R',
@@ -382,7 +428,7 @@ const PARTS = [
 export default PARTS
 
 // Lookup by id
-export const PARTS_MAP = Object.fromEntries(PARTS.map((p) => [p.id, p]))
+export const PARTS_MAP: Record<string, Part> = Object.fromEntries(PARTS.map((p) => [p.id, p]))
 
 // All categories in display order
 export const CATEGORIES = [

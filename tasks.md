@@ -6396,6 +6396,46 @@ this repo as transitive tscircuit dependencies. Both carry
   absolute position, not merely self-consistently.
 - **Depends-on:** T-526b (the oracle that found it) · **Blocks:** T-527 (a writer built on a
   mirrored reader would bake the error in permanently)
+- **Status:** ✅ shipped (2026-08-06) — `27304d7b`. **T-527 unblocked.**
+  - **Axis chosen: fixed origin, `cj_y = -kicad_y`, X untouched.** Applied once at the boundary via
+    `_flip_kicad_y_to_circuit_json_y`, covering top-level `y`, `polygon` point lists and `route`
+    point lists — not scattered per element type.
+  - **Three pre-existing tests had encoded the mirror**; each was individually justified rather than
+    mass-updated: the zone outline vertex `(xy 100 80)`, the `gr_text` at `(at 5 75 0)`, and
+    Gerber's pass-through at `Y80000000`. In every case the old expectation was wrong and the Gerber
+    writer had been faithfully passing through bad input.
+  - **New test asserts absolute correctness**, computing the expected position by hand from raw
+    fixture text (`(at 10 10)` → `(10.0, -10.0)`) independently of the reader — directly addressing
+    the self-consistency that let this hide.
+  - **VERIFIED:** 6852 → 6853 passed, 187 skipped. Oracle tests ran for real, not skipped.
+
+### T-539 — ⚠️ Validate the T-538 axis choice against a real board outline
+- **Tier:** A · **Priority:** P1 · **Status:** ⬜ not started
+- **Why this is not settled.** T-538's oracle test currently agrees **for a degenerate reason.**
+  `kicad-to-circuit-json` transforms with `compose(scale(1,-1), translate(-center.x, -center.y))`,
+  where `center` is the midpoint of the **`Edge.Cuts` outline bbox**, falling back to `{0,0}` when
+  no outline exists. Verified directly: `zones_keepout_board.kicad_pcb` contains `Edge.Cuts` only
+  as a *layer declaration* (line 13) with **zero outline geometry** — no `gr_line`/`gr_rect`/
+  `gr_arc`/`gr_poly` anywhere. So the oracle hits its `{0,0}` fallback, which is the only reason
+  fixed-origin and board-centred agree here.
+- **The open question:** on a **real pcbnew export with a board outline**, the oracle would
+  recentre and our fixed-origin reader would not — they would diverge, and imported boards could
+  sit offset relative to boards Kerf authors itself. So: does Circuit JSON mean **absolute** or
+  **board-centred** coordinates? Answer it from tscircuit's own authored output, not from our
+  reader.
+- **Scope:** obtain or construct a `.kicad_pcb` with a genuine `Edge.Cuts` outline, run both
+  implementations, and settle the convention. If board-centred wins, T-538's transform changes and
+  its tests change with it. T-538's reasoning for fixed origin was sound given the evidence
+  available — don't translate X for a Y-convention bug, don't make the axis silently dependent on
+  an outline that may be absent — but it was decided against a fixture that could not distinguish
+  the two.
+- **Also in scope:** `kicad_bridge.py` has the **same latent no-flip bug**, flagged by T-538 and
+  deliberately untouched (it is a self-contained export→route→import loop; fixing it needs its
+  writer and reader changed as a self-consistent pair). It is covered by no independent check.
+- **Broader lesson worth keeping:** a conformance oracle only proves what the fixture exercises. This
+  fixture could not distinguish two transforms, and the passing test looked like confirmation of
+  both. Fixture coverage is part of the oracle's validity, not separate from it.
+- **Depends-on:** T-538 · **Blocks:** T-527 (the writer must invert whichever transform is correct)
 
 ### T-537 — Frontend pour validator rejects every backend pour
 - **Tier:** A · **Priority:** P1 · **Status:** ⬜ not started

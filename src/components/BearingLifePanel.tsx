@@ -23,6 +23,7 @@
  */
 
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { Calculator, ChevronDown, ChevronRight, Loader2, AlertTriangle } from 'lucide-react'
 import { api } from '../lib/api.js'
 
@@ -30,21 +31,28 @@ import { api } from '../lib/api.js'
 // Pure helpers — export for tests
 // ---------------------------------------------------------------------------
 
+// Form state objects hold string inputs (and one boolean flag for
+// fatigue_limited); values are parsed with parseFloat before use.
+interface BearingFormState {
+  [key: string]: string | boolean | undefined
+}
+
+// bearing_* tool call params/results — JSON boundary we don't own.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type BearingToolResult = any
+
 /**
  * Format a number to `dp` decimal places; returns '—' for null/undefined/NaN.
- * @param {number|null|undefined} v
- * @param {number} dp
  */
-export function fmtNum(v, dp = 2) {
+export function fmtNum(v: number | null | undefined, dp = 2): string {
   if (v == null || !isFinite(v)) return '—'
   return v.toFixed(dp)
 }
 
 /**
  * Return the CSS class for a result value tag.
- * @param {boolean|null} ok
  */
-export function resultTagClass(ok) {
+export function resultTagClass(ok: boolean | null): string {
   if (ok === true) return 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
   if (ok === false) return 'bg-red-500/20 text-red-300 border border-red-500/30'
   return 'bg-ink-800 text-ink-400'
@@ -52,50 +60,47 @@ export function resultTagClass(ok) {
 
 /**
  * Build the bearing_select call params from form state.
- * @param {object} s
  */
-export function buildSelectParams(s) {
+export function buildSelectParams(s: BearingFormState) {
   return {
     series: s.series || '6200',
-    Fr: parseFloat(s.Fr) || 0,
-    Fa: parseFloat(s.Fa) || 0,
-    n_rpm: parseFloat(s.n_rpm) || 0,
-    Lh_min: parseFloat(s.Lh_min) || 20000,
+    Fr: parseFloat(s.Fr as string) || 0,
+    Fa: parseFloat(s.Fa as string) || 0,
+    n_rpm: parseFloat(s.n_rpm as string) || 0,
+    Lh_min: parseFloat(s.Lh_min as string) || 20000,
     bearing_type: s.bearing_type || 'ball',
-    a1: parseFloat(s.a1) || 1.0,
-    a23: parseFloat(s.a23) || 1.0,
+    a1: parseFloat(s.a1 as string) || 1.0,
+    a23: parseFloat(s.a23 as string) || 1.0,
   }
 }
 
 /**
  * Build the bearing_adjusted_life call params from form state.
- * @param {object} s
  */
-export function buildLifeParams(s) {
+export function buildLifeParams(s: BearingFormState) {
   return {
-    C: parseFloat(s.C) || 0,
-    P: parseFloat(s.P) || 0,
-    n_rpm: parseFloat(s.n_rpm) || 0,
+    C: parseFloat(s.C as string) || 0,
+    P: parseFloat(s.P as string) || 0,
+    n_rpm: parseFloat(s.n_rpm as string) || 0,
     bearing_type: s.bearing_type || 'ball',
-    a1: parseFloat(s.a1) || 1.0,
-    a23: parseFloat(s.a23) || 1.0,
+    a1: parseFloat(s.a1 as string) || 1.0,
+    a23: parseFloat(s.a23 as string) || 1.0,
   }
 }
 
 /**
  * Build bearing_modified_reference_life params from form state.
- * @param {object} s
  */
-export function buildIso16281Params(s) {
+export function buildIso16281Params(s: BearingFormState) {
   return {
-    C: parseFloat(s.C) || 0,
-    P: parseFloat(s.P) || 0,
-    n_rpm: parseFloat(s.n_rpm) || 0,
-    kappa: parseFloat(s.kappa) || 1.0,
-    eC: parseFloat(s.eC) || 0.5,
-    Cu_N: parseFloat(s.Cu_N) || 0,
+    C: parseFloat(s.C as string) || 0,
+    P: parseFloat(s.P as string) || 0,
+    n_rpm: parseFloat(s.n_rpm as string) || 0,
+    kappa: parseFloat(s.kappa as string) || 1.0,
+    eC: parseFloat(s.eC as string) || 0.5,
+    Cu_N: parseFloat(s.Cu_N as string) || 0,
     bearing_type: s.bearing_type || 'ball',
-    a1: parseFloat(s.a1) || 1.0,
+    a1: parseFloat(s.a1 as string) || 1.0,
     fatigue_limited: s.fatigue_limited ?? false,
   }
 }
@@ -104,7 +109,7 @@ export function buildIso16281Params(s) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function FieldRow({ label, children, hint }) {
+function FieldRow({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return (
     <div className="flex items-center gap-2 py-0.5">
       <label className="text-[11px] text-ink-400 w-32 flex-shrink-0">{label}</label>
@@ -114,11 +119,21 @@ function FieldRow({ label, children, hint }) {
   )
 }
 
-function NumInput({ value, onChange, placeholder, min, step, 'data-testid': testid }) {
+interface NumInputProps {
+  value: string | boolean | undefined
+  onChange: (v: string) => void
+  placeholder?: string
+  min?: number
+  max?: number
+  step?: number
+  'data-testid'?: string
+}
+
+function NumInput({ value, onChange, placeholder, min, step, 'data-testid': testid }: NumInputProps) {
   return (
     <input
       type="number"
-      value={value}
+      value={value as string}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       min={min}
@@ -129,10 +144,17 @@ function NumInput({ value, onChange, placeholder, min, step, 'data-testid': test
   )
 }
 
-function SelectInput({ value, onChange, options, 'data-testid': testid }) {
+interface SelectInputProps {
+  value: string | boolean | undefined
+  onChange: (v: string) => void
+  options: [string, string][]
+  'data-testid'?: string
+}
+
+function SelectInput({ value, onChange, options, 'data-testid': testid }: SelectInputProps) {
   return (
     <select
-      value={value}
+      value={value as string}
       onChange={(e) => onChange(e.target.value)}
       data-testid={testid}
       className="w-full bg-ink-900 border border-ink-700 rounded px-2 py-1 text-[11px] text-ink-100 focus:outline-none focus:ring-1 focus:ring-kerf-300/60"
@@ -144,7 +166,7 @@ function SelectInput({ value, onChange, options, 'data-testid': testid }) {
   )
 }
 
-function WarningList({ warnings }) {
+function WarningList({ warnings }: { warnings?: string[] }) {
   if (!warnings?.length) return null
   return (
     <div className="mt-2 space-y-0.5">
@@ -158,7 +180,7 @@ function WarningList({ warnings }) {
   )
 }
 
-function ResultKV({ label, value, unit }) {
+function ResultKV({ label, value, unit }: { label: string; value: ReactNode; unit?: string }) {
   return (
     <div className="flex items-center justify-between py-0.5 border-b border-ink-900">
       <span className="text-[11px] text-ink-400">{label}</span>
@@ -173,26 +195,26 @@ function ResultKV({ label, value, unit }) {
 // Mode: bearing_select
 // ---------------------------------------------------------------------------
 
-function SelectMode({ onToast }) {
+function SelectMode({ onToast }: { onToast?: (msg: string) => void }) {
   const [form, setForm] = useState({
     series: '6200', Fr: '5000', Fa: '1000', n_rpm: '1450',
     Lh_min: '20000', bearing_type: 'ball', a1: '1.0', a23: '1.0',
   })
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState<BearingToolResult>(null)
 
-  function set(k) {
-    return (v) => setForm((f) => ({ ...f, [k]: v }))
+  function set(k: string) {
+    return (v: string) => setForm((f) => ({ ...f, [k]: v }))
   }
 
   async function run() {
     setLoading(true)
     setResult(null)
     try {
-      const data = await api.callTool('bearing_select', buildSelectParams(form))
+      const data = await api.callTool<BearingToolResult>('bearing_select', buildSelectParams(form))
       setResult(data?.result ?? data)
     } catch (e) {
-      onToast?.(e?.message || 'bearing_select failed')
+      onToast?.((e as Error)?.message || 'bearing_select failed')
     } finally {
       setLoading(false)
     }
@@ -259,25 +281,25 @@ function SelectMode({ onToast }) {
 // Mode: bearing_adjusted_life (L10 / Lna)
 // ---------------------------------------------------------------------------
 
-function LifeMode({ onToast }) {
+function LifeMode({ onToast }: { onToast?: (msg: string) => void }) {
   const [form, setForm] = useState({
     C: '29100', P: '5000', n_rpm: '1450', bearing_type: 'ball', a1: '1.0', a23: '1.0',
   })
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState<BearingToolResult>(null)
 
-  function set(k) {
-    return (v) => setForm((f) => ({ ...f, [k]: v }))
+  function set(k: string) {
+    return (v: string) => setForm((f) => ({ ...f, [k]: v }))
   }
 
   async function run() {
     setLoading(true)
     setResult(null)
     try {
-      const data = await api.callTool('bearing_adjusted_life', buildLifeParams(form))
+      const data = await api.callTool<BearingToolResult>('bearing_adjusted_life', buildLifeParams(form))
       setResult(data?.result ?? data)
     } catch (e) {
-      onToast?.(e?.message || 'bearing_adjusted_life failed')
+      onToast?.((e as Error)?.message || 'bearing_adjusted_life failed')
     } finally {
       setLoading(false)
     }
@@ -334,27 +356,27 @@ function LifeMode({ onToast }) {
 // Mode: ISO/TS 16281 modified reference life
 // ---------------------------------------------------------------------------
 
-function Iso16281Mode({ onToast }) {
+function Iso16281Mode({ onToast }: { onToast?: (msg: string) => void }) {
   const [form, setForm] = useState({
     C: '29100', P: '5000', n_rpm: '1450',
     kappa: '1.0', eC: '0.5', Cu_N: '500',
     bearing_type: 'ball', a1: '1.0', fatigue_limited: false,
   })
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState<BearingToolResult>(null)
 
-  function set(k) {
-    return (v) => setForm((f) => ({ ...f, [k]: v }))
+  function set(k: string) {
+    return (v: string) => setForm((f) => ({ ...f, [k]: v }))
   }
 
   async function run() {
     setLoading(true)
     setResult(null)
     try {
-      const data = await api.callTool('bearing_modified_reference_life', buildIso16281Params(form))
+      const data = await api.callTool<BearingToolResult>('bearing_modified_reference_life', buildIso16281Params(form))
       setResult(data?.result ?? data)
     } catch (e) {
-      onToast?.(e?.message || 'bearing_modified_reference_life failed')
+      onToast?.((e as Error)?.message || 'bearing_modified_reference_life failed')
     } finally {
       setLoading(false)
     }
@@ -414,13 +436,19 @@ function Iso16281Mode({ onToast }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-const MODES = [
+const MODES: [string, string][] = [
   ['select', 'Select Bearing'],
   ['life', 'L10 / Lna Life'],
   ['iso16281', 'ISO/TS 16281 Lnm'],
 ]
 
-export default function BearingLifePanel({ onToast, content } = {}) {
+interface BearingLifePanelProps {
+  onToast?: (msg: string) => void
+  /** JSON string optionally pre-seeding mode/open state. */
+  content?: string
+}
+
+export default function BearingLifePanel({ onToast, content }: BearingLifePanelProps = {}) {
   // content prop: JSON string optionally pre-seeding mode/open state.
   const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
   const [open, setOpen] = useState(_parsed.open ?? false)

@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import SeakeepingRAOPanel from './SeakeepingRAOPanel.jsx'
+import SeakeepingRAOPanel from './SeakeepingRAOPanel'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -83,42 +83,42 @@ const STATS_RESULT = {
 
 describe('SeakeepingRAOPanel — RAO curves', () => {
   it('renders without crashing', () => {
-    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={RAO_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={RAO_RESULT} statsResult={null} loading={false} error={null} content={null} />)
     expect(html).toBeTruthy()
   })
 
   it('shows hull length', () => {
-    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={RAO_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={RAO_RESULT} statsResult={null} loading={false} error={null} content={null} />)
     expect(html).toContain('100')
   })
 
   it('shows n_sections', () => {
-    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={RAO_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={RAO_RESULT} statsResult={null} loading={false} error={null} content={null} />)
     expect(html).toContain('21')
   })
 
   it('renders SVG chart', () => {
-    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={RAO_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={RAO_RESULT} statsResult={null} loading={false} error={null} content={null} />)
     expect(html).toContain('<svg')
   })
 
   it('shows heave label', () => {
-    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={RAO_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={RAO_RESULT} statsResult={null} loading={false} error={null} content={null} />)
     expect(html.toLowerCase()).toContain('heave')
   })
 
   it('shows pitch label', () => {
-    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={RAO_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={RAO_RESULT} statsResult={null} loading={false} error={null} content={null} />)
     expect(html.toLowerCase()).toContain('pitch')
   })
 
   it('shows roll label', () => {
-    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={RAO_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={RAO_RESULT} statsResult={null} loading={false} error={null} content={null} />)
     expect(html.toLowerCase()).toContain('roll')
   })
 
   it('shows STF method reference', () => {
-    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={RAO_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={RAO_RESULT} statsResult={null} loading={false} error={null} content={null} />)
     expect(html).toContain('STF')
   })
 })
@@ -130,14 +130,14 @@ describe('SeakeepingRAOPanel — RAO curves', () => {
 describe('SeakeepingRAOPanel — with stats', () => {
   it('renders with stats result', () => {
     const html = renderToStaticMarkup(
-      <SeakeepingRAOPanel result={RAO_RESULT} statsResult={STATS_RESULT} loading={false} error={null} />
+      <SeakeepingRAOPanel result={RAO_RESULT} statsResult={STATS_RESULT} loading={false} error={null} content={null} />
     )
     expect(html).toBeTruthy()
   })
 
   it('shows Hs and Tp', () => {
     const html = renderToStaticMarkup(
-      <SeakeepingRAOPanel result={RAO_RESULT} statsResult={STATS_RESULT} loading={false} error={null} />
+      <SeakeepingRAOPanel result={RAO_RESULT} statsResult={STATS_RESULT} loading={false} error={null} content={null} />
     )
     expect(html).toContain('2.5')
     // Tp=8 may render as "8" or "8.0" depending on JS number formatting
@@ -146,14 +146,14 @@ describe('SeakeepingRAOPanel — with stats', () => {
 
   it('shows spectrum type', () => {
     const html = renderToStaticMarkup(
-      <SeakeepingRAOPanel result={RAO_RESULT} statsResult={STATS_RESULT} loading={false} error={null} />
+      <SeakeepingRAOPanel result={RAO_RESULT} statsResult={STATS_RESULT} loading={false} error={null} content={null} />
     )
     expect(html.toLowerCase()).toContain('jonswap')
   })
 
   it('shows significant amplitude', () => {
     const html = renderToStaticMarkup(
-      <SeakeepingRAOPanel result={RAO_RESULT} statsResult={STATS_RESULT} loading={false} error={null} />
+      <SeakeepingRAOPanel result={RAO_RESULT} statsResult={STATS_RESULT} loading={false} error={null} content={null} />
     )
     // heave significant_amplitude = 0.1 — shown as "sig: 0.1000"
     expect(html).toContain('0.1000')
@@ -161,7 +161,7 @@ describe('SeakeepingRAOPanel — with stats', () => {
 
   it('shows MPM values', () => {
     const html = renderToStaticMarkup(
-      <SeakeepingRAOPanel result={RAO_RESULT} statsResult={STATS_RESULT} loading={false} error={null} />
+      <SeakeepingRAOPanel result={RAO_RESULT} statsResult={STATS_RESULT} loading={false} error={null} content={null} />
     )
     expect(html).toContain('MPM')
   })
@@ -173,21 +173,21 @@ describe('SeakeepingRAOPanel — with stats', () => {
 
 describe('SeakeepingRAOPanel — loading state', () => {
   it('shows loading message', () => {
-    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={null} loading={true} error={null} />)
+    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={null} statsResult={null} loading={true} error={null} content={null} />)
     expect(html).toContain('RAO')
   })
 })
 
 describe('SeakeepingRAOPanel — error state', () => {
   it('shows error message', () => {
-    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={null} loading={false} error="Hull error" />)
+    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={null} statsResult={null} loading={false} error="Hull error" content={null} />)
     expect(html).toContain('Hull error')
   })
 })
 
 describe('SeakeepingRAOPanel — null result', () => {
   it('renders nothing', () => {
-    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={null} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<SeakeepingRAOPanel result={null} statsResult={null} loading={false} error={null} content={null} />)
     expect(html).toBe('')
   })
 })

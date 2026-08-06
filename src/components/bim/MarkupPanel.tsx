@@ -11,7 +11,7 @@
  * Route: /markup  (lazy-loaded via App.jsx)
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import {
   Circle, Square, ArrowRight, Pen, Type, Highlighter,
   Stamp, Eye, EyeOff, Download, FileText, Search,
@@ -35,20 +35,44 @@ const SHAPES = [
 const DEFAULT_LAYER = 'Review 1'
 const PALETTE = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899']
 
-function hexToRgb(hex) {
+type RgbColor = [number, number, number]
+
+interface Annotation {
+  guid: string
+  shape: string
+  xy_mm: [number, number][]
+  color_rgb: RgbColor
+  thickness_mm: number
+  fill_rgba: [number, number, number, number] | null
+  text_content: string
+  author?: string
+  created_at_iso?: string
+  page_or_view_id?: string
+}
+
+interface Layer {
+  name: string
+  color_rgb: RgbColor
+  visible: boolean
+  annotations: Annotation[]
+}
+
+type SortField = 'author' | 'created_at_iso' | 'shape'
+
+function hexToRgb(hex: string): RgbColor {
   const r = parseInt(hex.slice(1, 3), 16)
   const g = parseInt(hex.slice(3, 5), 16)
   const b = parseInt(hex.slice(5, 7), 16)
   return [r, g, b]
 }
 
-function rgbToHex([r, g, b]) {
+function rgbToHex([r, g, b]: RgbColor): string {
   return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')
 }
 
-function newId() {
-  return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
-    (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16),
+function newId(): string {
+  return (String(1e7) + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
+    (Number(c) ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (Number(c) / 4)))).toString(16),
   )
 }
 
@@ -56,7 +80,13 @@ function newId() {
 // Annotation rendering helpers
 // ---------------------------------------------------------------------------
 
-function AnnotationShape({ ann, selected, onClick }) {
+interface AnnotationShapeProps {
+  ann: Annotation
+  selected: boolean
+  onClick: (e: React.MouseEvent) => void
+}
+
+function AnnotationShape({ ann, selected, onClick }: AnnotationShapeProps) {
   const stroke = rgbToHex(ann.color_rgb)
   const sw = ann.thickness_mm
   const pts = ann.xy_mm
@@ -157,6 +187,17 @@ function AnnotationShape({ ann, selected, onClick }) {
   return null
 }
 
+interface SortIconProps {
+  field: SortField
+  sortField: SortField
+  sortDir: 'asc' | 'desc'
+}
+
+function SortIcon({ field, sortField, sortDir }: SortIconProps) {
+  if (sortField !== field) return null
+  return sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
+}
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -166,25 +207,20 @@ export default function MarkupPanel() {
   const [activeColor, setActiveColor] = useState('#ef4444')
   const [thickness, setThickness] = useState(1.5)
   const [activeLayer, setActiveLayer] = useState(DEFAULT_LAYER)
-  const [layers, setLayers] = useState([
+  const [layers, setLayers] = useState<Layer[]>([
     { name: DEFAULT_LAYER, color_rgb: [239, 68, 68], visible: true, annotations: [] },
   ])
   const [drawing, setDrawing] = useState(false)
-  const [currentPts, setCurrentPts] = useState([])
-  const [selectedGuid, setSelectedGuid] = useState(null)
+  const [currentPts, setCurrentPts] = useState<[number, number][]>([])
+  const [selectedGuid, setSelectedGuid] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [sortField, setSortField] = useState('created_at_iso')
-  const [sortDir, setSortDir] = useState('desc')
+  const [sortField, setSortField] = useState<SortField>('created_at_iso')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [textInput, setTextInput] = useState('')
-  const [pendingTextPt, setPendingTextPt] = useState(null)
-  const svgRef = useRef(null)
+  const [pendingTextPt, setPendingTextPt] = useState<[number, number] | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
 
   // ── Layer helpers ────────────────────────────────────────────────────────
-
-  const getCurrentLayer = useCallback(
-    () => layers.find((l) => l.name === activeLayer),
-    [layers, activeLayer],
-  )
 
   const addLayer = useCallback(() => {
     const name = `Review ${layers.length + 1}`
@@ -195,7 +231,7 @@ export default function MarkupPanel() {
     setActiveLayer(name)
   }, [layers])
 
-  const toggleLayerVisibility = useCallback((name) => {
+  const toggleLayerVisibility = useCallback((name: string) => {
     setLayers((prev) =>
       prev.map((l) => (l.name === name ? { ...l, visible: !l.visible } : l)),
     )
@@ -203,14 +239,14 @@ export default function MarkupPanel() {
 
   // ── SVG canvas interaction ───────────────────────────────────────────────
 
-  function svgCoords(evt) {
+  function svgCoords(evt: React.MouseEvent): [number, number] {
     const svg = svgRef.current
     if (!svg) return [0, 0]
     const rect = svg.getBoundingClientRect()
     return [evt.clientX - rect.left, evt.clientY - rect.top]
   }
 
-  function handleMouseDown(evt) {
+  function handleMouseDown(evt: React.MouseEvent<SVGSVGElement>) {
     if (evt.button !== 0) return
     const pt = svgCoords(evt)
 
@@ -224,7 +260,7 @@ export default function MarkupPanel() {
     setCurrentPts([pt])
   }
 
-  function handleMouseMove(evt) {
+  function handleMouseMove(evt: React.MouseEvent<SVGSVGElement>) {
     if (!drawing) return
     const pt = svgCoords(evt)
     if (activeShape === 'freehand' || activeShape === 'highlight') {
@@ -234,7 +270,7 @@ export default function MarkupPanel() {
     }
   }
 
-  function handleMouseUp(evt) {
+  function handleMouseUp(evt: React.MouseEvent<SVGSVGElement>) {
     if (!drawing) return
     setDrawing(false)
     const pt = svgCoords(evt)
@@ -247,7 +283,7 @@ export default function MarkupPanel() {
     setCurrentPts([])
   }
 
-  function commitAnnotation(pts, textContent) {
+  function commitAnnotation(pts: [number, number][], textContent: string) {
     const ann = {
       guid: newId(),
       shape: activeShape,
@@ -309,7 +345,7 @@ export default function MarkupPanel() {
       return sortDir === 'asc' ? cmp : -cmp
     })
 
-  function toggleSort(field) {
+  function toggleSort(field: SortField) {
     if (sortField === field) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     } else {
@@ -322,7 +358,6 @@ export default function MarkupPanel() {
 
   function exportSvg() {
     // Build SVG string from current session
-    const ns = 'http://www.w3.org/2000/svg'
     const svgEl = svgRef.current
     if (!svgEl) return
     const serialized = new XMLSerializer().serializeToString(svgEl)
@@ -350,11 +385,6 @@ export default function MarkupPanel() {
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
-
-  const SortIcon = ({ field }) =>
-    sortField === field ? (
-      sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
-    ) : null
 
   return (
     <div className="flex h-full bg-zinc-950 text-zinc-100 overflow-hidden">
@@ -621,21 +651,21 @@ export default function MarkupPanel() {
             onClick={() => toggleSort('author')}
             className="flex items-center gap-0.5 hover:text-zinc-300 transition-colors"
           >
-            Author <SortIcon field="author" />
+            Author <SortIcon field="author" sortField={sortField} sortDir={sortDir} />
           </button>
           <span className="mx-1">·</span>
           <button
             onClick={() => toggleSort('created_at_iso')}
             className="flex items-center gap-0.5 hover:text-zinc-300 transition-colors"
           >
-            Date <SortIcon field="created_at_iso" />
+            Date <SortIcon field="created_at_iso" sortField={sortField} sortDir={sortDir} />
           </button>
           <span className="mx-1">·</span>
           <button
             onClick={() => toggleSort('shape')}
             className="flex items-center gap-0.5 hover:text-zinc-300 transition-colors"
           >
-            Shape <SortIcon field="shape" />
+            Shape <SortIcon field="shape" sortField={sortField} sortDir={sortDir} />
           </button>
         </div>
 

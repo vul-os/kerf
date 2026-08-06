@@ -150,7 +150,7 @@ export default function CompareByDomain() {
         if (!cancelled) {
           setState({ status: 'ok', data: { features, cadSlugs, cadNames, totalItems: manifest.items.length } })
         }
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setState({ status: 'error', data: null })
         }

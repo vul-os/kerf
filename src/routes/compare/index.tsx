@@ -19,6 +19,7 @@
  * just the card.
  */
 import { useState, useEffect } from 'react'
+import type { ComponentType } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowRight,
@@ -1288,10 +1289,14 @@ const DCC_FEATURES = [
 ]
 
 /* — Silicon / EDA: Cadence / Synopsys + Kerf. 10 rows. */
+// NOTE: this matrix is not currently referenced by CATEGORY_SECTIONS below,
+// so it never renders — pre-existing before this migration, not fixed here.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- see note above.
 const SILICON_COMPETITORS = [
   { slug: 'cadence-synopsys', label: 'Cadence / Synopsys' },
 ]
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- see note above SILICON_COMPETITORS.
 const SILICON_FEATURES = [
   {
     group: 'Licensing & cost',
@@ -1376,10 +1381,13 @@ const SILICON_FEATURES = [
 ]
 
 /* — Firmware / Embedded: PlatformIO + Kerf. 10 rows. */
+// NOTE: not currently referenced by CATEGORY_SECTIONS — see SILICON_COMPETITORS note above.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- see note above.
 const FIRMWARE_COMPETITORS = [
   { slug: 'platformio', label: 'PlatformIO' },
 ]
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- see note above SILICON_COMPETITORS.
 const FIRMWARE_FEATURES = [
   {
     group: 'Licensing & platform',
@@ -1464,10 +1472,13 @@ const FIRMWARE_FEATURES = [
 ]
 
 /* — Aerospace: ANSYS Fluent + Kerf. 10 rows. */
+// NOTE: not currently referenced by CATEGORY_SECTIONS — see SILICON_COMPETITORS note above.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- see note above.
 const AEROSPACE_COMPETITORS = [
   { slug: 'ansys-fluent', label: 'ANSYS Fluent / Mechanical' },
 ]
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- see note above SILICON_COMPETITORS.
 const AEROSPACE_FEATURES = [
   {
     group: 'Licensing & cost',
@@ -1653,7 +1664,16 @@ const CATEGORY_SECTIONS = [
 /* Card (visual preserved from previous hub)                                  */
 /* -------------------------------------------------------------------------- */
 
-function CompareCard({ slug, icon: Icon, label, tagline, blurb, domainHref }) {
+interface CompareCardProps {
+  slug: string
+  icon: ComponentType<{ size?: number }>
+  label: string
+  tagline: string
+  blurb: string
+  domainHref?: string
+}
+
+function CompareCard({ slug, icon: Icon, label, tagline, blurb, domainHref }: CompareCardProps) {
   const href = domainHref ?? `/compare/${slug}`
   const ariaLabel = domainHref
     ? `Explore Kerf ${label} domain`

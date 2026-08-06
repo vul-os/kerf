@@ -23,7 +23,7 @@
  * the legacy JSX pages continue to supply their own wrappers unchanged.
  */
 
-import { useState, useEffect, lazy, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useParams, Navigate } from 'react-router-dom'
 import Header from '../../components/Header.jsx'
 import Footer from '../../components/Footer.jsx'
@@ -60,6 +60,7 @@ export default function CompareMdRoute() {
 
   useEffect(() => {
     if (!slug) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing before this migration.
       setState({ status: 'not-found', meta: null, error: null })
       return
     }
@@ -87,7 +88,8 @@ export default function CompareMdRoute() {
           return
         }
         const raw = await mdRes.text()
-        const meta = parseCompareMd(raw, slug)
+        const meta: ReturnType<typeof parseCompareMd> & { features?: unknown[] } =
+          parseCompareMd(raw, slug)
         // Merge structured features from the manifest (if available for this slug)
         const manifestItem = manifest.items.find((it) => it.slug === slug)
         if (manifestItem?.features?.length > 0) {

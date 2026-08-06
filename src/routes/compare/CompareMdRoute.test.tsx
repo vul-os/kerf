@@ -16,7 +16,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // ── Mock react-router-dom ────────────────────────────────────────────────────
 
 vi.mock('react-router-dom', async (importOriginal) => {
-  const actual = await importOriginal()
+  const actual = await importOriginal<typeof import('react-router-dom')>()
   return {
     ...actual,
     useParams: vi.fn(() => ({ slug: 'fusion' })),
@@ -63,14 +63,15 @@ vi.mock('remark-gfm', () => ({ default: () => {} }))
 
 import { renderToStaticMarkup } from 'react-dom/server'
 import { useParams } from 'react-router-dom'
-import { act } from 'react'
 
 // We import the module under test AFTER mocks are registered
 const { default: CompareMdRoute } = await import('./CompareMdRoute.jsx')
 
+const mockUseParams = vi.mocked(useParams)
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeFetchMock(status, body) {
+function makeFetchMock(status: number, body: string) {
   return vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
@@ -109,9 +110,9 @@ describe('CompareMdRoute — fetch behaviour', () => {
   })
 
   it('calls fetch() with /compare/<slug>.md', async () => {
-    useParams.mockReturnValue({ slug: 'fusion' })
+    mockUseParams.mockReturnValue({ slug: 'fusion' })
     const fetchMock = makeFetchMock(200, SAMPLE_MD)
-    global.fetch = fetchMock
+    globalThis.fetch = fetchMock
 
     // Render the component — it starts in loading state
     const html = renderToStaticMarkup(<CompareMdRoute />)
@@ -124,9 +125,9 @@ describe('CompareMdRoute — fetch behaviour', () => {
   })
 
   it('fetch is called with the slug from useParams', async () => {
-    useParams.mockReturnValue({ slug: 'kicad' })
+    mockUseParams.mockReturnValue({ slug: 'kicad' })
     const fetchMock = makeFetchMock(200, SAMPLE_MD)
-    global.fetch = fetchMock
+    globalThis.fetch = fetchMock
 
     // The route component sets up the fetch in useEffect.
     // We verify the slug is wired correctly by checking initial render.
@@ -139,8 +140,8 @@ describe('CompareMdRoute — fetch behaviour', () => {
 
 describe('CompareMdRoute — loading state', () => {
   it('renders a loading indicator on initial mount (SSR path)', () => {
-    useParams.mockReturnValue({ slug: 'fusion' })
-    global.fetch = makeFetchMock(200, SAMPLE_MD)
+    mockUseParams.mockReturnValue({ slug: 'fusion' })
+    globalThis.fetch = makeFetchMock(200, SAMPLE_MD)
 
     const html = renderToStaticMarkup(<CompareMdRoute />)
     // In SSR, useEffect does not run — so we see the loading skeleton.
@@ -185,26 +186,26 @@ right: fusion
 
 describe('CompareMdRoute — slug from URL param', () => {
   it('renders for slug "fusion"', () => {
-    useParams.mockReturnValue({ slug: 'fusion' })
-    global.fetch = makeFetchMock(404, 'not found')
+    mockUseParams.mockReturnValue({ slug: 'fusion' })
+    globalThis.fetch = makeFetchMock(404, 'not found')
     expect(() => renderToStaticMarkup(<CompareMdRoute />)).not.toThrow()
   })
 
   it('renders for slug "kicad"', () => {
-    useParams.mockReturnValue({ slug: 'kicad' })
-    global.fetch = makeFetchMock(404, 'not found')
+    mockUseParams.mockReturnValue({ slug: 'kicad' })
+    globalThis.fetch = makeFetchMock(404, 'not found')
     expect(() => renderToStaticMarkup(<CompareMdRoute />)).not.toThrow()
   })
 
   it('renders without crashing for an unknown slug', () => {
-    useParams.mockReturnValue({ slug: 'nonexistent-tool' })
-    global.fetch = makeFetchMock(404, 'not found')
+    mockUseParams.mockReturnValue({ slug: 'nonexistent-tool' })
+    globalThis.fetch = makeFetchMock(404, 'not found')
     expect(() => renderToStaticMarkup(<CompareMdRoute />)).not.toThrow()
   })
 
   it('renders without crashing when slug is undefined', () => {
-    useParams.mockReturnValue({ slug: undefined })
-    global.fetch = makeFetchMock(404, 'not found')
+    mockUseParams.mockReturnValue({ slug: undefined })
+    globalThis.fetch = makeFetchMock(404, 'not found')
     expect(() => renderToStaticMarkup(<CompareMdRoute />)).not.toThrow()
   })
 })
@@ -252,8 +253,8 @@ describe('CompareMdRoute — newly migrated slugs enforce left=kerf', () => {
     })
 
     it(`CompareMdRoute renders without throwing for slug "${slug}"`, () => {
-      useParams.mockReturnValue({ slug })
-      global.fetch = makeFetchMock(404, 'not found')
+      mockUseParams.mockReturnValue({ slug })
+      globalThis.fetch = makeFetchMock(404, 'not found')
       expect(() => renderToStaticMarkup(<CompareMdRoute />)).not.toThrow()
     })
   })
@@ -264,8 +265,8 @@ describe('CompareMdRoute — newly migrated slugs enforce left=kerf', () => {
     // to use legacy fallback for any of the migrated slugs.
     // The component renders loading state when fetch returns 404 for a
     // slug not in LEGACY_PAGES (not-found path), not a legacy JSX.
-    useParams.mockReturnValue({ slug: 'solidworks' })
-    global.fetch = makeFetchMock(404, 'not found')
+    mockUseParams.mockReturnValue({ slug: 'solidworks' })
+    globalThis.fetch = makeFetchMock(404, 'not found')
     const html = renderToStaticMarkup(<CompareMdRoute />)
     // Should render loading skeleton (SSR), not legacy page
     expect(html).toBeTruthy()

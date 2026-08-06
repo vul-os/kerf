@@ -9,7 +9,7 @@
  * Tests that need the loaded state import and call pivotByDomain directly,
  * or use the synchronous DomainMatrix sub-component extracted in isolation.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { DOMAIN_META, pivotByDomain, STATUS_META } from '../../lib/compareFeatures.js'

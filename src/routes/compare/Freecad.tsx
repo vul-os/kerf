@@ -444,8 +444,8 @@ function HeadMeta({ meta: m }) {
     const prev = document.title
     document.title = m.title
 
-    const tags = []
-    const addMeta = (attrs) => {
+    const tags: Element[] = []
+    const addMeta = (attrs: Record<string, string>) => {
       const el = document.createElement('meta')
       Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v))
       document.head.appendChild(el)

@@ -25,7 +25,24 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 
-export default function CategoryMatrix({ category, competitors, features }) {
+interface Competitor {
+  slug: string
+  label: string
+}
+
+interface MatrixFeatureRow {
+  group?: string
+  name: string
+  cells: Record<string, string> & { kerf: string }
+}
+
+export interface Props {
+  category: string
+  competitors: Competitor[]
+  features: MatrixFeatureRow[]
+}
+
+export default function CategoryMatrix({ category, competitors, features }: Props) {
   // Precompute group-header rows so we don't mutate state during render.
   const decorated = features.map((row, i) => ({
     row,
@@ -110,7 +127,14 @@ export default function CategoryMatrix({ category, competitors, features }) {
   )
 }
 
-function MatrixRow({ row, index, showGroup, competitors }) {
+interface MatrixRowProps {
+  row: MatrixFeatureRow
+  index: number
+  showGroup: boolean
+  competitors: Competitor[]
+}
+
+function MatrixRow({ row, index, showGroup, competitors }: MatrixRowProps) {
   const colSpan = competitors.length + 2 // feature + kerf + comps
   const stripe = index % 2 === 0 ? 'bg-transparent' : 'bg-ink-900/20'
   return (

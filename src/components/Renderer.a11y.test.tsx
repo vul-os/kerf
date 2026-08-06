@@ -19,14 +19,17 @@ import { describe, it, expect } from 'vitest'
 // T-500's — see docs/typescript-migration.md), so these Node builtins (used only for this
 // file's source-inspection assertions) are untyped at this boundary.
 // @ts-expect-error - no @types/node in this toolchain
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 // @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
 // @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const src = readFileSync(path.resolve(__dirname, './Renderer.jsx'), 'utf8')
+// Extension-agnostic: Renderer migrated from .jsx to .tsx (T-513).
+const rendererTsxPath = path.resolve(__dirname, './Renderer.tsx')
+const rendererJsxPath = path.resolve(__dirname, './Renderer.jsx')
+const src = readFileSync(existsSync(rendererTsxPath) ? rendererTsxPath : rendererJsxPath, 'utf8')
 
 // ── A. Structural: ARIA attributes on the canvas wrapper ──────────────────
 

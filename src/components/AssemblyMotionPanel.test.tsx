@@ -33,7 +33,10 @@ import { renderToStaticMarkup } from 'react-dom/server'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const panelPath = (ext: string) => path.resolve(__dirname, `./AssemblyMotionPanel.${ext}`)
 const src = readFileSync(existsSync(panelPath('tsx')) ? panelPath('tsx') : panelPath('jsx'), 'utf8')
-const rendererSrc = readFileSync(path.resolve(__dirname, './Renderer.jsx'), 'utf8')
+// Extension-agnostic: Renderer migrated from .jsx to .tsx (T-513).
+const rendererTsxPath = path.resolve(__dirname, './Renderer.tsx')
+const rendererJsxPath = path.resolve(__dirname, './Renderer.jsx')
+const rendererSrc = readFileSync(existsSync(rendererTsxPath) ? rendererTsxPath : rendererJsxPath, 'utf8')
 
 // ── Mock Vite env + store so the module can be imported server-side ──────────
 vi.mock('../store/auth.js', () => ({

@@ -18,14 +18,17 @@ import { describe, it, expect } from 'vitest'
 // T-500's — see docs/typescript-migration.md), so these Node builtins (used only for this
 // file's source-inspection assertions) are untyped at this boundary.
 // @ts-expect-error - no @types/node in this toolchain
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 // @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
 // @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const src = readFileSync(path.resolve(__dirname, './FeatureView.jsx'), 'utf8')
+// Extension-agnostic: FeatureView migrated from .jsx to .tsx (T-513).
+const featureViewTsxPath = path.resolve(__dirname, './FeatureView.tsx')
+const featureViewJsxPath = path.resolve(__dirname, './FeatureView.jsx')
+const src = readFileSync(existsSync(featureViewTsxPath) ? featureViewTsxPath : featureViewJsxPath, 'utf8')
 
 describe('FeatureView T-D2 a11y — no role=button divs', () => {
   it('contains no role="button" on a non-button element', () => {

@@ -1,5 +1,12 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import type { Ref } from 'react'
 import { snapshotSvg } from '../lib/snapshotHelpers.js'
+import type {
+  DrawingDoc, DrawingSheet, DrawingView as DrawingViewSpec,
+  DrawingDimension, DrawingAnnotation, DrawingCenterline, DrawingBreak, DrawingSymbol,
+  RenderablePart,
+} from '../store/workspace.js'
+import type { TopologyMapLike } from '../lib/topology.js'
 import { sheetDimensions, titleBlockLayout, scaleBarGeometry } from '../lib/sheetFrames.js'
 import {
   projectFile, projectFileWithHLR, projectionLabel,
@@ -22,6 +29,7 @@ import {
   addLeader,
   addRichText,
   addDimensionChain,
+  patternToSvgFill,
 } from '../lib/draftingComplete.js'
 // ---------------------------------------------------------------------------
 // GD&T FCF placement helpers.
@@ -106,7 +114,43 @@ function readSnapEnabled() {
   }
 }
 
-const DrawingView = forwardRef(function DrawingView({
+/** Imperative handle exposed via the `viewRef` prop — mirrors Renderer's/SketchView's ref surface. */
+export interface DrawingViewHandle {
+  snapshot: (opts?: { size?: number; quality?: number }) => Promise<Blob | null>
+}
+
+export interface DrawingViewProps {
+  drawing: DrawingDoc
+  /** Per-source-file resolved parts, keyed by file id — powers the cross-part HLR/projection pass. */
+  partsByFileId?: Map<string, RenderablePart[]> | null
+  /** Per-source-file topology maps, keyed by file id — same keying as partsByFileId. */
+  topologiesByFileId?: Map<string, TopologyMapLike> | null
+  selectedDimensionId?: string | null
+  onSelectDimension?: (id: string | null) => void
+  selectedAnnotationId?: string | null
+  onSelectAnnotation?: (id: string | null) => void
+  // Tool mode — see DrawingToolbar.jsx for the full enum.
+  tool?: string
+  // Payload/patch shapes below are ad hoc records assembled at each call site
+  // (dimension/annotation/centerline/break/symbol authoring flows) — loosely
+  // typed at this boundary rather than modeling every tool's draft shape.
+  onAddDimension?: (payload: any) => void
+  onDeleteDimension?: (id: string) => void
+  onAddAnnotation?: (payload: any) => void
+  onUpdateAnnotation?: (id: string, patch: any) => void
+  onDeleteAnnotation?: (id: string) => void
+  onAddCenterline?: (payload: any) => void
+  onAddBreak?: (payload: any) => void
+  onAddSymbol?: (payload: any) => void
+  onSelectSheet?: (idx: number) => void
+  onAddSheet?: (payload?: any) => void
+  onRemoveSheet?: (idx: number) => void
+  onResetTool?: () => void
+  /** Editor-managed ref for thumbnail capture (separate from the forwarded SVG `ref`). */
+  viewRef?: Ref<DrawingViewHandle>
+}
+
+const DrawingView = forwardRef<SVGSVGElement | null, DrawingViewProps>(function DrawingView({
   drawing,
   partsByFileId,
   topologiesByFileId,
@@ -133,11 +177,13 @@ const DrawingView = forwardRef(function DrawingView({
 }, ref) {
   // Resolve the active sheet from the multi-sheet drawing object. New
   // canonical shape: drawing.sheets = [{ id, frame, views, dimensions, ... }];
-  // legacy parses still produce sheets[0] from top-level fields.
-  const sheets = drawing.sheets && drawing.sheets.length > 0 ? drawing.sheets : [drawing]
+  // legacy parses still produce sheets[0] from top-level fields — DrawingDoc
+  // (store/workspace.js) models only the canonical shape, so the legacy
+  // fallback (`drawing` itself standing in for a sheet) is read loosely here.
+  const sheets: any[] = drawing.sheets && drawing.sheets.length > 0 ? drawing.sheets : [drawing]
   const sheetIdx = Math.min(drawing.currentSheet ?? 0, sheets.length - 1)
   const sheet = sheets[sheetIdx] || sheets[0]
-  const frame = sheet?.frame || drawing.frame || { size: 'A3', orientation: 'landscape' }
+  const frame = sheet?.frame || (drawing as any).frame || { size: 'A3', orientation: 'landscape' }
   const sheetViews = sheet?.views || []
   const sheetDims = sheet?.dimensions || []
   const sheetAnns = sheet?.annotations || []
@@ -302,7 +348,7 @@ const DrawingView = forwardRef(function DrawingView({
   // input is closed explicitly on commit/cancel/Esc, so it stays open
   // across an accidental tool change while the user is typing.
 
-  const svgRef = useRef(null)
+  const svgRef = useRef<SVGSVGElement | null>(null)
   // Forward the SVG ref for export.
   useEffect(() => {
     if (typeof ref === 'function') ref(svgRef.current)
@@ -311,7 +357,10 @@ const DrawingView = forwardRef(function DrawingView({
   // Editor thumbnail capture — separate imperative ref so it doesn't
   // clobber the SVG-element handoff the export pipeline relies on.
   useImperativeHandle(viewRef, () => ({
-    snapshot: (opts) => snapshotSvg(svgRef.current, opts),
+    // snapshotHelpers.js's `opts` param is untyped, which makes TS infer part
+    // of its internal Promise chain as `Promise<{}>` instead of
+    // `Promise<Blob | null>` — a boundary this component doesn't own.
+    snapshot: (opts?: { size?: number; quality?: number }) => snapshotSvg(svgRef.current, opts) as Promise<Blob | null>,
   }), [])
 
   // Build per-source BVH maps so the cross-part HLR pass can ray-test against
@@ -363,7 +412,11 @@ const DrawingView = forwardRef(function DrawingView({
       const tops = topologiesByFileId?.get?.(v.source_file_id) || new Map()
       const allBvhs = bvhsByFileId.get(v.source_file_id)
       const wantPart = v.part_id && v.part_id !== '*' ? v.part_id : null
-      const parts = wantPart ? allParts.filter((p) => p?.id === wantPart) : allParts
+      // RenderablePart (store/workspace.js) structurally has `.id` but, unlike
+      // projection.ts's ProjectionPart, doesn't declare an index signature —
+      // a boundary between two independently-typed modules, not a real shape
+      // mismatch (every projector here only ever reads `.id`).
+      const parts: any[] = wantPart ? allParts.filter((p) => p?.id === wantPart) : allParts
       let bvhs = allBvhs
       if (wantPart && allBvhs) {
         bvhs = new Map()
@@ -860,7 +913,7 @@ const DrawingView = forwardRef(function DrawingView({
         }
       }
       e.preventDefault()
-      const payload = {
+      const payload: any = {
         view_id: draft.viewId,
         kind: tool,
         picks,
@@ -2659,7 +2712,7 @@ function Handle({ cx, cy, onMouseDown }) {
   )
 }
 
-function DraftAnnotation({ draft }) {
+function DraftAnnotation({ draft }: { draft: any; hover?: any }) {
   const stroke = ANN_SELECTED_STROKE
   if (draft.kind === 'rect-draft') {
     const x = Math.min(draft.start.x, draft.end.x)
@@ -3252,11 +3305,11 @@ function toolHint(tool, draft, measure, annDraft, dcLeaderDraft, dimChainDraft) 
 // NEW: HatchPopover — small overlay panel for picking hatch pattern, scale,
 // and angle after the user closes a polygon in hatch mode.
 
-function HatchPopover({ onApply, onCancel }) {
+function HatchPopover({ onApply, onCancel }: { polygon?: any; viewId?: any; onApply: (v: { patternId: string; scale: number; angle: number }) => void; onCancel: () => void }) {
   const [patternId, setPatternId] = useState(HATCH_PATTERNS[0].id)
   const [scale, setScale] = useState(1)
   const [angle, setAngle] = useState(45)
-  const firstRef = useRef(null)
+  const firstRef = useRef<HTMLSelectElement | null>(null)
 
   useEffect(() => {
     firstRef.current?.focus()

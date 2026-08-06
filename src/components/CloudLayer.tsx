@@ -21,17 +21,33 @@
  */
 
 import { useEffect, useRef } from 'react'
+import type { RefObject } from 'react'
+import * as THREE from 'three'
 import { buildCloudMesh, CLOUD_DEFAULTS } from '../lib/clouds.js'
 
 /**
- * CloudLayer — pure declarative wrapper around buildCloudMesh.
- *
- * @param {{ kind?: string, density?: number, opacity?: number, sceneRef?: object }} props
- * @returns {null}
+ * The minimal shape CloudLayer needs from a "scene" — narrower than `THREE.Scene` so tests can
+ * pass a plain stub. The component itself guards each call with `typeof scene.add === 'function'`,
+ * so both members are optional here too.
  */
-export default function CloudLayer({ kind = 'scattered', density, opacity, sceneRef }) {
+export interface CloudLayerScene {
+  add?: (obj: THREE.Object3D) => void
+  remove?: (obj: THREE.Object3D) => void
+}
+
+export interface CloudLayerProps {
+  kind?: string
+  density?: number
+  opacity?: number
+  /** React ref whose `.current` is a THREE.Scene (or scene-like stub); the mesh is added/removed
+   *  from it automatically. */
+  sceneRef?: RefObject<CloudLayerScene | null>
+}
+
+/** CloudLayer — pure declarative wrapper around buildCloudMesh. Renders nothing to the DOM. */
+export default function CloudLayer({ kind = 'scattered', density, opacity, sceneRef }: CloudLayerProps) {
   // Keep a ref to the currently mounted mesh so we can remove it on cleanup.
-  const meshRef = useRef(null)
+  const meshRef = useRef<THREE.Mesh | null>(null)
 
   useEffect(() => {
     const scene = sceneRef?.current
@@ -43,10 +59,10 @@ export default function CloudLayer({ kind = 'scattered', density, opacity, scene
     const resolvedDensity = density ?? defaults.density
 
     // Build the mesh (returns null for kind='none').
-    let mesh = null
+    let mesh
     try {
       mesh = buildCloudMesh({ kind, density: resolvedDensity, opacity_max })
-    } catch (_) {
+    } catch {
       // THREE may not be available in SSR / test environments without a stub.
       mesh = null
     }

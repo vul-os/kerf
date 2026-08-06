@@ -9,27 +9,35 @@
  * THREE is stubbed via globalThis.THREE so buildCloudMesh works in-process.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createRef } from 'react'
 import CloudLayer from './CloudLayer.jsx'
+import type { CloudLayerScene } from './CloudLayer.jsx'
 
 // ── THREE stub ────────────────────────────────────────────────────────────────
 
 class FakeBufferAttribute {
-  constructor(array, itemSize) { this.array = array; this.itemSize = itemSize }
+  array: ArrayLike<number>
+  itemSize: number
+  constructor(array: ArrayLike<number>, itemSize: number) { this.array = array; this.itemSize = itemSize }
 }
 class FakeBufferGeometry {
+  attributes: Record<string, FakeBufferAttribute>
   constructor() { this.attributes = {} }
-  setAttribute(name, attr) { this.attributes[name] = attr }
+  setAttribute(name: string, attr: FakeBufferAttribute) { this.attributes[name] = attr }
   dispose() {}
 }
 class FakeMaterial {
-  constructor(opts = {}) { Object.assign(this, opts) }
+  [key: string]: unknown
+  constructor(opts: Record<string, unknown> = {}) { Object.assign(this, opts) }
   dispose() {}
 }
 class FakeMesh {
-  constructor(geometry, material) {
+  geometry: FakeBufferGeometry
+  material: FakeMaterial
+  userData: Record<string, unknown>
+  constructor(geometry: FakeBufferGeometry, material: FakeMaterial) {
     this.geometry = geometry
     this.material = material
     this.userData = {}
@@ -44,13 +52,15 @@ const fakeThree = {
   DoubleSide:        2,
 }
 
-beforeEach(() => { globalThis.THREE = fakeThree })
-afterEach(()  => { delete globalThis.THREE })
+// `globalThis.THREE` is an injection seam used only by clouds.js's test-environment fallback
+// (see clouds.ts); not declared in src/types/global.d.ts, so it's typed loosely here at the seam.
+beforeEach(() => { (globalThis as unknown as { THREE: unknown }).THREE = fakeThree })
+afterEach(()  => { delete (globalThis as unknown as { THREE?: unknown }).THREE })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeScene() {
-  const children = []
+function makeScene(): Required<CloudLayerScene> & { children: unknown[] } {
+  const children: unknown[] = []
   return {
     children,
     add(obj)    { children.push(obj) },
@@ -73,7 +83,7 @@ import { buildCloudMesh, CLOUD_KINDS, CLOUD_DEFAULTS } from '../lib/clouds.js'
 describe('CloudLayer DOM output', () => {
   it('renders nothing to the DOM (returns null)', () => {
     // renderToStaticMarkup of a null-returning component returns an empty string
-    const ref = createRef()
+    const ref = createRef<CloudLayerScene>()
     ref.current = makeScene()
     const html = renderToStaticMarkup(<CloudLayer kind="scattered" sceneRef={ref} />)
     expect(html).toBe('')
@@ -166,7 +176,7 @@ describe('CloudLayer prop defaults', () => {
 
 describe('CloudLayer edge cases', () => {
   it('renders nothing even when sceneRef.current is null', () => {
-    const ref = createRef()
+    const ref = createRef<CloudLayerScene>()
     // ref.current is null by default
     const html = renderToStaticMarkup(<CloudLayer kind="scattered" sceneRef={ref} />)
     expect(html).toBe('')

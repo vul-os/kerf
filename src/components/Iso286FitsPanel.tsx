@@ -22,8 +22,44 @@
  */
 
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { Ruler, ChevronDown, ChevronRight, Loader2, AlertTriangle } from 'lucide-react'
 import { api } from '../lib/api.js'
+
+// ---------------------------------------------------------------------------
+// Local types
+// ---------------------------------------------------------------------------
+
+// Tool result shapes are loose bags of numeric fields defined server-side;
+// not modelled field-by-field here.
+type ToolResult = Record<string, any>
+
+interface FitForm {
+  nominal_mm: string
+  hole_code: string
+  hole_grade: string
+  shaft_code: string
+  shaft_grade: string
+}
+
+interface PreferFitForm {
+  nominal_mm: string
+  fit_name: string
+}
+
+interface PressForm {
+  nominal_mm: string
+  interference_mm: string
+  hub_outer_mm: string
+  E_shaft_GPa: string
+  E_hub_GPa: string
+  nu_shaft: string
+  nu_hub: string
+  mu: string
+  length_mm: string
+  yield_shaft_MPa: string
+  yield_hub_MPa: string
+}
 
 // ---------------------------------------------------------------------------
 // Pure helpers — export for tests
@@ -34,7 +70,7 @@ import { api } from '../lib/api.js'
  * @param {number|null|undefined} v
  * @param {number} dp
  */
-export function fmtNum(v, dp = 3) {
+export function fmtNum(v: number | null | undefined, dp = 3): string {
   if (v == null || !isFinite(v)) return '—'
   return v.toFixed(dp)
 }
@@ -43,7 +79,7 @@ export function fmtNum(v, dp = 3) {
  * Classify a fit type string into a display class.
  * @param {'clearance'|'transition'|'interference'|string|null} type
  */
-export function fitTypeClass(type) {
+export function fitTypeClass(type: string | null | undefined): string {
   if (type === 'clearance')    return 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
   if (type === 'transition')   return 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
   if (type === 'interference') return 'bg-red-500/20 text-red-300 border border-red-500/30'
@@ -54,7 +90,7 @@ export function fitTypeClass(type) {
  * Build iso286_fit_analysis params from form state.
  * @param {object} s
  */
-export function buildFitParams(s) {
+export function buildFitParams(s: FitForm) {
   return {
     nominal_mm: parseFloat(s.nominal_mm) || 0,
     hole_code: s.hole_code || 'H',
@@ -68,7 +104,7 @@ export function buildFitParams(s) {
  * Build iso286_preferred_fits params from form state.
  * @param {object} s
  */
-export function buildPreferFitParams(s) {
+export function buildPreferFitParams(s: PreferFitForm) {
   return {
     nominal_mm: parseFloat(s.nominal_mm) || 0,
     fit_name: s.fit_name || '',
@@ -79,7 +115,7 @@ export function buildPreferFitParams(s) {
  * Build iso286_press_fit params from form state.
  * @param {object} s
  */
-export function buildPressParams(s) {
+export function buildPressParams(s: PressForm) {
   return {
     nominal_mm: parseFloat(s.nominal_mm) || 0,
     interference_mm: parseFloat(s.interference_mm) || 0,
@@ -99,7 +135,7 @@ export function buildPressParams(s) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function FieldRow({ label, children, hint }) {
+function FieldRow({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return (
     <div className="flex items-center gap-2 py-0.5">
       <label className="text-[11px] text-ink-400 w-36 flex-shrink-0">{label}</label>
@@ -109,7 +145,15 @@ function FieldRow({ label, children, hint }) {
   )
 }
 
-function NumInput({ value, onChange, placeholder, min, max, step, 'data-testid': testid }) {
+function NumInput({ value, onChange, placeholder, min, max, step, 'data-testid': testid }: {
+  value: string | number
+  onChange: (v: string) => void
+  placeholder?: string
+  min?: number
+  max?: number
+  step?: number
+  'data-testid'?: string
+}) {
   return (
     <input
       type="number"
@@ -125,7 +169,12 @@ function NumInput({ value, onChange, placeholder, min, max, step, 'data-testid':
   )
 }
 
-function TextInput({ value, onChange, placeholder, 'data-testid': testid }) {
+function TextInput({ value, onChange, placeholder, 'data-testid': testid }: {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  'data-testid'?: string
+}) {
   return (
     <input
       type="text"
@@ -138,7 +187,7 @@ function TextInput({ value, onChange, placeholder, 'data-testid': testid }) {
   )
 }
 
-function ResultKV({ label, value, unit }) {
+function ResultKV({ label, value, unit }: { label: string; value: string | number; unit?: string }) {
   return (
     <div className="flex items-center justify-between py-0.5 border-b border-ink-900">
       <span className="text-[11px] text-ink-400">{label}</span>
@@ -149,7 +198,7 @@ function ResultKV({ label, value, unit }) {
   )
 }
 
-function WarningList({ warnings }) {
+function WarningList({ warnings }: { warnings?: string[] }) {
   if (!warnings?.length) return null
   return (
     <div className="mt-2 space-y-0.5">
@@ -167,26 +216,26 @@ function WarningList({ warnings }) {
 // Mode: fit_analysis
 // ---------------------------------------------------------------------------
 
-function FitMode({ onToast }) {
-  const [form, setForm] = useState({
+function FitMode({ onToast }: { onToast?: (msg: string) => void }) {
+  const [form, setForm] = useState<FitForm>({
     nominal_mm: '50', hole_code: 'H', hole_grade: 'IT7',
     shaft_code: 'g', shaft_grade: 'IT6',
   })
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState<ToolResult | null>(null)
 
-  function set(k) {
-    return (v) => setForm((f) => ({ ...f, [k]: v }))
+  function set(k: keyof FitForm) {
+    return (v: string) => setForm((f) => ({ ...f, [k]: v }))
   }
 
   async function run() {
     setLoading(true)
     setResult(null)
     try {
-      const data = await api.callTool('iso286_fit_analysis', buildFitParams(form))
+      const data: any = await api.callTool('iso286_fit_analysis', buildFitParams(form))
       setResult(data?.result ?? data)
     } catch (e) {
-      onToast?.(e?.message || 'iso286_fit_analysis failed')
+      onToast?.((e as Error)?.message || 'iso286_fit_analysis failed')
     } finally {
       setLoading(false)
     }
@@ -255,25 +304,25 @@ function FitMode({ onToast }) {
 // Mode: preferred_fits
 // ---------------------------------------------------------------------------
 
-function PreferFitMode({ onToast }) {
-  const [form, setForm] = useState({
+function PreferFitMode({ onToast }: { onToast?: (msg: string) => void }) {
+  const [form, setForm] = useState<PreferFitForm>({
     nominal_mm: '50', fit_name: 'H7/g6',
   })
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState<ToolResult | null>(null)
 
-  function set(k) {
-    return (v) => setForm((f) => ({ ...f, [k]: v }))
+  function set(k: keyof PreferFitForm) {
+    return (v: string) => setForm((f) => ({ ...f, [k]: v }))
   }
 
   async function run() {
     setLoading(true)
     setResult(null)
     try {
-      const data = await api.callTool('iso286_preferred_fits', buildPreferFitParams(form))
+      const data: any = await api.callTool('iso286_preferred_fits', buildPreferFitParams(form))
       setResult(data?.result ?? data)
     } catch (e) {
-      onToast?.(e?.message || 'iso286_preferred_fits failed')
+      onToast?.((e as Error)?.message || 'iso286_preferred_fits failed')
     } finally {
       setLoading(false)
     }
@@ -321,8 +370,8 @@ function PreferFitMode({ onToast }) {
 // Mode: press_fit
 // ---------------------------------------------------------------------------
 
-function PressMode({ onToast }) {
-  const [form, setForm] = useState({
+function PressMode({ onToast }: { onToast?: (msg: string) => void }) {
+  const [form, setForm] = useState<PressForm>({
     nominal_mm: '50', interference_mm: '0.05',
     hub_outer_mm: '100', E_shaft_GPa: '200',
     E_hub_GPa: '200', nu_shaft: '0.3',
@@ -331,20 +380,20 @@ function PressMode({ onToast }) {
     yield_hub_MPa: '350',
   })
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState<ToolResult | null>(null)
 
-  function set(k) {
-    return (v) => setForm((f) => ({ ...f, [k]: v }))
+  function set(k: keyof PressForm) {
+    return (v: string) => setForm((f) => ({ ...f, [k]: v }))
   }
 
   async function run() {
     setLoading(true)
     setResult(null)
     try {
-      const data = await api.callTool('iso286_press_fit', buildPressParams(form))
+      const data: any = await api.callTool('iso286_press_fit', buildPressParams(form))
       setResult(data?.result ?? data)
     } catch (e) {
-      onToast?.(e?.message || 'iso286_press_fit failed')
+      onToast?.((e as Error)?.message || 'iso286_press_fit failed')
     } finally {
       setLoading(false)
     }
@@ -409,15 +458,20 @@ function PressMode({ onToast }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-const MODES = [
+const MODES: [string, string][] = [
   ['fit', 'Fit Analysis'],
   ['prefer', 'Preferred Fits'],
   ['press', 'Press Fit (Lamé)'],
 ]
 
-export default function Iso286FitsPanel({ onToast, content } = {}) {
+interface Iso286FitsPanelProps {
+  onToast?: (msg: string) => void
+  content?: string | null
+}
+
+export default function Iso286FitsPanel({ onToast, content }: Iso286FitsPanelProps = {}) {
   // content prop: JSON string optionally pre-seeding mode/open state.
-  const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
+  const _parsed: { open?: boolean; mode?: string } = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
   const [open, setOpen] = useState(_parsed.open ?? false)
   const [mode, setMode] = useState(_parsed.mode || 'fit')
 

@@ -29,18 +29,71 @@ import { useMemo, useState } from 'react'
 
 const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export type DryUtilityKind = 'gas' | 'electrical' | 'telecom'
+
+export type DryUtilityNodeType = 'manhole' | 'handhole' | 'valve' | 'regulator' | 'splice'
+
+export interface DryUtilityNode {
+  id: string
+  x?: number
+  y?: number
+  z_surface_m?: number
+  node_type?: DryUtilityNodeType
+}
+
+export interface DryUtilityAsset {
+  kind?: DryUtilityKind
+  diameter_mm?: number
+  voltage_class?: string | number
+  [key: string]: unknown
+}
+
+export interface DryUtilityLink {
+  id: string
+  node_from: string
+  node_to: string
+  length_m?: number
+  depth_of_cover_m?: number
+  corridor_offset_m?: number
+  wet_utility_offset_m?: number
+  asset?: DryUtilityAsset
+}
+
+export interface DryUtilityViolation {
+  violation_type: string
+  link_id: string
+  link_id_b?: string
+  required_m: number
+  actual_m: number
+  deficit_m: number
+}
+
+export interface DryUtilityNetworkPanelProps {
+  nodes?: DryUtilityNode[]
+  links?: DryUtilityLink[]
+  violations?: DryUtilityViolation[] | null
+  width?: number
+  height?: number
+  className?: string
+  onDispatch?: (event: { tool: string; params: Record<string, unknown> }) => void
+}
+
 // ── Colour palette by utility kind ──────────────────────────────────────────
-const KIND_COLOUR = {
+const KIND_COLOUR: Record<DryUtilityKind, string> = {
   gas:        '#f97316',  // orange
   electrical: '#eab308',  // yellow
   telecom:    '#22d3ee',  // cyan
 }
-const KIND_LABEL = {
+const KIND_LABEL: Record<DryUtilityKind, string> = {
   gas:        'Gas',
   electrical: 'Electrical',
   telecom:    'Telecom',
 }
-const NODE_TYPE_SHAPE = {
+const NODE_TYPE_SHAPE: Record<DryUtilityNodeType, 'circle' | 'square' | 'diamond'> = {
   manhole:    'circle',
   handhole:   'square',
   valve:      'diamond',
@@ -53,7 +106,7 @@ const NODE_R = 8
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function fitCoords(pts, w, h) {
+function fitCoords(pts: [number, number][], w: number, h: number) {
   if (!pts.length) return { scale: 1, offX: 0, offY: 0 }
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
   for (const [x, y] of pts) {
@@ -72,7 +125,7 @@ function fitCoords(pts, w, h) {
   }
 }
 
-function violationSeverityColour(vtype) {
+function violationSeverityColour(vtype: string) {
   if (vtype === 'cover_depth')           return '#f87171'  // red
   if (vtype === 'inter_utility_separation') return '#fb923c' // orange
   if (vtype === 'wet_utility_separation')  return '#facc15'  // yellow
@@ -81,8 +134,8 @@ function violationSeverityColour(vtype) {
 
 // ── Node symbol ─────────────────────────────────────────────────────────────
 
-function NodeSymbol({ node, x, y }) {
-  const shape = NODE_TYPE_SHAPE[node.node_type] || 'circle'
+function NodeSymbol({ node, x, y }: { node: DryUtilityNode; x: number; y: number }) {
+  const shape = NODE_TYPE_SHAPE[node.node_type as DryUtilityNodeType] || 'circle'
   const fill = '#334155'
   const stroke = '#94a3b8'
   const r = NODE_R
@@ -117,8 +170,16 @@ function NodeSymbol({ node, x, y }) {
 
 // ── Link edge ─────────────────────────────────────────────────────────────────
 
-function UtilityLinkEdge({ link, x1, y1, x2, y2, selected, onClick }) {
-  const colour = KIND_COLOUR[link.asset?.kind] || '#64748b'
+function UtilityLinkEdge({ link, x1, y1, x2, y2, selected, onClick }: {
+  link: DryUtilityLink
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  selected: boolean
+  onClick: () => void
+}) {
+  const colour = (link.asset?.kind && KIND_COLOUR[link.asset.kind]) || '#64748b'
   const dash = link.asset?.kind === 'telecom' ? '5,3' : null
   return (
     <g style={{ cursor: 'pointer' }} onClick={onClick} aria-label={`Link ${link.id}`} data-testid={`link-${link.id}`}>
@@ -136,7 +197,7 @@ function UtilityLinkEdge({ link, x1, y1, x2, y2, selected, onClick }) {
 
 // ── Violation badge ───────────────────────────────────────────────────────────
 
-function ViolationBadge({ count }) {
+function ViolationBadge({ count }: { count: number }) {
   if (!count) return <span className="text-xs text-green-400 font-mono">No violations</span>
   return (
     <span className="text-xs font-mono bg-red-900/60 text-red-300 border border-red-700 rounded px-2 py-0.5">
@@ -147,7 +208,11 @@ function ViolationBadge({ count }) {
 
 // ── Section view ─────────────────────────────────────────────────────────────
 
-function SectionView({ links, width = 600, height = 140 }) {
+function SectionView({ links, width = 600, height = 140 }: {
+  links: DryUtilityLink[]
+  width?: number
+  height?: number
+}) {
   if (!links.length) {
     return (
       <div className="text-xs text-slate-500 text-center py-4">
@@ -165,8 +230,8 @@ function SectionView({ links, width = 600, height = 140 }) {
   const scaleX = (maxOff - minOff < 0.01) ? 80 : (width - 80) / (maxOff - minOff)
   const scaleY = (height - 40) / maxDep
 
-  const toX = o => 40 + (o - minOff) * scaleX
-  const toY = d => 20 + d * scaleY
+  const toX = (o: number) => 40 + (o - minOff) * scaleX
+  const toY = (d: number) => 20 + d * scaleY
 
   return (
     <svg
@@ -197,7 +262,7 @@ function SectionView({ links, width = 600, height = 140 }) {
       {links.map(lk => {
         const cx = toX(lk.corridor_offset_m ?? 0)
         const cy = toY(lk.depth_of_cover_m  ?? 0)
-        const colour = KIND_COLOUR[lk.asset?.kind] || '#64748b'
+        const colour = (lk.asset?.kind && KIND_COLOUR[lk.asset.kind]) || '#64748b'
         const r = 7
         return (
           <g key={lk.id}>
@@ -222,21 +287,23 @@ export default function DryUtilityNetworkPanel({
   height = 360,
   className = '',
   onDispatch,
-}) {
+}: DryUtilityNetworkPanelProps) {
   const [loading, setLoading] = useState(false)
-  const [violations, setViolations] = useState(propViolations)
-  const [error, setError] = useState(null)
-  const [selectedLink, setSelectedLink] = useState(null)
-  const [tab, setTab] = useState('plan')  // 'plan' | 'section' | 'violations'
+  const [violations, setViolations] = useState<DryUtilityViolation[] | null>(propViolations)
+  const [error, setError] = useState<string | null>(null)
+  const [selectedLink, setSelectedLink] = useState<string | null>(null)
+  const [tab, setTab] = useState<'plan' | 'section' | 'violations'>('plan')
 
   // Coordinate projection
   const { scale, offX, offY } = useMemo(() => {
-    const pts = nodes.filter(n => n.x != null && n.y != null).map(n => [n.x, n.y])
+    const pts = nodes
+      .filter((n): n is DryUtilityNode & { x: number; y: number } => n.x != null && n.y != null)
+      .map((n): [number, number] => [n.x, n.y])
     return fitCoords(pts, width, height)
   }, [nodes, width, height])
 
   const posMap = useMemo(() => {
-    const m = {}
+    const m: Record<string, [number, number]> = {}
     for (const n of nodes) {
       if (n.x != null && n.y != null) {
         m[n.id] = [n.x * scale + offX, n.y * scale + offY]
@@ -247,8 +314,8 @@ export default function DryUtilityNetworkPanel({
 
   // Build violation set for quick link lookup
   const violatedLinkIds = useMemo(() => {
-    if (!violations) return new Set()
-    return new Set(violations.flatMap(v => [v.link_id, v.link_id_b].filter(Boolean)))
+    if (!violations) return new Set<string>()
+    return new Set(violations.flatMap(v => [v.link_id, v.link_id_b].filter((id): id is string => Boolean(id))))
   }, [violations])
 
   // ── Dispatch clearance check ─────────────────────────────────────────────
@@ -269,7 +336,7 @@ export default function DryUtilityNetworkPanel({
         if (data.violations) setViolations(data.violations)
       }
     } catch (e) {
-      setError(e.message || 'Check failed')
+      setError(e instanceof Error ? e.message : 'Check failed')
     } finally {
       setLoading(false)
     }
@@ -292,7 +359,7 @@ export default function DryUtilityNetworkPanel({
         </div>
         <div className="flex items-center gap-2">
           {/* Tab switcher */}
-          {['plan', 'section', 'violations'].map(t => (
+          {(['plan', 'section', 'violations'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -376,7 +443,7 @@ export default function DryUtilityNetworkPanel({
                 {/* Legend */}
                 <g transform={`translate(${width - 110}, 10)`} aria-label="Legend">
                   <rect x={0} y={0} width={100} height={62} rx={4} fill="#1e293b" opacity={0.92} />
-                  {Object.entries(KIND_COLOUR).map(([kind, colour], i) => (
+                  {(Object.entries(KIND_COLOUR) as [DryUtilityKind, string][]).map(([kind, colour], i) => (
                     <g key={kind} transform={`translate(8, ${10 + i * 17})`}>
                       <rect x={0} y={-6} width={14} height={4} fill={colour} rx={1} />
                       <text x={18} y={0} fontSize="9" fill="#94a3b8" fontFamily="monospace">
@@ -398,7 +465,7 @@ export default function DryUtilityNetworkPanel({
               <div className="flex items-center justify-between mb-2">
                 <span
                   className="font-semibold"
-                  style={{ color: KIND_COLOUR[selLinkObj.asset?.kind] || '#fff' }}
+                  style={{ color: (selLinkObj.asset?.kind && KIND_COLOUR[selLinkObj.asset.kind]) || '#fff' }}
                 >
                   {selLinkObj.id}
                 </span>
@@ -414,7 +481,7 @@ export default function DryUtilityNetworkPanel({
                 <tbody>
                   <tr>
                     <td className="text-slate-500 pr-2">Kind</td>
-                    <td>{KIND_LABEL[selLinkObj.asset?.kind] || '—'}</td>
+                    <td>{(selLinkObj.asset?.kind && KIND_LABEL[selLinkObj.asset.kind]) || '—'}</td>
                   </tr>
                   <tr>
                     <td className="text-slate-500 pr-2">Length</td>

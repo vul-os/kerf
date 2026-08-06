@@ -1,5 +1,5 @@
 /**
- * BimFamilyEditor.test.jsx — vitest tests for the BIM parametric family-
+ * BimFamilyEditor.test.tsx — vitest tests for the BIM parametric family-
  * authoring panel (T-109).
  *
  * Tests cover two layers:
@@ -10,6 +10,7 @@
  * and uses renderToStaticMarkup instead, so no new npm deps are needed.
  */
 
+import type { ComponentType } from 'react'
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import BimFamilyEditor from './BimFamilyEditor.jsx'
@@ -24,6 +25,23 @@ import {
   materialsByCategory,
   NUMERIC_KINDS,
 } from '../lib/bimFamilyOps.js'
+
+// bimFamilyOps.ts (already migrated, outside this slice) types
+// resolveParamValues's return as `{}` — its `resolved` accumulator is built
+// via bracket-notation assignment with no index signature, so the inferred
+// return type carries no keys even though it holds one per template
+// parameter at runtime. Cast through this thin wrapper for the assertions
+// below that read specific keys off the result.
+function resolveParams(template: unknown, overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return resolveParamValues(template, overrides)
+}
+
+// BimFamilyEditor.jsx (not yet migrated) declares onTemplateChange/
+// onPreviewChange without defaults, so allowJs infers them as required —
+// every call below relies on the real component's fallback behaviour
+// (undefined change handlers are simply never invoked in a static-markup
+// render), matching this suite's pre-migration behaviour.
+const AnyBimFamilyEditor = BimFamilyEditor as unknown as ComponentType<Record<string, unknown>>
 
 // ── A. bimFamilyOps.js pure-logic tests ─────────────────────────────────────
 
@@ -134,27 +152,27 @@ describe('clampParam', () => {
 describe('resolveParamValues', () => {
   it('uses default values when no overrides', () => {
     const t = defaultColumnTemplate()
-    const r = resolveParamValues(t, {})
+    const r = resolveParams(t, {})
     expect(r.D).toBe(0.3)
     expect(r.H).toBe(3.0)
   })
 
   it('applies overrides', () => {
     const t = defaultColumnTemplate()
-    const r = resolveParamValues(t, { D: 0.6, H: 6.0 })
+    const r = resolveParams(t, { D: 0.6, H: 6.0 })
     expect(r.D).toBe(0.6)
     expect(r.H).toBe(6.0)
   })
 
   it('clamps override to min_val', () => {
     const t = defaultColumnTemplate()
-    const r = resolveParamValues(t, { D: 0.001 }) // below min 0.05
+    const r = resolveParams(t, { D: 0.001 }) // below min 0.05
     expect(r.D).toBeGreaterThanOrEqual(0.05)
   })
 
   it('propagates material override', () => {
     const t = defaultColumnTemplate()
-    const r = resolveParamValues(t, { material: 'steel_a36' })
+    const r = resolveParams(t, { material: 'steel_a36' })
     expect(r.material).toBe('steel_a36')
   })
 })
@@ -256,48 +274,48 @@ describe('materialCategories / materialsByCategory', () => {
 
 describe('BimFamilyEditor (renderToStaticMarkup)', () => {
   it('renders without crashing', () => {
-    const html = renderToStaticMarkup(<BimFamilyEditor />)
+    const html = renderToStaticMarkup(<AnyBimFamilyEditor />)
     expect(typeof html).toBe('string')
     expect(html.length).toBeGreaterThan(0)
   })
 
   it('renders the data-testid root element', () => {
-    const html = renderToStaticMarkup(<BimFamilyEditor />)
+    const html = renderToStaticMarkup(<AnyBimFamilyEditor />)
     expect(html).toMatch(/data-testid="bim-family-editor"/)
   })
 
   it('renders a "Family Editor" heading', () => {
-    const html = renderToStaticMarkup(<BimFamilyEditor />)
+    const html = renderToStaticMarkup(<AnyBimFamilyEditor />)
     expect(html).toContain('Family Editor')
   })
 
   it('renders a "Parameters" section', () => {
-    const html = renderToStaticMarkup(<BimFamilyEditor />)
+    const html = renderToStaticMarkup(<AnyBimFamilyEditor />)
     expect(html).toMatch(/Parameters/i)
   })
 
   it('renders a "Preview" section', () => {
-    const html = renderToStaticMarkup(<BimFamilyEditor />)
+    const html = renderToStaticMarkup(<AnyBimFamilyEditor />)
     expect(html).toMatch(/Preview/i)
   })
 
   it('includes input[type=range] sliders for numeric params', () => {
-    const html = renderToStaticMarkup(<BimFamilyEditor />)
+    const html = renderToStaticMarkup(<AnyBimFamilyEditor />)
     expect(html).toMatch(/type="range"/)
   })
 
   it('includes a material select dropdown', () => {
-    const html = renderToStaticMarkup(<BimFamilyEditor />)
+    const html = renderToStaticMarkup(<AnyBimFamilyEditor />)
     expect(html).toMatch(/<select/)
   })
 
   it('includes Volume in the preview panel', () => {
-    const html = renderToStaticMarkup(<BimFamilyEditor />)
+    const html = renderToStaticMarkup(<AnyBimFamilyEditor />)
     expect(html).toMatch(/Volume/)
   })
 
   it('renders geometry_type badge', () => {
-    const html = renderToStaticMarkup(<BimFamilyEditor />)
+    const html = renderToStaticMarkup(<AnyBimFamilyEditor />)
     expect(html).toContain('circular_column')
   })
 
@@ -306,22 +324,22 @@ describe('BimFamilyEditor (renderToStaticMarkup)', () => {
       ...defaultColumnTemplate(),
       name: 'Test Pillar',
     }
-    const html = renderToStaticMarkup(<BimFamilyEditor template={t} />)
+    const html = renderToStaticMarkup(<AnyBimFamilyEditor template={t} />)
     expect(html).toContain('Test Pillar')
   })
 
   it('renders family-name input with aria-label', () => {
-    const html = renderToStaticMarkup(<BimFamilyEditor />)
+    const html = renderToStaticMarkup(<AnyBimFamilyEditor />)
     expect(html).toMatch(/aria-label="Family name"/)
   })
 
   it('renders family-category input with aria-label', () => {
-    const html = renderToStaticMarkup(<BimFamilyEditor />)
+    const html = renderToStaticMarkup(<AnyBimFamilyEditor />)
     expect(html).toMatch(/aria-label="Family category"/)
   })
 
   it('marks inputs readonly when readOnly prop is true', () => {
-    const html = renderToStaticMarkup(<BimFamilyEditor readOnly />)
+    const html = renderToStaticMarkup(<AnyBimFamilyEditor readOnly />)
     // React serialises the readOnly prop as readOnly="" in SSR markup.
     expect(html).toMatch(/readOnly=""/)
   })

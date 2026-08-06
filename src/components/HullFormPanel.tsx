@@ -27,15 +27,66 @@ import {
 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
+// Local types
+// ---------------------------------------------------------------------------
+
+interface SectionPoint {
+  half_breadth_m: number
+  waterline_m: number
+}
+
+interface Section {
+  points?: SectionPoint[]
+}
+
+interface Waterline {
+  stations_m?: number[]
+  half_breadths_m?: number[]
+  draft_m?: number
+}
+
+interface HullResult {
+  error?: string
+  Cb?: number
+  Cm?: number
+  Cp?: number
+  lcb_frac?: number
+  lcb_m_from_ap?: number
+  volume_m3?: number
+  L_m?: number
+  B_m?: number
+  T_m?: number
+  n_sections?: number
+  n_waterlines?: number
+  n_buttocks?: number
+  sections?: Section[]
+  waterlines?: Waterline[]
+}
+
+interface HullParams {
+  L: number
+  B: number
+  T: number
+  Cb: number
+  Cm: number
+  lcb_frac: number | string
+  n_stations: number
+  n_wl_curves: number
+  n_buttocks: number
+}
+
+// ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
 
+// import.meta.env typing depends on vite/client types not loaded in this
+// standalone tsc invocation; cast at this boundary only.
 const API_URL =
-  typeof import.meta !== 'undefined' && import.meta.env
-    ? import.meta.env.VITE_API_URL || ''
+  typeof import.meta !== 'undefined' && (import.meta as any).env
+    ? (import.meta as any).env.VITE_API_URL || ''
     : ''
 
-async function callTool(toolName, args) {
+async function callTool(toolName: string, args: Record<string, unknown>): Promise<any> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -52,7 +103,7 @@ async function callTool(toolName, args) {
   return data.result ?? data
 }
 
-function scaleLinear(domain, range) {
+function scaleLinear(domain: [number, number], range: [number, number]): (v: number) => number {
   const [d0, d1] = domain
   const [r0, r1] = range
   const dSpan = d1 - d0 || 1
@@ -74,7 +125,7 @@ const SECTION_COLORS = [
   '#fbbf24', '#2dd4bf', '#e879f9',
 ]
 
-function BodyPlanChart({ sections, B, T }) {
+function BodyPlanChart({ sections, B, T }: { sections: Section[]; B: number; T: number }) {
   if (!sections || sections.length === 0) return null
 
   const xS = scaleLinear([0, B / 2], [0, BP_IW])
@@ -158,7 +209,7 @@ const WL_PAD = { top: 14, right: 14, bottom: 36, left: 44 }
 const WL_IW = WL_W - WL_PAD.left - WL_PAD.right
 const WL_IH = WL_H - WL_PAD.top - WL_PAD.bottom
 
-function WaterlinesChart({ waterlines, L }) {
+function WaterlinesChart({ waterlines, L }: { waterlines: Waterline[]; L: number }) {
   if (!waterlines || waterlines.length === 0) return null
 
   const xS = scaleLinear([0, L], [0, WL_IW])
@@ -223,9 +274,9 @@ function WaterlinesChart({ waterlines, L }) {
 // Summary card
 // ---------------------------------------------------------------------------
 
-function SummaryCard({ hull }) {
+function SummaryCard({ hull }: { hull: HullResult | null }) {
   if (!hull) return null
-  const rows = [
+  const rows: [string, string | number | undefined][] = [
     ['Block coeff. Cb', hull.Cb?.toFixed(3)],
     ['Midship coeff. Cm', hull.Cm?.toFixed(3)],
     ['Prismatic coeff. Cp', hull.Cp?.toFixed(3)],
@@ -256,7 +307,7 @@ function SummaryCard({ hull }) {
 // Main panel
 // ---------------------------------------------------------------------------
 
-const DEFAULT_PARAMS = {
+const DEFAULT_PARAMS: HullParams = {
   L: 60,
   B: 10,
   T: 4,
@@ -268,9 +319,15 @@ const DEFAULT_PARAMS = {
   n_buttocks: 5,
 }
 
-export default function HullFormPanel({ onHullReady, initialParams, content }) {
+interface HullFormPanelProps {
+  onHullReady?: (result: HullResult) => void
+  initialParams?: Partial<HullParams> | null
+  content?: string | null
+}
+
+export default function HullFormPanel({ onHullReady, initialParams, content }: HullFormPanelProps) {
   // Backward-compatible content string: JSON.parse it and merge initial params.
-  let _parsedParams = null
+  let _parsedParams: Partial<HullParams> | null = null
   if (content != null) {
     try {
       const _p = JSON.parse(content)
@@ -278,13 +335,13 @@ export default function HullFormPanel({ onHullReady, initialParams, content }) {
     } catch { /* ignore */ }
   }
   const _initParams = initialParams ?? _parsedParams ?? null
-  const [params, setParams] = useState(_initParams ? { ...DEFAULT_PARAMS, ..._initParams } : DEFAULT_PARAMS)
-  const [hull, setHull] = useState(null)
+  const [params, setParams] = useState<HullParams>(_initParams ? { ...DEFAULT_PARAMS, ..._initParams } : DEFAULT_PARAMS)
+  const [hull, setHull] = useState<HullResult | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
 
-  const handleChange = useCallback((key, val) => {
+  const handleChange = useCallback((key: keyof HullParams, val: string) => {
     setParams(p => ({ ...p, [key]: val }))
   }, [])
 
@@ -292,7 +349,7 @@ export default function HullFormPanel({ onHullReady, initialParams, content }) {
     setLoading(true)
     setError(null)
     try {
-      const args = {
+      const args: Record<string, unknown> = {
         L: Number(params.L),
         B: Number(params.B),
         T: Number(params.T),
@@ -305,12 +362,12 @@ export default function HullFormPanel({ onHullReady, initialParams, content }) {
       if (params.lcb_frac !== '' && params.lcb_frac !== null) {
         args.lcb_frac = Number(params.lcb_frac)
       }
-      const result = await callTool('marine_hull_form', args)
+      const result: HullResult = await callTool('marine_hull_form', args)
       if (result?.error) throw new Error(result.error)
       setHull(result)
       onHullReady?.(result)
     } catch (e) {
-      setError(e.message)
+      setError((e as Error).message)
     } finally {
       setLoading(false)
     }
@@ -327,14 +384,14 @@ export default function HullFormPanel({ onHullReady, initialParams, content }) {
 
       {/* Parameter inputs */}
       <div className="grid grid-cols-3 gap-3">
-        {[
+        {([
           { key: 'L', label: 'L (m)', hint: 'LBP' },
           { key: 'B', label: 'B (m)', hint: 'Breadth' },
           { key: 'T', label: 'T (m)', hint: 'Draft' },
           { key: 'Cb', label: 'Cb', hint: '0.40–0.85' },
           { key: 'Cm', label: 'Cm', hint: '0.85–0.99' },
           { key: 'lcb_frac', label: 'LCB/L', hint: 'e.g. 0.51 (optional)' },
-        ].map(({ key, label, hint }) => (
+        ] as const).map(({ key, label, hint }) => (
           <label key={key} className="flex flex-col gap-1">
             <span className="text-xs text-gray-400">{label}</span>
             <input
@@ -360,11 +417,11 @@ export default function HullFormPanel({ onHullReady, initialParams, content }) {
       </button>
       {showAdvanced && (
         <div className="grid grid-cols-3 gap-3">
-          {[
+          {([
             { key: 'n_stations', label: 'Stations', hint: '11–41' },
             { key: 'n_wl_curves', label: 'Waterlines', hint: '3–9' },
             { key: 'n_buttocks', label: 'Buttocks', hint: '3–7' },
-          ].map(({ key, label, hint }) => (
+          ] as const).map(({ key, label, hint }) => (
             <label key={key} className="flex flex-col gap-1">
               <span className="text-xs text-gray-400">{label}</span>
               <input

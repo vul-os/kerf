@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Plus, Trash2, Eye, EyeOff, Loader2, Scissors } from 'lucide-react'
 import { PROJECTIONS, projectionLabel } from '../lib/projection.js'
 import { sheetDimensions, titleBlockLayout, TEMPLATES, parseScaleString } from '../lib/sheetFrames.js'
@@ -7,15 +8,145 @@ import { useWorkspace, loadFilePartsForProject } from '../store/workspace.js'
 // Right-side floating panel for editing the drawing's frame and managing
 // views. Compact on purpose so it doesn't dominate the sheet.
 
+// ---------------------------------------------------------------------------
+// Local types
+// ---------------------------------------------------------------------------
+//
+// The drawing document shape isn't defined in src/types/ (no owning module),
+// so it's modelled here loosely — fields that are read/written are typed,
+// everything else stays open via an index signature.
+
+interface FrameSpec {
+  title?: string
+  size?: string
+  orientation?: string
+  template?: string
+  author?: string
+  date?: string
+  scale_label?: string
+  sheet_number?: string
+  notes?: string
+  material?: string
+  [key: string]: any
+}
+
+interface ViewSpec {
+  id: string
+  source_file_id?: string
+  part_id?: string
+  projection?: string
+  show_hidden?: boolean
+  is_section?: boolean
+  position?: [number, number]
+  scale?: number
+  [key: string]: any
+}
+
+interface AnnotationSpec {
+  id: string
+  kind: string
+  text?: string
+  fontSize?: number
+  color?: string
+  side?: string
+  stroke?: string
+  fill?: string
+  width?: number
+  dashed?: boolean
+  [key: string]: any
+}
+
+interface DimensionSpec {
+  id: string
+  kind: string
+  value?: string | number | null
+  text_override?: string
+  offset?: number
+  radius?: number
+  [key: string]: any
+}
+
+interface SymbolSpec {
+  id: string
+  kind: string
+  params?: Record<string, any>
+  position?: { x?: number; y?: number }
+  [key: string]: any
+}
+
+interface CenterlineSpec {
+  id: string
+  [key: string]: any
+}
+
+interface BreakSpec {
+  id: string
+  orientation?: string
+  [key: string]: any
+}
+
+interface SheetSpec {
+  id?: string
+  annotations?: AnnotationSpec[]
+  dimensions?: DimensionSpec[]
+  symbols?: SymbolSpec[]
+  centerlines?: CenterlineSpec[]
+  breaks?: BreakSpec[]
+  views?: ViewSpec[]
+  frame?: FrameSpec
+  [key: string]: any
+}
+
+interface DrawingSpec extends SheetSpec {
+  sheets?: SheetSpec[]
+  currentSheet?: number
+}
+
+interface FileEntry {
+  id: string
+  kind?: string
+  name?: string
+  [key: string]: any
+}
+
 const SHEET_OPTIONS = ['A4', 'A3', 'A2', 'A1', 'A0', 'ANSI_A', 'ANSI_B', 'ANSI_C', 'ANSI_D']
-const TEMPLATE_LABELS = { default: 'Default', iso: 'ISO', ansi: 'ANSI', kerf: 'Kerf' }
+const TEMPLATE_LABELS: Record<string, string> = { default: 'Default', iso: 'ISO', ansi: 'ANSI', kerf: 'Kerf' }
 
 // Module-level cache of resolved part_id lists keyed by `${file_id}::${hash}`.
 // Lets the panel populate the part dropdown instantly when the user reopens
 // the form for a source file we've already inspected. Hash isn't easy to
 // compute without the file content; for now we just key by file_id and rely
 // on cache invalidation via a soft TTL when content changes during edit.
-const partListCache = new Map()
+const partListCache = new Map<string, { ids: string[]; bbox: BBox | null; _parts: unknown }>()
+
+interface BBox {
+  min: [number, number, number]
+  max: [number, number, number]
+}
+
+interface DrawingPropertiesPanelProps {
+  drawing: DrawingSpec
+  files?: FileEntry[]            // full project file list (used for the "add view" picker)
+  selectedAnnotationId?: string | null
+  selectedDimensionId?: string | null
+  onUpdateAnnotation?: (id: string, patch: Partial<AnnotationSpec>) => void
+  onDeleteAnnotation?: (id: string) => void
+  onUpdateDimension?: (id: string, patch: Partial<DimensionSpec>) => void
+  onDeleteDimension?: (id: string) => void
+  onUpdateFrame?: (patch: Partial<FrameSpec>) => void
+  onAddView?: (payload: { source_file_id: string; part_id: string; projection: string }) => void
+  onUpdateView?: (viewId: string, patch: Partial<ViewSpec>) => void
+  onRemoveView?: (viewId: string) => void
+  onUpdateSymbol?: (id: string, patch: Partial<SymbolSpec>) => void
+  onRemoveSymbol?: (id: string) => void
+  onRemoveCenterline?: (id: string) => void
+  onRemoveBreak?: (id: string) => void
+  onAddSheet?: () => void
+  onRemoveSheet?: () => void
+  onExportSvg?: () => void
+  onExportPng?: () => void
+  onExportPdf?: () => void
+}
 
 export default function DrawingPropertiesPanel({
   drawing,
@@ -39,7 +170,7 @@ export default function DrawingPropertiesPanel({
   onExportSvg,
   onExportPng,
   onExportPdf,
-}) {
+}: DrawingPropertiesPanelProps) {
   // Resolve the active sheet (multi-sheet shape).
   const sheets = drawing.sheets || [drawing]
   const sheetIdx = Math.min(drawing.currentSheet ?? 0, sheets.length - 1)
@@ -381,7 +512,7 @@ export default function DrawingPropertiesPanel({
   )
 }
 
-function Section({ title, action, children }) {
+function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
     <div className="px-3 py-2 border-b border-ink-800 last:border-b-0">
       <div className="flex items-center justify-between mb-1.5">
@@ -397,7 +528,7 @@ function Section({ title, action, children }) {
   )
 }
 
-function Row({ label, children }) {
+function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col">
       <span className="text-xs text-ink-400 mb-1">{label}</span>
@@ -408,7 +539,22 @@ function Row({ label, children }) {
   )
 }
 
-function AddViewForm({ files, projectId, drawing, onCancel, onAdd, onAddStandardViews }) {
+interface LoaderState {
+  sourceId: string | null
+  status: 'idle' | 'loading' | 'ready' | 'error'
+  ids: string[] | null
+  bbox: BBox | null
+  error: string | null
+}
+
+function AddViewForm({ files, projectId, drawing, onCancel, onAdd, onAddStandardViews }: {
+  files: FileEntry[]
+  projectId?: string | null
+  drawing: DrawingSpec
+  onCancel: () => void
+  onAdd: (payload: { source_file_id: string; part_id: string; projection: string }) => void
+  onAddStandardViews: (specs: ReturnType<typeof layoutStandardViews>) => void
+}) {
   // Coalesce sourceId + part_id into one piece of state so changing the
   // source naturally resets part_id without a setState-in-effect cascade.
   const [pick, setPick] = useState(() => ({ sourceId: files[0]?.id || '', partId: '*' }))
@@ -416,7 +562,7 @@ function AddViewForm({ files, projectId, drawing, onCancel, onAdd, onAddStandard
   // Per-source-id loader state keyed by sourceId. The effect only mutates
   // state when a fetch finishes — never synchronously to react to a prop
   // change — keeping the effect cascading-render-clean.
-  const [loaderState, setLoaderState] = useState({ sourceId: null, status: 'idle', ids: null, bbox: null, error: null })
+  const [loaderState, setLoaderState] = useState<LoaderState>({ sourceId: null, status: 'idle', ids: null, bbox: null, error: null })
   const lastReqRef = useRef(0)
   const { sourceId, partId } = pick
 
@@ -432,8 +578,8 @@ function AddViewForm({ files, projectId, drawing, onCancel, onAdd, onAddStandard
     const reqId = ++lastReqRef.current
     const promise = cached
       ? Promise.resolve({ parts: cached._parts, ids: cached.ids, bbox: cached.bbox, fromCache: true })
-      : loadFilePartsForProject(projectId, sourceId).then((parts) => {
-          const ids = (parts || []).map((p) => p?.id).filter(Boolean)
+      : loadFilePartsForProject(projectId, sourceId, undefined).then((parts: any) => {
+          const ids = (parts || []).map((p: any) => p?.id).filter(Boolean)
           const bbox = estimateBBox(parts)
           partListCache.set(sourceId, { ids, bbox, _parts: null })
           return { parts, ids, bbox, fromCache: false }
@@ -560,7 +706,11 @@ function AddViewForm({ files, projectId, drawing, onCancel, onAdd, onAddStandard
 // Per-kind inspector card for a selected annotation. Each kind exposes its
 // editable fields (text, font size, color, dashed toggle, etc.) plus a
 // Delete button. Updates flow through onUpdate(patch).
-function AnnotationInspector({ ann, onUpdate, onDelete }) {
+function AnnotationInspector({ ann, onUpdate, onDelete }: {
+  ann: AnnotationSpec
+  onUpdate: (patch: Partial<AnnotationSpec>) => void
+  onDelete: () => void
+}) {
   return (
     <Section
       title={`Annotation · ${ann.kind}`}
@@ -684,7 +834,7 @@ function AnnotationInspector({ ann, onUpdate, onDelete }) {
 // Estimate a 3D bbox from a parts list. Walks each part's geom positions if
 // available; otherwise returns a generic 80mm cube. Coarse on purpose — used
 // only for the auto-fit scale in standard-view layout.
-function estimateBBox(parts) {
+function estimateBBox(parts: any): BBox {
   let minX = Infinity, minY = Infinity, minZ = Infinity
   let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity
   let any = false
@@ -720,13 +870,16 @@ function estimateBBox(parts) {
     }
   }
   if (!any) return { min: [-40, -40, -40], max: [40, 40, 40] }
-  return { min: [minX, minY, minZ], max: [maxX, maxY, maxZ] }
+  return {
+    min: [minX, minY, minZ] as [number, number, number],
+    max: [maxX, maxY, maxZ] as [number, number, number],
+  }
 }
 
 // Compute the 2D footprint (page-mm-equivalent in model-units) for each
 // standard projection, given a 3D bbox. Mirrors the projection axes in
 // src/lib/projection.js.
-function projectedSize(bbox, proj) {
+function projectedSize(bbox: BBox, proj: string): [number, number] {
   const dx = bbox.max[0] - bbox.min[0]
   const dy = bbox.max[1] - bbox.min[1]
   const dz = bbox.max[2] - bbox.min[2]
@@ -747,7 +900,13 @@ function projectedSize(bbox, proj) {
 //
 // First-angle layout. Spacing is ~10mm between view bboxes. Scale is chosen
 // so the largest projected dimension fits inside the printable area.
-function layoutStandardViews({ drawing, source_file_id, part_id, bbox, layout }) {
+function layoutStandardViews({ drawing, source_file_id, part_id, bbox, layout }: {
+  drawing: DrawingSpec
+  source_file_id: string
+  part_id: string
+  bbox: BBox | null
+  layout: '3' | '6'
+}) {
   const SAFE_MARGIN = 10
   // Pull the active sheet's frame (multi-sheet shape) with a back-compat
   // fallback to the legacy top-level frame.
@@ -849,7 +1008,11 @@ function layoutStandardViews({ drawing, source_file_id, part_id, bbox, layout })
 
 // Inspector for a selected dimension. Edit kind-specific fields including
 // the auto-vs-manual override flag (clearing `value` returns to auto-measured).
-function DimensionInspector({ dim, onUpdate, onDelete }) {
+function DimensionInspector({ dim, onUpdate, onDelete }: {
+  dim: DimensionSpec
+  onUpdate: (patch: Partial<DimensionSpec>) => void
+  onDelete: () => void
+}) {
   return (
     <Section
       title={`Dimension · ${dim.kind}`}
@@ -920,7 +1083,11 @@ function DimensionInspector({ dim, onUpdate, onDelete }) {
 
 // Inspector for surface_finish / weld / gdt symbols. v1 surfaces the most
 // common params via simple text inputs.
-function SymbolInspector({ sym, onUpdate, onDelete }) {
+function SymbolInspector({ sym, onUpdate, onDelete }: {
+  sym: SymbolSpec
+  onUpdate: (patch: Partial<SymbolSpec>) => void
+  onDelete: () => void
+}) {
   const params = sym.params || {}
   const keys = sym.kind === 'surface_finish' ? [['ra', 'Ra']]
     : sym.kind === 'weld' ? [['text', 'Size'], ['side', 'Side']]

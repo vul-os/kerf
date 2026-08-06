@@ -28,9 +28,49 @@
  */
 
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { Watch, Cog, Gauge, CheckCircle, XCircle, Loader2, AlertCircle, Calculator } from 'lucide-react'
 
-const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+// import.meta.env typing depends on vite/client types not loaded in this
+// standalone tsc invocation; cast at this boundary only.
+const API_URL = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_URL) || ''
+
+// ---------------------------------------------------------------------------
+// Local types
+// ---------------------------------------------------------------------------
+
+// Tool result shapes are loose bags of numeric/string fields defined
+// server-side; not modelled field-by-field here.
+type ToolResult = Record<string, any>
+
+interface TrainForm {
+  freq_hz: string
+  power_reserve_hours: string
+  escape_wheel_teeth: string
+  barrel_turns_per_day: string
+}
+
+interface EscapementForm {
+  escape_teeth: string
+  lift_deg: string
+  draw_deg: string
+  escape_wheel_radius_mm: string
+  lever_arm_mm: string
+  escape_wheel_torque_Nmm: string
+}
+
+interface BalanceForm {
+  I_gmm2: string
+  k_Nmmrad: string
+  amp_min_deg: string
+  amp_max_deg: string
+}
+
+interface ToothForm {
+  module: string
+  num_teeth: string
+  pressure_angle_deg: string
+}
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for tests)
@@ -39,7 +79,7 @@ const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API
 /**
  * Format a number for display. Returns '—' for null/undefined/NaN.
  */
-export function fmtNum(n, digits = 4) {
+export function fmtNum(n: number | null | undefined, digits = 4): string {
   if (n == null || !Number.isFinite(n)) return '—'
   if (Math.abs(n) === 0) return '0'
   if (Math.abs(n) < 0.001 || Math.abs(n) >= 1e6) return n.toExponential(digits - 1)
@@ -49,14 +89,14 @@ export function fmtNum(n, digits = 4) {
 /**
  * Convert beat-rate Hz to bph (beats per hour).
  */
-export function hzToBph(hz) {
+export function hzToBph(hz: number): number {
   return hz * 3600
 }
 
 /**
  * Common balance frequencies as [Hz, label] pairs.
  */
-export const COMMON_FREQUENCIES = [
+export const COMMON_FREQUENCIES: [number, string][] = [
   [3.0, '21 600 bph (3 Hz)'],
   [4.0, '28 800 bph (4 Hz)'],
   [5.0, '36 000 bph (5 Hz)'],
@@ -66,8 +106,8 @@ export const COMMON_FREQUENCIES = [
 /**
  * Build gear-train tool args.
  */
-export function buildTrainArgs(form) {
-  const args = {
+export function buildTrainArgs(form: TrainForm): Record<string, number> {
+  const args: Record<string, number> = {
     freq_hz: parseFloat(form.freq_hz),
     power_reserve_hours: parseFloat(form.power_reserve_hours),
   }
@@ -79,7 +119,7 @@ export function buildTrainArgs(form) {
 /**
  * Build balance-period tool args.
  */
-export function buildBalanceArgs(form) {
+export function buildBalanceArgs(form: BalanceForm) {
   return {
     I_balance_gmm2: parseFloat(form.I_gmm2),
     k_hairspring_Nmmrad: parseFloat(form.k_Nmmrad),
@@ -90,7 +130,7 @@ export function buildBalanceArgs(form) {
 // API call
 // ---------------------------------------------------------------------------
 
-async function callTool(toolName, args) {
+async function callTool(toolName: string, args: Record<string, unknown>): Promise<ToolResult> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -109,7 +149,7 @@ async function callTool(toolName, args) {
 // Shared sub-components
 // ---------------------------------------------------------------------------
 
-function FieldRow({ label, children }) {
+function FieldRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-center gap-2 text-[11px]">
       <label className="text-ink-400 w-36 flex-shrink-0">{label}</label>
@@ -118,7 +158,14 @@ function FieldRow({ label, children }) {
   )
 }
 
-function NumInput({ value, onChange, placeholder, min, step = 'any' }) {
+function NumInput({ value, onChange, placeholder, min, step = 'any' }: {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  min?: string | number
+  max?: string | number
+  step?: string | number
+}) {
   return (
     <input
       type="number"
@@ -132,7 +179,7 @@ function NumInput({ value, onChange, placeholder, min, step = 'any' }) {
   )
 }
 
-function RunButton({ loading, onClick, children }) {
+function RunButton({ loading, onClick, children }: { loading: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
       type="button"
@@ -146,7 +193,7 @@ function RunButton({ loading, onClick, children }) {
   )
 }
 
-function ErrorBanner({ error }) {
+function ErrorBanner({ error }: { error?: string | null }) {
   if (!error) return null
   return (
     <div className="flex items-start gap-2 mt-2 px-3 py-2 bg-red-950/40 border border-red-900/50 rounded-lg text-[11px] text-red-300">
@@ -156,7 +203,7 @@ function ErrorBanner({ error }) {
   )
 }
 
-function PassBadge({ value }) {
+function PassBadge({ value }: { value: boolean | null | undefined }) {
   if (value === true) return (
     <span className="inline-flex items-center gap-1 text-emerald-400 font-medium text-[10px]">
       <CheckCircle size={10} />PASS
@@ -170,7 +217,7 @@ function PassBadge({ value }) {
   return null
 }
 
-function ResultTable({ data }) {
+function ResultTable({ data }: { data: ToolResult | null }) {
   if (!data || typeof data !== 'object') return null
 
   // Render stage list separately
@@ -243,24 +290,24 @@ function ResultTable({ data }) {
 // ---------------------------------------------------------------------------
 
 function GearTrainTab() {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<TrainForm>({
     freq_hz: '4.0',
     power_reserve_hours: '48',
     escape_wheel_teeth: '15',
     barrel_turns_per_day: '7.5',
   })
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<ToolResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const set = (k) => (v) => setForm(f => ({ ...f, [k]: v }))
+  const set = (k: keyof TrainForm) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
   async function run() {
     setLoading(true); setError(null); setResult(null)
     try {
       const data = await callTool('horology_train_calculator', buildTrainArgs(form))
       setResult(data)
-    } catch (e) { setError(e.message) } finally { setLoading(false) }
+    } catch (e) { setError((e as Error).message) } finally { setLoading(false) }
   }
 
   return (
@@ -315,7 +362,7 @@ function GearTrainTab() {
 // ---------------------------------------------------------------------------
 
 function EscapementTab() {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<EscapementForm>({
     escape_teeth: '15',
     lift_deg: '8.0',
     draw_deg: '12.0',
@@ -323,11 +370,11 @@ function EscapementTab() {
     lever_arm_mm: '1.6',
     escape_wheel_torque_Nmm: '0.35',
   })
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<ToolResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const set = (k) => (v) => setForm(f => ({ ...f, [k]: v }))
+  const set = (k: keyof EscapementForm) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
   async function run() {
     setLoading(true); setError(null); setResult(null)
@@ -342,7 +389,7 @@ function EscapementTab() {
       }
       const data = await callTool('horology_escapement_geometry', args)
       setResult(data)
-    } catch (e) { setError(e.message) } finally { setLoading(false) }
+    } catch (e) { setError((e as Error).message) } finally { setLoading(false) }
   }
 
   return (
@@ -383,18 +430,18 @@ function EscapementTab() {
 // ---------------------------------------------------------------------------
 
 function BalanceTab() {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<BalanceForm>({
     I_gmm2: '14.4',
     k_Nmmrad: '0.023',
     amp_min_deg: '180',
     amp_max_deg: '300',
   })
-  const [periodResult, setPeriodResult] = useState(null)
-  const [isoResult, setIsoResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [periodResult, setPeriodResult] = useState<ToolResult | null>(null)
+  const [isoResult, setIsoResult] = useState<ToolResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const set = (k) => (v) => setForm(f => ({ ...f, [k]: v }))
+  const set = (k: keyof BalanceForm) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
   async function run() {
     setLoading(true); setError(null); setPeriodResult(null); setIsoResult(null)
@@ -411,7 +458,7 @@ function BalanceTab() {
       ])
       setPeriodResult(period)
       setIsoResult(iso)
-    } catch (e) { setError(e.message) } finally { setLoading(false) }
+    } catch (e) { setError((e as Error).message) } finally { setLoading(false) }
   }
 
   return (
@@ -457,16 +504,16 @@ function BalanceTab() {
 // ---------------------------------------------------------------------------
 
 function ToothTab() {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<ToothForm>({
     module: '0.10',
     num_teeth: '80',
     pressure_angle_deg: '20',
   })
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<ToolResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const set = (k) => (v) => setForm(f => ({ ...f, [k]: v }))
+  const set = (k: keyof ToothForm) => (v: string) => setForm(f => ({ ...f, [k]: v }))
 
   async function run() {
     setLoading(true); setError(null); setResult(null)
@@ -478,7 +525,7 @@ function ToothTab() {
       }
       const data = await callTool('horology_check_tooth_profile', args)
       setResult(data)
-    } catch (e) { setError(e.message) } finally { setLoading(false) }
+    } catch (e) { setError((e as Error).message) } finally { setLoading(false) }
   }
 
   return (
@@ -516,7 +563,12 @@ const TABS = [
   { id: 'tooth', label: 'Tooth', Icon: Calculator },
 ]
 
-export default function HorologyPanel({ className = '', content }) {
+interface HorologyPanelProps {
+  className?: string
+  content?: string | null
+}
+
+export default function HorologyPanel({ className = '', content }: HorologyPanelProps) {
   // Parse content string (from panelRegistry) to seed defaults (not yet used but accepted for compat)
   // eslint-disable-next-line no-unused-vars
   const _defaults = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()

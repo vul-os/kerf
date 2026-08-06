@@ -26,10 +26,61 @@ import {
 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
+// Local types
+// ---------------------------------------------------------------------------
+
+interface MaterialEntry {
+  label?: string
+  total_mass_kg?: number
+  total_carbon_kg_co2?: number
+}
+
+interface LCAResult {
+  total_carbon_kg_co2?: number
+  circularity_score?: number | null
+  warnings?: string[]
+  by_material?: Record<string, MaterialEntry>
+}
+
+interface PhaseEntry {
+  phase: string
+  gwp_kg_co2_eq?: number
+}
+
+interface LifecycleResult {
+  phases?: PhaseEntry[]
+  total_gwp_kg_co2_eq?: number
+  functional_unit?: string
+  warnings?: string[]
+}
+
+interface MultiImpactResult {
+  impacts?: Record<string, number>
+  methods?: unknown
+  warnings?: string[]
+}
+
+interface UncertaintyResult {
+  ci_low?: number | null
+  ci_high?: number | null
+}
+
+interface ImpactDatum {
+  key: string
+  label: string
+  unit: string
+  color: string
+  value: number
+  maxValue: number
+  ciLow: number | null
+  ciHigh: number | null
+}
+
+// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const IMPACT_LABELS = {
+const IMPACT_LABELS: Record<string, { label: string; unit: string; color: string; method: string }> = {
   gwp100: { label: 'GWP100', unit: 'kg CO₂-eq', color: '#22c55e', method: 'IPCC AR6' },
   ap:     { label: 'Acidification', unit: 'kg SO₂-eq', color: '#f59e0b', method: 'CML 2002' },
   ep:     { label: 'Eutrophication', unit: 'kg PO₄-eq', color: '#3b82f6', method: 'CML 2002' },
@@ -38,7 +89,7 @@ const IMPACT_LABELS = {
   pm25:   { label: 'PM2.5', unit: 'kg PM2.5-eq', color: '#8b5cf6', method: 'ReCiPe 2016' },
 }
 
-const PHASE_COLORS = {
+const PHASE_COLORS: Record<string, string> = {
   cradle_to_gate: '#22c55e',
   use:            '#3b82f6',
   transport:      '#f59e0b',
@@ -46,7 +97,7 @@ const PHASE_COLORS = {
   module_d:       '#06b6d4',
 }
 
-const PHASE_LABELS = {
+const PHASE_LABELS: Record<string, string> = {
   cradle_to_gate: 'Phase A1–A3 Cradle-to-gate',
   use:            'Phase B6 Use (operational energy)',
   transport:      'Phase A4/C2 Transport',
@@ -58,7 +109,7 @@ const PHASE_LABELS = {
 // Helper: format a number with appropriate significant figures
 // ---------------------------------------------------------------------------
 
-function fmtNum(v, decimals = 4) {
+function fmtNum(v: number | null | undefined, decimals = 4): string {
   if (v === null || v === undefined) return '—'
   const n = Number(v)
   if (Number.isNaN(n)) return '—'
@@ -67,7 +118,7 @@ function fmtNum(v, decimals = 4) {
   return n.toFixed(decimals)
 }
 
-function fmtSci(v) {
+function fmtSci(v: number | null | undefined): string {
   if (v === null || v === undefined) return '—'
   const n = Number(v)
   if (Number.isNaN(n)) return '—'
@@ -79,7 +130,15 @@ function fmtSci(v) {
 // Sub-component: ImpactBar — single horizontal bar with optional CI
 // ---------------------------------------------------------------------------
 
-function ImpactBar({ label, unit, value, ciLow, ciHigh, maxValue, color }) {
+function ImpactBar({ label, unit, value, ciLow, ciHigh, maxValue, color }: {
+  label: string
+  unit: string
+  value: number
+  ciLow?: number | null
+  ciHigh?: number | null
+  maxValue: number
+  color: string
+}) {
   const pct = maxValue > 0 ? Math.max(0, Math.min(100, (value / maxValue) * 100)) : 0
   const ciLoPct = maxValue > 0 && ciLow !== undefined ? Math.max(0, (ciLow / maxValue) * 100) : null
   const ciHiPct = maxValue > 0 && ciHigh !== undefined ? Math.min(100, (ciHigh / maxValue) * 100) : null
@@ -112,7 +171,7 @@ function ImpactBar({ label, unit, value, ciLow, ciHigh, maxValue, color }) {
 // Sub-component: PhaseBreakdown
 // ---------------------------------------------------------------------------
 
-function PhaseBreakdown({ phases, total }) {
+function PhaseBreakdown({ phases, total }: { phases?: PhaseEntry[]; total?: number }) {
   if (!phases || phases.length === 0) return null
 
   const maxAbs = Math.max(...phases.map(p => Math.abs(p.gwp_kg_co2_eq || 0)), 0.001)
@@ -163,7 +222,7 @@ function PhaseBreakdown({ phases, total }) {
 // Sub-component: MaterialTable
 // ---------------------------------------------------------------------------
 
-function MaterialTable({ byMaterial }) {
+function MaterialTable({ byMaterial }: { byMaterial?: Record<string, MaterialEntry> }) {
   if (!byMaterial || Object.keys(byMaterial).length === 0) return null
   const entries = Object.entries(byMaterial)
   const totalCarbon = entries.reduce((s, [, v]) => s + (v.total_carbon_kg_co2 || 0), 0)
@@ -201,7 +260,7 @@ function MaterialTable({ byMaterial }) {
 // Sub-component: CircularityMeter
 // ---------------------------------------------------------------------------
 
-function CircularityMeter({ score }) {
+function CircularityMeter({ score }: { score?: number | null }) {
   if (score === null || score === undefined) return null
   const pct = Math.max(0, Math.min(100, Number(score)))
   const color = pct >= 70 ? '#22c55e' : pct >= 40 ? '#f59e0b' : '#ef4444'
@@ -250,7 +309,15 @@ function CircularityMeter({ score }) {
  *   uncertainty — output of `lca_impact_uncertainty_bounds` for GWP (optional)
  *   className   — additional CSS
  */
-export function LCAResultsPanel({ result, lifecycle, multi, uncertainty, className = '' }) {
+interface LCAResultsPanelProps {
+  result?: LCAResult | null
+  lifecycle?: LifecycleResult | null
+  multi?: MultiImpactResult | null
+  uncertainty?: UncertaintyResult | null
+  className?: string
+}
+
+export function LCAResultsPanel({ result, lifecycle, multi, uncertainty, className = '' }: LCAResultsPanelProps) {
   const [showMaterials, setShowMaterials] = useState(false)
   const [showWarnings, setShowWarnings] = useState(false)
 
@@ -274,7 +341,7 @@ export function LCAResultsPanel({ result, lifecycle, multi, uncertainty, classNa
   ]
 
   // Build impact data for chart
-  const impactData = []
+  const impactData: ImpactDatum[] = []
   if (multi?.impacts) {
     const maxImpact = Math.max(...Object.values(multi.impacts).map(v => Math.abs(Number(v)) || 0), 1e-12)
     for (const [cat, meta] of Object.entries(IMPACT_LABELS)) {
@@ -454,7 +521,7 @@ export function LCAResultsPanel({ result, lifecycle, multi, uncertainty, classNa
  *   totalCarbonKgCo2 — number
  *   circularity      — 0-100 circularity score (optional)
  */
-export function LCABadge({ totalCarbonKgCo2, circularity }) {
+export function LCABadge({ totalCarbonKgCo2, circularity }: { totalCarbonKgCo2: number; circularity?: number }) {
   const v = Number(totalCarbonKgCo2)
   const color = v < 1 ? 'text-emerald-400' : v < 10 ? 'text-amber-400' : 'text-red-400'
 

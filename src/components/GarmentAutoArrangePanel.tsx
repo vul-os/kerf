@@ -24,6 +24,48 @@ import { useMemo } from 'react'
 import { Shirt, CheckCircle, AlertTriangle, Play } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
+// Local types
+// ---------------------------------------------------------------------------
+
+interface GarmentPanel {
+  label: string
+  zone: string
+  translation_cm?: number[]
+  rotation_euler_deg?: number[]
+  max_penetration_cm?: number
+  no_deep_penetration?: boolean
+  drape_converged?: boolean
+  drape_steps_taken?: number
+  fit_tension?: number[]
+  fit_tension_mean?: number
+  rows?: number
+  cols?: number
+}
+
+interface AvatarInfo {
+  height_cm?: number
+  bust_cm?: number
+  waist_cm?: number
+  hip_cm?: number
+  n_verts?: number
+  n_faces?: number
+}
+
+interface ArrangeData {
+  panels: GarmentPanel[]
+  seam_proximity_met?: boolean[]
+  avatar?: AvatarInfo
+  error?: string
+  ok?: boolean
+}
+
+interface ParsedArrangeResult {
+  kind: 'ok' | 'empty' | 'invalid'
+  data?: ArrangeData
+  error?: string
+}
+
+// ---------------------------------------------------------------------------
 // Pure helpers (exported for tests)
 // ---------------------------------------------------------------------------
 
@@ -31,9 +73,9 @@ import { Shirt, CheckCircle, AlertTriangle, Play } from 'lucide-react'
  * Parse raw garment_auto_arrange result.
  * Returns { kind: 'ok'|'empty'|'invalid', data, error? }
  */
-export function parseArrangeResult(raw) {
+export function parseArrangeResult(raw: unknown): ParsedArrangeResult {
   if (raw == null) return { kind: 'empty' }
-  const obj =
+  const obj: any =
     typeof raw === 'string'
       ? (() => { try { return JSON.parse(raw) } catch { return null } })()
       : raw
@@ -43,14 +85,14 @@ export function parseArrangeResult(raw) {
   if (!Array.isArray(obj.panels))
     return { kind: 'invalid', error: 'Missing panels array in result' }
 
-  return { kind: 'ok', data: obj }
+  return { kind: 'ok', data: obj as ArrangeData }
 }
 
 /**
  * Return a distinct CSS colour for each body zone.
  */
-export function panelZoneColor(zone) {
-  const map = {
+export function panelZoneColor(zone: string): string {
+  const map: Record<string, string> = {
     front_torso:     '#3b82f6',  // blue
     back_torso:      '#8b5cf6',  // purple
     left_sleeve:     '#10b981',  // green
@@ -71,7 +113,7 @@ export function panelZoneColor(zone) {
  *   = 0 (relaxed):           white/cream
  *   < 0 (bunched):           blue
  */
-export function tensionColorAA(t, scale = 0.05) {
+export function tensionColorAA(t: number, scale = 0.05): string {
   if (!Number.isFinite(t) || scale <= 0) return '#888888'
   const clamped = Math.max(-1, Math.min(1, t / scale))
   if (clamped >= 0) {
@@ -91,7 +133,7 @@ export function tensionColorAA(t, scale = 0.05) {
 /**
  * Format a [x, y, z] cm array as a readable string.
  */
-export function formatVec3(arr) {
+export function formatVec3(arr: unknown): string {
   if (!Array.isArray(arr) || arr.length < 3) return '—'
   return arr.map((v) => (Number.isFinite(v) ? v.toFixed(1) : '?')).join(', ') + ' cm'
 }
@@ -101,7 +143,7 @@ export function formatVec3(arr) {
 // ---------------------------------------------------------------------------
 
 /** Zone badge with colour dot */
-function ZoneBadge({ zone }) {
+function ZoneBadge({ zone }: { zone: string }) {
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono"
       style={{ background: panelZoneColor(zone) + '22', color: panelZoneColor(zone) }}>
@@ -113,7 +155,7 @@ function ZoneBadge({ zone }) {
 }
 
 /** Fit-tension heatmap SVG grid for one panel */
-function TensionGrid({ tension, rows, cols }) {
+function TensionGrid({ tension, rows, cols }: { tension: number[]; rows: number; cols: number }) {
   if (!Array.isArray(tension) || tension.length === 0) return null
   const CELL = 14
   const W = cols * CELL
@@ -143,15 +185,15 @@ function TensionGrid({ tension, rows, cols }) {
 }
 
 /** Avatar schematic SVG (front-view body silhouette, top=crown, bottom=floor) */
-function AvatarSchematic({ panels, avatarHeightCm = 168 }) {
+function AvatarSchematic({ panels, avatarHeightCm = 168 }: { panels: GarmentPanel[]; avatarHeightCm?: number }) {
   const SVG_W = 200
   const SVG_H = 320
   const PAD = 16
 
   // Schematic body shape as polyline coordinates (normalised 0-1 from bottom)
   // in SVG space: y=0 at top, y=SVG_H at bottom
-  const toY = (frac) => PAD + (1 - frac) * (SVG_H - 2 * PAD)
-  const toX = (frac) => PAD + frac * (SVG_W - 2 * PAD)
+  const toY = (frac: number) => PAD + (1 - frac) * (SVG_H - 2 * PAD)
+  const toX = (frac: number) => PAD + frac * (SVG_W - 2 * PAD)
 
   // Simple body silhouette
   const cx = SVG_W / 2
@@ -167,7 +209,7 @@ function AvatarSchematic({ panels, avatarHeightCm = 168 }) {
   ]
 
   // Panel zone -> approximate SVG position (y fraction, x offset from centre)
-  const zonePos = {
+  const zonePos: Record<string, { yFrac: number; dx: number; side: string }> = {
     front_torso:     { yFrac: 0.68, dx: 0,    side: 'front' },
     back_torso:      { yFrac: 0.68, dx: 0,    side: 'back'  },
     left_sleeve:     { yFrac: 0.75, dx: -40,  side: 'left'  },
@@ -228,7 +270,7 @@ function AvatarSchematic({ panels, avatarHeightCm = 168 }) {
 }
 
 /** Single panel detail card */
-function PanelCard({ panel, seamStatuses, seams }) {
+function PanelCard({ panel, seamStatuses, seams }: { panel: GarmentPanel; seamStatuses?: boolean[]; seams?: boolean[] }) {
   const tension = panel.fit_tension ?? []
   const rows = panel.rows ?? 6
   const cols = panel.cols ?? 6
@@ -275,7 +317,7 @@ function PanelCard({ panel, seamStatuses, seams }) {
 // Empty / error states
 // ---------------------------------------------------------------------------
 
-function EmptyState({ onDrape }) {
+function EmptyState({ onDrape }: { onDrape?: (() => void) | null }) {
   return (
     <div className="flex flex-col items-center gap-4 py-8 text-center">
       <Shirt className="w-12 h-12 text-blue-400 opacity-60" />
@@ -302,7 +344,7 @@ function EmptyState({ onDrape }) {
   )
 }
 
-function ErrorState({ error, onDrape }) {
+function ErrorState({ error, onDrape }: { error?: string; onDrape?: (() => void) | null }) {
   return (
     <div className="flex flex-col items-center gap-3 py-8 text-center">
       <AlertTriangle className="w-10 h-10 text-amber-400" />
@@ -333,7 +375,13 @@ function ErrorState({ error, onDrape }) {
  *   onDrape    {Function|null}       called when user clicks "Drape"
  *   className  {string}
  */
-export default function GarmentAutoArrangePanel({ result, onDrape, className = '' }) {
+interface GarmentAutoArrangePanelProps {
+  result?: ArrangeData | string | null
+  onDrape?: (() => void) | null
+  className?: string
+}
+
+export default function GarmentAutoArrangePanel({ result, onDrape, className = '' }: GarmentAutoArrangePanelProps) {
   const parsed = useMemo(() => parseArrangeResult(result), [result])
 
   if (parsed.kind === 'empty') {

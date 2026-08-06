@@ -19,10 +19,26 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import type { MutableRefObject } from 'react'
+
+// ── Local types ─────────────────────────────────────────────────────────────
+
+interface QualityPreset {
+  id: string
+  label: string
+  samples: number
+  creditHint: string
+}
+
+// Render-job / path-trace-stats shapes are loose bags returned by the render
+// backend and the optional browser-PT fallback module; not modelled field
+// by field here.
+type RenderJob = Record<string, any>
+type PtStats = Record<string, any>
 
 // ── Quality presets ────────────────────────────────────────────────────────────
 
-export const QUALITY_PRESETS = [
+export const QUALITY_PRESETS: QualityPreset[] = [
   { id: 'draft',    label: 'Draft',    samples: 256,   creditHint: '~0.5 cr' },
   { id: 'standard', label: 'Standard', samples: 1024,  creditHint: '~2 cr'   },
   { id: 'hero',     label: 'Hero',     samples: 4096,  creditHint: '~10 cr'  },
@@ -41,7 +57,7 @@ const JOB_TERMINAL = new Set(['done', 'failed', 'cancelled'])
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function downloadBlob(blob, filename) {
+function downloadBlob(blob: Blob, filename: string) {
   if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') return
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -53,7 +69,7 @@ function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url)
 }
 
-function downloadUrl(url, filename) {
+function downloadUrl(url: string, filename: string) {
   const a = document.createElement('a')
   a.href = url
   a.download = filename
@@ -64,7 +80,11 @@ function downloadUrl(url, filename) {
 
 // ── Small UI pieces ────────────────────────────────────────────────────────────
 
-function PresetButton({ preset, active, onClick }) {
+function PresetButton({ preset, active, onClick }: {
+  preset: QualityPreset
+  active: boolean
+  onClick: (id: string) => void
+}) {
   return (
     <button
       type="button"
@@ -89,7 +109,7 @@ function PresetButton({ preset, active, onClick }) {
   )
 }
 
-function ProgressBar({ percent }) {
+function ProgressBar({ percent }: { percent: number }) {
   const clamped = Math.min(100, Math.max(0, percent ?? 0))
   return (
     <div
@@ -108,7 +128,11 @@ function ProgressBar({ percent }) {
   )
 }
 
-function GalleryItem({ job, onDownloadPng, onDownloadExr }) {
+function GalleryItem({ job, onDownloadPng, onDownloadExr }: {
+  job: RenderJob
+  onDownloadPng: (j?: RenderJob) => void
+  onDownloadExr: (j?: RenderJob) => void
+}) {
   const ts = job.created_at ? new Date(job.created_at).toLocaleString() : '—'
   const preset = QUALITY_PRESETS.find((p) => p.id === job.quality) ?? { label: job.quality ?? '—' }
   return (
@@ -169,23 +193,29 @@ function GalleryItem({ job, onDownloadPng, onDownloadExr }) {
  * @param {object}   [props.rendererRef] Optional forwarded ref to Renderer; used if the
  *                                       browser-PT fallback needs the live scene.
  */
-export default function HeroRenderPanel({ onClose, projectId, rendererRef }) {
+interface HeroRenderPanelProps {
+  onClose?: () => void
+  projectId?: string | null
+  rendererRef?: MutableRefObject<unknown> | null
+}
+
+export default function HeroRenderPanel({ onClose, projectId, rendererRef }: HeroRenderPanelProps) {
   const [tab, setTab]               = useState(TAB_RENDER)
   const [quality, setQuality]       = useState('hero')
-  const [job, setJob]               = useState(null)       // current in-flight or last job
+  const [job, setJob]               = useState<RenderJob | null>(null)       // current in-flight or last job
   const [progress, setProgress]     = useState(0)          // 0..100
   const [samplesRendered, setSamplesRendered] = useState(0)
   const [status, setStatus]         = useState('idle')     // idle | submitting | polling | done | failed | browser
-  const [errorMsg, setErrorMsg]     = useState(null)
+  const [errorMsg, setErrorMsg]     = useState<string | null>(null)
   const [browserMode, setBrowserMode] = useState(false)    // T-106f fallback active
-  const [gallery, setGallery]       = useState([])
+  const [gallery, setGallery]       = useState<RenderJob[]>([])
   const [galleryLoading, setGalleryLoading] = useState(false)
   // ── In-process CPU path tracer ("production render") ──────────────────────
   const [productionMode, setProductionMode] = useState(false) // path-traced GI
-  const [ptImage, setPtImage]       = useState(null)          // data URL of result
-  const [ptStats, setPtStats]       = useState(null)          // {samples, triangles, ...}
+  const [ptImage, setPtImage]       = useState<string | null>(null)          // data URL of result
+  const [ptStats, setPtStats]       = useState<PtStats | null>(null)          // {samples, triangles, ...}
 
-  const pollRef     = useRef(null)
+  const pollRef     = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cancelledRef = useRef(false)
 
   // ── Cleanup on unmount ───────────────────────────────────────────────────────
@@ -210,7 +240,7 @@ export default function HeroRenderPanel({ onClose, projectId, rendererRef }) {
   }, [tab, projectId])
 
   // ── Polling loop ─────────────────────────────────────────────────────────────
-  const pollJob = useCallback((jobId) => {
+  const pollJob = useCallback((jobId: string) => {
     if (cancelledRef.current) return
     fetch(`/api/render/job/${jobId}`)
       .then((r) => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
@@ -251,24 +281,25 @@ export default function HeroRenderPanel({ onClose, projectId, rendererRef }) {
       // Dynamically import the browser path-tracer module; gracefully
       // degrade if absent. @vite-ignore so the bundler does not hard-fail
       // when the optional module is not present at build time.
-      const mod = await import('../lib/heroShotBrowserPT.js')
+      // Optional module, absent by default; loose boundary type.
+      const mod: any = await import('../lib/heroShotBrowserPT.js')
       if (typeof mod.renderBrowserPT !== 'function') throw new Error('renderBrowserPT not exported')
 
       const preset = QUALITY_PRESETS.find((p) => p.id === quality) ?? QUALITY_PRESETS[2]
       const blob = await mod.renderBrowserPT({
         rendererRef,
         samples: preset.samples,
-        onProgress: (pct) => { if (!cancelledRef.current) setProgress(pct) },
+        onProgress: (pct: number) => { if (!cancelledRef.current) setProgress(pct) },
       })
       if (cancelledRef.current) return
 
       setProgress(100)
       setStatus('done')
       setJob({ status: 'done', _browserBlob: blob })
-    } catch (err) {
+    } catch (err: any) {
       if (!cancelledRef.current) {
         setStatus('failed')
-        setErrorMsg(`Browser render failed: ${err.message ?? err}`)
+        setErrorMsg(`Browser render failed: ${err?.message ?? err}`)
       }
     }
   }
@@ -328,11 +359,11 @@ export default function HeroRenderPanel({ onClose, projectId, rendererRef }) {
       setProgress(100)
       setStatus('done')
       setJob({ status: 'done' })
-    } catch (err) {
+    } catch (err: any) {
       if (err instanceof TypeError) { await runBrowserFallback(); return }
       if (!cancelledRef.current) {
         setStatus('failed')
-        setErrorMsg(`Path-traced render failed: ${err.message ?? err}`)
+        setErrorMsg(`Path-traced render failed: ${err?.message ?? err}`)
       }
     }
   }
@@ -376,28 +407,28 @@ export default function HeroRenderPanel({ onClose, projectId, rendererRef }) {
       setJob(data)
       setStatus('polling')
       pollJob(data.id ?? data.job_id)
-    } catch (err) {
+    } catch (err: any) {
       // Network error → treat as offline, fall back to browser PT
       if (
         err instanceof TypeError ||
-        (err.message && (err.message.includes('fetch') || err.message.includes('network') || err.message.includes('Failed to fetch')))
+        (err?.message && (err.message.includes('fetch') || err.message.includes('network') || err.message.includes('Failed to fetch')))
       ) {
         await runBrowserFallback()
         return
       }
       setStatus('failed')
-      setErrorMsg(err.message ?? String(err))
+      setErrorMsg(err?.message ?? String(err))
     }
   }
 
   // ── Download helpers ──────────────────────────────────────────────────────────
-  function handleDownloadPng(j = job) {
+  function handleDownloadPng(j: RenderJob | null = job) {
     if (!j) return
     if (j._browserBlob) { downloadBlob(j._browserBlob, `kerf-hero-${Date.now()}.png`); return }
     if (j.png_url) downloadUrl(j.png_url, `kerf-hero-${j.id ?? Date.now()}.png`)
   }
 
-  function handleDownloadExr(j = job) {
+  function handleDownloadExr(j: RenderJob | null = job) {
     if (!j) return
     if (j.exr_url) downloadUrl(j.exr_url, `kerf-hero-${j.id ?? Date.now()}.exr`)
   }

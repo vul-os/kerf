@@ -20,7 +20,24 @@
 //   pctBar(n, total)         → 0–100 percentage number
 //   detectCostTool(tool, r)  → string
 
+import type { CSSProperties } from 'react'
 import { AlertTriangle, DollarSign } from 'lucide-react'
+
+// ---------------------------------------------------------------------------
+// Local types
+// ---------------------------------------------------------------------------
+
+// Costing tool result shapes vary a great deal across the 10 costing_* tools
+// this panel renders; treated as a loose bag of numeric/string fields rather
+// than modelled per-tool.
+type CostResult = Record<string, any>
+
+interface ParsedCostFile {
+  kind: 'ok' | 'empty' | 'invalid'
+  tool?: string | null
+  result?: CostResult | null
+  error?: string
+}
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for tests)
@@ -30,14 +47,14 @@ import { AlertTriangle, DollarSign } from 'lucide-react'
  * Parse raw cost file content.
  * Returns { kind: 'ok'|'empty'|'invalid', tool, result, error? }
  */
-export function parseCostFile(content) {
+export function parseCostFile(content: string | null | undefined): ParsedCostFile {
   const raw = typeof content === 'string' ? content : ''
   if (!raw.trim()) return { kind: 'empty', tool: null, result: null }
-  let doc
+  let doc: any
   try {
     doc = JSON.parse(raw)
   } catch (e) {
-    return { kind: 'invalid', error: e.message }
+    return { kind: 'invalid', error: (e as Error).message }
   }
   if (!doc || typeof doc !== 'object') return { kind: 'invalid', error: 'Expected JSON object' }
   const tool   = doc.tool || null
@@ -51,7 +68,7 @@ export function parseCostFile(content) {
  * Format a number as a currency string (2 decimal places).
  * Returns "—" for non-finite values.
  */
-export function fmtCurrency(n) {
+export function fmtCurrency(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—'
   return '$' + n.toFixed(2)
 }
@@ -59,7 +76,7 @@ export function fmtCurrency(n) {
 /**
  * Compute percentage of n relative to total. Returns 0 for edge cases.
  */
-export function pctBar(n, total) {
+export function pctBar(n: number | null | undefined, total: number | null | undefined): number {
   if (!n || !total || total === 0) return 0
   return Math.min(100, Math.max(0, (n / total) * 100))
 }
@@ -67,7 +84,7 @@ export function pctBar(n, total) {
 /**
  * Detect which costing tool produced the result.
  */
-export function detectCostTool(tool, r) {
+export function detectCostTool(tool: string | null | undefined, r: CostResult | null | undefined): string {
   if (tool) {
     if (tool.includes('batch_curve'))    return 'batch_curve'
     if (tool.includes('learning_curve')) return 'learning_curve'
@@ -96,7 +113,12 @@ export function detectCostTool(tool, r) {
 // ---------------------------------------------------------------------------
 
 /** Cost metric card */
-function CostCard({ label, value, highlight, mono }) {
+function CostCard({ label, value, highlight, mono }: {
+  label: string
+  value?: number | string | null
+  highlight?: string
+  mono?: boolean
+}) {
   return (
     <div style={styles.metricCard}>
       <div style={styles.metricLabel}>{label}</div>
@@ -108,7 +130,12 @@ function CostCard({ label, value, highlight, mono }) {
 }
 
 /** Horizontal percentage bar for cost breakdown visualisation */
-function PercentBar({ label, value, total, color = '#818cf8' }) {
+function PercentBar({ label, value, total, color = '#818cf8' }: {
+  label: string
+  value?: number | null
+  total?: number | null
+  color?: string
+}) {
   const pct = pctBar(value, total)
   return (
     <div style={{ marginBottom: 6 }}>
@@ -125,7 +152,7 @@ function PercentBar({ label, value, total, color = '#818cf8' }) {
   )
 }
 
-function WarningsBox({ warnings }) {
+function WarningsBox({ warnings }: { warnings?: string[] }) {
   if (!warnings || warnings.length === 0) return null
   return (
     <div style={styles.warningBox}>
@@ -140,7 +167,7 @@ function WarningsBox({ warnings }) {
 // ---------------------------------------------------------------------------
 
 /** CNC Machining breakdown */
-function CNCResult({ r }) {
+function CNCResult({ r }: { r: CostResult }) {
   const total = r.unit_cost || r.total || 0
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -165,7 +192,7 @@ function CNCResult({ r }) {
 }
 
 /** Rollup waterfall breakdown */
-function RollupResult({ r }) {
+function RollupResult({ r }: { r: CostResult }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={styles.metricsGrid}>
@@ -189,7 +216,7 @@ function RollupResult({ r }) {
 }
 
 /** Generic process result (casting / injection / sheet metal / printing / assembly) */
-function GenericProcessResult({ r }) {
+function GenericProcessResult({ r }: { r: CostResult }) {
   const unit = r.unit_cost || r.unit_cost_per_good_part || r.total_labour_cost || r.total || 0
   const breakdown = Object.entries(r)
     .filter(([k, v]) => typeof v === 'number' && k !== 'ok' && !k.includes('rate') && !k.includes('fraction') && !k.includes('pct'))
@@ -209,7 +236,7 @@ function GenericProcessResult({ r }) {
 }
 
 /** Batch curve: unit cost vs. batch size */
-function BatchCurveResult({ r }) {
+function BatchCurveResult({ r }: { r: CostResult }) {
   const pts = r.breakpoints || []
   if (pts.length === 0) return <div style={styles.empty}>No batch curve data.</div>
 
@@ -238,7 +265,7 @@ function BatchCurveResult({ r }) {
 }
 
 /** Make vs. buy comparison */
-function MakeVsBuyResult({ r }) {
+function MakeVsBuyResult({ r }: { r: CostResult }) {
   const preferred = r.preferred
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -265,7 +292,7 @@ function MakeVsBuyResult({ r }) {
 }
 
 /** Learning curve */
-function LearningCurveResult({ r }) {
+function LearningCurveResult({ r }: { r: CostResult }) {
   return (
     <div style={styles.metricsGrid}>
       <CostCard label="Unit cost at n" value={r.unit_cost_at_n}    highlight="#34d399" />
@@ -281,7 +308,7 @@ function LearningCurveResult({ r }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-const TOOL_LABELS = {
+const TOOL_LABELS: Record<string, string> = {
   cnc:           'CNC Machining Should-Cost',
   casting:       'Casting Should-Cost',
   injection:     'Injection Moulding Should-Cost',
@@ -303,7 +330,13 @@ const TOOL_LABELS = {
  *   rawContent    — raw string content (used when parsedContent is absent).
  *   fileName      — display name.
  */
-export default function CostBreakdownPanel({ parsedContent, rawContent, fileName }) {
+interface CostBreakdownPanelProps {
+  parsedContent?: CostResult | null
+  rawContent?: string | null
+  fileName?: string | null
+}
+
+export default function CostBreakdownPanel({ parsedContent, rawContent, fileName }: CostBreakdownPanelProps) {
   const source = parsedContent ?? (rawContent ? (() => {
     try { return JSON.parse(rawContent) } catch { return null }
   })() : null)
@@ -356,7 +389,7 @@ export default function CostBreakdownPanel({ parsedContent, rawContent, fileName
 // Header
 // ---------------------------------------------------------------------------
 
-function Header({ fileName, title }) {
+function Header({ fileName, title }: { fileName?: string | null; title: string }) {
   return (
     <div style={styles.header}>
       <DollarSign size={14} style={{ color: '#34d399', flexShrink: 0 }} />
@@ -370,7 +403,7 @@ function Header({ fileName, title }) {
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   root: {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: 13,

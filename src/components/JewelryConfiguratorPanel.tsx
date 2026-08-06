@@ -11,7 +11,9 @@
  */
 
 import { useState, useMemo } from 'react'
+import type { ReactNode } from 'react'
 import { Gem, Circle, Settings2, ChevronDown, ChevronUp, Info } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 import {
   caratFromMm,
@@ -60,7 +62,7 @@ const SETTING_TYPES = [
 // Utility helpers
 // ---------------------------------------------------------------------------
 
-function fmt(n, decimals = 2) {
+function fmt(n: number | null | undefined, decimals = 2): string {
   if (n == null || isNaN(n)) return '—'
   return n.toFixed(decimals)
 }
@@ -69,7 +71,12 @@ function fmt(n, decimals = 2) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function TabButton({ active, onClick, icon: Icon, label }) {
+function TabButton({ active, onClick, icon: Icon, label }: {
+  active: boolean
+  onClick: () => void
+  icon?: LucideIcon
+  label: string
+}) {
   return (
     <button
       type="button"
@@ -89,7 +96,7 @@ function TabButton({ active, onClick, icon: Icon, label }) {
   )
 }
 
-function SectionHeader({ children }) {
+function SectionHeader({ children }: { children: ReactNode }) {
   return (
     <div className="text-[10px] uppercase tracking-wider text-ink-500 mt-3 mb-1.5 border-b border-ink-800 pb-0.5">
       {children}
@@ -97,7 +104,7 @@ function SectionHeader({ children }) {
   )
 }
 
-function FieldRow({ label, hint, children }) {
+function FieldRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div className="flex items-start gap-2 mb-2">
       <label className="text-[11px] text-ink-400 w-28 flex-shrink-0 pt-1.5 leading-tight">
@@ -109,7 +116,12 @@ function FieldRow({ label, hint, children }) {
   )
 }
 
-function ValRow({ label, value, unit, accent }) {
+function ValRow({ label, value, unit, accent }: {
+  label: string
+  value: string | number | null | undefined
+  unit?: string
+  accent?: boolean
+}) {
   return (
     <div className="flex items-center justify-between py-1 border-b border-ink-800/50 last:border-0">
       <span className="text-[11px] text-ink-400">{label}</span>
@@ -345,7 +357,7 @@ function GemPickerTab() {
 function RingSizerTab() {
   const [activeSystem, setActiveSystem] = useState('US')
   const [sizeInput, setSizeInput]       = useState('7')
-  const [sizeError, setSizeError]       = useState(null)
+  const [sizeError, setSizeError]       = useState<string | null>(null)
   const [metal, setMetal]               = useState('18k_yellow')
   const [bandWidth, setBandWidth]       = useState('4.0')
   const [thickness, setThickness]       = useState('1.5')
@@ -361,8 +373,8 @@ function RingSizerTab() {
         ? parseFloat(sizeInput)
         : sizeInput.trim()
       return ringSizeToDiameter(sys, val)
-    } catch (e) {
-      setSizeError(e.message)
+    } catch (e: any) {
+      setSizeError(e?.message)
       return null
     }
   }, [activeSystem, sizeInput])
@@ -765,7 +777,12 @@ const TABS = [
   { key: 'setting', label: 'Setting',     icon: Settings2 },
 ]
 
-export default function JewelryConfiguratorPanel({ onClose, content }) {
+interface JewelryConfiguratorPanelProps {
+  onClose?: () => void
+  content?: string | null
+}
+
+export default function JewelryConfiguratorPanel({ onClose, content }: JewelryConfiguratorPanelProps) {
   // Parse content string (from panelRegistry) to seed defaults (not yet used but accepted for compat)
   // eslint-disable-next-line no-unused-vars
   const _defaults = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()

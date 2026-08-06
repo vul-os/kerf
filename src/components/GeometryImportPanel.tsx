@@ -19,6 +19,7 @@
 //   .fcstd        — FreeCAD (import_freecad)
 
 import { useEffect, useRef, useState } from 'react'
+import type { ChangeEvent, DragEvent } from 'react'
 import {
   AlertCircle,
   Box,
@@ -31,10 +32,34 @@ import {
 import { api, ApiError } from '../lib/api.js'
 
 // ---------------------------------------------------------------------------
+// Local types
+// ---------------------------------------------------------------------------
+
+interface GeometryFormat {
+  label: string
+  icon: string
+  accept: string
+}
+
+// Import-result shapes vary per backend format (STEP/IGES/3dm/DXF/FreeCAD);
+// treated as a loose bag of fields rather than modelled per-format.
+type ImportData = Record<string, any>
+
+interface ImportState {
+  filename: string
+  format?: string
+  status: 'uploading' | 'importing' | 'done' | 'error'
+  progress?: number
+  error?: string
+  data?: ImportData
+  warnings?: string[]
+}
+
+// ---------------------------------------------------------------------------
 // Format detection
 // ---------------------------------------------------------------------------
 
-const SUPPORTED_EXTS = {
+const SUPPORTED_EXTS: Record<string, GeometryFormat> = {
   '.step': { label: 'STEP',     icon: 'Box',     accept: '.step,.stp' },
   '.stp':  { label: 'STEP',     icon: 'Box',     accept: '.step,.stp' },
   '.iges': { label: 'IGES 5.3', icon: 'Box',     accept: '.iges,.igs' },
@@ -46,13 +71,13 @@ const SUPPORTED_EXTS = {
 
 const ALL_ACCEPT = '.step,.stp,.iges,.igs,.3dm,.dxf,.FCStd,.fcstd'
 
-export function detectGeometryFormat(fileOrName) {
+export function detectGeometryFormat(fileOrName: File | string | null | undefined): GeometryFormat | null {
   const name = typeof fileOrName === 'string' ? fileOrName : fileOrName?.name || ''
-  const ext = '.' + name.split('.').pop().toLowerCase()
+  const ext = '.' + (name.split('.').pop() || '').toLowerCase()
   return SUPPORTED_EXTS[ext] || null
 }
 
-export function isGeometryFile(fileOrName) {
+export function isGeometryFile(fileOrName: File | string | null | undefined): boolean {
   return detectGeometryFormat(fileOrName) !== null
 }
 
@@ -68,16 +93,20 @@ export function isGeometryFile(fileOrName) {
  *   data     — raw import response from backend
  *   warnings — string[]
  */
-export function GeometryImportReport({ format, data, warnings }) {
+export function GeometryImportReport({ format, data, warnings }: {
+  format: string
+  data?: ImportData | null
+  warnings?: string[]
+}) {
   if (!data) return null
   const [expanded, setExpanded] = useState(false)
 
   // Extract common stats across formats
-  const stats = []
+  const stats: { label: string; value: number | string }[] = []
 
   if (data.entity_counts) {
     // IGES
-    for (const [name, count] of Object.entries(data.entity_counts)) {
+    for (const [name, count] of Object.entries(data.entity_counts as Record<string, number>)) {
       if (count > 0) stats.push({ label: name, value: count })
     }
     if (data.nurbs_curves !== undefined)
@@ -88,7 +117,7 @@ export function GeometryImportReport({ format, data, warnings }) {
       stats.push({ label: 'B-rep bodies', value: data.brep_bodies })
   } else if (data.stats?.count_by_kind) {
     // Rhino 3dm
-    for (const [kind, count] of Object.entries(data.stats.count_by_kind)) {
+    for (const [kind, count] of Object.entries(data.stats.count_by_kind as Record<string, number>)) {
       if (count > 0) stats.push({ label: kind, value: count })
     }
   } else if (data.bodies !== undefined) {
@@ -162,7 +191,16 @@ export function GeometryImportReport({ format, data, warnings }) {
 // Progress card (same style as IFCImportProgress)
 // ---------------------------------------------------------------------------
 
-export function GeometryImportProgress({ filename, format, status, progress = 0, error, data, warnings, onDismiss }) {
+export function GeometryImportProgress({ filename, format, status, progress = 0, error, data, warnings, onDismiss }: {
+  filename: string
+  format?: string
+  status: ImportState['status']
+  progress?: number
+  error?: string
+  data?: ImportData | null
+  warnings?: string[]
+  onDismiss?: (() => void) | null
+}) {
   const isTerminal = status === 'done' || status === 'error'
   const isError = status === 'error'
   const isDone = status === 'done'
@@ -237,15 +275,21 @@ export function GeometryImportProgress({ filename, format, status, progress = 0,
  *   onClose     — callback
  *   onImported  — called with { format, data } on success
  */
-export function GeometryImportDialog({ projectId, open, onClose, onImported }) {
-  const fileInputRef = useRef(null)
+export function GeometryImportDialog({ projectId, open, onClose, onImported }: {
+  projectId?: string | null
+  open: boolean
+  onClose: () => void
+  onImported?: (result: { format: string; data: ImportData }) => void
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
-  const [importState, setImportState] = useState(null)
+  const [importState, setImportState] = useState<ImportState | null>(null)
 
   useEffect(() => {
     if (!open) return
-    const handler = (e) => {
-      if (e.detail?.file && !importState) handleFile(e.detail.file)
+    const handler = (e: Event) => {
+      const file = (e as CustomEvent<{ file?: File }>).detail?.file
+      if (file && !importState) handleFile(file)
     }
     window.addEventListener('kerf:geometry-drop', handler)
     return () => window.removeEventListener('kerf:geometry-drop', handler)
@@ -256,7 +300,7 @@ export function GeometryImportDialog({ projectId, open, onClose, onImported }) {
 
   function resetState() { setImportState(null) }
 
-  async function handleFile(file) {
+  async function handleFile(file: File | null | undefined) {
     if (!file) return
     const fmt = detectGeometryFormat(file)
     if (!fmt) {
@@ -276,55 +320,61 @@ export function GeometryImportDialog({ projectId, open, onClose, onImported }) {
 
     // Phase 1: upload
     setImportState({ filename: file.name, format: fmt.label, status: 'uploading', progress: 0 })
-    let assetRecord
+    // Response shape varies (legacy `file_id` vs current `id`); not fully
+    // modelled by ChunkedUploadResult, so kept loose at this boundary.
+    let assetRecord: any
     try {
       assetRecord = await api.uploadAssetChunked(projectId, file, {
         kind: 'step',
         onProgress: ({ received, total }) => {
           const pct = total > 0 ? Math.round((received / total) * 100) : 0
-          setImportState(s => ({ ...s, progress: pct }))
+          setImportState(s => (s ? { ...s, progress: pct } : s))
         },
       })
-    } catch (err) {
-      const msg = err instanceof ApiError ? err.message : (err.message || 'Upload failed.')
+    } catch (err: any) {
+      const msg = err instanceof ApiError ? err.message : (err?.message || 'Upload failed.')
       setImportState({ filename: file.name, format: fmt.label, status: 'error', error: msg })
       return
     }
 
     // Phase 2: import
-    setImportState(s => ({ ...s, status: 'importing', progress: 100 }))
+    setImportState(s => (s ? { ...s, status: 'importing', progress: 100 } : s))
     try {
-      const ext = '.' + file.name.split('.').pop().toLowerCase()
-      let result
+      const ext = '.' + (file.name.split('.').pop() || '').toLowerCase()
+      let result: any
 
+      // api.importStep/importIges/import3dm/importDxf are not present on the
+      // typed `api` client (only importFreecadProject is); cast at this
+      // boundary to preserve existing runtime behaviour unchanged.
+      const apiAny = api as any
       if (ext === '.step' || ext === '.stp') {
-        result = await api.importStep(projectId, assetRecord.id ?? assetRecord.file_id)
+        result = await apiAny.importStep(projectId, assetRecord.id ?? assetRecord.file_id)
       } else if (ext === '.iges' || ext === '.igs') {
-        result = await api.importIges(projectId, assetRecord.id ?? assetRecord.file_id)
+        result = await apiAny.importIges(projectId, assetRecord.id ?? assetRecord.file_id)
       } else if (ext === '.3dm') {
-        result = await api.import3dm(projectId, assetRecord.id ?? assetRecord.file_id)
+        result = await apiAny.import3dm(projectId, assetRecord.id ?? assetRecord.file_id)
       } else if (ext === '.dxf') {
-        result = await api.importDxf(projectId, assetRecord.id ?? assetRecord.file_id)
+        result = await apiAny.importDxf(projectId, assetRecord.id ?? assetRecord.file_id)
       } else if (ext === '.fcstd') {
         result = await api.importFreecadProject(projectId, assetRecord.id ?? assetRecord.file_id)
       } else {
         throw new Error(`No import handler for ${ext}`)
       }
 
-      setImportState(s => ({ ...s, status: 'done', data: result, warnings: result.warnings }))
+      setImportState(s => (s ? { ...s, status: 'done', data: result, warnings: result.warnings } : s))
       onImported?.({ format: fmt.label, data: result })
-    } catch (err) {
-      const msg = err instanceof ApiError ? err.message : (err.message || 'Import failed.')
-      setImportState(s => ({ ...s, status: 'error', error: msg }))
+    } catch (err: any) {
+      const msg = err instanceof ApiError ? err.message : (err?.message || 'Import failed.')
+      setImportState(s => (s ? { ...s, status: 'error', error: msg } : s))
     }
   }
 
-  function onInputChange(e) {
+  function onInputChange(e: ChangeEvent<HTMLInputElement>) {
     handleFile(e.target.files?.[0])
     e.target.value = ''
   }
 
-  function onDrop(e) {
+  function onDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault()
     setDragOver(false)
     handleFile(e.dataTransfer.files?.[0])
@@ -449,7 +499,11 @@ export function GeometryImportDialog({ projectId, open, onClose, onImported }) {
 /**
  * GeometryImportButton — opens <GeometryImportDialog>.
  */
-export function GeometryImportButton({ projectId, onImported, className = '' }) {
+export function GeometryImportButton({ projectId, onImported, className = '' }: {
+  projectId?: string | null
+  onImported?: (result: { format: string; data: ImportData }) => void
+  className?: string
+}) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -483,6 +537,10 @@ export function GeometryImportButton({ projectId, onImported, className = '' }) 
 export default GeometryImportPanel
 
 // Dummy default export to satisfy named-export convention
-function GeometryImportPanel({ projectId, onImported, className = '' }) {
+function GeometryImportPanel({ projectId, onImported, className = '' }: {
+  projectId?: string | null
+  onImported?: (result: { format: string; data: ImportData }) => void
+  className?: string
+}) {
   return <GeometryImportButton projectId={projectId} onImported={onImported} className={className} />
 }

@@ -1,5 +1,5 @@
 /**
- * heroRender.test.js — Vitest suite for the one-click hero render module.
+ * heroRender.test.ts — Vitest suite for the one-click hero render module.
  *
  * All Three.js objects are stubbed in-process; no DOM or GPU required.
  */
@@ -12,40 +12,58 @@ import {
   composeContactSheet,
   socialMediaCrops,
 } from './heroRender.js'
+import type { HeroLight } from './heroRender.js'
 
 // ── Three.js stubs ────────────────────────────────────────────────────────────
 
-function makeFakeLight(type = 'DirectionalLight') {
+function makeFakeLight(type = 'DirectionalLight'): HeroLight {
   return { isLight: true, type, userData: {}, position: { x: 0, y: 0, z: 0 }, color: 0xffffff, intensity: 1 }
 }
 
+// Minimal stand-ins for THREE.DirectionalLight/AmbientLight — .ts files (unlike
+// .js under checkJs) don't infer class fields from constructor assignment, so
+// every field the real THREE classes expose (and this module reads) is
+// declared explicitly.
+class FakeDirectionalLight implements HeroLight {
+  isLight = true
+  type = 'DirectionalLight'
+  color: number
+  intensity: number
+  position: { x: number; y: number; z: number; set(x: number, y: number, z: number): void }
+  userData: Record<string, unknown> = {}
+  constructor(color: number, intensity: number) {
+    this.color = color
+    this.intensity = intensity
+    this.position = { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z } }
+  }
+}
+
+class FakeAmbientLight implements HeroLight {
+  isLight = true
+  type = 'AmbientLight'
+  color: number
+  intensity: number
+  position: null = null
+  userData: Record<string, unknown> = {}
+  constructor(color: number, intensity: number) {
+    this.color = color
+    this.intensity = intensity
+  }
+}
+
 const fakeThree = {
-  DirectionalLight: class {
-    constructor(color, intensity) {
-      this.isLight = true
-      this.type = 'DirectionalLight'
-      this.color = color
-      this.intensity = intensity
-      this.position = { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z } }
-      this.userData = {}
-    }
-  },
-  AmbientLight: class {
-    constructor(color, intensity) {
-      this.isLight = true
-      this.type = 'AmbientLight'
-      this.color = color
-      this.intensity = intensity
-      this.position = null
-      this.userData = {}
-    }
-  },
+  DirectionalLight: FakeDirectionalLight,
+  AmbientLight: FakeAmbientLight,
 }
 
 // ── Scene / camera / renderer helpers ─────────────────────────────────────────
 
-function makeScene(extraChildren = []) {
-  const children = [...extraChildren]
+// No explicit HeroScene return-type annotation, so `scene.children` keeps its
+// concrete `HeroLight[]` type in the tests below rather than widening to
+// HeroScene's looser `unknown[]`. Assignability to HeroScene at call sites is
+// still checked structurally.
+function makeScene(extraChildren: HeroLight[] = []) {
+  const children: HeroLight[] = [...extraChildren]
   return {
     children,
     add(obj) { children.push(obj) },
@@ -56,6 +74,10 @@ function makeScene(extraChildren = []) {
   }
 }
 
+// No explicit return-type annotation: `_lookAt` is extra test-only state the
+// HeroCamera interface doesn't declare, and annotating here would trip the
+// excess-property check on the object literal. Assignability to HeroCamera
+// at call sites is still checked structurally since this returns a variable.
 function makeCamera(pos = { x: 80, y: 80, z: 80 }) {
   return {
     position: {
@@ -64,25 +86,28 @@ function makeCamera(pos = { x: 80, y: 80, z: 80 }) {
     },
     fov: 45,
     aspect: 1,
-    _lookAt: null,
+    _lookAt: null as { x: number; y: number; z: number } | null,
     lookAt(x, y, z) { this._lookAt = { x, y, z } },
     updateProjectionMatrix: vi.fn(),
   }
 }
 
 let _frameIdx = 0
+// No explicit OrbitRenderer return-type annotation, so `.render`/`.setSize`
+// keep their concrete vi.fn() Mock type (tests below read `.mock.calls`)
+// rather than widening to OrbitRenderer's plain function signature.
 function makeRenderer() {
   const domElement = {
     width: 800,
     height: 600,
-    toDataURL(mime) {
+    toDataURL(mime?: string) {
       return `data:${mime || 'image/png'};base64,FRAME${String(_frameIdx++).padStart(4, '0')}`
     },
   }
   return {
     domElement,
     render: vi.fn(),
-    setSize: vi.fn((w, h) => { domElement.width = w; domElement.height = h }),
+    setSize: vi.fn((w: number, h: number) => { domElement.width = w; domElement.height = h }),
   }
 }
 
@@ -91,11 +116,11 @@ function makeRenderer() {
 beforeEach(() => {
   _frameIdx = 0
   // Inject fake THREE so _buildJewelryLights() uses real-ish objects.
-  globalThis.THREE = fakeThree
+  ;(globalThis as unknown as { THREE?: typeof fakeThree }).THREE = fakeThree
 })
 
 afterEach(() => {
-  delete globalThis.THREE
+  delete (globalThis as unknown as { THREE?: typeof fakeThree }).THREE
 })
 
 // ── applyJewelryLighting ──────────────────────────────────────────────────────

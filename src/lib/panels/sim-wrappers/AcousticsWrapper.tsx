@@ -2,6 +2,10 @@
 // AcousticsResultPanel is standalone (manages its own form state; no external props).
 import Panel from '../../../components/acoustics/AcousticsResultPanel.jsx'
 
-export default function AcousticsWrapper() {
+export interface Props {
+  content?: string
+}
+
+export default function AcousticsWrapper(_props: Props) {
   return <Panel />
 }

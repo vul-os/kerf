@@ -26,8 +26,17 @@
 //   model_notes
 
 import Panel from '../../../components/CfdLesPanel.jsx'
+import type { Props as CfdLesPanelProps } from '../../../components/CfdLesPanel.jsx'
 
-const DEFAULTS = {
+export interface Props {
+  content?: string
+}
+
+// CfdLesPanel's declared prop types don't include `null`, but this wrapper's
+// (pre-existing) defaults use null rather than leaving fields undefined; keep
+// that behaviour and type the defaults loosely rather than widening the panel's
+// own Props type.
+const DEFAULTS: { [K in keyof CfdLesPanelProps]?: CfdLesPanelProps[K] | null } = {
   // LES
   sgs_model: null,
   case: null,
@@ -69,12 +78,12 @@ const DEFAULTS = {
   model_notes: null,
 }
 
-function parseContent(content) {
+function parseContent(content: string | undefined): Record<string, unknown> {
   if (!content || typeof content !== 'string') return {}
   try { return JSON.parse(content) || {} } catch { return {} }
 }
 
-export default function CfdLesWrapper({ content }) {
+export default function CfdLesWrapper({ content }: Props) {
   const props = { ...DEFAULTS, ...parseContent(content) }
-  return <Panel {...props} />
+  return <Panel {...(props as CfdLesPanelProps)} />
 }

@@ -8,11 +8,23 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
 
-const NOT_FOUND_SRC = readFileSync(resolve(__dirname, '../NotFound.jsx'), 'utf8')
-const APP_SRC = readFileSync(resolve(__dirname, '../../App.jsx'), 'utf8')
+// Source-text inspection reads the module off disk by literal path, so a
+// .jsx -> .tsx migration silently breaks it (typecheck cannot catch this;
+// only running the suite does). Rather than re-pinning to .tsx and breaking
+// again on the next slice, resolve whichever extension is present.
+function readFirstExisting(base, exts) {
+  for (const ext of exts) {
+    const path = resolve(__dirname, `${base}.${ext}`)
+    if (existsSync(path)) return readFileSync(path, 'utf8')
+  }
+  throw new Error(`No source found for ${base}`)
+}
+
+const NOT_FOUND_SRC = readFirstExisting('../NotFound', ['tsx', 'jsx'])
+const APP_SRC = readFirstExisting('../../App', ['tsx', 'jsx'])
 
 // ---------------------------------------------------------------------------
 // NotFound.jsx — structural contracts

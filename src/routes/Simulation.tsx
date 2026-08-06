@@ -13,10 +13,15 @@ import FEAView from '../components/fea/FEAView.jsx'
 
 export default function Simulation() {
   const { projectId, fileId } = useMemo(() => {
-    if (typeof window === 'undefined') return {}
+    if (typeof window === 'undefined') return { projectId: null, fileId: null }
     const p = new URLSearchParams(window.location.search)
     return { projectId: p.get('projectId') || null, fileId: p.get('fileId') || null }
   }, [])
+
+  // Built separately (not as an inline object literal) so the extra fields
+  // FEAView doesn't declare in its Props type (kind, name) don't trip
+  // TypeScript's excess-property check on a fresh object literal.
+  const simFile = fileId ? { id: fileId, kind: 'step', name: 'current file' } : null
 
   return (
     <div style={{ minHeight: '100vh', background: '#0d1117' }}>
@@ -42,7 +47,7 @@ export default function Simulation() {
         </div>
 
         <FEAView
-          file={fileId ? { id: fileId, kind: 'step', name: 'current file' } : null}
+          file={simFile}
           projectId={projectId}
         />
       </div>

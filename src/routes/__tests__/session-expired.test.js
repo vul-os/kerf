@@ -14,11 +14,23 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
 
-const PROTECTED_SRC = readFileSync(resolve(__dirname, '../ProtectedRoute.jsx'), 'utf8')
-const LOGIN_SRC = readFileSync(resolve(__dirname, '../Login.jsx'), 'utf8')
+// Source-text inspection reads the module off disk by literal path, so a
+// .jsx -> .tsx migration silently breaks it (typecheck cannot catch this;
+// only running the suite does). Rather than re-pinning to .tsx and breaking
+// again on the next slice, resolve whichever extension is present.
+function readFirstExisting(base, exts) {
+  for (const ext of exts) {
+    const path = resolve(__dirname, `${base}.${ext}`)
+    if (existsSync(path)) return readFileSync(path, 'utf8')
+  }
+  throw new Error(`No source found for ${base}`)
+}
+
+const PROTECTED_SRC = readFirstExisting('../ProtectedRoute', ['tsx', 'jsx'])
+const LOGIN_SRC = readFirstExisting('../Login', ['tsx', 'jsx'])
 
 // ---------------------------------------------------------------------------
 // ProtectedRoute.jsx — passes sessionExpired reason in navigate state

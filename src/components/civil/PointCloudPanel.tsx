@@ -54,13 +54,94 @@
  */
 
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
+import type { Vec3 } from '@/types'
+
+// ── Domain types ──────────────────────────────────────────────────────────────
+
+type RgbTriple = [number, number, number]
+
+interface CloudStats {
+  n_points?: number
+  density_per_m2?: number
+}
+
+interface CloudAabb {
+  min_x?: number
+  min_y?: number
+  min_z?: number
+  max_x?: number
+  max_y?: number
+  max_z?: number
+  size_x?: number
+  size_y?: number
+  size_z?: number
+  diagonal_m?: number
+}
+
+interface PlaneResult {
+  success?: boolean
+  normal: Vec3
+  centroid?: Vec3
+  inlier_count?: number
+  inlier_fraction?: number
+  rmse_m?: number
+  dip_deg?: number
+  level_check?: string
+  plumb_check?: string
+}
+
+interface PipeSegment {
+  nominal_dn_mm?: number
+  length_m?: number
+  centerline_start?: Vec3
+  centerline_end?: Vec3
+  radius_m?: number
+}
+
+interface PipeElbow {
+  position?: Vec3
+  angle_deg?: number
+}
+
+interface PipeRun {
+  elbows?: PipeElbow[]
+}
+
+interface AsbuiltMatch {
+  asbuilt_id: string | number
+  design_id: string | number
+  pos_deviation_m: number
+  dia_deviation_m: number
+  dia_deviation_frac: number
+  pos_ok: boolean
+  dia_ok: boolean
+  status: string
+}
+
+interface AsbuiltSummary {
+  max_pos_dev_m?: number
+  rms_pos_dev_m?: number
+  n_ok?: number
+  n_pos_mismatch?: number
+  n_dia_mismatch?: number
+  n_both_mismatch?: number
+}
+
+interface AsbuiltOverlay {
+  matches?: AsbuiltMatch[]
+  summary?: AsbuiltSummary
+  n_asbuilt?: number
+  n_design?: number
+  n_matched?: number
+  n_unmatched?: number
+}
 
 // ── Projection helpers ────────────────────────────────────────────────────────
 
 const COS30 = Math.sqrt(3) / 2
 const SIN30 = 0.5
 
-function project(x, y, z, scale, zScale, cx, cy, rotY = 0) {
+function project(x: number, y: number, z: number, scale: number, zScale: number, cx: number, cy: number, rotY = 0) {
   // Rotate around Z-axis by rotY
   const cr = Math.cos(rotY)
   const sr = Math.sin(rotY)
@@ -72,7 +153,7 @@ function project(x, y, z, scale, zScale, cx, cy, rotY = 0) {
   }
 }
 
-function fitViewport(points, width, height, padding) {
+function fitViewport(points: Vec3[] | null, width: number, height: number, padding: number) {
   if (!points || points.length === 0) return { scale: 1, zScale: 1, cx: width / 2, cy: height / 2 }
   let minSX = Infinity, maxSX = -Infinity, minSY = Infinity, maxSY = -Infinity
   for (const [x, y, z] of points) {
@@ -93,7 +174,7 @@ function fitViewport(points, width, height, padding) {
 
 // ── Colour helpers ─────────────────────────────────────────────────────────────
 
-function deviationToColor(d, devRange) {
+function deviationToColor(d: number, devRange: number): string {
   if (devRange < 1e-9) return 'rgb(100,180,100)'
   const t = Math.max(-1, Math.min(1, d / devRange))
   if (t < 0) {
@@ -103,7 +184,7 @@ function deviationToColor(d, devRange) {
   return `rgb(${Math.round(255 * t)},${Math.round(255 * (1 - t))},0)`
 }
 
-function elevToColor(z, zMin, zMax) {
+function elevToColor(z: number, zMin: number, zMax: number): string {
   const t = zMax === zMin ? 0.5 : Math.max(0, Math.min(1, (z - zMin) / (zMax - zMin)))
   const r = Math.round(t < 0.5 ? 30 + t * 2 * 140 : 170 + (t - 0.5) * 2 * 60)
   const g = Math.round(t < 0.5 ? 100 + t * 2 * 80 : 180 - (t - 0.5) * 2 * 80)
@@ -113,7 +194,7 @@ function elevToColor(z, zMin, zMax) {
 
 // ── Stats panel ───────────────────────────────────────────────────────────────
 
-function StatRow({ label, value }) {
+function StatRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <tr>
       <td style={{ color: '#8a9aa8', fontSize: 11, paddingRight: 8, paddingBottom: 2, whiteSpace: 'nowrap' }}>
@@ -133,11 +214,21 @@ const PIPE_COLORS = [
   '#5be0b4', '#c05be0', '#7be060', '#e05ba0',
 ]
 
-function pipeColor(idx) {
+function pipeColor(idx: number): string {
   return PIPE_COLORS[idx % PIPE_COLORS.length]
 }
 
-function StatsPanel({ stats, aabb, planeResult, deviations, tolerance_m, pipeSegments, pipeRuns }) {
+interface StatsPanelProps {
+  stats: CloudStats | null
+  aabb: CloudAabb | null
+  planeResult: PlaneResult | null
+  deviations: number[] | null
+  tolerance_m: number
+  pipeSegments: PipeSegment[] | null
+  pipeRuns: PipeRun[] | null
+}
+
+function StatsPanel({ stats, aabb, planeResult, deviations, tolerance_m, pipeSegments, pipeRuns }: StatsPanelProps) {
   const nPts = stats?.n_points ?? (deviations?.length ?? 0)
   const hasDevs = deviations && deviations.length > 0
   const devMin = hasDevs ? Math.min(...deviations) : null
@@ -255,7 +346,7 @@ function StatsPanel({ stats, aabb, planeResult, deviations, tolerance_m, pipeSeg
 
 // ── Colour bar ─────────────────────────────────────────────────────────────────
 
-function DeviationColorBar({ devRange, tolerance_m }) {
+function DeviationColorBar({ devRange, tolerance_m }: { devRange: number; tolerance_m: number }) {
   const stops = 7
   const swatches = []
   for (let i = 0; i <= stops; i++) {
@@ -281,7 +372,7 @@ function DeviationColorBar({ devRange, tolerance_m }) {
   )
 }
 
-function ElevColorBar({ zMin, zMax }) {
+function ElevColorBar({ zMin, zMax }: { zMin: number; zMax: number }) {
   const stops = 5
   const swatches = []
   for (let i = 0; i <= stops; i++) {
@@ -306,16 +397,16 @@ function ElevColorBar({ zMin, zMax }) {
 
 // ── As-built / design deviation table ─────────────────────────────────────────
 
-const STATUS_COLOR = {
+const STATUS_COLOR: Record<string, string> = {
   ok: '#4ec94e',
   pos_mismatch: '#e0a040',
   dia_mismatch: '#e06040',
   both_mismatch: '#e04040',
 }
 
-function AsbuiltDeviationTable({ overlay }) {
+function AsbuiltDeviationTable({ overlay }: { overlay: AsbuiltOverlay | null }) {
   if (!overlay || !overlay.matches || overlay.matches.length === 0) return null
-  const { matches, summary, n_asbuilt, n_design, n_matched, n_unmatched } = overlay
+  const { matches, summary, n_asbuilt, n_matched, n_unmatched } = overlay
 
   return (
     <div style={{
@@ -414,6 +505,28 @@ function AsbuiltDeviationTable({ overlay }) {
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
+interface DispatchArgs {
+  tool: string
+  params: Record<string, unknown>
+}
+
+interface Props {
+  points?: Vec3[] | null
+  deviations?: number[] | null
+  heatmapColors?: RgbTriple[] | null
+  stats?: CloudStats | null
+  aabb?: CloudAabb | null
+  planeResult?: PlaneResult | null
+  pipeSegments?: PipeSegment[] | null
+  pipeRuns?: PipeRun[] | null
+  asbuiltOverlay?: AsbuiltOverlay | null
+  tolerance_m?: number
+  width?: number
+  height?: number
+  className?: string
+  onDispatch?: ((args: DispatchArgs) => void) | null
+}
+
 export default function PointCloudPanel({
   points = null,
   deviations = null,
@@ -429,8 +542,8 @@ export default function PointCloudPanel({
   height = 440,
   className = '',
   onDispatch = null,
-}) {
-  const canvasRef = useRef(null)
+}: Props) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const [rotY, setRotY] = useState(Math.PI / 6)
   const [dragging, setDragging] = useState(false)
   const [lastX, setLastX] = useState(0)
@@ -653,13 +766,13 @@ export default function PointCloudPanel({
   }, [pts, rotY, viewport, deviations, heatmapColors, hasDevs, hasHeatmap, devRange, zMin, zMax, ptSize, aabb, planeResult, pipeSegments, pipeRuns, hasPipes, canvasW, height])
 
   // Mouse handlers for rotation
-  const onPointerDown = useCallback((e) => {
+  const onPointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     setDragging(true)
     setLastX(e.clientX)
     e.currentTarget.setPointerCapture(e.pointerId)
   }, [])
 
-  const onPointerMove = useCallback((e) => {
+  const onPointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!dragging) return
     const dx = e.clientX - lastX
     setRotY(r => r + dx * 0.01)

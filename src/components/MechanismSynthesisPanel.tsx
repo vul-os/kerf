@@ -20,7 +20,7 @@
 //
 // Props: none (standalone panel)
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, type CSSProperties } from 'react'
 import { Settings, Cog, Circle, Sliders, AlertTriangle, CheckCircle, Loader2, Play } from 'lucide-react'
 
 const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
@@ -29,7 +29,7 @@ const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API
 // Styles (inline, consistent with AcousticsResultPanel palette)
 // ---------------------------------------------------------------------------
 
-const s = {
+const s: Record<string, CSSProperties> = {
   root:         { background: '#111827', padding: '12px', fontSize: 12, color: '#e5e7eb', minHeight: 200 },
   header:       { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 },
   title:        { fontWeight: 600, fontSize: 13, color: '#f9fafb' },
@@ -58,7 +58,10 @@ const s = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function callTool(toolName, args) {
+// Tool results are heterogeneous JSON from the backend tool layer we don't own.
+type ToolResult = Record<string, any>
+
+async function callTool(toolName: string, args: Record<string, unknown>): Promise<ToolResult> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -71,13 +74,13 @@ async function callTool(toolName, args) {
   return res.json()
 }
 
-function fmt(v, d = 3) {
+function fmt(v: unknown, d = 3): string {
   if (v == null) return '—'
   if (typeof v === 'number') return v.toFixed(d)
   return String(v)
 }
 
-function ErrBox({ msg }) {
+function ErrBox({ msg }: { msg?: string }) {
   if (!msg) return null
   return (
     <div style={s.errorBox}>
@@ -96,7 +99,12 @@ function ErrBox({ msg }) {
  * points: Array of [x, y] in mm.
  * precision_pts: Array of [x, y] in mm — shown as orange crosses.
  */
-export function CouplerCurvePlot({ points, precisionPts = [] }) {
+export interface CouplerCurvePlotProps {
+  points?: number[][] | null
+  precisionPts?: number[][]
+}
+
+export function CouplerCurvePlot({ points, precisionPts = [] }: CouplerCurvePlotProps) {
   if (!Array.isArray(points) || points.length < 2) {
     return (
       <div style={{ ...s.svgWrap, padding: '16px', textAlign: 'center', color: '#6b7280', fontSize: 11 }}>
@@ -115,7 +123,7 @@ export function CouplerCurvePlot({ points, precisionPts = [] }) {
   const xRange = xMax - xMin || 1
   const yRange = yMax - yMin || 1
 
-  function toSvg(x, y) {
+  function toSvg(x: number, y: number): [number, number] {
     const px = PAD + ((x - xMin) / xRange) * (W - 2 * PAD)
     const py = H - PAD - ((y - yMin) / yRange) * (H - 2 * PAD)
     return [px, py]
@@ -164,7 +172,19 @@ export function CouplerCurvePlot({ points, precisionPts = [] }) {
  * Render displacement vs cam-angle as inline SVG.
  * profile: Array of { theta_deg, displacement, velocity_per_omega, acceleration_per_omega2 }
  */
-export function CamProfileChart({ profile, h }) {
+export interface CamProfilePoint {
+  theta_deg: number
+  displacement: number
+  velocity_per_omega?: number
+  acceleration_per_omega2?: number
+}
+
+export interface CamProfileChartProps {
+  profile?: CamProfilePoint[] | null
+  h?: number | null
+}
+
+export function CamProfileChart({ profile, h }: CamProfileChartProps) {
   if (!Array.isArray(profile) || profile.length < 2) {
     return (
       <div style={{ ...s.svgWrap, padding: '16px', textAlign: 'center', color: '#6b7280', fontSize: 11 }}>
@@ -181,10 +201,10 @@ export function CamProfileChart({ profile, h }) {
   const tMin = thetas[0], tMax = thetas[thetas.length - 1]
   const dMax = Math.max(...disps, h || 0) || 1
 
-  function toX(theta) {
+  function toX(theta: number): number {
     return PAD + ((theta - tMin) / (tMax - tMin)) * (W - 2 * PAD)
   }
-  function toY(d) {
+  function toY(d: number): number {
     return H - PAD - (d / dMax) * (H - 2 * PAD)
   }
 
@@ -228,21 +248,26 @@ export function CamProfileChart({ profile, h }) {
 // Tab 1 — Four-bar synthesis
 // ---------------------------------------------------------------------------
 
-const DEFAULT_POINTS = [
+interface PointXY {
+  x: string
+  y: string
+}
+
+const DEFAULT_POINTS: PointXY[] = [
   { x: '10', y: '0' },
   { x: '10', y: '10' },
   { x: '0', y: '10' },
 ]
 
 function FourBarTab() {
-  const [points, setPoints] = useState(DEFAULT_POINTS)
+  const [points, setPoints] = useState<PointXY[]>(DEFAULT_POINTS)
   const [tolMm, setTolMm]   = useState('0.5')
   const [loading, setLoading] = useState(false)
-  const [result, setResult]   = useState(null)
-  const [curve, setCurve]     = useState(null)
+  const [result, setResult]   = useState<ToolResult | null>(null)
+  const [curve, setCurve]     = useState<number[][] | null>(null)
   const [error, setError]     = useState('')
 
-  function updatePoint(i, field, val) {
+  function updatePoint(i: number, field: 'x' | 'y', val: string) {
     setPoints(pts => pts.map((p, idx) => idx === i ? { ...p, [field]: val } : p))
   }
 
@@ -267,7 +292,7 @@ function FourBarTab() {
         n_points: 360,
       })
       if (cr.ok) setCurve(cr.points)
-    } catch (e) {
+    } catch (e: any) {
       setError(e.message)
     } finally {
       setLoading(false)
@@ -353,13 +378,13 @@ function CamTab() {
   const [polyOrder, setPolyOrder] = useState('5')
   const [rise, setRise]         = useState('true')
   const [loading, setLoading]   = useState(false)
-  const [result, setResult]     = useState(null)
+  const [result, setResult]     = useState<ToolResult | null>(null)
   const [error, setError]       = useState('')
 
   const run = useCallback(async () => {
     setError(''); setResult(null); setLoading(true)
     try {
-      const args = {
+      const args: Record<string, unknown> = {
         law,
         h: parseFloat(h),
         beta_deg: parseFloat(betaDeg),
@@ -370,7 +395,7 @@ function CamTab() {
       const r = await callTool('synthesise_cam', args)
       if (!r.ok) { setError(r.reason || r.error || 'cam synthesis failed'); return }
       setResult(r)
-    } catch (e) {
+    } catch (e: any) {
       setError(e.message)
     } finally {
       setLoading(false)
@@ -479,13 +504,13 @@ function GearTab() {
   const [maxRpm, setMaxRpm]           = useState('3000')
   const [tolRatio, setTolRatio]       = useState('0.02')
   const [loading, setLoading]         = useState(false)
-  const [result, setResult]           = useState(null)
+  const [result, setResult]           = useState<ToolResult | null>(null)
   const [error, setError]             = useState('')
 
   const run = useCallback(async () => {
     setError(''); setResult(null); setLoading(true)
     try {
-      const args = {
+      const args: Record<string, unknown> = {
         target_ratio: parseFloat(targetRatio),
         speed_range_rpm: [0, parseFloat(maxRpm) || 3000],
         tol_ratio: parseFloat(tolRatio) || 0.02,
@@ -494,7 +519,7 @@ function GearTab() {
       const r = await callTool('synthesise_gear_train', args)
       if (!r.ok) { setError(r.reason || r.error || 'gear synthesis failed'); return }
       setResult(r)
-    } catch (e) {
+    } catch (e: any) {
       setError(e.message)
     } finally {
       setLoading(false)
@@ -607,7 +632,11 @@ const TABS = [
   { id: 'gear',    label: 'Gear-train', icon: <Cog size={11} /> },
 ]
 
-export default function MechanismSynthesisPanel({ content } = {}) {
+export interface MechanismSynthesisPanelProps {
+  content?: string
+}
+
+export default function MechanismSynthesisPanel({ content }: MechanismSynthesisPanelProps = {}) {
   // content prop: JSON string optionally carrying persisted tab selection.
   const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
   const [activeTab, setActiveTab] = useState(_parsed.tab || 'fourbar')

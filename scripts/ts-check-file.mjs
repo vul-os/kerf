@@ -57,12 +57,14 @@ writeFileSync(
   ),
 )
 
-try {
-  const r = spawnSync('npx', ['tsc', '-p', cfgPath, '--noEmit'], {
-    stdio: 'inherit',
-    cwd: root,
-  })
-  process.exit(r.status ?? 1)
-} finally {
-  try { unlinkSync(cfgPath) } catch { /* best effort — a leftover temp config is harmless */ }
-}
+const r = spawnSync('npx', ['tsc', '-p', cfgPath, '--noEmit'], {
+  stdio: 'inherit',
+  cwd: root,
+})
+
+// Delete BEFORE exiting, not in a `finally`. `process.exit()` terminates the process immediately
+// and never unwinds, so a finally-block cleanup silently does not run — which is how two of these
+// temp configs ended up committed.
+try { unlinkSync(cfgPath) } catch { /* best effort — a leftover temp config is harmless */ }
+
+process.exit(r.status ?? 1)

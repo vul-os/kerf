@@ -1,5 +1,12 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import type { Ref } from 'react'
 import { snapshotSvg } from '../lib/snapshotHelpers.js'
+import type {
+  DrawingDoc, DrawingSheet, DrawingView as DrawingViewSpec,
+  DrawingDimension, DrawingAnnotation, DrawingCenterline, DrawingBreak, DrawingSymbol,
+  RenderablePart,
+} from '../store/workspace.js'
+import type { TopologyMapLike } from '../lib/topology.js'
 import { sheetDimensions, titleBlockLayout, scaleBarGeometry } from '../lib/sheetFrames.js'
 import {
   projectFile, projectFileWithHLR, projectionLabel,
@@ -106,7 +113,43 @@ function readSnapEnabled() {
   }
 }
 
-const DrawingView = forwardRef(function DrawingView({
+/** Imperative handle exposed via the `viewRef` prop — mirrors Renderer's/SketchView's ref surface. */
+export interface DrawingViewHandle {
+  snapshot: (opts?: { size?: number; quality?: number }) => Promise<Blob | null>
+}
+
+export interface DrawingViewProps {
+  drawing: DrawingDoc
+  /** Per-source-file resolved parts, keyed by file id — powers the cross-part HLR/projection pass. */
+  partsByFileId?: Map<string, RenderablePart[]> | null
+  /** Per-source-file topology maps, keyed by file id — same keying as partsByFileId. */
+  topologiesByFileId?: Map<string, TopologyMapLike> | null
+  selectedDimensionId?: string | null
+  onSelectDimension?: (id: string | null) => void
+  selectedAnnotationId?: string | null
+  onSelectAnnotation?: (id: string | null) => void
+  // Tool mode — see DrawingToolbar.jsx for the full enum.
+  tool?: string
+  // Payload/patch shapes below are ad hoc records assembled at each call site
+  // (dimension/annotation/centerline/break/symbol authoring flows) — loosely
+  // typed at this boundary rather than modeling every tool's draft shape.
+  onAddDimension?: (payload: any) => void
+  onDeleteDimension?: (id: string) => void
+  onAddAnnotation?: (payload: any) => void
+  onUpdateAnnotation?: (id: string, patch: any) => void
+  onDeleteAnnotation?: (id: string) => void
+  onAddCenterline?: (payload: any) => void
+  onAddBreak?: (payload: any) => void
+  onAddSymbol?: (payload: any) => void
+  onSelectSheet?: (idx: number) => void
+  onAddSheet?: (payload?: any) => void
+  onRemoveSheet?: (idx: number) => void
+  onResetTool?: () => void
+  /** Editor-managed ref for thumbnail capture (separate from the forwarded SVG `ref`). */
+  viewRef?: Ref<DrawingViewHandle>
+}
+
+const DrawingView = forwardRef<SVGSVGElement | null, DrawingViewProps>(function DrawingView({
   drawing,
   partsByFileId,
   topologiesByFileId,

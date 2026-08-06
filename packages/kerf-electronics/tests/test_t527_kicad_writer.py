@@ -362,5 +362,52 @@ class TestWrittenFileAgreesWithOracle(unittest.TestCase):
         self.assertNotIn("pcb_keepout", oracle_types)
 
 
+class TestViaWriting(unittest.TestCase):
+    """`pcb_via` -> `(via ...)`: valid, oracle-parseable KiCad output, but
+    documented as a one-way construct — kicad_pcb_to_circuit_json does not
+    model `via` as a first-class type (T-526 never added it; a `via` node
+    falls into the top-level `kicad_passthrough` bag like any other
+    unmodelled node), so a via written from a `pcb_via` entry does not come
+    back as `pcb_via` on the next read. This test pins that honestly rather
+    than asserting a round-trip that does not hold."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.cj = [
+            {"type": "source_net", "source_net_id": "sn_gnd", "name": "GND"},
+            {
+                "type": "pcb_via", "pcb_via_id": "v1", "x": 5.0, "y": 3.0,
+                "outer_diameter": 0.8, "drill_diameter": 0.4,
+                "net_id": "GND", "from_layer": "top_copper", "to_layer": "bottom_copper",
+            },
+        ]
+        cls.written = circuit_json_to_kicad_pcb(cls.cj)
+
+    def test_via_node_is_well_formed(self):
+        self.assertIn("(via", self.written)
+        self.assertEqual(self.written.count("("), self.written.count(")"))
+
+    def test_via_is_not_round_trip_stable_through_our_own_reader(self):
+        """Documents the caveat rather than hiding it: the written via
+        becomes inert top-level passthrough content on read, not `pcb_via`
+        again."""
+        reread = kicad_pcb_to_circuit_json(self.written)
+        self.assertEqual([e["type"] for e in reread if e["type"] != "source_net"],
+                          ["kicad_passthrough"])
+        passthrough = next(e for e in reread if e["type"] == "kicad_passthrough")
+        via_nodes = [n for n in passthrough["kicad_nodes"] if n[0] == "via"]
+        self.assertEqual(len(via_nodes), 1)
+
+    def test_via_is_readable_by_the_independent_oracle(self):
+        """Even though it isn't stable through *our* reader, it must still
+        be valid, parseable KiCad — checked against the independent oracle,
+        not assumed."""
+        oracle = _run_oracle_converter(self.written)
+        oracle_vias = [e for e in oracle if e["type"] == "pcb_via"]
+        self.assertEqual(len(oracle_vias), 1)
+        self.assertAlmostEqual(oracle_vias[0]["x"], 5.0, places=6)
+        self.assertAlmostEqual(oracle_vias[0]["y"], 3.0, places=6)
+
+
 if __name__ == "__main__":
     unittest.main()

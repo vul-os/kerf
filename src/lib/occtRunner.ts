@@ -1,4 +1,4 @@
-// occtRunner.js — main-thread wrapper around the OCCT Web Worker.
+// occtRunner.ts — main-thread wrapper around the OCCT Web Worker.
 //
 // Public API:
 //   - runFeatures(tree, sketches)  → Promise<{ meshes, error?, stale?, partial? }>
@@ -25,13 +25,20 @@
 //     (we DON'T want to load the wasm onto the main thread).
 
 import { substituteFeatureTree, substituteSketch } from './equations.js'
+import type { FeatureNode, SketchMap, FeatureFile, Configuration } from '../types/geometry.js'
+import type {
+  OcctWorkerResponse,
+  OcctRunFeaturesResult,
+  OcctFaceOutlineResult,
+} from '../types/workers.js'
+import type { EquationsScope } from '../store/workspace.js'
 
 // Equations injection hook — see store/workspace.js loadProject for the
 // resolver that walks the project tree, parses every `.equations` file, and
 // returns the merged scope. Mirrors setSketchResolver in jscadRunner.js.
-let equationsResolver = null
-export function setEquationsResolver(fn) {
-  // fn: () => Promise<{ values: { [name]: number }, errors, duplicates }> | null
+type EquationsResolver = () => Promise<EquationsScope> | EquationsScope | null | undefined
+let equationsResolver: EquationsResolver | null = null
+export function setEquationsResolver(fn: EquationsResolver | null): void {
   equationsResolver = fn || null
 }
 
@@ -42,9 +49,9 @@ export function setEquationsResolver(fn) {
 // triggers a fresh substitution + re-evaluation. Decoupled from
 // FeatureView (which we don't touch) so configurations can layer over
 // the existing runner without changing the public API.
-let activeConfigResolver = null
-export function setActiveConfigResolver(fn) {
-  // fn: () => { [name]: number } | null
+type ActiveConfigResolver = () => Record<string, number> | null
+let activeConfigResolver: ActiveConfigResolver | null = null
+export function setActiveConfigResolver(fn: ActiveConfigResolver | null): void {
   activeConfigResolver = fn || null
 }
 
@@ -57,8 +64,12 @@ export function setActiveConfigResolver(fn) {
 // `configParams` is the active configuration's per-file param overrides
 // (see src/lib/part.js getActiveConfig). Merged OVER the equations scope
 // so configs always win on key collision. Passing null/empty is a no-op.
-async function applyEquations(tree, sketches, configParams) {
-  let scope = {}
+async function applyEquations(
+  tree: FeatureNode[],
+  sketches: SketchMap,
+  configParams?: Record<string, number> | null,
+): Promise<{ tree: FeatureNode[]; sketches: SketchMap }> {
+  let scope: Record<string, number> = {}
   if (equationsResolver) {
     try {
       const res = await equationsResolver()
@@ -72,7 +83,7 @@ async function applyEquations(tree, sketches, configParams) {
   }
   if (!scope || Object.keys(scope).length === 0) return { tree, sketches }
   const subTree = substituteFeatureTree(tree || [], scope)
-  const subSketches = {}
+  const subSketches: SketchMap = {}
   for (const [path, raw] of Object.entries(sketches || {})) {
     if (typeof raw !== 'string' || raw === '') {
       subSketches[path] = raw
@@ -89,13 +100,20 @@ async function applyEquations(tree, sketches, configParams) {
   return { tree: subTree, sketches: subSketches }
 }
 
-let worker = null
+type PendingKind = 'evaluate' | 'prewarm' | 'face_outline'
+
+interface PendingEntry {
+  kind: PendingKind
+  resolve: (value: OcctRunFeaturesResult | OcctFaceOutlineResult) => void
+}
+
+let worker: Worker | null = null
 let workerBroken = false
 let nextRunId = 1
-const pending = new Map()
+const pending = new Map<number, PendingEntry>()
 let latestRunId = 0
 
-function ensureWorker() {
+function ensureWorker(): Worker | null {
   if (workerBroken) return null
   if (worker) return worker
   if (typeof Worker === 'undefined') {
@@ -106,21 +124,22 @@ function ensureWorker() {
     // Vite-friendly worker URL. The URL form lets Vite pick up dependencies
     // (opencascade.js + its wasm) and emit them as separate chunks.
     worker = new Worker(new URL('./occtWorker.js', import.meta.url), { type: 'module' })
-    worker.addEventListener('message', (ev) => {
-      const { type, runId } = ev.data || {}
-      const entry = pending.get(runId)
+    worker.addEventListener('message', (ev: MessageEvent<OcctWorkerResponse>) => {
+      const data = ev.data
+      const runId = data?.runId
+      const entry = runId != null ? pending.get(runId) : undefined
       if (!entry) return
       pending.delete(runId)
       // Face-outline requests are *not* part of the latest-run sequencing —
       // they're explicit RPCs the UI fires for a specific face id, and we
       // always want the answer.
-      if (type === 'face_outline_result') {
-        entry.resolve(ev.data)
+      if (data.type === 'face_outline_result') {
+        entry.resolve(data)
         return
       }
       if (entry.kind !== 'evaluate' && entry.kind !== 'prewarm') {
         // Defensive: unknown kind, just resolve with the raw payload.
-        entry.resolve(ev.data)
+        entry.resolve(data as unknown as OcctRunFeaturesResult)
         return
       }
       // Run-id sequencing: only the latest evaluate gets fresh meshes.
@@ -129,16 +148,16 @@ function ensureWorker() {
         entry.resolve({ stale: true })
         return
       }
-      if (type === 'error') {
-        entry.resolve({ error: ev.data.message || 'occt error', stack: ev.data.stack || null, partial: ev.data.partial || null })
-      } else if (type === 'result') {
-        entry.resolve({ meshes: ev.data.meshes || [] })
+      if (data.type === 'error') {
+        entry.resolve({ error: data.message || 'occt error', stack: data.stack || null, partial: data.partial || null })
+      } else if (data.type === 'result') {
+        entry.resolve({ meshes: data.meshes || [] })
       } else {
         entry.resolve({ error: 'unknown worker message' })
       }
     })
     worker.addEventListener('error', (ev) => {
-      try { worker.terminate() } catch { /* */ }
+      try { worker?.terminate() } catch { /* */ }
       worker = null
       workerBroken = true
       for (const [, entry] of pending) {
@@ -157,7 +176,7 @@ function ensureWorker() {
 // Send the worker an empty tree so the Wasm module gets eagerly compiled.
 // Useful right after the user opens a Feature file — by the time they edit a
 // param the OCCT instance is warm.
-export function prewarmOcct() {
+export function prewarmOcct(): Promise<OcctRunFeaturesResult | OcctFaceOutlineResult | null> {
   const w = ensureWorker()
   if (!w) return Promise.resolve(null)
   const runId = ++nextRunId
@@ -177,7 +196,11 @@ export function prewarmOcct() {
 // registered activeConfigResolver (set by the workspace store on project
 // load) so existing call sites (FeatureView) pick up configs without
 // changing their signature.
-export async function runFeatures(tree, sketches, configParams) {
+export async function runFeatures(
+  tree: FeatureNode[],
+  sketches: SketchMap,
+  configParams?: Record<string, number> | null,
+): Promise<OcctRunFeaturesResult> {
   const w = ensureWorker()
   if (!w) return { error: 'occt worker unavailable in this environment' }
   if (configParams == null && activeConfigResolver) {
@@ -186,16 +209,16 @@ export async function runFeatures(tree, sketches, configParams) {
   const { tree: subTree, sketches: subSketches } = await applyEquations(tree || [], sketches || {}, configParams)
   const runId = ++nextRunId
   latestRunId = runId
-  const promise = new Promise((resolve) => {
+  const promise = new Promise<OcctRunFeaturesResult | OcctFaceOutlineResult>((resolve) => {
     pending.set(runId, { resolve, kind: 'evaluate' })
   })
   try {
     w.postMessage({ type: 'evaluate', runId, tree: subTree, sketches: subSketches })
   } catch (err) {
     pending.delete(runId)
-    return { error: `failed to dispatch occt run: ${err?.message || String(err)}` }
+    return { error: `failed to dispatch occt run: ${(err as Error)?.message || String(err)}` }
   }
-  return promise
+  return promise as Promise<OcctRunFeaturesResult>
 }
 
 // Request the planar outline of a face on the post-evaluation shape. Used by
@@ -204,7 +227,12 @@ export async function runFeatures(tree, sketches, configParams) {
 // Returns:
 //   { ok: true, frame: { origin, normal, uDir, vDir }, outline: [[u,v]...], planar }
 //   { ok: false, reason }
-export async function requestFaceOutline(tree, sketches, faceId, configParams) {
+export async function requestFaceOutline(
+  tree: FeatureNode[],
+  sketches: SketchMap,
+  faceId: number,
+  configParams?: Record<string, number> | null,
+): Promise<OcctFaceOutlineResult> {
   const w = ensureWorker()
   if (!w) return { ok: false, reason: 'occt worker unavailable' }
   if (configParams == null && activeConfigResolver) {
@@ -212,22 +240,22 @@ export async function requestFaceOutline(tree, sketches, faceId, configParams) {
   }
   const { tree: subTree, sketches: subSketches } = await applyEquations(tree || [], sketches || {}, configParams)
   const runId = ++nextRunId
-  const promise = new Promise((resolve) => {
+  const promise = new Promise<OcctRunFeaturesResult | OcctFaceOutlineResult>((resolve) => {
     pending.set(runId, { resolve, kind: 'face_outline' })
   })
   try {
     w.postMessage({ type: 'face_outline', runId, tree: subTree, sketches: subSketches, faceId })
   } catch (err) {
     pending.delete(runId)
-    return { ok: false, reason: `failed to dispatch face_outline: ${err?.message || String(err)}` }
+    return { ok: false, reason: `failed to dispatch face_outline: ${(err as Error)?.message || String(err)}` }
   }
-  return promise
+  return promise as Promise<OcctFaceOutlineResult>
 }
 
 // Drop in-flight runs. Their resolvers receive { stale: true } so callers
 // can no-op cleanly. Does not destroy the worker — the next runFeatures()
 // call will reuse it.
-export function cancelFeatures() {
+export function cancelFeatures(): void {
   latestRunId = ++nextRunId
   for (const [, entry] of pending) entry.resolve({ stale: true })
   pending.clear()
@@ -236,7 +264,7 @@ export function cancelFeatures() {
 // Tear down the worker entirely. Called by the workspace store on project
 // unload so the OCCT heap from the previous project isn't carried into the
 // next one (~70 MB depending on what was modeled).
-export function destroyOcct() {
+export function destroyOcct(): void {
   cancelFeatures()
   if (worker) {
     try { worker.terminate() } catch { /* */ }
@@ -260,7 +288,7 @@ export const DEFAULT_FEATURE = JSON.stringify({
 // a `.feature` file may declare per-file parameter overrides. The active
 // config's `params` are merged OVER the equations scope before the OCCT
 // worker substitutes `${name}` placeholders inside feature node fields.
-export function parseFeature(content) {
+export function parseFeature(content: string | null | undefined): FeatureFile {
   const text = (content || '').trim()
   if (!text) return { version: 1, name: 'New feature', features: [], default_config: '', configurations: [] }
   try {
@@ -272,7 +300,7 @@ export function parseFeature(content) {
       metadata: obj.metadata || {},
       default_config: typeof obj.default_config === 'string' ? obj.default_config : '',
       configurations: Array.isArray(obj.configurations)
-        ? obj.configurations.map(normalizeFeatureConfiguration).filter(Boolean)
+        ? obj.configurations.map(normalizeFeatureConfiguration).filter((c: Configuration | null): c is Configuration => c != null)
         : [],
     }
   } catch {
@@ -280,7 +308,8 @@ export function parseFeature(content) {
   }
 }
 
-function normalizeFeatureConfiguration(raw) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeFeatureConfiguration(raw: any): Configuration | null {
   if (!raw || typeof raw !== 'object') return null
   const id = typeof raw.id === 'string' ? raw.id.trim() : ''
   if (!id) return null
@@ -293,8 +322,15 @@ function normalizeFeatureConfiguration(raw) {
 }
 
 // Serialize a parsed feature tree back to JSON. Stable ordering for diffs.
-export function serializeFeature(parsed) {
-  const out = {
+export function serializeFeature(parsed: Partial<FeatureFile> | null | undefined): string {
+  const out: {
+    version: number
+    name: string
+    features: FeatureNode[]
+    metadata?: Record<string, unknown>
+    default_config?: string
+    configurations?: Configuration[]
+  } = {
     version: parsed?.version || 1,
     name: parsed?.name || 'New feature',
     features: Array.isArray(parsed?.features) ? parsed.features : [],
@@ -317,6 +353,6 @@ export function serializeFeature(parsed) {
 
 // Produce a fresh feature node id. Short enough for visual debugging,
 // random enough that re-evaluation can't collide.
-export function newFeatureId(prefix = 'feat') {
+export function newFeatureId(prefix = 'feat'): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 8)}`
 }

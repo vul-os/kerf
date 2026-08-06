@@ -4,14 +4,16 @@
 // script swaps the main pane by file kind — the model isn't lost).
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const src = readFileSync(
-  path.resolve(__dirname, '../components/ScriptEditor.jsx'), 'utf8',
-)
+// Extension-agnostic: ScriptEditor may be .jsx (pre-migration) or .tsx (post T-514).
+const scriptEditorPath = ['ScriptEditor.tsx', 'ScriptEditor.jsx']
+  .map((f) => path.resolve(__dirname, '../components', f))
+  .find((p) => existsSync(p))
+const src = readFileSync(scriptEditorPath, 'utf8')
 
 describe('ScriptEditor copy', () => {
   it('does not falsely claim in-app editing is read-only', () => {

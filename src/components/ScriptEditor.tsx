@@ -12,9 +12,11 @@
 
 import { useState } from 'react'
 import Editor from '@monaco-editor/react'
+import type { OnChange } from '@monaco-editor/react'
+import type { editor as MonacoEditorNs } from 'monaco-editor'
 import { Code, Terminal, Info } from 'lucide-react'
 
-const MONACO_OPTIONS = {
+const MONACO_OPTIONS: MonacoEditorNs.IStandaloneEditorConstructionOptions = {
   readOnly: false,
   minimap: { enabled: false },
   fontFamily: 'JetBrains Mono, Geist Mono, ui-monospace, SF Mono, Menlo, monospace',
@@ -28,7 +30,19 @@ const MONACO_OPTIONS = {
   automaticLayout: true,
 }
 
-function scriptExtension(file) {
+/**
+ * The store's WorkspaceFile (src/store/workspace.ts) has no `extension` field — nothing in
+ * store/workspace.ts or lib/api.js ever sets one, so the `file.extension` branch below is
+ * dead in practice and detection always falls through to the `.script.py` name suffix check.
+ * Left as-is (found, not fixed) — modeled here as the narrow local shape actually read rather
+ * than importing WorkspaceFile, since that type doesn't carry the field this component wants.
+ */
+interface ScriptFileLike {
+  name?: string
+  extension?: string
+}
+
+function scriptExtension(file?: ScriptFileLike | null): string {
   if (!file) return 'ts'
   if (file.extension) return file.extension
   const n = (file.name || '').toLowerCase()
@@ -36,11 +50,18 @@ function scriptExtension(file) {
   return 'ts'
 }
 
-function languageFor(ext) {
+function languageFor(ext: string): string {
   return ext === 'py' ? 'python' : 'typescript'
 }
 
-export default function ScriptEditor({ content, fileName, file, onChange }) {
+export interface ScriptEditorProps {
+  content?: string
+  fileName?: string
+  file?: ScriptFileLike | null
+  onChange?: OnChange
+}
+
+export default function ScriptEditor({ content, fileName, file, onChange }: ScriptEditorProps) {
   const src = typeof content === 'string' ? content : ''
   const ext = scriptExtension(file)
   const lang = languageFor(ext)

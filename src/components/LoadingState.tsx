@@ -47,12 +47,16 @@ import clsx from 'clsx'
 
 // ── Primitive skeletons ───────────────────────────────────────────────────────
 
+interface SkeletonLineProps {
+  width?: string
+  height?: string
+  className?: string
+}
+
 /**
  * A single animated placeholder bar.
- *
- * @param {{ width?: string, height?: string, className?: string }} props
  */
-export function SkeletonLine({ width = 'w-full', height = 'h-4', className }) {
+export function SkeletonLine({ width = 'w-full', height = 'h-4', className }: SkeletonLineProps) {
   return (
     <div
       aria-hidden="true"
@@ -66,12 +70,15 @@ export function SkeletonLine({ width = 'w-full', height = 'h-4', className }) {
   )
 }
 
+interface SkeletonBlockProps {
+  aspect?: string
+  className?: string
+}
+
 /**
  * A rectangular block placeholder for images or charts.
- *
- * @param {{ aspect?: string, className?: string }} props
  */
-export function SkeletonBlock({ aspect = 'aspect-video', className }) {
+export function SkeletonBlock({ aspect = 'aspect-video', className }: SkeletonBlockProps) {
   return (
     <div
       aria-hidden="true"
@@ -84,12 +91,15 @@ export function SkeletonBlock({ aspect = 'aspect-video', className }) {
   )
 }
 
+interface SkeletonCircleProps {
+  size?: string
+  className?: string
+}
+
 /**
  * A circular avatar / icon placeholder.
- *
- * @param {{ size?: string, className?: string }} props
  */
-export function SkeletonCircle({ size = 'size-10', className }) {
+export function SkeletonCircle({ size = 'size-10', className }: SkeletonCircleProps) {
   return (
     <div
       aria-hidden="true"
@@ -104,17 +114,22 @@ export function SkeletonCircle({ size = 'size-10', className }) {
 
 // ── Composed card skeleton ────────────────────────────────────────────────────
 
+export interface Props {
+  rows?: number
+  showAvatar?: boolean
+  label?: string
+  className?: string
+}
+
 /**
  * Pre-composed loading skeleton that fits most list-item / detail-card states.
- *
- * @param {{ rows?: number, showAvatar?: boolean, label?: string, className?: string }} props
  */
 export default function LoadingState({
   rows = 3,
   showAvatar = false,
   label = 'Loading…',
   className,
-}) {
+}: Props) {
   return (
     <div
       role="status"

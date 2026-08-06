@@ -27,9 +27,41 @@
  * Registering a minimal custom grammar avoids these mismatches with ~100 lines.
  */
 import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import type { Ref } from 'react'
 import MonacoEditor, { useMonaco } from '@monaco-editor/react'
+import type { Monaco } from '@monaco-editor/react'
+import type { editor } from 'monaco-editor'
 import { SquareCode } from 'lucide-react'
 import { api } from '../lib/api.js'
+
+// ── Types ──────────────────────────────────────────────────────────────────
+//
+// api.lintPLC() returns PlcLintResult { diagnostics: unknown[]; warnings: unknown[] }
+// (src/types/api.ts) — deliberately `unknown[]` at that boundary since the pyworker's
+// matiec-wrapped diagnostic shape isn't a T-501 source. Narrowed to this file's own
+// Diagnostic shape here, from how it's actually read below (severity/message/line/column/source).
+
+interface Diagnostic {
+  severity?: 'error' | 'warning' | string
+  message: string
+  line?: number
+  column?: number
+  source?: string
+}
+
+interface PLCViewProps {
+  content?: string
+  projectId?: string
+  fileId?: string
+  fileName?: string
+  onContentChange?: (content: string) => void
+  viewRef?: Ref<PLCViewHandle>
+  className?: string
+}
+
+export interface PLCViewHandle {
+  snapshot: (opts?: { size?: number; quality?: number }) => Promise<Blob | null>
+}
 
 // ---------------------------------------------------------------------------
 // IEC 61131-3 ST keyword lists
@@ -90,7 +122,7 @@ const ST_STDLIB_FB = [
 
 let _stLanguageRegistered = false
 
-function registerIEC61131STLanguage(monaco) {
+function registerIEC61131STLanguage(monaco: Monaco) {
   if (_stLanguageRegistered) return
   _stLanguageRegistered = true
 
@@ -113,7 +145,7 @@ function registerIEC61131STLanguage(monaco) {
         [/"([^"\\]|\\.)*"/, 'string'],
 
         // Numeric literals (including time literals like T#5s, D#2024-01-01)
-        [/[TtDd]#[^\s,;()\[\]]+/, 'number'],
+        [/[TtDd]#[^\s,;()[\]]+/, 'number'],
         [/16#[0-9A-Fa-f]+/, 'number.hex'],
         [/8#[0-7]+/, 'number.octal'],
         [/2#[01]+/, 'number.binary'],
@@ -202,7 +234,7 @@ function registerIEC61131STLanguage(monaco) {
 // Monaco options
 // ---------------------------------------------------------------------------
 
-const EDITOR_OPTIONS = {
+const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
   minimap: { enabled: false },
   fontFamily: 'JetBrains Mono, Geist Mono, ui-monospace, SF Mono, Menlo, monospace',
   fontSize: 13,
@@ -226,17 +258,19 @@ const LINT_DEBOUNCE_MS = 600
 export default function PLCView({
   content = '',
   projectId,
-  fileId,
+  // Accepted for API-surface parity (JSDoc above) but not read here — pre-existing,
+  // left as-is (T-513 rename, no behaviour change).
+  fileId: _fileId,
   fileName = '',
   onContentChange,
   viewRef,
   className = '',
-}) {
+}: PLCViewProps) {
   const monaco = useMonaco()
-  const editorRef = useRef(null)
-  const lintTimerRef = useRef(null)
-  const [diagnostics, setDiagnostics] = useState([])
-  const [warnings, setWarnings] = useState([])
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null)
+  const lintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([])
+  const [warnings, setWarnings] = useState<string[]>([])
   const [linting, setLinting] = useState(false)
 
   // Register custom language once Monaco is available.
@@ -246,7 +280,7 @@ export default function PLCView({
 
   // ── Lint ────────────────────────────────────────────────────────────────────
 
-  const runLint = useCallback(async (src) => {
+  const runLint = useCallback(async (src: string) => {
     if (!projectId || !src || !src.trim()) {
       setDiagnostics([])
       setWarnings([])
@@ -255,8 +289,9 @@ export default function PLCView({
     setLinting(true)
     try {
       const result = await api.lintPLC(projectId, src)
-      const diags = result?.diagnostics || []
-      const warns = result?.warnings || []
+      // Boundary is `unknown[]` (see the Diagnostic comment above) — narrowed here.
+      const diags = (result?.diagnostics as Diagnostic[] | undefined) || []
+      const warns = (result?.warnings as string[] | undefined) || []
       setDiagnostics(diags)
       setWarnings(warns)
 
@@ -307,7 +342,7 @@ export default function PLCView({
   // ── Snapshot (thumbnail capture) ────────────────────────────────────────────
 
   useImperativeHandle(viewRef, () => ({
-    snapshot: async ({ size = 512, quality = 0.7 } = {}) => {
+    snapshot: async ({ size = 512, quality = 0.7 }: { size?: number; quality?: number } = {}) => {
       // Grab a screenshot of the Monaco editor's visible viewport by
       // serializing it to a canvas via html2canvas-style approach.
       // Simpler and taint-free: paint a dark canvas with no DOM cross-origin refs.
@@ -408,8 +443,8 @@ export default function PLCView({
           value={typeof content === 'string' ? content : ''}
           options={EDITOR_OPTIONS}
           onChange={(val) => onContentChange?.(val ?? '')}
-          onMount={(editor) => {
-            editorRef.current = editor
+          onMount={(ed: editor.IStandaloneCodeEditor) => {
+            editorRef.current = ed
             // Run initial lint when the editor mounts with existing content.
             if (content && content.trim()) {
               setTimeout(() => runLint(content), LINT_DEBOUNCE_MS)

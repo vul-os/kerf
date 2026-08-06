@@ -32,7 +32,8 @@ const fileTreeSrc = readFileSync(
 )
 
 const plcViewSrc = readFileSync(
-  path.resolve(__dirname, '../components/PLCView.jsx'), 'utf8',
+  // PLCView.jsx was migrated to PLCView.tsx (T-513); this reads the shipped source, not an import specifier.
+  path.resolve(__dirname, '../components/PLCView.tsx'), 'utf8',
 )
 
 // After the 66->10 migration fold the per-kind migrations were collapsed

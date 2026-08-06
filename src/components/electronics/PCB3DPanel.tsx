@@ -18,6 +18,48 @@
 
 import { useCallback, useState } from 'react'
 import { Layers3, AlertTriangle, CheckCircle2, X, RefreshCw, Upload, Download } from 'lucide-react'
+import type { CircuitJson } from '../../types'
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface PCB3DPanelProps {
+  circuitJson?: CircuitJson
+  onClose?: () => void
+}
+
+interface ClearanceViolation {
+  comp_a: string
+  comp_b: string
+  gap_mm: number
+  required_mm: number
+  violation_type: string
+  severity?: string
+}
+
+interface ClearanceResult {
+  violation_count: number
+  component_count: number
+  pairs_checked: number
+  violations?: ClearanceViolation[]
+}
+
+interface StepImportResult {
+  x_mm: number
+  y_mm: number
+  z_mm: number
+  method: string
+}
+
+interface IdfResult {
+  pass: boolean
+  violations?: string[]
+  outline_vertex_count: number
+  hole_count: number
+  placement_count: number
+  package_count: number
+}
+
+interface ApiError { ok: false; error: string }
 
 // ── Demo circuit JSON for offline mode ───────────────────────────────────────
 
@@ -33,7 +75,7 @@ const DEMO_CIRCUIT_JSON = [
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-async function apiPost(endpoint, body) {
+async function apiPost<T>(endpoint: string, body: Record<string, unknown>): Promise<T | ApiError> {
   try {
     const r = await fetch(`/api/llm-tools/${endpoint}`, {
       method: 'POST',
@@ -42,11 +84,11 @@ async function apiPost(endpoint, body) {
     })
     return r.ok ? r.json() : { ok: false, error: `HTTP ${r.status}` }
   } catch (e) {
-    return { ok: false, error: e.message }
+    return { ok: false, error: e instanceof Error ? e.message : 'Request failed' }
   }
 }
 
-function ViolationRow({ v }) {
+function ViolationRow({ v }: { v: ClearanceViolation }) {
   const isError = v.violation_type === 'body_intersection' || v.severity === 'error'
   return (
     <div className="flex items-start gap-2 px-2 py-1.5 text-[11px]">
@@ -62,12 +104,12 @@ function ViolationRow({ v }) {
 
 // ── Main panel ───────────────────────────────────────────────────────────────
 
-export default function PCB3DPanel({ circuitJson, onClose }) {
-  const [tab, setTab] = useState('clearance')
+export default function PCB3DPanel({ circuitJson, onClose }: PCB3DPanelProps) {
+  const [tab, setTab] = useState<'clearance' | 'step' | 'idf'>('clearance')
   const [loading, setLoading] = useState(false)
-  const [clearanceResult, setClearanceResult] = useState(null)
-  const [idfResult, setIdfResult]             = useState(null)
-  const [stepImportResult, setStepImportResult] = useState(null)
+  const [clearanceResult, setClearanceResult] = useState<ClearanceResult | null>(null)
+  const [idfResult, setIdfResult]             = useState<IdfResult | null>(null)
+  const [stepImportResult, setStepImportResult] = useState<StepImportResult | null>(null)
   const [stepText, setStepText]               = useState('')
   const [minClearance, setMinClearance]       = useState('0.2')
   const [offline, setOffline]                 = useState(false)
@@ -76,33 +118,33 @@ export default function PCB3DPanel({ circuitJson, onClose }) {
 
   const runClearanceCheck = useCallback(async () => {
     setLoading(true)
-    const r = await apiPost('pcb_3d_clearance_check', {
+    const r = await apiPost<ClearanceResult>('pcb_3d_clearance_check', {
       circuit_json: cj,
       min_clearance_mm: parseFloat(minClearance) || 0.2,
     })
     setLoading(false)
-    if (!r || r.error) { setOffline(true); return }
+    if (!r || 'error' in r) { setOffline(true); return }
     setClearanceResult(r)
   }, [cj, minClearance])
 
   const runIdfRoundtrip = useCallback(async () => {
     setLoading(true)
-    const r = await apiPost('validate_idf_roundtrip', { circuit_json: cj })
+    const r = await apiPost<IdfResult>('validate_idf_roundtrip', { circuit_json: cj })
     setLoading(false)
-    if (!r || r.error) { setOffline(true); return }
+    if (!r || 'error' in r) { setOffline(true); return }
     setIdfResult(r)
   }, [cj])
 
   const runStepImport = useCallback(async () => {
     if (!stepText.trim()) return
     setLoading(true)
-    const r = await apiPost('pcb_step_import_body', { step_text: stepText })
+    const r = await apiPost<StepImportResult>('pcb_step_import_body', { step_text: stepText })
     setLoading(false)
-    if (!r || r.error) { setOffline(true); return }
+    if (!r || 'error' in r) { setOffline(true); return }
     setStepImportResult(r)
   }, [stepText])
 
-  const TABS = [
+  const TABS: { id: 'clearance' | 'step' | 'idf'; label: string }[] = [
     { id: 'clearance', label: '3D Clearance' },
     { id: 'step', label: 'STEP Import' },
     { id: 'idf', label: 'IDF Bridge' },

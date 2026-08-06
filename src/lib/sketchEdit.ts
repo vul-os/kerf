@@ -8,9 +8,16 @@
 // unique-within-the-sketch id with a kind-prefix that helps debugging.
 
 import { intersectPosed, poseEntity, projectOnLine } from './sketchIntersect.js'
+import type {
+  SketchJSON,
+  SketchEntity,
+  SketchConstraint,
+  SketchPoint,
+  SketchExternalCurve,
+} from '@/types'
 
 const ALPHABET = 'abcdefghijkmnpqrstuvwxyz23456789'
-function shortId(prefix) {
+function shortId(prefix: string): string {
   let s = ''
   for (let i = 0; i < 5; i++) {
     s += ALPHABET[Math.floor(Math.random() * ALPHABET.length)]
@@ -18,31 +25,53 @@ function shortId(prefix) {
   return `${prefix}_${s}`
 }
 
-export function newId(prefix) { return shortId(prefix) }
+export function newId(prefix: string): string { return shortId(prefix) }
+
+/** A plain 2D coordinate pair — the shape most local geometry helpers pass around. */
+interface Point2 { x: number; y: number }
+
+/** Shared `{ id?, construction? }` options bag accepted by every `add*` entity helper. */
+interface EntityOpts {
+  id?: string
+  construction?: boolean
+}
+
+/** Common return shape for the `add*` entity-creation helpers: the updated sketch plus the new id. */
+interface EntityOpResult {
+  sketch: SketchJSON
+  id: string
+}
 
 // ---------- entity creation ----------
 
-export function addPoint(sketch, x, y, opts = {}) {
+export function addPoint(sketch: SketchJSON, x: number, y: number, opts: EntityOpts = {}): EntityOpResult {
   const id = opts.id || shortId('p')
-  const ent = { id, type: 'point', x, y, ...(opts.construction ? { construction: true } : {}) }
+  const ent: SketchPoint = { id, type: 'point', x, y, ...(opts.construction ? { construction: true } : {}) }
   return { sketch: { ...sketch, entities: [...(sketch.entities || []), ent] }, id }
 }
 
-export function addLine(sketch, p1Id, p2Id, opts = {}) {
+export function addLine(sketch: SketchJSON, p1Id: string, p2Id: string, opts: EntityOpts = {}): EntityOpResult {
   const id = opts.id || shortId('ln')
-  const ent = { id, type: 'line', p1: p1Id, p2: p2Id, ...(opts.construction ? { construction: true } : {}) }
+  const ent: SketchEntity = { id, type: 'line', p1: p1Id, p2: p2Id, ...(opts.construction ? { construction: true } : {}) }
   return { sketch: { ...sketch, entities: [...(sketch.entities || []), ent] }, id }
 }
 
-export function addCircle(sketch, centerId, radius, opts = {}) {
+export function addCircle(sketch: SketchJSON, centerId: string, radius: number, opts: EntityOpts = {}): EntityOpResult {
   const id = opts.id || shortId('c')
-  const ent = { id, type: 'circle', center: centerId, radius, ...(opts.construction ? { construction: true } : {}) }
+  const ent: SketchEntity = { id, type: 'circle', center: centerId, radius, ...(opts.construction ? { construction: true } : {}) }
   return { sketch: { ...sketch, entities: [...(sketch.entities || []), ent] }, id }
 }
 
-export function addArc(sketch, centerId, startId, endId, sweepCcw = true, opts = {}) {
+export function addArc(
+  sketch: SketchJSON,
+  centerId: string,
+  startId: string,
+  endId: string,
+  sweepCcw = true,
+  opts: EntityOpts = {},
+): EntityOpResult {
   const id = opts.id || shortId('a')
-  const ent = {
+  const ent: SketchEntity = {
     id, type: 'arc',
     center: centerId, start: startId, end: endId,
     sweep_ccw: !!sweepCcw,
@@ -51,14 +80,24 @@ export function addArc(sketch, centerId, startId, endId, sweepCcw = true, opts =
   return { sketch: { ...sketch, entities: [...(sketch.entities || []), ent] }, id }
 }
 
+/** The 3D-edge-specific fields addExternalCurve splats onto the entity — see {@link SketchExternalCurve}. */
+type ExternalCurveData =
+  Omit<SketchExternalCurve, 'id' | 'type' | 'construction' | 'source_file_id' | 'source_edge_id'>
+
 // external_curve — a projection of a 3D edge/curve into the sketch as construction
 // (dotted) reference geometry. `curveData` varies by the 3D edge's type:
 //   line:     { curveType: 'line', p1: {x,y}, p2: {x,y} }
 //   circle:   { curveType: 'circle', center: {x,y}, radius }
 //   arc:      { curveType: 'arc', center: {x,y}, radius, startAngle, endAngle }
-export function addExternalCurve(sketch, sourceFileId, sourceEdgeId, curveData, opts = {}) {
+export function addExternalCurve(
+  sketch: SketchJSON,
+  sourceFileId: string,
+  sourceEdgeId: string,
+  curveData: ExternalCurveData,
+  opts: EntityOpts = {},
+): EntityOpResult {
   const id = opts.id || shortId('ec')
-  const ent = {
+  const ent: SketchExternalCurve = {
     id,
     type: 'external_curve',
     construction: true,
@@ -66,14 +105,28 @@ export function addExternalCurve(sketch, sourceFileId, sourceEdgeId, curveData, 
     source_edge_id: sourceEdgeId,
     ...curveData,
   }
+  void opts // id is the only option this helper reads today; kept for signature parity with the other add* helpers
   return { sketch: { ...sketch, entities: [...(sketch.entities || []), ent] }, id }
 }
 
 // ---------- constraint creation ----------
 
-export function addConstraint(sketch, type, fields) {
+/**
+ * Add a constraint. Generic over the constraint's own `type` discriminant so
+ * `fields` is checked against exactly that {@link SketchConstraint} variant's
+ * shape (e.g. `addConstraint(s, 'symmetric', { a, b, line })`) rather than a
+ * loosened union of every variant's fields.
+ */
+export function addConstraint<T extends SketchConstraint['type']>(
+  sketch: SketchJSON,
+  type: T,
+  fields: Omit<Extract<SketchConstraint, { type: T }>, 'id' | 'type'>,
+): { sketch: SketchJSON; id: string } {
   const id = shortId('cn')
-  const c = { id, type, ...fields }
+  // The generic instantiation of `fields` (Omit<Extract<SketchConstraint, {type: T}>, 'id'|'type'>)
+  // is too abstract for TS to structurally match back against the full SketchConstraint union in
+  // one step; `unknown` first is the standard escape for a generic-construction cast like this.
+  const c = { id, type, ...fields } as unknown as SketchConstraint
   return { sketch: { ...sketch, constraints: [...(sketch.constraints || []), c] }, id }
 }
 
@@ -81,7 +134,7 @@ export function addConstraint(sketch, type, fields) {
 
 // Move a single point's x/y. Used during drag preview before the solver is
 // invoked. Doesn't fire any constraint propagation by itself.
-export function setPointXY(sketch, pointId, x, y) {
+export function setPointXY(sketch: SketchJSON, pointId: string, x: number, y: number): SketchJSON {
   return {
     ...sketch,
     entities: (sketch.entities || []).map((e) =>
@@ -90,7 +143,7 @@ export function setPointXY(sketch, pointId, x, y) {
 }
 
 // Toggle the construction flag on an entity.
-export function toggleConstruction(sketch, entityId) {
+export function toggleConstruction(sketch: SketchJSON, entityId: string): SketchJSON {
   return {
     ...sketch,
     entities: (sketch.entities || []).map((e) =>
@@ -98,20 +151,34 @@ export function toggleConstruction(sketch, entityId) {
   }
 }
 
-// Update a dimensional constraint's `value` field.
-export function setConstraintValue(sketch, constraintId, value) {
+// Update a dimensional constraint's `value` field. Matches the source exactly: it
+// doesn't check whether the constraint kind actually carries a `value` (only the
+// dimensional variants do) before splatting one on — calling this against e.g. a
+// 'coincident' constraint id would add a stray `value` field, same as before.
+export function setConstraintValue(sketch: SketchJSON, constraintId: string, value: number | string): SketchJSON {
   return {
     ...sketch,
     constraints: (sketch.constraints || []).map((c) =>
-      c.id === constraintId ? { ...c, value: Number(value) || 0 } : c),
+      c.id === constraintId ? { ...c, value: Number(value) || 0 } as SketchConstraint : c),
   }
 }
 
 // ---------- deletion ----------
 
+/** Duck-typed view over every possible entity-reference field, across all {@link SketchEntity} variants. */
+type EntityRefFields = {
+  p1?: string
+  p2?: string
+  center?: string
+  start?: string
+  end?: string
+  controls?: string[]
+  control_points?: string[]
+}
+
 // Delete entities by id, plus any constraints/lines/arcs that depend on a
 // deleted point. Returns the new sketch.
-export function deleteEntities(sketch, ids) {
+export function deleteEntities(sketch: SketchJSON, ids: string[]): SketchJSON {
   const idSet = new Set(ids)
   const ent = sketch.entities || []
 
@@ -145,7 +212,7 @@ export function deleteEntities(sketch, ids) {
   return { ...sketch, entities: nextEntities, constraints: nextConstraints }
 }
 
-export function deleteConstraint(sketch, constraintId) {
+export function deleteConstraint(sketch: SketchJSON, constraintId: string): SketchJSON {
   return {
     ...sketch,
     constraints: (sketch.constraints || []).filter((c) => c.id !== constraintId),
@@ -153,7 +220,16 @@ export function deleteConstraint(sketch, constraintId) {
 }
 
 // Helpful: list of entity ids referenced by a constraint.
-export function constraintRefs(c) {
+//
+// NOTE (found during T-503 typing, not fixed — behavior-preserving migration only):
+// this switch does not cover every `SketchConstraint` variant — 'midpoint', 'fixed',
+// 'collinear', 'ellipse_semi_major'/'ellipse_semi_minor'/'ellipse_rotation',
+// 'point_on_ellipse' and 'bezier_g2' all fall through to the `default: return []`
+// branch. That means deleteEntities's cascade won't drop e.g. a 'fixed' constraint
+// when the point it pins is deleted (leaving a dangling reference), and
+// isEntityReferenced won't count those constraint kinds as "using" an entity either.
+// Pre-existing gap in the source; left as-is since closing it is a behavior change.
+export function constraintRefs(c: SketchConstraint): string[] {
   switch (c.type) {
     case 'coincident': return [c.a, c.b]
     case 'horizontal':
@@ -169,7 +245,7 @@ export function constraintRefs(c) {
     case 'angle': return [c.a, c.b]
     case 'radius':
     case 'diameter': return [c.circle]
-    case 'symmetric': return [c.a, c.b, c.line]
+    case 'symmetric': return [c.a, c.b, c.line].filter((x): x is string => Boolean(x))
     case 'symmetric_over_line': return [c.entity_a_id, c.entity_b_id, c.construction_line_id].filter(Boolean)
     case 'block': return c.refs || []
     case 'point_on_line': return [c.point, c.line]
@@ -189,10 +265,11 @@ export function constraintRefs(c) {
 // any constraint. Used to decide whether a pending point left behind by
 // an aborted multi-click tool is a prunable orphan (vs. an existing
 // point the user snapped onto, which other geometry may depend on).
-export function isEntityReferenced(sketch, id) {
+export function isEntityReferenced(sketch: SketchJSON | null | undefined, id: string | null | undefined): boolean {
   if (!id) return false
-  for (const e of sketch?.entities || []) {
-    if (e.id === id) continue
+  for (const e0 of sketch?.entities || []) {
+    if (e0.id === id) continue
+    const e = e0 as SketchEntity & EntityRefFields
     if (e.p1 === id || e.p2 === id) return true
     if (e.center === id || e.start === id || e.end === id) return true
     if (Array.isArray(e.controls) && e.controls.includes(id)) return true
@@ -208,8 +285,21 @@ export function isEntityReferenced(sketch, id) {
 
 // pixelDist(a, b, scale): on-screen distance between two world-space points.
 // Used for "is the cursor close enough to snap?".
-export function pixelDist(a, b, scale) {
+export function pixelDist(a: Point2, b: Point2, scale: number): number {
   return Math.hypot(a.x - b.x, a.y - b.y) * scale
+}
+
+/** Result of {@link snapTarget} — the caller uses `{x,y}` as the world-space target and `kind` to draw a marker. */
+export type SnapResult =
+  | { kind: 'point'; id: string; x: number; y: number }
+  | { kind: 'midpoint'; line: string; x: number; y: number }
+  | { kind: 'center'; of: string; x: number; y: number }
+  | { kind: 'grid'; x: number; y: number }
+
+export interface SnapOptions {
+  exclude?: Set<string>
+  /** Grid spacing in world units. Default 5 (mm). */
+  grid?: number
 }
 
 // snapTarget(sketch, world, scale, opts): find the nearest snap target inside
@@ -223,13 +313,13 @@ export function pixelDist(a, b, scale) {
 // Caller uses {x,y} as the world-space target and `kind` to draw a marker.
 const PX_THRESHOLD = 8
 
-export function snapTarget(sketch, world, scale, opts = {}) {
+export function snapTarget(sketch: SketchJSON, world: Point2, scale: number, opts: SnapOptions = {}): SnapResult | null {
   const ent = sketch.entities || []
-  const pointById = new Map()
+  const pointById = new Map<string, SketchPoint>()
   for (const e of ent) if (e.type === 'point') pointById.set(e.id, e)
 
   // 1. Existing points.
-  let best = null
+  let best: SnapResult | null = null
   let bestDist = PX_THRESHOLD
   for (const e of ent) {
     if (e.type !== 'point') continue
@@ -286,9 +376,16 @@ export function snapTarget(sketch, world, scale, opts = {}) {
 
 // Ellipse: defined by a center point (entity) and rx, ry, rotation (radians).
 // The center can be coincident-constrained etc. via its point id.
-export function addEllipse(sketch, centerId, rx, ry, rotation = 0, opts = {}) {
+export function addEllipse(
+  sketch: SketchJSON,
+  centerId: string,
+  rx: number,
+  ry: number,
+  rotation = 0,
+  opts: EntityOpts = {},
+): EntityOpResult {
   const id = opts.id || shortId('el')
-  const ent = {
+  const ent: SketchEntity = {
     id, type: 'ellipse', center: centerId,
     rx: Number(rx) || 1, ry: Number(ry) || 1, rotation: Number(rotation) || 0,
     ...(opts.construction ? { construction: true } : {}),
@@ -298,9 +395,9 @@ export function addEllipse(sketch, centerId, rx, ry, rotation = 0, opts = {}) {
 
 // B-spline: cubic, defined by an array of point ids (control points). Min 4.
 // degree fixed to 3 for v1.
-export function addBspline(sketch, pointIds, opts = {}) {
+export function addBspline(sketch: SketchJSON, pointIds: string[], opts: EntityOpts = {}): EntityOpResult {
   const id = opts.id || shortId('bs')
-  const ent = {
+  const ent: SketchEntity = {
     id, type: 'bspline', degree: 3, controls: pointIds.slice(),
     ...(opts.construction ? { construction: true } : {}),
   }
@@ -311,10 +408,10 @@ export function addBspline(sketch, pointIds, opts = {}) {
 // Degree 2 (quadratic) needs 3 pts; degree 3 (cubic) needs 4 pts.
 // The degree is inferred from the point count: n+1 pts → degree n.
 // Degree > 3 is accepted but not recommended — use B-spline for high-degree.
-export function addBezier(sketch, pointIds, opts = {}) {
+export function addBezier(sketch: SketchJSON, pointIds: string[], opts: EntityOpts = {}): EntityOpResult {
   const id = opts.id || shortId('bz')
   const degree = Math.max(2, pointIds.length - 1)
-  const ent = {
+  const ent: SketchEntity = {
     id, type: 'bezier', degree, control_points: pointIds.slice(),
     ...(opts.construction ? { construction: true } : {}),
   }
@@ -323,7 +420,7 @@ export function addBezier(sketch, pointIds, opts = {}) {
 
 // ---------- multi-entity construction helpers ----------
 
-export function setConstruction(sketch, ids, value) {
+export function setConstruction(sketch: SketchJSON, ids: string[], value: boolean): SketchJSON {
   const idSet = new Set(ids)
   return {
     ...sketch,
@@ -332,7 +429,7 @@ export function setConstruction(sketch, ids, value) {
   }
 }
 
-export function toggleConstructionMany(sketch, ids) {
+export function toggleConstructionMany(sketch: SketchJSON, ids: string[]): SketchJSON {
   const idSet = new Set(ids)
   return {
     ...sketch,
@@ -350,7 +447,7 @@ export function toggleConstructionMany(sketch, ids) {
 // Symmetric / pattern-specific UI).
 
 // Reflect a point across the line through (a,b).
-function reflectAcross(p, a, b) {
+function reflectAcross(p: Point2, a: Point2, b: Point2): Point2 {
   const dx = b.x - a.x, dy = b.y - a.y
   const len2 = dx * dx + dy * dy
   if (len2 < 1e-12) return { x: p.x, y: p.y }
@@ -360,24 +457,31 @@ function reflectAcross(p, a, b) {
   return { x: 2 * fx - p.x, y: 2 * fy - p.y }
 }
 
-function rotatePoint(p, c, theta) {
+function rotatePoint(p: Point2, c: Point2, theta: number): Point2 {
   const cs = Math.cos(theta), sn = Math.sin(theta)
   const dx = p.x - c.x, dy = p.y - c.y
   return { x: c.x + dx * cs - dy * sn, y: c.y + dx * sn + dy * cs }
 }
 
-function translatePoint(p, dx, dy) { return { x: p.x + dx, y: p.y + dy } }
+function translatePoint(p: Point2, dx: number, dy: number): Point2 { return { x: p.x + dx, y: p.y + dy } }
+
+/** Result of the internal {@link clonePosed} helper. */
+interface ClonePosedResult {
+  sketch: SketchJSON
+  oldToNew: Map<string, string>
+  rootIds: string[]
+}
 
 // Internal: clone a set of entities applying transformPoint to every point
 // they reference. Points are duplicated 1:1 and remapped. Returns
 // {sketch, oldToNew (map), rootIds}.
-function clonePosed(sketch, entityIds, transformPoint) {
+function clonePosed(sketch: SketchJSON, entityIds: string[], transformPoint: (p: Point2) => Point2): ClonePosedResult {
   const ent = sketch.entities || []
-  const byId = new Map(ent.map((e) => [e.id, e]))
-  const points = new Map()
+  const byId = new Map<string, SketchEntity>(ent.map((e) => [e.id, e]))
+  const points = new Map<string, SketchPoint>()
   for (const e of ent) if (e.type === 'point') points.set(e.id, e)
-  const refPoints = new Set()
-  function addRefs(id) {
+  const refPoints = new Set<string>()
+  function addRefs(id: string): void {
     const e = byId.get(id); if (!e) return
     if (e.type === 'line') { refPoints.add(e.p1); refPoints.add(e.p2) }
     else if (e.type === 'circle') refPoints.add(e.center)
@@ -390,7 +494,7 @@ function clonePosed(sketch, entityIds, transformPoint) {
   for (const id of entityIds) addRefs(id)
 
   let next = sketch
-  const oldToNew = new Map()
+  const oldToNew = new Map<string, string>()
   for (const pid of refPoints) {
     const p = points.get(pid)
     if (!p) continue
@@ -399,7 +503,7 @@ function clonePosed(sketch, entityIds, transformPoint) {
     next = r.sketch
     oldToNew.set(pid, r.id)
   }
-  const rootIds = []
+  const rootIds: string[] = []
   for (const id of entityIds) {
     const e = byId.get(id); if (!e) continue
     if (e.type === 'point') {
@@ -409,27 +513,27 @@ function clonePosed(sketch, entityIds, transformPoint) {
       continue
     }
     if (e.type === 'line') {
-      const r = addLine(next, oldToNew.get(e.p1), oldToNew.get(e.p2),
+      const r = addLine(next, oldToNew.get(e.p1) as string, oldToNew.get(e.p2) as string,
         e.construction ? { construction: true } : {})
       next = r.sketch; rootIds.push(r.id)
     } else if (e.type === 'circle') {
-      const r = addCircle(next, oldToNew.get(e.center), e.radius,
+      const r = addCircle(next, oldToNew.get(e.center) as string, e.radius,
         e.construction ? { construction: true } : {})
       next = r.sketch; rootIds.push(r.id)
     } else if (e.type === 'arc') {
-      const r = addArc(next, oldToNew.get(e.center), oldToNew.get(e.start), oldToNew.get(e.end),
+      const r = addArc(next, oldToNew.get(e.center) as string, oldToNew.get(e.start) as string, oldToNew.get(e.end) as string,
         !!e.sweep_ccw, e.construction ? { construction: true } : {})
       next = r.sketch; rootIds.push(r.id)
     } else if (e.type === 'ellipse') {
-      const r = addEllipse(next, oldToNew.get(e.center), e.rx, e.ry, e.rotation,
+      const r = addEllipse(next, oldToNew.get(e.center) as string, e.rx, e.ry, e.rotation,
         e.construction ? { construction: true } : {})
       next = r.sketch; rootIds.push(r.id)
     } else if (e.type === 'bspline') {
-      const r = addBspline(next, (e.controls || []).map((cp) => oldToNew.get(cp)),
+      const r = addBspline(next, (e.controls || []).map((cp) => oldToNew.get(cp) as string),
         e.construction ? { construction: true } : {})
       next = r.sketch; rootIds.push(r.id)
     } else if (e.type === 'bezier') {
-      const r = addBezier(next, (e.control_points || []).map((cp) => oldToNew.get(cp)),
+      const r = addBezier(next, (e.control_points || []).map((cp) => oldToNew.get(cp) as string),
         e.construction ? { construction: true } : {})
       next = r.sketch; rootIds.push(r.id)
     }
@@ -437,13 +541,34 @@ function clonePosed(sketch, entityIds, transformPoint) {
   return { sketch: next, oldToNew, rootIds }
 }
 
+/** Result of {@link mirrorEntities} / {@link linearPattern} / {@link polarPattern}. */
+export interface PatternOpResult {
+  sketch: SketchJSON
+  newIds: string[]
+}
+
+export interface MirrorOpResult extends PatternOpResult {
+  pointMap: Map<string, string>
+}
+
+export interface MirrorOptions {
+  addSymmetric?: boolean
+  axisLineId?: string | null
+}
+
 // Public: mirror a list of entities across the line through (a, b) — both
 // supplied as POINT objects {x,y}. If `axisLineId` is provided AND
 // `addSymmetric` is true, append symmetric constraints between each pair of
 // reflected points.
-export function mirrorEntities(sketch, entityIds, axisA, axisB, opts = {}) {
+export function mirrorEntities(
+  sketch: SketchJSON,
+  entityIds: string[],
+  axisA: Point2,
+  axisB: Point2,
+  opts: MirrorOptions = {},
+): MirrorOpResult {
   const { addSymmetric = false, axisLineId = null } = opts
-  const transform = (p) => reflectAcross(p, axisA, axisB)
+  const transform = (p: Point2) => reflectAcross(p, axisA, axisB)
   const { sketch: next, oldToNew, rootIds } = clonePosed(sketch, entityIds, transform)
   let s = next
   if (addSymmetric && axisLineId) {
@@ -459,11 +584,11 @@ export function mirrorEntities(sketch, entityIds, axisA, axisB, opts = {}) {
 
 // Linear pattern: count copies (including the original = count). dx/dy is the
 // vector spacing between consecutive copies. Spawns count - 1 new sets.
-export function linearPattern(sketch, entityIds, dx, dy, count) {
+export function linearPattern(sketch: SketchJSON, entityIds: string[], dx: number, dy: number, count: number): PatternOpResult {
   let s = sketch
-  let allNew = []
+  let allNew: string[] = []
   for (let i = 1; i < count; i++) {
-    const transform = (p) => translatePoint(p, dx * i, dy * i)
+    const transform = (p: Point2) => translatePoint(p, dx * i, dy * i)
     const r = clonePosed(s, entityIds, transform)
     s = r.sketch
     allNew = allNew.concat(r.rootIds)
@@ -473,9 +598,9 @@ export function linearPattern(sketch, entityIds, dx, dy, count) {
 
 // Polar pattern: count copies (including original). totalAngleRad is the full
 // sweep; copies are evenly spaced.
-export function polarPattern(sketch, entityIds, center, totalAngleRad, count) {
+export function polarPattern(sketch: SketchJSON, entityIds: string[], center: Point2, totalAngleRad: number, count: number): PatternOpResult {
   let s = sketch
-  let allNew = []
+  let allNew: string[] = []
   const step = count > 1 ? totalAngleRad / (count - 1) : 0
   // If totalAngle is 2π (full circle), the last copy would coincide with the
   // first; in that case use count divisor not (count-1).
@@ -483,7 +608,7 @@ export function polarPattern(sketch, entityIds, center, totalAngleRad, count) {
   const stepAdj = fullCircle ? totalAngleRad / count : step
   for (let i = 1; i < count; i++) {
     const theta = stepAdj * i
-    const transform = (p) => rotatePoint(p, center, theta)
+    const transform = (p: Point2) => rotatePoint(p, center, theta)
     const r = clonePosed(s, entityIds, transform)
     s = r.sketch
     allNew = allNew.concat(r.rootIds)
@@ -493,14 +618,34 @@ export function polarPattern(sketch, entityIds, center, totalAngleRad, count) {
 
 // ---------- 2D editing operations: Trim / Extend / Fillet ----------
 
+/**
+ * A single intersection hit as returned by `intersectPosed` (sketchIntersect.ts —
+ * untyped from an earlier slice, so this is this file's own read-side view of the
+ * shape it actually produces): `ta` is the parameter on the first ("target") posed
+ * entity, `tb` the parameter on the second when the callee supplies one (e.g. arc
+ * angle); `otherId` is added by {@link intersectionsOf} itself.
+ */
+interface IntersectHit {
+  x: number
+  y: number
+  ta: number
+  tb?: number
+  otherId: string
+}
+
+interface PosedIndex {
+  pointById: Map<string, SketchPoint>
+  posedById: Map<string, unknown>
+}
+
 // Compute intersections of the picked entity with every other line/arc/circle
 // in the sketch. Returns array of {x, y, ta} where ta is the parameter on the
 // picked entity (0..1 for segments, angle for circle/arc).
-function buildPosedIndex(sketch) {
+function buildPosedIndex(sketch: SketchJSON): PosedIndex {
   const ent = sketch.entities || []
-  const pointById = new Map()
+  const pointById = new Map<string, SketchPoint>()
   for (const e of ent) if (e.type === 'point') pointById.set(e.id, e)
-  const posedById = new Map()
+  const posedById = new Map<string, unknown>()
   for (const e of ent) {
     if (e.construction) continue
     if (e.type === 'line' || e.type === 'circle' || e.type === 'arc') {
@@ -511,14 +656,14 @@ function buildPosedIndex(sketch) {
   return { pointById, posedById }
 }
 
-function intersectionsOf(sketch, entityId) {
+function intersectionsOf(sketch: SketchJSON, entityId: string): IntersectHit[] {
   const { posedById } = buildPosedIndex(sketch)
   const target = posedById.get(entityId)
   if (!target) return []
-  const out = []
+  const out: IntersectHit[] = []
   for (const [oid, other] of posedById) {
     if (oid === entityId) continue
-    const hits = intersectPosed(target, other)
+    const hits = intersectPosed(target, other) as Omit<IntersectHit, 'otherId'>[]
     for (const h of hits) out.push({ ...h, otherId: oid })
   }
   return out
@@ -539,7 +684,7 @@ function intersectionsOf(sketch, entityId) {
 //
 // For an arc, picking between two intersections shortens the arc to the kept
 // portion; with one intersection, trims to that side; with none, no-op.
-export function trimAt(sketch, entityId, clickWorld) {
+export function trimAt(sketch: SketchJSON, entityId: string, clickWorld: Point2): SketchJSON {
   const ent = (sketch.entities || []).find((e) => e.id === entityId)
   if (!ent) return sketch
   const { pointById } = buildPosedIndex(sketch)
@@ -556,7 +701,13 @@ export function trimAt(sketch, entityId, clickWorld) {
   return sketch
 }
 
-function trimLineAt(sketch, lineEnt, hits, clickWorld, pointById) {
+function trimLineAt(
+  sketch: SketchJSON,
+  lineEnt: Extract<SketchEntity, { type: 'line' }>,
+  hits: IntersectHit[],
+  clickWorld: Point2,
+  pointById: Map<string, SketchPoint>,
+): SketchJSON {
   const p1 = pointById.get(lineEnt.p1)
   const p2 = pointById.get(lineEnt.p2)
   if (!p1 || !p2) return sketch
@@ -613,12 +764,18 @@ function trimLineAt(sketch, lineEnt, hits, clickWorld, pointById) {
   return next
 }
 
-function trimCircleAt(sketch, circleEnt, hits, clickWorld, pointById) {
+function trimCircleAt(
+  sketch: SketchJSON,
+  circleEnt: Extract<SketchEntity, { type: 'circle' }>,
+  hits: IntersectHit[],
+  clickWorld: Point2,
+  pointById: Map<string, SketchPoint>,
+): SketchJSON {
   if (hits.length < 2) return sketch
   // Sort hits by angle.
   const c = pointById.get(circleEnt.center)
   if (!c) return sketch
-  const ang = (h) => Math.atan2(h.y - c.y, h.x - c.x)
+  const ang = (h: IntersectHit) => Math.atan2(h.y - c.y, h.x - c.x)
   const list = hits.map((h) => ({ ...h, ang: ang(h) })).sort((a, b) => a.ang - b.ang)
   const pickAng = Math.atan2(clickWorld.y - c.y, clickWorld.x - c.x)
   // Find the arc interval containing pickAng (between consecutive hit angles).
@@ -626,7 +783,8 @@ function trimCircleAt(sketch, circleEnt, hits, clickWorld, pointById) {
   for (let i = 0; i < list.length; i++) {
     const a = list[i]
     const b = list[(i + 1) % list.length]
-    let from = a.ang, to = b.ang
+    const from = a.ang
+    let to = b.ang
     if (to < from) to += Math.PI * 2
     let p = pickAng; if (p < from) p += Math.PI * 2
     if (p >= from - 1e-6 && p <= to + 1e-6) { lo = a; hi = b; break }
@@ -643,7 +801,13 @@ function trimCircleAt(sketch, circleEnt, hits, clickWorld, pointById) {
   return next
 }
 
-function trimArcAt(sketch, arcEnt, hits, clickWorld, pointById) {
+function trimArcAt(
+  sketch: SketchJSON,
+  arcEnt: Extract<SketchEntity, { type: 'arc' }>,
+  hits: IntersectHit[],
+  clickWorld: Point2,
+  pointById: Map<string, SketchPoint>,
+): SketchJSON {
   const c = pointById.get(arcEnt.center)
   const sP = pointById.get(arcEnt.start)
   const eP = pointById.get(arcEnt.end)
@@ -654,7 +818,7 @@ function trimArcAt(sketch, arcEnt, hits, clickWorld, pointById) {
   const endA = Math.atan2(eP.y - c.y, eP.x - c.x)
   const ccw = !!arcEnt.sweep_ccw
   // Map angle to a 0..1 parameter along the sweep direction.
-  function paramOf(theta) {
+  function paramOf(theta: number): number {
     let t = theta - startA
     if (ccw) { while (t < 0) t += Math.PI * 2; while (t > Math.PI * 2) t -= Math.PI * 2 }
     else { while (t > 0) t -= Math.PI * 2; while (t < -Math.PI * 2) t += Math.PI * 2 }
@@ -700,7 +864,7 @@ function trimArcAt(sketch, arcEnt, hits, clickWorld, pointById) {
 
 // Extend: move the closer endpoint of `entityId` (a line) to its first
 // intersection with `targetId` along the extended direction. Only lines for v1.
-export function extendTo(sketch, entityId, targetId, nearWorld) {
+export function extendTo(sketch: SketchJSON, entityId: string, targetId: string, nearWorld: Point2): SketchJSON {
   const ent = (sketch.entities || []).find((e) => e.id === entityId)
   const tgt = (sketch.entities || []).find((e) => e.id === targetId)
   if (!ent || !tgt) return sketch
@@ -726,12 +890,18 @@ export function extendTo(sketch, entityId, targetId, nearWorld) {
   const farEnd = { x: moving.x + ux * FAR, y: moving.y + uy * FAR }
   const tgtPose = posedById.get(targetId); if (!tgtPose) return sketch
   const ray = { kind: 'line', p1: moving, p2: farEnd }
-  const hits = intersectPosed(ray, tgtPose)
+  const hits = intersectPosed(ray, tgtPose) as Omit<IntersectHit, 'otherId'>[]
   if (!hits.length) return sketch
   // Pick the closest hit beyond the moving point.
   hits.sort((a, b) => Math.hypot(a.x - moving.x, a.y - moving.y) - Math.hypot(b.x - moving.x, b.y - moving.y))
   const hit = hits[0]
   return setPointXY(sketch, movingId, hit.x, hit.y)
+}
+
+/** Result of {@link filletCorner}: the modified sketch, plus the new arc's id when the fillet succeeded. */
+export interface FilletResult {
+  sketch: SketchJSON
+  arcId?: string
 }
 
 // Fillet: replace the corner formed by two lines that meet at (or near) a
@@ -740,7 +910,7 @@ export function extendTo(sketch, entityId, targetId, nearWorld) {
 //
 // Returns { sketch, arcId } or { sketch: original } if the lines don't
 // actually meet at a corner.
-export function filletCorner(sketch, lineAId, lineBId, radius) {
+export function filletCorner(sketch: SketchJSON, lineAId: string, lineBId: string, radius: number): FilletResult {
   const ent = sketch.entities || []
   const a = ent.find((e) => e.id === lineAId)
   const b = ent.find((e) => e.id === lineBId)
@@ -751,10 +921,10 @@ export function filletCorner(sketch, lineAId, lineBId, radius) {
   if (!a1 || !a2 || !b1 || !b2) return { sketch }
   // Find which endpoints meet (or are closest). 4 candidate pairings.
   const pairs = [
-    { ka: 'p1', kb: 'p1', d: Math.hypot(a1.x - b1.x, a1.y - b1.y) },
-    { ka: 'p1', kb: 'p2', d: Math.hypot(a1.x - b2.x, a1.y - b2.y) },
-    { ka: 'p2', kb: 'p1', d: Math.hypot(a2.x - b1.x, a2.y - b1.y) },
-    { ka: 'p2', kb: 'p2', d: Math.hypot(a2.x - b2.x, a2.y - b2.y) },
+    { ka: 'p1' as const, kb: 'p1' as const, d: Math.hypot(a1.x - b1.x, a1.y - b1.y) },
+    { ka: 'p1' as const, kb: 'p2' as const, d: Math.hypot(a1.x - b2.x, a1.y - b2.y) },
+    { ka: 'p2' as const, kb: 'p1' as const, d: Math.hypot(a2.x - b1.x, a2.y - b1.y) },
+    { ka: 'p2' as const, kb: 'p2' as const, d: Math.hypot(a2.x - b2.x, a2.y - b2.y) },
   ]
   pairs.sort((x, y) => x.d - y.d)
   const best = pairs[0]
@@ -809,7 +979,11 @@ export function filletCorner(sketch, lineAId, lineBId, radius) {
 
 // Project the cursor onto an existing point if a snap matches; otherwise
 // create a new point at the world coords. Returns {sketch, pointId}.
-export function ensurePointAt(sketch, snap, fallbackXY) {
+export function ensurePointAt(
+  sketch: SketchJSON,
+  snap: SnapResult | null | undefined,
+  fallbackXY: Partial<Point2> | null | undefined,
+): EntityOpResult {
   if (snap && snap.kind === 'point') {
     return { sketch, id: snap.id }
   }

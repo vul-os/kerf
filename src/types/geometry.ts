@@ -313,6 +313,33 @@ export interface SketchBezier extends SketchEntityBase {
   control_points: string[]
 }
 
+/**
+ * A projection of a 3D edge/curve into the sketch as construction (dotted) reference
+ * geometry — appended during T-503 (found in `sketchEdit.js` `addExternalCurve`, missing
+ * from the original T-501 mining pass; also read by `SketchView.jsx`'s external-curve
+ * render branch, which switches on `curveType` and reads `p1`/`p2` (line), `center`/`radius`
+ * (circle), or `center`/`radius`/`startAngle`/`endAngle` (arc) — never all of them on one
+ * entity, hence every geometry field below is optional and the discriminant is `curveType`,
+ * not `type` (which is always `'external_curve'`)). `construction` is always `true` in
+ * practice (`addExternalCurve` hardcodes it) but kept optional to match {@link
+ * SketchEntityBase} rather than narrowing the inherited field.
+ */
+export interface SketchExternalCurve extends SketchEntityBase {
+  type: 'external_curve'
+  source_file_id: string
+  source_edge_id: string
+  curveType: 'line' | 'circle' | 'arc'
+  /** Named-field 2D point, NOT the {@link Vec2} tuple — matches `SketchBackdrop3D`'s
+   *  `curveData` payload and SketchView.jsx's `e.p1.x`/`e.p1.y` reads verbatim. */
+  p1?: { x: number; y: number }
+  p2?: { x: number; y: number }
+  center?: { x: number; y: number }
+  radius?: number
+  startAngle?: number
+  endAngle?: number
+  sweepCCw?: boolean
+}
+
 export type SketchEntity =
   | SketchPoint
   | SketchLine
@@ -321,6 +348,7 @@ export type SketchEntity =
   | SketchEllipse
   | SketchBSpline
   | SketchBezier
+  | SketchExternalCurve
 
 /**
  * A dimensional constraint value: either a literal number, or a string equation reference like
@@ -334,8 +362,15 @@ export type SketchDimValue = number | string
  * `entity_a_id`/`entity_b_id`/`construction_line_id` naming on `symmetric_over_line` is
  * intentionally inconsistent with the shorter `a`/`b` used elsewhere — that mirrors the source
  * exactly, it is not a typo here.
+ *
+ * Every constraint variant is intersected with `{ id: string }` (added during T-503) — every
+ * real constraint object carries one (minted by `sketchEdit.js`'s `addConstraint` via
+ * `shortId('cn')`) and it's load-bearing: `deleteConstraint`/`setConstraintValue` both look
+ * constraints up by `c.id`. Missing from the original T-501 mining pass because the per-variant
+ * field lists were mined from `buildPlanegcsPrimitives`'s translate switch, which only ever reads
+ * the constraint-specific fields and never `id` itself.
  */
-export type SketchConstraint =
+export type SketchConstraint = { id: string } & (
   | { type: 'coincident'; a: string; b: string }
   | { type: 'horizontal'; line: string }
   | { type: 'vertical'; line: string }
@@ -369,6 +404,7 @@ export type SketchConstraint =
   | { type: 'bezier_tangent'; p0: string; p1: string; p2: string }
   | { type: 'bezier_g1'; p0: string; p1: string; p2: string }
   | { type: 'bezier_g2'; p_minus2: string; p_minus1: string; p_junction: string; p_plus1: string; p_plus2: string }
+)
 
 /**
  * Per-entity solved coordinates, keyed by entity id (sketchSolver.js: `solved[p.id] = { x, y }`

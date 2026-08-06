@@ -23,13 +23,17 @@
  *     not swallow events.
  */
 
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const src = readFileSync(join(root, 'components/Renderer.jsx'), 'utf8')
+// Extension-agnostic: Renderer migrated from .jsx to .tsx (T-513).
+const rendererPath = existsSync(join(root, 'components/Renderer.tsx'))
+  ? join(root, 'components/Renderer.tsx')
+  : join(root, 'components/Renderer.jsx')
+const src = readFileSync(rendererPath, 'utf8')
 
 // ─── 1. Source-level contract ─────────────────────────────────────────────────
 

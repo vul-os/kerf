@@ -1,4 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import type { ForwardedRef, KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { Sun, SlidersHorizontal, Check, ChevronDown, MonitorX, Layers } from 'lucide-react'
 import { useAuth } from '../store/auth.js'
 import * as THREE from 'three'
@@ -39,6 +40,126 @@ import { detectWebGL } from '../lib/detectWebGL.js'
 import { hexToInt } from '../lib/appearance.js'
 import NavPrefsTab from './NavPrefsTab.jsx'
 import { resolveButtons, loadNavPreset, saveNavPreset } from '../lib/navPresets.js'
+import type { FeatureKind, Topology, TopologyMapLike, TopologyFace, TopologyPart } from '../lib/topology.js'
+import type { AssemblyComponent, Geom3, Vec3 } from '../types/geometry.js'
+import type { RecordTurntableOptions } from '../lib/turntableRender.js'
+import type { RenderHeroSetOpts, RenderHeroSetResult } from '../lib/heroRender.js'
+
+// This component holds a large, densely-interlinked Three.js scene-graph state
+// object (`stateRef.current`), rebuilt imperatively on every parts/appearance/
+// mode change. Fully modeling it is a refactor-scale effort out of scope for a
+// rename-only TS migration pass — same call as the sibling FeatureRenderer.tsx
+// — so the internal scene state is typed `any` at its entry points below.
+// Component props and the public ref-handle surface are fully typed.
+type RendererState = any // boundary: internal Three.js scene-graph + per-part bookkeeping blob
+
+export type RendererMode = 'object' | 'face' | 'edge' | 'vertex'
+
+/** A renderable part: TopologyPart's id/geom/color plus the assembly componentId used for instancing + highlight. */
+export interface RendererPart extends TopologyPart {
+  componentId?: string | null
+}
+
+/** One entry of the `selectedFeatures` prop — a face/edge/vertex pick on a part. */
+export interface RendererFeatureSelection {
+  partId: string
+  kind: FeatureKind
+  featureId: string
+}
+
+/** Per-part appearance override (mirrors lib/appearance.js's private AppearanceEntry shape). */
+export interface RendererAppearanceOverride {
+  color?: string
+  opacity?: number
+  metalness?: number
+  roughness?: number
+}
+
+/** A `doc.lights[]` entry from a .render document (see lib/applyDocLightsToScene.js). */
+export interface RendererDocLight {
+  kind: string
+  color?: string
+  intensity?: number
+  direction?: [number, number, number]
+  position?: [number, number, number]
+  size_mm?: number
+  [key: string]: unknown
+}
+
+export interface RendererProps {
+  parts: RendererPart[]
+  selectedId?: string | null
+  hiddenIds?: Set<string> | null
+  onPick?: (id: string | null) => void
+  // Right-click on an object → (partId, clientX, clientY). partId is null when
+  // the click landed on empty space. Right-DRAG still pans (OrbitControls); we
+  // only fire this when the press didn't move.
+  onContextPick?: (id: string | null, clientX: number, clientY: number) => void
+  // Per-part appearance overrides: Record<partId, {color, opacity, metalness,
+  // roughness}>. Merged over the palette default when meshes are built, and
+  // re-applied in place when it changes so a colour tweak doesn't rebuild the
+  // scene. See lib/appearance.js.
+  appearance?: Record<string, RendererAppearanceOverride> | null
+  className?: string
+  // Measure-tool extension:
+  mode?: RendererMode
+  selectedFeatures?: RendererFeatureSelection[]
+  onPickFeature?: (partId: string | null, kind: FeatureKind | null, featureId: string | null, shiftAdd: boolean) => void
+  // Assembly extension: highlight all parts whose `componentId` matches.
+  selectedComponentId?: string | null
+  // S2 instancing: optional array of raw assembly Component rows
+  // (from parseAssembly), containing file_id + config_id so the instancing
+  // planner can group identical parts into InstancedMesh objects.
+  // Only used when KERF_INSTANCING is on. Non-assembly callers omit this.
+  assemblyComponents?: AssemblyComponent[] | null
+  // Hero Render: project ID forwarded to HeroRenderPanel for the gallery tab
+  // and render job submission.
+  projectId?: string | null
+  // doc.lights[] — when non-empty the caller's lighting rig overrides the
+  // built-in 3-point studio rig.  Pass the array from a .render document to
+  // preview how user-defined lights look in the viewport.
+  docLights?: RendererDocLight[] | null
+}
+
+interface CaptureHeroShotOpts {
+  width?: number
+  height?: number
+  samples?: number
+  transparent?: boolean
+  background?: number
+}
+
+export interface RendererHandle {
+  zoomToPart: (partId: string) => void
+  snapshot: (opts?: { size?: number; quality?: number }) => Promise<Blob | null>
+  recordTurntable: (opts?: RecordTurntableOptions) => Promise<string[]>
+  renderHeroSet: (opts?: RenderHeroSetOpts) => Promise<RenderHeroSetResult>
+  captureHeroShot: (opts?: CaptureHeroShotOpts) => Promise<Blob | null>
+  setEnvironmentHdr: (url: string | null) => Promise<void>
+  setBloomEnabled: (on: boolean) => void
+  setBloomStrength: (strength: number) => void
+  setExposure: (value: number) => void
+  setHdriBackground: (on: boolean) => void
+  setDfmIssues: (issues: unknown[] | null) => void
+  highlightFaces: (ids: string[] | null) => void
+  setComponentTransforms: (
+    transformMap: Map<string, { x?: number; y?: number; z?: number; qw?: number; qx?: number; qy?: number; qz?: number }>,
+  ) => void
+}
+
+interface LodStats {
+  total: number
+  hi: number
+  lo: number
+  box: number
+  cull: number
+  instances: number
+  instHi: number
+  instBox: number
+  instCull: number
+  latencyMs: number
+  frameMs: number
+}
 
 const PALETTE = [0xc9a96b, 0x6b9bc9, 0xc96b89, 0x89c96b, 0xc9b86b, 0x9b6bc9]
 
@@ -79,7 +200,11 @@ const BASE_ROUGHNESS = 0.55
 // depthWrite is turned off while transparent — otherwise a see-through part
 // writes depth and hides the geometry behind (and inside) it, which defeats the
 // point of turning the opacity down.
-function applyAppearance(material, override, baseColor) {
+function applyAppearance(
+  material: THREE.Material & { color: THREE.Color; opacity: number; transparent: boolean; depthWrite: boolean; metalness: number; roughness: number },
+  override: RendererAppearanceOverride | undefined | null,
+  baseColor: number,
+) {
   const ov = override || {}
   const color = ov.color != null ? hexToInt(ov.color) : null
   material.color.setHex(color != null ? color : baseColor)
@@ -162,20 +287,20 @@ function prefersReducedMotion() {
 //   - Three.js BufferGeometry (already tessellated, e.g. from STEP or OCCT worker)
 //   - JSCAD Geom3 (polygon list, runJscad output)
 // → BufferGeometry. We never mutate the input — JSCAD path always creates new.
-function resolveGeometry(geom) {
+function resolveGeometry(geom: Geom3 | THREE.BufferGeometry | null | undefined): THREE.BufferGeometry | null {
   if (!geom) return null
-  if (geom.isBufferGeometry) {
+  if ('isBufferGeometry' in geom && geom.isBufferGeometry) {
     // Cache a clone on the geometry so repeated mounts share buffers but don't
     // step on each other on dispose. We clone here, return the clone — the
     // mesh group fully owns it and will dispose on unmount.
     return geom.clone()
   }
-  return geom3ToBufferGeometry(geom)
+  return geom3ToBufferGeometry(geom as Geom3)
 }
 
 // Build a BufferGeometry from a face's flat triangle list. Computes flat
 // normals so the overlay doesn't z-fight visibly with the underlying mesh.
-function geometryFromFaceTriangles(triangles) {
+function geometryFromFaceTriangles(triangles: Array<[Vec3, Vec3, Vec3]>) {
   const positions = new Float32Array(triangles.length * 9)
   const normals = new Float32Array(triangles.length * 9)
   for (let i = 0; i < triangles.length; i++) {
@@ -261,9 +386,9 @@ function Renderer({
   // built-in 3-point studio rig.  Pass the array from a .render document to
   // preview how user-defined lights look in the viewport.
   docLights = null,
-}, ref) {
-  const mountRef = useRef(null)
-  const stateRef = useRef(null) // holds three.js objects across renders
+}: RendererProps, ref: ForwardedRef<RendererHandle>) {
+  const mountRef = useRef<HTMLDivElement | null>(null)
+  const stateRef = useRef<RendererState>(null) // holds three.js objects across renders
   // T-C4: WebGL availability + context-lost state.
   // webGLUnavailable is true when the host environment lacks WebGL or when the
   // GPU resets and fires a `webglcontextlost` event.  We check at mount time
@@ -271,14 +396,14 @@ function Renderer({
   // context-lost event so a mid-session GPU reset shows the fallback panel
   // rather than a silently dead/black canvas.
   const [webGLUnavailable, setWebGLUnavailable] = useState(() => !detectWebGL())
-  const [hudId, setHudId] = useState(null)
-  const [leaderHtml, setLeaderHtml] = useState(null) // {x, y, text} screen coords
+  const [hudId, setHudId] = useState<string | null>(null)
+  const [leaderHtml, setLeaderHtml] = useState<{ x: number; y: number; text: string } | null>(null) // screen coords
   const [zebraOn, setZebraOn] = useState(false)
   // Class-A overlay: when on, fetches continuity audit data from the backend
   // (via a synthetic occtRunner message) and renders a side-panel showing
   // per-edge G2/G3 residual readouts alongside the zebra-stripe overlay.
   const [classAOn, setClassAOn] = useState(false)
-  const [classAReport, setClassAReport] = useState(null)   // { edges: [...] } | null
+  const [classAReport, setClassAReport] = useState<ClassAReportData | null>(null)
   const [classALoading, setClassALoading] = useState(false)
   // Exposure slider state — wired into the tone-mapping exposure of the
   // WebGLRenderer.  Lives in a state hook (not a ref) so the slider thumb
@@ -347,7 +472,7 @@ function Renderer({
 
   // T-C5: keyboard handler — arrow keys orbit, +/-/= zoom, R resets view.
   // Fires on the focusable wrapper div so mouse/touch paths are unaffected.
-  const handleCanvasKeyDown = useCallback((e) => {
+  const handleCanvasKeyDown = useCallback((e: ReactKeyboardEvent<HTMLDivElement>) => {
     const s = stateRef.current
     if (!s) return
     const action = CANVAS_KEY_MAP[e.key.toLowerCase()]
@@ -433,7 +558,11 @@ function Renderer({
     const assemblyDict = {
       name: 'viewport-assembly',
       assembly_id: 'viewport-root',
-      components: comps.map((c) => ({
+      // Defensive duck-typing: reads several possible field names beyond the
+      // canonical AssemblyComponent shape (id/instance_id/componentId,
+      // part_ref/file_id) to tolerate legacy/loose caller-supplied rows —
+      // boundary this component doesn't own the exact shape of.
+      components: (comps as any[]).map((c) => ({
         instance_id: c.id ?? c.instance_id ?? c.componentId ?? String(Math.random()),
         part_ref: c.part_ref ?? c.file_id ?? 'unknown',
         name: c.name ?? c.part_ref ?? 'part',
@@ -712,7 +841,7 @@ function Renderer({
     // stops the browser from trying to restore the context automatically, since
     // we can't sensibly recover mid-session) and flip the fallback flag so the
     // React tree swaps the dead canvas for the explanatory status panel.
-    function onContextLost(ev) {
+    function onContextLost(ev: Event) {
       ev.preventDefault()
       setWebGLUnavailable(true)
     }
@@ -998,14 +1127,14 @@ function Renderer({
       }
     }
 
-    function setPointerFromEvent(ev) {
+    function setPointerFromEvent(ev: PointerEvent) {
       const rect = renderer.domElement.getBoundingClientRect()
       pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1
       pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1
     }
 
     // Run hover only for mouse / pen — there's no hover state on touch.
-    function onPointerMove(ev) {
+    function onPointerMove(ev: PointerEvent) {
       // Right button held → this is a pan in progress; remember that it moved so
       // the contextmenu that follows doesn't pop a menu at the end of the drag.
       if ((ev.buttons & 2) !== 0 && !rightMoved) {
@@ -1041,7 +1170,7 @@ function Renderer({
     // Dispatch a pick at the current pointer position.  `shiftAdd` is true
     // when the user signalled add-to-selection (mouse shift held, or touch
     // long-press fired).
-    function dispatchPick(ev, shiftAdd) {
+    function dispatchPick(ev: PointerEvent, shiftAdd: boolean) {
       const m = modeRef.current
       setPointerFromEvent(ev)
       raycaster.setFromCamera(pointer, camera)
@@ -1088,7 +1217,7 @@ function Renderer({
       }
     }
 
-    function onPointerDown(ev) {
+    function onPointerDown(ev: PointerEvent) {
       activePointerCount += 1
       // Multi-touch: a second pointer means pinch/pan — cancel any pending
       // pick + long-press.  Note: OrbitControls handles its own multi-touch
@@ -1136,7 +1265,7 @@ function Renderer({
       }
     }
 
-    function onPointerUp(ev) {
+    function onPointerUp(ev: PointerEvent) {
       activePointerCount = Math.max(0, activePointerCount - 1)
       cancelLongPress()
 
@@ -1170,7 +1299,7 @@ function Renderer({
       dispatchPick(ev, shiftAdd)
     }
 
-    function onPointerCancel(ev) {
+    function onPointerCancel(ev: PointerEvent) {
       activePointerCount = Math.max(0, activePointerCount - 1)
       if (ev.pointerId === primaryPointerId) {
         primaryPointerId = null
@@ -1183,13 +1312,13 @@ function Renderer({
     // drag has happened, so deciding here would pop the menu at the start of
     // every right-drag pan. The decision is made on pointerup instead, once we
     // know whether the press moved.
-    function onContextMenu(ev) {
+    function onContextMenu(ev: MouseEvent) {
       ev.preventDefault()
     }
 
     // Right-click (press + release without moving) on an object → context menu.
     // Object mode only; face/edge/vertex picking has its own semantics.
-    function openContextMenu(ev) {
+    function openContextMenu(ev: PointerEvent) {
       if (rightMoved || modeRef.current !== 'object') return
 
       setPointerFromEvent(ev)
@@ -1335,7 +1464,7 @@ function Renderer({
     }
     apply()
 
-    const onKey = (ev) => {
+    const onKey = (ev: KeyboardEvent) => {
       const next = { alt: ev.altKey, shift: ev.shiftKey, ctrl: ev.ctrlKey || ev.metaKey }
       const m = modsRef.current
       if (next.alt === m.alt && next.shift === m.shift && next.ctrl === m.ctrl) return
@@ -1946,9 +2075,13 @@ function Renderer({
       setClassALoading(true)
       // Build a minimal single-node tree that mirrors the `global_continuity_audit`
       // feature kind defined in FeatureView.jsx FEATURE_KINDS.
-      const auditTree = [{ id: 'classA-audit', op: 'global_continuity_audit', target_id: firstBodyId, tolerance: 1e-4 }]
+      // Synthetic single-node tree — `global_continuity_audit` isn't one of
+      // the real FeatureNode union's ops, and the worker's reply carries
+      // ad hoc fields (`stale`, `continuity_report`) the typed
+      // OcctRunFeaturesResult doesn't model. Boundary this call doesn't own.
+      const auditTree: any[] = [{ id: 'classA-audit', op: 'global_continuity_audit', target_id: firstBodyId, tolerance: 1e-4 }]
       import('../lib/occtRunner.js').then(({ runFeatures }) => {
-        return runFeatures(auditTree, {})
+        return runFeatures(auditTree, {}) as Promise<any>
       }).then((result) => {
         if (result?.stale) return
         const raw = result?.meshes?.[0]?.continuity_report
@@ -1985,7 +2118,7 @@ function Renderer({
   // Defined here as a closure so the UI button and the ref both invoke the
   // same path.  Hides UI chrome by walking the live state graph rather than
   // mutating React state — avoids a re-render mid-capture.
-  async function doCaptureHeroShot(opts = {}) {
+  async function doCaptureHeroShot(opts: CaptureHeroShotOpts = {}): Promise<Blob | null> {
     const s = stateRef.current
     if (!s) return null
     // Build the chrome-hide list: aux groups + grid + axes + leader line +
@@ -2004,7 +2137,11 @@ function Renderer({
       const prevSetLeader = s.setLeaderScreen
       s.setLeaderScreen = () => {}
       try {
-        return await _captureHeroShot({
+        // heroShot.js's `opts?` param is untyped, which makes TS infer its
+        // internal `new Promise((resolve) => ...)` result as `Promise<{}>`
+        // instead of `Promise<Blob | null>` — a boundary this component
+        // doesn't own (the module's own JSDoc pins the real return shape).
+        return (await _captureHeroShot({
           renderer: s.renderer,
           scene: s.scene,
           camera: s.camera,
@@ -2015,7 +2152,7 @@ function Renderer({
           transparent: !!opts.transparent,
           background: opts.background,
           hideTargets,
-        })
+        })) as Blob | null
       } finally {
         s.setLeaderScreen = prevSetLeader
       }
@@ -2072,7 +2209,7 @@ function Renderer({
      * No-ops for an unknown id (e.g. an InstancedMesh component, which has no
      * per-instance mesh to measure).
      */
-    zoomToPart(partId) {
+    zoomToPart(partId: string) {
       const s = stateRef.current
       if (!s || !partId) return
       const mesh = s.meshGroup.children.find((m) => m.userData?.id === partId)
@@ -2098,8 +2235,8 @@ function Renderer({
      * @param {{ size?: number, quality?: number }} [opts]
      * @returns {Promise<Blob|null>}
      */
-    snapshot: ({ size = 512, quality = 0.7 } = {}) =>
-      new Promise((resolve) => {
+    snapshot: ({ size = 512, quality = 0.7 }: { size?: number; quality?: number } = {}) =>
+      new Promise<Blob | null>((resolve) => {
         const s = stateRef.current
         if (!s) return resolve(null)
         // Wait one frame so any pending layout/render is on the canvas
@@ -2138,12 +2275,12 @@ function Renderer({
      * @param {object} [opts]  See turntableRender.recordTurntable opts.
      * @returns {Promise<string[]>}
      */
-    recordTurntable: (opts = {}) => {
+    recordTurntable: (opts: RecordTurntableOptions = {}) => {
       const s = stateRef.current
       if (!s) return Promise.resolve([])
       return _recordTurntable(s.scene, s.camera, s.renderer, opts)
     },
-    renderHeroSet: (opts = {}) => { const s = stateRef.current; if (!s) return Promise.resolve({ stills: [], turntable: [] }); return _renderHeroSet(s.scene, s.camera, s.renderer, opts) },
+    renderHeroSet: (opts: RenderHeroSetOpts = {}) => { const s = stateRef.current; if (!s) return Promise.resolve({ stills: [], turntable: [] }); return _renderHeroSet(s.scene, s.camera, s.renderer, opts) },
 
     /**
      * captureHeroShot — marketing-quality single image.
@@ -2156,7 +2293,7 @@ function Renderer({
      * @param {number}  [opts.background]   Hex color override for background.
      * @returns {Promise<Blob|null>}
      */
-    captureHeroShot: (opts = {}) => doCaptureHeroShot(opts),
+    captureHeroShot: (opts: CaptureHeroShotOpts = {}) => doCaptureHeroShot(opts),
 
     /**
      * setEnvironmentHdr — swap scene.environment to a real .hdr loaded via
@@ -2165,7 +2302,7 @@ function Renderer({
      * @param {string|null} url
      * @returns {Promise<void>}
      */
-    setEnvironmentHdr: (url) => new Promise((resolve, reject) => {
+    setEnvironmentHdr: (url: string | null) => new Promise<void>((resolve, reject) => {
       const s = stateRef.current
       if (!s) return resolve()
       if (!url) {
@@ -2199,23 +2336,23 @@ function Renderer({
     }),
 
     /** Toggle bloom on/off programmatically. */
-    setBloomEnabled: (on) => { setBloomOn(!!on) },
+    setBloomEnabled: (on: boolean) => { setBloomOn(!!on) },
 
     /** Override bloom strength (default 0.55). */
-    setBloomStrength: (strength) => {
+    setBloomStrength: (strength: number) => {
       const s = stateRef.current
       if (!s || !s.bloomPass) return
       s.bloomPass.strength = Number(strength) || 0
     },
 
     /** Override tone-mapping exposure (0.2 .. 2.0 typical). */
-    setExposure: (value) => { setExposure(Number(value) || DEFAULT_EXPOSURE) },
+    setExposure: (value: number) => { setExposure(Number(value) || DEFAULT_EXPOSURE) },
 
     /** Toggle the HDRI-as-background mode. */
-    setHdriBackground: (on) => { setHdriBackground(!!on) },
+    setHdriBackground: (on: boolean) => { setHdriBackground(!!on) },
 
     /** Paint DFM issue markers in the viewport. Pass null/[] to clear. */
-    setDfmIssues: (issues) => { const s = stateRef.current; if (!s) return; issues?.length ? attachDfmOverlay(s.scene, s.camera, s.renderer, issues) : detachDfmOverlay() },
+    setDfmIssues: (issues: unknown[] | null) => { const s = stateRef.current; if (!s) return; issues?.length ? attachDfmOverlay(s.scene, s.camera, s.renderer, issues) : detachDfmOverlay() },
 
     /**
      * highlightFaces — highlight a set of component / face ids in the viewport.
@@ -2231,12 +2368,12 @@ function Renderer({
      *
      * @param {string[]} ids — component ids to highlight (empty array = clear)
      */
-    highlightFaces: (ids) => {
+    highlightFaces: (ids: string[] | null) => {
       const s = stateRef.current
       if (!s) return
       // Walk the scene and tint meshes whose componentId appears in `ids`.
       const idSet = new Set(ids || [])
-      s.scene.traverse((obj) => {
+      s.scene.traverse((obj: any) => {
         if (!obj.isMesh) return
         const cid = obj.userData?.componentId
         if (!cid) return
@@ -2268,10 +2405,10 @@ function Renderer({
      *   Keys are componentId strings; values are position + quaternion.
      *   Components absent from the map are left unchanged.
      */
-    setComponentTransforms: (transformMap) => {
+    setComponentTransforms: (transformMap: Map<string, { x?: number; y?: number; z?: number; qw?: number; qx?: number; qy?: number; qz?: number }>) => {
       const s = stateRef.current
       if (!s || !(transformMap instanceof Map)) return
-      s.scene.traverse((obj) => {
+      s.scene.traverse((obj: any) => {
         if (!obj.isMesh) return
         const cid = obj.userData?.componentId
         if (!cid) return
@@ -2548,7 +2685,29 @@ function Renderer({
 // EdgeReport shape (from edge_continuity_report backend):
 //   { edge_id, G0_ok, G1_ok, G2_ok, G3_ok, G0_max, G1_max, G2_max, G3_max,
 //     G0_rms, G1_rms, G2_rms, G3_rms, continuity_grade }
-function ClassAPanel({ loading, report, onClose }) {
+interface ClassAEdgeReport {
+  edge_id?: string | number
+  G0_ok?: boolean
+  G1_ok?: boolean
+  G2_ok?: boolean
+  G3_ok?: boolean
+  G0_max?: number
+  G1_max?: number
+  G2_max?: number
+  G3_max?: number
+  G0_rms?: number
+  G1_rms?: number
+  G2_rms?: number
+  G3_rms?: number
+  continuity_grade?: string
+}
+
+interface ClassAReportData {
+  edges: ClassAEdgeReport[]
+  summary?: string
+}
+
+function ClassAPanel({ loading, report, onClose }: { loading: boolean; report: ClassAReportData | null; onClose: () => void }) {
   const edges = report?.edges || []
   const summary = report?.summary || null
 
@@ -2702,7 +2861,7 @@ export default forwardRef(Renderer)
  * The resulting CanvasTexture is wrapped in repeat-mode + sRGB color space
  * so PBR materials see a colorimetrically-correct background colour.
  */
-function _makeStudioGradientTexture(bottomHex, topHex) {
+function _makeStudioGradientTexture(bottomHex: number, topHex: number): THREE.CanvasTexture | null {
   if (typeof document === 'undefined' || typeof document.createElement !== 'function') {
     return null
   }
@@ -2726,7 +2885,7 @@ function _makeStudioGradientTexture(bottomHex, topHex) {
   }
 }
 
-function applyModeVisibility(s, mode) {
+function applyModeVisibility(s: RendererState, mode: RendererMode) {
   if (!s) return
   s.edgeGroup.visible = mode === 'edge'
   s.vertexGroup.visible = mode === 'vertex'
@@ -2739,7 +2898,7 @@ function applyModeVisibility(s, mode) {
 // repeated calls after the first do nothing. `topologies` is the lazy Map
 // from getTopologyLazy — calling `.get(partId)` here is the trigger that
 // derives topology for the part.
-function ensurePartAux(s, part, topologies) {
+function ensurePartAux(s: RendererState, part: RendererPart, topologies: TopologyMapLike) {
   if (!s || !part) return
   const aux = s.perPart.get(part.id)
   if (!aux || aux.auxBuilt) return
@@ -2796,12 +2955,12 @@ function ensurePartAux(s, part, topologies) {
   }
 }
 
-function ensureAllAux(s, parts, topologies) {
+function ensureAllAux(s: RendererState, parts: RendererPart[] | null | undefined, topologies: TopologyMapLike) {
   if (!s) return
   for (const part of parts || []) ensurePartAux(s, part, topologies)
 }
 
-function clearHoverOverlay(s) {
+function clearHoverOverlay(s: RendererState) {
   if (!s) return
   if (s.hoverOverlay) {
     if (s.hoverOverlay.parent) s.hoverOverlay.parent.remove(s.hoverOverlay)
@@ -2815,7 +2974,12 @@ function clearHoverOverlay(s) {
 // pickFeature: raycast against whichever aux geometry is appropriate for the
 // current mode and either install a hover highlight (hover=true) OR return
 // the hit info for click handling.
-function pickFeature(s, raycaster, mode, hover) {
+function pickFeature(
+  s: RendererState,
+  raycaster: THREE.Raycaster,
+  mode: RendererMode,
+  hover: boolean,
+): { partId: string; kind: FeatureKind; featureId: string } | null {
   if (!s) return null
   if (mode === 'face') {
     // Raycast against meshes; convert hit triangle → owning face id by
@@ -2887,7 +3051,7 @@ function pickFeature(s, raycaster, mode, hover) {
   return null
 }
 
-function installFaceHover(s, face) {
+function installFaceHover(s: RendererState, face: TopologyFace) {
   clearHoverOverlay(s)
   const g = geometryFromFaceTriangles(face.triangles)
   const m = new THREE.MeshBasicMaterial({
@@ -2904,7 +3068,7 @@ function installFaceHover(s, face) {
 }
 
 // Track currently-hovered line so we can revert its color on next move.
-function hoverLine(s, line) {
+function hoverLine(s: RendererState, line: any) {
   if (s._hoveredLine === line) return
   if (s._hoveredLine) {
     const mat = s._hoveredLine.material
@@ -2913,7 +3077,7 @@ function hoverLine(s, line) {
   s._hoveredLine = line
   if (line.material && line.material.color) line.material.color.setHex(KERF_YELLOW)
 }
-function clearLineHover(s) {
+function clearLineHover(s: RendererState) {
   if (s._hoveredLine) {
     const mat = s._hoveredLine.material
     if (mat && mat.color) mat.color.setHex(INK_300)
@@ -2923,7 +3087,7 @@ function clearLineHover(s) {
 
 // For instanced spheres, change just the hovered instance's color via
 // instanceColor. Cheap and avoids material churn.
-function hoverInstance(s, inst, instanceId) {
+function hoverInstance(s: RendererState, inst: THREE.InstancedMesh, instanceId: number) {
   if (!inst.instanceColor) {
     const colors = new Float32Array(inst.count * 3)
     for (let i = 0; i < inst.count; i++) {
@@ -2956,7 +3120,7 @@ function hoverInstance(s, inst, instanceId) {
   inst.instanceColor.needsUpdate = true
   s._hoveredInstance = { inst, id: instanceId }
 }
-function clearVertexHover(s) {
+function clearVertexHover(s: RendererState) {
   if (s._hoveredInstance) {
     const { inst, id } = s._hoveredInstance
     if (inst.instanceColor) {
@@ -2972,7 +3136,7 @@ function clearVertexHover(s) {
   }
 }
 
-function buildSelectionOverlay(sel, topology, s) {
+function buildSelectionOverlay(sel: RendererFeatureSelection, topology: Topology, s: RendererState) {
   if (sel.kind === 'face') {
     const f = topology.faces.find((x) => x.id === sel.featureId)
     if (!f) return null
@@ -3030,7 +3194,7 @@ function buildSelectionOverlay(sel, topology, s) {
   return null
 }
 
-function lookupFeature(sel, topologies) {
+function lookupFeature(sel: RendererFeatureSelection, topologies: TopologyMapLike) {
   const t = topologies.get(sel.partId)
   if (!t) return null
   if (sel.kind === 'face') return t.faces.find((f) => f.id === sel.featureId) || null
@@ -3042,7 +3206,7 @@ function lookupFeature(sel, topologies) {
 // Topology lookup for a partId by walking the perPart map's parent topologies.
 // We don't store the topology directly on the renderer state — pull it from
 // the cache (which is keyed by geom WeakMap inside topology.js).
-function getCachedTopologyForPart(s, partId) {
+function getCachedTopologyForPart(s: RendererState, partId: string): Topology | null {
   // We need access to the parts array; but we kept aux per-part already. The
   // cleanest way is to recompute via perPart edge/vertex contents — but here
   // we just store the topology when we build aux. (Patch perPart to include it.)
@@ -3051,7 +3215,7 @@ function getCachedTopologyForPart(s, partId) {
 }
 
 // (perPart aux now also holds `topology`; we set it in the rebuild loop.)
-function disposePartsAux(s) {
+function disposePartsAux(s: RendererState) {
   if (!s) return
   for (const aux of s.perPart.values()) {
     for (const l of aux.edgeLines) {
@@ -3108,7 +3272,7 @@ function disposePartsAux(s) {
   s._hoveredInstance = null
 }
 
-function disposeAll(s) {
+function disposeAll(s: RendererState) {
   if (!s) return
   s.meshGroup.children.forEach((m) => {
     m.geometry?.dispose()
@@ -3134,7 +3298,7 @@ function disposeAll(s) {
  * Only non-instanced Mesh objects are handled here.  InstancedMesh is handled
  * per-instance in the LOD apply loop (matrix rewrite, no geometry swap).
  */
-function _applyBboxProxy(mesh, s) {
+function _applyBboxProxy(mesh: THREE.Mesh, s: RendererState) {
   if (!mesh || mesh.isInstancedMesh || mesh.userData._lodBboxProxy) return
   try {
     // Compute the bounding box of the part geometry.
@@ -3185,7 +3349,7 @@ function _applyBboxProxy(mesh, s) {
  * Removes the LineSegments proxy from the scene, restores the original material,
  * and clears the userData flags.
  */
-function _restoreFromBboxProxy(mesh, _s) {
+function _restoreFromBboxProxy(mesh: any, _s: RendererState) {
   if (!mesh || !mesh.userData._lodBboxProxy) return
   const proxy = mesh.userData._lodBboxProxy
   try {
@@ -3217,7 +3381,7 @@ function _restoreFromBboxProxy(mesh, _s) {
  * @param {THREE.Box3|null} geomBb - precomputed bounding box of the geometry
  * @returns {THREE.InstancedMesh|null}
  */
-function _createInstBoxProxy(origMesh, geomBb) {
+function _createInstBoxProxy(origMesh: THREE.InstancedMesh, geomBb: THREE.Box3 | null): THREE.InstancedMesh | null {
   try {
     // Unit cube edges — 12 edges, 24 vertices.  Each instance's matrix scales
     // this to the actual bbox extents at runtime.

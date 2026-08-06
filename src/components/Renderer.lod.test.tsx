@@ -15,12 +15,21 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { readFileSync } from 'fs'
+// @types/node isn't part of this project's toolchain (tsconfig.json's `types` array is
+// T-500's — see docs/typescript-migration.md), so these Node builtins (used only for this
+// file's source-inspection assertions) are untyped at this boundary.
+// @ts-expect-error - no @types/node in this toolchain
+import { readFileSync, existsSync } from 'fs'
+// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const src = readFileSync(path.resolve(__dirname, './Renderer.jsx'), 'utf8')
+// Extension-agnostic: Renderer migrated from .jsx to .tsx (T-513).
+const rendererTsxPath = path.resolve(__dirname, './Renderer.tsx')
+const rendererJsxPath = path.resolve(__dirname, './Renderer.jsx')
+const src = readFileSync(existsSync(rendererTsxPath) ? rendererTsxPath : rendererJsxPath, 'utf8')
 
 // ===========================================================================
 // Tier 1 — source inspection: base LOD pass (Wave 4E)
@@ -393,16 +402,19 @@ describe('Renderer LOD — source: InstancedMesh per-instance handling', () => {
 describe('Renderer LOD — InstancedMesh matrix rewrite logic', () => {
   // Build a minimal THREE.Matrix4 mock that supports the subset used by
   // the LOD pass: fromArray, decompose, and setMatrixAt via InstancedMesh.
-  function makeMatrix4(values16) {
-    const arr = values16 ? [...values16] : Array(16).fill(0)
+  // Mock THREE.js primitives used only by these tests — duck-typed doubles,
+  // not the real THREE API, so their members are loosely typed (`any`) at
+  // this boundary rather than modeling THREE.Matrix4/Vector3/Quaternion in full.
+  function makeMatrix4(values16?: number[]) {
+    const arr: any[] = values16 ? [...values16] : Array(16).fill(0)
     arr[0] = arr[0] ?? 1; arr[5] = arr[5] ?? 1; arr[10] = arr[10] ?? 1; arr[15] = arr[15] ?? 1
     return {
       elements: arr,
-      fromArray(src, offset = 0) {
+      fromArray(src: ArrayLike<number>, offset = 0) {
         for (let i = 0; i < 16; i++) this.elements[i] = src[offset + i]
         return this
       },
-      decompose(pos, quat, scale) {
+      decompose(pos: any, quat: any, scale: any) {
         // Minimal: extract position from col3, assume identity rotation, diagonal scale.
         pos.x = this.elements[12]; pos.y = this.elements[13]; pos.z = this.elements[14]
         quat.x = 0; quat.y = 0; quat.z = 0; quat.w = 1
@@ -415,11 +427,15 @@ describe('Renderer LOD — InstancedMesh matrix rewrite logic', () => {
   }
 
   function makeVec3(x = 0, y = 0, z = 0) {
-    return { x, y, z, copy(v) { this.x = v.x; this.y = v.y; this.z = v.z; return this } }
+    return {
+      x, y, z,
+      set(nx: number, ny: number, nz: number) { this.x = nx; this.y = ny; this.z = nz; return this },
+      copy(v: any) { this.x = v.x; this.y = v.y; this.z = v.z; return this },
+    }
   }
 
   function makeQuat() {
-    return { x: 0, y: 0, z: 0, w: 1, copy(q) { Object.assign(this, q); return this } }
+    return { x: 0, y: 0, z: 0, w: 1, copy(q: any) { Object.assign(this, q); return this } }
   }
 
   // Fake Object3D.updateMatrix: writes position + scale into a matrix.
@@ -444,7 +460,7 @@ describe('Renderer LOD — InstancedMesh matrix rewrite logic', () => {
   }
 
   // Build a fake InstancedMesh with N instances.
-  function makeInstancedMesh(count, componentIds) {
+  function makeInstancedMesh(count: number, componentIds: Array<string | null>) {
     // instanceMatrix.array is a Float32Array: N × 16 elements.
     const buf = new Float32Array(count * 16)
     // Fill identity matrices for each instance (with distinct translations).
@@ -453,7 +469,7 @@ describe('Renderer LOD — InstancedMesh matrix rewrite logic', () => {
       buf[off + 0] = 1; buf[off + 5] = 1; buf[off + 10] = 1; buf[off + 15] = 1
       buf[off + 12] = i * 10 // x translation = 0, 10, 20 for instances 0,1,2
     }
-    const matrices = [] // track what setMatrixAt was called with
+    const matrices: any[] = [] // track what setMatrixAt was called with
     return {
       isInstancedMesh: true,
       count,
@@ -462,13 +478,16 @@ describe('Renderer LOD — InstancedMesh matrix rewrite logic', () => {
         boundingBox: {
           min: { x: -1, y: -1, z: -1 },
           max: { x: 1, y: 1, z: 1 },
-          getSize(v) { v.x = 2; v.y = 2; v.z = 2 },
-          getCenter(v) { v.x = 0; v.y = 0; v.z = 0 },
+          getSize(v: any) { v.x = 2; v.y = 2; v.z = 2 },
+          getCenter(v: any) { v.x = 0; v.y = 0; v.z = 0 },
         },
         computeBoundingBox() {},
       },
-      userData: { componentIds },
-      setMatrixAt(i, m) {
+      // `userData` carries dynamic LOD bookkeeping fields (_lodInstOrigMatrices,
+      // _lodBoxProxyMesh, …) added by the code under test — loosely typed to
+      // match the real mesh.userData bag rather than the fixed componentIds shape.
+      userData: { componentIds } as Record<string, any>,
+      setMatrixAt(i: number, m: any) {
         matrices.push({ i, elements: [...m.elements] })
         const off = i * 16
         for (let k = 0; k < 16; k++) buf[off + k] = m.elements[k]
@@ -480,7 +499,7 @@ describe('Renderer LOD — InstancedMesh matrix rewrite logic', () => {
   // Minimal implementation of the per-instance LOD logic extracted from
   // queryLodPlan — mirrors the source exactly so changes to the source will
   // cause this test to fail (catching regressions).
-  function applyInstancedLodPlan(mesh, detailMap) {
+  function applyInstancedLodPlan(mesh: any, detailMap: Map<string, string>) {
     const cids = mesh.userData.componentIds
     if (!cids || !cids.length) return
 
@@ -804,16 +823,19 @@ describe('Renderer LOD — Wave 4H: clean wireframe box proxy (source)', () => {
 
 describe('Renderer LOD — Wave 4H: box-proxy matrix correctness', () => {
   // Re-use helpers from the Wave 4G functional tests above.
-  function makeMatrix4(values16) {
-    const arr = values16 ? [...values16] : Array(16).fill(0)
+  // Mock THREE.js primitives used only by these tests — duck-typed doubles,
+  // not the real THREE API, so their members are loosely typed (`any`) at
+  // this boundary rather than modeling THREE.Matrix4/Vector3/Quaternion in full.
+  function makeMatrix4(values16?: number[]) {
+    const arr: any[] = values16 ? [...values16] : Array(16).fill(0)
     arr[0] = arr[0] ?? 1; arr[5] = arr[5] ?? 1; arr[10] = arr[10] ?? 1; arr[15] = arr[15] ?? 1
     return {
       elements: arr,
-      fromArray(src2, offset = 0) {
+      fromArray(src2: ArrayLike<number>, offset = 0) {
         for (let i = 0; i < 16; i++) this.elements[i] = src2[offset + i]
         return this
       },
-      decompose(pos, quat, scale) {
+      decompose(pos: any, quat: any, scale: any) {
         pos.x = this.elements[12]; pos.y = this.elements[13]; pos.z = this.elements[14]
         quat.x = 0; quat.y = 0; quat.z = 0; quat.w = 1
         scale.x = Math.abs(this.elements[0]) || 1
@@ -825,11 +847,15 @@ describe('Renderer LOD — Wave 4H: box-proxy matrix correctness', () => {
   }
 
   function makeVec3(x = 0, y = 0, z = 0) {
-    return { x, y, z, copy(v) { this.x = v.x; this.y = v.y; this.z = v.z; return this } }
+    return {
+      x, y, z,
+      set(nx: number, ny: number, nz: number) { this.x = nx; this.y = ny; this.z = nz; return this },
+      copy(v: any) { this.x = v.x; this.y = v.y; this.z = v.z; return this },
+    }
   }
 
   function makeQuat() {
-    return { x: 0, y: 0, z: 0, w: 1, copy(q) { Object.assign(this, q); return this } }
+    return { x: 0, y: 0, z: 0, w: 1, copy(q: any) { Object.assign(this, q); return this } }
   }
 
   function fakeObject3D() {
@@ -851,7 +877,7 @@ describe('Renderer LOD — Wave 4H: box-proxy matrix correctness', () => {
     return obj
   }
 
-  function makeInstancedMesh(count, componentIds) {
+  function makeInstancedMesh(count: number, componentIds: Array<string | null>) {
     const buf = new Float32Array(count * 16)
     for (let i = 0; i < count; i++) {
       const off = i * 16
@@ -866,13 +892,15 @@ describe('Renderer LOD — Wave 4H: box-proxy matrix correctness', () => {
         boundingBox: {
           min: { x: -2, y: -1, z: -1 },
           max: { x: 2, y: 1, z: 1 },
-          getSize(v) { v.x = 4; v.y = 2; v.z = 2 },
-          getCenter(v) { v.x = 0; v.y = 0; v.z = 0 },
+          getSize(v: any) { v.x = 4; v.y = 2; v.z = 2 },
+          getCenter(v: any) { v.x = 0; v.y = 0; v.z = 0 },
         },
         computeBoundingBox() {},
       },
-      userData: { componentIds },
-      setMatrixAt(i, m) {
+      // See the sibling makeInstancedMesh above — userData holds dynamic
+      // LOD bookkeeping fields the code under test adds at runtime.
+      userData: { componentIds } as Record<string, any>,
+      setMatrixAt(i: number, m: any) {
         const off = i * 16
         for (let k = 0; k < 16; k++) buf[off + k] = m.elements[k]
       },
@@ -880,7 +908,7 @@ describe('Renderer LOD — Wave 4H: box-proxy matrix correctness', () => {
   }
 
   // Minimal implementation of Wave 4H box-proxy per-instance LOD logic.
-  function applyWave4HLodPlan(origMesh, proxyMesh, detailMap) {
+  function applyWave4HLodPlan(origMesh: any, proxyMesh: any, detailMap: Map<string, string>) {
     const cids = origMesh.userData.componentIds
     if (!cids || !cids.length) return
 

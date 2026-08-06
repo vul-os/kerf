@@ -1,5 +1,5 @@
 /**
- * FirmwareProjectPanel.jsx — context panel for firmware projects.
+ * FirmwareProjectPanel.tsx — context panel for firmware projects.
  *
  * Shown in the Editor centre pane when the active file has kind 'firmware_project'
  * (a .fw.json / kerf.fw.json manifest). Displays:
@@ -33,6 +33,14 @@ import {
 import { buildFirmware, uploadFirmware } from '../../lib/firmwareBridge.js'
 import BuildOutput from './BuildOutput.jsx'
 import SerialMonitor from './SerialMonitor.jsx'
+import type { FwConfig, FirmwareBuildResult, FirmwareUploadResult, FirmwareFile } from './firmwareTypes'
+
+export interface Props {
+  file?: FirmwareFile | null
+  content?: string
+  projectId?: string
+  onFileAdded?: ((artifactPath: string) => void) | null
+}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -40,13 +48,18 @@ const IS_LOCAL_CLI = typeof import.meta !== 'undefined' && import.meta.env
   ? import.meta.env.VITE_LOCAL_CLI === '1'
   : false
 
-function parseFwConfig(content) {
+function parseFwConfig(content?: string): FwConfig | null {
   try { return JSON.parse(content || '{}') } catch { return null }
 }
 
 // ── sub-components ────────────────────────────────────────────────────────────
 
-function FieldRow({ label, value }) {
+interface FieldRowProps {
+  label: string
+  value?: string
+}
+
+function FieldRow({ label, value }: FieldRowProps) {
   if (!value) return null
   return (
     <div className="flex items-start gap-2 text-[11px]">
@@ -56,7 +69,11 @@ function FieldRow({ label, value }) {
   )
 }
 
-function CloudSentinel({ action }) {
+interface CloudSentinelProps {
+  action: string
+}
+
+function CloudSentinel({ action }: CloudSentinelProps) {
   return (
     <div className="flex items-start gap-2 rounded border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
       <Info size={12} className="flex-shrink-0 mt-0.5" />
@@ -68,6 +85,8 @@ function CloudSentinel({ action }) {
   )
 }
 
+type ActionStatus = 'idle' | 'loading' | 'success' | 'error'
+
 // ── main component ────────────────────────────────────────────────────────────
 
 export default function FirmwareProjectPanel({
@@ -75,18 +94,18 @@ export default function FirmwareProjectPanel({
   content,
   projectId,
   onFileAdded = null,
-}) {
+}: Props) {
   const fwConfig = parseFwConfig(content)
 
   // Per-action state: idle | loading | success | error
-  const [buildStatus, setBuildStatus] = useState('idle')
-  const [uploadStatus, setUploadStatus] = useState('idle')
-  const [buildError, setBuildError] = useState(null)
-  const [uploadError, setUploadError] = useState(null)
+  const [buildStatus, setBuildStatus] = useState<ActionStatus>('idle')
+  const [uploadStatus, setUploadStatus] = useState<ActionStatus>('idle')
+  const [buildError, setBuildError] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
 
   // Build output lines and last artefact paths.
-  const [buildLines, setBuildLines] = useState([])
-  const [lastHexPath, setLastHexPath] = useState(null)
+  const [buildLines, setBuildLines] = useState<string[]>([])
+  const [lastHexPath, setLastHexPath] = useState<string | null>(null)
 
   // Panel visibility toggles.
   const [showBuildOutput, setShowBuildOutput] = useState(false)
@@ -101,7 +120,7 @@ export default function FirmwareProjectPanel({
     setShowBuildOutput(true)
 
     const sourcePath = fwConfig?.sketch_dir || file?.name || ''
-    const result = await buildFirmware(sourcePath, fwConfig)
+    const result: FirmwareBuildResult = await buildFirmware(sourcePath, fwConfig)
 
     if (result.ok) {
       setBuildStatus('success')
@@ -123,7 +142,7 @@ export default function FirmwareProjectPanel({
     if (!IS_LOCAL_CLI) return  // guarded by the sentinel UI
     setUploadStatus('loading')
     setUploadError(null)
-    const result = await uploadFirmware(lastHexPath || '', fwConfig)
+    const result: FirmwareUploadResult = await uploadFirmware(lastHexPath || '', fwConfig)
     if (result.ok) {
       setUploadStatus('success')
     } else {

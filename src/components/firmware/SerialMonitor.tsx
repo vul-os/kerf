@@ -1,5 +1,5 @@
 /**
- * SerialMonitor.jsx — live serial output panel (board → server → poll/SSE).
+ * SerialMonitor.tsx — live serial output panel (board → server → poll/SSE).
  *
  * Calls POST /firmware/monitor via firmwareBridge.monitorFirmware() to take
  * a snapshot of the board's serial output. A "Stream" toggle re-polls every
@@ -17,22 +17,29 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { FormEvent } from 'react'
 import { Activity, Send, Trash2, ChevronsDown, Square, Play } from 'lucide-react'
 import { monitorFirmware } from '../../lib/firmwareBridge.js'
+import type { FwConfig, FirmwareMonitorResult } from './firmwareTypes'
+
+export interface Props {
+  fwConfig?: FwConfig | null
+  projectId?: string | null
+}
 
 const POLL_INTERVAL_MS = 2000
 const MAX_LINES = 500  // keep buffer bounded
 
-export default function SerialMonitor({ fwConfig = null, projectId = null }) {
-  const [lines, setLines] = useState([])
+export default function SerialMonitor({ fwConfig = null, projectId: _projectId = null }: Props) {
+  const [lines, setLines] = useState<string[]>([])
   const [streaming, setStreaming] = useState(false)
   const [autoScroll, setAutoScroll] = useState(true)
   const [port, setPort] = useState(fwConfig?.upload?.port || '')
   const [baud, setBaud] = useState(fwConfig?.monitor?.baud || 9600)
   const [txLine, setTxLine] = useState('')
-  const [error, setError] = useState(null)
-  const bottomRef = useRef(null)
-  const pollRef = useRef(null)
+  const [error, setError] = useState<string | null>(null)
+  const bottomRef = useRef<HTMLDivElement | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Autoscroll.
   useEffect(() => {
@@ -43,7 +50,7 @@ export default function SerialMonitor({ fwConfig = null, projectId = null }) {
 
   // Poll the backend for serial data.
   const doPoll = useCallback(async () => {
-    const result = await monitorFirmware(fwConfig, port || null, baud)
+    const result: FirmwareMonitorResult = await monitorFirmware(fwConfig, port || null, baud)
     if (!result.ok) {
       setError(result.errors?.[0] || 'Monitor error')
       setStreaming(false)
@@ -52,26 +59,28 @@ export default function SerialMonitor({ fwConfig = null, projectId = null }) {
     setError(null)
     if (result.lines?.length) {
       setLines((prev) => {
-        const next = [...prev, ...result.lines]
+        const next = [...prev, ...(result.lines ?? [])]
         return next.length > MAX_LINES ? next.slice(next.length - MAX_LINES) : next
       })
     }
   }, [fwConfig, port, baud])
 
   // Start / stop streaming.
+  // Pre-existing: fires the first poll immediately on Stream toggle rather than waiting
+  // POLL_INTERVAL_MS; not a behavior change for this slice.
   useEffect(() => {
     if (!streaming) {
       if (pollRef.current) clearInterval(pollRef.current)
       return
     }
-    doPoll()
+    doPoll() // eslint-disable-line react-hooks/set-state-in-effect
     pollRef.current = setInterval(doPoll, POLL_INTERVAL_MS)
     return () => {
       if (pollRef.current) clearInterval(pollRef.current)
     }
   }, [streaming, doPoll])
 
-  async function handleSend(e) {
+  async function handleSend(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!txLine.trim()) return
     // Fire the monitor endpoint with a tx_line field — backend echoes it.

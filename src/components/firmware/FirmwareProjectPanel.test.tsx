@@ -182,7 +182,7 @@ describe('SerialMonitor — static render', () => {
 
 describe('firmwareBridge dispatch — unit stubs', () => {
   beforeEach(() => {
-    buildFirmware.mockResolvedValue({
+    vi.mocked(buildFirmware).mockResolvedValue({
       ok: true,
       status: 'success',
       errors: [],
@@ -192,7 +192,7 @@ describe('firmwareBridge dispatch — unit stubs', () => {
       bin_path: '/project/.kerf-fw/build/esp32dev/firmware.bin',
       elf_path: '/project/.kerf-fw/build/esp32dev/firmware.elf',
     })
-    uploadFirmware.mockResolvedValue({
+    vi.mocked(uploadFirmware).mockResolvedValue({
       ok: true,
       status: 'success',
       errors: [],

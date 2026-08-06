@@ -1,5 +1,5 @@
 /**
- * BuildOutput.jsx — streaming compiler output panel.
+ * BuildOutput.tsx — streaming compiler output panel.
  *
  * Tails the build job's stdout by calling POST /firmware/build (via
  * firmwareBridge.buildFirmware) and rendering the build_log that comes back.
@@ -20,14 +20,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { Terminal, X, ChevronsDown } from 'lucide-react'
 
+export interface Props {
+  lines?: string[]
+  running?: boolean
+  error?: string | null
+  onClear?: (() => void) | null
+}
+
 export default function BuildOutput({
   lines = [],
   running = false,
   error = null,
   onClear = null,
-}) {
+}: Props) {
   const [autoScroll, setAutoScroll] = useState(true)
-  const bottomRef = useRef(null)
+  const bottomRef = useRef<HTMLDivElement | null>(null)
 
   // Autoscroll whenever lines change and autoscroll is enabled.
   useEffect(() => {

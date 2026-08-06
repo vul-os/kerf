@@ -1,4 +1,4 @@
-// FbdEditor.test.jsx — Vitest tests for the FBD SVG canvas editor.
+// FbdEditor.test.tsx — Vitest tests for the FBD SVG canvas editor.
 //
 // Uses react-dom/server (already a project dep) to render to static markup
 // and assert structurally — no @testing-library/react needed.
@@ -6,27 +6,53 @@
 // The sibling task T-225c-1 owns src/lib/fbdCanvas.js. We vi.mock it so
 // these tests pass regardless of whether that file has landed yet.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
+
+// ---------------------------------------------------------------------------
+// Local domain types — src/lib/fbdCanvas.js has no shared type (T-225c-1 not
+// landed), and FbdEditor.jsx itself is not yet migrated.
+// ---------------------------------------------------------------------------
+
+interface FbdBlock {
+  id: string
+  type: string
+  label: string
+  x: number
+  y: number
+}
+
+interface FbdSignal {
+  id?: string
+  fromBlock: string
+  fromPin: number
+  toBlock: string
+  toPin: number
+}
+
+interface FbdNetwork {
+  blocks: FbdBlock[]
+  signals: FbdSignal[]
+}
 
 // Mock fbdCanvas.js so tests are hermetic regardless of T-225c-1 landing.
 vi.mock('../lib/fbdCanvas.js', () => ({
-  addBlock: (network, blockDef) => {
+  addBlock: (network: FbdNetwork, blockDef: Omit<FbdBlock, 'id'>): FbdNetwork => {
     const id = `mock-block-${Date.now()}`
     return {
       ...network,
       blocks: [...(network.blocks || []), { id, ...blockDef }],
     }
   },
-  addSignal: (network, signalDef) => {
+  addSignal: (network: FbdNetwork, signalDef: Omit<FbdSignal, 'id'>): FbdNetwork => {
     const id = `mock-sig-${Date.now()}`
     return {
       ...network,
       signals: [...(network.signals || []), { id, ...signalDef }],
     }
   },
-  createNetwork: () => ({ blocks: [], signals: [] }),
-  validateNetwork: () => ({ ok: true, errors: [] }),
+  createNetwork: (): FbdNetwork => ({ blocks: [], signals: [] }),
+  validateNetwork: () => ({ ok: true, errors: [] as string[] }),
 }))
 
 import FbdEditor, { BLOCK_TYPES } from './FbdEditor.jsx'
@@ -35,8 +61,8 @@ import FbdEditor, { BLOCK_TYPES } from './FbdEditor.jsx'
 // Helpers
 // ---------------------------------------------------------------------------
 
-function renderEditor(props = {}) {
-  const defaultNetwork = { blocks: [], signals: [] }
+function renderEditor(props: Record<string, unknown> = {}) {
+  const defaultNetwork: FbdNetwork = { blocks: [], signals: [] }
   return renderToStaticMarkup(
     <FbdEditor value={defaultNetwork} onChange={() => {}} {...props} />,
   )
@@ -84,6 +110,9 @@ describe('FbdEditor — render without crashing', () => {
   })
 
   it('accepts value=undefined without crashing', () => {
+    // @ts-expect-error -- FbdEditor.jsx is not yet migrated (T-514); TS infers `value` as
+    // required from the untyped .jsx source, but this test intentionally omits it to verify
+    // the component's runtime empty-network fallback.
     const html = renderToStaticMarkup(<FbdEditor onChange={() => {}} />)
     expect(html).toBeTruthy()
   })
@@ -163,7 +192,7 @@ describe('FbdEditor — palette', () => {
 
 describe('FbdEditor — controlled component', () => {
   it('renders blocks from the value prop', () => {
-    const network = {
+    const network: FbdNetwork = {
       blocks: [
         { id: 'b1', type: 'AND', label: 'Gate1', x: 50, y: 50 },
       ],
@@ -176,7 +205,7 @@ describe('FbdEditor — controlled component', () => {
   })
 
   it('renders multiple blocks', () => {
-    const network = {
+    const network: FbdNetwork = {
       blocks: [
         { id: 'b1', type: 'AND', label: '', x: 40, y: 40 },
         { id: 'b2', type: 'OR', label: '', x: 200, y: 40 },
@@ -193,7 +222,7 @@ describe('FbdEditor — controlled component', () => {
   })
 
   it('renders block type labels in SVG text', () => {
-    const network = {
+    const network: FbdNetwork = {
       blocks: [{ id: 'b1', type: 'TON', label: 'Timer1', x: 50, y: 50 }],
       signals: [],
     }
@@ -205,7 +234,7 @@ describe('FbdEditor — controlled component', () => {
   })
 
   it('renders signals as SVG path elements', () => {
-    const network = {
+    const network: FbdNetwork = {
       blocks: [
         { id: 'b1', type: 'INPUT', label: '', x: 40, y: 80 },
         { id: 'b2', type: 'OUTPUT', label: '', x: 200, y: 80 },
@@ -222,7 +251,7 @@ describe('FbdEditor — controlled component', () => {
   })
 
   it('does not render paths when signals array is empty', () => {
-    const network = {
+    const network: FbdNetwork = {
       blocks: [{ id: 'b1', type: 'AND', label: '', x: 50, y: 50 }],
       signals: [],
     }
@@ -234,7 +263,7 @@ describe('FbdEditor — controlled component', () => {
   })
 
   it('renders input pins on blocks', () => {
-    const network = {
+    const network: FbdNetwork = {
       blocks: [{ id: 'b1', type: 'AND', label: '', x: 50, y: 50 }],
       signals: [],
     }
@@ -245,7 +274,7 @@ describe('FbdEditor — controlled component', () => {
   })
 
   it('renders output pins on blocks', () => {
-    const network = {
+    const network: FbdNetwork = {
       blocks: [{ id: 'b1', type: 'AND', label: '', x: 50, y: 50 }],
       signals: [],
     }
@@ -256,7 +285,7 @@ describe('FbdEditor — controlled component', () => {
   })
 
   it('INPUT block has no input pins', () => {
-    const network = {
+    const network: FbdNetwork = {
       blocks: [{ id: 'b1', type: 'INPUT', label: '', x: 50, y: 50 }],
       signals: [],
     }
@@ -269,7 +298,7 @@ describe('FbdEditor — controlled component', () => {
   })
 
   it('OUTPUT block has no output pins', () => {
-    const network = {
+    const network: FbdNetwork = {
       blocks: [{ id: 'b1', type: 'OUTPUT', label: '', x: 50, y: 50 }],
       signals: [],
     }
@@ -292,34 +321,34 @@ describe('FbdEditor — controlled component', () => {
 
 // Inline mock helpers matching the vi.mock factory above (used directly
 // in these tests so we avoid module-resolution issues for a non-existent file).
-const mockAddBlock = (network, blockDef) => {
+const mockAddBlock = (network: FbdNetwork, blockDef: Omit<FbdBlock, 'id'>): FbdNetwork => {
   const id = `mock-block-${Math.random().toString(36).slice(2, 9)}`
   return { ...network, blocks: [...(network.blocks || []), { id, ...blockDef }] }
 }
-const mockAddSignal = (network, signalDef) => {
+const mockAddSignal = (network: FbdNetwork, signalDef: Omit<FbdSignal, 'id'>): FbdNetwork => {
   const id = `mock-sig-${Math.random().toString(36).slice(2, 9)}`
   return { ...network, signals: [...(network.signals || []), { id, ...signalDef }] }
 }
-const mockCreateNetwork = () => ({ blocks: [], signals: [] })
-const mockValidateNetwork = () => ({ ok: true, errors: [] })
+const mockCreateNetwork = (): FbdNetwork => ({ blocks: [], signals: [] })
+const mockValidateNetwork = (_network: FbdNetwork) => ({ ok: true, errors: [] as string[] })
 
 describe('FbdEditor — onChange contract', () => {
   it('addBlock helper returns a network with one more block', () => {
     // Simulate what the component does when a palette button is clicked.
-    const network = { blocks: [], signals: [] }
+    const network: FbdNetwork = { blocks: [], signals: [] }
     const next = mockAddBlock(network, { type: 'AND', label: '', x: 40, y: 40 })
     expect(next.blocks).toHaveLength(1)
     expect(next.blocks[0].type).toBe('AND')
   })
 
   it('addBlock does not mutate original network', () => {
-    const network = { blocks: [], signals: [] }
+    const network: FbdNetwork = { blocks: [], signals: [] }
     mockAddBlock(network, { type: 'OR', label: '', x: 0, y: 0 })
     expect(network.blocks).toHaveLength(0)
   })
 
   it('addSignal adds a signal between two blocks', () => {
-    let net = { blocks: [], signals: [] }
+    let net: FbdNetwork = { blocks: [], signals: [] }
     net = mockAddBlock(net, { type: 'INPUT', label: '', x: 40, y: 40 })
     net = mockAddBlock(net, { type: 'OUTPUT', label: '', x: 200, y: 40 })
     const [src, dst] = net.blocks
@@ -345,22 +374,22 @@ describe('FbdEditor — onChange contract', () => {
 
   it('placing a block via onChange fires with an updated network', () => {
     // Simulate the palette click handler logic from FbdEditor.
-    let captured = null
-    const network = { blocks: [], signals: [] }
-    const onChange = (next) => { captured = next }
+    let captured: FbdNetwork | null = null
+    const network: FbdNetwork = { blocks: [], signals: [] }
+    const onChange = (next: FbdNetwork) => { captured = next }
 
     // Mimic what handlePaletteClick does internally.
     const next = mockAddBlock(network, { type: 'CTU', label: '', x: 40, y: 40 })
     onChange(next)
 
     expect(captured).not.toBeNull()
-    expect(captured.blocks).toHaveLength(1)
-    expect(captured.blocks[0].type).toBe('CTU')
+    expect((captured as FbdNetwork).blocks).toHaveLength(1)
+    expect((captured as FbdNetwork).blocks[0].type).toBe('CTU')
   })
 
   it('onChange receives updated blocks after adding second block', () => {
-    let state = { blocks: [], signals: [] }
-    const onChange = (next) => { state = next }
+    let state: FbdNetwork = { blocks: [], signals: [] }
+    const onChange = (next: FbdNetwork) => { state = next }
 
     onChange(mockAddBlock(state, { type: 'AND', label: '', x: 40, y: 40 }))
     onChange(mockAddBlock(state, { type: 'OR', label: '', x: 200, y: 40 }))

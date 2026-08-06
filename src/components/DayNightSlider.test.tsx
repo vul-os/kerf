@@ -7,11 +7,11 @@
 
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import DayNightSlider from './DayNightSlider.jsx'
+import DayNightSlider, { type Props } from './DayNightSlider.jsx'
 
 // ── Render helper ──────────────────────────────────────────────────────────────
 
-function render(props = {}) {
+function render(props: Props = {}) {
   return renderToStaticMarkup(<DayNightSlider {...props} />)
 }
 

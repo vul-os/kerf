@@ -9,9 +9,14 @@
 
 import { useCallback, useRef, useState } from 'react'
 import { parseGds } from '../lib/gdsLoader.js'
-import LayoutViewer from './LayoutViewer.jsx'
+import LayoutViewer, { type LayoutTree } from './LayoutViewer.jsx'
 
 // ── Component ─────────────────────────────────────────────────────────────────
+
+export interface Props {
+  pdk?: 'sky130' | 'gf180' | null
+  className?: string
+}
 
 /**
  * GdsLayoutPage — drop-zone + LayoutViewer integration.
@@ -20,16 +25,16 @@ import LayoutViewer from './LayoutViewer.jsx'
  *   pdk       {'sky130'|'gf180'|null}  PDK palette to use (default: 'sky130').
  *   className {string}                 Extra CSS classes for the outer wrapper.
  */
-export default function GdsLayoutPage({ pdk = 'sky130', className = '' }) {
-  const [layout, setLayout]   = useState(null)
+export default function GdsLayoutPage({ pdk = 'sky130', className = '' }: Props) {
+  const [layout, setLayout]   = useState<LayoutTree | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState(null)
-  const [fileName, setFileName] = useState(null)
-  const inputRef = useRef(null)
+  const [error, setError]     = useState<string | null>(null)
+  const [fileName, setFileName] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // ── File handling ────────────────────────────────────────────────────────
 
-  const handleFile = useCallback(async (file) => {
+  const handleFile = useCallback(async (file: File | null | undefined) => {
     if (!file) return
     setLoading(true)
     setError(null)
@@ -39,27 +44,27 @@ export default function GdsLayoutPage({ pdk = 'sky130', className = '' }) {
       const parsed = await parseGds(file)
       setLayout(parsed)
     } catch (err) {
-      setError(err.message ?? 'Unknown error parsing GDS file')
+      setError((err as Error)?.message ?? 'Unknown error parsing GDS file')
       setLayout(null)
     } finally {
       setLoading(false)
     }
   }, [])
 
-  const handleInputChange = useCallback((e) => {
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) handleFile(file)
     // Reset so the same file can be re-selected
     e.target.value = ''
   }, [handleFile])
 
-  const handleDrop = useCallback((e) => {
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     const file = e.dataTransfer.files?.[0]
     if (file) handleFile(file)
   }, [handleFile])
 
-  const handleDragOver = useCallback((e) => {
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
   }, [])
 

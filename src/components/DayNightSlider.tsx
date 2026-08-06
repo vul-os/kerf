@@ -22,6 +22,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { solarPosition, tToClockString, createClock } from '../lib/dayNightCycle.js'
 
+type SolarPosition = ReturnType<typeof solarPosition>
+type Clock = ReturnType<typeof createClock>
+
 // ── Speed options ──────────────────────────────────────────────────────────────
 
 const SPEED_OPTIONS = [
@@ -47,11 +50,11 @@ const GRADIENT = [
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function formatNum(n, decimals = 1) {
+function formatNum(n: number, decimals = 1) {
   return Number(n).toFixed(decimals)
 }
 
-function SunIcon({ className }) {
+function SunIcon({ className }: { className?: string }) {
   return (
     <svg
       className={className}
@@ -72,7 +75,7 @@ function SunIcon({ className }) {
   )
 }
 
-function MoonIcon({ className }) {
+function MoonIcon({ className }: { className?: string }) {
   return (
     <svg
       className={className}
@@ -87,16 +90,23 @@ function MoonIcon({ className }) {
 
 // ── DayNightSlider ─────────────────────────────────────────────────────────────
 
+export interface Props {
+  initialT?: number
+  speed?: number
+  onChange?: (pos: SolarPosition) => void
+  className?: string
+}
+
 export default function DayNightSlider({
   initialT = 0.25,
   speed: initialSpeed = 60,
   onChange,
   className = '',
-}) {
-  const [pos, setPos] = useState(() => solarPosition(initialT))
+}: Props) {
+  const [pos, setPos] = useState<SolarPosition>(() => solarPosition(initialT))
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(initialSpeed)
-  const clockRef = useRef(null)
+  const clockRef = useRef<Clock | null>(null)
 
   // Initialise the clock once
   useEffect(() => {
@@ -130,7 +140,7 @@ export default function DayNightSlider({
     }
   }, [playing])
 
-  const handleSliderChange = useCallback((e) => {
+  const handleSliderChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newT = parseFloat(e.target.value)
     const clock = clockRef.current
     if (!clock) return
@@ -140,7 +150,7 @@ export default function DayNightSlider({
     onChange?.(newPos)
   }, [onChange])
 
-  const handleSpeedChange = useCallback((val) => {
+  const handleSpeedChange = useCallback((val: number) => {
     setSpeed(val)
     clockRef.current?.setSpeed(val)
   }, [])

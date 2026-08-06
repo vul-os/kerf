@@ -18,6 +18,41 @@
 import { useCallback, useState } from 'react'
 import { Box, Network, AlertTriangle, CheckCircle2, X, Download, RefreshCw } from 'lucide-react'
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface MultiBoardPanelProps {
+  onClose?: () => void
+}
+
+interface ApiError { ok: false; error: string }
+
+interface ValidateResult {
+  valid: boolean
+  mating_issues?: string[]
+  overlap_warnings?: string[]
+}
+
+interface NetMapBridge {
+  workspace_net: string
+  board_a: string
+  board_a_net: string
+  board_b: string
+  board_b_net: string
+}
+
+interface NetMapResult {
+  bridge_count?: number
+  floating_nets?: string[]
+  bridges?: NetMapBridge[]
+  continuity_issues?: string[]
+}
+
+interface StepExportResult {
+  filename: string
+  board_count: number
+  size_bytes: number
+}
+
 // ── Demo fixture ─────────────────────────────────────────────────────────────
 
 const DEMO_WORKSPACE = {
@@ -40,7 +75,7 @@ const DEMO_WORKSPACE = {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-async function apiPost(endpoint, body) {
+async function apiPost<T>(endpoint: string, body: Record<string, unknown>): Promise<T | ApiError> {
   try {
     const r = await fetch(`/api/llm-tools/${endpoint}`, {
       method: 'POST',
@@ -49,13 +84,13 @@ async function apiPost(endpoint, body) {
     })
     return r.ok ? r.json() : { ok: false, error: `HTTP ${r.status}` }
   } catch (e) {
-    return { ok: false, error: e.message }
+    return { ok: false, error: e instanceof Error ? e.message : 'Request failed' }
   }
 }
 
 // ── Violation row ────────────────────────────────────────────────────────────
 
-function IssueRow({ text }) {
+function IssueRow({ text }: { text: string }) {
   return (
     <div className="flex items-start gap-2 px-2 py-1 text-[11px]">
       <AlertTriangle size={12} className="text-yellow-400 mt-0.5 shrink-0" />
@@ -66,41 +101,41 @@ function IssueRow({ text }) {
 
 // ── Main panel ───────────────────────────────────────────────────────────────
 
-export default function MultiBoardPanel({ onClose }) {
-  const [tab, setTab] = useState('workspace')
+export default function MultiBoardPanel({ onClose }: MultiBoardPanelProps) {
+  const [tab, setTab] = useState<'workspace' | 'connectors' | 'netmap' | 'export'>('workspace')
   const [loading, setLoading] = useState(false)
-  const [validateResult, setValidateResult] = useState(null)
-  const [netMapResult, setNetMapResult]     = useState(null)
-  const [stepResult, setStepResult]         = useState(null)
+  const [validateResult, setValidateResult] = useState<ValidateResult | null>(null)
+  const [netMapResult, setNetMapResult]     = useState<NetMapResult | null>(null)
+  const [stepResult, setStepResult]         = useState<StepExportResult | null>(null)
   const [offline, setOffline]               = useState(false)
 
   const ws = DEMO_WORKSPACE
 
   const runValidate = useCallback(async () => {
     setLoading(true)
-    const r = await apiPost('electronics_mb3d_validate_workspace', ws)
+    const r = await apiPost<ValidateResult>('electronics_mb3d_validate_workspace', ws)
     setLoading(false)
-    if (!r || r.error) { setOffline(true); return }
+    if (!r || 'error' in r) { setOffline(true); return }
     setValidateResult(r)
   }, [])
 
   const runNetMap = useCallback(async () => {
     setLoading(true)
-    const r = await apiPost('electronics_mb3d_net_map', ws)
+    const r = await apiPost<NetMapResult>('electronics_mb3d_net_map', ws)
     setLoading(false)
-    if (!r || r.error) { setOffline(true); return }
+    if (!r || 'error' in r) { setOffline(true); return }
     setNetMapResult(r)
   }, [])
 
   const runExportStep = useCallback(async () => {
     setLoading(true)
-    const r = await apiPost('electronics_mb3d_export_step', ws)
+    const r = await apiPost<StepExportResult>('electronics_mb3d_export_step', ws)
     setLoading(false)
-    if (!r || r.error) { setOffline(true); return }
+    if (!r || 'error' in r) { setOffline(true); return }
     setStepResult(r)
   }, [])
 
-  const TABS = [
+  const TABS: { id: 'workspace' | 'connectors' | 'netmap' | 'export'; label: string }[] = [
     { id: 'workspace', label: 'Workspace' },
     { id: 'connectors', label: 'Connectors' },
     { id: 'netmap', label: 'Net Map' },

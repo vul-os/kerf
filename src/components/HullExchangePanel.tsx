@@ -16,12 +16,69 @@ import { useState, useCallback } from 'react'
 import {
   Download,
   FileText,
-  Play,
   Loader2,
   AlertTriangle,
   CheckCircle,
   ArrowRight,
 } from 'lucide-react'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export type HullExchangeFormat = 'dxf' | 'iges' | '3dm'
+
+interface HullSectionPoint {
+  waterline_m: number
+  half_breadth_m: number
+}
+interface HullSection {
+  station_m: number
+  area_coeff: number
+  points: HullSectionPoint[]
+}
+interface HullWaterline {
+  draft_m: number
+  stations_m: number[]
+  half_breadths_m: number[]
+}
+interface HullButtock {
+  half_breadth_m: number
+  stations_m: number[]
+  drafts_m: number[]
+}
+export interface HullForm {
+  L_m: number
+  B_m: number
+  T_m: number
+  Cb?: number
+  Cm?: number
+  Cp?: number
+  lcb_frac?: number
+  lcb_m_from_ap?: number
+  volume_m3?: number
+  n_sections: number
+  n_waterlines?: number
+  n_buttocks?: number
+  sections: HullSection[]
+  waterlines: HullWaterline[]
+  buttocks: HullButtock[]
+}
+
+interface HullExchangeResult {
+  hull_name?: string
+  content?: string
+  content_base64?: string
+  n_bytes?: number
+  n_chars?: number
+  note?: string
+  error?: string
+}
+
+export interface HullExchangePanelProps {
+  hullForm?: HullForm | null
+  content?: string | null
+}
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -32,7 +89,7 @@ const API_URL =
     ? import.meta.env.VITE_API_URL || ''
     : ''
 
-async function callTool(toolName, args) {
+async function callTool<T>(toolName: string, args: Record<string, unknown>): Promise<T> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -49,14 +106,14 @@ async function callTool(toolName, args) {
   return data.result ?? data
 }
 
-function base64ToBlob(b64, mime) {
+function base64ToBlob(b64: string, mime: string): Blob {
   const binary = atob(b64)
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
   return new Blob([bytes], { type: mime })
 }
 
-function downloadText(text, filename, mime = 'text/plain') {
+function downloadText(text: string, filename: string, mime = 'text/plain'): void {
   const blob = new Blob([text], { type: mime })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -66,7 +123,7 @@ function downloadText(text, filename, mime = 'text/plain') {
   URL.revokeObjectURL(url)
 }
 
-function downloadBlob(blob, filename) {
+function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -79,7 +136,20 @@ function downloadBlob(blob, filename) {
 // Format cards
 // ---------------------------------------------------------------------------
 
-const FORMATS = [
+interface FormatDef {
+  id: HullExchangeFormat
+  label: string
+  subtitle: string
+  desc: string
+  ext: string
+  mime: string
+  badge: 'text' | 'binary'
+  color: string
+  borderColor: string
+  bgColor: string
+}
+
+const FORMATS: FormatDef[] = [
   {
     id: 'dxf',
     label: 'DXF',
@@ -118,7 +188,7 @@ const FORMATS = [
   },
 ]
 
-function FormatCard({ fmt, selected, onSelect }) {
+function FormatCard({ fmt, selected, onSelect }: { fmt: FormatDef; selected: boolean; onSelect: (id: HullExchangeFormat) => void }) {
   return (
     <button
       onClick={() => onSelect(fmt.id)}
@@ -144,7 +214,7 @@ function FormatCard({ fmt, selected, onSelect }) {
 // Export result display
 // ---------------------------------------------------------------------------
 
-function ExportResult({ result, format }) {
+function ExportResult({ result, format }: { result: HullExchangeResult | null | undefined; format: HullExchangeFormat }) {
   if (!result) return null
 
   const fmt = FORMATS.find(f => f.id === format)
@@ -152,12 +222,12 @@ function ExportResult({ result, format }) {
   const handleDownload = () => {
     const suffix = result.hull_name || 'hull'
     if (format === '3dm') {
-      const blob = base64ToBlob(result.content_base64, 'application/octet-stream')
+      const blob = base64ToBlob(result.content_base64 || '', 'application/octet-stream')
       downloadBlob(blob, `${suffix}.3dm`)
     } else if (format === 'dxf') {
-      downloadText(result.content, `${suffix}.dxf`, 'application/dxf')
+      downloadText(result.content || '', `${suffix}.dxf`, 'application/dxf')
     } else if (format === 'iges') {
-      downloadText(result.content, `${suffix}.igs`, 'application/iges')
+      downloadText(result.content || '', `${suffix}.igs`, 'application/iges')
     }
   }
 
@@ -201,25 +271,25 @@ function ExportResult({ result, format }) {
 // Main panel
 // ---------------------------------------------------------------------------
 
-export default function HullExchangePanel({ hullForm: hullFormProp, content }) {
+export default function HullExchangePanel({ hullForm: hullFormProp, content }: HullExchangePanelProps) {
   // Backward-compatible content string: JSON.parse it and merge into hullForm.
-  let _parsed = null
+  let _parsed: (HullForm & { hullForm?: HullForm }) | null = null
   if (content != null) {
     try { _parsed = JSON.parse(content) } catch { /* ignore */ }
   }
-  const hullForm = (_parsed && _parsed.sections) ? _parsed
+  const hullForm: HullForm | null | undefined = (_parsed && _parsed.sections) ? _parsed
     : (_parsed && _parsed.hullForm) ? _parsed.hullForm
     : hullFormProp
-  const [format, setFormat] = useState('dxf')
+  const [format, setFormat] = useState<HullExchangeFormat>('dxf')
   const [useSplines, setUseSplines] = useState(true)
-  const [results, setResults] = useState({})
+  const [results, setResults] = useState<Partial<Record<HullExchangeFormat, HullExchangeResult>>>({})
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const hasHullForm = hullForm && hullForm.sections && hullForm.sections.length > 0
+  const hasHullForm = Boolean(hullForm && hullForm.sections && hullForm.sections.length > 0)
 
   const handleExport = useCallback(async () => {
-    if (!hasHullForm) return
+    if (!hasHullForm || !hullForm) return
     setLoading(true)
     setError(null)
     try {
@@ -228,11 +298,11 @@ export default function HullExchangePanel({ hullForm: hullFormProp, content }) {
         format,
         use_splines: useSplines,
       }
-      const result = await callTool('marine_hull_exchange', args)
+      const result = await callTool<HullExchangeResult>('marine_hull_exchange', args)
       if (result?.error) throw new Error(result.error)
       setResults(prev => ({ ...prev, [format]: result }))
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
@@ -308,7 +378,7 @@ export default function HullExchangePanel({ hullForm: hullFormProp, content }) {
 
       {/* Results for each format */}
       {Object.entries(results).map(([fmt, result]) => (
-        <ExportResult key={fmt} result={result} format={fmt} />
+        <ExportResult key={fmt} result={result} format={fmt as HullExchangeFormat} />
       ))}
 
       {/* Standards note */}

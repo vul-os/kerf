@@ -6492,6 +6492,31 @@ this repo as transitive tscircuit dependencies. Both carry
     `point_on_ellipse`, ellipse semi-major/minor/rotation, `bezier_g2`) with cascade tests.
   - **VERIFIED:** typecheck 0, strict 0, ratchet 78/78, vitest 477 files / 13,209 passed.
 
+### T-567 — Worker protocol drift found by typing the workers (T-506/T-507)
+- **Tier:** A · **Priority:** P1 · **Status:** ⬜ not started
+- T-501 built `src/types/workers.ts` by reading the workers' header comments. Migrating the workers
+  themselves was the first time the declared protocol met the real `postMessage` call sites. Most
+  of it held — jscad and circuit matched **exactly**. The occt side did not:
+  - **Two OUT message types exist in neither the header comment nor `OcctWorkerResponse`:**
+    `surface_curvature_combs_result` and `occt_g3_audit_result`, posted as side-channels
+    mid-evaluation by `opSurfaceCurvatureCombs`/`opOcctG3Audit`. Verified: 8 occurrences in
+    `occtWorker.ts`, **0** in `workers.ts`. The agent correctly **did not widen the union silently**
+    — a type that quietly grows to match whatever the code does stops being a contract.
+  - `occtRunner.requestFaceOutline()` resolves with the **raw worker message** (still carrying
+    `type`/`runId`), not the stripped `OcctFaceOutlineResult` envelope its type and comment imply.
+    Harmless today — callers ignore the extra fields — but the type is wrong.
+  - The header comment omitted `partial` on the error message and `planar`/`faceNames` on
+    `face_outline_result`, all of which are always sent. **`workers.ts` had these right**, so the
+    stale artefact was the hand-written comment, not the derived type.
+  - `breptToMesh()` returns a bare mesh (no `id`/`faceNames`) while `workers.ts` types the error
+    envelope's `partial` as a full `Mesh`. Latent: every real consumer already treats it as bare.
+  - `geometry.ts`'s `FaceDescriptor.isCap`/`isTop` are **required**, but `extractFaceDescriptors()`
+    — the primary producer — never sets either.
+  - The `progress` message remains, as documented, with **no producer anywhere**.
+- **Scope:** decide per item whether the type or the code is authoritative, then fix that side. The
+  two undocumented messages are the substantive one — either model them or stop sending them.
+- **Depends-on:** T-506/T-507 (landed)
+
 ### T-566 — Dead modules found during migration (delete or wire up)
 - **Tier:** B · **Priority:** P2 · **Status:** ⬜ not started
 - Three modules were found unreachable while typing them. All were **typed and kept** rather than

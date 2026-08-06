@@ -1,5 +1,5 @@
 /**
- * ParametricFamilyEditorPanel.jsx — Parametric Family Editor
+ * ParametricFamilyEditorPanel.tsx — Parametric Family Editor
  * with nested sub-families and type catalogue (Revit parity).
  *
  * Features
@@ -30,13 +30,77 @@ import {
 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type ParamType = 'number' | 'text' | 'choice' | 'boolean'
+type ParamValue = number | string | boolean
+
+interface FamilyParameter {
+  name: string
+  type: ParamType
+  default: ParamValue
+  min?: number | null
+  max?: number | null
+  units?: string
+  description?: string
+  choices?: string[]
+}
+
+interface FamilyFormula {
+  name: string
+  expression: string
+}
+
+interface Family {
+  name: string
+  category: string
+  parameters: FamilyParameter[]
+  formulas: FamilyFormula[]
+}
+
+interface NestedFamily {
+  sub_family_id: string
+  placement_params: Record<string, string>
+  count: string | number
+  label: string
+  ifc_type: string
+}
+
+interface CatalogueEntry {
+  type_id: string
+  name: string
+  [key: string]: string | number
+}
+
+type ResolvedValues = Record<string, ParamValue | null>
+
+interface InstantiatedNested extends NestedFamily {
+  resolved_placement_params: Record<string, ParamValue>
+  resolved_count: number
+}
+
+interface InstantiatedResult {
+  family: string
+  category: string
+  type_id: string | null
+  resolved_params: ResolvedValues
+  nested: InstantiatedNested[]
+}
+
+export interface ParametricFamilyEditorPanelProps {
+  content?: string
+  onToast?: (msg: string) => void
+}
+
+// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const PARAM_TYPES = ['number', 'text', 'choice', 'boolean']
+const PARAM_TYPES: ParamType[] = ['number', 'text', 'choice', 'boolean']
 const CATEGORIES = ['door', 'window', 'furniture', 'fixture', 'column', 'beam', 'generic']
 
-const DEMO_FAMILY = {
+const DEMO_FAMILY: Family = {
   name: 'Curtain Wall System',
   category: 'generic',
   parameters: [
@@ -53,12 +117,12 @@ const DEMO_FAMILY = {
   ],
 }
 
-const DEMO_NESTED = [
+const DEMO_NESTED: NestedFamily[] = [
   { sub_family_id: 'GLAZING_PANEL', placement_params: { width: 'panel_width', height: 'frame_height' }, count: 'panel_count', label: 'Glazing Panel', ifc_type: 'IfcWindow' },
   { sub_family_id: 'FRAME_PROFILE',  placement_params: { width: 'frame_width', height: 'height' }, count: 4, label: 'Frame Profile', ifc_type: 'IfcMember' },
 ]
 
-const DEMO_CATALOGUE = [
+const DEMO_CATALOGUE: CatalogueEntry[] = [
   { type_id: 'CW-6000x3200', name: '6m × 3.2m (Standard)',  width: 6000, height: 3200, panel_count: 4 },
   { type_id: 'CW-3000x2700', name: '3m × 2.7m (Narrow)',    width: 3000, height: 2700, panel_count: 2 },
   { type_id: 'CW-9000x4200', name: '9m × 4.2m (Wide)',      width: 9000, height: 4200, panel_count: 6 },
@@ -68,8 +132,8 @@ const DEMO_CATALOGUE = [
 // Helpers
 // ---------------------------------------------------------------------------
 
-function evaluateFormulas(params, formulas, overrides = {}) {
-  const ns = { ...Object.fromEntries(params.map(p => [p.name, p.default])), ...overrides }
+function evaluateFormulas(params: FamilyParameter[], formulas: FamilyFormula[], overrides: Record<string, ParamValue> = {}): ResolvedValues {
+  const ns: ResolvedValues = { ...Object.fromEntries(params.map(p => [p.name, p.default])), ...overrides }
   for (const f of formulas) {
     try {
       // Safe eval with only known names
@@ -86,7 +150,12 @@ function evaluateFormulas(params, formulas, overrides = {}) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function FormulaRow({ formula, resolved }) {
+interface FormulaRowProps {
+  formula: FamilyFormula
+  resolved: ResolvedValues
+}
+
+function FormulaRow({ formula, resolved }: FormulaRowProps) {
   const val = resolved?.[formula.name]
   return (
     <div className="flex items-center gap-2 text-xs">
@@ -102,39 +171,39 @@ function FormulaRow({ formula, resolved }) {
   )
 }
 
-let _nextParamId = 0, _nextFormulaId = 0
+let _nextParamId = 0
 
 // ---------------------------------------------------------------------------
 // Main panel
 // ---------------------------------------------------------------------------
 
-export default function ParametricFamilyEditorPanel({ content, onToast }) {
+export default function ParametricFamilyEditorPanel({ content, onToast: _onToast }: ParametricFamilyEditorPanelProps) {
   // Accept a `content` string (JSON) from the panel registry.
   // content.family can seed the initial family definition.
-  const _cp = (() => { if (!content) return {}; try { return JSON.parse(content) } catch { return {} } })()
-  const [family, setFamily] = useState(_cp.family ?? DEMO_FAMILY)
-  const [nestedFamilies, setNestedFamilies] = useState(DEMO_NESTED)
-  const [catalogue, setCatalogue] = useState(DEMO_CATALOGUE)
-  const [selectedTypeId, setSelectedTypeId] = useState(null)
-  const [instantiated, setInstantiated] = useState(null)
-  const [errors, setErrors] = useState([])
+  const _cp = (() => { if (!content) return {} as { family?: Family }; try { return JSON.parse(content) } catch { return {} } })()
+  const [family, setFamily] = useState<Family>(_cp.family ?? DEMO_FAMILY)
+  const [nestedFamilies, _setNestedFamilies] = useState<NestedFamily[]>(DEMO_NESTED)
+  const [catalogue, _setCatalogue] = useState<CatalogueEntry[]>(DEMO_CATALOGUE)
+  const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null)
+  const [instantiated, setInstantiated] = useState<InstantiatedResult | null>(null)
+  const [errors, setErrors] = useState<string[]>([])
   const [expanded, setExpanded] = useState(true)
-  const [activeTab, setActiveTab] = useState('params')
+  const [activeTab, setActiveTab] = useState<'params' | 'formulas' | 'nested' | 'catalogue' | 'result' | 'validation'>('params')
 
   const currentTypeEntry = catalogue.find(e => e.type_id === selectedTypeId) || null
-  const typeOverrides = currentTypeEntry
+  const typeOverrides: Record<string, ParamValue> = currentTypeEntry
     ? Object.fromEntries(Object.entries(currentTypeEntry).filter(([k]) => !['type_id', 'name'].includes(k)))
     : {}
 
   const resolved = evaluateFormulas(family.parameters, family.formulas, typeOverrides)
 
   const instantiate = useCallback(() => {
-    const nested = nestedFamilies.map(nf => {
-      const childParams = {}
+    const nested: InstantiatedNested[] = nestedFamilies.map(nf => {
+      const childParams: Record<string, ParamValue> = {}
       for (const [k, expr] of Object.entries(nf.placement_params)) {
         childParams[k] = resolved[expr] ?? expr
       }
-      const count = typeof nf.count === 'string' ? (resolved[nf.count] || 1) : nf.count
+      const count = typeof nf.count === 'string' ? (Number(resolved[nf.count]) || 1) : nf.count
       return { ...nf, resolved_placement_params: childParams, resolved_count: count }
     })
     setInstantiated({ family: family.name, category: family.category, type_id: selectedTypeId, resolved_params: resolved, nested })
@@ -142,7 +211,7 @@ export default function ParametricFamilyEditorPanel({ content, onToast }) {
   }, [family, nestedFamilies, resolved, selectedTypeId])
 
   const validate = useCallback(() => {
-    const errs = []
+    const errs: string[] = []
     const paramNames = new Set(family.parameters.map(p => p.name))
     const known = new Set(paramNames)
     for (const f of family.formulas) {
@@ -162,7 +231,7 @@ export default function ParametricFamilyEditorPanel({ content, onToast }) {
     setActiveTab('validation')
   }, [family, nestedFamilies])
 
-  const updateParam = useCallback((idx, field, val) => {
+  const updateParam = useCallback((idx: number, field: keyof FamilyParameter, val: FamilyParameter[keyof FamilyParameter]) => {
     setFamily(f => ({ ...f, parameters: f.parameters.map((p, i) => i === idx ? { ...p, [field]: val } : p) }))
   }, [])
 
@@ -170,7 +239,7 @@ export default function ParametricFamilyEditorPanel({ content, onToast }) {
     setFamily(f => ({ ...f, parameters: [...f.parameters, { name: `param_${++_nextParamId}`, type: 'number', default: 0, units: '', description: '' }] }))
   }, [])
 
-  const removeParam = useCallback((idx) => {
+  const removeParam = useCallback((idx: number) => {
     setFamily(f => ({ ...f, parameters: f.parameters.filter((_, i) => i !== idx) }))
   }, [])
 
@@ -229,7 +298,16 @@ export default function ParametricFamilyEditorPanel({ content, onToast }) {
 
           {/* Tabs */}
           <div className="flex border-b border-ink-200 dark:border-ink-700 flex-wrap">
-            {[['params', 'Parameters'], ['formulas', 'Formulas'], ['nested', 'Nested'], ['catalogue', 'Type Catalogue'], ['result', 'Result'], ['validation', 'Validation']].map(([id, label]) => (
+            {(
+              [
+                ['params', 'Parameters'],
+                ['formulas', 'Formulas'],
+                ['nested', 'Nested'],
+                ['catalogue', 'Type Catalogue'],
+                ['result', 'Result'],
+                ['validation', 'Validation'],
+              ] as const
+            ).map(([id, label]) => (
               <button key={id} onClick={() => setActiveTab(id)}
                 className={`px-2.5 py-1.5 text-xs font-medium border-b-2 transition-colors ${
                   activeTab === id ? 'border-purple-500 text-purple-600 dark:text-purple-400' : 'border-transparent text-ink-500 hover:text-ink-700 dark:hover:text-ink-300'
@@ -254,7 +332,7 @@ export default function ParametricFamilyEditorPanel({ content, onToast }) {
                     <div className="flex items-center gap-1.5">
                       <input value={p.name} onChange={(e) => updateParam(idx, 'name', e.target.value)}
                         className="flex-1 rounded border border-ink-200 dark:border-ink-600 bg-transparent px-1.5 py-0.5 text-xs font-mono" placeholder="name" />
-                      <select value={p.type} onChange={(e) => updateParam(idx, 'type', e.target.value)}
+                      <select value={p.type} onChange={(e) => updateParam(idx, 'type', e.target.value as ParamType)}
                         className="rounded border border-ink-200 dark:border-ink-600 bg-transparent px-1 py-0.5 text-xs">
                         {PARAM_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
@@ -262,7 +340,7 @@ export default function ParametricFamilyEditorPanel({ content, onToast }) {
                     </div>
                     <div className="grid grid-cols-3 gap-1.5">
                       <div><label className="text-ink-400">Default</label>
-                        <input type={p.type === 'number' ? 'number' : 'text'} value={p.default} onChange={(e) => updateParam(idx, 'default', p.type === 'number' ? parseFloat(e.target.value) : e.target.value)}
+                        <input type={p.type === 'number' ? 'number' : 'text'} value={p.default as string | number} onChange={(e) => updateParam(idx, 'default', p.type === 'number' ? parseFloat(e.target.value) : e.target.value)}
                           className="mt-0.5 w-full rounded border border-ink-200 dark:border-ink-600 bg-transparent px-1 py-0.5 text-xs" /></div>
                       <div><label className="text-ink-400">Min</label>
                         <input type="number" value={p.min ?? ''} onChange={(e) => updateParam(idx, 'min', e.target.value ? parseFloat(e.target.value) : null)}
@@ -301,9 +379,12 @@ export default function ParametricFamilyEditorPanel({ content, onToast }) {
                   <div className="font-mono text-blue-600 dark:text-blue-400">{nf.sub_family_id}</div>
                   <div className="text-ink-500">{nf.label} · count: {nf.count} · {nf.ifc_type}</div>
                   <div className="mt-1 text-ink-400">
-                    {Object.entries(nf.placement_params).map(([k, v]) => (
-                      <span key={k} className="mr-2">{k}={resolved[v] !== undefined ? `${resolved[v]?.toFixed(2) ?? v}` : v}</span>
-                    ))}
+                    {Object.entries(nf.placement_params).map(([k, v]) => {
+                      const rv = resolved[v]
+                      return (
+                        <span key={k} className="mr-2">{k}={rv !== undefined ? `${typeof rv === 'number' ? rv.toFixed(2) : rv}` : v}</span>
+                      )
+                    })}
                   </div>
                 </div>
               ))}

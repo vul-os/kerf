@@ -1,4 +1,4 @@
-// DerivedCacheOverlay.test.jsx
+// DerivedCacheOverlay.test.tsx
 //
 // Tests for the DerivedCacheOverlay component and its mounting contract in
 // Editor.jsx.
@@ -15,8 +15,14 @@
 // useEffect execution needed to assert structural output.
 
 import { describe, it, expect, vi } from 'vitest'
+// @types/node isn't part of this project's toolchain (tsconfig.json's `types` array is
+// T-500's — see docs/typescript-migration.md), so these Node builtins (used only for this
+// file's source-inspection assertions) are untyped at this boundary.
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
+// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 import { renderToStaticMarkup } from 'react-dom/server'
 import React from 'react'
@@ -32,10 +38,16 @@ const editorSrc = readFileSync(
   'utf8',
 )
 
+// FINDING (dead code, left as-is per T-513's "report, don't fix"): this variable was
+// already unused in the original .jsx — no assertion below reads `overlaySrc`. Kept
+// for parity with the pre-migration file; path extension updated from .jsx to .tsx so
+// the eager readFileSync doesn't throw ENOENT now that the source has been renamed
+// (docs/typescript-migration.md's "tests that read source by literal path" trap).
 const overlaySrc = readFileSync(
-  path.resolve(__dirname, './DerivedCacheOverlay.jsx'),
+  path.resolve(__dirname, './DerivedCacheOverlay.tsx'),
   'utf8',
 )
+void overlaySrc
 
 // ---------------------------------------------------------------------------
 // 1. Editor.jsx DEV gate

@@ -1,4 +1,4 @@
-// DerivedCacheOverlay.jsx — dev toggle showing derived-artifact cache stats.
+// DerivedCacheOverlay.tsx — dev toggle showing derived-artifact cache stats.
 //
 // Displays a floating badge that tracks derived-artifact cache hits and misses
 // for the current session. Click the badge to expand a panel showing per-kind
@@ -14,26 +14,34 @@
 import { useEffect, useReducer, useRef, useState } from 'react'
 import { Database, X } from 'lucide-react'
 import { addDerivedCacheListener } from '../lib/assembly.js'
+import type { DerivedCacheEvent } from '../lib/assembly.js'
 
 // ---------------------------------------------------------------------------
 // State reducer
 // ---------------------------------------------------------------------------
 
-const INITIAL_STATE = {
+interface DerivedCacheStats {
   // session totals
+  hits: number
+  misses: number
+  // per-kind last event: derivedKind → { hit, payloadSize, age, timestamp }
+  byKind: Record<string, DerivedCacheEvent>
+  // flat log (last N)
+  log: DerivedCacheEvent[]
+}
+
+const INITIAL_STATE: DerivedCacheStats = {
   hits: 0,
   misses: 0,
-  // per-kind last event: derivedKind → { hit, payloadSize, age, timestamp }
   byKind: {},
-  // flat log (last N)
   log: [],
 }
 
 const MAX_LOG = 20
 
-function statsReducer(state, evt) {
+function statsReducer(state: DerivedCacheStats, evt: DerivedCacheEvent): DerivedCacheStats {
   const { hit, derivedKind, payloadSize, age, timestamp } = evt
-  const entry = { hit, derivedKind, payloadSize, age, timestamp }
+  const entry: DerivedCacheEvent = { hit, derivedKind, payloadSize, age, timestamp, projectId: evt.projectId, fileId: evt.fileId }
   return {
     hits: state.hits + (hit ? 1 : 0),
     misses: state.misses + (hit ? 0 : 1),
@@ -46,13 +54,13 @@ function statsReducer(state, evt) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function HitBadge({ hit }) {
+function HitBadge({ hit }: { hit: boolean }) {
   return hit
     ? <span className="inline-block px-1 rounded text-[9px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">HIT</span>
     : <span className="inline-block px-1 rounded text-[9px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">MISS</span>
 }
 
-function KindRow({ kind, entry }) {
+function KindRow({ kind, entry }: { kind: string; entry: DerivedCacheEvent }) {
   const ageStr = entry.age != null ? `${entry.age}s ago` : '—'
   const sizeStr = entry.payloadSize != null ? formatBytes(entry.payloadSize) : '—'
   return (
@@ -65,14 +73,14 @@ function KindRow({ kind, entry }) {
   )
 }
 
-function formatBytes(n) {
+function formatBytes(n: number | null | undefined): string {
   if (n == null) return '—'
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} kB`
   return `${(n / (1024 * 1024)).toFixed(2)} MB`
 }
 
-function formatTime(ts) {
+function formatTime(ts: number | null | undefined): string {
   if (!ts) return ''
   const d = new Date(ts)
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -82,6 +90,15 @@ function formatTime(ts) {
 // Main component
 // ---------------------------------------------------------------------------
 
+export type DerivedCacheOverlayPosition = 'bottom-left' | 'bottom-right'
+
+export interface DerivedCacheOverlayProps {
+  /** default 'bottom-right' */
+  position?: DerivedCacheOverlayPosition
+  /** start expanded (default false) */
+  defaultOpen?: boolean
+}
+
 /**
  * DerivedCacheOverlay — floating dev panel for derived-artifact cache stats.
  *
@@ -89,10 +106,10 @@ function formatTime(ts) {
  *   position  — 'bottom-left' | 'bottom-right' (default 'bottom-right')
  *   defaultOpen — start expanded (default false)
  */
-export default function DerivedCacheOverlay({ position = 'bottom-right', defaultOpen = false }) {
+export default function DerivedCacheOverlay({ position = 'bottom-right', defaultOpen = false }: DerivedCacheOverlayProps) {
   const [stats, dispatch] = useReducer(statsReducer, INITIAL_STATE)
   const [open, setOpen] = useState(defaultOpen)
-  const panelRef = useRef(null)
+  const panelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     return addDerivedCacheListener(dispatch)

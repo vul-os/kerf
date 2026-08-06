@@ -1,18 +1,12 @@
 // ControlsWrapper.jsx
 // ControlsPanel is a pure visualiser; content JSON is parsed and spread over defaults.
-import Panel from '../../../components/ControlsPanel.jsx'
+import Panel, { type ControlsPanelProps } from '../../../components/ControlsPanel'
 
 export interface Props {
   content?: string
 }
 
-// ControlsPanel.jsx is not yet migrated, so there's no Props type to import;
-// this mirrors the fields it destructures from its own props.
-interface ControlsContent {
-  bode?: unknown
-  nyquist?: unknown
-  step?: unknown
-}
+type ControlsContent = Pick<ControlsPanelProps, 'bode' | 'nyquist' | 'step'>
 
 const DEFAULTS: ControlsContent = {
   bode: null,

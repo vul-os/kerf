@@ -32,9 +32,9 @@ import { execFileSync } from 'node:child_process'
 // Inherited (not introduced) lint errors across the ENTIRE src tree, JS and TS alike.
 // Counting both buckets is the point — see the CORRECTION note above.
 // Measured 2026-08-07 at 662, down from 1184 when the TS-only variant read 73.
-// Lowered to 610 the same day as the chrome/panel slices landed.
+// Lowered to 610, then 540, as the chrome/panel/test slices landed.
 // This number may only ever go DOWN.
-const BASELINE = 610
+const BASELINE = 540
 
 const args = [
   'eslint',

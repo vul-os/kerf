@@ -1,8 +1,14 @@
-// FlutterPanel.test.jsx — vitest smoke tests for the V-g/V-f flutter panel.
+// FlutterPanel.test.tsx — vitest smoke tests for the V-g/V-f flutter panel.
 
+import type { ComponentType } from 'react'
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import FlutterPanel from './FlutterPanel.jsx'
+import FlutterPanelUntyped from './FlutterPanel.jsx'
+
+// FlutterPanel.jsx is not yet migrated (T-515); its destructured params read
+// as required by TS's structural inference even though `content` is optional
+// at runtime (no default value implies "required", not "absent").
+const FlutterPanel = FlutterPanelUntyped as unknown as ComponentType<Record<string, unknown>>
 
 // ---------------------------------------------------------------------------
 // Fixtures

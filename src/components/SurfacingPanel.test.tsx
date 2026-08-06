@@ -13,7 +13,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import SurfacingPanel from './SurfacingPanel.jsx'
+import SurfacingPanel from './SurfacingPanel'
 
 // ---------------------------------------------------------------------------
 // Basic rendering (Gordon tab is default)

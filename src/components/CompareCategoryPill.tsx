@@ -7,8 +7,18 @@
  *   onSelect    (id: string|null) => void
  */
 
-/** @param {{ categories: Array<{id: string, label: string}>, active: string|null, onSelect: (id: string|null) => void }} props */
-export default function CompareCategoryPill({ categories, active, onSelect }) {
+interface Category {
+  id: string
+  label: string
+}
+
+interface Props {
+  categories: Category[]
+  active: string | null
+  onSelect: (id: string | null) => void
+}
+
+export default function CompareCategoryPill({ categories, active, onSelect }: Props) {
   return (
     <div
       className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide"
@@ -36,8 +46,15 @@ export default function CompareCategoryPill({ categories, active, onSelect }) {
   )
 }
 
+interface PillProps {
+  id: string | null
+  label: string
+  active: boolean
+  onSelect: (id: string | null) => void
+}
+
 /** Individual pill button. */
-function Pill({ id, label, active, onSelect }) {
+function Pill({ id, label, active, onSelect }: PillProps) {
   return (
     <button
       role="tab"

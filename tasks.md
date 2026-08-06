@@ -6879,6 +6879,38 @@ imports across all `packages/*/src` Python.
 
 ---
 
+### T-569 — Enable @types/node; delete 193 boilerplate suppressions
+
+`@types/node` is already present in `node_modules` (transitive) but excluded by
+`tsconfig.json`'s explicit `"types": ["vite/client", "vitest/globals"]`. Because of that, every
+test file touching `fs`/`path`/`url` carries:
+
+```ts
+// @ts-expect-error - no @types/node in this toolchain
+import { readFileSync } from 'fs'
+```
+
+That accounts for **193 of the tree's 236 `@ts-expect-error` directives — 82% of all
+suppressions, from one missing entry in one array.**
+
+Measured, not assumed: adding `"node"` to the `types` array produces 196 errors, of which 195 are
+`TS2578 Unused '@ts-expect-error' directive` (i.e. the suppressions becoming correctly
+unnecessary) and exactly **one** is real — `src/lib/iesLoader.test.ts` declares a local
+`process` shim (`{ cwd(): string }`) that conflicts with the real `Process` type. Nothing else
+breaks: no `setTimeout`/`NodeJS.Timeout` fallout, no DOM/global collisions.
+
+**Deferred deliberately, not overlooked.** Seven migration agents are in flight and their briefs
+instruct them to add exactly this suppression pattern; flipping the flag mid-run would turn every
+new one into a hard error and force seven context-laden agents to be re-briefed. Sequenced as a
+single mechanical sweep once G1's file migrations are done.
+
+Steps:
+1. Add `"node"` to `types` in `tsconfig.json`, and declare `@types/node` explicitly in
+   `package.json` devDependencies — relying on a transitive install is fragile.
+2. Delete the local `process` shim in `src/lib/iesLoader.test.ts`.
+3. Codemod out every `// @ts-expect-error - no @types/node in this toolchain` line.
+4. Gates: typecheck 0, `lint:ts:ratchet` should FALL — lower the baseline.
+
 ## G1…G4 parallel execution plan
 
 **Barriers.** Only two: **T-500** (nothing in G1 forks before it) and **T-525** (nothing in G2

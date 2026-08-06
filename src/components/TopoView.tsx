@@ -25,14 +25,74 @@
 // result arrays a future engine slice writes into `results`.
 
 import { useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { Activity, AlertTriangle, Box, Loader2, Play, Sigma } from 'lucide-react'
+import type { Ref, ReactNode } from 'react'
+import { AlertTriangle, Loader2, Play, Sigma } from 'lucide-react'
 import { useWorkspace } from '../store/workspace.js'
 import { snapshotCanvas } from '../lib/snapshotHelpers.js'
 import { api } from '../lib/api.js'
 
+// ── Types ──────────────────────────────────────────────────────────────────
+//
+// Mirrors the `.topo` file shape documented in this file's header comment
+// (backend/internal/llm/docs/topo.md). Not a src/types/geometry.ts shape —
+// this is TopoView's own file-parsing domain, colocated per T-513.
+
+/** One X-Y projected sample of a SIMP density field — the `.topo` file's
+ *  own `results.density_field` shape, distinct from topoUtils.ts's binary
+ *  DensityVertex (x/y/z/density) mesh format. */
+export interface DensityFieldPoint {
+  x: number
+  y: number
+  rho: number
+}
+
+export interface TopoSpec {
+  design_space_feature_path?: string
+  material_path?: string
+  volume_fraction: number
+  penalization_power: number
+  filter_radius_mm: number
+  max_iterations: number
+  convergence_tolerance: number
+}
+
+export interface TopoResults {
+  status: string
+  iterations: number
+  final_compliance: number | null
+  final_volume_fraction: number | null
+  warnings: string[]
+  errors: string[]
+  output_mesh_file_id: string | null
+  density_field?: DensityFieldPoint[] | null
+}
+
+export type ParsedTopo =
+  | { kind: 'invalid'; raw: string }
+  | { kind: 'unsupported'; raw: string }
+  | { kind: 'ok'; spec: TopoSpec; results: TopoResults }
+
+/** Loosely-typed `.topo` JSON document as parsed off disk — every field is
+ *  optional/unknown-shaped until parseTopo() normalises it. */
+interface RawTopoDoc {
+  version?: number
+  design_space_feature_path?: string
+  material_path?: string
+  volume_fraction?: number
+  penalization_power?: number
+  filter_radius_mm?: number
+  max_iterations?: number
+  convergence_tolerance?: number
+  results?: Partial<TopoResults> & Record<string, unknown>
+}
+
 const ENGINE_PENDING_WARNING = 'Engine pending — FEniCSx not yet deployed.'
 
-export function parseTopo(content) {
+// Exported alongside the default TopoView component (module's own file-parsing helpers) —
+// pre-existing; splitting into a separate module is a refactor out of scope for a rename-only
+// migration (T-513).
+// eslint-disable-next-line react-refresh/only-export-components -- see comment above.
+export function parseTopo(content: string | null | undefined): ParsedTopo {
   const raw = typeof content === 'string' ? content : ''
   if (!raw.trim()) {
     return {
@@ -55,10 +115,10 @@ export function parseTopo(content) {
       },
     }
   }
-  let doc
+  let doc: RawTopoDoc
   try {
     doc = JSON.parse(raw)
-  } catch (e) {
+  } catch {
     return { kind: 'invalid', raw }
   }
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
@@ -67,7 +127,7 @@ export function parseTopo(content) {
   if (doc.version !== 1) {
     return { kind: 'unsupported', raw }
   }
-  const spec = {
+  const spec: TopoSpec = {
     design_space_feature_path: doc.design_space_feature_path || '',
     material_path: doc.material_path || '',
     volume_fraction: doc.volume_fraction || 0.3,
@@ -77,7 +137,7 @@ export function parseTopo(content) {
     convergence_tolerance: doc.convergence_tolerance || 1e-4,
   }
   const r = (doc.results && typeof doc.results === 'object') ? doc.results : {}
-  const results = {
+  const results: TopoResults = {
     status: typeof r.status === 'string' ? r.status : 'pending',
     iterations: typeof r.iterations === 'number' ? r.iterations : 0,
     final_compliance: typeof r.final_compliance === 'number' ? r.final_compliance : null,
@@ -87,13 +147,14 @@ export function parseTopo(content) {
     errors: Array.isArray(r.errors) ? r.errors : [],
     output_mesh_file_id:
       typeof r.output_mesh_file_id === 'string' ? r.output_mesh_file_id : null,
-    density_field: Array.isArray(r.density_field) ? r.density_field : null,
+    density_field: Array.isArray(r.density_field) ? r.density_field as DensityFieldPoint[] : null,
   }
   return { kind: 'ok', spec, results }
 }
 
-export function addEnginePendingWarning(parsed) {
-  const base = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+// eslint-disable-next-line react-refresh/only-export-components -- pre-existing, see parseTopo above.
+export function addEnginePendingWarning(parsed: unknown): RawTopoDoc {
+  const base: RawTopoDoc = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as RawTopoDoc : {}
   const r = base.results && typeof base.results === 'object' && !Array.isArray(base.results) ? base.results : {}
   const warnings = Array.isArray(r.warnings) ? r.warnings.slice() : []
   const errors = Array.isArray(r.errors) ? r.errors.slice() : []
@@ -110,18 +171,32 @@ export function addEnginePendingWarning(parsed) {
   }
 }
 
-export default function TopoView({ content, fileName, viewRef, projectId, fileId }) {
+export interface TopoViewHandle {
+  snapshot: (opts?: { size?: number; quality?: number }) => Promise<Blob | null>
+}
+
+interface TopoViewProps {
+  content?: string | null
+  fileName?: string
+  viewRef?: Ref<TopoViewHandle>
+  projectId?: string
+  fileId?: string
+}
+
+export default function TopoView({ content, fileName, viewRef, projectId, fileId }: TopoViewProps) {
   const parsed = parseTopo(content || '')
   const [running, setRunning] = useState(false)
-  const rootRef = useRef(null)
+  const rootRef = useRef<HTMLDivElement | null>(null)
 
   // Capture whatever the DensityMeshViewer is currently rendering. If
   // the optimization hasn't run yet, no canvas exists → null → Editor
   // falls back to skipping the upload.
   useImperativeHandle(viewRef, () => ({
-    snapshot: (opts) => {
+    snapshot: (opts?: { size?: number; quality?: number }) => {
       const canvas = rootRef.current?.querySelector?.('canvas')
-      return snapshotCanvas(canvas, opts)
+      // snapshotHelpers.ts (untyped .ts, not this slice) infers Promise<unknown> from its
+      // bare `new Promise((resolve) => ...)` — it only ever resolves Blob | null at runtime.
+      return snapshotCanvas(canvas, opts) as Promise<Blob | null>
     },
   }), [])
 
@@ -328,7 +403,7 @@ export default function TopoView({ content, fileName, viewRef, projectId, fileId
   )
 }
 
-function FieldCard({ label, value, mono }) {
+function FieldCard({ label, value, mono }: { label: string; value: string | number | null | undefined; mono?: boolean }) {
   return (
     <div className="bg-ink-900 border border-ink-800 rounded px-2 py-1.5">
       <div className="text-[10px] uppercase tracking-wider text-ink-500 font-medium">
@@ -345,14 +420,17 @@ function FieldCard({ label, value, mono }) {
   )
 }
 
-function DensityMeshViewer({ meshFileId }) {
-  const [glbUrl, setGlbUrl] = useState(null)
+function DensityMeshViewer({ meshFileId }: { meshFileId: string }) {
+  const [glbUrl, setGlbUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!meshFileId) return
     let cancelled = false
+    // Kicks off the async densityMeshToGLTF fetch and needs the loading flag set before that
+    // promise chain starts — pre-existing "fetch effect" shape, same as many other view components.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see comment above.
     setLoading(true)
     setError(null)
 
@@ -399,14 +477,23 @@ function DensityMeshViewer({ meshFileId }) {
   )
 }
 
-function ThreeDenseMesh({ url }) {
-  const containerRef = useRef(null)
+// `three` ships no type declarations and there is no @types/three (see docs/typescript-migration.md
+// "Known traps") — THREE.* below resolves to `any`. Annotated anyway for documentation value,
+// matching the CloudLayer.tsx/BIMView.tsx precedent. GLTFLoader has no types at all either.
+interface ThreeSceneObj {
+  renderer: { render: (scene: unknown, camera: unknown) => void; dispose: () => void }
+  camera: unknown
+  scene: unknown
+}
+
+function ThreeDenseMesh({ url }: { url: string | null }) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (!containerRef.current || !url) return
 
     let cancelled = false
-    let sceneObj = null
+    let sceneObj: ThreeSceneObj | null = null
 
     Promise.all([
       import('three'),
@@ -463,7 +550,7 @@ function ThreeDenseMesh({ url }) {
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
 }
 
-function SectionHeading({ children }) {
+function SectionHeading({ children }: { children: ReactNode }) {
   return (
     <div className="mb-2 text-[10px] uppercase tracking-wider text-ink-500 font-medium">
       {children}
@@ -476,7 +563,7 @@ function SectionHeading({ children }) {
  * Groups elements by (x, y) grid cell, averages rho per cell.
  * Renders as an SVG grid where color encodes density (0=transparent, 1=kerf-300).
  */
-function DensityFieldHeatmap({ densityField }) {
+function DensityFieldHeatmap({ densityField }: { densityField: DensityFieldPoint[] | null | undefined }) {
   if (!densityField || densityField.length === 0) return null
 
   const GRID = 30  // max grid resolution
@@ -495,8 +582,8 @@ function DensityFieldHeatmap({ densityField }) {
   const yRange = yMax - yMin || 1
 
   // Bin into grid
-  const grid = new Map()
-  const gridCount = new Map()
+  const grid = new Map<string, number>()
+  const gridCount = new Map<string, number>()
   for (const pt of densityField) {
     const gx = Math.min(GRID - 1, Math.floor(((pt.x - xMin) / xRange) * GRID))
     const gy = Math.min(GRID - 1, Math.floor(((pt.y - yMin) / yRange) * GRID))
@@ -505,7 +592,7 @@ function DensityFieldHeatmap({ densityField }) {
     gridCount.set(key, (gridCount.get(key) || 0) + 1)
   }
 
-  const cells = []
+  const cells: { gx: number; gy: number; rho: number }[] = []
   for (const [key, sum] of grid.entries()) {
     const [gx, gy] = key.split(',').map(Number)
     const avg = sum / gridCount.get(key)

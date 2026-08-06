@@ -14,11 +14,33 @@
  */
 
 import { useState, useCallback } from 'react'
-import { POST_EFFECTS, DEFAULT_SETTINGS, clampSettings } from '../lib/postEffects.js'
+import {
+  POST_EFFECTS,
+  DEFAULT_SETTINGS,
+  clampSettings,
+  type PostEffectKey,
+  type PostEffectsSettings,
+  type PostEffectsSettingsInput,
+} from '../lib/postEffects.js'
 
 // ── Labels / metadata for each effect ────────────────────────────────────────
 
-const EFFECT_META = {
+interface SliderMeta {
+  key: string
+  label: string
+  min: number
+  max: number
+  step: number
+  decimals: number
+}
+
+interface EffectMeta {
+  label: string
+  description: string
+  sliders: SliderMeta[]
+}
+
+const EFFECT_META: Record<PostEffectKey, EffectMeta> = {
   bloom: {
     label: 'Bloom',
     description: 'Glow around bright surfaces',
@@ -72,7 +94,13 @@ const EFFECT_META = {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function EffectToggle({ effectKey, enabled, onToggle }) {
+interface EffectToggleProps {
+  effectKey: PostEffectKey
+  enabled: boolean
+  onToggle: (effectKey: PostEffectKey, enabled: boolean) => void
+}
+
+function EffectToggle({ effectKey, enabled, onToggle }: EffectToggleProps) {
   const id = `post-fx-toggle-${effectKey}`
   return (
     <button
@@ -99,7 +127,14 @@ function EffectToggle({ effectKey, enabled, onToggle }) {
   )
 }
 
-function EffectSlider({ effectKey, sliderMeta, value, onSliderChange }) {
+interface EffectSliderProps {
+  effectKey: PostEffectKey
+  sliderMeta: SliderMeta
+  value: number | undefined
+  onSliderChange: (effectKey: PostEffectKey, paramKey: string, value: number) => void
+}
+
+function EffectSlider({ effectKey, sliderMeta, value, onSliderChange }: EffectSliderProps) {
   const id = `post-fx-${effectKey}-${sliderMeta.key}`
   const displayValue = typeof value === 'number' && !Number.isNaN(value)
     ? value.toFixed(sliderMeta.decimals)
@@ -131,7 +166,16 @@ function EffectSlider({ effectKey, sliderMeta, value, onSliderChange }) {
   )
 }
 
-function EffectRow({ effectKey, effectSettings, onToggle, onSliderChange }) {
+type AnyEffectSettings = PostEffectsSettings[PostEffectKey]
+
+interface EffectRowProps {
+  effectKey: PostEffectKey
+  effectSettings: AnyEffectSettings | undefined
+  onToggle: (effectKey: PostEffectKey, enabled: boolean) => void
+  onSliderChange: (effectKey: PostEffectKey, paramKey: string, value: number) => void
+}
+
+function EffectRow({ effectKey, effectSettings, onToggle, onSliderChange }: EffectRowProps) {
   const meta = EFFECT_META[effectKey]
   if (!meta) return null
   const enabled = !!effectSettings?.enabled
@@ -153,7 +197,7 @@ function EffectRow({ effectKey, effectSettings, onToggle, onSliderChange }) {
           key={slider.key}
           effectKey={effectKey}
           sliderMeta={slider}
-          value={effectSettings?.[slider.key]}
+          value={(effectSettings as unknown as Record<string, number> | undefined)?.[slider.key]}
           onSliderChange={onSliderChange}
         />
       ))}
@@ -163,30 +207,31 @@ function EffectRow({ effectKey, effectSettings, onToggle, onSliderChange }) {
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
-/**
- * PostEffectsPanel
- *
- * @param {object}    props
- * @param {object}    [props.settings]   Initial/controlled settings. Defaults to DEFAULT_SETTINGS.
- * @param {function}  [props.onChange]   onChange(settings) — called on every change.
- * @param {function}  [props.onClose]    Optional close-button handler.
- */
-export default function PostEffectsPanel({ settings: settingsProp, onChange, onClose }) {
-  const [settings, setSettings] = useState(() =>
+export interface PostEffectsPanelProps {
+  /** Initial/controlled settings. Defaults to DEFAULT_SETTINGS. */
+  settings?: PostEffectsSettingsInput
+  /** Called with the full updated settings object on every change. */
+  onChange?: (settings: PostEffectsSettings) => void
+  /** Optional close-button handler. */
+  onClose?: () => void
+}
+
+export default function PostEffectsPanel({ settings: settingsProp, onChange, onClose }: PostEffectsPanelProps) {
+  const [settings, setSettings] = useState<PostEffectsSettings>(() =>
     clampSettings({ ...DEFAULT_SETTINGS, ...(settingsProp || {}) })
   )
 
-  const emit = useCallback((next) => {
+  const emit = useCallback((next: PostEffectsSettings) => {
     setSettings(next)
     if (typeof onChange === 'function') onChange(next)
   }, [onChange])
 
-  const handleToggle = useCallback((effectKey, enabled) => {
+  const handleToggle = useCallback((effectKey: PostEffectKey, enabled: boolean) => {
     const next = { ...settings, [effectKey]: { ...settings[effectKey], enabled } }
     emit(clampSettings(next))
   }, [settings, emit])
 
-  const handleSlider = useCallback((effectKey, paramKey, value) => {
+  const handleSlider = useCallback((effectKey: PostEffectKey, paramKey: string, value: number) => {
     const next = {
       ...settings,
       [effectKey]: { ...settings[effectKey], [paramKey]: value },

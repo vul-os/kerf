@@ -79,8 +79,11 @@ beforeAll(async () => {
 //    directly — avoids re-importing the whole component.
 // ---------------------------------------------------------------------------
 
+// Extension-agnostic: FeatureView migrated from .jsx to .tsx (T-513).
+const featureViewTsxPath = path.resolve(import.meta.dirname, '../components/FeatureView.tsx')
+const featureViewJsxPath = path.resolve(import.meta.dirname, '../components/FeatureView.jsx')
 const FEATURE_VIEW_SRC = fs.readFileSync(
-  path.resolve(import.meta.dirname, '../components/FeatureView.jsx'),
+  fs.existsSync(featureViewTsxPath) ? featureViewTsxPath : featureViewJsxPath,
   'utf8',
 )
 

@@ -22,7 +22,7 @@
 
 import { describe, it, expect, vi } from 'vitest'
 // @ts-expect-error - no @types/node in this toolchain
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 // @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
 // @ts-expect-error - no @types/node in this toolchain
@@ -31,8 +31,11 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+// Extension-agnostic: FeatureView migrated from .jsx to .tsx (T-513).
+const featureViewTsxPath = path.resolve(__dirname, './FeatureView.tsx')
+const featureViewJsxPath = path.resolve(__dirname, './FeatureView.jsx')
 const src = readFileSync(
-  path.resolve(__dirname, './FeatureView.jsx'),
+  existsSync(featureViewTsxPath) ? featureViewTsxPath : featureViewJsxPath,
   'utf8',
 )
 

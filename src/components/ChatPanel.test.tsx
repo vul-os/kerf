@@ -1,4 +1,4 @@
-// ChatPanel.test.jsx — Vitest tests for ChatPanel wiring:
+// ChatPanel.test.tsx — Vitest tests for ChatPanel wiring:
 //   - childrenToText utility
 //   - isCircuitJson guard (via Markdown code component)
 //   - Markdown component renders without crashing
@@ -42,7 +42,13 @@ vi.mock('../lib/usePrefersReducedMotion.js', () => ({
   default: () => false,
 }))
 
-import { childrenToText, Markdown } from './ChatPanel.jsx'
+import type { ComponentType } from 'react'
+import { childrenToText, Markdown as MarkdownUntyped } from './ChatPanel.jsx'
+
+// Markdown's `projectId` param has no default in ChatPanel.jsx (not yet
+// migrated, T-515), so TS's structural inference reads it as required even
+// though it's optional at runtime (only threaded into makeMdComponents()).
+const Markdown = MarkdownUntyped as unknown as ComponentType<{ text: string; projectId?: string }>
 
 // ---------------------------------------------------------------------------
 // childrenToText

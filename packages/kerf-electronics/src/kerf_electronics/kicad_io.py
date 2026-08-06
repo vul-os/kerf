@@ -922,6 +922,36 @@ def _parse_footprint_attr(child: list) -> dict[str, bool]:
 #   positions verbatim with no offset — a future writer built with the flip
 #   in mind (T-527) has a stable, geometry-independent rule to invert.
 #
+# T-539 CONFIRMATION: the paragraph above was reasoned from a fixture
+# (zones_keepout_board.kicad_pcb) that has no Edge.Cuts outline at all, so it
+# could not actually distinguish fixed-origin from board-centered — both
+# formulas degenerate to the same thing when `center == {0, 0}`. T-539 built
+# a second fixture with a genuine, off-origin outline
+# (tests/fixtures/board_with_outline.kicad_pcb, bbox (50,50)-(150,120),
+# center (100, 85)) specifically to make them disagree, then settled which
+# one Circuit JSON actually means from evidence, not from this reasoning
+# alone:
+#   - `node_modules/circuit-json/dist/index.d.mts`'s `pcb_board` zod schema
+#     declares `center` as a *required* field of every board — the format
+#     lets a board sit anywhere, `center` is descriptive, not a mandate that
+#     contents get recentered around it.
+#   - `node_modules/@tscircuit/core/dist/index.js`, `Board._getBoardCalcVariables`
+#     / `getResolvedPcbPositionProp`: when tscircuit itself authors a board,
+#     `center` is *derived* from the board's own position props or from its
+#     components' bounding box — never the reverse. Nothing recenters a
+#     component's already-placed coordinates once the board's extent is known.
+#   - A real tscircuit-authored fixture,
+#     `node_modules/@tscircuit/schematic-corpus/dist/designs/design036/circuit.json`,
+#     has `pcb_board.center == {x: 2.415, y: 0}` yet one of its
+#     `pcb_component` entries sits at literal `x: 0` — nowhere near the
+#     board's own center, confirming component coordinates are absolute in a
+#     single shared frame, not relative to the board's bounding box.
+# Verdict: fixed origin is correct. `kicad-to-circuit-json`'s Edge.Cuts-bbox
+# recentering is that project's own import-time convenience, not something
+# Circuit JSON as a format requires. No change made to this function; see
+# `TestKicadOracleOutlineConvention` in test_kicad_oracle.py for the fixture
+# that proves the divergence and pins this conclusion.
+#
 # Deliberately NOT touched: `rotation` on `pcb_component`. A mirror transform
 # does, in general, invert the sense of a rotation angle (kicad-to-circuit-
 # json's own source negates it: `dist/index.js`, `processFootprint`,

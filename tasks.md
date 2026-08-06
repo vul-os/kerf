@@ -6508,7 +6508,38 @@ this repo as transitive tscircuit dependencies. Both carry
 - **Depends-on:** T-560 (landed)
 
 ### T-539 — ⚠️ Validate the T-538 axis choice against a real board outline
-- **Tier:** A · **Priority:** P1 · **Status:** ⬜ not started
+- **Tier:** A · **Priority:** P1 · **Status:** ✅ shipped (2026-08-06) — `d97d4123` (fixture),
+  `696d794d` (divergence recorded), and this commit (verdict + kicad_bridge.py fix).
+  **Verdict: fixed origin is correct. No change to `_flip_kicad_y_to_circuit_json_y`.**
+  - **New fixture** `tests/fixtures/board_with_outline.kicad_pcb`: a genuine `gr_line` rectangle
+    Edge.Cuts outline, bbox `(50,50)-(150,120)`, center `(100, 85)` — deliberately off-origin — plus
+    one footprint at KiCad `(70, 60)`. Does not touch `zones_keepout_board.kicad_pcb`.
+  - **Measured divergence** (`TestKicadOracleOutlineConvention` in `test_kicad_oracle.py`, verified
+    by running `node scripts/kicad_oracle_convert.mjs` and `kicad_pcb_to_circuit_json` directly):
+    kerf's fixed-origin gives `(70.0, -60.0)`; the oracle's board-centered gives `(-30.0, 25.0)`. A
+    real, visible disagreement — not the previous fixture's degenerate agreement.
+  - **Evidence deciding the convention** (from tscircuit's own authoring model, not either reader):
+    (1) `node_modules/circuit-json/dist/index.d.mts`'s `pcb_board` zod schema declares `center` as a
+    **required** field — the format lets a board sit anywhere; `center` is descriptive, not a
+    recentering mandate. (2) `node_modules/@tscircuit/core/dist/index.js`,
+    `Board._getBoardCalcVariables`/`getResolvedPcbPositionProp`: tscircuit *derives* a board's
+    `center` from its own position props or its components' bounding box — never the reverse; nothing
+    recenters already-placed component coordinates once the board's extent is known. (3) A real
+    tscircuit-authored fixture, `@tscircuit/schematic-corpus/dist/designs/design036/circuit.json`, has
+    `pcb_board.center == {x: 2.415, y: 0}` yet one `pcb_component` sits at literal `x: 0` — proving
+    component coordinates are absolute in one shared frame, not relative to the board's own bbox.
+    Conclusion: `kicad-to-circuit-json`'s Edge.Cuts-bbox recentering is that project's own
+    import-time convenience, not something Circuit JSON as a format requires.
+  - **`kicad_bridge.py` fixed too** (writer + reader, as a pair, per this task's scope note below):
+    `_build_kicad_pcb` now writes `kicad_y = -cj_y`; `import_from_kicad_pcb` now flips every `y` it
+    reads (segment start/end, via, footprint `at`) back with `cj_y = -kicad_y`. Before this fix, an
+    *unrouted* round-trip happened to preserve footprint Y only because both bugs canceled out on
+    the one thing that never changed — anything the user actually drew in KiCad Pcbnew (every route,
+    every via, any moved footprint) came back silently mismatched against the rest of Kerf's Y-up
+    geometry. New tests in `TestYAxisConvention` (`test_kicad_bridge.py`) pin the write-side flip
+    (`(at 10.0000 -15.0000)` for CJ `y=15.0`), the unmoved-footprint round-trip recovering the
+    original CJ `y`, and a hand-routed track/via correctly flipping back.
+  - **VERIFIED:** 6853 → 6858 passed, 187 skipped. Oracle tests ran for real, not skipped.
 - **Why this is not settled.** T-538's oracle test currently agrees **for a degenerate reason.**
   `kicad-to-circuit-json` transforms with `compose(scale(1,-1), translate(-center.x, -center.y))`,
   where `center` is the midpoint of the **`Edge.Cuts` outline bbox**, falling back to `{0,0}` when

@@ -581,10 +581,22 @@ def _build_kicad_pcb(
         value = sc.get("value", "")
         fp_name = sc.get("footprint", "Device:R")
 
-        # Use stored position or auto-grid
+        # Use stored position or auto-grid.
+        #
+        # T-539: `pcb_comp["x"]`/`["y"]` are Circuit JSON (Y-up); KiCad's
+        # `.kicad_pcb` is Y-down. This writer previously wrote CJ's `y`
+        # straight through with no flip — the same latent bug T-538 fixed
+        # in kicad_io.py's reader, flagged but deliberately left alone by
+        # T-538/T-539 because this export -> route -> import loop needed its
+        # writer and reader fixed together, not the writer alone. Fixed here:
+        # `kicad_y = -cj_y`, matching kicad_io.py's fixed-origin convention
+        # (`_flip_kicad_y_to_circuit_json_y`) settled by T-539. The
+        # auto-grid fallback below is defined directly in KiCad's own Y-down
+        # space (it has no Circuit JSON origin to invert), so it is
+        # unaffected.
         if "x" in pcb_comp and "y" in pcb_comp:
             x = float(pcb_comp["x"])
-            y = float(pcb_comp["y"])
+            y = -float(pcb_comp["y"])
         else:
             col = pcb_idx % grid_cols
             row = pcb_idx // grid_cols
@@ -656,6 +668,18 @@ def import_from_kicad_pcb(pcb_path: str) -> KiCadImportResult:
     -------
     KiCadImportResult
         Extracted tracks, vias, footprint positions and net list.
+
+    T-539: every `y` this function returns (track start/end, via position,
+    footprint position) is flipped back from KiCad's Y-down to Circuit
+    JSON's Y-up (`cj_y = -kicad_y`) — the same fixed-origin convention
+    kicad_io.py's `_flip_kicad_y_to_circuit_json_y` uses, and the writer
+    half of this pair (`_build_kicad_pcb` above) now applies on the way out.
+    Before this fix, neither direction flipped Y, so an *unrouted*
+    round-trip happened to preserve footprint Y (both bugs canceled out on
+    the one thing that never changed), but anything the user actually drew
+    in KiCad Pcbnew — every route and via, and any footprint the user
+    moved — came back with Y in KiCad's raw sense, silently mismatched
+    against the rest of Kerf's Y-up geometry.
     """
     with open(pcb_path, encoding="utf-8", errors="replace") as fh:
         text = fh.read()
@@ -700,12 +724,13 @@ def import_from_kicad_pcb(pcb_path: str) -> KiCadImportResult:
             tag = child[0]
             if tag == "start" and len(child) >= 3:
                 try:
-                    sx = float(child[1]); sy = float(child[2])
+                    # T-539: KiCad Y-down -> Circuit JSON Y-up.
+                    sx = float(child[1]); sy = -float(child[2])
                 except (ValueError, TypeError):
                     pass
             elif tag == "end" and len(child) >= 3:
                 try:
-                    ex = float(child[1]); ey = float(child[2])
+                    ex = float(child[1]); ey = -float(child[2])
                 except (ValueError, TypeError):
                     pass
             elif tag == "width" and len(child) >= 2:
@@ -747,7 +772,8 @@ def import_from_kicad_pcb(pcb_path: str) -> KiCadImportResult:
             tag = child[0]
             if tag == "at" and len(child) >= 3:
                 try:
-                    vx = float(child[1]); vy = float(child[2])
+                    # T-539: KiCad Y-down -> Circuit JSON Y-up.
+                    vx = float(child[1]); vy = -float(child[2])
                 except (ValueError, TypeError):
                     pass
             elif tag == "size" and len(child) >= 2:
@@ -789,7 +815,8 @@ def import_from_kicad_pcb(pcb_path: str) -> KiCadImportResult:
             tag = child[0]
             if tag == "at" and len(child) >= 3:
                 try:
-                    x = float(child[1]); y = float(child[2])
+                    # T-539: KiCad Y-down -> Circuit JSON Y-up.
+                    x = float(child[1]); y = -float(child[2])
                     if len(child) >= 4:
                         rot = float(child[3])
                 except (ValueError, TypeError):

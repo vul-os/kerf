@@ -235,6 +235,71 @@ class TestImportFromKicadPcb(unittest.TestCase):
         self.assertTrue(imported.caveat)
 
 
+class TestYAxisConvention(unittest.TestCase):
+    """T-539: kicad_bridge.py had the same latent no-flip bug T-538 fixed in
+    kicad_io.py — its writer wrote Circuit JSON's Y-up `y` straight into
+    KiCad's Y-down `.kicad_pcb` with no negation, and its reader read
+    KiCad's Y-down `y` straight back with no negation either. Because this
+    module is a self-contained export -> route -> import loop (unlike
+    kicad_io.py, which only reads externally-authored files), the two bugs
+    silently canceled out for anything that round-tripped *unmoved* — which
+    is exactly why T-538's own oracle work never caught it here, and why
+    T-539 fixes writer and reader together rather than one at a time.
+
+    R1 in two_resistors_circuit.json is `{"x": 10.0, "y": 15.0}` (Circuit
+    JSON, Y-up).
+    """
+
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.outdir = self._tmpdir.name
+
+    def tearDown(self):
+        self._tmpdir.cleanup()
+
+    def test_export_flips_y_into_kicads_down_convention(self):
+        """The writer must emit KiCad's Y-down `at` as `-cj_y`: R1's CJ
+        `y=15.0` must appear in the .kicad_pcb as `-15.0000`, not `15.0000`."""
+        result = export_to_kicad_project(FIXTURE, FIXTURE, self.outdir)
+        with open(result.pcb_path, encoding="utf-8") as fh:
+            text = fh.read()
+        self.assertIn("(at 10.0000 -15.0000)", text)
+        self.assertNotIn("(at 10.0000 15.0000)", text)
+
+    def test_import_recovers_original_cj_y_for_an_unmoved_footprint(self):
+        """Export then immediately re-import (nothing moved in KiCad): the
+        writer's `-cj_y` and the reader's `-kicad_y` must compose back to
+        the original Circuit JSON `y`, not KiCad's raw (negative) one."""
+        result = export_to_kicad_project(FIXTURE, FIXTURE, self.outdir)
+        imported = import_from_kicad_pcb(result.pcb_path)
+        by_ref = {fp.ref: fp for fp in imported.footprint_positions}
+        self.assertAlmostEqual(by_ref["R1"].x, 10.0, places=6)
+        self.assertAlmostEqual(by_ref["R1"].y, 15.0, places=6)
+        self.assertAlmostEqual(by_ref["R2"].x, 35.0, places=6)
+        self.assertAlmostEqual(by_ref["R2"].y, 15.0, places=6)
+
+    def test_import_flips_a_hand_routed_track_and_via_back_to_cj_y(self):
+        """A track/via the user draws in KiCad Pcbnew is authored directly
+        in KiCad's Y-down space. Injecting a segment/via at KiCad `y=15.0`
+        (mirroring `_make_routed_pcb_text`'s convention) must come back as
+        Circuit JSON `y=-15.0`, not `15.0` — the reader's flip must apply
+        uniformly to routing geometry the user adds, not only to footprint
+        positions that started out on the Circuit JSON side."""
+        result = export_to_kicad_project(FIXTURE, FIXTURE, self.outdir)
+        routed_text = _make_routed_pcb_text(result)
+        routed_path = os.path.join(self.outdir, "board_axis.kicad_pcb")
+        with open(routed_path, "w", encoding="utf-8") as fh:
+            fh.write(routed_text)
+
+        imported = import_from_kicad_pcb(routed_path)
+        self.assertEqual(len(imported.tracks), 2)
+        for track in imported.tracks:
+            self.assertAlmostEqual(track.start_y, -15.0, places=6)
+            self.assertAlmostEqual(track.end_y, -15.0, places=6)
+        self.assertEqual(len(imported.vias), 1)
+        self.assertAlmostEqual(imported.vias[0].y, -15.0, places=6)
+
+
 class TestRoundTrip(unittest.TestCase):
     """Round-trip tests: export → inject routes → re-import."""
 

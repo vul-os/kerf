@@ -26,6 +26,8 @@
 // Calls are dispatched as JSON-RPC to /api/llm/tool (chat tool dispatch).
 
 import { useState } from 'react'
+import type { ReactNode } from 'react'
+import type { LucideIcon } from 'lucide-react'
 import {
   Shield, ChevronRight, CheckCircle, XCircle, AlertTriangle,
   Ruler, RotateCcw, Layers, Activity, Filter, AlignLeft,
@@ -35,10 +37,44 @@ import {
 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
+// Local types
+// ---------------------------------------------------------------------------
+
+interface GdtFieldOption {
+  value: string
+  label: string
+}
+
+interface GdtField {
+  key: string
+  label: string
+  kind: 'text' | 'number' | 'select' | 'boolean'
+  default?: unknown
+  min?: number
+  step?: number
+  options?: GdtFieldOption[]
+}
+
+interface GdtTool {
+  id: string
+  label: string
+  category: string
+  icon: LucideIcon
+  standard: string
+  description: string
+  fields: GdtField[]
+}
+
+// LLM tool call params/results are freeform JSON dispatched to
+// /api/llm/tool — no shared schema owns this shape.
+type ToolParams = Record<string, any>
+type ToolResult = Record<string, any> | null
+
+// ---------------------------------------------------------------------------
 // Tool catalogue
 // ---------------------------------------------------------------------------
 
-const GDT_TOOLS = [
+const GDT_TOOLS: GdtTool[] = [
   // ── Runout ─────────────────────────────────────────────────────────────────
   {
     id: 'gdt_check_runout',
@@ -184,7 +220,7 @@ const GDT_TOOLS = [
 // Helpers
 // ---------------------------------------------------------------------------
 
-const CATEGORIES = {
+const CATEGORIES: Record<string, { label: string; color: string }> = {
   runout:    { label: 'Runout',           color: 'text-blue-400' },
   tolerance: { label: 'Composite / Frame', color: 'text-kerf-400' },
   chain:     { label: 'Dimension Chain',  color: 'text-amber-400' },
@@ -192,7 +228,7 @@ const CATEGORIES = {
 }
 
 // GD&T characteristic symbols (Unicode)
-const GDT_SYMBOLS = {
+const GDT_SYMBOLS: Record<string, string> = {
   position:        '⊕',
   flatness:        '⏥',
   straightness:    '⏤',
@@ -210,7 +246,14 @@ const GDT_SYMBOLS = {
 }
 
 // FCF SVG renderer — builds a simple feature control frame SVG preview
-function FcfSvgPreview({ symbol, toleranceMm, datumA, datumB, datumC, modifier }) {
+function FcfSvgPreview({ symbol, toleranceMm, datumA, datumB, datumC, modifier }: {
+  symbol: string
+  toleranceMm?: number | null
+  datumA?: string
+  datumB?: string
+  datumC?: string
+  modifier?: string
+}) {
   const sym = GDT_SYMBOLS[symbol] || symbol || '⊕'
   const modSuffix = modifier === 'mmc' ? 'Ⓜ' : modifier === 'lmc' ? 'Ⓛ' : ''
   const tolStr = toleranceMm != null ? `⌀${Number(toleranceMm).toFixed(3)}${modSuffix}` : '⌀0.000'
@@ -256,7 +299,7 @@ function FcfSvgPreview({ symbol, toleranceMm, datumA, datumB, datumC, modifier }
   )
 }
 
-function PassBadge({ value }) {
+function PassBadge({ value }: { value: unknown }) {
   const pass = value === true || value === 'PASS'
   const fail = value === false || value === 'FAIL'
   if (pass) return (
@@ -272,7 +315,11 @@ function PassBadge({ value }) {
   return null
 }
 
-function FieldEditor({ field, value, onChange }) {
+function FieldEditor({ field, value, onChange }: {
+  field: GdtField
+  value: unknown
+  onChange: (v: any) => void
+}) {
   if (field.kind === 'boolean') {
     return (
       <label className="flex items-center gap-2 text-[11px] text-ink-300 cursor-pointer">
@@ -291,11 +338,11 @@ function FieldEditor({ field, value, onChange }) {
       <div className="flex flex-col gap-1">
         <label className="text-[10px] text-ink-500 uppercase tracking-wider">{field.label}</label>
         <select
-          value={value ?? field.default}
+          value={(value ?? field.default) as string}
           onChange={(e) => onChange(e.target.value)}
           className="bg-ink-900 border border-ink-700 text-ink-100 text-[11px] rounded px-2 py-1 focus:outline-none focus:border-kerf-500"
         >
-          {field.options.map((o) => (
+          {(field.options || []).map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
@@ -308,7 +355,7 @@ function FieldEditor({ field, value, onChange }) {
         <label className="text-[10px] text-ink-500 uppercase tracking-wider">{field.label}</label>
         <input
           type="number"
-          value={value ?? field.default}
+          value={(value ?? field.default) as number}
           min={field.min}
           step={field.step ?? 'any'}
           onChange={(e) => onChange(parseFloat(e.target.value))}
@@ -323,7 +370,7 @@ function FieldEditor({ field, value, onChange }) {
       <label className="text-[10px] text-ink-500 uppercase tracking-wider">{field.label}</label>
       <input
         type="text"
-        value={value ?? field.default ?? ''}
+        value={(value ?? field.default ?? '') as string}
         onChange={(e) => onChange(e.target.value)}
         className="bg-ink-900 border border-ink-700 text-ink-100 text-[11px] rounded px-2 py-1 w-full focus:outline-none focus:border-kerf-500"
       />
@@ -335,7 +382,14 @@ function FieldEditor({ field, value, onChange }) {
 // Tool Inspector (right-hand pane)
 // ---------------------------------------------------------------------------
 
-function ToolInspector({ tool, params, onParamChange, onRun, running, result }) {
+function ToolInspector({ tool, params, onParamChange, onRun, running, result }: {
+  tool: GdtTool | null
+  params: ToolParams
+  onParamChange: (key: string, value: any) => void
+  onRun: () => void
+  running: boolean
+  result: ToolResult
+}) {
   if (!tool) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 text-ink-600">
@@ -346,7 +400,7 @@ function ToolInspector({ tool, params, onParamChange, onRun, running, result }) 
   }
 
   const Icon = tool.icon
-  const catInfo = CATEGORIES[tool.category] ?? {}
+  const catInfo: { label?: string; color?: string } = CATEGORIES[tool.category] ?? {}
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -414,9 +468,9 @@ function ToolInspector({ tool, params, onParamChange, onRun, running, result }) 
 // Tool Card
 // ---------------------------------------------------------------------------
 
-function ToolCard({ tool, selected, onClick }) {
+function ToolCard({ tool, selected, onClick }: { tool: GdtTool; selected: boolean; onClick: () => void }) {
   const Icon = tool.icon
-  const catInfo = CATEGORIES[tool.category] ?? {}
+  const catInfo: { label?: string; color?: string } = CATEGORIES[tool.category] ?? {}
   return (
     <button
       onClick={onClick}
@@ -440,7 +494,13 @@ function ToolCard({ tool, selected, onClick }) {
 // ---------------------------------------------------------------------------
 // Section collapse helper
 // ---------------------------------------------------------------------------
-function CollapsibleSection({ title, icon: Icon, iconClass = 'text-kerf-400', children, defaultOpen = true }) {
+function CollapsibleSection({ title, icon: Icon, iconClass = 'text-kerf-400', children, defaultOpen = true }: {
+  title: string
+  icon?: LucideIcon
+  iconClass?: string
+  children: ReactNode
+  defaultOpen?: boolean
+}) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div className="border border-ink-800 rounded-lg overflow-hidden">
@@ -489,7 +549,7 @@ const TOLERANCE_TYPES = [
   { value: 'runout_total',    label: '⌿ Total Runout' },
 ]
 
-function DrawingAnnotationPanel({ mbdMode, onResult }) {
+function DrawingAnnotationPanel({ mbdMode, onResult }: { mbdMode: boolean; onResult?: (r: ToolResult) => void }) {
   // Drawing selector
   const [drawingId, setDrawingId] = useState(MOCK_DRAWINGS[0].id)
 
@@ -511,15 +571,15 @@ function DrawingAnnotationPanel({ mbdMode, onResult }) {
   const [tolFeatureId, setTolFeatureId]         = useState('hole-0')
 
   // Validate frame state
-  const [validateResult, setValidateResult]     = useState(null)
+  const [validateResult, setValidateResult]     = useState<ToolResult>(null)
   const [validateLoading, setValidateLoading]   = useState(false)
 
   // Apply datum state
-  const [applyDatumResult, setApplyDatumResult] = useState(null)
+  const [applyDatumResult, setApplyDatumResult] = useState<ToolResult>(null)
   const [applyDatumLoading, setApplyDatumLoading] = useState(false)
 
   // Apply tolerance state
-  const [applyTolResult, setApplyTolResult]     = useState(null)
+  const [applyTolResult, setApplyTolResult]     = useState<ToolResult>(null)
   const [applyTolLoading, setApplyTolLoading]   = useState(false)
 
   // Build FCF string from builder state
@@ -531,7 +591,7 @@ function DrawingAnnotationPanel({ mbdMode, onResult }) {
     return `${sym}|${zone}${Number(fcfTolMm).toFixed(3)}${modStr}${datums ? '|' + datums : ''}`
   }
 
-  async function callTool(toolId, params) {
+  async function callTool(toolId: string, params: ToolParams): Promise<any> {
     const res = await fetch('/api/llm/tool', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -840,22 +900,31 @@ function DrawingAnnotationPanel({ mbdMode, onResult }) {
 // Tolerance Stackup Workflow panel
 // ---------------------------------------------------------------------------
 
-const EMPTY_LINK = () => ({ id: crypto.randomUUID(), link_id: '', nominal_mm: 0, tol_plus_mm: 0.1, tol_minus_mm: 0.1, direction: 'positive' })
+interface StackupLink {
+  id: string
+  link_id: string
+  nominal_mm: number
+  tol_plus_mm: number
+  tol_minus_mm: number
+  direction: string
+}
 
-function ToleranceStackupPanel({ onResult }) {
-  const [links, setLinks]                   = useState([EMPTY_LINK()])
+const EMPTY_LINK = (): StackupLink => ({ id: crypto.randomUUID(), link_id: '', nominal_mm: 0, tol_plus_mm: 0.1, tol_minus_mm: 0.1, direction: 'positive' })
+
+function ToleranceStackupPanel({ onResult }: { onResult?: (r: ToolResult) => void }) {
+  const [links, setLinks]                   = useState<StackupLink[]>([EMPTY_LINK()])
   const [gapMin, setGapMin]                 = useState(0.0)
   const [gapMax, setGapMax]                 = useState(1.0)
   const [loading, setLoading]               = useState(false)
-  const [result, setResult]                 = useState(null)
+  const [result, setResult]                 = useState<ToolResult>(null)
 
   function addLink() { setLinks((prev) => [...prev, EMPTY_LINK()]) }
-  function removeLink(idx) { setLinks((prev) => prev.filter((_, i) => i !== idx)) }
-  function updateLink(idx, key, val) {
+  function removeLink(idx: number) { setLinks((prev) => prev.filter((_, i) => i !== idx)) }
+  function updateLink(idx: number, key: keyof StackupLink, val: any) {
     setLinks((prev) => prev.map((l, i) => i === idx ? { ...l, [key]: val } : l))
   }
 
-  async function runStackup(method) {
+  async function runStackup(method: string) {
     setLoading(true)
     setResult(null)
     try {
@@ -916,11 +985,11 @@ function ToleranceStackupPanel({ onResult }) {
               </button>
             </div>
             <div className="grid grid-cols-3 gap-1">
-              {[
+              {([
                 { label: 'Nominal (mm)', key: 'nominal_mm' },
                 { label: '+Tol (mm)',    key: 'tol_plus_mm' },
                 { label: '−Tol (mm)',    key: 'tol_minus_mm' },
-              ].map(({ label, key }) => (
+              ] as const).map(({ label, key }) => (
                 <div key={key} className="flex flex-col gap-0.5">
                   <label className="text-[9px] text-ink-600">{label}</label>
                   <input
@@ -1043,7 +1112,7 @@ function ToleranceStackupPanel({ onResult }) {
 // ---------------------------------------------------------------------------
 // Tiny inline result display
 // ---------------------------------------------------------------------------
-function ResultMini({ result }) {
+function ResultMini({ result }: { result: ToolResult }) {
   if (!result) return null
   const hasPass = result.valid != null || result.compliant != null || result.overall_pass != null
   return (
@@ -1065,10 +1134,10 @@ function ResultMini({ result }) {
 // ---------------------------------------------------------------------------
 
 export default function GDTPanel() {
-  const [selectedId, setSelectedId]   = useState(null)
-  const [params, setParams]           = useState({})
+  const [selectedId, setSelectedId]   = useState<string | null>(null)
+  const [params, setParams]           = useState<ToolParams>({})
   const [running, setRunning]         = useState(false)
-  const [result, setResult]           = useState(null)
+  const [result, setResult]           = useState<ToolResult>(null)
 
   // MBD toggle — when on, GD&T attaches to 3D body instead of drawing sheet
   const [mbdMode, setMbdMode]         = useState(false)
@@ -1078,17 +1147,17 @@ export default function GDTPanel() {
 
   const selected = GDT_TOOLS.find((t) => t.id === selectedId) ?? null
 
-  function handleSelect(tool) {
+  function handleSelect(tool: GdtTool) {
     if (tool.id === selectedId) return
     setSelectedId(tool.id)
     // Initialise params from field defaults
-    const init = {}
+    const init: ToolParams = {}
     for (const f of tool.fields) init[f.key] = f.default ?? ''
     setParams(init)
     setResult(null)
   }
 
-  function handleParamChange(key, value) {
+  function handleParamChange(key: string, value: any) {
     setParams((p) => ({ ...p, [key]: value }))
   }
 
@@ -1112,7 +1181,7 @@ export default function GDTPanel() {
   }
 
   // Group tools by category
-  const grouped = {}
+  const grouped: Record<string, GdtTool[]> = {}
   for (const tool of GDT_TOOLS) {
     if (!grouped[tool.category]) grouped[tool.category] = []
     grouped[tool.category].push(tool)
@@ -1179,7 +1248,7 @@ export default function GDTPanel() {
           <div className="flex-1 overflow-auto py-3 px-2 space-y-4">
             {/* ── Tools tab ─────────────────────────────────────── */}
             {leftTab === 'tools' && Object.entries(grouped).map(([catId, tools]) => {
-              const catInfo = CATEGORIES[catId] ?? { label: catId }
+              const catInfo: { label?: string; color?: string } = CATEGORIES[catId] ?? { label: catId }
               return (
                 <div key={catId}>
                   <p className={`text-[10px] font-semibold uppercase tracking-wider px-1 mb-1.5 ${catInfo.color ?? 'text-ink-500'}`}>

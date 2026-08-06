@@ -1,5 +1,5 @@
 /**
- * cfdViz.test.js — Unit tests for CFD visualisation helpers.
+ * cfdViz.test.ts — Unit tests for CFD visualisation helpers.
  * No DOM, no Three.js, no canvas rendering.
  * We test pure computation functions and mock canvas for draw functions.
  */
@@ -13,16 +13,17 @@ import {
   drawVectorArrows,
   drawPressureContour,
 } from './cfdViz.js'
+import type { PressureFieldGrid } from './cfdViz.js'
 
 // ── Test field ────────────────────────────────────────────────────────────────
 
-function makeField({ nx = 11, ny = 11, speed = 1 } = {}) {
+function makeField({ nx = 11, ny = 11, speed = 1 } = {}): PressureFieldGrid {
   const u = Array.from({ length: ny }, () => Array(nx).fill(speed))
   const v = Array.from({ length: ny }, () => Array(nx).fill(0))
   return { x0: 0, y0: 0, dx: 1, dy: 1, nx, ny, u, v }
 }
 
-function makePressureField({ nx = 5, ny = 5 } = {}) {
+function makePressureField({ nx = 5, ny = 5 } = {}): PressureFieldGrid {
   const field = makeField({ nx, ny })
   field.p = Array.from({ length: ny }, (_, row) =>
     Array.from({ length: nx }, (_, col) => col + row * nx)
@@ -32,8 +33,8 @@ function makePressureField({ nx = 5, ny = 5 } = {}) {
 
 // ── Minimal canvas mock ───────────────────────────────────────────────────────
 
-function makeCtx({ width = 300, height = 200 } = {}) {
-  const calls = []
+function makeCtx({ width = 300, height = 200 } = {}): CanvasRenderingContext2D {
+  const calls: unknown[] = []
   const ctx = {
     canvas: { width, height },
     save: vi.fn(),
@@ -51,7 +52,9 @@ function makeCtx({ width = 300, height = 200 } = {}) {
     // Track calls for assertions
     _calls: calls,
   }
-  return ctx
+  // Minimal mock — only the members the drawing functions actually call are
+  // implemented, so the cast is intentional rather than a real full context.
+  return ctx as unknown as CanvasRenderingContext2D
 }
 
 // ── scalarToCssColor ─────────────────────────────────────────────────────────

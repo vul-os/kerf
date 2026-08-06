@@ -41,17 +41,17 @@ import {
   generateInletSeeds,
   scalarToCssColor,
 } from '../lib/cfdViz.js'
+import type { VectorField, VectorFieldGrid, PressureField } from '../lib/cfdViz.js'
 import { cellsToGrid } from '../lib/streamlineIntegrator.js'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 //
-// Both src/lib/cfdViz.js and src/lib/streamlineIntegrator.js (outside this slice
-// — not part of src/components) are untyped JS, so the CFD field shape is
-// declared locally. Every field is optional because the source branches on
-// `field.cells` truthiness rather than a real discriminant — both the grid form
-// and the flat OpenFOAM-bridge cell-list form fold into one interface here,
-// matching that loose runtime check rather than forcing a discriminated union
-// neither module actually enforces.
+// src/lib/cfdViz.ts and src/lib/streamlineIntegrator.ts (outside this slice — not
+// part of src/components) now export real VectorField/VectorFieldGrid/PressureField
+// types (T-505), but this file's own CfdField shape is kept as-is since
+// CfdViewport.test.tsx imports it and every field being optional matches this
+// component's loose `field.cells` truthiness check rather than a real discriminant.
+// Call sites below cast to the stricter lib types where needed.
 
 export interface CfdCell {
   x: number
@@ -163,7 +163,7 @@ export default function CfdViewport({
     const field = vectorField.cells ? (cellsToGrid(vectorField.cells) as CfdField) : vectorField
 
     // Build transform once and share across layers
-    const transform = buildTransform(field, canvas.width, canvas.height)
+    const transform = buildTransform(field as VectorFieldGrid, canvas.width, canvas.height)
 
     // Layer 1: Pressure contour
     if (showPressure) {
@@ -182,13 +182,13 @@ export default function CfdViewport({
         canvasW: canvas.width,
         canvasH: canvas.height,
       }
-      drawPressureContour(ctx, pField, pressureOpts)
+      drawPressureContour(ctx, pField as PressureField, pressureOpts)
     }
 
     // Layer 2: Streamlines
     if (showStreamlines) {
-      const seeds = seedsProp ?? (generateInletSeeds(field, streamlineCount) as Array<{ x: number; y: number }>)
-      drawStreamlines(ctx, field, seeds, {
+      const seeds = seedsProp ?? (generateInletSeeds(field as VectorFieldGrid, streamlineCount) as Array<{ x: number; y: number }>)
+      drawStreamlines(ctx, field as VectorField, seeds, {
         traceOpts: { max_steps: 2000, dt: (field.dx ?? 1) * 0.5 },
         color: 'rgba(100,200,255,0.7)',
         lineWidth: 1.2,
@@ -209,7 +209,7 @@ export default function CfdViewport({
         canvasW: canvas.width,
         canvasH: canvas.height,
       }
-      drawVectorArrows(ctx, field, arrowOpts)
+      drawVectorArrows(ctx, field as VectorField, arrowOpts)
     }
   }, [
     vectorField, pressureField,

@@ -1,5 +1,5 @@
 /**
- * cfdViz.js — Pure helper functions for CFD viewport visualisation.
+ * cfdViz.ts — Pure helper functions for CFD viewport visualisation.
  *
  * Covers three visual layers that CfdViewport renders on a <canvas>:
  *   1. Streamlines  — traced by streamlineIntegrator, drawn as polylines
@@ -22,18 +22,46 @@
 
 import { traceStreamlines, cellsToGrid, sampleField } from './streamlineIntegrator.js'
 import { scalarToRGB } from './femDisplacement.js'
+import type { VectorFieldGrid, VectorField, OpenFoamCell, Point2, TraceOpts } from './streamlineIntegrator.js'
+
+// Re-exported so consumers (e.g. CfdViewport.tsx) can import the field shapes
+// straight from this module rather than reaching into streamlineIntegrator.js.
+export type { VectorFieldGrid, VectorField, OpenFoamCell, Point2, TraceOpts }
+
+// ── Shared shapes ─────────────────────────────────────────────────────────────
+
+/** {@link OpenFoamCell} plus the optional scalar the pressure overlay reads. */
+export interface PressureCell extends OpenFoamCell {
+  p?: number | null
+}
+
+export interface PressureFieldCells {
+  cells: PressureCell[]
+}
+
+/** {@link VectorFieldGrid} plus the optional `p[][]` scalar grid. */
+export type PressureFieldGrid = VectorFieldGrid & { p?: number[][] | null }
+
+export type PressureField = PressureFieldGrid | PressureFieldCells
+
+export interface CanvasPoint {
+  cx: number
+  cy: number
+}
+
+export interface Transform {
+  scale: number
+  toCanvas(wx: number, wy: number): CanvasPoint
+  toWorld(cx: number, cy: number): { wx: number; wy: number }
+}
 
 // ── Colour helpers ───────────────────────────────────────────────────────────
 
 /**
  * Convert a normalised scalar [0..1] to a CSS rgba() string.
  * Uses the same blue→cyan→green→yellow→red palette as the FEM overlay.
- *
- * @param {number} t  Normalised value [0, 1]
- * @param {number} [alpha=1]
- * @returns {string}
  */
-export function scalarToCssColor(t, alpha = 1) {
+export function scalarToCssColor(t: number, alpha = 1): string {
   const [r, g, b] = scalarToRGB(t)
   return `rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},${alpha})`
 }
@@ -47,12 +75,15 @@ export function scalarToCssColor(t, alpha = 1) {
  *   toCanvas(wx, wy) → {cx, cy}
  *   toWorld(cx, cy)  → {wx, wy}
  *
- * @param {object} field  Grid field (provides x0/y0/dx/dy/nx/ny)
- * @param {number} canvasW
- * @param {number} canvasH
- * @param {number} [margin=10]  Pixel padding inside canvas
+ * @param field  Grid field (provides x0/y0/dx/dy/nx/ny)
+ * @param margin  Pixel padding inside canvas
  */
-export function buildTransform(field, canvasW, canvasH, margin = 10) {
+export function buildTransform(
+  field: VectorFieldGrid,
+  canvasW: number,
+  canvasH: number,
+  margin = 10,
+): Transform {
   const worldW = (field.nx - 1) * field.dx
   const worldH = (field.ny - 1) * field.dy
 
@@ -66,14 +97,14 @@ export function buildTransform(field, canvasW, canvasH, margin = 10) {
 
   return {
     scale,
-    toCanvas(wx, wy) {
+    toCanvas(wx: number, wy: number): CanvasPoint {
       return {
         cx: offsetX + (wx - field.x0) * scale,
         // y flipped: world y increases up, canvas y increases down
         cy: canvasH - offsetY - (wy - field.y0) * scale,
       }
     },
-    toWorld(cx, cy) {
+    toWorld(cx: number, cy: number): { wx: number; wy: number } {
       return {
         wx: (cx - offsetX) / scale + field.x0,
         wy: (canvasH - cy - offsetY) / scale + field.y0,
@@ -84,21 +115,26 @@ export function buildTransform(field, canvasW, canvasH, margin = 10) {
 
 // ── Streamline rendering ─────────────────────────────────────────────────────
 
+export interface DrawStreamlinesOpts {
+  traceOpts?: TraceOpts
+  color?: string
+  lineWidth?: number
+  transform?: Transform
+  canvasW?: number
+  canvasH?: number
+}
+
 /**
  * Draw streamlines onto a 2D canvas context.
  *
- * @param {CanvasRenderingContext2D} ctx
- * @param {object} vectorField  Grid field
- * @param {{x:number,y:number}[]} seeds  World-space seed points
- * @param {object} [opts]
- * @param {object} [opts.traceOpts]   Forwarded to traceStreamlines
- * @param {string} [opts.color='rgba(100,180,255,0.75)']
- * @param {number} [opts.lineWidth=1.2]
- * @param {object} [opts.transform]  Pre-built buildTransform result (optional)
- * @param {number} [opts.canvasW=300]
- * @param {number} [opts.canvasH=200]
+ * @param seeds  World-space seed points
  */
-export function drawStreamlines(ctx, vectorField, seeds, opts = {}) {
+export function drawStreamlines(
+  ctx: CanvasRenderingContext2D,
+  vectorField: VectorField,
+  seeds: Point2[],
+  opts: DrawStreamlinesOpts = {},
+): void {
   const {
     traceOpts = {},
     color = 'rgba(100,180,255,0.75)',
@@ -107,7 +143,8 @@ export function drawStreamlines(ctx, vectorField, seeds, opts = {}) {
     canvasH = ctx.canvas?.height ?? 200,
   } = opts
 
-  const field = vectorField.cells ? cellsToGrid(vectorField.cells) : vectorField
+  const cells = (vectorField as { cells?: OpenFoamCell[] }).cells
+  const field = cells ? cellsToGrid(cells) : (vectorField as VectorFieldGrid)
   const transform = opts.transform || buildTransform(field, canvasW, canvasH)
   const lines = traceStreamlines(field, seeds, traceOpts)
 
@@ -133,20 +170,27 @@ export function drawStreamlines(ctx, vectorField, seeds, opts = {}) {
 
 // ── Vector field arrow glyphs ────────────────────────────────────────────────
 
+export interface DrawVectorArrowsOpts {
+  gridStep?: number
+  arrowScale?: number
+  color?: string
+  lineWidth?: number
+  canvasW?: number
+  canvasH?: number
+  transform?: Transform
+}
+
 /**
  * Draw vector-field arrow glyphs sampled on a coarse sub-grid.
  *
- * @param {CanvasRenderingContext2D} ctx
- * @param {object} vectorField  Grid field
- * @param {object} [opts]
- * @param {number} [opts.gridStep=4]   Sample every N grid cells
- * @param {number} [opts.arrowScale]   Max arrow length in canvas pixels (default auto)
- * @param {string} [opts.color='rgba(255,220,100,0.85)']
- * @param {number} [opts.lineWidth=1]
- * @param {number} [opts.canvasW=300]
- * @param {number} [opts.canvasH=200]
+ * @param opts.gridStep  Sample every N grid cells
+ * @param opts.arrowScale  Max arrow length in canvas pixels (default auto)
  */
-export function drawVectorArrows(ctx, vectorField, opts = {}) {
+export function drawVectorArrows(
+  ctx: CanvasRenderingContext2D,
+  vectorField: VectorField,
+  opts: DrawVectorArrowsOpts = {},
+): void {
   const {
     gridStep = 4,
     color = 'rgba(255,220,100,0.85)',
@@ -155,7 +199,8 @@ export function drawVectorArrows(ctx, vectorField, opts = {}) {
     canvasH = ctx.canvas?.height ?? 200,
   } = opts
 
-  const field = vectorField.cells ? cellsToGrid(vectorField.cells) : vectorField
+  const cells = (vectorField as { cells?: OpenFoamCell[] }).cells
+  const field = cells ? cellsToGrid(cells) : (vectorField as VectorFieldGrid)
   const transform = opts.transform || buildTransform(field, canvasW, canvasH)
 
   // Compute max speed for normalisation
@@ -226,21 +271,27 @@ export function drawVectorArrows(ctx, vectorField, opts = {}) {
 
 // ── Pressure contour overlay ─────────────────────────────────────────────────
 
+export interface DrawPressureContourOpts {
+  alpha?: number
+  minVal?: number | null
+  maxVal?: number | null
+  canvasW?: number
+  canvasH?: number
+  transform?: Transform
+}
+
 /**
  * Draw a pressure (or generic scalar) contour colour overlay.
  * Renders one filled rectangle per grid cell, coloured by the scalar value.
  *
- * @param {CanvasRenderingContext2D} ctx
- * @param {object} pressureField  { x0, y0, dx, dy, nx, ny, p[][] }
- *   or { cells: [{x, y, p},...] }  (cells must have .p)
- * @param {object} [opts]
- * @param {number} [opts.alpha=0.45]
- * @param {number|null} [opts.minVal=null]  Clamp min (null=auto)
- * @param {number|null} [opts.maxVal=null]  Clamp max (null=auto)
- * @param {number} [opts.canvasW=300]
- * @param {number} [opts.canvasH=200]
+ * @param pressureField  { x0, y0, dx, dy, nx, ny, p[][] } or { cells: [{x, y, p},...] }
+ *   (cells must have .p)
  */
-export function drawPressureContour(ctx, pressureField, opts = {}) {
+export function drawPressureContour(
+  ctx: CanvasRenderingContext2D,
+  pressureField: PressureField,
+  opts: DrawPressureContourOpts = {},
+): void {
   const {
     alpha = 0.45,
     canvasW = ctx.canvas?.width ?? 300,
@@ -248,19 +299,20 @@ export function drawPressureContour(ctx, pressureField, opts = {}) {
   } = opts
 
   // Normalise to grid with p[][] array
-  let field
-  if (pressureField.cells) {
-    const base = cellsToGrid(pressureField.cells)
-    const pMap = new Map()
-    for (const c of pressureField.cells) {
+  let field: PressureFieldGrid
+  const cells = (pressureField as PressureFieldCells).cells
+  if (cells) {
+    const base: PressureFieldGrid = cellsToGrid(cells)
+    const pMap = new Map<string, number>()
+    for (const c of cells) {
       pMap.set(`${c.x},${c.y}`, c.p ?? 0)
     }
-    const xs = [...new Set(pressureField.cells.map(c => c.x))].sort((a, b) => a - b)
-    const ys = [...new Set(pressureField.cells.map(c => c.y))].sort((a, b) => a - b)
+    const xs = [...new Set(cells.map(c => c.x))].sort((a, b) => a - b)
+    const ys = [...new Set(cells.map(c => c.y))].sort((a, b) => a - b)
     base.p = ys.map(y => xs.map(x => pMap.get(`${x},${y}`) ?? 0))
     field = base
   } else {
-    field = pressureField
+    field = pressureField as PressureFieldGrid
   }
 
   if (!field.p) return
@@ -309,18 +361,16 @@ export function drawPressureContour(ctx, pressureField, opts = {}) {
 /**
  * Generate a uniform grid of seed positions inside the field domain.
  *
- * @param {object} field  Grid field
- * @param {number} [count=20]  Approximate number of seeds
- * @returns {{x:number,y:number}[]}
+ * @param count  Approximate number of seeds
  */
-export function generateSeeds(field, count = 20) {
+export function generateSeeds(field: VectorFieldGrid, count = 20): Point2[] {
   const cols = Math.max(1, Math.ceil(Math.sqrt(count)))
   const rows = Math.max(1, Math.ceil(count / cols))
 
   const worldW = (field.nx - 1) * field.dx
   const worldH = (field.ny - 1) * field.dy
 
-  const seeds = []
+  const seeds: Point2[] = []
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       seeds.push({
@@ -335,12 +385,10 @@ export function generateSeeds(field, count = 20) {
 /**
  * Generate seeds along the inlet edge (left column) of the field.
  *
- * @param {object} field  Grid field
- * @param {number} [n=10]  Number of seeds
- * @returns {{x:number,y:number}[]}
+ * @param n  Number of seeds
  */
-export function generateInletSeeds(field, n = 10) {
-  const seeds = []
+export function generateInletSeeds(field: VectorFieldGrid, n = 10): Point2[] {
+  const seeds: Point2[] = []
   const worldH = (field.ny - 1) * field.dy
   for (let i = 0; i < n; i++) {
     seeds.push({

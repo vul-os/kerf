@@ -1,17 +1,41 @@
-// StagingPanel.jsx — Multi-stage rocket staging / Tsiolkovsky ΔV panel.
+// StagingPanel.tsx — Multi-stage rocket staging / Tsiolkovsky ΔV panel.
 //
 // Renders output from aero_staging tool:
 //   - Total ΔV, payload fraction, total wet mass summary
 //   - Per-stage breakdown table (ΔV, mass ratio, mass flow)
 //   - ΔV bar chart per stage
-//
-// Props
-// ─────
-//   result  {Object|null}  — parsed JSON from aero_staging
-//   loading {boolean}
-//   error   {string|null}
 
 import { useMemo } from 'react'
+
+/** One entry in `stage_results` from the aero_staging tool. */
+interface StageResult {
+  stage?: string
+  isp?: number
+  m0?: number
+  mf?: number
+  mass_ratio?: number
+  delta_v_ms?: number
+  delta_v_kms?: number
+  propellant_fraction?: number
+  structural_fraction?: number
+}
+
+/** Parsed JSON payload from the aero_staging tool. */
+interface StagingResult {
+  ok: boolean
+  mode?: string
+  total_delta_v_m_s?: number
+  total_delta_v_km_s?: number
+  n_stages?: number
+  payload_mass_kg?: number
+  payload_fraction?: number
+  total_wet_mass_kg?: number
+  optimal_dv_split_m_s?: number[]
+  stage_mass_ratios?: number[]
+  equal_split?: boolean
+  stage_results?: StageResult[]
+  inputs?: Record<string, unknown>
+}
 
 const STAGE_COLORS = ['#60a5fa', '#34d399', '#f97316', '#a78bfa', '#fb923c']
 
@@ -19,10 +43,10 @@ const STAGE_COLORS = ['#60a5fa', '#34d399', '#f97316', '#a78bfa', '#fb923c']
 // Bar chart
 // ---------------------------------------------------------------------------
 
-function DvBarChart({ stages }) {
+function DvBarChart({ stages }: { stages?: StageResult[] }) {
   if (!stages || stages.length === 0) return null
 
-  const dvs = stages.map(s => s.delta_v_ms ?? s.delta_v_kms * 1000 ?? 0)
+  const dvs = stages.map(s => s.delta_v_ms ?? (s.delta_v_kms as number) * 1000)
   const maxDv = Math.max(...dvs, 1)
   const barH = 28
   const barGap = 8
@@ -58,7 +82,7 @@ function DvBarChart({ stages }) {
 // Stage table
 // ---------------------------------------------------------------------------
 
-function StageTable({ stages }) {
+function StageTable({ stages }: { stages?: StageResult[] }) {
   if (!stages || stages.length === 0) return null
 
   return (
@@ -81,7 +105,7 @@ function StageTable({ stages }) {
                 {s.stage ?? `Stage ${i + 1}`}
               </td>
               <td className="text-right py-1 pr-3">
-                {(s.delta_v_ms ?? (s.delta_v_kms * 1000))?.toFixed(1) ?? '—'}
+                {(s.delta_v_ms ?? (s.delta_v_kms as number) * 1000)?.toFixed(1) ?? '—'}
               </td>
               <td className="text-right py-1 pr-3">{s.isp?.toFixed(1) ?? '—'}</td>
               <td className="text-right py-1 pr-3">{s.mass_ratio?.toFixed(3) ?? '—'}</td>
@@ -99,8 +123,18 @@ function StageTable({ stages }) {
 // StagingPanel
 // ---------------------------------------------------------------------------
 
-export default function StagingPanel({ result, loading, error, content }) {
+export interface Props {
+  /** Parsed JSON from aero_staging. */
+  result?: StagingResult | null
+  loading?: boolean
+  error?: string | null
+  /** Backward-compatible JSON string, parsed into `result` when `result` is absent. */
+  content?: string | null
+}
+
+export default function StagingPanel({ result: resultProp, loading, error, content }: Props) {
   // Backward-compatible content string: JSON.parse it and merge into result.
+  let result = resultProp
   if (content != null && result == null) {
     try { result = JSON.parse(content) } catch { /* ignore */ }
   }
@@ -128,7 +162,6 @@ export default function StagingPanel({ result, loading, error, content }) {
   if (!data) return null
 
   const {
-    total_delta_v_m_s,
     total_delta_v_km_s,
     n_stages,
     payload_fraction,
@@ -188,7 +221,13 @@ export default function StagingPanel({ result, loading, error, content }) {
   )
 }
 
-function SummaryCard({ label, value, highlight }) {
+interface SummaryCardProps {
+  label: string
+  value: string | number
+  highlight?: boolean
+}
+
+function SummaryCard({ label, value, highlight }: SummaryCardProps) {
   return (
     <div className={`rounded p-2 border text-center ${
       highlight ? 'border-emerald-600 bg-emerald-950' : 'border-gray-700 bg-gray-800'

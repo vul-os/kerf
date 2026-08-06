@@ -108,7 +108,7 @@ describe('resolvePanelEntry — aero/marine kinds', () => {
 // ---------------------------------------------------------------------------
 
 import FlutterPanel from '../../../components/FlutterPanel.jsx'
-import StagingPanel from '../../../components/StagingPanel.jsx'
+import StagingPanel from '../../../components/StagingPanel'
 import AttitudeViewer from '../../../components/AttitudeViewer.jsx'
 import SeakeepingRAOPanel from '../../../components/SeakeepingRAOPanel.jsx'
 import HullFormPanel from '../../../components/HullFormPanel.jsx'

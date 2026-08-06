@@ -1,8 +1,8 @@
-// StagingPanel.test.jsx — vitest smoke tests for the multi-stage rocket staging panel.
+// StagingPanel.test.tsx — vitest smoke tests for the multi-stage rocket staging panel.
 
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import StagingPanel from './StagingPanel.jsx'
+import StagingPanel from './StagingPanel'
 
 // ---------------------------------------------------------------------------
 // Fixtures

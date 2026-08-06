@@ -57,7 +57,7 @@ export default [
     id: 'staging',
     kinds: ['aero_staging'],
     exts: ['.staging'],
-    load: () => import('../../components/StagingPanel.jsx'),
+    load: () => import('../../components/StagingPanel'),
     label: 'Staging Analysis',
   },
 

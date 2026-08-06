@@ -12,7 +12,7 @@
  *  - render Renderer via renderToStaticMarkup and assert the fallback markup
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import React from 'react'
 
@@ -36,9 +36,19 @@ vi.mock('lucide-react', async (importOriginal) => {
 // ── Stub three (all usages guarded by early return, but module must resolve) ──
 vi.mock('three', () => {
   const noop = () => {}
-  class Fake { constructor() {} set() { return this } dispose() {} }
+  // 'three' ships no .d.ts and this repo has no @types/three (see prior T-513 commits) — these
+  // fake stand-ins are typed loosely (`any` fields) since they only need to satisfy the mocked
+  // module shape, not the real THREE.* API surface.
+  class Fake { constructor(..._args: any[]) {} set() { return this } dispose() {} }
   return {
-    WebGLRenderer: class extends Fake { constructor(o) { super(); this.setPixelRatio = noop; this.setClearColor = noop; this.setSize = noop; this.render = noop; this.domElement = (typeof document !== 'undefined' ? document.createElement('canvas') : {}) } },
+    WebGLRenderer: class extends Fake {
+      setPixelRatio: any
+      setClearColor: any
+      setSize: any
+      render: any
+      domElement: any
+      constructor(o?: any) { super(o); this.setPixelRatio = noop; this.setClearColor = noop; this.setSize = noop; this.render = noop; this.domElement = (typeof document !== 'undefined' ? document.createElement('canvas') : {}) }
+    },
     Scene: Fake,
     PerspectiveCamera: Fake,
     AmbientLight: Fake,
@@ -79,7 +89,7 @@ vi.mock('three/examples/jsm/lines/LineGeometry.js', () => ({ LineGeometry: class
 vi.mock('three/examples/jsm/lines/LineMaterial.js', () => ({ LineMaterial: class { constructor() {} dispose() {} } }))
 vi.mock('three/examples/jsm/postprocessing/EffectComposer.js', () => ({ EffectComposer: class { constructor() {} addPass() {} setSize() {} setPixelRatio() {} render() {} dispose() {} } }))
 vi.mock('three/examples/jsm/postprocessing/RenderPass.js', () => ({ RenderPass: class { constructor() {} dispose() {} } }))
-vi.mock('three/examples/jsm/postprocessing/UnrealBloomPass.js', () => ({ UnrealBloomPass: class { constructor() { this.resolution = { set: () => {} }; this.enabled = true } dispose() {} } }))
+vi.mock('three/examples/jsm/postprocessing/UnrealBloomPass.js', () => ({ UnrealBloomPass: class { resolution: any; enabled: any; constructor() { this.resolution = { set: () => {} }; this.enabled = true } dispose() {} } }))
 vi.mock('three/examples/jsm/loaders/RGBELoader.js', () => ({ RGBELoader: class { constructor() {} load() {} } }))
 vi.mock('three/examples/jsm/environments/RoomEnvironment.js', () => ({ RoomEnvironment: class { constructor() {} dispose() {} } }))
 
@@ -101,7 +111,12 @@ vi.mock('./HeroRenderPanel.jsx', () => ({ default: () => null }))
 import RendererRaw from './Renderer.jsx'
 
 // forwardRef component; wrap it so SSR render works without a ref prop.
-const Renderer = React.forwardRef ? RendererRaw : RendererRaw
+// Renderer.jsx is not yet migrated (T-513, later in this slice); TS infers a required-props
+// shape from its JSDoc even though checkJs is off. This test intentionally exercises the
+// WebGL-fallback branch with a minimal `{ parts: [] }` prop set (the fallback bails out before
+// touching the other props), so the boundary is widened to `any` rather than fabricating values
+// for props this test doesn't exercise.
+const Renderer: any = React.forwardRef ? RendererRaw : RendererRaw
 
 describe('Renderer — WebGL fallback (T-C4)', () => {
   it('renders the fallback panel when detectWebGL returns false', () => {

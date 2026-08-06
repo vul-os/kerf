@@ -12,8 +12,19 @@
 import { useEffect } from 'react'
 import { ACTIONS } from '../lib/viewportKeybinds.js'
 
+// No shared type exported by viewportKeybinds.ts (untyped JS-in-TS); declared
+// locally per T-517 convention.
+export interface KeyBinding {
+  key: string
+  action: string
+  shift?: boolean
+  ctrl?: boolean
+  alt?: boolean
+  meta?: boolean
+}
+
 // Human-readable labels for each action constant.
-const ACTION_LABELS = {
+const ACTION_LABELS: Record<string, string> = {
   [ACTIONS.VIEW_FRONT]:       'Front view',
   [ACTIONS.VIEW_RIGHT]:       'Right view',
   [ACTIONS.VIEW_TOP]:         'Top view',
@@ -62,7 +73,7 @@ const GROUPS = [
  * Format a binding object into a human-readable key chord string.
  * e.g. { key: 'z', shift: true } → 'Shift+Z'
  */
-export function formatBinding(binding) {
+export function formatBinding(binding: KeyBinding | null | undefined) {
   if (!binding) return ''
   const parts = []
   if (binding.ctrl)  parts.push('Ctrl')
@@ -83,20 +94,20 @@ export function formatBinding(binding) {
 /**
  * Given a bindings array, return the first binding entry for a given action.
  */
-export function bindingForAction(bindings, action) {
+export function bindingForAction(bindings: KeyBinding[], action: string) {
   return bindings.find((b) => b.action === action) ?? null
 }
 
 /**
  * Return all binding entries for a given action (an action may have multiple).
  */
-export function bindingsForAction(bindings, action) {
+export function bindingsForAction(bindings: KeyBinding[], action: string) {
   return bindings.filter((b) => b.action === action)
 }
 
 // ── KeyChip ───────────────────────────────────────────────────────────────────
 
-function KeyChip({ label }) {
+function KeyChip({ label }: { label?: string }) {
   if (!label) return null
   return (
     <kbd className="inline-flex items-center justify-center min-w-[2rem] h-6 px-1.5 rounded bg-ink-800 border border-ink-600 text-ink-100 text-[11px] font-mono leading-none shadow-[0_1px_0_rgba(0,0,0,0.5)]">
@@ -107,7 +118,7 @@ function KeyChip({ label }) {
 
 // ── BindingRow ────────────────────────────────────────────────────────────────
 
-function BindingRow({ action, bindings }) {
+function BindingRow({ action, bindings }: { action: string; bindings: KeyBinding[] }) {
   const entries = bindingsForAction(bindings, action)
   const label   = ACTION_LABELS[action] ?? action
 
@@ -132,7 +143,7 @@ function BindingRow({ action, bindings }) {
 
 // ── GroupBlock ────────────────────────────────────────────────────────────────
 
-function GroupBlock({ group, bindings }) {
+function GroupBlock({ group, bindings }: { group: { label: string; actions: string[] }; bindings: KeyBinding[] }) {
   return (
     <div>
       <h3 className="text-[10px] uppercase tracking-widest text-ink-500 font-semibold mb-1 mt-3 first:mt-0">
@@ -147,16 +158,22 @@ function GroupBlock({ group, bindings }) {
 
 // ── KeybindHelp ───────────────────────────────────────────────────────────────
 
+export interface Props {
+  bindings?: KeyBinding[]
+  onClose?: () => void
+  title?: string
+}
+
 /**
  * Floating overlay panel displaying the active viewport keybindings.
  *
  * @param {{ bindings: Array, onClose?: () => void, title?: string }} props
  */
-export default function KeybindHelp({ bindings = [], onClose, title = 'Viewport Shortcuts' }) {
+export default function KeybindHelp({ bindings = [], onClose, title = 'Viewport Shortcuts' }: Props) {
   // Close on Escape key.
   useEffect(() => {
     if (!onClose) return
-    function handleKey(e) {
+    function handleKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', handleKey)

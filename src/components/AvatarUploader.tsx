@@ -3,21 +3,33 @@ import { ImagePlus, Trash2, X, Loader2 } from 'lucide-react'
 import clsx from 'clsx'
 import { api, ApiError } from '../lib/api.js'
 import { useAuth } from '../store/auth.js'
+import type { ApiUser } from '../types/api.js'
 
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const MAX_BYTES = 1 * 1024 * 1024
+
+interface PickedFile {
+  file: File
+  url: string
+}
+
+export interface Props {
+  user?: ApiUser | null
+  onClose?: () => void
+  onUpdated?: (user: ApiUser) => void
+}
 
 // AvatarUploader is a self-contained dialog: a file picker, a live preview
 // of the chosen image, an "Upload" CTA, and (when an avatar exists) a
 // "Remove" affordance. The backend does the canonical resize — we just
 // preview the raw selection so the user knows what they picked.
-export default function AvatarUploader({ user, onClose, onUpdated }) {
+export default function AvatarUploader({ user, onClose, onUpdated }: Props) {
   const setUser = useAuth((s) => s.setUser)
-  const fileInputRef = useRef(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [picked, setPicked] = useState(null) // { file, url }
+  const [picked, setPicked] = useState<PickedFile | null>(null)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   // Revoke any pending preview URL when the dialog unmounts or picked
   // is reset. The URL is created synchronously inside the picker
@@ -31,14 +43,14 @@ export default function AvatarUploader({ user, onClose, onUpdated }) {
 
   // Esc to close, focus-trap-lite: focus the picker on mount.
   useEffect(() => {
-    const onKey = (e) => {
+    const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !busy) onClose?.()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [busy, onClose])
 
-  const handlePick = (f) => {
+  const handlePick = (f: File | null | undefined) => {
     setError(null)
     if (!f) return
     if (!ACCEPTED_TYPES.includes(f.type)) {
@@ -62,7 +74,7 @@ export default function AvatarUploader({ user, onClose, onUpdated }) {
       onUpdated?.(updated)
       onClose?.()
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : (e?.message || 'Upload failed')
+      const msg = e instanceof ApiError ? e.message : ((e as Error)?.message || 'Upload failed')
       setError(msg)
     } finally {
       setBusy(false)
@@ -73,12 +85,19 @@ export default function AvatarUploader({ user, onClose, onUpdated }) {
     setBusy(true)
     setError(null)
     try {
-      const updated = await api.deleteAvatar()
+      // NOTE (found during T-517 migration, not fixed — behaviour preserved):
+      // api.deleteAvatar() is typed `Promise<void>` in lib/api.ts (the endpoint
+      // returns no body), so `updated` is always `undefined` here. The
+      // pre-existing runtime behaviour calls setUser(undefined)/onUpdated(undefined)
+      // rather than the actual post-removal user. Reported, not fixed, per
+      // migration convention (rename-only, no behaviour changes).
+      // @ts-expect-error -- api.deleteAvatar() returns Promise<void>, not Promise<ApiUser>; pre-existing mismatch, see NOTE above.
+      const updated: ApiUser = await api.deleteAvatar()
       setUser(updated)
       onUpdated?.(updated)
       onClose?.()
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : (e?.message || 'Remove failed')
+      const msg = e instanceof ApiError ? e.message : ((e as Error)?.message || 'Remove failed')
       setError(msg)
     } finally {
       setBusy(false)

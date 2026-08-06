@@ -4,8 +4,17 @@ import { Building2, Check, ChevronDown, Plus, Settings, Loader2, Users } from 'l
 import clsx from 'clsx'
 import { useWorkspaces } from '../store/workspaces.js'
 import CreateWorkspaceDialog from './CreateWorkspaceDialog.jsx'
+import type { ApiWorkspace } from '../types/api.js'
 
-function initials(name) {
+// ApiWorkspace (src/types/api.ts, T-501) doesn't carry avatar_url / member_count,
+// but the backend response and this component's existing usage both do — widened
+// locally rather than changing the shared type (T-501's call), per T-517 convention.
+type WorkspaceWithExtras = ApiWorkspace & {
+  avatar_url?: string | null
+  member_count?: number
+}
+
+function initials(name: string | null | undefined) {
   const src = (name || '?').trim()
   if (!src) return '?'
   const parts = src.split(/\s+/).filter(Boolean)
@@ -13,7 +22,7 @@ function initials(name) {
   return src.slice(0, 2).toUpperCase()
 }
 
-function Avatar({ workspace, size = 24 }) {
+function Avatar({ workspace, size = 24 }: { workspace?: WorkspaceWithExtras | null; size?: number }) {
   const px = `${size}px`
   if (workspace?.avatar_url) {
     return (
@@ -39,9 +48,9 @@ export default function WorkspaceSwitcher() {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
-  const ref = useRef(null)
+  const ref = useRef<HTMLDivElement>(null)
 
-  const workspaces = useWorkspaces((s) => s.workspaces)
+  const workspaces = useWorkspaces((s) => s.workspaces) as WorkspaceWithExtras[]
   const currentSlug = useWorkspaces((s) => s.currentSlug)
   const loading = useWorkspaces((s) => s.loading)
   const loaded = useWorkspaces((s) => s.loaded)
@@ -54,8 +63,8 @@ export default function WorkspaceSwitcher() {
 
   useEffect(() => {
     if (!open) return
-    const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
     document.addEventListener('mousedown', onDoc)
     document.addEventListener('keydown', onKey)
     return () => {
@@ -66,7 +75,7 @@ export default function WorkspaceSwitcher() {
 
   const current = workspaces.find((w) => w.slug === currentSlug) || workspaces[0] || null
 
-  const onPick = (slug) => {
+  const onPick = (slug: string) => {
     setOpen(false)
     setCurrent(slug)
     navigate(`/w/${slug}/projects`)

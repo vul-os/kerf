@@ -3,9 +3,38 @@
  * Operates on a plain `.canvas.json` object — no side effects.
  */
 
+export interface CanvasLayer {
+  id: string
+  name: string
+  visible: boolean
+  color: string
+  linetype: string
+  material_id: string | null
+  locked: boolean
+}
+
+export interface CanvasDisplayMode {
+  id: string
+  name: string
+  wireframe: boolean
+  edges: boolean
+  shadows?: boolean
+  transparency?: number
+  background_color?: string
+  silhouette?: boolean
+}
+
+export interface Canvas {
+  version: 1
+  layers: CanvasLayer[]
+  display_modes: CanvasDisplayMode[]
+  active_display_mode: string
+  active_layer: string
+}
+
 const HEX_RE = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/
 
-function _nextId(canvas) {
+function _nextId(canvas: Canvas): string {
   const existing = new Set(canvas.layers.map((l) => l.id))
   let n = canvas.layers.length + 1
   while (existing.has(`L${String(n).padStart(2, '0')}`)) n++
@@ -13,7 +42,7 @@ function _nextId(canvas) {
 }
 
 /** Return a fresh canvas with sensible defaults. */
-export function defaultCanvas() {
+export function defaultCanvas(): Canvas {
   return {
     version: 1,
     layers: [
@@ -40,14 +69,12 @@ export function defaultCanvas() {
 
 /**
  * Add a new layer. Auto-assigns `id`. Returns new canvas (immutable).
- * @param {object} canvas
- * @param {{ name: string, color?: string, linetype?: string, material_id?: string|null, locked?: boolean }} opts
  */
-export function addLayer(canvas, opts = {}) {
+export function addLayer(canvas: Canvas, opts: { name: string; color?: string; linetype?: string; material_id?: string | null; locked?: boolean }): Canvas {
   const { name, color = '#ffffff', linetype = 'continuous', material_id = null, locked = false } = opts
   if (!name || !name.trim()) throw new Error('layer name required')
   const id = _nextId(canvas)
-  const layer = { id, name: name.trim(), visible: true, color, linetype, material_id, locked }
+  const layer: CanvasLayer = { id, name: name.trim(), visible: true, color, linetype, material_id, locked }
   return { ...canvas, layers: [...canvas.layers, layer] }
 }
 
@@ -56,7 +83,7 @@ export function addLayer(canvas, opts = {}) {
  * reassigned to `active_layer` by the caller; this function just removes the
  * entry and updates active_layer if it pointed to the removed one.
  */
-export function removeLayer(canvas, layer_id) {
+export function removeLayer(canvas: Canvas, layer_id: string): Canvas {
   const filtered = canvas.layers.filter((l) => l.id !== layer_id)
   if (filtered.length === canvas.layers.length) return canvas // not found — no-op
   if (filtered.length === 0) throw new Error('cannot remove the last layer')
@@ -65,14 +92,14 @@ export function removeLayer(canvas, layer_id) {
   return { ...canvas, layers: filtered, active_layer: active }
 }
 
-export function setLayerVisibility(canvas, layer_id, visible) {
+export function setLayerVisibility(canvas: Canvas, layer_id: string, visible: boolean): Canvas {
   return {
     ...canvas,
     layers: canvas.layers.map((l) => l.id === layer_id ? { ...l, visible: Boolean(visible) } : l),
   }
 }
 
-export function setLayerColor(canvas, layer_id, color) {
+export function setLayerColor(canvas: Canvas, layer_id: string, color: string): Canvas {
   if (!HEX_RE.test(color)) throw new Error(`invalid hex color: ${color}`)
   return {
     ...canvas,
@@ -80,50 +107,50 @@ export function setLayerColor(canvas, layer_id, color) {
   }
 }
 
-export function setActiveLayer(canvas, layer_id) {
+export function setActiveLayer(canvas: Canvas, layer_id: string): Canvas {
   if (!canvas.layers.find((l) => l.id === layer_id)) throw new Error(`layer ${layer_id} not found`)
   return { ...canvas, active_layer: layer_id }
 }
 
-export function setActiveDisplayMode(canvas, mode_id) {
+export function setActiveDisplayMode(canvas: Canvas, mode_id: string): Canvas {
   if (!canvas.display_modes.find((m) => m.id === mode_id)) throw new Error(`display mode ${mode_id} not found`)
   return { ...canvas, active_display_mode: mode_id }
 }
 
-export function getLayer(canvas, layer_id) {
+export function getLayer(canvas: Canvas, layer_id: string): CanvasLayer | null {
   return canvas.layers.find((l) => l.id === layer_id) ?? null
 }
 
 /**
  * Validate a canvas object.
- * @returns {{ ok: boolean, errors: string[] }}
  */
-export function validateCanvas(canvas) {
-  const errors = []
+export function validateCanvas(canvas: unknown): { ok: boolean; errors: string[] } {
+  const errors: string[] = []
   if (!canvas || typeof canvas !== 'object') {
     return { ok: false, errors: ['canvas must be an object'] }
   }
-  if (canvas.version !== 1) errors.push('version must be 1')
-  if (!Array.isArray(canvas.layers)) {
+  const c = canvas as Partial<Canvas> & Record<string, unknown>
+  if (c.version !== 1) errors.push('version must be 1')
+  if (!Array.isArray(c.layers)) {
     errors.push('layers must be an array')
   } else {
     const ids = new Set()
-    canvas.layers.forEach((l, i) => {
+    c.layers.forEach((l: Partial<CanvasLayer>, i: number) => {
       if (!l.id)   errors.push(`layers[${i}] missing id`)
       if (!l.name) errors.push(`layers[${i}] missing name`)
       if (l.color && !HEX_RE.test(l.color)) errors.push(`layers[${i}] invalid color: ${l.color}`)
       if (ids.has(l.id)) errors.push(`duplicate layer id: ${l.id}`)
       ids.add(l.id)
     })
-    if (!canvas.layers.find((l) => l.id === canvas.active_layer)) {
-      errors.push(`active_layer '${canvas.active_layer}' not in layers`)
+    if (!c.layers.find((l: Partial<CanvasLayer>) => l.id === c.active_layer)) {
+      errors.push(`active_layer '${c.active_layer}' not in layers`)
     }
   }
-  if (!Array.isArray(canvas.display_modes)) {
+  if (!Array.isArray(c.display_modes)) {
     errors.push('display_modes must be an array')
   } else {
-    if (!canvas.display_modes.find((m) => m.id === canvas.active_display_mode)) {
-      errors.push(`active_display_mode '${canvas.active_display_mode}' not in display_modes`)
+    if (!c.display_modes.find((m: Partial<CanvasDisplayMode>) => m.id === c.active_display_mode)) {
+      errors.push(`active_display_mode '${c.active_display_mode}' not in display_modes`)
     }
   }
   return { ok: errors.length === 0, errors }

@@ -18,11 +18,37 @@
 // enough; we don't pre-build a spatial index.
 
 import { detectCenterlines } from './annotations.js'
+import type { DrawingView } from '../store/workspace.js'
 
 // Page-mm tolerance == 12 screen-px / current px-per-mm. Caller passes
 // `pxPerMm` (rect.width / viewBox.w from DrawingView) so we can convert
 // the spec's "12px screen distance" into a model-space radius.
 const SNAP_PIXELS = 12
+
+// projection.js hasn't migrated yet; this mirrors its documented output
+// shape (its own header comment: "polylines: [{ kind, points: [[u,v],[u,v]] }, ...],
+// bbox: { min: [u,v], max: [u,v] } | null").
+interface SnapProjectionPolyline {
+  kind: string
+  points: [number[], number[]]
+}
+interface SnapProjection {
+  polylines: SnapProjectionPolyline[]
+  bbox: { min: number[]; max: number[] } | null
+}
+
+type Endpoint = number[]
+type Midpoint = [number, number, number, number, number, number]
+type Segment = [number, number, number, number]
+type Center = [number, number, number]
+
+interface SnapTargets {
+  endpoints: Endpoint[]
+  midpoints: Midpoint[]
+  segments: Segment[]
+  centers: Center[]
+  viewId: string | null
+}
 
 // ---------------------------------------------------------------------------
 // Per-view snap-target extraction
@@ -38,17 +64,17 @@ const SNAP_PIXELS = 12
 // local model units via the view's bbox + scale). This way the cursor (also
 // in page-mm) can be compared directly without per-frame transforms.
 
-export function extractSnapTargets(view, projection) {
+export function extractSnapTargets(view: DrawingView | null | undefined, projection: SnapProjection | null | undefined): SnapTargets {
   if (!view || !projection || !projection.bbox) {
     return { endpoints: [], midpoints: [], segments: [], centers: [], viewId: view?.id || null }
   }
   const minU = projection.bbox.min[0]
   const minV = projection.bbox.min[1]
-  const tx = view.position[0]
-  const ty = view.position[1]
+  const tx = view.position![0]
+  const ty = view.position![1]
   const sw = 1 / (view.scale || 1)
   // Projection-local model coords → page-mm.
-  const toPage = (u, v) => [tx + (u - minU) * sw, ty + (v - minV) * sw]
+  const toPage = (u: number, v: number): [number, number] => [tx + (u - minU) * sw, ty + (v - minV) * sw]
 
   // Only visible/silhouette edges contribute to snaps; hidden lines aren't
   // visible to the user so snapping to them surprises rather than helps.
@@ -56,10 +82,10 @@ export function extractSnapTargets(view, projection) {
     (p) => p.kind === 'visible' || p.kind === 'silhouette',
   )
 
-  const endpoints = []
-  const midpoints = []
-  const segments = []
-  const epKeys = new Set() // dedupe coincident endpoints (very common for shared corners)
+  const endpoints: Endpoint[] = []
+  const midpoints: Midpoint[] = []
+  const segments: Segment[] = []
+  const epKeys = new Set<string>() // dedupe coincident endpoints (very common for shared corners)
 
   for (const pl of visible) {
     const [a, b] = pl.points
@@ -81,7 +107,7 @@ export function extractSnapTargets(view, projection) {
   // the rough centre.
   const localSegs = visible.map((p) => p.points)
   const detected = detectCenterlines(localSegs)
-  const centers = detected.map((c) => {
+  const centers: Center[] = detected.map((c: { cx: number; cy: number; r: number }) => {
     const [x, y] = toPage(c.cx, c.cy)
     return [x, y, c.r * sw]
   })
@@ -99,12 +125,20 @@ export function extractSnapTargets(view, projection) {
 // Higher-priority kinds win ties: an endpoint snap is preferred over a
 // midpoint at the same distance because the endpoint is a hard geometric
 // feature.
-export function resolveSnap(targets, cx, cy, opts = {}) {
+interface SnapBest {
+  kind: string
+  x: number
+  y: number
+  d2: number
+  priority: number
+}
+
+export function resolveSnap(targets: (SnapTargets | null | undefined)[], cx: number, cy: number, opts: { tolMm?: number } = {}) {
   const tolMm = (opts.tolMm != null ? opts.tolMm : SNAP_PIXELS) || 12
   const tol2 = tolMm * tolMm
-  let best = null
+  let best: SnapBest | null = null
 
-  function consider(kind, px, py, priority) {
+  function consider(kind: string, px: number, py: number, priority: number) {
     const dx = px - cx
     const dy = py - cy
     const d2 = dx * dx + dy * dy
@@ -131,7 +165,7 @@ export function resolveSnap(targets, cx, cy, opts = {}) {
   // Intersection scan — O(n²) over near-cursor segments only. We bound the
   // candidate list at 64 to keep dense views snappy; in practice fewer than
   // that ever land within the snap radius simultaneously.
-  const near = []
+  const near: { seg: Segment; viewId: string | null }[] = []
   for (const list of targets) {
     if (!list) continue
     for (const seg of list.segments) {
@@ -154,12 +188,12 @@ export function resolveSnap(targets, cx, cy, opts = {}) {
   // viewId — find the list this point came from. We don't track per-target
   // viewId because it's only ever consumed for the dim/view binding; pick
   // the first (typically only) target list.
-  const viewId = (targets.find((t) => t && t.viewId) || {}).viewId || null
+  const viewId = targets.find((t) => t && t.viewId)?.viewId || null
   return { kind: best.kind, x: best.x, y: best.y, viewId }
 }
 
 // True iff the perpendicular distance from (cx, cy) to the segment is ≤ tol.
-function segmentNearPoint(seg, cx, cy, tol) {
+function segmentNearPoint(seg: Segment, cx: number, cy: number, tol: number) {
   const [ax, ay, bx, by] = seg
   const dx = bx - ax
   const dy = by - ay
@@ -177,7 +211,7 @@ function segmentNearPoint(seg, cx, cy, tol) {
 // 2D segment-segment intersection. Returns [x, y] if the segments cross
 // strictly within their interiors, else null. Coincident endpoints don't
 // count as intersections (they're already covered by the endpoint snap).
-function segIntersect(s1, s2) {
+function segIntersect(s1: Segment, s2: Segment): [number, number] | null {
   const [x1, y1, x2, y2] = s1
   const [x3, y3, x4, y4] = s2
   const dx1 = x2 - x1, dy1 = y2 - y1
@@ -208,7 +242,7 @@ export const SNAP_MARKER_MM = 1.6
 
 // Human-readable label for a snap kind. Lowercase to match the contract's
 // hint-chip convention.
-export function snapLabel(kind) {
+export function snapLabel(kind: string) {
   switch (kind) {
     case 'endpoint':     return 'endpoint'
     case 'midpoint':     return 'midpoint'

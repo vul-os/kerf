@@ -1,10 +1,14 @@
-import { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState,
+  type ReactNode, type RefObject, type KeyboardEvent as ReactKeyboardEvent,
+} from 'react'
 import {
   Send, Star, MessageSquarePlus, MessageSquare, Trash2, Plus,
   Code as CodeIcon, ChevronDown, ChevronRight, Check, X, Sparkles,
   FolderTree, FileText, FilePen, Pencil, FilePlus, FileX, Search,
   Box, ShieldCheck, Wrench, Loader2, Square,
   TriangleAlert,
+  type LucideIcon,
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -16,24 +20,35 @@ import CircuitJsonPreview from './Chat/CircuitJsonPreview.jsx'
 import { detectAtopile } from '../lib/detectAtopile.js'
 import { api } from '../lib/api.js'
 import { useWorkspace } from '../store/workspace.js'
+import type { WorkspaceThread, WorkspaceMessage, PartRef, ToolChip } from '../store/workspace.js'
 import usePrefersReducedMotion from '../lib/usePrefersReducedMotion.js'
 
-const PROVIDER_LABELS = {
+const PROVIDER_LABELS: Record<string, string> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
   moonshot: 'Moonshot',
   gemini: 'Google',
 }
 
+// A model entry from GET /api/models. Not modeled in src/types/api.ts (that
+// endpoint's response is untyped there — `listModels: () => request<unknown[]>`),
+// so this is a local shape covering the fields this file actually reads.
+interface ChatModel {
+  id: string
+  label: string
+  provider: string
+  is_default?: boolean
+}
+
 // ---------- click-outside hook ----------
 
-function useClickOutside(ref, onOutside, enabled) {
+function useClickOutside(ref: RefObject<HTMLElement | null>, onOutside: () => void, enabled: boolean) {
   useEffect(() => {
     if (!enabled) return
-    function handle(e) {
-      if (ref.current && !ref.current.contains(e.target)) onOutside()
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onOutside()
     }
-    function escListener(e) { if (e.key === 'Escape') onOutside() }
+    function escListener(e: globalThis.KeyboardEvent) { if (e.key === 'Escape') onOutside() }
     document.addEventListener('mousedown', handle)
     document.addEventListener('keydown', escListener)
     return () => {
@@ -45,18 +60,25 @@ function useClickOutside(ref, onOutside, enabled) {
 
 // ---------- model picker (popover) ----------
 
-function ModelPicker({ models, selectedId, onSelect, disabled }) {
+interface ModelPickerProps {
+  models: ChatModel[]
+  selectedId: string | null
+  onSelect: (modelId: string) => void
+  disabled?: boolean
+}
+
+function ModelPicker({ models, selectedId, onSelect, disabled }: ModelPickerProps) {
   const [open, setOpen] = useState(false)
-  const wrapRef = useRef(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
   useClickOutside(wrapRef, () => setOpen(false), open)
 
   const current = useMemo(() => models.find((m) => m.id === selectedId), [models, selectedId])
 
   const grouped = useMemo(() => {
-    const map = new Map()
+    const map = new Map<string, ChatModel[]>()
     for (const m of models) {
       if (!map.has(m.provider)) map.set(m.provider, [])
-      map.get(m.provider).push(m)
+      map.get(m.provider)!.push(m)
     }
     return Array.from(map.entries())
   }, [models])
@@ -132,9 +154,18 @@ function ModelPicker({ models, selectedId, onSelect, disabled }) {
 
 // ---------- thread switcher (popover at top) ----------
 
-function ThreadSwitcher({ threads, currentThreadId, onSelect, onCreate, onToggleStar, onDelete }) {
+interface ThreadSwitcherProps {
+  threads: WorkspaceThread[]
+  currentThreadId: string | null
+  onSelect: (threadId: string) => void
+  onCreate: () => void
+  onToggleStar: (threadId: string) => void
+  onDelete: (threadId: string) => void
+}
+
+function ThreadSwitcher({ threads, currentThreadId, onSelect, onCreate, onToggleStar, onDelete }: ThreadSwitcherProps) {
   const [open, setOpen] = useState(false)
-  const wrapRef = useRef(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
   useClickOutside(wrapRef, () => setOpen(false), open)
 
   const sorted = useMemo(() => {
@@ -242,12 +273,18 @@ function ThreadSwitcher({ threads, currentThreadId, onSelect, onCreate, onToggle
 // React tree — that's how we got `[object Object],[object Object],…` in the
 // rendered output. We do NOT use this for rendering; rendering passes the
 // real `children` so syntax-highlight spans survive.
-export function childrenToText(node) {
+export function childrenToText(node: ReactNode): string {
   if (node == null || node === false) return ''
   if (typeof node === 'string' || typeof node === 'number') return String(node)
   if (Array.isArray(node)) return node.map(childrenToText).join('')
-  if (typeof node === 'object' && node.props && 'children' in node.props) {
-    return childrenToText(node.props.children)
+  if (
+    typeof node === 'object' &&
+    'props' in node &&
+    node.props &&
+    typeof node.props === 'object' &&
+    'children' in node.props
+  ) {
+    return childrenToText((node.props as { children: ReactNode }).children)
   }
   return ''
 }
@@ -262,7 +299,7 @@ const CIRCUIT_JSON_TYPES = new Set([
   'schematic_component', 'schematic_port', 'schematic_trace', 'schematic_net_label',
 ])
 
-function isCircuitJson(text) {
+function isCircuitJson(text: unknown): boolean {
   if (typeof text !== 'string' || !text.trim().startsWith('[')) return false
   try {
     const parsed = JSON.parse(text)
@@ -276,7 +313,15 @@ function isCircuitJson(text) {
 
 // Build the ReactMarkdown components map.  projectId is threaded in so that
 // AtopilePreview / CircuitJsonPreview can offer "Open in editor" without hooks.
-function makeMdComponents(projectId) {
+//
+// `any` here is a boundary this file doesn't own: react-markdown v9's actual
+// Components type has no `inline` prop (that was a v8-era signal), but the
+// `code` renderer below still defensively destructures it, and rehype-highlight
+// pipes through a `node` (hast AST) prop that isn't in the plain-DOM typings
+// either. Typing the map strictly against react-markdown's `Components`
+// would fight both without changing any runtime behaviour.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function makeMdComponents(projectId: string | null | undefined): Record<string, (props: any) => ReactNode> {
   return {
   // ReactMarkdown 9+ tells us inline vs block by checking children for newlines
   // / className. We detect block-ness by the presence of a `language-*` class.
@@ -400,14 +445,20 @@ function makeMdComponents(projectId) {
   }  // end of components object
 } // end of makeMdComponents
 
-export function Markdown({ text, projectId }) {
+export interface MarkdownProps {
+  text?: string
+  projectId?: string | null
+}
+
+export function Markdown({ text, projectId }: MarkdownProps) {
   const components = useMemo(() => makeMdComponents(projectId), [projectId])
   if (!text) return null
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
-      components={components}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      components={components as any}
       allowedElements={ALLOWED_ELEMENTS}
       urlTransform={urlTransformer}
     >
@@ -426,7 +477,11 @@ export function Markdown({ text, projectId }) {
  * Uses CSS keyframe animation via Tailwind's animate-bounce stagger trick.
  * When reduced-motion is active the dots are shown statically (no bounce).
  */
-export function TypingIndicator({ reduced = false }) {
+export interface TypingIndicatorProps {
+  reduced?: boolean
+}
+
+export function TypingIndicator({ reduced = false }: TypingIndicatorProps) {
   const base = 'inline-block w-1.5 h-1.5 rounded-full bg-kerf-300'
   return (
     <span
@@ -444,7 +499,7 @@ export function TypingIndicator({ reduced = false }) {
 
 // ---------- tool-call chips ----------
 
-const TOOL_ICONS = {
+const TOOL_ICONS: Record<string, LucideIcon> = {
   list_files: FolderTree,
   read_file: FileText,
   write_file: FilePen,
@@ -456,20 +511,41 @@ const TOOL_ICONS = {
   validate_jscad: ShieldCheck,
 }
 
-function ToolIcon({ name, size = 13, className = 'text-kerf-300 flex-shrink-0' }) {
+interface ToolIconProps {
+  name: string
+  size?: number
+  className?: string
+}
+
+function ToolIcon({ name, size = 13, className = 'text-kerf-300 flex-shrink-0' }: ToolIconProps) {
   const Icon = TOOL_ICONS[name] || Wrench
   return <Icon size={size} className={className} />
 }
 
 // Try to JSON.parse; if it fails, return the raw string.
-function parseMaybe(value) {
+function parseMaybe(value: unknown): unknown {
   if (value == null) return null
   if (typeof value !== 'string') return value
   try { return JSON.parse(value) } catch { return value }
 }
 
+// One tool-use call as rendered by ToolCallChip/ToolGroup. `arguments` and
+// `resultContent`/parsed-result are `any` at this boundary — the shape is
+// entirely tool-specific (read_file's args differ from search_code's), set
+// by whichever LLM tool the model invoked, not by this file.
+export interface ToolCallInfo {
+  id: string
+  name: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  arguments: Record<string, any>
+  resultContent?: unknown
+  durationMs?: number | null
+  pending?: boolean
+}
+
 // Compact one-liner derived from the call's args + result.
-function toolSummary(name, args, parsedResult) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toolSummary(name: string, args: Record<string, any>, parsedResult: any): string {
   const a = args || {}
   switch (name) {
     case 'read_file': return a.path || ''
@@ -507,9 +583,9 @@ function toolSummary(name, args, parsedResult) {
 }
 
 // Naive but readable JSON pretty-printer with subtle syntax tinting.
-function PrettyJson({ value }) {
+function PrettyJson({ value }: { value: unknown }) {
   if (value === undefined) return null
-  let text
+  let text: string
   if (typeof value === 'string') text = value
   else {
     try { text = JSON.stringify(value, null, 2) }
@@ -522,7 +598,7 @@ function PrettyJson({ value }) {
   )
 }
 
-function StatusDot({ state }) {
+function StatusDot({ state }: { state: 'pending' | 'error' | 'success' }) {
   if (state === 'pending') {
     return <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse flex-shrink-0" title="Running" />
   }
@@ -532,12 +608,12 @@ function StatusDot({ state }) {
   return <Check size={12} className="text-emerald-400 flex-shrink-0" />
 }
 
-function ToolCallChip({ call }) {
+function ToolCallChip({ call }: { call: ToolCallInfo }) {
   const [open, setOpen] = useState(false)
   const args = call.arguments || {}
   const parsedResult = parseMaybe(call.resultContent)
-  const isError = !!(parsedResult && typeof parsedResult === 'object' && parsedResult.error)
-  let state = 'success'
+  const isError = !!(parsedResult && typeof parsedResult === 'object' && (parsedResult as { error?: unknown }).error)
+  let state: 'pending' | 'error' | 'success' = 'success'
   if (call.pending) state = 'pending'
   else if (isError) state = 'error'
   const summary = toolSummary(call.name, args, parsedResult)
@@ -594,9 +670,22 @@ function ToolCallChip({ call }) {
 // into "groups". Each group is rendered as: assistant-text bubble (if any)
 // followed by a stack of ToolCallChips.
 
-function buildRenderItems(messages) {
-  const items = []
-  const byCallId = new Map()
+// One entry of a WorkspaceMessage's `tool_calls` (server/optimistic shape;
+// not modeled in src/types/api.ts — see WorkspaceMessage's own header note).
+interface RawToolCall {
+  id: string
+  name: string
+  arguments?: unknown
+  duration_ms?: number | null
+}
+
+export type RenderItem =
+  | { kind: 'message'; message: WorkspaceMessage }
+  | { kind: 'tool-group'; id: string; calls: ToolCallInfo[]; model?: string }
+
+function buildRenderItems(messages: WorkspaceMessage[] | undefined | null): RenderItem[] {
+  const items: RenderItem[] = []
+  const byCallId = new Map<unknown, WorkspaceMessage>()
   for (const m of messages || []) {
     if (m.role === 'tool') {
       byCallId.set(m.tool_call_id, m)
@@ -613,15 +702,15 @@ function buildRenderItems(messages) {
         items.push({ kind: 'message', message: { ...m, tool_calls: undefined } })
       }
       // Then emit a chip group.
-      const calls = m.tool_calls.map((c) => {
+      const calls: ToolCallInfo[] = (m.tool_calls as RawToolCall[]).map((c) => {
         const toolMsg = byCallId.get(c.id)
         const argsParsed = typeof c.arguments === 'string' ? parseMaybe(c.arguments) : c.arguments
         return {
           id: c.id,
           name: c.name,
-          arguments: argsParsed && typeof argsParsed === 'object' ? argsParsed : {},
+          arguments: argsParsed && typeof argsParsed === 'object' ? (argsParsed as Record<string, unknown>) : {},
           resultContent: toolMsg ? toolMsg.content : undefined,
-          durationMs: toolMsg?.duration_ms ?? c.duration_ms ?? null,
+          durationMs: (toolMsg?.duration_ms as number | null | undefined) ?? c.duration_ms ?? null,
           pending: !toolMsg && !!m._pending,
         }
       })
@@ -644,7 +733,7 @@ function buildRenderItems(messages) {
 // Human labels for the tool-use chips. The model surface uses
 // snake_case ids (read_file, run_compute(engine=...)) which look
 // engineery in a chat bubble; map them to verbs the user understands.
-const TOOL_VERB = {
+const TOOL_VERB: Record<string, string> = {
   read_file:        'Reading',
   write_file:       'Writing',
   edit_file:        'Editing',
@@ -659,7 +748,7 @@ const TOOL_VERB = {
   poll_compute:     'Checking compute',
 }
 
-function _humanToolLabel(chip) {
+function _humanToolLabel(chip: ToolChip): string {
   const verb = TOOL_VERB[chip.name] || chip.name
   // Extract a short target hint from the input if available — file path
   // basename or engine name. Keeps each chip to a single line.
@@ -677,7 +766,7 @@ function _humanToolLabel(chip) {
   return hint ? `${verb} ${hint}` : verb
 }
 
-function ToolChipList({ chips }) {
+function ToolChipList({ chips }: { chips: ToolChip[] | undefined | null }) {
   if (!chips || chips.length === 0) return null
   return (
     <div
@@ -735,7 +824,16 @@ function ToolChipList({ chips }) {
 
 // ---------- message bubble ----------
 
-function MessageBlock({ message, modelLookup, isLatestAssistant, onRetry }) {
+type ModelLookup = Record<string, ChatModel>
+
+interface MessageBlockProps {
+  message: WorkspaceMessage
+  modelLookup: ModelLookup
+  isLatestAssistant: boolean
+  onRetry?: () => void
+}
+
+function MessageBlock({ message, modelLookup, isLatestAssistant, onRetry }: MessageBlockProps) {
   const projectId = useWorkspace((s) => s.projectId)
   const reduced = usePrefersReducedMotion()
   const isUser = message.role === 'user'
@@ -834,7 +932,13 @@ function MessageBlock({ message, modelLookup, isLatestAssistant, onRetry }) {
   )
 }
 
-function ToolGroup({ calls, model, modelLookup }) {
+interface ToolGroupProps {
+  calls: ToolCallInfo[]
+  model?: string
+  modelLookup: ModelLookup
+}
+
+function ToolGroup({ calls, model, modelLookup }: ToolGroupProps) {
   const showBadge = model && model !== 'none'
   const badgeProvider = showBadge ? (modelLookup?.[model]?.provider || '') : ''
   return (
@@ -860,13 +964,27 @@ function ToolGroup({ calls, model, modelLookup }) {
 
 // ---------- input ----------
 
-const ChatInput = forwardRef(function ChatInput({
+interface ChatInputProps {
+  pendingPartRefs: PartRef[]
+  onRemoveRef: (index: number) => void
+  onSubmit: (content: string) => void
+  sending?: boolean
+  disabled?: boolean
+  models: ChatModel[]
+  selectedModelId: string | null
+  onSelectModel: (modelId: string) => void
+}
+
+const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(function ChatInput({
   pendingPartRefs, onRemoveRef, onSubmit, sending, disabled,
   models, selectedModelId, onSelectModel,
 }, ref) {
   const [value, setValue] = useState('')
-  const internalRef = useRef(null)
-  const taRef = ref || internalRef
+  const internalRef = useRef<HTMLTextAreaElement>(null)
+  // `ref` may be a callback ref in the general forwardRef case, but every
+  // caller in this codebase passes an object ref (useRef), so `.current` is
+  // always safe here.
+  const taRef = (ref && typeof ref !== 'function' ? ref : null) || internalRef
 
   useLayoutEffect(() => {
     const ta = taRef.current
@@ -882,7 +1000,7 @@ const ChatInput = forwardRef(function ChatInput({
     setValue('')
   }
 
-  function onKey(e) {
+  function onKey(e: ReactKeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault()
       submit()
@@ -957,16 +1075,32 @@ const ChatInput = forwardRef(function ChatInput({
 // render anything narrower than its full width. Keeping a second collapse
 // here used to leave an empty grid track behind.
 
-const ChatPanel = forwardRef(function ChatPanel({
+export interface ChatPanelProps {
+  threads: WorkspaceThread[]
+  currentThreadId: string | null
+  messages: WorkspaceMessage[]
+  pendingPartRefs: PartRef[]
+  onSelectThread: (threadId: string) => void
+  onCreateThread: () => void
+  onToggleStar: (threadId: string) => void
+  onDeleteThread: (threadId: string) => void
+  onSend: (content: string, opts?: { model?: string | null }) => void
+  onRemovePartRef: (index: number) => void
+  onCancelStream?: () => void
+  sending?: boolean
+  loadingMessages?: boolean
+}
+
+const ChatPanel = forwardRef<HTMLTextAreaElement, ChatPanelProps>(function ChatPanel({
   threads, currentThreadId, messages, pendingPartRefs,
   onSelectThread, onCreateThread, onToggleStar, onDeleteThread,
   onSend, onRemovePartRef, onCancelStream, sending, loadingMessages,
 }, inputRef) {
-  const scrollRef = useRef(null)
-  const [models, setModels] = useState([])
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [models, setModels] = useState<ChatModel[]>([])
   const setThreadModel = useWorkspace((s) => s.setThreadModel)
-  const [pendingModel, setPendingModel] = useState(null)
-  const [sendError, setSendError] = useState(null)
+  const [pendingModel, setPendingModel] = useState<string | null>(null)
+  const [sendError, setSendError] = useState<string | null>(null)
   const reduced = usePrefersReducedMotion()
 
   useEffect(() => {
@@ -977,7 +1111,7 @@ const ChatPanel = forwardRef(function ChatPanel({
         // /api/models returns { models: [...] }; tolerate a bare array
         // too. Treating the object as non-array gave models=[] →
         // ModelPicker rendered null → no model dropdown at all.
-        const arr = Array.isArray(list) ? list : (list?.models || [])
+        const arr = (Array.isArray(list) ? list : ((list as { models?: unknown[] })?.models || [])) as ChatModel[]
         setModels(arr)
       })
       .catch(() => { if (!cancelled) setModels([]) })
@@ -1004,7 +1138,7 @@ const ChatPanel = forwardRef(function ChatPanel({
   }, [models])
 
   const modelLookup = useMemo(() => {
-    const o = {}
+    const o: ModelLookup = {}
     for (const m of models) o[m.id] = m
     return o
   }, [models])
@@ -1021,7 +1155,7 @@ const ChatPanel = forwardRef(function ChatPanel({
     return defaultModelId
   }, [models, currentThread, pendingModel, modelLookup, defaultModelId])
 
-  const handleSelectModel = useCallback((modelId) => {
+  const handleSelectModel = useCallback((modelId: string) => {
     if (!modelId) return
     if (currentThreadId) {
       setThreadModel(currentThreadId, modelId)
@@ -1030,7 +1164,7 @@ const ChatPanel = forwardRef(function ChatPanel({
     }
   }, [currentThreadId, setThreadModel])
 
-  const handleSend = useCallback((content) => {
+  const handleSend = useCallback((content: string) => {
     setSendError(null)
     onSend(content, { model: selectedModelId })
   }, [onSend, selectedModelId])
@@ -1041,8 +1175,8 @@ const ChatPanel = forwardRef(function ChatPanel({
   // message content — used to wire up the retry button on errored assistant
   // messages so we can re-send the same prompt without needing the store.
   const retryContentByIndex = useMemo(() => {
-    const map = {}
-    let lastUserContent = null
+    const map: Record<number, string | null> = {}
+    let lastUserContent: string | null = null
     for (let i = 0; i < renderItems.length; i++) {
       const item = renderItems[i]
       if (item.kind === 'message' && item.message.role === 'user') {
@@ -1075,7 +1209,8 @@ const ChatPanel = forwardRef(function ChatPanel({
           // it with aria-live="polite" for screen-reader streaming announcement.
           let lastAssistantIdx = -1
           for (let i = renderItems.length - 1; i >= 0; i--) {
-            if (renderItems[i].kind === 'message' && renderItems[i].message.role === 'assistant') {
+            const ri = renderItems[i]
+            if (ri.kind === 'message' && ri.message.role === 'assistant') {
               lastAssistantIdx = i
               break
             }
@@ -1177,7 +1312,7 @@ const ChatPanel = forwardRef(function ChatPanel({
   )
 })
 
-function EmptyState({ hasThreads }) {
+function EmptyState({ hasThreads }: { hasThreads: boolean }) {
   return (
     <div className="m-auto max-w-xs text-center text-ink-400">
       <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-kerf-300/10 border border-kerf-300/30 mb-3">

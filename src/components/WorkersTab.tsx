@@ -5,7 +5,7 @@
  * status + last-seen, and lets the user enroll a new worker (one-time
  * token reveal + CLI hint) or revoke an existing one.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import {
   AlertCircle,
   CheckCircle2,
@@ -24,19 +24,51 @@ import {
 import Card from './Card.jsx'
 import Button from './Button.jsx'
 import Input from './Input.jsx'
-import { api, ApiError } from '../lib/api.js'
+import { api } from '../lib/api.js'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type WorkerStatus = 'online' | 'busy' | 'offline'
+
+interface WorkerCapabilities {
+  gpu_type?: string
+  vram_gb?: number
+  supported_workloads?: string[]
+}
+
+interface Worker {
+  id: string
+  name: string
+  status: WorkerStatus
+  capabilities?: WorkerCapabilities
+  last_seen_at?: string | null
+}
+
+interface EnrollResult {
+  id: string
+  name: string
+  token: string
+  cli_hint?: string
+}
 
 // ---------------------------------------------------------------------------
 // API helpers
 // ---------------------------------------------------------------------------
 
-async function apiListWorkers() {
-  return api.listWorkers ? api.listWorkers() : fetch('/api/workers', {
+// api.listWorkers isn't defined in src/lib/api.ts — this predates (or
+// anticipates) that module and falls back to a raw fetch when it's absent.
+// The cast documents the feature-detection without widening api.ts's type.
+const apiWithWorkers = api as typeof api & { listWorkers?: () => Promise<Worker[]> }
+
+async function apiListWorkers(): Promise<Worker[]> {
+  return apiWithWorkers.listWorkers ? apiWithWorkers.listWorkers() : fetch('/api/workers', {
     headers: { Authorization: `Bearer ${_getToken()}` },
   }).then(r => r.json())
 }
 
-async function apiEnrollWorker(name, capabilities) {
+async function apiEnrollWorker(name: string, capabilities: WorkerCapabilities): Promise<EnrollResult> {
   return fetch('/api/workers/enroll', {
     method: 'POST',
     headers: {
@@ -47,16 +79,20 @@ async function apiEnrollWorker(name, capabilities) {
   }).then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(new Error(e?.detail || 'Enroll failed'))))
 }
 
-async function apiDeleteWorker(id) {
+async function apiDeleteWorker(id: string): Promise<unknown> {
   return fetch(`/api/workers/${id}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${_getToken()}` },
   }).then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(new Error(e?.detail || 'Delete failed'))))
 }
 
-function _getToken() {
+function _getToken(): string {
   try {
-    const { accessToken } = window.__kerf_auth_state__ || JSON.parse(localStorage.getItem('kerf_auth') || '{}')
+    // window.__kerf_auth_state__ isn't declared in src/types/global.d.ts;
+    // this is a boundary this file doesn't own — cast rather than widen the
+    // ambient Window type for one caller.
+    const authState = (window as unknown as { __kerf_auth_state__?: { accessToken?: string } }).__kerf_auth_state__
+    const { accessToken } = authState || JSON.parse(localStorage.getItem('kerf_auth') || '{}')
     return accessToken || ''
   } catch { return '' }
 }
@@ -65,8 +101,8 @@ function _getToken() {
 // Status badge
 // ---------------------------------------------------------------------------
 
-function StatusBadge({ status }) {
-  const map = {
+function StatusBadge({ status }: { status: WorkerStatus }) {
+  const map: Record<WorkerStatus, { icon: ReactNode; label: string; cls: string }> = {
     online:  { icon: <Wifi size={11} />, label: 'Online',  cls: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' },
     busy:    { icon: <CpuIcon size={11} />, label: 'Busy', cls: 'text-amber-400 bg-amber-400/10 border-amber-400/20' },
     offline: { icon: <WifiOff size={11} />, label: 'Offline', cls: 'text-ink-400 bg-ink-400/10 border-ink-700' },
@@ -83,7 +119,7 @@ function StatusBadge({ status }) {
 // Worker row
 // ---------------------------------------------------------------------------
 
-function WorkerRow({ worker, onRevoke }) {
+function WorkerRow({ worker, onRevoke }: { worker: Worker; onRevoke: (id: string) => void }) {
   const [revoking, setRevoking] = useState(false)
 
   const onDelete = async () => {
@@ -93,7 +129,7 @@ function WorkerRow({ worker, onRevoke }) {
       await apiDeleteWorker(worker.id)
       onRevoke(worker.id)
     } catch (e) {
-      alert(e?.message || 'Revoke failed')
+      alert((e as Error)?.message || 'Revoke failed')
     } finally {
       setRevoking(false)
     }
@@ -142,21 +178,26 @@ function WorkerRow({ worker, onRevoke }) {
 // Enroll modal
 // ---------------------------------------------------------------------------
 
-function EnrollModal({ onClose, onEnrolled }) {
+interface EnrollModalProps {
+  onClose: () => void
+  onEnrolled?: (data: EnrollResult) => void
+}
+
+function EnrollModal({ onClose, onEnrolled }: EnrollModalProps) {
   const [name, setName] = useState('')
   const [gpuType, setGpuType] = useState('')
   const [vramGb, setVramGb] = useState('')
   const [enrolling, setEnrolling] = useState(false)
-  const [result, setResult] = useState(null)
-  const [err, setErr] = useState(null)
+  const [result, setResult] = useState<EnrollResult | null>(null)
+  const [err, setErr] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
-  const onSubmit = async (e) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (!name.trim()) { setErr('Name is required'); return }
     setEnrolling(true); setErr(null)
     try {
-      const caps = {}
+      const caps: WorkerCapabilities = {}
       if (gpuType.trim()) caps.gpu_type = gpuType.trim()
       if (vramGb.trim()) caps.vram_gb = parseInt(vramGb, 10) || undefined
       caps.supported_workloads = ['render']
@@ -164,7 +205,7 @@ function EnrollModal({ onClose, onEnrolled }) {
       setResult(data)
       onEnrolled?.(data)
     } catch (e) {
-      setErr(e?.message || 'Enrollment failed')
+      setErr((e as Error)?.message || 'Enrollment failed')
     } finally {
       setEnrolling(false)
     }
@@ -299,9 +340,9 @@ function EnrollModal({ onClose, onEnrolled }) {
 // ---------------------------------------------------------------------------
 
 export default function WorkersTab() {
-  const [workers, setWorkers] = useState([])
+  const [workers, setWorkers] = useState<Worker[]>([])
   const [loading, setLoading] = useState(true)
-  const [err, setErr] = useState(null)
+  const [err, setErr] = useState<string | null>(null)
   const [showEnroll, setShowEnroll] = useState(false)
 
   const load = async () => {
@@ -310,7 +351,7 @@ export default function WorkersTab() {
       const data = await apiListWorkers()
       setWorkers(Array.isArray(data) ? data : [])
     } catch (e) {
-      setErr(e?.message || 'Could not load workers')
+      setErr((e as Error)?.message || 'Could not load workers')
     } finally {
       setLoading(false)
     }
@@ -318,8 +359,8 @@ export default function WorkersTab() {
 
   useEffect(() => { load() }, [])
 
-  const onRevoke = (id) => setWorkers(ws => ws.filter(w => w.id !== id))
-  const onEnrolled = (data) => {
+  const onRevoke = (id: string) => setWorkers(ws => ws.filter(w => w.id !== id))
+  const onEnrolled = (data: EnrollResult) => {
     setWorkers(ws => [{ id: data.id, name: data.name, status: 'offline', capabilities: {}, last_seen_at: null }, ...ws])
     setShowEnroll(false)
   }

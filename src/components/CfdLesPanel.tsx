@@ -63,7 +63,7 @@
 
 // ── Utilities ────────────────────────────────────────────────────────────────
 
-function fmt(v, digits = 4) {
+function fmt(v: unknown, digits = 4): string {
   if (v == null) return '—'
   if (typeof v !== 'number') return String(v)
   if (!isFinite(v)) return String(v)
@@ -76,7 +76,7 @@ function fmt(v, digits = 4) {
 
 const SPARK_CHARS = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█']
 
-function sparkline(values, width = 24) {
+function sparkline(values: number[] | null | undefined, width = 24): string {
   if (!Array.isArray(values) || values.length === 0) return '—'
   const valid = values.filter(v => isFinite(v))
   if (valid.length === 0) return '—'
@@ -85,9 +85,9 @@ function sparkline(values, width = 24) {
   const range = mx - mn
   // Downsample to `width` bins
   const step = Math.max(1, Math.ceil(valid.length / width))
-  const binned = []
+  const binned: number[] = []
   for (let i = 0; i < valid.length; i += step) {
-    binned.push(valid[i])
+    binned.push(valid[i] as number)
   }
   return binned.map(v => {
     const idx = range > 0
@@ -105,13 +105,28 @@ const OK_COLOR    = '#10b981'
 const WARN_COLOR  = '#f59e0b'
 const ERR_COLOR   = '#f87171'
 
-function statusColor(ok) { return ok ? OK_COLOR : ERR_COLOR }
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- dead code, unused before this migration; reported, not fixed.
+function statusColor(ok: boolean | null | undefined): string { return ok ? OK_COLOR : ERR_COLOR }
 
 // ── Section: LES overview ─────────────────────────────────────────────────────
 
+interface LesOverviewProps {
+  sgs_model?: string
+  case?: string
+  Re_lambda?: number
+  n_steps?: number
+  dt?: number
+  tke_decay_ratio?: number
+  u_rms?: number
+  v_rms?: number
+  w_rms?: number
+  unsteady?: boolean
+  temporal_u_fluctuation?: number
+}
+
 function LesOverview({ sgs_model, case: caseName, Re_lambda, n_steps, dt,
                         tke_decay_ratio, u_rms, v_rms, w_rms,
-                        unsteady, temporal_u_fluctuation }) {
+                        unsteady, temporal_u_fluctuation: _temporal_u_fluctuation }: LesOverviewProps) {
   if (sgs_model == null && caseName == null) return null
   const rows = [
     ['SGS model',          sgs_model ? sgs_model.toUpperCase() : '—'],
@@ -146,7 +161,13 @@ function LesOverview({ sgs_model, case: caseName, Re_lambda, n_steps, dt,
 
 // ── Section: TKE time-series ──────────────────────────────────────────────────
 
-function TkeSeries({ resolved_tke, modeled_tke, nu_sgs_mean }) {
+interface TkeSeriesProps {
+  resolved_tke?: number[]
+  modeled_tke?: number[]
+  nu_sgs_mean?: number[]
+}
+
+function TkeSeries({ resolved_tke, modeled_tke, nu_sgs_mean }: TkeSeriesProps) {
   if (!Array.isArray(resolved_tke) || resolved_tke.length === 0) return null
   const res_spark  = sparkline(resolved_tke)
   const mod_spark  = sparkline(modeled_tke)
@@ -181,7 +202,12 @@ function TkeSeries({ resolved_tke, modeled_tke, nu_sgs_mean }) {
 
 // ── Section: Energy spectrum ──────────────────────────────────────────────────
 
-function EnergySpectrum({ wavenumbers, energy_spectrum }) {
+interface EnergySpectrumProps {
+  wavenumbers?: number[]
+  energy_spectrum?: number[]
+}
+
+function EnergySpectrum({ wavenumbers, energy_spectrum }: EnergySpectrumProps) {
   if (!Array.isArray(wavenumbers) || wavenumbers.length === 0) return null
   if (!Array.isArray(energy_spectrum) || energy_spectrum.length === 0) return null
   const valid = energy_spectrum.filter(isFinite)
@@ -210,8 +236,20 @@ function EnergySpectrum({ wavenumbers, energy_spectrum }) {
 
 // ── Section: DES model-index profile ─────────────────────────────────────────
 
-function DesProfile({ variant, Re_tau, model_index, blend, y_plus,
-                       n_rans_cells, n_les_cells, near_wall_rans, has_les_region }) {
+interface DesProfileProps {
+  variant?: string
+  Re_tau?: number
+  model_index?: number[]
+  blend?: number[]
+  y_plus?: number[]
+  n_rans_cells?: number
+  n_les_cells?: number
+  near_wall_rans?: boolean
+  has_les_region?: boolean
+}
+
+function DesProfile({ variant, Re_tau, model_index, blend, y_plus: _y_plus,
+                       n_rans_cells, n_les_cells, near_wall_rans, has_les_region }: DesProfileProps) {
   if (!Array.isArray(model_index) || model_index.length === 0) return null
   const ny = model_index.length
   const BAR_W = 200  // px
@@ -269,9 +307,20 @@ function DesProfile({ variant, Re_tau, model_index, blend, y_plus,
 
 // ── Section: Overset diagnostics ─────────────────────────────────────────────
 
+interface OversetDiagnosticsProps {
+  omega_rad_s?: number
+  angle_deg?: number
+  interpolation_error?: number
+  conservation_error?: number
+  phi_sum_bg?: number[]
+  phi_sum_sg?: number[]
+  feature_rotated?: boolean
+  interpolation_ok?: boolean
+}
+
 function OversetDiagnostics({ omega_rad_s, angle_deg, interpolation_error,
                                conservation_error, phi_sum_bg, phi_sum_sg,
-                               feature_rotated, interpolation_ok }) {
+                               feature_rotated, interpolation_ok }: OversetDiagnosticsProps) {
   if (omega_rad_s == null && angle_deg == null) return null
   const phi_bg_spark = sparkline(phi_sum_bg)
   const phi_sg_spark = sparkline(phi_sum_sg)
@@ -322,7 +371,7 @@ function OversetDiagnostics({ omega_rad_s, angle_deg, interpolation_error,
 
 // ── Section: Model notes ──────────────────────────────────────────────────────
 
-function ModelNotes({ model_notes }) {
+function ModelNotes({ model_notes }: { model_notes?: string }) {
   if (!model_notes) return null
   return (
     <section style={{ marginBottom: '0.5rem' }}>
@@ -342,6 +391,48 @@ function ModelNotes({ model_notes }) {
 
 // ── Root panel ────────────────────────────────────────────────────────────────
 
+export interface Props {
+  // LES
+  sgs_model?: string
+  case?: string
+  Re_lambda?: number
+  n_steps?: number
+  dt?: number
+  resolved_tke?: number[]
+  modeled_tke?: number[]
+  nu_sgs_mean?: number[]
+  tke_decay_ratio?: number
+  u_rms?: number
+  v_rms?: number
+  w_rms?: number
+  wavenumbers?: number[]
+  energy_spectrum?: number[]
+  unsteady?: boolean
+  temporal_u_fluctuation?: number
+  // DES
+  variant?: string
+  Re_tau?: number
+  y_plus?: number[]
+  model_index?: number[]
+  blend?: number[]
+  n_rans_cells?: number
+  n_les_cells?: number
+  near_wall_rans?: boolean
+  has_les_region?: boolean
+  // Overset
+  omega_rad_s?: number
+  angle_deg?: number
+  interpolation_error?: number
+  conservation_error?: number
+  phi_sum_bg?: number[]
+  phi_sum_sg?: number[]
+  feature_rotated?: boolean
+  interpolation_ok?: boolean
+  // Common
+  ok?: boolean
+  model_notes?: string
+}
+
 export default function CfdLesPanel({
   // LES
   sgs_model, case: caseName, Re_lambda, n_steps, dt,
@@ -357,12 +448,12 @@ export default function CfdLesPanel({
   phi_sum_bg, phi_sum_sg, feature_rotated, interpolation_ok,
   // Common
   ok, model_notes,
-}) {
+}: Props) {
   const isLes    = sgs_model != null || caseName != null
   const isDes    = Array.isArray(model_index) && model_index.length > 0
   const isOvset  = omega_rad_s != null || angle_deg != null
 
-  let modeLabel = []
+  const modeLabel: string[] = []
   if (isLes)   modeLabel.push(sgs_model ? `LES-${sgs_model.toUpperCase()}` : 'LES')
   if (isDes)   modeLabel.push(variant ? variant.toUpperCase() : 'DES')
   if (isOvset) modeLabel.push('Overset')

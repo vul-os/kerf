@@ -16,6 +16,7 @@
 // All instruments show demo-mode data when the backend is offline.
 // References: Tektronix TDS2000 operator's manual (scope), IEC 60469 §4 (AC RMS).
 
+import type { ComponentType, ReactNode } from 'react'
 import { useCallback, useState } from 'react'
 import { X, Activity, Radio, Zap, Crosshair } from 'lucide-react'
 
@@ -23,13 +24,83 @@ const API_URL = typeof import.meta !== 'undefined'
   ? (import.meta.env?.VITE_API_URL || '')
   : ''
 
+// ── Types ─────────────────────────────────────────────────────────────────
+// The virtual instrument bench is a thin client over POST /api/llm-tools/
+// eda_virtual_instrument + eda_probe_nodes; there's no shared type for these
+// payload shapes yet, so they're declared locally from the route's response
+// contract (mirrored in the DEMO_* fallbacks below).
+
+interface OscopeChannel {
+  channel: string
+  vpp: number
+  v_min: number
+  v_max: number
+  dc_mean: number
+  rms: number
+  ac_rms: number
+  frequency_hz: number | null
+  period_s: number | null
+  rise_time_s: number | null
+  n_samples: number
+}
+
+interface OscopeResult {
+  instrument: 'oscilloscope'
+  channels: OscopeChannel[]
+  time_start_s: number
+  time_stop_s: number
+  sample_rate_hz: number
+  warnings: string[]
+}
+
+interface MultimeterResult {
+  instrument: 'multimeter'
+  node: string
+  mode: string
+  value: number | null
+  unit: string
+  n_samples: number
+  warning: string | null
+}
+
+interface FGenResult {
+  instrument: 'function_generator'
+  waveform: string
+  freq_hz: number
+  amplitude_v: number
+  offset_v: number
+  duty_cycle: number
+  source_name: string
+  pos_node: string
+  neg_node: string
+  spice_line: string
+  tran_directive: string
+}
+
+interface ProbeResult {
+  node: string
+  kind: string
+  value: number
+  unit: string
+  dc: number
+  rms: number
+  label: string
+  not_found: boolean
+}
+
+interface ProbesResult {
+  probes: ProbeResult[]
+  warnings: string[]
+  at_time: number | null
+}
+
 // ── Palette ────────────────────────────────────────────────────────────────
 
 const CHANNEL_COLORS = ['#f59e0b', '#22d3ee', '#a78bfa', '#34d399', '#f472b6']
 
 // ── Demo data ──────────────────────────────────────────────────────────────
 
-const DEMO_OSCOPE = {
+const DEMO_OSCOPE: OscopeResult = {
   instrument: 'oscilloscope',
   channels: [
     {
@@ -52,7 +123,7 @@ const DEMO_OSCOPE = {
   warnings: [],
 }
 
-const DEMO_MULTIMETER = {
+const DEMO_MULTIMETER: MultimeterResult = {
   instrument: 'multimeter',
   node: 'V(out)',
   mode: 'dc_voltage',
@@ -62,7 +133,7 @@ const DEMO_MULTIMETER = {
   warning: null,
 }
 
-const DEMO_FGEN = {
+const DEMO_FGEN: FGenResult = {
   instrument: 'function_generator',
   waveform: 'sine',
   freq_hz: 1000,
@@ -76,7 +147,7 @@ const DEMO_FGEN = {
   tran_directive: '.TRAN 1e-05 0.01',
 }
 
-const DEMO_PROBES = {
+const DEMO_PROBES: ProbesResult = {
   probes: [
     { node: 'V(out)', kind: 'V', value: 2.5, unit: 'V', dc: 2.5, rms: 2.5, label: '2.5 V', not_found: false },
     { node: 'V(vdd)', kind: 'V', value: 5.0, unit: 'V', dc: 5.0, rms: 5.0, label: '5.0 V', not_found: false },
@@ -87,13 +158,24 @@ const DEMO_PROBES = {
 
 // ── Shared form helpers ────────────────────────────────────────────────────
 
-function Label({ children }) {
+function Label({ children }: { children: ReactNode }) {
   return (
     <span className="text-gray-500 text-[10px] uppercase tracking-wide">{children}</span>
   )
 }
 
-function Field({ label, value, unit, type = 'number', step = 'any', min, onChange, testId }) {
+interface FieldProps {
+  label: string
+  value: string
+  unit?: string
+  type?: string
+  step?: string
+  min?: string
+  onChange: (value: string) => void
+  testId?: string
+}
+
+function Field({ label, value, unit, type = 'number', step = 'any', min, onChange, testId }: FieldProps) {
   return (
     <label className="flex flex-col gap-0.5">
       <Label>{label}</Label>
@@ -113,7 +195,20 @@ function Field({ label, value, unit, type = 'number', step = 'any', min, onChang
   )
 }
 
-function Select({ label, value, options, onChange, testId }) {
+interface SelectOption {
+  value: string
+  label: string
+}
+
+interface SelectProps {
+  label: string
+  value: string
+  options: SelectOption[]
+  onChange: (value: string) => void
+  testId?: string
+}
+
+function Select({ label, value, options, onChange, testId }: SelectProps) {
   return (
     <label className="flex flex-col gap-0.5">
       <Label>{label}</Label>
@@ -131,7 +226,14 @@ function Select({ label, value, options, onChange, testId }) {
   )
 }
 
-function Metric({ label, value, unit, color }) {
+interface MetricProps {
+  label: string
+  value: ReactNode
+  unit?: string
+  color?: string
+}
+
+function Metric({ label, value, unit, color }: MetricProps) {
   return (
     <div className="flex flex-col gap-0.5 min-w-[64px]">
       <span className="text-gray-500 text-[10px] uppercase tracking-wide">{label}</span>
@@ -145,7 +247,7 @@ function Metric({ label, value, unit, color }) {
   )
 }
 
-function Warn({ msg }) {
+function Warn({ msg }: { msg: string | null }) {
   if (!msg) return null
   return (
     <div className="mt-1 px-2 py-1 rounded bg-amber-950/40 border border-amber-700/40 text-[10px] text-amber-300 font-mono break-all">
@@ -154,7 +256,7 @@ function Warn({ msg }) {
   )
 }
 
-function fmtSI(v, unit) {
+function fmtSI(v: number | null | undefined, unit: string): string {
   if (v == null || typeof v !== 'number' || !isFinite(v)) return '—'
   const a = Math.abs(v)
   if (a === 0) return `0 ${unit}`
@@ -164,7 +266,7 @@ function fmtSI(v, unit) {
   return `${(v * 1e9).toPrecision(4)} n${unit}`
 }
 
-async function callTool(toolName, payload) {
+async function callTool<T>(toolName: string, payload: Record<string, unknown>): Promise<T> {
   const res = await fetch(`${API_URL}/api/llm-tools/${toolName}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -178,11 +280,11 @@ async function callTool(toolName, payload) {
 // Oscilloscope tab
 // ─────────────────────────────────────────────────────────────────────────────
 
-function OscopeTab({ waveforms }) {
+function OscopeTab({ waveforms }: { waveforms?: unknown[] }) {
   const [channels, setChannels] = useState('V(out)')
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState<OscopeResult | null>(null)
   const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState(null)
+  const [err, setErr] = useState<string | null>(null)
   const [demoMode, setDemoMode] = useState(false)
 
   const run = useCallback(async () => {
@@ -190,7 +292,7 @@ function OscopeTab({ waveforms }) {
     setErr(null)
     try {
       const chList = channels.split(',').map((c) => c.trim()).filter(Boolean)
-      const data = await callTool('eda_virtual_instrument', {
+      const data = await callTool<OscopeResult>('eda_virtual_instrument', {
         instrument: 'oscilloscope',
         waveforms: waveforms || [],
         channels: chList,
@@ -280,17 +382,17 @@ const MM_MODES = [
   { value: 'ac_current_rms', label: 'AC Current RMS' },
 ]
 
-function MultimeterTab({ waveforms }) {
+function MultimeterTab({ waveforms }: { waveforms?: unknown[] }) {
   const [node, setNode] = useState('V(out)')
   const [mode, setMode] = useState('dc_voltage')
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState<MultimeterResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [demoMode, setDemoMode] = useState(false)
 
   const run = useCallback(async () => {
     setBusy(true)
     try {
-      const data = await callTool('eda_virtual_instrument', {
+      const data = await callTool<MultimeterResult>('eda_virtual_instrument', {
         instrument: 'multimeter',
         waveforms: waveforms || [],
         node,
@@ -376,14 +478,14 @@ function FunctionGenTab() {
   const [duty, setDuty] = useState('0.5')
   const [sourceName, setSourceName] = useState('stim')
   const [posNode, setPosNode] = useState('vin')
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState<FGenResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [demoMode, setDemoMode] = useState(false)
 
   const generate = useCallback(async () => {
     setBusy(true)
     try {
-      const data = await callTool('eda_virtual_instrument', {
+      const data = await callTool<FGenResult>('eda_virtual_instrument', {
         instrument: 'function_generator',
         waveform,
         freq_hz: Number(freqHz),
@@ -477,10 +579,10 @@ function FunctionGenTab() {
 // Probes tab
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ProbesTab({ waveforms }) {
+function ProbesTab({ waveforms }: { waveforms?: unknown[] }) {
   const [nodeList, setNodeList] = useState('V(out), V(vdd)')
   const [atTime, setAtTime] = useState('')
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState<ProbesResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [demoMode, setDemoMode] = useState(false)
 
@@ -488,12 +590,12 @@ function ProbesTab({ waveforms }) {
     setBusy(true)
     try {
       const nodes = nodeList.split(',').map((n) => n.trim()).filter(Boolean)
-      const payload = {
+      const payload: { waveforms: unknown[]; nodes: string[]; at_time?: number } = {
         waveforms: waveforms || [],
         nodes,
       }
       if (atTime !== '') payload.at_time = Number(atTime)
-      const data = await callTool('eda_probe_nodes', payload)
+      const data = await callTool<ProbesResult>('eda_probe_nodes', payload)
       setResult(data)
       setDemoMode(false)
     } catch {
@@ -591,18 +693,25 @@ function ProbesTab({ waveforms }) {
 // Main panel
 // ─────────────────────────────────────────────────────────────────────────────
 
-const TABS = [
+type TabKey = 'oscilloscope' | 'multimeter' | 'fgen' | 'probes'
+
+const TABS: { key: TabKey; label: string; icon: ComponentType<{ size?: number }> }[] = [
   { key: 'oscilloscope', label: 'Oscilloscope', icon: Activity },
   { key: 'multimeter',   label: 'Multimeter',   icon: Radio },
   { key: 'fgen',         label: 'Func Gen',     icon: Zap },
   { key: 'probes',       label: 'Probes',       icon: Crosshair },
 ]
 
-export default function VirtualInstrumentBench({ onClose, waveforms, content }) {
+export interface Props {
+  onClose?: () => void
+  waveforms?: unknown[]
+  content?: string
+}
+
+export default function VirtualInstrumentBench({ onClose, waveforms, content }: Props) {
   // Parse content string (from panelRegistry) to seed defaults (not yet used but accepted for compat)
-  // eslint-disable-next-line no-unused-vars
   const _defaults = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
-  const [tab, setTab] = useState('oscilloscope')
+  const [tab, setTab] = useState<TabKey>('oscilloscope')
 
   return (
     <div

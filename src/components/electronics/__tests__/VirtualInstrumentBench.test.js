@@ -48,7 +48,7 @@ beforeAll(() => {
 
 // ── Source file under test ─────────────────────────────────────────────────────
 
-const benchSrc = src('components/electronics/VirtualInstrumentBench.jsx')
+const benchSrc = src('components/electronics/VirtualInstrumentBench.tsx')
 
 // ── 1. Default export ──────────────────────────────────────────────────────────
 

@@ -21,7 +21,12 @@ import { useCallback } from 'react'
 // Default import of the real store — tests inject a mock via the prop.
 import { useWorkspace as _useWorkspace } from '../store/workspace.js'
 
-export default function ConflictBanner({ useWorkspace = _useWorkspace, className = '' }) {
+interface Props {
+  useWorkspace?: typeof _useWorkspace
+  className?: string
+}
+
+export default function ConflictBanner({ useWorkspace = _useWorkspace, className = '' }: Props) {
   const conflictFile = useWorkspace((s) => s.conflictFile)
   const loadFileForEditor = useWorkspace((s) => s.loadFileForEditor)
 

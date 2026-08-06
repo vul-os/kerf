@@ -110,21 +110,21 @@ describe('ConflictBanner — source contracts', () => {
   it('imports from the workspace store', () => {
     const { readFileSync } = require('fs')
     const { resolve } = require('path')
-    const src = readFileSync(resolve(__dirname, '../ConflictBanner.jsx'), 'utf8')
+    const src = readFileSync(resolve(__dirname, '../ConflictBanner.tsx'), 'utf8')
     expect(src).toMatch(/from.*store\/workspace/)
   })
 
   it('calls loadFileForEditor on Reload click (via source)', () => {
     const { readFileSync } = require('fs')
     const { resolve } = require('path')
-    const src = readFileSync(resolve(__dirname, '../ConflictBanner.jsx'), 'utf8')
+    const src = readFileSync(resolve(__dirname, '../ConflictBanner.tsx'), 'utf8')
     expect(src).toMatch(/loadFileForEditor/)
   })
 
   it('clears conflictFile via setState on Reload', () => {
     const { readFileSync } = require('fs')
     const { resolve } = require('path')
-    const src = readFileSync(resolve(__dirname, '../ConflictBanner.jsx'), 'utf8')
+    const src = readFileSync(resolve(__dirname, '../ConflictBanner.tsx'), 'utf8')
     expect(src).toMatch(/setState.*conflictFile.*null|conflictFile.*null.*setState/s)
   })
 })

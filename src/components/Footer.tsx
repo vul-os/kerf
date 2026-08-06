@@ -2,9 +2,20 @@ import { Link } from 'react-router-dom'
 import { Github, ExternalLink } from 'lucide-react'
 import { LogoMark } from './Logo.jsx'
 
+// __APP_VERSION__ is a build-time constant injected by Vite's `define` plugin
+// (see src/lib/appVersion.ts, which has the same local declaration — it must
+// stay a bare identifier reference, not a globalThis property access, or the
+// literal substitution won't fire).
+declare const __APP_VERSION__: string
+
 const GITHUB_URL = 'https://github.com/kerf-sh/kerf'
 
-function Col({ title, children }) {
+interface ColProps {
+  title: string
+  children?: React.ReactNode
+}
+
+function Col({ title, children }: ColProps) {
   return (
     <div className="flex flex-col gap-3">
       <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-400">
@@ -15,7 +26,14 @@ function Col({ title, children }) {
   )
 }
 
-function Item({ to, href, external, children }) {
+interface ItemProps {
+  to?: string
+  href?: string
+  external?: boolean
+  children?: React.ReactNode
+}
+
+function Item({ to, href, external, children }: ItemProps) {
   const cls =
     'inline-flex items-center gap-1.5 text-sm text-ink-300 hover:text-ink-100 transition-colors'
   if (href) {

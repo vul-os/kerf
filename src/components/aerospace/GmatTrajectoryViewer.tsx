@@ -1,5 +1,5 @@
 /**
- * GmatTrajectoryViewer.jsx — 3D spacecraft trajectory viewer.
+ * GmatTrajectoryViewer.tsx — 3D spacecraft trajectory viewer.
  *
  * Renders a Three.js scene containing:
  *   - Earth (blue sphere, R = 6 378 km)
@@ -29,8 +29,17 @@
  * <GmatTrajectoryViewer trajectory={traj} events={evts} onLoadMission={handleLoad} />
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
+import type { TrajectoryPoint, MissionEvent } from './aerospaceTypes'
+
+export interface Props {
+  trajectory?: TrajectoryPoint[]
+  events?: MissionEvent[]
+  width?: number
+  height?: number
+  onLoadMission?: () => void
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -55,10 +64,9 @@ const PHASE_COLORS = [
 // Apollo TLI fixture (~50 sample points, simplified geometry)
 // ---------------------------------------------------------------------------
 
-function _generateApolloFixture() {
-  const pts = []
-  const evts = []
-  const N = 50
+function _generateApolloFixture(): { pts: TrajectoryPoint[]; evts: MissionEvent[] } {
+  const pts: TrajectoryPoint[] = []
+  const evts: MissionEvent[] = []
 
   // Phase 1: Low-Earth parking orbit (circular, 0-10 steps)
   const r_park = R_EARTH_KM + 185  // 185 km parking altitude
@@ -167,7 +175,14 @@ const DEFAULT_EVENTS     = APOLLO_FIXTURE.evts
 // Helper: compute altitude + velocity from state vector
 // ---------------------------------------------------------------------------
 
-function _stateInfo(pt) {
+interface StateInfo {
+  alt: string
+  v: string
+  e: string
+  t: number
+}
+
+function _stateInfo(pt: TrajectoryPoint | null): StateInfo | null {
   if (!pt) return null
   const r = Math.sqrt(pt.x ** 2 + pt.y ** 2 + pt.z ** 2)
   const alt = r - R_EARTH_KM
@@ -193,9 +208,9 @@ export default function GmatTrajectoryViewer({
   width      = 900,
   height     = 560,
   onLoadMission,
-}) {
-  const mountRef = useRef(null)
-  const stateRef = useRef(null)
+}: Props) {
+  const mountRef = useRef<HTMLDivElement | null>(null)
+  const stateRef = useRef<unknown>(null)
 
   // Playback state
   const [frameIdx, setFrameIdx]   = useState(0)
@@ -298,7 +313,7 @@ export default function GmatTrajectoryViewer({
     // ── Trajectory lines (colour by phase) ──────────────────────────────────
     // Group consecutive points by phase
     let currentPhase = (trajectory[0]?.phase ?? 0) % PHASE_COLORS.length
-    let segPts = []
+    let segPts: TrajectoryPoint[] = []
 
     function flushSegment() {
       if (segPts.length < 2) { segPts = []; return }
@@ -338,7 +353,7 @@ export default function GmatTrajectoryViewer({
     // ── Camera orbit controls ────────────────────────────────────────────────
     let isDown = false
     let lastPtr = { x: 0, y: 0 }
-    let spherical = {
+    const spherical = {
       theta:  0,
       phi:    Math.PI / 2.2,
       radius: R_EARTH_KM * 5,
@@ -356,8 +371,8 @@ export default function GmatTrajectoryViewer({
 
     const canvas = renderer.domElement
 
-    function onDown(e) { isDown = true; lastPtr = { x: e.clientX, y: e.clientY } }
-    function onMove(e) {
+    function onDown(e: PointerEvent) { isDown = true; lastPtr = { x: e.clientX, y: e.clientY } }
+    function onMove(e: PointerEvent) {
       if (!isDown) return
       const dx = e.clientX - lastPtr.x
       const dy = e.clientY - lastPtr.y
@@ -367,7 +382,7 @@ export default function GmatTrajectoryViewer({
       _updateCamera()
     }
     function onUp() { isDown = false }
-    function onWheel(e) {
+    function onWheel(e: WheelEvent) {
       e.preventDefault()
       spherical.radius = Math.max(
         R_EARTH_KM * 1.1,
@@ -383,11 +398,11 @@ export default function GmatTrajectoryViewer({
     canvas.addEventListener('wheel',        onWheel, { passive: false })
 
     // ── Animation loop ───────────────────────────────────────────────────────
-    let animId
+    let animId: number
     let lastTime = performance.now()
     let accumMs = 0
 
-    function animate(now) {
+    function animate(now: number) {
       animId = requestAnimationFrame(animate)
       const dt = now - lastTime
       lastTime = now
@@ -437,7 +452,7 @@ export default function GmatTrajectoryViewer({
   }, [trajectory, width, height])
 
   // Format time label
-  function _fmtTime(s) {
+  function _fmtTime(s: number): string {
     const h = Math.floor(s / 3600)
     const m = Math.floor((s % 3600) / 60)
     return `T+${h}h${m.toString().padStart(2,'0')}m`
@@ -604,7 +619,12 @@ export default function GmatTrajectoryViewer({
 // Sub-component: state row
 // ---------------------------------------------------------------------------
 
-function _StateRow({ label, value }) {
+interface StateRowProps {
+  label: string
+  value: string
+}
+
+function _StateRow({ label, value }: StateRowProps) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
       <span style={{ color: '#405878' }}>{label}</span>

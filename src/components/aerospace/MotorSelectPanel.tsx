@@ -1,5 +1,5 @@
 /**
- * MotorSelectPanel.jsx — Rocket motor database browser and selector.
+ * MotorSelectPanel.tsx — Rocket motor database browser and selector.
  *
  * Allows users to:
  *   1. Browse the built-in motor catalogue (Estes, Aerotech, Cesaroni).
@@ -33,13 +33,25 @@
  * />
  */
 
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
+import type { Motor, MotorFilter, ThrustPoint } from './aerospaceTypes'
+
+export interface Props {
+  motors?: Motor[] | null
+  selectedMotor?: Motor | null
+  onFilter?: ((filter: MotorFilter) => void) | null
+  onSelect?: ((name: string) => void) | null
+  onParseEng?: ((engText: string) => void) | null
+  loading?: boolean
+  /** Backward-compatible JSON-string form merged over the props above. */
+  content?: string
+}
 
 // ---------------------------------------------------------------------------
 // Impulse class colour palette (A=teal, B=blue, …, M=red)
 // ---------------------------------------------------------------------------
 
-const CLASS_COLORS = {
+const CLASS_COLORS: Record<string, string> = {
   '1/4A': '#94a3b8',
   '1/2A': '#94a3b8',
   'A': '#22d3ee',
@@ -59,13 +71,13 @@ const CLASS_COLORS = {
   'O': '#b91c1c',
 }
 
-const classColor = (cls) => CLASS_COLORS[cls] ?? '#94a3b8'
+const classColor = (cls: string) => CLASS_COLORS[cls] ?? '#94a3b8'
 
 // ---------------------------------------------------------------------------
 // Built-in demo catalogue (shown when no API data available)
 // ---------------------------------------------------------------------------
 
-const DEMO_MOTORS = [
+const DEMO_MOTORS: Motor[] = [
   { name: 'A8',  manufacturer: 'Estes',    impulse_class: 'A', total_impulse_ns: 2.40,  average_thrust_n: 5.0,   burn_time_s: 0.49, isp_s: 80,  diameter_mm: 18, propellant_mass_g: 3.1  },
   { name: 'C6',  manufacturer: 'Estes',    impulse_class: 'D', total_impulse_ns: 11.2,  average_thrust_n: 6.6,   burn_time_s: 1.70, isp_s: 104, diameter_mm: 18, propellant_mass_g: 11.0 },
   { name: 'D12', manufacturer: 'Estes',    impulse_class: 'D', total_impulse_ns: 19.7,  average_thrust_n: 11.2,  burn_time_s: 1.75, isp_s: 96,  diameter_mm: 24, propellant_mass_g: 20.8 },
@@ -75,7 +87,7 @@ const DEMO_MOTORS = [
   { name: 'K711', manufacturer: 'Cesaroni', impulse_class: 'K', total_impulse_ns: 1298.0, average_thrust_n: 763.5, burn_time_s: 1.70, isp_s: 201, diameter_mm: 75, propellant_mass_g: 660.0 },
 ]
 
-const DEMO_DETAIL = {
+const DEMO_DETAIL: Motor = {
   ...DEMO_MOTORS[3],
   length_mm: 124,
   total_mass_g: 72,
@@ -98,7 +110,13 @@ const DEMO_DETAIL = {
 // Thrust curve SVG chart
 // ---------------------------------------------------------------------------
 
-function ThrustCurveChart({ curve, width = 300, height = 100 }) {
+interface ThrustCurveChartProps {
+  curve?: ThrustPoint[]
+  width?: number
+  height?: number
+}
+
+function ThrustCurveChart({ curve, width = 300, height = 100 }: ThrustCurveChartProps) {
   if (!curve || curve.length < 2) return null
 
   const pad = { top: 8, right: 8, bottom: 20, left: 36 }
@@ -108,8 +126,8 @@ function ThrustCurveChart({ curve, width = 300, height = 100 }) {
   const tMax = Math.max(...curve.map(p => p.time_s))
   const fMax = Math.max(...curve.map(p => p.thrust_n))
 
-  const sx = t => (t / (tMax || 1)) * W
-  const sy = f => H - (f / (fMax || 1)) * H
+  const sx = (t: number) => (t / (tMax || 1)) * W
+  const sy = (f: number) => H - (f / (fMax || 1)) * H
 
   const pathD = curve.map((p, i) =>
     `${i === 0 ? 'M' : 'L'}${sx(p.time_s).toFixed(1)},${sy(p.thrust_n).toFixed(1)}`
@@ -133,7 +151,7 @@ function ThrustCurveChart({ curve, width = 300, height = 100 }) {
           <g key={i}>
             <line x1={0} y1={sy(g.f).toFixed(1)} x2={W} y2={sy(g.f).toFixed(1)}
                   stroke="#1e293b" strokeWidth={1} />
-            <text x={-4} y={(parseFloat(sy(g.f)) + 3).toFixed(1)}
+            <text x={-4} y={(sy(g.f) + 3).toFixed(1)}
                   fill="#475569" fontSize={8} textAnchor="end">{g.label}</text>
           </g>
         ))}
@@ -167,7 +185,13 @@ function ThrustCurveChart({ curve, width = 300, height = 100 }) {
 // Motor list row
 // ---------------------------------------------------------------------------
 
-function MotorRow({ motor, selected, onSelect }) {
+interface MotorRowProps {
+  motor: Motor
+  selected?: boolean
+  onSelect?: (name: string) => void
+}
+
+function MotorRow({ motor, selected, onSelect }: MotorRowProps) {
   const cls = motor.impulse_class ?? '?'
   return (
     <tr
@@ -196,7 +220,11 @@ function MotorRow({ motor, selected, onSelect }) {
 // Motor detail sidebar
 // ---------------------------------------------------------------------------
 
-function MotorDetail({ motor }) {
+interface MotorDetailProps {
+  motor?: Motor | null
+}
+
+function MotorDetail({ motor }: MotorDetailProps) {
   if (!motor) return null
   const cls = motor.impulse_class ?? '?'
   const clrBase = classColor(cls)
@@ -220,7 +248,7 @@ function MotorDetail({ motor }) {
         <DetailRow label="Isp"            value={motor.isp_s?.toFixed(1)} unit="s" />
         <DetailRow label="Propellant"     value={motor.propellant_mass_g?.toFixed(1)} unit="g" />
         <DetailRow label="Total mass"     value={motor.total_mass_g?.toFixed(1)} unit="g" />
-        {motor.delays_s?.length > 0 && (
+        {motor.delays_s && motor.delays_s.length > 0 && (
           <DetailRow label="Delays" value={motor.delays_s?.join(', ')} unit="s" />
         )}
       </div>
@@ -235,7 +263,13 @@ function MotorDetail({ motor }) {
   )
 }
 
-function DetailRow({ label, value, unit }) {
+interface DetailRowProps {
+  label: string
+  value?: string | number | null
+  unit?: string
+}
+
+function DetailRow({ label, value, unit }: DetailRowProps) {
   return (
     <div className="msp-detail-row">
       <span className="msp-detail-label">{label}</span>
@@ -251,7 +285,11 @@ function DetailRow({ label, value, unit }) {
 // Eng file paste input
 // ---------------------------------------------------------------------------
 
-function EngPasteInput({ onParse }) {
+interface EngPasteInputProps {
+  onParse?: ((text: string) => void) | null
+}
+
+function EngPasteInput({ onParse }: EngPasteInputProps) {
   const [text, setText] = useState('')
   return (
     <div className="msp-eng-input">
@@ -280,7 +318,11 @@ function EngPasteInput({ onParse }) {
 
 const CLASSES = ['', '1/2A', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N']
 
-function FilterBar({ onFilter }) {
+interface FilterBarProps {
+  onFilter?: ((filter: MotorFilter) => void) | null
+}
+
+function FilterBar({ onFilter }: FilterBarProps) {
   const [cls, setCls]    = useState('')
   const [mfr, setMfr]    = useState('')
   const [diam, setDiam]  = useState('')
@@ -329,9 +371,9 @@ export default function MotorSelectPanel({
   onParseEng = null,
   loading: loadingProp = false,
   content,
-}) {
+}: Props) {
   // Backward-compatible content string: JSON.parse it and merge over prop defaults.
-  let _parsed = null
+  let _parsed: { motors?: Motor[]; selectedMotor?: Motor; loading?: boolean } | null = null
   if (content != null) {
     try { _parsed = JSON.parse(content) } catch { /* ignore */ }
   }
@@ -339,13 +381,13 @@ export default function MotorSelectPanel({
   const selectedMotor = (_parsed && _parsed.selectedMotor !== undefined) ? _parsed.selectedMotor : selectedMotorProp
   const loading = (_parsed && _parsed.loading !== undefined) ? _parsed.loading : loadingProp
   const [showEng, setShowEng]     = useState(false)
-  const [localSel, setLocalSel]   = useState(null)
+  const [localSel, setLocalSel]   = useState<string | null>(null)
   const [showDemo, setShowDemo]   = useState(false)
 
   const motorList = motors ?? (showDemo ? DEMO_MOTORS : null)
   const detail    = selectedMotor ?? (showDemo && localSel === 'G79' ? DEMO_DETAIL : null)
 
-  const handleSelect = (name) => {
+  const handleSelect = (name: string) => {
     setLocalSel(name)
     onSelect?.(name)
   }

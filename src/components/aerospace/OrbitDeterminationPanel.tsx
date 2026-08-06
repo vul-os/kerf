@@ -1,5 +1,5 @@
 /**
- * OrbitDeterminationPanel.jsx — Orbit determination results panel.
+ * OrbitDeterminationPanel.tsx — Orbit determination results panel.
  *
  * Displays results from both batch least-squares (BLS) and Extended Kalman
  * Filter (EKF) orbit determination, including:
@@ -34,13 +34,34 @@
  */
 
 import { useState, useMemo } from 'react'
+import type { OrbitDeterminationResult } from './aerospaceTypes'
+
+export type OrbitDeterminationMode = 'batch' | 'ekf' | 'both'
+
+export interface Props {
+  mode?: OrbitDeterminationMode
+  batchResult?: OrbitDeterminationResult | null
+  ekfResult?: OrbitDeterminationResult | null
+  onRunBatch?: (() => void) | null
+  onRunEkf?: (() => void) | null
+  loading?: boolean
+  /** Backward-compatible JSON-string form merged over the props above. */
+  content?: string
+}
 
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
+interface StateRowProps {
+  label: string
+  value?: number
+  unit?: string
+  sigma?: number | null
+}
+
 /** Single row in a state-vector table. */
-function StateRow({ label, value, unit, sigma }) {
+function StateRow({ label, value, unit, sigma }: StateRowProps) {
   const sigStr = sigma != null ? ` ± ${sigma.toFixed(4)}` : ''
   return (
     <tr className="od-state-row">
@@ -54,8 +75,13 @@ function StateRow({ label, value, unit, sigma }) {
   )
 }
 
+interface StatusBadgeProps {
+  ok?: boolean
+  label: string
+}
+
 /** Convergence / health badge. */
-function StatusBadge({ ok, label }) {
+function StatusBadge({ ok, label }: StatusBadgeProps) {
   const color = ok ? '#22c55e' : '#ef4444'
   return (
     <span
@@ -75,8 +101,15 @@ function StatusBadge({ ok, label }) {
   )
 }
 
+interface SparklineProps {
+  values?: number[]
+  width?: number
+  height?: number
+  color?: string
+}
+
 /** Mini sparkline — SVG polyline of normalised values. */
-function Sparkline({ values, width = 200, height = 36, color = '#60a5fa' }) {
+function Sparkline({ values, width = 200, height = 36, color = '#60a5fa' }: SparklineProps) {
   if (!values || values.length < 2) return null
   const min = Math.min(...values)
   const max = Math.max(...values)
@@ -105,8 +138,14 @@ function Sparkline({ values, width = 200, height = 36, color = '#60a5fa' }) {
   )
 }
 
+interface StateTableProps {
+  result?: OrbitDeterminationResult | null
+  title: string
+  color: string
+}
+
 /** State vector table for either batch or EKF result. */
-function StateTable({ result, title, color }) {
+function StateTable({ result, title, color }: StateTableProps) {
   if (!result || !result.ok) return null
 
   const x = result.x_estimated ?? result.state_final
@@ -141,8 +180,13 @@ function StateTable({ result, title, color }) {
   )
 }
 
+interface StatsBlockProps {
+  result?: OrbitDeterminationResult | null
+  title: string
+}
+
 /** Statistics row for one estimator. */
-function StatsBlock({ result, title }) {
+function StatsBlock({ result, title }: StatsBlockProps) {
   if (!result || !result.ok) return null
 
   const rms = result.rms_residual ?? result.rms_innovation
@@ -194,7 +238,7 @@ function StatsBlock({ result, title }) {
 // Default fixture data (demonstration mode when no results provided)
 // ---------------------------------------------------------------------------
 
-const DEMO_BATCH = {
+const DEMO_BATCH: OrbitDeterminationResult = {
   ok: true,
   converged: true,
   n_iter: 5,
@@ -206,7 +250,7 @@ const DEMO_BATCH = {
   warnings: [],
 }
 
-const DEMO_EKF = {
+const DEMO_EKF: OrbitDeterminationResult = {
   ok: true,
   state_final: [5673.445, 2350.102, 1237.334, -1.229, 6.792, 3.015],
   covariance_diag: [4.1e-5, 3.8e-5, 5.2e-5, 1.2e-9, 1.1e-9, 9.8e-10],
@@ -235,9 +279,14 @@ export default function OrbitDeterminationPanel({
   onRunEkf = null,
   loading: loadingProp = false,
   content,
-}) {
+}: Props) {
   // Backward-compatible content string: JSON.parse it and merge over prop defaults.
-  let _parsed = null
+  let _parsed: {
+    mode?: OrbitDeterminationMode
+    batchResult?: OrbitDeterminationResult | null
+    ekfResult?: OrbitDeterminationResult | null
+    loading?: boolean
+  } | null = null
   if (content != null) {
     try { _parsed = JSON.parse(content) } catch { /* ignore */ }
   }

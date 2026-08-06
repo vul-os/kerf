@@ -15,8 +15,9 @@
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import OrbitDeterminationPanel from './OrbitDeterminationPanel.jsx'
+import type { Props } from './OrbitDeterminationPanel.jsx'
 
-function render(props = {}) {
+function render(props: Partial<Props> = {}) {
   return renderToStaticMarkup(<OrbitDeterminationPanel {...props} />)
 }
 

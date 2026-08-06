@@ -17,8 +17,9 @@
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import MotorSelectPanel from './MotorSelectPanel.jsx'
+import type { Props } from './MotorSelectPanel.jsx'
 
-function render(props = {}) {
+function render(props: Partial<Props> = {}) {
   return renderToStaticMarkup(<MotorSelectPanel {...props} />)
 }
 

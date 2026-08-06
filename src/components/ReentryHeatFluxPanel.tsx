@@ -1,16 +1,34 @@
-// ReentryHeatFluxPanel.jsx — Re-entry stagnation heat-flux panel.
+// ReentryHeatFluxPanel.tsx — Re-entry stagnation heat-flux panel.
 //
 // Renders output from aero_reentry_heat_flux tool:
 //   - Point-mode: summary cards (q_conv, q_rad, q_total)
 //   - Trajectory-mode: heat-flux vs altitude or vs velocity SVG chart
-//
-// Props
-// ─────
-//   result  {Object|null}  — parsed JSON from aero_reentry_heat_flux
-//   loading {boolean}
-//   error   {string|null}
 
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
+
+/** One entry in `trajectory` from the aero_reentry_heat_flux tool. */
+interface TrajectoryPoint {
+  altitude_km: number
+  velocity_m_s: number
+  q_total_W_m2: number
+  q_convective_W_m2: number
+  q_radiative_W_m2: number
+}
+
+/** Parsed JSON payload from the aero_reentry_heat_flux tool. */
+interface ReentryHeatFluxResult {
+  ok: boolean
+  trajectory?: TrajectoryPoint[]
+  n_points?: number
+  nose_radius_m?: number
+  altitude_km?: number
+  velocity_m_s?: number
+  q_convective_W_m2?: number
+  q_radiative_W_m2?: number
+  q_total_W_m2?: number
+  q_total_W_cm2?: number
+  method?: string
+}
 
 // ---------------------------------------------------------------------------
 // Chart constants
@@ -22,14 +40,19 @@ const PAD = { top: 20, right: 20, bottom: 42, left: 70 }
 const INNER_W = CHART_W - PAD.left - PAD.right
 const INNER_H = CHART_H - PAD.top - PAD.bottom
 
-function scaleLinear(domain, range) {
+function scaleLinear(domain: [number, number], range: [number, number]) {
   const [d0, d1] = domain
   const [r0, r1] = range
   const dSpan = d1 - d0 || 1
-  return v => r0 + ((v - d0) / dSpan) * (r1 - r0)
+  return (v: number) => r0 + ((v - d0) / dSpan) * (r1 - r0)
 }
 
-function buildPath(xs, ys, xS, yS) {
+function buildPath(
+  xs: number[],
+  ys: (number | null)[],
+  xS: (v: number) => number,
+  yS: (v: number) => number,
+) {
   return xs
     .map((x, i) => {
       const y = ys[i]
@@ -40,18 +63,18 @@ function buildPath(xs, ys, xS, yS) {
     .join(' ')
 }
 
-function axisTicks(min, max, n = 5) {
+function axisTicks(min: number, max: number, n = 5) {
   const step = (max - min) / (n - 1)
   return Array.from({ length: n }, (_, i) => min + i * step)
 }
 
-function fmtFlux(v) {
+function fmtFlux(v: number) {
   if (v >= 1e6) return `${(v / 1e6).toFixed(2)} MW/m²`
   if (v >= 1e3) return `${(v / 1e3).toFixed(1)} kW/m²`
   return `${v.toFixed(1)} W/m²`
 }
 
-function fmtCm2(v) {
+function fmtCm2(v: number | null | undefined) {
   if (v === null || v === undefined) return '—'
   return `${v.toFixed(2)} W/cm²`
 }
@@ -60,7 +83,7 @@ function fmtCm2(v) {
 // Trajectory chart
 // ---------------------------------------------------------------------------
 
-function TrajectoryChart({ trajectory }) {
+function TrajectoryChart({ trajectory }: { trajectory: TrajectoryPoint[] }) {
   const alts = trajectory.map(p => p.altitude_km)
   const fluxes = trajectory.map(p => p.q_total_W_m2)
   const convs = trajectory.map(p => p.q_convective_W_m2)
@@ -174,8 +197,18 @@ function TrajectoryChart({ trajectory }) {
 // ReentryHeatFluxPanel
 // ---------------------------------------------------------------------------
 
-export default function ReentryHeatFluxPanel({ result, loading, error, content }) {
+export interface Props {
+  /** Parsed JSON from aero_reentry_heat_flux. */
+  result?: ReentryHeatFluxResult | null
+  loading?: boolean
+  error?: string | null
+  /** Backward-compatible JSON string, parsed into `result` when `result` is absent. */
+  content?: string | null
+}
+
+export default function ReentryHeatFluxPanel({ result: resultProp, loading, error, content }: Props) {
   // Backward-compatible content string: JSON.parse it and merge into result.
+  let result = resultProp
   if (content != null && result == null) {
     try { result = JSON.parse(content) } catch { /* ignore */ }
   }
@@ -262,7 +295,7 @@ export default function ReentryHeatFluxPanel({ result, loading, error, content }
   )
 }
 
-function SummaryCard({ label, value, highlight }) {
+function SummaryCard({ label, value, highlight }: { label: string; value: ReactNode; highlight?: boolean }) {
   return (
     <div className={`rounded p-2 border text-center ${
       highlight ? 'border-purple-600 bg-purple-950' : 'border-gray-700 bg-gray-800'

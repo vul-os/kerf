@@ -13,7 +13,7 @@ import {
   classifyRegime,
   buildPressureDropArgs,
   buildDropletArgs,
-} from './MicrofluidicsPanel.jsx'
+} from './MicrofluidicsPanel'
 
 describe('fmtNum', () => {
   it('returns "—" for null', () => {

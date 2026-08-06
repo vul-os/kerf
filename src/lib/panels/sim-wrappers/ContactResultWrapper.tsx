@@ -23,7 +23,29 @@
 //   notes: string,
 // }
 
-const DEFAULTS = {
+export interface Props {
+  content?: string
+}
+
+interface ContactResultContent {
+  method?: 'penalty' | 'auglag'
+  contact_status?: ('open' | 'stick' | 'slip')[]
+  normal_forces_n?: number[][]
+  tangential_forces_n?: number[][]
+  gaps_m?: number[]
+  n_open?: number
+  n_stick?: number
+  n_slip?: number
+  n_active_contacts?: number
+  friction_coefficient?: number
+  penalty_penetration_m?: number[] | null
+  auglag_penetration_m?: number[] | null
+  iterations?: number | null
+  converged?: boolean | null
+  notes?: string | null
+}
+
+const DEFAULTS: ContactResultContent = {
   method: 'penalty',
   contact_status: [],
   normal_forces_n: [],
@@ -41,35 +63,36 @@ const DEFAULTS = {
   notes: null,
 }
 
-function parseContent(content) {
+function parseContent(content: string | undefined): ContactResultContent {
   if (!content || typeof content !== 'string') return {}
   try { return JSON.parse(content) || {} } catch { return {} }
 }
 
 // Status badge colors
-const STATUS_COLORS = {
+const STATUS_COLORS: Record<'open' | 'stick' | 'slip', string> = {
   open: '#64748b',   // slate
   stick: '#22c55e',  // green
   slip: '#f59e0b',   // amber
 }
 
 function ContactResultPanel({
-  method,
-  contact_status,
-  normal_forces_n,
-  tangential_forces_n,
-  gaps_m,
-  n_open,
-  n_stick,
-  n_slip,
-  n_active_contacts,
-  friction_coefficient,
-  penalty_penetration_m,
-  auglag_penetration_m,
-  iterations,
-  converged,
-  notes,
-}) {
+  method = 'penalty',
+  contact_status = [],
+  normal_forces_n = [],
+  tangential_forces_n = [],
+  gaps_m = [],
+  n_open = 0,
+  n_stick = 0,
+  n_slip = 0,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- dead prop, unused before this migration; reported, not fixed.
+  n_active_contacts = 0,
+  friction_coefficient = 0,
+  penalty_penetration_m = null,
+  auglag_penetration_m = null,
+  iterations = null,
+  converged = null,
+  notes = null,
+}: ContactResultContent) {
   const total = contact_status.length
 
   const maxPen = auglag_penetration_m
@@ -246,7 +269,7 @@ function ContactResultPanel({
   )
 }
 
-export default function ContactResultWrapper({ content }) {
+export default function ContactResultWrapper({ content }: Props) {
   const props = { ...DEFAULTS, ...parseContent(content) }
   return <ContactResultPanel {...props} />
 }

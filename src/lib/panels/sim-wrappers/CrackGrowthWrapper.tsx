@@ -19,7 +19,43 @@
 //   notes: string,
 // }
 
-const DEFAULTS = {
+export interface Props {
+  content?: string
+}
+
+interface PlateGeometry {
+  W_m?: number
+  H_m?: number
+  a0_m?: number
+  condition?: string
+}
+
+interface ParisParams {
+  C?: number
+  m?: number
+  K_Ic_pa_sqrt_m?: number
+  K_th_pa_sqrt_m?: number
+  R_ratio?: number
+}
+
+interface CrackGrowthContent {
+  crack_path_m?: [number, number][]
+  crack_length_m?: number[]
+  K_I_pa_sqrt_m?: number[]
+  K_II_pa_sqrt_m?: number[]
+  K_eff_pa_sqrt_m?: number[]
+  kink_angle_deg?: number[]
+  N_fatigue_cycles?: number
+  stable?: boolean
+  stop_reason?: 'unstable_fracture' | 'max_steps' | 'max_crack_length' | string
+  n_increments?: number
+  K_handbook_initial_pa_sqrt_m?: number | null
+  plate_geometry?: PlateGeometry | null
+  paris_params?: ParisParams | null
+  notes?: string | null
+}
+
+const DEFAULTS: CrackGrowthContent = {
   crack_path_m: [],
   crack_length_m: [],
   K_I_pa_sqrt_m: [],
@@ -36,14 +72,21 @@ const DEFAULTS = {
   notes: null,
 }
 
-function parseContent(content) {
+function parseContent(content: string | undefined): CrackGrowthContent {
   if (!content || typeof content !== 'string') return {}
   try { return JSON.parse(content) || {} } catch { return {} }
 }
 
 // ── Mini SVG crack-path visualiser ─────────────────────────────────────────
 
-function CrackPathSVG({ crack_path_m, plate_geometry, K_I_pa_sqrt_m, K_Ic }) {
+interface CrackPathSVGProps {
+  crack_path_m?: [number, number][]
+  plate_geometry?: PlateGeometry | null
+  K_I_pa_sqrt_m?: number[]
+  K_Ic?: number
+}
+
+function CrackPathSVG({ crack_path_m, plate_geometry, K_I_pa_sqrt_m, K_Ic }: CrackPathSVGProps) {
   if (!crack_path_m || crack_path_m.length === 0) return null
   const W = plate_geometry?.W_m ?? 0.1
   const H = plate_geometry?.H_m ?? 0.1
@@ -132,7 +175,14 @@ function CrackPathSVG({ crack_path_m, plate_geometry, K_I_pa_sqrt_m, K_Ic }) {
 
 // ── K history chart (simple inline bars) ──────────────────────────────────
 
-function KHistoryChart({ crack_length_m, K_I_pa_sqrt_m, K_II_pa_sqrt_m, K_Ic }) {
+interface KHistoryChartProps {
+  crack_length_m?: number[]
+  K_I_pa_sqrt_m?: number[]
+  K_II_pa_sqrt_m?: number[]
+  K_Ic?: number
+}
+
+function KHistoryChart({ crack_length_m, K_I_pa_sqrt_m, K_II_pa_sqrt_m, K_Ic }: KHistoryChartProps) {
   if (!crack_length_m || crack_length_m.length === 0) return null
   const n = Math.min(crack_length_m.length, K_I_pa_sqrt_m?.length ?? 0)
   if (n === 0) return null
@@ -146,8 +196,8 @@ function KHistoryChart({ crack_length_m, K_I_pa_sqrt_m, K_II_pa_sqrt_m, K_Ic }) 
   const cw = W - pad.l - pad.r
   const ch = H - pad.t - pad.b
 
-  const toX = (i) => pad.l + (i / Math.max(n - 1, 1)) * cw
-  const toY = (v) => pad.t + ch - (Math.abs(v) / maxK) * ch
+  const toX = (i: number) => pad.l + (i / Math.max(n - 1, 1)) * cw
+  const toY = (v: number) => pad.t + ch - (Math.abs(v) / maxK) * ch
 
   const K1pts = (K_I_pa_sqrt_m ?? []).slice(0, n).map((v, i) => `${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')
   const K2pts = (K_II_pa_sqrt_m ?? []).slice(0, n).map((v, i) => `${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')
@@ -195,6 +245,7 @@ function CrackGrowthPanel({
   crack_length_m,
   K_I_pa_sqrt_m,
   K_II_pa_sqrt_m,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- dead prop, unused before this migration; reported, not fixed.
   K_eff_pa_sqrt_m,
   kink_angle_deg,
   N_fatigue_cycles,
@@ -205,17 +256,17 @@ function CrackGrowthPanel({
   plate_geometry,
   paris_params,
   notes,
-}) {
-  const stopColors = {
+}: CrackGrowthContent) {
+  const stopColors: Record<string, string> = {
     unstable_fracture: '#dc2626',
     max_steps: '#f59e0b',
     max_crack_length: '#f59e0b',
   }
-  const stopColor = stopColors[stop_reason] ?? '#64748b'
+  const stopColor = (stop_reason && stopColors[stop_reason]) ?? '#64748b'
   const K_Ic = paris_params?.K_Ic_pa_sqrt_m
 
   // Determine max K from history
-  const maxKI = K_I_pa_sqrt_m?.length > 0 ? Math.max(...K_I_pa_sqrt_m) : 0
+  const maxKI = K_I_pa_sqrt_m && K_I_pa_sqrt_m.length > 0 ? Math.max(...K_I_pa_sqrt_m) : 0
 
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', padding: '16px', color: '#1e293b', maxWidth: '640px' }}>
@@ -355,7 +406,7 @@ function CrackGrowthPanel({
   )
 }
 
-export default function CrackGrowthWrapper({ content }) {
+export default function CrackGrowthWrapper({ content }: Props) {
   const props = { ...DEFAULTS, ...parseContent(content) }
   return <CrackGrowthPanel {...props} />
 }

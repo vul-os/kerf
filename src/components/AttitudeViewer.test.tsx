@@ -1,4 +1,4 @@
-// AttitudeViewer.test.jsx — Vitest smoke tests for the AttitudeViewer component.
+// AttitudeViewer.test.tsx — Vitest smoke tests for the AttitudeViewer component.
 //
 // Strategy: render to static HTML via react-dom/server (already a project dep).
 // Three.js is dynamically imported inside a useEffect, which does NOT run in
@@ -8,10 +8,11 @@
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import AttitudeViewer from './AttitudeViewer.jsx'
+import type { AttitudeViewerProps } from './AttitudeViewer.jsx'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function render(props = {}) {
+function render(props: AttitudeViewerProps = {}) {
   return renderToStaticMarkup(<AttitudeViewer {...props} />)
 }
 

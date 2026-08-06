@@ -13,10 +13,42 @@
 
 import { useEffect, useRef } from 'react'
 import { slerp } from '../lib/quaternionInterp.js'
+import type * as ThreeNS from 'three'
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+//
+// 'three' ships no .d.ts and this repo has no @types/three (see prior T-513
+// commits) — THREE.X positions resolve to `any` because noImplicitAny is off.
+// src/lib/quaternionInterp.ts (outside this slice) is untyped, so its
+// {w,x,y,z} quaternion shape is declared locally and its calls cast to it.
+
+export interface Quaternion {
+  w: number
+  x: number
+  y: number
+  z: number
+}
+
+export interface AttitudeViewerProps {
+  quaternion?: Quaternion
+  width?: number
+  height?: number
+  className?: string
+  content?: string
+}
+
+interface SceneState {
+  THREE: typeof ThreeNS
+  renderer: ThreeNS.WebGLRenderer
+  scene: ThreeNS.Scene
+  camera: ThreeNS.PerspectiveCamera
+  cubesat: ThreeNS.Group
+  targetQ?: Quaternion
+}
 
 // ── Three.js lazy loader ───────────────────────────────────────────────────────
 
-async function loadThree() {
+async function loadThree(): Promise<typeof ThreeNS> {
   return import('three')
 }
 
@@ -28,7 +60,7 @@ async function loadThree() {
  *
  * Returns a Group so the caller can set group.quaternion from the attitude.
  */
-function buildCubeSatGroup(THREE) {
+function buildCubeSatGroup(THREE: typeof ThreeNS): ThreeNS.Group {
   const group = new THREE.Group()
 
   // ── Main body (1U cube: 10 × 10 × 10) ───────────────────────────────────
@@ -82,7 +114,7 @@ function buildCubeSatGroup(THREE) {
 
   // ── Face markers: coloured dots to reveal orientation ───────────────────
   const dotGeo = new THREE.CircleGeometry(1.5, 16)
-  const faceMarkers = [
+  const faceMarkers: Array<{ color: number; pos: [number, number, number]; rot: [number, number, number] }> = [
     { color: 0xff4444, pos: [0, 0, 5.05],  rot: [0, 0, 0] },            // +Z red
     { color: 0x44ff44, pos: [0, 5.05, 0],  rot: [-Math.PI / 2, 0, 0] }, // +Y green
     { color: 0x4444ff, pos: [5.05, 0, 0],  rot: [0, Math.PI / 2, 0] },  // +X blue
@@ -99,10 +131,10 @@ function buildCubeSatGroup(THREE) {
 
 // ── Reference frame axes helper ───────────────────────────────────────────────
 
-function buildAxes(THREE, length = 18) {
+function buildAxes(THREE: typeof ThreeNS, length = 18): ThreeNS.Group {
   const group = new THREE.Group()
 
-  const dirs = [
+  const dirs: Array<{ dir: [number, number, number]; color: number; label: string }> = [
     { dir: [1, 0, 0], color: 0xff4444, label: 'X' },
     { dir: [0, 1, 0], color: 0x44ff44, label: 'Y' },
     { dir: [0, 0, 1], color: 0x4444ff, label: 'Z' },
@@ -137,23 +169,23 @@ export default function AttitudeViewer({
   height = 320,
   className = '',
   content,
-}) {
+}: AttitudeViewerProps) {
   // Backward-compatible content string: JSON.parse it and merge over prop defaults.
-  let _parsed = null
+  let _parsed: { quaternion?: Quaternion } | null = null
   if (content != null) {
     try { _parsed = JSON.parse(content) } catch { /* ignore */ }
   }
   const quaternion = (_parsed && _parsed.quaternion) ? _parsed.quaternion : quaternionProp
-  const canvasRef = useRef(null)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
   // We store mutable scene state in a ref so the animation loop always reads
   // the latest quaternion prop without re-running the heavy setup effect.
-  const sceneRef = useRef(null)
+  const sceneRef = useRef<SceneState | null>(null)
 
   // ── Scene setup (runs once on mount) ──────────────────────────────────────
   useEffect(() => {
     let cancelled = false
-    let animFrame = null
-    let renderer = null
+    let animFrame: number | null = null
+    let renderer: ThreeNS.WebGLRenderer | null = null
 
     async function init() {
       const THREE = await loadThree()
@@ -200,7 +232,7 @@ export default function AttitudeViewer({
       sceneRef.current = { THREE, renderer, scene, camera, cubesat }
 
       // Render loop — attitude is read from sceneRef each frame
-      let prevQ = { w: 1, x: 0, y: 0, z: 0 }
+      let prevQ: Quaternion = { w: 1, x: 0, y: 0, z: 0 }
       let slerpT = 1 // start fully settled
 
       function animate() {
@@ -212,7 +244,7 @@ export default function AttitudeViewer({
         // Smoothly interpolate toward the target quaternion
         if (slerpT < 1) {
           slerpT = Math.min(slerpT + 0.05, 1)
-          prevQ = slerp(prevQ, targetQ, 0.05)
+          prevQ = slerp(prevQ, targetQ, 0.05) as Quaternion
         } else {
           prevQ = targetQ
         }
@@ -220,7 +252,7 @@ export default function AttitudeViewer({
         // Apply to Three.js quaternion
         cubesat.quaternion.set(prevQ.x, prevQ.y, prevQ.z, prevQ.w)
 
-        renderer.render(scene, camera)
+        renderer?.render(scene, camera)
       }
 
       animate()
@@ -263,7 +295,7 @@ export default function AttitudeViewer({
         className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[10px] text-blue-300/70 pointer-events-none select-none"
         aria-hidden="true"
       >
-        {['w', 'x', 'y', 'z'].map((key) => (
+        {(['w', 'x', 'y', 'z'] as const).map((key) => (
           <span key={key}>
             {key}={Number(quaternion[key] ?? 0).toFixed(4)}
           </span>

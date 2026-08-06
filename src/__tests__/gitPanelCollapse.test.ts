@@ -24,18 +24,19 @@ import {
 // Minimal localStorage stub (vitest runs in a node environment that may not
 // provide window.localStorage; we shim it on globalThis for this module only).
 // ---------------------------------------------------------------------------
-const store = {}
+const store: Record<string, string> = {}
 const localStorageStub = {
-  getItem: (k) => (k in store ? store[k] : null),
-  setItem: (k, v) => { store[k] = String(v) },
-  removeItem: (k) => { delete store[k] },
+  getItem: (k: string) => (k in store ? store[k] : null),
+  setItem: (k: string, v: unknown) => { store[k] = String(v) },
+  removeItem: (k: string) => { delete store[k] },
   clear: () => { Object.keys(store).forEach((k) => delete store[k]) },
 }
 
 beforeEach(() => {
   localStorageStub.clear()
   // Inject the stub into globalThis so panelCollapse.js picks it up.
-  globalThis.localStorage = localStorageStub
+  // Partial stub — the module only reads getItem/setItem/removeItem/clear.
+  globalThis.localStorage = localStorageStub as unknown as Storage
 })
 
 // ---------------------------------------------------------------------------
@@ -94,7 +95,7 @@ describe('readCollapsed — unexpected stored value', () => {
 describe('readCollapsed — localStorage unavailable', () => {
   it('returns the default when localStorage throws', () => {
     const broken = { getItem: () => { throw new Error('quota') } }
-    globalThis.localStorage = broken
+    globalThis.localStorage = broken as unknown as Storage
     expect(readCollapsed('kerf:test', true)).toBe(true)
     expect(readCollapsed('kerf:test', false)).toBe(false)
   })
@@ -116,7 +117,7 @@ describe('writeCollapsed', () => {
   })
 
   it('does not throw when localStorage is unavailable', () => {
-    globalThis.localStorage = { setItem: () => { throw new Error('private') } }
+    globalThis.localStorage = { setItem: () => { throw new Error('private') } } as unknown as Storage
     expect(() => writeCollapsed('kerf:test', true)).not.toThrow()
   })
 })

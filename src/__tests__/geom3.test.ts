@@ -11,8 +11,10 @@ import {
   applyMatrixToGeom,
   combinedBoundingBox,
 } from '../lib/geom3.js'
+import type { Geom3 } from '@/types'
 
 // A unit-square polygon on z=0 winding CCW (normal +Z).
+// Minimal Geom3-shaped polygon soup — only `polygons` is exercised.
 const unitSquareXY = {
   polygons: [
     {
@@ -24,7 +26,7 @@ const unitSquareXY = {
       ],
     },
   ],
-}
+} as unknown as Geom3
 
 describe('geom3ToBufferGeometry', () => {
   it('returns a BufferGeometry with position+normal attributes', () => {
@@ -57,15 +59,15 @@ describe('geom3ToBufferGeometry', () => {
         { vertices: [[0, 0, 0], [1, 0, 0]] }, // only 2 verts
         { vertices: [[0, 0, 0], [1, 0, 0], [1, 1, 0]] }, // proper triangle
       ],
-    }
+    } as unknown as Geom3
     const g = geom3ToBufferGeometry(degenerate)
     expect(g.getAttribute('position').count).toBe(3)
   })
 
   it('handles empty/missing polygons array safely', () => {
     expect(geom3ToBufferGeometry(null).getAttribute('position').count).toBe(0)
-    expect(geom3ToBufferGeometry({}).getAttribute('position').count).toBe(0)
-    expect(geom3ToBufferGeometry({ polygons: [] }).getAttribute('position').count).toBe(0)
+    expect(geom3ToBufferGeometry({} as unknown as Geom3).getAttribute('position').count).toBe(0)
+    expect(geom3ToBufferGeometry({ polygons: [] } as unknown as Geom3).getAttribute('position').count).toBe(0)
   })
 
   it('computes a bounding box that hugs the input', () => {
@@ -112,15 +114,15 @@ describe('applyMatrixToGeom', () => {
 describe('combinedBoundingBox', () => {
   it('returns null when the entries list is empty or all geometries have no box', () => {
     expect(combinedBoundingBox([])).toBeNull()
-    expect(combinedBoundingBox([{ geometry: null }])).toBeNull()
+    expect(combinedBoundingBox([{ id: 'x', geometry: null }])).toBeNull()
   })
 
   it('unions multiple boxes correctly', () => {
     const a = geom3ToBufferGeometry(unitSquareXY)
     const b = applyMatrixToGeom(unitSquareXY, new THREE.Matrix4().makeTranslation(10, 0, 0))
     const box = combinedBoundingBox([
-      { geometry: a },
-      { geometry: b },
+      { id: 'a', geometry: a },
+      { id: 'b', geometry: b },
     ])
     expect(box).not.toBeNull()
     expect(box.min.x).toBe(0)
@@ -130,8 +132,8 @@ describe('combinedBoundingBox', () => {
   it('ignores entries with null geometry', () => {
     const a = geom3ToBufferGeometry(unitSquareXY)
     const box = combinedBoundingBox([
-      { geometry: null },
-      { geometry: a },
+      { id: 'null', geometry: null },
+      { id: 'a', geometry: a },
     ])
     expect(box.max.x).toBe(1)
   })

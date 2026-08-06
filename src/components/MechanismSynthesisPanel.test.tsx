@@ -16,14 +16,15 @@
 
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
+// @types/node isn't part of this project's toolchain (tsconfig.json's `types` array is
+// T-500's — see docs/typescript-migration.md), so these Node builtins (used only for this
+// file's source-inspection assertions) are untyped at this boundary.
 // @ts-expect-error - no @types/node in this toolchain
 import { readFileSync, existsSync } from 'fs'
 // @ts-expect-error - no @types/node in this toolchain
-import { resolve } from 'path'
-// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
-
-const __dirname = resolve(fileURLToPath(import.meta.url), '..')
+// @ts-expect-error - no @types/node in this toolchain
+import path from 'path'
 
 import MechanismSynthesisPanel, {
   CouplerCurvePlot,
@@ -34,12 +35,9 @@ import MechanismSynthesisPanel, {
 // Source text for Tier 1 assertions
 // ---------------------------------------------------------------------------
 
-const SRC = readFileSync(
-  existsSync(resolve(__dirname, 'MechanismSynthesisPanel.tsx'))
-    ? resolve(__dirname, 'MechanismSynthesisPanel.tsx')
-    : resolve(__dirname, 'MechanismSynthesisPanel.jsx'),
-  'utf8',
-)
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const panelPath = (ext: string) => path.resolve(__dirname, `MechanismSynthesisPanel.${ext}`)
+const SRC = readFileSync(existsSync(panelPath('tsx')) ? panelPath('tsx') : panelPath('jsx'), 'utf8')
 
 // ---------------------------------------------------------------------------
 // 1. Source-level assertions

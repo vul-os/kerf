@@ -10,7 +10,7 @@
 //
 // Route: /lifecycle  (also /plm-fw)
 
-import { useState } from 'react'
+import { useState, type CSSProperties, type ComponentType, type ReactNode } from 'react'
 import {
   ListTree, Tag, DollarSign, Cpu, Shield,
   GitBranch, Package, Activity, ChevronDown, ChevronRight,
@@ -25,7 +25,10 @@ const API_URL = typeof import.meta !== 'undefined' && import.meta.env
   ? (import.meta.env.VITE_API_URL || '')
   : ''
 
-async function callTool(toolName, args) {
+// Tool results are heterogeneous JSON from the backend tool layer we don't own.
+type ToolResult = unknown
+
+async function callTool(toolName: string, args: Record<string, unknown>): Promise<ToolResult> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -42,9 +45,13 @@ async function callTool(toolName, args) {
   return data
 }
 
-function num(v) { return v === '' || v == null ? undefined : Number(v) }
-function int(v) { return v === '' || v == null ? undefined : parseInt(v, 10) }
-function tryJSON(v, fallback) {
+function num(v: string | null | undefined): number | undefined {
+  return v === '' || v == null ? undefined : Number(v)
+}
+function int(v: string | null | undefined): number | undefined {
+  return v === '' || v == null ? undefined : parseInt(v, 10)
+}
+function tryJSON(v: string | null | undefined, fallback: unknown): unknown {
   if (!v) return fallback
   try { return JSON.parse(v) } catch { return v }
 }
@@ -53,7 +60,7 @@ function tryJSON(v, fallback) {
 // Styles (dark mono palette — matches ManufacturingPanel)
 // ---------------------------------------------------------------------------
 
-const s = {
+const s: Record<string, CSSProperties> = {
   root: {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: 13,
@@ -218,24 +225,50 @@ const s = {
 // ToolCard — generic data-driven tool card
 // ---------------------------------------------------------------------------
 
-function ToolCard({ name, icon: Icon, color, desc, fields, buildArgs }) {
-  const [values, setValues] = useState(() =>
+interface FieldOption {
+  value: string
+  label: string
+}
+
+interface FieldSpec {
+  key: string
+  label: string
+  type?: 'text' | 'number' | 'select' | 'textarea'
+  default?: string
+  placeholder?: string
+  options?: FieldOption[]
+  coerce?: (v: string) => unknown
+}
+
+type ToolValues = Record<string, string>
+
+export interface ToolCardSpec {
+  name: string
+  icon?: ComponentType<{ size?: number; style?: CSSProperties }>
+  color?: string
+  desc?: string
+  fields: FieldSpec[]
+  buildArgs?: (v: ToolValues) => Record<string, unknown>
+}
+
+function ToolCard({ name, icon: Icon, color, desc, fields, buildArgs }: ToolCardSpec) {
+  const [values, setValues] = useState<ToolValues>(() =>
     Object.fromEntries(fields.map((f) => [f.key, f.default ?? '']))
   )
   const [running, setRunning] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<ToolResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  function set(key, val) { setValues((v) => ({ ...v, [key]: val })) }
+  function set(key: string, val: string) { setValues((v) => ({ ...v, [key]: val })) }
 
   async function run() {
     setRunning(true); setResult(null); setError(null)
     try {
-      const args = buildArgs ? buildArgs(values) : Object.fromEntries(
+      const args: Record<string, unknown> = buildArgs ? buildArgs(values) : Object.fromEntries(
         fields.map((f) => [f.key, f.coerce ? f.coerce(values[f.key]) : values[f.key]])
       )
       setResult(await callTool(name, args))
-    } catch (e) {
+    } catch (e: any) {
       setError(e.message)
     } finally {
       setRunning(false)
@@ -307,7 +340,15 @@ function ToolCard({ name, icon: Icon, color, desc, fields, buildArgs }) {
 // Section — collapsible header + card grid
 // ---------------------------------------------------------------------------
 
-function Section({ title, icon: Icon, color, cards, defaultOpen = true }) {
+interface SectionProps {
+  title: ReactNode
+  icon: ComponentType<{ size?: number; style?: CSSProperties }>
+  color?: string
+  cards: ToolCardSpec[]
+  defaultOpen?: boolean
+}
+
+function Section({ title, icon: Icon, color, cards, defaultOpen = true }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div style={s.section}>
@@ -334,7 +375,7 @@ function Section({ title, icon: Icon, color, cards, defaultOpen = true }) {
 
 // ── Section 1: Change Management ─────────────────────────────────────────────
 
-const PLM_CHANGE_MGMT = [
+const PLM_CHANGE_MGMT: ToolCardSpec[] = [
   {
     name: 'plm_change_impact',
     icon: ListTree,
@@ -459,7 +500,7 @@ const PLM_CHANGE_MGMT = [
 
 // ── Section 2: Part Numbering ──────────────────────────────────────────────
 
-const PLM_PART_NUMBERING = [
+const PLM_PART_NUMBERING: ToolCardSpec[] = [
   {
     name: 'plm_validate_part_number',
     icon: Tag,
@@ -531,7 +572,7 @@ const PLM_PART_NUMBERING = [
 
 // ── Section 3: Cost & Currency ─────────────────────────────────────────────
 
-const PLM_COST = [
+const PLM_COST: ToolCardSpec[] = [
   {
     name: 'plm_rollup_bom_cost',
     icon: DollarSign,
@@ -588,7 +629,7 @@ const PLM_COST = [
 
 // ── Section 4: BOM Analysis ────────────────────────────────────────────────
 
-const PLM_BOM = [
+const PLM_BOM: ToolCardSpec[] = [
   {
     name: 'plm_expand_effectivity_bom',
     icon: ListTree,
@@ -636,7 +677,7 @@ const PLM_BOM = [
 
 // ── Section 1: Memory & Resources ─────────────────────────────────────────
 
-const FW_MEMORY = [
+const FW_MEMORY: ToolCardSpec[] = [
   {
     name: 'firmware_analyze_const_allocation',
     icon: Server,
@@ -723,7 +764,7 @@ const FW_MEMORY = [
 
 // ── Section 2: Real-time & Safety ──────────────────────────────────────────
 
-const FW_REALTIME = [
+const FW_REALTIME: ToolCardSpec[] = [
   {
     name: 'firmware_check_watchdog',
     icon: Shield,
@@ -818,7 +859,7 @@ const FW_REALTIME = [
 
 // ── Section 3: Hardware Verification ──────────────────────────────────────
 
-const FW_HW_VERIFY = [
+const FW_HW_VERIFY: ToolCardSpec[] = [
   {
     name: 'firmware_verify_clock_tree',
     icon: Cpu,
@@ -929,7 +970,7 @@ const FW_HW_VERIFY = [
 
 // ── Section 4: Protocol & Communication ────────────────────────────────────
 
-const FW_PROTOCOL = [
+const FW_PROTOCOL: ToolCardSpec[] = [
   {
     name: 'firmware_check_uart_baud_drift',
     icon: Activity,
@@ -996,9 +1037,9 @@ const PLM_TOOL_COUNT = PLM_CHANGE_MGMT.length + PLM_PART_NUMBERING.length + PLM_
 const FW_TOOL_COUNT = FW_MEMORY.length + FW_REALTIME.length + FW_HW_VERIFY.length + FW_PROTOCOL.length
 
 export default function ProductLifecyclePanel() {
-  const [tab, setTab] = useState('plm')
+  const [tab, setTab] = useState<'plm' | 'firmware'>('plm')
 
-  const tabs = [
+  const tabs: { id: 'plm' | 'firmware'; label: string; icon: ComponentType<{ size?: number }>; count: number }[] = [
     { id: 'plm', label: `PLM (Lifecycle)`, icon: ListTree, count: PLM_TOOL_COUNT },
     { id: 'firmware', label: `Firmware (Embedded)`, icon: Cpu, count: FW_TOOL_COUNT },
   ]

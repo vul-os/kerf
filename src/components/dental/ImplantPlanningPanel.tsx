@@ -4,8 +4,8 @@
  *
  * Features:
  *  - Straumann BLT / NobelActive / Astra EV brand selection
- *  - Inter-implant spacing check (Tarnow 2000: ≥ 3 mm)
- *  - Implant-to-tooth check (Grunder 2005: ≥ 1.5 mm)
+ *  - Inter-implant spacing check (Tarnow 2000: >= 3 mm)
+ *  - Implant-to-tooth check (Grunder 2005: >= 1.5 mm)
  *  - Step-by-step drill sequence per IFU
  *
  * Backend tools:
@@ -21,19 +21,41 @@ const API_URL = import.meta.env.VITE_API_URL || ''
 
 const BRANDS = ['Straumann BLT', 'NobelActive', 'Astra EV']
 
-const BRAND_DIAMETERS = {
+const BRAND_DIAMETERS: Record<string, number[]> = {
   'Straumann BLT': [3.3, 4.1, 4.8],
   'NobelActive': [3.5, 4.3, 5.0],
   'Astra EV': [3.5, 4.0, 4.5],
 }
 
-const BRAND_LENGTHS = {
+const BRAND_LENGTHS: Record<string, number[]> = {
   'Straumann BLT': [6, 8, 10, 12, 14, 16],
   'NobelActive': [8.5, 10, 11.5, 13, 15],
   'Astra EV': [6, 8, 9, 11, 13],
 }
 
-function callTool(tool, args, accessToken) {
+/** Loosely-typed backend tool response — every field here is read defensively
+ *  (optional chaining / `data.error` checks) because the three tools this panel
+ *  calls (dental_drill_sequence, dental_implant_spacing_check) return different
+ *  shapes and this slice does not own that response contract. */
+interface ToolResult {
+  error?: string
+  steps?: Array<{
+    step: number
+    drill: string
+    diameter_mm: number
+    speed_rpm: number
+    torque_ncm: number
+  }>
+  disclaimer?: string
+  tarnow_ok?: boolean
+  grunder_ok?: boolean
+  min_implant_to_implant_mm?: number
+  min_implant_to_tooth_mm?: number
+  tarnow_violations?: Array<{ implant_i: number; implant_j: number; surface_to_surface_mm: number; deficit_mm: number }>
+  grunder_violations?: Array<{ implant_i: number; tooth_j: number; surface_to_tooth_mm: number; deficit_mm: number }>
+}
+
+function callTool(tool: string, args: Record<string, unknown>, accessToken: string | null): Promise<ToolResult> {
   return fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: {
@@ -44,7 +66,12 @@ function callTool(tool, args, accessToken) {
   }).then((r) => r.json().catch(() => ({})))
 }
 
-export default function ImplantPlanningPanel({ projectId, content }) {
+export interface Props {
+  projectId?: string | null
+  content?: string | null
+}
+
+export default function ImplantPlanningPanel({ content }: Props) {
   const { accessToken } = useAuth()
   // Parse content string (from panelRegistry) to seed defaults
   const _defaults = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
@@ -56,12 +83,12 @@ export default function ImplantPlanningPanel({ projectId, content }) {
   // Two implant positions for Tarnow check
   const [pos1, setPos1] = useState([0, 0, 0])
   const [pos2, setPos2] = useState([7, 0, 0])
-  const [toothPos, setToothPos] = useState(null) // optional adjacent tooth
+  const [toothPos] = useState<number[] | null>(null) // optional adjacent tooth
 
-  const [drillSeq, setDrillSeq]     = useState(null)
-  const [spacing, setSpacing]       = useState(null)
-  const [loading, setLoading]       = useState(null) // 'drill' | 'spacing'
-  const [error, setError]           = useState(null)
+  const [drillSeq, setDrillSeq]     = useState<ToolResult | null>(null)
+  const [spacing, setSpacing]       = useState<ToolResult | null>(null)
+  const [loading, setLoading]       = useState<'drill' | 'spacing' | null>(null) // 'drill' | 'spacing'
+  const [error, setError]           = useState<string | null>(null)
 
   async function handleDrillSeq() {
     setLoading('drill')
@@ -75,7 +102,7 @@ export default function ImplantPlanningPanel({ projectId, content }) {
   async function handleSpacingCheck() {
     setLoading('spacing')
     setError(null)
-    const args = {
+    const args: Record<string, unknown> = {
       implant_positions: [pos1, pos2],
       implant_diameters_mm: [diam, diam],
     }
@@ -86,7 +113,7 @@ export default function ImplantPlanningPanel({ projectId, content }) {
     else setSpacing(data)
   }
 
-  function updatePos(setter, idx, val) {
+  function updatePos(setter: (fn: (prev: number[]) => number[]) => void, idx: number, val: string) {
     setter((prev) => {
       const next = [...prev]
       next[idx] = parseFloat(val) || 0
@@ -94,7 +121,11 @@ export default function ImplantPlanningPanel({ projectId, content }) {
     })
   }
 
-  const PosInput = ({ label, pos, setPos }) => (
+  const PosInput = ({ label, pos, setPos }: {
+    label: string
+    pos: number[]
+    setPos: (fn: (prev: number[]) => number[]) => void
+  }) => (
     <div className="flex items-center gap-1.5 text-[10px]">
       <span className="text-ink-500 w-8">{label}</span>
       {['x', 'y', 'z'].map((ax, i) => (
@@ -242,12 +273,15 @@ export default function ImplantPlanningPanel({ projectId, content }) {
               <span className="text-ink-500 ml-1">(Grunder min 1.5 mm)</span>
             </div>
           )}
-          {spacing.tarnow_violations.map((v, i) => (
+          {/* Note: unlike the fields above, these two arrays are read without a
+              null-guard — matches the pre-existing .jsx behavior verbatim (found,
+              not fixed: a spacing response missing either array would throw here). */}
+          {spacing.tarnow_violations!.map((v, i) => (
             <div key={i} className="text-red-400 text-[10px]">
               Tarnow: implant {v.implant_i + 1}–{v.implant_j + 1}: {v.surface_to_surface_mm} mm (deficit {v.deficit_mm} mm)
             </div>
           ))}
-          {spacing.grunder_violations.map((v, i) => (
+          {spacing.grunder_violations!.map((v, i) => (
             <div key={i} className="text-amber-400 text-[10px]">
               Grunder: implant {v.implant_i + 1}–tooth {v.tooth_j + 1}: {v.surface_to_tooth_mm} mm (deficit {v.deficit_mm} mm)
             </div>

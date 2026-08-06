@@ -18,6 +18,7 @@
  */
 
 import { useRef, useState } from 'react'
+import type { ChangeEvent } from 'react'
 import { useAuth } from '../../store/auth.js'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -26,7 +27,24 @@ const SCANNER_BRANDS = [
   'unknown', 'Trios 3', 'Trios 4', 'Trios 5', 'Itero Element', 'Medit i700',
 ]
 
-function callTool(tool, args, accessToken) {
+/** Loosely-typed backend tool response — dental_intraoral_scan_process and
+ *  dental_lab_stl_export return different shapes; this slice does not own
+ *  either response contract. */
+interface ToolResult {
+  error?: string
+  vertex_count?: number
+  triangle_count?: number
+  scanner_brand?: string
+  bounding_box?: { min?: number[]; max?: number[] }
+  landmarks?: Record<string, number[] | string>
+  stl_b64?: string
+  component_name?: string
+  triangles_written?: number
+  file_size_bytes?: number
+  format?: string
+}
+
+function callTool(tool: string, args: Record<string, unknown>, accessToken: string | null): Promise<ToolResult> {
   return fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: {
@@ -37,12 +55,12 @@ function callTool(tool, args, accessToken) {
   }).then((r) => r.json().catch(() => ({})))
 }
 
-function readFileAsBase64(file) {
+function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = (e) => {
       const b64 = btoa(
-        new Uint8Array(e.target.result).reduce((s, b) => s + String.fromCharCode(b), '')
+        new Uint8Array(e.target!.result as ArrayBuffer).reduce((s, b) => s + String.fromCharCode(b), '')
       )
       resolve(b64)
     }
@@ -51,26 +69,31 @@ function readFileAsBase64(file) {
   })
 }
 
-export default function IntraoralScanLabPanel({ projectId, content }) {
+export interface Props {
+  projectId?: string | null
+  content?: string | null
+}
+
+export default function IntraoralScanLabPanel({ content }: Props) {
   const { accessToken } = useAuth()
   // Parse content string (from panelRegistry) to seed defaults
   const _defaults = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
-  const fileInputRef = useRef(null)
-  const labFileRef = useRef(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const labFileRef = useRef<HTMLInputElement>(null)
 
   const [scannerBrand, setScannerBrand] = useState('unknown')
   const [arch, setArch]                 = useState('maxillary')
-  const [scanFile, setScanFile]         = useState(null)
-  const [scanResult, setScanResult]     = useState(null)
+  const [scanFile, setScanFile]         = useState<File | null>(null)
+  const [scanResult, setScanResult]     = useState<ToolResult | null>(null)
 
   // Lab export state
-  const [labFile, setLabFile]           = useState(null)
-  const [exportResult, setExportResult] = useState(null)
+  const [labFile, setLabFile]           = useState<File | null>(null)
+  const [exportResult, setExportResult] = useState<ToolResult | null>(null)
 
-  const [loading, setLoading]           = useState(null)
-  const [error, setError]               = useState(null)
+  const [loading, setLoading]           = useState<'scan' | 'lab' | null>(null)
+  const [error, setError]               = useState<string | null>(null)
 
-  async function handleScanUpload(e) {
+  async function handleScanUpload(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     setScanFile(file)
@@ -90,14 +113,14 @@ export default function IntraoralScanLabPanel({ projectId, content }) {
       if (data.error) setError(data.error)
       else setScanResult(data)
     } catch (err) {
-      setError(err?.message || String(err))
+      setError((err as { message?: string } | undefined)?.message || String(err))
     } finally {
       setLoading(null)
     }
     e.target.value = ''
   }
 
-  async function handleLabExport(e) {
+  async function handleLabExport(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     setLabFile(file)
@@ -111,12 +134,12 @@ export default function IntraoralScanLabPanel({ projectId, content }) {
       const view = new DataView(buffer)
       const nTris = view.getUint32(80, true)
 
-      const vertices = []
-      const faces = []
-      const vMap = {}
+      const vertices: number[][] = []
+      const faces: number[][] = []
+      const vMap: Record<string, number> = {}
       let pos = 84
 
-      function vid(x, y, z) {
+      function vid(x: number, y: number, z: number): number {
         const key = `${x.toFixed(4)},${y.toFixed(4)},${z.toFixed(4)}`
         if (vMap[key] === undefined) {
           vMap[key] = vertices.length
@@ -127,7 +150,7 @@ export default function IntraoralScanLabPanel({ projectId, content }) {
 
       for (let i = 0; i < nTris; i++) {
         pos += 12 // skip normal
-        const ids = []
+        const ids: number[] = []
         for (let j = 0; j < 3; j++) {
           const x = view.getFloat32(pos, true)
           const y = view.getFloat32(pos + 4, true)
@@ -165,7 +188,7 @@ export default function IntraoralScanLabPanel({ projectId, content }) {
         }
       }
     } catch (err) {
-      setError(err?.message || String(err))
+      setError((err as { message?: string } | undefined)?.message || String(err))
     } finally {
       setLoading(null)
     }

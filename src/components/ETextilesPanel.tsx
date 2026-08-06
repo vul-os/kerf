@@ -19,16 +19,62 @@ import { useMemo } from 'react'
 import { Zap, CircuitBoard } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
+// Types — textiles_etextiles tool output isn't declared elsewhere, so its
+// shape is captured here from how this panel destructures it. One loose
+// object covers both 'heater' and 'led_layout' modes (fields are mode-specific
+// and optional).
+// ---------------------------------------------------------------------------
+
+export interface ETextilesData {
+  mode?: string
+  error?: string
+  ok?: boolean
+  // heater mode
+  resistance_ohm?: number
+  power_w?: number
+  voltage_drop_v?: number
+  length_m?: number
+  // led_layout mode
+  n_branches?: number
+  n_parallel?: number
+  total_leds?: number
+  total_current_a?: number
+  total_power_w?: number
+  vsupply?: number
+  branch_currents_a?: number[]
+  [key: string]: unknown
+}
+
+export type ParsedETextilesResult =
+  | { kind: 'empty' }
+  | { kind: 'invalid'; error: string }
+  | { kind: 'ok'; mode: string; data: ETextilesData }
+
+export interface ETextilesPanelProps {
+  /** Parsed or raw JSON-string output from the textiles_etextiles tool. */
+  result?: ETextilesData | string | null
+  /** Raw content string (from panelRegistry); parsed and used in place of `result` when present. */
+  content?: string
+  /** Extra CSS classes on root. */
+  className?: string
+}
+
+// ---------------------------------------------------------------------------
 // Pure helpers (exported for tests)
 // ---------------------------------------------------------------------------
 
 /**
  * Parse raw textiles_etextiles tool result.
  * Returns { kind: 'ok'|'empty'|'invalid', mode, data, error? }
+ *
+ * Exported alongside the default ETextilesPanel component (module's own pure
+ * helpers, exercised directly by vitest) — pre-existing; splitting into a
+ * separate module is a refactor out of scope for a rename-only migration (T-515).
  */
-export function parseETextilesResult(raw) {
+// eslint-disable-next-line react-refresh/only-export-components -- see comment above.
+export function parseETextilesResult(raw: ETextilesData | string | null | undefined): ParsedETextilesResult {
   if (raw == null) return { kind: 'empty' }
-  const obj = typeof raw === 'string'
+  const obj: ETextilesData | null = typeof raw === 'string'
     ? (() => { try { return JSON.parse(raw) } catch { return null } })()
     : raw
   if (!obj || typeof obj !== 'object') return { kind: 'invalid', error: 'Expected JSON object' }
@@ -44,7 +90,8 @@ export function parseETextilesResult(raw) {
 /**
  * Format watts — "N.NN W" or "—".
  */
-export function fmtWatts(n) {
+// eslint-disable-next-line react-refresh/only-export-components -- see parseETextilesResult above.
+export function fmtWatts(n?: number | null) {
   if (n == null || !Number.isFinite(n)) return '—'
   return `${n.toFixed(3)} W`
 }
@@ -52,7 +99,8 @@ export function fmtWatts(n) {
 /**
  * Format ohms — "N.NN Ω" or "—".
  */
-export function fmtOhms(n) {
+// eslint-disable-next-line react-refresh/only-export-components -- see parseETextilesResult above.
+export function fmtOhms(n?: number | null) {
   if (n == null || !Number.isFinite(n)) return '—'
   return `${n.toFixed(3)} Ω`
 }
@@ -60,7 +108,8 @@ export function fmtOhms(n) {
 /**
  * Format milliamps — "NNN.N mA" or "—".
  */
-export function fmtMilliamps(n) {
+// eslint-disable-next-line react-refresh/only-export-components -- see parseETextilesResult above.
+export function fmtMilliamps(n?: number | null) {
   if (n == null || !Number.isFinite(n)) return '—'
   return `${(n * 1000).toFixed(1)} mA`
 }
@@ -69,7 +118,7 @@ export function fmtMilliamps(n) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function StatGrid({ rows }) {
+function StatGrid({ rows }: { rows: Array<[string, string]> }) {
   return (
     <div
       className="grid grid-cols-2 gap-2 mt-2"
@@ -85,8 +134,8 @@ function StatGrid({ rows }) {
   )
 }
 
-function HeaterView({ data }) {
-  const rows = [
+function HeaterView({ data }: { data: ETextilesData }) {
+  const rows: Array<[string, string]> = [
     ['Resistance', fmtOhms(data.resistance_ohm)],
     ['Power (I²R)', fmtWatts(data.power_w)],
     ['Voltage drop', data.voltage_drop_v != null ? `${data.voltage_drop_v.toFixed(3)} V` : '—'],
@@ -102,12 +151,12 @@ function HeaterView({ data }) {
   )
 }
 
-function LEDLayoutView({ data }) {
+function LEDLayoutView({ data }: { data: ETextilesData }) {
   const totalPower = data.total_power_w ?? data.total_current_a != null
     ? (data.total_current_a * (data.vsupply ?? 0))
     : null
 
-  const rows = [
+  const rows: Array<[string, string]> = [
     ['Branches', String(data.n_branches ?? data.n_parallel ?? '—')],
     ['LEDs total', String(data.total_leds ?? '—')],
     ['Total current', fmtMilliamps(data.total_current_a)],
@@ -149,14 +198,10 @@ function LEDLayoutView({ data }) {
 
 /**
  * ETextilesPanel — renders e-textile heater or LED layout results.
- *
- * @param {Object} props
- * @param {Object|string|null} props.result  — textiles_etextiles output
- * @param {string} [props.className]
  */
-export default function ETextilesPanel({ result = null, content, className = '' }) {
+export default function ETextilesPanel({ result = null, content, className = '' }: ETextilesPanelProps) {
   // content prop (from panelRegistry) is a JSON string; parse and use as result
-  const effectiveResult = useMemo(() => {
+  const effectiveResult: ETextilesData | string | null = useMemo(() => {
     if (content != null) {
       try { return JSON.parse(content) } catch { return result }
     }

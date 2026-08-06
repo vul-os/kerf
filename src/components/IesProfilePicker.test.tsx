@@ -9,18 +9,18 @@
 
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import IesProfilePicker from './IesProfilePicker'
+import IesProfilePicker, { type IesProfilePickerProps } from './IesProfilePicker'
 import { IES_PRESETS } from '../lib/iesPresets.js'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function render(props = {}) {
-  const defaults = { onSelect: () => {}, selectedSlug: null }
+function render(props: Partial<IesProfilePickerProps> = {}) {
+  const defaults: IesProfilePickerProps = { onSelect: () => {}, selectedSlug: null }
   return renderToStaticMarkup(<IesProfilePicker {...defaults} {...props} />)
 }
 
 // Count non-overlapping occurrences of a substring
-function countOccurrences(str, sub) {
+function countOccurrences(str: string, sub: string) {
   let count = 0
   let idx = 0
   while ((idx = str.indexOf(sub, idx)) !== -1) {

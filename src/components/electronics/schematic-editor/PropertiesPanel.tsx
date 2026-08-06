@@ -1,18 +1,32 @@
-// PropertiesPanel.jsx — Right sidebar for selected component properties.
-//
-// Props:
-//   selected     — {type: 'part'|'wire', id, ...} or null
-//   devices      — [{id, partId, x, y, props, label}]
-//   onUpdateProps — (deviceId, newProps) => void
-//   onUpdateLabel — (deviceId, newLabel) => void
-//   onDelete      — (id, type) => void
+// PropertiesPanel.tsx — Right sidebar for selected component properties.
 
 import { useCallback } from 'react'
 import { PARTS_MAP } from './parts_library.js'
 
+export interface Device {
+  id: string
+  partId: string
+  x: number
+  y: number
+  props?: Record<string, string>
+  label?: string
+}
+
+export interface Selected {
+  type: 'part' | 'wire'
+  id: string
+}
+
 // ── Field renderer ────────────────────────────────────────────────────────────
 
-function Field({ label, value, onChange, suffix }) {
+interface FieldProps {
+  label: string
+  value: string | undefined
+  onChange: (value: string) => void
+  suffix?: string
+}
+
+function Field({ label, value, onChange, suffix }: FieldProps) {
   return (
     <div className="flex flex-col gap-0.5">
       <label className="text-[10px] text-gray-500 uppercase tracking-wide">{label}</label>
@@ -31,7 +45,13 @@ function Field({ label, value, onChange, suffix }) {
 
 // ── Property schema per part type ─────────────────────────────────────────────
 
-const PROP_SCHEMA = {
+interface PropSchemaEntry {
+  key: string
+  label: string
+  suffix?: string
+}
+
+const PROP_SCHEMA: Record<string, PropSchemaEntry[]> = {
   R:       [{ key: 'resistance', label: 'Resistance', suffix: 'Ω' }],
   C:       [{ key: 'capacitance', label: 'Capacitance', suffix: 'F' }],
   L:       [{ key: 'inductance', label: 'Inductance', suffix: 'H' }],
@@ -51,8 +71,16 @@ const PROP_SCHEMA = {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function PropertiesPanel({ selected, devices, onUpdateProps, onUpdateLabel, onDelete }) {
-  const handlePropChange = useCallback((deviceId, key, value) => {
+export interface PropertiesPanelProps {
+  selected: Selected | null
+  devices: Device[]
+  onUpdateProps?: (deviceId: string, newProps: Record<string, string>) => void
+  onUpdateLabel?: (deviceId: string, newLabel: string) => void
+  onDelete?: (id: string, type: 'part' | 'wire') => void
+}
+
+export default function PropertiesPanel({ selected, devices, onUpdateProps, onUpdateLabel, onDelete }: PropertiesPanelProps) {
+  const handlePropChange = useCallback((deviceId: string, key: string, value: string) => {
     const dev = devices.find((d) => d.id === deviceId)
     if (!dev) return
     onUpdateProps?.(deviceId, { ...dev.props, [key]: value })

@@ -1,4 +1,23 @@
-function generateStitchingPattern(polygon, pitch_mm, via_spec, edge_offset_mm = 0) {
+interface Point2D {
+  x: number
+  y: number
+}
+
+interface ViaSpec {
+  diameter: number
+  drill: number
+  net_id?: string
+}
+
+interface Via {
+  x: number
+  y: number
+  net_id?: string
+  diameter: number
+  drill: number
+}
+
+function generateStitchingPattern(polygon: Point2D[], pitch_mm: number, via_spec: ViaSpec, edge_offset_mm = 0): Via[] {
   const { diameter, drill, net_id } = via_spec;
   const radius = diameter / 2;
 
@@ -20,7 +39,7 @@ function generateStitchingPattern(polygon, pitch_mm, via_spec, edge_offset_mm = 
   const cols = Math.floor((innerMaxX - innerMinX) / pitch_mm) + 1;
   const rows = Math.floor((innerMaxY - innerMinY) / pitch_mm) + 1;
 
-  const vias = [];
+  const vias: Via[] = [];
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
       const x = innerMinX + col * pitch_mm;
@@ -33,11 +52,11 @@ function generateStitchingPattern(polygon, pitch_mm, via_spec, edge_offset_mm = 
   return vias;
 }
 
-function gridStitching(polygon, pitch_mm, via_spec, edge_offset_mm = 0) {
+function gridStitching(polygon: Point2D[], pitch_mm: number, via_spec: ViaSpec, edge_offset_mm = 0): Via[] {
   return generateStitchingPattern(polygon, pitch_mm, via_spec, edge_offset_mm);
 }
 
-function perimeterStitching(polygon, pitch_mm, via_spec, edge_offset_mm = 0) {
+function perimeterStitching(polygon: Point2D[], pitch_mm: number, via_spec: ViaSpec, edge_offset_mm = 0): Via[] {
   const { diameter, drill, net_id } = via_spec;
   const radius = diameter / 2;
   const offset = edge_offset_mm + radius;
@@ -59,7 +78,7 @@ function perimeterStitching(polygon, pitch_mm, via_spec, edge_offset_mm = 0) {
     return [];
   }
 
-  const vias = [];
+  const vias: Via[] = [];
 
   const numRight = Math.floor(height / pitch_mm) + 1;
   for (let i = 0; i <= numRight; i++) {
@@ -96,7 +115,7 @@ function perimeterStitching(polygon, pitch_mm, via_spec, edge_offset_mm = 0) {
   return vias;
 }
 
-function hexStitching(polygon, pitch_mm, via_spec, edge_offset_mm = 0) {
+function hexStitching(polygon: Point2D[], pitch_mm: number, via_spec: ViaSpec, edge_offset_mm = 0): Via[] {
   const { diameter, drill, net_id } = via_spec;
   const radius = diameter / 2;
   const offset = edge_offset_mm + radius;
@@ -124,7 +143,7 @@ function hexStitching(polygon, pitch_mm, via_spec, edge_offset_mm = 0) {
   const cols = Math.floor(width / colPitch) + 2;
   const rows = Math.floor(height / rowPitch) + 2;
 
-  const vias = [];
+  const vias: Via[] = [];
   for (let row = 0; row < rows; row++) {
     const rowOffset = (row % 2) * (colPitch / 2);
     const y = innerMinY + row * rowPitch;
@@ -139,10 +158,60 @@ function hexStitching(polygon, pitch_mm, via_spec, edge_offset_mm = 0) {
   return vias;
 }
 
-function teardropForPadVia(pad_or_via, trace, radius_factor = 1.5) {
+interface PadOrVia {
+  x: number
+  y: number
+  width?: number
+  diameter?: number
+  net_id?: string
+  pcb_pad_id?: string
+  pcb_via_id?: string
+  [key: string]: any
+}
+
+interface TraceRoutePoint {
+  x: number
+  y: number
+}
+
+interface PcbTrace {
+  pcb_trace_id?: string
+  net_id?: string
+  width?: number
+  route?: TraceRoutePoint[]
+  [key: string]: any
+}
+
+// `circuit_json` is a loosely-shaped PCB board document (distinct from the
+// circuit-json array format aliased in src/types/circuit.ts) — typed locally
+// since this is this function's own idiosyncratic input, not a shared domain
+// contract.
+interface PcbBoardDoc {
+  teardrops?: Array<{
+    pad_id_or_via_id?: string
+    trace_id?: string
+    radius_factor: number
+    path: TraceRoutePoint[]
+  }>
+  pcb_trace?: PcbTrace[]
+  pcb_pad?: PadOrVia[]
+  pcb_via?: PadOrVia[]
+  [key: string]: any
+}
+
+export interface CircuitJsonDoc {
+  pcb_board?: PcbBoardDoc
+  board?: PcbBoardDoc
+  [key: string]: any
+}
+
+function teardropForPadVia(pad_or_via: PadOrVia, trace: PcbTrace, radius_factor = 1.5): TraceRoutePoint[] | null {
   const px = pad_or_via.x;
   const py = pad_or_via.y;
-  const padRadius = (pad_or_via.width || pad_or_via.diameter || 1) / 2;
+  // Computed but unused by either return branch below — pre-existing dead
+  // code kept as-is (not removed: that would be a behaviour/content change
+  // out of migration scope), `_`-prefixed to satisfy no-unused-vars.
+  const _padRadius = (pad_or_via.width || pad_or_via.diameter || 1) / 2;
   const traceWidth = trace.width || 0.25;
   const teardropRadius = traceWidth * radius_factor;
 
@@ -179,8 +248,12 @@ function teardropForPadVia(pad_or_via, trace, radius_factor = 1.5) {
       const ny = segDx / segLen;
       const baseX = pt.x + nx * traceWidth / 2;
       const baseY = pt.y + ny * traceWidth / 2;
-      const tipX = px - nx * teardropRadius;
-      const tipY = py - ny * teardropRadius;
+      // Computed but unused — the return below uses {px, py} directly
+      // instead of a tip offset by these; possible pre-existing bug, left
+      // as-is (behaviour change out of migration scope), `_`-prefixed to
+      // satisfy no-unused-vars.
+      const _tipX = px - nx * teardropRadius;
+      const _tipY = py - ny * teardropRadius;
       return [
         { x: baseX, y: baseY },
         { x: px, y: py },
@@ -204,8 +277,8 @@ function teardropForPadVia(pad_or_via, trace, radius_factor = 1.5) {
   ];
 }
 
-function applyTeardropsToAll(circuit_json, radius_factor = 1.5) {
-  const circuit = JSON.parse(JSON.stringify(circuit_json));
+function applyTeardropsToAll(circuit_json: CircuitJsonDoc, radius_factor = 1.5): CircuitJsonDoc {
+  const circuit: CircuitJsonDoc = JSON.parse(JSON.stringify(circuit_json));
   const board = circuit.pcb_board || circuit.board;
 
   if (!board) {

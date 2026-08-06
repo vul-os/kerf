@@ -23,30 +23,30 @@ import usePrefersReducedMotion, { prefersReducedMotion } from './usePrefersReduc
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function stubWindow(matches) {
-  const listeners = []
+function stubWindow(matches: boolean) {
+  const listeners: Array<(e: { matches: boolean }) => void> = []
   const mql = {
     matches,
-    addEventListener: vi.fn((event, handler) => {
+    addEventListener: vi.fn((event: string, handler: (e: { matches: boolean }) => void) => {
       if (event === 'change') listeners.push(handler)
     }),
-    removeEventListener: vi.fn((event, handler) => {
+    removeEventListener: vi.fn((event: string, handler: (e: { matches: boolean }) => void) => {
       const idx = listeners.indexOf(handler)
       if (idx !== -1) listeners.splice(idx, 1)
     }),
-    _fire(newMatches) {
+    _fire(newMatches: boolean) {
       mql.matches = newMatches
       listeners.forEach((fn) => fn({ matches: newMatches }))
     },
   }
   globalThis.window = {
     matchMedia: vi.fn(() => mql),
-  }
+  } as unknown as Window & typeof globalThis
   return mql
 }
 
 function clearWindow() {
-  delete globalThis.window
+  delete (globalThis as any).window
 }
 
 // ── prefersReducedMotion() (non-hook helper) ──────────────────────────────────
@@ -126,7 +126,7 @@ describe('addEventListener + removeEventListener contract', () => {
   afterEach(clearWindow)
 
   it('matchMedia is called with the reduce query string', () => {
-    const mql = stubWindow(false)
+    const _mql = stubWindow(false)
     // Invoke the helper (which internally calls matchMedia) to confirm
     // the right query is passed.
     prefersReducedMotion()

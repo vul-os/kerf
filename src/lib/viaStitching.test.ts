@@ -5,7 +5,8 @@ import {
   perimeterStitching,
   hexStitching,
   teardropForPadVia,
-  applyTeardropsToAll
+  applyTeardropsToAll,
+  type CircuitJsonDoc,
 } from './viaStitching.js'
 
 const W = 50;
@@ -47,7 +48,7 @@ describe('generateStitchingPattern', () => {
     const pitch = 5;
     const offset = 2;
     const vias = generateStitchingPattern(squarePolygon, pitch, viaSpec, offset);
-    const minX = Math.min(...squarePolygon.map(p => p.x));
+    const _minX = Math.min(...squarePolygon.map(p => p.x));
     for (const via of vias) {
       expect(via.x).toBeGreaterThan(0 + offset + viaSpec.diameter / 2 - 0.001);
       expect(via.y).toBeGreaterThan(0 + offset + viaSpec.diameter / 2 - 0.001);
@@ -59,8 +60,8 @@ describe('gridStitching', () => {
   it('produces regular grid pattern', () => {
     const pitch = 5;
     const vias = gridStitching(squarePolygon, pitch, viaSpec, 0);
-    const cols = new Set(vias.map(v => Math.round(v.x / pitch)));
-    const rows = new Set(vias.map(v => Math.round(v.y / pitch)));
+    const _cols = new Set(vias.map(v => Math.round(v.x / pitch)));
+    const _rows = new Set(vias.map(v => Math.round(v.y / pitch)));
     expect(vias.length).toBeGreaterThan(1);
   });
 
@@ -160,7 +161,7 @@ describe('teardropForPadVia', () => {
 
 describe('applyTeardropsToAll', () => {
   it('adds teardrops array to board', () => {
-    const circuit = {
+    const circuit: CircuitJsonDoc = {
       pcb_board: {
         width: 50,
         height: 50,
@@ -185,7 +186,7 @@ describe('applyTeardropsToAll', () => {
   });
 
   it('does not mutate original circuit', () => {
-    const circuit = {
+    const circuit: CircuitJsonDoc = {
       pcb_board: {
         width: 50,
         height: 50,
@@ -210,7 +211,7 @@ describe('applyTeardropsToAll', () => {
   });
 
   it('teardrop path has valid coordinates', () => {
-    const circuit = {
+    const circuit: CircuitJsonDoc = {
       pcb_board: {
         width: 50,
         height: 50,

@@ -4,7 +4,7 @@
  * Three.js is mocked below so no GPU / DOM is required.
  */
 
-import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 
 // ── Minimal THREE stubs ────────────────────────────────────────────────────────
 
@@ -12,6 +12,10 @@ import { describe, it, expect, vi, beforeAll } from 'vitest'
 // be verified numerically without requiring a full Three.js environment.
 
 class Vector3Stub {
+  x: number
+  y: number
+  z: number
+
   constructor(x = 0, y = 0, z = 0) {
     this.x = x
     this.y = y
@@ -26,7 +30,7 @@ class Vector3Stub {
     }
     return this
   }
-  copy(v) {
+  copy(v: { x: number; y: number; z: number }) {
     this.x = v.x
     this.y = v.y
     this.z = v.z
@@ -40,6 +44,10 @@ function makeSkySurfaceUniform(initial = 0) {
 }
 
 class SkyStub {
+  isSky: boolean
+  scale: { setScalar: () => void }
+  material: { uniforms: Record<string, { value: any }> }
+
   constructor() {
     this.isSky = true
     this.scale = { setScalar() {} }

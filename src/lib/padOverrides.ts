@@ -1,8 +1,35 @@
-export function setPadMaskOverride(pad, expansion_mm) {
+export interface PadMaskOverride {
+  expansion_mm: number
+}
+
+export interface PadPasteOverride {
+  scale?: number
+  offset_mm?: number
+  polygon?: Array<[number, number]>
+}
+
+export interface Pad {
+  pcb_smtpad_id?: string
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+  pad_diameter?: number
+  mask_override?: PadMaskOverride
+  paste_override?: PadPasteOverride
+  [key: string]: any
+}
+
+export interface BoardDefaults {
+  mask_expansion_mm?: number
+  paste_scale?: number
+}
+
+export function setPadMaskOverride(pad: Pad, expansion_mm: number): void {
   pad.mask_override = { expansion_mm }
 }
 
-export function setPadPasteOverride(pad, scaleOrOffset) {
+export function setPadPasteOverride(pad: Pad, scaleOrOffset: number | PadPasteOverride): void {
   if (typeof scaleOrOffset === 'number') {
     pad.paste_override = { scale: scaleOrOffset }
   } else if (scaleOrOffset && typeof scaleOrOffset === 'object') {
@@ -10,7 +37,7 @@ export function setPadPasteOverride(pad, scaleOrOffset) {
   }
 }
 
-export function getEffectivePadMask(pad, board_defaults) {
+export function getEffectivePadMask(pad: Pad, board_defaults: BoardDefaults | null | undefined): Array<[number, number]> {
   const expansion = pad.mask_override?.expansion_mm ??
     (board_defaults == null ? 0.05 : board_defaults.mask_expansion_mm !== undefined ? board_defaults.mask_expansion_mm : 0)
   const w = pad.width ?? pad.pad_diameter ?? 0
@@ -25,7 +52,7 @@ export function getEffectivePadMask(pad, board_defaults) {
   ]
 }
 
-export function getEffectivePadPaste(pad, board_defaults) {
+export function getEffectivePadPaste(pad: Pad, board_defaults: BoardDefaults | null | undefined): Array<[number, number]> {
   const override = pad.paste_override
   const defaultScale = board_defaults?.paste_scale ?? 1.0
 
@@ -51,8 +78,8 @@ export function getEffectivePadPaste(pad, board_defaults) {
   ]
 }
 
-export function validatePadOverrides(pad) {
-  const errors = []
+export function validatePadOverrides(pad: Pad | null | undefined): string[] {
+  const errors: string[] = []
   if (!pad) {
     errors.push('pad is required')
     return errors

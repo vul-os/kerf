@@ -33,7 +33,7 @@ const DEG2RAD = Math.PI / 180
  * @param {number} azimuth_deg    Sun azimuth from north, clockwise (0 = north / +x axis)
  * @returns {Vector3}
  */
-export function elevationAzimuthToDirection(elevation_deg, azimuth_deg) {
+export function elevationAzimuthToDirection(elevation_deg: number, azimuth_deg: number): Vector3 {
   const el = elevation_deg * DEG2RAD
   const az = azimuth_deg  * DEG2RAD
 
@@ -62,6 +62,15 @@ export function elevationAzimuthToDirection(elevation_deg, azimuth_deg) {
  *   sky         — A THREE.Mesh (Sky instance) ready to add to the scene.
  *   sunPosition — Unit Vector3 direction toward the sun (use to aim a DirectionalLight).
  */
+export interface ProceduralSkyOptions {
+  elevation_deg?: number
+  azimuth_deg?: number
+  turbidity?: number
+  rayleigh?: number
+  mieCoefficient?: number
+  mieDirectionalG?: number
+}
+
 export function createProceduralSky({
   elevation_deg    = 15,
   azimuth_deg      = 180,
@@ -69,7 +78,7 @@ export function createProceduralSky({
   rayleigh         = 3,
   mieCoefficient   = 0.005,
   mieDirectionalG  = 0.7,
-} = {}) {
+}: ProceduralSkyOptions = {}): { sky: Sky; sunPosition: Vector3 } {
   const sky = new Sky()
 
   // Scale to render-unit "infinity" — large enough to always be behind all scene objects.

@@ -23,8 +23,11 @@ import { execFileSync } from 'node:child_process'
 
 // Inherited (not introduced) lint errors across the migrated .ts/.tsx tree.
 // Measured 2026-08-05 after T-502 landed 191 src/lib modules.
+// Lowered to 73 by T-505 (2026-08-06): migrating orphaned lib tests surfaced
+// unused-vars in previously-untyped-and-unlinted padOverrides/pcbRouting/
+// viaStitching source, fixed in place rather than left at the old count.
 // This number may only ever go DOWN.
-const BASELINE = 78
+const BASELINE = 73
 
 const args = [
   'eslint',

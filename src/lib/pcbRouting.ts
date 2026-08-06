@@ -1,9 +1,36 @@
 // pcbRouting.js — Pure geometry helpers for manual PCB trace routing.
 // No React or browser imports — safe to use in vitest and workers.
 
+export interface Point {
+  x: number
+  y: number
+}
+
+export interface Trace {
+  id?: string
+  net_id?: string
+  layer?: string
+  width_mm?: number
+  points: Point[]
+  [key: string]: any
+}
+
+// shovePairClearance uses a distinct camelCase field convention
+// (netId/widthMm) from the rest of this file's snake_case Trace — this
+// mirrors a pre-existing inconsistency in the original JS, not introduced
+// here.
+export interface ShoveTrace {
+  id?: string
+  netId: string
+  layer: string
+  widthMm?: number
+  points: Point[]
+  [key: string]: any
+}
+
 // ─── Internal geometry primitives ────────────────────────────────────────────
 
-function dist2(a, b) {
+function dist2(a: Point, b: Point): number {
   const dx = b.x - a.x
   const dy = b.y - a.y
   return Math.sqrt(dx * dx + dy * dy)
@@ -21,14 +48,14 @@ function dist2(a, b) {
  * @param {{x:number,y:number}} b2
  * @returns {number}
  */
-export function segSegMinDist(a1, a2, b1, b2) {
+export function segSegMinDist(a1: Point, a2: Point, b1: Point, b2: Point): number {
   const dx1 = a2.x - a1.x, dy1 = a2.y - a1.y
   const dx2 = b2.x - b1.x, dy2 = b2.y - b1.y
   const cx = b1.x - a1.x, cy = b1.y - a1.y
   const len1sq = dx1 * dx1 + dy1 * dy1
   const len2sq = dx2 * dx2 + dy2 * dy2
 
-  function ptSegDist(p, a, b) {
+  function ptSegDist(p: Point, a: Point, b: Point): number {
     const ddx = b.x - a.x, ddy = b.y - a.y
     const lsq = ddx * ddx + ddy * ddy
     if (lsq === 0) return dist2(p, a)
@@ -66,12 +93,12 @@ export function segSegMinDist(a1, a2, b1, b2) {
  * @param {number} offset   positive = CCW (left), negative = CW (right)
  * @returns {Array<{x:number,y:number}>}
  */
-export function offsetPolyline(points, offset) {
+export function offsetPolyline(points: Point[], offset: number): Point[] {
   const n = points.length
   if (n < 2) return points.map(p => ({ ...p }))
 
   // Per-segment perpendicular unit vectors (CCW)
-  const perps = []
+  const perps: Point[] = []
   for (let i = 0; i < n - 1; i++) {
     const dx = points[i + 1].x - points[i].x
     const dy = points[i + 1].y - points[i].y
@@ -107,12 +134,16 @@ export function offsetPolyline(points, offset) {
  * @param {number} spacingMm  edge-to-edge coupling gap in mm
  * @returns {{ pos: Array<{x,y}>, neg: Array<{x,y}>, centreline: Array<{x,y}> }}
  */
-export function routeDiffPairCentreline(start, end, spacingMm) {
+export function routeDiffPairCentreline(
+  start: Point,
+  end: Point,
+  spacingMm: number
+): { pos: Point[]; neg: Point[]; centreline: Point[] } {
   const half = spacingMm / 2
   const dx = end.x - start.x
   const dy = end.y - start.y
 
-  let centreline
+  let centreline: Point[]
   if (Math.abs(dx) < 1e-9 || Math.abs(dy) < 1e-9) {
     centreline = [{ ...start }, { ...end }]
   } else {
@@ -132,7 +163,7 @@ export function routeDiffPairCentreline(start, end, spacingMm) {
  * @param {Array<{x:number,y:number}>} pts
  * @returns {number} length in mm
  */
-export function polylineLength(pts) {
+export function polylineLength(pts: Point[]): number {
   let len = 0
   for (let i = 1; i < pts.length; i++) len += dist2(pts[i - 1], pts[i])
   return len
@@ -158,18 +189,18 @@ export function polylineLength(pts) {
  * @returns {{ traces: Array<object>, shovedIds: string[] }}
  */
 export function shovePairClearance(
-  traces,
-  segStart,
-  segEnd,
-  layer,
-  diffPairNetIds,
-  clearanceMm,
-  newWidthMm,
+  traces: ShoveTrace[],
+  segStart: Point,
+  segEnd: Point,
+  layer: string,
+  diffPairNetIds: string[],
+  clearanceMm: number,
+  newWidthMm: number,
   maxPasses = 4,
-) {
+): { traces: ShoveTrace[]; shovedIds: string[] } {
   // Deep-clone so callers' arrays are not mutated.
-  const working = traces.map(t => ({ ...t, points: t.points.map(p => ({ ...p })) }))
-  const shovedIds = []
+  const working: ShoveTrace[] = traces.map(t => ({ ...t, points: t.points.map(p => ({ ...p })) }))
+  const shovedIds: string[] = []
 
   for (let pass = 0; pass < maxPasses; pass++) {
     let changed = false
@@ -235,7 +266,7 @@ export function shovePairClearance(
  * @param {number} [amplitude=0.5]  meander half-width in mm
  * @returns {Array<{x:number,y:number}>}
  */
-export function insertMeanderPoints(pts, extraMm, amplitude = 0.5) {
+export function insertMeanderPoints(pts: Point[], extraMm: number, amplitude = 0.5): Point[] {
   if (!pts || pts.length < 2 || extraMm < 1e-6) return pts
 
   // Find longest segment.
@@ -254,7 +285,7 @@ export function insertMeanderPoints(pts, extraMm, amplitude = 0.5) {
   const extraPerTooth = 2 * amplitude
   const nTeeth = Math.max(1, Math.ceil(extraMm / extraPerTooth))
 
-  const newPts = [{ ...a }]
+  const newPts: Point[] = [{ ...a }]
   let sign = 1
   for (let i = 0; i < nTeeth; i++) {
     const t0 = i / nTeeth
@@ -296,7 +327,12 @@ export function insertMeanderPoints(pts, extraMm, amplitude = 0.5) {
  * @param {number} [amplitude=0.5]
  * @returns {{ pos: Array<{x,y}>, neg: Array<{x,y}>, skewMm: number }}
  */
-export function diffPairLengthMatch(posPoints, negPoints, skewToleranceMm = 0.05, amplitude = 0.5) {
+export function diffPairLengthMatch(
+  posPoints: Point[],
+  negPoints: Point[],
+  skewToleranceMm = 0.05,
+  amplitude = 0.5
+): { pos: Point[]; neg: Point[]; skewMm: number } {
   const lenPos = polylineLength(posPoints)
   const lenNeg = polylineLength(negPoints)
   let pos = posPoints, neg = negPoints
@@ -319,14 +355,14 @@ export function diffPairLengthMatch(posPoints, negPoints, skewToleranceMm = 0.05
   }
 }
 
-function ptEq(a, b, tol = 1e-9) {
+function ptEq(a: Point, b: Point, tol = 1e-9): boolean {
   return Math.abs(a.x - b.x) <= tol && Math.abs(a.y - b.y) <= tol
 }
 
 /**
  * Minimum distance from point p to segment [a, b].
  */
-export function pointToSegmentDist(p, a, b) {
+export function pointToSegmentDist(p: Point, a: Point, b: Point): number {
   const dx = b.x - a.x
   const dy = b.y - a.y
   const lenSq = dx * dx + dy * dy
@@ -340,7 +376,7 @@ export function pointToSegmentDist(p, a, b) {
 /**
  * Project p onto segment [a, b]; return the t parameter in [0,1].
  */
-function projectOntoSegment(p, a, b) {
+function projectOntoSegment(p: Point, a: Point, b: Point): number {
   const dx = b.x - a.x
   const dy = b.y - a.y
   const lenSq = dx * dx + dy * dy
@@ -360,7 +396,11 @@ function projectOntoSegment(p, a, b) {
  * @param {'horizontal'|'vertical'|undefined} lastDirection
  * @returns {{ p2_snapped: {x: number, y: number}, direction: 'horizontal'|'vertical' }}
  */
-export function orthogonalSnap(p1, p2, lastDirection) {
+export function orthogonalSnap(
+  p1: Point | null | undefined,
+  p2: Point | null | undefined,
+  lastDirection?: 'horizontal' | 'vertical'
+): { p2_snapped: Point; direction: 'horizontal' | 'vertical' } {
   // Guard: identical points
   if (!p1 || !p2) {
     const pt = p2 || p1 || { x: 0, y: 0 }
@@ -370,7 +410,7 @@ export function orthogonalSnap(p1, p2, lastDirection) {
   const dx = Math.abs(p2.x - p1.x)
   const dy = Math.abs(p2.y - p1.y)
 
-  let direction
+  let direction: 'horizontal' | 'vertical'
   if (dx > dy) {
     direction = 'horizontal'
   } else if (dy > dx) {
@@ -406,7 +446,7 @@ export function orthogonalSnap(p1, p2, lastDirection) {
  * @param {{x: number, y: number}} p2
  * @returns {Array<{x: number, y: number}>}
  */
-export function corner45(p1, p2) {
+export function corner45(p1: Point | null | undefined, p2: Point | null | undefined): Point[] {
   if (!p1 || !p2) return [p2 || p1 || { x: 0, y: 0 }]
 
   const dx = p2.x - p1.x
@@ -447,7 +487,7 @@ export function corner45(p1, p2) {
  * @param {{x: number, y: number}} p2
  * @returns {Array<{x: number, y: number}>}
  */
-export function freeRoute(p1, p2) {
+export function freeRoute(p1: Point | null | undefined, p2: Point | null | undefined): Point[] {
   if (!p2) return []
   return [{ x: p2.x, y: p2.y }]
 }
@@ -463,7 +503,15 @@ export function freeRoute(p1, p2) {
  * @param {'horizontal'|'vertical'|undefined} lastDirection  — passed through to orthogonalSnap
  * @returns {Array<{x: number, y: number}>|{ p2_snapped: {x,y}, direction: string }}
  */
-export function pickRoutingMode(mode, p1, p2, lastDirection) {
+// `mode` is deliberately `string`, not a literal union — the switch's
+// `default` branch falls back to freeRoute for any unrecognised mode, and a
+// test exercises exactly that forgiving-fallback contract.
+export function pickRoutingMode(
+  mode: string,
+  p1: Point | null | undefined,
+  p2: Point | null | undefined,
+  lastDirection?: 'horizontal' | 'vertical'
+): Point[] | { p2_snapped: Point; direction: string } {
   switch (mode) {
     case 'orthogonal':
       return orthogonalSnap(p1, p2, lastDirection)
@@ -488,7 +536,7 @@ export function pickRoutingMode(mode, p1, p2, lastDirection) {
  * @param {number} tolerance
  * @returns {[object, object]|null}  null if no segment within tolerance found
  */
-export function splitTraceAtPoint(trace, point, tolerance = 0.1) {
+export function splitTraceAtPoint(trace: Trace, point: Point | null | undefined, tolerance = 0.1): [Trace, Trace] | null {
   if (!trace || !trace.points || trace.points.length < 2) return null
   if (!point) return null
 
@@ -553,7 +601,20 @@ export function splitTraceAtPoint(trace, point, tolerance = 0.1) {
  * @param {number} tolerance
  * @returns {string|null}
  */
-export function detectTJunction(traces, vertex, tolerance = 0.1) {
+/**
+ * `traces`/`vertex`/`tolerance` are typed loosely (`any`) because this
+ * function has two shapes at runtime, discriminated dynamically (see body)
+ * rather than by TypeScript overloads — in the legacy call form `tolerance`
+ * is actually the third positional point argument, not a number. This is
+ * legacy call-site compatibility the migration preserves as-is rather than
+ * restructures.
+ */
+export function detectTJunction(
+  traces: any,
+  vertex: any,
+  tolerance: any = 0.1,
+  tol = 0.1
+): string | null | { hit: boolean; point: Point } {
   // Legacy two-argument segment form: detectTJunction(segA, segB, point, tol)
   if (
     traces &&
@@ -564,7 +625,6 @@ export function detectTJunction(traces, vertex, tolerance = 0.1) {
     const segA = traces
     const segB = vertex
     const p = tolerance
-    const tol = arguments[3] !== undefined ? arguments[3] : 0.1
     return _detectTJunctionSegment(segA, segB, p, tol)
   }
 
@@ -573,7 +633,7 @@ export function detectTJunction(traces, vertex, tolerance = 0.1) {
 
   const netId = vertex.net_id
 
-  for (const trace of traces) {
+  for (const trace of traces as Trace[]) {
     if (netId !== undefined && trace.net_id !== netId) continue
     const pts = trace.points
     if (!pts || pts.length < 2) continue
@@ -599,7 +659,7 @@ export function detectTJunction(traces, vertex, tolerance = 0.1) {
 }
 
 /** @private Legacy two-point-segment form used by existing tests */
-function _detectTJunctionSegment(segA, segB, p, tol) {
+function _detectTJunctionSegment(segA: Point, segB: Point, p: Point, tol: number): { hit: boolean; point: Point } {
   const distToA = dist2(p, segA)
   const distToB = dist2(p, segB)
   if (distToA < tol || distToB < tol) {
@@ -631,7 +691,7 @@ function _detectTJunctionSegment(segA, segB, p, tol) {
  * @param {number} tolerance
  * @returns {Array<object>}
  */
-export function mergeTraces(traces, tolerance = 0.1) {
+export function mergeTraces(traces: Trace[], tolerance = 0.1): Trace[] {
   if (!Array.isArray(traces) || traces.length === 0) return []
 
   // Work on a mutable copy keyed by index

@@ -12,7 +12,7 @@
  *      each test so the initialiser can read window.innerWidth.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import React from 'react'
 import { getBreakpointForWidth, BREAKPOINTS, useBreakpoint } from './useBreakpoint.js'
@@ -108,10 +108,10 @@ describe('BREAKPOINTS', () => {
  * Stubs globalThis.window with a minimal window-like object that provides
  * innerWidth and matchMedia so useBreakpoint's initialiser works in Node.
  */
-function stubWindow(width) {
+function stubWindow(width: number) {
   globalThis.window = {
     innerWidth: width,
-    matchMedia: vi.fn((query) => {
+    matchMedia: vi.fn((query: string) => {
       const match = query.match(/\(min-width:\s*(\d+)px\)/)
       const minWidth = match ? parseInt(match[1], 10) : 0
       return {
@@ -123,7 +123,7 @@ function stubWindow(width) {
         dispatchEvent: vi.fn(),
       }
     }),
-  }
+  } as unknown as Window & typeof globalThis
 }
 
 function BreakpointProbe() {

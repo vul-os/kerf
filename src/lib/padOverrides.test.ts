@@ -5,11 +5,12 @@ import {
   getEffectivePadMask,
   getEffectivePadPaste,
   validatePadOverrides,
+  type Pad,
 } from './padOverrides.js'
 
 const BOARD_DEFAULTS = { mask_expansion_mm: 0.05, paste_scale: 1.0 }
 
-function makePad(overrides = {}) {
+function makePad(overrides: Partial<Pad> = {}): Pad {
   return {
     type: 'pcb_smtpad',
     pcb_smtpad_id: 'p1',
@@ -57,7 +58,7 @@ describe('setPadPasteOverride', () => {
 
   it('accepts an object with polygon', () => {
     const pad = makePad()
-    const poly = [[0, 0], [1, 0], [1, 1]]
+    const poly: Array<[number, number]> = [[0, 0], [1, 0], [1, 1]]
     setPadPasteOverride(pad, { polygon: poly })
     expect(pad.paste_override.polygon).toEqual(poly)
   })
@@ -124,7 +125,7 @@ describe('getEffectivePadPaste', () => {
 
   it('returns custom polygon when provided', () => {
     const pad = makePad()
-    const customPoly = [[0, 0], [2, 0], [2, 2], [0, 2]]
+    const customPoly: Array<[number, number]> = [[0, 0], [2, 0], [2, 2], [0, 2]]
     setPadPasteOverride(pad, { polygon: customPoly })
     const paste = getEffectivePadPaste(pad, BOARD_DEFAULTS)
     expect(paste).toEqual(customPoly)

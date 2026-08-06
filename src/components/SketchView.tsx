@@ -12,7 +12,10 @@
 // the workspace store, which handles persistence + revisions.
 
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, useMemo } from 'react'
+import type { Ref } from 'react'
 import { snapshotSvg } from '../lib/snapshotHelpers.js'
+import type { SketchJSON, SketchEntity, SketchConstraint } from '../types/geometry.js'
+import type { WorkspaceFile } from '../store/workspace.js'
 import {
   MousePointer2, Slash, Circle as CircleIcon, Spline, Square, Dot,
   MoveHorizontal, MoveVertical, Triangle, Equal, Anchor,
@@ -101,6 +104,31 @@ const CONSTRAINTS = [
 // ---------------------------------------------------------------------------
 // Main component.
 
+/** Imperative handle exposed via the `viewRef` prop — mirrors Renderer's/DrawingView's ref surface. */
+export interface SketchViewHandle {
+  snapshot: (opts?: { size?: number; quality?: number }) => Promise<Blob | null>
+}
+
+export interface SketchViewProps {
+  /** The parsed sketch object from the workspace store. */
+  sketch: SketchJSON
+  /** Project files — powers the visible_3d 3D-backdrop picker. */
+  files: WorkspaceFile[]
+  /** Debounced upstream — called with the next sketch after every edit. */
+  onChange: (next: SketchJSON) => void
+  /** Called with the solver's result after every solve pass. */
+  onSolved: (next: SketchJSON, status: string | null, dof: number, conflicts: string[]) => void
+  status?: 'fully' | 'under' | 'over' | 'conflict' | null
+  dofCount?: number
+  conflicts?: string[]
+  // Loosely typed at this boundary: resolves to whatever loadFilePartsForProject's
+  // (untyped) rows are (id/geom/color-ish part records) — powers the translucent
+  // 3D backdrop only, never solved or persisted, so a precise shape isn't load-bearing here.
+  loadParts: (fileId: string) => Promise<any[]>
+  /** Editor-managed ref for thumbnail capture (SketchView isn't a forwardRef component). */
+  viewRef?: Ref<SketchViewHandle>
+}
+
 export default function SketchView({
   sketch,                // the parsed sketch object from store
   files,                 // for the visible_3d picker
@@ -111,14 +139,17 @@ export default function SketchView({
   conflicts,             // string[] of conflicting constraint ids
   loadParts,             // (fileId) => Promise<parts[]>; powers 3D backdrop
   viewRef,               // Editor-managed ref for thumbnail capture
-}) {
-  const svgRef = useRef(null)
-  const containerRef = useRef(null)
+}: SketchViewProps) {
+  const svgRef = useRef<SVGSVGElement | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
 
   // Thumbnail capture for the Editor's project-thumbnail trigger. SVG
   // gets serialized + rasterized to JPEG via snapshotHelpers.
   useImperativeHandle(viewRef, () => ({
-    snapshot: (opts) => snapshotSvg(svgRef.current, opts),
+    // snapshotHelpers.js's `opts` param is untyped, which makes TS infer part
+    // of its internal Promise chain as `Promise<{}>` instead of
+    // `Promise<Blob | null>` — a boundary this component doesn't own.
+    snapshot: (opts?: { size?: number; quality?: number }) => snapshotSvg(svgRef.current, opts) as Promise<Blob | null>,
   }), [])
   const [view, setView] = useState(DEFAULT_VIEW)
   const [tool, setTool] = useState('select')
@@ -146,14 +177,22 @@ export default function SketchView({
   // children can re-render based on prop diffs (and so eslint's react-hooks
   // rules don't complain about reading the ref during render). The two
   // diverge for at most one frame; that's fine for what they drive.
-  const INITIAL_LINE_DRAFT = {
+  interface LineDraft {
+    length: string
+    angle: string
+    lockLength: boolean
+    lockAngle: boolean
+    snapTarget: { x: number; y: number } | null
+    focus: string // which field has focus ('length' | 'angle')
+  }
+  const INITIAL_LINE_DRAFT: LineDraft = {
     length: '', angle: '',
     lockLength: false, lockAngle: false,
     snapTarget: null,        // {x, y} world-space override for the next click
     focus: 'length',         // which field has focus ('length' | 'angle')
   }
-  const lineDraftRef = useRef(INITIAL_LINE_DRAFT)
-  const [lineDraft, setLineDraft] = useState(INITIAL_LINE_DRAFT)
+  const lineDraftRef = useRef<LineDraft>(INITIAL_LINE_DRAFT)
+  const [lineDraft, setLineDraft] = useState<LineDraft>(INITIAL_LINE_DRAFT)
   const bumpLineDraft = useCallback(() => {
     // Mirror the ref into state so consumers reading via props see the latest.
     setLineDraft({ ...lineDraftRef.current })
@@ -414,9 +453,9 @@ export default function SketchView({
     // the target IS the cursor; when length/angle are locked, the target is
     // the projected point along the locked direction at the locked length.
     if (tool === 'line' && pendingPoints.length === 1) {
-      const start = sketch.entities.find((x) => x.id === pendingPoints[0].id)
+      const start: any = sketch.entities.find((x) => x.id === pendingPoints[0].id)
       if (start) {
-        const draft = lineDraftRef.current || {}
+        const draft: LineDraft = lineDraftRef.current || INITIAL_LINE_DRAFT
         const next = projectLineDraft(start, w, draft)
         if (next) {
           lineDraftRef.current = { ...draft, snapTarget: next }
@@ -516,7 +555,7 @@ export default function SketchView({
         return
       }
       const center = pendingPoints[0]
-      const cEnt = sketch.entities.find((x) => x.id === center.id)
+      const cEnt: any = sketch.entities.find((x) => x.id === center.id)
       if (!cEnt) { setPendingPoints([]); return }
       const dx = w.x - cEnt.x, dy = w.y - cEnt.y
       const rx = Math.max(0.01, Math.hypot(dx, dy))
@@ -638,7 +677,7 @@ export default function SketchView({
         return
       }
       const center = pendingPoints[0]
-      const cEnt = sketch.entities.find((x) => x.id === center.id)
+      const cEnt: any = sketch.entities.find((x) => x.id === center.id)
       const radius = cEnt ? Math.hypot(w.x - cEnt.x, w.y - cEnt.y) : 10
       const { sketch: s1 } = addCircle(sketch, center.id, radius, { construction })
       commit(s1)
@@ -661,8 +700,8 @@ export default function SketchView({
         return
       }
       // Third click: derive center from the three points.
-      const start = sketch.entities.find((x) => x.id === pendingPoints[0].id)
-      const end = sketch.entities.find((x) => x.id === pendingPoints[1].id)
+      const start: any = sketch.entities.find((x) => x.id === pendingPoints[0].id)
+      const end: any = sketch.entities.find((x) => x.id === pendingPoints[1].id)
       if (!start || !end) {
         setPendingPoints([])
         return
@@ -690,7 +729,7 @@ export default function SketchView({
         setPendingPoints([{ id: pid }])
         return
       }
-      const start = sketch.entities.find((x) => x.id === pendingPoints[0].id)
+      const start: any = sketch.entities.find((x) => x.id === pendingPoints[0].id)
       if (!start) { setPendingPoints([]); return }
       const tl = start
       const br = { x: w.x, y: w.y }
@@ -721,7 +760,13 @@ export default function SketchView({
   const applyConstraint = useCallback((kind) => {
     const sel = selection
     if (sel.length === 0) return
-    const ent = sketch.entities || []
+    // Looked up by id and read generically (`.x`/`.p1`/`.radius`/…) without
+    // re-narrowing SketchEntity's discriminated union at each call site below —
+    // callers already know the concrete kind from context. Narrowing every
+    // lookup here would be a refactor-scale change out of scope for a
+    // rename-only migration (same boundary call as Renderer.tsx/
+    // FeatureRenderer.tsx's internal-state `any`).
+    const ent: any[] = sketch.entities || []
     const get = (id) => ent.find((e) => e.id === id)
 
     function isLine(id) { return get(id)?.type === 'line' }
@@ -763,7 +808,13 @@ export default function SketchView({
       // Need 2 entities (any kind) + 1 construction line.
       // The construction line is identified as the line with construction=true
       // if available, otherwise the last selected line entity.
-      const ent = sketch.entities || []
+      // Looked up by id and read generically (`.x`/`.p1`/`.radius`/…) without
+    // re-narrowing SketchEntity's discriminated union at each call site below —
+    // callers already know the concrete kind from context. Narrowing every
+    // lookup here would be a refactor-scale change out of scope for a
+    // rename-only migration (same boundary call as Renderer.tsx/
+    // FeatureRenderer.tsx's internal-state `any`).
+    const ent: any[] = sketch.entities || []
       const get = (id) => ent.find((e) => e.id === id)
       const lns = sel.filter(isLine)
       // Prefer construction lines; fall back to any line.
@@ -930,7 +981,13 @@ export default function SketchView({
     // Selection requires at least one entity to mirror plus an axis. Axis is
     // derived from a selected line (preferred) or two selected points.
     if (selection.length < 2) return
-    const ent = sketch.entities || []
+    // Looked up by id and read generically (`.x`/`.p1`/`.radius`/…) without
+    // re-narrowing SketchEntity's discriminated union at each call site below —
+    // callers already know the concrete kind from context. Narrowing every
+    // lookup here would be a refactor-scale change out of scope for a
+    // rename-only migration (same boundary call as Renderer.tsx/
+    // FeatureRenderer.tsx's internal-state `any`).
+    const ent: any[] = sketch.entities || []
     const get = (id) => ent.find((e) => e.id === id)
     const lines = selection.filter((id) => get(id)?.type === 'line')
     const points = selection.filter((id) => get(id)?.type === 'point')
@@ -956,7 +1013,13 @@ export default function SketchView({
 
   const openLinearPattern = useCallback(() => {
     if (selection.length === 0) return
-    const ent = sketch.entities || []
+    // Looked up by id and read generically (`.x`/`.p1`/`.radius`/…) without
+    // re-narrowing SketchEntity's discriminated union at each call site below —
+    // callers already know the concrete kind from context. Narrowing every
+    // lookup here would be a refactor-scale change out of scope for a
+    // rename-only migration (same boundary call as Renderer.tsx/
+    // FeatureRenderer.tsx's internal-state `any`).
+    const ent: any[] = sketch.entities || []
     const get = (id) => ent.find((e) => e.id === id)
     // Allow patterning any kind of entity (including points).
     const targetIds = selection.filter((id) => !!get(id))
@@ -969,7 +1032,13 @@ export default function SketchView({
 
   const openPolarPattern = useCallback(() => {
     if (selection.length === 0) return
-    const ent = sketch.entities || []
+    // Looked up by id and read generically (`.x`/`.p1`/`.radius`/…) without
+    // re-narrowing SketchEntity's discriminated union at each call site below —
+    // callers already know the concrete kind from context. Narrowing every
+    // lookup here would be a refactor-scale change out of scope for a
+    // rename-only migration (same boundary call as Renderer.tsx/
+    // FeatureRenderer.tsx's internal-state `any`).
+    const ent: any[] = sketch.entities || []
     const get = (id) => ent.find((e) => e.id === id)
     // First point in selection becomes the center; remaining are patterned.
     const points = selection.filter((id) => get(id)?.type === 'point')
@@ -1012,7 +1081,13 @@ export default function SketchView({
   // ---- Fillet ------------------------------------------------------------
 
   const openFilletFromSelection = useCallback(() => {
-    const ent = sketch.entities || []
+    // Looked up by id and read generically (`.x`/`.p1`/`.radius`/…) without
+    // re-narrowing SketchEntity's discriminated union at each call site below —
+    // callers already know the concrete kind from context. Narrowing every
+    // lookup here would be a refactor-scale change out of scope for a
+    // rename-only migration (same boundary call as Renderer.tsx/
+    // FeatureRenderer.tsx's internal-state `any`).
+    const ent: any[] = sketch.entities || []
     const get = (id) => ent.find((e) => e.id === id)
     const lines = selection.filter((id) => get(id)?.type === 'line')
     if (lines.length >= 2) {
@@ -1357,8 +1432,8 @@ export default function SketchView({
             onLockLength={(lineId) => {
               const ent = sketch.entities.find((x) => x.id === lineId)
               if (!ent || ent.type !== 'line') return
-              const p1 = sketch.entities.find((x) => x.id === ent.p1)
-              const p2 = sketch.entities.find((x) => x.id === ent.p2)
+              const p1: any = sketch.entities.find((x) => x.id === ent.p1)
+              const p2: any = sketch.entities.find((x) => x.id === ent.p2)
               if (!p1 || !p2) return
               const v = round(Math.hypot(p1.x - p2.x, p1.y - p2.y))
               setDimensionPrompt({ kind: 'distance', refs: { a: ent.p1, b: ent.p2 }, defaultValue: v })
@@ -1366,8 +1441,8 @@ export default function SketchView({
             onLockAngle={(lineId) => {
               const ent = sketch.entities.find((x) => x.id === lineId)
               if (!ent || ent.type !== 'line') return
-              const p1 = sketch.entities.find((x) => x.id === ent.p1)
-              const p2 = sketch.entities.find((x) => x.id === ent.p2)
+              const p1: any = sketch.entities.find((x) => x.id === ent.p1)
+              const p2: any = sketch.entities.find((x) => x.id === ent.p2)
               if (!p1 || !p2) return
               // No reference axis; just bind to horizontal/vertical if cardinal.
               const dx = p2.x - p1.x, dy = p2.y - p1.y
@@ -1588,7 +1663,10 @@ function SketchAxes({ view, svgRef }) {
 
 // Render every entity. Color reflects constraint state.
 function SketchEntities({ sketch, view, worldToScreen, selection, conflicts, status, onDimensionDragStart, pulseConstraintId }) {
-  const ent = sketch.entities || []
+  // See the boundary comment on the other `ent` declarations in this file:
+  // looked up by id and read generically without re-narrowing SketchEntity's
+  // discriminated union at each call site.
+  const ent: any[] = sketch.entities || []
   const cons = sketch.constraints || []
   const conflictSet = new Set(conflicts || [])
   const selSet = new Set(selection || [])
@@ -1965,7 +2043,10 @@ function DimensionLabel({ c, sketch, worldToScreen, onDragStart }) {
 // badge highlights all three involved entities (entity_a, entity_b, the line).
 function SymmetricOverLineGlyph({ c, sketch, worldToScreen, onHover }) {
   if (c.type !== 'symmetric_over_line') return null
-  const ent = sketch.entities || []
+  // See the boundary comment on the other `ent` declarations in this file:
+  // looked up by id and read generically without re-narrowing SketchEntity's
+  // discriminated union at each call site.
+  const ent: any[] = sketch.entities || []
   const lineEnt = ent.find((e) => e.id === c.construction_line_id)
   if (!lineEnt || lineEnt.type !== 'line') return null
   const pointById = new Map()
@@ -2230,7 +2311,10 @@ function LineDraftStrip({ startEntity, cursor, worldToScreen, draft, draftRef, o
 //     "Set length to N mm") replace FreeCAD's cryptic constraint names.
 function EntityMiniToolbar({ sketch, selection, worldToScreen, onApply, onLockLength, onLockAngle }) {
   // Compute the world-space bbox of the selection.
-  const ent = sketch.entities || []
+  // See the boundary comment on the other `ent` declarations in this file:
+  // looked up by id and read generically without re-narrowing SketchEntity's
+  // discriminated union at each call site.
+  const ent: any[] = sketch.entities || []
   const byId = new Map(ent.map((e) => [e.id, e]))
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   function expandWith(p) {
@@ -3168,7 +3252,10 @@ function ConstraintRow({ c, onChangeValue, onDelete }) {
 // Pick the first non-construction entity within ~6px of the cursor.
 function entityHitTest(sketch, world, scale) {
   const TOL = 6 / scale
-  const ent = sketch.entities || []
+  // See the boundary comment on the other `ent` declarations in this file:
+  // looked up by id and read generically without re-narrowing SketchEntity's
+  // discriminated union at each call site.
+  const ent: any[] = sketch.entities || []
   const pointById = new Map()
   for (const e of ent) if (e.type === 'point') pointById.set(e.id, e)
   // Try lines.

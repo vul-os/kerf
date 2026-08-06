@@ -31,20 +31,28 @@ import { useEffect, useRef } from 'react'
 import clsx from 'clsx'
 import usePrefersReducedMotion from '../lib/usePrefersReducedMotion.js'
 
+export interface Props {
+  open: boolean
+  onClose?: () => void
+  title?: string
+  className?: string
+  children?: React.ReactNode
+}
+
 export default function MobileNavSheet({
   open,
   onClose,
   title = 'Navigation',
   className,
   children,
-}) {
-  const panelRef = useRef(null)
+}: Props) {
+  const panelRef = useRef<HTMLDivElement>(null)
   const reduced = usePrefersReducedMotion()
 
   // Close on Escape key.
   useEffect(() => {
     if (!open) return
-    const handler = (e) => {
+    const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose?.()
     }
     document.addEventListener('keydown', handler)
@@ -54,7 +62,7 @@ export default function MobileNavSheet({
   // Trap focus inside the sheet when open.
   useEffect(() => {
     if (!open || !panelRef.current) return
-    const focusable = panelRef.current.querySelectorAll(
+    const focusable = panelRef.current.querySelectorAll<HTMLElement>(
       'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
     )
     if (focusable.length) focusable[0].focus()

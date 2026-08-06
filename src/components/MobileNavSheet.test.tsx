@@ -17,7 +17,8 @@ import MobileNavSheet from './MobileNavSheet.jsx'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function renderSheet(props = {}, children = null) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- test helper exercises many partial prop shapes
+function renderSheet(props: any = {}, children: React.ReactNode = null) {
   return renderToStaticMarkup(
     React.createElement(MobileNavSheet, props, children),
   )

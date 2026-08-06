@@ -19,7 +19,7 @@ import { useWorkspace as _useWorkspace } from '../store/workspace.js'
 
 const MAX_FILES_SHOWN = 3
 
-function formatTime(ts) {
+function formatTime(ts: number | undefined) {
   if (!ts) return ''
   try {
     return new Date(ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
@@ -28,7 +28,12 @@ function formatTime(ts) {
   }
 }
 
-export default function UnsavedRestoreBanner({ useWorkspace = _useWorkspace, className = '' }) {
+export interface Props {
+  useWorkspace?: typeof _useWorkspace
+  className?: string
+}
+
+export default function UnsavedRestoreBanner({ useWorkspace = _useWorkspace, className = '' }: Props) {
   const unsavedEntries = useWorkspace((s) => s.unsavedEntries)
   const restoreUnsavedEntries = useWorkspace((s) => s.restoreUnsavedEntries)
   const discardUnsavedEntries = useWorkspace((s) => s.discardUnsavedEntries)

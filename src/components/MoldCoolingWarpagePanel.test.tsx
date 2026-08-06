@@ -12,7 +12,7 @@ import MoldCoolingWarpagePanel, {
   warpageColor,
   balanceColor,
   fmtVal,
-} from './MoldCoolingWarpagePanel.jsx'
+} from './MoldCoolingWarpagePanel'
 
 // ---------------------------------------------------------------------------
 // parseMoldResult

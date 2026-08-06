@@ -8,7 +8,7 @@
 //
 // Pattern: dark mono palette, collapsible ToolCards, callTool helper.
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, type CSSProperties, type ComponentType, type ReactNode } from 'react'
 import {
   Triangle,
   Box,
@@ -33,7 +33,10 @@ const API_URL =
     ? import.meta.env.VITE_API_URL || ''
     : ''
 
-async function callTool(toolName, args) {
+// Tool results are heterogeneous JSON from the backend tool layer we don't own.
+type ToolResult = Record<string, any>
+
+async function callTool(toolName: string, args: Record<string, unknown>): Promise<ToolResult> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -50,7 +53,7 @@ async function callTool(toolName, args) {
   return data
 }
 
-function fmt(v) {
+function fmt(v: unknown): string {
   if (v === null || v === undefined) return '—'
   if (typeof v === 'object') return JSON.stringify(v, null, 2)
   return String(v)
@@ -60,7 +63,7 @@ function fmt(v) {
 // Styles
 // ---------------------------------------------------------------------------
 
-const s = {
+const s: Record<string, CSSProperties> = {
   root: {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: 13,
@@ -233,7 +236,15 @@ const EXAMPLE_TARGET_MESH = JSON.stringify({
 // Reusable ToolCard
 // ---------------------------------------------------------------------------
 
-function ToolCard({ icon: Icon, title, description, accentColor = '#4ade80', children }) {
+interface ToolCardProps {
+  icon?: ComponentType<{ size?: number; color?: string }>
+  title: string
+  description?: string
+  accentColor?: string
+  children?: ReactNode
+}
+
+function ToolCard({ icon: Icon, title, description, accentColor = '#4ade80', children }: ToolCardProps) {
   const [open, setOpen] = useState(true)
   return (
     <div style={s.card}>
@@ -254,7 +265,7 @@ function ToolCard({ icon: Icon, title, description, accentColor = '#4ade80', chi
   )
 }
 
-function StatusBadge({ ok }) {
+function StatusBadge({ ok }: { ok?: boolean }) {
   return ok !== false
     ? <span style={{ ...s.badge, ...s.badgeGreen }}><CheckCircle size={10} /> OK</span>
     : <span style={{ ...s.badge, ...s.badgeAmber }}><AlertTriangle size={10} /> Failed</span>
@@ -268,8 +279,8 @@ function MeshRepairTool() {
   const [mesh, setMesh] = useState(EXAMPLE_SIMPLE_MESH)
   const [weldTol, setWeldTol] = useState('1e-6')
   const [maxHoleEdges, setMaxHoleEdges] = useState('20')
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<ToolResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const run = useCallback(async () => {
@@ -286,7 +297,7 @@ function MeshRepairTool() {
         max_hole_edges: parseInt(maxHoleEdges, 10) || 20,
       })
       setResult(res)
-    } catch (e) {
+    } catch (e: any) {
       setError(e.message)
     } finally {
       setLoading(false)
@@ -354,8 +365,8 @@ function MeshRepairTool() {
 
 function DiagnosticsTool() {
   const [mesh, setMesh] = useState(EXAMPLE_SIMPLE_MESH)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<ToolResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const run = useCallback(async () => {
@@ -370,7 +381,7 @@ function DiagnosticsTool() {
         faces: m.faces,
       })
       setResult(res)
-    } catch (e) {
+    } catch (e: any) {
       setError(e.message)
     } finally {
       setLoading(false)
@@ -426,8 +437,8 @@ function ShrinkWrapTool() {
   const [method, setMethod] = useState('nearest_surface_point')
   const [iterations, setIterations] = useState('1')
   const [snapTol, setSnapTol] = useState('1e-6')
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<ToolResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const run = useCallback(async () => {
@@ -448,7 +459,7 @@ function ShrinkWrapTool() {
         snap_tol: parseFloat(snapTol) || 1e-6,
       })
       setResult(res)
-    } catch (e) {
+    } catch (e: any) {
       setError(e.message)
     } finally {
       setLoading(false)
@@ -530,8 +541,8 @@ function BooleanTool() {
   const [meshA, setMeshA] = useState(EXAMPLE_SIMPLE_MESH)
   const [meshB, setMeshB] = useState(EXAMPLE_TARGET_MESH)
   const [operation, setOperation] = useState('union')
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<ToolResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const run = useCallback(async () => {
@@ -548,7 +559,7 @@ function BooleanTool() {
         operation,
       })
       setResult(res)
-    } catch (e) {
+    } catch (e: any) {
       setError(e.message)
     } finally {
       setLoading(false)
@@ -598,7 +609,11 @@ function BooleanTool() {
 
 const TABS = ['Repair', 'Diagnostics', 'ShrinkWrap', 'Boolean']
 
-export default function MeshRepairPanel({ content } = {}) {
+export interface MeshRepairPanelProps {
+  content?: string
+}
+
+export default function MeshRepairPanel({ content }: MeshRepairPanelProps = {}) {
   // content prop: JSON string optionally carrying persisted tab selection.
   const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
   const [tab, setTab] = useState(_parsed.tab || 'Repair')

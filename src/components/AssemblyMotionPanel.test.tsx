@@ -18,14 +18,21 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { readFileSync } from 'fs'
+// @types/node isn't part of this project's toolchain (tsconfig.json's `types` array is
+// T-500's — see docs/typescript-migration.md), so these Node builtins (used only for this
+// file's source-inspection assertions) are untyped at this boundary.
+// @ts-expect-error - no @types/node in this toolchain
+import { readFileSync, existsSync } from 'fs'
+// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 // ── Module-level source text for Tier 1 inspection ──────────────────────────
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const src = readFileSync(path.resolve(__dirname, './AssemblyMotionPanel.jsx'), 'utf8')
+const panelPath = (ext: string) => path.resolve(__dirname, `./AssemblyMotionPanel.${ext}`)
+const src = readFileSync(existsSync(panelPath('tsx')) ? panelPath('tsx') : panelPath('jsx'), 'utf8')
 const rendererSrc = readFileSync(path.resolve(__dirname, './Renderer.jsx'), 'utf8')
 
 // ── Mock Vite env + store so the module can be imported server-side ──────────
@@ -39,7 +46,10 @@ import AssemblyMotionPanel, {
   DRIVER_TYPES,
   buildSimPayload,
   extractTransformsAtFrame,
-} from './AssemblyMotionPanel.jsx'
+  type JointSpec,
+  type DriverSpec,
+  type AssemblyMotionPanelProps,
+} from './AssemblyMotionPanel'
 
 // ===========================================================================
 // Tier 1 — source inspection
@@ -166,10 +176,10 @@ describe('DRIVER_TYPES', () => {
 // ===========================================================================
 
 describe('buildSimPayload', () => {
-  const joints = [
+  const joints: JointSpec[] = [
     { type: 'revolute', componentA: 'arm1', componentB: 'arm2', axis: [0, 0, 1] },
   ]
-  const driver = { type: 'constant_velocity', velocity: 2.5 }
+  const driver: DriverSpec = { type: 'constant_velocity', velocity: 2.5 }
   const sim = { dt: 0.01, duration: 1.0 }
 
   it('returns tool = "simulate_motion"', () => {
@@ -300,7 +310,7 @@ describe('extractTransformsAtFrame', () => {
 // ===========================================================================
 
 describe('AssemblyMotionPanel: static render (closed state)', () => {
-  function render(props = {}) {
+  function render(props: AssemblyMotionPanelProps = {}) {
     return renderToStaticMarkup(
       <AssemblyMotionPanel {...props} />,
     )
@@ -325,6 +335,7 @@ describe('AssemblyMotionPanel: static render (closed state)', () => {
     // which is always rendered. Run button is inside the open body; test that
     // the data-testid key strings exist in source (Tier 1 confirmed them above).
     // For the static render we just confirm the outer shell renders.
+    let html: string | undefined
     expect(typeof html).toBe('undefined') // intentional — let's use render()
     const html2 = render()
     expect(html2.length).toBeGreaterThan(0)
@@ -342,34 +353,34 @@ describe('AssemblyMotionPanel: static render (closed state)', () => {
 
 describe('AssemblyMotionPanel: buildSimPayload dispatch shape', () => {
   it('payload tool field matches registered name', () => {
-    const j = [{ type: 'revolute', componentA: 'link1', componentB: 'link2', axis: [0, 0, 1] }]
-    const d = { type: 'constant_velocity', velocity: 1.0 }
+    const j: JointSpec[] = [{ type: 'revolute', componentA: 'link1', componentB: 'link2', axis: [0, 0, 1] }]
+    const d: DriverSpec = { type: 'constant_velocity', velocity: 1.0 }
     const s = { dt: 0.01, duration: 1.0 }
     const payload = buildSimPayload(j, d, s)
     expect(payload.tool).toBe('simulate_motion')
   })
 
   it('dispatch JSON is serialisable', () => {
-    const j = [{ type: 'prismatic', componentA: 'slider', componentB: 'rail', axis: [1, 0, 0] }]
-    const d = { type: 'sinusoidal', amplitude: 0.5, frequency: 2.0 }
+    const j: JointSpec[] = [{ type: 'prismatic', componentA: 'slider', componentB: 'rail', axis: [1, 0, 0] }]
+    const d: DriverSpec = { type: 'sinusoidal', amplitude: 0.5, frequency: 2.0 }
     const s = { dt: 0.005, duration: 0.5 }
     const payload = buildSimPayload(j, d, s)
     expect(() => JSON.stringify(payload)).not.toThrow()
   })
 
   it('sinusoidal driver produces applied force entry', () => {
-    const j = [{ type: 'revolute', componentA: 'gear', componentB: '', axis: [0, 1, 0] }]
-    const d = { type: 'sinusoidal', amplitude: 1.0, frequency: 1.0 }
+    const j: JointSpec[] = [{ type: 'revolute', componentA: 'gear', componentB: '', axis: [0, 1, 0] }]
+    const d: DriverSpec = { type: 'sinusoidal', amplitude: 1.0, frequency: 1.0 }
     const s = { dt: 0.01, duration: 1.0 }
     const payload = buildSimPayload(j, d, s)
     const applied = payload.args.forces.find((f) => f.type === 'applied')
     expect(applied).toBeTruthy()
-    expect(applied.torque[2]).toBeCloseTo(1.0)
+    expect((applied as { torque: number[] }).torque[2]).toBeCloseTo(1.0)
   })
 
   it('table driver produces no applied force (no amplitude to set)', () => {
-    const j = []
-    const d = { type: 'table', table: '0 0\n1 3.14' }
+    const j: JointSpec[] = []
+    const d: DriverSpec = { type: 'table', table: '0 0\n1 3.14' }
     const s = { dt: 0.01, duration: 1.0 }
     const payload = buildSimPayload(j, d, s)
     const applied = payload.args.forces.find((f) => f.type === 'applied')

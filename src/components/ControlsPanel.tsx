@@ -33,7 +33,36 @@
  * Nyquist, H. (1932). "Regeneration Theory." Bell System Tech. J. 11.
  */
 
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
+
+// ---------------------------------------------------------------------------
+// Data shapes
+// ---------------------------------------------------------------------------
+
+export interface BodeData {
+  omega: number[]
+  mag_db: number[]
+  phase_deg: number[]
+  gain_margin_db?: number | null
+  phase_margin_deg?: number | null
+  omega_gc?: number | null
+  omega_pc?: number | null
+}
+
+export interface NyquistData {
+  real_g: number[]
+  imag_g: number[]
+  encirclements_approx?: number | null
+}
+
+export interface StepData {
+  t: number[]
+  y: number[]
+  steady_state?: number | null
+  response_type?: string
+}
+
+type Scale = (v: number) => number
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -45,31 +74,31 @@ const MAR = { top: 28, right: 20, bottom: 44, left: 60 }
 // Generic helpers (pure functions — no hooks)
 // ---------------------------------------------------------------------------
 
-function scaleLinear(domMin, domMax, rangeMin, rangeMax) {
+function scaleLinear(domMin: number, domMax: number, rangeMin: number, rangeMax: number): Scale {
   const den = domMax - domMin
-  return (v) => den === 0 ? rangeMin : rangeMin + ((v - domMin) / den) * (rangeMax - rangeMin)
+  return (v: number) => den === 0 ? rangeMin : rangeMin + ((v - domMin) / den) * (rangeMax - rangeMin)
 }
 
-function scaleLog10(domMin, domMax, rangeMin, rangeMax) {
+function scaleLog10(domMin: number, domMax: number, rangeMin: number, rangeMax: number): Scale {
   const lmin = Math.log10(domMin)
   const lmax = Math.log10(domMax)
   const den = lmax - lmin
-  return (v) => den === 0 ? rangeMin : rangeMin + ((Math.log10(v) - lmin) / den) * (rangeMax - rangeMin)
+  return (v: number) => den === 0 ? rangeMin : rangeMin + ((Math.log10(v) - lmin) / den) * (rangeMax - rangeMin)
 }
 
-function finiteRange(arr) {
+function finiteRange(arr: number[]): [number, number] {
   const finite = arr.filter(Number.isFinite)
   if (!finite.length) return [0, 1]
   return [Math.min(...finite), Math.max(...finite)]
 }
 
-function niceTicks(min, max, count = 6) {
+function niceTicks(min: number, max: number, count = 6): number[] {
   if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) return [min]
   const step = (max - min) / (count - 1)
   const mag = Math.pow(10, Math.floor(Math.log10(Math.abs(step) || 1)))
   const niceStep = Math.ceil(step / mag) * mag
   const start = Math.ceil(min / niceStep) * niceStep
-  const ticks = []
+  const ticks: number[] = []
   for (let v = start; v <= max + niceStep * 0.01; v += niceStep) {
     ticks.push(+v.toPrecision(5))
     if (ticks.length > 10) break
@@ -77,8 +106,8 @@ function niceTicks(min, max, count = 6) {
   return ticks.length ? ticks : [min, max]
 }
 
-function logTicks(min, max) {
-  const ticks = []
+function logTicks(min: number, max: number): number[] {
+  const ticks: number[] = []
   for (let e = Math.floor(Math.log10(min)); e <= Math.ceil(Math.log10(max)); e++) {
     const v = Math.pow(10, e)
     if (v >= min * 0.99 && v <= max * 1.01) ticks.push(v)
@@ -86,8 +115,8 @@ function logTicks(min, max) {
   return ticks.length ? ticks : [min, max]
 }
 
-function polyline(xs, ys, xScale, yScale) {
-  const pts = []
+function polyline(xs: number[], ys: number[], xScale: Scale, yScale: Scale): string {
+  const pts: string[] = []
   for (let i = 0; i < xs.length; i++) {
     const x = xScale(xs[i])
     const y = yScale(ys[i])
@@ -100,7 +129,16 @@ function polyline(xs, ys, xScale, yScale) {
 // Axis helpers
 // ---------------------------------------------------------------------------
 
-function YAxis({ scale, ticks, unit, width: w, height: h, x0 }) {
+interface YAxisProps {
+  scale: Scale
+  ticks: number[]
+  unit: string
+  width: number
+  height: number
+  x0: number
+}
+
+function YAxis({ scale, ticks, unit, width: w, height: h, x0 }: YAxisProps) {
   return (
     <g>
       {ticks.map((t) => {
@@ -128,7 +166,15 @@ function YAxis({ scale, ticks, unit, width: w, height: h, x0 }) {
   )
 }
 
-function XAxisLog({ scale, ticks, unit, y0, width: w }) {
+interface XAxisLogProps {
+  scale: Scale
+  ticks: number[]
+  unit: string
+  y0: number
+  width: number
+}
+
+function XAxisLog({ scale, ticks, unit, y0, width: w }: XAxisLogProps) {
   return (
     <g>
       {ticks.map((t) => {
@@ -155,7 +201,13 @@ function XAxisLog({ scale, ticks, unit, y0, width: w }) {
 // Sub-chart: Bode Magnitude
 // ---------------------------------------------------------------------------
 
-function BodeMagChart({ bode, width, height }) {
+interface BodeChartProps {
+  bode?: BodeData | null
+  width: number
+  height: number
+}
+
+function BodeMagChart({ bode, width, height }: BodeChartProps) {
   const innerW = width - MAR.left - MAR.right
   const innerH = height - MAR.top - MAR.bottom
 
@@ -217,7 +269,7 @@ function BodeMagChart({ bode, width, height }) {
 // Sub-chart: Bode Phase
 // ---------------------------------------------------------------------------
 
-function BodePhaseChart({ bode, width, height }) {
+function BodePhaseChart({ bode, width, height }: BodeChartProps) {
   const innerW = width - MAR.left - MAR.right
   const innerH = height - MAR.top - MAR.bottom
 
@@ -279,7 +331,13 @@ function BodePhaseChart({ bode, width, height }) {
 // Sub-chart: Nyquist diagram
 // ---------------------------------------------------------------------------
 
-function NyquistChart({ nyquist, width, height }) {
+interface NyquistChartProps {
+  nyquist?: NyquistData | null
+  width: number
+  height: number
+}
+
+function NyquistChart({ nyquist, width, height }: NyquistChartProps) {
   const innerW = width - MAR.left - MAR.right
   const innerH = height - MAR.top - MAR.bottom
 
@@ -368,7 +426,13 @@ function NyquistChart({ nyquist, width, height }) {
 // Sub-chart: Step response
 // ---------------------------------------------------------------------------
 
-function StepResponseChart({ step, width, height }) {
+interface StepChartProps {
+  step?: StepData | null
+  width: number
+  height: number
+}
+
+function StepResponseChart({ step, width, height }: StepChartProps) {
   const innerW = width - MAR.left - MAR.right
   const innerH = height - MAR.top - MAR.bottom
 
@@ -429,7 +493,13 @@ function StepResponseChart({ step, width, height }) {
 // Empty state helper
 // ---------------------------------------------------------------------------
 
-function EmptyState({ width, height, label }) {
+interface EmptyStateProps {
+  width: number
+  height: number
+  label: string
+}
+
+function EmptyState({ width, height, label }: EmptyStateProps) {
   return (
     <div
       style={{
@@ -454,6 +524,17 @@ function EmptyState({ width, height, label }) {
 // Main component
 // ---------------------------------------------------------------------------
 
+export interface ControlsPanelProps {
+  bode?: BodeData | null
+  nyquist?: NyquistData | null
+  step?: StepData | null
+  width?: number
+  height?: number
+  className?: string
+}
+
+type TabId = 'bode' | 'nyquist' | 'step'
+
 export default function ControlsPanel({
   bode = null,
   nyquist = null,
@@ -461,16 +542,16 @@ export default function ControlsPanel({
   width = 560,
   height = 200,
   className = '',
-}) {
-  const [activeTab, setActiveTab] = useState('bode')
+}: ControlsPanelProps) {
+  const [activeTab, setActiveTab] = useState<TabId>('bode')
 
-  const tabs = [
+  const tabs: { id: TabId; label: string }[] = [
     { id: 'bode',    label: 'Bode' },
     { id: 'nyquist', label: 'Nyquist' },
     { id: 'step',    label: 'Step Response' },
   ]
 
-  const tabStyle = (id) => ({
+  const tabStyle = (id: TabId): CSSProperties => ({
     padding: '6px 14px',
     background: activeTab === id ? '#1e2040' : 'transparent',
     border: 'none',

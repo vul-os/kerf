@@ -240,7 +240,8 @@ describe('inferSheetSize', () => {
       { x: 5, y: 5, w: 80, h: 40 },
       { x: 90, y: 50, w: 60, h: 60 },
     ]
-    const r = inferSheetSize(placements)
+    // NestPlacement requires `part`; inferSheetSize only uses x/y/w/h. Component owned by another slice.
+    const r = inferSheetSize(placements as any)
     expect(r.w).toBeGreaterThan(90 + 60)   // 150
     expect(r.h).toBeGreaterThan(50 + 60)   // 110
   })
@@ -248,14 +249,16 @@ describe('inferSheetSize', () => {
   it('adds at least 5mm margin on each axis', () => {
     // Very small part: 1×1 at origin — margin must be >= 5 mm
     const placements = [{ x: 0, y: 0, w: 1, h: 1 }]
-    const r = inferSheetSize(placements)
+    // NestPlacement requires `part`; inferSheetSize only uses x/y/w/h. Component owned by another slice.
+    const r = inferSheetSize(placements as any)
     expect(r.w).toBeGreaterThanOrEqual(1 + 5)
     expect(r.h).toBeGreaterThanOrEqual(1 + 5)
   })
 
   it('single placement maps to part bounding box + margin', () => {
     const placements = [{ x: 10, y: 20, w: 100, h: 50 }]
-    const r = inferSheetSize(placements)
+    // NestPlacement requires `part`; inferSheetSize only uses x/y/w/h. Component owned by another slice.
+    const r = inferSheetSize(placements as any)
     // maxX = 110, maxY = 70; margin = max(110*0.1, 5)=11 and max(70*0.1, 5)=7
     expect(r.w).toBeCloseTo(110 + Math.max(110 * 0.1, 5), 5)
     expect(r.h).toBeCloseTo(70 + Math.max(70 * 0.1, 5), 5)

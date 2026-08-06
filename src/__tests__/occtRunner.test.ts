@@ -110,7 +110,10 @@ describe('serializeFeature', () => {
       default_config: 'one',
       configurations: [{ id: 'one', label: 'One', params: { r: 5 } }],
     }
-    const json = serializeFeature(original)
+    // Fixture feature nodes omit `op` on purpose (round-trip only cares about
+    // `id` here); FeatureFile's stricter type lives in occtRunner.js, owned
+    // by another slice.
+    const json = serializeFeature(original as any)
     const reparsed = parseFeature(json)
     expect(reparsed.name).toBe('Round')
     expect(reparsed.features).toEqual([{ id: 'a' }])
@@ -135,13 +138,14 @@ describe('serializeFeature', () => {
       metadata: { author: 'imran' },
     })
     expect(JSON.parse(withMeta).metadata).toEqual({ author: 'imran' })
-    // String metadata is rejected.
+    // String metadata is rejected — intentionally wrong-typed input to
+    // exercise that runtime guard.
     const withStringMeta = serializeFeature({
       version: 1,
       name: 'M',
       features: [],
       metadata: 'nope',
-    })
+    } as any)
     expect(JSON.parse(withStringMeta).metadata).toBeUndefined()
   })
 

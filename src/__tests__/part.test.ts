@@ -139,18 +139,21 @@ describe('configurations + misc helpers', () => {
   })
 
   it('getActiveConfig honours configId, falls back to default_config, then first', () => {
+    // Fixtures omit `label` on purpose — getActiveConfig only inspects `id`.
+    // ConfigurableDocument's stricter type lives in the Part lib, owned by
+    // another slice.
     const parsed = {
       default_config: 'M3',
       configurations: [
         { id: 'M3', params: { d: 3 } },
         { id: 'M4', params: { d: 4 } },
       ],
-    }
+    } as any
     expect(getActiveConfig(parsed, 'M4').id).toBe('M4')
     expect(getActiveConfig(parsed, 'unknown').id).toBe('M3') // falls back to default
     expect(getActiveConfig(parsed, '').id).toBe('M3')
-    expect(getActiveConfig({ configurations: [{ id: 'A' }] }, '').id).toBe('A')
-    expect(getActiveConfig({ configurations: [] }, '')).toBeNull()
+    expect(getActiveConfig({ configurations: [{ id: 'A' }] } as any, '').id).toBe('A')
+    expect(getActiveConfig({ configurations: [] } as any, '')).toBeNull()
     expect(getActiveConfig(null, 'M3')).toBeNull()
   })
 

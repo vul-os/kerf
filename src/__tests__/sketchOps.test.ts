@@ -21,6 +21,11 @@ import {
 import { defaultSketch } from '../lib/sketchSolver.js'
 import { addPoint, addLine } from '../lib/sketchEdit.js'
 
+// `.entities.find(...) as any` narrows the SketchEntity union (SketchPoint |
+// SketchLine | ...) down to whatever shape each assertion needs (.x/.y).
+// SketchEntity's per-kind typing lives in src/lib/sketchSolver.js, owned by
+// another slice.
+
 // Build a sketch with two crossing lines:
 //   L1: (0,0) → (10, 0)   horizontal along x-axis
 //   L2: (5,-5) → (5, 5)   vertical, crossing L1 at (5, 0)
@@ -124,7 +129,7 @@ describe('trim', () => {
     const { sketch, ids } = loneLine()
     const next = trim(sketch, ids.L, { x: 5, y: 0 }).sketch
     expect(next).not.toBe(sketch) // changed
-    expect(next.entities.find((e) => e.id === ids.L)).toBeUndefined()
+    expect(next.entities.find((e) => e.id === ids.L) as any).toBeUndefined()
   })
 
   it('shortens the line by moving p1 when the click is on the lo side of the only hit', () => {
@@ -133,8 +138,8 @@ describe('trim', () => {
     const { sketch, ids } = crossingPair()
     const next = trim(sketch, ids.L1, { x: 1, y: 0 }).sketch
     expect(next).not.toBe(sketch)
-    const p1 = next.entities.find((e) => e.id === ids.p1a)
-    const p1b = next.entities.find((e) => e.id === ids.p1b)
+    const p1 = next.entities.find((e) => e.id === ids.p1a) as any
+    const p1b = next.entities.find((e) => e.id === ids.p1b) as any
     expect(p1.x).toBeCloseTo(5, 6)
     expect(p1.y).toBeCloseTo(0, 6)
     // p1b unchanged.
@@ -147,7 +152,7 @@ describe('trim', () => {
     // i.e. p2 should move to (5, 0).
     const { sketch, ids } = crossingPair()
     const next = trim(sketch, ids.L1, { x: 9, y: 0 }).sketch
-    const p1b = next.entities.find((e) => e.id === ids.p1b)
+    const p1b = next.entities.find((e) => e.id === ids.p1b) as any
     expect(p1b.x).toBeCloseTo(5, 6)
     expect(p1b.y).toBeCloseTo(0, 6)
   })
@@ -184,7 +189,7 @@ describe('extend', () => {
     const L2 = addLine(s, b1.id, b2.id); s = L2.sketch
     const next = extend(s, a.id, L2.id).sketch
     expect(next).not.toBe(s)
-    const moved = next.entities.find((e) => e.id === a.id)
+    const moved = next.entities.find((e) => e.id === a.id) as any
     expect(moved.x).toBeCloseTo(10, 6)
     expect(moved.y).toBeCloseTo(0, 6)
   })

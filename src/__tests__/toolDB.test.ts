@@ -13,8 +13,8 @@ import { describe, it, expect } from 'vitest'
 // (The component's `validate()` fn is a closure — we shadow it here.)
 // ---------------------------------------------------------------------------
 
-function validate(form) {
-  const errs = {}
+function validate(form: any) {
+  const errs: Record<string, string> = {}
   if (!form.id || !form.id.trim()) errs.id = 'Required'
   if (!form.name || !form.name.trim()) errs.name = 'Required'
   const d = parseFloat(form.diameter_mm)

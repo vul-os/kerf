@@ -15,8 +15,11 @@
 // stay independent of import mechanics.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
+// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -138,7 +141,7 @@ describe('getNurbsPhase4Bindings — binding map logic', () => {
 // Re-derive the log helper from the description in the plan so we can test
 // the contract without importing the worker module.
 function _logNurbsPhase4Bindings_derived(oc, consoleSpy) {
-  const groups = [
+  const groups: [string, string[]][] = [
     ['C1 (surface-direct booleans)', C1_CLASSES],
   ]
   for (const [label, classes] of groups) {

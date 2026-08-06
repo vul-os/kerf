@@ -75,18 +75,21 @@ describe('convert across units', () => {
 
 describe('formatLength', () => {
   it('mm with 2-decimal default, trimmed', () => {
-    expect(formatLength(12.5, 'mm')).toBe('12.5 mm')
-    expect(formatLength(10, 'mm')).toBe('10 mm')
+    // formatLength's `precision` param has no TS default (src/lib/units.ts,
+    // owned by another slice) though the implementation treats a missing
+    // value as "use the unit's default" — pass undefined explicitly.
+    expect(formatLength(12.5, 'mm', undefined)).toBe('12.5 mm')
+    expect(formatLength(10, 'mm', undefined)).toBe('10 mm')
   })
   it('inches with 3-decimal default, trimmed', () => {
-    expect(formatLength(25.4, 'inches')).toBe('1 in')
-    expect(formatLength(2, 'inches')).toBe('0.079 in')
+    expect(formatLength(25.4, 'inches', undefined)).toBe('1 in')
+    expect(formatLength(2, 'inches', undefined)).toBe('0.079 in')
   })
   it('honours custom precision', () => {
     // Value chosen to avoid banker's-rounding edge cases in toFixed.
     expect(formatLength(1.2349, 'mm', 3)).toBe('1.235 mm')
   })
   it('falls back to mm for unknown units', () => {
-    expect(formatLength(7, 'qux')).toBe('7 mm')
+    expect(formatLength(7, 'qux', undefined)).toBe('7 mm')
   })
 })

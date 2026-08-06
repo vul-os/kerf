@@ -11,12 +11,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // must be defined inline inside the factory arrow.
 vi.mock('three', () => {
   class Vector2 {
+    x: number
+    y: number
     constructor(x = 0, y = 0) { this.x = x; this.y = y }
   }
   class Vector3 {
+    x: number
+    y: number
+    z: number
     constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z }
   }
   class ShaderMaterial {
+    _disposed: boolean
     constructor(opts) {
       Object.assign(this, opts)
       this._disposed = false

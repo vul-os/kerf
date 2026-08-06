@@ -12,8 +12,11 @@
 //   6. Fallback common (A − (A − B)) when Common_3 is absent.
 
 import { describe, it, expect } from 'vitest'
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
+// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -107,7 +110,7 @@ function getNurbsPhase4Bindings_mock(oc, classes) {
 
 const P4_C1 = ['BOPAlgo_Builder', 'ShapeFix_Shape', 'ShapeUpgrade_UnifySameDomain']
 
-function opSurfaceBoolean(oc, _prev, node, _sketches, tracker, bodyMap, overrides = {}) {
+function opSurfaceBoolean(oc, _prev, node, _sketches, tracker, bodyMap, overrides: any = {}) {
   const {
     BRepAlgoAPI_Cut_3: Cut3 = oc.BRepAlgoAPI_Cut_3,
     BRepAlgoAPI_Fuse_3: Fuse3 = oc.BRepAlgoAPI_Fuse_3,
@@ -230,6 +233,8 @@ function makeShape(tag = 'shape') {
 
 function makeAlgoClass(resultShape, isDone = true) {
   return class MockAlgo {
+    _result: any
+    _done: any
     constructor(_a, _b, _pr) {
       this._result = resultShape
       this._done = isDone
@@ -302,6 +307,7 @@ describe('opSurfaceBoolean — dispatch by kind', () => {
     const innerResult = makeShape('inner_cut')
     const outerResult = makeShape('outer_cut')
     class MockCut {
+      _result: any
       constructor() {
         cutCallCount++
         this._result = cutCallCount === 1 ? innerResult : outerResult
@@ -415,6 +421,7 @@ describe('opSurfaceBoolean — probe-gated ShapeFix + Unify + Fuzzy', () => {
           Shape() { return fixedShape }
         },
         BRepAlgoAPI_Cut_3: class {
+          _a: any
           constructor(_a, _b) { this._a = _a }
           Build() {}
           IsDone() { return true }

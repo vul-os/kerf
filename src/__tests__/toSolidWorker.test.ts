@@ -13,8 +13,11 @@
 //   6. opts.tolerance is forwarded to surfaceToSolid.
 
 import { describe, it, expect } from 'vitest'
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
+// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -84,7 +87,8 @@ describe('occtWorker.js to_solid wiring', () => {
 // level checks above confirm the real code matches the tested contract.
 
 class MockSurfaceToSolidUnsupportedError extends Error {
-  constructor(msg) {
+  code: string
+  constructor(msg?: string) {
     super(msg || 'surfaceToSolid: BRepBuilderAPI_Sewing is not bound')
     this.name = 'SurfaceToSolidUnsupportedError'
     this.code = 'OCCT_BINDING_MISSING'
@@ -324,7 +328,7 @@ describe('opToSolid — binding probe fast-fail', () => {
 
 describe('to_solid in a minimal two-node tree', () => {
   // Lightweight evaluateTree stub: processes [network_srf-like, to_solid].
-  function runTree(tree, { surfaceToSolidFn } = {}) {
+  function runTree(tree, { surfaceToSolidFn }: any = {}) {
     const shapes = {}
     let current = null
     const errors = []

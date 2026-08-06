@@ -61,7 +61,8 @@ function unitCube() {
 describe('getTopology — defensive cases', () => {
   it('returns empty topology for null / missing geom', () => {
     expect(getTopology(null)).toEqual({ faces: [], edges: [], vertices: [] })
-    expect(getTopology({})).toEqual({ faces: [], edges: [], vertices: [] })
+    // Intentionally missing `geom` to exercise the defensive branch.
+    expect(getTopology({} as any)).toEqual({ faces: [], edges: [], vertices: [] })
   })
 
   it('skips polygons with fewer than 3 vertices', () => {
@@ -213,7 +214,8 @@ describe('findFeature + featureSnapPoint', () => {
   })
 
   it('findFeature returns null for an unknown kind', () => {
-    expect(findFeature(top, 'nonsense', 'whatever')).toBeNull()
+    // Intentionally invalid kind to exercise the runtime fallback.
+    expect(findFeature(top, 'nonsense' as any, 'whatever')).toBeNull()
   })
 
   it('featureSnapPoint returns the centroid for a face', () => {
@@ -223,17 +225,21 @@ describe('findFeature + featureSnapPoint', () => {
 
   it('featureSnapPoint returns the midpoint for an edge', () => {
     // Build an edge with known endpoints (avoid index churn).
+    // Minimal edge fixture (a/b only); TopologyEdge's full type (id, faceA,
+    // faceB, length) is beside the point for this midpoint calculation.
     const edge = { a: [0, 0, 0], b: [2, 0, 0] }
-    expect(featureSnapPoint('edge', edge)).toEqual([1, 0, 0])
+    expect(featureSnapPoint('edge', edge as any)).toEqual([1, 0, 0])
   })
 
   it('featureSnapPoint returns the position for a vertex', () => {
+    // Minimal vertex fixture (position only); see edge fixture note above.
     const v = { position: [3, 4, 5] }
-    expect(featureSnapPoint('vertex', v)).toEqual([3, 4, 5])
+    expect(featureSnapPoint('vertex', v as any)).toEqual([3, 4, 5])
   })
 
   it('featureSnapPoint returns null for a missing feature or unknown kind', () => {
     expect(featureSnapPoint('face', null)).toBeNull()
-    expect(featureSnapPoint('mystery', { whatever: true })).toBeNull()
+    // Intentionally invalid kind to exercise the runtime fallback.
+    expect(featureSnapPoint('mystery' as any, { whatever: true } as any)).toBeNull()
   })
 })

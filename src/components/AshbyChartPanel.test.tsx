@@ -1,5 +1,5 @@
 /**
- * AshbyChartPanel.test.jsx
+ * AshbyChartPanel.test.tsx
  *
  * Vitest tests for AshbyChartPanel — log-log Ashby material chart.
  * Uses renderToStaticMarkup (react-dom/server).

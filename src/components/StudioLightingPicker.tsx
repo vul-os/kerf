@@ -1,9 +1,9 @@
 // StudioLightingPicker — compact preset selector for studio lighting rigs.
 //
 // Props:
-//   - value (string|null): currently active preset name, or null for none.
+//   - value: currently active preset name, or null for none.
 //   - onChange(presetName): called when the user picks a preset.
-//   - className (string, optional): extra CSS classes for the root element.
+//   - className (optional): extra CSS classes for the root element.
 //
 // Re-exports getPresetMeta for use in data-layer tests without a DOM.
 
@@ -11,7 +11,13 @@ import { STUDIO_PRESETS } from '../lib/studioLighting.js'
 
 // ── Metadata ──────────────────────────────────────────────────────────────────
 
-const META = {
+export interface PresetMeta {
+  label: string
+  description: string
+  lightCount: number
+}
+
+const META: Record<string, PresetMeta> = {
   'three-point': {
     label: 'Three-point',
     description: 'Key + fill + back — the universal workhorse rig.',
@@ -47,24 +53,28 @@ const META = {
 /**
  * Return display metadata for a preset name.
  * Exported so data-layer tests can use it without a DOM.
- *
- * @param {string} presetName
- * @returns {{ label: string, description: string, lightCount: number } | null}
  */
-export function getPresetMeta(presetName) {
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper consumed directly by tests; not a component
+export function getPresetMeta(presetName: string): PresetMeta | null {
   return META[presetName] ?? null
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function StudioLightingPicker({ value, onChange, className = '' }) {
+export interface StudioLightingPickerProps {
+  value?: string | null
+  onChange: (presetName: string) => void
+  className?: string
+}
+
+export default function StudioLightingPicker({ value, onChange, className = '' }: StudioLightingPickerProps) {
   return (
     <div className={`flex flex-col gap-1 ${className}`}>
       <span className="text-[10px] uppercase tracking-wider text-ink-500 mb-0.5">
         Studio lighting
       </span>
       <div className="grid grid-cols-2 gap-1.5">
-        {STUDIO_PRESETS.map((name) => {
+        {STUDIO_PRESETS.map((name: string) => {
           const meta = META[name]
           const active = value === name
           return (

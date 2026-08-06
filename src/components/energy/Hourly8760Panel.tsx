@@ -18,6 +18,7 @@
  */
 
 import { useState, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import { Building2, Play, AlertTriangle, Info, BarChart2 } from 'lucide-react'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -26,7 +27,7 @@ const API_URL = import.meta.env.VITE_API_URL || ''
 // Utility
 // ---------------------------------------------------------------------------
 
-async function callTool(toolName, args) {
+async function callTool<T>(toolName: string, args: Record<string, unknown>): Promise<T & { ok?: boolean; reason?: string }> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -41,22 +42,17 @@ async function callTool(toolName, args) {
   return res.json()
 }
 
-function fmt2(n) {
-  if (n == null || !Number.isFinite(n)) return '—'
-  return n.toFixed(2)
-}
-
-function fmtKwh(n) {
+function fmtKwh(n: number | null | undefined) {
   if (n == null || !Number.isFinite(n)) return '—'
   return `${Math.round(n).toLocaleString()} kWh`
 }
 
-function fmtEUI(n) {
+function fmtEUI(n: number | null | undefined) {
   if (n == null || !Number.isFinite(n)) return '—'
   return `${n.toFixed(1)} kWh/(m²·yr)`
 }
 
-function fmtKW(n) {
+function fmtKW(n: number | null | undefined) {
   if (n == null || !Number.isFinite(n)) return '—'
   return `${n.toFixed(1)} kW`
 }
@@ -65,7 +61,15 @@ function fmtKW(n) {
 // Common UI primitives
 // ---------------------------------------------------------------------------
 
-function NumInput({ value, onChange, min, max, step = 'any', disabled, unit }) {
+function NumInput({ value, onChange, min, max, step = 'any', disabled, unit }: {
+  value: number | string
+  onChange: (v: string) => void
+  min?: number
+  max?: number
+  step?: number | string
+  disabled?: boolean
+  unit?: string
+}) {
   return (
     <div className="flex items-center gap-1">
       <input
@@ -83,7 +87,12 @@ function NumInput({ value, onChange, min, max, step = 'any', disabled, unit }) {
   )
 }
 
-function SelectInput({ value, onChange, options, disabled }) {
+function SelectInput({ value, onChange, options, disabled }: {
+  value: string
+  onChange: (v: string) => void
+  options: { value: string; label: string }[]
+  disabled?: boolean
+}) {
   return (
     <select
       value={value}
@@ -96,7 +105,7 @@ function SelectInput({ value, onChange, options, disabled }) {
   )
 }
 
-function FieldRow({ label, hint, children }) {
+function FieldRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div className="flex items-start gap-2 mb-1.5">
       <label className="text-[11px] text-ink-400 w-36 flex-shrink-0 pt-1.5 leading-tight">
@@ -108,7 +117,7 @@ function FieldRow({ label, hint, children }) {
   )
 }
 
-function ResultRow({ label, value, highlight }) {
+function ResultRow({ label, value, highlight }: { label: string; value: ReactNode; highlight?: boolean }) {
   return (
     <div className="flex justify-between items-center py-1 border-b border-ink-800/50">
       <span className="text-[11px] text-ink-400">{label}</span>
@@ -117,7 +126,7 @@ function ResultRow({ label, value, highlight }) {
   )
 }
 
-function SectionHeader({ children }) {
+function SectionHeader({ children }: { children: ReactNode }) {
   return (
     <div className="text-[10px] uppercase tracking-wider text-ink-600 mb-1.5 mt-3 first:mt-0">
       {children}
@@ -129,8 +138,8 @@ function SectionHeader({ children }) {
 // Simple bar chart for monthly energy breakdown
 // ---------------------------------------------------------------------------
 
-function EnergyBar({ label, value, max, color }) {
-  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0
+function EnergyBar({ label, value, max, color }: { label: string; value: number | null | undefined; max: number; color: string }) {
+  const pct = max > 0 ? Math.min(100, ((value ?? 0) / max) * 100) : 0
   return (
     <div className="flex items-center gap-2 mb-0.5">
       <span className="text-[10px] text-ink-500 w-14 flex-shrink-0 text-right">{label}</span>
@@ -159,8 +168,44 @@ const CLIMATE_PRESETS = [
 // Main panel
 // ---------------------------------------------------------------------------
 
-export default function Hourly8760Panel({ projectId: _projectId }) {
-  const [inputs, setInputs] = useState({
+interface Hourly8760Inputs {
+  name: string
+  floor_area_m2: number
+  ceiling_height_m: number
+  window_to_wall_ratio: number
+  wall_u: number
+  roof_u: number
+  window_u: number
+  shgc: number
+  internal_load_w_m2: number
+  ventilation_ach: number
+  lighting_fraction: number
+  fan_power_w_m2: number
+  setpoint_heating_c: number
+  setpoint_cooling_c: number
+  climate: string
+  // HVAC plant
+  chiller_cop: number
+  boiler_efficiency: number
+}
+
+interface Hourly8760Result {
+  eui_kwh_m2_yr: number
+  annual_heating_kwh: number
+  annual_cooling_kwh: number
+  annual_fan_kwh: number
+  annual_lighting_kwh: number
+  peak_heating_kw: number
+  peak_cooling_kw: number
+  leed?: {
+    prerequisite_met: boolean
+    eac1_points?: number
+    savings_pct?: number
+  }
+}
+
+export default function Hourly8760Panel({ projectId: _projectId }: { projectId?: string }) {
+  const [inputs, setInputs] = useState<Hourly8760Inputs>({
     name: 'My Building',
     floor_area_m2: 1000,
     ceiling_height_m: 3.0,
@@ -180,18 +225,19 @@ export default function Hourly8760Panel({ projectId: _projectId }) {
     chiller_cop: 4.5,
     boiler_efficiency: 0.90,
   })
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<Hourly8760Result | null>(null)
+  const [error, setError] = useState<string | undefined>(undefined)
   const [loading, setLoading] = useState(false)
 
-  const set = (k, v) => setInputs((prev) => ({ ...prev, [k]: parseFloat(v) !== undefined && v !== '' ? (isNaN(parseFloat(v)) ? v : parseFloat(v)) : v }))
+  const set = (k: keyof Hourly8760Inputs, v: string) =>
+    setInputs((prev) => ({ ...prev, [k]: parseFloat(v) !== undefined && v !== '' ? (isNaN(parseFloat(v)) ? v : parseFloat(v)) : v }) as Hourly8760Inputs)
 
   const run = useCallback(async () => {
     setLoading(true)
-    setError(null)
+    setError(undefined)
     setResult(null)
     try {
-      const r = await callTool('be_simulate_8760', {
+      const r = await callTool<Hourly8760Result>('be_simulate_8760', {
         building: {
           name: inputs.name,
           floor_area_m2: inputs.floor_area_m2,
@@ -216,7 +262,7 @@ export default function Hourly8760Panel({ projectId: _projectId }) {
       if (r.ok === false) { setError(r.reason); return }
       setResult(r)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }

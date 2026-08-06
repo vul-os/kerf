@@ -19,9 +19,8 @@ import { createRung, addContact, addCoil } from '../lib/ladderCanvas.js'
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function render(props: Record<string, unknown> = {}) {
-  // LadderEditor requires onChange; tests only assert on rendered markup, so a
-  // no-op default keeps every existing call site (which never passed one)
-  // behaviourally identical while satisfying the component's prop type.
+  // LadderEditor's `onChange` prop is optional (T-514), but a no-op default here keeps
+  // these render calls identical regardless — tests only assert on rendered markup.
   return renderToStaticMarkup(<LadderEditor onChange={() => {}} {...props} />)
 }
 

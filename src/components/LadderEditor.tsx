@@ -36,6 +36,55 @@ import {
   rungsToPlcopenModel, plcopenModelToRungs,
 } from '../lib/ladderCanvas.js'
 
+// ---------------------------------------------------------------------------
+// Local domain types — src/lib/ladderCanvas.ts exports its functions with
+// implicit `any` params/returns (no shared type), so the Rung/contact/coil
+// shape is declared locally from that file's own header-comment doc. Kept
+// in sync with LadderEditorWithFlow.tsx's (deliberately looser) local Rung.
+// ---------------------------------------------------------------------------
+
+interface RungContact {
+  id: string
+  name: string
+  type: string
+  position: number
+  negated: boolean
+}
+
+interface RungCoil {
+  id: string
+  name: string
+  type: string
+  position: number
+}
+
+interface RungWire {
+  id: string
+  from: string
+  to: string
+}
+
+interface Rung {
+  id: string
+  contacts: RungContact[]
+  coils: RungCoil[]
+  wires: RungWire[]
+}
+
+interface PaletteItem {
+  kind: 'contact' | 'coil'
+  type: string
+  label: string
+  title: string
+}
+
+interface DraggingState {
+  rungIndex: number
+  elementId: string
+}
+
+type IoStatus = 'importing' | 'exporting' | { error: string } | null
+
 // ── Layout constants ──────────────────────────────────────────────────────────
 
 const RAIL_X_LEFT = 60
@@ -47,39 +96,41 @@ const GRID_COLS = 10
 
 // First usable column is at RAIL_X_LEFT + CELL_W/2 centre.
 // Column index → X centre
-function colToX(col) {
+function colToX(col: number): number {
   return RAIL_X_LEFT + CELL_W / 2 + col * CELL_W
 }
 
-function xToCol(x) {
-  return Math.max(0, Math.min(GRID_COLS - 1, Math.round((x - RAIL_X_LEFT - CELL_W / 2) / CELL_W)))
-}
-
-function rungY(rungIndex) {
+function rungY(rungIndex: number): number {
   return RUNG_Y_START + rungIndex * RUNG_SPACING
 }
 
 // ── Palette items ─────────────────────────────────────────────────────────────
 
-const PALETTE_CONTACTS = [
+const PALETTE_CONTACTS: PaletteItem[] = [
   { kind: 'contact', type: 'no',      label: '–[ ]–',  title: 'Normally Open'    },
   { kind: 'contact', type: 'nc',      label: '–[/]–',  title: 'Normally Closed'  },
   { kind: 'contact', type: 'rising',  label: '–[P]–',  title: 'Rising Edge'      },
   { kind: 'contact', type: 'falling', label: '–[N]–',  title: 'Falling Edge'     },
 ]
 
-const PALETTE_COILS = [
+const PALETTE_COILS: PaletteItem[] = [
   { kind: 'coil', type: 'output', label: '–( )–',  title: 'Output Coil'  },
   { kind: 'coil', type: 'set',    label: '–(S)–',  title: 'Set Coil'     },
   { kind: 'coil', type: 'reset',  label: '–(R)–',  title: 'Reset Coil'   },
   { kind: 'coil', type: 'pulse',  label: '–(P)–',  title: 'Pulse Coil'   },
 ]
 
-const ALL_PALETTE_ITEMS = [...PALETTE_CONTACTS, ...PALETTE_COILS]
-
 // ── SVG element renderers ─────────────────────────────────────────────────────
 
-function ContactSymbol({ cx, cy, contact, onContextMenu, onDragStart }) {
+interface ContactSymbolProps {
+  cx: number
+  cy: number
+  contact: RungContact
+  onContextMenu: (e: React.MouseEvent) => void
+  onDragStart: (e: React.MouseEvent) => void
+}
+
+function ContactSymbol({ cx, cy, contact, onContextMenu, onDragStart }: ContactSymbolProps) {
   const HALF_W = 24
   const BAR = 10
 
@@ -140,7 +191,15 @@ function ContactSymbol({ cx, cy, contact, onContextMenu, onDragStart }) {
   )
 }
 
-function CoilSymbol({ cx, cy, coil, onContextMenu, onDragStart }) {
+interface CoilSymbolProps {
+  cx: number
+  cy: number
+  coil: RungCoil
+  onContextMenu: (e: React.MouseEvent) => void
+  onDragStart: (e: React.MouseEvent) => void
+}
+
+function CoilSymbol({ cx, cy, coil, onContextMenu, onDragStart }: CoilSymbolProps) {
   const HALF_W = 24
   const R = 10
 
@@ -190,7 +249,13 @@ function CoilSymbol({ cx, cy, coil, onContextMenu, onDragStart }) {
 
 // ── Drop zone overlay ─────────────────────────────────────────────────────────
 
-function DropZones({ rungIndex, onDrop, dragActive }) {
+interface DropZonesProps {
+  rungIndex: number
+  onDrop: (rungIndex: number, col: number) => void
+  dragActive: boolean
+}
+
+function DropZones({ rungIndex, onDrop, dragActive }: DropZonesProps) {
   if (!dragActive) return null
   const y = rungY(rungIndex)
   return (
@@ -220,24 +285,31 @@ function DropZones({ rungIndex, onDrop, dragActive }) {
 
 // ── Main LadderEditor ─────────────────────────────────────────────────────────
 
-export default function LadderEditor({ value = [], onChange, programName = 'Main', className = '' }) {
+export interface Props {
+  value?: Rung[]
+  onChange?: (rungs: Rung[]) => void
+  programName?: string
+  className?: string
+}
+
+export default function LadderEditor({ value = [], onChange, programName = 'Main', className = '' }: Props) {
   // Currently selected palette item for click-to-place
-  const [selectedPalette, setSelectedPalette] = useState(null)
+  const [selectedPalette, setSelectedPalette] = useState<PaletteItem | null>(null)
   // Element being dragged (from placed elements, not palette)
-  const [dragging, setDragging] = useState(null) // { rungIndex, elementId }
+  const [dragging, setDragging] = useState<DraggingState | null>(null)
   // Palette drag-to-canvas state
-  const [paletteDrag, setPaletteDrag] = useState(null) // { kind, type } — palette item being dragged onto canvas
+  const [paletteDrag, setPaletteDrag] = useState<PaletteItem | null>(null) // palette item being dragged onto canvas
   const [paletteDragOver, setPaletteDragOver] = useState(false)
   // PLCopen import/export state
-  const [ioStatus, setIoStatus] = useState(null) // null | 'importing' | 'exporting' | {error: string}
-  const importInputRef = useRef(null)
-  const svgRef = useRef(null)
+  const [ioStatus, setIoStatus] = useState<IoStatus>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
 
   const rungs = value
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
-  const updateRung = useCallback((index, newRung) => {
+  const updateRung = useCallback((index: number, newRung: Rung) => {
     const next = [...rungs]
     next[index] = newRung
     onChange?.(next)
@@ -249,10 +321,10 @@ export default function LadderEditor({ value = [], onChange, programName = 'Main
 
   // ── Click-to-place on canvas cell ─────────────────────────────────────────
 
-  const handleCanvasClick = useCallback((rungIndex, col) => {
+  const handleCanvasClick = useCallback((rungIndex: number, col: number) => {
     if (!selectedPalette) return
     const { kind, type } = selectedPalette
-    let newRung
+    let newRung: Rung
     if (kind === 'contact') {
       newRung = addContact(rungs[rungIndex], type, col)
     } else {
@@ -263,7 +335,7 @@ export default function LadderEditor({ value = [], onChange, programName = 'Main
 
   // ── Right-click to delete ─────────────────────────────────────────────────
 
-  const handleElementContextMenu = useCallback((e, rungIndex, elementId) => {
+  const handleElementContextMenu = useCallback((e: React.MouseEvent, rungIndex: number, elementId: string) => {
     e.preventDefault()
     e.stopPropagation()
     const newRung = deleteElement(rungs[rungIndex], elementId)
@@ -272,18 +344,18 @@ export default function LadderEditor({ value = [], onChange, programName = 'Main
 
   // ── Drag placed elements within a rung ──────────────────────────────────
 
-  const handleElementDragStart = useCallback((e, rungIndex, elementId) => {
+  const handleElementDragStart = useCallback((e: React.MouseEvent, rungIndex: number, elementId: string) => {
     e.preventDefault()
     setDragging({ rungIndex, elementId })
   }, [])
 
-  const handleDrop = useCallback((rungIndex, col) => {
+  const handleDrop = useCallback((rungIndex: number, col: number) => {
     if (dragging && dragging.rungIndex === rungIndex) {
       const newRung = moveElement(rungs[rungIndex], dragging.elementId, col)
       updateRung(rungIndex, newRung)
     } else if (paletteDrag) {
       const { kind, type } = paletteDrag
-      let newRung
+      let newRung: Rung
       if (kind === 'contact') {
         newRung = addContact(rungs[rungIndex], type, col)
       } else {
@@ -308,7 +380,7 @@ export default function LadderEditor({ value = [], onChange, programName = 'Main
     importInputRef.current?.click()
   }, [])
 
-  const handleImportFile = useCallback(async (e) => {
+  const handleImportFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setIoStatus('importing')
@@ -329,7 +401,7 @@ export default function LadderEditor({ value = [], onChange, programName = 'Main
       onChange?.(importedRungs)
       setIoStatus(null)
     } catch (err) {
-      setIoStatus({ error: `Import error: ${err.message}` })
+      setIoStatus({ error: `Import error: ${(err as Error)?.message}` })
     } finally {
       // Reset input so the same file can be re-selected
       if (importInputRef.current) importInputRef.current.value = ''
@@ -362,7 +434,7 @@ export default function LadderEditor({ value = [], onChange, programName = 'Main
       URL.revokeObjectURL(url)
       setIoStatus(null)
     } catch (err) {
-      setIoStatus({ error: `Export error: ${err.message}` })
+      setIoStatus({ error: `Export error: ${(err as Error)?.message}` })
     }
   }, [rungs, programName])
 

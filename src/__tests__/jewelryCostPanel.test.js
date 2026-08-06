@@ -5,7 +5,7 @@
 // JewelryCostPanel.jsx, matching the Python model in metal_cost.py.
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import path from 'path'
 
@@ -16,7 +16,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // ---------------------------------------------------------------------------
 
 const panelSrc = readFileSync(
-  path.resolve(__dirname, '../components/JewelryCostPanel.jsx'), 'utf8',
+  (existsSync(path.resolve(__dirname, '../components/JewelryCostPanel.tsx')) ? path.resolve(__dirname, '../components/JewelryCostPanel.tsx') : path.resolve(__dirname, '../components/JewelryCostPanel.jsx')), 'utf8',
 )
 
 const apiSrc = readFileSync(

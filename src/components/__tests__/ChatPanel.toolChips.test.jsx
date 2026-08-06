@@ -18,11 +18,11 @@
  *  - _toolChips is read from the streaming message
  */
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
 
 const SRC = readFileSync(
-  resolve(__dirname, '../ChatPanel.jsx'),
+  (existsSync(resolve(__dirname, '../ChatPanel.tsx')) ? resolve(__dirname, '../ChatPanel.tsx') : resolve(__dirname, '../ChatPanel.jsx')),
   'utf8',
 )
 

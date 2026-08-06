@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
 import {
   DOMAINS_META,
@@ -21,10 +21,10 @@ import {
 } from '../routes/domains/index.jsx'
 
 const HUB_SRC = readFileSync(
-  resolve(__dirname, '../routes/domains/index.jsx'),
+  (existsSync(resolve(__dirname, '../routes/domains/index.tsx')) ? resolve(__dirname, '../routes/domains/index.tsx') : resolve(__dirname, '../routes/domains/index.jsx')),
   'utf8',
 )
-const APP_SRC = readFileSync(resolve(__dirname, '../App.jsx'), 'utf8')
+const APP_SRC = readFileSync((existsSync(resolve(__dirname, '../App.tsx')) ? resolve(__dirname, '../App.tsx') : resolve(__dirname, '../App.jsx')), 'utf8')
 const HEADER_SRC = readFileSync(
   resolve(__dirname, '../components/Header.tsx'),
   'utf8',

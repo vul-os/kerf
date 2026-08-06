@@ -19,7 +19,7 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
 
 import BearingLifePanel, {
@@ -31,7 +31,7 @@ import BearingLifePanel, {
 } from '../BearingLifePanel.jsx'
 
 const SRC = readFileSync(
-  resolve(__dirname, '../BearingLifePanel.jsx'),
+  (existsSync(resolve(__dirname, '../BearingLifePanel.tsx')) ? resolve(__dirname, '../BearingLifePanel.tsx') : resolve(__dirname, '../BearingLifePanel.jsx')),
   'utf8',
 )
 

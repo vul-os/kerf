@@ -14,7 +14,7 @@
 //      includes 'cam_layered' (the per-kind migrations were folded 66->10).
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync, readdirSync } from 'fs'
+import { readFileSync, readdirSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import path from 'path'
 
@@ -23,10 +23,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // ── 0. File path helpers ─────────────────────────────────────────────────────
 
 const fileTreeSrc = readFileSync(
-  path.resolve(__dirname, '../components/FileTree.jsx'), 'utf8',
+  (existsSync(path.resolve(__dirname, '../components/FileTree.tsx')) ? path.resolve(__dirname, '../components/FileTree.tsx') : path.resolve(__dirname, '../components/FileTree.jsx')), 'utf8',
 )
 const camViewSrc = readFileSync(
-  path.resolve(__dirname, '../components/CAMView.jsx'), 'utf8',
+  (existsSync(path.resolve(__dirname, '../components/CAMView.tsx')) ? path.resolve(__dirname, '../components/CAMView.tsx') : path.resolve(__dirname, '../components/CAMView.jsx')), 'utf8',
 )
 // After the 66->10 migration fold the per-kind migrations were collapsed
 // into the consolidated baseline. Use whichever migration carries the

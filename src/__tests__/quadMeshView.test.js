@@ -19,7 +19,7 @@
 //      and target_vertex_count fields.
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync, readdirSync } from 'fs'
+import { readFileSync, readdirSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import path from 'path'
 
@@ -28,7 +28,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // ── 0. Source readers ─────────────────────────────────────────────────────────
 
 const fileTreeSrc = readFileSync(
-  path.resolve(__dirname, '../components/FileTree.jsx'), 'utf8',
+  (existsSync(path.resolve(__dirname, '../components/FileTree.tsx')) ? path.resolve(__dirname, '../components/FileTree.tsx') : path.resolve(__dirname, '../components/FileTree.jsx')), 'utf8',
 )
 
 const quadMeshViewSrc = readFileSync(
@@ -54,11 +54,11 @@ const migrationSrc = (() => {
 })()
 
 const editorSrc = readFileSync(
-  path.resolve(__dirname, '../routes/Editor.jsx'), 'utf8',
+  (existsSync(path.resolve(__dirname, '../routes/Editor.tsx')) ? path.resolve(__dirname, '../routes/Editor.tsx') : path.resolve(__dirname, '../routes/Editor.jsx')), 'utf8',
 )
 
 const featureViewSrc = readFileSync(
-  path.resolve(__dirname, '../components/FeatureView.jsx'), 'utf8',
+  (existsSync(path.resolve(__dirname, '../components/FeatureView.tsx')) ? path.resolve(__dirname, '../components/FeatureView.tsx') : path.resolve(__dirname, '../components/FeatureView.jsx')), 'utf8',
 )
 
 // ── 1. FileTree kind registration ─────────────────────────────────────────────

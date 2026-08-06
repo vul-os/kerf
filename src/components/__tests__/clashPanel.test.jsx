@@ -167,7 +167,7 @@ describe('api.js — runClashDetect', () => {
 describe('Renderer — highlightFaces hook', () => {
   it('defines highlightFaces in useImperativeHandle', () => {
     const RENDERER_SRC = readFileSync(
-      resolve(__dirname, '../Renderer.jsx'),
+      (existsSync(resolve(__dirname, '../Renderer.tsx')) ? resolve(__dirname, '../Renderer.tsx') : resolve(__dirname, '../Renderer.jsx')),
       'utf8',
     )
     expect(RENDERER_SRC).toMatch(/highlightFaces/)

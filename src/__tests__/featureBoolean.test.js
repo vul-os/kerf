@@ -12,7 +12,7 @@
 //      field kinds match spec.
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import path from 'path'
 
@@ -387,7 +387,7 @@ describe('opBoolean — error paths', () => {
 
 describe('FeatureView.jsx to_solid + boolean inspector entries', () => {
   const viewSrc = readFileSync(
-    path.resolve(__dirname, '../components/FeatureView.jsx'),
+    (existsSync(path.resolve(__dirname, '../components/FeatureView.tsx')) ? path.resolve(__dirname, '../components/FeatureView.tsx') : path.resolve(__dirname, '../components/FeatureView.jsx')),
     'utf8',
   )
 

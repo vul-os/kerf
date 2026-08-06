@@ -18,7 +18,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement, useCallback } from 'react'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
 
 // ── Import the component under test ──────────────────────────────────────────
@@ -179,7 +179,7 @@ describe('UnsavedRestoreBanner — file list truncation', () => {
 
 describe('UnsavedRestoreBanner — source contracts', () => {
   const src = readFileSync(
-    resolve(__dirname, '../UnsavedRestoreBanner.jsx'),
+    (existsSync(resolve(__dirname, '../UnsavedRestoreBanner.tsx')) ? resolve(__dirname, '../UnsavedRestoreBanner.tsx') : resolve(__dirname, '../UnsavedRestoreBanner.jsx')),
     'utf8',
   )
 

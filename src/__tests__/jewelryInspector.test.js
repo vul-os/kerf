@@ -6,7 +6,7 @@
 // module side-effects).
 
 import { describe, it, expect, beforeAll } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import path from 'path'
 
@@ -19,7 +19,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // ---------------------------------------------------------------------------
 
 const src = readFileSync(
-  path.resolve(__dirname, '../components/FeatureView.jsx'),
+  (existsSync(path.resolve(__dirname, '../components/FeatureView.tsx')) ? path.resolve(__dirname, '../components/FeatureView.tsx') : path.resolve(__dirname, '../components/FeatureView.jsx')),
   'utf8',
 )
 

@@ -18,7 +18,7 @@ import {
 // at a time (T-513..T-517), so a literal `.jsx` path here would break the
 // moment its target is renamed. Try .tsx first, then fall back to .jsx.
 const APPAREL_TSX = resolve(__dirname, '../ApparelGradingPanel.tsx')
-const APPAREL_JSX = resolve(__dirname, '../ApparelGradingPanel.jsx')
+const APPAREL_JSX = (existsSync(resolve(__dirname, '../ApparelGradingPanel.tsx')) ? resolve(__dirname, '../ApparelGradingPanel.tsx') : resolve(__dirname, '../ApparelGradingPanel.jsx'))
 const SRC = readFileSync(
   existsSync(APPAREL_TSX) ? APPAREL_TSX : APPAREL_JSX,
   'utf8',

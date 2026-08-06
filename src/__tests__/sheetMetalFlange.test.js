@@ -11,7 +11,7 @@
 // Pattern: identical to jewelryDispatch.test.js and jewelerySeatChainDispatch.test.js.
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import path from 'path'
 
@@ -22,7 +22,7 @@ const workerSrc = readFileSync(
   'utf8',
 )
 const featureViewSrc = readFileSync(
-  path.resolve(__dirname, '../components/FeatureView.jsx'),
+  (existsSync(path.resolve(__dirname, '../components/FeatureView.tsx')) ? path.resolve(__dirname, '../components/FeatureView.tsx') : path.resolve(__dirname, '../components/FeatureView.jsx')),
   'utf8',
 )
 

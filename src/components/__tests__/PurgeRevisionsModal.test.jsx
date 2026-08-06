@@ -165,9 +165,9 @@ describe('PurgeRevisionsModal — size stats', () => {
 // ── 4. Source-contract assertions ─────────────────────────────────────────────
 
 describe('PurgeRevisionsModal — source contracts', () => {
-  const { readFileSync } = require('fs')
+  const { readFileSync, existsSync } = require('fs')
   const { resolve } = require('path')
-  const src = readFileSync(resolve(__dirname, '../PurgeRevisionsModal.jsx'), 'utf8')
+  const src = readFileSync((existsSync(resolve(__dirname, '../PurgeRevisionsModal.tsx')) ? resolve(__dirname, '../PurgeRevisionsModal.tsx') : resolve(__dirname, '../PurgeRevisionsModal.jsx')), 'utf8')
 
   it('imports toast from ToastBus', () => {
     expect(src).toMatch(/from.*ToastBus/)
@@ -204,17 +204,17 @@ describe('PurgeRevisionsModal — source contracts', () => {
 
 describe('PurgeRevisionsModal — purge call shape', () => {
   it('calls purgeRevisions with projectId and keepLast=5', () => {
-    const { readFileSync } = require('fs')
+    const { readFileSync, existsSync } = require('fs')
     const { resolve } = require('path')
-    const src = readFileSync(resolve(__dirname, '../PurgeRevisionsModal.jsx'), 'utf8')
+    const src = readFileSync((existsSync(resolve(__dirname, '../PurgeRevisionsModal.tsx')) ? resolve(__dirname, '../PurgeRevisionsModal.tsx') : resolve(__dirname, '../PurgeRevisionsModal.jsx')), 'utf8')
     // The call should pass { keepLast: 5 } (the default safety net).
     expect(src).toMatch(/purgeRevisions\(projectId.*keepLast.*5/s)
   })
 
   it('calls purgeRevisions once per confirm click (source contract)', () => {
-    const { readFileSync } = require('fs')
+    const { readFileSync, existsSync } = require('fs')
     const { resolve } = require('path')
-    const src = readFileSync(resolve(__dirname, '../PurgeRevisionsModal.jsx'), 'utf8')
+    const src = readFileSync((existsSync(resolve(__dirname, '../PurgeRevisionsModal.tsx')) ? resolve(__dirname, '../PurgeRevisionsModal.tsx') : resolve(__dirname, '../PurgeRevisionsModal.jsx')), 'utf8')
     // There should be exactly one call site to purgeRevisions.
     const matches = src.match(/api\.purgeRevisions/g) || []
     expect(matches).toHaveLength(1)

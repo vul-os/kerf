@@ -17,7 +17,7 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
 
 import Iso286FitsPanel, {
@@ -29,7 +29,7 @@ import Iso286FitsPanel, {
 } from '../Iso286FitsPanel.jsx'
 
 const SRC = readFileSync(
-  resolve(__dirname, '../Iso286FitsPanel.jsx'),
+  (existsSync(resolve(__dirname, '../Iso286FitsPanel.tsx')) ? resolve(__dirname, '../Iso286FitsPanel.tsx') : resolve(__dirname, '../Iso286FitsPanel.jsx')),
   'utf8',
 )
 

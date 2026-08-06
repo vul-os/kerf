@@ -5,13 +5,13 @@
 // kind in KIND_ORDER can never render a blank card.
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const src = readFileSync(
-  path.resolve(__dirname, '../components/FileTree.jsx'), 'utf8',
+  (existsSync(path.resolve(__dirname, '../components/FileTree.tsx')) ? path.resolve(__dirname, '../components/FileTree.tsx') : path.resolve(__dirname, '../components/FileTree.jsx')), 'utf8',
 )
 
 describe('New file: dialog (not dropdown)', () => {

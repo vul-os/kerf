@@ -19,12 +19,12 @@
  *   - animate-bounce used for the dots animation
  */
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 const SRC = readFileSync(
-  resolve(__dirname, '../ChatPanel.jsx'),
+  (existsSync(resolve(__dirname, '../ChatPanel.tsx')) ? resolve(__dirname, '../ChatPanel.tsx') : resolve(__dirname, '../ChatPanel.jsx')),
   'utf8',
 )
 

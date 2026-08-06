@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
 
 import WeldmentFramePanel, {
@@ -25,7 +25,7 @@ import WeldmentFramePanel, {
 } from '../WeldmentFramePanel.jsx'
 
 const SRC = readFileSync(
-  resolve(__dirname, '../WeldmentFramePanel.jsx'),
+  (existsSync(resolve(__dirname, '../WeldmentFramePanel.tsx')) ? resolve(__dirname, '../WeldmentFramePanel.tsx') : resolve(__dirname, '../WeldmentFramePanel.jsx')),
   'utf8',
 )
 

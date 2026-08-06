@@ -12,11 +12,11 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
 
 const PAGE_SRC = readFileSync(
-  resolve(__dirname, '../routes/domains/Automotive.jsx'),
+  (existsSync(resolve(__dirname, '../routes/domains/Automotive.tsx')) ? resolve(__dirname, '../routes/domains/Automotive.tsx') : resolve(__dirname, '../routes/domains/Automotive.jsx')),
   'utf8',
 )
 
@@ -26,7 +26,7 @@ const META_SRC = readFileSync(
 )
 
 const APP_SRC = readFileSync(
-  resolve(__dirname, '../App.jsx'),
+  (existsSync(resolve(__dirname, '../App.tsx')) ? resolve(__dirname, '../App.tsx') : resolve(__dirname, '../App.jsx')),
   'utf8',
 )
 

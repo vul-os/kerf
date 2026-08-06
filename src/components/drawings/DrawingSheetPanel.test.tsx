@@ -1,5 +1,5 @@
 /**
- * DrawingSheetPanel.test.jsx
+ * DrawingSheetPanel.test.tsx
  *
  * Vitest unit tests for the DrawingSheetPanel React component.
  * Uses renderToStaticMarkup (react-dom/server) — no DOM / fetch needed.
@@ -22,14 +22,14 @@
 
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import DrawingSheetPanel from './DrawingSheetPanel.jsx'
+import DrawingSheetPanel from './DrawingSheetPanel'
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function render(props = {}) {
-  return renderToStaticMarkup(<DrawingSheetPanel {...props} />)
+function render() {
+  return renderToStaticMarkup(<DrawingSheetPanel />)
 }
 
 // ---------------------------------------------------------------------------
@@ -159,10 +159,20 @@ describe('DrawingSheetPanel', () => {
 // ---------------------------------------------------------------------------
 // We import the internal PolylineSvg via a tiny wrapper component
 
-function PolylineSvgWrapper({ visible, hidden, hatch, contour }) {
+type Point = [number, number]
+type Segment = Point[]
+
+interface PolylineSvgWrapperProps {
+  visible?: Segment[]
+  hidden?: Segment[]
+  hatch?: Segment[]
+  contour?: Segment[]
+}
+
+function PolylineSvgWrapper({ visible, hidden, hatch, contour }: PolylineSvgWrapperProps) {
   // Mirrors the inline render logic in DrawingSheetPanel.
   // If visible is empty → show placeholder text.
-  const allPts = [
+  const allPts: Point[] = [
     ...(visible || []).flat(),
     ...(hidden || []).flat(),
     ...(hatch || []).flat(),
@@ -180,9 +190,9 @@ function PolylineSvgWrapper({ visible, hidden, hatch, contour }) {
   const scale = 200 / Math.max(W, H)
   const pad = 4
 
-  const tx = p => ((p[0] - xmin) * scale + pad).toFixed(2)
-  const ty = p => ((ymax - p[1]) * scale + pad).toFixed(2)
-  const polyPts = (seg) => seg.map(p => `${tx(p)},${ty(p)}`).join(' ')
+  const tx = (p: Point) => ((p[0] - xmin) * scale + pad).toFixed(2)
+  const ty = (p: Point) => ((ymax - p[1]) * scale + pad).toFixed(2)
+  const polyPts = (seg: Segment) => seg.map(p => `${tx(p)},${ty(p)}`).join(' ')
   const svgW = W * scale + pad * 2
   const svgH = H * scale + pad * 2
 
@@ -268,8 +278,8 @@ describe('PolylineSvg (geometry preview)', () => {
     const hMatch = html.match(/height="([\d.]+)"/)
     expect(wMatch).not.toBeNull()
     expect(hMatch).not.toBeNull()
-    expect(parseFloat(wMatch[1])).toBeGreaterThan(0)
-    expect(parseFloat(hMatch[1])).toBeGreaterThan(0)
+    expect(parseFloat(wMatch![1])).toBeGreaterThan(0)
+    expect(parseFloat(hMatch![1])).toBeGreaterThan(0)
   })
 
   it('handles single-point degenerate input gracefully', () => {

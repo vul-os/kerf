@@ -1,4 +1,4 @@
-// DrawingPanel.jsx — 2D engineering drawing UI.
+// DrawingPanel.tsx — 2D engineering drawing UI.
 //
 // Wires 8 drawing backend tools into a tabbed UI.
 // Tabs: Views | Dimensions | Annotations | Sheet Layout | Export
@@ -14,20 +14,103 @@
 // Props: none (standalone panel — operates without a project file)
 
 import { useState, useCallback } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import {
   FileText, Ruler, LayoutDashboard, Download, StickyNote,
   AlertTriangle, CheckCircle, Loader2, Play,
-  ChevronDown, ChevronUp, RefreshCw, Layers, SplitSquareHorizontal,
+  ChevronDown, ChevronUp, Layers, SplitSquareHorizontal,
   AlignCenter, Scan, FileSearch,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
-const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+const API_URL: string = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+
+// ---------------------------------------------------------------------------
+// Result shapes — mined field-by-field from the `result.<field>` reads at each call site below.
+// These describe `/api/tools/call` responses, a boundary this slice does not own; the `unknown`
+// index signature covers fields a given tool result carries but no call site here reads.
+// ---------------------------------------------------------------------------
+
+interface DrawingView {
+  name?: string
+  visible_edges?: unknown[]
+  hidden_edges?: unknown[]
+  [field: string]: unknown
+}
+
+interface AutoViewsResult {
+  views?: DrawingView[]
+  svg?: string
+  svg_data?: string
+  [field: string]: unknown
+}
+
+interface SilhouetteResult {
+  svg?: string
+  svg_data?: string
+  [field: string]: unknown
+}
+
+interface ObliqueResult {
+  svg?: string
+  svg_data?: string
+  [field: string]: unknown
+}
+
+interface DrawingDimension {
+  id?: string
+  kind?: string
+  value?: number
+  [field: string]: unknown
+}
+
+interface AutoDimResult {
+  dimensions?: DrawingDimension[]
+  dimension_count?: number
+  [field: string]: unknown
+}
+
+interface MeasurementChainItem {
+  feature?: string
+  dimension?: string
+  value?: number
+  [field: string]: unknown
+}
+
+interface MeasChainResult {
+  chain?: MeasurementChainItem[]
+  [field: string]: unknown
+}
+
+interface ValidateResult {
+  valid?: boolean
+  violations?: string[]
+  [field: string]: unknown
+}
+
+interface InspectionReportResult {
+  report?: string
+  text?: string
+  [field: string]: unknown
+}
+
+interface PdfResult {
+  pdf_base64?: string
+  [field: string]: unknown
+}
+
+interface ExportResult {
+  svg?: string
+  svg_data?: string
+  dxf?: string
+  [field: string]: unknown
+}
 
 // ---------------------------------------------------------------------------
 // Styles — matching fea/BucklingPanel + OpticsDesignPanel pattern
 // ---------------------------------------------------------------------------
 
-const s = {
+const s: Record<string, CSSProperties> = {
   root:         { background: '#111827', padding: '12px', fontSize: 12, color: '#e5e7eb', minHeight: 200 },
   header:       { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 },
   title:        { fontWeight: 600, fontSize: 13, color: '#f9fafb' },
@@ -59,7 +142,12 @@ const s = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function callTool(toolName, args) {
+// Generic over the specific tool's result shape — `/api/tools/call` dispatches to whichever
+// backend tool `toolName` names, so the return shape genuinely varies per call site.
+async function callTool<T = Record<string, unknown>>(
+  toolName: string,
+  args: Record<string, unknown>,
+): Promise<T> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -72,7 +160,9 @@ async function callTool(toolName, args) {
   return res.json()
 }
 
-function fmt(v, decimals = 4) {
+// `unknown` — this formats whatever raw field a tool result happens to carry (a boundary this
+// slice does not own); the runtime typeof-narrowing below is the actual contract.
+function fmt(v?: unknown, decimals = 4): string {
   if (v == null) return '—'
   if (typeof v === 'boolean') return v ? 'yes' : 'no'
   if (typeof v === 'number') {
@@ -84,7 +174,12 @@ function fmt(v, decimals = 4) {
   return String(v)
 }
 
-function ResultTable({ data, skip = [] }) {
+interface ResultTableProps {
+  data?: Record<string, unknown> | null
+  skip?: string[]
+}
+
+function ResultTable({ data, skip = [] }: ResultTableProps) {
   if (!data || typeof data !== 'object') return null
   const entries = Object.entries(data).filter(
     ([k]) => !skip.includes(k) && !Array.isArray(data[k]) && typeof data[k] !== 'object'
@@ -104,7 +199,17 @@ function ResultTable({ data, skip = [] }) {
   )
 }
 
-function ToolWidget({ title, icon: Icon, color = '#2563eb', children, result, error, running }) {
+interface ToolWidgetProps {
+  title: string
+  icon?: LucideIcon
+  color?: string
+  children?: ReactNode
+  result?: Record<string, unknown> | null
+  error?: string | null
+  running?: boolean
+}
+
+function ToolWidget({ title, icon: Icon, color = '#2563eb', children, result, error, running }: ToolWidgetProps) {
   const [open, setOpen] = useState(true)
   return (
     <div style={{ ...s.section, borderLeft: `3px solid ${color}` }}>
@@ -148,7 +253,14 @@ function ToolWidget({ title, icon: Icon, color = '#2563eb', children, result, er
   )
 }
 
-function RunBtn({ onClick, running, disabled, label = 'Run' }) {
+interface RunBtnProps {
+  onClick: () => void
+  running?: boolean
+  disabled?: boolean
+  label?: string
+}
+
+function RunBtn({ onClick, running, disabled, label = 'Run' }: RunBtnProps) {
   return (
     <button
       onClick={onClick}
@@ -165,7 +277,20 @@ function RunBtn({ onClick, running, disabled, label = 'Run' }) {
   )
 }
 
-function SelRow({ label, value, onChange, options, disabled }) {
+interface SelectOption {
+  value: string
+  label: string
+}
+
+interface SelRowProps {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: SelectOption[]
+  disabled?: boolean
+}
+
+function SelRow({ label, value, onChange, options, disabled }: SelRowProps) {
   return (
     <div style={s.row}>
       <label style={s.label}>{label}</label>
@@ -178,7 +303,15 @@ function SelRow({ label, value, onChange, options, disabled }) {
   )
 }
 
-function NumRow({ label, value, onChange, step = 'any', disabled }) {
+interface NumRowProps {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  step?: string | number
+  disabled?: boolean
+}
+
+function NumRow({ label, value, onChange, step = 'any', disabled }: NumRowProps) {
   return (
     <div style={s.row}>
       <label style={s.label}>{label}</label>
@@ -194,7 +327,15 @@ function NumRow({ label, value, onChange, step = 'any', disabled }) {
   )
 }
 
-function TextRow({ label, value, onChange, placeholder, disabled }) {
+interface TextRowProps {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  disabled?: boolean
+}
+
+function TextRow({ label, value, onChange, placeholder, disabled }: TextRowProps) {
   return (
     <div style={s.row}>
       <label style={s.label}>{label}</label>
@@ -210,7 +351,14 @@ function TextRow({ label, value, onChange, placeholder, disabled }) {
   )
 }
 
-function CheckRow({ label, value, onChange, disabled }) {
+interface CheckRowProps {
+  label: string
+  value: boolean
+  onChange: (value: boolean) => void
+  disabled?: boolean
+}
+
+function CheckRow({ label, value, onChange, disabled }: CheckRowProps) {
   return (
     <div style={{ ...s.row, cursor: 'pointer' }} onClick={() => !disabled && onChange(!value)}>
       <label style={{ ...s.label, cursor: 'pointer' }}>{label}</label>
@@ -229,8 +377,12 @@ function CheckRow({ label, value, onChange, disabled }) {
   )
 }
 
+interface SvgPreviewProps {
+  data?: string | null
+}
+
 // SVG preview helper — renders inline if data is a string starting with <svg
-function SvgPreview({ data }) {
+function SvgPreview({ data }: SvgPreviewProps) {
   if (!data || typeof data !== 'string') return null
   const isSvg = data.trimStart().startsWith('<svg') || data.trimStart().startsWith('<?xml')
   if (!isSvg) return null
@@ -267,24 +419,24 @@ function TabViews() {
     sheet: 'A3',
     scale: '',
   })
-  const [avR, setAvR] = useState(null)
-  const [avE, setAvE] = useState(null)
+  const [avR, setAvR] = useState<AutoViewsResult | null>(null)
+  const [avE, setAvE] = useState<string | null>(null)
   const [avRun, setAvRun] = useState(false)
 
   const runAutoViews = useCallback(async () => {
     setAvRun(true); setAvE(null); setAvR(null)
     try {
       const body = JSON.parse(av.body)
-      const args = {
+      const args: Record<string, unknown> = {
         body,
         projection_type: av.projection_type,
         include_iso: av.include_iso,
         sheet: av.sheet,
       }
       if (av.scale) args.scale = parseFloat(av.scale)
-      const r = await callTool('drawing_auto_views', args)
+      const r = await callTool<AutoViewsResult>('drawing_auto_views', args)
       setAvR(r)
-    } catch (e) { setAvE(e.message) } finally { setAvRun(false) }
+    } catch (e) { setAvE((e as Error).message) } finally { setAvRun(false) }
   }, [av])
 
   // ── drawing_silhouette_projection ───────────────────────────────────────
@@ -293,21 +445,21 @@ function TabViews() {
     direction: 'front',
     include_hidden: true,
   })
-  const [spR, setSpR] = useState(null)
-  const [spE, setSpE] = useState(null)
+  const [spR, setSpR] = useState<SilhouetteResult | null>(null)
+  const [spE, setSpE] = useState<string | null>(null)
   const [spRun, setSpRun] = useState(false)
 
   const runSilhouette = useCallback(async () => {
     setSpRun(true); setSpE(null); setSpR(null)
     try {
       const body = JSON.parse(sp.body)
-      const r = await callTool('drawing_silhouette_projection', {
+      const r = await callTool<SilhouetteResult>('drawing_silhouette_projection', {
         body,
         direction: sp.direction,
         include_hidden: sp.include_hidden,
       })
       setSpR(r)
-    } catch (e) { setSpE(e.message) } finally { setSpRun(false) }
+    } catch (e) { setSpE((e as Error).message) } finally { setSpRun(false) }
   }, [sp])
 
   // ── drawing_oblique_projection ──────────────────────────────────────────
@@ -317,22 +469,22 @@ function TabViews() {
     angle_deg: '45',
     scale_depth: '0.5',
   })
-  const [opR, setOpR] = useState(null)
-  const [opE, setOpE] = useState(null)
+  const [opR, setOpR] = useState<ObliqueResult | null>(null)
+  const [opE, setOpE] = useState<string | null>(null)
   const [opRun, setOpRun] = useState(false)
 
   const runOblique = useCallback(async () => {
     setOpRun(true); setOpE(null); setOpR(null)
     try {
       const body = JSON.parse(op.body)
-      const r = await callTool('drawing_oblique_projection', {
+      const r = await callTool<ObliqueResult>('drawing_oblique_projection', {
         body,
         kind: op.kind,
         angle_deg: parseFloat(op.angle_deg),
         scale_depth: parseFloat(op.scale_depth),
       })
       setOpR(r)
-    } catch (e) { setOpE(e.message) } finally { setOpRun(false) }
+    } catch (e) { setOpE((e as Error).message) } finally { setOpRun(false) }
   }, [op])
 
   return (
@@ -531,34 +683,34 @@ function TabDimensions() {
     }, null, 2),
     mode: 'chain',
   })
-  const [adR, setAdR] = useState(null)
-  const [adE, setAdE] = useState(null)
+  const [adR, setAdR] = useState<AutoDimResult | null>(null)
+  const [adE, setAdE] = useState<string | null>(null)
   const [adRun, setAdRun] = useState(false)
 
   const runAutoDim = useCallback(async () => {
     setAdRun(true); setAdE(null); setAdR(null)
     try {
       const view = JSON.parse(ad.view)
-      const r = await callTool('drawing_auto_dimension_iso', { view, mode: ad.mode })
+      const r = await callTool<AutoDimResult>('drawing_auto_dimension_iso', { view, mode: ad.mode })
       setAdR(r)
-    } catch (e) { setAdE(e.message) } finally { setAdRun(false) }
+    } catch (e) { setAdE((e as Error).message) } finally { setAdRun(false) }
   }, [ad])
 
   // ── drawing_measurement_chain ───────────────────────────────────────────
   const [mc, setMc] = useState({
     body: DEFAULT_BODY,
   })
-  const [mcR, setMcR] = useState(null)
-  const [mcE, setMcE] = useState(null)
+  const [mcR, setMcR] = useState<MeasChainResult | null>(null)
+  const [mcE, setMcE] = useState<string | null>(null)
   const [mcRun, setMcRun] = useState(false)
 
   const runMeasChain = useCallback(async () => {
     setMcRun(true); setMcE(null); setMcR(null)
     try {
       const body = JSON.parse(mc.body)
-      const r = await callTool('drawing_measurement_chain', { body })
+      const r = await callTool<MeasChainResult>('drawing_measurement_chain', { body })
       setMcR(r)
-    } catch (e) { setMcE(e.message) } finally { setMcRun(false) }
+    } catch (e) { setMcE((e as Error).message) } finally { setMcRun(false) }
   }, [mc])
 
   // ── drawing_validate_iso ────────────────────────────────────────────────
@@ -570,17 +722,17 @@ function TabDimensions() {
       ],
     }, null, 2),
   })
-  const [viR, setViR] = useState(null)
-  const [viE, setViE] = useState(null)
+  const [viR, setViR] = useState<ValidateResult | null>(null)
+  const [viE, setViE] = useState<string | null>(null)
   const [viRun, setViRun] = useState(false)
 
   const runValidate = useCallback(async () => {
     setViRun(true); setViE(null); setViR(null)
     try {
       const view = JSON.parse(vi.view)
-      const r = await callTool('drawing_validate_iso', { view })
+      const r = await callTool<ValidateResult>('drawing_validate_iso', { view })
       setViR(r)
-    } catch (e) { setViE(e.message) } finally { setViRun(false) }
+    } catch (e) { setViE((e as Error).message) } finally { setViRun(false) }
   }, [vi])
 
   return (
@@ -731,10 +883,24 @@ function TabDimensions() {
 // TAB 3: Annotations
 // ---------------------------------------------------------------------------
 
+interface NoteItem {
+  text: string
+  x: number
+  y: number
+  font_size: number
+}
+
+interface BalloonItem {
+  label: string
+  x: number
+  y: number
+  radius: number
+}
+
 function TabAnnotations() {
   // Text notes
   const [note, setNote] = useState({ text: '', x: '20', y: '20', font_size: '3.5' })
-  const [noteItems, setNoteItems] = useState([])
+  const [noteItems, setNoteItems] = useState<NoteItem[]>([])
 
   const addNote = useCallback(() => {
     if (!note.text.trim()) return
@@ -747,7 +913,7 @@ function TabAnnotations() {
 
   // Balloons / leaders
   const [balloon, setBalloon] = useState({ label: '1', x: '60', y: '40', radius: '5' })
-  const [balloonItems, setBalloonItems] = useState([])
+  const [balloonItems, setBalloonItems] = useState<BalloonItem[]>([])
 
   const addBalloon = useCallback(() => {
     if (!balloon.label.trim()) return
@@ -763,17 +929,17 @@ function TabAnnotations() {
     body: DEFAULT_BODY,
     format: 'iso129',
   })
-  const [irR, setIrR] = useState(null)
-  const [irE, setIrE] = useState(null)
+  const [irR, setIrR] = useState<InspectionReportResult | null>(null)
+  const [irE, setIrE] = useState<string | null>(null)
   const [irRun, setIrRun] = useState(false)
 
   const runInspReport = useCallback(async () => {
     setIrRun(true); setIrE(null); setIrR(null)
     try {
       const body = JSON.parse(ir.body)
-      const r = await callTool('drawing_inspection_report', { body, format: ir.format })
+      const r = await callTool<InspectionReportResult>('drawing_inspection_report', { body, format: ir.format })
       setIrR(r)
-    } catch (e) { setIrE(e.message) } finally { setIrRun(false) }
+    } catch (e) { setIrE((e as Error).message) } finally { setIrRun(false) }
   }, [ir])
 
   // Simple SVG preview of accumulated annotations
@@ -784,7 +950,7 @@ function TabAnnotations() {
     ).join('')
     const balloons = balloonItems.map(b =>
       `<circle cx="${b.x}" cy="${b.y}" r="${b.radius}" fill="none" stroke="#34d399" stroke-width="0.5"/>` +
-      `<text x="${b.x}" y="${parseFloat(b.y) + parseFloat(b.radius) * 0.4}" text-anchor="middle" font-size="${b.radius * 0.8}" fill="#34d399">${b.label}</text>`
+      `<text x="${b.x}" y="${b.y + b.radius * 0.4}" text-anchor="middle" font-size="${b.radius * 0.8}" fill="#34d399">${b.label}</text>`
     ).join('')
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="background:#0f172a;border-radius:4px">${notes}${balloons}</svg>`
   })()
@@ -939,16 +1105,30 @@ function TabAnnotations() {
 // ---------------------------------------------------------------------------
 
 // Standard sheet sizes (mm)
-const SHEET_SIZES = {
+const SHEET_SIZES: Record<string, [number, number]> = {
   A0: [841, 1189], A1: [594, 841], A2: [420, 594], A3: [297, 420], A4: [210, 297],
   LETTER: [216, 279], TABLOID: [279, 432], C: [432, 559], D: [559, 864], E: [864, 1118],
+}
+
+interface TitleBlock {
+  title: string
+  drawn_by: string
+  date: string
+  revision: string
+  material: string
+  finish: string
+  tolerances: string
+  projection: string
+  company: string
+  part_number: string
+  sheet_of: string
 }
 
 function TabSheetLayout() {
   const [sheet, setSheet] = useState('A3')
   const [landscape, setLandscape] = useState(false)
   const [scale, setScale] = useState('1:1')
-  const [titleBlock, setTitleBlock] = useState({
+  const [titleBlock, setTitleBlock] = useState<TitleBlock>({
     title: '',
     drawn_by: '',
     date: new Date().toISOString().slice(0, 10),
@@ -988,6 +1168,19 @@ function TabSheetLayout() {
   <!-- Sheet size tag -->
   <text x="${pw - 4}" y="${tbY + 12}" font-size="3" fill="#4b5563" text-anchor="end">${sheet} ${landscape ? 'L' : 'P'}</text>
 </svg>`
+
+  const titleBlockFields: Array<[string, keyof TitleBlock, string]> = [
+    ['Drawing title',  'title',       'e.g. Bracket Assembly'],
+    ['Part number',    'part_number', 'e.g. BRK-001-A'],
+    ['Drawn by',       'drawn_by',    'e.g. J. Smith'],
+    ['Date',           'date',        'YYYY-MM-DD'],
+    ['Revision',       'revision',    'e.g. A'],
+    ['Material',       'material',    'e.g. Al 6061-T6'],
+    ['Surface finish', 'finish',      'e.g. Ra 1.6'],
+    ['Tolerances',     'tolerances',  'e.g. ISO 2768-m'],
+    ['Company',        'company',     'e.g. Acme Corp'],
+    ['Sheet',          'sheet_of',    'e.g. 1 of 3'],
+  ]
 
   return (
     <div>
@@ -1036,18 +1229,7 @@ function TabSheetLayout() {
           <FileText size={12} style={{ color: '#f59e0b' }} />
           Title Block Fields
         </div>
-        {[
-          ['Drawing title',  'title',       'e.g. Bracket Assembly'],
-          ['Part number',    'part_number', 'e.g. BRK-001-A'],
-          ['Drawn by',       'drawn_by',    'e.g. J. Smith'],
-          ['Date',           'date',        'YYYY-MM-DD'],
-          ['Revision',       'revision',    'e.g. A'],
-          ['Material',       'material',    'e.g. Al 6061-T6'],
-          ['Surface finish', 'finish',      'e.g. Ra 1.6'],
-          ['Tolerances',     'tolerances',  'e.g. ISO 2768-m'],
-          ['Company',        'company',     'e.g. Acme Corp'],
-          ['Sheet',          'sheet_of',    'e.g. 1 of 3'],
-        ].map(([label, key, ph]) => (
+        {titleBlockFields.map(([label, key, ph]) => (
           <TextRow
             key={key}
             label={label}
@@ -1084,8 +1266,8 @@ function TabExport() {
     include_title_block: true,
     title: '',
   })
-  const [pdfR, setPdfR] = useState(null)
-  const [pdfE, setPdfE] = useState(null)
+  const [pdfR, setPdfR] = useState<PdfResult | null>(null)
+  const [pdfE, setPdfE] = useState<string | null>(null)
   const [pdfRun, setPdfRun] = useState(false)
 
   const runPdf = useCallback(async () => {
@@ -1093,7 +1275,7 @@ function TabExport() {
     try {
       const body = JSON.parse(pdf.body)
       // drawing_compile_pdf may not exist — degrade gracefully
-      const r = await callTool('drawing_compile_pdf', {
+      const r = await callTool<PdfResult>('drawing_compile_pdf', {
         body,
         sheet: pdf.sheet,
         projection_type: pdf.projection_type,
@@ -1102,7 +1284,7 @@ function TabExport() {
         title: pdf.title || undefined,
       })
       setPdfR(r)
-    } catch (e) { setPdfE(e.message) } finally { setPdfRun(false) }
+    } catch (e) { setPdfE((e as Error).message) } finally { setPdfRun(false) }
   }, [pdf])
 
   // DXF / SVG export — dispatches drawing_auto_views then signals download
@@ -1112,15 +1294,15 @@ function TabExport() {
     sheet: 'A3',
     projection_type: 'third_angle',
   })
-  const [expR, setExpR] = useState(null)
-  const [expE, setExpE] = useState(null)
+  const [expR, setExpR] = useState<ExportResult | null>(null)
+  const [expE, setExpE] = useState<string | null>(null)
   const [expRun, setExpRun] = useState(false)
 
   const runExport = useCallback(async () => {
     setExpRun(true); setExpE(null); setExpR(null)
     try {
       const body = JSON.parse(exp.body)
-      const r = await callTool('drawing_auto_views', {
+      const r = await callTool<ExportResult>('drawing_auto_views', {
         body,
         sheet: exp.sheet,
         projection_type: exp.projection_type,
@@ -1140,7 +1322,7 @@ function TabExport() {
         a.href = url; a.download = `drawing.${ext}`; a.click()
         URL.revokeObjectURL(url)
       }
-    } catch (e) { setExpE(e.message) } finally { setExpRun(false) }
+    } catch (e) { setExpE((e as Error).message) } finally { setExpRun(false) }
   }, [exp])
 
   // Inspection report download
@@ -1148,15 +1330,15 @@ function TabExport() {
     body: DEFAULT_BODY,
     format: 'iso129',
   })
-  const [irExpR, setIrExpR] = useState(null)
-  const [irExpE, setIrExpE] = useState(null)
+  const [irExpR, setIrExpR] = useState<InspectionReportResult | null>(null)
+  const [irExpE, setIrExpE] = useState<string | null>(null)
   const [irExpRun, setIrExpRun] = useState(false)
 
   const runIrExport = useCallback(async () => {
     setIrExpRun(true); setIrExpE(null); setIrExpR(null)
     try {
       const body = JSON.parse(irExp.body)
-      const r = await callTool('drawing_inspection_report', { body, format: irExp.format })
+      const r = await callTool<InspectionReportResult>('drawing_inspection_report', { body, format: irExp.format })
       setIrExpR(r)
       const text = r.report || r.text || JSON.stringify(r, null, 2)
       const blob = new Blob([text], { type: 'text/plain' })
@@ -1164,7 +1346,7 @@ function TabExport() {
       const a = document.createElement('a')
       a.href = url; a.download = `inspection_report.txt`; a.click()
       URL.revokeObjectURL(url)
-    } catch (e) { setIrExpE(e.message) } finally { setIrExpRun(false) }
+    } catch (e) { setIrExpE((e as Error).message) } finally { setIrExpRun(false) }
   }, [irExp])
 
   return (
@@ -1363,7 +1545,13 @@ function TabExport() {
 // Root component
 // ---------------------------------------------------------------------------
 
-const TABS = [
+interface TabDef {
+  id: string
+  label: string
+  Icon: LucideIcon
+}
+
+const TABS: TabDef[] = [
   { id: 'views',       label: 'Views',        Icon: Layers },
   { id: 'dimensions',  label: 'Dimensions',   Icon: Ruler },
   { id: 'annotations', label: 'Annotations',  Icon: StickyNote },

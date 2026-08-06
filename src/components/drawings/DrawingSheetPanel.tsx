@@ -1,4 +1,4 @@
-// DrawingSheetPanel.jsx — Full 2D drawing sheet editor.
+// DrawingSheetPanel.tsx — Full 2D drawing sheet editor.
 //
 // Covers the capability gap: section views (cutting plane + hatch),
 // detail views (magnified crop), and title block.
@@ -18,19 +18,107 @@
 // All results include an inline SVG preview where the tool returns one.
 
 import { useState, useCallback } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import {
   FileText, Scissors, ZoomIn, LayoutDashboard,
   AlertTriangle, CheckCircle, Loader2, Play,
   ChevronDown, ChevronUp,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
-const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+const API_URL: string = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+
+// ---------------------------------------------------------------------------
+// Geometry primitives shared by the polyline preview
+// ---------------------------------------------------------------------------
+
+type Point = [number, number]
+type Segment = Point[]
+
+// ---------------------------------------------------------------------------
+// Result shapes — mined field-by-field from the `result.<field>` reads at each call site below.
+// These describe `/api/tools/call` responses, a boundary this slice does not own; the `unknown`
+// index signature covers fields a given tool result carries but no call site here reads.
+// ---------------------------------------------------------------------------
+
+interface SheetView {
+  visible?: Segment[]
+  hidden?: Segment[]
+  [field: string]: unknown
+}
+
+interface SheetResult {
+  views?: Record<string, SheetView>
+  scale?: string | number
+  drawing_id?: string
+  [field: string]: unknown
+}
+
+interface CuttingPlaneMarker {
+  label_left?: string
+  label_right?: string
+  [field: string]: unknown
+}
+
+interface SectionResult {
+  n_visible_edges?: number
+  n_hatch_lines?: number
+  n_contour_edges?: number
+  hatch_pattern?: string
+  cutting_plane_marker?: CuttingPlaneMarker
+  visible_edges?: Segment[]
+  hatch_lines?: Segment[]
+  contour_edges?: Segment[]
+  [field: string]: unknown
+}
+
+interface DetailLabelAnnotation {
+  scale_note?: string
+  [field: string]: unknown
+}
+
+interface DetailCircle {
+  cx?: number
+  cy?: number
+  r?: number
+  [field: string]: unknown
+}
+
+interface DetailResult {
+  n_clipped_visible?: number
+  n_clipped_hidden?: number
+  magnification?: number
+  label?: string
+  detail_label_annotation?: DetailLabelAnnotation
+  detail_circle?: DetailCircle
+  clipped_visible?: Segment[]
+  clipped_hidden?: Segment[]
+  [field: string]: unknown
+}
+
+interface TitleBlockField {
+  label?: string
+  value?: string
+  [field: string]: unknown
+}
+
+interface TitleBlockInfo {
+  drawing_id?: string
+  standard?: string
+  [field: string]: unknown
+}
+
+interface TitleBlockResult {
+  fields?: TitleBlockField[]
+  title_block?: TitleBlockInfo
+  [field: string]: unknown
+}
 
 // ---------------------------------------------------------------------------
 // Shared style tokens
 // ---------------------------------------------------------------------------
 
-const s = {
+const s: Record<string, CSSProperties> = {
   root:        { background: '#111827', padding: '12px', fontSize: 12, color: '#e5e7eb', minHeight: 200 },
   header:      { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 },
   title:       { fontWeight: 600, fontSize: 13, color: '#f9fafb' },
@@ -61,7 +149,12 @@ const s = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function callTool(toolName, args) {
+// Generic over the specific tool's result shape — `/api/tools/call` dispatches to whichever
+// backend tool `toolName` names, so the return shape genuinely varies per call site.
+async function callTool<T = Record<string, unknown>>(
+  toolName: string,
+  args: Record<string, unknown>,
+): Promise<T> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -74,7 +167,9 @@ async function callTool(toolName, args) {
   return res.json()
 }
 
-function fmt(v, d = 4) {
+// `unknown` — this formats whatever raw field a tool result happens to carry (a boundary this
+// slice does not own); the runtime typeof-narrowing below is the actual contract.
+function fmt(v?: unknown, d = 4): string {
   if (v == null) return '—'
   if (typeof v === 'boolean') return v ? 'yes' : 'no'
   if (typeof v === 'number') {
@@ -84,7 +179,12 @@ function fmt(v, d = 4) {
   return String(v)
 }
 
-function ResultTable({ data, skip = [] }) {
+interface ResultTableProps {
+  data?: Record<string, unknown> | null
+  skip?: string[]
+}
+
+function ResultTable({ data, skip = [] }: ResultTableProps) {
   if (!data || typeof data !== 'object') return null
   const entries = Object.entries(data).filter(
     ([k]) => !skip.includes(k) && !Array.isArray(data[k]) && typeof data[k] !== 'object'
@@ -104,7 +204,17 @@ function ResultTable({ data, skip = [] }) {
   )
 }
 
-function ToolWidget({ title, icon: Icon, color = '#2563eb', children, result, error, running }) {
+interface ToolWidgetProps {
+  title: string
+  icon?: LucideIcon
+  color?: string
+  children?: ReactNode
+  result?: Record<string, unknown> | null
+  error?: string | null
+  running?: boolean
+}
+
+function ToolWidget({ title, icon: Icon, color = '#2563eb', children, result, error, running }: ToolWidgetProps) {
   const [open, setOpen] = useState(true)
   return (
     <div style={{ ...s.section, borderLeft: `3px solid ${color}` }}>
@@ -150,7 +260,14 @@ function ToolWidget({ title, icon: Icon, color = '#2563eb', children, result, er
   )
 }
 
-function RunBtn({ onClick, running, disabled, label = 'Run' }) {
+interface RunBtnProps {
+  onClick: () => void
+  running?: boolean
+  disabled?: boolean
+  label?: string
+}
+
+function RunBtn({ onClick, running, disabled, label = 'Run' }: RunBtnProps) {
   return (
     <button onClick={onClick} disabled={running || disabled}
       style={{ ...s.btn, ...(running || disabled ? s.btnDis : {}) }}>
@@ -161,7 +278,20 @@ function RunBtn({ onClick, running, disabled, label = 'Run' }) {
   )
 }
 
-function SelRow({ label, value, onChange, options, disabled }) {
+interface SelectOption {
+  value: string
+  label: string
+}
+
+interface SelRowProps {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: SelectOption[]
+  disabled?: boolean
+}
+
+function SelRow({ label, value, onChange, options, disabled }: SelRowProps) {
   return (
     <div style={s.row}>
       <label style={s.label}>{label}</label>
@@ -172,7 +302,16 @@ function SelRow({ label, value, onChange, options, disabled }) {
   )
 }
 
-function NumRow({ label, value, onChange, step = 'any', disabled, placeholder }) {
+interface NumRowProps {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  step?: string | number
+  disabled?: boolean
+  placeholder?: string
+}
+
+function NumRow({ label, value, onChange, step = 'any', disabled, placeholder }: NumRowProps) {
   return (
     <div style={s.row}>
       <label style={s.label}>{label}</label>
@@ -182,7 +321,15 @@ function NumRow({ label, value, onChange, step = 'any', disabled, placeholder })
   )
 }
 
-function TextRow({ label, value, onChange, placeholder, disabled }) {
+interface TextRowProps {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  disabled?: boolean
+}
+
+function TextRow({ label, value, onChange, placeholder, disabled }: TextRowProps) {
   return (
     <div style={s.row}>
       <label style={s.label}>{label}</label>
@@ -196,9 +343,17 @@ function TextRow({ label, value, onChange, placeholder, disabled }) {
 // Minimal SVG preview: builds an SVG from polylines
 // ---------------------------------------------------------------------------
 
-function PolylineSvg({ visible = [], hidden = [], hatch = [], contour = [], maxPx = 300 }) {
+interface PolylineSvgProps {
+  visible?: Segment[]
+  hidden?: Segment[]
+  hatch?: Segment[]
+  contour?: Segment[]
+  maxPx?: number
+}
+
+function PolylineSvg({ visible = [], hidden = [], hatch = [], contour = [], maxPx = 300 }: PolylineSvgProps) {
   // Gather all points to compute bounding box
-  const allPts = [
+  const allPts: Point[] = [
     ...visible.flat(), ...hidden.flat(), ...hatch.flat(), ...contour.flat(),
   ]
   if (!allPts.length) return <div style={{ color: '#6b7280', fontSize: 11, marginTop: 6 }}>No geometry</div>
@@ -212,10 +367,10 @@ function PolylineSvg({ visible = [], hidden = [], hatch = [], contour = [], maxP
   const scale = maxPx / Math.max(W, H)
   const pad = 4
 
-  const tx = p => ((p[0] - xmin) * scale + pad).toFixed(2)
-  const ty = p => ((ymax - p[1]) * scale + pad).toFixed(2)
+  const tx = (p: Point) => ((p[0] - xmin) * scale + pad).toFixed(2)
+  const ty = (p: Point) => ((ymax - p[1]) * scale + pad).toFixed(2)
 
-  const polyPts = (seg) => seg.map(p => `${tx(p)},${ty(p)}`).join(' ')
+  const polyPts = (seg: Segment) => seg.map(p => `${tx(p)},${ty(p)}`).join(' ')
   const svgW = W * scale + pad * 2
   const svgH = H * scale + pad * 2
 
@@ -276,24 +431,24 @@ function TabSheet() {
   const [includeIso, setIncludeIso] = useState(true)
   const [sheet, setSheet] = useState('A3')
   const [scale, setScale] = useState('')
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<SheetResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
 
   const run = useCallback(async () => {
     setRunning(true); setError(null); setResult(null)
     try {
       const meshObj = JSON.parse(mesh)
-      const args = {
+      const args: Record<string, unknown> = {
         mesh: meshObj,
         projection_type: projType,
         include_iso: includeIso,
         sheet,
       }
       if (scale) args.scale = parseFloat(scale)
-      const r = await callTool('drawing_auto_views', args)
+      const r = await callTool<SheetResult>('drawing_auto_views', args)
       setResult(r)
-    } catch (e) { setError(e.message) } finally { setRunning(false) }
+    } catch (e) { setError((e as Error).message) } finally { setRunning(false) }
   }, [mesh, projType, includeIso, sheet, scale])
 
   return (
@@ -321,7 +476,7 @@ function TabSheet() {
         </div>
       </div>
       <SelRow label="Sheet size" value={sheet} onChange={setSheet} disabled={running}
-        options={['A0','A1','A2','A3','A4','LETTER'].map(s => ({ value: s, label: s }))} />
+        options={['A0','A1','A2','A3','A4','LETTER'].map(sz => ({ value: sz, label: sz }))} />
       <NumRow label="Scale (blank = auto)" value={scale} onChange={setScale} disabled={running} />
       <RunBtn onClick={run} running={running} />
       {result && !running && !error && (
@@ -356,8 +511,8 @@ function TabSection() {
   const [hatchAngle, setHatchAngle] = useState('45')
   const [hatchSpacing, setHatchSpacing] = useState('3')
   const [label, setLabel] = useState('A')
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<SectionResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
 
   const run = useCallback(async () => {
@@ -367,7 +522,7 @@ function TabSection() {
       const planeObj = (() => {
         try { return JSON.parse(plane) } catch { return plane }
       })()
-      const args = {
+      const args: Record<string, unknown> = {
         vertices: meshObj.vertices,
         triangles: meshObj.triangles,
         plane: planeObj,
@@ -378,9 +533,9 @@ function TabSection() {
       if (viewDir.trim()) {
         try { args.view_direction = JSON.parse(viewDir) } catch { /**/ }
       }
-      const r = await callTool('drawing_section_view', args)
+      const r = await callTool<SectionResult>('drawing_section_view', args)
       setResult(r)
-    } catch (e) { setError(e.message) } finally { setRunning(false) }
+    } catch (e) { setError((e as Error).message) } finally { setRunning(false) }
   }, [mesh, plane, viewDir, hatchAngle, hatchSpacing, label])
 
   return (
@@ -462,8 +617,8 @@ function TabDetail() {
   const [radius, setRadius] = useState('4')
   const [magnification, setMagnification] = useState('2')
   const [label, setLabel] = useState('A')
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<DetailResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
 
   const run = useCallback(async () => {
@@ -471,7 +626,7 @@ function TabDetail() {
     try {
       const visible = JSON.parse(visibleEdges)
       const hidden = JSON.parse(hiddenEdges)
-      const r = await callTool('drawing_detail_view', {
+      const r = await callTool<DetailResult>('drawing_detail_view', {
         visible_edges: visible,
         hidden_edges: hidden,
         centre: [parseFloat(cx), parseFloat(cy)],
@@ -480,7 +635,7 @@ function TabDetail() {
         label: label || 'A',
       })
       setResult(r)
-    } catch (e) { setError(e.message) } finally { setRunning(false) }
+    } catch (e) { setError((e as Error).message) } finally { setRunning(false) }
   }, [visibleEdges, hiddenEdges, cx, cy, radius, magnification, label])
 
   return (
@@ -550,8 +705,23 @@ function TabDetail() {
 // TAB: Title block
 // ---------------------------------------------------------------------------
 
+interface TitleBlockFields {
+  title: string
+  document_number: string
+  organisation: string
+  scale: string
+  sheet: string
+  revision: string
+  date: string
+  drawn_by: string
+  approved_by: string
+  material: string
+  weight_kg: string
+  project: string
+}
+
 function TabTitleBlock() {
-  const [fields, setFields] = useState({
+  const [fields, setFields] = useState<TitleBlockFields>({
     title: 'Bracket Assembly',
     document_number: 'DWG-001',
     organisation: 'ACME Engineering',
@@ -565,22 +735,22 @@ function TabTitleBlock() {
     weight_kg: '',
     project: '',
   })
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<TitleBlockResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
 
-  const set = (key, val) => setFields(f => ({ ...f, [key]: val }))
+  const set = (key: keyof TitleBlockFields, val: string) => setFields(f => ({ ...f, [key]: val }))
 
   const run = useCallback(async () => {
     setRunning(true); setError(null); setResult(null)
     try {
-      const args = { ...fields }
-      if (args.weight_kg === '' || args.weight_kg == null) delete args.weight_kg
-      else args.weight_kg = parseFloat(args.weight_kg)
-      if (!args.date) delete args.date
-      const r = await callTool('drawing_title_block', args)
+      const args: Record<string, unknown> = { ...fields }
+      if (fields.weight_kg === '' || fields.weight_kg == null) delete args.weight_kg
+      else args.weight_kg = parseFloat(fields.weight_kg)
+      if (!fields.date) delete args.date
+      const r = await callTool<TitleBlockResult>('drawing_title_block', args)
       setResult(r)
-    } catch (e) { setError(e.message) } finally { setRunning(false) }
+    } catch (e) { setError((e as Error).message) } finally { setRunning(false) }
   }, [fields])
 
   return (
@@ -599,11 +769,11 @@ function TabTitleBlock() {
         placeholder="auto-generated" disabled={running} />
       <TextRow label="Organisation" value={fields.organisation} onChange={v => set('organisation', v)} disabled={running} />
       <SelRow label="Scale" value={fields.scale} onChange={v => set('scale', v)} disabled={running}
-        options={['1:100','1:50','1:20','1:10','1:5','1:2','1:1','2:1','5:1','10:1'].map(s => ({ value: s, label: s }))} />
+        options={['1:100','1:50','1:20','1:10','1:5','1:2','1:1','2:1','5:1','10:1'].map(sc => ({ value: sc, label: sc }))} />
       <TextRow label="Sheet" value={fields.sheet} onChange={v => set('sheet', v)}
         placeholder="1/1" disabled={running} />
       <SelRow label="Revision" value={fields.revision} onChange={v => set('revision', v)} disabled={running}
-        options={['A','B','C','D','E','F'].map(s => ({ value: s, label: s }))} />
+        options={['A','B','C','D','E','F'].map(r => ({ value: r, label: r }))} />
       <TextRow label="Date (ISO 8601)" value={fields.date} onChange={v => set('date', v)}
         placeholder="blank = today" disabled={running} />
       <TextRow label="Drawn by" value={fields.drawn_by} onChange={v => set('drawn_by', v)} disabled={running} />
@@ -649,7 +819,13 @@ function TabTitleBlock() {
 // Root panel
 // ---------------------------------------------------------------------------
 
-const TABS = [
+interface TabDef {
+  id: string
+  label: string
+  Icon: LucideIcon
+}
+
+const TABS: TabDef[] = [
   { id: 'sheet',    label: 'Sheet',       Icon: LayoutDashboard },
   { id: 'section',  label: 'Section',     Icon: Scissors },
   { id: 'detail',   label: 'Detail',      Icon: ZoomIn },

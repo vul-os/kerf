@@ -1,5 +1,5 @@
 /**
- * SculptStudioPanel.jsx — Blender-parity DCC sculpt workspace.
+ * SculptStudioPanel.tsx — Blender-parity DCC sculpt workspace.
  *
  * Parity target: Blender Sculpt Mode / ZBrush
  *
@@ -17,18 +17,10 @@
  * - sculpt_apply_brush     (packages/kerf-cad-core/sculpt/tools.py)
  * - sculpt_dynamesh_remesh (packages/kerf-cad-core/sculpt/sculpt_extended_tools.py)
  * - sculpt_polypaint_stroke (packages/kerf-cad-core/sculpt/sculpt_extended_tools.py)
- *
- * Props
- * -----
- * file      {object|null}
- * content   {object|string|null}  — parsed .sculpt session JSON or null
- * projectId {string|null}
- * fileId    {string|null}
- * callTool  {(name:string, args:object) => Promise<any>}  — kerf tool-call
- * onDispatch {(action:object) => void}
  */
 
 import { useState, useCallback, useMemo } from 'react'
+import type { ComponentType, CSSProperties, ReactNode } from 'react'
 import {
   Layers,
   Zap,
@@ -40,12 +32,45 @@ import {
   ChevronRight,
 } from 'lucide-react'
 
+/** Backend tool-call dispatcher, as passed down from the panel host. */
+export type CallToolFn = (name: string, args?: Record<string, unknown>) => Promise<unknown>
+
+/**
+ * The plain positions/triangles mesh this panel's sculpt tools operate on — a simpler
+ * shape than `src/types`' occtWorker-wire `Mesh` (which carries typed-array vertex/index
+ * buffers plus face/edge metadata). Local to this panel because the sculpt_* backend
+ * tools (packages/kerf-cad-core/sculpt/tools.py) speak plain nested arrays, not the OCCT
+ * triangulation wire format.
+ */
+export interface SimpleMesh {
+  positions: number[][]
+  triangles: number[][]
+}
+
+export interface Props {
+  file?: { name?: string } | null
+  /** Parsed .sculpt session JSON or null. */
+  content?: string | SimpleMesh | null
+  projectId?: string | null
+  fileId?: string | null
+  callTool?: CallToolFn
+  onDispatch?: (action: { type: string; payload?: unknown }) => void
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
+export interface BrushKind {
+  id: string
+  label: string
+  icon: string
+  description: string
+}
+
 /** Brush kinds supported by sculpt_apply_brush. */
-export const BRUSH_KINDS = [
+// eslint-disable-next-line react-refresh/only-export-components -- data export, not a component
+export const BRUSH_KINDS: BrushKind[] = [
   { id: 'grab',   label: 'Grab',   icon: '✊', description: 'Translate vertices inside radius' },
   { id: 'smooth', label: 'Smooth', icon: '〰', description: 'Laplacian smooth toward neighbours' },
   { id: 'inflate', label: 'Inflate', icon: '🫧', description: 'Push along per-vertex normal' },
@@ -56,9 +81,11 @@ export const BRUSH_KINDS = [
 /** Taubin-smooth is a double-pass smooth (inflate then smooth) at UI level. */
 export const TAUBIN_ID = 'taubin'
 
-const FALLOFF_OPTIONS = ['smooth', 'linear', 'constant']
+type Falloff = 'smooth' | 'linear' | 'constant'
 
-const DEFAULT_MESH = {
+const FALLOFF_OPTIONS: Falloff[] = ['smooth', 'linear', 'constant']
+
+const DEFAULT_MESH: SimpleMesh = {
   positions: [
     [0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1],
     [1, 1, 0], [1, 0, 1], [0, 1, 1], [1, 1, 1],
@@ -74,11 +101,16 @@ const DEFAULT_MESH = {
 // Exported pure helpers — used by the component and directly unit-testable
 // ---------------------------------------------------------------------------
 
-/**
- * Build args for the sculpt_apply_brush tool call.
- * @param {{mesh, kind, center, radius, strength, falloff}} opts
- */
-export function makeBrushArgs({ mesh, kind, center, radius, strength, falloff }) {
+/** Build args for the sculpt_apply_brush tool call. */
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper, not a component
+export function makeBrushArgs({ mesh, kind, center, radius, strength, falloff }: {
+  mesh: SimpleMesh
+  kind: string
+  center: number[]
+  radius: number
+  strength: number
+  falloff: Falloff
+}) {
   return {
     positions: mesh.positions,
     triangles: mesh.triangles,
@@ -91,11 +123,9 @@ export function makeBrushArgs({ mesh, kind, center, radius, strength, falloff })
   }
 }
 
-/**
- * Build args for the sculpt_dynamesh_remesh tool call.
- * @param {{mesh, resolution}} opts
- */
-export function makeRemeshArgs({ mesh, resolution }) {
+/** Build args for the sculpt_dynamesh_remesh tool call. */
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper, not a component
+export function makeRemeshArgs({ mesh, resolution }: { mesh: SimpleMesh; resolution: number }) {
   return {
     positions: mesh.positions,
     triangles: mesh.triangles,
@@ -106,10 +136,18 @@ export function makeRemeshArgs({ mesh, resolution }) {
 /**
  * Build args for the sculpt_polypaint_stroke tool call.
  * Converts '#rrggbb' hex color to normalized [r, g, b] float array.
- * @param {{mesh, vertexColors, center, radius, polyColor, polyOpacity, falloff}} opts
  */
-export function makePolypaintArgs({ mesh, vertexColors, center, radius, polyColor, polyOpacity, falloff }) {
-  const hexToRgb = (hex) => {
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper, not a component
+export function makePolypaintArgs({ mesh, vertexColors, center, radius, polyColor, polyOpacity, falloff }: {
+  mesh: SimpleMesh
+  vertexColors: number[][] | null
+  center: number[]
+  radius: number
+  polyColor: string
+  polyOpacity: number
+  falloff: Falloff
+}) {
+  const hexToRgb = (hex: string): [number, number, number] => {
     const r = parseInt(hex.slice(1, 3), 16) / 255
     const g = parseInt(hex.slice(3, 5), 16) / 255
     const b = parseInt(hex.slice(5, 7), 16) / 255
@@ -131,13 +169,13 @@ export function makePolypaintArgs({ mesh, vertexColors, center, radius, polyColo
 // Helpers
 // ---------------------------------------------------------------------------
 
-function parseContent(content) {
+function parseContent(content: Props['content']): SimpleMesh | null {
   if (!content) return null
   if (typeof content === 'object') return content
   try { return JSON.parse(content) } catch { return null }
 }
 
-function fmtFloat(v, dp = 4) {
+function fmtFloat(v: unknown, dp = 4): string {
   return typeof v === 'number' ? v.toFixed(dp) : String(v)
 }
 
@@ -145,7 +183,14 @@ function fmtFloat(v, dp = 4) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function Section({ title, icon: Icon, children, defaultOpen = true }) {
+interface SectionProps {
+  title: string
+  icon?: ComponentType<{ size?: number; style?: CSSProperties }>
+  children: ReactNode
+  defaultOpen?: boolean
+}
+
+function Section({ title, icon: Icon, children, defaultOpen = true }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div
@@ -185,7 +230,17 @@ function Section({ title, icon: Icon, children, defaultOpen = true }) {
   )
 }
 
-function Slider({ label, value, min, max, step = 0.01, onChange, testId }) {
+interface SliderProps {
+  label: string
+  value: number
+  min: number
+  max: number
+  step?: number
+  onChange: (value: number) => void
+  testId: string
+}
+
+function Slider({ label, value, min, max, step = 0.01, onChange, testId }: SliderProps) {
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
@@ -210,29 +265,39 @@ function Slider({ label, value, min, max, step = 0.01, onChange, testId }) {
 // Main component
 // ---------------------------------------------------------------------------
 
+interface LastResult {
+  op: string
+  kind?: string
+  n_affected?: number
+  version: number
+  resolution?: number
+  n_verts?: number
+  n_faces?: number
+  volume_before?: number
+  volume_after?: number
+}
+
 export default function SculptStudioPanel({
   file,
   content,
-  projectId,
-  fileId,
   callTool,
   onDispatch,
-}) {
+}: Props) {
   const parsed = useMemo(() => parseContent(content), [content])
 
   // Mesh state (positions + triangles)
-  const [mesh, setMesh] = useState(() => {
+  const [mesh, setMesh] = useState<SimpleMesh>(() => {
     if (parsed?.positions && parsed?.triangles) return parsed
     return DEFAULT_MESH
   })
   const [meshVersion, setMeshVersion] = useState(0)
 
   // Brush state
-  const [activeBrush, setActiveBrush] = useState('grab')
+  const [activeBrush, setActiveBrush] = useState<string>('grab')
   const [strength, setStrength] = useState(0.5)
   const [radius, setRadius] = useState(0.3)
-  const [falloff, setFalloff] = useState('smooth')
-  const [brushCenter, setBrushCenter] = useState([0.5, 0.5, 0.5])
+  const [falloff, setFalloff] = useState<Falloff>('smooth')
+  const [brushCenter, setBrushCenter] = useState<number[]>([0.5, 0.5, 0.5])
 
   // DynaMesh remesh
   const [remeshRes, setRemeshRes] = useState(128)
@@ -240,22 +305,22 @@ export default function SculptStudioPanel({
   // PolyPaint
   const [polyColor, setPolyColor] = useState('#ff5500')
   const [polyOpacity, setPolyOpacity] = useState(0.8)
-  const [vertexColors, setVertexColors] = useState(null)
+  const [vertexColors, setVertexColors] = useState<number[][] | null>(null)
 
   // Status
   const [loading, setLoading] = useState(false)
-  const [lastResult, setLastResult] = useState(null)
-  const [error, setError] = useState(null)
-
-  // UI accordions
-  const [paletteOpen, setPaletteOpen] = useState(true)
+  const [lastResult, setLastResult] = useState<LastResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   // ---------------------------------------------------------------------------
   // Tool call helpers
   // ---------------------------------------------------------------------------
 
+  // `any` here is a boundary tool: the sculpt_* backend tool responses are shaped
+  // per-call (ok/reason, positions/triangles, n_affected, target_resolution, ...)
+  // and this slice does not own that response contract.
   const doCallTool = useCallback(
-    async (name, args) => {
+    async (name: string, args?: Record<string, unknown>): Promise<any> => {
       if (!callTool) throw new Error('callTool prop not provided')
       const raw = await callTool(name, args)
       if (typeof raw === 'string') return JSON.parse(raw)
@@ -275,7 +340,7 @@ export default function SculptStudioPanel({
       if (result?.ok === false) {
         setError(result.reason || 'brush error')
       } else {
-        const newMesh = { ...mesh, positions: result.positions }
+        const newMesh: SimpleMesh = { ...mesh, positions: result.positions }
         setMesh(newMesh)
         setMeshVersion((v) => v + 1)
         setLastResult({
@@ -287,7 +352,7 @@ export default function SculptStudioPanel({
         onDispatch?.({ type: 'SCULPT_BRUSH_APPLIED', payload: result })
       }
     } catch (err) {
-      setError(String(err?.message ?? err))
+      setError(String((err as { message?: string } | undefined)?.message ?? err))
     } finally {
       setLoading(false)
     }
@@ -320,13 +385,13 @@ export default function SculptStudioPanel({
         falloff,
       })
       if (r2?.ok === false) { setError(r2.reason || 'Taubin pass2 error'); return }
-      const newMesh = { ...mesh, positions: r2.positions }
+      const newMesh: SimpleMesh = { ...mesh, positions: r2.positions }
       setMesh(newMesh)
       setMeshVersion((v) => v + 1)
       setLastResult({ op: 'taubin_smooth', version: meshVersion + 1 })
       onDispatch?.({ type: 'SCULPT_TAUBIN_APPLIED', payload: r2 })
     } catch (err) {
-      setError(String(err?.message ?? err))
+      setError(String((err as { message?: string } | undefined)?.message ?? err))
     } finally {
       setLoading(false)
     }
@@ -341,7 +406,7 @@ export default function SculptStudioPanel({
       if (result?.ok === false) {
         setError(result.reason || 'remesh error')
       } else {
-        const newMesh = { positions: result.positions, triangles: result.triangles }
+        const newMesh: SimpleMesh = { positions: result.positions, triangles: result.triangles }
         setMesh(newMesh)
         setMeshVersion((v) => v + 1)
         setLastResult({
@@ -356,7 +421,7 @@ export default function SculptStudioPanel({
         onDispatch?.({ type: 'SCULPT_REMESH_DONE', payload: result })
       }
     } catch (err) {
-      setError(String(err?.message ?? err))
+      setError(String((err as { message?: string } | undefined)?.message ?? err))
     } finally {
       setLoading(false)
     }
@@ -378,7 +443,7 @@ export default function SculptStudioPanel({
         onDispatch?.({ type: 'SCULPT_POLYPAINT_APPLIED', payload: result })
       }
     } catch (err) {
-      setError(String(err?.message ?? err))
+      setError(String((err as { message?: string } | undefined)?.message ?? err))
     } finally {
       setLoading(false)
     }

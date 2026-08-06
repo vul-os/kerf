@@ -2,12 +2,32 @@
  * CircuitObjectsPanel — Components + Nets panel for `kind='circuit'` files; each Component row also surfaces a Library-link chip backed by `setCircuitLibraryMapping`.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { ChevronDown, ChevronRight, Cpu, CircuitBoard, HelpCircle, Link2, Library, ShieldAlert, AlertTriangle, AlertCircle } from 'lucide-react'
-import { useWorkspace } from '../store/workspace.js'
-import { parseLibraryMappings } from '../lib/circuitMappings.js'
+import { useWorkspace, type WorkspaceFile } from '../store/workspace.js'
+import { parseLibraryMappings, type LibraryMappings } from '../lib/circuitMappings.js'
 import { runERC } from '../lib/erc.js'
 import LibraryPicker from './LibraryPicker.jsx'
+
+// The raw flat CircuitJSON record shape (source_component / source_port /
+// source_trace elements) — heterogeneous JSON from the circuit compiler we
+// don't own the types for.
+export type CircuitRecord = Record<string, any>
+
+interface ErcIssue {
+  kind: string
+  severity: 'error' | 'warning'
+  message: string
+  component_id?: string
+  port_id?: string
+  net_id?: number | string
+  [key: string]: unknown
+}
+
+interface ErcResult {
+  errors: ErcIssue[]
+  warnings: ErcIssue[]
+}
 
 // Engineering-notation prefixes covering 1e-12 (p) → 1e9 (G). We pick the
 // largest prefix whose magnitude divides cleanly, then trim trailing zeros so
@@ -23,11 +43,11 @@ const ENG_PREFIXES = [
   { exp: -12, sym: 'p' },
 ]
 
-export function formatEngineering(value, unit = '') {
+export function formatEngineering(value: number | string, unit = ''): string {
   if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) {
     value = Number(value)
   }
-  if (!Number.isFinite(value)) return ''
+  if (typeof value !== 'number' || !Number.isFinite(value)) return ''
   if (value === 0) return `0${unit}`
   const abs = Math.abs(value)
   let chosen = ENG_PREFIXES[ENG_PREFIXES.length - 1]
@@ -43,25 +63,25 @@ export function formatEngineering(value, unit = '') {
 }
 
 // Duplicated from circuitToSpice.js — extract when there's a third caller.
-function unionFindNets(records) {
+function unionFindNets(records: CircuitRecord[]) {
   const ports = records.filter((r) => r && r.type === 'source_port')
   const traces = records.filter((r) => r && r.type === 'source_trace')
   const components = records.filter((r) => r && r.type === 'source_component')
 
-  const parent = new Map()
-  const find = (x) => {
+  const parent = new Map<string, string>()
+  const find = (x: string): string => {
     if (!parent.has(x)) parent.set(x, x)
     let r = x
-    while (parent.get(r) !== r) r = parent.get(r)
+    while (parent.get(r) !== r) r = parent.get(r) as string
     let cur = x
     while (parent.get(cur) !== r) {
-      const nxt = parent.get(cur)
+      const nxt = parent.get(cur) as string
       parent.set(cur, r)
       cur = nxt
     }
     return r
   }
-  const union = (a, b) => {
+  const union = (a: string, b: string) => {
     const ra = find(a)
     const rb = find(b)
     if (ra !== rb) parent.set(ra, rb)
@@ -72,32 +92,32 @@ function unionFindNets(records) {
     for (let i = 1; i < ids.length; i++) union(ids[0], ids[i])
   }
 
-  const groundComponentIds = new Set()
+  const groundComponentIds = new Set<string>()
   for (const c of components) {
     const nm = String(c.name || '').toLowerCase()
     if (nm === 'gnd' || nm === 'ground' || c.ftype === 'simple_ground' || c.ftype === 'ground') {
       groundComponentIds.add(c.source_component_id)
     }
   }
-  const groundRoots = new Set()
+  const groundRoots = new Set<string>()
   for (const p of ports) {
     if (groundComponentIds.has(p.source_component_id)) groundRoots.add(find(p.source_port_id))
   }
 
-  const netByRoot = new Map()
+  const netByRoot = new Map<string, number>()
   for (const r of groundRoots) netByRoot.set(r, 0)
   let nextNet = 1
-  const getOrAssignNet = (portId) => {
+  const getOrAssignNet = (portId: string): number => {
     const r = find(portId)
     if (!netByRoot.has(r)) netByRoot.set(r, nextNet++)
-    return netByRoot.get(r)
+    return netByRoot.get(r) as number
   }
   for (const p of ports) getOrAssignNet(p.source_port_id)
 
   // Count connected ports per net by walking traces (each trace contributes
   // its full port list to the net it lives on).
-  const portCountByNet = new Map()
-  const seenPortByNet = new Map() // net → Set of unique port ids
+  const portCountByNet = new Map<number, number>()
+  const seenPortByNet = new Map<number, Set<string>>() // net → Set of unique port ids
   for (const p of ports) {
     const n = getOrAssignNet(p.source_port_id)
     if (!seenPortByNet.has(n)) seenPortByNet.set(n, new Set())
@@ -107,7 +127,7 @@ function unionFindNets(records) {
     for (const id of ids) {
       const n = getOrAssignNet(id)
       if (!seenPortByNet.has(n)) seenPortByNet.set(n, new Set())
-      seenPortByNet.get(n).add(id)
+      seenPortByNet.get(n)!.add(id)
     }
   }
   for (const [n, set] of seenPortByNet) portCountByNet.set(n, set.size)
@@ -115,7 +135,7 @@ function unionFindNets(records) {
   return { netByRoot, find, getOrAssignNet, portCountByNet, groundComponentIds }
 }
 
-function valueOf(c) {
+function valueOf(c: CircuitRecord): string {
   if (c.resistance != null && Number.isFinite(Number(c.resistance))) {
     return formatEngineering(Number(c.resistance), 'Ω')
   }
@@ -131,25 +151,42 @@ function valueOf(c) {
   return ''
 }
 
-function refdesOf(c, fallbackCounters) {
+function refdesOf(c: CircuitRecord, fallbackCounters: Record<string, number>): string {
   if (c.name && /^[A-Za-z][A-Za-z0-9_]*$/.test(c.name)) return c.name
   const ftype = String(c.ftype || 'X').replace(/^simple_/, '') || 'X'
   fallbackCounters[ftype] = (fallbackCounters[ftype] || 0) + 1
   return `${ftype}-${fallbackCounters[ftype]}`
 }
 
+export interface ComponentRow {
+  id: string
+  refdes: string
+  ftype: string
+  value: string
+  mappedLibraryRef: string | null
+}
+
+export interface NetRow {
+  id: number
+  label: string
+  portCount: number
+}
+
 // Build the rendered rows. `mappings` is the refdes → file_id object
 // produced by `parseLibraryMappings(content)`; each component row picks up a
 // `mappedLibraryRef` field (the file_id string, or null when unmapped). The
 // lookup is case-sensitive — the marker comment stores refdes verbatim.
-export function buildPanelData(circuitJson, mappings = {}) {
+export function buildPanelData(
+  circuitJson: CircuitRecord[] | null | undefined,
+  mappings: LibraryMappings = {},
+): { components: ComponentRow[]; nets: NetRow[] } {
   if (!Array.isArray(circuitJson) || circuitJson.length === 0) {
     return { components: [], nets: [] }
   }
   const sourceComps = circuitJson.filter((r) => r && r.type === 'source_component')
-  const fallbackCounters = {}
-  const safeMap = mappings && typeof mappings === 'object' ? mappings : {}
-  const components = sourceComps.map((c) => {
+  const fallbackCounters: Record<string, number> = {}
+  const safeMap: LibraryMappings = mappings && typeof mappings === 'object' ? mappings : {}
+  const components: ComponentRow[] = sourceComps.map((c) => {
     const refdes = refdesOf(c, fallbackCounters)
     const ftype = c.ftype ? String(c.ftype).replace(/^simple_/, '') : ''
     const value = valueOf(c)
@@ -162,15 +199,15 @@ export function buildPanelData(circuitJson, mappings = {}) {
 
   const { netByRoot, portCountByNet } = unionFindNets(circuitJson)
   // netByRoot is root → netId. Build sorted unique list.
-  const seenNets = new Set()
-  const netList = []
+  const seenNets = new Set<number>()
+  const netList: number[] = []
   for (const n of netByRoot.values()) {
     if (seenNets.has(n)) continue
     seenNets.add(n)
     netList.push(n)
   }
   netList.sort((a, b) => a - b)
-  const nets = netList.map((n) => ({
+  const nets: NetRow[] = netList.map((n) => ({
     id: n,
     label: n === 0 ? 'GND' : `N${n}`,
     portCount: portCountByNet.get(n) || 0,
@@ -183,14 +220,18 @@ export function buildPanelData(circuitJson, mappings = {}) {
 // Strips the extension off `file.name`; falls back to a short-id hint when
 // the row isn't (yet) in the project's file list — the picker is still the
 // authoritative chooser, the chip is just a label.
-function partDisplayName(fileRow, fileId) {
+function partDisplayName(fileRow: WorkspaceFile | undefined, fileId: string | null): string {
   if (fileRow && typeof fileRow.name === 'string' && fileRow.name) {
     return fileRow.name.replace(/\.[^.]+$/, '')
   }
   return fileId ? `…${String(fileId).slice(-6)}` : '(linked)'
 }
 
-export default function CircuitObjectsPanel({ circuitJson }) {
+export interface CircuitObjectsPanelProps {
+  circuitJson?: CircuitRecord[] | null
+}
+
+export default function CircuitObjectsPanel({ circuitJson }: CircuitObjectsPanelProps) {
   const currentFileContent = useWorkspace((s) => s.currentFileContent)
   const projectId = useWorkspace((s) => s.projectId)
   const files = useWorkspace((s) => s.files)
@@ -200,7 +241,7 @@ export default function CircuitObjectsPanel({ circuitJson }) {
   // refdes(scoped to component id) → row DOM node, used to scrollIntoView when
   // the schematic side drives the selection. Cleared between renders by `key`
   // changes; React fills the entries via ref callbacks.
-  const rowRefs = useRef(new Map())
+  const rowRefs = useRef(new Map<string, HTMLElement>())
 
   // refdes → file_id, parsed live from the TSX source. Updates as the user
   // types or links a new part. parseLibraryMappings tolerates absent/malformed.
@@ -215,7 +256,7 @@ export default function CircuitObjectsPanel({ circuitJson }) {
   // kind='part'). Built off the in-memory project file list — the picker
   // refreshes that on selection.
   const partFilesById = useMemo(() => {
-    const out = new Map()
+    const out = new Map<string, WorkspaceFile>()
     if (Array.isArray(files)) {
       for (const f of files) if (f && f.kind === 'part') out.set(f.id, f)
     }
@@ -224,13 +265,13 @@ export default function CircuitObjectsPanel({ circuitJson }) {
 
   // Picker state. `pickFor` holds the refdes whose mapping is being edited;
   // null means closed.
-  const [pickFor, setPickFor] = useState(null)
+  const [pickFor, setPickFor] = useState<string | null>(null)
   const [openComponents, setOpenComponents] = useState(true)
   const [openNets, setOpenNets] = useState(true)
   const [openERC, setOpenERC] = useState(true)
 
   // ERC — run on every circuitJson update; cheap pure function.
-  const ercResult = useMemo(() => {
+  const ercResult: ErcResult = useMemo(() => {
     if (!Array.isArray(circuitJson) || circuitJson.length === 0) {
       return { errors: [], warnings: [] }
     }
@@ -419,7 +460,16 @@ export default function CircuitObjectsPanel({ circuitJson }) {
   )
 }
 
-function Section({ icon: Icon, title, count, open, onToggle, children }) {
+interface SectionProps {
+  icon: ComponentType<{ size?: number }>
+  title: string
+  count: number
+  open: boolean
+  onToggle: () => void
+  children?: ReactNode
+}
+
+function Section({ icon: Icon, title, count, open, onToggle, children }: SectionProps) {
   return (
     <div className="mb-1">
       <button
@@ -443,7 +493,14 @@ function Section({ icon: Icon, title, count, open, onToggle, children }) {
 // Shows errors (red) and warnings (amber) from runERC output.
 // Clicking an item selects the component in the schematic view.
 // ---------------------------------------------------------------------------
-function ErcTab({ ercResult, open, onToggle, onSelectComponent }) {
+interface ErcTabProps {
+  ercResult: ErcResult
+  open: boolean
+  onToggle: () => void
+  onSelectComponent: (id: string | null) => void
+}
+
+function ErcTab({ ercResult, open, onToggle, onSelectComponent }: ErcTabProps) {
   const { errors, warnings } = ercResult
   const total = errors.length + warnings.length
 
@@ -500,7 +557,13 @@ function ErcTab({ ercResult, open, onToggle, onSelectComponent }) {
   )
 }
 
-function ErcItem({ item, isError, onSelectComponent }) {
+interface ErcItemProps {
+  item: ErcIssue
+  isError: boolean
+  onSelectComponent: (id: string | null) => void
+}
+
+function ErcItem({ item, isError, onSelectComponent }: ErcItemProps) {
   const hasTarget = item.component_id || item.port_id
   return (
     <div

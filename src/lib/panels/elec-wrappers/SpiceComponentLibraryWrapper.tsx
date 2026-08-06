@@ -11,7 +11,8 @@
 // Content JSON shape (optional, forwarded from file content):
 //   { initial_category?: string, initial_keyword?: string }
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, type CSSProperties } from 'react'
+import type { ApiFile } from '@/types/api'
 
 // ── Category metadata (mirrors spice_library.py CATEGORIES) ──────────────────
 const CATEGORIES = {
@@ -45,13 +46,55 @@ const DISCLAIMER =
   'from vendor datasheets. For high-accuracy simulation, replace with ' +
   'vendor-supplied SPICE models from the manufacturer\'s website.'
 
-function parseContent(raw) {
+interface SpiceLibraryContent {
+  initial_category?: string
+  initial_keyword?: string
+}
+
+function parseContent(raw: unknown): SpiceLibraryContent {
   if (!raw || typeof raw !== 'string') return {}
   try { return JSON.parse(raw) || {} } catch { return {} }
 }
 
+interface SpiceModel {
+  name: string
+  description?: string
+  category?: string
+  category_label?: string
+  spice?: string
+  params?: Record<string, unknown>
+  usage_hint?: string
+}
+
 // ── Styles (inline — panel is self-contained) ────────────────────────────────
-const S = {
+const S: {
+  root: CSSProperties
+  sidebar: CSSProperties
+  catItem: (active: boolean) => CSSProperties
+  catGroup: CSSProperties
+  main: CSSProperties
+  toolbar: CSSProperties
+  input: CSSProperties
+  specRow: CSSProperties
+  specLabel: CSSProperties
+  specInput: CSSProperties
+  body: CSSProperties
+  list: CSSProperties
+  listItem: (active: boolean) => CSSProperties
+  listName: CSSProperties
+  listDesc: CSSProperties
+  preview: CSSProperties
+  previewTitle: CSSProperties
+  previewCat: CSSProperties
+  previewDesc: CSSProperties
+  previewCode: CSSProperties
+  paramRow: CSSProperties
+  param: CSSProperties
+  insertBtn: CSSProperties
+  disclaimer: CSSProperties
+  empty: CSSProperties
+  count: CSSProperties
+} = {
   root: {
     display: 'flex', height: '100%', fontFamily: 'system-ui, sans-serif',
     fontSize: 13, color: '#e2e8f0', background: '#0f1117',
@@ -138,25 +181,39 @@ const CAT_GROUPS = [
   { label: 'Logic / ICs', keys: ['logic','ic_timer','ic_misc'] },
 ]
 
+export interface Props {
+  content?: string
+  file?: ApiFile
+  projectId?: string
+  fileId?: string
+}
+
+interface SpiceSearchParams {
+  category?: string
+  keyword?: string
+  spec_key?: string
+  spec_value?: string
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
-export default function SpiceComponentLibraryWrapper({ content, file, projectId, fileId }) {
+export default function SpiceComponentLibraryWrapper({ content, file: _file, projectId: _projectId, fileId: _fileId }: Props) {
   const parsed = parseContent(content)
 
-  const [activeCat, setActiveCat] = useState(parsed.initial_category || null)
+  const [activeCat, setActiveCat] = useState<string | null>(parsed.initial_category || null)
   const [keyword, setKeyword] = useState(parsed.initial_keyword || '')
   const [specKey, setSpecKey] = useState('')
   const [specVal, setSpecVal] = useState('')
-  const [selected, setSelected] = useState(null)
-  const [searchResults, setSearchResults] = useState(null)
+  const [selected, setSelected] = useState<SpiceModel | null>(null)
+  const [searchResults, setSearchResults] = useState<SpiceModel[] | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   // ── Search via LLM tool ───────────────────────────────────────────────────
   const doSearch = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const params = {}
+      const params: SpiceSearchParams = {}
       if (activeCat) params.category = activeCat
       if (keyword.trim()) params.keyword = keyword.trim()
       if (specKey.trim()) params.spec_key = specKey.trim()
@@ -172,7 +229,7 @@ export default function SpiceComponentLibraryWrapper({ content, file, projectId,
       if (data.error) throw new Error(data.error)
       setSearchResults(data.models || [])
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : String(err))
       setSearchResults([])
     } finally {
       setLoading(false)
@@ -180,7 +237,7 @@ export default function SpiceComponentLibraryWrapper({ content, file, projectId,
   }, [activeCat, keyword, specKey, specVal])
 
   // Fetch model card on selection
-  const fetchModel = useCallback(async (name) => {
+  const fetchModel = useCallback(async (name: string) => {
     try {
       const resp = await fetch('/api/tools/spice_library_get_model', {
         method: 'POST',
@@ -192,11 +249,14 @@ export default function SpiceComponentLibraryWrapper({ content, file, projectId,
       if (data.error) throw new Error(data.error)
       setSelected(data)
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : String(err))
     }
   }, [])
 
-  const handleCatClick = (cat) => {
+  // NOTE: unused — dead code inherited from the .jsx original; superseded by
+  // handleCatSearch below. Kept as-is (not removed) per migration scope; renamed
+  // with `_` prefix only to satisfy the no-unused-vars lint rule now enforced on .tsx.
+  const _handleCatClick = (cat: string | null) => {
     setActiveCat(cat === activeCat ? null : cat)
     setSearchResults(null)
     setSelected(null)
@@ -212,7 +272,7 @@ export default function SpiceComponentLibraryWrapper({ content, file, projectId,
   }
 
   // Auto-search when category changes
-  const handleCatSearch = (cat) => {
+  const handleCatSearch = (cat: string | null) => {
     const newCat = cat === activeCat ? null : cat
     setActiveCat(newCat)
     setSelected(null)
@@ -221,7 +281,7 @@ export default function SpiceComponentLibraryWrapper({ content, file, projectId,
       setLoading(true)
       setError(null)
       try {
-        const params = {}
+        const params: SpiceSearchParams = {}
         if (newCat) params.category = newCat
         if (keyword.trim()) params.keyword = keyword.trim()
         const resp = await fetch('/api/tools/spice_library_search', {
@@ -234,7 +294,7 @@ export default function SpiceComponentLibraryWrapper({ content, file, projectId,
         if (data.error) throw new Error(data.error)
         setSearchResults(data.models || [])
       } catch (err) {
-        setError(err.message)
+        setError(err instanceof Error ? err.message : String(err))
         setSearchResults([])
       } finally {
         setLoading(false)

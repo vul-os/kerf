@@ -1,23 +1,3 @@
-// @ts-nocheck — TODO(T-521 follow-up): needs per-call-site casts for
-// SketchEntity/SketchConstraint union narrowing (~15 sites: .x/.y, .p1/.p2,
-// .value, SnapResult.line/.id). Renamed to .ts and left unchecked rather than
-// blocking this slice; see sketcher.test.ts for the established cast pattern.
-// sketchEdit.test.js — coverage for pure sketch-mutation helpers in
-// src/lib/sketchEdit.js that aren't otherwise exercised. The broader
-// sketcher.test.js + sketchOps.test.js cover addPoint/addLine/addConstraint
-// and the trim/extend/fillet flows; this file pins down:
-//
-//   * pixelDist + snapTarget (snap precedence: point > midpoint > center > grid)
-//   * deleteEntities cascades through dependent lines/circles/arcs and drops
-//     constraints that reference deleted entities; deleteConstraint is targeted.
-//   * setPointXY / setConstraintValue / toggleConstruction(Many) / setConstruction
-//   * mirrorEntities reflects across an axis line and optionally emits symmetric
-//     constraints; linearPattern produces (count-1) clones; polarPattern handles
-//     the full-circle special case.
-//   * addEllipse / addBspline shape and id-prefix invariants.
-//
-// All helpers are pure JSON-walkers — no DOM, three.js, or worker mocks needed.
-
 import { describe, it, expect } from 'vitest'
 import {
   addPoint,
@@ -40,6 +20,12 @@ import {
   linearPattern,
   polarPattern,
 } from '../lib/sketchEdit.js'
+
+// `.find()` over entities/constraints yields the whole discriminated union, but these assertions
+// read member-specific fields (x/y on a point, p1/p2 on a line, value on a dimension). One
+// widening helper at the declaration keeps the assertions themselves untouched.
+const asAny = <T>(v: T) => v as T & Record<string, any>
+
 
 // Untyped on purpose: a partial SketchJSON fixture threaded through the
 // sketchEdit.js pure helpers (owned by another slice), whose real SketchJSON
@@ -195,11 +181,11 @@ describe('setPointXY / setConstraintValue / construction toggles', () => {
   it('setPointXY mutates only the targeted point', () => {
     const { sketch, ids } = squareSketch()
     const next = setPointXY(sketch, ids.a, 99, -99)
-    const a = next.entities.find((e) => e.id === ids.a)
+    const a = asAny(next.entities.find((e) => e.id === ids.a))
     expect(a.x).toBe(99)
     expect(a.y).toBe(-99)
     // b should be untouched.
-    const b = next.entities.find((e) => e.id === ids.b)
+    const b = asAny(next.entities.find((e) => e.id === ids.b))
     expect(b.x).toBe(10)
     expect(b.y).toBe(0)
   })
@@ -207,8 +193,8 @@ describe('setPointXY / setConstraintValue / construction toggles', () => {
   it('setConstraintValue coerces to Number and zeroes garbage', () => {
     let s = empty()
     const cn = addConstraint(s, 'distance', { a: 'x', b: 'y', value: 5 }); s = cn.sketch
-    expect(setConstraintValue(s, cn.id, 12.5).constraints[0].value).toBe(12.5)
-    expect(setConstraintValue(s, cn.id, 'nope').constraints[0].value).toBe(0)
+    expect(asAny(setConstraintValue(s, cn.id, 12.5).constraints[0]).value).toBe(12.5)
+    expect(asAny(setConstraintValue(s, cn.id, 'nope').constraints[0]).value).toBe(0)
   })
 
   it('toggleConstruction flips a single entity flag', () => {
@@ -250,9 +236,9 @@ describe('mirrorEntities', () => {
     expect(result.newIds).toHaveLength(1)
     // The new line's points should be at x=-5 (mirrored across the y-axis).
     const newLineId = result.newIds[0]
-    const newLine = result.sketch.entities.find((e) => e.id === newLineId)
-    const a = result.sketch.entities.find((e) => e.id === newLine.p1)
-    const b = result.sketch.entities.find((e) => e.id === newLine.p2)
+    const newLine = asAny(result.sketch.entities.find((e) => e.id === newLineId))
+    const a = asAny(result.sketch.entities.find((e) => e.id === newLine.p1))
+    const b = asAny(result.sketch.entities.find((e) => e.id === newLine.p2))
     expect(a.x).toBeCloseTo(-5, 6)
     expect(b.x).toBeCloseTo(-5, 6)
     expect(a.y).toBeCloseTo(0, 6)
@@ -318,7 +304,7 @@ describe('addEllipse / addBspline', () => {
     const c = addPoint(s, 0, 0); s = c.sketch
     const e = addEllipse(s, c.id, 5, 3, Math.PI / 4); s = e.sketch
     expect(e.id.startsWith('el_')).toBe(true)
-    const ent = s.entities.find((x) => x.id === e.id)
+    const ent = asAny(s.entities.find((x) => x.id === e.id))
     expect(ent.type).toBe('ellipse')
     expect(ent.rx).toBe(5)
     expect(ent.ry).toBe(3)
@@ -335,7 +321,7 @@ describe('addEllipse / addBspline', () => {
     const ids = [p1.id, p2.id, p3.id, p4.id]
     const bs = addBspline(s, ids); s = bs.sketch
     expect(bs.id.startsWith('bs_')).toBe(true)
-    const ent = s.entities.find((x) => x.id === bs.id)
+    const ent = asAny(s.entities.find((x) => x.id === bs.id))
     expect(ent.type).toBe('bspline')
     expect(ent.degree).toBe(3)
     expect(ent.controls).toEqual(ids)

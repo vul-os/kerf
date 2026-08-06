@@ -1,7 +1,3 @@
-// @ts-nocheck — TODO(T-521 follow-up): needs per-fixture casts (SketchJSON's
-// `plane.type` literal vs plain string fixtures; `vi.mock`'s .mock property
-// on the mocked import). Renamed to .ts and left unchecked rather than
-// blocking this slice.
 /**
  * sketchGKP36.test.js — GK-P36 collinear constraint JS-side tests.
  *
@@ -34,11 +30,12 @@ vi.mock('@salusoft89/planegcs', () => {
 })
 
 import { solveSketch } from '../lib/sketchSolver.js'
+import type { SketchJSON } from '@/types'
 
-function emptySketch() {
+function emptySketch(): SketchJSON {
   return {
     version: 1, plane: { type: 'base', name: 'XY' },
-    entities: [{ id: 'origin', type: 'point', x: 0, y: 0 }],
+    entities: [{ id: 'origin', type: 'point' as const, x: 0, y: 0 }],
     constraints: [], visible_3d: [], solved: {}, metadata: {},
   }
 }
@@ -47,14 +44,14 @@ describe('GK-P36 — collinear constraint', () => {
   it('solves without conflict for collinear points', async () => {
     const sketch = emptySketch()
     sketch.entities.push(
-      { id: 'pa', type: 'point', x: 0, y: 0 },
-      { id: 'pb', type: 'point', x: 5, y: 0 },
-      { id: 'pc', type: 'point', x: 10, y: 0 },
+      { id: 'pa', type: 'point' as const, x: 0, y: 0 },
+      { id: 'pb', type: 'point' as const, x: 5, y: 0 },
+      { id: 'pc', type: 'point' as const, x: 10, y: 0 },
     )
     sketch.constraints.push(
-      { id: 'fix_a', type: 'fixed', point: 'pa', x: 0, y: 0 },
-      { id: 'fix_b', type: 'fixed', point: 'pb', x: 5, y: 0 },
-      { id: 'col1', type: 'collinear', p1: 'pc', p2: 'pa', p3: 'pb' },
+      { id: 'fix_a', type: 'fixed' as const, point: 'pa', x: 0, y: 0 },
+      { id: 'fix_b', type: 'fixed' as const, point: 'pb', x: 5, y: 0 },
+      { id: 'col1', type: 'collinear' as const, p1: 'pc', p2: 'pa', p3: 'pb' },
     )
     const result = await solveSketch(sketch)
     expect(result.ok).toBe(true)
@@ -64,14 +61,14 @@ describe('GK-P36 — collinear constraint', () => {
   it('dofCount drops by 1 when collinear constraint is added', async () => {
     const sketchBase = emptySketch()
     sketchBase.entities.push(
-      { id: 'pa', type: 'point', x: 0, y: 0 },
-      { id: 'pb', type: 'point', x: 5, y: 0 },
-      { id: 'pc', type: 'point', x: 10, y: 0 },
+      { id: 'pa', type: 'point' as const, x: 0, y: 0 },
+      { id: 'pb', type: 'point' as const, x: 5, y: 0 },
+      { id: 'pc', type: 'point' as const, x: 10, y: 0 },
     )
     const sketchConstrained = {
       ...sketchBase,
       entities: [...sketchBase.entities],
-      constraints: [{ id: 'col1', type: 'collinear', p1: 'pc', p2: 'pa', p3: 'pb' }],
+      constraints: [{ id: 'col1', type: 'collinear' as const, p1: 'pc', p2: 'pa', p3: 'pb' }],
     }
     const rBase = await solveSketch(sketchBase)
     const rCon  = await solveSketch(sketchConstrained)
@@ -82,13 +79,13 @@ describe('GK-P36 — collinear constraint', () => {
     const { make_gcs_wrapper } = await import('@salusoft89/planegcs')
     const sketch = emptySketch()
     sketch.entities.push(
-      { id: 'pa', type: 'point', x: 0, y: 0 },
-      { id: 'pb', type: 'point', x: 5, y: 0 },
-      { id: 'pc', type: 'point', x: 10, y: 1 },
+      { id: 'pa', type: 'point' as const, x: 0, y: 0 },
+      { id: 'pb', type: 'point' as const, x: 5, y: 0 },
+      { id: 'pc', type: 'point' as const, x: 10, y: 1 },
     )
-    sketch.constraints.push({ id: 'col1', type: 'collinear', p1: 'pc', p2: 'pa', p3: 'pb' })
+    sketch.constraints.push({ id: 'col1', type: 'collinear' as const, p1: 'pc', p2: 'pa', p3: 'pb' })
     await solveSketch(sketch)
-    const wrapper = await make_gcs_wrapper.mock.results[make_gcs_wrapper.mock.results.length - 1].value
+    const wrapper = await (make_gcs_wrapper as unknown as { mock: { results: { value: any }[] } }).mock.results[(make_gcs_wrapper as unknown as { mock: { results: { value: any }[] } }).mock.results.length - 1].value
     const polPrim = wrapper.primitives.find((p) => p.type === 'point_on_line_ppp')
     expect(polPrim).toBeDefined()
     // T-560: these previously asserted `p1_id`/`p2_id`. Those were the WRONG

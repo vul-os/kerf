@@ -6,8 +6,10 @@
 
 import { describe, it, expect } from 'vitest'
 import { isEntityReferenced, deleteEntities } from '../lib/sketchEdit.js'
+import type { SketchPoint, SketchLine } from '@/types'
 
-const P = (id, x = 0, y = 0) => ({ id, type: 'point', x, y })
+const P = (id: string, x = 0, y = 0): SketchPoint => ({ id, type: 'point', x, y })
+const L = (id: string, p1: string, p2: string): SketchLine => ({ id, type: 'line', p1, p2 })
 
 describe('isEntityReferenced', () => {
   it('false for a lone free point (the abort-orphan case)', () => {
@@ -21,7 +23,7 @@ describe('isEntityReferenced', () => {
 
   it('true when used as a line endpoint', () => {
     const sketch = {
-      entities: [P('p1'), P('p2'), { id: 'l1', type: 'line', p1: 'p1', p2: 'p2' }],
+      entities: [P('p1'), P('p2'), L('l1', 'p1', 'p2')],
       constraints: [],
     }
     expect(isEntityReferenced(sketch, 'p1')).toBe(true)
@@ -30,7 +32,7 @@ describe('isEntityReferenced', () => {
   it('true when used by a constraint (snapped-onto existing point)', () => {
     const sketch = {
       entities: [P('p1'), P('p2')],
-      constraints: [{ id: 'c1', type: 'coincident', a: 'p1', b: 'p2' }],
+      constraints: [{ id: 'c1', type: 'coincident' as const, a: 'p1', b: 'p2' }],
     }
     expect(isEntityReferenced(sketch, 'p1')).toBe(true)
   })
@@ -38,7 +40,7 @@ describe('isEntityReferenced', () => {
   it('true when used as a spline control point', () => {
     const sketch = {
       entities: [P('a'), P('b'), P('c'), P('d'),
-        { id: 's1', type: 'bspline', controls: ['a', 'b', 'c', 'd'] }],
+        { id: 's1', type: 'bspline' as const, degree: 3, controls: ['a', 'b', 'c', 'd'] }],
       constraints: [],
     }
     expect(isEntityReferenced(sketch, 'c')).toBe(true)
@@ -54,7 +56,7 @@ describe('orphan prune via deleteEntities', () => {
   it('removes only the unreferenced pending point, keeps real geometry', () => {
     const sketch = {
       entities: [P('keep1'), P('keep2'), P('orphan'),
-        { id: 'l1', type: 'line', p1: 'keep1', p2: 'keep2' }],
+        L('l1', 'keep1', 'keep2')],
       constraints: [],
     }
     const orphans = ['orphan'].filter((id) => !isEntityReferenced(sketch, id))

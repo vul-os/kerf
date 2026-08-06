@@ -1,8 +1,3 @@
-// @ts-nocheck — TODO(T-521 follow-up): needs per-fixture casts (SketchJSON's
-// `plane.type` literal vs plain string fixtures; ellipse entity literals vs
-// the point-shaped inline entity type; `vi.mock`'s .mock property on the
-// mocked import). Renamed to .ts and left unchecked rather than blocking
-// this slice.
 /**
  * sketchGKP37.test.js — GK-P37 ellipse entity (5 DOF) JS-side tests.
  *
@@ -37,11 +32,12 @@ vi.mock('@salusoft89/planegcs', () => {
 })
 
 import { solveSketch } from '../lib/sketchSolver.js'
+import type { SketchJSON } from '@/types'
 
-function emptySketch() {
+function emptySketch(): SketchJSON {
   return {
     version: 1, plane: { type: 'base', name: 'XY' },
-    entities: [{ id: 'origin', type: 'point', x: 0, y: 0 }],
+    entities: [{ id: 'origin', type: 'point' as const, x: 0, y: 0 }],
     constraints: [], visible_3d: [], solved: {}, metadata: {},
   }
 }
@@ -49,13 +45,13 @@ function emptySketch() {
 describe('GK-P37 — ellipse entity (5 DOF)', () => {
   it('ellipse adds 3 extra DOFs on top of its center point', async () => {
     const sketchNoEllipse = emptySketch()
-    sketchNoEllipse.entities.push({ id: 'ec', type: 'point', x: 5, y: 5 })
+    sketchNoEllipse.entities.push({ id: 'ec', type: 'point' as const, x: 5, y: 5 })
 
     const sketchWithEllipse = {
       ...sketchNoEllipse,
       entities: [
         ...sketchNoEllipse.entities,
-        { id: 'el1', type: 'ellipse', center: 'ec', rx: 5, ry: 3, rotation: 0 },
+        { id: 'el1', type: 'ellipse' as const, center: 'ec', rx: 5, ry: 3, rotation: 0 },
       ],
     }
 
@@ -69,14 +65,14 @@ describe('GK-P37 — ellipse entity (5 DOF)', () => {
     const sketchBase = emptySketch()
     sketchBase.entities.push(
       { id: 'ec',  type: 'point',   x: 0, y: 0 },
-      { id: 'el1', type: 'ellipse', center: 'ec', rx: 5, ry: 3, rotation: 0 },
-      { id: 'pt1', type: 'point',   x: 5, y: 0 },
+      { id: 'el1', type: 'ellipse' as const, center: 'ec', rx: 5, ry: 3, rotation: 0 },
+      { id: 'pt1', type: 'point' as const,   x: 5, y: 0 },
     )
 
     const sketchPOE = {
       ...sketchBase,
       entities: [...sketchBase.entities],
-      constraints: [{ id: 'poe1', type: 'point_on_ellipse', point: 'pt1', ellipse: 'el1' }],
+      constraints: [{ id: 'poe1', type: 'point_on_ellipse' as const, point: 'pt1', ellipse: 'el1' }],
     }
 
     const rBase = await solveSketch(sketchBase)
@@ -89,16 +85,16 @@ describe('GK-P37 — ellipse entity (5 DOF)', () => {
     const base = emptySketch()
     base.entities.push(
       { id: 'ec',  type: 'point',   x: 0, y: 0 },
-      { id: 'el1', type: 'ellipse', center: 'ec', rx: 5, ry: 3, rotation: 0 },
+      { id: 'el1', type: 'ellipse' as const, center: 'ec', rx: 5, ry: 3, rotation: 0 },
     )
 
     const withDims = {
       ...base,
       entities: [...base.entities],
       constraints: [
-        { id: 'smaj', type: 'ellipse_semi_major', ellipse: 'el1', value: 5 },
-        { id: 'smin', type: 'ellipse_semi_minor', ellipse: 'el1', value: 3 },
-        { id: 'rot',  type: 'ellipse_rotation',  ellipse: 'el1', value: 0 },
+        { id: 'smaj', type: 'ellipse_semi_major' as const, ellipse: 'el1', value: 5 },
+        { id: 'smin', type: 'ellipse_semi_minor' as const, ellipse: 'el1', value: 3 },
+        { id: 'rot',  type: 'ellipse_rotation' as const,  ellipse: 'el1', value: 0 },
       ],
     }
 
@@ -112,11 +108,11 @@ describe('GK-P37 — ellipse entity (5 DOF)', () => {
     const sketch = emptySketch()
     sketch.entities.push(
       { id: 'ec',  type: 'point',   x: 0, y: 0 },
-      { id: 'el1', type: 'ellipse', center: 'ec', rx: 5, ry: 3, rotation: 0 },
-      { id: 'pt1', type: 'point',   x: 5, y: 0 },
+      { id: 'el1', type: 'ellipse' as const, center: 'ec', rx: 5, ry: 3, rotation: 0 },
+      { id: 'pt1', type: 'point' as const,   x: 5, y: 0 },
     )
     sketch.constraints.push(
-      { id: 'fix_ec', type: 'fixed',             point: 'ec', x: 0, y: 0 },
+      { id: 'fix_ec', type: 'fixed' as const,             point: 'ec', x: 0, y: 0 },
       { id: 'smaj',   type: 'ellipse_semi_major', ellipse: 'el1', value: 5 },
       { id: 'smin',   type: 'ellipse_semi_minor', ellipse: 'el1', value: 3 },
       { id: 'rot',    type: 'ellipse_rotation',  ellipse: 'el1', value: 0 },
@@ -133,12 +129,12 @@ describe('GK-P37 — ellipse entity (5 DOF)', () => {
     const sketch = emptySketch()
     sketch.entities.push(
       { id: 'ec',  type: 'point',   x: 0, y: 0 },
-      { id: 'el1', type: 'ellipse', center: 'ec', rx: 5, ry: 3, rotation: 0 },
-      { id: 'pt1', type: 'point',   x: 5, y: 0 },
+      { id: 'el1', type: 'ellipse' as const, center: 'ec', rx: 5, ry: 3, rotation: 0 },
+      { id: 'pt1', type: 'point' as const,   x: 5, y: 0 },
     )
-    sketch.constraints.push({ id: 'poe1', type: 'point_on_ellipse', point: 'pt1', ellipse: 'el1' })
+    sketch.constraints.push({ id: 'poe1', type: 'point_on_ellipse' as const, point: 'pt1', ellipse: 'el1' })
     await solveSketch(sketch)
-    const wrapper = await make_gcs_wrapper.mock.results[make_gcs_wrapper.mock.results.length - 1].value
+    const wrapper = await (make_gcs_wrapper as unknown as { mock: { results: { value: any }[] } }).mock.results[(make_gcs_wrapper as unknown as { mock: { results: { value: any }[] } }).mock.results.length - 1].value
     const distPrim = wrapper.primitives.find((p) => p.type === 'p2p_distance' && p.p1_id === 'pt1')
     expect(distPrim).toBeDefined()
     expect(distPrim.p2_id).toBe('ec')

@@ -178,7 +178,13 @@ type EntityRefFields = {
 
 // Delete entities by id, plus any constraints/lines/arcs that depend on a
 // deleted point. Returns the new sketch.
-export function deleteEntities(sketch: SketchJSON, ids: string[]): SketchJSON {
+// Generic over the sketch shape: only `entities` and `constraints` are read, and the result is
+// a spread of whatever came in — so callers passing a partial fixture get the same shape back
+// rather than being forced to construct a whole SketchJSON.
+export function deleteEntities<T extends Pick<SketchJSON, 'entities' | 'constraints'>>(
+  sketch: T,
+  ids: string[],
+): T {
   const idSet = new Set(ids)
   const ent = sketch.entities || []
 
@@ -272,7 +278,12 @@ export function constraintRefs(c: SketchConstraint): string[] {
 // any constraint. Used to decide whether a pending point left behind by
 // an aborted multi-click tool is a prunable orphan (vs. an existing
 // point the user snapped onto, which other geometry may depend on).
-export function isEntityReferenced(sketch: SketchJSON | null | undefined, id: string | null | undefined): boolean {
+// Only `entities` and `constraints` are read, so a caller need not supply a whole SketchJSON —
+// the orphan checks in particular pass bare {entities, constraints} fixtures.
+export function isEntityReferenced(
+  sketch: Pick<SketchJSON, 'entities' | 'constraints'> | null | undefined,
+  id: string | null | undefined,
+): boolean {
   if (!id) return false
   for (const e0 of sketch?.entities || []) {
     if (e0.id === id) continue

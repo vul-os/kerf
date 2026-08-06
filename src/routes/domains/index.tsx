@@ -35,7 +35,6 @@ import {
   Box,
   Layers,
   Anchor,
-  Mountain,
   TreePine,
   Cpu,
   Terminal,
@@ -78,6 +77,7 @@ const GITHUB_URL = 'https://github.com/kerf-sh/kerf'
 /* SEO meta                                                                    */
 /* -------------------------------------------------------------------------- */
 
+// eslint-disable-next-line react-refresh/only-export-components -- data export alongside the page component, pre-existing before this migration.
 export const DOMAINS_META = {
   title: 'CAD domains — jewelry to aerospace — Kerf',
   description:
@@ -90,6 +90,7 @@ export const DOMAINS_META = {
 /* Domain data                                                                 */
 /* -------------------------------------------------------------------------- */
 
+// eslint-disable-next-line react-refresh/only-export-components -- data export alongside the page component, pre-existing before this migration.
 export const DOMAINS = [
   {
     slug: 'jewelry',
@@ -327,6 +328,7 @@ export const DOMAINS = [
 /* JSON-LD                                                                     */
 /* -------------------------------------------------------------------------- */
 
+// eslint-disable-next-line react-refresh/only-export-components -- helper function alongside the page component, pre-existing before this migration.
 export function buildDomainsJsonLd() {
   return {
     '@context': 'https://schema.org',
@@ -361,7 +363,7 @@ function DomainsHead() {
     const prev = document.title
     document.title = DOMAINS_META.title
 
-    let desc = document.querySelector('meta[name="description"]')
+    let desc = document.querySelector<HTMLMetaElement>('meta[name="description"]')
     const descCreated = !desc
     if (!desc) {
       desc = document.createElement('meta')
@@ -371,7 +373,7 @@ function DomainsHead() {
     const prevDescContent = desc.content
     desc.content = DOMAINS_META.description
 
-    let canonical = document.querySelector('link[rel="canonical"]')
+    let canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]')
     const canonicalCreated = !canonical
     if (!canonical) {
       canonical = document.createElement('link')
@@ -392,12 +394,12 @@ function DomainsHead() {
       { name: 'twitter:description', content: DOMAINS_META.description },
       { name: 'twitter:image', content: DOMAINS_META.ogImage },
     ]
-    const createdOg = []
+    const createdOg: HTMLMetaElement[] = []
     for (const tag of ogTags) {
       const sel = tag.property
         ? `meta[property="${tag.property}"]`
         : `meta[name="${tag.name}"]`
-      let el = document.querySelector(sel)
+      let el = document.querySelector<HTMLMetaElement>(sel)
       if (!el) {
         el = document.createElement('meta')
         if (tag.property) el.setAttribute('property', tag.property)

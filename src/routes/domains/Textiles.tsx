@@ -1,5 +1,5 @@
 /**
- * MotionSim domain page — /domains/motion
+ * Textiles domain page — /domains/textiles
  *
  * Sections (top → bottom):
  *   1. Hero — eyebrow / tagline / title / body
@@ -11,15 +11,14 @@
  * Palette: ink-* / kerf-* / cyan-edge from src/index.css. No raster assets.
  */
 import { Link } from 'react-router-dom'
-import { ArrowRight, Github, Cog, Layers, Activity, ExternalLink } from 'lucide-react'
+import { ArrowRight, Github, Scissors, Layers, Activity, ExternalLink } from 'lucide-react'
 import Header from '../../components/Header.jsx'
 import Footer from '../../components/Footer.jsx'
 import Button from '../../components/Button.jsx'
 import DomainSwitcher from '../../components/domains/DomainSwitcher.jsx'
-import { meta } from './motion.meta.js'
-import { ChatLoopIllustration } from '../../components/illustrations/index.js'
+import { SketcherIllustration } from '../../components/illustrations/index.js'
 
-export const HERO_ILLUSTRATION = ChatLoopIllustration
+export const HERO_ILLUSTRATION = SketcherIllustration
 
 const GITHUB_URL = 'https://github.com/kerf-sh/kerf'
 
@@ -53,68 +52,55 @@ function Hero() {
       </div>
 
       <div className="relative mx-auto max-w-7xl px-6 pt-14 pb-16 sm:pt-16 lg:pt-20 lg:pb-20">
-        <div className="grid lg:grid-cols-[1fr_1.1fr] gap-8 lg:gap-12 items-center">
-          <div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-ink-800 bg-ink-900/70 backdrop-blur px-3 py-1 text-xs text-ink-300 font-mono">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-edge animate-pulse" />
-              domain · motion simulation
+        <div className="max-w-3xl">
+          <span className="inline-flex items-center gap-2 rounded-full border border-ink-800 bg-ink-900/70 backdrop-blur px-3 py-1 text-xs text-ink-300 font-mono">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-edge animate-pulse" />
+            domain · textile &amp; apparel
+          </span>
+
+          <h1 className="mt-4 font-display text-[2.6rem] sm:text-5xl lg:text-[4rem] font-semibold tracking-[-0.03em] leading-[1.02]">
+            Textiles that
+            <br />
+            <span className="relative inline-block">
+              <span className="relative z-10 text-cyan-edge">think in seams.</span>
+              <span
+                aria-hidden
+                className="absolute left-0 right-0 -bottom-2 h-2.5 bg-cyan-edge/10 -skew-x-12 rounded-sm"
+              />
             </span>
+          </h1>
 
-            <h1 className="mt-4 font-display text-[2.6rem] sm:text-5xl lg:text-[4rem] font-semibold tracking-[-0.03em] leading-[1.02]">
-              Motion that
-              <br />
-              <span className="relative inline-block">
-                <span className="relative z-10 text-cyan-edge">computes itself.</span>
-                <span
-                  aria-hidden
-                  className="absolute left-0 right-0 -bottom-2 h-2.5 bg-cyan-edge/10 -skew-x-12 rounded-sm"
-                />
-              </span>
-            </h1>
+          <p className="mt-5 text-lg text-ink-300 leading-relaxed max-w-2xl">
+            Pattern drafting, grading, seam allowances, fabric drape simulation,
+            and cut-file export — all in a single conversation. Describe the
+            garment; Kerf drafts the blocks, grades across sizes, and generates
+            DXF cut files ready for your plotter or cutter.
+          </p>
 
-            <p className="mt-5 text-lg text-ink-300 leading-relaxed max-w-2xl">
-              Full multi-body dynamics: Featherstone recursive Newton-Euler, Craig-Bampton
-              flexible bodies, Pacejka tire model, CCD/FABRIK IK, four-bar Burmester
-              synthesis, cam profiles, gear trains, and keyframe animation — all wired
-              as LLM tools. Chat describes the mechanism; Kerf assembles the constraint
-              graph, solves the dynamics, and visualises the result in real time.
-            </p>
-
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <Button as={Link} to="/signup" variant="primary" size="lg">
-                Start simulating free
-                <ArrowRight size={16} />
-              </Button>
-              <Button as={Link} to="/docs/motion" variant="outline" size="lg">
-                Read the docs
-              </Button>
-            </div>
-
-            <ul className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-ink-400 font-mono">
-              <li className="flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-ink-500" />
-                MIT licensed
-              </li>
-              <li className="flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-ink-500" />
-                local or hosted
-              </li>
-              <li className="flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-ink-500" />
-                kerf-sdk on PyPI
-              </li>
-            </ul>
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <Button as={Link} to="/signup" variant="primary" size="lg">
+              Start drafting free
+              <ArrowRight size={16} />
+            </Button>
+            <Button as={Link} to="/docs/textiles" variant="outline" size="lg">
+              Read the docs
+            </Button>
           </div>
 
-          <div className="relative hidden md:block">
-            <div className="relative rounded-2xl border border-ink-800 bg-ink-900/40 backdrop-blur shadow-2xl shadow-black/60 overflow-hidden aspect-[16/10]">
-              <ChatLoopIllustration className="block w-full h-full" />
-            </div>
-            <div
-              aria-hidden
-              className="absolute -inset-6 -z-10 rounded-[2rem] bg-cyan-edge/[0.04] blur-3xl"
-            />
-          </div>
+          <ul className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-ink-400 font-mono">
+            <li className="flex items-center gap-1.5">
+              <span className="w-1 h-1 rounded-full bg-ink-500" />
+              MIT licensed
+            </li>
+            <li className="flex items-center gap-1.5">
+              <span className="w-1 h-1 rounded-full bg-ink-500" />
+              local or hosted
+            </li>
+            <li className="flex items-center gap-1.5">
+              <span className="w-1 h-1 rounded-full bg-ink-500" />
+              kerf-sdk on PyPI
+            </li>
+          </ul>
         </div>
       </div>
     </section>
@@ -127,34 +113,19 @@ function Hero() {
 
 const CAPABILITIES = [
   {
-    icon: Cog,
-    title: 'Rigid-body dynamics',
-    body: 'Featherstone 2008 recursive Newton-Euler inverse dynamics; RK4 + semi-implicit Euler integrator; forward + inverse kinematics; joints, contact, friction cone — full MBD stack in packages/kerf-motion/.',
+    icon: Scissors,
+    title: 'Pattern drafting & grading',
+    body: 'Draft bodice, sleeve, trouser, and skirt blocks from measurements or size charts. Grade across a size run using ASTM or EN 13402 grade rules. Notches and grain lines included.',
   },
   {
     icon: Layers,
-    title: 'Cam profiles & gear trains',
-    body: 'Four-bar Burmester graphical synthesis; cam-follower profile generator (cycloidal, polynomial, harmonic); gear-train ratio synthesis; Litvin gear/belt machinery dynamics (Adams/Machinery parity).',
+    title: 'Seam allowances & markers',
+    body: 'Apply seam allowances per edge with corner mitring. Generate nesting markers for fabric efficiency. Supports single-ply and multi-ply cutting orders with lay plan export.',
   },
   {
     icon: Activity,
-    title: 'Robot trajectory planning',
-    body: 'CCD + FABRIK IK solvers with pole-target support; quintic / cubic-spline waypoint interpolation; singularity + joint-limit checks; ROS2-compatible trajectory YAML export.',
-  },
-  {
-    icon: Layers,
-    title: 'Flexible-body MBD (Wave 9C3)',
-    body: 'Craig-Bampton modal-synthesis reduction: attach FEA mode shapes to rigid bodies, capture flexibility mid-simulation. Pacejka Magic Formula tire model — Adams/Car parity for vehicle dynamics.',
-  },
-  {
-    icon: Activity,
-    title: 'Keyframe animation + armature',
-    body: 'FCurve keyframe system with bezier / cubic-Hermite / cyclic interpolation. Armature poser with cascading parent-matrix transforms. Export joint-angle CSV for controller validation.',
-  },
-  {
-    icon: Cog,
-    title: 'Contact dynamics',
-    body: 'Penalty-based contact + friction cone model; collision detection between rigid bodies; impulse resolution for hard contacts. Integrates with the Featherstone dynamics tree.',
+    title: 'Fabric drape simulation',
+    body: 'Mass-spring cloth simulation for drape preview on parametric dress forms. Adjust fabric weight and stiffness; see gathering, pleating, and drape in the 3D viewport before cutting.',
   },
 ]
 
@@ -183,12 +154,12 @@ function CapabilityGrid() {
             What&apos;s included
           </p>
           <h2 className="mt-2 font-display text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-[-0.02em]">
-            Dynamics to trajectory.
+            Draft to cut file.
             <br />
             <span className="text-ink-300">Chat-native.</span>
           </h2>
           <p className="mt-3 text-ink-300 leading-relaxed">
-            Every motion module ships in the same MIT-licensed binary — no add-ons,
+            Every textile module ships in the same MIT-licensed binary — no add-ons,
             no tier gates.
           </p>
         </div>
@@ -208,7 +179,7 @@ function CapabilityGrid() {
 /* -------------------------------------------------------------------------- */
 
 const FILE_TYPES = [
-  '.urdf', '.sdf', '.csv (joint angles)', '.yaml (ROS2)', '.step', '.dxf (cam)',
+  '.dxf (pattern)', '.svg', '.pdf (lay plan)', '.csv (grade rules)', '.obj (3D drape)',
 ]
 
 function FileTypesStrip() {
@@ -246,7 +217,7 @@ function PromptExample() {
             In practice
           </p>
           <h2 className="mt-2 font-display text-3xl sm:text-4xl font-semibold tracking-[-0.02em]">
-            Describe the mechanism. Get the simulation.
+            Describe the garment. Get the pattern.
           </h2>
         </div>
 
@@ -255,16 +226,16 @@ function PromptExample() {
             <span className="w-2.5 h-2.5 rounded-full bg-red-500/70" aria-hidden />
             <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/70" aria-hidden />
             <span className="w-2.5 h-2.5 rounded-full bg-green-500/70" aria-hidden />
-            <span className="ml-2 font-mono text-xs text-ink-400">pick_place_arm.urdf — kerf chat</span>
+            <span className="ml-2 font-mono text-xs text-ink-400">shirt_block.pattern — kerf chat</span>
           </div>
 
           <div className="p-5 flex flex-col gap-4">
             <div className="flex justify-end">
               <div className="max-w-[85%] rounded-xl rounded-tr-sm bg-ink-800 border border-ink-700 px-3.5 py-2.5">
                 <p className="text-sm text-ink-100 leading-relaxed">
-                  Plan a pick-and-place trajectory from the home pose to position
-                  (0.35, 0.1, 0.22 m). Blend the approach and depart phases with
-                  quintic interpolation and check for joint-limit violations.
+                  Draft a fitted shirt bodice block for a 92 cm chest, 78 cm waist.
+                  Grade it across sizes 36–44 using standard EN 13402 rules and add
+                  1.5 cm seam allowances on side seams.
                 </p>
               </div>
             </div>
@@ -274,10 +245,10 @@ function PromptExample() {
                 <span className="text-[10px] uppercase tracking-widest text-cyan-edge border border-cyan-edge/30 rounded px-1.5 py-0.5">
                   tool
                 </span>
-                <span className="text-sm text-ink-200">motion.plan_trajectory</span>
+                <span className="text-sm text-ink-200">textiles.draft_bodice_block</span>
               </div>
               <p className="text-xs text-emerald-400/80 mt-1">
-                Trajectory planned — 3 segments, quintic blend. Joint limits: all clear. Duration 1.8 s. YAML exported.
+                Bodice block drafted — 5 sizes (36–44). Side seams: 1.5 cm allowance. Grain lines and notches placed. DXF exported.
               </p>
             </div>
 
@@ -287,9 +258,10 @@ function PromptExample() {
               </span>
               <div className="flex-1 rounded-xl rounded-tl-sm border border-ink-800 bg-ink-900/40 px-3.5 py-2.5">
                 <p className="text-sm text-ink-200 leading-relaxed">
-                  Trajectory ready. Three quintic-blended segments take the arm from home to the
-                  target in 1.8 s. No joint limits breached — peak J3 is 78° against a 90° limit.
-                  ROS2 trajectory YAML exported to <code className="text-cyan-edge font-mono text-xs">pick_place_arm.yaml</code>.
+                  Done. Fitted bodice block drafted for a 92 cm chest / 78 cm waist and graded
+                  across sizes 36–44 using EN 13402 grade increments. Side seams carry 1.5 cm
+                  allowances; neckline and armhole have 1 cm. Grain lines and balance notches are
+                  placed. DXF ready for your plotter.
                 </p>
               </div>
             </div>
@@ -310,16 +282,16 @@ function InterchangeCallout() {
       <div className="mx-auto max-w-7xl px-6 py-12 lg:py-14">
         <div className="rounded-2xl border border-cyan-edge/20 bg-cyan-edge/5 p-6 lg:p-8">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-cyan-edge mb-3">
-            Both produce URDF + ROS2 YAML
+            Both produce DXF + SVG
           </p>
           <h3 className="font-display text-2xl font-semibold tracking-[-0.02em]">
-            Kinematic models and trajectories in the same interchange format.
+            2D patterns and 3D drape in the same project.
           </h3>
           <p className="mt-3 text-ink-300 leading-relaxed max-w-3xl">
-            Whether you model a parallel robot or a serial arm, Kerf exports
-            URDF for the kinematic description and ROS2-compatible trajectory
-            YAML for the motion plan. Feed both directly into MoveIt 2,
-            Gazebo, or a real robot controller — no conversion step required.
+            Whether you need a flat DXF for a digital cutter, an SVG for a home
+            printer, or an OBJ drape preview for a presentation, Kerf produces them
+            all from the same parametric pattern. Change a measurement and every
+            output updates together — no redrawing, no re-exporting by hand.
           </p>
         </div>
       </div>
@@ -340,10 +312,10 @@ function CompareStrip() {
             Deep-dive comparison
           </span>
           <Link
-            to="/compare/adams"
+            to="/compare/clo3d"
             className="inline-flex items-center gap-1.5 rounded-lg border border-ink-800 bg-ink-900/40 px-3 py-1.5 text-xs font-mono text-ink-300 hover:border-ink-700 hover:text-ink-100 transition-colors"
           >
-            Kerf vs MSC Adams
+            Kerf vs CLO3D
             <ExternalLink size={11} />
           </Link>
         </div>
@@ -368,11 +340,11 @@ function CTAStrip() {
           <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
             <div>
               <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-[-0.02em]">
-                Simulate your first mechanism.
+                Draft your first pattern.
               </h2>
               <p className="mt-2 text-ink-300 max-w-xl">
-                Sign up free and plan a trajectory in your next session — or clone
-                the repo and self-host. Both paths are first-class.
+                Sign up free and cut a graded pattern block in your next session — or
+                clone the repo and self-host. Both paths are first-class.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -403,12 +375,12 @@ function CTAStrip() {
 /* Page                                                                        */
 /* -------------------------------------------------------------------------- */
 
-export default function MotionSim() {
+export default function Textiles() {
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100">
       <Header />
       <Hero />
-      <DomainSwitcher active="motion" />
+      <DomainSwitcher active="textiles" />
       <CapabilityGrid />
       <FileTypesStrip />
       <PromptExample />

@@ -16,7 +16,6 @@ import Header from '../../components/Header.jsx'
 import Footer from '../../components/Footer.jsx'
 import Button from '../../components/Button.jsx'
 import DomainSwitcher from '../../components/domains/DomainSwitcher.jsx'
-import { meta } from './plc.meta.js'
 import { ScriptingIllustration } from '../../components/illustrations/index.js'
 
 export const HERO_ILLUSTRATION = ScriptingIllustration

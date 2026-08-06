@@ -38,6 +38,7 @@ import { CircuitIllustration, SpiceSimIllustration } from '../../components/illu
 
 // Exported so tests and parent pages can reference the illustration mapping
 export const HERO_ILLUSTRATION = CircuitIllustration
+// eslint-disable-next-line react-refresh/only-export-components -- data export alongside the page component, pre-existing before this migration.
 export const CAPABILITY_ILLUSTRATIONS = [
   { Illustration: SpiceSimIllustration, caption: 'SPICE transient analysis of the analog IP block under PVT corner simulation.' },
 ]

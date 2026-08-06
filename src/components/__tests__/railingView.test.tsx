@@ -169,19 +169,21 @@ describe('railingFromStair', () => {
   }
 
   it('returns a railing object for side=left', () => {
-    const r = railingFromStair(makeStair(), 'left')
+    // Fixture's plain number[] doesn't satisfy the Vec3-tuple / single-doc
+    // return types; cast at the boundary rather than tuple-type the fixture.
+    const r = railingFromStair(makeStair() as any, 'left') as any
     expect(r).toHaveProperty('path')
     expect(r.path.length).toBeGreaterThan(1)
   })
 
   it('returns an array of two railings for side=both', () => {
-    const result = railingFromStair(makeStair(), 'both')
+    const result = railingFromStair(makeStair() as any, 'both')
     expect(Array.isArray(result)).toBe(true)
     expect(result).toHaveLength(2)
   })
 
   it('path length matches step_count + 1', () => {
-    const r = railingFromStair(makeStair(), 'right')
+    const r = railingFromStair(makeStair() as any, 'right') as any
     expect(r.path).toHaveLength(9) // 8 steps → 9 points
   })
 })

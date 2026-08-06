@@ -7,14 +7,20 @@
  */
 
 import { describe, it, expect } from 'vitest'
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
-import { resolve } from 'path'
+// @ts-expect-error - no @types/node in this toolchain
+import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
+import { resolve, dirname } from 'path'
 
 import {
   parseTextilesResult,
   fmtFloat,
   weaveStatLabel,
 } from '../TextilesWeaveKnitPanel.jsx'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const SRC = readFileSync(
   resolve(__dirname, '../TextilesWeaveKnitPanel.tsx'),
@@ -79,13 +85,15 @@ describe('parseTextilesResult', () => {
   })
 
   it('returns invalid when result has error key', () => {
-    const r = parseTextilesResult({ error: 'unknown weave structure' })
+    // Discriminated union; `expect().toBe()` doesn't narrow for TS — probe via `any`.
+    const r: any = parseTextilesResult({ error: 'unknown weave structure' })
     expect(r.kind).toBe('invalid')
     expect(r.error).toMatch(/unknown/)
   })
 
   it('detects weave type from float_stats', () => {
-    const r = parseTextilesResult({
+    // See discriminated-union note above.
+    const r: any = parseTextilesResult({
       name: '2/1 twill',
       float_stats: { warp_mean_float: 1.5, max_float: 2 },
       analytic_warp_mean_float: 1.5,
@@ -98,7 +106,8 @@ describe('parseTextilesResult', () => {
   })
 
   it('detects knit type from density_stats', () => {
-    const r = parseTextilesResult({
+    // See discriminated-union note above.
+    const r: any = parseTextilesResult({
       name: 'jersey',
       density_stats: { wales_per_cm: 5.0, courses_per_cm: 7.0, density_within_1pct: true },
       svg: '<svg/>',
@@ -108,7 +117,8 @@ describe('parseTextilesResult', () => {
   })
 
   it('parses weave stats correctly', () => {
-    const r = parseTextilesResult({
+    // See discriminated-union note above.
+    const r: any = parseTextilesResult({
       analytic_warp_mean_float: 2.0,
       analytic_weft_mean_float: 1.0,
       float_stats: { max_float: 2 },
@@ -118,7 +128,8 @@ describe('parseTextilesResult', () => {
   })
 
   it('parses knit stats correctly', () => {
-    const r = parseTextilesResult({
+    // See discriminated-union note above.
+    const r: any = parseTextilesResult({
       density_stats: { wales_per_cm: 5, courses_per_cm: 7, density_within_1pct: true },
     })
     expect(r.stats.wales_per_cm).toBe(5)
@@ -131,7 +142,8 @@ describe('parseTextilesResult', () => {
       name: 'plain',
       float_stats: { warp_mean_float: 1.0 },
     })
-    const r = parseTextilesResult(raw)
+    // See discriminated-union note above.
+    const r: any = parseTextilesResult(raw)
     expect(r.kind).toBe('ok')
     expect(r.name).toBe('plain')
   })

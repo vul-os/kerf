@@ -18,8 +18,14 @@
 import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement, useCallback } from 'react'
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync, existsSync } from 'fs'
-import { resolve } from 'path'
+// @ts-expect-error - no @types/node in this toolchain
+import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
+import { resolve, dirname } from 'path'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 // ── Import the component under test ──────────────────────────────────────────
 import UnsavedRestoreBanner from '../UnsavedRestoreBanner.jsx'
@@ -43,7 +49,10 @@ function makeUseWorkspace({
 function render(entries, extra = {}) {
   const useWorkspace = makeUseWorkspace({ unsavedEntries: entries, ...extra })
   return renderToStaticMarkup(
-    createElement(UnsavedRestoreBanner, { useWorkspace }),
+    // Mock only implements the selector-call shape, not the full
+    // UseBoundStore interface; cast at the boundary (component owned by
+    // another slice).
+    createElement(UnsavedRestoreBanner, { useWorkspace: useWorkspace as any }),
   )
 }
 

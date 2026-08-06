@@ -4,8 +4,43 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { Play, Plus, Trash2, X, ChevronDown } from 'lucide-react'
-import { defaultGraph, addNode, removeNode, connectNodes, disconnectNode, evaluateGraph } from '../lib/graph.js'
+import { defaultGraph, addNode, removeNode, connectNodes, evaluateGraph } from '../lib/graph.js'
 import { graphOps, BACKEND_OPS } from '../lib/graphOps.js'
+
+// ---------------------------------------------------------------------------
+// Local domain types — src/lib/graph.ts exports its functions with implicit
+// `any` graph params/returns (no shared type), so the graph/node shape is
+// declared locally from this file's own usage + graph.ts's doc comments.
+// ---------------------------------------------------------------------------
+
+interface GraphNodeData {
+  id: string
+  op: string
+  params?: Record<string, unknown>
+  inputs?: string[]
+  x?: number
+  y?: number
+}
+
+interface GraphData {
+  version?: string
+  name?: string
+  nodes: GraphNodeData[]
+  outputs?: string[]
+}
+
+interface Point {
+  x: number
+  y: number
+}
+
+type Positions = Record<string, Point>
+
+interface RunResult {
+  outputs: Record<string, unknown>
+  intermediate: Record<string, unknown>
+  errors: string[]
+}
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -51,10 +86,8 @@ const BACKEND_OP_NAMES = [
   'assembly.constrain',
 ]
 
-const ALL_OPS = [...BUILTIN_OP_NAMES, ...BACKEND_OP_NAMES]
-
 // Default param values for new nodes
-const DEFAULT_PARAMS = {
+const DEFAULT_PARAMS: Record<string, Record<string, unknown>> = {
   number_slider: { value: 0 },
   integer_slider: { value: 0 },
   panel: { value: '' },
@@ -67,36 +100,25 @@ const DEFAULT_PARAMS = {
 
 // ── Layout helpers ─────────────────────────────────────────────────────────────
 
-function nodeHeight(node) {
+function nodeHeight(node: GraphNodeData): number {
   const params = Object.keys(node.params || {})
   return NODE_H + params.length * PARAM_ROW_H
 }
 
-function portY(node, index, total) {
+function portY(node: GraphNodeData, index: number, total: number): number {
   const h = nodeHeight(node)
   if (total <= 1) return h / 2
   return (h / (total + 1)) * (index + 1)
 }
 
-function inputPortPos(node, paramIndex, paramCount) {
-  const x = node.x ?? 0
-  const y = node.y ?? 0
-  return {
-    x: x,
-    y: y + portY(node, paramIndex, paramCount),
-  }
-}
-
-function outputPortPos(node) {
-  const x = node.x ?? 0
-  const y = node.y ?? 0
-  const h = nodeHeight(node)
-  return { x: x + NODE_W, y: y + h / 2 }
-}
-
 // ── SVG Canvas ────────────────────────────────────────────────────────────────
 
-function EdgePath({ from, to }) {
+interface EdgePathProps {
+  from: Point
+  to: Point
+}
+
+function EdgePath({ from, to }: EdgePathProps) {
   const dx = Math.abs(to.x - from.x) * 0.5
   const d = `M ${from.x} ${from.y} C ${from.x + dx} ${from.y}, ${to.x - dx} ${to.y}, ${to.x} ${to.y}`
   return (
@@ -110,6 +132,17 @@ function EdgePath({ from, to }) {
   )
 }
 
+interface GraphNodeProps {
+  node: GraphNodeData
+  isSelected: boolean
+  onSelect: (id: string) => void
+  onDragStart: (e: React.MouseEvent, nodeId: string) => void
+  onOutputPortClick: (nodeId: string) => void
+  onInputPortClick: (targetId: string, paramKey: string) => void
+  pendingSourceId: string | null
+  results: Record<string, unknown>
+}
+
 function GraphNode({
   node,
   isSelected,
@@ -119,7 +152,7 @@ function GraphNode({
   onInputPortClick,
   pendingSourceId,
   results,
-}) {
+}: GraphNodeProps) {
   const h = nodeHeight(node)
   const params = Object.entries(node.params || {})
   const isBackend = BACKEND_OPS.has(node.op)
@@ -129,7 +162,7 @@ function GraphNode({
   const borderColor = isSelected ? '#4ade80' : isBackend ? '#7c3aed' : '#2d2d2d'
   const headerColor = isBackend ? '#3b1e6b' : '#1a1a1a'
 
-  const canConnectTo = pendingSourceId && pendingSourceId !== node.id
+  const canConnectTo = pendingSourceId !== null && pendingSourceId !== node.id
 
   return (
     <g
@@ -259,7 +292,13 @@ function GraphNode({
 
 // ── Param inspector panel ─────────────────────────────────────────────────────
 
-function ParamField({ paramKey, value, onUpdate }) {
+interface ParamFieldProps {
+  paramKey: string
+  value: unknown
+  onUpdate: (paramKey: string, value: unknown) => void
+}
+
+function ParamField({ paramKey, value, onUpdate }: ParamFieldProps) {
   const isRef = typeof value === 'string' && value.startsWith('@')
 
   if (isRef) {
@@ -267,7 +306,7 @@ function ParamField({ paramKey, value, onUpdate }) {
       <div className="flex items-center gap-2 py-1">
         <span className="text-xs text-ink-400 w-24 truncate font-mono">{paramKey}</span>
         <span className="flex-1 text-xs text-kerf-300 font-mono truncate bg-ink-850 px-2 py-0.5 rounded">
-          {value}
+          {value as string}
         </span>
         <button
           type="button"
@@ -336,7 +375,15 @@ function ParamField({ paramKey, value, onUpdate }) {
   )
 }
 
-function InspectorPanel({ node, results, onParamUpdate, onDelete, onClose }) {
+interface InspectorPanelProps {
+  node: GraphNodeData | null
+  results: Record<string, unknown>
+  onParamUpdate: (paramKey: string, value: unknown) => void
+  onDelete: (nodeId: string) => void
+  onClose: () => void
+}
+
+function InspectorPanel({ node, results, onParamUpdate, onDelete, onClose }: InspectorPanelProps) {
   if (!node) {
     return (
       <div className="w-64 border-l border-ink-800 bg-ink-900 flex items-center justify-center text-xs text-ink-500 p-4 text-center">
@@ -402,9 +449,15 @@ function InspectorPanel({ node, results, onParamUpdate, onDelete, onClose }) {
 
 // ── Main GraphEditor ──────────────────────────────────────────────────────────
 
-export default function GraphEditor({ content, fileName, onContentChange }) {
+export interface Props {
+  content?: string
+  fileName?: string
+  onContentChange?: (json: string) => void
+}
+
+export default function GraphEditor({ content, fileName, onContentChange }: Props) {
   // Parse or default
-  const [graph, setGraph] = useState(() => {
+  const [graph, setGraph] = useState<GraphData>(() => {
     try {
       const parsed = JSON.parse(content || '{}')
       return (parsed && parsed.nodes) ? parsed : defaultGraph(fileName || 'graph')
@@ -420,6 +473,9 @@ export default function GraphEditor({ content, fileName, onContentChange }) {
       prevContentRef.current = content
       try {
         const parsed = JSON.parse(content || '{}')
+        // Resyncs local state from an external prop change (LLM write landing mid-edit),
+        // pre-existing before this migration.
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- see above.
         if (parsed && parsed.nodes) setGraph(parsed)
       } catch { /* bad JSON, leave graph as-is */ }
     }
@@ -427,8 +483,8 @@ export default function GraphEditor({ content, fileName, onContentChange }) {
 
   // Node positions (local only; written into graph on next save)
   // Seed from graph.nodes[*].x/y if present, else auto-layout
-  const [positions, setPositions] = useState(() => {
-    const pos = {}
+  const [positions, setPositions] = useState<Positions>(() => {
+    const pos: Positions = {}
     const nodes = graph.nodes || []
     nodes.forEach((n, i) => {
       pos[n.id] = { x: n.x ?? 80 + (i % 4) * 200, y: n.y ?? 80 + Math.floor(i / 4) * 160 }
@@ -436,22 +492,29 @@ export default function GraphEditor({ content, fileName, onContentChange }) {
     return pos
   })
 
-  const [selectedId, setSelectedId] = useState(null)
-  const [pendingSourceId, setPendingSourceId] = useState(null) // output port click pending
-  const [runResult, setRunResult] = useState(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [pendingSourceId, setPendingSourceId] = useState<string | null>(null) // output port click pending
+  const [runResult, setRunResult] = useState<RunResult | null>(null)
   const [showRunPanel, setShowRunPanel] = useState(false)
   const [addDropdownOpen, setAddDropdownOpen] = useState(false)
-  const [nodeResults, setNodeResults] = useState({})
+  const [nodeResults, setNodeResults] = useState<Record<string, unknown>>({})
 
   // Dragging state
-  const draggingRef = useRef(null) // { nodeId, startMouse, startPos }
-  const svgRef = useRef(null)
+  interface DragState {
+    nodeId: string
+    startMouseX: number
+    startMouseY: number
+    startX: number
+    startY: number
+  }
+  const draggingRef = useRef<DragState | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
 
   // Debounce timer for onContentChange
-  const changeTimerRef = useRef(null)
+  const changeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Merge positions into graph nodes and call onContentChange
-  const flushChanges = useCallback((g, pos) => {
+  const flushChanges = useCallback((g: GraphData, pos: Positions) => {
     if (changeTimerRef.current) clearTimeout(changeTimerRef.current)
     changeTimerRef.current = setTimeout(() => {
       const withPos = {
@@ -477,7 +540,7 @@ export default function GraphEditor({ content, fileName, onContentChange }) {
   }, [graph])
 
   // Add node
-  const handleAddNode = useCallback((op) => {
+  const handleAddNode = useCallback((op: string) => {
     const params = DEFAULT_PARAMS[op] ?? {}
     const next = addNode(graph, { op, params })
     const newNode = next.nodes[next.nodes.length - 1]
@@ -497,7 +560,7 @@ export default function GraphEditor({ content, fileName, onContentChange }) {
   }, [graph, positions, flushChanges])
 
   // Delete selected node
-  const handleDeleteNode = useCallback((nodeId) => {
+  const handleDeleteNode = useCallback((nodeId: string) => {
     try {
       const next = removeNode(graph, nodeId)
       const nextPos = { ...positions }
@@ -507,12 +570,12 @@ export default function GraphEditor({ content, fileName, onContentChange }) {
       if (selectedId === nodeId) setSelectedId(null)
       flushChanges(next, nextPos)
     } catch (err) {
-      alert(err.message)
+      alert((err as Error).message)
     }
   }, [graph, positions, selectedId, flushChanges])
 
   // Update a param on the selected node
-  const handleParamUpdate = useCallback((paramKey, value) => {
+  const handleParamUpdate = useCallback((paramKey: string, value: unknown) => {
     if (!selectedId) return
     const next = {
       ...graph,
@@ -525,12 +588,12 @@ export default function GraphEditor({ content, fileName, onContentChange }) {
   }, [graph, positions, selectedId, flushChanges])
 
   // Output port click — start pending connection
-  const handleOutputPortClick = useCallback((nodeId) => {
+  const handleOutputPortClick = useCallback((nodeId: string) => {
     setPendingSourceId((prev) => prev === nodeId ? null : nodeId)
   }, [])
 
   // Input port click — complete connection
-  const handleInputPortClick = useCallback((targetId, paramKey) => {
+  const handleInputPortClick = useCallback((targetId: string, paramKey: string) => {
     if (!pendingSourceId || pendingSourceId === targetId) {
       setPendingSourceId(null)
       return
@@ -540,14 +603,13 @@ export default function GraphEditor({ content, fileName, onContentChange }) {
       setGraph(next)
       flushChanges(next, positions)
     } catch (err) {
-      alert(err.message)
+      alert((err as Error).message)
     }
     setPendingSourceId(null)
   }, [graph, positions, pendingSourceId, flushChanges])
 
   // Drag node start
-  const handleDragStart = useCallback((e, nodeId) => {
-    const pt = svgRef.current?.getBoundingClientRect()
+  const handleDragStart = useCallback((e: React.MouseEvent, nodeId: string) => {
     draggingRef.current = {
       nodeId,
       startMouseX: e.clientX,
@@ -558,7 +620,7 @@ export default function GraphEditor({ content, fileName, onContentChange }) {
   }, [positions])
 
   // Mouse move / up on SVG
-  const handleSvgMouseMove = useCallback((e) => {
+  const handleSvgMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (!draggingRef.current) return
     const { nodeId, startMouseX, startMouseY, startX, startY } = draggingRef.current
     const dx = e.clientX - startMouseX
@@ -570,7 +632,6 @@ export default function GraphEditor({ content, fileName, onContentChange }) {
 
   const handleSvgMouseUp = useCallback(() => {
     if (draggingRef.current) {
-      const { nodeId } = draggingRef.current
       draggingRef.current = null
       // Flush position change
       setPositions((prev) => {
@@ -588,7 +649,7 @@ export default function GraphEditor({ content, fileName, onContentChange }) {
 
   // Build edges from param refs
   const edges = useMemo(() => {
-    const out = []
+    const out: { key: string; from: Point; to: Point }[] = []
     for (const node of graph.nodes || []) {
       const params = Object.entries(node.params || {})
       params.forEach(([paramKey, val], paramIdx) => {

@@ -20,7 +20,7 @@
 //
 // Props: none (standalone panel)
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, type CSSProperties } from 'react'
 import { Settings, Cog, Circle, Sliders, AlertTriangle, CheckCircle, Loader2, Play } from 'lucide-react'
 
 const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
@@ -29,7 +29,8 @@ const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API
 // Styles (inline, consistent with AcousticsResultPanel palette)
 // ---------------------------------------------------------------------------
 
-const s = {
+// Typed so literals like borderCollapse:'collapse' keep their CSSProperties meaning.
+const s: Record<string, CSSProperties> = {
   root:         { background: '#111827', padding: '12px', fontSize: 12, color: '#e5e7eb', minHeight: 200 },
   header:       { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 },
   title:        { fontWeight: 600, fontSize: 13, color: '#f9fafb' },
@@ -365,7 +366,7 @@ function CamTab() {
         beta_deg: parseFloat(betaDeg),
         n_points: 180,
         rise: rise === 'true',
-      }
+      } as Record<string, unknown>
       if (law === 'polynomial') args.poly_order = parseInt(polyOrder, 10)
       const r = await callTool('synthesise_cam', args)
       if (!r.ok) { setError(r.reason || r.error || 'cam synthesis failed'); return }
@@ -489,7 +490,7 @@ function GearTab() {
         target_ratio: parseFloat(targetRatio),
         speed_range_rpm: [0, parseFloat(maxRpm) || 3000],
         tol_ratio: parseFloat(tolRatio) || 0.02,
-      }
+      } as Record<string, unknown>
       if (preferStages) args.prefer_stages = parseInt(preferStages, 10)
       const r = await callTool('synthesise_gear_train', args)
       if (!r.ok) { setError(r.reason || r.error || 'gear synthesis failed'); return }
@@ -607,7 +608,12 @@ const TABS = [
   { id: 'gear',    label: 'Gear-train', icon: <Cog size={11} /> },
 ]
 
-export default function MechanismSynthesisPanel({ content } = {}) {
+export interface MechanismSynthesisPanelProps {
+  /** JSON string optionally carrying persisted tab selection. */
+  content?: string
+}
+
+export default function MechanismSynthesisPanel({ content }: MechanismSynthesisPanelProps = {}) {
   // content prop: JSON string optionally carrying persisted tab selection.
   const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
   const [activeTab, setActiveTab] = useState(_parsed.tab || 'fourbar')

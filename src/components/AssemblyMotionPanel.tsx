@@ -34,9 +34,13 @@ export type DriverType = typeof DRIVER_TYPES[number]
 // Data shapes
 // ---------------------------------------------------------------------------
 
+/**
+ * No index signature: TypeScript gives interfaces no implicit index signature, so adding one
+ * makes every concrete interface (AssemblyEditor's EditorRow, AssemblyComponent) permanently
+ * un-assignable here. Only `id` is read.
+ */
 export interface AssemblyComponentRow {
   id: string
-  [key: string]: unknown
 }
 
 export interface JointSpec {

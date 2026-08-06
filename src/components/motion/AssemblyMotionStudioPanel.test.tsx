@@ -11,14 +11,20 @@
  * Tier 4 — scrubber state: mock fetch + inject fake timeline, verify frame advances.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+// @types/node isn't part of this project's toolchain (tsconfig.json's `types` array is
+// T-500's — see docs/typescript-migration.md), so these Node builtins (used only for this
+// file's source-inspection tier) are untyped at this boundary.
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
+// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const src = readFileSync(path.resolve(__dirname, './AssemblyMotionStudioPanel.jsx'), 'utf8')
+const src = readFileSync(path.resolve(__dirname, './AssemblyMotionStudioPanel.tsx'), 'utf8')
 
 // ── Mocks ─────────────────────────────────────────────────────────────────
 vi.mock('../../store/auth.js', () => ({
@@ -53,13 +59,15 @@ vi.mock('three', () => ({
   })),
 }))
 
-import AssemblyMotionStudioPanel, {
+import AssemblyMotionStudioPanel from './AssemblyMotionStudioPanel.jsx'
+import {
   JOINT_TYPES,
   DRIVER_TYPES,
   parseTableDriver,
   buildTimelinePayload,
   parseStudySpec,
-} from './AssemblyMotionStudioPanel.jsx'
+} from './motionHelpers'
+import type { Joint, Driver } from './motionTypes'
 
 // ===========================================================================
 // Tier 1 — source inspection
@@ -173,15 +181,15 @@ describe('parseTableDriver', () => {
 
 describe('buildTimelinePayload', () => {
   it('returns tool=motion_frame_timeline', () => {
-    const joints = [{ componentA: 'arm', componentB: 'base', type: 'revolute' }]
-    const driver = { type: 'constant_velocity', velocity: 2.0 }
+    const joints: Joint[] = [{ componentA: 'arm', componentB: 'base', type: 'revolute' }]
+    const driver: Driver = { type: 'constant_velocity', velocity: 2.0 }
     const sim = { dt: 0.01, duration: 1.0, maxFrames: 100 }
     const p = buildTimelinePayload(joints, driver, sim)
     expect(p.tool).toBe('motion_frame_timeline')
   })
 
   it('args.bodies contains the joint components', () => {
-    const joints = [{ componentA: 'link1', componentB: 'link2', type: 'revolute' }]
+    const joints: Joint[] = [{ componentA: 'link1', componentB: 'link2', type: 'revolute' }]
     const p = buildTimelinePayload(joints, { type: 'constant_velocity', velocity: 1 }, { dt: 0.01, duration: 1 })
     const bodyNames = p.args.bodies.map((b) => b.name)
     expect(bodyNames).toContain('link1')
@@ -200,7 +208,7 @@ describe('buildTimelinePayload', () => {
   })
 
   it('constant_velocity driver adds applied torque force', () => {
-    const driver = { type: 'constant_velocity', velocity: 3.0 }
+    const driver: Driver = { type: 'constant_velocity', velocity: 3.0 }
     const p = buildTimelinePayload(
       [{ componentA: 'b0', componentB: 'b1', type: 'revolute' }],
       driver,
@@ -212,21 +220,21 @@ describe('buildTimelinePayload', () => {
   })
 
   it('sinusoidal driver adds applied force with amplitude', () => {
-    const driver = { type: 'sinusoidal', amplitude: 2.5, frequency: 1.0 }
+    const driver: Driver = { type: 'sinusoidal', amplitude: 2.5, frequency: 1.0 }
     const p = buildTimelinePayload([], driver, { dt: 0.01, duration: 1.0 })
     const applied = p.args.forces.find((f) => f.type === 'applied')
     expect(applied?.torque[2]).toBe(2.5)
   })
 
   it('table driver with < 2 points: no driver force added', () => {
-    const driver = { type: 'table', table: '0.0 0' }   // only 1 point
+    const driver: Driver = { type: 'table', table: '0.0 0' }   // only 1 point
     const p = buildTimelinePayload([], driver, { dt: 0.01, duration: 1.0 })
     const tableFf = p.args.forces.find((f) => f.type === 'table_driver')
     expect(tableFf).toBeUndefined()
   })
 
   it('table driver with 2+ points: table_driver force added', () => {
-    const driver = { type: 'table', table: '0.0 0\n1.0 3.14' }
+    const driver: Driver = { type: 'table', table: '0.0 0\n1.0 3.14' }
     const p = buildTimelinePayload([], driver, { dt: 0.01, duration: 1.0 })
     const tableFf = p.args.forces.find((f) => f.type === 'table_driver')
     expect(tableFf).toBeDefined()
@@ -381,8 +389,8 @@ describe('JOINT_TYPES and DRIVER_TYPES constants', () => {
 
 describe('buildTimelinePayload: deterministic output', () => {
   it('same inputs → same output', () => {
-    const joints = [{ componentA: 'a', componentB: 'b', type: 'revolute' }]
-    const driver = { type: 'constant_velocity', velocity: 1.0 }
+    const joints: Joint[] = [{ componentA: 'a', componentB: 'b', type: 'revolute' }]
+    const driver: Driver = { type: 'constant_velocity', velocity: 1.0 }
     const sim = { dt: 0.01, duration: 2.0 }
     const p1 = buildTimelinePayload(joints, driver, sim)
     const p2 = buildTimelinePayload(joints, driver, sim)
@@ -390,8 +398,8 @@ describe('buildTimelinePayload: deterministic output', () => {
   })
 
   it('dt affects n_steps proportionally', () => {
-    const joints = []
-    const driver = { type: 'constant_velocity', velocity: 1.0 }
+    const joints: Joint[] = []
+    const driver: Driver = { type: 'constant_velocity', velocity: 1.0 }
     const p1 = buildTimelinePayload(joints, driver, { dt: 0.01, duration: 1.0 })
     const p2 = buildTimelinePayload(joints, driver, { dt: 0.005, duration: 1.0 })
     expect(p2.args.n_steps).toBe(p1.args.n_steps * 2)

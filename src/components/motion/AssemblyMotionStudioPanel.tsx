@@ -43,10 +43,10 @@ import {
   useRef,
   useState,
 } from 'react'
+import type { RefObject } from 'react'
 import {
   Activity,
   AlertTriangle,
-  ChevronDown,
   ChevronRight,
   Download,
   Loader2,
@@ -54,157 +54,67 @@ import {
   Play,
   Plus,
   SkipBack,
-  SkipForward,
   Square,
   Trash2,
   Zap,
 } from 'lucide-react'
 import { useAuth } from '../../store/auth.js'
+import type {
+  Joint, JointType, Driver, SimParams,
+  BodyPose, MotionFrame, FrameTimeline, InterferenceEvent,
+} from './motionTypes'
+import { JOINT_TYPES, buildTimelinePayload, parseStudySpec } from './motionHelpers'
 
-const API_URL = import.meta.env.VITE_API_URL || ''
+export interface Props {
+  /** Parsed `.motion` study spec, its JSON-string form, or null. */
+  content?: string | Record<string, unknown> | null
+  /** File object from the workspace registry; only `.name` is read here. */
+  file?: { name?: string } | null
+  projectId?: string | null
+  fileId?: string | null
+}
+
+const API_URL: string = import.meta.env.VITE_API_URL || ''
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-export const JOINT_TYPES = ['revolute', 'prismatic', 'cylindrical', 'fixed', 'spherical']
-export const DRIVER_TYPES = ['constant_velocity', 'sinusoidal', 'table']
 
 const BODY_PALETTE = [
   0x4e9af1, 0xf1a94e, 0x6fe06f, 0xf16f8e, 0xb36ff1,
   0x6ff1e0, 0xf1ec6f, 0xf17f4e, 0x9ef16f, 0x6f9ef1,
 ]
 const GRID_COLOR = 0x2a2f3a
-const GROUND_COLOR = 0x1a1e27
 const FRAME_RATE = 30   // playback fps target
-
-// ---------------------------------------------------------------------------
-// Pure helpers (exported for tests)
-// ---------------------------------------------------------------------------
-
-/**
- * Parse a "t theta" table string into { times, thetas } arrays.
- * Lines with < 2 parsable numbers are silently skipped.
- */
-export function parseTableDriver(raw) {
-  const times = []
-  const thetas = []
-  for (const line of (raw || '').split('\n')) {
-    const parts = line.trim().split(/\s+/)
-    if (parts.length < 2) continue
-    const t = parseFloat(parts[0])
-    const theta = parseFloat(parts[1])
-    if (isFinite(t) && isFinite(theta)) {
-      times.push(t)
-      thetas.push(theta)
-    }
-  }
-  return { times, thetas }
-}
-
-/**
- * Build the `motion_frame_timeline` tool payload from panel state.
- */
-export function buildTimelinePayload(joints, driver, sim) {
-  const n_steps = Math.max(1, Math.round(sim.duration / sim.dt))
-  const record_every = Math.max(1, Math.round(n_steps / Math.min(n_steps, sim.maxFrames ?? 300)))
-
-  const componentIds = []
-  for (const j of joints) {
-    if (j.componentA && !componentIds.includes(j.componentA)) componentIds.push(j.componentA)
-    if (j.componentB && !componentIds.includes(j.componentB)) componentIds.push(j.componentB)
-  }
-  if (componentIds.length === 0) componentIds.push('body_0')
-
-  const bodies = componentIds.map((id, i) => ({
-    name: id,
-    mass: 1.0,
-    inertia: [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-    position: [i * 0.5, 0, 0],
-    velocity: [0, 0, 0],
-  }))
-
-  const forces = [{ type: 'gravity', g: 9.80665 }]
-  const driverForce = _driverForce(driver)
-  if (driverForce) forces.push(driverForce)
-
-  return {
-    tool: 'motion_frame_timeline',
-    args: { bodies, forces, dt: sim.dt, n_steps, record_every },
-  }
-}
-
-function _driverForce(driver) {
-  if (!driver) return null
-  switch (driver.type) {
-    case 'constant_velocity':
-      return {
-        type: 'applied',
-        body_idx: 0,
-        force: [0, 0, 0],
-        torque: [0, 0, driver.velocity ?? 1.0],
-      }
-    case 'sinusoidal':
-      return {
-        type: 'applied',
-        body_idx: 0,
-        force: [0, 0, 0],
-        torque: [0, 0, driver.amplitude ?? 1.0],
-      }
-    case 'table': {
-      const { times, thetas } = parseTableDriver(driver.table ?? '')
-      if (times.length < 2) return null
-      return {
-        type: 'table_driver',
-        body_idx: 0,
-        table_times: times,
-        table_thetas: thetas,
-        inertia: driver.inertia ?? 1.0,
-        damping: driver.damping ?? 0.0,
-        axis: [0, 0, 1],
-      }
-    }
-    default:
-      return null
-  }
-}
-
-/**
- * Parse a motion study spec (from .motion file content) into panel defaults.
- * Returns { joints, driver, sim } or null.
- */
-export function parseStudySpec(content) {
-  if (!content) return null
-  try {
-    const doc = typeof content === 'string' ? JSON.parse(content) : content
-    if (!doc || typeof doc !== 'object') return null
-    return {
-      joints: Array.isArray(doc.joints) ? doc.joints : [],
-      driver: doc.driver ?? { type: 'constant_velocity', velocity: 1.0 },
-      sim: {
-        dt: doc.dt ?? 0.01,
-        duration: doc.duration ?? 2.0,
-        maxFrames: doc.maxFrames ?? 300,
-      },
-    }
-  } catch (_) {
-    return null
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Three.js viewport — lightweight mini-renderer for body poses
 // ---------------------------------------------------------------------------
 
-function useMotionViewport(mountRef, bodies) {
-  const stateRef = useRef(null)
+// The whole `three` namespace, resolved via the dynamic `import('three')` below — kept as a
+// type-only alias since the module itself is only ever loaded at runtime (lazy chunk).
+type ThreeModule = typeof import('three')
+
+interface ViewportState {
+  renderer: import('three').WebGLRenderer
+  scene: import('three').Scene
+  camera: import('three').PerspectiveCamera
+  bodyMeshes: Map<string, import('three').Mesh>
+  ensureBodyMesh: (name: string, idx: number) => import('three').Mesh
+  ro: ResizeObserver
+}
+
+// `bodies` isn't read inside — the hook derives everything it needs from `applyPoses` calls
+// instead; kept in the signature since callers pass it, not this slice's behavior to change.
+function useMotionViewport(mountRef: RefObject<HTMLDivElement | null>, _bodies: string[]) {
+  const stateRef = useRef<ViewportState | null>(null)
 
   useLayoutEffect(() => {
     const el = mountRef.current
     if (!el) return
 
-    let THREE_mod = null
-    let animId = null
+    let THREE_mod: ThreeModule | null = null
+    let animId: number | null = null
     let destroyed = false
 
     async function init() {
@@ -242,7 +152,7 @@ function useMotionViewport(mountRef, bodies) {
         // Simple orbit (manual mouse drag)
         let isDragging = false
         let prevMouse = { x: 0, y: 0 }
-        let spherical = { theta: 0.9, phi: 0.5, r: 6 }
+        const spherical = { theta: 0.9, phi: 0.5, r: 6 }
 
         function updateCamera() {
           const x = spherical.r * Math.sin(spherical.phi) * Math.sin(spherical.theta)
@@ -274,10 +184,11 @@ function useMotionViewport(mountRef, bodies) {
         }, { passive: false })
 
         // Body meshes map: name → THREE.Mesh
-        const bodyMeshes = new Map()
+        const bodyMeshes = new Map<string, import('three').Mesh>()
 
-        function ensureBodyMesh(name, idx) {
-          if (bodyMeshes.has(name)) return bodyMeshes.get(name)
+        function ensureBodyMesh(name: string, idx: number): import('three').Mesh {
+          const existing = bodyMeshes.get(name)
+          if (existing) return existing
           const geo = new THREE.BoxGeometry(0.3, 0.3, 0.3)
           const color = BODY_PALETTE[idx % BODY_PALETTE.length]
           const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.45, metalness: 0.3 })
@@ -308,7 +219,7 @@ function useMotionViewport(mountRef, bodies) {
         ro.observe(el)
 
         stateRef.current = { renderer, scene, camera, bodyMeshes, ensureBodyMesh, ro }
-      } catch (_) {
+      } catch {
         // WebGL unavailable — viewport stays empty
       }
     }
@@ -328,10 +239,10 @@ function useMotionViewport(mountRef, bodies) {
       }
       stateRef.current = null
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps — mount once
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- mount once
 
   // Return an apply function that callers use to push poses
-  const applyPoses = useCallback((poses) => {
+  const applyPoses = useCallback((poses: BodyPose[]) => {
     const s = stateRef.current
     if (!s || !Array.isArray(poses)) return
     poses.forEach((pose, idx) => {
@@ -353,7 +264,14 @@ function useMotionViewport(mountRef, bodies) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function JointRow({ joint, index, onChange, onRemove }) {
+interface JointRowProps {
+  joint: Joint
+  index: number
+  onChange: (index: number, next: Joint) => void
+  onRemove: (index: number) => void
+}
+
+function JointRow({ joint, index, onChange, onRemove }: JointRowProps) {
   return (
     <div
       className="flex flex-col gap-1 bg-ink-900 border border-ink-800 rounded p-2 text-[11px]"
@@ -363,7 +281,7 @@ function JointRow({ joint, index, onChange, onRemove }) {
         <select
           className="flex-1 bg-ink-950 border border-ink-800 rounded px-1.5 py-0.5 text-[11px] text-ink-200"
           value={joint.type}
-          onChange={(e) => onChange(index, { ...joint, type: e.target.value })}
+          onChange={(e) => onChange(index, { ...joint, type: e.target.value as JointType })}
           aria-label={`Joint ${index + 1} type`}
         >
           {JOINT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -399,7 +317,12 @@ function JointRow({ joint, index, onChange, onRemove }) {
   )
 }
 
-function DriverEditor({ driver, onChange }) {
+interface DriverEditorProps {
+  driver: Driver
+  onChange: (next: Driver) => void
+}
+
+function DriverEditor({ driver, onChange }: DriverEditorProps) {
   return (
     <div className="flex flex-col gap-1.5 text-[11px]" data-testid="studio-driver-editor">
       <div className="flex items-center gap-2">
@@ -407,7 +330,7 @@ function DriverEditor({ driver, onChange }) {
         <select
           className="flex-1 bg-ink-950 border border-ink-800 rounded px-1.5 py-0.5 text-[11px] text-ink-200"
           value={driver.type}
-          onChange={(e) => onChange({ ...driver, type: e.target.value })}
+          onChange={(e) => onChange({ ...driver, type: e.target.value } as Driver)}
           aria-label="Driver type"
         >
           <option value="constant_velocity">Constant ω</option>
@@ -466,8 +389,13 @@ function DriverEditor({ driver, onChange }) {
   )
 }
 
+interface TrajectoryTraceProps {
+  frames?: MotionFrame[]
+  bodyName: string
+}
+
 /** Compact trajectory trace SVG for a single body */
-function TrajectoryTrace({ frames, bodyName }) {
+function TrajectoryTrace({ frames, bodyName }: TrajectoryTraceProps) {
   const path = useMemo(() => {
     if (!frames?.length) return ''
     const pts = frames
@@ -476,7 +404,7 @@ function TrajectoryTrace({ frames, bodyName }) {
         if (!p) return null
         return { t: f.t, y: p.position[1] }
       })
-      .filter(Boolean)
+      .filter((p): p is { t: number; y: number } => p !== null)
     if (pts.length < 2) return ''
     const minT = pts[0].t
     const maxT = pts[pts.length - 1].t
@@ -486,8 +414,8 @@ function TrajectoryTrace({ frames, bodyName }) {
     const spanT = maxT - minT || 1
     const spanY = maxY - minY || 1
     const W = 160; const H = 40
-    const toX = (t) => ((t - minT) / spanT) * W
-    const toY = (y) => H - ((y - minY) / spanY) * H
+    const toX = (t: number) => ((t - minT) / spanT) * W
+    const toY = (y: number) => H - ((y - minY) / spanY) * H
     return pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(p.t).toFixed(1)},${toY(p.y).toFixed(1)}`).join(' ')
   }, [frames, bodyName])
 
@@ -500,7 +428,11 @@ function TrajectoryTrace({ frames, bodyName }) {
 }
 
 /** Interference events list */
-function InterferenceOverlay({ events }) {
+interface InterferenceOverlayProps {
+  events?: InterferenceEvent[]
+}
+
+function InterferenceOverlay({ events }: InterferenceOverlayProps) {
   if (!events?.length) {
     return (
       <p className="text-[10px] text-ink-600 italic">No interference events detected.</p>
@@ -535,46 +467,46 @@ function InterferenceOverlay({ events }) {
 export default function AssemblyMotionStudioPanel({
   content = null,
   file = null,
-  projectId = null,
-  fileId = null,
-}) {
+  projectId: _projectId = null,
+  fileId: _fileId = null,
+}: Props) {
   // ── Parse spec from file content ─────────────────────────────────────
   const specDefaults = useMemo(() => parseStudySpec(content), [content])
 
   // ── State ─────────────────────────────────────────────────────────────
-  const [joints, setJoints] = useState(specDefaults?.joints ?? [])
-  const [driver, setDriver] = useState(
+  const [joints, setJoints] = useState<Joint[]>(specDefaults?.joints ?? [])
+  const [driver, setDriver] = useState<Driver>(
     specDefaults?.driver ?? { type: 'constant_velocity', velocity: 1.0 },
   )
-  const [sim, setSim] = useState(
+  const [sim, setSim] = useState<SimParams>(
     specDefaults?.sim ?? { dt: 0.01, duration: 2.0, maxFrames: 300 },
   )
 
   const [running, setRunning] = useState(false)
-  const [error, setError] = useState(null)
-  const [timeline, setTimeline] = useState(null)   // FrameTimeline dict from backend
+  const [error, setError] = useState<string | null>(null)
+  const [timeline, setTimeline] = useState<FrameTimeline | null>(null)   // FrameTimeline dict from backend
   const [frameIdx, setFrameIdx] = useState(0)
   const [playing, setPlaying] = useState(false)
 
-  const [activeTab, setActiveTab] = useState('setup')   // 'setup' | 'results' | 'traces'
+  const [activeTab, setActiveTab] = useState<'setup' | 'results' | 'traces'>('setup')
 
   // ── FEA load export ──────────────────────────────────────────────────────
-  const [feaFormat, setFeaFormat] = useState('nastran')   // 'nastran' | 'calculix'
+  const [feaFormat, setFeaFormat] = useState<'nastran' | 'calculix'>('nastran')
   const [feaCritical, setFeaCritical] = useState(3)       // n_critical instants
   const [feaBusy, setFeaBusy] = useState(false)
-  const [feaError, setFeaError] = useState(null)
+  const [feaError, setFeaError] = useState<string | null>(null)
 
   // ── Viewport ──────────────────────────────────────────────────────────
-  const mountRef = useRef(null)
+  const mountRef = useRef<HTMLDivElement | null>(null)
   const applyPoses = useMotionViewport(mountRef, timeline?.body_names ?? [])
 
   // ── Playback ──────────────────────────────────────────────────────────
-  const playbackRef = useRef(null)
+  const playbackRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const frameIdxRef = useRef(0)    // mutable ref for rAF loop
 
   const totalFrames = timeline?.frame_count ?? 0
 
-  function _seekTo(idx) {
+  function _seekTo(idx: number) {
     const clamped = Math.max(0, Math.min(idx, totalFrames - 1))
     frameIdxRef.current = clamped
     setFrameIdx(clamped)
@@ -607,16 +539,19 @@ export default function AssemblyMotionStudioPanel({
   function rewind() { _seekTo(0) }
 
   useEffect(() => () => stopPlayback(), []) // cleanup on unmount
-  useEffect(() => { if (!timeline) stopPlayback() }, [timeline]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Pre-existing: synchronously clears playback state when the timeline is reset; not a
+  // behavior change for this slice.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { if (!timeline) stopPlayback() }, [timeline])
 
   // ── Joint list mutations ───────────────────────────────────────────────
   function addJoint() {
     setJoints((p) => [...p, { type: 'revolute', componentA: '', componentB: '', axis: [0, 0, 1] }])
   }
-  function updateJoint(idx, next) {
+  function updateJoint(idx: number, next: Joint) {
     setJoints((p) => p.map((j, i) => (i === idx ? next : j)))
   }
-  function removeJoint(idx) {
+  function removeJoint(idx: number) {
     setJoints((p) => p.filter((_, i) => i !== idx))
   }
 
@@ -634,7 +569,7 @@ export default function AssemblyMotionStudioPanel({
 
     try {
       const token = useAuth.getState().accessToken
-      const headers = { 'Content-Type': 'application/json' }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
 
       const res = await fetch(`${API_URL}/api/tools/call`, {
@@ -649,7 +584,7 @@ export default function AssemblyMotionStudioPanel({
       const data = await res.json()
       if (data.error) throw new Error(data.error)
 
-      const inner = data.result ?? data
+      const inner: FrameTimeline = data.result ?? data
       if (!inner?.frames || !Array.isArray(inner.frames)) {
         throw new Error('No frame data returned from motion_frame_timeline')
       }
@@ -658,7 +593,7 @@ export default function AssemblyMotionStudioPanel({
       // Seek to frame 0
       if (inner.frames[0]?.poses) applyPoses(inner.frames[0].poses)
     } catch (err) {
-      setError(err.message || 'Simulation failed')
+      setError(err instanceof Error ? err.message : 'Simulation failed')
     } finally {
       setRunning(false)
     }
@@ -701,7 +636,7 @@ export default function AssemblyMotionStudioPanel({
 
     try {
       const token = useAuth.getState().accessToken
-      const headers = { 'Content-Type': 'application/json' }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
 
       const payload = {
@@ -740,7 +675,7 @@ export default function AssemblyMotionStudioPanel({
       a.click()
       URL.revokeObjectURL(url)
     } catch (err) {
-      setFeaError(err.message || 'FEA export failed')
+      setFeaError(err instanceof Error ? err.message : 'FEA export failed')
     } finally {
       setFeaBusy(false)
     }
@@ -876,7 +811,7 @@ export default function AssemblyMotionStudioPanel({
 
       {/* ── Tab bar ───────────────────────────────────────────────────── */}
       <div className="flex shrink-0 border-b border-ink-800" role="tablist">
-        {['setup', 'results', 'traces'].map((tab) => (
+        {(['setup', 'results', 'traces'] as const).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -1056,7 +991,7 @@ export default function AssemblyMotionStudioPanel({
                   <span className="text-ink-500">Format</span>
                   <select
                     value={feaFormat}
-                    onChange={(e) => setFeaFormat(e.target.value)}
+                    onChange={(e) => setFeaFormat(e.target.value as 'nastran' | 'calculix')}
                     className="bg-ink-950 border border-ink-800 rounded px-1.5 py-0.5 text-[11px] text-ink-100"
                     data-testid="fea-format-select"
                   >

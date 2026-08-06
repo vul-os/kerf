@@ -538,6 +538,7 @@ function CreateMenu({ onCreate, openImportPicker, openKicadPicker, openFreecadPi
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- prop-sync effect; pre-existing before this migration.
     if (!open) { setQ(''); return }
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
     window.addEventListener('keydown', onKey)

@@ -31,7 +31,7 @@ import CompareFeatureMatrix from './CompareFeatureMatrix.jsx'
 /* Verdict-glyph constants (mirrors Freecad.jsx)                               */
 /* -------------------------------------------------------------------------- */
 
-const VERDICT_CLASSES: Record<string, string> = {
+const _VERDICT_CLASSES: Record<string, string> = {
   '✅': 'text-emerald-400',
   '⚠️': 'text-amber-400',
   '❌': 'text-red-400',

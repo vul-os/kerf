@@ -318,6 +318,7 @@ export default function PlcHmiTester({ program = '', onProgramLoad, className = 
   // Reset trace and session when program changes
   useEffect(() => {
     sessionRef.current = null
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- prop-sync effect; pre-existing before this migration.
     setOutputs({})
     setTraceData({})
     setErrorMsg('')

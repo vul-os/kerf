@@ -21,7 +21,7 @@
 // a row of source-toggle chips (You / AI / Tool / Restore). Filtering is
 // purely client-side — no API roundtrip.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   History, RotateCcw, X, RefreshCw, Search, Check, ChevronRight,
   FileText, Eye, EyeOff, Loader,
@@ -401,6 +401,7 @@ export default function RevisionDrawer({ revisions, loading, onRestore, onClose 
 
   // Reset transient UI state when the underlying file changes.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- prop-sync effect; pre-existing before this migration.
     setQuery('')
     setActiveKinds(new Set())
     setConfirmingId(null)
@@ -458,6 +459,7 @@ export default function RevisionDrawer({ revisions, loading, onRestore, onClose 
     if (focusedId) return
     if (filtered.length === 0) return
     const target = filtered.find((r) => r.id !== currentId) || filtered[0]
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- prop-sync effect; pre-existing before this migration.
     setFocusedId(target.id)
   }, [filtered, currentId, focusedId])
 
@@ -466,6 +468,7 @@ export default function RevisionDrawer({ revisions, loading, onRestore, onClose 
   useEffect(() => {
     if (!focusedId) return
     if (!filtered.find((r) => r.id === focusedId)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- prop-sync effect; pre-existing before this migration.
       setFocusedId(filtered[0]?.id ?? null)
     }
   }, [filtered, focusedId])

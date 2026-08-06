@@ -1,4 +1,4 @@
-// AcousticsResultPanel.jsx — Engineering acoustics analysis panel.
+// AcousticsResultPanel.tsx — Engineering acoustics analysis panel.
 //
 // Wires acoustics LLM tools into a tabbed UI.
 // Tabs: Outdoor (ISO 9613-2) | Room (RT60 / NC / NR) | Transmission Loss | Weighting
@@ -9,18 +9,24 @@
 // Props: none (standalone panel — operates without a project file)
 
 import { useState, useCallback } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import {
   Volume2, Wind, Home, Shield, Sliders, AlertTriangle, CheckCircle,
   Loader2, Play, ChevronDown, ChevronUp
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import type {
+  Iso9613OutdoorResult, Iso9613OctaveBandsResult,
+  NcRatingResult, NrRatingResult, RoomModesResult, SeaTwoRoomsResult, ApplyWeightingResult,
+} from './acousticsTypes'
 
-const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+const API_URL: string = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
 
 // ---------------------------------------------------------------------------
 // Styles
 // ---------------------------------------------------------------------------
 
-const s = {
+const s: Record<string, CSSProperties> = {
   root:         { background: '#111827', padding: '12px', fontSize: 12, color: '#e5e7eb', minHeight: 200 },
   header:       { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 },
   title:        { fontWeight: 600, fontSize: 13, color: '#f9fafb' },
@@ -50,7 +56,12 @@ const s = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function callTool(toolName, args) {
+// Generic over the specific tool's result shape — `/api/tools/call` dispatches to whichever
+// backend tool `toolName` names, so the return shape genuinely varies per call site.
+async function callTool<T = Record<string, unknown>>(
+  toolName: string,
+  args: Record<string, unknown>,
+): Promise<T> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -63,7 +74,9 @@ async function callTool(toolName, args) {
   return res.json()
 }
 
-function fmt(v, decimals = 2) {
+// `unknown` — this formats whatever raw field a tool result happens to carry (a boundary this
+// slice does not own); the runtime typeof-narrowing below is the actual contract.
+function fmt(v?: unknown, decimals = 2): string {
   if (v == null) return '—'
   if (typeof v === 'boolean') return v ? 'yes' : 'no'
   if (typeof v === 'number') {
@@ -73,7 +86,12 @@ function fmt(v, decimals = 2) {
   return String(v)
 }
 
-function ResultTable({ data, skip = [] }) {
+interface ResultTableProps {
+  data?: Record<string, unknown> | null
+  skip?: string[]
+}
+
+function ResultTable({ data, skip = [] }: ResultTableProps) {
   if (!data || typeof data !== 'object') return null
   const entries = Object.entries(data).filter(
     ([k]) => !skip.includes(k) && !Array.isArray(data[k]) && typeof data[k] !== 'object'
@@ -93,7 +111,17 @@ function ResultTable({ data, skip = [] }) {
   )
 }
 
-function ToolWidget({ title, icon: Icon, color = '#2563eb', children, result, error, running }) {
+interface ToolWidgetProps {
+  title: string
+  icon?: LucideIcon
+  color?: string
+  children?: ReactNode
+  result?: Record<string, unknown> | null
+  error?: string | null
+  running?: boolean
+}
+
+function ToolWidget({ title, icon: Icon, color = '#2563eb', children, result, error, running }: ToolWidgetProps) {
   const [open, setOpen] = useState(true)
   return (
     <div style={{ ...s.section, borderLeft: `3px solid ${color}` }}>
@@ -136,7 +164,13 @@ function ToolWidget({ title, icon: Icon, color = '#2563eb', children, result, er
   )
 }
 
-function RunBtn({ onClick, running, disabled }) {
+interface RunBtnProps {
+  onClick: () => void
+  running?: boolean
+  disabled?: boolean
+}
+
+function RunBtn({ onClick, running, disabled }: RunBtnProps) {
   return (
     <button
       onClick={onClick}
@@ -150,7 +184,15 @@ function RunBtn({ onClick, running, disabled }) {
   )
 }
 
-function NumRow({ label, value, onChange, step = 'any', disabled }) {
+interface NumRowProps {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  step?: string | number
+  disabled?: boolean
+}
+
+function NumRow({ label, value, onChange, step = 'any', disabled }: NumRowProps) {
   return (
     <div style={s.row}>
       <label style={s.label}>{label}</label>
@@ -166,12 +208,26 @@ function NumRow({ label, value, onChange, step = 'any', disabled }) {
   )
 }
 
-function SelectRow({ label, value, onChange, options, disabled }) {
+type SelectOption = string | { value: string; label: string }
+
+interface SelectRowProps {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: SelectOption[]
+  disabled?: boolean
+}
+
+function SelectRow({ label, value, onChange, options, disabled }: SelectRowProps) {
   return (
     <div style={s.row}>
       <label style={s.label}>{label}</label>
       <select value={value} onChange={e => onChange(e.target.value)} disabled={disabled} style={s.select}>
-        {options.map(o => <option key={o.value || o} value={o.value || o}>{o.label || o}</option>)}
+        {options.map(o => {
+          const v = typeof o === 'string' ? o : o.value
+          const l = typeof o === 'string' ? o : o.label
+          return <option key={v} value={v}>{l}</option>
+        })}
       </select>
     </div>
   )
@@ -188,14 +244,14 @@ function TabOutdoor() {
     horizontal_dist: '100', Q: '2', ground_type: 'hard',
     barrier_h: '0', barrier_dist_source: '30', freq_hz: '500',
   })
-  const [sbR, setSbR] = useState(null)
-  const [sbE, setSbE] = useState(null)
+  const [sbR, setSbR] = useState<Iso9613OutdoorResult | null>(null)
+  const [sbE, setSbE] = useState<string | null>(null)
   const [sbRun, setSbRun] = useState(false)
 
   const runSingleBand = useCallback(async () => {
     setSbRun(true); setSbE(null); setSbR(null)
     try {
-      const args = {
+      const args: Record<string, unknown> = {
         Lw: +sb.Lw, source_h: +sb.source_h, receiver_h: +sb.receiver_h,
         horizontal_dist: +sb.horizontal_dist, Q: +sb.Q,
         ground_type: sb.ground_type, freq_hz: +sb.freq_hz,
@@ -204,9 +260,9 @@ function TabOutdoor() {
         args.barrier_h = +sb.barrier_h
         args.barrier_dist_source = +sb.barrier_dist_source
       }
-      const r = await callTool('acoustics_iso9613_outdoor', args)
+      const r = await callTool<Iso9613OutdoorResult>('acoustics_iso9613_outdoor', args)
       setSbR(r)
-    } catch (e) { setSbE(e.message) } finally { setSbRun(false) }
+    } catch (e) { setSbE(e instanceof Error ? e.message : String(e)) } finally { setSbRun(false) }
   }, [sb])
 
   // ── Octave bands ──
@@ -216,15 +272,15 @@ function TabOutdoor() {
     horizontal_dist: '100', Q: '2', ground_type: 'soft',
     barrier_h: '0', barrier_dist_source: '30',
   })
-  const [obR, setObR] = useState(null)
-  const [obE, setObE] = useState(null)
+  const [obR, setObR] = useState<Iso9613OctaveBandsResult | null>(null)
+  const [obE, setObE] = useState<string | null>(null)
   const [obRun, setObRun] = useState(false)
 
   const runOctaveBands = useCallback(async () => {
     setObRun(true); setObE(null); setObR(null)
     try {
       const Lw_bands = JSON.parse(ob.lw_bands)
-      const args = {
+      const args: Record<string, unknown> = {
         Lw_bands, source_h: +ob.source_h, receiver_h: +ob.receiver_h,
         horizontal_dist: +ob.horizontal_dist, Q: +ob.Q,
         ground_type: ob.ground_type,
@@ -233,9 +289,9 @@ function TabOutdoor() {
         args.barrier_h = +ob.barrier_h
         args.barrier_dist_source = +ob.barrier_dist_source
       }
-      const r = await callTool('acoustics_iso9613_octave_bands', args)
+      const r = await callTool<Iso9613OctaveBandsResult>('acoustics_iso9613_octave_bands', args)
       setObR(r)
-    } catch (e) { setObE(e.message) } finally { setObRun(false) }
+    } catch (e) { setObE(e instanceof Error ? e.message : String(e)) } finally { setObRun(false) }
   }, [ob])
 
   const GROUND_OPTIONS = [
@@ -350,56 +406,68 @@ function TabOutdoor() {
 function TabRoom() {
   // ── Sabine RT60 ──
   const [sab, setSab] = useState({ volume_m3: '500', total_absorption_m2: '80' })
-  const [sabR, setSabR] = useState(null); const [sabE, setSabE] = useState(null); const [sabRun, setSabRun] = useState(false)
+  const [sabR, setSabR] = useState<Record<string, unknown> | null>(null)
+  const [sabE, setSabE] = useState<string | null>(null)
+  const [sabRun, setSabRun] = useState(false)
   const runSabine = useCallback(async () => {
     setSabRun(true); setSabE(null); setSabR(null)
     try { const r = await callTool('acoustics_sabine_rt60', { volume_m3: +sab.volume_m3, total_absorption_m2: +sab.total_absorption_m2 }); setSabR(r) }
-    catch (e) { setSabE(e.message) } finally { setSabRun(false) }
+    catch (e) { setSabE(e instanceof Error ? e.message : String(e)) } finally { setSabRun(false) }
   }, [sab])
 
   // ── Eyring RT60 ──
   const [eyr, setEyr] = useState({ volume_m3: '500', S_m2: '400', alpha_avg: '0.2' })
-  const [eyrR, setEyrR] = useState(null); const [eyrE, setEyrE] = useState(null); const [eyrRun, setEyrRun] = useState(false)
+  const [eyrR, setEyrR] = useState<Record<string, unknown> | null>(null)
+  const [eyrE, setEyrE] = useState<string | null>(null)
+  const [eyrRun, setEyrRun] = useState(false)
   const runEyring = useCallback(async () => {
     setEyrRun(true); setEyrE(null); setEyrR(null)
     try { const r = await callTool('acoustics_eyring_rt60', { volume_m3: +eyr.volume_m3, S_m2: +eyr.S_m2, alpha_avg: +eyr.alpha_avg }); setEyrR(r) }
-    catch (e) { setEyrE(e.message) } finally { setEyrRun(false) }
+    catch (e) { setEyrE(e instanceof Error ? e.message : String(e)) } finally { setEyrRun(false) }
   }, [eyr])
 
   // ── Room constant ──
   const [rc, setRc] = useState({ S_m2: '400', alpha_avg: '0.15' })
-  const [rcR, setRcR] = useState(null); const [rcE, setRcE] = useState(null); const [rcRun, setRcRun] = useState(false)
+  const [rcR, setRcR] = useState<Record<string, unknown> | null>(null)
+  const [rcE, setRcE] = useState<string | null>(null)
+  const [rcRun, setRcRun] = useState(false)
   const runRoomConst = useCallback(async () => {
     setRcRun(true); setRcE(null); setRcR(null)
     try { const r = await callTool('acoustics_room_constant', { S_m2: +rc.S_m2, alpha_avg: +rc.alpha_avg }); setRcR(r) }
-    catch (e) { setRcE(e.message) } finally { setRcRun(false) }
+    catch (e) { setRcE(e instanceof Error ? e.message : String(e)) } finally { setRcRun(false) }
   }, [rc])
 
   // ── NC Rating ──
   const [nc, setNc] = useState({ octave_band_spls: JSON.stringify({ '63': 54, '125': 44, '250': 37, '500': 31, '1000': 27, '2000': 24, '4000': 22, '8000': 21 }) })
-  const [ncR, setNcR] = useState(null); const [ncE, setNcE] = useState(null); const [ncRun, setNcRun] = useState(false)
+  const [ncR, setNcR] = useState<NcRatingResult | null>(null)
+  const [ncE, setNcE] = useState<string | null>(null)
+  const [ncRun, setNcRun] = useState(false)
   const runNc = useCallback(async () => {
     setNcRun(true); setNcE(null); setNcR(null)
-    try { const r = await callTool('acoustics_nc_rating', { octave_band_spls: JSON.parse(nc.octave_band_spls) }); setNcR(r) }
-    catch (e) { setNcE(e.message) } finally { setNcRun(false) }
+    try { const r = await callTool<NcRatingResult>('acoustics_nc_rating', { octave_band_spls: JSON.parse(nc.octave_band_spls) }); setNcR(r) }
+    catch (e) { setNcE(e instanceof Error ? e.message : String(e)) } finally { setNcRun(false) }
   }, [nc])
 
   // ── NR Rating ──
   const [nr, setNr] = useState({ octave_band_spls: JSON.stringify({ '63': 55, '125': 47, '250': 40, '500': 35, '1000': 31, '2000': 28, '4000': 27, '8000': 26 }) })
-  const [nrR, setNrR] = useState(null); const [nrE, setNrE] = useState(null); const [nrRun, setNrRun] = useState(false)
+  const [nrR, setNrR] = useState<NrRatingResult | null>(null)
+  const [nrE, setNrE] = useState<string | null>(null)
+  const [nrRun, setNrRun] = useState(false)
   const runNr = useCallback(async () => {
     setNrRun(true); setNrE(null); setNrR(null)
-    try { const r = await callTool('acoustics_nr_rating', { octave_band_spls: JSON.parse(nr.octave_band_spls) }); setNrR(r) }
-    catch (e) { setNrE(e.message) } finally { setNrRun(false) }
+    try { const r = await callTool<NrRatingResult>('acoustics_nr_rating', { octave_band_spls: JSON.parse(nr.octave_band_spls) }); setNrR(r) }
+    catch (e) { setNrE(e instanceof Error ? e.message : String(e)) } finally { setNrRun(false) }
   }, [nr])
 
   // ── Room Modes ──
   const [modes, setModes] = useState({ L: '8', W: '5', H: '3', f_max: '200' })
-  const [modesR, setModesR] = useState(null); const [modesE, setModesE] = useState(null); const [modesRun, setModesRun] = useState(false)
+  const [modesR, setModesR] = useState<RoomModesResult | null>(null)
+  const [modesE, setModesE] = useState<string | null>(null)
+  const [modesRun, setModesRun] = useState(false)
   const runModes = useCallback(async () => {
     setModesRun(true); setModesE(null); setModesR(null)
-    try { const r = await callTool('wave_room_modes', { L: +modes.L, W: +modes.W, H: +modes.H, f_max: +modes.f_max }); setModesR(r) }
-    catch (e) { setModesE(e.message) } finally { setModesRun(false) }
+    try { const r = await callTool<RoomModesResult>('wave_room_modes', { L: +modes.L, W: +modes.W, H: +modes.H, f_max: +modes.f_max }); setModesR(r) }
+    catch (e) { setModesE(e instanceof Error ? e.message : String(e)) } finally { setModesRun(false) }
   }, [modes])
 
   return (
@@ -474,8 +542,8 @@ function TabRoom() {
                 {fmt(m.f_hz, 1)} Hz — {m.type} ({m.nx},{m.ny},{m.nz})
               </div>
             ))}
-            {modesR.modes?.length > 15 && (
-              <div style={{ color: '#6b7280', fontSize: 10 }}>…and {modesR.modes.length - 15} more</div>
+            {(modesR.modes?.length ?? 0) > 15 && (
+              <div style={{ color: '#6b7280', fontSize: 10 }}>…and {(modesR.modes?.length ?? 0) - 15} more</div>
             )}
           </div>
         )}
@@ -491,11 +559,13 @@ function TabRoom() {
 function TabTL() {
   // ── Mass-law TL ──
   const [ml, setMl] = useState({ surface_density_kg_m2: '10', freq_hz: '500' })
-  const [mlR, setMlR] = useState(null); const [mlE, setMlE] = useState(null); const [mlRun, setMlRun] = useState(false)
+  const [mlR, setMlR] = useState<Record<string, unknown> | null>(null)
+  const [mlE, setMlE] = useState<string | null>(null)
+  const [mlRun, setMlRun] = useState(false)
   const runMassLaw = useCallback(async () => {
     setMlRun(true); setMlE(null); setMlR(null)
     try { const r = await callTool('acoustics_mass_law_tl', { surface_density_kg_m2: +ml.surface_density_kg_m2, freq_hz: +ml.freq_hz }); setMlR(r) }
-    catch (e) { setMlE(e.message) } finally { setMlRun(false) }
+    catch (e) { setMlE(e instanceof Error ? e.message : String(e)) } finally { setMlRun(false) }
   }, [ml])
 
   // ── Composite TL ──
@@ -505,38 +575,44 @@ function TabTL() {
       { area_m2: 2.5, tl_db: 25 },
     ])
   })
-  const [ctR, setCtR] = useState(null); const [ctE, setCtE] = useState(null); const [ctRun, setCtRun] = useState(false)
+  const [ctR, setCtR] = useState<Record<string, unknown> | null>(null)
+  const [ctE, setCtE] = useState<string | null>(null)
+  const [ctRun, setCtRun] = useState(false)
   const runCompTL = useCallback(async () => {
     setCtRun(true); setCtE(null); setCtR(null)
     try {
       const elements = JSON.parse(ct.elements)
       const r = await callTool('acoustics_composite_tl', { elements })
       setCtR(r)
-    } catch (e) { setCtE(e.message) } finally { setCtRun(false) }
+    } catch (e) { setCtE(e instanceof Error ? e.message : String(e)) } finally { setCtRun(false) }
   }, [ct])
 
   // ── SPL transmitted ──
   const [tr, setTr] = useState({ spl_source: '75', tl_db: '40' })
-  const [trR, setTrR] = useState(null); const [trE, setTrE] = useState(null); const [trRun, setTrRun] = useState(false)
+  const [trR, setTrR] = useState<Record<string, unknown> | null>(null)
+  const [trE, setTrE] = useState<string | null>(null)
+  const [trRun, setTrRun] = useState(false)
   const runTransmit = useCallback(async () => {
     setTrRun(true); setTrE(null); setTrR(null)
     try { const r = await callTool('acoustics_spl_transmitted', { spl_source: +tr.spl_source, tl_db: +tr.tl_db }); setTrR(r) }
-    catch (e) { setTrE(e.message) } finally { setTrRun(false) }
+    catch (e) { setTrE(e instanceof Error ? e.message : String(e)) } finally { setTrRun(false) }
   }, [tr])
 
   // ── SEA Two-Room ──
   const [sea, setSea] = useState({ loss_factor_1: '0.05', loss_factor_2: '0.05', coupling: '0.01', modal_density: '1.0', freq_bands: '125,250,500,1000,2000' })
-  const [seaR, setSeaR] = useState(null); const [seaE, setSeaE] = useState(null); const [seaRun, setSeaRun] = useState(false)
+  const [seaR, setSeaR] = useState<SeaTwoRoomsResult | null>(null)
+  const [seaE, setSeaE] = useState<string | null>(null)
+  const [seaRun, setSeaRun] = useState(false)
   const runSEA = useCallback(async () => {
     setSeaRun(true); setSeaE(null); setSeaR(null)
     try {
       const freq_bands = sea.freq_bands.split(',').map(Number)
-      const r = await callTool('wave_sea_two_rooms_tl', {
+      const r = await callTool<SeaTwoRoomsResult>('wave_sea_two_rooms_tl', {
         loss_factor_1: +sea.loss_factor_1, loss_factor_2: +sea.loss_factor_2,
         coupling: +sea.coupling, modal_density: +sea.modal_density, freq_bands,
       })
       setSeaR(r)
-    } catch (e) { setSeaE(e.message) } finally { setSeaRun(false) }
+    } catch (e) { setSeaE(e instanceof Error ? e.message : String(e)) } finally { setSeaRun(false) }
   }, [sea])
 
   return (
@@ -606,11 +682,13 @@ function TabTL() {
 function TabWeighting() {
   // ── A-weighting ──
   const [aw, setAw] = useState({ freq_hz: '1000' })
-  const [awR, setAwR] = useState(null); const [awE, setAwE] = useState(null); const [awRun, setAwRun] = useState(false)
+  const [awR, setAwR] = useState<Record<string, unknown> | null>(null)
+  const [awE, setAwE] = useState<string | null>(null)
+  const [awRun, setAwRun] = useState(false)
   const runAW = useCallback(async () => {
     setAwRun(true); setAwE(null); setAwR(null)
     try { const r = await callTool('acoustics_a_weighting', { freq_hz: +aw.freq_hz }); setAwR(r) }
-    catch (e) { setAwE(e.message) } finally { setAwRun(false) }
+    catch (e) { setAwE(e instanceof Error ? e.message : String(e)) } finally { setAwRun(false) }
   }, [aw])
 
   // ── Apply weighting ──
@@ -618,34 +696,40 @@ function TabWeighting() {
     octave_band_spls: JSON.stringify({ '63': 70, '125': 68, '250': 65, '500': 62, '1000': 60, '2000': 58, '4000': 55, '8000': 52 }),
     weighting: 'A',
   })
-  const [apwR, setApwR] = useState(null); const [apwE, setApwE] = useState(null); const [apwRun, setApwRun] = useState(false)
+  const [apwR, setApwR] = useState<ApplyWeightingResult | null>(null)
+  const [apwE, setApwE] = useState<string | null>(null)
+  const [apwRun, setApwRun] = useState(false)
   const runApplyW = useCallback(async () => {
     setApwRun(true); setApwE(null); setApwR(null)
     try {
-      const r = await callTool('acoustics_apply_weighting', {
+      const r = await callTool<ApplyWeightingResult>('acoustics_apply_weighting', {
         octave_band_spls: JSON.parse(apw.octave_band_spls),
         weighting: apw.weighting,
       })
       setApwR(r)
-    } catch (e) { setApwE(e.message) } finally { setApwRun(false) }
+    } catch (e) { setApwE(e instanceof Error ? e.message : String(e)) } finally { setApwRun(false) }
   }, [apw])
 
   // ── SPL sum ──
   const [sum, setSum] = useState({ levels: '70,70,65' })
-  const [sumR, setSumR] = useState(null); const [sumE, setSumE] = useState(null); const [sumRun, setSumRun] = useState(false)
+  const [sumR, setSumR] = useState<Record<string, unknown> | null>(null)
+  const [sumE, setSumE] = useState<string | null>(null)
+  const [sumRun, setSumRun] = useState(false)
   const runSum = useCallback(async () => {
     setSumRun(true); setSumE(null); setSumR(null)
     try { const r = await callTool('acoustics_spl_sum', { levels_db: sum.levels.split(',').map(Number) }); setSumR(r) }
-    catch (e) { setSumE(e.message) } finally { setSumRun(false) }
+    catch (e) { setSumE(e instanceof Error ? e.message : String(e)) } finally { setSumRun(false) }
   }, [sum])
 
   // ── Point source ──
   const [ps, setPs] = useState({ Lw: '90', r: '10', Q: '2' })
-  const [psR, setPsR] = useState(null); const [psE, setPsE] = useState(null); const [psRun, setPsRun] = useState(false)
+  const [psR, setPsR] = useState<Record<string, unknown> | null>(null)
+  const [psE, setPsE] = useState<string | null>(null)
+  const [psRun, setPsRun] = useState(false)
   const runPS = useCallback(async () => {
     setPsRun(true); setPsE(null); setPsR(null)
     try { const r = await callTool('acoustics_point_source', { Lw: +ps.Lw, r: +ps.r, Q: +ps.Q }); setPsR(r) }
-    catch (e) { setPsE(e.message) } finally { setPsRun(false) }
+    catch (e) { setPsE(e instanceof Error ? e.message : String(e)) } finally { setPsRun(false) }
   }, [ps])
 
   return (

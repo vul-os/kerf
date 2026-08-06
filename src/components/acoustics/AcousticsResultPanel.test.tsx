@@ -1,4 +1,4 @@
-// AcousticsResultPanel.test.jsx
+// AcousticsResultPanel.test.tsx
 //
 // Vitest suite for AcousticsResultPanel.
 //
@@ -10,20 +10,28 @@
 // component source file — confirming that each /api/tools/call reference
 // is present and uses the correct tool name.
 //
-// Run: npx vitest run src/components/acoustics/AcousticsResultPanel.test.jsx
+// Run: npx vitest run src/components/acoustics/AcousticsResultPanel.test.tsx
 
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
+// @types/node isn't part of this project's toolchain (tsconfig.json's `types` array is
+// T-500's — see docs/typescript-migration.md), so these Node builtins (used only for this
+// file's source-inspection assertions) are untyped at this boundary.
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
-import { resolve } from 'path'
+// @ts-expect-error - no @types/node in this toolchain
+import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
+import path from 'path'
 import AcousticsResultPanel from './AcousticsResultPanel.jsx'
 
 // ---------------------------------------------------------------------------
 // Source text for tool-name assertions
 // ---------------------------------------------------------------------------
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SRC = readFileSync(
-  resolve(import.meta.dirname, 'AcousticsResultPanel.jsx'),
+  path.resolve(__dirname, 'AcousticsResultPanel.tsx'),
   'utf8',
 )
 
@@ -31,8 +39,8 @@ const SRC = readFileSync(
 // Render helper
 // ---------------------------------------------------------------------------
 
-function render(props = {}) {
-  return renderToStaticMarkup(<AcousticsResultPanel {...props} />)
+function render() {
+  return renderToStaticMarkup(<AcousticsResultPanel />)
 }
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 /**
- * CfdResultsPanel.test.jsx
+ * CfdResultsPanel.test.tsx
  *
  * SSR render tests using react-dom/server (same pattern as CfdViewport.test.jsx).
  * Tests structure, prop handling, and conditional rendering.

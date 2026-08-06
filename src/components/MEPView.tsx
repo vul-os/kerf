@@ -1,22 +1,88 @@
-// MEPView.jsx — Viewer/editor for .duct.json / .pipe.json / .conduit.json files.
+// MEPView.tsx — Viewer/editor for .duct.json / .pipe.json / .conduit.json files.
 import { useState, useEffect, useRef, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import { Plus, Trash2, Zap } from 'lucide-react'
 import {
   defaultMepRoute, addSegment, addFitting, addEndpoint,
   computeRouteLength, computePressureDrop, connectEndpoints,
 } from '../lib/mep.js'
+import type { Vec3 } from '../types/geometry'
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+//
+// src/lib/mep.js (already a .ts file, migrated by another slice) has no type
+// annotations at all — every parameter and return value is implicitly `any`, so
+// spreading `route` through addSegment/addFitting/addEndpoint/connectEndpoints
+// infers `any` throughout. That is a gap outside this slice's ownership (mep.ts
+// isn't part of src/components), so the MEP JSON shape is modeled locally here
+// and applied to mep.js's calls via casts rather than left as `any` at every use.
+
+export type MepRouteKind = 'duct' | 'pipe' | 'conduit'
+export type MepSegmentKind = 'straight' | 'elbow' | 'vertical'
+export type MepFittingKind = 'tee' | 'reducer' | 'transition' | 'cap' | 'cross'
+export type MepEndpointKind = 'source' | 'sink'
+
+export interface MepSegment {
+  id: string
+  from: Vec3
+  to: Vec3
+  kind?: MepSegmentKind
+  elbow_radius_mm?: number
+}
+
+export interface MepFitting {
+  id: string
+  kind: MepFittingKind
+  position: Vec3
+  branches?: unknown[]
+}
+
+export interface MepEndpoint {
+  id: string
+  kind: MepEndpointKind
+  position: Vec3
+}
+
+export interface MepRoute {
+  version: number
+  kind: MepRouteKind
+  system_name: string
+  system_color: string
+  material: string
+  size_mm: number | null
+  width_mm: number | null
+  height_mm: number | null
+  insulation_thickness_mm: number
+  segments: MepSegment[]
+  fittings: MepFitting[]
+  endpoints: MepEndpoint[]
+}
+
+export interface MEPViewProps {
+  content: string
+  fileName?: string
+  onContentChange?: (json: string) => void
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-function parseContent(c) { try { return JSON.parse(c) } catch { return null } }
+function parseContent(c: string): MepRoute | null {
+  try {
+    // mep.js's own JSON shape is untyped; this view is the only place that reads
+    // file content back into a route, so the cast happens once, here.
+    return JSON.parse(c) as MepRoute
+  } catch {
+    return null
+  }
+}
 function uid() { return Math.random().toString(36).slice(2, 9) }
-function kindFromFileName(name) {
+function kindFromFileName(name?: string): MepRouteKind {
   const n = (name || '').toLowerCase()
   if (n.includes('.duct.')) return 'duct'
   if (n.includes('.pipe.')) return 'pipe'
   if (n.includes('.conduit.')) return 'conduit'
   return 'duct'
 }
-const KIND_BADGE = {
+const KIND_BADGE: Record<MepRouteKind, string> = {
   duct:    'bg-blue-900/40 text-blue-300 border border-blue-700/50',
   pipe:    'bg-green-900/40 text-green-300 border border-green-700/50',
   conduit: 'bg-amber-900/40 text-amber-300 border border-amber-700/50',
@@ -24,16 +90,16 @@ const KIND_BADGE = {
 const iCls = 'w-full bg-ink-950 border border-ink-700 rounded px-2 py-0.5 text-[12px] text-ink-200 focus:outline-none focus:border-kerf-300/60'
 const sCls = 'bg-ink-950 border border-ink-700 rounded px-1.5 py-0.5 text-[11px] text-ink-200 focus:outline-none focus:border-kerf-300/60'
 
-function CoordCell({ value, onChange }) {
+function CoordCell({ value, onChange }: { value: Vec3 | undefined; onChange: (v: Vec3) => void }) {
   const txt = Array.isArray(value) ? value.join(', ') : ''
   return (
     <input className={iCls} defaultValue={txt} onBlur={(e) => {
       const p = e.target.value.split(',').map((s) => parseFloat(s.trim()))
-      if (p.length === 3 && p.every(Number.isFinite)) onChange(p)
+      if (p.length === 3 && p.every(Number.isFinite)) onChange(p as Vec3)
     }} />
   )
 }
-function Section({ title, action, children }) {
+function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
@@ -44,44 +110,45 @@ function Section({ title, action, children }) {
     </div>
   )
 }
-const AddBtn = ({ onClick }) => (
+const AddBtn = ({ onClick }: { onClick: () => void }) => (
   <button type="button" onClick={onClick} className="inline-flex items-center gap-1 text-[11px] text-kerf-300 hover:text-kerf-200"><Plus size={12} />Add</button>
 )
-const Empty = ({ children }) => <p className="text-[11px] text-ink-600 italic py-1">{children}</p>
+const Empty = ({ children }: { children: ReactNode }) => <p className="text-[11px] text-ink-600 italic py-1">{children}</p>
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function MEPView({ content, fileName, onContentChange }) {
+export default function MEPView({ content, fileName, onContentChange }: MEPViewProps) {
   const kind = kindFromFileName(fileName)
-  const [route, setRoute] = useState(() => parseContent(content) || defaultMepRoute(kind))
+  const [route, setRoute] = useState<MepRoute>(() => parseContent(content) || (defaultMepRoute(kind) as MepRoute))
   const [autoStart, setAutoStart] = useState('')
   const [autoEnd, setAutoEnd] = useState('')
   const [autoWarn, setAutoWarn] = useState('')
-  const debRef = useRef(null)
+  const debRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- content-prop sync, pre-existing before this migration.
   useEffect(() => { const n = parseContent(content); if (n) setRoute(n) }, [content])
 
-  const commit = useCallback((next) => {
+  const commit = useCallback((next: MepRoute) => {
     setRoute(next)
     if (debRef.current) clearTimeout(debRef.current)
     debRef.current = setTimeout(() => onContentChange?.(JSON.stringify(next, null, 2)), 250)
   }, [onContentChange])
 
-  const patch = (u) => commit({ ...route, ...u })
-  const patchSeg = (id, u) => commit({ ...route, segments: route.segments.map((s) => s.id === id ? { ...s, ...u } : s) })
-  const patchEp  = (id, u) => commit({ ...route, endpoints: route.endpoints.map((e) => e.id === id ? { ...e, ...u } : e) })
+  const patch = (u: Partial<MepRoute>) => commit({ ...route, ...u })
+  const patchSeg = (id: string, u: Partial<MepSegment>) => commit({ ...route, segments: route.segments.map((s) => s.id === id ? { ...s, ...u } : s) })
+  const patchEp  = (id: string, u: Partial<MepEndpoint>) => commit({ ...route, endpoints: route.endpoints.map((e) => e.id === id ? { ...e, ...u } : e) })
 
   function runAutoRoute() {
     setAutoWarn('')
     if (!autoStart || !autoEnd) { setAutoWarn('Pick both endpoints first.'); return }
     try {
-      const { route: next, warning } = connectEndpoints(route, autoStart, autoEnd, [])
+      const { route: next, warning } = connectEndpoints(route, autoStart, autoEnd, []) as { route: MepRoute; warning?: string }
       commit(next)
       if (warning) setAutoWarn(warning)
     } catch (err) { setAutoWarn(err.message) }
   }
 
-  const lengthMm   = computeRouteLength(route)
-  const pressurePa = computePressureDrop(route)
+  const lengthMm   = computeRouteLength(route) as number
+  const pressurePa = computePressureDrop(route) as number
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto bg-ink-950 text-ink-100 p-4 space-y-5">
@@ -101,14 +168,14 @@ export default function MEPView({ content, fileName, onContentChange }) {
       {/* Properties */}
       <Section title="Properties">
         <div className="grid grid-cols-2 gap-3 text-[12px]">
-          {[
+          {([
             ['Material', <input className={iCls} value={route.material || ''} onChange={(e) => patch({ material: e.target.value })} />],
             ['Insulation (mm)', <input className={iCls} type="number" value={route.insulation_thickness_mm ?? 0} onChange={(e) => patch({ insulation_thickness_mm: parseFloat(e.target.value) || 0 })} />],
             ...(route.width_mm != null
               ? [['Width (mm)', <input className={iCls} type="number" value={route.width_mm ?? ''} onChange={(e) => patch({ width_mm: parseFloat(e.target.value) || null })} />],
                  ['Height (mm)', <input className={iCls} type="number" value={route.height_mm ?? ''} onChange={(e) => patch({ height_mm: parseFloat(e.target.value) || null })} />]]
               : [['Diameter (mm)', <input className={iCls} type="number" value={route.size_mm ?? ''} onChange={(e) => patch({ size_mm: parseFloat(e.target.value) || null })} />]])
-          ].map(([label, field]) => (
+          ] as Array<[string, ReactNode]>).map(([label, field]) => (
             <div key={label} className="flex flex-col gap-1">
               <span className="text-[10px] text-ink-500 uppercase tracking-wide">{label}</span>
               {field}
@@ -118,7 +185,7 @@ export default function MEPView({ content, fileName, onContentChange }) {
       </Section>
 
       {/* Segments */}
-      <Section title="Segments" action={<AddBtn onClick={() => commit(addSegment(route, { id: `s_${uid()}`, from: [0,0,0], to: [1000,0,0], kind: 'straight' }))} />}>
+      <Section title="Segments" action={<AddBtn onClick={() => commit(addSegment(route, { id: `s_${uid()}`, from: [0,0,0], to: [1000,0,0], kind: 'straight' }) as MepRoute)} />}>
         {route.segments.length === 0 ? <Empty>No segments yet.</Empty> : (
           <div className="overflow-x-auto">
             <table className="w-full text-[11px] border-collapse">
@@ -129,7 +196,7 @@ export default function MEPView({ content, fileName, onContentChange }) {
                 {route.segments.map((seg) => (
                   <tr key={seg.id} className="border-b border-ink-850 hover:bg-ink-900/40">
                     <td className="px-2 py-1">
-                      <select className={sCls} value={seg.kind || 'straight'} onChange={(e) => patchSeg(seg.id, { kind: e.target.value })}>
+                      <select className={sCls} value={seg.kind || 'straight'} onChange={(e) => patchSeg(seg.id, { kind: e.target.value as MepSegmentKind })}>
                         {['straight','elbow','vertical'].map((k) => <option key={k}>{k}</option>)}
                       </select>
                     </td>
@@ -150,10 +217,10 @@ export default function MEPView({ content, fileName, onContentChange }) {
       </Section>
 
       {/* Fittings */}
-      <Section title="Fittings" action={<AddBtn onClick={() => commit(addFitting(route, { id: `f_${uid()}`, kind: 'tee', position: [0,0,0], branches: [] }))} />}>
+      <Section title="Fittings" action={<AddBtn onClick={() => commit(addFitting(route, { id: `f_${uid()}`, kind: 'tee', position: [0,0,0], branches: [] }) as MepRoute)} />}>
         {route.fittings.length === 0 ? <Empty>No fittings yet.</Empty> : route.fittings.map((f) => (
           <div key={f.id} className="flex items-center gap-2 py-1 border-b border-ink-850 text-[11px]">
-            <select className={sCls} value={f.kind} onChange={(e) => commit({ ...route, fittings: route.fittings.map((x) => x.id === f.id ? { ...x, kind: e.target.value } : x) })}>
+            <select className={sCls} value={f.kind} onChange={(e) => commit({ ...route, fittings: route.fittings.map((x) => x.id === f.id ? { ...x, kind: e.target.value as MepFittingKind } : x) })}>
               {['tee','reducer','transition','cap','cross'].map((k) => <option key={k}>{k}</option>)}
             </select>
             <span className="text-ink-500">@</span>
@@ -164,10 +231,10 @@ export default function MEPView({ content, fileName, onContentChange }) {
       </Section>
 
       {/* Endpoints */}
-      <Section title="Endpoints" action={<AddBtn onClick={() => commit(addEndpoint(route, { id: `ep_${uid()}`, kind: 'source', position: [0,0,0] }))} />}>
+      <Section title="Endpoints" action={<AddBtn onClick={() => commit(addEndpoint(route, { id: `ep_${uid()}`, kind: 'source', position: [0,0,0] }) as MepRoute)} />}>
         {route.endpoints.length === 0 ? <Empty>No endpoints yet.</Empty> : route.endpoints.map((ep) => (
           <div key={ep.id} className="flex items-center gap-2 py-1 border-b border-ink-850 text-[11px]">
-            <select className={sCls} value={ep.kind} onChange={(e) => patchEp(ep.id, { kind: e.target.value })}>
+            <select className={sCls} value={ep.kind} onChange={(e) => patchEp(ep.id, { kind: e.target.value as MepEndpointKind })}>
               <option value="source">source</option>
               <option value="sink">sink</option>
             </select>
@@ -182,10 +249,10 @@ export default function MEPView({ content, fileName, onContentChange }) {
       {/* Computed */}
       <Section title="Computed">
         <div className="flex gap-6 text-[12px]">
-          {[
+          {([
             ['Total length', `${(lengthMm / 1000).toFixed(3)} m`],
             ['Pressure drop', route.kind === 'conduit' ? 'N/A (electrical)' : `${pressurePa.toFixed(2)} Pa`],
-          ].map(([label, value]) => (
+          ] as Array<[string, string]>).map(([label, value]) => (
             <div key={label} className="flex flex-col gap-0.5">
               <span className="text-[10px] text-ink-500 uppercase tracking-wide">{label}</span>
               <span className="font-mono text-kerf-300 text-[13px]">{value}</span>

@@ -1,5 +1,5 @@
 /**
- * WaveformViewer.jsx
+ * WaveformViewer.tsx
  *
  * SVG/canvas-based multi-trace SPICE waveform viewer.
  *
@@ -28,6 +28,13 @@
  */
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import type { WaveformData, WaveformSignal } from './siliconTypes'
+
+export interface Props {
+  data?: WaveformData
+  content?: string
+  className?: string
+}
 
 // ---------------------------------------------------------------------------
 // Layout
@@ -51,18 +58,26 @@ const TRACE_COLORS = [
 // Helpers
 // ---------------------------------------------------------------------------
 
-function scaleLinear(domain, range) {
+/** A linear scale function carrying its domain/range/invert, D3-style. */
+interface Scale {
+  (v: number): number
+  domain: [number, number]
+  range: [number, number]
+  invert: (px: number) => number
+}
+
+function scaleLinear(domain: [number, number], range: [number, number]): Scale {
   const [d0, d1] = domain
   const [r0, r1] = range
   const k = d1 === d0 ? 0 : (r1 - r0) / (d1 - d0)
-  const scale = (v) => r0 + (v - d0) * k
+  const scale = ((v: number) => r0 + (v - d0) * k) as Scale
   scale.domain = domain
   scale.range = range
-  scale.invert = (px) => d1 === d0 ? d0 : d0 + (px - r0) / k
+  scale.invert = (px: number) => d1 === d0 ? d0 : d0 + (px - r0) / k
   return scale
 }
 
-function niceTicks(min, max, count = 6) {
+function niceTicks(min: number, max: number, count = 6): number[] {
   if (min === max) return [min]
   const span = max - min
   const roughStep = span / (count - 1)
@@ -70,7 +85,7 @@ function niceTicks(min, max, count = 6) {
   const candidates = [1, 2, 2.5, 5, 10]
   const niceStep = candidates.map(c => c * mag).find(c => c >= roughStep) || roughStep
   const start = Math.ceil(min / niceStep) * niceStep
-  const ticks = []
+  const ticks: number[] = []
   for (let v = start; v <= max + niceStep * 0.01; v += niceStep) {
     ticks.push(parseFloat(v.toPrecision(8)))
     if (ticks.length > 20) break
@@ -78,10 +93,10 @@ function niceTicks(min, max, count = 6) {
   return ticks
 }
 
-function fmtSI(v, unit) {
+function fmtSI(v: number, unit: string): string {
   if (v === 0) return `0 ${unit}`
   const abs = Math.abs(v)
-  const prefixes = [
+  const prefixes: Array<[number, string]> = [
     [1e-15, 'f'], [1e-12, 'p'], [1e-9, 'n'], [1e-6, 'µ'],
     [1e-3, 'm'], [1, ''], [1e3, 'k'], [1e6, 'M'], [1e9, 'G'],
   ]
@@ -92,12 +107,15 @@ function fmtSI(v, unit) {
   return `${scaled.toFixed(dp)} ${pfx}${unit}`
 }
 
-function polylinePts(t, y, xScale, yScale) {
+function polylinePts(t: number[], y: number[], xScale: Scale, yScale: Scale): string {
   if (!t || t.length === 0) return ''
   return t.map((tv, i) => `${xScale(tv).toFixed(1)},${yScale(y[i]).toFixed(1)}`).join(' ')
 }
 
-function clampedPolyline(t, y, xScale, yScale, tMin, tMax, innerH) {
+function clampedPolyline(
+  t: number[], y: number[], xScale: Scale, yScale: Scale,
+  tMin: number, tMax: number, _innerH: number,
+): string {
   // Only include points visible in the current time window + 1 point outside on each side
   let start = 0
   let end = t.length
@@ -113,7 +131,7 @@ function clampedPolyline(t, y, xScale, yScale, tMin, tMax, innerH) {
 }
 
 // Parse raw JSON content string → { signals, meta }
-function parseWaveformContent(content) {
+function parseWaveformContent(content?: string): WaveformData {
   try {
     const parsed = JSON.parse(content || '{}')
     return {
@@ -129,7 +147,16 @@ function parseWaveformContent(content) {
 // Cursor measurement chip
 // ---------------------------------------------------------------------------
 
-function CursorChip({ cursorA, cursorB, signals, xScale, tUnit, innerW }) {
+interface CursorChipProps {
+  cursorA: number | null
+  cursorB: number | null
+  signals: WaveformSignal[]
+  xScale: Scale
+  tUnit: string
+  innerW: number
+}
+
+function CursorChip({ cursorA, cursorB, xScale, tUnit }: CursorChipProps) {
   if (!cursorA && !cursorB) return null
 
   const rows = []
@@ -174,7 +201,13 @@ function CursorChip({ cursorA, cursorB, signals, xScale, tUnit, innerW }) {
 // Legend
 // ---------------------------------------------------------------------------
 
-function Legend({ signals, visible, onToggle }) {
+interface LegendProps {
+  signals: WaveformSignal[]
+  visible: boolean[]
+  onToggle: (i: number) => void
+}
+
+function Legend({ signals, visible, onToggle }: LegendProps) {
   if (!signals.length) return null
   return (
     <div className="flex flex-wrap gap-2 px-4 pb-2">
@@ -206,14 +239,7 @@ function Legend({ signals, visible, onToggle }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-/**
- * @param {{
- *   data?: { signals: Array<{name: string, units: string, t: number[], y: number[]}>, meta?: object },
- *   content?: string,
- *   className?: string,
- * }} props
- */
-export default function WaveformViewer({ data, content, className = '' }) {
+export default function WaveformViewer({ data, content, className = '' }: Props) {
   // Parse content if data not provided
   const parsed = useMemo(() => {
     if (data) return data
@@ -223,8 +249,8 @@ export default function WaveformViewer({ data, content, className = '' }) {
   const { signals, meta } = parsed
 
   // Trace visibility
-  const [visible, setVisible] = useState(() => signals.map(() => true))
-  const handleToggle = useCallback((i) => {
+  const [visible, setVisible] = useState<boolean[]>(() => signals.map(() => true))
+  const handleToggle = useCallback((i: number) => {
     setVisible(prev => {
       const next = [...prev]
       next[i] = prev[i] === false ? true : false
@@ -232,12 +258,14 @@ export default function WaveformViewer({ data, content, className = '' }) {
     })
   }, [])
   // Sync visible array length when signals change
+  // Pre-existing: resets per-trace visibility when the signal set is replaced; not a
+  // behavior change for this slice.
   useEffect(() => {
-    setVisible(signals.map(() => true))
+    setVisible(signals.map(() => true)) // eslint-disable-line react-hooks/set-state-in-effect
   }, [signals.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Canvas/SVG element ref for mouse interactions
-  const svgRef = useRef(null)
+  const svgRef = useRef<SVGSVGElement | null>(null)
   const [dims, setDims] = useState({ w: 800, h: 400 })
   useEffect(() => {
     if (!svgRef.current) return
@@ -245,7 +273,8 @@ export default function WaveformViewer({ data, content, className = '' }) {
       const entry = entries[0]
       if (entry) setDims({ w: entry.contentRect.width, h: entry.contentRect.height })
     })
-    obs.observe(svgRef.current.parentElement)
+    const parent = svgRef.current.parentElement
+    if (parent) obs.observe(parent)
     return () => obs.disconnect()
   }, [])
 
@@ -254,7 +283,7 @@ export default function WaveformViewer({ data, content, className = '' }) {
 
   // Time domain extent across all active signals
   const tAll = useMemo(() => {
-    const all = []
+    const all: number[] = []
     signals.forEach((s, i) => {
       if (visible[i] !== false && s.t && s.t.length > 0) all.push(...s.t)
     })
@@ -265,19 +294,19 @@ export default function WaveformViewer({ data, content, className = '' }) {
   const tGlobalMax = tAll.length ? Math.max(...tAll) : 1e-6
 
   // Zoom state: [tMin, tMax] (null = full range)
-  const [zoom, setZoom] = useState(null)
+  const [zoom, setZoom] = useState<[number, number] | null>(null)
   const tMin = zoom ? zoom[0] : tGlobalMin
   const tMax = zoom ? zoom[1] : tGlobalMax
   const tSpan = tMax - tMin || 1e-12
 
   // Scales
   const xScale = useMemo(() => {
-    const domain = [tMin, tMax === tMin ? tMin + 1e-12 : tMax]
+    const domain: [number, number] = [tMin, tMax === tMin ? tMin + 1e-12 : tMax]
     return scaleLinear(domain, [0, innerW])
   }, [tMin, tMax, innerW])
 
   // Y extent across visible signals in current time window
-  const yRange = useMemo(() => {
+  const yRange = useMemo((): [number, number] => {
     let yMin = Infinity, yMax = -Infinity
     signals.forEach((s, i) => {
       if (visible[i] === false) return
@@ -327,20 +356,20 @@ export default function WaveformViewer({ data, content, className = '' }) {
   // Interaction: pan + zoom + cursors
   // ---------------------------------------------------------------------------
 
-  const [cursorA, setCursorA] = useState(null) // px x within plot
-  const [cursorB, setCursorB] = useState(null)
-  const [dragging, setDragging] = useState(null) // 'pan' | 'cursorA' | 'cursorB'
-  const dragStartRef = useRef(null)
-  const zoomOnEnterRef = useRef(null)
+  const [cursorA, setCursorA] = useState<number | null>(null) // px x within plot
+  const [cursorB, setCursorB] = useState<number | null>(null)
+  const [dragging, setDragging] = useState<'pan' | 'cursorA' | 'cursorB' | null>(null)
+  const dragStartRef = useRef<{ px: number; tMinSaved: number; tMaxSaved: number } | null>(null)
+  const zoomOnEnterRef = useRef<[number, number] | null>(null)
 
   // Convert SVG-space client X to plot-space px (within inner area)
-  const clientToPx = useCallback((clientX) => {
+  const clientToPx = useCallback((clientX: number) => {
     if (!svgRef.current) return 0
     const rect = svgRef.current.getBoundingClientRect()
     return clientX - rect.left - MARGIN.left
   }, [])
 
-  const handleWheel = useCallback((e) => {
+  const handleWheel = useCallback((e: React.WheelEvent<SVGSVGElement>) => {
     e.preventDefault()
     const px = clientToPx(e.clientX)
     const frac = Math.max(0, Math.min(1, px / innerW))
@@ -355,7 +384,7 @@ export default function WaveformViewer({ data, content, className = '' }) {
     setZoom([newMin, newMax])
   }, [clientToPx, innerW, tMin, tMax, tSpan, tGlobalMin, tGlobalMax])
 
-  const handlePointerDown = useCallback((e) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
     const px = clientToPx(e.clientX)
     // Check cursor proximity (± 8 px)
     if (cursorA !== null && Math.abs(px - cursorA) < 8) {
@@ -381,7 +410,7 @@ export default function WaveformViewer({ data, content, className = '' }) {
     }
   }, [clientToPx, cursorA, cursorB, innerW, tMin, tMax, zoom])
 
-  const handlePointerMove = useCallback((e) => {
+  const handlePointerMove = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
     const px = clientToPx(e.clientX)
     if (dragging === 'cursorA') {
       setCursorA(Math.max(0, Math.min(innerW, px)))
@@ -398,10 +427,10 @@ export default function WaveformViewer({ data, content, className = '' }) {
     }
   }, [dragging, clientToPx, innerW, tSpan, tGlobalMin, tGlobalMax])
 
-  const handlePointerUp = useCallback((e) => {
+  const handlePointerUp = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
     setDragging(null)
     dragStartRef.current = null
-    try { e.currentTarget.releasePointerCapture(e.pointerId) } catch {}
+    try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* not captured */ }
   }, [])
 
   // Double-click → reset zoom
@@ -427,7 +456,7 @@ export default function WaveformViewer({ data, content, className = '' }) {
     )
   }
 
-  const title = meta.title || meta.analysis || ''
+  const title = meta?.title || meta?.analysis || ''
 
   return (
     <div className={`flex-1 min-h-0 flex flex-col bg-ink-950 select-none ${className}`} data-testid="waveform-viewer">
@@ -439,7 +468,7 @@ export default function WaveformViewer({ data, content, className = '' }) {
           )}
           <span className="text-[10px] text-ink-600 font-mono">
             {signals.length} signal{signals.length !== 1 ? 's' : ''}
-            {meta.source && ` · ${meta.source}`}
+            {meta?.source && ` · ${meta.source}`}
           </span>
         </div>
         <div className="flex items-center gap-2 text-[10px] text-ink-500">

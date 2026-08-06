@@ -13,18 +13,20 @@
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import WaveformViewer from './WaveformViewer.jsx'
+import type { Props } from './WaveformViewer.jsx'
+import type { WaveformSignal } from './siliconTypes'
 
 // ---------------------------------------------------------------------------
 // Test fixture helpers
 // ---------------------------------------------------------------------------
 
-function makeSignal(name, units, n = 20) {
+function makeSignal(name: string, units: string, n = 20): WaveformSignal {
   const t = Array.from({ length: n }, (_, i) => i * 1e-9)
   const y = Array.from({ length: n }, (_, i) => Math.sin(i * 0.3) * 1.8)
   return { name, units, t, y }
 }
 
-function render(props = {}) {
+function render(props: Partial<Props> = {}) {
   return renderToStaticMarkup(<WaveformViewer {...props} />)
 }
 

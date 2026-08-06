@@ -1,5 +1,5 @@
 /**
- * SpiceRunPanel.jsx
+ * SpiceRunPanel.tsx
  *
  * Netlist editor + analysis selector for SPICE simulations.
  *
@@ -19,14 +19,27 @@
  *   fileId         {string}  - Source file ID
  */
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { api } from '../../lib/api.js'
+import type {
+  AnalysisId, AnalysisType, AnalysisParam,
+  WaveformSignal, WaveformData, SpiceToolResponse, PvtSweepResult, SpiceWaveformResult,
+} from './siliconTypes'
+
+export interface Props {
+  content?: string
+  fileName?: string
+  onChange?: (netlist: string) => void
+  onWaveformResult?: (data: WaveformData) => void
+  projectId?: string
+  fileId?: string
+}
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const ANALYSIS_TYPES = [
+const ANALYSIS_TYPES: AnalysisType[] = [
   {
     id: 'transient',
     label: 'Transient',
@@ -85,7 +98,7 @@ const ANALYSIS_TYPES = [
 ]
 
 // Sample netlist templates
-const NETLIST_TEMPLATES = {
+const NETLIST_TEMPLATES: Partial<Record<AnalysisId, string>> = {
   transient: `* RC low-pass filter transient\nV1 in 0 PULSE(0 1.8 0 1n 1n 50n 100n)\nR1 in out 1k\nC1 out 0 100p\n.TRAN 0.5n 500n\n.PROBE V(out) V(in)\n.end`,
   ac: `* Op-amp AC analysis\nV1 in 0 AC 1\nR1 in inv 10k\nR2 inv out 100k\nC1 out 0 10p\n.AC DEC 20 1 1Meg\n.PROBE V(out)\n.end`,
   dc_sweep: `* MOSFET Ids vs Vgs\nM1 d g 0 0 nmos W=4u L=150n\nVgs g 0 DC 0\nVdd d 0 DC 1.8\n.DC Vgs 0 1.8 0.01\n.PROBE I(Vdd)\n.end`,
@@ -95,7 +108,13 @@ const NETLIST_TEMPLATES = {
 // Parameter input row
 // ---------------------------------------------------------------------------
 
-function ParamRow({ param, value, onChange }) {
+interface ParamRowProps {
+  param: AnalysisParam
+  value: string
+  onChange: (paramId: string, value: string) => void
+}
+
+function ParamRow({ param, value, onChange }: ParamRowProps) {
   if (param.type === 'select') {
     return (
       <label className="flex items-center gap-2">
@@ -105,7 +124,7 @@ function ParamRow({ param, value, onChange }) {
           onChange={e => onChange(param.id, e.target.value)}
           className="bg-ink-800 border border-ink-700 rounded px-2 py-1 text-xs text-ink-100 outline-none focus:border-kerf-300/60 flex-1"
         >
-          {param.options.map(opt => (
+          {param.options?.map(opt => (
             <option key={opt} value={opt}>{opt}</option>
           ))}
         </select>
@@ -130,7 +149,12 @@ function ParamRow({ param, value, onChange }) {
 // Error / warning display
 // ---------------------------------------------------------------------------
 
-function SimError({ errors, warnings }) {
+interface SimErrorProps {
+  errors?: string[]
+  warnings?: string[]
+}
+
+function SimError({ errors, warnings }: SimErrorProps) {
   if (!errors?.length && !warnings?.length) return null
   return (
     <div className="flex flex-col gap-1 px-4 pb-3">
@@ -154,34 +178,39 @@ function SimError({ errors, warnings }) {
 // Main component
 // ---------------------------------------------------------------------------
 
+interface ToolCallPayload {
+  tool: string
+  params: Record<string, unknown>
+}
+
 export default function SpiceRunPanel({
   content = '',
   fileName = '',
   onChange,
   onWaveformResult,
-  projectId,
-  fileId,
-}) {
-  const [analysisId, setAnalysisId] = useState('transient')
-  const [params, setParams] = useState(() => {
-    const defaults = {}
+  projectId: _projectId,
+  fileId: _fileId,
+}: Props) {
+  const [analysisId, setAnalysisId] = useState<AnalysisId>('transient')
+  const [params, setParams] = useState<Record<string, string>>(() => {
+    const defaults: Record<string, string> = {}
     ANALYSIS_TYPES.forEach(a => {
       a.params.forEach(p => { defaults[`${a.id}__${p.id}`] = p.default })
     })
     return defaults
   })
   const [running, setRunning] = useState(false)
-  const [lastResult, setLastResult] = useState(null)
-  const [errors, setErrors] = useState([])
-  const [warnings, setWarnings] = useState([])
+  const [lastResult, setLastResult] = useState<{ ok: boolean; n_signals: number } | null>(null)
+  const [errors, setErrors] = useState<string[]>([])
+  const [warnings, setWarnings] = useState<string[]>([])
 
-  const analysis = ANALYSIS_TYPES.find(a => a.id === analysisId)
+  const analysis = ANALYSIS_TYPES.find(a => a.id === analysisId)!
 
-  const handleParamChange = useCallback((paramId, value) => {
+  const handleParamChange = useCallback((paramId: string, value: string) => {
     setParams(prev => ({ ...prev, [`${analysisId}__${paramId}`]: value }))
   }, [analysisId])
 
-  const getParamValue = useCallback((aId, pId) => {
+  const getParamValue = useCallback((aId: string, pId: string): string => {
     const key = `${aId}__${pId}`
     return params[key] ?? ANALYSIS_TYPES.find(a => a.id === aId)?.params.find(p => p.id === pId)?.default ?? ''
   }, [params])
@@ -192,8 +221,8 @@ export default function SpiceRunPanel({
   }, [analysisId, onChange])
 
   // Build tool call payload
-  const buildPayload = useCallback(() => {
-    const ap = {}
+  const buildPayload = useCallback((): ToolCallPayload => {
+    const ap: Record<string, string> = {}
     analysis.params.forEach(p => {
       ap[p.id] = getParamValue(analysisId, p.id)
     })
@@ -260,27 +289,30 @@ export default function SpiceRunPanel({
   }, [analysisId, analysis, getParamValue, content])
 
   // Convert backend response → .spice.waveform signals array
-  const toSignals = useCallback((toolResult, analysisType) => {
+  const toSignals = useCallback((
+    toolResult: PvtSweepResult | SpiceWaveformResult | undefined,
+    analysisType: AnalysisId,
+  ): WaveformSignal[] => {
     if (analysisType === 'pvt_corner') {
       // PVT result: corners × metrics → signals keyed by corner name
-      const result = toolResult?.result
+      const result = toolResult as PvtSweepResult | undefined
       if (!result?.results) return []
-      const byMetric = {}
+      const byMetric: Record<string, { t: number[]; y: number[] }> = {}
       result.results.forEach(r => {
         if (!byMetric[r.metric]) byMetric[r.metric] = { t: [], y: [] }
-        byMetric[r.metric].t.push(parseFloat(r.temp_c))
+        byMetric[r.metric].t.push(parseFloat(String(r.temp_c)))
         byMetric[r.metric].y.push(r.mean)
       })
       return Object.entries(byMetric).map(([name, d]) => ({
         name,
-        units: result.results.find(r => r.metric === name)?.unit || '',
+        units: result.results!.find(r => r.metric === name)?.unit || '',
         t: d.t,
         y: d.y,
       }))
     }
 
     // Standard SPICE waveform result: { waveforms: { time: [], v(out): [], ... } }
-    const waveforms = toolResult?.waveforms || {}
+    const waveforms = (toolResult as SpiceWaveformResult | undefined)?.waveforms || {}
     const time = waveforms.time || waveforms.t || []
     return Object.entries(waveforms)
       .filter(([k]) => k !== 'time' && k !== 't')
@@ -301,7 +333,7 @@ export default function SpiceRunPanel({
     try {
       const payload = buildPayload()
 
-      const resp = await api.callTool(payload.tool, payload.params)
+      const resp: SpiceToolResponse = await api.callTool(payload.tool, payload.params)
 
       const toolResult = resp?.result || resp
 
@@ -317,7 +349,7 @@ export default function SpiceRunPanel({
         source: fileName || '',
         ran_at: new Date().toISOString(),
       }
-      const waveformData = { signals, meta }
+      const waveformData: WaveformData = { signals, meta }
 
       setLastResult({ ok: true, n_signals: signals.length })
 
@@ -325,7 +357,7 @@ export default function SpiceRunPanel({
 
       if (onWaveformResult) onWaveformResult(waveformData)
     } catch (err) {
-      setErrors([err?.message || String(err)])
+      setErrors([err instanceof Error ? err.message : String(err)])
     } finally {
       setRunning(false)
     }

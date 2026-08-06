@@ -10,9 +10,10 @@
  *   6. Mock dispatch payload shape via a dispatch mock
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import SpiceRunPanel from './SpiceRunPanel.jsx'
+import type { Props } from './SpiceRunPanel.jsx'
 
 // ---------------------------------------------------------------------------
 // Mock api.js — we don't want actual fetch calls in unit tests
@@ -30,7 +31,7 @@ vi.mock('../../lib/api.js', () => ({
   },
 }))
 
-function render(props = {}) {
+function render(props: Partial<Props> = {}) {
   return renderToStaticMarkup(
     <SpiceRunPanel
       content={props.content ?? '* test netlist\n.end'}

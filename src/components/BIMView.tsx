@@ -11,6 +11,8 @@
  * its WASM couldn't be fetched, not that the package is missing.
  */
 import { useEffect, useImperativeHandle, useRef, useState } from 'react'
+import type { Ref } from 'react'
+import type * as ThreeNS from 'three'
 import { snapshotCanvas } from '../lib/snapshotHelpers.js'
 
 // web-ifc's emscripten glue resolves its .wasm relative to the executing script,
@@ -18,6 +20,62 @@ import { snapshotCanvas } from '../lib/snapshotHelpers.js'
 // and hands us its final URL; we feed that to Init()'s locateFile hook below so
 // the viewer works offline / air-gapped instead of reaching for a CDN.
 import wasmUrl from 'web-ifc/web-ifc.wasm?url'
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+//
+// 'three' ships no .d.ts and this repo has no @types/three (see prior T-513
+// commits) — `THREE.X` type positions below resolve to `any` because
+// noImplicitAny is off, same as every other Three.js-consuming file in this
+// slice. 'web-ifc' does ship .d.ts (web-ifc-api.d.ts / web-ifc-api-node.d.ts)
+// but its package.json "exports" map has no "types" condition, so under
+// moduleResolution: bundler, `import('web-ifc')`'s dynamic-import type is also
+// `any` — confirmed by tsc below raising no error for untyped member access on
+// `webifc.IfcAPI`. Both are real gaps worth flagging to T-500/T-501; this slice
+// works around them with an inline `IfcApiLike` shape for the handful of members
+// this component actually calls, rather than leaving everything bare `any`.
+
+export interface IfcFlatMeshGeometry {
+  geometryExpressID: number
+  flatTransformation: number[]
+}
+export interface IfcFlatMeshGeometries {
+  size: () => number
+  get: (i: number) => IfcFlatMeshGeometry
+}
+export interface IfcFlatMesh {
+  geometries: IfcFlatMeshGeometries
+}
+export interface IfcGeometry {
+  GetVertexData: () => number
+  GetVertexDataSize: () => number
+  GetIndexData: () => number
+  GetIndexDataSize: () => number
+  delete: () => void
+}
+export interface IfcApiLike {
+  Init: (locateFile: () => string, forceSingleThread: boolean) => Promise<void>
+  OpenModel: (bytes: Uint8Array) => number
+  CloseModel: (modelId: number) => void
+  StreamAllMeshes: (modelId: number, cb: (flatMesh: IfcFlatMesh) => void) => void
+  GetGeometry: (modelId: number, geometryExpressId: number) => IfcGeometry
+  GetVertexArray: (ptr: number, size: number) => Float32Array
+  GetIndexArray: (ptr: number, size: number) => Uint32Array
+}
+
+interface LoadedDeps {
+  IfcAPI: new () => IfcApiLike
+  THREE: typeof ThreeNS
+}
+
+export interface BIMViewHandle {
+  snapshot: (opts?: { size?: number; quality?: number }) => Promise<Blob | null>
+}
+
+export interface BIMViewProps {
+  ifc_base64?: string
+  className?: string
+  viewRef?: Ref<BIMViewHandle>
+}
 
 // Camera framing. FIT_MARGIN pulls back past the exact fit so the model doesn't
 // touch the viewport edges.
@@ -27,7 +85,7 @@ const FIT_MARGIN = 1.6
 // ---------------------------------------------------------------------------
 // Lazy dep loader — dynamic import so the IFC stack chunks separately
 // ---------------------------------------------------------------------------
-async function tryLoadDeps() {
+async function tryLoadDeps(): Promise<{ deps?: LoadedDeps; loadError?: string }> {
   try {
     const [webifc, three] = await Promise.all([
       import('web-ifc'),
@@ -35,7 +93,7 @@ async function tryLoadDeps() {
     ])
     return { deps: { IfcAPI: webifc.IfcAPI, THREE: three } }
   } catch (err) {
-    return { loadError: err.message || String(err) }
+    return { loadError: err instanceof Error ? err.message : String(err) }
   }
 }
 
@@ -43,24 +101,28 @@ async function tryLoadDeps() {
 // Component
 // ---------------------------------------------------------------------------
 
-export default function BIMView({ ifc_base64, className = '', viewRef }) {
-  const canvasRef = useRef(null)
-  const [error, setError] = useState(null)
+export default function BIMView({ ifc_base64, className = '', viewRef }: BIMViewProps) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [depsError, setDepsError] = useState(null)
+  const [depsError, setDepsError] = useState<string | null>(null)
 
   // Editor thumbnail capture: pull whatever's currently on the WebGL
   // canvas. We don't force a render here because the IFC scene already
   // re-renders every frame via animate(); reading the buffer between
   // frames is enough.
   useImperativeHandle(viewRef, () => ({
-    snapshot: (opts) => snapshotCanvas(canvasRef.current, opts),
+    snapshot: (opts?: { size?: number; quality?: number }): Promise<Blob | null> =>
+      // snapshotCanvas (src/lib/snapshotHelpers.ts, outside this slice) has untyped params,
+      // which widens its inferred return to Promise<unknown>; its own JSDoc documents the
+      // real runtime type as Promise<Blob|null>.
+      snapshotCanvas(canvasRef.current, opts) as Promise<Blob | null>,
   }), [])
 
   useEffect(() => {
     let cancelled = false
-    let renderer = null
-    let animFrame = null
+    let renderer: ThreeNS.WebGLRenderer | null = null
+    let animFrame: number | null = null
 
     async function init() {
       setLoading(true)
@@ -185,13 +247,13 @@ export default function BIMView({ ifc_base64, className = '', viewRef }) {
         function animate() {
           if (cancelled) return
           animFrame = requestAnimationFrame(animate)
-          renderer.render(scene, camera)
+          renderer?.render(scene, camera)
         }
         animate()
         setLoading(false)
       } catch (err) {
         if (!cancelled) {
-          setError(err.message || String(err))
+          setError(err instanceof Error ? err.message : String(err))
           setLoading(false)
         }
       }

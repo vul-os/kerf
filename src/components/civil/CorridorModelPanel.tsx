@@ -1,5 +1,5 @@
 /**
- * CorridorModelPanel.jsx — Template-driven corridor model panel.
+ * CorridorModelPanel.tsx — Template-driven corridor model panel.
  *
  * Shows:
  *   1. Cross-section viewer at a selectable station — draws the point-coded
@@ -26,15 +26,91 @@
  * civil_corridor_model via POST /api/tools/call.
  */
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 
 const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface CrossSectionPoint {
+  offset_m: number
+  elev_m: number
+  label: string
+}
+
+interface CrossSection {
+  station_m: number
+  cl_elev_m: number
+  cut_area_m2: number
+  fill_area_m2: number
+  points: CrossSectionPoint[]
+}
+
+interface MassHaulPoint {
+  station_m: number
+  mass_ordinate_m3: number
+  cut_vol_m3: number
+  fill_vol_m3: number
+}
+
+interface Earthwork {
+  total_cut_m3?: number
+  total_fill_m3?: number
+  net_m3?: number
+}
+
+interface DispatchParams {
+  alignment_length_m: number
+  interval_m: number
+  lane_width_m: number
+  shoulder_width_m: number
+  lanes_each_side: number
+  crown_slope_pct: number
+  shoulder_slope_pct: number
+  cut_slope: number
+  fill_slope: number
+}
+
+interface DispatchPayload {
+  tool: string
+  params: DispatchParams
+}
+
+interface CorridorModelToolResponse {
+  ok?: boolean
+  cross_sections?: CrossSection[]
+  mass_haul?: MassHaulPoint[]
+  earthwork?: Earthwork
+  reason?: string
+  error?: string
+}
+
+interface CorridorModelContent {
+  crossSections?: CrossSection[]
+  massHaul?: MassHaulPoint[]
+  earthwork?: Earthwork
+  alignmentLength?: number
+}
+
+export interface CorridorModelPanelProps {
+  content?: string
+  crossSections?: CrossSection[]
+  massHaul?: MassHaulPoint[]
+  earthwork?: Earthwork
+  alignmentLength?: number
+  width?: number
+  height?: number
+  className?: string
+  onDispatch?: (payload: DispatchPayload) => void
+}
 
 // ---------------------------------------------------------------------------
 // Colour helpers
 // ---------------------------------------------------------------------------
 
-const LABEL_COLOURS = {
+const LABEL_COLOURS: Record<string, string> = {
   CL:             '#f8fafc',
   edge_lane_left:  '#60a5fa',
   edge_lane_right: '#60a5fa',
@@ -46,7 +122,7 @@ const LABEL_COLOURS = {
   daylight_right:  '#f87171',
 }
 
-function labelColour(label) {
+function labelColour(label: string): string {
   return LABEL_COLOURS[label] || '#94a3b8'
 }
 
@@ -58,7 +134,12 @@ const XS_W = 400
 const XS_H = 200
 const XS_PAD = 30
 
-function CrossSectionView({ xs, terrainPts }) {
+interface CrossSectionViewProps {
+  xs: CrossSection | null
+  terrainPts: CrossSectionPoint[] | null
+}
+
+function CrossSectionView({ xs, terrainPts }: CrossSectionViewProps) {
   if (!xs || !xs.points || xs.points.length === 0) {
     return (
       <svg width={XS_W} height={XS_H} style={{ background: '#0f172a', borderRadius: 4 }}>
@@ -85,7 +166,7 @@ function CrossSectionView({ xs, terrainPts }) {
   const usableW = XS_W - XS_PAD * 2
   const usableH = XS_H - XS_PAD * 2
 
-  function toScreen(off, elev) {
+  function toScreen(off: number, elev: number): [number, number] {
     const sx = XS_PAD + ((off - minOff) / offRange) * usableW
     const sy = XS_PAD + (1 - (elev - minElev) / elevRange) * usableH
     return [sx, sy]
@@ -213,7 +294,7 @@ const MH_PAD_R = 12
 const MH_PAD_T = 16
 const MH_PAD_B = 28
 
-function MassHaulChart({ massHaul }) {
+function MassHaulChart({ massHaul }: { massHaul: MassHaulPoint[] | null }) {
   if (!massHaul || massHaul.length < 2) {
     return (
       <svg width={MH_W} height={MH_H} style={{ background: '#0f172a', borderRadius: 4 }}>
@@ -238,8 +319,8 @@ function MassHaulChart({ massHaul }) {
   const usableW = MH_W - MH_PAD_L - MH_PAD_R
   const usableH = MH_H - MH_PAD_T - MH_PAD_B
 
-  function sx(sta)  { return MH_PAD_L + ((sta - minSta) / staRange) * usableW }
-  function sy(ord)  { return MH_PAD_T + (1 - (ord - minOrd) / ordRange) * usableH }
+  function sx(sta: number)  { return MH_PAD_L + ((sta - minSta) / staRange) * usableW }
+  function sy(ord: number)  { return MH_PAD_T + (1 - (ord - minOrd) / ordRange) * usableH }
 
   // Zero line y position
   const zeroY = sy(0)
@@ -341,14 +422,14 @@ export default function CorridorModelPanel({
   earthwork: initialEWProp,
   alignmentLength: alignmentLengthProp = 200.0,
   width = 640,
-  height = 400,
+  height: _height = 400,
   className = '',
   onDispatch,
-}) {
+}: CorridorModelPanelProps) {
   // Accept a `content` string (JSON) passed by the panel registry; parse it
   // and merge over the component's own prop defaults.  Existing direct-prop
   // usage continues to work unchanged.
-  const _parsed = (() => {
+  const _parsed: CorridorModelContent = (() => {
     if (!content) return {}
     try { return JSON.parse(content) } catch { return {} }
   })()
@@ -356,18 +437,18 @@ export default function CorridorModelPanel({
   const initialMH = _parsed.massHaul ?? initialMHProp
   const initialEW = _parsed.earthwork ?? initialEWProp
   const alignmentLength = _parsed.alignmentLength ?? alignmentLengthProp
-  const [crossSections, setCrossSections] = useState(initialXS || null)
-  const [massHaul, setMassHaul]           = useState(initialMH || null)
-  const [earthwork, setEarthwork]         = useState(initialEW || null)
+  const [crossSections, setCrossSections] = useState<CrossSection[] | null>(initialXS || null)
+  const [massHaul, setMassHaul]           = useState<MassHaulPoint[] | null>(initialMH || null)
+  const [earthwork, setEarthwork]         = useState<Earthwork | null>(initialEW || null)
   const [loading, setLoading]             = useState(false)
-  const [error, setError]                 = useState(null)
+  const [error, setError]                 = useState<string | null>(null)
   const [stationIdx, setStationIdx]       = useState(0)
 
   const stationCount = crossSections?.length ?? 0
   const currentXS = crossSections?.[stationIdx] ?? null
 
   // Default params for dispatch
-  const defaultParams = {
+  const defaultParams: DispatchParams = {
     alignment_length_m: alignmentLength,
     interval_m: 20.0,
     lane_width_m: 3.65,
@@ -391,18 +472,18 @@ export default function CorridorModelPanel({
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ tool_name: 'civil_corridor_model', params: defaultParams }),
         })
-        const data = await res.json()
+        const data = await res.json() as CorridorModelToolResponse
         if (data.ok) {
-          setCrossSections(data.cross_sections)
-          setMassHaul(data.mass_haul)
-          setEarthwork(data.earthwork)
+          setCrossSections(data.cross_sections ?? null)
+          setMassHaul(data.mass_haul ?? null)
+          setEarthwork(data.earthwork ?? null)
           setStationIdx(0)
         } else {
           setError(data.reason || data.error || 'Run failed')
         }
       }
     } catch (e) {
-      setError(e.message || 'Dispatch failed')
+      setError((e as Error).message || 'Dispatch failed')
     } finally {
       setLoading(false)
     }
@@ -450,8 +531,8 @@ export default function CorridorModelPanel({
           <span className="text-green-400">
             fill {earthwork.total_fill_m3?.toFixed(1) ?? '–'} m³
           </span>
-          <span className={earthwork.net_m3 >= 0 ? 'text-green-300' : 'text-red-300'}>
-            net {earthwork.net_m3 >= 0 ? '+' : ''}{earthwork.net_m3?.toFixed(1) ?? '–'} m³
+          <span className={(earthwork.net_m3 ?? 0) >= 0 ? 'text-green-300' : 'text-red-300'}>
+            net {(earthwork.net_m3 ?? 0) >= 0 ? '+' : ''}{earthwork.net_m3?.toFixed(1) ?? '–'} m³
           </span>
         </div>
       )}

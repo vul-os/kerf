@@ -8,19 +8,35 @@
 //
 // Props: none (standalone panel — operates without a project file)
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, type ReactNode, type CSSProperties } from 'react'
 import {
   Building2, Wind, Wrench, Layers, AlertTriangle, CheckCircle,
   Loader2, Play, ChevronDown, ChevronUp, Construction,
+  type LucideIcon,
 } from 'lucide-react'
 
 const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
 
 // ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+// `/api/tools/call` fans out to 24 distinct arch_* backend tool handlers, each returning its
+// own undocumented, tool-specific JSON shape (none modeled in src/types/api.ts, which covers
+// src/lib/api.js's endpoints — this component calls `/api/tools/call` directly). `any` is the
+// honest boundary type here rather than hand-rolling 24 speculative response interfaces this
+// slice doesn't own and can't verify.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ToolResult = any
+
+interface SelectOption { value: string; label: string }
+type SelectOptions = (string | SelectOption)[]
+
+// ---------------------------------------------------------------------------
 // Styles (matching OpticsDesignPanel.jsx / BucklingPanel.jsx pattern)
 // ---------------------------------------------------------------------------
 
-const s = {
+const s: Record<string, CSSProperties> = {
   root:         { background: '#111827', padding: '12px', fontSize: 12, color: '#e5e7eb', minHeight: 200 },
   header:       { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 },
   title:        { fontWeight: 600, fontSize: 14, color: '#f9fafb' },
@@ -52,7 +68,7 @@ const s = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function callTool(toolName, args) {
+async function callTool(toolName: string, args: Record<string, unknown>): Promise<ToolResult> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -65,7 +81,7 @@ async function callTool(toolName, args) {
   return res.json()
 }
 
-function fmt(v, decimals = 3) {
+function fmt(v: unknown, decimals = 3): string {
   if (v == null) return '—'
   if (typeof v === 'boolean') return v ? 'yes' : 'no'
   if (typeof v === 'number') {
@@ -77,13 +93,13 @@ function fmt(v, decimals = 3) {
   return String(v)
 }
 
-function StatusChip({ ok }) {
+function StatusChip({ ok }: { ok?: boolean }) {
   return ok
     ? <span style={s.passChip}>PASS</span>
     : <span style={s.failChip}>FAIL</span>
 }
 
-function ResultTable({ data, skip = [] }) {
+function ResultTable({ data, skip = [] }: { data: ToolResult; skip?: string[] }) {
   if (!data || typeof data !== 'object') return null
   const entries = Object.entries(data).filter(
     ([k, v]) => !skip.includes(k) && typeof v !== 'object' && !Array.isArray(v)
@@ -103,7 +119,16 @@ function ResultTable({ data, skip = [] }) {
   )
 }
 
-function ToolWidget({ title, icon: Icon, color = '#2563eb', children, result, error, running, passKey }) {
+function ToolWidget({ title, icon: Icon, color = '#2563eb', children, result, error, running, passKey }: {
+  title: string
+  icon?: LucideIcon
+  color?: string
+  children?: ReactNode
+  result?: ToolResult
+  error?: string | null
+  running?: boolean
+  passKey?: string
+}) {
   const [open, setOpen] = useState(true)
   const ok = result && passKey ? Boolean(result[passKey]) : undefined
 
@@ -159,7 +184,11 @@ function ToolWidget({ title, icon: Icon, color = '#2563eb', children, result, er
   )
 }
 
-function RunBtn({ onClick, running, label = 'Run' }) {
+function RunBtn({ onClick, running, label = 'Run' }: {
+  onClick: () => void
+  running?: boolean
+  label?: string
+}) {
   return (
     <button
       onClick={onClick}
@@ -173,7 +202,13 @@ function RunBtn({ onClick, running, label = 'Run' }) {
   )
 }
 
-function NumRow({ label, value, onChange, step = 'any', disabled }) {
+function NumRow({ label, value, onChange, step = 'any', disabled }: {
+  label: string
+  value: string | number
+  onChange: (value: string) => void
+  step?: string | number
+  disabled?: boolean
+}) {
   return (
     <div style={s.row}>
       <label style={s.label}>{label}</label>
@@ -189,7 +224,13 @@ function NumRow({ label, value, onChange, step = 'any', disabled }) {
   )
 }
 
-function SelRow({ label, value, onChange, options, disabled }) {
+function SelRow({ label, value, onChange, options, disabled }: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: SelectOptions
+  disabled?: boolean
+}) {
   return (
     <div style={s.row}>
       <label style={s.label}>{label}</label>
@@ -216,7 +257,7 @@ function SelRow({ label, value, onChange, options, disabled }) {
 function TabBeamSlab() {
   // ── arch_compute_beam_deflection ──
   const [bd, setBd] = useState({ length_mm: '6000', E_MPa: '200000', I_mm4: '270000000', support_type: 'simply_supported', load_type: 'udl', load_value: '5' })
-  const [bdR, setBdR] = useState(null); const [bdE, setBdE] = useState(null); const [bdRun, setBdRun] = useState(false)
+  const [bdR, setBdR] = useState<ToolResult>(null); const [bdE, setBdE] = useState<string | null>(null); const [bdRun, setBdRun] = useState(false)
   const runBeam = useCallback(async () => {
     setBdRun(true); setBdE(null); setBdR(null)
     try {
@@ -225,12 +266,12 @@ function TabBeamSlab() {
         support_type: bd.support_type, load_type: bd.load_type, load_value: +bd.load_value,
       })
       setBdR(r)
-    } catch (e) { setBdE(e.message) } finally { setBdRun(false) }
+    } catch (e) { setBdE(e instanceof Error ? e.message : String(e)) } finally { setBdRun(false) }
   }, [bd])
 
   // ── arch_compute_slab_deflection ──
   const [sd, setSd] = useState({ length_a_mm: '5000', width_b_mm: '4000', thickness_h_mm: '200', udl_kPa: '5', edge_condition: 'simply_supported' })
-  const [sdR, setSdR] = useState(null); const [sdE, setSdE] = useState(null); const [sdRun, setSdRun] = useState(false)
+  const [sdR, setSdR] = useState<ToolResult>(null); const [sdE, setSdE] = useState<string | null>(null); const [sdRun, setSdRun] = useState(false)
   const runSlab = useCallback(async () => {
     setSdRun(true); setSdE(null); setSdR(null)
     try {
@@ -240,12 +281,12 @@ function TabBeamSlab() {
         edge_condition: sd.edge_condition,
       })
       setSdR(r)
-    } catch (e) { setSdE(e.message) } finally { setSdRun(false) }
+    } catch (e) { setSdE(e instanceof Error ? e.message : String(e)) } finally { setSdRun(false) }
   }, [sd])
 
   // ── arch_check_punching_shear ──
   const [ps, setPs] = useState({ column_size_mm: '400', slab_thickness_mm: '250', fc_MPa: '30', effective_depth_d_mm: '210', column_shape: 'square', V_applied_kN: '500' })
-  const [psR, setPsR] = useState(null); const [psE, setPsE] = useState(null); const [psRun, setPsRun] = useState(false)
+  const [psR, setPsR] = useState<ToolResult>(null); const [psE, setPsE] = useState<string | null>(null); const [psRun, setPsRun] = useState(false)
   const runPunch = useCallback(async () => {
     setPsRun(true); setPsE(null); setPsR(null)
     try {
@@ -255,12 +296,12 @@ function TabBeamSlab() {
         column_shape: ps.column_shape, V_applied_kN: +ps.V_applied_kN,
       })
       setPsR(r)
-    } catch (e) { setPsE(e.message) } finally { setPsRun(false) }
+    } catch (e) { setPsE(e instanceof Error ? e.message : String(e)) } finally { setPsRun(false) }
   }, [ps])
 
   // ── arch_check_slab_on_grade ──
   const [sog, setSog] = useState({ slab_thickness_mm: '150', fc_MPa: '25', subgrade_modulus_k_MPa_per_m: '27.2', point_load_kN: '50', contact_radius_mm: '80', slab_long_dimension_m: '6' })
-  const [sogR, setSogR] = useState(null); const [sogE, setSogE] = useState(null); const [sogRun, setSogRun] = useState(false)
+  const [sogR, setSogR] = useState<ToolResult>(null); const [sogE, setSogE] = useState<string | null>(null); const [sogRun, setSogRun] = useState(false)
   const runSog = useCallback(async () => {
     setSogRun(true); setSogE(null); setSogR(null)
     try {
@@ -271,7 +312,7 @@ function TabBeamSlab() {
         slab_long_dimension_m: +sog.slab_long_dimension_m,
       })
       setSogR(r)
-    } catch (e) { setSogE(e.message) } finally { setSogRun(false) }
+    } catch (e) { setSogE(e instanceof Error ? e.message : String(e)) } finally { setSogRun(false) }
   }, [sog])
 
   return (
@@ -329,7 +370,7 @@ function TabBeamSlab() {
 function TabWindLoads() {
   // ── arch_compute_wind_load ──
   const [wl, setWl] = useState({ V_basic_mph: '115', exposure_category: 'C', mean_height_h_ft: '40', length_ft: '100', width_ft: '60' })
-  const [wlR, setWlR] = useState(null); const [wlE, setWlE] = useState(null); const [wlRun, setWlRun] = useState(false)
+  const [wlR, setWlR] = useState<ToolResult>(null); const [wlE, setWlE] = useState<string | null>(null); const [wlRun, setWlRun] = useState(false)
   const runWind = useCallback(async () => {
     setWlRun(true); setWlE(null); setWlR(null)
     try {
@@ -338,12 +379,12 @@ function TabWindLoads() {
         mean_height_h_ft: +wl.mean_height_h_ft, length_ft: +wl.length_ft, width_ft: +wl.width_ft,
       })
       setWlR(r)
-    } catch (e) { setWlE(e.message) } finally { setWlRun(false) }
+    } catch (e) { setWlE(e instanceof Error ? e.message : String(e)) } finally { setWlRun(false) }
   }, [wl])
 
   // ── arch_compute_wind_cc_pressure ──
   const [cc, setCc] = useState({ V_basic_mph: '115', exposure_category: 'C', mean_height_h_ft: '40', length_ft: '100', width_ft: '60', area_ft2: '100', zone: '1', component_type: 'wall' })
-  const [ccR, setCcR] = useState(null); const [ccE, setCcE] = useState(null); const [ccRun, setCcRun] = useState(false)
+  const [ccR, setCcR] = useState<ToolResult>(null); const [ccE, setCcE] = useState<string | null>(null); const [ccRun, setCcRun] = useState(false)
   const runWcc = useCallback(async () => {
     setCcRun(true); setCcE(null); setCcR(null)
     try {
@@ -354,12 +395,12 @@ function TabWindLoads() {
         zone: cc.zone, component_type: cc.component_type,
       })
       setCcR(r)
-    } catch (e) { setCcE(e.message) } finally { setCcRun(false) }
+    } catch (e) { setCcE(e instanceof Error ? e.message : String(e)) } finally { setCcRun(false) }
   }, [cc])
 
   // ── arch_check_lateral_bracing ──
   const [lb, setLb] = useState({ section_label: 'W14x90', S_x_mm3: '2330000', Z_x_mm3: '2620000', r_y_mm: '65', J_mm4: '3710000', h_o_mm: '360', L_b_mm: '3000' })
-  const [lbR, setLbR] = useState(null); const [lbE, setLbE] = useState(null); const [lbRun, setLbRun] = useState(false)
+  const [lbR, setLbR] = useState<ToolResult>(null); const [lbE, setLbE] = useState<string | null>(null); const [lbRun, setLbRun] = useState(false)
   const runLB = useCallback(async () => {
     setLbRun(true); setLbE(null); setLbR(null)
     try {
@@ -368,12 +409,12 @@ function TabWindLoads() {
         r_y_mm: +lb.r_y_mm, J_mm4: +lb.J_mm4, h_o_mm: +lb.h_o_mm, L_b_mm: +lb.L_b_mm,
       })
       setLbR(r)
-    } catch (e) { setLbE(e.message) } finally { setLbRun(false) }
+    } catch (e) { setLbE(e instanceof Error ? e.message : String(e)) } finally { setLbRun(false) }
   }, [lb])
 
   // ── arch_check_diaphragm_shear ──
   const [dsh, setDsh] = useState({ length_along_load_mm: '12192', width_perp_to_load_mm: '9144', sheathing_type: 'plywood_15_32', nail_spacing_mm: '152', blocked: 'true', framing_species: 'DF_L', V_lateral_lbs: '20000' })
-  const [dshR, setDshR] = useState(null); const [dshE, setDshE] = useState(null); const [dshRun, setDshRun] = useState(false)
+  const [dshR, setDshR] = useState<ToolResult>(null); const [dshE, setDshE] = useState<string | null>(null); const [dshRun, setDshRun] = useState(false)
   const runDsh = useCallback(async () => {
     setDshRun(true); setDshE(null); setDshR(null)
     try {
@@ -387,7 +428,7 @@ function TabWindLoads() {
         V_lateral_lbs: +dsh.V_lateral_lbs,
       })
       setDshR(r)
-    } catch (e) { setDshE(e.message) } finally { setDshRun(false) }
+    } catch (e) { setDshE(e instanceof Error ? e.message : String(e)) } finally { setDshRun(false) }
   }, [dsh])
 
   return (
@@ -464,7 +505,7 @@ function TabWindLoads() {
 function TabConnections() {
   // ── arch_design_base_plate ──
   const [bp, setBp] = useState({ column_d_mm: '357', column_bf_mm: '268', axial_load_kN: '1000', fc_MPa: '30', support_width_B_mm: '600', support_length_L_mm: '600' })
-  const [bpR, setBpR] = useState(null); const [bpE, setBpE] = useState(null); const [bpRun, setBpRun] = useState(false)
+  const [bpR, setBpR] = useState<ToolResult>(null); const [bpE, setBpE] = useState<string | null>(null); const [bpRun, setBpRun] = useState(false)
   const runBP = useCallback(async () => {
     setBpRun(true); setBpE(null); setBpR(null)
     try {
@@ -474,12 +515,12 @@ function TabConnections() {
         support_width_B_mm: +bp.support_width_B_mm, support_length_L_mm: +bp.support_length_L_mm,
       })
       setBpR(r)
-    } catch (e) { setBpE(e.message) } finally { setBpRun(false) }
+    } catch (e) { setBpE(e instanceof Error ? e.message : String(e)) } finally { setBpRun(false) }
   }, [bp])
 
   // ── arch_check_bolt_shear ──
   const [bsh, setBsh] = useState({ grade: 'A325-N', diameter_in: '0.75', num_bolts: '4', plate_thickness_in: '0.375', end_distance_in: '1.25' })
-  const [bshR, setBshR] = useState(null); const [bshE, setBshE] = useState(null); const [bshRun, setBshRun] = useState(false)
+  const [bshR, setBshR] = useState<ToolResult>(null); const [bshE, setBshE] = useState<string | null>(null); const [bshRun, setBshRun] = useState(false)
   const runBSh = useCallback(async () => {
     setBshRun(true); setBshE(null); setBshR(null)
     try {
@@ -489,12 +530,12 @@ function TabConnections() {
         end_distance_in: +bsh.end_distance_in,
       })
       setBshR(r)
-    } catch (e) { setBshE(e.message) } finally { setBshRun(false) }
+    } catch (e) { setBshE(e instanceof Error ? e.message : String(e)) } finally { setBshRun(false) }
   }, [bsh])
 
   // ── arch_check_anchor_pullout ──
   const [anc, setAnc] = useState({ bolt_diameter_mm: '16', embedment_depth_hef_mm: '200', edge_distance_min_mm: '300', anchor_spacing_min_mm: '200', fc_MPa: '25', fy_steel_MPa: '420', head_bearing_area_mm2: '400', N_factored_kN: '15' })
-  const [ancR, setAncR] = useState(null); const [ancE, setAncE] = useState(null); const [ancRun, setAncRun] = useState(false)
+  const [ancR, setAncR] = useState<ToolResult>(null); const [ancE, setAncE] = useState<string | null>(null); const [ancRun, setAncRun] = useState(false)
   const runAnc = useCallback(async () => {
     setAncRun(true); setAncE(null); setAncR(null)
     try {
@@ -505,12 +546,12 @@ function TabConnections() {
         head_bearing_area_mm2: +anc.head_bearing_area_mm2, N_factored_kN: +anc.N_factored_kN,
       })
       setAncR(r)
-    } catch (e) { setAncE(e.message) } finally { setAncRun(false) }
+    } catch (e) { setAncE(e instanceof Error ? e.message : String(e)) } finally { setAncRun(false) }
   }, [anc])
 
   // ── arch_design_lintel ──
   const [ln, setLn] = useState({ opening_span_mm: '1800', wall_thickness_mm: '200', material: 'reinforced_masonry', lintel_depth_mm: '200', lintel_width_mm: '200', fc_or_fy_MPa: '20', dead_load_kN_per_m: '10', live_load_kN_per_m: '6', masonry_above_height_mm: '1200' })
-  const [lnR, setLnR] = useState(null); const [lnE, setLnE] = useState(null); const [lnRun, setLnRun] = useState(false)
+  const [lnR, setLnR] = useState<ToolResult>(null); const [lnE, setLnE] = useState<string | null>(null); const [lnRun, setLnRun] = useState(false)
   const runLn = useCallback(async () => {
     setLnRun(true); setLnE(null); setLnR(null)
     try {
@@ -522,12 +563,12 @@ function TabConnections() {
         masonry_above_height_mm: +ln.masonry_above_height_mm,
       })
       setLnR(r)
-    } catch (e) { setLnE(e.message) } finally { setLnRun(false) }
+    } catch (e) { setLnE(e instanceof Error ? e.message : String(e)) } finally { setLnRun(false) }
   }, [ln])
 
   // ── arch_check_opening_in_wall ──
   const [ow, setOw] = useState({ wall_height_m: '3', wall_thickness_m: '0.2', opening_width_m: '1.2', opening_height_m: '2.1', header_above_opening_height_m: '0.2', lintel_depth_m: '0.2', jamb_width_m: '0.4', material: 'masonry', f_prime_or_fy_MPa: '20', applied_axial_kN_per_m: '50', applied_lateral_kN_per_m2: '1.5' })
-  const [owR, setOwR] = useState(null); const [owE, setOwE] = useState(null); const [owRun, setOwRun] = useState(false)
+  const [owR, setOwR] = useState<ToolResult>(null); const [owE, setOwE] = useState<string | null>(null); const [owRun, setOwRun] = useState(false)
   const runOw = useCallback(async () => {
     setOwRun(true); setOwE(null); setOwR(null)
     try {
@@ -541,7 +582,7 @@ function TabConnections() {
         applied_lateral_kN_per_m2: +ow.applied_lateral_kN_per_m2,
       })
       setOwR(r)
-    } catch (e) { setOwE(e.message) } finally { setOwRun(false) }
+    } catch (e) { setOwE(e instanceof Error ? e.message : String(e)) } finally { setOwRun(false) }
   }, [ow])
 
   return (
@@ -618,7 +659,7 @@ function TabConnections() {
 function TabWallsFootings() {
   // ── arch_compute_bearing_capacity ──
   const [bc, setBc] = useState({ length_B_m: '2', width_L_m: '2', depth_Df_m: '1', shape: 'square', cohesion_c_kPa: '0', friction_angle_phi_deg: '30', unit_weight_kN_m3: '18' })
-  const [bcR, setBcR] = useState(null); const [bcE, setBcE] = useState(null); const [bcRun, setBcRun] = useState(false)
+  const [bcR, setBcR] = useState<ToolResult>(null); const [bcE, setBcE] = useState<string | null>(null); const [bcRun, setBcRun] = useState(false)
   const runBC = useCallback(async () => {
     setBcRun(true); setBcE(null); setBcR(null)
     try {
@@ -628,12 +669,12 @@ function TabWallsFootings() {
         friction_angle_phi_deg: +bc.friction_angle_phi_deg, unit_weight_kN_m3: +bc.unit_weight_kN_m3,
       })
       setBcR(r)
-    } catch (e) { setBcE(e.message) } finally { setBcRun(false) }
+    } catch (e) { setBcE(e instanceof Error ? e.message : String(e)) } finally { setBcRun(false) }
   }, [bc])
 
   // ── arch_check_retaining_wall_stability ──
   const [rw, setRw] = useState({ wall_height_H_m: '4', stem_thickness_t_m: '0.4', base_width_B_m: '2.8', base_thickness_h_m: '0.5', heel_length_m: '1.8', toe_length_m: '0.6', soil_unit_weight_kN_m3: '18', friction_angle_phi_deg: '30', base_friction_delta_deg: '20', allowable_bearing_q_a_kPa: '150' })
-  const [rwR, setRwR] = useState(null); const [rwE, setRwE] = useState(null); const [rwRun, setRwRun] = useState(false)
+  const [rwR, setRwR] = useState<ToolResult>(null); const [rwE, setRwE] = useState<string | null>(null); const [rwRun, setRwRun] = useState(false)
   const runRW = useCallback(async () => {
     setRwRun(true); setRwE(null); setRwR(null)
     try {
@@ -647,12 +688,12 @@ function TabWallsFootings() {
         allowable_bearing_q_a_kPa: +rw.allowable_bearing_q_a_kPa,
       })
       setRwR(r)
-    } catch (e) { setRwE(e.message) } finally { setRwRun(false) }
+    } catch (e) { setRwE(e instanceof Error ? e.message : String(e)) } finally { setRwRun(false) }
   }, [rw])
 
   // ── arch_check_pier_axial ──
   const [pier, setPier] = useState({ pier_width_mm: '400', pier_thickness_mm: '200', height_h_mm: '2400', material: 'reinforced_concrete', f_prime_MPa: '25', end_conditions: 'fixed_fixed', P_factored_kN: '200' })
-  const [pierR, setPierR] = useState(null); const [pierE, setPierE] = useState(null); const [pierRun, setPierRun] = useState(false)
+  const [pierR, setPierR] = useState<ToolResult>(null); const [pierE, setPierE] = useState<string | null>(null); const [pierRun, setPierRun] = useState(false)
   const runPier = useCallback(async () => {
     setPierRun(true); setPierE(null); setPierR(null)
     try {
@@ -663,12 +704,12 @@ function TabWallsFootings() {
         P_factored_kN: +pier.P_factored_kN,
       })
       setPierR(r)
-    } catch (e) { setPierE(e.message) } finally { setPierRun(false) }
+    } catch (e) { setPierE(e instanceof Error ? e.message : String(e)) } finally { setPierRun(false) }
   }, [pier])
 
   // ── arch_check_bearing_wall_axial ──
   const [bwa, setBwa] = useState({ wall_thickness_t_mm: '200', wall_height_h_mm: '3000', wall_length_lw_m: '5', material: 'reinforced_concrete', f_prime_MPa: '25', P_factored_kN_per_m: '150' })
-  const [bwaR, setBwaR] = useState(null); const [bwaE, setBwaE] = useState(null); const [bwaRun, setBwaRun] = useState(false)
+  const [bwaR, setBwaR] = useState<ToolResult>(null); const [bwaE, setBwaE] = useState<string | null>(null); const [bwaRun, setBwaRun] = useState(false)
   const runBWA = useCallback(async () => {
     setBwaRun(true); setBwaE(null); setBwaR(null)
     try {
@@ -678,12 +719,12 @@ function TabWallsFootings() {
         f_prime_MPa: +bwa.f_prime_MPa, P_factored_kN_per_m: +bwa.P_factored_kN_per_m,
       })
       setBwaR(r)
-    } catch (e) { setBwaE(e.message) } finally { setBwaRun(false) }
+    } catch (e) { setBwaE(e instanceof Error ? e.message : String(e)) } finally { setBwaRun(false) }
   }, [bwa])
 
   // ── arch_check_shear_wall_oop ──
   const [sw, setSw] = useState({ wall_thickness_t_mm: '200', wall_height_h_mm: '3000', wall_length_lw_mm: '5000', fc_MPa: '25', fy_MPa: '420', As_each_face_mm2_per_m: '300', axial_load_Pu_kN_per_m: '100', oop_moment_Mu_kNm_per_m: '30' })
-  const [swR, setSwR] = useState(null); const [swE, setSwE] = useState(null); const [swRun, setSwRun] = useState(false)
+  const [swR, setSwR] = useState<ToolResult>(null); const [swE, setSwE] = useState<string | null>(null); const [swRun, setSwRun] = useState(false)
   const runSW = useCallback(async () => {
     setSwRun(true); setSwE(null); setSwR(null)
     try {
@@ -695,7 +736,7 @@ function TabWallsFootings() {
         oop_moment_Mu_kNm_per_m: +sw.oop_moment_Mu_kNm_per_m,
       })
       setSwR(r)
-    } catch (e) { setSwE(e.message) } finally { setSwRun(false) }
+    } catch (e) { setSwE(e instanceof Error ? e.message : String(e)) } finally { setSwRun(false) }
   }, [sw])
 
   return (
@@ -779,7 +820,7 @@ function TabWallsFootings() {
 function TabStairsMisc() {
   // ── arch_design_stair_stringer ──
   const [ss, setSs] = useState({ num_treads: '8', riser_height_in: '7', tread_depth_in: '11', stair_width_in: '48', material: 'sawn-DF-No2' })
-  const [ssR, setSsR] = useState(null); const [ssE, setSsE] = useState(null); const [ssRun, setSsRun] = useState(false)
+  const [ssR, setSsR] = useState<ToolResult>(null); const [ssE, setSsE] = useState<string | null>(null); const [ssRun, setSsRun] = useState(false)
   const runSS = useCallback(async () => {
     setSsRun(true); setSsE(null); setSsR(null)
     try {
@@ -789,13 +830,13 @@ function TabStairsMisc() {
         material: ss.material,
       })
       setSsR(r)
-    } catch (e) { setSsE(e.message) } finally { setSsRun(false) }
+    } catch (e) { setSsE(e instanceof Error ? e.message : String(e)) } finally { setSsRun(false) }
   }, [ss])
 
   // ── arch_check_bearing_capacity via footing ── (repeat with different defaults)
   // Instead wire arch_check_column_load as the 2nd misc tool
   const [cl, setCl] = useState({ column_type: 'steel_wide_flange', P_demand_kN: '800' })
-  const [clR, setClR] = useState(null); const [clE, setClE] = useState(null); const [clRun, setClRun] = useState(false)
+  const [clR, setClR] = useState<ToolResult>(null); const [clE, setClE] = useState<string | null>(null); const [clRun, setClRun] = useState(false)
   const runCL = useCallback(async () => {
     setClRun(true); setClE(null); setClR(null)
     try {
@@ -803,7 +844,7 @@ function TabStairsMisc() {
         column_type: cl.column_type, P_demand_kN: +cl.P_demand_kN,
       })
       setClR(r)
-    } catch (e) { setClE(e.message) } finally { setClRun(false) }
+    } catch (e) { setClE(e instanceof Error ? e.message : String(e)) } finally { setClRun(false) }
   }, [cl])
 
   return (

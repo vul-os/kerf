@@ -22,7 +22,7 @@ const ITEMS = [
   { id: 'T1', kind: 'table', x_mm: 3000, y_mm: 1500, width_mm: 2400, depth_mm: 1200, label: 'Conf Table' },
 ]
 
-const CIRC_PATHS = [
+const CIRC_PATHS: { name: string; start: [number, number]; end: [number, number]; clear_width_mm: number }[] = [
   {
     name: 'Main aisle',
     start: [0, 2500],

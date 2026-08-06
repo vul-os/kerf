@@ -34,17 +34,73 @@ const PADDING = 44
 // Furniture fill colours by kind
 // ---------------------------------------------------------------------------
 
-const KIND_FILL = {
+const KIND_FILL: Record<string, string> = {
   chair: '#1d4ed8',
   desk:  '#15803d',
   sofa:  '#7c3aed',
   table: '#b45309',
 }
-const KIND_STROKE = {
+const KIND_STROKE: Record<string, string> = {
   chair: '#3b82f6',
   desk:  '#22c55e',
   sofa:  '#a78bfa',
   table: '#f59e0b',
+}
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface Room {
+  name?: string
+  width_mm?: number
+  depth_mm?: number
+  ceiling_height_mm?: number
+}
+
+interface FurnitureItem {
+  id?: string
+  kind?: string
+  x_mm?: number
+  y_mm?: number
+  width_mm?: number
+  depth_mm?: number
+  label?: string
+  rotation_deg?: number
+}
+
+interface CircPath {
+  name: string
+  start: [number, number]
+  end: [number, number]
+  clear_width_mm: number
+}
+
+interface Finishes {
+  floor?: string
+  ceiling?: string
+  walls?: string
+}
+
+interface AuditViolation {
+  message: string
+}
+
+interface AuditResult {
+  ada_violations?: number
+  violations?: AuditViolation[]
+}
+
+export interface Props {
+  content?: string
+  room?: Room
+  items?: FurnitureItem[]
+  circPaths?: CircPath[]
+  finishes?: Finishes
+  svgWidth?: number
+  svgHeight?: number
+  className?: string
+  onDispatch?: (action: { tool: string; params: Record<string, unknown> }) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -61,17 +117,22 @@ export default function InteriorSpacePanel({
   svgHeight = 420,
   className = '',
   onDispatch,
-}) {
+}: Props) {
   // Accept a `content` string (JSON) from the panel registry.
-  const _p = (() => { if (!content) return {}; try { return JSON.parse(content) } catch { return {} } })()
+  const _p: {
+    room?: Room
+    items?: FurnitureItem[]
+    circPaths?: CircPath[]
+    finishes?: Finishes
+  } = (() => { if (!content) return {}; try { return JSON.parse(content) } catch { return {} } })()
   const room      = _p.room      ?? room_prop
   const items     = _p.items     ?? items_prop
   const circPaths = _p.circPaths ?? circPaths_prop
   const finishes  = _p.finishes  ?? finishes_prop
   const [loading, setLoading] = useState(false)
-  const [activeAction, setActiveAction] = useState(null)
-  const [auditResult, setAuditResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [activeAction, setActiveAction] = useState<string | null>(null)
+  const [auditResult, setAuditResult] = useState<AuditResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const roomW = room.width_mm || 6000
   const roomD = room.depth_mm || 5000
@@ -131,7 +192,7 @@ export default function InteriorSpacePanel({
         }
       }
     } catch (e) {
-      setError(e.message || 'Audit dispatch failed')
+      setError(e instanceof Error ? e.message : 'Audit dispatch failed')
     } finally {
       setLoading(false)
       setActiveAction(null)

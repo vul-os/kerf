@@ -18,10 +18,58 @@ import { useState, useCallback } from 'react'
 import { CheckCircle, XCircle, AlertTriangle, RefreshCw, Download } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type TrimBox = [number, number, number, number]
+
+interface Preset {
+  label: string
+  trim: TrimBox | null
+}
+
+interface Mark {
+  position: [number, number]
+  kind: string
+  color_layers: string[]
+  size_mm: number
+}
+
+interface CheckResult {
+  ok?: boolean
+  bleed_mm_correct?: boolean
+  safety_zone_clear?: boolean
+  registration_mark_count?: number
+  n_spot_colors?: number
+  pdf_x_1a_compliant?: boolean
+  estimated_plate_count?: number
+  warnings?: string[]
+}
+
+interface MarksResult {
+  ok?: boolean
+  marks?: Mark[]
+}
+
+interface ExportResult {
+  ok?: boolean
+  pdf_size_bytes?: number
+  page_count?: number
+  trim_box_mm?: TrimBox
+  bleed_mm?: number
+  spot_colors?: string[]
+  honest_caveat?: string
+}
+
+export interface Props {
+  className?: string
+}
+
+// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const PRESETS = [
+const PRESETS: Preset[] = [
   { label: 'A4 Portrait (210×297)',   trim: [10, 10, 220, 307] },
   { label: 'A3 Landscape (420×297)',  trim: [10, 10, 430, 307] },
   { label: 'US Letter (216×279)',     trim: [10, 10, 226, 289] },
@@ -36,12 +84,12 @@ const FINISHING_OPTIONS = [
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function TrimBoxInput({ value, onChange }) {
+function TrimBoxInput({ value, onChange }: { value: TrimBox; onChange: (v: TrimBox) => void }) {
   const [raw, setRaw] = useState(() => value.join(', '))
 
   const handleBlur = () => {
     const parsed = raw.split(/[\s,]+/).map(Number).filter((n) => !isNaN(n))
-    if (parsed.length === 4) onChange(parsed)
+    if (parsed.length === 4) onChange(parsed as TrimBox)
   }
 
   return (
@@ -57,7 +105,7 @@ function TrimBoxInput({ value, onChange }) {
   )
 }
 
-function WarningList({ warnings }) {
+function WarningList({ warnings }: { warnings?: string[] }) {
   if (!warnings || warnings.length === 0) return null
   return (
     <ul className="flex flex-col gap-1 mt-2">
@@ -89,7 +137,7 @@ function WarningList({ warnings }) {
   )
 }
 
-function CheckResultCard({ result }) {
+function CheckResultCard({ result }: { result: CheckResult }) {
   const items = [
     { label: 'Bleed ≥ 3 mm',           val: result.bleed_mm_correct,    good: true },
     { label: 'Safety zone clear',       val: result.safety_zone_clear,   good: true },
@@ -134,24 +182,24 @@ function CheckResultCard({ result }) {
  * -----
  * className  {string}  Extra Tailwind classes.
  */
-export default function PackagingPrePressPanel({ className = '' }) {
+export default function PackagingPrePressPanel({ className = '' }: Props) {
   const [activeTab,   setActiveTab]   = useState('check')
-  const [trimBox,     setTrimBox]     = useState([10, 10, 220, 307])
+  const [trimBox,     setTrimBox]     = useState<TrimBox>([10, 10, 220, 307])
   const [bleedMm,     setBleedMm]     = useState(3.0)
   const [safetyMm,    setSafetyMm]    = useState(4.0)
-  const [finishing,   setFinishing]   = useState([])
-  const [artworkBbox, setArtworkBbox] = useState([20, 20, 210, 297])
+  const [finishing,   setFinishing]   = useState<string[]>([])
+  const [artworkBbox, setArtworkBbox] = useState<TrimBox>([20, 20, 210, 297])
   const [loading,     setLoading]     = useState(false)
-  const [error,       setError]       = useState(null)
+  const [error,       setError]       = useState<string | null>(null)
 
   // Tab-specific results
-  const [checkResult, setCheckResult] = useState(null)
-  const [marksResult, setMarksResult] = useState(null)
-  const [exportResult, setExportResult] = useState(null)
+  const [checkResult, setCheckResult] = useState<CheckResult | null>(null)
+  const [marksResult, setMarksResult] = useState<MarksResult | null>(null)
+  const [exportResult, setExportResult] = useState<ExportResult | null>(null)
 
   // --- Helpers ---
 
-  const callTool = useCallback(async (toolName, body) => {
+  const callTool = useCallback(async <T,>(toolName: string, body: Record<string, unknown>): Promise<T> => {
     const res = await fetch(`/api/llm-tools/${toolName}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -168,7 +216,7 @@ export default function PackagingPrePressPanel({ className = '' }) {
     setError(null)
     setCheckResult(null)
     try {
-      const result = await callTool('packaging_prepress_check', {
+      const result = await callTool<CheckResult>('packaging_prepress_check', {
         trim_box:            trimBox,
         bleed_mm:            bleedMm,
         safety_zone_mm:      safetyMm,
@@ -211,7 +259,7 @@ export default function PackagingPrePressPanel({ className = '' }) {
     setError(null)
     setMarksResult(null)
     try {
-      const result = await callTool('packaging_prepress_gen_marks', {
+      const result = await callTool<MarksResult>('packaging_prepress_gen_marks', {
         trim_box: trimBox,
         bleed_mm: bleedMm,
         kind:     'corner_bracket',
@@ -222,10 +270,10 @@ export default function PackagingPrePressPanel({ className = '' }) {
         return {
           ok: true,
           marks: [
-            { position: [x0 - d, y0 - d], kind: 'corner_bracket', color_layers: ['cyan', 'magenta', 'yellow', 'black'], size_mm: 5 },
-            { position: [x1 + d, y0 - d], kind: 'corner_bracket', color_layers: ['cyan', 'magenta', 'yellow', 'black'], size_mm: 5 },
-            { position: [x1 + d, y1 + d], kind: 'corner_bracket', color_layers: ['cyan', 'magenta', 'yellow', 'black'], size_mm: 5 },
-            { position: [x0 - d, y1 + d], kind: 'corner_bracket', color_layers: ['cyan', 'magenta', 'yellow', 'black'], size_mm: 5 },
+            { position: [x0 - d, y0 - d] as [number, number], kind: 'corner_bracket', color_layers: ['cyan', 'magenta', 'yellow', 'black'], size_mm: 5 },
+            { position: [x1 + d, y0 - d] as [number, number], kind: 'corner_bracket', color_layers: ['cyan', 'magenta', 'yellow', 'black'], size_mm: 5 },
+            { position: [x1 + d, y1 + d] as [number, number], kind: 'corner_bracket', color_layers: ['cyan', 'magenta', 'yellow', 'black'], size_mm: 5 },
+            { position: [x0 - d, y1 + d] as [number, number], kind: 'corner_bracket', color_layers: ['cyan', 'magenta', 'yellow', 'black'], size_mm: 5 },
           ],
         }
       })
@@ -244,7 +292,7 @@ export default function PackagingPrePressPanel({ className = '' }) {
     setError(null)
     setExportResult(null)
     try {
-      const result = await callTool('packaging_prepress_export_pdf_x1a', {
+      const result = await callTool<ExportResult>('packaging_prepress_export_pdf_x1a', {
         trim_box:   trimBox,
         bleed_mm:   bleedMm,
         finishing,

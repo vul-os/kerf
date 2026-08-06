@@ -18,10 +18,40 @@ import { useState, useCallback } from 'react'
 import { Calculator, RefreshCw, AlertTriangle } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface MaterialPreset {
+  label: string
+  material_name: string
+  cost_per_kg: number
+  sheet_width_mm: number
+  sheet_height_mm: number
+  sheet_weight_gsm: number
+}
+
+type Point = [number, number]
+
+interface YieldResult {
+  parts_per_sheet?: number
+  sheets_per_job?: number
+  material_used_kg?: number
+  waste_pct?: number
+  total_material_cost?: number
+  material_cost_per_part?: number
+  honest_caveat?: string
+  error?: string
+}
+
+export interface Props {
+  className?: string
+}
+
+// ---------------------------------------------------------------------------
 // Material presets
 // ---------------------------------------------------------------------------
 
-const MATERIAL_PRESETS = [
+const MATERIAL_PRESETS: MaterialPreset[] = [
   {
     label:          'SBS 320 gsm (A4 sheet)',
     material_name:  'sbs_320gsm',
@@ -50,21 +80,21 @@ const MATERIAL_PRESETS = [
 ]
 
 // Default outline: 200×150 mm rectangle
-const DEFAULT_OUTLINE = [[0, 0], [200, 0], [200, 150], [0, 150]]
+const DEFAULT_OUTLINE: Point[] = [[0, 0], [200, 0], [200, 150], [0, 150]]
 
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function OutlineInput({ value, onChange }) {
+function OutlineInput({ value, onChange }: { value: Point[]; onChange: (pts: Point[]) => void }) {
   const [raw, setRaw] = useState(() =>
     value.map((pt) => `${pt[0]},${pt[1]}`).join(' | ')
   )
 
   const handleBlur = () => {
-    const pts = raw.split(/\s*\|\s*/).map((s) => {
+    const pts: Point[] = raw.split(/\s*\|\s*/).map((s) => {
       const [x, y] = s.split(',').map(Number)
-      return [x, y]
+      return [x, y] as Point
     }).filter(([x, y]) => !isNaN(x) && !isNaN(y))
     if (pts.length >= 2) onChange(pts)
   }
@@ -82,7 +112,12 @@ function OutlineInput({ value, onChange }) {
   )
 }
 
-function MetricCard({ label, value, unit = '', color = 'text-gray-900 dark:text-gray-100' }) {
+function MetricCard({ label, value, unit = '', color = 'text-gray-900 dark:text-gray-100' }: {
+  label: string
+  value: string | number | undefined
+  unit?: string
+  color?: string
+}) {
   return (
     <div className="flex flex-col rounded-lg border border-gray-200 dark:border-gray-700 p-3">
       <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
@@ -105,7 +140,7 @@ function MetricCard({ label, value, unit = '', color = 'text-gray-900 dark:text-
  * -----
  * className  {string}  Extra Tailwind classes.
  */
-export default function PackagingMaterialYieldPanel({ className = '' }) {
+export default function PackagingMaterialYieldPanel({ className = '' }: Props) {
   const [preset,       setPreset]       = useState(MATERIAL_PRESETS[0])
   const [materialName, setMaterialName] = useState(preset.material_name)
   const [costPerKg,    setCostPerKg]    = useState(preset.cost_per_kg)
@@ -114,13 +149,13 @@ export default function PackagingMaterialYieldPanel({ className = '' }) {
   const [sheetGsm,     setSheetGsm]     = useState(preset.sheet_weight_gsm)
   const [jobQty,       setJobQty]       = useState(1000)
   const [efficiency,   setEfficiency]   = useState(75)
-  const [outline,      setOutline]      = useState(DEFAULT_OUTLINE)
+  const [outline,      setOutline]      = useState<Point[]>(DEFAULT_OUTLINE)
 
   const [loading,      setLoading]      = useState(false)
-  const [error,        setError]        = useState(null)
-  const [result,       setResult]       = useState(null)
+  const [error,        setError]        = useState<string | null>(null)
+  const [result,       setResult]       = useState<YieldResult | null>(null)
 
-  const handlePresetChange = useCallback((label) => {
+  const handlePresetChange = useCallback((label: string) => {
     const p = MATERIAL_PRESETS.find((x) => x.label === label)
     if (!p) return
     setPreset(p)

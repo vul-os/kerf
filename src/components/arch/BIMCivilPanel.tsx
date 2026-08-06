@@ -11,20 +11,37 @@
 //
 // Props: none (standalone panel — operates without a project file)
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, type ReactNode, type CSSProperties } from 'react'
 import {
   Building2, Construction, Wind, AlertTriangle, CheckCircle,
   Loader2, Play, ChevronDown, ChevronUp, Pipette, Layers,
   Map, Droplets, Route, ShieldAlert,
+  type LucideIcon,
 } from 'lucide-react'
 
 const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
 
 // ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+// `/api/tools/call` fans out to ~34 distinct backend tool handlers (bim_*, civil_*, hvac_*,
+// pipe_*, piping_*, create_mep_route, auto_route_mep, clash_detect, export_ifc, import_ifc,
+// ...), each returning its own undocumented, tool-specific JSON shape. None of these are
+// modeled in src/types/api.ts (that file covers src/lib/api.js's endpoints; this component
+// calls `/api/tools/call` directly). `any` is the honest boundary type here — the alternative
+// is hand-rolling ~34 speculative response interfaces this slice doesn't own and can't verify.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ToolResult = any
+
+interface SelectOption { value: string; label: string }
+type SelectOptions = (string | SelectOption)[]
+
+// ---------------------------------------------------------------------------
 // Styles — identical palette to StructuralPanel.jsx
 // ---------------------------------------------------------------------------
 
-const s = {
+const s: Record<string, CSSProperties> = {
   root:         { background: '#111827', padding: '12px', fontSize: 12, color: '#e5e7eb', minHeight: 200 },
   header:       { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 },
   title:        { fontWeight: 600, fontSize: 14, color: '#f9fafb' },
@@ -56,7 +73,7 @@ const s = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function callTool(toolName, args) {
+async function callTool(toolName: string, args: Record<string, unknown>): Promise<ToolResult> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -69,7 +86,7 @@ async function callTool(toolName, args) {
   return res.json()
 }
 
-function fmt(v, decimals = 3) {
+function fmt(v: unknown, decimals = 3): string {
   if (v == null) return '—'
   if (typeof v === 'boolean') return v ? 'yes' : 'no'
   if (typeof v === 'number') {
@@ -81,13 +98,13 @@ function fmt(v, decimals = 3) {
   return String(v)
 }
 
-function StatusChip({ ok }) {
+function StatusChip({ ok }: { ok?: boolean }) {
   return ok
     ? <span style={s.passChip}>PASS</span>
     : <span style={s.failChip}>FAIL</span>
 }
 
-function ResultTable({ data, skip = [] }) {
+function ResultTable({ data, skip = [] }: { data: ToolResult; skip?: string[] }) {
   if (!data || typeof data !== 'object') return null
   const entries = Object.entries(data).filter(
     ([k, v]) => !skip.includes(k) && typeof v !== 'object' && !Array.isArray(v)
@@ -107,7 +124,16 @@ function ResultTable({ data, skip = [] }) {
   )
 }
 
-function ToolWidget({ title, icon: Icon, color = '#2563eb', children, result, error, running, passKey }) {
+function ToolWidget({ title, icon: Icon, color = '#2563eb', children, result, error, running, passKey }: {
+  title: string
+  icon?: LucideIcon
+  color?: string
+  children?: ReactNode
+  result?: ToolResult
+  error?: string | null
+  running?: boolean
+  passKey?: string
+}) {
   const [open, setOpen] = useState(true)
   const ok = result && passKey ? Boolean(result[passKey]) : undefined
 
@@ -163,7 +189,11 @@ function ToolWidget({ title, icon: Icon, color = '#2563eb', children, result, er
   )
 }
 
-function RunBtn({ onClick, running, label = 'Run' }) {
+function RunBtn({ onClick, running, label = 'Run' }: {
+  onClick: () => void
+  running?: boolean
+  label?: string
+}) {
   return (
     <button
       onClick={onClick}
@@ -177,7 +207,13 @@ function RunBtn({ onClick, running, label = 'Run' }) {
   )
 }
 
-function NumRow({ label, value, onChange, step = 'any', disabled }) {
+function NumRow({ label, value, onChange, step = 'any', disabled }: {
+  label: string
+  value: string | number
+  onChange: (value: string) => void
+  step?: string | number
+  disabled?: boolean
+}) {
   return (
     <div style={s.row}>
       <label style={s.label}>{label}</label>
@@ -193,7 +229,13 @@ function NumRow({ label, value, onChange, step = 'any', disabled }) {
   )
 }
 
-function SelRow({ label, value, onChange, options, disabled }) {
+function SelRow({ label, value, onChange, options, disabled }: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: SelectOptions
+  disabled?: boolean
+}) {
   return (
     <div style={s.row}>
       <label style={s.label}>{label}</label>
@@ -213,7 +255,12 @@ function SelRow({ label, value, onChange, options, disabled }) {
   )
 }
 
-function TxtRow({ label, value, onChange, disabled }) {
+function TxtRow({ label, value, onChange, disabled }: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  disabled?: boolean
+}) {
   return (
     <div style={s.row}>
       <label style={s.label}>{label}</label>
@@ -235,7 +282,7 @@ function TxtRow({ label, value, onChange, disabled }) {
 function TabBIM() {
   // ── bim_make_wall ──────────────────────────────────────────────────────────
   const [wall, setWall] = useState({ start_x: '0', start_y: '0', end_x: '6000', end_y: '0', height_mm: '3000', thickness_mm: '200', base_offset_mm: '0', wall_type: 'basic' })
-  const [wallR, setWallR] = useState(null); const [wallE, setWallE] = useState(null); const [wallRun, setWallRun] = useState(false)
+  const [wallR, setWallR] = useState<ToolResult>(null); const [wallE, setWallE] = useState<string | null>(null); const [wallRun, setWallRun] = useState(false)
   const runWall = useCallback(async () => {
     setWallRun(true); setWallE(null); setWallR(null)
     try {
@@ -248,12 +295,12 @@ function TabBIM() {
         wall_type: wall.wall_type,
       })
       setWallR(r)
-    } catch (e) { setWallE(e.message) } finally { setWallRun(false) }
+    } catch (e) { setWallE(e instanceof Error ? e.message : String(e)) } finally { setWallRun(false) }
   }, [wall])
 
   // ── bim_make_slab ──────────────────────────────────────────────────────────
   const [slab, setSlab] = useState({ width_mm: '8000', length_mm: '12000', thickness_mm: '250', level_mm: '0', slab_type: 'floor' })
-  const [slabR, setSlabR] = useState(null); const [slabE, setSlabE] = useState(null); const [slabRun, setSlabRun] = useState(false)
+  const [slabR, setSlabR] = useState<ToolResult>(null); const [slabE, setSlabE] = useState<string | null>(null); const [slabRun, setSlabRun] = useState(false)
   const runSlab = useCallback(async () => {
     setSlabRun(true); setSlabE(null); setSlabR(null)
     try {
@@ -263,12 +310,12 @@ function TabBIM() {
         slab_type: slab.slab_type,
       })
       setSlabR(r)
-    } catch (e) { setSlabE(e.message) } finally { setSlabRun(false) }
+    } catch (e) { setSlabE(e instanceof Error ? e.message : String(e)) } finally { setSlabRun(false) }
   }, [slab])
 
   // ── bim_make_roof ──────────────────────────────────────────────────────────
   const [roof, setRoof] = useState({ width_mm: '10000', length_mm: '14000', pitch_degrees: '22.5', thickness_mm: '200', roof_type: 'gable', eave_offset_mm: '600' })
-  const [roofR, setRoofR] = useState(null); const [roofE, setRoofE] = useState(null); const [roofRun, setRoofRun] = useState(false)
+  const [roofR, setRoofR] = useState<ToolResult>(null); const [roofE, setRoofE] = useState<string | null>(null); const [roofRun, setRoofRun] = useState(false)
   const runRoof = useCallback(async () => {
     setRoofRun(true); setRoofE(null); setRoofR(null)
     try {
@@ -278,12 +325,12 @@ function TabBIM() {
         roof_type: roof.roof_type, eave_offset_mm: +roof.eave_offset_mm,
       })
       setRoofR(r)
-    } catch (e) { setRoofE(e.message) } finally { setRoofRun(false) }
+    } catch (e) { setRoofE(e instanceof Error ? e.message : String(e)) } finally { setRoofRun(false) }
   }, [roof])
 
   // ── bim_curtain_wall_geometry ──────────────────────────────────────────────
   const [cw, setCw] = useState({ width_mm: '5000', height_mm: '3600', grid_u_count: '5', grid_v_count: '3', mullion_width_mm: '50', panel_type: 'glazed' })
-  const [cwR, setCwR] = useState(null); const [cwE, setCwE] = useState(null); const [cwRun, setCwRun] = useState(false)
+  const [cwR, setCwR] = useState<ToolResult>(null); const [cwE, setCwE] = useState<string | null>(null); const [cwRun, setCwRun] = useState(false)
   const runCW = useCallback(async () => {
     setCwRun(true); setCwE(null); setCwR(null)
     try {
@@ -293,12 +340,12 @@ function TabBIM() {
         mullion_width_mm: +cw.mullion_width_mm, panel_type: cw.panel_type,
       })
       setCwR(r)
-    } catch (e) { setCwE(e.message) } finally { setCwRun(false) }
+    } catch (e) { setCwE(e instanceof Error ? e.message : String(e)) } finally { setCwRun(false) }
   }, [cw])
 
   // ── bim_hatch_region ───────────────────────────────────────────────────────
   const [hatch, setHatch] = useState({ width_mm: '3000', height_mm: '2000', pattern: 'diagonal_cross', scale: '1.0', angle_deg: '45' })
-  const [hatchR, setHatchR] = useState(null); const [hatchE, setHatchE] = useState(null); const [hatchRun, setHatchRun] = useState(false)
+  const [hatchR, setHatchR] = useState<ToolResult>(null); const [hatchE, setHatchE] = useState<string | null>(null); const [hatchRun, setHatchRun] = useState(false)
   const runHatch = useCallback(async () => {
     setHatchRun(true); setHatchE(null); setHatchR(null)
     try {
@@ -307,12 +354,12 @@ function TabBIM() {
         pattern: hatch.pattern, scale: +hatch.scale, angle_deg: +hatch.angle_deg,
       })
       setHatchR(r)
-    } catch (e) { setHatchE(e.message) } finally { setHatchRun(false) }
+    } catch (e) { setHatchE(e instanceof Error ? e.message : String(e)) } finally { setHatchRun(false) }
   }, [hatch])
 
   // ── bim_section_fill ───────────────────────────────────────────────────────
   const [fill, setFill] = useState({ section_width_mm: '200', section_height_mm: '3000', material: 'concrete', cut_angle_deg: '90' })
-  const [fillR, setFillR] = useState(null); const [fillE, setFillE] = useState(null); const [fillRun, setFillRun] = useState(false)
+  const [fillR, setFillR] = useState<ToolResult>(null); const [fillE, setFillE] = useState<string | null>(null); const [fillRun, setFillRun] = useState(false)
   const runFill = useCallback(async () => {
     setFillRun(true); setFillE(null); setFillR(null)
     try {
@@ -321,12 +368,12 @@ function TabBIM() {
         material: fill.material, cut_angle_deg: +fill.cut_angle_deg,
       })
       setFillR(r)
-    } catch (e) { setFillE(e.message) } finally { setFillRun(false) }
+    } catch (e) { setFillE(e instanceof Error ? e.message : String(e)) } finally { setFillRun(false) }
   }, [fill])
 
   // ── bim_make2d_from_brep ───────────────────────────────────────────────────
   const [m2d, setM2d] = useState({ brep_id: 'wall_001', view_direction: 'front', scale: '1:100', include_hidden: 'false' })
-  const [m2dR, setM2dR] = useState(null); const [m2dE, setM2dE] = useState(null); const [m2dRun, setM2dRun] = useState(false)
+  const [m2dR, setM2dR] = useState<ToolResult>(null); const [m2dE, setM2dE] = useState<string | null>(null); const [m2dRun, setM2dRun] = useState(false)
   const runM2d = useCallback(async () => {
     setM2dRun(true); setM2dE(null); setM2dR(null)
     try {
@@ -335,12 +382,12 @@ function TabBIM() {
         scale: m2d.scale, include_hidden: m2d.include_hidden === 'true',
       })
       setM2dR(r)
-    } catch (e) { setM2dE(e.message) } finally { setM2dRun(false) }
+    } catch (e) { setM2dE(e instanceof Error ? e.message : String(e)) } finally { setM2dRun(false) }
   }, [m2d])
 
   // ── bim_toposolid_to_brep ──────────────────────────────────────────────────
   const [topo, setTopo] = useState({ grid_spacing_mm: '1000', base_elevation_mm: '0', smoothing_iterations: '3' })
-  const [topoR, setTopoR] = useState(null); const [topoE, setTopoE] = useState(null); const [topoRun, setTopoRun] = useState(false)
+  const [topoR, setTopoR] = useState<ToolResult>(null); const [topoE, setTopoE] = useState<string | null>(null); const [topoRun, setTopoRun] = useState(false)
   const runTopo = useCallback(async () => {
     setTopoRun(true); setTopoE(null); setTopoR(null)
     try {
@@ -356,12 +403,12 @@ function TabBIM() {
         ],
       })
       setTopoR(r)
-    } catch (e) { setTopoE(e.message) } finally { setTopoRun(false) }
+    } catch (e) { setTopoE(e instanceof Error ? e.message : String(e)) } finally { setTopoRun(false) }
   }, [topo])
 
   // ── bim_cut_fill_volume ────────────────────────────────────────────────────
   const [cf, setCf] = useState({ existing_avg_elev_mm: '5000', proposed_avg_elev_mm: '4800', site_area_m2: '2500' })
-  const [cfR, setCfR] = useState(null); const [cfE, setCfE] = useState(null); const [cfRun, setCfRun] = useState(false)
+  const [cfR, setCfR] = useState<ToolResult>(null); const [cfE, setCfE] = useState<string | null>(null); const [cfRun, setCfRun] = useState(false)
   const runCF = useCallback(async () => {
     setCfRun(true); setCfE(null); setCfR(null)
     try {
@@ -371,11 +418,11 @@ function TabBIM() {
         site_area_m2: +cf.site_area_m2,
       })
       setCfR(r)
-    } catch (e) { setCfE(e.message) } finally { setCfRun(false) }
+    } catch (e) { setCfE(e instanceof Error ? e.message : String(e)) } finally { setCfRun(false) }
   }, [cf])
 
   // ── export_ifc / import_ifc (status-only tools) ────────────────────────────
-  const [ifcExR, setIfcExR] = useState(null); const [ifcExE, setIfcExE] = useState(null); const [ifcExRun, setIfcExRun] = useState(false)
+  const [ifcExR, setIfcExR] = useState<ToolResult>(null); const [ifcExE, setIfcExE] = useState<string | null>(null); const [ifcExRun, setIfcExRun] = useState(false)
   const [ifcIfc, setIfcIfc] = useState({ schema: 'IFC4', include_geometry: 'true', include_properties: 'true' })
   const runIfcEx = useCallback(async () => {
     setIfcExRun(true); setIfcExE(null); setIfcExR(null)
@@ -386,10 +433,10 @@ function TabBIM() {
         include_properties: ifcIfc.include_properties === 'true',
       })
       setIfcExR(r)
-    } catch (e) { setIfcExE(e.message) } finally { setIfcExRun(false) }
+    } catch (e) { setIfcExE(e instanceof Error ? e.message : String(e)) } finally { setIfcExRun(false) }
   }, [ifcIfc])
 
-  const [ifcImR, setIfcImR] = useState(null); const [ifcImE, setIfcImE] = useState(null); const [ifcImRun, setIfcImRun] = useState(false)
+  const [ifcImR, setIfcImR] = useState<ToolResult>(null); const [ifcImE, setIfcImE] = useState<string | null>(null); const [ifcImRun, setIfcImRun] = useState(false)
   const [ifcFile, setIfcFile] = useState({ file_path: '/models/building.ifc', merge_strategy: 'replace' })
   const runIfcIm = useCallback(async () => {
     setIfcImRun(true); setIfcImE(null); setIfcImR(null)
@@ -398,12 +445,12 @@ function TabBIM() {
         file_path: ifcFile.file_path, merge_strategy: ifcFile.merge_strategy,
       })
       setIfcImR(r)
-    } catch (e) { setIfcImE(e.message) } finally { setIfcImRun(false) }
+    } catch (e) { setIfcImE(e instanceof Error ? e.message : String(e)) } finally { setIfcImRun(false) }
   }, [ifcFile])
 
   // ── bim_create_space ───────────────────────────────────────────────────────
   const [space, setSpace] = useState({ name: 'Office A', number: '101', area_m2: '24', height_mm: '3000', level: '0', space_type: 'office' })
-  const [spaceR, setSpaceR] = useState(null); const [spaceE, setSpaceE] = useState(null); const [spaceRun, setSpaceRun] = useState(false)
+  const [spaceR, setSpaceR] = useState<ToolResult>(null); const [spaceE, setSpaceE] = useState<string | null>(null); const [spaceRun, setSpaceRun] = useState(false)
   const runSpace = useCallback(async () => {
     setSpaceRun(true); setSpaceE(null); setSpaceR(null)
     try {
@@ -413,12 +460,12 @@ function TabBIM() {
         level: +space.level, space_type: space.space_type,
       })
       setSpaceR(r)
-    } catch (e) { setSpaceE(e.message) } finally { setSpaceRun(false) }
+    } catch (e) { setSpaceE(e instanceof Error ? e.message : String(e)) } finally { setSpaceRun(false) }
   }, [space])
 
   // ── bim_parse_facade_ifc ───────────────────────────────────────────────────
   const [facade, setFacade] = useState({ ifc_path: '/models/facade.ifc', extract_thermal: 'true' })
-  const [facadeR, setFacadeR] = useState(null); const [facadeE, setFacadeE] = useState(null); const [facadeRun, setFacadeRun] = useState(false)
+  const [facadeR, setFacadeR] = useState<ToolResult>(null); const [facadeE, setFacadeE] = useState<string | null>(null); const [facadeRun, setFacadeRun] = useState(false)
   const runFacade = useCallback(async () => {
     setFacadeRun(true); setFacadeE(null); setFacadeR(null)
     try {
@@ -426,7 +473,7 @@ function TabBIM() {
         ifc_path: facade.ifc_path, extract_thermal: facade.extract_thermal === 'true',
       })
       setFacadeR(r)
-    } catch (e) { setFacadeE(e.message) } finally { setFacadeRun(false) }
+    } catch (e) { setFacadeE(e instanceof Error ? e.message : String(e)) } finally { setFacadeRun(false) }
   }, [facade])
 
   return (
@@ -584,7 +631,7 @@ function TabBIM() {
 function TabCivil() {
   // ── civil_horizontal_alignment ────────────────────────────────────────────
   const [ha, setHa] = useState({ start_station: '0', design_speed_kph: '80', curve_radius_m: '400', tangent_length_m: '500' })
-  const [haR, setHaR] = useState(null); const [haE, setHaE] = useState(null); const [haRun, setHaRun] = useState(false)
+  const [haR, setHaR] = useState<ToolResult>(null); const [haE, setHaE] = useState<string | null>(null); const [haRun, setHaRun] = useState(false)
   const runHA = useCallback(async () => {
     setHaRun(true); setHaE(null); setHaR(null)
     try {
@@ -593,12 +640,12 @@ function TabCivil() {
         curve_radius_m: +ha.curve_radius_m, tangent_length_m: +ha.tangent_length_m,
       })
       setHaR(r)
-    } catch (e) { setHaE(e.message) } finally { setHaRun(false) }
+    } catch (e) { setHaE(e instanceof Error ? e.message : String(e)) } finally { setHaRun(false) }
   }, [ha])
 
   // ── civil_vertical_alignment ───────────────────────────────────────────────
   const [va, setVa] = useState({ start_grade_pct: '-2.5', end_grade_pct: '3.0', pvi_station: '250', design_speed_kph: '80', sag_or_crest: 'crest' })
-  const [vaR, setVaR] = useState(null); const [vaE, setVaE] = useState(null); const [vaRun, setVaRun] = useState(false)
+  const [vaR, setVaR] = useState<ToolResult>(null); const [vaE, setVaE] = useState<string | null>(null); const [vaRun, setVaRun] = useState(false)
   const runVA = useCallback(async () => {
     setVaRun(true); setVaE(null); setVaR(null)
     try {
@@ -608,12 +655,12 @@ function TabCivil() {
         sag_or_crest: va.sag_or_crest,
       })
       setVaR(r)
-    } catch (e) { setVaE(e.message) } finally { setVaRun(false) }
+    } catch (e) { setVaE(e instanceof Error ? e.message : String(e)) } finally { setVaRun(false) }
   }, [va])
 
   // ── civil_corridor_brep ────────────────────────────────────────────────────
   const [corr, setCorr] = useState({ carriageway_width_m: '7.4', shoulder_width_m: '2.5', fill_slope_h: '2', cut_slope_h: '1.5', length_m: '500' })
-  const [corrR, setCorrR] = useState(null); const [corrE, setCorrE] = useState(null); const [corrRun, setCorrRun] = useState(false)
+  const [corrR, setCorrR] = useState<ToolResult>(null); const [corrE, setCorrE] = useState<string | null>(null); const [corrRun, setCorrRun] = useState(false)
   const runCorr = useCallback(async () => {
     setCorrRun(true); setCorrE(null); setCorrR(null)
     try {
@@ -625,12 +672,12 @@ function TabCivil() {
         length_m: +corr.length_m,
       })
       setCorrR(r)
-    } catch (e) { setCorrE(e.message) } finally { setCorrRun(false) }
+    } catch (e) { setCorrE(e instanceof Error ? e.message : String(e)) } finally { setCorrRun(false) }
   }, [corr])
 
   // ── civil_earthwork_volume ─────────────────────────────────────────────────
   const [ew, setEw] = useState({ cut_volume_m3: '12500', fill_volume_m3: '8700', swell_factor: '1.25', shrink_factor: '0.85' })
-  const [ewR, setEwR] = useState(null); const [ewE, setEwE] = useState(null); const [ewRun, setEwRun] = useState(false)
+  const [ewR, setEwR] = useState<ToolResult>(null); const [ewE, setEwE] = useState<string | null>(null); const [ewRun, setEwRun] = useState(false)
   const runEW = useCallback(async () => {
     setEwRun(true); setEwE(null); setEwR(null)
     try {
@@ -639,12 +686,12 @@ function TabCivil() {
         swell_factor: +ew.swell_factor, shrink_factor: +ew.shrink_factor,
       })
       setEwR(r)
-    } catch (e) { setEwE(e.message) } finally { setEwRun(false) }
+    } catch (e) { setEwE(e instanceof Error ? e.message : String(e)) } finally { setEwRun(false) }
   }, [ew])
 
   // ── civil_tin_terrain ──────────────────────────────────────────────────────
   const [tin, setTin] = useState({ grid_size_m: '10', smooth: 'true' })
-  const [tinR, setTinR] = useState(null); const [tinE, setTinE] = useState(null); const [tinRun, setTinRun] = useState(false)
+  const [tinR, setTinR] = useState<ToolResult>(null); const [tinE, setTinE] = useState<string | null>(null); const [tinRun, setTinRun] = useState(false)
   const runTin = useCallback(async () => {
     setTinRun(true); setTinE(null); setTinR(null)
     try {
@@ -658,12 +705,12 @@ function TabCivil() {
         smooth: tin.smooth === 'true',
       })
       setTinR(r)
-    } catch (e) { setTinE(e.message) } finally { setTinRun(false) }
+    } catch (e) { setTinE(e instanceof Error ? e.message : String(e)) } finally { setTinRun(false) }
   }, [tin])
 
   // ── civil_water_network_solve ──────────────────────────────────────────────
   const [wnet, setWnet] = useState({ pipe_diameter_mm: '200', pipe_length_m: '500', roughness_mm: '0.045', demand_lps: '15', supply_head_m: '30' })
-  const [wnetR, setWnetR] = useState(null); const [wnetE, setWnetE] = useState(null); const [wnetRun, setWnetRun] = useState(false)
+  const [wnetR, setWnetR] = useState<ToolResult>(null); const [wnetE, setWnetE] = useState<string | null>(null); const [wnetRun, setWnetRun] = useState(false)
   const runWnet = useCallback(async () => {
     setWnetRun(true); setWnetE(null); setWnetR(null)
     try {
@@ -673,12 +720,12 @@ function TabCivil() {
         supply_head_m: +wnet.supply_head_m,
       })
       setWnetR(r)
-    } catch (e) { setWnetE(e.message) } finally { setWnetRun(false) }
+    } catch (e) { setWnetE(e instanceof Error ? e.message : String(e)) } finally { setWnetRun(false) }
   }, [wnet])
 
   // ── civil_sewer_manning_capacity ───────────────────────────────────────────
   const [sewer, setSewer] = useState({ diameter_mm: '450', slope_pct: '0.5', n_manning: '0.013', fill_ratio: '0.8' })
-  const [sewerR, setSewerR] = useState(null); const [sewerE, setSewerE] = useState(null); const [sewerRun, setSewerRun] = useState(false)
+  const [sewerR, setSewerR] = useState<ToolResult>(null); const [sewerE, setSewerE] = useState<string | null>(null); const [sewerRun, setSewerRun] = useState(false)
   const runSewer = useCallback(async () => {
     setSewerRun(true); setSewerE(null); setSewerR(null)
     try {
@@ -687,12 +734,12 @@ function TabCivil() {
         n_manning: +sewer.n_manning, fill_ratio: +sewer.fill_ratio,
       })
       setSewerR(r)
-    } catch (e) { setSewerE(e.message) } finally { setSewerRun(false) }
+    } catch (e) { setSewerE(e instanceof Error ? e.message : String(e)) } finally { setSewerRun(false) }
   }, [sewer])
 
   // ── civil_storm_rational ───────────────────────────────────────────────────
   const [storm, setStorm] = useState({ catchment_area_ha: '5', runoff_coefficient: '0.65', rainfall_intensity_mm_hr: '80' })
-  const [stormR, setStormR] = useState(null); const [stormE, setStormE] = useState(null); const [stormRun, setStormRun] = useState(false)
+  const [stormR, setStormR] = useState<ToolResult>(null); const [stormE, setStormE] = useState<string | null>(null); const [stormRun, setStormRun] = useState(false)
   const runStorm = useCallback(async () => {
     setStormRun(true); setStormE(null); setStormR(null)
     try {
@@ -702,12 +749,12 @@ function TabCivil() {
         rainfall_intensity_mm_hr: +storm.rainfall_intensity_mm_hr,
       })
       setStormR(r)
-    } catch (e) { setStormE(e.message) } finally { setStormRun(false) }
+    } catch (e) { setStormE(e instanceof Error ? e.message : String(e)) } finally { setStormRun(false) }
   }, [storm])
 
   // ── civil_culvert_capacity (HDS-5) ─────────────────────────────────────────
   const [culvert, setCulvert] = useState({ diameter_mm: '900', length_m: '20', slope_pct: '1.5', headwater_depth_m: '1.2', tailwater_depth_m: '0.3', n_manning: '0.024' })
-  const [culvertR, setCulvertR] = useState(null); const [culvertE, setCulvertE] = useState(null); const [culvertRun, setCulvertRun] = useState(false)
+  const [culvertR, setCulvertR] = useState<ToolResult>(null); const [culvertE, setCulvertE] = useState<string | null>(null); const [culvertRun, setCulvertRun] = useState(false)
   const runCulvert = useCallback(async () => {
     setCulvertRun(true); setCulvertE(null); setCulvertR(null)
     try {
@@ -717,7 +764,7 @@ function TabCivil() {
         tailwater_depth_m: +culvert.tailwater_depth_m, n_manning: +culvert.n_manning,
       })
       setCulvertR(r)
-    } catch (e) { setCulvertE(e.message) } finally { setCulvertRun(false) }
+    } catch (e) { setCulvertE(e instanceof Error ? e.message : String(e)) } finally { setCulvertRun(false) }
   }, [culvert])
 
   return (
@@ -822,16 +869,18 @@ function TabCivil() {
 // Surfaces the A* path-finding backend and OBB clash engine in a single form.
 // ---------------------------------------------------------------------------
 
-function parseXYZ(s) {
+function parseXYZ(s: string): number[] | null {
   const parts = s.split(',').map(v => parseFloat(v.trim()))
   if (parts.length !== 3 || parts.some(isNaN)) return null
   return parts
 }
 
-function parseObstacles(text) {
+interface Obstacle { min: number[]; max: number[] }
+
+function parseObstacles(text: string): Obstacle[] {
   // Each line: "minX,minY,minZ:maxX,maxY,maxZ"
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
-  const obstacles = []
+  const obstacles: Obstacle[] = []
   for (const line of lines) {
     const [minPart, maxPart] = line.split(':')
     if (!minPart || !maxPart) continue
@@ -850,8 +899,8 @@ function MEPClashRoutingWidget() {
   const [sysName, setSysName] = useState('Supply Air')
   const [sizeMm, setSizeMm] = useState('400')
   const [material, setMaterial] = useState('galvanized_steel')
-  const [crR, setCrR] = useState(null)
-  const [crE, setCrE] = useState(null)
+  const [crR, setCrR] = useState<ToolResult>(null)
+  const [crE, setCrE] = useState<string | null>(null)
   const [crRun, setCrRun] = useState(false)
 
   const runCreate = useCallback(async () => {
@@ -864,7 +913,7 @@ function MEPClashRoutingWidget() {
         material,
       })
       setCrR(r)
-    } catch (e) { setCrE(e.message) } finally { setCrRun(false) }
+    } catch (e) { setCrE(e instanceof Error ? e.message : String(e)) } finally { setCrRun(false) }
   }, [routeKind, sysName, sizeMm, material])
 
   // Step 2 — auto-route with clash avoidance
@@ -874,13 +923,13 @@ function MEPClashRoutingWidget() {
   const [gridMm, setGridMm] = useState('300')
   const [obstacleText, setObstacleText] = useState('1000,0,0:3000,2000,2800')
   const [clashToggle, setClashToggle] = useState(true)
-  const [arR, setArR] = useState(null)
-  const [arE, setArE] = useState(null)
+  const [arR, setArR] = useState<ToolResult>(null)
+  const [arE, setArE] = useState<string | null>(null)
   const [arRun, setArRun] = useState(false)
 
   // Step 3 — clash results
-  const [cdR, setCdR] = useState(null)
-  const [cdE, setCdE] = useState(null)
+  const [cdR, setCdR] = useState<ToolResult>(null)
+  const [cdE, setCdE] = useState<string | null>(null)
 
   const runAutoRoute = useCallback(async () => {
     const startPt = parseXYZ(startXyz)
@@ -911,13 +960,15 @@ function MEPClashRoutingWidget() {
       }
 
       // Add start and end endpoints to the route file so auto_route_mep can reference them.
-      const epStart = await callTool('add_mep_endpoint', {
+      // NB: results are discarded and failures swallowed by `.catch(() => null)` below — pre-existing
+      // in the .jsx (dead-code flag; not fixed here per migration convention, see slice report).
+      const _epStart = await callTool('add_mep_endpoint', {
         file_id: fid,
         endpoint_id: 'ep_start',
         position: startPt,
         kind: 'source',
       }).catch(() => null)
-      const epEnd = await callTool('add_mep_endpoint', {
+      const _epEnd = await callTool('add_mep_endpoint', {
         file_id: fid,
         endpoint_id: 'ep_end',
         position: endPt,
@@ -967,10 +1018,10 @@ function MEPClashRoutingWidget() {
           try {
             const cd = await callTool('clash_detect', { components, min_clearance: 0 })
             setCdR(cd)
-          } catch (e) { setCdE(e.message) }
+          } catch (e) { setCdE(e instanceof Error ? e.message : String(e)) }
         }
       }
-    } catch (e) { setArE(e.message) } finally { setArRun(false) }
+    } catch (e) { setArE(e instanceof Error ? e.message : String(e)) } finally { setArRun(false) }
   }, [fileId, routeKind, sysName, sizeMm, material, startXyz, endXyz, gridMm, obstacleText, clashToggle])
 
   // Derive clash summary
@@ -1152,7 +1203,7 @@ function MEPClashRoutingWidget() {
 function TabMEP() {
   // ── hvac_cfm_from_sensible_load ────────────────────────────────────────────
   const [cfm, setCfm] = useState({ sensible_load_kW: '12', supply_temp_C: '13', room_temp_C: '24' })
-  const [cfmR, setCfmR] = useState(null); const [cfmE, setCfmE] = useState(null); const [cfmRun, setCfmRun] = useState(false)
+  const [cfmR, setCfmR] = useState<ToolResult>(null); const [cfmE, setCfmE] = useState<string | null>(null); const [cfmRun, setCfmRun] = useState(false)
   const runCfm = useCallback(async () => {
     setCfmRun(true); setCfmE(null); setCfmR(null)
     try {
@@ -1162,12 +1213,12 @@ function TabMEP() {
         room_temp_C: +cfm.room_temp_C,
       })
       setCfmR(r)
-    } catch (e) { setCfmE(e.message) } finally { setCfmRun(false) }
+    } catch (e) { setCfmE(e instanceof Error ? e.message : String(e)) } finally { setCfmRun(false) }
   }, [cfm])
 
   // ── hvac_round_duct_diameter ───────────────────────────────────────────────
   const [ductD, setDuctD] = useState({ flow_rate_m3s: '0.5', max_velocity_ms: '8', friction_rate_Pa_per_m: '1.0' })
-  const [ductDR, setDuctDR] = useState(null); const [ductDE, setDuctDE] = useState(null); const [ductDRun, setDuctDRun] = useState(false)
+  const [ductDR, setDuctDR] = useState<ToolResult>(null); const [ductDE, setDuctDE] = useState<string | null>(null); const [ductDRun, setDuctDRun] = useState(false)
   const runDuctD = useCallback(async () => {
     setDuctDRun(true); setDuctDE(null); setDuctDR(null)
     try {
@@ -1177,12 +1228,12 @@ function TabMEP() {
         friction_rate_Pa_per_m: +ductD.friction_rate_Pa_per_m,
       })
       setDuctDR(r)
-    } catch (e) { setDuctDE(e.message) } finally { setDuctDRun(false) }
+    } catch (e) { setDuctDE(e instanceof Error ? e.message : String(e)) } finally { setDuctDRun(false) }
   }, [ductD])
 
   // ── hvac_duct_friction_loss ────────────────────────────────────────────────
   const [dfl, setDfl] = useState({ diameter_mm: '400', length_m: '30', flow_rate_m3s: '0.5', roughness_mm: '0.09' })
-  const [dflR, setDflR] = useState(null); const [dflE, setDflE] = useState(null); const [dflRun, setDflRun] = useState(false)
+  const [dflR, setDflR] = useState<ToolResult>(null); const [dflE, setDflE] = useState<string | null>(null); const [dflRun, setDflRun] = useState(false)
   const runDfl = useCallback(async () => {
     setDflRun(true); setDflE(null); setDflR(null)
     try {
@@ -1191,12 +1242,12 @@ function TabMEP() {
         flow_rate_m3s: +dfl.flow_rate_m3s, roughness_mm: +dfl.roughness_mm,
       })
       setDflR(r)
-    } catch (e) { setDflE(e.message) } finally { setDflRun(false) }
+    } catch (e) { setDflE(e instanceof Error ? e.message : String(e)) } finally { setDflRun(false) }
   }, [dfl])
 
   // ── hvac_rect_equiv_diameter ───────────────────────────────────────────────
   const [rect, setRect] = useState({ width_mm: '600', height_mm: '300' })
-  const [rectR, setRectR] = useState(null); const [rectE, setRectE] = useState(null); const [rectRun, setRectRun] = useState(false)
+  const [rectR, setRectR] = useState<ToolResult>(null); const [rectE, setRectE] = useState<string | null>(null); const [rectRun, setRectRun] = useState(false)
   const runRect = useCallback(async () => {
     setRectRun(true); setRectE(null); setRectR(null)
     try {
@@ -1204,12 +1255,12 @@ function TabMEP() {
         width_mm: +rect.width_mm, height_mm: +rect.height_mm,
       })
       setRectR(r)
-    } catch (e) { setRectE(e.message) } finally { setRectRun(false) }
+    } catch (e) { setRectE(e instanceof Error ? e.message : String(e)) } finally { setRectRun(false) }
   }, [rect])
 
   // ── hvac_fan_law_scale ─────────────────────────────────────────────────────
   const [fan, setFan] = useState({ flow_1_m3s: '2.0', pressure_1_Pa: '500', power_1_kW: '1.5', flow_2_m3s: '2.4' })
-  const [fanR, setFanR] = useState(null); const [fanE, setFanE] = useState(null); const [fanRun, setFanRun] = useState(false)
+  const [fanR, setFanR] = useState<ToolResult>(null); const [fanE, setFanE] = useState<string | null>(null); const [fanRun, setFanRun] = useState(false)
   const runFan = useCallback(async () => {
     setFanRun(true); setFanE(null); setFanR(null)
     try {
@@ -1218,12 +1269,12 @@ function TabMEP() {
         power_1_kW: +fan.power_1_kW, flow_2_m3s: +fan.flow_2_m3s,
       })
       setFanR(r)
-    } catch (e) { setFanE(e.message) } finally { setFanRun(false) }
+    } catch (e) { setFanE(e instanceof Error ? e.message : String(e)) } finally { setFanRun(false) }
   }, [fan])
 
   // ── hvac_branch_static_pressure ────────────────────────────────────────────
   const [bsp, setBsp] = useState({ upstream_pressure_Pa: '200', velocity_1_ms: '5', velocity_2_ms: '3', density_kg_m3: '1.2' })
-  const [bspR, setBspR] = useState(null); const [bspE, setBspE] = useState(null); const [bspRun, setBspRun] = useState(false)
+  const [bspR, setBspR] = useState<ToolResult>(null); const [bspE, setBspE] = useState<string | null>(null); const [bspRun, setBspRun] = useState(false)
   const runBsp = useCallback(async () => {
     setBspRun(true); setBspE(null); setBspR(null)
     try {
@@ -1234,12 +1285,12 @@ function TabMEP() {
         density_kg_m3: +bsp.density_kg_m3,
       })
       setBspR(r)
-    } catch (e) { setBspE(e.message) } finally { setBspRun(false) }
+    } catch (e) { setBspE(e instanceof Error ? e.message : String(e)) } finally { setBspRun(false) }
   }, [bsp])
 
   // ── pipe_pressure_drop ─────────────────────────────────────────────────────
   const [ppd, setPpd] = useState({ pipe_od_mm: '114.3', schedule: '40', length_m: '120', fluid: 'water', flow_rate_lps: '8', temperature_C: '60' })
-  const [ppdR, setPpdR] = useState(null); const [ppdE, setPpdE] = useState(null); const [ppdRun, setPpdRun] = useState(false)
+  const [ppdR, setPpdR] = useState<ToolResult>(null); const [ppdE, setPpdE] = useState<string | null>(null); const [ppdRun, setPpdRun] = useState(false)
   const runPpd = useCallback(async () => {
     setPpdRun(true); setPpdE(null); setPpdR(null)
     try {
@@ -1249,12 +1300,12 @@ function TabMEP() {
         flow_rate_lps: +ppd.flow_rate_lps, temperature_C: +ppd.temperature_C,
       })
       setPpdR(r)
-    } catch (e) { setPpdE(e.message) } finally { setPpdRun(false) }
+    } catch (e) { setPpdE(e instanceof Error ? e.message : String(e)) } finally { setPpdRun(false) }
   }, [ppd])
 
   // ── pipe_thermal_expansion ─────────────────────────────────────────────────
   const [pte, setPte] = useState({ pipe_od_mm: '114.3', length_m: '50', material: 'carbon_steel', T_install_C: '20', T_operating_C: '180' })
-  const [pteR, setPteR] = useState(null); const [pteE, setPteE] = useState(null); const [pteRun, setPteRun] = useState(false)
+  const [pteR, setPteR] = useState<ToolResult>(null); const [pteE, setPteE] = useState<string | null>(null); const [pteRun, setPteRun] = useState(false)
   const runPte = useCallback(async () => {
     setPteRun(true); setPteE(null); setPteR(null)
     try {
@@ -1264,12 +1315,12 @@ function TabMEP() {
         T_operating_C: +pte.T_operating_C,
       })
       setPteR(r)
-    } catch (e) { setPteE(e.message) } finally { setPteRun(false) }
+    } catch (e) { setPteE(e instanceof Error ? e.message : String(e)) } finally { setPteRun(false) }
   }, [pte])
 
   // ── pipe_wall_thickness (ASME B31.1) ───────────────────────────────────────
   const [pwt, setPwt] = useState({ pipe_od_mm: '114.3', design_pressure_MPa: '4.5', material: 'A106-B', temperature_C: '250', mill_tolerance_pct: '12.5' })
-  const [pwtR, setPwtR] = useState(null); const [pwtE, setPwtE] = useState(null); const [pwtRun, setPwtRun] = useState(false)
+  const [pwtR, setPwtR] = useState<ToolResult>(null); const [pwtE, setPwtE] = useState<string | null>(null); const [pwtRun, setPwtRun] = useState(false)
   const runPwt = useCallback(async () => {
     setPwtRun(true); setPwtE(null); setPwtR(null)
     try {
@@ -1279,12 +1330,12 @@ function TabMEP() {
         mill_tolerance_pct: +pwt.mill_tolerance_pct,
       })
       setPwtR(r)
-    } catch (e) { setPwtE(e.message) } finally { setPwtRun(false) }
+    } catch (e) { setPwtE(e instanceof Error ? e.message : String(e)) } finally { setPwtRun(false) }
   }, [pwt])
 
   // ── pipe_allowable_span ─────────────────────────────────────────────────────
   const [pas, setPas] = useState({ pipe_od_mm: '114.3', schedule: '40', fluid: 'water', deflection_limit_mm: '3', support_type: 'simply_supported' })
-  const [pasR, setPasR] = useState(null); const [pasE, setPasE] = useState(null); const [pasRun, setPasRun] = useState(false)
+  const [pasR, setPasR] = useState<ToolResult>(null); const [pasE, setPasE] = useState<string | null>(null); const [pasRun, setPasRun] = useState(false)
   const runPas = useCallback(async () => {
     setPasRun(true); setPasE(null); setPasR(null)
     try {
@@ -1294,12 +1345,12 @@ function TabMEP() {
         support_type: pas.support_type,
       })
       setPasR(r)
-    } catch (e) { setPasE(e.message) } finally { setPasRun(false) }
+    } catch (e) { setPasE(e instanceof Error ? e.message : String(e)) } finally { setPasRun(false) }
   }, [pas])
 
   // ── piping_route_isometric ─────────────────────────────────────────────────
   const [iso, setIso] = useState({ pipe_spec: 'ASME_B31_1', nominal_size_in: '4', from_node: 'P-001', to_node: 'P-002', fluid_service: 'steam' })
-  const [isoR, setIsoR] = useState(null); const [isoE, setIsoE] = useState(null); const [isoRun, setIsoRun] = useState(false)
+  const [isoR, setIsoR] = useState<ToolResult>(null); const [isoE, setIsoE] = useState<string | null>(null); const [isoRun, setIsoRun] = useState(false)
   const runIso = useCallback(async () => {
     setIsoRun(true); setIsoE(null); setIsoR(null)
     try {
@@ -1309,7 +1360,7 @@ function TabMEP() {
         fluid_service: iso.fluid_service,
       })
       setIsoR(r)
-    } catch (e) { setIsoE(e.message) } finally { setIsoRun(false) }
+    } catch (e) { setIsoE(e instanceof Error ? e.message : String(e)) } finally { setIsoRun(false) }
   }, [iso])
 
   return (

@@ -14,8 +14,8 @@ import { resolve } from 'path'
 
 const PKG_DIR = resolve(__dirname, '../packaging')
 
-const PP_SRC   = readFileSync(resolve(PKG_DIR, 'PackagingPrePressPanel.jsx'), 'utf8')
-const YIELD_SRC = readFileSync(resolve(PKG_DIR, 'PackagingMaterialYieldPanel.jsx'), 'utf8')
+const PP_SRC   = readFileSync(resolve(PKG_DIR, 'PackagingPrePressPanel.tsx'), 'utf8')
+const YIELD_SRC = readFileSync(resolve(PKG_DIR, 'PackagingMaterialYieldPanel.tsx'), 'utf8')
 
 
 // ===========================================================================

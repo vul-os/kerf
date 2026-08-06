@@ -6,13 +6,53 @@ import { VALID_SIZES, VALID_ORIENTATIONS, SHEET_SIZES_MM, validateSheet, addView
 
 const DEBOUNCE_MS = 250
 
-function parse(content) {
+// sheet.js doesn't export types, so the doc/viewport/revision/titleblock
+// shapes are declared here to match what validateSheet/addViewport/
+// removeViewport expect and produce.
+interface SheetViewport {
+  id: string
+  view_file_id?: string
+  title?: string
+  position?: number[]
+  scale?: number
+}
+
+interface SheetRevision {
+  revision?: string
+  rev?: string
+  date?: string
+  description?: string
+  note?: string
+  drawn_by?: string
+  by?: string
+}
+
+interface SheetTitleblock {
+  project_name?: string
+  issue_date?: string
+  drawn_by?: string
+  scale?: string
+  [key: string]: string | undefined
+}
+
+interface SheetDoc {
+  version?: number
+  name?: string
+  sheet_number?: string
+  size?: string
+  orientation?: string
+  titleblock?: SheetTitleblock
+  viewports?: SheetViewport[]
+  revisions?: SheetRevision[]
+}
+
+function parse(content?: string): SheetDoc {
   try { return JSON.parse(content || '{}') } catch { return {} }
 }
 
 // SVG preview of the sheet — outline + labeled viewport rectangles.
-function SheetPreview({ sheet }) {
-  const size = SHEET_SIZES_MM[sheet.size] || [297, 420]
+function SheetPreview({ sheet }: { sheet: SheetDoc }) {
+  const size = (sheet.size && SHEET_SIZES_MM[sheet.size as keyof typeof SHEET_SIZES_MM]) || [297, 420]
   const [w, h] = sheet.orientation === 'landscape' ? [size[1], size[0]] : [size[0], size[1]]
   const SVG_W = 360
   const SVG_H = Math.round((SVG_W / w) * h)
@@ -68,10 +108,16 @@ function SheetPreview({ sheet }) {
   )
 }
 
-export default function SheetEditor({ content, fileName, onContentChange }) {
-  const [sheet, setSheet] = useState(() => parse(content))
+export interface SheetEditorProps {
+  content?: string
+  fileName?: string
+  onContentChange?: (content: string) => void
+}
+
+export default function SheetEditor({ content, fileName, onContentChange }: SheetEditorProps) {
+  const [sheet, setSheet] = useState<SheetDoc>(() => parse(content))
   const lastEmittedRef = useRef(content)
-  const timerRef = useRef(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (content !== lastEmittedRef.current) {
@@ -79,7 +125,7 @@ export default function SheetEditor({ content, fileName, onContentChange }) {
     }
   }, [content])
 
-  const emit = useCallback((next) => {
+  const emit = useCallback((next: SheetDoc) => {
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => {
       const s = JSON.stringify(next, null, 2)
@@ -89,7 +135,7 @@ export default function SheetEditor({ content, fileName, onContentChange }) {
   }, [onContentChange])
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
 
-  function patch(delta) {
+  function patch(delta: Partial<SheetDoc>) {
     setSheet((s) => {
       const next = { ...s, ...delta }
       emit(next)
@@ -97,7 +143,7 @@ export default function SheetEditor({ content, fileName, onContentChange }) {
     })
   }
 
-  function patchTitleblock(delta) {
+  function patchTitleblock(delta: Partial<SheetTitleblock>) {
     patch({ titleblock: { ...(sheet.titleblock || {}), ...delta } })
   }
 
@@ -109,13 +155,13 @@ export default function SheetEditor({ content, fileName, onContentChange }) {
     setSheet(next)
   }
 
-  function handleRemoveViewport(id) {
+  function handleRemoveViewport(id: string) {
     const next = removeViewport(sheet, id)
     emit(next)
     setSheet(next)
   }
 
-  function patchViewport(id, delta) {
+  function patchViewport(id: string, delta: Partial<SheetViewport>) {
     setSheet((s) => {
       const viewports = (s.viewports || []).map((vp) => vp.id === id ? { ...vp, ...delta } : vp)
       const next = { ...s, viewports }
@@ -174,12 +220,14 @@ export default function SheetEditor({ content, fileName, onContentChange }) {
         <section>
           <span className="text-[11px] text-ink-400 uppercase tracking-wider font-semibold block mb-2">Title block</span>
           <div className="grid grid-cols-2 gap-2">
-            {[
-              ['project_name', 'Project name'],
-              ['issue_date', 'Issue date'],
-              ['drawn_by', 'Drawn by'],
-              ['scale', 'Scale'],
-            ].map(([key, label]) => (
+            {(
+              [
+                ['project_name', 'Project name'],
+                ['issue_date', 'Issue date'],
+                ['drawn_by', 'Drawn by'],
+                ['scale', 'Scale'],
+              ] as const
+            ).map(([key, label]) => (
               <label key={key} className="flex flex-col gap-0.5">
                 <span className="text-[10px] text-ink-500">{label}</span>
                 <input
@@ -240,7 +288,7 @@ export default function SheetEditor({ content, fileName, onContentChange }) {
                         type="number"
                         value={vp.position?.[axis] ?? 0}
                         onChange={(e) => {
-                          const pos = [...(vp.position || [0,0])]
+                          const pos = [...(vp.position || [0, 0])]
                           pos[axis] = Number(e.target.value)
                           patchViewport(vp.id, { position: pos })
                         }}

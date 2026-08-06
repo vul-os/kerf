@@ -15,16 +15,27 @@
 // Pan + zoom via mouse wheel + drag. Tab bar at the top for mode switching.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
 import { convertCircuitJsonToSchematicSvg, convertCircuitJsonToPcbSvg } from 'circuit-to-svg'
 import { Maximize2, RotateCcw, AlertTriangle } from 'lucide-react'
+import type { CircuitJson } from '../types/circuit.js'
+
+/** Accepted shapes for the `circuitJson` prop: a flat array, the
+ * `{ circuit_json: [...] }` wrapper shape, or null/undefined for empty state. */
+type CircuitJsonInput = CircuitJson | { circuit_json?: CircuitJson } | null | undefined
+
+interface ParsedSvg {
+  innerHTML: string
+  viewBox: number[] | null
+}
 
 // ---------------------------------------------------------------------------
 // SVG helpers (same approach as SchematicView / PCBView)
 // ---------------------------------------------------------------------------
 
-function parseLibrarySvg(svgText) {
+function parseLibrarySvg(svgText: string): ParsedSvg {
   if (!svgText || typeof svgText !== 'string') return { innerHTML: '', viewBox: null }
-  let doc
+  let doc: Document
   try {
     doc = new DOMParser().parseFromString(svgText, 'image/svg+xml')
   } catch {
@@ -34,12 +45,12 @@ function parseLibrarySvg(svgText) {
   if (!root || root.nodeName.toLowerCase() !== 'svg') return { innerHTML: '', viewBox: null }
   if (root.querySelector && root.querySelector('parsererror')) return { innerHTML: '', viewBox: null }
   const vbAttr = root.getAttribute('viewBox')
-  let viewBox = null
+  let viewBox: number[] | null = null
   if (vbAttr) {
     const parts = vbAttr.trim().split(/\s+/).map(Number)
     if (parts.length === 4 && parts.every((n) => Number.isFinite(n))) viewBox = parts
   }
-  let innerHTML = ''
+  let innerHTML: string
   if (typeof root.innerHTML === 'string') {
     innerHTML = root.innerHTML
   } else {
@@ -52,27 +63,41 @@ function parseLibrarySvg(svgText) {
 }
 
 // Normalise the circuitJson prop: accept array or { circuit_json: [...] } wrapper.
-function normaliseJson(raw) {
+function normaliseJson(raw: CircuitJsonInput): CircuitJson {
   if (!raw) return []
   if (Array.isArray(raw)) return raw
   if (raw && Array.isArray(raw.circuit_json)) return raw.circuit_json
   return []
 }
 
-function safeRenderSchematic(items) {
+interface RenderResult {
+  svg: string
+  error: string | null
+}
+
+// circuit-to-svg's schematic options type (unexported; recovered via Parameters<>) has no
+// `backgroundColor` field — unlike `PcbSvgOptions` below, which does declare one. Passing
+// `backgroundColor` here is a pre-existing no-op for the schematic renderer (the JS call sent
+// it too; TS just now makes the mismatch visible). Not fixed here — flagging for whoever owns
+// this rendering path next.
+type SchematicSvgOptions = NonNullable<Parameters<typeof convertCircuitJsonToSchematicSvg>[1]> & {
+  backgroundColor?: string
+}
+
+function safeRenderSchematic(items: CircuitJson): RenderResult {
   if (!items.length) return { svg: '', error: null }
   try {
     const svg = convertCircuitJsonToSchematicSvg(items, {
       backgroundColor: 'transparent',
       includeVersion: false,
-    })
+    } as SchematicSvgOptions)
     return { svg, error: null }
   } catch (err) {
-    return { svg: '', error: err?.message || String(err) }
+    return { svg: '', error: (err as Error)?.message || String(err) }
   }
 }
 
-function safeRenderPcb(items) {
+function safeRenderPcb(items: CircuitJson): RenderResult {
   if (!items.length) return { svg: '', error: null }
   try {
     const svg = convertCircuitJsonToPcbSvg(items, {
@@ -81,7 +106,7 @@ function safeRenderPcb(items) {
     })
     return { svg, error: null }
   } catch (err) {
-    return { svg: '', error: err?.message || String(err) }
+    return { svg: '', error: (err as Error)?.message || String(err) }
   }
 }
 
@@ -94,16 +119,36 @@ const MODES = [
   { id: 'pcb',       label: 'PCB' },
 ]
 
+interface Props {
+  circuitJson?: CircuitJsonInput
+  mode?: 'schematic' | 'pcb'
+  onModeChange?: (mode: string) => void
+  className?: string
+}
+
+interface View {
+  tx: number
+  ty: number
+  scale: number
+}
+
+interface DragState {
+  startX: number
+  startY: number
+  startTx: number
+  startTy: number
+}
+
 export default function CircuitPreviewPane({
   circuitJson,
   mode = 'schematic',
   onModeChange,
   className = '',
-}) {
-  const containerRef = useRef(null)
-  const innerRef = useRef(null)
+}: Props) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const innerRef = useRef<SVGGElement>(null)
 
-  const [view, setView] = useState({ tx: 0, ty: 0, scale: 1 })
+  const [view, setView] = useState<View>({ tx: 0, ty: 0, scale: 1 })
   const [size, setSize] = useState({ w: 800, h: 600 })
 
   // Normalise the circuitJson prop once.
@@ -135,6 +180,7 @@ export default function CircuitPreviewPane({
   // Fit-to-viewport whenever the rendered SVG changes.
   useEffect(() => {
     if (!parsed.viewBox || !size.w || !size.h) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- derived-state sync on prop/measurement change, pre-existing before this migration.
       setView({ tx: 0, ty: 0, scale: 1 })
       return
     }
@@ -162,15 +208,15 @@ export default function CircuitPreviewPane({
 
   // ---- Pan + zoom -----------------------------------------------------------
 
-  const draggingRef = useRef(null)
+  const draggingRef = useRef<DragState | null>(null)
 
-  const onPointerDown = useCallback((e) => {
+  const onPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0 && e.button !== 1) return
     draggingRef.current = { startX: e.clientX, startY: e.clientY, startTx: view.tx, startTy: view.ty }
     e.currentTarget.setPointerCapture?.(e.pointerId ?? 0)
   }, [view.tx, view.ty])
 
-  const onPointerMove = useCallback((e) => {
+  const onPointerMove = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     const d = draggingRef.current
     if (!d) return
     const dx = e.clientX - d.startX
@@ -182,7 +228,7 @@ export default function CircuitPreviewPane({
     draggingRef.current = null
   }, [])
 
-  const onWheel = useCallback((e) => {
+  const onWheel = useCallback((e: ReactWheelEvent<HTMLDivElement>) => {
     e.preventDefault()
     if (!containerRef.current) return
     const r = containerRef.current.getBoundingClientRect()
@@ -267,6 +313,7 @@ export default function CircuitPreviewPane({
         onPointerCancel={onPointerUp}
         onPointerLeave={onPointerUp}
         className="relative flex-1 min-w-0 overflow-hidden"
+        // eslint-disable-next-line react-hooks/refs -- reads a ref during render for cursor styling only (no state derived from it), pre-existing before this migration.
         style={{ touchAction: 'none', cursor: draggingRef.current ? 'grabbing' : 'grab' }}
       >
         <svg

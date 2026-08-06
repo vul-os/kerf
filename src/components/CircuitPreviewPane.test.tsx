@@ -17,6 +17,7 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
+import type { CircuitJson } from '../types/circuit.js'
 import CircuitPreviewPane from './CircuitPreviewPane.jsx'
 
 // circuit-to-svg performs DOM operations (DOMParser, XMLSerializer) that are
@@ -47,7 +48,12 @@ describe('CircuitPreviewPane', () => {
   })
 
   it('renders without crashing with a minimal circuit item array', () => {
-    const items = [{ type: 'source_component', source_component_id: 'sc0', name: 'R1' }]
+    // Deliberately minimal/incomplete fixture — real `source_component` variants also
+    // require `ftype` plus type-specific fields. This only exercises the "doesn't crash on
+    // an item shape it doesn't fully validate" path, so it's cast rather than fleshed out.
+    const items = [
+      { type: 'source_component', source_component_id: 'sc0', name: 'R1' },
+    ] as unknown as CircuitJson
     expect(() => renderToStaticMarkup(<CircuitPreviewPane circuitJson={items} />)).not.toThrow()
   })
 

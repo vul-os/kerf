@@ -1,5 +1,5 @@
 /**
- * AtopileEditor.jsx
+ * AtopileEditor.tsx
  *
  * IDE editor for `.ato` (atopile) hardware-description files.
  *
@@ -34,13 +34,23 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ComponentType } from 'react'
 import Editor from '@monaco-editor/react'
+import type { BeforeMount, OnMount } from '@monaco-editor/react'
+import type { editor as MonacoEditorNs } from 'monaco-editor'
 import { AlertTriangle, FileCode, CircuitBoard, Loader2 } from 'lucide-react'
 import SchematicView from './SchematicView.jsx'
-import PCBView from './PCBView.jsx'
 import { useWorkspace } from '../store/workspace.js'
 import { registerAtopileLanguage, LANGUAGE_ID } from '../lib/atopileMonacoLanguage.js'
 import { compileAtopile } from '../lib/atopileCompileBridge.js'
+
+// SchematicView.jsx (not yet migrated) declares onSelectRefdes/viewRef
+// without destructure defaults, so allowJs infers them as required — but
+// both are used defensively inside SchematicView (`if (onSelectRefdes && …)`
+// / useImperativeHandle tolerates an undefined ref), so passing only
+// circuitJson below is not a runtime bug. Cast to a permissive component
+// type rather than fabricating no-op handlers that weren't there before.
+const UntypedSchematicView = SchematicView as unknown as ComponentType<Record<string, unknown>>
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -48,7 +58,7 @@ import { compileAtopile } from '../lib/atopileCompileBridge.js'
 
 const COMPILE_DEBOUNCE_MS = 400
 
-const MONACO_OPTIONS = {
+const MONACO_OPTIONS: MonacoEditorNs.IStandaloneEditorConstructionOptions = {
   minimap: { enabled: false },
   fontFamily:
     'JetBrains Mono, Geist Mono, ui-monospace, SF Mono, Menlo, monospace',
@@ -73,31 +83,35 @@ const TABS = [
 // AtopileEditor component
 // ---------------------------------------------------------------------------
 
-/**
- * @param {object}  props
- * @param {string}  props.value         - Current .ato source text
- * @param {Function} props.onChange     - Called with new source on edit
- * @param {boolean} [props.readOnly]    - Prevent edits
- * @param {string}  [props.readOnlyReason] - Banner message when readOnly
- */
+export interface AtopileEditorProps {
+  /** Current .ato source text */
+  value?: string
+  /** Called with new source on edit */
+  onChange?: (value: string) => void
+  /** Prevent edits */
+  readOnly?: boolean
+  /** Banner message when readOnly */
+  readOnlyReason?: string | null
+}
+
 export default function AtopileEditor({
   value,
   onChange,
   readOnly = false,
   readOnlyReason = null,
-}) {
+}: AtopileEditorProps) {
   const [activeTab, setActiveTab] = useState('source')
   const [compiling, setCompiling] = useState(false)
-  const [circuit, setCircuit] = useState(null)       // last successful Circuit JSON
-  const [compileErrors, setCompileErrors] = useState([])
-  const [compileWarnings, setCompileWarnings] = useState([])
+  const [circuit, setCircuit] = useState<unknown[] | null>(null)       // last successful Circuit JSON
+  const [compileErrors, setCompileErrors] = useState<string[]>([])
+  const [compileWarnings, setCompileWarnings] = useState<string[]>([])
 
-  const debounceTimer = useRef(null)
-  const abortRef = useRef(null)
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   // ── Compile on source change ────────────────────────────────────────────
 
-  const triggerCompile = useCallback((source) => {
+  const triggerCompile = useCallback((source: string) => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current)
     debounceTimer.current = setTimeout(async () => {
       // Cancel any in-flight compile
@@ -132,12 +146,12 @@ export default function AtopileEditor({
 
   // ── Monaco lifecycle ────────────────────────────────────────────────────
 
-  const handleBeforeMount = useCallback((monaco) => {
+  const handleBeforeMount = useCallback<BeforeMount>((monaco) => {
     registerAtopileLanguage(monaco)
   }, [])
 
-  const handleMount = useCallback((editor) => {
-    const set = (focused) =>
+  const handleMount = useCallback<OnMount>((editor) => {
+    const set = (focused: boolean) =>
       useWorkspace.getState().setEditorFocused(focused)
     editor.onDidFocusEditorText(() => set(true))
     editor.onDidBlurEditorText(() => set(false))
@@ -224,7 +238,12 @@ export default function AtopileEditor({
 // CircuitPanel — renders the compiled Circuit JSON
 // ---------------------------------------------------------------------------
 
-function CircuitPanel({ circuit, compiling }) {
+interface CircuitPanelProps {
+  circuit: unknown[] | null
+  compiling: boolean
+}
+
+function CircuitPanel({ circuit, compiling }: CircuitPanelProps) {
   if (!circuit && compiling) {
     return (
       <div className="flex items-center justify-center h-full text-ink-500 text-sm gap-2">
@@ -246,7 +265,7 @@ function CircuitPanel({ circuit, compiling }) {
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 min-h-0">
-        <SchematicView circuitJson={circuit} />
+        <UntypedSchematicView circuitJson={circuit} />
       </div>
     </div>
   )

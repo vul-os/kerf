@@ -7,8 +7,11 @@
  * Pattern mirrors src/__tests__/docsSidebarDrawer.test.js.
  */
 
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync, existsSync } from 'fs'
+// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 import { describe, it, expect } from 'vitest'
 

@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import SixDOFPanel from './SixDOFPanel.jsx'
+import SixDOFPanel from './SixDOFPanel'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -46,22 +46,22 @@ const SIXDOF_RESULT = {
 
 describe('SixDOFPanel — nominal flight', () => {
   it('renders without crashing', () => {
-    const html = renderToStaticMarkup(<SixDOFPanel result={SIXDOF_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<SixDOFPanel result={SIXDOF_RESULT} loading={false} error={null} content={null} />)
     expect(html).toBeTruthy()
   })
 
   it('shows final altitude', () => {
-    const html = renderToStaticMarkup(<SixDOFPanel result={SIXDOF_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<SixDOFPanel result={SIXDOF_RESULT} loading={false} error={null} content={null} />)
     expect(html).toContain('998.5')
   })
 
   it('shows final airspeed', () => {
-    const html = renderToStaticMarkup(<SixDOFPanel result={SIXDOF_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<SixDOFPanel result={SIXDOF_RESULT} loading={false} error={null} content={null} />)
     expect(html).toContain('99.80')
   })
 
   it('shows Euler angles', () => {
-    const html = renderToStaticMarkup(<SixDOFPanel result={SIXDOF_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<SixDOFPanel result={SIXDOF_RESULT} loading={false} error={null} content={null} />)
     // Roll, Pitch, Yaw cards
     expect(html).toContain('Roll')
     expect(html).toContain('Pitch')
@@ -69,50 +69,50 @@ describe('SixDOFPanel — nominal flight', () => {
   })
 
   it('shows pitch angle value', () => {
-    const html = renderToStaticMarkup(<SixDOFPanel result={SIXDOF_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<SixDOFPanel result={SIXDOF_RESULT} loading={false} error={null} content={null} />)
     expect(html).toContain('2.15')
   })
 
   it('renders two SVG charts', () => {
-    const html = renderToStaticMarkup(<SixDOFPanel result={SIXDOF_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<SixDOFPanel result={SIXDOF_RESULT} loading={false} error={null} content={null} />)
     const count = (html.match(/<svg/g) || []).length
     expect(count).toBeGreaterThanOrEqual(2)
   })
 
   it('shows n_steps', () => {
-    const html = renderToStaticMarkup(<SixDOFPanel result={SIXDOF_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<SixDOFPanel result={SIXDOF_RESULT} loading={false} error={null} content={null} />)
     expect(html).toContain('200')
   })
 
   it('shows altitude range', () => {
-    const html = renderToStaticMarkup(<SixDOFPanel result={SIXDOF_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<SixDOFPanel result={SIXDOF_RESULT} loading={false} error={null} content={null} />)
     expect(html).toContain('995')
     expect(html).toContain('1001')
   })
 
   it('shows 6-DOF label', () => {
-    const html = renderToStaticMarkup(<SixDOFPanel result={SIXDOF_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<SixDOFPanel result={SIXDOF_RESULT} loading={false} error={null} content={null} />)
     expect(html).toContain('6-DOF')
   })
 })
 
 describe('SixDOFPanel — loading state', () => {
   it('shows loading message', () => {
-    const html = renderToStaticMarkup(<SixDOFPanel result={null} loading={true} error={null} />)
+    const html = renderToStaticMarkup(<SixDOFPanel result={null} loading={true} error={null} content={null} />)
     expect(html).toContain('6-DOF')
   })
 })
 
 describe('SixDOFPanel — error state', () => {
   it('shows error message', () => {
-    const html = renderToStaticMarkup(<SixDOFPanel result={null} loading={false} error="Simulation failed" />)
+    const html = renderToStaticMarkup(<SixDOFPanel result={null} loading={false} error="Simulation failed" content={null} />)
     expect(html).toContain('Simulation failed')
   })
 })
 
 describe('SixDOFPanel — null result', () => {
   it('renders nothing', () => {
-    const html = renderToStaticMarkup(<SixDOFPanel result={null} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<SixDOFPanel result={null} loading={false} error={null} content={null} />)
     expect(html).toBe('')
   })
 })

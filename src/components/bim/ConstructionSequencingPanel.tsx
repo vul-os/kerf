@@ -1,5 +1,5 @@
 /**
- * ConstructionSequencingPanel.jsx — 4D Construction Sequencing (Revit parity).
+ * ConstructionSequencingPanel.tsx — 4D Construction Sequencing (Revit parity).
  *
  * Links a task schedule (IFC4 IfcTask) to BIM elements and renders a
  * time-phased element-appearance timeline with a date-scrubber.
@@ -27,11 +27,50 @@ import {
   ClipboardList,
   Zap,
   CheckCircle2,
-  Clock,
   AlertCircle,
   Plus,
   Trash2,
 } from 'lucide-react'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type TaskState = 'not_started' | 'active' | 'complete'
+
+interface Task {
+  id: string
+  name: string
+  start: string
+  finish: string
+  element_ids: string[]
+  predecessors: string[]
+  ifc_task_type: string
+  trade: string
+}
+
+interface Schedule {
+  tasks: Task[]
+  project_start: string
+  project_finish: string
+  name: string
+}
+
+interface TimelineEntry {
+  element_id: string
+  task_id: string
+  task_name: string
+  state: TaskState
+  progress_pct: number
+  ifc_task_type: string
+  trade: string
+}
+
+export interface ConstructionSequencingPanelProps {
+  content?: string
+  projectId?: string
+  onToast?: (msg: string) => void
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -42,13 +81,13 @@ const IFC_TASK_TYPES = [
   'RENOVATION', 'MAINTENANCE', 'LOGISTIC', 'NOTDEFINED',
 ]
 
-const STATE_META = {
+const STATE_META: Record<TaskState, { label: string; color: string; bg: string; text: string }> = {
   not_started: { label: 'Not Started', color: '#6b7280', bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-600 dark:text-gray-400' },
   active:      { label: 'Active',       color: '#f59e0b', bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-300' },
   complete:    { label: 'Complete',     color: '#22c55e', bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-300' },
 }
 
-const DEMO_TASKS = [
+const DEMO_TASKS: Task[] = [
   { id: 'T1', name: 'Excavation',      start: '2025-01-06', finish: '2025-01-17', element_ids: ['found-001', 'found-002'], predecessors: [],    ifc_task_type: 'CONSTRUCTION', trade: 'civil' },
   { id: 'T2', name: 'Foundations',     start: '2025-01-20', finish: '2025-02-07', element_ids: ['slab-001'],               predecessors: ['T1'], ifc_task_type: 'CONSTRUCTION', trade: 'structural' },
   { id: 'T3', name: 'Structural Frame',start: '2025-02-10', finish: '2025-03-21', element_ids: ['col-001', 'beam-001'],    predecessors: ['T2'], ifc_task_type: 'CONSTRUCTION', trade: 'structural' },
@@ -60,11 +99,17 @@ const DEMO_TASKS = [
 // Helpers
 // ---------------------------------------------------------------------------
 
-function today() {
+function today(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-function StatBadge({ label, count, color }) {
+interface StatBadgeProps {
+  label: string
+  count: number
+  color: string
+}
+
+function StatBadge({ label, count, color }: StatBadgeProps) {
   return (
     <div className={`flex flex-col items-center rounded-lg px-3 py-2 ${color}`}>
       <span className="text-lg font-bold leading-tight">{count}</span>
@@ -73,7 +118,12 @@ function StatBadge({ label, count, color }) {
   )
 }
 
-function ProgressBar({ pct, state }) {
+interface ProgressBarProps {
+  pct: number
+  state: TaskState
+}
+
+function ProgressBar({ pct, state }: ProgressBarProps) {
   const color = state === 'complete' ? '#22c55e' : state === 'active' ? '#f59e0b' : '#d1d5db'
   return (
     <div className="h-1.5 w-20 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
@@ -82,7 +132,7 @@ function ProgressBar({ pct, state }) {
   )
 }
 
-function StateBadge({ state }) {
+function StateBadge({ state }: { state: TaskState }) {
   const m = STATE_META[state] || STATE_META.not_started
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${m.bg} ${m.text}`}>
@@ -97,17 +147,22 @@ function StateBadge({ state }) {
 
 let _nextTaskId = 10
 
-function TaskEditor({ tasks, onChange }) {
+interface TaskEditorProps {
+  tasks: Task[]
+  onChange: (tasks: Task[]) => void
+}
+
+function TaskEditor({ tasks, onChange }: TaskEditorProps) {
   const addTask = useCallback(() => {
     const id = `T${++_nextTaskId}`
     onChange([...tasks, { id, name: 'New Task', start: today(), finish: today(), element_ids: [], predecessors: [], ifc_task_type: 'CONSTRUCTION', trade: '' }])
   }, [tasks, onChange])
 
-  const removeTask = useCallback((idx) => {
+  const removeTask = useCallback((idx: number) => {
     onChange(tasks.filter((_, i) => i !== idx))
   }, [tasks, onChange])
 
-  const updateTask = useCallback((idx, field, value) => {
+  const updateTask = useCallback((idx: number, field: keyof Task, value: Task[keyof Task]) => {
     const updated = tasks.map((t, i) => i === idx ? { ...t, [field]: value } : t)
     onChange(updated)
   }, [tasks, onChange])
@@ -175,19 +230,19 @@ function TaskEditor({ tasks, onChange }) {
 // Main panel
 // ---------------------------------------------------------------------------
 
-export default function ConstructionSequencingPanel({ content, projectId, onToast }) {
+export default function ConstructionSequencingPanel({ content, projectId: _projectId, onToast }: ConstructionSequencingPanelProps) {
   // Accept a `content` string (JSON) from the panel registry; merge over defaults.
   // Currently the panel is self-contained (DEMO_TASKS); content can seed
   // an initial tasks list via content.tasks if provided.
-  const _contentParsed = (() => { if (!content) return {}; try { return JSON.parse(content) } catch { return {} } })()
-  const [tasks, setTasks] = useState(_contentParsed.tasks ?? DEMO_TASKS)
+  const _contentParsed = (() => { if (!content) return {} as { tasks?: Task[] }; try { return JSON.parse(content) } catch { return {} } })()
+  const [tasks, setTasks] = useState<Task[]>(_contentParsed.tasks ?? DEMO_TASKS)
   const [queryDate, setQueryDate] = useState(today())
-  const [timeline, setTimeline] = useState(null)
-  const [criticalPath, setCriticalPath] = useState([])
-  const [validationErrors, setValidationErrors] = useState([])
+  const [timeline, setTimeline] = useState<TimelineEntry[] | null>(null)
+  const [criticalPath, setCriticalPath] = useState<string[]>([])
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [expanded, setExpanded] = useState(true)
-  const [activeTab, setActiveTab] = useState('timeline') // 'timeline' | 'tasks' | 'validation'
+  const [activeTab, setActiveTab] = useState<'timeline' | 'tasks' | 'validation'>('timeline') // 'timeline' | 'tasks' | 'validation'
 
   // Derived: project date range for scrubber
   const projectDates = useMemo(() => {
@@ -197,7 +252,7 @@ export default function ConstructionSequencingPanel({ content, projectId, onToas
     return { min: starts[0], max: finishes[finishes.length - 1] }
   }, [tasks])
 
-  const schedule = useMemo(() => ({
+  const schedule: Schedule = useMemo(() => ({
     tasks,
     project_start: projectDates.min,
     project_finish: projectDates.max,
@@ -213,14 +268,14 @@ export default function ConstructionSequencingPanel({ content, projectId, onToas
       setTimeline(result)
       setCriticalPath(_computeCriticalPath(tasks))
     } catch (err) {
-      onToast?.(err?.message || '4D timeline computation failed')
+      onToast?.((err as Error)?.message || '4D timeline computation failed')
     } finally {
       setLoading(false)
     }
   }, [schedule, queryDate, tasks, onToast])
 
   const validateSchedule = useCallback(() => {
-    const errors = []
+    const errors: string[] = []
     const taskIds = new Set(tasks.map(t => t.id))
     tasks.forEach(t => {
       t.predecessors.forEach(p => {
@@ -234,8 +289,8 @@ export default function ConstructionSequencingPanel({ content, projectId, onToas
 
   const summary = useMemo(() => {
     if (!timeline) return { not_started: 0, active: 0, complete: 0 }
-    const seen = new Set()
-    const counts = { not_started: 0, active: 0, complete: 0 }
+    const seen = new Set<string>()
+    const counts: Record<TaskState, number> = { not_started: 0, active: 0, complete: 0 }
     timeline.forEach(e => {
       if (!seen.has(e.element_id)) {
         seen.add(e.element_id)
@@ -311,7 +366,9 @@ export default function ConstructionSequencingPanel({ content, projectId, onToas
 
           {/* Tabs */}
           <div className="flex border-b border-ink-200 dark:border-ink-700">
-            {[['timeline', 'Timeline'], ['tasks', 'Tasks'], ['validation', 'Validation']].map(([id, label]) => (
+            {(
+              [['timeline', 'Timeline'], ['tasks', 'Tasks'], ['validation', 'Validation']] as const
+            ).map(([id, label]) => (
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
@@ -398,19 +455,19 @@ export default function ConstructionSequencingPanel({ content, projectId, onToas
 // Client-side computation (mirrors Python engine — used without backend call)
 // ---------------------------------------------------------------------------
 
-function _computeTimeline(schedule, queryDate) {
+function _computeTimeline(schedule: Schedule, queryDate: string): TimelineEntry[] {
   const q = new Date(queryDate)
-  const entries = []
+  const entries: TimelineEntry[] = []
   for (const task of schedule.tasks) {
     const s = new Date(task.start)
     const f = new Date(task.finish)
-    let state, progress
+    let state: TaskState, progress: number
     if (q < s) { state = 'not_started'; progress = 0 }
     else if (q > f) { state = 'complete'; progress = 100 }
     else {
       state = 'active'
-      const elapsed = (q - s) / 86400000
-      const total = Math.max((f - s) / 86400000, 1)
+      const elapsed = (q.getTime() - s.getTime()) / 86400000
+      const total = Math.max((f.getTime() - s.getTime()) / 86400000, 1)
       progress = Math.round(Math.min(100, elapsed / total * 100) * 10) / 10
     }
     for (const eid of (task.element_ids || [])) {
@@ -420,10 +477,9 @@ function _computeTimeline(schedule, queryDate) {
   return entries
 }
 
-function _computeCriticalPath(tasks) {
+function _computeCriticalPath(tasks: Task[]): string[] {
   // Simplified: tasks with no successors or those with longest path
-  const taskMap = Object.fromEntries(tasks.map(t => [t.id, t]))
-  const successors = Object.fromEntries(tasks.map(t => [t.id, []]))
+  const successors: Record<string, string[]> = Object.fromEntries(tasks.map(t => [t.id, [] as string[]]))
   tasks.forEach(t => t.predecessors.forEach(p => { if (successors[p]) successors[p].push(t.id) }))
   // Tasks with no successors are "critical" in simplified model
   return tasks.filter(t => successors[t.id].length === 0).map(t => t.id)

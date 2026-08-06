@@ -56,16 +56,35 @@
  *     auto-dismiss.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, type KeyboardEvent } from 'react'
 import clsx from 'clsx'
-import { X, CheckCircle, AlertTriangle, Info, XCircle } from 'lucide-react'
+import { X, CheckCircle, AlertTriangle, Info, XCircle, type LucideIcon } from 'lucide-react'
 
 // ── Bus ───────────────────────────────────────────────────────────────────────
 
-let _listeners = new Set()
+export type ToastVariant = 'info' | 'success' | 'error' | 'warning'
+
+export interface ToastOptions {
+  variant?: ToastVariant
+  duration?: number
+  id?: string
+}
+
+export interface ToastEntry {
+  id: string
+  message: string
+  variant: ToastVariant
+  duration: number
+  createdAt: number
+}
+
+type BusEvent = { type: 'add'; entry: ToastEntry } | { type: 'dismiss'; id: string }
+type BusListener = (event: BusEvent) => void
+
+let _listeners = new Set<BusListener>()
 let _toastIdCounter = 0
 
-function nextToastId() {
+function nextToastId(): string {
   _toastIdCounter += 1
   return `toast-${_toastIdCounter}`
 }
@@ -73,12 +92,10 @@ function nextToastId() {
 /**
  * Internal: broadcast a toast to all mounted ToastBus instances.
  *
- * @param {string} message
- * @param {{ variant?: string, duration?: number, id?: string }} options
- * @returns {string} the toast's ID
+ * @returns the toast's ID
  */
-function _emit(message, options = {}) {
-  const entry = {
+function _emit(message: string, options: ToastOptions = {}): string {
+  const entry: ToastEntry = {
     id: options.id ?? nextToastId(),
     message,
     variant: options.variant ?? 'info',
@@ -89,20 +106,27 @@ function _emit(message, options = {}) {
   return entry.id
 }
 
-function _emitDismiss(id) {
+function _emitDismiss(id: string): void {
   for (const fn of _listeners) fn({ type: 'dismiss', id })
 }
 
 // ── Public imperative API ─────────────────────────────────────────────────────
 
-export function toast(message, options) {
-  return _emit(message, { ...options, variant: 'info' })
+interface ToastFn {
+  (message: string, options?: ToastOptions): string
+  success: (message: string, options?: ToastOptions) => string
+  error: (message: string, options?: ToastOptions) => string
+  warning: (message: string, options?: ToastOptions) => string
 }
+
+export const toast: ToastFn = ((message: string, options?: ToastOptions) => {
+  return _emit(message, { ...options, variant: 'info' })
+}) as ToastFn
 toast.success = (message, options) => _emit(message, { ...options, variant: 'success' })
 toast.error   = (message, options) => _emit(message, { ...options, variant: 'error' })
 toast.warning = (message, options) => _emit(message, { ...options, variant: 'warning' })
 
-export function dismissToast(id) {
+export function dismissToast(id: string): void {
   _emitDismiss(id)
 }
 
@@ -110,29 +134,35 @@ export function dismissToast(id) {
  * Reset the bus (clears listeners and resets counter).
  * FOR TESTS ONLY.
  */
-export function _resetBus() {
+export function _resetBus(): void {
   _listeners = new Set()
   _toastIdCounter = 0
 }
 
 // ── useToast hook ─────────────────────────────────────────────────────────────
 
+export interface UseToastResult {
+  toasts: ToastEntry[]
+  dismiss: (id: string) => void
+  add: (message: string, options?: ToastOptions) => string
+  pause: (id: string) => void
+  resume: (id: string) => void
+}
+
 /**
  * React hook that provides access to the toast list and imperative controls.
- *
- * @returns {{ toasts: ToastEntry[], dismiss: (id: string) => void, add: (msg: string, opts?: object) => string, pause: (id: string) => void, resume: (id: string) => void }}
  */
-export function useToast() {
-  const [toasts, setToasts] = useState([])
-  const timersRef = useRef({})
+export function useToast(): UseToastResult {
+  const [toasts, setToasts] = useState<ToastEntry[]>([])
+  const timersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   // Track remaining time when a toast is paused { id: remainingMs }
-  const pausedRef = useRef({})
+  const pausedRef = useRef<Record<string, number>>({})
   // Track when each timer started { id: startTimestamp }
-  const timerStartRef = useRef({})
+  const timerStartRef = useRef<Record<string, number>>({})
   // Track the full duration for each active timer { id: durationMs }
-  const timerDurationRef = useRef({})
+  const timerDurationRef = useRef<Record<string, number>>({})
 
-  const dismiss = useCallback((id) => {
+  const dismiss = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id))
     clearTimeout(timersRef.current[id])
     delete timersRef.current[id]
@@ -142,7 +172,7 @@ export function useToast() {
   }, [])
 
   const scheduleAutoDismiss = useCallback(
-    (id, duration) => {
+    (id: string, duration: number) => {
       if (duration <= 0) return
       clearTimeout(timersRef.current[id])
       timerStartRef.current[id] = Date.now()
@@ -156,7 +186,7 @@ export function useToast() {
    * Pause the auto-dismiss timer for a toast (e.g. on hover/focus).
    * Stores remaining time so resume() can restore it accurately.
    */
-  const pause = useCallback((id) => {
+  const pause = useCallback((id: string) => {
     if (!timersRef.current[id]) return
     clearTimeout(timersRef.current[id])
     delete timersRef.current[id]
@@ -169,7 +199,7 @@ export function useToast() {
    * Resume the auto-dismiss timer with the remaining time.
    */
   const resume = useCallback(
-    (id) => {
+    (id: string) => {
       const remaining = pausedRef.current[id]
       if (remaining == null) return
       delete pausedRef.current[id]
@@ -179,9 +209,9 @@ export function useToast() {
   )
 
   const add = useCallback(
-    (message, options = {}) => {
+    (message: string, options: ToastOptions = {}) => {
       const id = options.id ?? nextToastId()
-      const entry = {
+      const entry: ToastEntry = {
         id,
         message,
         variant: options.variant ?? 'info',
@@ -204,7 +234,7 @@ export function useToast() {
 
   // Subscribe to bus events
   useEffect(() => {
-    function handler(event) {
+    function handler(event: BusEvent) {
       if (event.type === 'add') {
         const { entry } = event
         setToasts((prev) => {
@@ -237,7 +267,15 @@ export function useToast() {
 
 // ── Toast UI primitives ───────────────────────────────────────────────────────
 
-export const VARIANT_CONFIG = {
+interface VariantConfig {
+  icon: LucideIcon
+  role: 'status' | 'alert'
+  live: 'polite' | 'assertive'
+  iconClass: string
+  borderClass: string
+}
+
+export const VARIANT_CONFIG: Record<ToastVariant, VariantConfig> = {
   info: {
     icon: Info,
     role: 'status',
@@ -268,11 +306,18 @@ export const VARIANT_CONFIG = {
   },
 }
 
-function ToastItem({ entry, onDismiss, onPause, onResume }) {
+interface ToastItemProps {
+  entry: ToastEntry
+  onDismiss: (id: string) => void
+  onPause?: (id: string) => void
+  onResume?: (id: string) => void
+}
+
+function ToastItem({ entry, onDismiss, onPause, onResume }: ToastItemProps) {
   const config = VARIANT_CONFIG[entry.variant] ?? VARIANT_CONFIG.info
   const Icon = config.icon
 
-  function handleKeyDown(e) {
+  function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (e.key === 'Escape') {
       e.stopPropagation()
       onDismiss(entry.id)

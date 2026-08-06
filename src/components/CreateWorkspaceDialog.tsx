@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent 
 import { createPortal } from 'react-dom'
 import { Building2, X, AlertCircle, Loader2, Upload } from 'lucide-react'
 import clsx from 'clsx'
-import { useWorkspaces } from '../store/workspaces'
-import { api, ApiError } from '../lib/api'
+import { useWorkspaces } from '../store/workspaces.js'
+import { api, ApiError } from '../lib/api.js'
 import type { ApiWorkspace } from '@/types'
 
 function slugify(s?: string): string {

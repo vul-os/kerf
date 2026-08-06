@@ -12,7 +12,7 @@
  * removed — the layout does not vary.
  */
 
-import { DOMAIN_META, STATUS_META, TONE_CLASSES, featuresByDomain } from '../lib/compareFeatures'
+import { DOMAIN_META, STATUS_META, TONE_CLASSES, featuresByDomain } from '../lib/compareFeatures.js'
 
 /* -------------------------------------------------------------------------- */
 /* Local types                                                                 */

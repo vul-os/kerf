@@ -34,6 +34,7 @@ import {
   useToast,
   _resetBus,
   VARIANT_CONFIG,
+  type ToastOptions,
 } from './ToastBus.jsx'
 
 // Also import the default export
@@ -112,17 +113,25 @@ describe('bus subscription contract', () => {
 // closures from the React hook lifecycle. The add/dismiss functions are pure
 // stateful operations on a toasts array.
 
+interface TestToastEntry {
+  id: string
+  message: string
+  variant: string
+  duration: number
+  createdAt: number
+}
+
 describe('useToast — add and dismiss logic', () => {
   function makeToastState() {
-    let toasts = []
+    let toasts: TestToastEntry[] = []
 
-    function dismiss(id) {
+    function dismiss(id: string) {
       toasts = toasts.filter((t) => t.id !== id)
     }
 
-    function add(message, options = {}) {
+    function add(message: string, options: ToastOptions = {}) {
       const id = options.id ?? `t-${Date.now()}-${Math.random()}`
-      const entry = {
+      const entry: TestToastEntry = {
         id,
         message,
         variant: options.variant ?? 'info',
@@ -309,7 +318,7 @@ describe('Keyboard Esc dismiss handler', () => {
     const onDismiss = vi.fn()
     const id = 'test-id'
 
-    function handleKeyDown(e) {
+    function handleKeyDown(e: { key: string; stopPropagation: () => void }) {
       if (e.key === 'Escape') {
         e.stopPropagation()
         onDismiss(id)
@@ -350,13 +359,13 @@ describe('Keyboard Esc dismiss handler', () => {
 
 describe('useToast — pause and resume logic', () => {
   function makePauseableState() {
-    let toasts = []
-    const timers = {}
-    const paused = {}
-    const timerStart = {}
-    const timerDuration = {}
+    let toasts: TestToastEntry[] = []
+    const timers: Record<string, ReturnType<typeof setTimeout>> = {}
+    const paused: Record<string, number> = {}
+    const timerStart: Record<string, number> = {}
+    const timerDuration: Record<string, number> = {}
 
-    function dismiss(id) {
+    function dismiss(id: string) {
       toasts = toasts.filter((t) => t.id !== id)
       clearTimeout(timers[id])
       delete timers[id]
@@ -365,7 +374,7 @@ describe('useToast — pause and resume logic', () => {
       delete timerDuration[id]
     }
 
-    function scheduleAutoDismiss(id, duration) {
+    function scheduleAutoDismiss(id: string, duration: number) {
       if (duration <= 0) return
       clearTimeout(timers[id])
       timerStart[id] = Date.now()
@@ -373,7 +382,7 @@ describe('useToast — pause and resume logic', () => {
       timers[id] = setTimeout(() => dismiss(id), duration)
     }
 
-    function pause(id) {
+    function pause(id: string) {
       if (!timers[id]) return
       clearTimeout(timers[id])
       delete timers[id]
@@ -382,16 +391,16 @@ describe('useToast — pause and resume logic', () => {
       paused[id] = remaining
     }
 
-    function resume(id) {
+    function resume(id: string) {
       const remaining = paused[id]
       if (remaining == null) return
       delete paused[id]
       scheduleAutoDismiss(id, remaining)
     }
 
-    function add(message, options = {}) {
+    function add(message: string, options: ToastOptions = {}) {
       const id = options.id ?? `t-${Math.random()}`
-      const entry = {
+      const entry: TestToastEntry = {
         id,
         message,
         variant: options.variant ?? 'info',
@@ -479,13 +488,13 @@ describe('useToast — pause and resume logic', () => {
 
 describe('multi-toast stacking', () => {
   function makeToastState() {
-    let toasts = []
+    let toasts: { id: string; message: string; variant: string }[] = []
 
-    function dismiss(id) {
+    function dismiss(id: string) {
       toasts = toasts.filter((t) => t.id !== id)
     }
 
-    function add(message, options = {}) {
+    function add(message: string, options: ToastOptions = {}) {
       const id = options.id ?? `t-${Date.now()}-${Math.random()}`
       const entry = { id, message, variant: options.variant ?? 'info' }
       const exists = toasts.some((t) => t.id === id)

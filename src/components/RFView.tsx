@@ -2,17 +2,57 @@
 // tables, and a VSWR vs frequency line chart.
 
 import { useImperativeHandle, useMemo, useRef } from 'react'
+import type { Ref } from 'react'
 import { Activity, AlertTriangle, CheckCircle, Clock, XCircle } from 'lucide-react'
 import { snapshotSvg } from '../lib/snapshotHelpers.js'
 
-const STATUS_CONFIG = {
+// ── Types ──────────────────────────────────────────────────────────────────────
+//
+// Not modeled anywhere in src/types (no RF/S-parameter shapes exist there); this is
+// tool-call output (`rf_run_study`), not a src/lib/api.ts REST endpoint, so there's
+// no api.ts return type to import either. Mirrors the shape documented in
+// src/lib/panels/misc-wrappers/RFViewWrapper.jsx's header comment (the only other
+// consumer) — declared locally since nothing else in this slice shares it.
+
+export type RfStudyStatus = 'queued' | 'running' | 'done' | 'error'
+
+export interface RfStudyResultData {
+  smith_chart_svg?: string
+  vswr?: number[]
+  frequency_range?: number[]
+  frequency_unit?: string
+  return_loss_db?: number[]
+  insertion_loss_db?: number[]
+  stability_factor_k?: number[]
+  max_gain_db?: number[]
+  warnings?: string[]
+}
+
+export interface RfStudyResult {
+  status?: RfStudyStatus
+  result?: RfStudyResultData
+  errors?: string[]
+}
+
+export interface RFViewHandle {
+  snapshot: (opts?: { size?: number; quality?: number }) => Promise<Blob | null>
+}
+
+export interface RFViewProps {
+  rfResult?: RfStudyResult
+  fileId?: string
+  onRunStudy?: () => void
+  viewRef?: Ref<RFViewHandle>
+}
+
+const STATUS_CONFIG: Record<RfStudyStatus, { icon: typeof Clock; color: string; label: string }> = {
   queued:  { icon: Clock,       color: 'text-ink-400',   label: 'Queued' },
   running: { icon: Activity,    color: 'text-kerf-300',  label: 'Running' },
   done:    { icon: CheckCircle, color: 'text-emerald-400', label: 'Done' },
   error:   { icon: XCircle,     color: 'text-red-400',   label: 'Error' },
 }
 
-function StatusBadge({ status }) {
+function StatusBadge({ status }: { status: RfStudyStatus }) {
   const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.queued
   const Icon = cfg.icon
   return (
@@ -23,7 +63,11 @@ function StatusBadge({ status }) {
   )
 }
 
-function MetricRow({ label, value, unit = '' }) {
+// Dead code inherited from the .jsx: MetricRow is defined but never called anywhere
+// (MetricsTable builds its rows inline instead). Reported, not removed — see the T-513
+// migration report.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function MetricRow({ label, value, unit = '' }: { label: string; value: number | string | null | undefined; unit?: string }) {
   if (value == null) return null
   const formatted = typeof value === 'number' ? value.toFixed(3) : value
   return (
@@ -35,7 +79,7 @@ function MetricRow({ label, value, unit = '' }) {
   )
 }
 
-function MetricsTable({ result }) {
+function MetricsTable({ result }: { result?: RfStudyResultData }) {
   if (!result) return null
   const { frequency_range, vswr, return_loss_db, insertion_loss_db, stability_factor_k, max_gain_db, frequency_unit } = result
   if (!frequency_range?.length) return null
@@ -45,7 +89,7 @@ function MetricsTable({ result }) {
   const indices = [0, mid, n - 1]
   const labels = ['Min', 'Center', 'Max']
 
-  const get = (arr, i) => (arr && arr[i] != null ? arr[i] : null)
+  const get = (arr: number[] | undefined, i: number) => (arr && arr[i] != null ? arr[i] : null)
 
   return (
     <table className="w-full text-[12px] border-separate border-spacing-0">
@@ -89,7 +133,7 @@ function MetricsTable({ result }) {
   )
 }
 
-function VswrChart({ frequency_range, vswr, frequency_unit }) {
+function VswrChart({ frequency_range, vswr, frequency_unit }: { frequency_range?: number[]; vswr?: number[]; frequency_unit?: string }) {
   const svg = useMemo(() => {
     if (!frequency_range?.length || !vswr?.length) return null
     const W = 600, H = 200, PAD_L = 48, PAD_R = 16, PAD_T = 16, PAD_B = 32
@@ -104,8 +148,8 @@ function VswrChart({ frequency_range, vswr, frequency_unit }) {
     const yMin = 1.0
     const yMax = Math.max(...data.filter((v) => isFinite(v)), 1.5)
 
-    const xScale = (v) => PAD_L + ((v - xMin) / (xMax - xMin || 1)) * innerW
-    const yScale = (v) => PAD_T + innerH - ((v - yMin) / (yMax - yMin || 1)) * innerH
+    const xScale = (v: number) => PAD_L + ((v - xMin) / (xMax - xMin || 1)) * innerW
+    const yScale = (v: number) => PAD_T + innerH - ((v - yMin) / (yMax - yMin || 1)) * innerH
 
     const points = freqs.map((f, i) => `${xScale(f).toFixed(1)},${yScale(data[i]).toFixed(1)}`).join(' ')
 
@@ -113,12 +157,12 @@ function VswrChart({ frequency_range, vswr, frequency_unit }) {
     const xTickCount = 5
     const xTicks = Array.from({ length: xTickCount }, (_, i) => xMin + (i * (xMax - xMin)) / (xTickCount - 1))
 
-    return { W, H, PAD_L, PAD_R, PAD_T, PAD_B, innerW, innerH, xScale, yScale, points, yTicks, xTicks, xMin, xMax, yMin, yMax, xScale, yScale }
+    return { W, H, PAD_L, PAD_R, PAD_T, PAD_B, innerW, innerH, xScale, yScale, points, yTicks, xTicks, xMin, xMax, yMin, yMax }
   }, [frequency_range, vswr])
 
   if (!svg) return null
 
-  const { W, H, PAD_L, PAD_R, PAD_T, PAD_B, innerW, innerH, yTicks, xTicks, xMin, xMax, yMin, yMax, xScale, yScale } = svg
+  const { W, H, PAD_L, PAD_R: _PAD_R, PAD_T, PAD_B: _PAD_B, innerW, innerH, yTicks, xTicks, xMin: _xMin, xMax: _xMax, yMin: _yMin, yMax: _yMax, xScale, yScale } = svg
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto block">
@@ -160,18 +204,22 @@ function VswrChart({ frequency_range, vswr, frequency_unit }) {
   )
 }
 
-export default function RFView({ rfResult, fileId, onRunStudy, viewRef }) {
-  const status = rfResult?.status || 'queued'
-  const rootRef = useRef(null)
+export default function RFView({ rfResult, fileId, onRunStudy, viewRef }: RFViewProps) {
+  const status: RfStudyStatus = rfResult?.status || 'queued'
+  const rootRef = useRef<HTMLDivElement | null>(null)
 
   // The visual artifact for an RF analysis is the Smith chart SVG
   // injected via dangerouslySetInnerHTML. If a study hasn't run yet,
   // we fall back to the local-rendered VSWR SVG, which is always
   // present even in the empty-state.
   useImperativeHandle(viewRef, () => ({
-    snapshot: (opts) => {
+    snapshot: (opts?: { size?: number; quality?: number }): Promise<Blob | null> => {
       const svg = rootRef.current?.querySelector?.('svg')
-      return snapshotSvg(svg, opts)
+      // snapshotSvg (src/lib/snapshotHelpers.ts, outside this slice) has untyped params,
+      // which defeats TS's inference through its nested `new Promise` executor and widens
+      // its return to `Promise<unknown>`; its own JSDoc documents the real runtime type
+      // as `Promise<Blob|null>`.
+      return snapshotSvg(svg, opts) as Promise<Blob | null>
     },
   }), [])
 
@@ -192,7 +240,7 @@ export default function RFView({ rfResult, fileId, onRunStudy, viewRef }) {
         </button>
       </div>
 
-      {status === 'error' && rfResult?.errors?.length > 0 && (
+      {status === 'error' && rfResult?.errors && rfResult.errors.length > 0 && (
         <div className="mx-4 mt-3 px-3 py-2 rounded bg-red-950/60 border border-red-900/60 text-red-200 text-[11px] flex items-start gap-2">
           <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" />
           <div>{rfResult.errors.join(', ')}</div>
@@ -223,7 +271,7 @@ export default function RFView({ rfResult, fileId, onRunStudy, viewRef }) {
           </div>
 
           {/* VSWR chart */}
-          {rfResult.result.vswr?.length > 0 && (
+          {rfResult.result.vswr && rfResult.result.vswr.length > 0 && (
             <div className="p-4">
               <div className="text-[11px] font-semibold text-ink-400 uppercase tracking-wider mb-3">
                 VSWR vs Frequency
@@ -237,7 +285,7 @@ export default function RFView({ rfResult, fileId, onRunStudy, viewRef }) {
           )}
 
           {/* Warnings */}
-          {rfResult.result.warnings?.length > 0 && (
+          {rfResult.result.warnings && rfResult.result.warnings.length > 0 && (
             <div className="px-4 py-2">
               <div className="text-[11px] text-amber-400">
                 {rfResult.result.warnings.join('; ')}

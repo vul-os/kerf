@@ -16,14 +16,22 @@
  *   - inline SVG, no raster
  *   - Tailwind responsive (sm: / lg:)
  */
-import { ArrowRight, ShieldCheck, Layers, Sigma } from 'lucide-react'
+import { ArrowRight, ShieldCheck, Layers, Sigma, type LucideIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 /* -------------------------------------------------------------------------- */
 /* Three user-language proof cards                                            */
 /* -------------------------------------------------------------------------- */
 
-const PROOFS = [
+interface Proof {
+  icon: LucideIcon
+  eyebrow: string
+  title: string
+  body: string
+  detail: string
+}
+
+const PROOFS: Proof[] = [
   {
     icon: Sigma,
     eyebrow: 'Parametric history',
@@ -51,7 +59,13 @@ const PROOFS = [
 /* Quiet-credibility stat strip                                               */
 /* -------------------------------------------------------------------------- */
 
-const STATS = [
+interface Stat {
+  value: string
+  label: string
+  sub: string
+}
+
+const STATS: Stat[] = [
   {
     value: '620',
     label: 'kernel tests',
@@ -78,7 +92,11 @@ const STATS = [
 /* Survival diagram — small inline SVG showing param edit → fillet survives   */
 /* -------------------------------------------------------------------------- */
 
-function SurvivalDiagram({ className = '' }) {
+interface SurvivalDiagramProps {
+  className?: string
+}
+
+function SurvivalDiagram({ className = '' }: SurvivalDiagramProps) {
   return (
     <svg
       viewBox="0 0 320 140"

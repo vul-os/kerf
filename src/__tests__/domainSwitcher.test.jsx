@@ -10,14 +10,23 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
 import { DOMAIN_TABS } from '../components/domains/DomainSwitcher.jsx'
 
-const SWITCHER_SRC = readFileSync(
-  resolve(__dirname, '../components/domains/DomainSwitcher.jsx'),
-  'utf8',
-)
+// Source-text inspection reads the module off disk by literal path, so a
+// .jsx -> .tsx migration silently breaks it (typecheck cannot catch this;
+// only running the suite does). Rather than re-pinning to .tsx and breaking
+// again on the next slice, resolve whichever extension is present.
+function readSwitcherSrc() {
+  for (const ext of ['tsx', 'jsx']) {
+    const path = resolve(__dirname, `../components/domains/DomainSwitcher.${ext}`)
+    if (existsSync(path)) return readFileSync(path, 'utf8')
+  }
+  throw new Error('No DomainSwitcher source found')
+}
+
+const SWITCHER_SRC = readSwitcherSrc()
 
 const DOMAIN_PAGES = {
   jewelry: 'Jewelry.jsx',

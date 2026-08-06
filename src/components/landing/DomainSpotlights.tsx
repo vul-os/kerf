@@ -20,7 +20,15 @@ import SectorIllustration from '../../illustrations/SectorIllustration.jsx'
 /* Data                                                                        */
 /* -------------------------------------------------------------------------- */
 
-const SPOTLIGHTS = [
+interface Spotlight {
+  sector: string
+  slug: string
+  title: string
+  eyebrow: string
+  bullets: string[]
+}
+
+const SPOTLIGHTS: Spotlight[] = [
   {
     sector: 'mechanical',
     slug: 'mechanical',
@@ -225,7 +233,9 @@ const SPOTLIGHTS = [
 /* Single spotlight card                                                        */
 /* -------------------------------------------------------------------------- */
 
-function SpotlightCard({ sector, slug, title, eyebrow, bullets }) {
+type SpotlightCardProps = Spotlight
+
+function SpotlightCard({ sector, slug, title, eyebrow, bullets }: SpotlightCardProps) {
   return (
     <article className="group flex flex-col md:flex-row rounded-2xl border border-ink-800 bg-ink-900/40 overflow-hidden hover:border-ink-700 hover:bg-ink-900/60 hover:-translate-y-0.5 transition-all duration-200">
       {/* Illustration — top on mobile, left on md+ */}

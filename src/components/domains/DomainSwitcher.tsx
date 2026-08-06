@@ -13,6 +13,7 @@
 import { Link } from 'react-router-dom'
 
 /* All domains that have a dedicated /domains/<slug> page. */
+// eslint-disable-next-line react-refresh/only-export-components -- data export consumed by tests; not a component
 export const DOMAIN_TABS = [
   { slug: 'jewelry', label: 'Jewelry' },
   { slug: 'mechanical', label: 'Mechanical' },
@@ -38,12 +39,13 @@ export const DOMAIN_TABS = [
   { slug: 'textiles', label: 'Textiles' },
 ]
 
-/**
- * @param {{ active?: string }} props
- *   active — slug of the current domain (e.g. "jewelry"). The matching
- *   tab is rendered as a non-link, highlighted current item.
- */
-export default function DomainSwitcher({ active }) {
+export interface Props {
+  /** slug of the current domain (e.g. "jewelry"). The matching tab is
+   *  rendered as a non-link, highlighted current item. */
+  active?: string
+}
+
+export default function DomainSwitcher({ active }: Props) {
   return (
     <nav
       aria-label="CAD domains"

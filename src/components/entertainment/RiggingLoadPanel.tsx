@@ -1,5 +1,5 @@
 /**
- * RiggingLoadPanel.jsx — Entertainment rigging load analysis panel.
+ * RiggingLoadPanel.tsx — Entertainment rigging load analysis panel.
  *
  * Features
  * ────────
@@ -7,23 +7,55 @@
  *   • Hoist results table: reaction (N / kg), capacity, utilisation ratio,
  *     overload highlight
  *   • Bridle section: geometry summary + leg tension + overload status
- *
- * Props
- * ─────
- *   trusses         {Array}   TrussAnalysisResult list
- *   bridles         {Array}   BridleResult list
- *   any_overload    {boolean} True if any hoist or bridle exceeds capacity
- *   onDispatch      {function}
- *   className       {string}
  */
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
 const G = 9.81   // m/s²
 
+// ── Shared data shapes (documented in the original props JSDoc) ───────────
+
+export interface HoistResult {
+  label?: string
+  position_m?: number
+  reaction_N?: number
+  hoist_capacity_N?: number
+  utilisation_ratio: number
+  overloaded?: boolean
+  overload_margin_N?: number
+}
+
+export interface TrussAnalysisResult {
+  label?: string
+  length_m?: number
+  truss_type?: string
+  self_weight_N_per_m?: number
+  total_load_N?: number
+  hoist_results?: HoistResult[]
+  point_loads_debug?: unknown[]
+  equilibrium_check?: boolean
+  equilibrium_error_N?: number
+  overloaded_hoists?: unknown[]
+  warnings?: string[]
+}
+
+export interface BridleResult {
+  label?: string
+  overloaded?: boolean
+  load_N?: number
+  half_angle_deg?: number
+  leg_tension_N?: number
+  leg_length_m?: number
+  horizontal_spread_m?: number
+  vertical_height_m?: number
+  leg_capacity_N?: number
+  overload_margin_N?: number
+  warnings?: string[]
+}
+
 // ── Colour helpers ────────────────────────────────────────────────────────────
 
-function utilisationColour(ratio) {
+function utilisationColour(ratio: number) {
   if (ratio === 0) return '#475569'
   if (ratio >= 1.0) return '#dc2626'
   if (ratio >= 0.8) return '#f59e0b'
@@ -41,12 +73,11 @@ const BEAM_COL = '#475569'
 const HOIST_COL = '#7dd3fc'
 const OVER_COL = '#f87171'
 
-function TrussSpanDiagram({ truss }) {
+function TrussSpanDiagram({ truss }: { truss?: TrussAnalysisResult | null }) {
   if (!truss) return null
   const span = truss.length_m || 1
-  const px = x => 40 + (x / span) * (DIAG_W - 80)
+  const px = (x: number) => 40 + (x / span) * (DIAG_W - 80)
   const hoists = truss.hoist_results || []
-  const loads = truss.point_loads_debug || []   // optional debug data
 
   return (
     <svg width={DIAG_W} height={DIAG_H} style={{ display: 'block' }}>
@@ -64,7 +95,7 @@ function TrussSpanDiagram({ truss }) {
 
       {/* Hoists */}
       {hoists.map((h, i) => {
-        const xp = px(h.position_m)
+        const xp = px(h.position_m ?? 0)
         const col = h.overloaded ? OVER_COL : HOIST_COL
         return (
           <g key={i}>
@@ -78,7 +109,7 @@ function TrussSpanDiagram({ truss }) {
               {h.label?.split(' ')[0] || `H${i + 1}`}
             </text>
             <text x={xp} y={TRUSS_Y + 38} textAnchor="middle" fill={col} fontSize={10}>
-              {(h.reaction_N / G).toFixed(0)} kg
+              {((h.reaction_N ?? 0) / G).toFixed(0)} kg
             </text>
           </g>
         )
@@ -89,7 +120,7 @@ function TrussSpanDiagram({ truss }) {
 
 // ── Hoist results table ───────────────────────────────────────────────────────
 
-function HoistTable({ hoists }) {
+function HoistTable({ hoists }: { hoists?: HoistResult[] }) {
   if (!hoists?.length) return null
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -117,13 +148,13 @@ function HoistTable({ hoists }) {
                 {h.reaction_N?.toFixed(1)}
               </td>
               <td style={{ padding: '5px 10px', fontFamily: 'monospace' }}>
-                {(h.reaction_N / G).toFixed(1)}
+                {((h.reaction_N ?? 0) / G).toFixed(1)}
               </td>
               <td style={{ padding: '5px 10px', fontFamily: 'monospace' }}>
-                {h.hoist_capacity_N > 0 ? h.hoist_capacity_N : '—'}
+                {h.hoist_capacity_N && h.hoist_capacity_N > 0 ? h.hoist_capacity_N : '—'}
               </td>
               <td style={{ padding: '5px 10px' }}>
-                {h.hoist_capacity_N > 0 ? (
+                {h.hoist_capacity_N && h.hoist_capacity_N > 0 ? (
                   <span style={{ color: col, fontWeight: 700 }}>
                     {(h.utilisation_ratio * 100).toFixed(0)}%
                     <UtilBar ratio={h.utilisation_ratio} />
@@ -133,9 +164,9 @@ function HoistTable({ hoists }) {
               <td style={{ padding: '5px 10px' }}>
                 {over ? (
                   <span style={{ color: '#f87171', fontWeight: 700 }}>
-                    OVERLOAD {Math.abs(h.overload_margin_N).toFixed(0)} N over
+                    OVERLOAD {Math.abs(h.overload_margin_N ?? 0).toFixed(0)} N over
                   </span>
-                ) : h.hoist_capacity_N > 0 ? (
+                ) : h.hoist_capacity_N && h.hoist_capacity_N > 0 ? (
                   <span style={{ color: '#4ade80' }}>
                     OK ({h.overload_margin_N?.toFixed(0)} N headroom)
                   </span>
@@ -151,7 +182,7 @@ function HoistTable({ hoists }) {
   )
 }
 
-function UtilBar({ ratio }) {
+function UtilBar({ ratio }: { ratio: number }) {
   const clamped = Math.min(ratio, 1.0)
   return (
     <span style={{
@@ -168,7 +199,7 @@ function UtilBar({ ratio }) {
 
 // ── Bridle section ────────────────────────────────────────────────────────────
 
-function BridleCard({ br }) {
+function BridleCard({ br }: { br: BridleResult }) {
   const over = br.overloaded
   return (
     <div style={{
@@ -187,18 +218,18 @@ function BridleCard({ br }) {
         )}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, fontSize: 13 }}>
-        <BridleStat label="Load" value={`${br.load_N?.toFixed(0)} N (${(br.load_N / G).toFixed(1)} kg)`} />
+        <BridleStat label="Load" value={`${br.load_N?.toFixed(0)} N (${((br.load_N ?? 0) / G).toFixed(1)} kg)`} />
         <BridleStat label="Half-angle" value={`${br.half_angle_deg?.toFixed(1)}°`}
-          warn={br.half_angle_deg > 60} />
+          warn={(br.half_angle_deg ?? 0) > 60} />
         <BridleStat label="Leg tension" value={`${br.leg_tension_N?.toFixed(0)} N`}
           highlight={over} />
         <BridleStat label="Leg length" value={`${br.leg_length_m?.toFixed(2)} m`} />
         <BridleStat label="Spread" value={`${br.horizontal_spread_m} m`} />
         <BridleStat label="Height" value={`${br.vertical_height_m} m`} />
-        {br.leg_capacity_N > 0 && (
+        {br.leg_capacity_N != null && br.leg_capacity_N > 0 && (
           <BridleStat label="Leg WLL" value={`${br.leg_capacity_N} N`} />
         )}
-        {br.leg_capacity_N > 0 && (
+        {br.leg_capacity_N != null && br.leg_capacity_N > 0 && (
           <BridleStat
             label="Margin"
             value={`${br.overload_margin_N?.toFixed(0)} N`}
@@ -206,7 +237,7 @@ function BridleCard({ br }) {
           />
         )}
       </div>
-      {br.warnings?.length > 0 && (
+      {br.warnings && br.warnings.length > 0 && (
         <div style={{ marginTop: 8 }}>
           {br.warnings.map((w, i) => (
             <div key={i} style={{
@@ -222,7 +253,14 @@ function BridleCard({ br }) {
   )
 }
 
-function BridleStat({ label, value, highlight, warn }) {
+interface BridleStatProps {
+  label: string
+  value: string
+  highlight?: boolean
+  warn?: boolean
+}
+
+function BridleStat({ label, value, highlight, warn }: BridleStatProps) {
   return (
     <div>
       <div style={{ color: '#64748b', fontSize: 11, marginBottom: 2 }}>{label}</div>
@@ -239,13 +277,26 @@ function BridleStat({ label, value, highlight, warn }) {
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
+export interface DispatchAction {
+  tool: string
+  params?: Record<string, unknown>
+}
+
+export interface Props {
+  trusses?: TrussAnalysisResult[]
+  bridles?: BridleResult[]
+  any_overload?: boolean
+  onDispatch?: (action: DispatchAction) => void | Promise<void>
+  className?: string
+}
+
 export default function RiggingLoadPanel({
   trusses = [],
   bridles = [],
   any_overload = false,
-  onDispatch,
+  onDispatch: _onDispatch,
   className = '',
-}) {
+}: Props) {
   const [selectedTruss, setSelectedTruss] = useState(0)
 
   const truss = trusses[selectedTruss]
@@ -293,7 +344,7 @@ export default function RiggingLoadPanel({
               }}
             >
               {t.label}
-              {t.overloaded_hoists?.length > 0 && ' ⚠'}
+              {t.overloaded_hoists && t.overloaded_hoists.length > 0 && ' ⚠'}
             </button>
           ))}
         </div>
@@ -309,8 +360,8 @@ export default function RiggingLoadPanel({
             <Stat label="Truss" value={truss.label} />
             <Stat label="Length" value={`${truss.length_m} m`} />
             <Stat label="Type" value={truss.truss_type || 'Custom'} />
-            <Stat label="Self-weight" value={`${truss.self_weight_N_per_m} N/m (${(truss.self_weight_N_per_m / G).toFixed(1)} kg/m)`} />
-            <Stat label="Total load" value={`${truss.total_load_N?.toFixed(0)} N (${(truss.total_load_N / G).toFixed(1)} kg)`} />
+            <Stat label="Self-weight" value={`${truss.self_weight_N_per_m} N/m (${((truss.self_weight_N_per_m ?? 0) / G).toFixed(1)} kg/m)`} />
+            <Stat label="Total load" value={`${truss.total_load_N?.toFixed(0)} N (${((truss.total_load_N ?? 0) / G).toFixed(1)} kg)`} />
           </div>
 
           {/* Span diagram */}
@@ -359,7 +410,12 @@ export default function RiggingLoadPanel({
   )
 }
 
-function Stat({ label, value }) {
+interface StatProps {
+  label: string
+  value: ReactNode
+}
+
+function Stat({ label, value }: StatProps) {
   return (
     <div>
       <span style={{ color: '#64748b', marginRight: 4 }}>{label}:</span>

@@ -1,5 +1,5 @@
 /**
- * ArchvizScatterPanel.jsx — Archviz scatter / population panel.
+ * ArchvizScatterPanel.tsx — Archviz scatter / population panel.
  *
  * Purpose
  * -------
@@ -13,18 +13,9 @@
  * ----------------------------------------
  *   archviz_asset_library     — browse/search assets
  *   archviz_scatter_populate  — run scatter engine, get instance list
- *
- * Props
- * -----
- *   file        {object|null}
- *   content     {object|string|null}
- *   projectId   {string|null}
- *   fileId      {string|null}
- *   callTool    {(name:string, args:object) => Promise<any>}
- *   onDispatch  {(action:object) => void}
  */
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import {
   Trees,
   Users,
@@ -40,8 +31,11 @@ import {
   Info,
 } from 'lucide-react'
 
+export type ScatterCategory = 'tree' | 'shrub' | 'ground_cover' | 'person' | 'car' | 'furniture'
+
 // ── Category colour map (matches Python backend) ──────────────────────────
-export const CATEGORY_COLORS = {
+// eslint-disable-next-line react-refresh/only-export-components -- data export, not a component
+export const CATEGORY_COLORS: Record<ScatterCategory, string> = {
   tree:         '#2d8a3e',
   shrub:        '#5aad4e',
   ground_cover: '#8aaa44',
@@ -50,8 +44,47 @@ export const CATEGORY_COLORS = {
   furniture:    '#9060b0',
 }
 
+export interface ScatterArea {
+  x_min?: number
+  y_min?: number
+  x_max?: number
+  y_max?: number
+  base_z?: number
+}
+
+export interface ScatterAsset {
+  id: string
+  category: ScatterCategory
+  label: string
+  bbox?: number[]
+  tags?: string[]
+}
+
+export interface ScatterInstance {
+  id: string | number
+  asset_id: string
+  category: ScatterCategory
+  position: number[]
+  rotation: number[]
+  scale: number[]
+}
+
+export interface ScatterStats {
+  count: number
+  method: string
+  seed: number
+}
+
+/** Generic backend-tool dispatcher — response shape is the named tool's, not this panel's. */
+export type CallToolFn = (name: string, args?: Record<string, unknown>) => Promise<unknown>
+
 // ── Category icon helper ───────────────────────────────────────────────────
-function CategoryIcon({ category, size = 14 }) {
+interface CategoryIconProps {
+  category?: ScatterCategory
+  size?: number
+}
+
+function CategoryIcon({ category, size = 14 }: CategoryIconProps) {
   const props = { size, strokeWidth: 1.8 }
   switch (category) {
     case 'tree':
@@ -65,7 +98,14 @@ function CategoryIcon({ category, size = 14 }) {
 }
 
 // ── Top-down scatter preview ───────────────────────────────────────────────
-export function ScatterPreview({ instances, area, width = 320, height = 220 }) {
+export interface ScatterPreviewProps {
+  instances: ScatterInstance[]
+  area: ScatterArea | null
+  width?: number
+  height?: number
+}
+
+export function ScatterPreview({ instances, area, width = 320, height = 220 }: ScatterPreviewProps) {
   if (!area) return null
   const xRange = (area.x_max ?? 10) - (area.x_min ?? 0)
   const yRange = (area.y_max ?? 10) - (area.y_min ?? 0)
@@ -75,9 +115,9 @@ export function ScatterPreview({ instances, area, width = 320, height = 220 }) {
   const svgW = width - pad * 2
   const svgH = height - pad * 2
 
-  function toSvg(x, y) {
-    const sx = pad + ((x - (area.x_min ?? 0)) / xRange) * svgW
-    const sy = pad + (1 - (y - (area.y_min ?? 0)) / yRange) * svgH
+  function toSvg(x: number, y: number): [number, number] {
+    const sx = pad + ((x - (area?.x_min ?? 0)) / xRange) * svgW
+    const sy = pad + (1 - (y - (area?.y_min ?? 0)) / yRange) * svgH
     return [sx, sy]
   }
 
@@ -146,7 +186,13 @@ export function ScatterPreview({ instances, area, width = 320, height = 220 }) {
 }
 
 // ── Asset chip ─────────────────────────────────────────────────────────────
-function AssetChip({ asset, selected, onToggle }) {
+interface AssetChipProps {
+  asset: ScatterAsset
+  selected: boolean
+  onToggle: (id: string) => void
+}
+
+function AssetChip({ asset, selected, onToggle }: AssetChipProps) {
   const color = CATEGORY_COLORS[asset.category] ?? '#888'
   return (
     <button
@@ -174,7 +220,17 @@ function AssetChip({ asset, selected, onToggle }) {
 }
 
 // ── Numeric slider control ─────────────────────────────────────────────────
-function SliderControl({ label, value, min, max, step, onChange, format }) {
+interface SliderControlProps {
+  label: string
+  value: number
+  min: number
+  max: number
+  step: number
+  onChange: (value: number) => void
+  format?: (value: number) => string
+}
+
+function SliderControl({ label, value, min, max, step, onChange, format }: SliderControlProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#8a9' }}>
@@ -197,39 +253,54 @@ function SliderControl({ label, value, min, max, step, onChange, format }) {
 }
 
 // ── Main panel ─────────────────────────────────────────────────────────────
-export default function ArchvizScatterPanel({ callTool }) {
+export interface Props {
+  callTool?: CallToolFn
+}
+
+const DEFAULT_CATALOGUE_PREVIEW: ScatterAsset[] = [
+  { id: 'tree_deciduous_medium', category: 'tree',    label: 'Deciduous Tree (M)' },
+  { id: 'tree_conifer_tall',      category: 'tree',    label: 'Conifer Tall' },
+  { id: 'shrub_rounded',          category: 'shrub',   label: 'Rounded Shrub' },
+  { id: 'person_standing_male',   category: 'person',  label: 'Standing Male' },
+  { id: 'person_standing_female', category: 'person',  label: 'Standing Female' },
+  { id: 'car_sedan',              category: 'car',     label: 'Sedan' },
+  { id: 'furniture_chair',        category: 'furniture', label: 'Chair' },
+]
+
+export default function ArchvizScatterPanel({ callTool }: Props) {
   // Scatter parameters
   const [density, setDensity] = useState(1.0)
   const [seed, setSeed] = useState(42)
   const [minSpacing, setMinSpacing] = useState(0.5)
   const [scaleJitter, setScaleJitter] = useState(0.2)
   const [rotJitter, setRotJitter] = useState(360)
-  const [method, setMethod] = useState('poisson')
-  const [area] = useState({ x_min: 0, y_min: 0, x_max: 20, y_max: 20, base_z: 0 })
+  const [method, setMethod] = useState<'poisson' | 'grid'>('poisson')
+  const [area] = useState<ScatterArea>({ x_min: 0, y_min: 0, x_max: 20, y_max: 20, base_z: 0 })
 
   // Asset library
-  const [catalogue, setCatalogue] = useState([])
+  const [catalogue, setCatalogue] = useState<ScatterAsset[]>([])
   const [catalogueLoaded, setCatalogueLoaded] = useState(false)
   const [assetSearch, setAssetSearch] = useState('')
-  const [selectedAssets, setSelectedAssets] = useState(new Set(['tree_deciduous_medium', 'person_standing_male']))
+  const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set(['tree_deciduous_medium', 'person_standing_male']))
   const [assetPaletteOpen, setAssetPaletteOpen] = useState(true)
 
   // Scatter results
-  const [instances, setInstances] = useState([])
+  const [instances, setInstances] = useState<ScatterInstance[]>([])
   const [running, setRunning] = useState(false)
-  const [error, setError] = useState(null)
-  const [stats, setStats] = useState(null)
+  const [error, setError] = useState<string | null>(null)
+  const [stats, setStats] = useState<ScatterStats | null>(null)
 
   // Load asset catalogue on first open
   const loadCatalogue = useCallback(async () => {
     if (catalogueLoaded || !callTool) return
     try {
       const res = await callTool('archviz_asset_library', { action: 'search', limit: 100 })
-      const data = typeof res === 'string' ? JSON.parse(res) : res
+      const data = (typeof res === 'string' ? JSON.parse(res) : res) as
+        { result?: { assets?: ScatterAsset[] }; assets?: ScatterAsset[] } | null | undefined
       const list = data?.result?.assets ?? data?.assets ?? []
       setCatalogue(list)
       setCatalogueLoaded(true)
-    } catch (e) {
+    } catch {
       // Graceful fallback — show built-in default names
       setCatalogueLoaded(true)
     }
@@ -240,7 +311,7 @@ export default function ArchvizScatterPanel({ callTool }) {
     if (!catalogueLoaded) loadCatalogue()
   }, [catalogueLoaded, loadCatalogue])
 
-  const toggleAsset = useCallback((id) => {
+  const toggleAsset = useCallback((id: string) => {
     setSelectedAssets((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -273,7 +344,17 @@ export default function ArchvizScatterPanel({ callTool }) {
         rotation_jitter_deg: rotJitter,
         method,
       })
-      const data = typeof res === 'string' ? JSON.parse(res) : res
+      const data = (typeof res === 'string' ? JSON.parse(res) : res) as
+        {
+          result?: {
+            instances?: ScatterInstance[]
+            asset_meta?: Record<string, { category?: ScatterCategory }>
+            method?: string
+            seed?: number
+          }
+          instances?: ScatterInstance[]
+          asset_meta?: Record<string, { category?: ScatterCategory }>
+        } | null | undefined
       const rawInstances = data?.result?.instances ?? data?.instances ?? []
 
       // Attach category from asset_meta for preview colouring
@@ -290,7 +371,7 @@ export default function ArchvizScatterPanel({ callTool }) {
         seed: data?.result?.seed ?? seed,
       })
     } catch (e) {
-      setError(String(e?.message ?? e))
+      setError(String(e instanceof Error ? e.message : e))
     } finally {
       setRunning(false)
     }
@@ -311,7 +392,7 @@ export default function ArchvizScatterPanel({ callTool }) {
 
   const panelStyle = {
     display: 'flex',
-    flexDirection: 'column',
+    flexDirection: 'column' as const,
     gap: 12,
     padding: 14,
     background: '#141a10',
@@ -319,8 +400,8 @@ export default function ArchvizScatterPanel({ callTool }) {
     fontFamily: 'system-ui, sans-serif',
     fontSize: 12,
     height: '100%',
-    overflowY: 'auto',
-    boxSizing: 'border-box',
+    overflowY: 'auto' as const,
+    boxSizing: 'border-box' as const,
   }
 
   const sectionStyle = {
@@ -407,15 +488,7 @@ export default function ArchvizScatterPanel({ callTool }) {
               ))}
               {catalogue.length === 0 && (
                 /* Show default asset ids when catalogue not yet loaded */
-                [
-                  { id: 'tree_deciduous_medium', category: 'tree',    label: 'Deciduous Tree (M)' },
-                  { id: 'tree_conifer_tall',      category: 'tree',    label: 'Conifer Tall' },
-                  { id: 'shrub_rounded',          category: 'shrub',   label: 'Rounded Shrub' },
-                  { id: 'person_standing_male',   category: 'person',  label: 'Standing Male' },
-                  { id: 'person_standing_female', category: 'person',  label: 'Standing Female' },
-                  { id: 'car_sedan',              category: 'car',     label: 'Sedan' },
-                  { id: 'furniture_chair',        category: 'furniture', label: 'Chair' },
-                ].map((asset) => (
+                DEFAULT_CATALOGUE_PREVIEW.map((asset) => (
                   <AssetChip
                     key={asset.id}
                     asset={asset}
@@ -437,7 +510,7 @@ export default function ArchvizScatterPanel({ callTool }) {
 
         {/* Method toggle */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-          {['poisson', 'grid'].map((m) => (
+          {(['poisson', 'grid'] as const).map((m) => (
             <button
               key={m}
               onClick={() => setMethod(m)}

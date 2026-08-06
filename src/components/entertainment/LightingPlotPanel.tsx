@@ -1,5 +1,5 @@
 /**
- * LightingPlotPanel.jsx — Theatrical lighting plot + DMX patch panel.
+ * LightingPlotPanel.tsx — Theatrical lighting plot + DMX patch panel.
  *
  * Features
  * ────────
@@ -7,29 +7,16 @@
  *   • DMX patch grid: per-universe address map with conflict highlighting
  *   • Circuit / dimmer schedule with per-circuit load and overload warning
  *   • Summary bar: fixture count, total load (W / A), universe count
- *
- * Props
- * ─────
- *   fixtures        {Array}   FixtureInstance list from lighting_plot_patch tool
- *   dmx_conflicts   {Array}   DMX conflict objects {universe, address_range, fixture_a, fixture_b, message}
- *   circuit_schedule {Array}  Circuit rows {dimmer, fixtures, total_wattage_W, channels, overloaded, overload_margin_W}
- *   total_wattage_W  {number}
- *   total_amperage_A {number}
- *   supply_voltage_V {number}
- *   universes_used   {Array<number>}
- *   patch_sheet      {Array}  PatchRow list
- *   magic_sheet      {Array}  MagicSheetEntry list
- *   onDispatch       {function} Called with {tool, params} when user triggers a check.
- *   className        {string}
  */
 
-import { useMemo, useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- pre-existing dead code (not this slice's behavior to change); see migration report
 const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
 
 // ── Colour map for gels / filters ─────────────────────────────────────────
 
-const GEL_COLOURS = {
+const GEL_COLOURS: Record<string, string> = {
   'R02':  '#ffd580',
   'R04':  '#ffb347',
   'R21':  '#ff8c69',
@@ -44,17 +31,64 @@ const GEL_COLOURS = {
   'L119': '#cc44ff',
   'L120': '#aa33ff',
   'L161': '#44ccff',
-  'L201': '#ffd700',
+  // Note: the original .jsx here repeated the 'L201' key a second time (same value,
+  // '#ffd700', so behaviourally a no-op either way) — removed because TypeScript's
+  // object-literal-key check (TS1117) treats a duplicate key as a hard compile error,
+  // not a lint warning. See migration report for T-512.
 }
 
-function gelColor(color) {
+function gelColor(color?: string | null) {
   if (!color || color === 'no color' || color === 'open') return '#f1f5f9'
   return GEL_COLOURS[color?.toUpperCase?.()] || '#e2e8f0'
 }
 
+// ── Shared data shapes (documented in the original props JSDoc) ───────────
+
+export interface PatchRow {
+  channel?: number | string
+  dimmer?: number | string
+  fixture_ids?: string[]
+  fixture_type?: string
+  position?: string
+  unit_number?: number | string
+  dmx_universe?: number
+  dmx_address?: number
+  dmx_end_address?: number
+  wattage_W?: number
+  color?: string
+  focus_note?: string
+}
+
+export interface DmxConflict {
+  universe?: number
+  address_range?: [number, number]
+  fixture_a?: string
+  fixture_b?: string
+  message?: string
+}
+
+export interface CircuitRow {
+  dimmer: number | string
+  channels?: Array<number | string>
+  fixtures?: string[]
+  total_wattage_W?: number
+  total_amperage_A?: number
+  overloaded?: boolean
+  overload_margin_W?: number
+}
+
 // ── Sub-components ───────────────────────────────────────────────────────────
 
-function SummaryBar({ totalFixtures, totalWattage, totalAmperage, voltage, universes, conflicts }) {
+interface SummaryBarProps {
+  totalFixtures: number
+  totalWattage: number
+  totalAmperage: number
+  voltage: number
+  universes: number[]
+  conflicts: DmxConflict[]
+}
+
+function SummaryBar({ totalFixtures, totalWattage, totalAmperage, voltage, universes, conflicts }: SummaryBarProps) {
   const hasConflicts = conflicts?.length > 0
   return (
     <div style={{
@@ -78,7 +112,12 @@ function SummaryBar({ totalFixtures, totalWattage, totalAmperage, voltage, unive
   )
 }
 
-function Stat({ label, value }) {
+interface StatProps {
+  label: string
+  value: ReactNode
+}
+
+function Stat({ label, value }: StatProps) {
   return (
     <div>
       <span style={{ color: '#64748b', marginRight: 4 }}>{label}:</span>
@@ -89,7 +128,7 @@ function Stat({ label, value }) {
 
 // ── Fixture list table ────────────────────────────────────────────────────────
 
-function FixtureTable({ rows }) {
+function FixtureTable({ rows }: { rows: PatchRow[] }) {
   if (!rows?.length) return <Empty text="No fixtures patched" />
   return (
     <div style={{ overflowX: 'auto' }}>
@@ -117,7 +156,7 @@ function FixtureTable({ rows }) {
               <td style={tdStyle}>{row.dmx_universe}</td>
               <td style={{ ...tdStyle, fontFamily: 'monospace' }}>
                 {row.dmx_address}
-                {row.dmx_end_address > row.dmx_address ? `–${row.dmx_end_address}` : ''}
+                {row.dmx_end_address != null && row.dmx_address != null && row.dmx_end_address > row.dmx_address ? `–${row.dmx_end_address}` : ''}
               </td>
               <td style={tdStyle}>{row.wattage_W}W</td>
               <td style={tdStyle}>
@@ -141,11 +180,11 @@ function FixtureTable({ rows }) {
   )
 }
 
-const tdStyle = { padding: '5px 10px', verticalAlign: 'middle' }
+const tdStyle = { padding: '5px 10px', verticalAlign: 'middle' as const }
 
 // ── DMX conflict panel ────────────────────────────────────────────────────────
 
-function ConflictPanel({ conflicts }) {
+function ConflictPanel({ conflicts }: { conflicts: DmxConflict[] }) {
   if (!conflicts?.length) return (
     <div style={{ color: '#4ade80', fontSize: 13, padding: '8px 0' }}>
       No DMX conflicts detected.
@@ -171,7 +210,7 @@ function ConflictPanel({ conflicts }) {
 
 // ── Circuit / dimmer schedule ─────────────────────────────────────────────────
 
-function CircuitTable({ rows }) {
+function CircuitTable({ rows }: { rows: CircuitRow[] }) {
   if (!rows?.length) return <Empty text="No circuits defined" />
   return (
     <div style={{ overflowX: 'auto' }}>
@@ -203,7 +242,7 @@ function CircuitTable({ rows }) {
                 <td style={tdStyle}>
                   {over ? (
                     <span style={{ color: '#f87171', fontWeight: 700 }}>
-                      OVERLOAD {Math.abs(row.overload_margin_W).toFixed(0)} W over
+                      OVERLOAD {Math.abs(row.overload_margin_W ?? 0).toFixed(0)} W over
                     </span>
                   ) : (
                     <span style={{ color: '#4ade80' }}>
@@ -222,11 +261,17 @@ function CircuitTable({ rows }) {
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
-function Empty({ text }) {
+function Empty({ text }: { text: string }) {
   return <div style={{ color: '#475569', fontSize: 13, padding: '12px 0' }}>{text}</div>
 }
 
-function Tab({ label, active, onClick }) {
+interface TabProps {
+  label: string
+  active: boolean
+  onClick: () => void
+}
+
+function Tab({ label, active, onClick }: TabProps) {
   return (
     <button
       onClick={onClick}
@@ -245,6 +290,26 @@ function Tab({ label, active, onClick }) {
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
+export interface DispatchAction {
+  tool: string
+  params?: Record<string, unknown>
+}
+
+export interface Props {
+  fixtures?: unknown[]
+  dmx_conflicts?: DmxConflict[]
+  circuit_schedule?: CircuitRow[]
+  total_wattage_W?: number
+  total_amperage_A?: number
+  supply_voltage_V?: number
+  universes_used?: number[]
+  patch_sheet?: PatchRow[]
+  /** MagicSheetEntry list — accepted but not currently rendered; see migration report. */
+  magic_sheet?: unknown[]
+  onDispatch?: (action: DispatchAction) => void | Promise<void>
+  className?: string
+}
+
 export default function LightingPlotPanel({
   fixtures = [],
   dmx_conflicts = [],
@@ -254,18 +319,18 @@ export default function LightingPlotPanel({
   supply_voltage_V = 120,
   universes_used = [],
   patch_sheet = [],
-  magic_sheet = [],
+  magic_sheet: _magic_sheet = [],
   onDispatch,
   className = '',
-}) {
-  const [tab, setTab] = useState('patch')
+}: Props) {
+  const [tab, setTab] = useState<'patch' | 'circuits' | 'conflicts'>('patch')
   const [checking, setChecking] = useState(false)
 
   const TABS = [
     { key: 'patch',    label: 'Patch Sheet' },
     { key: 'circuits', label: 'Circuit Schedule' },
     { key: 'conflicts',label: `DMX Conflicts${dmx_conflicts.length ? ` (${dmx_conflicts.length})` : ''}` },
-  ]
+  ] as const
 
   async function handleCheck() {
     if (!onDispatch) return
@@ -277,7 +342,7 @@ export default function LightingPlotPanel({
           fixture_id: r.fixture_ids?.[0],
           dmx_universe: r.dmx_universe,
           dmx_address: r.dmx_address,
-          dmx_footprint: r.dmx_end_address - r.dmx_address + 1,
+          dmx_footprint: (r.dmx_end_address ?? 0) - (r.dmx_address ?? 0) + 1,
         })) },
       })
     } finally {

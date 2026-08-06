@@ -30,23 +30,40 @@ import {
 } from '../lib/materialPreviewSphere.js'
 
 // ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+// materialPreviewSphere.ts (already migrated) leaves its params/returns as
+// implicit `any` — parsePbr's return shape is inferred precisely enough
+// from its body to reuse here rather than redeclaring it by hand.
+type PbrState = ReturnType<typeof parsePbr>
+
+/** The material doc shape this editor reads/writes. Loosely typed — the
+ * three source shapes it accepts (T-115 BIM, T-214 flat PBR, jewelryMaterials)
+ * are documented in materialPreviewSphere.ts and read structurally there. */
+export interface MaterialDoc {
+  name?: string
+  [key: string]: unknown
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 // Convert float [0,1] to CSS hex channel (00–ff)
-function fToHex(f) {
+function fToHex(f: unknown): string {
   const n = Math.max(0, Math.min(1, typeof f === 'number' ? f : 0))
   return Math.round(n * 255).toString(16).padStart(2, '0')
 }
 
 // base_color [r,g,b] → CSS #rrggbb
-function baseColorToHex(rgb) {
+function baseColorToHex(rgb: unknown): string {
   if (!Array.isArray(rgb) || rgb.length < 3) return '#cccccc'
   return `#${fToHex(rgb[0])}${fToHex(rgb[1])}${fToHex(rgb[2])}`
 }
 
 // #rrggbb → [r,g,b] float
-function hexToBaseColor(hex) {
+function hexToBaseColor(hex: unknown): number[] {
   if (typeof hex !== 'string' || hex.length < 7) return [...DEFAULT_PBR_STATE.base_color]
   const r = parseInt(hex.slice(1, 3), 16) / 255
   const g = parseInt(hex.slice(3, 5), 16) / 255
@@ -64,7 +81,11 @@ function hexToBaseColor(hex) {
 // for test rendering via react-dom/server. Callers that have a live WebGL
 // context can replace this with a real Three.js canvas.
 
-function PreviewSphere({ pbrState }) {
+interface PreviewSphereProps {
+  pbrState: PbrState
+}
+
+function PreviewSphere({ pbrState }: PreviewSphereProps) {
   const spec = pbrStateToSpec(pbrState)
 
   // Convert hex integer to CSS color
@@ -121,8 +142,15 @@ function PreviewSphere({ pbrState }) {
 // Slider row
 // ---------------------------------------------------------------------------
 
-function SliderRow({ label, propKey, value, onChange }) {
-  const [min, max, step] = PBR_RANGES[propKey] || [0, 1, 0.01]
+interface SliderRowProps {
+  label: string
+  propKey: string
+  value: number
+  onChange: (propKey: string, value: number) => void
+}
+
+function SliderRow({ label, propKey, value, onChange }: SliderRowProps) {
+  const [min, max, step] = (PBR_RANGES as Record<string, number[]>)[propKey] || [0, 1, 0.01]
   const displayValue = typeof value === 'number' ? value.toFixed(2) : '–'
 
   return (
@@ -152,7 +180,13 @@ function SliderRow({ label, propKey, value, onChange }) {
 // SaveAsDialog — inline save-as input
 // ---------------------------------------------------------------------------
 
-function SaveAsRow({ sourceName, onConfirm, onCancel }) {
+interface SaveAsRowProps {
+  sourceName?: string
+  onConfirm: (name: string) => void
+  onCancel: () => void
+}
+
+function SaveAsRow({ sourceName, onConfirm, onCancel }: SaveAsRowProps) {
   const [name, setName] = useState(`${sourceName || 'Material'} copy`)
 
   return (
@@ -190,25 +224,39 @@ function SaveAsRow({ sourceName, onConfirm, onCancel }) {
 // MaterialPbrEditor (default export)
 // ---------------------------------------------------------------------------
 
-export default function MaterialPbrEditor({ material, onSave, onClose, className = '' }) {
-  const [pbrState, setPbrState] = useState(() => parsePbr(material))
+export interface MaterialPbrEditorProps {
+  /** The material doc to edit (from workspace/catalogue) */
+  material?: MaterialDoc | null
+  /** (forkedMaterial) => void — called when user confirms Save As */
+  onSave?: (forked: MaterialDoc) => void
+  /** () => void — optional, called when panel close button clicked */
+  onClose?: () => void
+  /** optional extra CSS classes */
+  className?: string
+}
+
+export default function MaterialPbrEditor({ material, onSave, onClose, className = '' }: MaterialPbrEditorProps) {
+  const [pbrState, setPbrState] = useState<PbrState>(() => parsePbr(material))
   const [showSaveAs, setShowSaveAs] = useState(false)
 
-  // Re-parse when external material prop changes (catalogue pick / undo)
+  // Re-parse when external material prop changes (catalogue pick / undo).
+  // Syncs local edit state from the external material prop, pre-existing
+  // before this migration (see TopoView.tsx for the same pattern).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see above.
     setPbrState(parsePbr(material))
   }, [material])
 
-  function handleSliderChange(propKey, value) {
+  function handleSliderChange(propKey: string, value: number) {
     setPbrState((prev) => ({ ...prev, [propKey]: value }))
   }
 
-  function handleColorChange(hexString) {
+  function handleColorChange(hexString: string) {
     const base_color = hexToBaseColor(hexString)
     setPbrState((prev) => ({ ...prev, base_color }))
   }
 
-  function handleSaveConfirm(newName) {
+  function handleSaveConfirm(newName: string) {
     const forked = forkMaterial(
       { ...(material || {}), pbr: pbrState },
       newName,

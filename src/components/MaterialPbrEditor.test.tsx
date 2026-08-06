@@ -1,4 +1,4 @@
-// MaterialPbrEditor.test.jsx — vitest tests for the PBR editor component.
+// MaterialPbrEditor.test.tsx — vitest tests for the PBR editor component.
 //
 // Uses react-dom/server (renderToStaticMarkup) — same pattern as Loader.test.jsx.
 // No @testing-library/react dependency.
@@ -6,18 +6,18 @@
 import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import MaterialPbrEditor from './MaterialPbrEditor.jsx'
+import type { MaterialPbrEditorProps } from './MaterialPbrEditor.jsx'
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function render(props: Record<string, unknown> = {}) {
-  // MaterialPbrEditor.jsx (not yet migrated) declares material/onSave/onClose
-  // without defaults, so allowJs infers them as required — this suite
-  // deliberately calls with partial/missing props to exercise the
-  // component's own runtime fallbacks (e.g. no `onClose` renders no close
-  // button), matching its actual pre-migration behaviour.
-  return renderToStaticMarkup(<MaterialPbrEditor {...(props as any)} />)
+  // MaterialPbrEditor's real props are all optional (MaterialPbrEditorProps),
+  // but they're typed (MaterialDoc / callback signatures) while this suite
+  // passes loosely-shaped test fixtures — cast through `unknown` rather than
+  // giving the fixtures below a parallel type declaration.
+  return renderToStaticMarkup(<MaterialPbrEditor {...(props as unknown as MaterialPbrEditorProps)} />)
 }
 
 // ---------------------------------------------------------------------------

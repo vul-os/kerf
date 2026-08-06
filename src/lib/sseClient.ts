@@ -16,16 +16,20 @@
  * Multi-line data fields are concatenated with "\n" before JSON.parse.
  */
 
+export interface SseFrame {
+  event: string
+  data: any
+}
+
 /**
  * Parse a single SSE frame (one block between double-newlines) into
  * { event, data } or null if the frame has no data.
  *
- * @param {string} block - raw text between blank lines
- * @returns {{ event: string, data: any } | null}
+ * @param block - raw text between blank lines
  */
-function parseFrame(block) {
+function parseFrame(block: string): SseFrame | null {
   let event = 'message'
-  const dataLines = []
+  const dataLines: string[] = []
 
   for (const line of block.split('\n')) {
     if (line.startsWith(':')) {
@@ -42,7 +46,7 @@ function parseFrame(block) {
   if (dataLines.length === 0) return null
 
   const raw = dataLines.join('\n')
-  let data
+  let data: any
   try {
     data = JSON.parse(raw)
   } catch {
@@ -52,15 +56,22 @@ function parseFrame(block) {
   return { event, data }
 }
 
+export interface StreamSseOptions {
+  signal?: AbortSignal
+  headers?: Record<string, string>
+}
+
 /**
  * Async generator that opens a POST SSE connection and yields parsed events.
  *
- * @param {string} url
- * @param {any} body - will be JSON.stringify'd
- * @param {{ signal?: AbortSignal, headers?: Record<string,string> }} [options]
- * @yields {{ event: string, data: any }}
+ * @param url
+ * @param body - will be JSON.stringify'd
  */
-export async function* streamSse(url, body, options = {}) {
+export async function* streamSse(
+  url: string,
+  body: any,
+  options: StreamSseOptions = {}
+): AsyncGenerator<SseFrame, void, unknown> {
   const { signal, headers = {} } = options
 
   const res = await fetch(url, {

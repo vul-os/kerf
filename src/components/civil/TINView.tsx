@@ -28,6 +28,26 @@
 import { useMemo, useState } from 'react'
 
 // ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type Point3 = number[]
+type Triangle = number[]
+
+export interface TINViewProps {
+  points?: Point3[]
+  edges?: number[][]
+  triangles?: Triangle[]
+  contourInterval?: number
+  width?: number
+  height?: number
+  wireframe?: boolean
+  showContours?: boolean
+  className?: string
+  onDispatch?: (event: { tool: string; params: { points: Point3[]; op: string } }) => void
+}
+
+// ---------------------------------------------------------------------------
 // Projection helpers
 // ---------------------------------------------------------------------------
 
@@ -36,7 +56,9 @@ import { useMemo, useState } from 'react'
  *   screen_x = (x - y) * cos(30°) * scale
  *   screen_y = (x + y) * sin(30°) * scale - z * zScale
  */
-function project(x, y, z, scale, zScale) {
+// NOTE: unused — dead code carried over from the original .jsx (T-510/511 found,
+// not fixed; toScreen()/fitToViewport() reimplement this math inline instead).
+function _project(x: number, y: number, z: number, scale: number, zScale: number) {
   const cos30 = Math.sqrt(3) / 2
   const sin30 = 0.5
   return {
@@ -45,7 +67,7 @@ function project(x, y, z, scale, zScale) {
   }
 }
 
-function fitToViewport(points, width, height, padding) {
+function fitToViewport(points: Point3[], width: number, height: number, padding: number) {
   if (!points || points.length === 0) return { scale: 1, zScale: 1, cx: 0, cy: 0 }
   const cos30 = Math.sqrt(3) / 2
   const sin30 = 0.5
@@ -74,7 +96,7 @@ function fitToViewport(points, width, height, padding) {
 // Colour helpers
 // ---------------------------------------------------------------------------
 
-function elevToRgb(z, zMin, zMax) {
+function elevToRgb(z: number, zMin: number, zMax: number) {
   const t = zMax === zMin ? 0.5 : Math.max(0, Math.min(1, (z - zMin) / (zMax - zMin)))
   // Low: dark teal → mid: olive green → high: sand/brown
   const r = Math.round(t < 0.5 ? 40 + t * 2 * 120 : 160 + (t - 0.5) * 2 * 60)
@@ -83,7 +105,7 @@ function elevToRgb(z, zMin, zMax) {
   return `rgb(${r},${g},${b})`
 }
 
-function shadedFaceColour(pts3, zMin, zMax) {
+function shadedFaceColour(pts3: Point3[], zMin: number, zMax: number) {
   // Average z for base colour, then apply simple Lambert shading
   const avgZ = pts3.reduce((s, p) => s + p[2], 0) / pts3.length
 
@@ -112,11 +134,11 @@ function shadedFaceColour(pts3, zMin, zMax) {
 // Contour extraction
 // ---------------------------------------------------------------------------
 
-function extractContourSegments(points, triangles, zLevel) {
-  const segments = []
+function extractContourSegments(points: Point3[], triangles: Triangle[], zLevel: number) {
+  const segments: Point3[][] = []
   for (const [i, j, k] of triangles) {
     const pts = [points[i], points[j], points[k]]
-    const crossed = []
+    const crossed: Point3[] = []
     const edges = [[0, 1], [1, 2], [2, 0]]
     for (const [a, b] of edges) {
       const za = pts[a][2], zb = pts[b][2]
@@ -140,8 +162,8 @@ function extractContourSegments(points, triangles, zLevel) {
 // For small point sets this is adequate for visualization.
 // ---------------------------------------------------------------------------
 
-function buildFanTriangles(points) {
-  if (points.length < 3) return []
+function buildFanTriangles(points: Point3[]): { augPoints: Point3[]; triangles: Triangle[] } {
+  if (points.length < 3) return { augPoints: [], triangles: [] }
   // Use centroid as anchor and fan-triangulate the sorted perimeter
   const cx = points.reduce((s, p) => s + p[0], 0) / points.length
   const cy = points.reduce((s, p) => s + p[1], 0) / points.length
@@ -178,10 +200,10 @@ export default function TINView({
   showContours = true,
   className = '',
   onDispatch,
-}) {
+}: TINViewProps) {
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<{ ok?: boolean; n_triangles?: number; area_2d_m2?: number; error?: string } | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   // ── Geometry setup ─────────────────────────────────────────────────────────
   const { points, triangles, zMin, zMax } = useMemo(() => {
@@ -215,7 +237,7 @@ export default function TINView({
   )
   const zScale = scale * 0.6
 
-  function toScreen(p) {
+  function toScreen(p: Point3) {
     const cos30 = Math.sqrt(3) / 2
     const sin30 = 0.5
     const sx = (p[0] - p[1]) * cos30 * scale - cx * scale
@@ -270,7 +292,7 @@ export default function TINView({
         setResult(data)
       }
     } catch (e) {
-      setError(e.message || 'Dispatch failed')
+      setError(e instanceof Error ? e.message : 'Dispatch failed')
     } finally {
       setLoading(false)
     }
@@ -324,7 +346,7 @@ export default function TINView({
           <>
             {/* Shaded faces */}
             <g aria-label="TIN faces">
-              {sortedFaces.map(({ pts3, avgZ }, fi) => {
+              {sortedFaces.map(({ pts3, avgZ: _avgZ }, fi) => {
                 const screenPts = pts3.map(p => toScreen(p))
                 const d = `M${screenPts.map(([sx, sy]) => `${sx.toFixed(1)},${sy.toFixed(1)}`).join('L')}Z`
                 const fill = shadedFaceColour(pts3, zMin, zMax)

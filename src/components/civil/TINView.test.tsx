@@ -1,10 +1,10 @@
 /**
- * TINView.test.jsx — SSR smoke tests for the TIN surface viewport.
+ * TINView.test.tsx — SSR smoke tests for the TIN surface viewport.
  *
  * Uses react-dom/server renderToStaticMarkup (same pattern as
  * ThermalNetworkViewer.test.jsx) — no jsdom / @testing-library required.
  */
-import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import TINView from './TINView.jsx'
 
@@ -13,7 +13,7 @@ import TINView from './TINView.jsx'
 // ---------------------------------------------------------------------------
 
 // Minimal 4-point hill: centred around (5,5,2), corners at z=0
-const POINTS = [
+const POINTS: number[][] = [
   [0, 0, 0],
   [10, 0, 0],
   [10, 10, 0],
@@ -21,7 +21,7 @@ const POINTS = [
   [5, 5, 4],   // peak
 ]
 
-const TRIANGLES = [
+const TRIANGLES: number[][] = [
   [0, 1, 4],
   [1, 2, 4],
   [2, 3, 4],
@@ -58,7 +58,7 @@ describe('TINView — empty state', () => {
 // ---------------------------------------------------------------------------
 
 describe('TINView — with points and triangles', () => {
-  let html
+  let html: string
 
   beforeAll(() => {
     html = renderToStaticMarkup(

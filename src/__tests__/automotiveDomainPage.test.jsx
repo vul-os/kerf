@@ -21,7 +21,7 @@ const PAGE_SRC = readFileSync(
 )
 
 const META_SRC = readFileSync(
-  resolve(__dirname, '../routes/domains/automotive.meta.js'),
+  (existsSync(resolve(__dirname, '../routes/domains/automotive.meta.ts')) ? resolve(__dirname, '../routes/domains/automotive.meta.ts') : resolve(__dirname, '../routes/domains/automotive.meta.js')),
   'utf8',
 )
 

@@ -27,27 +27,15 @@ function readFirstExisting(dir, base, exts) {
   throw new Error(`No source found for ${base} in ${dir}`)
 }
 
-const PAGE_SRC = readFileSync(
-  resolve(__dirname, '../domains/Firmware.jsx'),
-  'utf8',
-)
+const PAGE_SRC = readFirstExisting(__dirname, '../domains/Firmware', ['tsx', 'jsx'])
 
-const META_SRC = readFileSync(
-  resolve(__dirname, '../domains/firmware.meta.js'),
-  'utf8',
-)
+const META_SRC = readFirstExisting(__dirname, '../domains/firmware.meta', ['ts', 'js'])
 
-const LANDING_SRC = readFileSync(
-  resolve(__dirname, '../Landing.jsx'),
-  'utf8',
-)
+const LANDING_SRC = readFirstExisting(__dirname, '../Landing', ['tsx', 'jsx'])
 
 const SWITCHER_SRC = readFirstExisting(__dirname, '../../components/domains/DomainSwitcher', ['tsx', 'jsx'])
 
-const APP_SRC = readFileSync(
-  resolve(__dirname, '../../App.jsx'),
-  'utf8',
-)
+const APP_SRC = readFirstExisting(__dirname, '../../App', ['tsx', 'jsx'])
 
 /* -------------------------------------------------------------------------- */
 /* Firmware.jsx — module structure                                             */

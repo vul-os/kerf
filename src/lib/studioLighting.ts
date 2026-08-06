@@ -161,11 +161,15 @@ export function buildRembrandtPreset(target: Vec3): StudioLight[] {
  * Ring-light rig: 8 small sun lights evenly distributed around the camera
  * axis at constant elevation, mimicking a circular ring flash.
  *
- * @param target - Scene centre [x, y, z] in mm.
+ * @param _target - Scene centre [x, y, z] in mm. Unused: every ring light is a directional
+ *   (`sun`) light, and a direction vector is translation- and radius-invariant, so neither the
+ *   rig's target centre nor its nominal radius affects the output. Pre-existing in the source
+ *   .js (both `target` and the `RADIUS_MM` local below were already dead); kept and merely
+ *   underscore-prefixed here to satisfy the TS lint rule without changing behaviour.
  */
-export function buildRingLightPreset(target: Vec3): SunLight[] {
+export function buildRingLightPreset(_target: Vec3): SunLight[] {
   const COUNT = 8
-  const RADIUS_MM = 1500   // ring radius in scene space (used for direction)
+  const _RADIUS_MM = 1500  // ring radius in scene space — see note above; not used
   const ELEVATION_DEG = 10 // degrees above the horizon
   const el = (ELEVATION_DEG * Math.PI) / 180
 

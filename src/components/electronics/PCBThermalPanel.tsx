@@ -21,9 +21,52 @@
 import { useCallback, useState } from 'react'
 import { Thermometer, AlertTriangle, CheckCircle2, X, RefreshCw, Zap } from 'lucide-react'
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface PCBThermalPanelProps {
+  onClose?: () => void
+}
+
+interface ApiError { ok: false; error: string }
+
+interface ThermalComponentResult {
+  ref: string
+  over_limit?: boolean
+  Tj_c?: number
+  tj_c?: number
+  margin_c?: number
+  T_board_c?: number
+}
+
+interface ThermalMapResult {
+  ok: boolean
+  peak_T_c?: number
+  any_over_limit?: boolean
+  T_field?: number[][]
+  nx?: number
+  ny?: number
+  peak_ij?: [number, number]
+  components?: ThermalComponentResult[]
+  energy_balance_err?: number
+  total_power_w?: number
+}
+
+interface ViaOption {
+  n_vias: number
+  delta_t_c: number
+  meets_target?: boolean
+}
+
+interface ThermalRecommendResult {
+  ok: boolean
+  already_ok?: boolean
+  copper_recommendation?: { min_coverage?: number | null }
+  via_options?: ViaOption[]
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function apiPost(endpoint, body) {
+async function apiPost<T>(endpoint: string, body: Record<string, unknown>): Promise<T | ApiError> {
   try {
     const r = await fetch(`/api/llm-tools/${endpoint}`, {
       method: 'POST',
@@ -32,7 +75,7 @@ async function apiPost(endpoint, body) {
     })
     return r.ok ? r.json() : { ok: false, error: `HTTP ${r.status}` }
   } catch (e) {
-    return { ok: false, error: e.message }
+    return { ok: false, error: e instanceof Error ? e.message : 'Request failed' }
   }
 }
 
@@ -52,7 +95,7 @@ const DEFAULT_COMPONENTS = [
   { ref: 'U2', x_m: 0.02, y_m: 0.08, power_w: 0.5, theta_jc: 30.0, tj_max_c: 150.0 },
 ]
 
-function ComponentResult({ comp }) {
+function ComponentResult({ comp }: { comp: ThermalComponentResult }) {
   const overLimit = comp.over_limit
   return (
     <div className={`px-3 py-2 rounded-lg text-[11px] ${overLimit ? 'bg-red-900/20 border border-red-700/40' : 'bg-white/5'}`}>
@@ -73,7 +116,14 @@ function ComponentResult({ comp }) {
 
 // ── Mini heat map renderer ────────────────────────────────────────────────────
 
-function HeatMap({ T_field, nx, ny, peak_ij }) {
+interface HeatMapProps {
+  T_field?: number[][]
+  nx?: number
+  ny?: number
+  peak_ij?: [number, number]
+}
+
+function HeatMap({ T_field, nx, ny, peak_ij }: HeatMapProps) {
   if (!T_field) return null
   const all = T_field.flatMap((row) => row)
   const tMin = Math.min(...all)
@@ -125,12 +175,12 @@ function HeatMap({ T_field, nx, ny, peak_ij }) {
 
 // ── Main panel ───────────────────────────────────────────────────────────────
 
-export default function PCBThermalPanel({ onClose }) {
-  const [tab, setTab]         = useState('map')
+export default function PCBThermalPanel({ onClose }: PCBThermalPanelProps) {
+  const [tab, setTab]         = useState<'map' | 'recommend'>('map')
   const [loading, setLoading] = useState(false)
   const [offline, setOffline] = useState(false)
-  const [mapResult, setMapResult]   = useState(null)
-  const [recResult, setRecResult]   = useState(null)
+  const [mapResult, setMapResult]   = useState<ThermalMapResult | null>(null)
+  const [recResult, setRecResult]   = useState<ThermalRecommendResult | null>(null)
 
   // Board parameters (editable)
   const [copperCoverage, setCopperCoverage] = useState('0.4')
@@ -148,28 +198,28 @@ export default function PCBThermalPanel({ onClose }) {
   const runMap = useCallback(async () => {
     setLoading(true)
     const board = buildBoard()
-    const r = await apiPost('board_thermal_map', {
+    const r = await apiPost<ThermalMapResult>('board_thermal_map', {
       ...board,
       components: DEFAULT_COMPONENTS,
     })
     setLoading(false)
-    if (!r || r.error) { setOffline(true); return }
+    if (!r || 'error' in r) { setOffline(true); return }
     setMapResult(r)
   }, [buildBoard])
 
   const runRecommend = useCallback(async () => {
     setLoading(true)
     const board = buildBoard()
-    const r = await apiPost('board_thermal_recommend', {
+    const r = await apiPost<ThermalRecommendResult>('board_thermal_recommend', {
       board: { ...board, components: DEFAULT_COMPONENTS },
       target_delta_t_c: parseFloat(targetDt) || 30,
     })
     setLoading(false)
-    if (!r || r.error) { setOffline(true); return }
+    if (!r || 'error' in r) { setOffline(true); return }
     setRecResult(r)
   }, [buildBoard, targetDt])
 
-  const TABS = [
+  const TABS: { id: 'map' | 'recommend'; label: string }[] = [
     { id: 'map', label: 'Thermal Map' },
     { id: 'recommend', label: 'Recommend' },
   ]

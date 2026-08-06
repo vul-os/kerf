@@ -1,4 +1,4 @@
-// OpticsDesignPanel.jsx — Geometric optics & lens design solver panel.
+// OpticsDesignPanel.tsx — Geometric optics & lens design solver panel.
 //
 // Wires 42 optics LLM backend tools into a tabbed UI.
 // Tabs: Lens Design | Aberrations | MTF / PSF | Pupils & Field | Utilities
@@ -9,18 +9,105 @@
 // Props: none (standalone panel — operates without a project file)
 
 import { useState, useCallback } from 'react'
+import type { CSSProperties, Dispatch, ReactNode, SetStateAction } from 'react'
 import {
   Eye, Circle, Zap, Sun, Aperture, AlertTriangle, CheckCircle,
   Loader2, Play, ChevronDown, ChevronUp, RefreshCw
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
-const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+const API_URL: string = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
+
+// ---------------------------------------------------------------------------
+// Result shapes — most of the 42 tool results here are only ever rendered
+// generically through <ResultTable>/<ToolWidget> (opaque field dump, no dot
+// access), so those stay `ToolResult`. A handful of tabs read specific
+// fields directly off a result — those get a small named interface mined
+// from the reads below, each with an `unknown` index signature since this
+// slice does not own the backend tool response shapes.
+// ---------------------------------------------------------------------------
+
+type ToolResult = Record<string, unknown>
+
+interface RayTraceResult {
+  EFL_mm?: number
+  BFL_mm?: number
+  FFL_mm?: number
+  [field: string]: unknown
+}
+
+interface ComaFieldEntry {
+  field_angle_deg?: number
+  total_coma_mm?: number
+  seidel_prediction_mm?: number
+  [field: string]: unknown
+}
+
+interface ComaResult {
+  per_field?: ComaFieldEntry[]
+  [field: string]: unknown
+}
+
+interface DistortionResult {
+  distortion_percent?: unknown
+  max_distortion_pct?: number
+  kind?: string
+  [field: string]: unknown
+}
+
+interface DiffractionMtfResult {
+  cutoff_freq_cyc_per_mm?: number
+  mtf_at_50_percent?: number
+  [field: string]: unknown
+}
+
+interface SpotDiagramResult {
+  rms_spot_size_per_field?: number[]
+  svg?: string
+  [field: string]: unknown
+}
+
+interface DefocusCurveResult {
+  best_focus_shift_mm?: number
+  min_rms_mm?: number
+  [field: string]: unknown
+}
+
+interface VignettingFieldEntry {
+  field_angle_deg?: number
+  relative_illumination?: number
+  ri?: number
+  cos4_baseline?: number
+  [field: string]: unknown
+}
+
+type VignettingResult = VignettingFieldEntry[] | { per_field?: VignettingFieldEntry[]; [field: string]: unknown }
+
+interface RelativeIllumResult {
+  corner_ri?: number
+  corner_cos4?: number
+  max_field_angle?: number
+  [field: string]: unknown
+}
+
+interface ZernikeResult {
+  dominant_aberration?: string
+  rms_residual_waves?: number
+  coefficients?: number[]
+  coefficient_names?: string[]
+  [field: string]: unknown
+}
+
+interface PupilSummaryData {
+  rms_spot_size_per_field?: number[]
+  [field: string]: unknown
+}
 
 // ---------------------------------------------------------------------------
 // Styles (inline, matching fea/BucklingPanel.jsx pattern)
 // ---------------------------------------------------------------------------
 
-const s = {
+const s: Record<string, CSSProperties> = {
   root:         { background: '#111827', padding: '12px', fontSize: 12, color: '#e5e7eb', minHeight: 200 },
   header:       { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 },
   title:        { fontWeight: 600, fontSize: 13, color: '#f9fafb' },
@@ -50,7 +137,9 @@ const s = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function callTool(toolName, args) {
+// Generic over the specific tool's result shape — `/api/tools/call` dispatches to whichever
+// backend tool `toolName` names, so the return shape genuinely varies per call site.
+async function callTool<T = ToolResult>(toolName: string, args: Record<string, unknown>): Promise<T> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -63,7 +152,9 @@ async function callTool(toolName, args) {
   return res.json()
 }
 
-function fmt(v, decimals = 4) {
+// `unknown` — this formats whatever raw field a tool result happens to carry (a boundary this
+// slice does not own); the runtime typeof-narrowing below is the actual contract.
+function fmt(v?: unknown, decimals = 4): string {
   if (v == null) return '—'
   if (typeof v === 'boolean') return v ? 'yes' : 'no'
   if (typeof v === 'number') {
@@ -77,7 +168,12 @@ function fmt(v, decimals = 4) {
   return String(v)
 }
 
-function ResultTable({ data, skip = [] }) {
+interface ResultTableProps {
+  data?: Record<string, unknown> | null
+  skip?: string[]
+}
+
+function ResultTable({ data, skip = [] }: ResultTableProps) {
   if (!data || typeof data !== 'object') return null
   const entries = Object.entries(data).filter(([k]) => !skip.includes(k) && !Array.isArray(data[k]) && typeof data[k] !== 'object')
   if (!entries.length) return null
@@ -95,7 +191,17 @@ function ResultTable({ data, skip = [] }) {
   )
 }
 
-function ToolWidget({ title, icon: Icon, color = '#2563eb', children, result, error, running }) {
+interface ToolWidgetProps {
+  title: string
+  icon?: LucideIcon
+  color?: string
+  children?: ReactNode
+  result?: Record<string, unknown> | null
+  error?: string | null
+  running?: boolean
+}
+
+function ToolWidget({ title, icon: Icon, color = '#2563eb', children, result, error, running }: ToolWidgetProps) {
   const [open, setOpen] = useState(true)
   return (
     <div style={{ ...s.section, borderLeft: `3px solid ${color}` }}>
@@ -136,7 +242,13 @@ function ToolWidget({ title, icon: Icon, color = '#2563eb', children, result, er
   )
 }
 
-function RunBtn({ onClick, running, disabled }) {
+interface RunBtnProps {
+  onClick: () => void
+  running?: boolean
+  disabled?: boolean
+}
+
+function RunBtn({ onClick, running, disabled }: RunBtnProps) {
   return (
     <button
       onClick={onClick}
@@ -150,7 +262,15 @@ function RunBtn({ onClick, running, disabled }) {
   )
 }
 
-function NumRow({ label, value, onChange, step = 'any', disabled }) {
+interface NumRowProps {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  step?: string | number
+  disabled?: boolean
+}
+
+function NumRow({ label, value, onChange, step = 'any', disabled }: NumRowProps) {
   return (
     <div style={s.row}>
       <label style={s.label}>{label}</label>
@@ -162,6 +282,26 @@ function NumRow({ label, value, onChange, step = 'any', disabled }) {
         disabled={disabled}
         style={s.input}
       />
+    </div>
+  )
+}
+
+interface PupilSummaryProps {
+  data?: PupilSummaryData | null
+}
+
+// Module-scope (not nested in TabPupilsField) — a component declared inside another
+// component's render body gets recreated (and its state reset) on every render.
+function PupilSummary({ data }: PupilSummaryProps) {
+  if (!data || !data.rms_spot_size_per_field) return null
+  return (
+    <div style={s.resultBox}>
+      <div style={s.subhead}>RMS spot radius per field (mm)</div>
+      {data.rms_spot_size_per_field.map((v, i) => (
+        <div key={i} style={{ ...s.mono, fontSize: 11 }}>
+          Field {i}: {fmt(v)} mm
+        </div>
+      ))}
     </div>
   )
 }
@@ -179,79 +319,79 @@ const BK7_SURFACES_DEFAULT = JSON.stringify([
 function TabLensDesign() {
   // ── optics_lensmaker ──
   const [lm, setLm] = useState({ R1: '0.05', R2: '-0.05', n: '1.5168', d: '0.005' })
-  const [lmR, setLmR] = useState(null); const [lmE, setLmE] = useState(null); const [lmRun, setLmRun] = useState(false)
+  const [lmR, setLmR] = useState<ToolResult | null>(null); const [lmE, setLmE] = useState<string | null>(null); const [lmRun, setLmRun] = useState(false)
   const runLensmaker = useCallback(async () => {
     setLmRun(true); setLmE(null); setLmR(null)
     try {
       const r = await callTool('optics_lensmaker', { R1: +lm.R1, R2: +lm.R2, n: +lm.n, d: +lm.d })
       setLmR(r)
-    } catch (e) { setLmE(e.message) } finally { setLmRun(false) }
+    } catch (e) { setLmE((e as Error).message) } finally { setLmRun(false) }
   }, [lm])
 
   // ── optics_thin_lens_imaging ──
   const [tli, setTli] = useState({ f: '0.05', s_o: '0.3' })
-  const [tliR, setTliR] = useState(null); const [tliE, setTliE] = useState(null); const [tliRun, setTliRun] = useState(false)
+  const [tliR, setTliR] = useState<ToolResult | null>(null); const [tliE, setTliE] = useState<string | null>(null); const [tliRun, setTliRun] = useState(false)
   const runThinLens = useCallback(async () => {
     setTliRun(true); setTliE(null); setTliR(null)
     try { const r = await callTool('optics_thin_lens_imaging', { f: +tli.f, s_o: +tli.s_o }); setTliR(r) }
-    catch (e) { setTliE(e.message) } finally { setTliRun(false) }
+    catch (e) { setTliE((e as Error).message) } finally { setTliRun(false) }
   }, [tli])
 
   // ── optics_two_lens_system ──
   const [tls, setTls] = useState({ f1: '0.05', f2: '0.08', d: '0.03' })
-  const [tlsR, setTlsR] = useState(null); const [tlsE, setTlsE] = useState(null); const [tlsRun, setTlsRun] = useState(false)
+  const [tlsR, setTlsR] = useState<ToolResult | null>(null); const [tlsE, setTlsE] = useState<string | null>(null); const [tlsRun, setTlsRun] = useState(false)
   const runTwoLens = useCallback(async () => {
     setTlsRun(true); setTlsE(null); setTlsR(null)
     try { const r = await callTool('optics_two_lens_system', { f1: +tls.f1, f2: +tls.f2, d: +tls.d }); setTlsR(r) }
-    catch (e) { setTlsE(e.message) } finally { setTlsRun(false) }
+    catch (e) { setTlsE((e as Error).message) } finally { setTlsRun(false) }
   }, [tls])
 
   // ── optics_achromat_powers ──
   const [ach, setAch] = useState({ f_total: '0.1', V1: '64.2', V2: '36.4' })
-  const [achR, setAchR] = useState(null); const [achE, setAchE] = useState(null); const [achRun, setAchRun] = useState(false)
+  const [achR, setAchR] = useState<ToolResult | null>(null); const [achE, setAchE] = useState<string | null>(null); const [achRun, setAchRun] = useState(false)
   const runAchromat = useCallback(async () => {
     setAchRun(true); setAchE(null); setAchR(null)
     try { const r = await callTool('optics_achromat_powers', { f_total: +ach.f_total, V1: +ach.V1, V2: +ach.V2 }); setAchR(r) }
-    catch (e) { setAchE(e.message) } finally { setAchRun(false) }
+    catch (e) { setAchE((e as Error).message) } finally { setAchRun(false) }
   }, [ach])
 
   // ── optics_fnumber ──
   const [fn, setFn] = useState({ f: '0.1', D: '0.025' })
-  const [fnR, setFnR] = useState(null); const [fnE, setFnE] = useState(null); const [fnRun, setFnRun] = useState(false)
+  const [fnR, setFnR] = useState<ToolResult | null>(null); const [fnE, setFnE] = useState<string | null>(null); const [fnRun, setFnRun] = useState(false)
   const runFnumber = useCallback(async () => {
     setFnRun(true); setFnE(null); setFnR(null)
     try { const r = await callTool('optics_fnumber', { f: +fn.f, D: +fn.D }); setFnR(r) }
-    catch (e) { setFnE(e.message) } finally { setFnRun(false) }
+    catch (e) { setFnE((e as Error).message) } finally { setFnRun(false) }
   }, [fn])
 
   // ── optics_numerical_aperture ──
   const [na, setNa] = useState({ n: '1.0', half_angle_rad: '0.25' })
-  const [naR, setNaR] = useState(null); const [naE, setNaE] = useState(null); const [naRun, setNaRun] = useState(false)
+  const [naR, setNaR] = useState<ToolResult | null>(null); const [naE, setNaE] = useState<string | null>(null); const [naRun, setNaRun] = useState(false)
   const runNA = useCallback(async () => {
     setNaRun(true); setNaE(null); setNaR(null)
     try { const r = await callTool('optics_numerical_aperture', { n: +na.n, half_angle_rad: +na.half_angle_rad }); setNaR(r) }
-    catch (e) { setNaE(e.message) } finally { setNaRun(false) }
+    catch (e) { setNaE((e as Error).message) } finally { setNaRun(false) }
   }, [na])
 
   // ── optics_depth_of_field ──
   const [dof, setDof] = useState({ f: '0.05', N: '5.6', c: '0.000025', s_o: '3.0' })
-  const [dofR, setDofR] = useState(null); const [dofE, setDofE] = useState(null); const [dofRun, setDofRun] = useState(false)
+  const [dofR, setDofR] = useState<ToolResult | null>(null); const [dofE, setDofE] = useState<string | null>(null); const [dofRun, setDofRun] = useState(false)
   const runDof = useCallback(async () => {
     setDofRun(true); setDofE(null); setDofR(null)
     try { const r = await callTool('optics_depth_of_field', { f: +dof.f, N: +dof.N, c: +dof.c, s_o: +dof.s_o }); setDofR(r) }
-    catch (e) { setDofE(e.message) } finally { setDofRun(false) }
+    catch (e) { setDofE((e as Error).message) } finally { setDofRun(false) }
   }, [dof])
 
   // ── optics_ray_trace_lens_stack ──
   const [rts, setRts] = useState({ surfaces: BK7_SURFACES_DEFAULT, ray_h: '1.0', ray_u: '0.0' })
-  const [rtsR, setRtsR] = useState(null); const [rtsE, setRtsE] = useState(null); const [rtsRun, setRtsRun] = useState(false)
+  const [rtsR, setRtsR] = useState<RayTraceResult | null>(null); const [rtsE, setRtsE] = useState<string | null>(null); const [rtsRun, setRtsRun] = useState(false)
   const runRayTrace = useCallback(async () => {
     setRtsRun(true); setRtsE(null); setRtsR(null)
     try {
       const surfaces = JSON.parse(rts.surfaces)
-      const r = await callTool('optics_ray_trace_lens_stack', { surfaces, ray_h: +rts.ray_h, ray_u: +rts.ray_u })
+      const r = await callTool<RayTraceResult>('optics_ray_trace_lens_stack', { surfaces, ray_h: +rts.ray_h, ray_u: +rts.ray_u })
       setRtsR(r)
-    } catch (e) { setRtsE(e.message) } finally { setRtsRun(false) }
+    } catch (e) { setRtsE((e as Error).message) } finally { setRtsRun(false) }
   }, [rts])
 
   return (
@@ -341,48 +481,48 @@ function TabLensDesign() {
 function TabAberrations() {
   // ── optics_seidel_aberrations ──
   const [sa, setSa] = useState({ surfaces: BK7_SURFACES_DEFAULT, aperture: '1.0', field_angle_deg: '5.0' })
-  const [saR, setSaR] = useState(null); const [saE, setSaE] = useState(null); const [saRun, setSaRun] = useState(false)
+  const [saR, setSaR] = useState<ToolResult | null>(null); const [saE, setSaE] = useState<string | null>(null); const [saRun, setSaRun] = useState(false)
   const runSeidel = useCallback(async () => {
     setSaRun(true); setSaE(null); setSaR(null)
     try {
       const surfaces = JSON.parse(sa.surfaces)
       const r = await callTool('optics_seidel_aberrations', { surfaces, aperture: +sa.aperture, field_angle_deg: +sa.field_angle_deg })
       setSaR(r)
-    } catch (e) { setSaE(e.message) } finally { setSaRun(false) }
+    } catch (e) { setSaE((e as Error).message) } finally { setSaRun(false) }
   }, [sa])
 
   // ── optics_compute_coma ──
   const [coma, setComa] = useState({ surfaces: BK7_SURFACES_DEFAULT, field_angles: '0,5,10,14', aperture_radius_mm: '5.0' })
-  const [comaR, setComaR] = useState(null); const [comaE, setComaE] = useState(null); const [comaRun, setComaRun] = useState(false)
+  const [comaR, setComaR] = useState<ComaResult | null>(null); const [comaE, setComaE] = useState<string | null>(null); const [comaRun, setComaRun] = useState(false)
   const runComa = useCallback(async () => {
     setComaRun(true); setComaE(null); setComaR(null)
     try {
       const surfaces = JSON.parse(coma.surfaces)
       const field_angles_deg = coma.field_angles.split(',').map(Number)
-      const r = await callTool('optics_compute_coma', { surfaces, field_angles_deg, aperture_radius_mm: +coma.aperture_radius_mm })
+      const r = await callTool<ComaResult>('optics_compute_coma', { surfaces, field_angles_deg, aperture_radius_mm: +coma.aperture_radius_mm })
       setComaR(r)
-    } catch (e) { setComaE(e.message) } finally { setComaRun(false) }
+    } catch (e) { setComaE((e as Error).message) } finally { setComaRun(false) }
   }, [coma])
 
   // ── optics_compute_seidel_coma ──
   const [sc, setSc] = useState({ surfaces: BK7_SURFACES_DEFAULT, field_height_mm: '5.0', aperture_radius_mm: '1.0' })
-  const [scR, setScR] = useState(null); const [scE, setScE] = useState(null); const [scRun, setScRun] = useState(false)
+  const [scR, setScR] = useState<ToolResult | null>(null); const [scE, setScE] = useState<string | null>(null); const [scRun, setScRun] = useState(false)
   const runSeidelComa = useCallback(async () => {
     setScRun(true); setScE(null); setScR(null)
     try {
       const surfaces = JSON.parse(sc.surfaces)
       const r = await callTool('optics_compute_seidel_coma', { surfaces, field_height_mm: +sc.field_height_mm, aperture_radius_mm: +sc.aperture_radius_mm })
       setScR(r)
-    } catch (e) { setScE(e.message) } finally { setScRun(false) }
+    } catch (e) { setScE((e as Error).message) } finally { setScRun(false) }
   }, [sc])
 
   // ── optics_chromatic_aberration ──
   const [ca, setCa] = useState({ f: '0.1', V: '64.2' })
-  const [caR, setCaR] = useState(null); const [caE, setCaE] = useState(null); const [caRun, setCaRun] = useState(false)
+  const [caR, setCaR] = useState<ToolResult | null>(null); const [caE, setCaE] = useState<string | null>(null); const [caRun, setCaRun] = useState(false)
   const runChromatic = useCallback(async () => {
     setCaRun(true); setCaE(null); setCaR(null)
     try { const r = await callTool('optics_chromatic_aberration', { f: +ca.f, V: +ca.V }); setCaR(r) }
-    catch (e) { setCaE(e.message) } finally { setCaRun(false) }
+    catch (e) { setCaE((e as Error).message) } finally { setCaRun(false) }
   }, [ca])
 
   // ── optics_compute_chromatic_focus ──
@@ -390,7 +530,7 @@ function TabAberrations() {
     stack: JSON.stringify([{ glass: 'BK7', R1: 50, R2: -50, separation_mm: 0 }]),
     wavelengths_nm: '486,587,656'
   })
-  const [cfR, setCfR] = useState(null); const [cfE, setCfE] = useState(null); const [cfRun, setCfRun] = useState(false)
+  const [cfR, setCfR] = useState<ToolResult | null>(null); const [cfE, setCfE] = useState<string | null>(null); const [cfRun, setCfRun] = useState(false)
   const runChromaticFocus = useCallback(async () => {
     setCfRun(true); setCfE(null); setCfR(null)
     try {
@@ -398,7 +538,7 @@ function TabAberrations() {
       const wavelengths_nm = cf.wavelengths_nm.split(',').map(Number)
       const r = await callTool('optics_compute_chromatic_focus', { stack, wavelengths_nm })
       setCfR(r)
-    } catch (e) { setCfE(e.message) } finally { setCfRun(false) }
+    } catch (e) { setCfE((e as Error).message) } finally { setCfRun(false) }
   }, [cf])
 
   // ── optics_compute_petzval_curvature ──
@@ -408,36 +548,36 @@ function TabAberrations() {
       { radius_mm: -50, n_index_before: 1.5168, n_index_after: 1.0 },
     ])
   })
-  const [petzR, setPetzR] = useState(null); const [petzE, setPetzE] = useState(null); const [petzRun, setPetzRun] = useState(false)
+  const [petzR, setPetzR] = useState<ToolResult | null>(null); const [petzE, setPetzE] = useState<string | null>(null); const [petzRun, setPetzRun] = useState(false)
   const runPetzval = useCallback(async () => {
     setPetzRun(true); setPetzE(null); setPetzR(null)
     try {
       const surfaces = JSON.parse(petz.surfaces)
       const r = await callTool('optics_compute_petzval_curvature', { surfaces })
       setPetzR(r)
-    } catch (e) { setPetzE(e.message) } finally { setPetzRun(false) }
+    } catch (e) { setPetzE((e as Error).message) } finally { setPetzRun(false) }
   }, [petz])
 
   // ── optics_distortion_map ──
   const [dm, setDm] = useState({ surfaces: BK7_SURFACES_DEFAULT, field_angles: '0,5,10,15,20' })
-  const [dmR, setDmR] = useState(null); const [dmE, setDmE] = useState(null); const [dmRun, setDmRun] = useState(false)
+  const [dmR, setDmR] = useState<DistortionResult | null>(null); const [dmE, setDmE] = useState<string | null>(null); const [dmRun, setDmRun] = useState(false)
   const runDistortion = useCallback(async () => {
     setDmRun(true); setDmE(null); setDmR(null)
     try {
       const surfaces = JSON.parse(dm.surfaces)
       const field_angles_deg = dm.field_angles.split(',').map(Number)
-      const r = await callTool('optics_distortion_map', { surfaces, field_angles_deg })
+      const r = await callTool<DistortionResult>('optics_distortion_map', { surfaces, field_angles_deg })
       setDmR(r)
-    } catch (e) { setDmE(e.message) } finally { setDmRun(false) }
+    } catch (e) { setDmE((e as Error).message) } finally { setDmRun(false) }
   }, [dm])
 
   // ── optics_compute_abbe_number ──
   const [abbe, setAbbe] = useState({ glass_name: 'BK7' })
-  const [abbeR, setAbbeR] = useState(null); const [abbeE, setAbbeE] = useState(null); const [abbeRun, setAbbeRun] = useState(false)
+  const [abbeR, setAbbeR] = useState<ToolResult | null>(null); const [abbeE, setAbbeE] = useState<string | null>(null); const [abbeRun, setAbbeRun] = useState(false)
   const runAbbe = useCallback(async () => {
     setAbbeRun(true); setAbbeE(null); setAbbeR(null)
     try { const r = await callTool('optics_compute_abbe_number', { glass_name: abbe.glass_name }); setAbbeR(r) }
-    catch (e) { setAbbeE(e.message) } finally { setAbbeRun(false) }
+    catch (e) { setAbbeE((e as Error).message) } finally { setAbbeRun(false) }
   }, [abbe])
 
   return (
@@ -581,16 +721,16 @@ function TabAberrations() {
 function TabMtfPsf() {
   // ── optics_compute_diffraction_mtf ──
   const [dm, setDm] = useState({ wavelength_nm: '550', f_number: '4' })
-  const [dmR, setDmR] = useState(null); const [dmE, setDmE] = useState(null); const [dmRun, setDmRun] = useState(false)
+  const [dmR, setDmR] = useState<DiffractionMtfResult | null>(null); const [dmE, setDmE] = useState<string | null>(null); const [dmRun, setDmRun] = useState(false)
   const runDiffrMtf = useCallback(async () => {
     setDmRun(true); setDmE(null); setDmR(null)
-    try { const r = await callTool('optics_compute_diffraction_mtf', { wavelength_nm: +dm.wavelength_nm, f_number: +dm.f_number }); setDmR(r) }
-    catch (e) { setDmE(e.message) } finally { setDmRun(false) }
+    try { const r = await callTool<DiffractionMtfResult>('optics_compute_diffraction_mtf', { wavelength_nm: +dm.wavelength_nm, f_number: +dm.f_number }); setDmR(r) }
+    catch (e) { setDmE((e as Error).message) } finally { setDmRun(false) }
   }, [dm])
 
   // ── optics_mtf_across_field ──
   const [maf, setMaf] = useState({ surfaces: BK7_SURFACES_DEFAULT, field_angles: '0,5,10,14', aperture_radius_mm: '10' })
-  const [mafR, setMafR] = useState(null); const [mafE, setMafE] = useState(null); const [mafRun, setMafRun] = useState(false)
+  const [mafR, setMafR] = useState<unknown>(null); const [mafE, setMafE] = useState<string | null>(null); const [mafRun, setMafRun] = useState(false)
   const runMtfField = useCallback(async () => {
     setMafRun(true); setMafE(null); setMafR(null)
     try {
@@ -598,25 +738,25 @@ function TabMtfPsf() {
       const field_angles_deg = maf.field_angles.split(',').map(Number)
       const r = await callTool('optics_mtf_across_field', { surfaces, field_angles_deg, aperture_radius_mm: +maf.aperture_radius_mm })
       setMafR(r)
-    } catch (e) { setMafE(e.message) } finally { setMafRun(false) }
+    } catch (e) { setMafE((e as Error).message) } finally { setMafRun(false) }
   }, [maf])
 
   // ── optics_compute_spot_diagram ──
   const [spd, setSpd] = useState({ surfaces: BK7_SURFACES_DEFAULT, field_angles: '0,5,10', aperture_radius_mm: '5' })
-  const [spdR, setSpdR] = useState(null); const [spdE, setSpdE] = useState(null); const [spdRun, setSpdRun] = useState(false)
+  const [spdR, setSpdR] = useState<SpotDiagramResult | null>(null); const [spdE, setSpdE] = useState<string | null>(null); const [spdRun, setSpdRun] = useState(false)
   const runSpotDiagram = useCallback(async () => {
     setSpdRun(true); setSpdE(null); setSpdR(null)
     try {
       const surfaces = JSON.parse(spd.surfaces)
       const field_angles_deg = spd.field_angles.split(',').map(Number)
-      const r = await callTool('optics_compute_spot_diagram', { surfaces, field_angles_deg, aperture_radius_mm: +spd.aperture_radius_mm })
+      const r = await callTool<SpotDiagramResult>('optics_compute_spot_diagram', { surfaces, field_angles_deg, aperture_radius_mm: +spd.aperture_radius_mm })
       setSpdR(r)
-    } catch (e) { setSpdE(e.message) } finally { setSpdRun(false) }
+    } catch (e) { setSpdE((e as Error).message) } finally { setSpdRun(false) }
   }, [spd])
 
   // ── optics_compute_diffraction_psf ──
   const [psf, setPsf] = useState({ wavelength_nm: '550', f_number: '4', grid_size: '64', defocus_waves: '0' })
-  const [psfR, setPsfR] = useState(null); const [psfE, setPsfE] = useState(null); const [psfRun, setPsfRun] = useState(false)
+  const [psfR, setPsfR] = useState<ToolResult | null>(null); const [psfE, setPsfE] = useState<string | null>(null); const [psfRun, setPsfRun] = useState(false)
   const runDiffrPsf = useCallback(async () => {
     setPsfRun(true); setPsfE(null); setPsfR(null)
     try {
@@ -625,12 +765,12 @@ function TabMtfPsf() {
         grid_size: +psf.grid_size, defocus_waves: +psf.defocus_waves
       })
       setPsfR(r)
-    } catch (e) { setPsfE(e.message) } finally { setPsfRun(false) }
+    } catch (e) { setPsfE((e as Error).message) } finally { setPsfRun(false) }
   }, [psf])
 
   // ── optics_compute_pixel_mtf ──
   const [pmtf, setPmtf] = useState({ pixel_pitch_um: '4.64', fill_factor: '1.0', wavelength_nm: '550', f_number: '2.8' })
-  const [pmtfR, setPmtfR] = useState(null); const [pmtfE, setPmtfE] = useState(null); const [pmtfRun, setPmtfRun] = useState(false)
+  const [pmtfR, setPmtfR] = useState<ToolResult | null>(null); const [pmtfE, setPmtfE] = useState<string | null>(null); const [pmtfRun, setPmtfRun] = useState(false)
   const runPixelMtf = useCallback(async () => {
     setPmtfRun(true); setPmtfE(null); setPmtfR(null)
     try {
@@ -639,28 +779,28 @@ function TabMtfPsf() {
         wavelength_nm: +pmtf.wavelength_nm, f_number: +pmtf.f_number
       })
       setPmtfR(r)
-    } catch (e) { setPmtfE(e.message) } finally { setPmtfRun(false) }
+    } catch (e) { setPmtfE((e as Error).message) } finally { setPmtfRun(false) }
   }, [pmtf])
 
   // ── optics_airy_spot ──
   const [airy, setAiry] = useState({ wavelength: '550e-9', N: '4' })
-  const [airyR, setAiryR] = useState(null); const [airyE, setAiryE] = useState(null); const [airyRun, setAiryRun] = useState(false)
+  const [airyR, setAiryR] = useState<ToolResult | null>(null); const [airyE, setAiryE] = useState<string | null>(null); const [airyRun, setAiryRun] = useState(false)
   const runAiry = useCallback(async () => {
     setAiryRun(true); setAiryE(null); setAiryR(null)
     try { const r = await callTool('optics_airy_spot', { wavelength: +airy.wavelength, N: +airy.N }); setAiryR(r) }
-    catch (e) { setAiryE(e.message) } finally { setAiryRun(false) }
+    catch (e) { setAiryE((e as Error).message) } finally { setAiryRun(false) }
   }, [airy])
 
   // ── optics_defocus_curve ──
   const [dc, setDc] = useState({ surfaces: BK7_SURFACES_DEFAULT, field_angle_deg: '0', defocus_range_mm: '0.5' })
-  const [dcR, setDcR] = useState(null); const [dcE, setDcE] = useState(null); const [dcRun, setDcRun] = useState(false)
+  const [dcR, setDcR] = useState<DefocusCurveResult | null>(null); const [dcE, setDcE] = useState<string | null>(null); const [dcRun, setDcRun] = useState(false)
   const runDefocus = useCallback(async () => {
     setDcRun(true); setDcE(null); setDcR(null)
     try {
       const surfaces = JSON.parse(dc.surfaces)
-      const r = await callTool('optics_defocus_curve', { surfaces, field_angle_deg: +dc.field_angle_deg, defocus_range_mm: +dc.defocus_range_mm })
+      const r = await callTool<DefocusCurveResult>('optics_defocus_curve', { surfaces, field_angle_deg: +dc.field_angle_deg, defocus_range_mm: +dc.defocus_range_mm })
       setDcR(r)
-    } catch (e) { setDcE(e.message) } finally { setDcRun(false) }
+    } catch (e) { setDcE((e as Error).message) } finally { setDcRun(false) }
   }, [dc])
 
   return (
@@ -691,7 +831,7 @@ function TabMtfPsf() {
         </div>
         <NumRow label="aperture radius (mm)" value={maf.aperture_radius_mm} onChange={v => setMaf(p => ({ ...p, aperture_radius_mm: v }))} disabled={mafRun} />
         <RunBtn onClick={runMtfField} running={mafRun} />
-        {mafR && !mafRun && (
+        {mafR != null && !mafRun && (
           <div style={s.resultBox}>
             {mafE && <div style={{ color: '#fca5a5' }}>{mafE}</div>}
             <div style={{ ...s.mono, fontSize: 11, color: '#34d399' }}>MTF results received ({Array.isArray(mafR) ? mafR.length : 'n/a'} field angles)</div>
@@ -776,69 +916,69 @@ function TabMtfPsf() {
 function TabPupilsField() {
   // ── optics_pupil_diagram ──
   const [pd, setPd] = useState({ surfaces: BK7_SURFACES_DEFAULT, field_angles: '0,5,14', aperture_radius_mm: '10' })
-  const [pdR, setPdR] = useState(null); const [pdE, setPdE] = useState(null); const [pdRun, setPdRun] = useState(false)
+  const [pdR, setPdR] = useState<PupilSummaryData | null>(null); const [pdE, setPdE] = useState<string | null>(null); const [pdRun, setPdRun] = useState(false)
   const runPupilDiagram = useCallback(async () => {
     setPdRun(true); setPdE(null); setPdR(null)
     try {
       const surfaces = JSON.parse(pd.surfaces)
       const field_angles_deg = pd.field_angles.split(',').map(Number)
-      const r = await callTool('optics_pupil_diagram', { surfaces, field_angles_deg, aperture_radius_mm: +pd.aperture_radius_mm })
+      const r = await callTool<PupilSummaryData>('optics_pupil_diagram', { surfaces, field_angles_deg, aperture_radius_mm: +pd.aperture_radius_mm })
       setPdR(r)
-    } catch (e) { setPdE(e.message) } finally { setPdRun(false) }
+    } catch (e) { setPdE((e as Error).message) } finally { setPdRun(false) }
   }, [pd])
 
   // ── optics_compute_vignetting ──
   const [vig, setVig] = useState({ surfaces: BK7_SURFACES_DEFAULT, field_angles: '0,5,10,14', aperture_radius_mm: '10' })
-  const [vigR, setVigR] = useState(null); const [vigE, setVigE] = useState(null); const [vigRun, setVigRun] = useState(false)
+  const [vigR, setVigR] = useState<VignettingResult | null>(null); const [vigE, setVigE] = useState<string | null>(null); const [vigRun, setVigRun] = useState(false)
   const runVignetting = useCallback(async () => {
     setVigRun(true); setVigE(null); setVigR(null)
     try {
       const surfaces = JSON.parse(vig.surfaces)
       const field_angles_deg = vig.field_angles.split(',').map(Number)
-      const r = await callTool('optics_compute_vignetting', { surfaces, field_angles_deg, aperture_radius_mm: +vig.aperture_radius_mm })
+      const r = await callTool<VignettingResult>('optics_compute_vignetting', { surfaces, field_angles_deg, aperture_radius_mm: +vig.aperture_radius_mm })
       setVigR(r)
-    } catch (e) { setVigE(e.message) } finally { setVigRun(false) }
+    } catch (e) { setVigE((e as Error).message) } finally { setVigRun(false) }
   }, [vig])
 
   // ── optics_compute_entrance_pupil ──
   const [ep, setEp] = useState({ surfaces: BK7_SURFACES_DEFAULT, stop_diameter_mm: '20' })
-  const [epR, setEpR] = useState(null); const [epE, setEpE] = useState(null); const [epRun, setEpRun] = useState(false)
+  const [epR, setEpR] = useState<ToolResult | null>(null); const [epE, setEpE] = useState<string | null>(null); const [epRun, setEpRun] = useState(false)
   const runEntrance = useCallback(async () => {
     setEpRun(true); setEpE(null); setEpR(null)
     try {
       const surfaces = JSON.parse(ep.surfaces)
       const r = await callTool('optics_compute_entrance_pupil', { surfaces, stop_diameter_mm: +ep.stop_diameter_mm })
       setEpR(r)
-    } catch (e) { setEpE(e.message) } finally { setEpRun(false) }
+    } catch (e) { setEpE((e as Error).message) } finally { setEpRun(false) }
   }, [ep])
 
   // ── optics_compute_exit_pupil ──
   const [xp, setXp] = useState({ surfaces: BK7_SURFACES_DEFAULT, stop_diameter_mm: '20' })
-  const [xpR, setXpR] = useState(null); const [xpE, setXpE] = useState(null); const [xpRun, setXpRun] = useState(false)
+  const [xpR, setXpR] = useState<ToolResult | null>(null); const [xpE, setXpE] = useState<string | null>(null); const [xpRun, setXpRun] = useState(false)
   const runExit = useCallback(async () => {
     setXpRun(true); setXpE(null); setXpR(null)
     try {
       const surfaces = JSON.parse(xp.surfaces)
       const r = await callTool('optics_compute_exit_pupil', { surfaces, stop_diameter_mm: +xp.stop_diameter_mm })
       setXpR(r)
-    } catch (e) { setXpE(e.message) } finally { setXpRun(false) }
+    } catch (e) { setXpE((e as Error).message) } finally { setXpRun(false) }
   }, [xp])
 
   // ── optics_compute_relative_illum_map ──
   const [ri, setRi] = useState({ surfaces: BK7_SURFACES_DEFAULT, sensor_half_height_mm: '15', aperture_radius_mm: '10' })
-  const [riR, setRiR] = useState(null); const [riE, setRiE] = useState(null); const [riRun, setRiRun] = useState(false)
+  const [riR, setRiR] = useState<RelativeIllumResult | null>(null); const [riE, setRiE] = useState<string | null>(null); const [riRun, setRiRun] = useState(false)
   const runRelIllum = useCallback(async () => {
     setRiRun(true); setRiE(null); setRiR(null)
     try {
       const surfaces = JSON.parse(ri.surfaces)
-      const r = await callTool('optics_compute_relative_illum_map', { surfaces, sensor_half_height_mm: +ri.sensor_half_height_mm, aperture_radius_mm: +ri.aperture_radius_mm })
+      const r = await callTool<RelativeIllumResult>('optics_compute_relative_illum_map', { surfaces, sensor_half_height_mm: +ri.sensor_half_height_mm, aperture_radius_mm: +ri.aperture_radius_mm })
       setRiR(r)
-    } catch (e) { setRiE(e.message) } finally { setRiRun(false) }
+    } catch (e) { setRiE((e as Error).message) } finally { setRiRun(false) }
   }, [ri])
 
   // ── optics_compute_vignetting_check ──
   const [vc, setVc] = useState({ surfaces: BK7_SURFACES_DEFAULT, field_angles: '0,5,10,14' })
-  const [vcR, setVcR] = useState(null); const [vcE, setVcE] = useState(null); const [vcRun, setVcRun] = useState(false)
+  const [vcR, setVcR] = useState<ToolResult | null>(null); const [vcE, setVcE] = useState<string | null>(null); const [vcRun, setVcRun] = useState(false)
   const runVigCheck = useCallback(async () => {
     setVcRun(true); setVcE(null); setVcR(null)
     try {
@@ -846,12 +986,12 @@ function TabPupilsField() {
       const field_angles_deg = vc.field_angles.split(',').map(Number)
       const r = await callTool('optics_compute_vignetting_check', { surfaces, field_angles_deg })
       setVcR(r)
-    } catch (e) { setVcE(e.message) } finally { setVcRun(false) }
+    } catch (e) { setVcE((e as Error).message) } finally { setVcRun(false) }
   }, [vc])
 
   // ── optics_compute_telecentricity ──
   const [tc, setTc] = useState({ surfaces: BK7_SURFACES_DEFAULT, field_angles: '0,5,10,14' })
-  const [tcR, setTcR] = useState(null); const [tcE, setTcE] = useState(null); const [tcRun, setTcRun] = useState(false)
+  const [tcR, setTcR] = useState<ToolResult | null>(null); const [tcE, setTcE] = useState<string | null>(null); const [tcRun, setTcRun] = useState(false)
   const runTelecentric = useCallback(async () => {
     setTcRun(true); setTcE(null); setTcR(null)
     try {
@@ -859,30 +999,18 @@ function TabPupilsField() {
       const field_angles_deg = tc.field_angles.split(',').map(Number)
       const r = await callTool('optics_compute_telecentricity', { surfaces, field_angles_deg })
       setTcR(r)
-    } catch (e) { setTcE(e.message) } finally { setTcRun(false) }
+    } catch (e) { setTcE((e as Error).message) } finally { setTcRun(false) }
   }, [tc])
 
-  function PupilSummary({ data }) {
-    if (!data || !data.rms_spot_size_per_field) return null
+  function surfacesInput<S extends { surfaces: string }>(val: string, setter: Dispatch<SetStateAction<S>>, disabled: boolean) {
     return (
-      <div style={s.resultBox}>
-        <div style={s.subhead}>RMS spot radius per field (mm)</div>
-        {data.rms_spot_size_per_field.map((v, i) => (
-          <div key={i} style={{ ...s.mono, fontSize: 11 }}>
-            Field {i}: {fmt(v)} mm
-          </div>
-        ))}
+      <div style={s.row}>
+        <label style={{ ...s.label, alignSelf: 'flex-start', paddingTop: 3 }}>Surfaces (JSON)</label>
+        <textarea value={val} onChange={e => setter(p => ({ ...p, surfaces: e.target.value }))} disabled={disabled}
+          rows={3} style={{ ...s.input, fontFamily: 'monospace', fontSize: 11, resize: 'vertical' }} />
       </div>
     )
   }
-
-  const surfacesInput = (val, setter, disabled) => (
-    <div style={s.row}>
-      <label style={{ ...s.label, alignSelf: 'flex-start', paddingTop: 3 }}>Surfaces (JSON)</label>
-      <textarea value={val} onChange={e => setter(p => ({ ...p, surfaces: e.target.value }))} disabled={disabled}
-        rows={3} style={{ ...s.input, fontFamily: 'monospace', fontSize: 11, resize: 'vertical' }} />
-    </div>
-  )
 
   return (
     <div>
@@ -987,14 +1115,14 @@ function TabUtilities() {
     ]),
     num_terms: '15'
   })
-  const [zernR, setZernR] = useState(null); const [zernE, setZernE] = useState(null); const [zernRun, setZernRun] = useState(false)
+  const [zernR, setZernR] = useState<ZernikeResult | null>(null); const [zernE, setZernE] = useState<string | null>(null); const [zernRun, setZernRun] = useState(false)
   const runZernike = useCallback(async () => {
     setZernRun(true); setZernE(null); setZernR(null)
     try {
       const samples = JSON.parse(zern.samples)
-      const r = await callTool('optics_fit_zernike_wavefront', { samples, num_terms: +zern.num_terms })
+      const r = await callTool<ZernikeResult>('optics_fit_zernike_wavefront', { samples, num_terms: +zern.num_terms })
       setZernR(r)
-    } catch (e) { setZernE(e.message) } finally { setZernRun(false) }
+    } catch (e) { setZernE((e as Error).message) } finally { setZernRun(false) }
   }, [zern])
 
   // ── optics_analyze_wavefront_alignment ──
@@ -1004,96 +1132,96 @@ function TabUtilities() {
       [0.7, 1.57, 0.12], [0.3, 3.14, 0.02]
     ])
   })
-  const [waR, setWaR] = useState(null); const [waE, setWaE] = useState(null); const [waRun, setWaRun] = useState(false)
+  const [waR, setWaR] = useState<ToolResult | null>(null); const [waE, setWaE] = useState<string | null>(null); const [waRun, setWaRun] = useState(false)
   const runWfAlign = useCallback(async () => {
     setWaRun(true); setWaE(null); setWaR(null)
     try {
       const samples = JSON.parse(wa.samples)
       const r = await callTool('optics_analyze_wavefront_alignment', { samples })
       setWaR(r)
-    } catch (e) { setWaE(e.message) } finally { setWaRun(false) }
+    } catch (e) { setWaE((e as Error).message) } finally { setWaRun(false) }
   }, [wa])
 
   // ── optics_snell ──
   const [snell, setSnell] = useState({ n1: '1.0', theta1_rad: '0.3', n2: '1.5168' })
-  const [snellR, setSnellR] = useState(null); const [snellE, setSnellE] = useState(null); const [snellRun, setSnellRun] = useState(false)
+  const [snellR, setSnellR] = useState<ToolResult | null>(null); const [snellE, setSnellE] = useState<string | null>(null); const [snellRun, setSnellRun] = useState(false)
   const runSnell = useCallback(async () => {
     setSnellRun(true); setSnellE(null); setSnellR(null)
     try { const r = await callTool('optics_snell', { n1: +snell.n1, theta1_rad: +snell.theta1_rad, n2: +snell.n2 }); setSnellR(r) }
-    catch (e) { setSnellE(e.message) } finally { setSnellRun(false) }
+    catch (e) { setSnellE((e as Error).message) } finally { setSnellRun(false) }
   }, [snell])
 
   // ── optics_critical_angle ──
   const [cang, setCang] = useState({ n1: '1.5168', n2: '1.0' })
-  const [cangR, setCangR] = useState(null); const [cangE, setCangE] = useState(null); const [cangRun, setCangRun] = useState(false)
+  const [cangR, setCangR] = useState<ToolResult | null>(null); const [cangE, setCangE] = useState<string | null>(null); const [cangRun, setCangRun] = useState(false)
   const runCritAngle = useCallback(async () => {
     setCangRun(true); setCangE(null); setCangR(null)
     try { const r = await callTool('optics_critical_angle', { n1: +cang.n1, n2: +cang.n2 }); setCangR(r) }
-    catch (e) { setCangE(e.message) } finally { setCangRun(false) }
+    catch (e) { setCangE((e as Error).message) } finally { setCangRun(false) }
   }, [cang])
 
   // ── optics_brewster_angle ──
   const [brew, setBrew] = useState({ n1: '1.0', n2: '1.5168' })
-  const [brewR, setBrewR] = useState(null); const [brewE, setBrewE] = useState(null); const [brewRun, setBrewRun] = useState(false)
+  const [brewR, setBrewR] = useState<ToolResult | null>(null); const [brewE, setBrewE] = useState<string | null>(null); const [brewRun, setBrewRun] = useState(false)
   const runBrewster = useCallback(async () => {
     setBrewRun(true); setBrewE(null); setBrewR(null)
     try { const r = await callTool('optics_brewster_angle', { n1: +brew.n1, n2: +brew.n2 }); setBrewR(r) }
-    catch (e) { setBrewE(e.message) } finally { setBrewRun(false) }
+    catch (e) { setBrewE((e as Error).message) } finally { setBrewRun(false) }
   }, [brew])
 
   // ── optics_prism_deviation ──
   const [prism, setPrism] = useState({ n: '1.5168', apex_rad: '0.5236', theta_i_rad: '0.5236' })
-  const [prismR, setPrismR] = useState(null); const [prismE, setPrismE] = useState(null); const [prismRun, setPrismRun] = useState(false)
+  const [prismR, setPrismR] = useState<ToolResult | null>(null); const [prismE, setPrismE] = useState<string | null>(null); const [prismRun, setPrismRun] = useState(false)
   const runPrism = useCallback(async () => {
     setPrismRun(true); setPrismE(null); setPrismR(null)
     try { const r = await callTool('optics_prism_deviation', { n: +prism.n, apex_rad: +prism.apex_rad, theta_i_rad: +prism.theta_i_rad }); setPrismR(r) }
-    catch (e) { setPrismE(e.message) } finally { setPrismRun(false) }
+    catch (e) { setPrismE((e as Error).message) } finally { setPrismRun(false) }
   }, [prism])
 
   // ── optics_mirror_imaging ──
   const [mirr, setMirr] = useState({ R: '-0.2', s_o: '0.5' })
-  const [mirrR, setMirrR] = useState(null); const [mirrE, setMirrE] = useState(null); const [mirrRun, setMirrRun] = useState(false)
+  const [mirrR, setMirrR] = useState<ToolResult | null>(null); const [mirrE, setMirrE] = useState<string | null>(null); const [mirrRun, setMirrRun] = useState(false)
   const runMirror = useCallback(async () => {
     setMirrRun(true); setMirrE(null); setMirrR(null)
     try { const r = await callTool('optics_mirror_imaging', { R: +mirr.R, s_o: +mirr.s_o }); setMirrR(r) }
-    catch (e) { setMirrE(e.message) } finally { setMirrRun(false) }
+    catch (e) { setMirrE((e as Error).message) } finally { setMirrRun(false) }
   }, [mirr])
 
   // ── optics_design_schmidt_corrector ──
   const [schmidt, setSchmidt] = useState({ D_mm: '300', R_mm: '2400', n: '1.5168' })
-  const [schmidtR, setSchmidtR] = useState(null); const [schmidtE, setSchmidtE] = useState(null); const [schmidtRun, setSchmidtRun] = useState(false)
+  const [schmidtR, setSchmidtR] = useState<ToolResult | null>(null); const [schmidtE, setSchmidtE] = useState<string | null>(null); const [schmidtRun, setSchmidtRun] = useState(false)
   const runSchmidt = useCallback(async () => {
     setSchmidtRun(true); setSchmidtE(null); setSchmidtR(null)
     try {
       const r = await callTool('optics_design_schmidt_corrector', { D_mm: +schmidt.D_mm, R_mm: +schmidt.R_mm, n: +schmidt.n })
       setSchmidtR(r)
-    } catch (e) { setSchmidtE(e.message) } finally { setSchmidtRun(false) }
+    } catch (e) { setSchmidtE((e as Error).message) } finally { setSchmidtRun(false) }
   }, [schmidt])
 
   // ── optics_compute_working_fno ──
   const [wfno, setWfno] = useState({ f_number: '4', magnification: '0.1' })
-  const [wfnoR, setWfnoR] = useState(null); const [wfnoE, setWfnoE] = useState(null); const [wfnoRun, setWfnoRun] = useState(false)
+  const [wfnoR, setWfnoR] = useState<ToolResult | null>(null); const [wfnoE, setWfnoE] = useState<string | null>(null); const [wfnoRun, setWfnoRun] = useState(false)
   const runWorkingFno = useCallback(async () => {
     setWfnoRun(true); setWfnoE(null); setWfnoR(null)
     try { const r = await callTool('optics_compute_working_fno', { f_number: +wfno.f_number, magnification: +wfno.magnification }); setWfnoR(r) }
-    catch (e) { setWfnoE(e.message) } finally { setWfnoRun(false) }
+    catch (e) { setWfnoE((e as Error).message) } finally { setWfnoRun(false) }
   }, [wfno])
 
   // ── optics_compute_lens_volume ──
   const [lv, setLv] = useState({ surfaces: BK7_SURFACES_DEFAULT, aperture_radius_mm: '25' })
-  const [lvR, setLvR] = useState(null); const [lvE, setLvE] = useState(null); const [lvRun, setLvRun] = useState(false)
+  const [lvR, setLvR] = useState<ToolResult | null>(null); const [lvE, setLvE] = useState<string | null>(null); const [lvRun, setLvRun] = useState(false)
   const runLensVolume = useCallback(async () => {
     setLvRun(true); setLvE(null); setLvR(null)
     try {
       const surfaces = JSON.parse(lv.surfaces)
       const r = await callTool('optics_compute_lens_volume', { surfaces, aperture_radius_mm: +lv.aperture_radius_mm })
       setLvR(r)
-    } catch (e) { setLvE(e.message) } finally { setLvRun(false) }
+    } catch (e) { setLvE((e as Error).message) } finally { setLvRun(false) }
   }, [lv])
 
   // ── optics_compute_iris_diameter_map ──
   const [iris, setIris] = useState({ surfaces: BK7_SURFACES_DEFAULT, field_angles: '0,5,10,14', aperture_radius_mm: '10' })
-  const [irisR, setIrisR] = useState(null); const [irisE, setIrisE] = useState(null); const [irisRun, setIrisRun] = useState(false)
+  const [irisR, setIrisR] = useState<ToolResult | null>(null); const [irisE, setIrisE] = useState<string | null>(null); const [irisRun, setIrisRun] = useState(false)
   const runIris = useCallback(async () => {
     setIrisRun(true); setIrisE(null); setIrisR(null)
     try {
@@ -1101,43 +1229,43 @@ function TabUtilities() {
       const field_angles_deg = iris.field_angles.split(',').map(Number)
       const r = await callTool('optics_compute_iris_diameter_map', { surfaces, field_angles_deg, aperture_radius_mm: +iris.aperture_radius_mm })
       setIrisR(r)
-    } catch (e) { setIrisE(e.message) } finally { setIrisRun(false) }
+    } catch (e) { setIrisE((e as Error).message) } finally { setIrisRun(false) }
   }, [iris])
 
   // ── optics_compute_sagitta_arrow_chart ──
   const [sag, setSag] = useState({ surfaces: BK7_SURFACES_DEFAULT })
-  const [sagR, setSagR] = useState(null); const [sagE, setSagE] = useState(null); const [sagRun, setSagRun] = useState(false)
+  const [sagR, setSagR] = useState<ToolResult | null>(null); const [sagE, setSagE] = useState<string | null>(null); const [sagRun, setSagRun] = useState(false)
   const runSagitta = useCallback(async () => {
     setSagRun(true); setSagE(null); setSagR(null)
     try {
       const surfaces = JSON.parse(sag.surfaces)
       const r = await callTool('optics_compute_sagitta_arrow_chart', { surfaces })
       setSagR(r)
-    } catch (e) { setSagE(e.message) } finally { setSagRun(false) }
+    } catch (e) { setSagE((e as Error).message) } finally { setSagRun(false) }
   }, [sag])
 
   // ── optics_compute_depth_of_field (extended) ──
   const [edof, setEdof] = useState({ surfaces: BK7_SURFACES_DEFAULT, aperture_radius_mm: '5', rms_threshold_mm: '0.01' })
-  const [edofR, setEdofR] = useState(null); const [edofE, setEdofE] = useState(null); const [edofRun, setEdofRun] = useState(false)
+  const [edofR, setEdofR] = useState<ToolResult | null>(null); const [edofE, setEdofE] = useState<string | null>(null); const [edofRun, setEdofRun] = useState(false)
   const runExtDof = useCallback(async () => {
     setEdofRun(true); setEdofE(null); setEdofR(null)
     try {
       const surfaces = JSON.parse(edof.surfaces)
       const r = await callTool('optics_compute_depth_of_field', { surfaces, aperture_radius_mm: +edof.aperture_radius_mm, rms_threshold_mm: +edof.rms_threshold_mm })
       setEdofR(r)
-    } catch (e) { setEdofE(e.message) } finally { setEdofRun(false) }
+    } catch (e) { setEdofE((e as Error).message) } finally { setEdofRun(false) }
   }, [edof])
 
   // ── optics_trace_chief_ray ──
   const [cr, setCr] = useState({ surfaces: BK7_SURFACES_DEFAULT, field_angle_deg: '10' })
-  const [crR, setCrR] = useState(null); const [crE, setCrE] = useState(null); const [crRun, setCrRun] = useState(false)
+  const [crR, setCrR] = useState<ToolResult | null>(null); const [crE, setCrE] = useState<string | null>(null); const [crRun, setCrRun] = useState(false)
   const runChiefRay = useCallback(async () => {
     setCrRun(true); setCrE(null); setCrR(null)
     try {
       const surfaces = JSON.parse(cr.surfaces)
       const r = await callTool('optics_trace_chief_ray', { surfaces, field_angle_deg: +cr.field_angle_deg })
       setCrR(r)
-    } catch (e) { setCrE(e.message) } finally { setCrRun(false) }
+    } catch (e) { setCrE((e as Error).message) } finally { setCrRun(false) }
   }, [cr])
 
   // ── optics_abcd_system ──
@@ -1148,23 +1276,25 @@ function TabUtilities() {
       { type: 'free_space', d: 0.1 }
     ])
   })
-  const [abcdR, setAbcdR] = useState(null); const [abcdE, setAbcdE] = useState(null); const [abcdRun, setAbcdRun] = useState(false)
+  const [abcdR, setAbcdR] = useState<ToolResult | null>(null); const [abcdE, setAbcdE] = useState<string | null>(null); const [abcdRun, setAbcdRun] = useState(false)
   const runAbcd = useCallback(async () => {
     setAbcdRun(true); setAbcdE(null); setAbcdR(null)
     try {
       const elements = JSON.parse(abcd.elements)
       const r = await callTool('optics_abcd_system', { elements })
       setAbcdR(r)
-    } catch (e) { setAbcdE(e.message) } finally { setAbcdRun(false) }
+    } catch (e) { setAbcdE((e as Error).message) } finally { setAbcdRun(false) }
   }, [abcd])
 
-  const surfacesInput = (val, setter, disabled) => (
-    <div style={s.row}>
-      <label style={{ ...s.label, alignSelf: 'flex-start', paddingTop: 3 }}>Surfaces (JSON)</label>
-      <textarea value={val} onChange={e => setter(p => ({ ...p, surfaces: e.target.value }))} disabled={disabled}
-        rows={3} style={{ ...s.input, fontFamily: 'monospace', fontSize: 11, resize: 'vertical' }} />
-    </div>
-  )
+  function surfacesInput<S extends { surfaces: string }>(val: string, setter: Dispatch<SetStateAction<S>>, disabled: boolean) {
+    return (
+      <div style={s.row}>
+        <label style={{ ...s.label, alignSelf: 'flex-start', paddingTop: 3 }}>Surfaces (JSON)</label>
+        <textarea value={val} onChange={e => setter(p => ({ ...p, surfaces: e.target.value }))} disabled={disabled}
+          rows={3} style={{ ...s.input, fontFamily: 'monospace', fontSize: 11, resize: 'vertical' }} />
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -1192,7 +1322,7 @@ function TabUtilities() {
                 <tbody>
                   {zernR.coefficients.map((c, i) => (
                     <tr key={i}>
-                      <td style={{ ...s.td, color: '#9ca3af', fontSize: 10 }}>j={i+1} {zernR.coefficient_names[i]}</td>
+                      <td style={{ ...s.td, color: '#9ca3af', fontSize: 10 }}>j={i+1} {zernR.coefficient_names?.[i]}</td>
                       <td style={{ ...s.td, ...s.mono, fontSize: 11 }}>{fmt(c)}</td>
                     </tr>
                   ))}
@@ -1301,7 +1431,13 @@ function TabUtilities() {
 // Main component
 // ---------------------------------------------------------------------------
 
-const TABS = [
+interface TabDef {
+  id: string
+  label: string
+  icon: LucideIcon
+}
+
+const TABS: TabDef[] = [
   { id: 'lens',       label: 'Lens Design',      icon: Circle  },
   { id: 'aberr',      label: 'Aberrations',       icon: Eye     },
   { id: 'mtf',        label: 'MTF / PSF',         icon: Zap     },

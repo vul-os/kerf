@@ -24,7 +24,39 @@
 
 import Panel from '../../../components/PlasmaDischargePanel.jsx'
 
-const DEFAULTS = {
+export interface Props {
+  content?: string
+}
+
+interface PaschenCurve {
+  pd_Pa_m?: number[]
+  V_bd_V?: number[]
+}
+
+// PlasmaDischargePanel.jsx is not yet migrated, so there's no Props type to
+// import; this mirrors the JSON fields documented above. Required here (not
+// optional) since DEFAULTS always supplies every key and the plain-JS panel's
+// inferred prop types are all required.
+interface PlasmaDischargeContent {
+  x_m: number[] | null
+  n_e_m3: number[] | null
+  n_i_m3: number[] | null
+  E_field_V_m: number[] | null
+  phi_V: number[] | null
+  ionization_rate_m3_s: number[] | null
+  paschen_curve: PaschenCurve | null
+  current_density_A_m2: number | null
+  sheath_thickness_m: number | null
+  breakdown_estimate_V: number | null
+  converged: boolean
+  gas: string
+  pressure_Pa: number | null
+  gap_m: number | null
+  voltage_V: number | null
+  model_notes: string | null
+}
+
+const DEFAULTS: PlasmaDischargeContent = {
   x_m: null,
   n_e_m3: null,
   n_i_m3: null,
@@ -43,12 +75,12 @@ const DEFAULTS = {
   model_notes: null,
 }
 
-function parseContent(content) {
+function parseContent(content: string | undefined): Partial<PlasmaDischargeContent> {
   if (!content || typeof content !== 'string') return {}
   try { return JSON.parse(content) || {} } catch { return {} }
 }
 
-export default function PlasmaDischargeWrapper({ content }) {
+export default function PlasmaDischargeWrapper({ content }: Props) {
   const props = { ...DEFAULTS, ...parseContent(content) }
   return <Panel {...props} />
 }

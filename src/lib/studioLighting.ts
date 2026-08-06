@@ -1,5 +1,5 @@
 /**
- * studioLighting.js — Studio-lighting preset library.
+ * studioLighting.ts — Studio-lighting preset library.
  *
  * Each preset builder returns a `doc.lights[]`-shaped array using the
  * same light object schema as `presetThreePointLighting` in render.js.
@@ -8,10 +8,50 @@
  */
 
 import { presetThreePointLighting } from './render.js'
+import type { Vec3 } from '@/types'
+
+// ── Light shapes ─────────────────────────────────────────────────────────────
+//
+// render.js/render.ts export no types (JSDoc-only, loosely `object[]`), so the
+// light shapes used here are modeled locally from how presetThreePointLighting
+// and the preset builders below actually construct them.
+
+export interface SunLight {
+  id: string
+  kind: 'sun'
+  direction: Vec3
+  intensity: number
+  color: string
+}
+
+export interface AreaLight {
+  id: string
+  kind: 'area'
+  position: Vec3
+  size_mm: number
+  intensity: number
+  color: string
+}
+
+export type StudioLight = SunLight | AreaLight
+
+/** Minimal render-document shape `applyStudioPreset` needs — it only reads/writes `lights`. */
+export interface StudioLightingDoc {
+  lights: StudioLight[]
+  [key: string]: unknown
+}
+
+export type StudioPresetName =
+  | 'three-point'
+  | 'four-point'
+  | 'butterfly'
+  | 'rembrandt'
+  | 'ring-light'
+  | 'softbox'
 
 // ── Preset registry ────────────────────────────────────────────────────────────
 
-export const STUDIO_PRESETS = [
+export const STUDIO_PRESETS: StudioPresetName[] = [
   'three-point',
   'four-point',
   'butterfly',
@@ -27,11 +67,13 @@ export const STUDIO_PRESETS = [
  * Re-uses presetThreePointLighting from render.js so the output is
  * byte-identical to the existing function.
  *
- * @param {number[]} target - Scene centre [x, y, z] in mm.
- * @returns {object[]}
+ * @param target - Scene centre [x, y, z] in mm.
  */
-export function buildThreePointPreset(target) {
-  return presetThreePointLighting(target)
+export function buildThreePointPreset(target: Vec3): StudioLight[] {
+  // render.ts (T-502) carries no return-type annotation, so its object-literal `kind` /
+  // `direction` / `position` fields infer as widened `string` / `number[]`. The runtime
+  // shape is exactly StudioLight; this cast documents that boundary.
+  return presetThreePointLighting(target) as StudioLight[]
 }
 
 // ── four-point ─────────────────────────────────────────────────────────────────
@@ -40,21 +82,17 @@ export function buildThreePointPreset(target) {
  * 4-point rig: 3-point base + kicker (low rear-side rim to accentuate
  * silhouette separation from the background).
  *
- * @param {number[]} target - Scene centre [x, y, z] in mm.
- * @returns {object[]}
+ * @param target - Scene centre [x, y, z] in mm.
  */
-export function buildFourPointPreset(target) {
-  const [tx, ty, tz] = target
-  return [
-    ...presetThreePointLighting(target),
-    {
-      id: 'kicker',
-      kind: 'sun',
-      direction: [0.8, -0.5, 0.3],
-      intensity: 1.5,
-      color: '#ffe8d0',
-    },
-  ]
+export function buildFourPointPreset(target: Vec3): StudioLight[] {
+  const kicker: SunLight = {
+    id: 'kicker',
+    kind: 'sun',
+    direction: [0.8, -0.5, 0.3],
+    intensity: 1.5,
+    color: '#ffe8d0',
+  }
+  return [...(presetThreePointLighting(target) as StudioLight[]), kicker]
 }
 
 // ── butterfly ──────────────────────────────────────────────────────────────────
@@ -63,10 +101,9 @@ export function buildFourPointPreset(target) {
  * Butterfly / beauty rig: overhead key casts a small shadow under the nose;
  * low frontal fill lifts the shadow contrast.
  *
- * @param {number[]} target - Scene centre [x, y, z] in mm.
- * @returns {object[]}
+ * @param target - Scene centre [x, y, z] in mm.
  */
-export function buildButterflyPreset(target) {
+export function buildButterflyPreset(target: Vec3): StudioLight[] {
   const [tx, ty, tz] = target
   return [
     {
@@ -93,10 +130,9 @@ export function buildButterflyPreset(target) {
  * Rembrandt rig: 45° key from one side creates the characteristic triangle of
  * light under the eye; low opposing fill keeps shadow detail visible.
  *
- * @param {number[]} target - Scene centre [x, y, z] in mm.
- * @returns {object[]}
+ * @param target - Scene centre [x, y, z] in mm.
  */
-export function buildRembrandtPreset(target) {
+export function buildRembrandtPreset(target: Vec3): StudioLight[] {
   const [tx, ty, tz] = target
   return [
     {
@@ -125,10 +161,9 @@ export function buildRembrandtPreset(target) {
  * Ring-light rig: 8 small sun lights evenly distributed around the camera
  * axis at constant elevation, mimicking a circular ring flash.
  *
- * @param {number[]} target - Scene centre [x, y, z] in mm.
- * @returns {object[]}
+ * @param target - Scene centre [x, y, z] in mm.
  */
-export function buildRingLightPreset(target) {
+export function buildRingLightPreset(target: Vec3): SunLight[] {
   const COUNT = 8
   const RADIUS_MM = 1500   // ring radius in scene space (used for direction)
   const ELEVATION_DEG = 10 // degrees above the horizon
@@ -142,8 +177,8 @@ export function buildRingLightPreset(target) {
     const dz = -Math.sin(el)
     return {
       id: `ring-${i}`,
-      kind: 'sun',
-      direction: [dx, dy, dz],
+      kind: 'sun' as const,
+      direction: [dx, dy, dz] as Vec3,
       intensity: 1.5,
       color: '#ffffff',
     }
@@ -156,10 +191,9 @@ export function buildRingLightPreset(target) {
  * Softbox rig: single large area light overhead-front at ~45° — the
  * workhorse of product photography.
  *
- * @param {number[]} target - Scene centre [x, y, z] in mm.
- * @returns {object[]}
+ * @param target - Scene centre [x, y, z] in mm.
  */
-export function buildSoftboxPreset(target) {
+export function buildSoftboxPreset(target: Vec3): AreaLight[] {
   const [tx, ty, tz] = target
   return [
     {
@@ -176,7 +210,7 @@ export function buildSoftboxPreset(target) {
 
 // ── applyStudioPreset ─────────────────────────────────────────────────────────
 
-const BUILDERS = {
+const BUILDERS: Record<StudioPresetName, (target: Vec3) => StudioLight[]> = {
   'three-point': buildThreePointPreset,
   'four-point': buildFourPointPreset,
   'butterfly': buildButterflyPreset,
@@ -189,12 +223,15 @@ const BUILDERS = {
  * Return a new render doc with `lights` cleared and repopulated by the
  * named preset.
  *
- * @param {object} doc - Render document (not mutated).
- * @param {string} presetName - One of STUDIO_PRESETS.
- * @param {number[]} [target=[0,0,500]] - Scene centre in mm.
- * @returns {object} New render document.
+ * @param doc - Render document (not mutated).
+ * @param presetName - One of STUDIO_PRESETS.
+ * @param target - Scene centre in mm.
  */
-export function applyStudioPreset(doc, presetName, target = [0, 0, 500]) {
+export function applyStudioPreset<T extends StudioLightingDoc>(
+  doc: T,
+  presetName: StudioPresetName,
+  target: Vec3 = [0, 0, 500],
+): T {
   const builder = BUILDERS[presetName]
   if (!builder) {
     throw new Error(`Unknown studio preset: "${presetName}". Valid: ${STUDIO_PRESETS.join(', ')}`)

@@ -8,9 +8,12 @@ import {
   buildRingLightPreset,
   buildSoftboxPreset,
   applyStudioPreset,
+  type StudioLightingDoc,
+  type AreaLight,
 } from './studioLighting.js'
+import type { Vec3 } from '@/types'
 
-const TARGET = [0, 0, 500]
+const TARGET: Vec3 = [0, 0, 500]
 
 // ── STUDIO_PRESETS list ────────────────────────────────────────────────────────
 
@@ -45,12 +48,12 @@ describe('buildThreePointPreset', () => {
 
   it('key is a sun light', () => {
     const key = buildThreePointPreset(TARGET).find((l) => l.id === 'key')
-    expect(key.kind).toBe('sun')
+    expect(key?.kind).toBe('sun')
   })
 
   it('fill is an area light', () => {
     const fill = buildThreePointPreset(TARGET).find((l) => l.id === 'fill')
-    expect(fill.kind).toBe('area')
+    expect(fill?.kind).toBe('area')
   })
 })
 
@@ -68,7 +71,7 @@ describe('buildFourPointPreset', () => {
 
   it('kicker is a sun light', () => {
     const kicker = buildFourPointPreset(TARGET).find((l) => l.id === 'kicker')
-    expect(kicker.kind).toBe('sun')
+    expect(kicker?.kind).toBe('sun')
   })
 
   it('includes all three-point lights plus kicker', () => {
@@ -95,13 +98,13 @@ describe('buildButterflyPreset', () => {
 
   it('key is a sun light', () => {
     const key = buildButterflyPreset(TARGET).find((l) => l.id === 'butterfly-key')
-    expect(key.kind).toBe('sun')
+    expect(key?.kind).toBe('sun')
   })
 
   it('fill is an area light with size_mm', () => {
-    const fill = buildButterflyPreset(TARGET).find((l) => l.id === 'butterfly-fill')
-    expect(fill.kind).toBe('area')
-    expect(fill.size_mm).toBeGreaterThan(0)
+    const fill = buildButterflyPreset(TARGET).find((l) => l.id === 'butterfly-fill') as AreaLight | undefined
+    expect(fill?.kind).toBe('area')
+    expect(fill?.size_mm).toBeGreaterThan(0)
   })
 })
 
@@ -120,12 +123,12 @@ describe('buildRembrandtPreset', () => {
 
   it('key is a sun light', () => {
     const key = buildRembrandtPreset(TARGET).find((l) => l.id === 'rembrandt-key')
-    expect(key.kind).toBe('sun')
+    expect(key?.kind).toBe('sun')
   })
 
   it('fill is an area light', () => {
     const fill = buildRembrandtPreset(TARGET).find((l) => l.id === 'rembrandt-fill')
-    expect(fill.kind).toBe('area')
+    expect(fill?.kind).toBe('area')
   })
 })
 
@@ -203,7 +206,7 @@ describe('buildSoftboxPreset', () => {
 // ── applyStudioPreset ─────────────────────────────────────────────────────────
 
 describe('applyStudioPreset', () => {
-  const baseDoc = {
+  const baseDoc: StudioLightingDoc = {
     version: 1,
     name: 'Test',
     scene_file_id: 'file-abc',
@@ -255,13 +258,14 @@ describe('applyStudioPreset', () => {
   })
 
   it('throws for an unknown preset name', () => {
+    // @ts-expect-error — deliberately passing an invalid preset name to exercise the runtime guard
     expect(() => applyStudioPreset(baseDoc, 'neon-disco')).toThrow(/neon-disco/)
   })
 
   it('accepts a custom target', () => {
     const next = applyStudioPreset(baseDoc, 'three-point', [100, 200, 300])
-    const fill = next.lights.find((l) => l.id === 'fill')
+    const fill = next.lights.find((l) => l.id === 'fill') as AreaLight | undefined
     // fill position should be offset from [100, 200, 300]
-    expect(fill.position[0]).toBeCloseTo(100 + 3000, 0)
+    expect(fill?.position[0]).toBeCloseTo(100 + 3000, 0)
   })
 })

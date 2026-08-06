@@ -1,14 +1,48 @@
 // StairView.jsx — Viewer/editor for .stair.json files.
 // Includes a Stair Code Check card (IBC 2024 / ADA §504 / ICC A117.1 / OBC).
 import { useState, useEffect, useRef, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import { Plus, Trash2, ShieldCheck, ShieldAlert, AlertTriangle, FileText } from 'lucide-react'
 import {
   defaultStair, validateStair, addFlight, addLanding,
   straightStairFromAB, lShapeStair, uShapeStair,
 } from '../lib/stairs.js'
+import type { Vec3 } from '../types/index.js'
+
+// ── Types ────────────────────────────────────────────────────────────────────
+// stairs.ts (T-513's dependency, not this slice) has no JSDoc-derived static types of its own —
+// its exports are all bare `any` in/out. These shapes are mined from this file's own field reads
+// (`.flights`, `.landings`, `fl.start_point`, `ld.size_mm`, etc.) rather than from stairs.ts.
+
+interface StairFlight {
+  id: string
+  start_point: Vec3
+  direction: Vec3
+  step_count: number
+}
+
+interface StairLanding {
+  id: string
+  position: Vec3
+  size_mm: [number, number]
+}
+
+interface StairDoc {
+  version?: number
+  shape?: string
+  width_mm?: number
+  total_rise_mm?: number
+  total_run_mm?: number
+  riser_height_mm?: number
+  tread_depth_mm?: number
+  nosing_mm?: number
+  flights: StairFlight[]
+  landings: StairLanding[]
+  handedness?: string
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-function parse(c) { try { return JSON.parse(c) } catch { return null } }
+function parse(c: string | null | undefined): StairDoc | null { try { return JSON.parse(c || '') } catch { return null } }
 function uid() { return Math.random().toString(36).slice(2, 9) }
 
 const iCls = 'w-full bg-ink-950 border border-ink-700 rounded px-2 py-0.5 text-[12px] text-ink-200 focus:outline-none focus:border-kerf-300/60'
@@ -16,7 +50,7 @@ const sCls = 'bg-ink-950 border border-ink-700 rounded px-1.5 py-0.5 text-[11px]
 const btnCls = 'inline-flex items-center gap-1 text-[11px] text-kerf-300 hover:text-kerf-200'
 const buildBtnCls = 'px-2.5 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-[11px]'
 
-function Section({ title, action, children }) {
+function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
@@ -27,8 +61,8 @@ function Section({ title, action, children }) {
     </div>
   )
 }
-const Empty = ({ children }) => <p className="text-[11px] text-ink-600 italic py-1">{children}</p>
-const Stat = ({ label, value }) => (
+const Empty = ({ children }: { children: ReactNode }) => <p className="text-[11px] text-ink-600 italic py-1">{children}</p>
+const Stat = ({ label, value }: { label: string; value: ReactNode }) => (
   <div className="flex flex-col gap-0.5">
     <span className="text-[10px] text-ink-500 uppercase tracking-wide">{label}</span>
     <span className="font-mono text-kerf-300 text-[13px]">{value}</span>
@@ -44,7 +78,27 @@ const CODE_JURISDICTIONS = [
   { value: 'ontario_obc', label: 'Ontario OBC Part 9' },
 ]
 
-const DEFAULT_CODE_SPEC = {
+type NumericCodeSpecKey =
+  | 'riser_height_in'
+  | 'tread_depth_in'
+  | 'stair_width_in'
+  | 'handrail_height_in'
+  | 'headroom_clearance_in'
+  | 'num_risers'
+
+interface CodeSpec {
+  tread_depth_in: number
+  riser_height_in: number
+  stair_width_in: number
+  handrail_height_in: number
+  headroom_clearance_in: number
+  num_risers: number
+  has_landing: boolean
+  landing_depth_in: number
+  jurisdiction: string
+}
+
+const DEFAULT_CODE_SPEC: CodeSpec = {
   tread_depth_in: 11.0,
   riser_height_in: 7.0,
   stair_width_in: 44.0,
@@ -56,10 +110,29 @@ const DEFAULT_CODE_SPEC = {
   jurisdiction: 'ibc_2024',
 }
 
+interface CodeViolation {
+  code_ref: string
+  requirement: string
+  actual: string
+}
+
+interface CodeCheckResult {
+  riser_compliant: boolean
+  tread_compliant: boolean
+  width_compliant: boolean
+  handrail_compliant: boolean
+  headroom_compliant: boolean
+  landing_compliant: boolean
+  ratio_2r_plus_t_compliant: boolean
+  turning_compliant: boolean
+  violations: CodeViolation[]
+  all_compliant: boolean
+}
+
 // Inline pure-JS implementation mirrors kerf_cad_core.arch.stair_code_check
 // so code checks work without a backend round-trip during UI interaction.
-function runStairCodeCheck(spec) {
-  const violations = []
+function runStairCodeCheck(spec: CodeSpec): CodeCheckResult {
+  const violations: CodeViolation[] = []
   let riser_compliant = true
   let tread_compliant = true
   let width_compliant = true
@@ -178,7 +251,7 @@ function runStairCodeCheck(spec) {
   }
 }
 
-function Badge({ ok, label }) {
+function Badge({ ok, label }: { ok: boolean; label: string }) {
   return (
     <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${
       ok ? 'bg-emerald-900/30 border border-emerald-700/30 text-emerald-300'
@@ -191,10 +264,10 @@ function Badge({ ok, label }) {
 }
 
 function StairCodeCheckCard() {
-  const [spec, setSpec] = useState(DEFAULT_CODE_SPEC)
-  const [result, setResult] = useState(null)
+  const [spec, setSpec] = useState<CodeSpec>(DEFAULT_CODE_SPEC)
+  const [result, setResult] = useState<CodeCheckResult | null>(null)
 
-  const patch = (u) => setSpec((s) => ({ ...s, ...u }))
+  const patch = (u: Partial<CodeSpec>) => setSpec((s) => ({ ...s, ...u }))
 
   function handleRun() {
     setResult(runStairCodeCheck(spec))
@@ -249,7 +322,7 @@ function StairCodeCheckCard() {
     URL.revokeObjectURL(url)
   }
 
-  const CHECKS = [
+  const CHECKS: Array<[string, boolean | undefined]> = [
     ['Riser', result?.riser_compliant],
     ['Tread', result?.tread_compliant],
     ['Width', result?.width_compliant],
@@ -270,14 +343,16 @@ function StairCodeCheckCard() {
             {CODE_JURISDICTIONS.map((j) => <option key={j.value} value={j.value}>{j.label}</option>)}
           </select>
         </div>
-        {[
-          ['Riser height (in)', 'riser_height_in', 0.5, 12, 0.25],
-          ['Tread depth (in)', 'tread_depth_in', 6, 24, 0.25],
-          ['Stair width (in)', 'stair_width_in', 12, 120, 1],
-          ['Handrail ht. (in)', 'handrail_height_in', 20, 50, 0.5],
-          ['Headroom (in)', 'headroom_clearance_in', 60, 120, 1],
-          ['Num risers', 'num_risers', 1, 200, 1],
-        ].map(([label, key, min, max, step]) => (
+        {(
+          [
+            ['Riser height (in)', 'riser_height_in', 0.5, 12, 0.25],
+            ['Tread depth (in)', 'tread_depth_in', 6, 24, 0.25],
+            ['Stair width (in)', 'stair_width_in', 12, 120, 1],
+            ['Handrail ht. (in)', 'handrail_height_in', 20, 50, 0.5],
+            ['Headroom (in)', 'headroom_clearance_in', 60, 120, 1],
+            ['Num risers', 'num_risers', 1, 200, 1],
+          ] as Array<[string, NumericCodeSpecKey, number, number, number]>
+        ).map(([label, key, min, max, step]) => (
           <div key={key} className="flex flex-col gap-0.5">
             <span className="text-[10px] text-ink-500 uppercase tracking-wide">{label}</span>
             <input
@@ -377,7 +452,7 @@ function StairCodeCheckCard() {
 }
 
 // ── SVG side-view preview ──────────────────────────────────────────────────────
-function StairSVG({ stair }) {
+function StairSVG({ stair }: { stair: StairDoc }) {
   const r = stair.riser_height_mm || 175
   const t = stair.tread_depth_mm || 280
   const steps = Math.round((stair.total_rise_mm || 2100) / r) || 12
@@ -391,7 +466,7 @@ function StairSVG({ stair }) {
   const sy = usableH / (steps * r || 1)
   const scale = Math.min(sx, sy)
 
-  const pts = []
+  const pts: number[][] = []
   for (let i = 0; i <= steps; i++) {
     pts.push([margin + i * t * scale, H - margin - i * r * scale])
     if (i < steps) pts.push([margin + (i + 1) * t * scale, H - margin - i * r * scale])
@@ -408,20 +483,26 @@ function StairSVG({ stair }) {
   )
 }
 
+export interface Props {
+  content?: string | null
+  fileName?: string
+  onContentChange?: (content: string) => void
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function StairView({ content, fileName, onContentChange }) {
-  const [stair, setStair] = useState(() => parse(content) || defaultStair({ total_rise_mm: 2800, total_run_mm: 4200 }))
-  const debRef = useRef(null)
+export default function StairView({ content, fileName, onContentChange }: Props) {
+  const [stair, setStair] = useState<StairDoc>(() => parse(content) || defaultStair({ total_rise_mm: 2800, total_run_mm: 4200 }))
+  const debRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { const n = parse(content); if (n) setStair(n) }, [content])
 
-  const commit = useCallback((next) => {
+  const commit = useCallback((next: StairDoc) => {
     setStair(next)
     if (debRef.current) clearTimeout(debRef.current)
     debRef.current = setTimeout(() => onContentChange?.(JSON.stringify(next, null, 2)), 250)
   }, [onContentChange])
 
-  const patch = (u) => commit({ ...stair, ...u })
+  const patch = (u: Partial<StairDoc>) => commit({ ...stair, ...u })
 
   const riser = stair.riser_height_mm || 175
   const tread = stair.tread_depth_mm || 280
@@ -456,16 +537,18 @@ export default function StairView({ content, fileName, onContentChange }) {
       {/* Header */}
       <Section title="Stair">
         <div className="grid grid-cols-2 gap-3 text-[12px]">
-          {[
-            ['Shape', (
-              <select className={sCls} value={stair.shape || 'straight'} onChange={(e) => patch({ shape: e.target.value })}>
-                {['straight', 'L-shape', 'U-shape'].map((s) => <option key={s}>{s}</option>)}
-              </select>
-            )],
-            ['Width (mm)', <input className={iCls} type="number" value={stair.width_mm ?? 1000} onChange={(e) => patch({ width_mm: parseFloat(e.target.value) || 1000 })} />],
-            ['Total rise (mm)', <input className={iCls} type="number" value={stair.total_rise_mm ?? ''} onChange={(e) => patch({ total_rise_mm: parseFloat(e.target.value) || 0 })} />],
-            ['Total run (mm)', <input className={iCls} type="number" value={stair.total_run_mm ?? ''} onChange={(e) => patch({ total_run_mm: parseFloat(e.target.value) || 0 })} />],
-          ].map(([label, field]) => (
+          {(
+            [
+              ['Shape', (
+                <select className={sCls} value={stair.shape || 'straight'} onChange={(e) => patch({ shape: e.target.value })}>
+                  {['straight', 'L-shape', 'U-shape'].map((s) => <option key={s}>{s}</option>)}
+                </select>
+              )],
+              ['Width (mm)', <input className={iCls} type="number" value={stair.width_mm ?? 1000} onChange={(e) => patch({ width_mm: parseFloat(e.target.value) || 1000 })} />],
+              ['Total rise (mm)', <input className={iCls} type="number" value={stair.total_rise_mm ?? ''} onChange={(e) => patch({ total_rise_mm: parseFloat(e.target.value) || 0 })} />],
+              ['Total run (mm)', <input className={iCls} type="number" value={stair.total_run_mm ?? ''} onChange={(e) => patch({ total_run_mm: parseFloat(e.target.value) || 0 })} />],
+            ] as Array<[string, ReactNode]>
+          ).map(([label, field]) => (
             <div key={label} className="flex flex-col gap-1">
               <span className="text-[10px] text-ink-500 uppercase tracking-wide">{label}</span>
               {field}
@@ -523,7 +606,7 @@ export default function StairView({ content, fileName, onContentChange }) {
                 <input className={iCls} defaultValue={(fl.start_point || [0, 0, 0]).join(', ')}
                   onBlur={(e) => {
                     const p = e.target.value.split(',').map(Number)
-                    if (p.length === 3) commit({ ...stair, flights: stair.flights.map((f) => f.id === fl.id ? { ...f, start_point: p } : f) })
+                    if (p.length === 3) commit({ ...stair, flights: stair.flights.map((f) => f.id === fl.id ? { ...f, start_point: p as Vec3 } : f) })
                   }} />
               </div>
               <div className="flex items-center gap-2">
@@ -531,7 +614,7 @@ export default function StairView({ content, fileName, onContentChange }) {
                 <input className={iCls} defaultValue={(fl.direction || [1, 0, 0]).join(', ')}
                   onBlur={(e) => {
                     const p = e.target.value.split(',').map(Number)
-                    if (p.length === 3) commit({ ...stair, flights: stair.flights.map((f) => f.id === fl.id ? { ...f, direction: p } : f) })
+                    if (p.length === 3) commit({ ...stair, flights: stair.flights.map((f) => f.id === fl.id ? { ...f, direction: p as Vec3 } : f) })
                   }} />
                 <span className="text-ink-500 w-14 flex-shrink-0">Steps</span>
                 <input className={iCls} type="number" value={fl.step_count ?? 6}
@@ -559,7 +642,7 @@ export default function StairView({ content, fileName, onContentChange }) {
                 <input className={iCls} defaultValue={(ld.position || [0, 0, 0]).join(', ')}
                   onBlur={(e) => {
                     const p = e.target.value.split(',').map(Number)
-                    if (p.length === 3) commit({ ...stair, landings: stair.landings.map((l) => l.id === ld.id ? { ...l, position: p } : l) })
+                    if (p.length === 3) commit({ ...stair, landings: stair.landings.map((l) => l.id === ld.id ? { ...l, position: p as Vec3 } : l) })
                   }} />
               </div>
               <div className="flex flex-col gap-0.5">
@@ -567,7 +650,7 @@ export default function StairView({ content, fileName, onContentChange }) {
                 <input className={iCls} defaultValue={(ld.size_mm || [1000, 1000]).join(', ')}
                   onBlur={(e) => {
                     const p = e.target.value.split(',').map(Number)
-                    if (p.length === 2) commit({ ...stair, landings: stair.landings.map((l) => l.id === ld.id ? { ...l, size_mm: p } : l) })
+                    if (p.length === 2) commit({ ...stair, landings: stair.landings.map((l) => l.id === ld.id ? { ...l, size_mm: p as [number, number] } : l) })
                   }} />
               </div>
             </div>

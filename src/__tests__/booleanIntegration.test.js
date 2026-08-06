@@ -43,7 +43,7 @@ const SKIP_WASM = typeof Worker === 'undefined' && typeof self === 'undefined'
 
 describe('booleanIntegration — source-level wiring', () => {
   const workerSrc = readFileSync(
-    path.resolve(__dirname, '../lib/occtWorker.js'),
+    path.resolve(__dirname, '../lib/occtWorker.ts'),
     'utf8',
   )
 

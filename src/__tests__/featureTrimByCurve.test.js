@@ -213,7 +213,7 @@ describe('FeatureInspector — trim_by_curve node renders param labels', () => {
 
 describe('occtWorker.js dispatch table — trim_by_curve', () => {
   const workerSrc = fs.readFileSync(
-    path.resolve(import.meta.dirname, '../lib/occtWorker.js'),
+    path.resolve(import.meta.dirname, '../lib/occtWorker.ts'),
     'utf8',
   )
 

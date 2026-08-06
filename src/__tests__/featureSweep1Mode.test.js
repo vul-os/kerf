@@ -87,7 +87,7 @@ describe('newFeatureId for sweep1 nodes', () => {
 
 describe('occtWorker.js sweep1 mode wiring', () => {
   const workerSrc = readFileSync(
-    path.resolve(__dirname, '../lib/occtWorker.js'),
+    path.resolve(__dirname, '../lib/occtWorker.ts'),
     'utf8',
   )
 

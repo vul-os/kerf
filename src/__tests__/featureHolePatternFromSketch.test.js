@@ -214,7 +214,7 @@ describe('occtWorker.js dispatch table', () => {
 
   it('loads the worker source', () => {
     workerSrc = readFileSync(
-      path.resolve(__dirname, '../lib/occtWorker.js'),
+      path.resolve(__dirname, '../lib/occtWorker.ts'),
       'utf8',
     )
     expect(workerSrc.length).toBeGreaterThan(0)
@@ -222,7 +222,7 @@ describe('occtWorker.js dispatch table', () => {
 
   it("contains 'hole_pattern' case in evaluateTree (not dormant)", () => {
     const src = readFileSync(
-      path.resolve(__dirname, '../lib/occtWorker.js'),
+      path.resolve(__dirname, '../lib/occtWorker.ts'),
       'utf8',
     )
     const matches = src.match(/case 'hole_pattern'/g)
@@ -233,7 +233,7 @@ describe('occtWorker.js dispatch table', () => {
 
   it("contains the opHolePattern function definition", () => {
     const src = readFileSync(
-      path.resolve(__dirname, '../lib/occtWorker.js'),
+      path.resolve(__dirname, '../lib/occtWorker.ts'),
       'utf8',
     )
     expect(src).toContain('function opHolePattern(')
@@ -241,7 +241,7 @@ describe('occtWorker.js dispatch table', () => {
 
   it("contains the cutCylinderAtPoint helper function", () => {
     const src = readFileSync(
-      path.resolve(__dirname, '../lib/occtWorker.js'),
+      path.resolve(__dirname, '../lib/occtWorker.ts'),
       'utf8',
     )
     expect(src).toContain('function cutCylinderAtPoint(')
@@ -249,7 +249,7 @@ describe('occtWorker.js dispatch table', () => {
 
   it("contains the parseSketchPoints helper function", () => {
     const src = readFileSync(
-      path.resolve(__dirname, '../lib/occtWorker.js'),
+      path.resolve(__dirname, '../lib/occtWorker.ts'),
       'utf8',
     )
     expect(src).toContain('function parseSketchPoints(')
@@ -257,7 +257,7 @@ describe('occtWorker.js dispatch table', () => {
 
   it("opHole still calls cutCylinderAtPoint (refactor did not break hole)", () => {
     const src = readFileSync(
-      path.resolve(__dirname, '../lib/occtWorker.js'),
+      path.resolve(__dirname, '../lib/occtWorker.ts'),
       'utf8',
     )
     // The refactored opHole should delegate to cutCylinderAtPoint.

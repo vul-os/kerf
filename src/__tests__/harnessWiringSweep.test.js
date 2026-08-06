@@ -27,7 +27,7 @@ import { parseFeature, serializeFeature } from '../lib/occtRunner.js'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const workerSrc = readFileSync(
-  path.resolve(__dirname, '../lib/occtWorker.js'),
+  path.resolve(__dirname, '../lib/occtWorker.ts'),
   'utf8',
 )
 

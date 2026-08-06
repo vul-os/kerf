@@ -1,24 +1,46 @@
 // occtWorker.js — Web Worker that lazy-loads opencascade.js (OCCT compiled
 // to WebAssembly) and evaluates feature trees into triangulated meshes.
 //
-// Message protocol:
+// Message protocol (T-506 cross-check against the actual `self.addEventListener`
+// handler and every `postMessage(...)` call site — see src/types/workers.ts for
+// the typed version of this same protocol; two drifts found and corrected here,
+// documented rather than silently folded into workers.ts):
 //
 //   IN:  { type: 'evaluate', runId, tree, sketches }
-//          tree     — array of FeatureNode  (see types in occtRunner.js)
+//          tree     — array of FeatureNode  (see types in occtRunner.ts)
 //          sketches — { '<sketch_path>': SketchJSON, ... }
 //   OUT: { type: 'result', runId, meshes: [{ id, vertices, indices, normals,
 //                                            faceIds, faceMeta,
 //                                            edgeSegs, edgeIds, edgeMap }] }
-//   OUT: { type: 'error',  runId, message, stack? }
-//   OUT: { type: 'progress', runId, stage }   (rare; reserved for v2)
+//   OUT: { type: 'error',  runId, message, stack?, partial }
+//          `partial` (a re-triangulated partial Mesh, or null) was previously
+//          undocumented here even though the handler has always sent it —
+//          workers.ts's OcctErrorMessage already modeled it correctly.
+//   OUT: { type: 'progress', runId, stage }   (rare; reserved for v2 — still
+//          true: no call site in this file ever posts `type: 'progress'`.)
 //
 //   IN:  { type: 'face_outline', runId, tree, sketches, faceId }
 //        Re-evaluates the tree, finds the face by id, returns its planar
 //        outline + frame so the main thread can build a sketch on it or a
 //        push/pull preview.
 //   OUT: { type: 'face_outline_result', runId, ok: true,
-//          frame: { origin, normal, uDir, vDir }, outline: [[u,v],...] }
+//          frame: { origin, normal, uDir, vDir }, outline: [[u,v],...],
+//          planar, faceNames }
+//          `planar` and `faceNames` were previously undocumented here even
+//          though the handler has always sent them — workers.ts's
+//          OcctFaceOutlineOkMessage already modeled both correctly.
 //   OUT: { type: 'face_outline_result', runId, ok: false, reason }
+//
+//   Two more OUT message types exist that are documented in NEITHER this
+//   header nor src/types/workers.ts's OcctWorkerResponse union — genuine
+//   protocol drift, left unresolved here per T-506 instructions (report,
+//   don't silently widen the shared type):
+//     - { type: 'surface_curvature_combs_result', nodeId, targetRef,
+//         faceSamples, scaleFactor, showCombs } — posted by the
+//         surface_curvature_combs op as a side-channel while tree evaluation
+//         is still in flight (see opSurfaceCurvatureCombs below).
+//     - { type: 'occt_g3_audit_result', nodeId, targetRef, dnPresent,
+//         faceResults } — same pattern, posted by opOcctG3Audit.
 //
 // Worker boot:
 //   We construct the OCCT module on demand via opencascade.js's
@@ -35,6 +57,69 @@
 //   array. After each feature is consumed (its result has been merged into
 //   the running shape) we delete intermediates immediately. Final shapes
 //   are deleted after triangulation.
+//
+// Typing note (T-506): follows T-503's occtBridge.ts precedent — `OcInstance`/
+// `OcHandle` (both `any` under the hood; opencascade.js ships zero `.d.ts`s)
+// are imported from occtBridge.ts rather than redeclared. `OpNode` below is
+// this file's own addition: every op function receives a FeatureNode that
+// evaluateTree() has already decorated with worker-internal bookkeeping
+// fields (`_sketches`, `_faceNames` — not part of the wire FeatureNode shape
+// in @/types) and then reads fields specific to its own FeatureNode member
+// (PadFeatureNode.distance, PocketFeatureNode.depth, …). Separately, a T-506
+// finding while typing this file: the 'pad'/'boss_with_draft' cases below
+// also read `node._prevId`, which is never actually set anywhere — not by
+// this decoration, not by occtRunner.ts, not in the wire shape. Dead code
+// (the `|| \`body-${meshes.length}\`` fallback always wins), left as-is per
+// T-506 instructions to report rather than fix; see the cast at each read
+// site.
+// Modeling that precisely would mean either re-deriving a decorated variant
+// of every one of the ~29 FeatureNode members, or fighting the compiler at
+// each of the ~90 op/helper functions on fields the broad union doesn't
+// guarantee for that call — real, but out of scope for this pass; flagged
+// as a good follow-up (per T-506's own instructions to land the rename +
+// protocol typing first and tighten in a later commit on this file).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type OpNode = any
+
+/**
+ * Several op functions throw a plain `Error` decorated ad-hoc with a
+ * `.code` (machine-readable reason, e.g. `'BAD_ARGS'`, read defensively by
+ * some callers) and/or `.partial` (a partially-built OCCT shape recovered
+ * before the failure — evaluateTree's per-node catch stamps this on
+ * re-throw so the top-level `self.addEventListener` handler can send back a
+ * best-effort triangulated mesh). Neither field exists on the lib.es5
+ * `Error` type.
+ */
+type OpError = Error & { code?: string; partial?: OcHandle }
+
+/**
+ * Mutable "out" parameter several op functions (fillet/chamfer/shell/push_pull/
+ * cut_from_sketch/boolean) use to hand back their internal OCCT builder — so
+ * evaluateTree/evaluateToFinalShape's dispatch loop can build a face-naming
+ * closure that captures it after the call returns. push_pull and
+ * cut_from_sketch additionally hand back the extrusion `frame` (from
+ * occtBridge.ts's `faceFrame()`) so the namer can read `.normal`. Passed in
+ * as `{}` by the caller and filled in by the callee.
+ */
+interface BuilderRef {
+  builder?: OcHandle
+  frame?: FaceMeta | null
+}
+
+import type { OcInstance, OcHandle, BareMesh } from './occtBridge.js'
+import type {
+  FeatureNode,
+  SketchMap,
+  SketchJSON,
+  SketchPlane,
+  FaceDescriptor,
+  FaceNameMap,
+  ModifiedMap,
+  Vec3,
+  Mesh,
+  FaceMeta,
+} from '../types/geometry.js'
+import type { OcctWorkerRequest, OcctWorkerResponse } from '../types/workers.js'
 
 import {
   makeTracker, track, freeAll, cleanupShape,
@@ -44,7 +129,13 @@ import {
   resolveAxisRef, resolvePlaneRef,
   sketchToWire, geom2ToWire, placeWireOnPlane,
   buildVariableRadiusLaw,
-  surfaceToSolid, SurfaceToSolidUnsupportedError,
+  surfaceToSolid,
+  // Imported but not referenced by name anywhere below (only in comments) —
+  // a T-506 dead-code finding, same class as the countFaceEdges/_prevId ones
+  // documented elsewhere in this file. Kept (aliased with the repo's `_`
+  // unused-vars convention rather than dropped) because toSolidWorker.test.js
+  // pins its presence in this import block as part of its source-wiring probe.
+  SurfaceToSolidUnsupportedError as _SurfaceToSolidUnsupportedError,
   projectCurveOntoSurface, splitFaceAlongCurve, TrimByCurveUnsupportedError,
   sampleSurfaceCurvature,
   sampleSurfaceThirdDeriv, probeOcctG3Bindings, OcctG3UnsupportedError,
@@ -70,7 +161,7 @@ import { resolveFaceRef } from './faceRef.js'
 // emscripten loader fetches the right file at runtime.
 import wasmUrl from 'opencascade.js/dist/opencascade.wasm.wasm?url'
 
-let ocPromise = null
+let ocPromise: Promise<OcInstance> | null = null
 
 // ---------------------------------------------------------------------------
 // NURBS booleans v1 — T1: binding probe
@@ -93,7 +184,7 @@ const NURBS_BOOLEAN_BINDINGS = [
  * @param {object} oc — resolved opencascade.js handle
  * @returns {{ BRepBuilderAPI_Sewing: boolean, BRepBuilderAPI_MakeSolid_1: boolean, BRepAlgoAPI_Common_3: boolean }}
  */
-export function getNurbsBooleanBindings(oc) {
+export function getNurbsBooleanBindings(oc: OcInstance): Record<string, boolean> {
   return Object.fromEntries(
     NURBS_BOOLEAN_BINDINGS.map(cls => [cls, typeof oc[cls] === 'function'])
   )
@@ -105,10 +196,10 @@ export function getNurbsBooleanBindings(oc) {
  *
  * @param {object} oc — resolved opencascade.js handle
  */
-function _logNurbsBooleanBindings(oc) {
+function _logNurbsBooleanBindings(oc: OcInstance): void {
   for (const cls of NURBS_BOOLEAN_BINDINGS) {
     const status = typeof oc[cls] === 'function' ? 'OK' : 'MISSING'
-    // eslint-disable-next-line no-console
+     
     console.log(`[occt-bindings] ${cls}: ${status}`)
   }
 }
@@ -203,7 +294,7 @@ const NURBS_PHASE4_ALL_BINDINGS = [
  * @param {object} oc — resolved opencascade.js handle
  * @returns {Record<string, boolean>}
  */
-export function getNurbsPhase4Bindings(oc) {
+export function getNurbsPhase4Bindings(oc: OcInstance): Record<string, boolean> {
   return Object.fromEntries(
     NURBS_PHASE4_ALL_BINDINGS.map(cls => [cls, typeof oc[cls] === 'function'])
   )
@@ -224,7 +315,7 @@ export function getNurbsPhase4Bindings(oc) {
  * @param {object} oc — resolved opencascade.js handle
  * @returns {Record<string, boolean>}
  */
-export function getNurbsPhase4C2Bindings(oc) {
+export function getNurbsPhase4C2Bindings(oc: OcInstance): Record<string, boolean> {
   return Object.fromEntries(
     NURBS_PHASE4_C2_BINDINGS.map(cls => [cls, typeof oc[cls] === 'function'])
   )
@@ -241,7 +332,7 @@ export function getNurbsPhase4C2Bindings(oc) {
  * @param {object} oc — resolved opencascade.js handle
  * @returns {Record<string, boolean>}
  */
-export function getNurbsPhase4G3Bindings(oc) {
+export function getNurbsPhase4G3Bindings(oc: OcInstance): Record<string, boolean> {
   return Object.fromEntries(
     NURBS_PHASE4_G3_BINDINGS.map(cls => [cls, typeof oc[cls] === 'function'])
   )
@@ -254,15 +345,15 @@ export function getNurbsPhase4G3Bindings(oc) {
  *
  * @param {object} oc — resolved opencascade.js handle
  */
-function _logNurbsPhase4C2Bindings(oc) {
+function _logNurbsPhase4C2Bindings(oc: OcInstance): void {
   const statuses = NURBS_PHASE4_C2_BINDINGS.map(cls => {
     const ok = typeof oc[cls] === 'function'
-    // eslint-disable-next-line no-console
+     
     console.info(`[occt-phase4] C2 (trim-by-curve) — ${cls}: ${ok ? 'OK' : 'MISSING'}`)
     return ok
   })
   const allOk = statuses.every(Boolean)
-  // eslint-disable-next-line no-console
+   
   console.info(`[occt-phase4] C2 (trim-by-curve) gate: ${allOk ? 'GO' : 'PARTIAL/BLOCKED'}`)
 }
 
@@ -270,8 +361,8 @@ function _logNurbsPhase4C2Bindings(oc) {
  * Log Phase 4 binding probe results at boot.
  * Groups output by capability so the console is readable.
  */
-function _logNurbsPhase4Bindings(oc) {
-  const groups = [
+function _logNurbsPhase4Bindings(oc: OcInstance): void {
+  const groups: Array<[string, string[]]> = [
     ['C1 (surface-direct booleans)', NURBS_PHASE4_C1_BINDINGS],
     ['C2 (trim-by-curve)',           NURBS_PHASE4_C2_BINDINGS],
     ['C3 (matchSrf)',                NURBS_PHASE4_C3_BINDINGS],
@@ -281,19 +372,19 @@ function _logNurbsPhase4Bindings(oc) {
   for (const [label, classes] of groups) {
     const statuses = classes.map(cls => {
       const ok = typeof oc[cls] === 'function'
-      // eslint-disable-next-line no-console
+       
       console.info(`[occt-phase4] ${label} — ${cls}: ${ok ? 'OK' : 'MISSING'}`)
       return ok
     })
     const allOk = statuses.every(Boolean)
-    // eslint-disable-next-line no-console
+     
     console.info(`[occt-phase4] ${label} gate: ${allOk ? 'GO' : 'PARTIAL/BLOCKED'}`)
   }
 }
 
 // Lazy-init OCCT. Returns a Promise<oc>. The first call kicks off the wasm
 // download + compile; subsequent calls re-use the resolved module.
-function loadOcct() {
+function loadOcct(): Promise<OcInstance> {
   if (ocPromise) return ocPromise
   ocPromise = (async () => {
     const mod = await import('opencascade.js')
@@ -316,7 +407,7 @@ function loadOcct() {
 // We accept either the raw Sketch JSON object passed in `sketches`, or
 // (rarely) one already pre-parsed.
 
-function buildFaceFromSketchJson(oc, sketchJson, tracker) {
+function buildFaceFromSketchJson(oc: OcInstance, sketchJson: string | SketchJSON | null | undefined, tracker: OcHandle[]): OcHandle | null {
   const sketch = parseSketch(typeof sketchJson === 'string' ? sketchJson : JSON.stringify(sketchJson))
   // sketchToGeom2 is pure JS (no OCCT) and returns a JSCAD Geom2 with `sides`.
   // We pull the polyline rings and feed them into ringsToFace.
@@ -332,7 +423,7 @@ function buildFaceFromSketchJson(oc, sketchJson, tracker) {
 // Apply the sketch's plane to a face built on Z=0. We rotate the XY-plane
 // face into the target plane (XZ → rotate -90° around X; YZ → rotate +90°
 // around Y). For face-anchored sketches (v2) we'd take an arbitrary frame.
-function placeFaceOnPlane(oc, face, plane, tracker) {
+function placeFaceOnPlane(oc: OcInstance, face: OcHandle | null, plane: SketchPlane | null | undefined, tracker: OcHandle[]): OcHandle | null {
   if (!face || !plane) return face
   if (plane.type === 'face' && plane.frame
       && plane.frame.origin && plane.frame.normal && plane.frame.uDir && plane.frame.vDir) {
@@ -375,14 +466,14 @@ function placeFaceOnPlane(oc, face, plane, tracker) {
 }
 
 // Build a TopoDS_Face from a feature node's sketch_path.
-function faceForSketchPath(oc, path, sketches, tracker) {
+function faceForSketchPath(oc: OcInstance, path: string | null | undefined, sketches: SketchMap, tracker: OcHandle[]): OcHandle | null {
   if (!path) return null
   const json = sketches?.[path]
   if (!json) return null
   const face = buildFaceFromSketchJson(oc, json, tracker)
   if (!face) return null
   // Apply the sketch's plane orientation.
-  let plane = { type: 'base', name: 'XY' }
+  let plane: SketchPlane = { type: 'base', name: 'XY' }
   try {
     const parsed = typeof json === 'string' ? JSON.parse(json) : json
     if (parsed?.plane) plane = parsed.plane
@@ -398,7 +489,7 @@ function faceForSketchPath(oc, path, sketches, tracker) {
 // into the new one; helpers must not delete the previous shape themselves —
 // the caller's evaluation loop owns its lifecycle.
 
-function opPad(oc, _prev, node, sketches, tracker) {
+function opPad(oc: OcInstance, _prev: OcHandle, node: OpNode, sketches: SketchMap, tracker: OcHandle[]) {
   const face = faceForSketchPath(oc, node.sketch_path, sketches, tracker)
   if (!face) throw new Error(`pad: sketch '${node.sketch_path}' produced no profile`)
   const h = Math.abs(Number(node.height) || 0)
@@ -439,7 +530,7 @@ function opPad(oc, _prev, node, sketches, tracker) {
 // centroid-normal is within 15° of parallel to axisDir (dot product ≥ 0.966).
 // That threshold is tight enough to exclude the flat caps on any reasonable
 // prism, and loose enough to tolerate sub-1° floating-point noise.
-function walkSideFaces(oc, shape, axisDir) {
+function walkSideFaces(oc: OcInstance, shape: OcHandle, axisDir: number[]) {
   const [ax, ay, az] = axisDir
   const axLen = Math.sqrt(ax * ax + ay * ay + az * az)
   if (axLen < 1e-10) return []
@@ -496,7 +587,7 @@ function walkSideFaces(oc, shape, axisDir) {
 // `draft_direction`:
 //   'outward'  → positive angle widens the prism away from the sketch plane.
 //   'inward'   → negate the angle so the prism narrows toward the sketch plane.
-function opBossWithDraft(oc, _prev, node, sketches, tracker) {
+function opBossWithDraft(oc: OcInstance, _prev: OcHandle, node: OpNode, sketches: SketchMap, tracker: OcHandle[]) {
   const face = faceForSketchPath(oc, node.sketch_path, sketches, tracker)
   if (!face) throw new Error(`boss_with_draft: sketch '${node.sketch_path}' produced no profile`)
 
@@ -592,7 +683,7 @@ function opBossWithDraft(oc, _prev, node, sketches, tracker) {
   return draftBuilder.Shape()
 }
 
-function opPocket(oc, prev, node, sketches, tracker) {
+function opPocket(oc: OcInstance, prev: OcHandle, node: OpNode, sketches: SketchMap, tracker: OcHandle[]) {
   if (!prev) throw new Error('pocket: no target shape (must follow a pad)')
   const face = faceForSketchPath(oc, node.sketch_path, sketches, tracker)
   if (!face) throw new Error(`pocket: sketch '${node.sketch_path}' produced no profile`)
@@ -623,7 +714,7 @@ function opPocket(oc, prev, node, sketches, tracker) {
   return cut.Shape()
 }
 
-function opRevolve(oc, _prev, node, sketches, tracker) {
+function opRevolve(oc: OcInstance, _prev: OcHandle, node: OpNode, sketches: SketchMap, tracker: OcHandle[]) {
   const face = faceForSketchPath(oc, node.sketch_path, sketches, tracker)
   if (!face) throw new Error(`revolve: sketch '${node.sketch_path}' produced no profile`)
   const angle = ((Number(node.angle_deg) || 360) * Math.PI) / 180
@@ -643,7 +734,7 @@ function opRevolve(oc, _prev, node, sketches, tracker) {
   return builder.Shape()
 }
 
-function opFillet(oc, prev, node, _sketches, tracker, builderRef) {
+function opFillet(oc: OcInstance, prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[], builderRef: BuilderRef) {
   if (!prev) throw new Error('fillet: no target shape')
   const r = Number(node.radius) || 0
   if (r <= 0) throw new Error('fillet: radius must be > 0')
@@ -661,7 +752,7 @@ function opFillet(oc, prev, node, _sketches, tracker, builderRef) {
   return builder.Shape()
 }
 
-function opChamfer(oc, prev, node, _sketches, tracker, builderRef) {
+function opChamfer(oc: OcInstance, prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[], builderRef: BuilderRef) {
   if (!prev) throw new Error('chamfer: no target shape')
   const dist = Number(node.distance) || 0
   if (dist <= 0) throw new Error('chamfer: distance must be > 0')
@@ -680,7 +771,7 @@ function opChamfer(oc, prev, node, _sketches, tracker, builderRef) {
   return builder.Shape()
 }
 
-function opShell(oc, prev, node, _sketches, tracker, builderRef) {
+function opShell(oc: OcInstance, prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[], builderRef: BuilderRef) {
   if (!prev) throw new Error('shell: no target shape')
   const t = Number(node.thickness) || 0
   if (t <= 0) throw new Error('shell: thickness must be > 0')
@@ -748,7 +839,7 @@ function opShell(oc, prev, node, _sketches, tracker, builderRef) {
  * @param {object} tracker  - OCCT memory tracker (from makeTracker)
  * @returns {object} the resulting BRep shape after the boolean cut
  */
-function cutCylinderAtPoint(oc, body, cx, cy, dia, depth, tracker) {
+function cutCylinderAtPoint(oc: OcInstance, body: OcHandle, cx: number, cy: number, dia: number, depth: number, tracker: OcHandle[]) {
   const ax1 = track(tracker, new oc.gp_Ax2_3(
     track(tracker, new oc.gp_Pnt_3(cx, cy, depth)),
     track(tracker, new oc.gp_Dir_4(0, 0, -1)),
@@ -763,7 +854,7 @@ function cutCylinderAtPoint(oc, body, cx, cy, dia, depth, tracker) {
   return cut.Shape()
 }
 
-function opHole(oc, prev, node, _sketches, tracker) {
+function opHole(oc: OcInstance, prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   // v1 hole: cut a cylinder of `diameter` × `depth` through the previous
   // shape, centered at a point picked from the sketch. Center selection
   // priority:
@@ -808,7 +899,7 @@ function opHole(oc, prev, node, _sketches, tracker) {
  * @param {string|object|null} sketchJson
  * @returns {Array<{x:number, y:number}>}
  */
-function parseSketchPoints(sketchJson) {
+function parseSketchPoints(sketchJson: string | SketchJSON | null | undefined) {
   if (!sketchJson) return []
   try {
     const obj = typeof sketchJson === 'string' ? JSON.parse(sketchJson) : sketchJson
@@ -823,7 +914,7 @@ function parseSketchPoints(sketchJson) {
   } catch { return [] }
 }
 
-function opHolePattern(oc, prev, node, _sketches, tracker) {
+function opHolePattern(oc: OcInstance, prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   // Parametric hole pattern: iterate every non-origin point in the sketch
   // and call cutCylinderAtPoint for each one.  Non-point sketch entities
   // (lines, arcs, circles) are silently ignored so the user can include
@@ -857,7 +948,7 @@ function opHolePattern(oc, prev, node, _sketches, tracker) {
 // always operates on the full current shape; the LLM tools may bypass and
 // generate a fresh body via a separate Pad-then-pattern pipeline.
 
-function opLinearPattern(oc, prev, node, _sketches, tracker) {
+function opLinearPattern(oc: OcInstance, prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   if (!prev) throw new Error('linear_pattern: no target shape')
   const count = Math.max(1, Math.floor(Number(node.count) || 1))
   const spacing = Number(node.spacing) || 0
@@ -877,7 +968,7 @@ function opLinearPattern(oc, prev, node, _sketches, tracker) {
   return fused
 }
 
-function opPolarPattern(oc, prev, node, _sketches, tracker) {
+function opPolarPattern(oc: OcInstance, prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   if (!prev) throw new Error('polar_pattern: no target shape')
   const count = Math.max(1, Math.floor(Number(node.count) || 1))
   const totalDeg = Number(node.total_angle_deg)
@@ -897,7 +988,7 @@ function opPolarPattern(oc, prev, node, _sketches, tracker) {
   return fused
 }
 
-function opMirrorPattern(oc, prev, node, _sketches, tracker) {
+function opMirrorPattern(oc: OcInstance, prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   if (!prev) throw new Error('mirror_pattern: no target shape')
   const plane = resolvePlaneRef(oc, prev, node.plane)
   if (!plane) throw new Error(`mirror_pattern: cannot resolve plane '${node.plane}'`)
@@ -920,7 +1011,7 @@ function opMirrorPattern(oc, prev, node, _sketches, tracker) {
 //
 // T4: opCutFromSketch uses resolveFaceRef — tries target_face_name first,
 // falls back to target_face_id integer.
-function opCutFromSketch(oc, prev, node, sketches, tracker, builderRef) {
+function opCutFromSketch(oc: OcInstance, prev: OcHandle, node: OpNode, sketches: SketchMap, tracker: OcHandle[], builderRef: BuilderRef) {
   if (!prev) throw new Error('cut_from_sketch: no target shape (must follow a body-building op)')
   const depth = Number(node.depth) || 0
   if (depth <= 0) throw new Error('cut_from_sketch: depth must be > 0')
@@ -955,15 +1046,20 @@ function opCutFromSketch(oc, prev, node, sketches, tracker, builderRef) {
   //    placeFaceOnPlane already handles the face-anchored case: we pass a
   //    plane spec with type='face' and the resolved world-space frame from
   //    faceFrame (origin, normal, uDir, vDir).
+  // Synthetic plane spec: placeFaceOnPlane's face-anchored branch only reads
+  // `.frame` (origin/normal/uDir/vDir), so this intentionally omits
+  // SketchPlaneFace's file_id/feature_node_id/face_id — this isn't a real
+  // persisted sketch plane, just a vehicle for handing the resolved frame
+  // through the same code path.
   const plane = {
-    type: 'face',
+    type: 'face' as const,
     frame: {
       origin: frame.origin,
       normal: frame.normal,
       uDir: frame.uDir,
       vDir: frame.vDir,
     },
-  }
+  } as SketchPlane
   const orientedProfile = placeFaceOnPlane(oc, profileFace, plane, tracker)
   if (!orientedProfile) {
     throw new Error('cut_from_sketch: failed to orient profile onto target face frame')
@@ -999,7 +1095,7 @@ function opCutFromSketch(oc, prev, node, sketches, tracker, builderRef) {
 // extruding by `distance` along the face normal, then fuse-or-cut against
 // the body.
 // T4: opPushPull uses resolveFaceRef — tries face_name first, falls back to face_id.
-function opPushPull(oc, prev, node, _sketches, tracker, builderRef) {
+function opPushPull(oc: OcInstance, prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[], builderRef: BuilderRef) {
   if (!prev) throw new Error('push_pull: no target shape')
   const distance = Number(node.distance) || 0
   if (distance === 0) return prev
@@ -1053,7 +1149,7 @@ function opPushPull(oc, prev, node, _sketches, tracker, builderRef) {
 // honoured (XY / XZ / YZ; face-anchored sweep paths are NOT supported in v1
 // because MakePipeShell needs a continuous spine and the face-frame baking
 // path doesn't yet produce one for arbitrary chains).
-function wireForSketchPath(oc, path, sketches, tracker, { closed = null, preferGeom2 = false } = {}) {
+function wireForSketchPath(oc: OcInstance, path: string, sketches: SketchMap, tracker: OcHandle[], { closed = null, preferGeom2 = false }: { closed?: boolean | null; preferGeom2?: boolean } = {}) {
   if (!path) return null
   const json = sketches?.[path]
   if (!json) return null
@@ -1084,7 +1180,7 @@ function wireForSketchPath(oc, path, sketches, tracker, { closed = null, preferG
 // "auto" or "frenet" pipe shell, MakeSolid() if the profile is closed.
 // Twist/scale law functions are wired through if the bindings expose them
 // — otherwise we degrade silently (the no-twist sweep is still useful).
-function opSweep1(oc, _prev, node, sketches, tracker) {
+function opSweep1(oc: OcInstance, _prev: OcHandle, node: OpNode, sketches: SketchMap, tracker: OcHandle[]) {
   const profileFace = faceForSketchPath(oc, node.profile_sketch_path, sketches, tracker)
   if (!profileFace) {
     throw new Error(`sweep1: profile sketch '${node.profile_sketch_path}' produced no profile`)
@@ -1147,7 +1243,7 @@ function opSweep1(oc, _prev, node, sketches, tracker) {
       throw new Error('no Add overload')
     }
   } catch (err) {
-    throw new Error(`sweep1: profile add failed: ${err?.message || err}`)
+    throw new Error(`sweep1: profile add failed: ${err?.message || err}`, { cause: err })
   }
   pipe.Build(new oc.Message_ProgressRange_1())
   if (!pipe.IsDone()) throw new Error('sweep1: pipe build failed')
@@ -1166,7 +1262,7 @@ function opSweep1(oc, _prev, node, sketches, tracker) {
 // Wraps BRepOffsetAPI_MakePipeShell with SetMode_3(rail2_wire, false, ...)
 // to wire rail2 as the auxiliary spine. Falls back to Frenet mode if the
 // SetMode_3 binding is unavailable on this OpenCASCADE.js build.
-function opSweep2(oc, _prev, node, sketches, tracker) {
+function opSweep2(oc: OcInstance, _prev: OcHandle, node: OpNode, sketches: SketchMap, tracker: OcHandle[]) {
   const profileFace = faceForSketchPath(oc, node.profile_sketch_path, sketches, tracker)
   if (!profileFace) {
     throw new Error(`sweep2: profile sketch '${node.profile_sketch_path}' produced no profile`)
@@ -1217,7 +1313,7 @@ function opSweep2(oc, _prev, node, sketches, tracker) {
       throw new Error('no Add overload')
     }
   } catch (err) {
-    throw new Error(`sweep2: profile add failed: ${err?.message || err}`)
+    throw new Error(`sweep2: profile add failed: ${err?.message || err}`, { cause: err })
   }
   pipe.Build(new oc.Message_ProgressRange_1())
   if (!pipe.IsDone()) throw new Error('sweep2: pipe build failed')
@@ -1237,18 +1333,18 @@ function opSweep2(oc, _prev, node, sketches, tracker) {
 // ThruSections doesn't accept guide curves on this binding, so we just
 // loft the U-curves and warn). Caller still gets a usable surface — the
 // fall-back is a coarser approximation rather than a hard failure.
-function opNetworkSrf(oc, _prev, node, sketches, tracker) {
+function opNetworkSrf(oc: OcInstance, _prev: OcHandle, node: OpNode, sketches: SketchMap, tracker: OcHandle[]) {
   const uPaths = Array.isArray(node.u_curves) ? node.u_curves
     : Array.isArray(node.u_sketch_paths) ? node.u_sketch_paths : []
   const vPaths = Array.isArray(node.v_curves) ? node.v_curves
     : Array.isArray(node.v_sketch_paths) ? node.v_sketch_paths : []
   if (uPaths.length < 2) {
-    const e = new Error('network_srf: need at least 2 U-curves')
+    const e: OpError = new Error('network_srf: need at least 2 U-curves')
     e.code = 'BAD_ARGS'
     throw e
   }
   if (vPaths.length < 2) {
-    const e = new Error('network_srf: need at least 2 V-curves')
+    const e: OpError = new Error('network_srf: need at least 2 V-curves')
     e.code = 'BAD_ARGS'
     throw e
   }
@@ -1295,7 +1391,7 @@ function opNetworkSrf(oc, _prev, node, sketches, tracker) {
       if (typeof builder.AddWire === 'function') builder.AddWire(w)
       else if (typeof builder.AddWire_1 === 'function') builder.AddWire_1(w)
     } catch (err) {
-      throw new Error(`network_srf: AddWire failed: ${err?.message || err}`)
+      throw new Error(`network_srf: AddWire failed: ${err?.message || err}`, { cause: err })
     }
   }
   if (cont === 'C1' || cont === 'C2') {
@@ -1316,33 +1412,33 @@ function opNetworkSrf(oc, _prev, node, sketches, tracker) {
 // the BRepFill_Filling constructor is missing on this build (some
 // opencascade.js builds omit it), we throw BAD_ARGS so the caller can
 // detect and degrade.
-function opBlendSrf(oc, prev, node, _sketches, tracker) {
+function opBlendSrf(oc: OcInstance, prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   if (!prev) {
-    const e = new Error('blend_srf: no target shape (need an upstream feature)')
+    const e: OpError = new Error('blend_srf: no target shape (need an upstream feature)')
     e.code = 'BAD_ARGS'
     throw e
   }
   const e1 = Number(node.edge1_id)
   const e2 = Number(node.edge2_id)
   if (!Number.isFinite(e1) || !Number.isFinite(e2)) {
-    const e = new Error('blend_srf: edge1_id and edge2_id must be numeric')
+    const e: OpError = new Error('blend_srf: edge1_id and edge2_id must be numeric')
     e.code = 'BAD_ARGS'
     throw e
   }
   const edge1 = edgeById(oc, prev, e1)
   if (!edge1) {
-    const e = new Error(`blend_srf: edge id ${e1} not found on target`)
+    const e: OpError = new Error(`blend_srf: edge id ${e1} not found on target`)
     e.code = 'BAD_ARGS'
     throw e
   }
   const edge2 = edgeById(oc, prev, e2)
   if (!edge2) {
-    const e = new Error(`blend_srf: edge id ${e2} not found on target`)
+    const e: OpError = new Error(`blend_srf: edge id ${e2} not found on target`)
     e.code = 'BAD_ARGS'
     throw e
   }
   if (typeof oc.BRepFill_Filling === 'undefined') {
-    const e = new Error('blend_srf: BRepFill_Filling binding unavailable on this OCCT build')
+    const e: OpError = new Error('blend_srf: BRepFill_Filling binding unavailable on this OCCT build')
     e.code = 'BAD_ARGS'
     throw e
   }
@@ -1350,7 +1446,7 @@ function opBlendSrf(oc, prev, node, _sketches, tracker) {
   try {
     filler = track(tracker, new oc.BRepFill_Filling())
   } catch (err) {
-    const e = new Error(`blend_srf: BRepFill_Filling constructor failed: ${err?.message || err}`)
+    const e: OpError = new Error(`blend_srf: BRepFill_Filling constructor failed: ${err?.message || err}`)
     e.code = 'BAD_ARGS'
     throw e
   }
@@ -1377,7 +1473,7 @@ function opBlendSrf(oc, prev, node, _sketches, tracker) {
   if (!addEdge(edge1)) throw new Error('blend_srf: filling.Add(edge1) failed')
   if (!addEdge(edge2)) throw new Error('blend_srf: filling.Add(edge2) failed')
   try { filler.Build() } catch (err) {
-    throw new Error(`blend_srf: build failed: ${err?.message || err}`)
+    throw new Error(`blend_srf: build failed: ${err?.message || err}`, { cause: err })
   }
   if (typeof filler.IsDone === 'function' && !filler.IsDone()) {
     throw new Error('blend_srf: filling not done')
@@ -1385,7 +1481,7 @@ function opBlendSrf(oc, prev, node, _sketches, tracker) {
   // Face() returns the patch as a TopoDS_Face — a usable surface body.
   let face
   try { face = filler.Face() } catch (err) {
-    throw new Error(`blend_srf: Face() failed: ${err?.message || err}`)
+    throw new Error(`blend_srf: Face() failed: ${err?.message || err}`, { cause: err })
   }
   return face
 }
@@ -1414,7 +1510,7 @@ function opBlendSrf(oc, prev, node, _sketches, tracker) {
 // For base planes (XY/XZ/YZ) the origin is at the standard plane through
 // the world origin; for face-anchored planes the frame carries the exact
 // world position.
-function sketchPlaneFrame(sketchJson) {
+function sketchPlaneFrame(sketchJson: string | SketchJSON | null | undefined) {
   let parsed
   try { parsed = typeof sketchJson === 'string' ? JSON.parse(sketchJson) : sketchJson } catch { parsed = null }
   const plane = parsed?.plane || { type: 'base', name: 'XY' }
@@ -1429,7 +1525,7 @@ function sketchPlaneFrame(sketchJson) {
   return { origin: [0, 0, 0], normal: [0, 0, 1] }
 }
 
-function opLoft(oc, _prev, node, sketches, tracker) {
+function opLoft(oc: OcInstance, _prev: OcHandle, node: OpNode, sketches: SketchMap, tracker: OcHandle[]) {
   const paths = Array.isArray(node.profile_sketch_paths) ? node.profile_sketch_paths : []
   if (paths.length < 2) {
     throw new Error('loft: need at least 2 profile sketches')
@@ -1478,7 +1574,7 @@ function opLoft(oc, _prev, node, sketches, tracker) {
 
     // Mid-plane: origin = midpoint; normal = averaged normalised normals.
     const o0 = frame0.origin, o1 = frame1.origin
-    const midOrigin = [
+    const midOrigin: Vec3 = [
       (o0[0] + o1[0]) * 0.5,
       (o0[1] + o1[1]) * 0.5,
       (o0[2] + o1[2]) * 0.5,
@@ -1487,9 +1583,9 @@ function opLoft(oc, _prev, node, sketches, tracker) {
     // If they point in opposite directions, flip n1 before averaging.
     const rawDot = dn0[0] * dn1[0] + dn0[1] * dn1[1] + dn0[2] * dn1[2]
     const sign = rawDot >= 0 ? 1 : -1
-    const sumN = [dn0[0] + sign * dn1[0], dn0[1] + sign * dn1[1], dn0[2] + sign * dn1[2]]
+    const sumN: Vec3 = [dn0[0] + sign * dn1[0], dn0[1] + sign * dn1[1], dn0[2] + sign * dn1[2]]
     const sumLen = Math.sqrt(sumN[0] ** 2 + sumN[1] ** 2 + sumN[2] ** 2) || 1
-    const midNormal = sumN.map((v) => v / sumLen)
+    const midNormal = sumN.map((v) => v / sumLen) as Vec3
 
     // Mirror both wires across the mid-plane.
     // mirrorShape(oc, shape, origin, normal, tracker) → mirrored shape
@@ -1511,7 +1607,7 @@ function opLoft(oc, _prev, node, sketches, tracker) {
         if (typeof builder.AddWire === 'function') builder.AddWire(w)
         else if (typeof builder.AddWire_1 === 'function') builder.AddWire_1(w)
       } catch (err) {
-        throw new Error(`loft (symmetric): AddWire failed: ${err?.message || err}`)
+        throw new Error(`loft (symmetric): AddWire failed: ${err?.message || err}`, { cause: err })
       }
     }
     const cont = (node.continuity || 'C0').toUpperCase()
@@ -1534,7 +1630,7 @@ function opLoft(oc, _prev, node, sketches, tracker) {
       if (typeof builder.AddWire === 'function') builder.AddWire(wires[i])
       else if (typeof builder.AddWire_1 === 'function') builder.AddWire_1(wires[i])
     } catch (err) {
-      throw new Error(`loft: AddWire failed for '${paths[i]}': ${err?.message || err}`)
+      throw new Error(`loft: AddWire failed for '${paths[i]}': ${err?.message || err}`, { cause: err })
     }
   }
 
@@ -1618,7 +1714,7 @@ function opLoft(oc, _prev, node, sketches, tracker) {
 // If the law-function binding is also absent (older builds), we fall back
 // to a constant radius equal to the FIRST entry's radius and surface the
 // degradation in a console.warn.
-function opVariableRadiusFillet(oc, prev, node, _sketches, tracker) {
+function opVariableRadiusFillet(oc: OcInstance, prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   if (!prev) throw new Error('variable_radius_fillet: no target shape')
   const edges = Array.isArray(node.edges) ? node.edges : []
   if (edges.length === 0) throw new Error('variable_radius_fillet: no edges specified')
@@ -1690,7 +1786,7 @@ function opVariableRadiusFillet(oc, prev, node, _sketches, tracker) {
  * @param {object} face - TopoDS_Face
  * @returns {string} 'plane'|'cylinder'|'cone'|'sphere'|'torus'|'bspline'|'unknown'
  */
-function occtSurfaceKind(oc, face) {
+function occtSurfaceKind(oc: OcInstance, face: OcHandle) {
   try {
     const surf = oc.BRep_Tool.Surface_2(face)
     const ga = oc.GeomAdaptor_Surface
@@ -1724,11 +1820,16 @@ function occtSurfaceKind(oc, face) {
 
 /**
  * Count the edges in a face's outer wire.
+ *
+ * T-506 finding: dead code — never called anywhere in this file (or any
+ * other). Renamed with the repo's `_`-unused-vars convention rather than
+ * deleted, per instructions to report dead code rather than remove it.
+ *
  * @param {object} oc
  * @param {object} face - TopoDS_Face
  * @returns {number}
  */
-function countFaceEdges(oc, face) {
+function _countFaceEdges(oc: OcInstance, face: OcHandle) {
   let count = 0
   let exp
   try {
@@ -1745,7 +1846,7 @@ function countFaceEdges(oc, face) {
  * @param {object} edge - TopoDS_Edge
  * @returns {string} 'line'|'circle'|'ellipse'|'bspline'|'other'
  */
-function occtEdgeKind(oc, edge) {
+function occtEdgeKind(oc: OcInstance, edge: OcHandle) {
   try {
     const ea = new (oc.BRepAdaptor_Curve || oc.BRepAdaptor_Curve2d)(edge)
     const kind = ea.GetType?.()
@@ -1769,8 +1870,14 @@ function occtEdgeKind(oc, edge) {
  * @param {Record<number,string>} sketchEntityIdMap
  * @returns {import('./faceNaming.js').FaceDescriptor[]}
  */
-function extractFaceDescriptors(oc, shape, sketchEntityIdMap) {
-  const descriptors = []
+function extractFaceDescriptors(oc: OcInstance, shape: OcHandle, sketchEntityIdMap: Record<number, string>): FaceDescriptor[] {
+  // T-506 finding: geometry.ts's FaceDescriptor declares `isCap`/`isTop` as
+  // required booleans, but this — the primary FaceDescriptor producer — never
+  // sets either; only extractFaceDescriptorsWithCaps() below sets `isCap` via
+  // a later mutation pass, and `isTop` is never set anywhere in this file.
+  // Typed and cast at the return points below rather than silently widening
+  // the shared type or fabricating default values (a real behaviour change).
+  const descriptors: Array<Omit<FaceDescriptor, 'isCap' | 'isTop'>> = []
   // First pass: collect per-face data and build an edge → face-indices map.
   const faceShapes = []
   const faceEdgeSets = []  // faceEdgeSets[i] = Set of global edge indices
@@ -1784,7 +1891,7 @@ function extractFaceDescriptors(oc, shape, sketchEntityIdMap) {
   try {
     faceExp = new oc.TopExp_Explorer_2(shape, oc.TopAbs_ShapeEnum.TopAbs_FACE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE)
   } catch {
-    return descriptors
+    return descriptors as FaceDescriptor[]
   }
 
   for (; faceExp.More(); faceExp.Next()) {
@@ -1861,7 +1968,7 @@ function extractFaceDescriptors(oc, shape, sketchEntityIdMap) {
     for (const val of vertValenceMap.values()) vertexValences.push(val)
 
     // Normal at parametric midpoint.
-    let normalVec = [0, 0, 1]
+    let normalVec: Vec3 = [0, 0, 1]
     try {
       const surf = oc.BRep_Tool.Surface_2(face)
       const props = new oc.GeomLProp_SLProps_2(surf, 0.5, 0.5, 1, 1e-7)
@@ -1884,7 +1991,7 @@ function extractFaceDescriptors(oc, shape, sketchEntityIdMap) {
       sketchEntityId:  sketchEntityIdMap[i] ?? null,
     })
   }
-  return descriptors
+  return descriptors as FaceDescriptor[]
 }
 
 /**
@@ -1894,7 +2001,7 @@ function extractFaceDescriptors(oc, shape, sketchEntityIdMap) {
  * @param {string|object|null} sketchJson
  * @returns {string[]}
  */
-function extractWireEntityIds(sketchJson) {
+function extractWireEntityIds(sketchJson: string | SketchJSON | null | undefined) {
   if (!sketchJson) return []
   try {
     const obj = typeof sketchJson === 'string' ? JSON.parse(sketchJson) : sketchJson
@@ -1921,7 +2028,7 @@ function extractWireEntityIds(sketchJson) {
  * @param {boolean} [isPocket=false]
  * @returns {Record<string, string>}  faceIndex(string) → name
  */
-function computeExtrudeFaceNames(oc, resultShape, _prismBuilder, nodeId, axis, sketchJson, isPocket = false) {
+function computeExtrudeFaceNames(oc: OcInstance, resultShape: OcHandle, _prismBuilder: OcHandle, nodeId: string, axis: number[], sketchJson: string | SketchJSON | null | undefined, isPocket: boolean = false) {
   try {
     const wireEntityIds = extractWireEntityIds(sketchJson)
     // Position-based correlation: the k-th side face (non-cap, in explorer order)
@@ -1933,7 +2040,7 @@ function computeExtrudeFaceNames(oc, resultShape, _prismBuilder, nodeId, axis, s
       : {}
 
     const descriptors = extractFaceDescriptors(oc, resultShape, entityIdMap)
-    return buildFaceNamesForExtrude(nodeId, descriptors, axis, isPocket)
+    return buildFaceNamesForExtrude(nodeId, descriptors, axis as Vec3, isPocket)
   } catch {
     return {}
   }
@@ -1955,7 +2062,7 @@ function computeExtrudeFaceNames(oc, resultShape, _prismBuilder, nodeId, axis, s
  * @param {string[]} wireEntityIds  - entity ids in wire edge order
  * @returns {Record<number, string>}  faceIndex → entityId
  */
-function _buildPositionalEntityIdMap(oc, resultShape, axis, wireEntityIds) {
+function _buildPositionalEntityIdMap(oc: OcInstance, resultShape: OcHandle, axis: number[], wireEntityIds: string[]) {
   const map = {}
   if (!wireEntityIds || wireEntityIds.length === 0) return map
 
@@ -2009,14 +2116,14 @@ function _buildPositionalEntityIdMap(oc, resultShape, axis, wireEntityIds) {
  * @param {string|object|null} sketchJson
  * @returns {Record<string, string>}
  */
-function computeRevolveFaceNames(oc, resultShape, nodeId, axis, isFullCircle, sketchJson) {
+function computeRevolveFaceNames(oc: OcInstance, resultShape: OcHandle, nodeId: string, axis: number[], isFullCircle: boolean, sketchJson: string | SketchJSON | null | undefined) {
   try {
     const wireEntityIds = extractWireEntityIds(sketchJson)
     const entityIdMap = wireEntityIds.length > 0
       ? _buildPositionalEntityIdMap(oc, resultShape, axis, wireEntityIds)
       : {}
     const descriptors = extractFaceDescriptors(oc, resultShape, entityIdMap)
-    return buildFaceNamesForRevolve(nodeId, descriptors, axis, isFullCircle)
+    return buildFaceNamesForRevolve(nodeId, descriptors, axis as Vec3, isFullCircle)
   } catch {
     return {}
   }
@@ -2044,9 +2151,8 @@ function computeRevolveFaceNames(oc, resultShape, nodeId, axis, isFullCircle, sk
  * @param {object}   outputShape - TopoDS_Shape AFTER the op (builder.Shape())
  * @returns {import('./faceNaming.js').ModifiedMap}
  */
-function extractModifiedMap(oc, builder, inputShape, outputShape) {
-  /** @type {import('./faceNaming.js').ModifiedMap} */
-  const result = { modified: {}, generated: [], deletedInputs: new Set() }
+function extractModifiedMap(oc: OcInstance, builder: OcHandle, inputShape: OcHandle, outputShape: OcHandle): ModifiedMap {
+  const result: ModifiedMap = { modified: {}, generated: [], deletedInputs: new Set<number>() }
 
   // Build an output-face hashcode → index map so we can translate OCCT
   // shape pointers back to our 0-based face indices.
@@ -2189,7 +2295,7 @@ function extractModifiedMap(oc, builder, inputShape, outputShape) {
  * @param {number[]} [axis] - cap-detection axis; [0,0,1] when omitted
  * @returns {FaceDescriptor[]}
  */
-function extractFaceDescriptorsWithCaps(oc, shape, axis) {
+function extractFaceDescriptorsWithCaps(oc: OcInstance, shape: OcHandle, axis: number[]): FaceDescriptor[] {
   const descriptors = extractFaceDescriptors(oc, shape, {})
   if (!axis || axis.length < 3) return descriptors
   const [ax, ay, az] = axis
@@ -2214,7 +2320,7 @@ function extractFaceDescriptorsWithCaps(oc, shape, axis) {
  * @param {Record<number,string>} prevFaceNames - face names from prior namer
  * @returns {(oc_:object, shape:object) => Record<string,string>}
  */
-function makeFilletChamferNamer(oc, builder, inputShape, nodeId, opKind, prevFaceNames) {
+function makeFilletChamferNamer(oc: OcInstance, builder: OcHandle, inputShape: OcHandle, nodeId: string, opKind: string, prevFaceNames: FaceNameMap) {
   // Snapshot the inputShape reference and prevFaceNames at closure-creation
   // time so subsequent ops don't corrupt them.
   const snapshotInputShape = inputShape
@@ -2240,7 +2346,7 @@ function makeFilletChamferNamer(oc, builder, inputShape, nodeId, opKind, prevFac
  * @param {Record<number,string>} prevFaceNames
  * @returns {(oc_:object, shape:object) => Record<string,string>}
  */
-function makeShellNamer(oc, builder, inputShape, nodeId, prevFaceNames) {
+function makeShellNamer(oc: OcInstance, builder: OcHandle, inputShape: OcHandle, nodeId: string, prevFaceNames: FaceNameMap) {
   const snapshotInputShape = inputShape
   const snapshotPrev = { ...prevFaceNames }
   return (_oc, outputShape) => {
@@ -2266,7 +2372,7 @@ function makeShellNamer(oc, builder, inputShape, nodeId, prevFaceNames) {
  * @param {Record<number,string>} prevFaceNames
  * @returns {(oc_:object, shape:object) => Record<string,string>}
  */
-function makeCutFromSketchNamer(oc, builder, inputShape, nodeId, cutNormal, sketchEntityIds, prevFaceNames) {
+function makeCutFromSketchNamer(oc: OcInstance, builder: OcHandle, inputShape: OcHandle, nodeId: string, cutNormal: number[], sketchEntityIds: string[], prevFaceNames: FaceNameMap) {
   const snapshotInputShape = inputShape
   const snapshotPrev = { ...prevFaceNames }
   return (_oc, outputShape) => {
@@ -2291,7 +2397,7 @@ function makeCutFromSketchNamer(oc, builder, inputShape, nodeId, cutNormal, sket
  * @param {Record<number,string>} prevFaceNames
  * @returns {(oc_:object, shape:object) => Record<string,string>}
  */
-function makePushPullNamer(oc, builder, inputShape, nodeId, faceNormal, prevFaceNames) {
+function makePushPullNamer(oc: OcInstance, builder: OcHandle, inputShape: OcHandle, nodeId: string, faceNormal: number[], prevFaceNames: FaceNameMap) {
   const snapshotInputShape = inputShape
   const snapshotPrev = { ...prevFaceNames }
   return (_oc, outputShape) => {
@@ -2324,7 +2430,7 @@ function makePushPullNamer(oc, builder, inputShape, nodeId, faceNormal, prevFace
  * @param {Record<number,string>} faceNamesB - faceIndex → name for B
  * @returns {(oc_:object, shape:object) => Record<string,string>}
  */
-function makeBooleanNamer(oc, builder, shapeA, shapeB, nodeId, opKind, faceNamesA, faceNamesB) {
+function makeBooleanNamer(oc: OcInstance, builder: OcHandle, shapeA: OcHandle, shapeB: OcHandle, nodeId: string, opKind: string, faceNamesA: FaceNameMap, faceNamesB: FaceNameMap) {
   const snapA = { ...faceNamesA }
   const snapB = { ...faceNamesB }
   // Build a combined input shape from A+B so extractModifiedMap has a single
@@ -2382,7 +2488,7 @@ function makeBooleanNamer(oc, builder, shapeA, shapeB, nodeId, opKind, faceNames
  * @param {string}   nodeId
  * @returns {(oc_:object, shape:object) => Record<string,string>}
  */
-function makeSweepNamer(nodeId) {
+function makeSweepNamer(nodeId: string) {
   return (_oc, shape) => {
     try {
       const descs = extractFaceDescriptors(_oc, shape, {})
@@ -2397,7 +2503,7 @@ function makeSweepNamer(nodeId) {
  * @param {string}   nodeId
  * @returns {(oc_:object, shape:object) => Record<string,string>}
  */
-function makeLoftNamer(nodeId) {
+function makeLoftNamer(nodeId: string) {
   return (_oc, shape) => {
     try {
       const descs = extractFaceDescriptors(_oc, shape, {})
@@ -2431,7 +2537,7 @@ function makeLoftNamer(nodeId) {
 //   - makeSolidFromShell probe failed (via boot-time NURBS_BOOLEAN_BINDINGS)
 //     → fast-fail with a "wasm binding missing" message before calling sewer.
 
-function opToSolid(oc, prev, node, _sketches, tracker) {
+function opToSolid(oc: OcInstance, prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   if (!prev) {
     throw new Error('to_solid: no upstream shape — to_solid must follow a surface-producing op (sweep1, loft, network_srf, blend_srf, etc.)')
   }
@@ -2452,7 +2558,7 @@ function opToSolid(oc, prev, node, _sketches, tracker) {
   })
   if (warnings.length > 0 && typeof console !== 'undefined') {
     for (const w of warnings) {
-      // eslint-disable-next-line no-console
+       
       console.warn(`[to_solid] ${w}`)
     }
   }
@@ -2468,7 +2574,7 @@ function opToSolid(oc, prev, node, _sketches, tracker) {
  * Uses the numeric enum value 2 as a fallback when TopAbs_SOLID is not
  * directly accessible on the oc object.
  */
-function _isSolid(oc, shape) {
+function _isSolid(oc: OcInstance, shape: OcHandle) {
   if (!shape || typeof shape.ShapeType !== 'function') return false
   try {
     const st = shape.ShapeType()
@@ -2483,7 +2589,7 @@ function _isSolid(oc, shape) {
  * Return a human-readable name for the ShapeType of `shape`.
  * Used in error messages when a boolean receives a non-solid operand.
  */
-function _shapeKindName(oc, shape) {
+function _shapeKindName(oc: OcInstance, shape: OcHandle) {
   if (!shape || typeof shape.ShapeType !== 'function') return 'UNKNOWN'
   try {
     const st = shape.ShapeType()
@@ -2507,7 +2613,7 @@ function _shapeKindName(oc, shape) {
  * Uses TopExp_Explorer to look for at least one face; if none, the result
  * is considered empty. Falls back to false (non-empty) on probe failure.
  */
-function _isEmptyShape(oc, shape) {
+function _isEmptyShape(oc: OcInstance, shape: OcHandle) {
   if (!shape) return true
   try {
     const FACE  = oc.TopAbs_ShapeEnum?.TopAbs_FACE  ?? 4
@@ -2535,7 +2641,7 @@ function _isEmptyShape(oc, shape) {
  * Node schema:
  *   { op: "boolean", id, target_a_id, target_b_id, kind: "cut"|"fuse"|"common" }
  */
-function opBoolean(oc, _prev, node, _sketches, tracker, bodyMap, builderRef) {
+function opBoolean(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[], bodyMap: Record<string, OcHandle>, builderRef: BuilderRef) {
   const aId = node.target_a_id
   const bId = node.target_b_id
   if (!aId) throw new Error('boolean: target_a_id is required')
@@ -2629,7 +2735,7 @@ function opBoolean(oc, _prev, node, _sketches, tracker, bodyMap, builderRef) {
  * @param {object} bodyMap  - { [nodeId]: TopoDS_Shape } — prior evaluated shapes
  * @returns {object} TopoDS_Compound of intersection edges
  */
-function opSection(oc, _prev, node, _sketches, tracker, bodyMap) {
+function opSection(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[], bodyMap: Record<string, OcHandle>) {
   // ── Binding gate ──────────────────────────────────────────────────────────
   if (typeof oc.BRepAlgoAPI_Section !== 'function') {
     throw new Error(
@@ -2744,7 +2850,7 @@ function opSection(oc, _prev, node, _sketches, tracker, bodyMap) {
  * @param {object} tracker   — OCCT object lifetime tracker
  * @param {object} bodyMap   — { [nodeId]: TopoDS_Shape }
  */
-function opSurfaceBoolean(oc, _prev, node, _sketches, tracker, bodyMap) {
+function opSurfaceBoolean(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[], bodyMap: Record<string, OcHandle>) {
   const aId = node.target_a_id
   const bId = node.target_b_id
   if (!aId) throw new Error('surface_boolean: target_a_id is required')
@@ -2937,7 +3043,7 @@ function opSurfaceBoolean(oc, _prev, node, _sketches, tracker, bodyMap) {
  * @param {object} bodyMap   — { [nodeId]: TopoDS_Shape }
  * @returns {TopoDS_Shape}   — the trimmed face (kept side)
  */
-function opTrimByCurve(oc, prev, node, sketches, tracker, bodyMap) {
+function opTrimByCurve(oc: OcInstance, prev: OcHandle, node: OpNode, sketches: SketchMap, tracker: OcHandle[], bodyMap: Record<string, OcHandle>) {
   const c2 = getNurbsPhase4C2Bindings(oc)
 
   // Guard: we need at minimum a way to project points (GeomAPI_ProjectPointOnSurf
@@ -3020,14 +3126,14 @@ function opTrimByCurve(oc, prev, node, sketches, tracker, bodyMap) {
     : 1e-3
 
   // Attempt to resolve as a sketch path first.
-  let cutterWire = null
+  let cutterWire
   const sketchJson = sketches && (sketches[trimCurveRef] || sketches[trimCurveRef + '.sketch'])
   if (sketchJson) {
     // Build a 3D wire from the sketch using wireForSketchPath (same as opSweep1).
     try {
       cutterWire = wireForSketchPath(oc, trimCurveRef, sketches, tracker, { closed: null })
     } catch (err) {
-      throw new Error(`trim_by_curve: failed to build wire from sketch '${trimCurveRef}': ${err?.message || err}`)
+      throw new Error(`trim_by_curve: failed to build wire from sketch '${trimCurveRef}': ${err?.message || err}`, { cause: err })
     }
   } else if (bodyMap && bodyMap[trimCurveRef]) {
     // Resolve as a feature body — use its shape directly as the cutter wire.
@@ -3144,7 +3250,7 @@ function opTrimByCurve(oc, prev, node, sketches, tracker, bodyMap) {
 // @param {object} bodyMap  — { [nodeId]: TopoDS_Shape }
 // @returns {null}          — no shape mutation; result sent as a side message
 
-function opSurfaceCurvatureCombs(oc, _prev, node, _sketches, tracker, bodyMap) {
+function opSurfaceCurvatureCombs(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[], bodyMap: Record<string, OcHandle>) {
   const targetRef  = node.target_feature_ref
   const faceName   = node.target_face_name   || null
   const uvDensity  = typeof node.uv_density  === 'number' ? node.uv_density  : 0.1
@@ -3184,7 +3290,7 @@ function opSurfaceCurvatureCombs(oc, _prev, node, _sketches, tracker, bodyMap) {
       })
     }
   } catch (err) {
-    throw new Error(`surface_curvature_combs: face exploration failed: ${err?.message || err}`)
+    throw new Error(`surface_curvature_combs: face exploration failed: ${err?.message || err}`, { cause: err })
   } finally {
     try { if (exp) exp.delete() } catch { /* */ }
   }
@@ -3234,7 +3340,7 @@ function opSurfaceCurvatureCombs(oc, _prev, node, _sketches, tracker, bodyMap) {
 //     target_face_name?: string,    // sample only this face; else all faces
 //     uv_samples?: [[u,v], ...],    // explicit UV sites (default: seam grid)
 //   }
-function opOcctG3Audit(oc, _prev, node, _sketches, tracker, bodyMap) {
+function opOcctG3Audit(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[], bodyMap: Record<string, OcHandle>) {
   const targetRef = node.target_feature_ref
   const faceName  = node.target_face_name || null
   if (!targetRef) throw new Error('occt_g3_audit: target_feature_ref is required')
@@ -3329,7 +3435,7 @@ function opOcctG3Audit(oc, _prev, node, _sketches, tracker, bodyMap) {
  * @param {object}  tracker
  * @returns {object} transformed shape
  */
-function _jewelryTransform(oc, shape, pos, oriDeg, tracker) {
+function _jewelryTransform(oc: OcInstance, shape: OcHandle, pos: number[], oriDeg: number[], tracker: OcHandle[]) {
   const rx = ((oriDeg && oriDeg[0]) || 0) * Math.PI / 180
   const ry = ((oriDeg && oriDeg[1]) || 0) * Math.PI / 180
   const rz = ((oriDeg && oriDeg[2]) || 0) * Math.PI / 180
@@ -3382,7 +3488,7 @@ function _jewelryTransform(oc, shape, pos, oriDeg, tracker) {
 /**
  * _jewelryFuse — boolean fuse two shapes; helper for assembling multi-part settings.
  */
-function _jewelryFuse(oc, a, b, tracker) {
+function _jewelryFuse(oc: OcInstance, a: OcHandle, b: OcHandle, tracker: OcHandle[]) {
   const pr = () => new oc.Message_ProgressRange_1()
   const fuse = track(tracker, new oc.BRepAlgoAPI_Fuse_3(a, b, pr()))
   fuse.Build(pr())
@@ -3393,7 +3499,7 @@ function _jewelryFuse(oc, a, b, tracker) {
 /**
  * _jewelryCut — boolean cut b from a.
  */
-function _jewelryCut(oc, a, b, tracker) {
+function _jewelryCut(oc: OcInstance, a: OcHandle, b: OcHandle, tracker: OcHandle[]) {
   const pr = () => new oc.Message_ProgressRange_1()
   const cut = track(tracker, new oc.BRepAlgoAPI_Cut_3(a, b, pr()))
   cut.Build(pr())
@@ -3410,7 +3516,7 @@ function _jewelryCut(oc, a, b, tracker) {
  * @param {number} zBase    Z offset for the base (shapes start at zBase)
  * @param {object} tracker
  */
-function _makeCylinder(oc, radius, height, zBase, tracker) {
+function _makeCylinder(oc: OcInstance, radius: number, height: number, zBase: number, tracker: OcHandle[]) {
   const ax = track(tracker, new oc.gp_Ax2_3(
     track(tracker, new oc.gp_Pnt_3(0, 0, zBase)),
     track(tracker, new oc.gp_Dir_4(0, 0, 1)),
@@ -3431,7 +3537,7 @@ function _makeCylinder(oc, radius, height, zBase, tracker) {
  * @param {number} zBase
  * @param {object} tracker
  */
-function _makeCone(oc, r1, r2, height, zBase, tracker) {
+function _makeCone(oc: OcInstance, r1: number, r2: number, height: number, zBase: number, tracker: OcHandle[]) {
   const ax = track(tracker, new oc.gp_Ax2_3(
     track(tracker, new oc.gp_Pnt_3(0, 0, zBase)),
     track(tracker, new oc.gp_Dir_4(0, 0, 1)),
@@ -3448,7 +3554,7 @@ function _makeCone(oc, r1, r2, height, zBase, tracker) {
  * Built as a prism of a rectangle in the XY plane (matching the existing
  * BRepPrimAPI_MakePrism pattern used throughout this file).
  */
-function _makeBox(oc, x0, y0, z0, dx, dy, dz, tracker) {
+function _makeBox(oc: OcInstance, x0: number, y0: number, z0: number, dx: number, dy: number, dz: number, tracker: OcHandle[]) {
   // Build a rectangle face in the XY plane at z=z0.
   const wBuilder = track(tracker, new oc.BRepBuilderAPI_MakeWire_1())
   const corners = [
@@ -3488,6 +3594,16 @@ function _makeBox(oc, x0, y0, z0, dx, dy, dz, tracker) {
  * optionally scaled on the Y axis (aspect_ratio ar) for non-round girdles.
  * Rotated by rotRad so the first vertex lands at angle rotRad.
  */
+// Untyped by design: jewelryFacets.test.js slices this function declaration's
+// raw source text (indexOf-searching for its own name) and runs it through
+// `new Function(...)` as a standalone plain-JS eval to unit-test the vertex
+// math directly, with no TypeScript transform in that path — type
+// annotations on this signature would break that probe with a syntax error
+// (and, worse, writing the searched-for substring literally in this comment
+// would shift the slice into the comment itself — avoided here on purpose).
+// n/rx/ry/rotRad are all numbers (see call sites); left as plain (implicit
+// `any`, allowed under this repo's non-strict root tsconfig) for that reason
+// alone, not because the types are unknown.
 function _ngonPoints(n, rx, ry, rotRad) {
   const pts = []
   for (let i = 0; i < n; i++) {
@@ -3509,7 +3625,7 @@ function _ngonPoints(n, rx, ry, rotRad) {
  * @param {number} h          — extrusion height (signed, +Z direction)
  * @param {object} tracker
  */
-function _makeNgonPrism(oc, pts2D, zBase, h, tracker) {
+function _makeNgonPrism(oc: OcInstance, pts2D: number[][], zBase: number, h: number, tracker: OcHandle[]) {
   const n = pts2D.length
   if (n < 3) throw new Error('gemstone: polygon must have ≥ 3 vertices')
   const wBuilder = track(tracker, new oc.BRepBuilderAPI_MakeWire_1())
@@ -3539,7 +3655,7 @@ function _makeNgonPrism(oc, pts2D, zBase, h, tracker) {
  * _makeGirdleFacetPrism — build a faceted girdle band.
  * nSides: number of girdle facets (16 for round brilliant, 8 for step/fancy).
  */
-function _makeGirdleFacetPrism(oc, nSides, rx, ry, girdHeight, tracker) {
+function _makeGirdleFacetPrism(oc: OcInstance, nSides: number, rx: number, ry: number, girdHeight: number, tracker: OcHandle[]) {
   const pts = _ngonPoints(nSides, rx, ry, Math.PI / nSides)
   return _makeNgonPrism(oc, pts, 0, girdHeight, tracker)
 }
@@ -3558,7 +3674,7 @@ function _makeGirdleFacetPrism(oc, nSides, rx, ry, girdHeight, tracker) {
  * This yields ≥ 2×nSides + 2 faces (outer walls + inner walls + top + bottom).
  * For nSides=16: ≥ 34 faces — well above the ~3 of a smooth cone.
  */
-function _makeFacetedCrownBrilliant(oc, rGirdle, tableR, crownH, girdHeight, ar, tracker) {
+function _makeFacetedCrownBrilliant(oc: OcInstance, rGirdle: number, tableR: number, crownH: number, girdHeight: number, ar: number, tracker: OcHandle[]) {
   // Outer prism: full girdle polygon extruded to crownH — the bezel facets.
   // We rotate by half a sector so bezel midpoints face the cardinal directions.
   const nOuter = 16
@@ -3588,7 +3704,7 @@ function _makeFacetedCrownBrilliant(oc, rGirdle, tableR, crownH, girdHeight, ar,
  *
  * Face count: ≥ 2×nSides + 2 = ≥ 34 faces for nSides=16.
  */
-function _makeFacetedPavilionBrilliant(oc, rGirdle, culetR, pavH, ar, tracker) {
+function _makeFacetedPavilionBrilliant(oc: OcInstance, rGirdle: number, culetR: number, pavH: number, ar: number, tracker: OcHandle[]) {
   // nMain=16 + nCulet=8 fused → ≥ 34 face geometry (16+2 = 18 per prism tier).
   const nMain = 16
   const ptsMain = _ngonPoints(nMain, rGirdle, rGirdle * ar, Math.PI / nMain)
@@ -3610,7 +3726,7 @@ function _makeFacetedPavilionBrilliant(oc, rGirdle, culetR, pavH, ar, tracker) {
  * @param {number} stepRows   — number of step rows (from extras.step_rows)
  * @param {number} cornerCut  — fraction of corner removed (0 = straight, 0.15 = emerald)
  */
-function _makeFacetedStepCrown(oc, rGirdle, tableR, crownH, girdHeight, ar, stepRows, cornerCut, tracker) {
+function _makeFacetedStepCrown(oc: OcInstance, rGirdle: number, tableR: number, crownH: number, girdHeight: number, ar: number, stepRows: number, cornerCut: number, tracker: OcHandle[]) {
   const nRows = Math.max(1, stepRows || 2)
   const stepH = crownH / nRows
   let crown = null
@@ -3622,7 +3738,7 @@ function _makeFacetedStepCrown(oc, rGirdle, tableR, crownH, girdHeight, ar, step
     const ry = rOuter * ar
     const zBase = girdHeight + row * stepH
     // Build a rectangular (or octagonal for corner-cut) polygon per row.
-    const nSides = cornerCut > 0 ? 8 : 4
+    const _nSides = cornerCut > 0 ? 8 : 4  // computed but unused — T-506 dead-code finding
     const pts = cornerCut > 0
       ? _ngonOctRect(rx, ry, cornerCut)
       : _ngonPoints(4, rx, ry, Math.PI / 4)
@@ -3636,7 +3752,7 @@ function _makeFacetedStepCrown(oc, rGirdle, tableR, crownH, girdHeight, ar, step
  * _makeFacetedStepPavilion — step-cut pavilion (emerald/asscher/baguette).
  * Mirror of _makeFacetedStepCrown: step_rows concentric rectangles converging to culet.
  */
-function _makeFacetedStepPavilion(oc, rGirdle, culetR, pavH, ar, stepRows, cornerCut, tracker) {
+function _makeFacetedStepPavilion(oc: OcInstance, rGirdle: number, culetR: number, pavH: number, ar: number, stepRows: number, cornerCut: number, tracker: OcHandle[]) {
   const nRows = Math.max(1, stepRows || 2)
   const stepH = pavH / nRows
   let pavilion = null
@@ -3646,7 +3762,7 @@ function _makeFacetedStepPavilion(oc, rGirdle, culetR, pavH, ar, stepRows, corne
     const rx = rOuter
     const ry = rOuter * ar
     const zBase = -(pavH - row * stepH)
-    const nSides = cornerCut > 0 ? 8 : 4
+    const _nSides = cornerCut > 0 ? 8 : 4  // computed but unused — T-506 dead-code finding
     const pts = cornerCut > 0
       ? _ngonOctRect(rx, ry, cornerCut)
       : _ngonPoints(4, rx, ry, Math.PI / 4)
@@ -3664,7 +3780,7 @@ function _makeFacetedStepPavilion(oc, rGirdle, culetR, pavH, ar, stepRows, corne
  * @param {number} ry         — half-height (Y radius)
  * @param {number} cornerCut  — fraction of the shorter half-side removed at each corner
  */
-function _ngonOctRect(rx, ry, cornerCut) {
+function _ngonOctRect(rx: number, ry: number, cornerCut: number) {
   const cx = rx * cornerCut
   const cy = ry * cornerCut
   return [
@@ -3689,7 +3805,7 @@ function _ngonOctRect(rx, ry, cornerCut) {
  *   heart     — approximated as oval with a V-notch (6-sided outer girdle)
  *   princess  — 4-fold symmetry, 4 main + 4 kite, nOuter=8
  */
-function _makeFacetedFancyCrown(oc, rGirdle, tableR, crownH, girdHeight, ar, cut, extras, tracker) {
+function _makeFacetedFancyCrown(oc: OcInstance, rGirdle: number, tableR: number, crownH: number, girdHeight: number, ar: number, cut: string, extras: Record<string, unknown> | null | undefined, tracker: OcHandle[]) {
   let nOuter, nTable
   switch (cut) {
     case 'trillion':   nOuter = 12; nTable = 3;  break
@@ -3709,7 +3825,7 @@ function _makeFacetedFancyCrown(oc, rGirdle, tableR, crownH, girdHeight, ar, cut
 /**
  * _makeFacetedFancyPavilion — fancy-cut pavilion (same set as crown above).
  */
-function _makeFacetedFancyPavilion(oc, rGirdle, culetR, pavH, ar, cut, tracker) {
+function _makeFacetedFancyPavilion(oc: OcInstance, rGirdle: number, culetR: number, pavH: number, ar: number, cut: string, tracker: OcHandle[]) {
   let nMain
   switch (cut) {
     case 'trillion':   nMain = 12; break
@@ -3735,7 +3851,7 @@ function _makeFacetedFancyPavilion(oc, rGirdle, culetR, pavH, ar, cut, tracker) 
  *
  * facet_rows from extras controls the number of horizontal facet bands.
  */
-function _makeBriolette(oc, rGirdle, crownH, pavH, ar, extras, tracker) {
+function _makeBriolette(oc: OcInstance, rGirdle: number, crownH: number, pavH: number, ar: number, extras: Record<string, unknown> | null | undefined, tracker: OcHandle[]) {
   const facetRows = Number((extras && extras.facet_rows) || 8)
   const nSides = Math.max(6, facetRows * 2)  // triangular facets per row
 
@@ -3802,7 +3918,7 @@ function _makeBriolette(oc, rGirdle, crownH, pavH, ar, extras, tracker) {
  *   extras (step_rows, corner_cut_ratio, facet_rows, facet_count, etc.),
  *   position?, orientation_deg?, material?
  */
-function opGemstone(oc, _prev, node, _sketches, tracker) {
+function opGemstone(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const diam     = Number(node.diameter_mm)   || 6.5
   const ar       = Number(node.aspect_ratio)  || 1.0
   const tablePct = Number(node.table_pct)     || 57.0
@@ -3814,7 +3930,7 @@ function opGemstone(oc, _prev, node, _sketches, tracker) {
 
   // Derived mm dimensions.
   const rGirdle    = diam / 2                        // girdle equatorial radius (long axis)
-  const rGirdleB   = rGirdle * ar                    // short-axis radius (for non-round)
+  const _rGirdleB  = rGirdle * ar                    // short-axis radius (for non-round) — computed but unused, T-506 dead-code finding
   const girdHeight = diam * girdPct / 100
   const crownH     = diam * crownHPct / 100
   const pavH       = diam * pavDepPct / 100
@@ -3899,14 +4015,11 @@ function opGemstone(oc, _prev, node, _sketches, tracker) {
     return _jewelryTransform(oc, gem, node.position, node.orientation_deg, tracker)
 
   } catch (_facetErr) {
+    void _facetErr // jewelryFacets.test.js pins this catch's binding name; unused otherwise
     // Graceful fallback: if facet construction fails, revert to the smooth solid.
     // This prevents any regression in the pipeline if OCCT bindings behave differently.
-    try {
-      const gem = _smoothFallback()
-      return _jewelryTransform(oc, gem, node.position, node.orientation_deg, tracker)
-    } catch (fallbackErr) {
-      throw fallbackErr
-    }
+    const gem = _smoothFallback()
+    return _jewelryTransform(oc, gem, node.position, node.orientation_deg, tracker)
   }
 }
 
@@ -3931,7 +4044,7 @@ function opGemstone(oc, _prev, node, _sketches, tracker) {
  *   3. Crown relief  — truncated cone countersink from Z=girdH to Z=girdH+crownRelief.
  *   4. Optional through-hole — thin cylinder punching through to the back.
  */
-function opGemSeat(oc, _prev, node, _sketches, tracker) {
+function opGemSeat(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const girdR    = Number(node.girdle_radius_mm)           || 3.3
   const topR     = Number(node.bearing_cone_top_radius)    || girdR
   const botR     = Number(node.bearing_cone_bottom_radius) || 0.15
@@ -3992,7 +4105,7 @@ function opGemSeat(oc, _prev, node, _sketches, tracker) {
  *                  prong_height, equally spaced around the ledge top.
  *   Basket rail  — for basket/trellis: a thin ring cylinder at mid-prong height.
  */
-function opJewelryProngHead(oc, _prev, node, _sketches, tracker) {
+function opJewelryProngHead(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const stoneDiam   = Number(node.stone_diameter)        || 6.5
   const prongCount  = Math.max(2, Math.round(Number(node.prong_count) || 4))
   const wireD       = Number(node.prong_wire_diameter)   || 1.0
@@ -4069,7 +4182,7 @@ function opJewelryProngHead(oc, _prev, node, _sketches, tracker) {
  *   Bearing ledge — a thin ring at bearing_ledge_height from the base.
  *   Partial gap  — for 'partial': a box cutter removes partial_opening_deg sector.
  */
-function opJewelryBezel(oc, _prev, node, _sketches, tracker) {
+function opJewelryBezel(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const stoneDiam    = Number(node.stone_diameter)          || 6.5
   const wallT        = Number(node.wall_thickness)          || 0.5
   const bezH         = Number(node.bezel_height)            || 3.0
@@ -4132,7 +4245,7 @@ function opJewelryBezel(oc, _prev, node, _sketches, tracker) {
  * The evaluate result includes seat_positions (list of XYZ per stone)
  * stored in the node itself for downstream boolean cuts.
  */
-function opJewelryChannel(oc, _prev, node, _sketches, tracker) {
+function opJewelryChannel(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const stoneD   = Number(node.stone_diameter)    || 4.0
   const stoneN   = Math.max(1, Math.round(Number(node.stone_count) || 3))
   const stoneS   = Number(node.stone_spacing)     || stoneD + 0.15
@@ -4186,7 +4299,7 @@ function opJewelryChannel(oc, _prev, node, _sketches, tracker) {
  *
  * Each sphere has radius = stone_diameter/4 (hemisphere marker size).
  */
-function opJewelryPave(oc, _prev, node, _sketches, tracker) {
+function opJewelryPave(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const rW      = Number(node.region_width)    || 10.0
   const rH      = Number(node.region_height)   || 10.0
   const stoneD  = Number(node.stone_diameter)  || 2.0
@@ -4282,7 +4395,7 @@ function opJewelryPave(oc, _prev, node, _sketches, tracker) {
  *   metal_weight is stored in the result payload via the OCCT GProp volume
  *   computation; it is exposed on the mesh entry as `metalCost` for the UI.
  */
-function opRingShank(oc, _prev, node, _sketches, tracker) {
+function opRingShank(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const innerD  = Number(node.inner_diameter_mm)  || 17.32  // US 7
   const outerD  = Number(node.outer_diameter_mm)  || innerD + 2 * (Number(node.thickness_mm) || 1.8)
   const thick   = (outerD - innerD) / 2
@@ -4446,7 +4559,7 @@ function opRingShank(oc, _prev, node, _sketches, tracker) {
  *
  * Graceful fallback: if any per-stone step fails the groove box alone is returned.
  */
-function opChannelSeat(oc, _prev, node, _sketches, tracker) {
+function opChannelSeat(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const nStones   = Math.max(1, Math.round(Number(node.n_stones) || 1))
   const pitchMm   = Number(node.pitch_mm)          || 4.0
   const grvW      = Number(node.groove_width_mm)    || 3.5
@@ -4512,7 +4625,7 @@ function opChannelSeat(oc, _prev, node, _sketches, tracker) {
  *      height = bezel_wall_height_mm; inner bore subtracted.
  *   3. Optional through-hole.
  */
-function opBezelSeat(oc, _prev, node, _sketches, tracker) {
+function opBezelSeat(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const girdR       = Number(node.girdle_radius_mm)           || 3.3
   const topR        = Number(node.bearing_cone_top_radius)    || girdR
   const botR        = Number(node.bearing_cone_bottom_radius) || 0.15
@@ -4586,7 +4699,7 @@ function opBezelSeat(oc, _prev, node, _sketches, tracker) {
  *      thin tapered box (approximated as a slim cone slice) that creates the
  *      bright-cut reflective groove.
  */
-function opFishtailSeat(oc, _prev, node, _sketches, tracker) {
+function opFishtailSeat(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const girdR     = Number(node.girdle_radius_mm)           || 3.3
   const topR      = Number(node.bearing_cone_top_radius)    || girdR
   const botR      = Number(node.bearing_cone_bottom_radius) || 0.15
@@ -4674,7 +4787,7 @@ function opFishtailSeat(oc, _prev, node, _sketches, tracker) {
  * side_positions and per-seat geometry are preserved in the node payload for
  * downstream reference; the returned solid is the union of all seat cutters.
  */
-function opMultiStoneSeat(oc, _prev, node, _sketches, tracker) {
+function opMultiStoneSeat(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   // Helper: build a single gem-seat cutter solid at a given [x,y,z] offset.
   function _buildSeatAt(geom, posArr) {
     const gr  = Number(geom.girdle_radius_mm)           || 3.3
@@ -4719,6 +4832,7 @@ function opMultiStoneSeat(oc, _prev, node, _sketches, tracker) {
   try {
     compound = _buildSeatAt(centerGeom, centerPos)
   } catch (e) {
+    void e // jewelrySeatChainDispatch.test.js pins this catch's binding name; unused otherwise
     // Fallback: a minimal cylinder at origin if center seat build fails.
     compound = _makeCylinder(oc, 1.0, 1.0, 0, tracker)
   }
@@ -4769,7 +4883,7 @@ function opMultiStoneSeat(oc, _prev, node, _sketches, tracker) {
  * Graceful fallback: if the torus build fails, each link falls back to a simple
  * cylinder placeholder so the compound always has link_count shapes.
  */
-function opChainAssembly(oc, _prev, node, _sketches, tracker) {
+function opChainAssembly(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const style     = (node.style || 'cable').toLowerCase()
   const gauge     = Math.max(0.1, Number(node.wire_gauge_mm)  || 1.0)
   const linkLen   = Math.max(gauge, Number(node.link_length_mm) || gauge * 3.5)
@@ -4923,7 +5037,7 @@ function opChainAssembly(oc, _prev, node, _sketches, tracker) {
 //
 // Geometry: rectangular/oval plate + cylinder bail loop on top.
 // ---------------------------------------------------------------------------
-function opPendant(oc, _prev, node, _sketches, tracker) {
+function opPendant(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const w     = Number(node.width_mm)      || 12.0
   const h     = Number(node.height_mm)     || 18.0
   const t     = Number(node.thickness_mm)  || 1.5
@@ -4975,7 +5089,7 @@ function opPendant(oc, _prev, node, _sketches, tracker) {
 //   attach_points, composite_ops,
 //   position?, orientation_deg?
 // ---------------------------------------------------------------------------
-function opEarrings(oc, _prev, node, _sketches, tracker) {
+function opEarrings(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const faceD  = Number(node.face_diameter_mm)    || 8.0
   const faceT  = Number(node.face_thickness_mm)   || 1.2
   const gauge  = Number(node.wire_gauge_mm)        || 0.8
@@ -5046,7 +5160,7 @@ function opEarrings(oc, _prev, node, _sketches, tracker) {
 //   pin_style, pin_length_mm, attach_points, composite_ops,
 //   position?, orientation_deg?
 // ---------------------------------------------------------------------------
-function opBrooch(oc, _prev, node, _sketches, tracker) {
+function opBrooch(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const w     = Number(node.width_mm)           || 30.0
   const h     = Number(node.height_mm)          || 30.0
   const t     = Number(node.thickness_mm)       || 2.0
@@ -5086,7 +5200,7 @@ function opBrooch(oc, _prev, node, _sketches, tracker) {
 //   attach_points, composite_ops,
 //   position?, orientation_deg?
 // ---------------------------------------------------------------------------
-function opCufflink(oc, _prev, node, _sketches, tracker) {
+function opCufflink(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const faceD  = Number(node.face_diameter_mm)  || 12.0
   const faceT  = Number(node.face_thickness_mm) || 3.0
   const postL  = Number(node.post_length_mm)    || 10.0
@@ -5147,7 +5261,7 @@ function opCufflink(oc, _prev, node, _sketches, tracker) {
 //   attach_points, composite_ops,
 //   position?, orientation_deg?
 // ---------------------------------------------------------------------------
-function opBangle(oc, _prev, node, _sketches, tracker) {
+function opBangle(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const innerD   = Number(node.inner_diameter_mm) || 63.5
   const width    = Number(node.width_mm)           || 6.0
   const thick    = Number(node.thickness_mm)       || 2.5
@@ -5223,8 +5337,15 @@ function opBangle(oc, _prev, node, _sketches, tracker) {
 // The op returns a simple bead/marker compound along the target or a small
 // cylinder at the origin as a graceful placeholder when the target can't be
 // resolved. Surface-texture hints have no geometric output (render only).
+//
+// T-506 finding: `bodyMap` (below) is never actually read anywhere in this
+// function, despite the comment above describing target resolution through
+// it — the "resolved from bodyMap" strategy this comment describes isn't
+// implemented. Left as-is (not fixed) and renamed with the repo's `_`-unused
+// convention rather than removed from the signature, since evaluateTree's
+// dispatch loop passes it positionally alongside every other op call.
 // ---------------------------------------------------------------------------
-function opDecorativeApply(oc, _prev, node, _sketches, tracker, bodyMap) {
+function opDecorativeApply(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[], _bodyMap: Record<string, OcHandle>) {
   const feature  = (node.feature || '').toLowerCase()
   const hints    = node.decorative_hints || {}
 
@@ -5284,7 +5405,7 @@ function opDecorativeApply(oc, _prev, node, _sketches, tracker, bodyMap) {
 // Geometry: union of small bearing-cone cutters at each stone position.
 // Falls back to a flat box cutter if any position step fails.
 // ---------------------------------------------------------------------------
-function opPaveFieldSeat(oc, _prev, node, _sketches, tracker) {
+function opPaveFieldSeat(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const psg       = node.per_seat_geom || {}
   const girdR     = Number(psg.girdle_radius_mm || node.stone_diameter_mm / 2) || 1.0
   const topR      = Number(psg.bearing_cone_top_radius) || girdR
@@ -5293,7 +5414,7 @@ function opPaveFieldSeat(oc, _prev, node, _sketches, tracker) {
   const culetD    = Number(psg.culet_depth_mm)    || 0.1
   const girdH     = Number(psg.girdle_height_mm)  || 0.1
   const crownR    = Number(psg.crown_relief_depth_mm) || 0.2
-  const crownHA   = Number(psg.crown_relief_half_angle) || 7.5
+  const _crownHA  = Number(psg.crown_relief_half_angle) || 7.5  // computed but unused — T-506 dead-code finding
   const positions = Array.isArray(node.stone_positions) ? node.stone_positions : []
   const fW        = Number(node.field_width_mm)   || 10.0
   const fH        = Number(node.field_height_mm)  || 10.0
@@ -5342,7 +5463,7 @@ function opPaveFieldSeat(oc, _prev, node, _sketches, tracker) {
 //
 // Geometry: center opGemSeat-style cutter + N accent opGemSeat-style cutters.
 // ---------------------------------------------------------------------------
-function opClusterHaloSeat(oc, _prev, node, _sketches, tracker) {
+function opClusterHaloSeat(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   function _oneSeat(geom, px, py) {
     const girdR   = Number(geom.girdle_radius_mm)           || 1.5
     const topR    = Number(geom.bearing_cone_top_radius)    || girdR
@@ -5403,7 +5524,7 @@ function opClusterHaloSeat(oc, _prev, node, _sketches, tracker) {
 // Geometry: straight-wall cylindrical bore + shallow countersink on top.
 // Same structure as opGemSeat minus the bearing cone overhang above grade.
 // ---------------------------------------------------------------------------
-function opGypsySeat(oc, _prev, node, _sketches, tracker) {
+function opGypsySeat(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const girdR    = Number(node.girdle_radius_mm)           || 3.3
   const topR     = Number(node.bearing_cone_top_radius)    || girdR
   const botR     = Number(node.bearing_cone_bottom_radius) || 0.15
@@ -5454,7 +5575,7 @@ function opGypsySeat(oc, _prev, node, _sketches, tracker) {
 //
 // Geometry: rectangular groove box + per-stone rectangular cutter pockets.
 // ---------------------------------------------------------------------------
-function opBaguetteChannelSeat(oc, _prev, node, _sketches, tracker) {
+function opBaguetteChannelSeat(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const cutterL   = Number(node.cutter_length_mm) || 3.5
   const cutterW   = Number(node.cutter_width_mm)  || 2.5
   const cutterD   = Number(node.cutter_depth_mm || node.total_cutter_depth_mm) || 2.0
@@ -5497,7 +5618,7 @@ function opBaguetteChannelSeat(oc, _prev, node, _sketches, tracker) {
 // Reuses opJewelryProngHead geometry — builds standard prongs then adds
 // variant-specific modifications.
 // ---------------------------------------------------------------------------
-function opJewelryProngVariant(oc, _prev, node, _sketches, tracker) {
+function opJewelryProngVariant(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const stoneDiam  = Number(node.stone_diameter) || 6.5
   const prongCount = Math.max(2, Math.round(Number(node.prong_count) || 4))
   const wireD      = Number(node.wire_gauge)     || 1.0
@@ -5522,7 +5643,7 @@ function opJewelryProngVariant(oc, _prev, node, _sketches, tracker) {
     // Variant-specific additions (best-effort; any failure keeps base head).
     if (variant === 'double_prong') {
       // Add a second ring of prongs offset by half a pitch.
-      const gap = vParam > 0 ? vParam : 0.3
+      const _gap = vParam > 0 ? vParam : 0.3  // computed but unused — T-506 dead-code finding
       const stdNode2 = { ...stdNode, prong_wire_diameter: wireD * 0.85 }
       // Offset second ring by half pitch — approximate with a small rotation.
       try {
@@ -5540,7 +5661,7 @@ function opJewelryProngVariant(oc, _prev, node, _sketches, tracker) {
     } else if (variant === 'claw_prong') {
       // Add small claw-hook cylinders at the prong tips.
       const hookD  = wireD * 0.7
-      const hookR  = wireD * (vParam > 0 ? vParam : 0.4)
+      const _hookR = wireD * (vParam > 0 ? vParam : 0.4)  // computed but unused — T-506 dead-code finding
       const stoneR = stoneDiam / 2
       const pCentreR = stoneR + wireD / 2
       for (let i = 0; i < prongCount; i++) {
@@ -5577,7 +5698,7 @@ function opJewelryProngVariant(oc, _prev, node, _sketches, tracker) {
 //   motif_pitch, _gallery_outer_diameter, _gallery_circumference, _motif_count,
 //   position?, orientation_deg?
 // ---------------------------------------------------------------------------
-function opJewelryHeadGallery(oc, _prev, node, _sketches, tracker) {
+function opJewelryHeadGallery(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const headD   = Number(node.head_diameter)   || 8.0
   const headH   = Number(node.head_height)     || 4.0
   const galH    = Number(node.gallery_height)  || 1.5
@@ -5591,7 +5712,7 @@ function opJewelryHeadGallery(oc, _prev, node, _sketches, tracker) {
     const wallT  = headR * 0.2   // approximate wall thickness
     const outerCyl = _makeCylinder(oc, headR, headH, 0, tracker)
     const innerBore = _makeCylinder(oc, headR - wallT, headH + 0.1, -0.05, tracker)
-    let head = _jewelryCut(oc, outerCyl, innerBore, tracker)
+    const head = _jewelryCut(oc, outerCyl, innerBore, tracker)
 
     // Gallery rail: a thin ring below the head (at z = -galH).
     const galOuter = _makeCylinder(oc, headR, galH, -(galH), tracker)
@@ -5637,7 +5758,7 @@ function opJewelryHeadGallery(oc, _prev, node, _sketches, tracker) {
 //   _outer_diameter, _collet_volume_approx,
 //   position?, orientation_deg?
 // ---------------------------------------------------------------------------
-function opJewelryUnderBezel(oc, _prev, node, _sketches, tracker) {
+function opJewelryUnderBezel(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const stoneD  = Number(node.stone_diameter)   || 6.5
   const wallT   = Number(node.wall_thickness)   || 0.5
   const colH    = Number(node.collet_height)    || 2.0
@@ -5678,7 +5799,7 @@ function opJewelryUnderBezel(oc, _prev, node, _sketches, tracker) {
 //   _cup_depth, _peg_aspect_ratio,
 //   position?, orientation_deg?
 // ---------------------------------------------------------------------------
-function opJewelryPegSetting(oc, _prev, node, _sketches, tracker) {
+function opJewelryPegSetting(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const stoneD  = Number(node.stone_diameter)  || 6.5
   const pegD    = Number(node.peg_diameter)    || 2.0
   const pegL    = Number(node.peg_length)      || 10.0
@@ -5730,14 +5851,14 @@ function opJewelryPegSetting(oc, _prev, node, _sketches, tracker) {
 //   _base_diameter, _tip_diameter, _prong_pitch_deg,
 //   position?, orientation_deg?
 // ---------------------------------------------------------------------------
-function opJewelryCoronet(oc, _prev, node, _sketches, tracker) {
+function opJewelryCoronet(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const stoneDiam  = Number(node.stone_diameter) || 6.5
   const prongCount = Math.max(3, Math.round(Number(node.prong_count) || 6))
   const crownH     = Number(node.crown_height)   || 3.0
   const taper      = Number(node.taper)           || 0.3
   const wireD      = Number(node.wire_gauge)      || 1.0
   const baseD      = Number(node._base_diameter)  || stoneDiam + 2 * wireD
-  const tipD       = Number(node._tip_diameter)   || Math.max(stoneDiam, baseD - 2 * taper)
+  const _tipD      = Number(node._tip_diameter)   || Math.max(stoneDiam, baseD - 2 * taper)  // computed but unused — T-506 dead-code finding
 
   try {
     // Base collet ring.
@@ -5752,7 +5873,7 @@ function opJewelryCoronet(oc, _prev, node, _sketches, tracker) {
       const angle = (2 * Math.PI * i) / prongCount
       // Base centre at base radius, tip centre pulled inward by taper.
       const baseCR = stoneR + wireD / 2
-      const tipCR  = Math.max(stoneR, baseCR - taper)
+      const _tipCR = Math.max(stoneR, baseCR - taper)  // computed but unused — T-506 dead-code finding
       const bx = baseCR * Math.cos(angle)
       const by = baseCR * Math.sin(angle)
       try {
@@ -5783,18 +5904,18 @@ function opJewelryCoronet(oc, _prev, node, _sketches, tracker) {
 //   _ring_outer_diameter, _total_height, _seat_radius,
 //   position?, orientation_deg?
 // ---------------------------------------------------------------------------
-function opJewelrySuspensionMount(oc, _prev, node, _sketches, tracker) {
+function opJewelrySuspensionMount(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const stoneD    = Number(node.stone_diameter)      || 6.5
   const seatD     = Number(node.seat_depth)          || 2.0
   const ringWire  = Number(node.ring_wire_diameter)  || 1.0
   const ringID    = Number(node.ring_inner_diameter) || 4.0
   const bailH     = Number(node.bail_height)         || 3.0
-  const seatStyle = (node.seat_style || 'bezel_cup').toLowerCase()
+  const _seatStyle = (node.seat_style || 'bezel_cup').toLowerCase()  // read but unused — T-506 dead-code finding (style is a hint only at this fidelity, per comment below)
 
   try {
     const stoneR    = stoneD / 2
     const ringOD    = ringID + 2 * ringWire
-    const totalH    = seatD + bailH + ringWire
+    const _totalH   = seatD + bailH + ringWire  // computed but unused — T-506 dead-code finding
 
     // Stone seat body (cylinder cup, style is a hint only at this fidelity).
     const seatOuter = _makeCylinder(oc, stoneR + 0.8, seatD, 0, tracker)
@@ -5830,7 +5951,7 @@ function opJewelrySuspensionMount(oc, _prev, node, _sketches, tracker) {
 //   _tip_opening_width, _cap_area_approx,
 //   position?, orientation_deg?
 // ---------------------------------------------------------------------------
-function opJewelryVtipProtector(oc, _prev, node, _sketches, tracker) {
+function opJewelryVtipProtector(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const tipCount  = Math.max(1, Math.round(Number(node.tip_count) || 2))
   const tipW      = Number(node.tip_width)       || 0.6
   const tipL      = Number(node.tip_length)       || 1.0
@@ -5876,7 +5997,7 @@ function opJewelryVtipProtector(oc, _prev, node, _sketches, tracker) {
 //   _cap_arc_length, _base_diameter, _actual_count,
 //   position?, orientation_deg?
 // ---------------------------------------------------------------------------
-function opJewelryBombeCluster(oc, _prev, node, _sketches, tracker) {
+function opJewelryBombeCluster(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const domeR      = Number(node.dome_radius)         || 8.0
   const stoneS     = Number(node.stone_size)           || 2.0
   const baseH      = Number(node.base_height)          || 1.5
@@ -5942,7 +6063,7 @@ function opJewelryBombeCluster(oc, _prev, node, _sketches, tracker) {
 //
 // Reuses opJewelryBezel for the base; adds decorative petal cutter/additions.
 // ---------------------------------------------------------------------------
-function opJewelryPatternedBezel(oc, _prev, node, _sketches, tracker) {
+function opJewelryPatternedBezel(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const stoneDiam  = Number(node.stone_diameter)       || 6.5
   const wallT      = Number(node.wall_thickness)       || 0.5
   const bezH       = Number(node.bezel_height)         || 3.0
@@ -6023,7 +6144,7 @@ function opJewelryPatternedBezel(oc, _prev, node, _sketches, tracker) {
 //   _outer_diameter, _cross_clearance, _prong_pitch_deg,
 //   position?, orientation_deg?
 // ---------------------------------------------------------------------------
-function opJewelryTrellisProng(oc, _prev, node, _sketches, tracker) {
+function opJewelryTrellisProng(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const stoneDiam  = Number(node.stone_diameter) || 6.5
   const prongCount = Math.max(4, Math.round(Number(node.prong_count) || 4))
   const wireD      = Number(node.wire_gauge)     || 1.0
@@ -6067,8 +6188,8 @@ function opJewelryTrellisProng(oc, _prev, node, _sketches, tracker) {
           const dist = Math.sqrt(dx * dx + dy * dy)
           if (dist < 0.01) continue
 
-          const midX = (x1 + x2) / 2
-          const midY = (y1 + y2) / 2
+          const _midX = (x1 + x2) / 2  // computed but unused — T-506 dead-code finding
+          const _midY = (y1 + y2) / 2  // computed but unused — T-506 dead-code finding
           const barAx = track(tracker, new oc.gp_Ax2_3(
             track(tracker, new oc.gp_Pnt_3(x1, y1, crossZ)),
             track(tracker, new oc.gp_Dir_4(dx / dist, dy / dist, 0)),
@@ -6099,14 +6220,14 @@ function opJewelryTrellisProng(oc, _prev, node, _sketches, tracker) {
 //   _total_row_length, _bar_count, _actual_stone_count,
 //   position?, orientation_deg?
 // ---------------------------------------------------------------------------
-function opJewelryBarChannelGraduated(oc, _prev, node, _sketches, tracker) {
+function opJewelryBarChannelGraduated(oc: OcInstance, _prev: OcHandle, node: OpNode, _sketches: SketchMap, tracker: OcHandle[]) {
   const rowL    = Number(node._total_row_length)  || 20.0
   const barW    = Number(node.bar_width)          || 0.6
   const barH    = Number(node.bar_height)         || 1.5
   const floorT  = Number(node.floor_thickness)    || 0.6
   const stones  = Array.isArray(node.stones) ? node.stones : []
   const largeD  = Number(node.largest_diameter)   || 4.0
-  const spacedD = Number(node.stone_spacing)      || 0.15
+  const _spacedD = Number(node.stone_spacing)     || 0.15  // computed but unused — T-506 dead-code finding
 
   try {
     // Channel floor running the full row length.
@@ -6203,7 +6324,7 @@ function opJewelryBarChannelGraduated(oc, _prev, node, _sketches, tracker) {
  * @param {object} tracker — OCCT shape tracker
  * @returns {object} TopoDS_Shape (solid)
  */
-function opSheetFlange(oc, _prev, node, _sk, tracker) {
+function opSheetFlange(oc: OcInstance, _prev: OcHandle, node: OpNode, _sk: SketchMap, tracker: OcHandle[]) {
   const W       = Math.max(0.01, Number(node.base_width)    || 50)
   const D       = Math.max(0.01, Number(node.base_depth)    || 50)
   const T       = Math.max(0.01, Number(node.thickness)     || 1)
@@ -6281,8 +6402,8 @@ function opSheetFlange(oc, _prev, node, _sk, tracker) {
 
   const sinA = Math.sin(angRad)
   const cosA = Math.cos(angRad)
-  const wallY0 = -rOuter * sinA                 // outer face of arc far end in Y (rel to y=0, z=T)
-  const wallZ0 = T - rOuter * cosA              // Z of the outer face far end
+  const _wallY0 = -rOuter * sinA                 // outer face of arc far end in Y (rel to y=0, z=T) — computed but unused, T-506 dead-code finding
+  const _wallZ0 = T - rOuter * cosA              // Z of the outer face far end — computed but unused, T-506 dead-code finding
   // Wall inner face start (same computation with rInner):
   // For the box we span from inner to outer (thickness T) in the radial direction,
   // and in the tangent direction for fLen.
@@ -6515,7 +6636,7 @@ export function harnessSegmentLengths(waypoints) {
  * @param {object} tracker  — OCCT shape tracker
  * @returns {object} TopoDS_Shape (solid)
  */
-function opHarnessTubeSweep(oc, _prev, node, _sk, tracker) {
+function opHarnessTubeSweep(oc: OcInstance, _prev: OcHandle, node: OpNode, _sk: SketchMap, tracker: OcHandle[]) {
   const rawWpts = node.waypoints
   if (!Array.isArray(rawWpts) || rawWpts.length < 2) {
     throw new Error('harness_tube_sweep: waypoints must be an array of ≥ 2 [x,y,z] points')
@@ -6567,7 +6688,7 @@ function opHarnessTubeSweep(oc, _prev, node, _sk, tracker) {
       throw new Error('no Add overload')
     }
   } catch (err) {
-    throw new Error(`harness_tube_sweep: profile add failed: ${err?.message || err}`)
+    throw new Error(`harness_tube_sweep: profile add failed: ${err?.message || err}`, { cause: err })
   }
   pipe.Build(new oc.Message_ProgressRange_1())
   if (!pipe.IsDone()) throw new Error('harness_tube_sweep: pipe build failed')
@@ -6592,7 +6713,7 @@ function opHarnessTubeSweep(oc, _prev, node, _sk, tracker) {
 // downstream ops (pocket/fillet/chamfer/shell/hole) operate on the most
 // recent root only — multi-body trees aren't a v1 goal.
 
-function evaluateTree(oc, tree, sketches) {
+function evaluateTree(oc: OcInstance, tree: FeatureNode[], sketches: SketchMap): Mesh[] {
   if (!Array.isArray(tree)) tree = []
   const tracker = makeTracker()
   const meshes = []
@@ -6631,13 +6752,17 @@ function evaluateTree(oc, tree, sketches) {
       try { _faceNames = currentFaceNamer(oc, current) || {} } catch { /* ignore */ }
     }
     const node = { ...raw, _sketches: sketches, _faceNames }
-    let next = null
+    let next
     try {
       switch (node.op) {
         case 'pad': {
           // Pads always start a fresh body; finalize previous body first.
           if (current) {
-            pushCurrentMesh(node._prevId || `body-${meshes.length}`)
+            // node._prevId: read here but never set anywhere in this file, in
+            // occtRunner.ts, or in the wire FeatureNode shape — a T-506 finding,
+            // left as dead code (not fixed) since this fallback always wins in
+            // practice. Cast documents the gap rather than a real decorated field.
+            pushCurrentMesh((node as OpNode)._prevId || `body-${meshes.length}`)
             cleanupShape(oc, current)
             current = null
           }
@@ -6652,7 +6777,8 @@ function evaluateTree(oc, tree, sketches) {
         }
         case 'boss_with_draft': {
           if (current) {
-            pushCurrentMesh(node._prevId || `body-${meshes.length}`)
+            // node._prevId — see the 'pad' case above; same dead-field read.
+            pushCurrentMesh((node as OpNode)._prevId || `body-${meshes.length}`)
             cleanupShape(oc, current)
             current = null
           }
@@ -6703,7 +6829,7 @@ function evaluateTree(oc, tree, sketches) {
           let filPrevNames = {}
           try { if (currentFaceNamer) filPrevNames = currentFaceNamer(oc, current) } catch { /* */ }
           const filInputShape = current
-          const filRef = {}
+          const filRef: BuilderRef = {}
           next = opFillet(oc, current, node, sketches, tracker, filRef)
           if (filRef.builder) {
             currentFaceNamer = makeFilletChamferNamer(oc, filRef.builder, filInputShape, filNodeId, 'fillet', filPrevNames)
@@ -6716,7 +6842,7 @@ function evaluateTree(oc, tree, sketches) {
           let chmPrevNames = {}
           try { if (currentFaceNamer) chmPrevNames = currentFaceNamer(oc, current) } catch { /* */ }
           const chmInputShape = current
-          const chmRef = {}
+          const chmRef: BuilderRef = {}
           next = opChamfer(oc, current, node, sketches, tracker, chmRef)
           if (chmRef.builder) {
             currentFaceNamer = makeFilletChamferNamer(oc, chmRef.builder, chmInputShape, chmNodeId, 'chamfer', chmPrevNames)
@@ -6728,7 +6854,7 @@ function evaluateTree(oc, tree, sketches) {
           let shlPrevNames = {}
           try { if (currentFaceNamer) shlPrevNames = currentFaceNamer(oc, current) } catch { /* */ }
           const shlInputShape = current
-          const shlRef = {}
+          const shlRef: BuilderRef = {}
           next = opShell(oc, current, node, sketches, tracker, shlRef)
           if (shlRef.builder) {
             currentFaceNamer = makeShellNamer(oc, shlRef.builder, shlInputShape, shlNodeId, shlPrevNames)
@@ -6790,7 +6916,7 @@ function evaluateTree(oc, tree, sketches) {
           let ppPrevNames = {}
           try { if (currentFaceNamer) ppPrevNames = currentFaceNamer(oc, current) } catch { /* */ }
           const ppInputShape = current
-          const ppRef = {}
+          const ppRef: BuilderRef = {}
           next = opPushPull(oc, current, node, sketches, tracker, ppRef)
           if (ppRef.builder && ppRef.frame) {
             currentFaceNamer = makePushPullNamer(oc, ppRef.builder, ppInputShape, ppNodeId, ppRef.frame.normal, ppPrevNames)
@@ -6802,7 +6928,7 @@ function evaluateTree(oc, tree, sketches) {
           let cfsPrevNames = {}
           try { if (currentFaceNamer) cfsPrevNames = currentFaceNamer(oc, current) } catch { /* */ }
           const cfsInputShape = current
-          const cfsRef = {}
+          const cfsRef: BuilderRef = {}
           const cfsSketchIds = extractWireEntityIds(sketches?.[node.sketch_path] || null)
           next = opCutFromSketch(oc, current, node, sketches, tracker, cfsRef)
           if (cfsRef.builder && cfsRef.frame) {
@@ -6886,7 +7012,7 @@ function evaluateTree(oc, tree, sketches) {
           const boolShapeA = bodyMap[node.target_a_id]
           const boolShapeB = bodyMap[node.target_b_id]
           let boolNamesA = {}, boolNamesB = {}
-          const boolRef = {}
+          const boolRef: BuilderRef = {}
           next = opBoolean(oc, null, node, sketches, tracker, bodyMap, boolRef)
           // Resolve operand face names from their respective namers if available.
           // bodyFaceNamers is maintained below.
@@ -7321,13 +7447,13 @@ function evaluateTree(oc, tree, sketches) {
           break
         }
         default:
-          throw new Error(`unknown feature op '${node.op}'`)
+          throw new Error(`unknown feature op '${(node as OpNode).op}'`)
       }
     } catch (err) {
       // Preserve the partial shape on error so the renderer keeps showing
       // whatever was built so far.
       const msg = err && err.message ? err.message : String(err)
-      const e = new Error(`feature '${node.id || node.op}': ${msg}`)
+      const e: OpError = new Error(`feature '${node.id || node.op}': ${msg}`)
       e.partial = current
       throw e
     }
@@ -7366,7 +7492,11 @@ function evaluateTree(oc, tree, sketches) {
 //               sketch-anchored naming (sweep1/2, loft, etc.)
 //
 // Callers that don't need face names can ignore faceNamer (backwards-compat).
-async function evaluateToFinalShape(oc, tree, sketches) {
+async function evaluateToFinalShape(
+  oc: OcInstance,
+  tree: FeatureNode[],
+  sketches: SketchMap,
+): Promise<{ shape: OcHandle | null; faceNamer: ((oc: OcInstance, shape: OcHandle) => FaceNameMap) | null }> {
   const tracker = makeTracker()
   let current = null
   let currentFaceNamer = null
@@ -7380,7 +7510,7 @@ async function evaluateToFinalShape(oc, tree, sketches) {
       try { _faceNames = currentFaceNamer(oc, current) || {} } catch { /* ignore */ }
     }
     const node = { ...raw, _sketches: sketches, _faceNames }
-    let next = null
+    let next
     try {
       switch (node.op) {
         case 'pad': {
@@ -7438,7 +7568,7 @@ async function evaluateToFinalShape(oc, tree, sketches) {
           let filPrevNames2 = {}
           try { if (currentFaceNamer) filPrevNames2 = currentFaceNamer(oc, current) } catch { /* */ }
           const filInputShape2 = current
-          const filRef2 = {}
+          const filRef2: BuilderRef = {}
           next = opFillet(oc, current, node, sketches, tracker, filRef2)
           if (filRef2.builder) {
             currentFaceNamer = makeFilletChamferNamer(oc, filRef2.builder, filInputShape2, filNodeId2, 'fillet', filPrevNames2)
@@ -7450,7 +7580,7 @@ async function evaluateToFinalShape(oc, tree, sketches) {
           let chmPrevNames2 = {}
           try { if (currentFaceNamer) chmPrevNames2 = currentFaceNamer(oc, current) } catch { /* */ }
           const chmInputShape2 = current
-          const chmRef2 = {}
+          const chmRef2: BuilderRef = {}
           next = opChamfer(oc, current, node, sketches, tracker, chmRef2)
           if (chmRef2.builder) {
             currentFaceNamer = makeFilletChamferNamer(oc, chmRef2.builder, chmInputShape2, chmNodeId2, 'chamfer', chmPrevNames2)
@@ -7462,7 +7592,7 @@ async function evaluateToFinalShape(oc, tree, sketches) {
           let shlPrevNames2 = {}
           try { if (currentFaceNamer) shlPrevNames2 = currentFaceNamer(oc, current) } catch { /* */ }
           const shlInputShape2 = current
-          const shlRef2 = {}
+          const shlRef2: BuilderRef = {}
           next = opShell(oc, current, node, sketches, tracker, shlRef2)
           if (shlRef2.builder) {
             currentFaceNamer = makeShellNamer(oc, shlRef2.builder, shlInputShape2, shlNodeId2, shlPrevNames2)
@@ -7523,7 +7653,7 @@ async function evaluateToFinalShape(oc, tree, sketches) {
           let ppPrevNames2 = {}
           try { if (currentFaceNamer) ppPrevNames2 = currentFaceNamer(oc, current) } catch { /* */ }
           const ppInputShape2 = current
-          const ppRef2 = {}
+          const ppRef2: BuilderRef = {}
           next = opPushPull(oc, current, node, sketches, tracker, ppRef2)
           if (ppRef2.builder && ppRef2.frame) {
             currentFaceNamer = makePushPullNamer(oc, ppRef2.builder, ppInputShape2, ppNodeId2, ppRef2.frame.normal, ppPrevNames2)
@@ -7535,7 +7665,7 @@ async function evaluateToFinalShape(oc, tree, sketches) {
           let cfsPrevNames2 = {}
           try { if (currentFaceNamer) cfsPrevNames2 = currentFaceNamer(oc, current) } catch { /* */ }
           const cfsInputShape2 = current
-          const cfsRef2 = {}
+          const cfsRef2: BuilderRef = {}
           const cfsSketchIds2 = extractWireEntityIds(sketches?.[node.sketch_path] || null)
           next = opCutFromSketch(oc, current, node, sketches, tracker, cfsRef2)
           if (cfsRef2.builder && cfsRef2.frame) {
@@ -7583,7 +7713,7 @@ async function evaluateToFinalShape(oc, tree, sketches) {
           const boolShapeA2 = bodyMap[node.target_a_id]
           const boolShapeB2 = bodyMap[node.target_b_id]
           let boolNamesA2 = {}, boolNamesB2 = {}
-          const boolRef2 = {}
+          const boolRef2: BuilderRef = {}
           next = opBoolean(oc, null, node, sketches, tracker, bodyMap, boolRef2)
           try {
             if (bodyFaceNamers[node.target_a_id] && boolShapeA2) {
@@ -7848,7 +7978,7 @@ async function evaluateToFinalShape(oc, tree, sketches) {
           next = opHarnessTubeSweep(oc, null, node, sketches, tracker)
           currentFaceNamer = null
           break
-        default: throw new Error(`unknown feature op '${node.op}'`)
+        default: throw new Error(`unknown feature op '${(node as OpNode).op}'`)
       }
     } catch {
       // Best-effort: bail with whatever we have.
@@ -7866,8 +7996,8 @@ async function evaluateToFinalShape(oc, tree, sketches) {
   return { shape: current, faceNamer: currentFaceNamer }
 }
 
-self.addEventListener('message', async (ev) => {
-  const msg = ev.data || {}
+self.addEventListener('message', async (ev: MessageEvent<OcctWorkerRequest>) => {
+  const msg = ev.data || ({} as OcctWorkerRequest)
   const { runId } = msg
   if (msg.type === 'evaluate') {
     const { tree, sketches } = msg
@@ -7876,7 +8006,7 @@ self.addEventListener('message', async (ev) => {
       const meshes = evaluateTree(oc, tree || [], sketches || {})
       // Build transferables so we don't pay structured-clone cost for big
       // typed arrays. Each mesh contributes ~5-7 typed arrays.
-      const transferables = []
+      const transferables: Transferable[] = []
       for (const m of meshes) {
         if (m.vertices?.buffer) transferables.push(m.vertices.buffer)
         if (m.indices?.buffer) transferables.push(m.indices.buffer)
@@ -7889,10 +8019,18 @@ self.addEventListener('message', async (ev) => {
         // edgeSegs (which references the same numbers but not the same Float32
         // buffers). We rebuild edgeSegs from edges in the bridge.
       }
-      self.postMessage({ type: 'result', runId, meshes }, transferables)
+      const response: OcctWorkerResponse = { type: 'result', runId, meshes }
+      self.postMessage(response, transferables)
     } catch (err) {
-      const partial = err?.partial
-      let partialMesh = null
+      const partial = (err as OpError)?.partial
+      // breptToMesh() returns BareMesh (Mesh minus id/faceNames — see
+      // occtBridge.ts) — NOT a full Mesh. workers.ts's OcctErrorMessage
+      // types `partial` as `Mesh | null` regardless; a T-506 finding, since
+      // every real consumer (FeatureView.jsx) already treats it as bare and
+      // wraps its own synthetic `{id: 'partial', mesh: result.partial}`
+      // rather than reading `.id`/`.faceNames` off it. Cast at the boundary
+      // documents the gap rather than silently widening the shared type.
+      let partialMesh: BareMesh | null = null
       if (partial) {
         try {
           const oc = await loadOcct()
@@ -7900,13 +8038,14 @@ self.addEventListener('message', async (ev) => {
           cleanupShape(oc, partial)
         } catch { /* */ }
       }
-      self.postMessage({
+      const response: OcctWorkerResponse = {
         type: 'error',
         runId,
-        message: err?.message || String(err),
-        stack: err?.stack || null,
-        partial: partialMesh,
-      })
+        message: (err as Error)?.message || String(err),
+        stack: (err as Error)?.stack || null,
+        partial: partialMesh as Mesh | null,
+      }
+      self.postMessage(response)
     }
     return
   }
@@ -7916,13 +8055,15 @@ self.addEventListener('message', async (ev) => {
       const oc = await loadOcct()
       const { shape, faceNamer } = await evaluateToFinalShape(oc, tree || [], sketches || {})
       if (!shape) {
-        self.postMessage({ type: 'face_outline_result', runId, ok: false, reason: 'no shape' })
+        const response: OcctWorkerResponse = { type: 'face_outline_result', runId, ok: false, reason: 'no shape' }
+        self.postMessage(response)
         return
       }
       const face = faceById(oc, shape, Number(faceId))
       if (!face) {
         cleanupShape(oc, shape)
-        self.postMessage({ type: 'face_outline_result', runId, ok: false, reason: `face ${faceId} not found` })
+        const response: OcctWorkerResponse = { type: 'face_outline_result', runId, ok: false, reason: `face ${faceId} not found` }
+        self.postMessage(response)
         return
       }
       const frame = faceFrame(oc, face)
@@ -7930,27 +8071,34 @@ self.addEventListener('message', async (ev) => {
       // Compute faceNames from the namer closure so the caller gets the full
       // name table alongside the outline — satisfies the dormant-node-bug
       // requirement that evaluateToFinalShape also produces names.
-      let faceNames = {}
+      let faceNames: FaceNameMap = {}
       try {
         if (faceNamer) faceNames = faceNamer(oc, shape)
       } catch { /* silently omit on failure */ }
       cleanupShape(oc, shape)
-      self.postMessage({
+      // `frame` can in principle be null here (faceFrame() failed internally
+      // even though the face resolved) — OcctFaceOutlineOkMessage's `frame`
+      // is not nullable. Not observed in practice (faceFrame only returns
+      // null for a null/undefined face, already ruled out above); the `!`
+      // documents that assumption rather than silently widening the type.
+      const response: OcctWorkerResponse = {
         type: 'face_outline_result',
         runId,
         ok: true,
-        frame,
+        frame: frame!,
         outline: outline || [],
         planar: !!(frame && frame.planar),
         faceNames,
-      })
+      }
+      self.postMessage(response)
     } catch (err) {
-      self.postMessage({
+      const response: OcctWorkerResponse = {
         type: 'face_outline_result',
         runId,
         ok: false,
-        reason: err?.message || String(err),
-      })
+        reason: (err as Error)?.message || String(err),
+      }
+      self.postMessage(response)
     }
     return
   }

@@ -23,7 +23,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 describe('occtWorker.js to_solid wiring', () => {
   const workerSrc = readFileSync(
-    path.resolve(__dirname, '../lib/occtWorker.js'),
+    path.resolve(__dirname, '../lib/occtWorker.ts'),
     'utf8',
   )
 

@@ -369,7 +369,7 @@ describe('loft node schema', () => {
 
 describe('occtWorker.js dispatch table', () => {
   const workerSrc = fs.readFileSync(
-    path.resolve(__dirname, '../../src/lib/occtWorker.js'),
+    path.resolve(__dirname, '../../src/lib/occtWorker.ts'),
     'utf8',
   )
 

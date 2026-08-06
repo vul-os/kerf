@@ -91,7 +91,7 @@ describe('newFeatureId for cut_from_sketch nodes', () => {
 describe('occtWorker.js switch table', () => {
   it("contains a 'cut_from_sketch' case so the op is not dormant", () => {
     const workerSrc = readFileSync(
-      path.resolve(__dirname, '../lib/occtWorker.js'),
+      path.resolve(__dirname, '../lib/occtWorker.ts'),
       'utf8',
     )
     // Expect the literal case label to appear at least twice — once in
@@ -103,7 +103,7 @@ describe('occtWorker.js switch table', () => {
 
   it("contains the opCutFromSketch function definition", () => {
     const workerSrc = readFileSync(
-      path.resolve(__dirname, '../lib/occtWorker.js'),
+      path.resolve(__dirname, '../lib/occtWorker.ts'),
       'utf8',
     )
     expect(workerSrc).toContain('function opCutFromSketch(')

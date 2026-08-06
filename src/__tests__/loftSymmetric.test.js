@@ -312,7 +312,7 @@ describe('opLoft symmetric arg guards (logic-level)', () => {
 
 describe('occtWorker.js — loft appears in both switch tables', () => {
   const workerSrc = fs.readFileSync(
-    path.resolve(import.meta.dirname, '../lib/occtWorker.js'),
+    path.resolve(import.meta.dirname, '../lib/occtWorker.ts'),
     'utf8',
   )
 

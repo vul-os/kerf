@@ -35,7 +35,7 @@ const SKIP_WASM = typeof Worker === 'undefined' && typeof self === 'undefined'
 
 describe('surfaceBooleanIntegration — source-level wiring', () => {
   const workerSrc = readFileSync(
-    path.resolve(__dirname, '../lib/occtWorker.js'),
+    path.resolve(__dirname, '../lib/occtWorker.ts'),
     'utf8',
   )
 
@@ -186,7 +186,7 @@ describe('surfaceBooleanIntegration — scenario 4: IsDone=false escalation', ()
     // We verify the source-level message here to keep the integration spec
     // self-contained.
     const workerSrc = readFileSync(
-      path.resolve(__dirname, '../lib/occtWorker.js'),
+      path.resolve(__dirname, '../lib/occtWorker.ts'),
       'utf8',
     )
     expect(workerSrc).toContain('C1-T10')
@@ -214,7 +214,7 @@ describe('surfaceBooleanIntegration — scenario 5: common fallback', () => {
 
   it('fallback identity A − (A − B) is in source when Common_3 absent (source-level)', () => {
     const workerSrc = readFileSync(
-      path.resolve(__dirname, '../lib/occtWorker.js'),
+      path.resolve(__dirname, '../lib/occtWorker.ts'),
       'utf8',
     )
     const fnStart = workerSrc.indexOf('function opSurfaceBoolean(')

@@ -27,7 +27,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SKIP_WASM = typeof Worker === 'undefined' && typeof self === 'undefined'
 
 const workerSrc = readFileSync(
-  path.resolve(__dirname, '../lib/occtWorker.js'),
+  path.resolve(__dirname, '../lib/occtWorker.ts'),
   'utf8',
 )
 

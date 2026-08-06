@@ -10,8 +10,14 @@
 //  6. kinematic_family flows through to both 3plus2 and 5axis_finish.
 
 import { describe, it, expect, beforeAll, vi } from 'vitest'
+// @types/node isn't part of this project's toolchain (tsconfig.json's `types` array is
+// T-500's — see docs/typescript-migration.md), so these Node builtins (used only for this
+// file's source-inspection assertions) are untyped at this boundary.
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
+// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 
 vi.mock('../store/auth.js', () => ({ useAuth: { getState: () => ({ accessToken: null }) } }))
@@ -26,7 +32,10 @@ const camViewSrc = readFileSync(path.resolve(__dirname, 'CAMView.jsx'), 'utf8')
 // ── 1–3. fiveAxisBackendArgs with machineKinematic ────────────────────────────
 
 describe('fiveAxisBackendArgs with machineKinematic', () => {
-  let fiveAxisBackendArgs
+  // CAMView.jsx is not yet migrated (T-513, later in this slice) — its export is untyped
+  // (`any`) at this boundary; a local function-shape alias documents the call site without
+  // pretending to know CAMView's eventual real signature.
+  let fiveAxisBackendArgs: (...args: any[]) => Record<string, any>
 
   beforeAll(async () => {
     const mod = await import('./CAMView.jsx')

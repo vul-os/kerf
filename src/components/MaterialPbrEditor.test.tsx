@@ -11,8 +11,13 @@ import MaterialPbrEditor from './MaterialPbrEditor.jsx'
 // Helpers
 // ---------------------------------------------------------------------------
 
-function render(props = {}) {
-  return renderToStaticMarkup(<MaterialPbrEditor {...props} />)
+function render(props: Record<string, unknown> = {}) {
+  // MaterialPbrEditor.jsx (not yet migrated) declares material/onSave/onClose
+  // without defaults, so allowJs infers them as required — this suite
+  // deliberately calls with partial/missing props to exercise the
+  // component's own runtime fallbacks (e.g. no `onClose` renders no close
+  // button), matching its actual pre-migration behaviour.
+  return renderToStaticMarkup(<MaterialPbrEditor {...(props as any)} />)
 }
 
 // ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@
 // Uses react-dom/server renderToStaticMarkup — no @testing-library/react needed.
 // MaterialPbrEditor is mocked to a lightweight stub so this test suite stays
 // focused on the integration wiring, not PBR internals (which have their own
-// test file: MaterialPbrEditor.test.jsx).
+// test file: MaterialPbrEditor.test.tsx).
 
 import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'

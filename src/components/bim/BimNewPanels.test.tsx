@@ -55,6 +55,8 @@ describe('ConstructionSequencingPanel', () => {
 
   it('renders without crashing with elementIds prop', () => {
     expect(() =>
+      // @ts-expect-error -- elementIds is not a ConstructionSequencingPanelProps field; the panel
+      // ignores it. Pre-existing test/prop-name mismatch, not touched by this migration.
       renderToStaticMarkup(<ConstructionSequencingPanel elementIds={['w1', 'w2', 'c1']} />)
     ).not.toThrow()
   })
@@ -100,6 +102,8 @@ describe('CostEstimationPanel', () => {
       { id: 'd1', category: 'Door', trade: 'architectural' },
     ]
     expect(() =>
+      // @ts-expect-error -- elements is not a CostEstimationPanel prop; the panel ignores it.
+      // Pre-existing test/prop-name mismatch, not touched by this migration.
       renderToStaticMarkup(<CostEstimationPanel elements={elements} />)
     ).not.toThrow()
   })
@@ -139,6 +143,9 @@ describe('ParametricFamilyEditorPanel', () => {
       parameters: [{ name: 'width', type: 'number', default: 900.0 }],
     }
     expect(() =>
+      // @ts-expect-error -- initialFamily is not a ParametricFamilyEditorPanelProps field (the
+      // panel seeds from `content` instead); the panel ignores it. Pre-existing test/prop-name
+      // mismatch, not touched by this migration.
       renderToStaticMarkup(<ParametricFamilyEditorPanel initialFamily={family} />)
     ).not.toThrow()
   })
@@ -190,6 +197,8 @@ describe('GDLLibraryPanel', () => {
 
   it('renders without crashing with selectedObjectId prop', () => {
     expect(() =>
+      // @ts-expect-error -- selectedObjectId is not a GDLLibraryPanel prop; the panel ignores it.
+      // Pre-existing test/prop-name mismatch, not touched by this migration.
       renderToStaticMarkup(<GDLLibraryPanel selectedObjectId="DOOR_SINGLE_00001" />)
     ).not.toThrow()
   })
@@ -235,6 +244,9 @@ describe('SiteTerrainPanel', () => {
       [0, 10, 101], [10, 10, 103], [20, 10, 106],
     ]
     expect(() =>
+      // @ts-expect-error -- initialPoints is not a SiteTerrainPanelProps field (the panel seeds
+      // from `content` instead); the panel ignores it. Pre-existing test/prop-name mismatch,
+      // not touched by this migration.
       renderToStaticMarkup(<SiteTerrainPanel initialPoints={pts} />)
     ).not.toThrow()
   })

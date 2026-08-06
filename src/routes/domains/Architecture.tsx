@@ -29,7 +29,6 @@ import {
   ClipboardList,
   GitBranch,
   ChevronsUp,
-  Code2,
   Sparkles,
   TriangleAlert,
 } from 'lucide-react'
@@ -41,6 +40,7 @@ import { ARCH_META, buildArchJsonLd } from './architecture.meta.js'
 import { BimIllustration, RevitParityIllustration, StairsMepIllustration } from '../../components/illustrations/index.js'
 
 export const HERO_ILLUSTRATION = BimIllustration
+// eslint-disable-next-line react-refresh/only-export-components -- data export alongside the page component, pre-existing before this migration.
 export const CAPABILITY_ILLUSTRATIONS = [
   { Illustration: RevitParityIllustration, caption: 'IFC Tier 2 import — Revit-compatible IFC 4 geometry lands as OCCT solids.' },
   { Illustration: StairsMepIllustration, caption: 'StairView: parametric stair builder with code-compliant riser/tread geometry.' },
@@ -56,6 +56,7 @@ const GITHUB_URL = 'https://github.com/kerf-sh/kerf'
  * Capabilities that are live today. Each tile must have a *truthful* subtitle.
  * Don't add anything that isn't shipped.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- data export alongside the page component, pre-existing before this migration.
 export const TODAY_CAPABILITIES = [
   {
     id: 'ifc-import',
@@ -104,6 +105,7 @@ export const TODAY_CAPABILITIES = [
 /**
  * Roadmap items for Architecture & Civil. Keep short; link to /roadmap.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- data export alongside the page component, pre-existing before this migration.
 export const ARCH_ROADMAP = [
   {
     id: 'bim-tier2',
@@ -126,6 +128,7 @@ export const ARCH_ROADMAP = [
  * Comparison table rows.
  * Values: true (full support), false (no support), 'partial' (limited/roadmap), string (note).
  */
+// eslint-disable-next-line react-refresh/only-export-components -- data export alongside the page component, pre-existing before this migration.
 export const COMPARISON_ROWS = [
   {
     feature: 'Parametric BIM depth',
@@ -218,6 +221,7 @@ export const COMPARISON_ROWS = [
 /**
  * Chat transcript turns (realistic, uses real module/command names).
  */
+// eslint-disable-next-line react-refresh/only-export-components -- data export alongside the page component, pre-existing before this migration.
 export const CHAT_TURNS = [
   {
     role: 'user',
@@ -299,7 +303,7 @@ function ArchMeta() {
       } else {
         desc.remove()
       }
-      ogEls.forEach(({ el, prev, prop }) => {
+      ogEls.forEach(({ el, prev }) => {
         if (prev !== null) {
           el.setAttribute('content', prev)
         } else {

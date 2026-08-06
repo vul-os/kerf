@@ -6,6 +6,7 @@ import * as meta from './civil.meta.js'
 import { PipelineIllustration, DrawingIllustration } from '../../components/illustrations/index.js'
 
 export const HERO_ILLUSTRATION = PipelineIllustration
+// eslint-disable-next-line react-refresh/only-export-components -- data export alongside the page component, pre-existing before this migration.
 export const CAPABILITY_ILLUSTRATIONS = [
   { Illustration: DrawingIllustration, caption: 'Site plan DXF output from a TR-55 catchment analysis.' },
 ]

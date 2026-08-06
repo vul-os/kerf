@@ -113,10 +113,16 @@ describe('DomainSwitcher component', () => {
 describe('domain pages render DomainSwitcher', () => {
   for (const [slug, file] of Object.entries(DOMAIN_PAGES)) {
     it(`${file} imports and renders <DomainSwitcher active="${slug}" />`, () => {
-      const src = readFileSync(
-        resolve(__dirname, `../routes/domains/${file}`),
-        'utf8',
-      )
+      const base = file.replace(/\.jsx$/, '')
+      let src = null
+      for (const ext of ['tsx', 'jsx']) {
+        const path = resolve(__dirname, `../routes/domains/${base}.${ext}`)
+        if (existsSync(path)) {
+          src = readFileSync(path, 'utf8')
+          break
+        }
+      }
+      if (src == null) throw new Error(`No source found for ${base}`)
       expect(src).toMatch(
         /import DomainSwitcher from '\.\.\/\.\.\/components\/domains\/DomainSwitcher\.jsx'/,
       )

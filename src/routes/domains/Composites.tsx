@@ -6,6 +6,7 @@ import * as meta from './composites.meta.js'
 import { ViewportScaleIllustration, FemIllustration } from '../../components/illustrations/index.js'
 
 export const HERO_ILLUSTRATION = ViewportScaleIllustration
+// eslint-disable-next-line react-refresh/only-export-components -- data export alongside the page component, pre-existing before this migration.
 export const CAPABILITY_ILLUSTRATIONS = [
   { Illustration: FemIllustration, caption: 'Interlaminar stress distribution from CLT + FEniCSx on a curved CFRP panel.' },
 ]

@@ -18,6 +18,7 @@
  *   comingSoon  — if true, renders a "Coming soon" badge in the hero
  */
 import { useEffect } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowRight,
@@ -36,15 +37,78 @@ import DomainSwitcher from '../../components/domains/DomainSwitcher.jsx'
 const GITHUB_URL = 'https://github.com/kerf-sh/kerf'
 
 /* -------------------------------------------------------------------------- */
+/* Shared types                                                               */
+/* -------------------------------------------------------------------------- */
+
+interface DomainFeature {
+  id: string
+  name: string
+  description: string
+}
+
+interface DomainMeta {
+  META_TITLE: string
+  META_DESCRIPTION: string
+  META_OG_IMAGE: string
+  META_URL: string
+  FEATURES: DomainFeature[]
+  JSON_LD: unknown
+}
+
+interface CapabilityIllustrationItem {
+  Illustration: ComponentType<{ className?: string }>
+  caption?: string
+}
+
+type ComparisonCellValue = boolean | null | string
+
+interface ComparisonRow {
+  feature: string
+  note?: string
+  values: ComparisonCellValue[]
+}
+
+interface Comparison {
+  products: string[]
+  rows: ComparisonRow[]
+}
+
+interface CompareLink {
+  slug: string
+  label: string
+}
+
+interface Bullet {
+  title: string
+  body: string
+}
+
+export interface Props {
+  meta: DomainMeta
+  slug: string
+  accentColor?: string
+  heroHeadline: ReactNode
+  heroParagraph: ReactNode
+  heroTags?: string[]
+  heroIllustration?: ComponentType<{ className?: string }>
+  capabilityIllustrations?: CapabilityIllustrationItem[]
+  bullets?: Bullet[]
+  comparison?: Comparison
+  compareLinks?: CompareLink[]
+  comingSoon?: boolean
+  domainName?: string
+}
+
+/* -------------------------------------------------------------------------- */
 /* Head injection                                                              */
 /* -------------------------------------------------------------------------- */
 
-function DomainHead({ meta }) {
+function DomainHead({ meta }: { meta: DomainMeta }) {
   useEffect(() => {
     const prev = document.title
     document.title = meta.META_TITLE
-    const tags = []
-    function addMeta(attrs) {
+    const tags: Element[] = []
+    function addMeta(attrs: Record<string, string>) {
       const el = document.createElement('meta')
       Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v))
       document.head.appendChild(el)
@@ -77,7 +141,17 @@ function DomainHead({ meta }) {
 /* Hero                                                                        */
 /* -------------------------------------------------------------------------- */
 
-function Hero({ headline, paragraph, tags, accentColor, comingSoon, slug, heroIllustration: HeroIllustration }) {
+interface HeroProps {
+  headline: ReactNode
+  paragraph: ReactNode
+  tags?: string[]
+  accentColor?: string
+  comingSoon?: boolean
+  slug: string
+  heroIllustration?: ComponentType<{ className?: string }>
+}
+
+function Hero({ headline, paragraph, tags, accentColor, comingSoon, slug, heroIllustration: HeroIllustration }: HeroProps) {
   const accent = accentColor || 'kerf-300'
   const hasIllustration = Boolean(HeroIllustration)
   return (
@@ -173,7 +247,7 @@ function Hero({ headline, paragraph, tags, accentColor, comingSoon, slug, heroIl
 /* Capability grid                                                             */
 /* -------------------------------------------------------------------------- */
 
-function CapabilityGrid({ features, accentColor }) {
+function CapabilityGrid({ features, accentColor }: { features: DomainFeature[]; accentColor?: string }) {
   const accent = accentColor || 'kerf-300'
   return (
     <section
@@ -233,7 +307,7 @@ function CapabilityGrid({ features, accentColor }) {
  * @param {Array<{Illustration: React.ComponentType, caption: string}>} items
  * @param {string} accentColor
  */
-function CapabilityIllustrations({ items, accentColor }) {
+function CapabilityIllustrations({ items, accentColor }: { items?: CapabilityIllustrationItem[]; accentColor?: string }) {
   if (!items || items.length === 0) return null
   const accent = accentColor || 'kerf-300'
   const gridCols =
@@ -280,7 +354,7 @@ function CapabilityIllustrations({ items, accentColor }) {
 /* What you get (3-bullet summary)                                            */
 /* -------------------------------------------------------------------------- */
 
-function WhatYouGet({ bullets, accentColor }) {
+function WhatYouGet({ bullets, accentColor }: { bullets: Bullet[]; accentColor?: string }) {
   const accent = accentColor || 'kerf-300'
   return (
     <section className="relative border-t border-ink-900 bg-gradient-to-b from-ink-950 to-ink-900/30">
@@ -310,14 +384,21 @@ function WhatYouGet({ bullets, accentColor }) {
 /* Optional comparison table                                                  */
 /* -------------------------------------------------------------------------- */
 
-function CellIcon({ value }) {
+function CellIcon({ value }: { value: ComparisonCellValue }) {
   if (value === true) return <Check size={15} aria-label="Yes" className="text-emerald-400 mx-auto" />
   if (value === false) return <X size={15} aria-label="No" className="text-ink-600 mx-auto" />
   if (value === null) return <Minus size={15} aria-label="Partial" className="text-ink-500 mx-auto" />
   return <span className="text-xs text-ink-300 font-mono">{value}</span>
 }
 
-function ComparisonTable({ products, rows, accentColor, compareLinks }) {
+interface ComparisonTableProps {
+  products: string[]
+  rows: ComparisonRow[]
+  accentColor?: string
+  compareLinks?: CompareLink[]
+}
+
+function ComparisonTable({ products, rows, accentColor, compareLinks }: ComparisonTableProps) {
   const accent = accentColor || 'kerf-300'
   return (
     <section className="relative border-t border-ink-900">
@@ -420,7 +501,7 @@ function ComparisonTable({ products, rows, accentColor, compareLinks }) {
 /* CTA Strip                                                                  */
 /* -------------------------------------------------------------------------- */
 
-function CTAStrip({ domainName }) {
+function CTAStrip({ domainName }: { domainName?: string }) {
   return (
     <section className="relative border-t border-ink-900">
       <div className="mx-auto max-w-7xl px-6 py-12 lg:py-14">
@@ -474,7 +555,7 @@ export default function DomainPage({
   compareLinks,
   comingSoon,
   domainName,
-}) {
+}: Props) {
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100">
       <DomainHead meta={meta} />

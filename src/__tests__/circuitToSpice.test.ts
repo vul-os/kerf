@@ -10,21 +10,24 @@ import { describe, it, expect } from 'vitest'
 import { circuitToSpice } from '../lib/circuitToSpice.js'
 
 // --- fixture builders -----------------------------------------------------
+// Loosely-typed on purpose: the real CircuitJson union has 200+ literal-`type`
+// members with divergent required fields, far stricter than these minimal
+// fixtures need to be.
 
-const comp = (id, ftype, name, extra = {}) => ({
+const comp = (id: string, ftype: string, name: string, extra = {}): any => ({
   type: 'source_component',
   source_component_id: id,
   ftype,
   name,
   ...extra,
 })
-const port = (id, compId, pin) => ({
+const port = (id: string, compId: string, pin: number): any => ({
   type: 'source_port',
   source_port_id: id,
   source_component_id: compId,
   pin_number: pin,
 })
-const trace = (...portIds) => ({
+const trace = (...portIds: string[]): any => ({
   type: 'source_trace',
   connected_source_port_ids: portIds,
 })

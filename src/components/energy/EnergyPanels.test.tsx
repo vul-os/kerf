@@ -24,10 +24,6 @@ function makeFetch(body, { ok = true, status = 200 } = {}) {
   })
 }
 
-function makeFetchError(msg = 'Network error') {
-  return vi.fn().mockRejectedValue(new Error(msg))
-}
-
 // ---------------------------------------------------------------------------
 // 1. MonthlyLoadChart — renders SVG with 12 month labels
 // ---------------------------------------------------------------------------
@@ -144,11 +140,7 @@ describe('BuildingEnergyPanel — dispatch payload', () => {
   afterEach(() => { vi.unstubAllGlobals() })
 
   it('dispatch body contains zones and location keys', async () => {
-    let capturedBody = null
-    const mockFetch = vi.fn().mockImplementation(async (url, init) => {
-      if (url && String(url).includes('/energy/building')) {
-        capturedBody = JSON.parse(init?.body || '{}')
-      }
+    const mockFetch = vi.fn().mockImplementation(async () => {
       return { ok: true, status: 200, json: async () => ({
         totals: { heating_kWh: 1000, cooling_kWh: 500, lighting_kWh: 800,
                   equipment_kWh: 600, annual_kWh: 2900, eui_kWh_m2: 58 },

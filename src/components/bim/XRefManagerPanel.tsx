@@ -13,33 +13,56 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Link2, RefreshCw, FileSymlink, AlertTriangle, CheckCircle2 } from 'lucide-react'
 
-function parseContent(content) {
+interface XRefLink {
+  id?: string
+  name?: string
+  path?: string
+  origin_xyz_mm?: number[]
+  rotation_deg?: number
+  nested?: unknown[] | number
+  status?: string
+  out_of_date?: boolean
+}
+
+interface XRefState {
+  links?: XRefLink[]
+  xrefs?: XRefLink[]
+  [key: string]: unknown
+}
+
+function parseContent(content: unknown): XRefState {
   if (!content) return {}
   try {
-    return typeof content === 'string' ? JSON.parse(content) : content
+    return (typeof content === 'string' ? JSON.parse(content) : content) as XRefState
   } catch {
     return {}
   }
 }
 
-export default function XRefManagerPanel({ content, projectId, fileId, callTool }) {
+export default function XRefManagerPanel({ content, projectId, fileId, callTool }: {
+  content?: unknown
+  projectId?: string
+  fileId?: string
+  callTool?: (tool: string, args: Record<string, unknown>) => Promise<unknown>
+}) {
   const initial = useMemo(() => parseContent(content), [content])
-  const [state, setState] = useState(initial)
-  const [busy, setBusy] = useState(null)
-  const [error, setError] = useState(null)
+  const [state, setState] = useState<XRefState>(initial)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const links = state.links || state.xrefs || []
 
-  const run = useCallback(async (tool, args, key) => {
+  const run = useCallback(async (tool: string, args: Record<string, unknown>, key: string) => {
     if (!callTool) return
     setBusy(key)
     setError(null)
     try {
       const res = await callTool(tool, { project_id: projectId, file_id: fileId, ...args })
-      const next = res?.result ?? res
-      if (next && typeof next === 'object') setState((s) => ({ ...s, ...next }))
+      const resObj = res as { result?: unknown } | undefined
+      const next = resObj?.result ?? res
+      if (next && typeof next === 'object') setState((s) => ({ ...s, ...(next as XRefState) }))
     } catch (e) {
-      setError(String(e?.message || e))
+      setError(String(e instanceof Error ? e.message : e))
     } finally {
       setBusy(null)
     }
@@ -93,7 +116,7 @@ export default function XRefManagerPanel({ content, projectId, fileId, callTool 
               </div>
               <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
                 origin {fmtXYZ(x.origin_xyz_mm)} · rot {x.rotation_deg ?? 0}°
-                {x.nested ? ` · ${(x.nested.length ?? x.nested)} nested` : ''}
+                {x.nested ? ` · ${(Array.isArray(x.nested) ? x.nested.length : x.nested)} nested` : ''}
                 {' · read-only'}
               </div>
               <button
@@ -111,7 +134,7 @@ export default function XRefManagerPanel({ content, projectId, fileId, callTool 
   )
 }
 
-function fmtXYZ(v) {
+function fmtXYZ(v: number[] | undefined) {
   if (!Array.isArray(v)) return '(0, 0, 0)'
   return `(${v.map((n) => Number(n).toFixed(0)).join(', ')})`
 }

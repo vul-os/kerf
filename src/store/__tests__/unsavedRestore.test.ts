@@ -25,9 +25,14 @@ vi.mock('../../lib/api.js', () => ({
   api: {
     updateFile: vi.fn(),
   },
+  // T-505: this mock's constructor took (message, status) — the REVERSE of the
+  // real ApiError in src/lib/api.ts, which is and always was (status, message).
+  // A mock whose signature contradicts the real class tests the wrong contract:
+  // production code building an ApiError correctly would have been rejected by
+  // tests written against this mock, and vice versa. Aligned with the real one.
   ApiError: class ApiError extends Error {
     status: number
-    constructor(message: string, status: number) {
+    constructor(status: number, message: string) {
       super(message)
       this.status = status
     }
@@ -71,7 +76,11 @@ describe('loadUnsavedEntries logic', () => {
 describe('restoreUnsavedEntries logic', () => {
   it('calls api.updateFile per entry and markFlushed on success', async () => {
     const { api } = await import('../../lib/api.js')
-    vi.mocked(api.updateFile).mockResolvedValue({ id: 'file-a', content: 'hello' })
+    // Deliberately partial: this test only exercises the id/content path, and
+    // the full ApiFileWithMesh shape is irrelevant to what it asserts.
+    vi.mocked(api.updateFile).mockResolvedValue(
+      { id: 'file-a', content: 'hello' } as unknown as Awaited<ReturnType<typeof api.updateFile>>,
+    )
 
     await stash(WS, 'file-a', new TextEncoder().encode('hello'))
     const entries = await listUnflushed(WS)
@@ -114,7 +123,12 @@ describe('restoreUnsavedEntries logic', () => {
 
   it('409 conflict leaves the entry with a "Server has newer version" hint', async () => {
     const { api, ApiError } = await import('../../lib/api.js')
-    const conflictErr = new ApiError('version conflict', 409)
+    // T-505: arguments were reversed here — ApiError is (status, message), and
+    // always has been (verified against the pre-migration api.js). In JS this
+    // silently produced status='version conflict' and message=409, so any
+    // `err.status === 409` check downstream could never have matched. Untyped
+    // JS hid it; typing api.ts surfaced it.
+    const conflictErr = new ApiError(409, 'version conflict')
     vi.mocked(api.updateFile).mockRejectedValue(conflictErr)
 
     await stash(WS, 'conflict-file', new TextEncoder().encode('my content'))

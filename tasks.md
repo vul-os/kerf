@@ -6492,6 +6492,37 @@ this repo as transitive tscircuit dependencies. Both carry
     `point_on_ellipse`, ellipse semi-major/minor/rotation, `bezier_g2`) with cascade tests.
   - **VERIFIED:** typecheck 0, strict 0, ratchet 78/78, vitest 477 files / 13,209 passed.
 
+### T-562 — 🐛 User preferences have never worked (`api.getPreferences` does not exist)
+- **Tier:** A · **Priority:** **P0** · **Status:** ⬜ not started
+- **Found by:** T-505, on typing `api.js` → `api.ts`. Verified against the pre-migration `api.js`:
+  `getPreferences` and `updatePreferences` appear **zero** times. They never existed.
+- **The bug:** `src/store/userPrefs.ts` calls `api.getPreferences()` (line ~74) and
+  `api.updatePreferences()` (line ~102). Both throw `TypeError: api.getPreferences is not a
+  function` — **every time, always**. Both call sites sit inside `try/catch` blocks that convert
+  the TypeError into `"failed to load preferences"` / `"failed to save preferences"`, so the
+  failure reads as a server problem rather than a missing method. **Loading and saving user
+  preferences have never worked.**
+- **Marked visibly, not silenced:** both sites carry a `@ts-expect-error` naming this task.
+  Removing the suppression *is* the fix — it must not be silenced any other way.
+- **Scope:** implement the two API methods against whatever preference endpoints the server
+  exposes (check `packages/kerf-api/`), or if none exist, implement those too or remove the store
+  actions. Add a test that fails if the methods go missing again — the current `try/catch` will
+  otherwise keep hiding it.
+- **Depends-on:** T-505
+
+### T-563 — Test mock contradicted the real `ApiError` signature
+- **Tier:** B · **Priority:** P2 · **Status:** ✅ fixed in passing (2026-08-06)
+- `src/store/__tests__/unsavedRestore.test.ts` mocked `ApiError` with `constructor(message, status)`
+  — the **reverse** of the real class in `src/lib/api.ts`, which is and always was
+  `(status, message)`. A mock whose signature contradicts the real class tests the wrong contract:
+  production code constructing an `ApiError` correctly would be rejected by tests written against
+  the mock, and vice versa. Aligned with the real class and the call site corrected.
+- **Worth generalising:** this is the fourth instance in this program of tests validating code
+  against themselves rather than against reality — after mocked planegcs (T-560), self-authored
+  KiCad fixtures (T-538) and a fixture that could not distinguish two transforms (T-539). **Audit
+  other hand-written mocks against the real signatures they stand in for**; typing the real module
+  is what exposes them.
+
 ### T-561 — `bezier_g2` only converges when already near its solution
 - **Tier:** A · **Priority:** P2 · **Status:** ⬜ not started
 - **Found by:** T-560b, while writing real-solver tests — invisible to mocked tests.

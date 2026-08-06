@@ -20,7 +20,8 @@ const panelSrc = readFileSync(
 )
 
 const apiSrc = readFileSync(
-  path.resolve(__dirname, '../lib/api.js'), 'utf8',
+  // api.js was migrated to api.ts (T-505); this reads the shipped source, not an import specifier.
+  path.resolve(__dirname, '../lib/api.ts'), 'utf8',
 )
 
 const llmDocSrc = (() => {

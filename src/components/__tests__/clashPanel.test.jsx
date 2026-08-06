@@ -29,7 +29,8 @@ const ASSEMBLY_SRC = readFileSync(
   'utf8',
 )
 const API_SRC = readFileSync(
-  resolve(__dirname, '../../lib/api.js'),
+  // api.js was migrated to api.ts (T-505); this reads the shipped source, not an import specifier.
+  resolve(__dirname, '../../lib/api.ts'),
   'utf8',
 )
 

@@ -71,6 +71,14 @@ export const useUserPrefs = create<UserPrefsState>()(
         if (get().loading) return
         set({ loading: true, error: null })
         try {
+          // @ts-expect-error T-562: `api.getPreferences` DOES NOT EXIST — it was
+          // never defined in api.js either, so this has always thrown
+          // "api.getPreferences is not a function". The catch below swallows it
+          // into a generic "failed to load preferences", which is why it reads as
+          // a server problem rather than a missing method. Surfaced by typing
+          // api.ts in T-505. Left visible deliberately: removing the suppression
+          // is the fix, and it must not be silenced without implementing the
+          // endpoint. See tasks.md T-562.
           const data = await api.getPreferences()
           set({ prefs: data || {}, loaded: true, loading: false })
           applyPrefsToDOM(data || {})
@@ -99,6 +107,10 @@ export const useUserPrefs = create<UserPrefsState>()(
         if (get().saving) return
         set({ saving: true, error: null })
         try {
+          // @ts-expect-error T-562: `api.updatePreferences` DOES NOT EXIST — same
+          // defect as `getPreferences` above. Every save has always thrown, with
+          // the catch converting it into "failed to save preferences". Left
+          // visible deliberately; see tasks.md T-562.
           const stored = await api.updatePreferences(get().prefs || {})
           set({ prefs: stored || {}, saving: false })
           applyPrefsToDOM(stored || {})

@@ -40,23 +40,28 @@ function installDom({
   createCanvas = () => makeFakeCanvas({ width: 512, height: 512 }),
   imageWillLoad = true,
 } = {}) {
+  // These stub the browser DOM surface for a node-only vitest run; casting
+  // each assignment sidesteps the real lib.dom types (HTMLElement, Blob,
+  // URL, XMLSerializer, HTMLImageElement) that the fakes intentionally only
+  // partially implement.
   globalThis.document = {
     createElement: vi.fn((tag) => {
       if (tag === 'canvas') return createCanvas()
       return {}
     }),
-  }
+  } as any
   globalThis.Blob = class FakeBlob {
+    parts: any; type: string; size: number
     constructor(parts, opts) {
       this.parts = parts
       this.type = opts?.type || ''
       this.size = parts.reduce((n, p) => n + (p?.length || 0), 0)
     }
-  }
+  } as any
   globalThis.URL = {
     createObjectURL: vi.fn(() => 'blob:fake'),
     revokeObjectURL: vi.fn(),
-  }
+  } as any
   globalThis.XMLSerializer = class FakeXMLSerializer {
     serializeToString(node) {
       // Surface whatever the caller stuck on the clone — good enough to
@@ -65,10 +70,12 @@ function installDom({
       // separately by returning null).
       return node?.__xml || '<svg/>'
     }
-  }
+  } as any
   // The Image global resolves onload synchronously on the next tick so
   // tests can `await` it without timing out.
   globalThis.Image = class FakeImage {
+    naturalWidth: number; naturalHeight: number; _src: string
+    onload?: () => void; onerror?: () => void
     constructor() {
       this.naturalWidth = 200
       this.naturalHeight = 200
@@ -82,7 +89,7 @@ function installDom({
       }, 0)
     }
     get src() { return this._src }
-  }
+  } as any
 }
 
 function uninstallDom() {
@@ -103,7 +110,7 @@ describe('snapshotCanvas', () => {
     const src = makeFakeCanvas({ width: 800, height: 600 })
     const blob = await snapshotCanvas(src, { size: 256, quality: 0.7 })
     expect(blob).not.toBeNull()
-    expect(blob.type).toBe('image/jpeg')
+    expect((blob as any).type).toBe('image/jpeg')
   })
 
   it('returns null when canvas has zero dimensions', async () => {
@@ -137,7 +144,7 @@ describe('snapshotCanvas', () => {
   it('center-crops a wide canvas to a square', async () => {
     const src = makeFakeCanvas({ width: 1000, height: 400 })
     let captured
-    src._ctx = null
+    ;(src as any)._ctx = null
     const offCanvas = makeFakeCanvas({ width: 512, height: 512 })
     const offCtx = makeFakeContext()
     offCanvas.getContext = vi.fn(() => offCtx)
@@ -161,8 +168,8 @@ describe('snapshotSvg', () => {
   beforeEach(() => installDom())
   afterEach(() => uninstallDom())
 
-  function makeFakeSvg({ width, height, viewBox, attrs = {} } = {}) {
-    const attrMap = {}
+  function makeFakeSvg({ width, height, viewBox, attrs = {} }: any = {}) {
+    const attrMap: any = {}
     if (width != null) attrMap.width = String(width)
     if (height != null) attrMap.height = String(height)
     if (viewBox) attrMap.viewBox = viewBox
@@ -179,14 +186,14 @@ describe('snapshotSvg', () => {
     const svg = makeFakeSvg({ width: 200, height: 200 })
     const blob = await snapshotSvg(svg, { size: 128, quality: 0.7 })
     expect(blob).not.toBeNull()
-    expect(blob.type).toBe('image/jpeg')
+    expect((blob as any).type).toBe('image/jpeg')
   })
 
   it('falls back to viewBox when width/height attrs are missing', async () => {
     const svg = makeFakeSvg({ viewBox: '0 0 300 150' })
     const blob = await snapshotSvg(svg, { size: 128 })
     expect(blob).not.toBeNull()
-    expect(blob.type).toBe('image/jpeg')
+    expect((blob as any).type).toBe('image/jpeg')
   })
 
   it('returns null when SVG has no dimensions anywhere', async () => {

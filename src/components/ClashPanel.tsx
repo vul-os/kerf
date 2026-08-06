@@ -23,15 +23,43 @@
 import { useState } from 'react'
 import { AlertTriangle, ChevronDown, ChevronRight, Loader2, ShieldAlert, ZapOff } from 'lucide-react'
 import { api } from '../lib/api.js'
+import type { ClashDetectResult } from '../types/api'
+
+// api.ts's ClashDetectResult types `clashes`/`errors` as `unknown[]` — too
+// loose for this panel's direct `clash.a`/`clash.b`/`clash.type`/`clash.depth`
+// field access and `errors` string rendering. Narrowed locally; api.ts could
+// usefully adopt this shape (T-515 note, not touched here — out of slice).
+interface ClashEntry {
+  a: string
+  b: string
+  type: 'hard' | 'clearance' | 'coincident' | string
+  depth: number
+}
+
+interface ClashPanelResult extends Omit<ClashDetectResult, 'clashes' | 'errors'> {
+  clashes: ClashEntry[]
+  errors: string[]
+}
+
+export interface ClashPanelProps {
+  /** Current project id. */
+  projectId?: string | null
+  /** Id of the .assembly file. */
+  assemblyFileId?: string | null
+  /** Called when the user clicks "Jump to". */
+  onHighlight?: (componentId: string) => void
+  /** Surface errors as toasts. */
+  onToast?: (msg: string) => void
+}
 
 // Badge colour per clash type.
-const CLASH_TYPE_CLASS = {
+const CLASH_TYPE_CLASS: Record<string, string> = {
   hard: 'bg-red-500/20 text-red-300 border border-red-500/30',
   clearance: 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
   coincident: 'bg-purple-500/20 text-purple-300 border border-purple-500/30',
 }
 
-function ClashTypeBadge({ type }) {
+function ClashTypeBadge({ type }: { type: string }) {
   const cls = CLASH_TYPE_CLASS[type] || 'bg-ink-800 text-ink-300'
   return (
     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono ${cls}`}>
@@ -40,11 +68,11 @@ function ClashTypeBadge({ type }) {
   )
 }
 
-export default function ClashPanel({ projectId, assemblyFileId, onHighlight, onToast }) {
+export default function ClashPanel({ projectId, assemblyFileId, onHighlight, onToast }: ClashPanelProps) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null) // { clashes, clash_count, errors }
-  const [highlighted, setHighlighted] = useState(null)
+  const [result, setResult] = useState<ClashPanelResult | null>(null)
+  const [highlighted, setHighlighted] = useState<string | null>(null)
 
   async function runCheck() {
     if (!projectId || !assemblyFileId) {
@@ -55,15 +83,15 @@ export default function ClashPanel({ projectId, assemblyFileId, onHighlight, onT
     setResult(null)
     try {
       const data = await api.runClashDetect(projectId, assemblyFileId)
-      setResult(data)
+      setResult(data as unknown as ClashPanelResult)
     } catch (err) {
-      onToast?.(err?.message || 'Clash detection failed')
+      onToast?.((err as { message?: string } | undefined)?.message || 'Clash detection failed')
     } finally {
       setLoading(false)
     }
   }
 
-  function jumpTo(componentId) {
+  function jumpTo(componentId: string) {
     setHighlighted(componentId)
     onHighlight?.(componentId)
   }

@@ -17,13 +17,19 @@
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { resolve } from 'path'
 
-const CLASH_SRC = readFileSync(
-  resolve(__dirname, '../ClashPanel.jsx'),
-  'utf8',
-)
+// Extension-agnostic source read: components migrate from .jsx to .tsx one
+// at a time (T-513..T-517), so a literal `.jsx` path here would break the
+// moment its target is renamed. Try .tsx first, then fall back to .jsx.
+function readComponentSource(baseName) {
+  const tsxPath = resolve(__dirname, `../${baseName}.tsx`)
+  const jsxPath = resolve(__dirname, `../${baseName}.jsx`)
+  return readFileSync(existsSync(tsxPath) ? tsxPath : jsxPath, 'utf8')
+}
+
+const CLASH_SRC = readComponentSource('ClashPanel')
 const ASSEMBLY_SRC = readFileSync(
   resolve(__dirname, '../AssemblyEditor.jsx'),
   'utf8',

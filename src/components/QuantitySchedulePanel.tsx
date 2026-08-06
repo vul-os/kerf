@@ -83,6 +83,7 @@ export interface ParsedScheduleFile {
  * Parse raw quantity schedule file content.
  * Returns { kind: 'ok'|'empty'|'invalid', result, hasCost, error? }
  */
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper exported alongside the component; pre-existing before this migration.
 export function parseScheduleFile(content: string): ParsedScheduleFile {
   const raw = typeof content === 'string' ? content : ''
   if (!raw.trim()) return { kind: 'empty', result: null, hasCost: false }
@@ -110,6 +111,7 @@ export function parseScheduleFile(content: string): ParsedScheduleFile {
  * Format a quantity number with an optional unit label.
  * Returns "—" for nulls.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper exported alongside the component; pre-existing before this migration.
 export function fmtQty(n: number | null | undefined, unit = ''): string {
   if (n == null || !Number.isFinite(n)) return '—'
   const s = Number.isInteger(n) ? String(n) : n.toFixed(3).replace(/\.?0+$/, '')
@@ -120,6 +122,7 @@ export function fmtQty(n: number | null | undefined, unit = ''): string {
  * Format a number as a USD cost string (2 decimal places).
  * Returns "—" for non-finite values.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper exported alongside the component; pre-existing before this migration.
 export function fmtCostUsd(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—'
   return '$' + n.toFixed(2)

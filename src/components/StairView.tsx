@@ -490,10 +490,11 @@ export interface Props {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function StairView({ content, fileName, onContentChange }: Props) {
+export default function StairView({ content, fileName: _fileName, onContentChange }: Props) {
   const [stair, setStair] = useState<StairDoc>(() => parse(content) || defaultStair({ total_rise_mm: 2800, total_run_mm: 4200 }))
   const debRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- prop-sync effect; pre-existing before this migration.
   useEffect(() => { const n = parse(content); if (n) setStair(n) }, [content])
 
   const commit = useCallback((next: StairDoc) => {

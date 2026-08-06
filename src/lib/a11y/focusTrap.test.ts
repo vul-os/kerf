@@ -19,7 +19,10 @@ import { createFocusTrap, getFocusableChildren } from './focusTrap.js'
 
 // ── minimal DOM stub factory ──────────────────────────────────────────────────
 
-function makeEl(tag = 'button', extra = {}) {
+// Unused by any test below (pre-existing dead code, kept as-is since removing
+// it is a behaviour/content change out of migration scope; prefixed with `_`
+// to satisfy the no-unused-vars lint rule).
+function _makeEl(tag = 'button', extra = {}) {
   return {
     tagName: tag.toUpperCase(),
     offsetParent: {},   // non-null ⇒ visible
@@ -33,7 +36,7 @@ function makeEl(tag = 'button', extra = {}) {
   }
 }
 
-function makeComputedStyle(visibility = 'visible') {
+function _makeComputedStyle(visibility = 'visible') {
   return { visibility }
 }
 
@@ -62,11 +65,13 @@ describe('getFocusableChildren', () => {
 
 describe('createFocusTrap — Tab capture logic', () => {
   let capturedKeydown = null
-  let capturedPointerdown = null
+  let _capturedPointerdown = null
   let origAdd, origRemove, origActive
 
   // Minimal focusable-child stubs
-  function makeButtons(n) {
+  // Deliberately loosely typed: these are hand-rolled DOM mocks, not full
+  // HTMLElement/Document implementations, so the boundary is `any`.
+  function makeButtons(n): any[] {
     return Array.from({ length: n }, (_, i) => ({
       tagName: 'BUTTON',
       offsetParent: {},
@@ -81,41 +86,41 @@ describe('createFocusTrap — Tab capture logic', () => {
 
   beforeEach(() => {
     capturedKeydown = null
-    capturedPointerdown = null
+    _capturedPointerdown = null
 
     // Stub document.addEventListener to capture our handlers
-    origAdd = global.document?.addEventListener
-    origRemove = global.document?.removeEventListener
+    origAdd = globalThis.document?.addEventListener
+    origRemove = globalThis.document?.removeEventListener
 
-    if (typeof global.document === 'undefined') {
-      // Provide a minimal global.document stub for this test suite
-      global.document = {
+    if (typeof globalThis.document === 'undefined') {
+      // Provide a minimal globalThis.document stub for this test suite
+      globalThis.document = {
         addEventListener: vi.fn((type, fn) => {
           if (type === 'keydown') capturedKeydown = fn
-          if (type === 'pointerdown') capturedPointerdown = fn
+          if (type === 'pointerdown') _capturedPointerdown = fn
         }),
         removeEventListener: vi.fn(),
         activeElement: null,
-      }
+      } as unknown as Document
     } else {
-      global.document.addEventListener = vi.fn((type, fn, ...rest) => {
+      globalThis.document.addEventListener = vi.fn((type, fn, ..._rest) => {
         if (type === 'keydown') capturedKeydown = fn
-        if (type === 'pointerdown') capturedPointerdown = fn
+        if (type === 'pointerdown') _capturedPointerdown = fn
       })
-      global.document.removeEventListener = vi.fn()
-      origActive = Object.getOwnPropertyDescriptor(global.document, 'activeElement')
+      globalThis.document.removeEventListener = vi.fn()
+      origActive = Object.getOwnPropertyDescriptor(globalThis.document, 'activeElement')
     }
   })
 
   afterEach(() => {
-    if (origAdd !== undefined) global.document.addEventListener = origAdd
-    if (origRemove !== undefined) global.document.removeEventListener = origRemove
+    if (origAdd !== undefined) globalThis.document.addEventListener = origAdd
+    if (origRemove !== undefined) globalThis.document.removeEventListener = origRemove
     if (origActive !== undefined) {
-      Object.defineProperty(global.document, 'activeElement', origActive)
+      Object.defineProperty(globalThis.document, 'activeElement', origActive)
     }
   })
 
-  function makeContainer(buttons) {
+  function makeContainer(buttons): any {
     return {
       querySelectorAll: vi.fn(() => buttons.map(b => ({
         ...b,
@@ -165,8 +170,8 @@ describe('createFocusTrap — Tab capture logic', () => {
     })
 
     // Patch document.activeElement
-    if (typeof global.document !== 'undefined') {
-      Object.defineProperty(global.document, 'activeElement', {
+    if (typeof globalThis.document !== 'undefined') {
+      Object.defineProperty(globalThis.document, 'activeElement', {
         get: () => lastBtn,
         configurable: true,
       })
@@ -190,8 +195,8 @@ describe('createFocusTrap — Tab capture logic', () => {
     container.querySelectorAll = vi.fn(() => buttons)
     container.contains = vi.fn((el) => el === firstBtn)
 
-    if (typeof global.document !== 'undefined') {
-      Object.defineProperty(global.document, 'activeElement', {
+    if (typeof globalThis.document !== 'undefined') {
+      Object.defineProperty(globalThis.document, 'activeElement', {
         get: () => firstBtn,
         configurable: true,
       })
@@ -215,8 +220,8 @@ describe('createFocusTrap — Tab capture logic', () => {
     container.querySelectorAll = vi.fn(() => buttons)
     container.contains = vi.fn((el) => el === midBtn)
 
-    if (typeof global.document !== 'undefined') {
-      Object.defineProperty(global.document, 'activeElement', {
+    if (typeof globalThis.document !== 'undefined') {
+      Object.defineProperty(globalThis.document, 'activeElement', {
         get: () => midBtn,
         configurable: true,
       })
@@ -280,7 +285,7 @@ describe('createFocusTrap — Tab capture logic', () => {
     trap.activate()
     trap.deactivate()
 
-    expect(global.document.removeEventListener).toHaveBeenCalledWith(
+    expect(globalThis.document.removeEventListener).toHaveBeenCalledWith(
       'keydown',
       expect.any(Function),
       true,

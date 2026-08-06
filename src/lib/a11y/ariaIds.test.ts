@@ -51,7 +51,7 @@ describe('generateAriaId', () => {
   })
 
   it('produces IDs that are valid HTML id attribute values (no spaces)', () => {
-    const id = generateAriaId('my label')
+    const _id = generateAriaId('my label')
     // The ID should not contain bare spaces — replace with hyphen or similar
     // (we don't enforce this in the implementation but the default doesn't
     // produce spaces, so check the default-prefix form)

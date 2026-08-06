@@ -140,92 +140,92 @@ describe('isFocusInInput', () => {
   let savedDocument
 
   beforeEach(() => {
-    savedDocument = global.document
+    savedDocument = globalThis.document
   })
   afterEach(() => {
-    global.document = savedDocument
+    globalThis.document = savedDocument
   })
 
   it('returns false when document is undefined', () => {
-    global.document = undefined
+    globalThis.document = undefined as unknown as Document
     expect(isFocusInInput()).toBe(false)
   })
 
   it('returns false when activeElement is null', () => {
-    global.document = { activeElement: null }
+    globalThis.document = { activeElement: null } as unknown as Document
     expect(isFocusInInput()).toBe(false)
   })
 
   it('returns true for INPUT element', () => {
-    global.document = {
+    globalThis.document = {
       activeElement: {
         tagName: 'INPUT',
         isContentEditable: false,
         getAttribute: () => null,
       },
-    }
+    } as unknown as Document
     expect(isFocusInInput()).toBe(true)
   })
 
   it('returns true for TEXTAREA element', () => {
-    global.document = {
+    globalThis.document = {
       activeElement: {
         tagName: 'TEXTAREA',
         isContentEditable: false,
         getAttribute: () => null,
       },
-    }
+    } as unknown as Document
     expect(isFocusInInput()).toBe(true)
   })
 
   it('returns true for SELECT element', () => {
-    global.document = {
+    globalThis.document = {
       activeElement: {
         tagName: 'SELECT',
         isContentEditable: false,
         getAttribute: () => null,
       },
-    }
+    } as unknown as Document
     expect(isFocusInInput()).toBe(true)
   })
 
   it('returns true for contenteditable element', () => {
-    global.document = {
+    globalThis.document = {
       activeElement: {
         tagName: 'DIV',
         isContentEditable: true,
         getAttribute: () => null,
       },
-    }
+    } as unknown as Document
     expect(isFocusInInput()).toBe(true)
   })
 
   it('returns true for role=textbox element (Monaco)', () => {
-    global.document = {
+    globalThis.document = {
       activeElement: {
         tagName: 'DIV',
         isContentEditable: false,
         getAttribute: (attr) => (attr === 'role' ? 'textbox' : null),
       },
-    }
+    } as unknown as Document
     expect(isFocusInInput()).toBe(true)
   })
 
   it('returns false for a plain BUTTON', () => {
-    global.document = {
+    globalThis.document = {
       activeElement: {
         tagName: 'BUTTON',
         isContentEditable: false,
         getAttribute: () => null,
       },
-    }
+    } as unknown as Document
     expect(isFocusInInput()).toBe(false)
   })
 })
 
 // ── registerShortcut — dispatch logic ────────────────────────────────────────
 //
-// We stub global.document with a minimal event-listener implementation so we
+// We stub globalThis.document with a minimal event-listener implementation so we
 // can capture the dispatch function and fire it directly.
 
 describe('registerShortcut — dispatch logic', () => {
@@ -234,13 +234,13 @@ describe('registerShortcut — dispatch logic', () => {
 
   beforeEach(() => {
     // Install a document stub that captures the keydown listener
-    global.document = {
+    globalThis.document = {
       addEventListener: vi.fn((type, fn) => {
         if (type === 'keydown') capturedListener = fn
       }),
       removeEventListener: vi.fn(),
       get activeElement() { return fakeActiveElement },
-    }
+    } as unknown as Document
     fakeActiveElement = { tagName: 'BODY', isContentEditable: false, getAttribute: () => null }
     capturedListener = null
     unregisterAll()
@@ -250,7 +250,7 @@ describe('registerShortcut — dispatch logic', () => {
     unregisterAll()
   })
 
-  function fireKey(key, mods = {}) {
+  function fireKey(key, mods: { ctrl?: boolean; shift?: boolean; alt?: boolean; meta?: boolean } = {}) {
     const e = {
       key,
       ctrlKey: mods.ctrl ?? false,
@@ -266,7 +266,7 @@ describe('registerShortcut — dispatch logic', () => {
   it('registers a listener on document', () => {
     const handler = vi.fn()
     registerShortcut('ctrl+k', handler)
-    expect(global.document.addEventListener).toHaveBeenCalledWith('keydown', expect.any(Function), true)
+    expect(globalThis.document.addEventListener).toHaveBeenCalledWith('keydown', expect.any(Function), true)
   })
 
   it('handler is called when shortcut matches', () => {

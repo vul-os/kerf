@@ -62,25 +62,40 @@ const IS_MAC =
   typeof navigator !== 'undefined' &&
   /mac|iphone|ipad|ipod/i.test(navigator.platform || navigator.userAgent)
 
+export interface ParsedShortcut {
+  mod: boolean
+  ctrl: boolean
+  alt: boolean
+  shift: boolean
+  meta: boolean
+  key: string
+}
+
+type Modifier = 'mod' | 'ctrl' | 'alt' | 'shift' | 'meta'
+
 /**
  * Parse a shortcut descriptor string into a normalised object.
- *
- * @param {string} descriptor
- * @returns {{ mod: boolean, ctrl: boolean, alt: boolean, shift: boolean, meta: boolean, key: string }}
  */
-export function parseShortcut(descriptor) {
+export function parseShortcut(descriptor: string): ParsedShortcut {
   const parts = descriptor
     .toLowerCase()
     .split('+')
     .map((p) => p.trim())
     .filter(Boolean)
 
-  const result = { mod: false, ctrl: false, alt: false, shift: false, meta: false, key: '' }
-  const modifiers = new Set(['mod', 'ctrl', 'alt', 'shift', 'meta'])
+  const result: ParsedShortcut = {
+    mod: false,
+    ctrl: false,
+    alt: false,
+    shift: false,
+    meta: false,
+    key: '',
+  }
+  const modifiers = new Set<Modifier>(['mod', 'ctrl', 'alt', 'shift', 'meta'])
 
   for (const part of parts) {
-    if (modifiers.has(part)) {
-      result[part] = true
+    if (modifiers.has(part as Modifier)) {
+      result[part as Modifier] = true
     } else {
       // Last non-modifier part becomes the key
       result.key = part
@@ -102,12 +117,8 @@ export function parseShortcut(descriptor) {
 
 /**
  * Test whether a KeyboardEvent matches a parsed shortcut descriptor.
- *
- * @param {KeyboardEvent} event
- * @param {{ ctrl: boolean, alt: boolean, shift: boolean, meta: boolean, key: string }} parsed
- * @returns {boolean}
  */
-export function matchesShortcut(event, parsed) {
+export function matchesShortcut(event: KeyboardEvent, parsed: ParsedShortcut): boolean {
   if (event.ctrlKey !== parsed.ctrl) return false
   if (event.altKey !== parsed.alt) return false
   if (event.shiftKey !== parsed.shift) return false
@@ -123,16 +134,14 @@ export function matchesShortcut(event, parsed) {
 /**
  * Return true if the currently-focused element is an interactive input
  * (typing target). Used to suppress shortcuts when the user is composing text.
- *
- * @returns {boolean}
  */
-export function isFocusInInput() {
+export function isFocusInInput(): boolean {
   if (typeof document === 'undefined') return false
   const el = document.activeElement
   if (!el) return false
   const tag = el.tagName.toUpperCase()
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true
-  if (el.isContentEditable) return true
+  if ((el as HTMLElement).isContentEditable) return true
   // Monaco editor wraps everything in a div with role=textbox
   if (el.getAttribute('role') === 'textbox') return true
   return false
@@ -140,7 +149,22 @@ export function isFocusInInput() {
 
 // ── Registry ──────────────────────────────────────────────────────────────────
 
-let _handlers = []
+export interface ShortcutOptions {
+  priority?: number
+  allowInInput?: boolean
+  preventDefault?: boolean
+}
+
+export type ShortcutHandler = (event: KeyboardEvent) => boolean | 'stop' | void
+
+interface ShortcutEntry {
+  descriptor: string
+  parsed: ParsedShortcut
+  handler: ShortcutHandler
+  options: Required<ShortcutOptions>
+}
+
+let _handlers: ShortcutEntry[] = []
 let _listenerAttached = false
 
 function ensureListener() {
@@ -150,7 +174,7 @@ function ensureListener() {
   document.addEventListener('keydown', _dispatch, true)
 }
 
-function _dispatch(event) {
+function _dispatch(event: KeyboardEvent) {
   // Sort by priority (descending) each time so insertions are reflected.
   const sorted = [..._handlers].sort((a, b) => (b.options.priority ?? 0) - (a.options.priority ?? 0))
 
@@ -171,14 +195,16 @@ function _dispatch(event) {
 /**
  * Register a global keyboard shortcut.
  *
- * @param {string} descriptor   e.g. 'mod+k'
- * @param {(e: KeyboardEvent) => boolean | void} handler
- * @param {{ priority?: number, allowInInput?: boolean, preventDefault?: boolean }} [options]
- * @returns {() => void}  call to unregister
+ * @param descriptor   e.g. 'mod+k'
+ * @returns call to unregister
  */
-export function registerShortcut(descriptor, handler, options = {}) {
+export function registerShortcut(
+  descriptor: string,
+  handler: ShortcutHandler,
+  options: ShortcutOptions = {}
+): () => void {
   const parsed = parseShortcut(descriptor)
-  const entry = {
+  const entry: ShortcutEntry = {
     descriptor,
     parsed,
     handler,
@@ -201,7 +227,7 @@ export function registerShortcut(descriptor, handler, options = {}) {
  * Remove all registered shortcuts and detach the document listener.
  * Useful in test teardown to prevent cross-test contamination.
  */
-export function unregisterAll() {
+export function unregisterAll(): void {
   _handlers = []
   if (_listenerAttached && typeof document !== 'undefined') {
     document.removeEventListener('keydown', _dispatch, true)
@@ -213,9 +239,7 @@ export function unregisterAll() {
 
 /**
  * Return a snapshot of currently registered shortcut descriptors (for debugging).
- *
- * @returns {string[]}
  */
-export function listShortcuts() {
+export function listShortcuts(): string[] {
   return _handlers.map((h) => h.descriptor)
 }

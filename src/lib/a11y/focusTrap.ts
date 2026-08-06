@@ -56,13 +56,10 @@ const FOCUSABLE_SELECTOR = [
 /**
  * Return all focusable descendants of `container`, in DOM order, filtering out
  * hidden / inert nodes.
- *
- * @param {HTMLElement} container
- * @returns {HTMLElement[]}
  */
-export function getFocusableChildren(container) {
+export function getFocusableChildren(container: HTMLElement | null | undefined): HTMLElement[] {
   if (!container) return []
-  const candidates = Array.from(container.querySelectorAll(FOCUSABLE_SELECTOR))
+  const candidates = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
   return candidates.filter((el) => {
     if (el.offsetParent === null && el.tagName !== 'BODY') return false // hidden via display:none
     if (typeof window !== 'undefined') {
@@ -74,14 +71,26 @@ export function getFocusableChildren(container) {
   })
 }
 
+type FocusTarget = HTMLElement | (() => HTMLElement | null) | false
+
+export interface FocusTrapOptions {
+  initialFocus?: FocusTarget
+  returnFocus?: FocusTarget | true
+  escapeDeactivates?: boolean
+  onDeactivate?: () => void
+  allowOutsideClick?: boolean
+}
+
+export interface FocusTrap {
+  activate: () => void
+  deactivate: () => void
+  update: () => void
+}
+
 /**
  * Create a focus trap bound to `container`.
- *
- * @param {HTMLElement} container
- * @param {object} [options]
- * @returns {{ activate: () => void, deactivate: () => void, update: () => void }}
  */
-export function createFocusTrap(container, options = {}) {
+export function createFocusTrap(container: HTMLElement, options: FocusTrapOptions = {}): FocusTrap {
   const {
     initialFocus,
     returnFocus = true,
@@ -91,34 +100,38 @@ export function createFocusTrap(container, options = {}) {
   } = options
 
   let active = false
-  let focusableChildren = []
-  let savedFocus = null
+  let focusableChildren: HTMLElement[] = []
+  let savedFocus: HTMLElement | null = null
 
   function update() {
     focusableChildren = getFocusableChildren(container)
   }
 
-  function isHTMLElement(val) {
+  function isHTMLElement(val: unknown): val is HTMLElement {
     if (typeof HTMLElement !== 'undefined') return val instanceof HTMLElement
     // In environments without HTMLElement (Node/test), duck-type as an object with focus()
-    return val !== null && typeof val === 'object' && typeof val.focus === 'function'
+    return (
+      val !== null &&
+      typeof val === 'object' &&
+      typeof (val as { focus?: unknown }).focus === 'function'
+    )
   }
 
-  function getInitialFocusEl() {
+  function getInitialFocusEl(): HTMLElement | null {
     if (initialFocus === false) return null
     if (typeof initialFocus === 'function') return initialFocus()
     if (isHTMLElement(initialFocus)) return initialFocus
     return focusableChildren[0] ?? null
   }
 
-  function getReturnFocusEl() {
+  function getReturnFocusEl(): HTMLElement | null {
     if (returnFocus === false) return null
     if (typeof returnFocus === 'function') return returnFocus()
     if (isHTMLElement(returnFocus)) return returnFocus
     return savedFocus
   }
 
-  function onKeyDown(e) {
+  function onKeyDown(e: KeyboardEvent) {
     if (!active) return
 
     if (e.key === 'Escape' && escapeDeactivates) {
@@ -154,9 +167,9 @@ export function createFocusTrap(container, options = {}) {
     }
   }
 
-  function onPointerDown(e) {
+  function onPointerDown(e: PointerEvent) {
     if (!active || allowOutsideClick) return
-    if (!container.contains(e.target)) {
+    if (!container.contains(e.target as Node | null)) {
       e.preventDefault()
       deactivate()
     }
@@ -165,7 +178,7 @@ export function createFocusTrap(container, options = {}) {
   function activate() {
     if (active) return
     active = true
-    savedFocus = document.activeElement
+    savedFocus = document.activeElement as HTMLElement | null
 
     update()
 

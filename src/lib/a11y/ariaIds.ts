@@ -40,7 +40,7 @@ let _counter = 0
  * @param {string} [prefix='aria'] — human-readable label segment
  * @returns {string}   e.g. 'kerf-dialog-1'
  */
-export function generateAriaId(prefix = 'aria') {
+export function generateAriaId(prefix: string = 'aria'): string {
   _counter += 1
   return `kerf-${prefix}-${_counter}`
 }
@@ -56,8 +56,8 @@ export function generateAriaId(prefix = 'aria') {
  *   ids('input')   // 'kerf-combo-input-7'
  *   ids('listbox') // 'kerf-combo-listbox-8'
  */
-export function createAriaIdGroup(namespace) {
-  return function (suffix = '') {
+export function createAriaIdGroup(namespace: string): (suffix?: string) => string {
+  return function (suffix: string = '') {
     const key = suffix ? `${namespace}-${suffix}` : namespace
     return generateAriaId(key)
   }
@@ -67,7 +67,7 @@ export function createAriaIdGroup(namespace) {
  * Reset the internal counter.
  * FOR TESTS ONLY — calling this in production will cause ID collisions.
  */
-export function resetAriaIdCounter() {
+export function resetAriaIdCounter(): void {
   _counter = 0
 }
 
@@ -75,6 +75,6 @@ export function resetAriaIdCounter() {
  * Return the current counter value without incrementing it.
  * FOR TESTS ONLY — useful for asserting that IDs are sequential.
  */
-export function peekAriaIdCounter() {
+export function peekAriaIdCounter(): number {
   return _counter
 }

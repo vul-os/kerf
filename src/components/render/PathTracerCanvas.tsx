@@ -1,20 +1,70 @@
 /**
- * PathTracerCanvas.jsx — WebGPU path-tracer canvas component.
- *
- * Props:
- *   scene        {Scene}   — PathTracerScene.Scene instance
- *   width        {number}  — canvas pixel width  (default 800)
- *   height       {number}  — canvas pixel height (default 600)
- *   onSampleCount {Function(n)} — called each frame with accumulated sample count
+ * PathTracerCanvas.tsx — WebGPU path-tracer canvas component.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { RefObject } from 'react'
 import shader from './shaders/pathtracer.wgsl?raw'
-import { buildBVH } from './PathTracerScene.js'
+import { buildBVH, type Scene } from './PathTracerScene.js'
+import type { Vec3 } from '../../types'
+
+export interface Props {
+  /** PathTracerScene.Scene instance */
+  scene: Scene
+  /** canvas pixel width (default 800) */
+  width?: number
+  /** canvas pixel height (default 600) */
+  height?: number
+  /** called each frame with accumulated sample count */
+  onSampleCount?: (n: number) => void
+}
+
+interface Camera {
+  eye: Vec3
+  target: Vec3
+  fovY: number
+}
+
+interface MousePos { x: number; y: number }
+
+interface InputState {
+  keys: Set<string>
+  mouse: MousePos | null
+  lastMouse: MousePos | null
+}
+
+interface FrameState {
+  index: number
+  rafId: number | null
+  dirty: boolean
+}
+
+interface GpuResources {
+  device: GPUDevice
+  context: GPUCanvasContext
+  format: GPUTextureFormat
+  pipeline: GPURenderPipeline
+  pipelineLayout: GPUPipelineLayout
+  bindGroupLayout0: GPUBindGroupLayout
+  bindGroupLayout1: GPUBindGroupLayout
+  bindGroup0: GPUBindGroup
+  bindGroup1: GPUBindGroup
+  uniformBuf: GPUBuffer
+  accumTex: GPUTexture
+  spheresBuf: GPUBuffer
+  planesBuf: GPUBuffer
+  matsBuf: GPUBuffer
+  lightsBuf: GPUBuffer
+  bvhBuf: GPUBuffer
+  width: number
+  height: number
+}
+
+type GpuError = 'no-webgpu' | 'no-adapter' | string | null
 
 // ─── Matrix helpers (column-major Float32Array, matches WGSL mat4x4<f32>) ───
 
-function mat4Identity() {
+function mat4Identity(): Float32Array {
   // eslint-disable-next-line no-return-assign
   return new Float32Array([
     1, 0, 0, 0,
@@ -24,7 +74,7 @@ function mat4Identity() {
   ])
 }
 
-function mat4Multiply(a, b) {
+function mat4Multiply(a: Float32Array, b: Float32Array): Float32Array {
   const out = new Float32Array(16)
   for (let i = 0; i < 4; i++) {
     for (let j = 0; j < 4; j++) {
@@ -36,7 +86,7 @@ function mat4Multiply(a, b) {
   return out
 }
 
-function mat4Inverse(m) {
+function mat4Inverse(m: Float32Array): Float32Array {
   // Standard 4×4 inverse via cofactors
   const inv = new Float32Array(16)
   inv[0]  =  m[5]*m[10]*m[15] - m[5]*m[11]*m[14] - m[9]*m[6]*m[15] + m[9]*m[7]*m[14] + m[13]*m[6]*m[11] - m[13]*m[7]*m[10]
@@ -62,7 +112,7 @@ function mat4Inverse(m) {
   return inv
 }
 
-function makePerspective(fovY, aspect, near, far) {
+function makePerspective(fovY: number, aspect: number, near: number, far: number): Float32Array {
   const f = 1.0 / Math.tan(fovY / 2)
   const nf = 1 / (near - far)
   return new Float32Array([
@@ -73,7 +123,7 @@ function makePerspective(fovY, aspect, near, far) {
   ])
 }
 
-function makeView(eye, target, up = [0, 1, 0]) {
+function makeView(eye: Vec3, target: Vec3, up: Vec3 = [0, 1, 0]): Float32Array {
   const f = _normalise([target[0]-eye[0], target[1]-eye[1], target[2]-eye[2]])
   const s = _normalise(_cross(f, up))
   const u = _cross(s, f)
@@ -85,13 +135,13 @@ function makeView(eye, target, up = [0, 1, 0]) {
   ])
 }
 
-function _normalise(v) { const l = Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]); return l<1e-10?[0,1,0]:[v[0]/l,v[1]/l,v[2]/l] }
-function _cross(a, b) { return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]] }
-function _dot(a, b) { return a[0]*b[0]+a[1]*b[1]+a[2]*b[2] }
+function _normalise(v: Vec3): Vec3 { const l = Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]); return l<1e-10?[0,1,0]:[v[0]/l,v[1]/l,v[2]/l] }
+function _cross(a: Vec3, b: Vec3): Vec3 { return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]] }
+function _dot(a: Vec3, b: Vec3): number { return a[0]*b[0]+a[1]*b[1]+a[2]*b[2] }
 
 // ─── GPU resource helpers ────────────────────────────────────────────────────
 
-function createStorageBuffer(device, data, usage) {
+function createStorageBuffer(device: GPUDevice, data: Float32Array, usage?: GPUBufferUsageFlags): GPUBuffer {
   const buf = device.createBuffer({
     size: Math.max(data.byteLength, 16), // min 16 bytes
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | (usage || 0),
@@ -102,7 +152,7 @@ function createStorageBuffer(device, data, usage) {
   return buf
 }
 
-function createUniformBuffer(device, size) {
+function createUniformBuffer(device: GPUDevice, size: number): GPUBuffer {
   return device.createBuffer({
     size,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -111,17 +161,17 @@ function createUniformBuffer(device, size) {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function PathTracerCanvas({ scene, width = 800, height = 600, onSampleCount }) {
-  const canvasRef   = useRef(null)
-  const gpuRef      = useRef(null)   // { device, pipeline, bindGroups, uniformBuf, accumTex, ... }
-  const cameraRef   = useRef({
+export default function PathTracerCanvas({ scene, width = 800, height = 600, onSampleCount }: Props) {
+  const canvasRef   = useRef<HTMLCanvasElement>(null)
+  const gpuRef      = useRef<GpuResources | null>(null)
+  const cameraRef   = useRef<Camera>({
     eye:    [0, 1, 6],
     target: [0, 0, -5],
     fovY:   Math.PI / 4,
   })
-  const inputRef    = useRef({ keys: new Set(), mouse: null, lastMouse: null })
-  const frameRef    = useRef({ index: 0, rafId: null, dirty: true })
-  const [gpuError, setGpuError] = useState(null)
+  const inputRef    = useRef<InputState>({ keys: new Set(), mouse: null, lastMouse: null })
+  const frameRef    = useRef<FrameState>({ index: 0, rafId: null, dirty: true })
+  const [gpuError, setGpuError] = useState<GpuError>(null)
 
   // ── Reset accumulation ──────────────────────────────────────────────────
   const resetAccum = useCallback(() => {
@@ -135,7 +185,7 @@ export default function PathTracerCanvas({ scene, width = 800, height = 600, onS
   // ── Init WebGPU ─────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false
-    let rafId = null
+    let rafId: number | null = null
 
     async function init() {
       const canvas = canvasRef.current
@@ -154,7 +204,7 @@ export default function PathTracerCanvas({ scene, width = 800, height = 600, onS
       const device = await adapter.requestDevice()
       if (cancelled) return
 
-      const context = canvas.getContext('webgpu')
+      const context = canvas.getContext('webgpu') as GPUCanvasContext
       const format  = navigator.gpu.getPreferredCanvasFormat()
       context.configure({ device, format, alphaMode: 'opaque' })
 
@@ -278,12 +328,12 @@ export default function PathTracerCanvas({ scene, width = 800, height = 600, onS
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const onMouseDown = (e) => {
+    const onMouseDown = (e: MouseEvent) => {
       inputRef.current.mouse = { x: e.clientX, y: e.clientY }
       inputRef.current.lastMouse = { x: e.clientX, y: e.clientY }
     }
-    const onMouseMove = (e) => {
-      if (!inputRef.current.mouse) return
+    const onMouseMove = (e: MouseEvent) => {
+      if (!inputRef.current.mouse || !inputRef.current.lastMouse) return
       const dx = e.clientX - inputRef.current.lastMouse.x
       const dy = e.clientY - inputRef.current.lastMouse.y
       inputRef.current.lastMouse = { x: e.clientX, y: e.clientY }
@@ -292,14 +342,14 @@ export default function PathTracerCanvas({ scene, width = 800, height = 600, onS
       if (gpuRef.current) _recreateAccumTex(gpuRef.current, width, height)
     }
     const onMouseUp = () => { inputRef.current.mouse = null }
-    const onWheel   = (e) => {
+    const onWheel   = (e: WheelEvent) => {
       e.preventDefault()
       _zoomCamera(cameraRef.current, e.deltaY)
       frameRef.current.index = 0
       if (gpuRef.current) _recreateAccumTex(gpuRef.current, width, height)
     }
-    const onKeyDown = (e) => inputRef.current.keys.add(e.code)
-    const onKeyUp   = (e) => inputRef.current.keys.delete(e.code)
+    const onKeyDown = (e: KeyboardEvent) => inputRef.current.keys.add(e.code)
+    const onKeyUp   = (e: KeyboardEvent) => inputRef.current.keys.delete(e.code)
 
     canvas.addEventListener('mousedown', onMouseDown)
     canvas.addEventListener('mousemove', onMouseMove)
@@ -354,7 +404,7 @@ export default function PathTracerCanvas({ scene, width = 800, height = 600, onS
 
 // ─── GPU helpers ─────────────────────────────────────────────────────────────
 
-function _createAccumTex(device, w, h) {
+function _createAccumTex(device: GPUDevice, w: number, h: number): GPUTexture {
   return device.createTexture({
     size: [w, h, 1],
     format: 'rgba32float',
@@ -362,20 +412,20 @@ function _createAccumTex(device, w, h) {
   })
 }
 
-function _makeAccumBindGroup(device, layout, tex) {
+function _makeAccumBindGroup(device: GPUDevice, layout: GPUBindGroupLayout, tex: GPUTexture): GPUBindGroup {
   return device.createBindGroup({
     layout,
     entries: [{ binding: 0, resource: tex.createView() }],
   })
 }
 
-function _recreateAccumTex(gpu, w, h) {
+function _recreateAccumTex(gpu: GpuResources, w: number, h: number): void {
   gpu.accumTex.destroy()
   gpu.accumTex = _createAccumTex(gpu.device, w, h)
   gpu.bindGroup1 = _makeAccumBindGroup(gpu.device, gpu.bindGroupLayout1, gpu.accumTex)
 }
 
-function _uploadCameraUniform(gpu, cam, w, h, frameIndex) {
+function _uploadCameraUniform(gpu: GpuResources, cam: Camera, w: number, h: number, frameIndex: number): void {
   const view = makeView(cam.eye, cam.target)
   const proj = makePerspective(cam.fovY, w / h, 0.01, 1000)
   const vp   = mat4Multiply(proj, view)
@@ -397,7 +447,7 @@ function _uploadCameraUniform(gpu, cam, w, h, frameIndex) {
   gpu.device.queue.writeBuffer(gpu.uniformBuf, 0, data)
 }
 
-function _renderFrame(gpu) {
+function _renderFrame(gpu: GpuResources): void {
   const { device, context, pipeline, bindGroup0, bindGroup1 } = gpu
   const encoder = device.createCommandEncoder()
   const pass = encoder.beginRenderPass({
@@ -422,12 +472,12 @@ const ORBIT_SPEED = 0.005
 const ZOOM_SPEED  = 0.01
 const PAN_SPEED   = 0.05
 
-function _orbitCamera(cam, dx, dy) {
+function _orbitCamera(cam: Camera, dx: number, dy: number): void {
   const [ex, ey, ez] = cam.eye
   const [tx, ty, tz] = cam.target
   const rx = ex - tx, ry = ey - ty, rz = ez - tz
   const r  = Math.sqrt(rx*rx + ry*ry + rz*rz)
-  let theta = Math.atan2(rx, rz) + dx * ORBIT_SPEED
+  const theta = Math.atan2(rx, rz) + dx * ORBIT_SPEED
   let phi   = Math.acos(Math.max(-0.99, Math.min(0.99, ry / r))) + dy * ORBIT_SPEED
   phi = Math.max(0.05, Math.min(Math.PI - 0.05, phi))
   cam.eye = [
@@ -437,20 +487,25 @@ function _orbitCamera(cam, dx, dy) {
   ]
 }
 
-function _zoomCamera(cam, delta) {
-  const dir = cam.eye.map((v, i) => v - cam.target[i])
+function _zoomCamera(cam: Camera, delta: number): void {
+  const dir = cam.eye.map((v, i) => v - cam.target[i]) as Vec3
   const r   = Math.sqrt(dir.reduce((s, v) => s + v * v, 0))
   const scale = Math.max(0.2, 1.0 + delta * ZOOM_SPEED)
-  cam.eye = cam.eye.map((v, i) => cam.target[i] + (dir[i] / r) * r * scale)
+  cam.eye = cam.eye.map((v, i) => cam.target[i] + (dir[i] / r) * r * scale) as Vec3
 }
 
-function _updateCameraFromInput(cameraRef, inputRef, frameRef, resetAccum) {
+function _updateCameraFromInput(
+  cameraRef: RefObject<Camera>,
+  inputRef: RefObject<InputState>,
+  frameRef: RefObject<FrameState>,
+  resetAccum: () => void,
+): void {
   const keys = inputRef.current.keys
   if (keys.size === 0) return
   const cam = cameraRef.current
   const fwd = _normalise([cam.target[0]-cam.eye[0], 0, cam.target[2]-cam.eye[2]])
   const right = _normalise(_cross(fwd, [0,1,0]))
-  const move = (dx, dy, dz) => {
+  const move = (dx: number, dy: number, dz: number) => {
     cam.eye    = [cam.eye[0]+dx, cam.eye[1]+dy, cam.eye[2]+dz]
     cam.target = [cam.target[0]+dx, cam.target[1]+dy, cam.target[2]+dz]
   }

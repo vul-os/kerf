@@ -1,5 +1,5 @@
 /**
- * PathTracerScene.js — Scene graph + BVH builder for WebGPU path-tracer.
+ * PathTracerScene.ts — Scene graph + BVH builder for WebGPU path-tracer.
  *
  * Exports:
  *   class Material  — material descriptor
@@ -8,18 +8,35 @@
  *                     in one root AABB; full SAH BVH is laid in as a TODO)
  */
 
+import type { Vec3 } from '../../types'
+
+export type MaterialKind = 'diffuse' | 'glass' | 'emissive'
+
+export interface MaterialOptions {
+  kind?: MaterialKind
+  /** linear RGB [0..1] */
+  albedo?: Vec3
+  /** index of refraction (glass) */
+  ior?: number
+  roughness?: number
+  /** emissive scale (emissive kind) */
+  emission?: number
+}
+
+interface Sphere { center: Vec3; radius: number; matIndex: number }
+interface Plane { point: Vec3; normal: Vec3; matIndex: number }
+interface SceneLight { position: Vec3; intensity: Vec3 }
+
 // ─── Material ────────────────────────────────────────────────────────────────
 
-/**
- * @param {object} opts
- * @param {'diffuse'|'glass'|'emissive'} opts.kind
- * @param {[number,number,number]}       opts.albedo    — linear RGB [0..1]
- * @param {number}                       [opts.ior]     — index of refraction (glass)
- * @param {number}                       [opts.roughness]
- * @param {number}                       [opts.emission] — emissive scale (emissive kind)
- */
 export class Material {
-  constructor({ kind = 'diffuse', albedo = [0.8, 0.8, 0.8], ior = 1.5, roughness = 0.0, emission = 1.0 } = {}) {
+  kind: MaterialKind
+  albedo: Vec3
+  ior: number
+  roughness: number
+  emission: number
+
+  constructor({ kind = 'diffuse', albedo = [0.8, 0.8, 0.8], ior = 1.5, roughness = 0.0, emission = 1.0 }: MaterialOptions = {}) {
     this.kind      = kind
     this.albedo    = albedo
     this.ior       = ior
@@ -28,8 +45,8 @@ export class Material {
   }
 
   /** Encode as Float32Array for GPU upload (matches Material struct in WGSL: 8 × f32). */
-  toGPU() {
-    const kindMap = { diffuse: 0, glass: 1, emissive: 2 }
+  toGPU(): Float32Array {
+    const kindMap: Record<MaterialKind, number> = { diffuse: 0, glass: 1, emissive: 2 }
     return new Float32Array([
       this.albedo[0], this.albedo[1], this.albedo[2],
       kindMap[this.kind] ?? 0,
@@ -44,34 +61,25 @@ export class Material {
 // ─── Scene ───────────────────────────────────────────────────────────────────
 
 export class Scene {
+  spheres: Sphere[]
+  planes: Plane[]
+  sceneLights: SceneLight[]
+  materials: Material[]
+
   constructor() {
-    /** @type {Array<{center: [number,number,number], radius: number, matIndex: number}>} */
     this.spheres   = []
-    /** @type {Array<{point: [number,number,number], normal: [number,number,number], matIndex: number}>} */
     this.planes    = []
-    /** @type {Array<{position: [number,number,number], intensity: [number,number,number]}>} */
     this.sceneLights = []
-    /** @type {Material[]} */
     this.materials = []
   }
 
-  /**
-   * Register a material and return its index.
-   * @param {Material} mat
-   * @returns {number} index
-   */
-  addMaterial(mat) {
+  /** Register a material and return its index. */
+  addMaterial(mat: Material): number {
     this.materials.push(mat)
     return this.materials.length - 1
   }
 
-  /**
-   * @param {object} opts
-   * @param {[number,number,number]} opts.center
-   * @param {number}                 opts.radius
-   * @param {Material}               opts.material
-   */
-  addSphere({ center, radius, material }) {
+  addSphere({ center, radius, material }: { center: Vec3; radius: number; material: Material | number }): void {
     const matIndex = material instanceof Material
       ? this.addMaterial(material)
       : material // allow passing pre-registered index
@@ -79,12 +87,10 @@ export class Scene {
   }
 
   /**
-   * @param {object} opts
-   * @param {[number,number,number]} opts.point   — any point on the plane
-   * @param {[number,number,number]} opts.normal  — outward normal (will be normalised)
-   * @param {Material}               opts.material
+   * @param opts.point   — any point on the plane
+   * @param opts.normal  — outward normal (will be normalised)
    */
-  addPlane({ point, normal, material }) {
+  addPlane({ point, normal, material }: { point: Vec3; normal: Vec3; material: Material | number }): void {
     const n = _normalise(normal)
     const matIndex = material instanceof Material
       ? this.addMaterial(material)
@@ -92,13 +98,9 @@ export class Scene {
     this.planes.push({ point, normal: n, matIndex })
   }
 
-  /**
-   * @param {object} opts
-   * @param {[number,number,number]}      opts.position
-   * @param {[number,number,number]|number} opts.intensity — RGB or scalar
-   */
-  addLight({ position, intensity }) {
-    const rgb = typeof intensity === 'number'
+  /** @param opts.intensity — RGB or scalar */
+  addLight({ position, intensity }: { position: Vec3; intensity: Vec3 | number }): void {
+    const rgb: Vec3 = typeof intensity === 'number'
       ? [intensity, intensity, intensity]
       : intensity
     this.sceneLights.push({ position, intensity: rgb })
@@ -107,7 +109,7 @@ export class Scene {
   // ── GPU serialisation ────────────────────────────────────────────────────
 
   /** Float32Array: each sphere = 8 floats (center xyz, radius, matIndex, pad×3) */
-  spheresGPU() {
+  spheresGPU(): Float32Array {
     const buf = new Float32Array(this.spheres.length * 8)
     this.spheres.forEach(({ center, radius, matIndex }, i) => {
       const o = i * 8
@@ -123,7 +125,7 @@ export class Scene {
   }
 
   /** Float32Array: each plane = 8 floats (point xyz, pad, normal xyz, matIndex) */
-  planesGPU() {
+  planesGPU(): Float32Array {
     const buf = new Float32Array(this.planes.length * 8)
     this.planes.forEach(({ point, normal, matIndex }, i) => {
       const o = i * 8
@@ -140,7 +142,7 @@ export class Scene {
   }
 
   /** Float32Array: each light = 8 floats (position xyz, pad, intensity xyz, pad) */
-  lightsGPU() {
+  lightsGPU(): Float32Array {
     const buf = new Float32Array(this.sceneLights.length * 8)
     this.sceneLights.forEach(({ position, intensity }, i) => {
       const o = i * 8
@@ -157,7 +159,7 @@ export class Scene {
   }
 
   /** Float32Array: packed material array — each material = 8 floats */
-  materialsGPU() {
+  materialsGPU(): Float32Array {
     const arrays = this.materials.map((m) => m.toGPU())
     const total = new Float32Array(arrays.reduce((s, a) => s + a.length, 0))
     let offset = 0
@@ -178,13 +180,12 @@ export class Scene {
  * Suitable for up to ~20 primitives; a SAH split pass is straightforward to
  * add by recursing over sphere centroids.
  *
- * @param {Scene} scene
- * @returns {Float32Array} — flat array of BvhNode (each node = 8 floats):
+ * @returns flat array of BvhNode (each node = 8 floats):
  *   [aabbMin.xyz, leftIdx, aabbMax.xyz, rightIdx]
  *   Leaf node: rightIdx MSB set (0x80000000), leftIdx = first sphere index,
  *   rightIdx & 0x7FFFFFFF = count.
  */
-export function buildBVH(scene) {
+export function buildBVH(scene: Scene): Float32Array {
   const spheres = scene.spheres
   if (spheres.length === 0) {
     // Empty scene — return a degenerate node
@@ -218,7 +219,7 @@ export function buildBVH(scene) {
  * Default "Glass Spheres" scene: 3 glass spheres with different IORs on a
  * checkerboard plane, lit by a single area light.
  */
-export function createGlassSpheresScene() {
+export function createGlassSpheresScene(): Scene {
   const scene = new Scene()
 
   // Materials
@@ -240,13 +241,16 @@ export function createGlassSpheresScene() {
 /**
  * Cornell Box scene approximation using spheres + planes.
  */
-export function createCornellBoxScene() {
+export function createCornellBoxScene(): Scene {
   const scene = new Scene()
 
   const white  = new Material({ kind: 'diffuse', albedo: [0.73, 0.73, 0.73] })
   const red    = new Material({ kind: 'diffuse', albedo: [0.65, 0.05, 0.05] })
   const green  = new Material({ kind: 'diffuse', albedo: [0.12, 0.45, 0.15] })
-  const light  = new Material({ kind: 'emissive', albedo: [15, 15, 15], emission: 1.0 })
+  // NOTE: constructed but never assigned to a surface — addLight() below creates a point
+  // light instead. Pre-existing in the source (confirmed against the pre-migration .js);
+  // left as-is (no behaviour change), just renamed to satisfy the unused-var lint rule.
+  const _light = new Material({ kind: 'emissive', albedo: [15, 15, 15], emission: 1.0 })
   const glass  = new Material({ kind: 'glass', albedo: [1, 1, 1], ior: 1.5 })
 
   // Walls (planes)
@@ -269,7 +273,7 @@ export function createCornellBoxScene() {
  * Prism / dispersion demo: a triangular prism approximated as a glass sphere
  * with the highest IOR, plus a background light.
  */
-export function createPrismScene() {
+export function createPrismScene(): Scene {
   const scene = new Scene()
 
   const floor  = new Material({ kind: 'diffuse', albedo: [0.5, 0.5, 0.5] })
@@ -289,7 +293,7 @@ export function createPrismScene() {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function _normalise([x, y, z]) {
+function _normalise([x, y, z]: Vec3): Vec3 {
   const len = Math.sqrt(x * x + y * y + z * z)
   return len < 1e-10 ? [0, 1, 0] : [x / len, y / len, z / len]
 }

@@ -147,7 +147,12 @@ describe('Modal — close button', () => {
 // ── 5. Source contracts ───────────────────────────────────────────────────────
 
 describe('Modal — source contracts (Modal.jsx)', () => {
-  const src = readFileSync(resolve(ROOT, 'src/components/Modal.jsx'), 'utf8')
+  const src = readFileSync(
+    existsSync(resolve(ROOT, 'src/components/Modal.tsx'))
+      ? resolve(ROOT, 'src/components/Modal.tsx')
+      : resolve(ROOT, 'src/components/Modal.jsx'),
+    'utf8',
+  )
 
   it('implements a focus trap (Tab key handling)', () => {
     expect(src).toMatch(/e\.key.*Tab|Tab.*e\.key/)
@@ -238,7 +243,12 @@ describe('ShortcutsModal — uses canonical Modal', () => {
 })
 
 describe('Editor.jsx Build3DModal — uses canonical Modal', () => {
-  const src = readFileSync(resolve(ROOT, 'src/routes/Editor.jsx'), 'utf8')
+  const src = readFileSync(
+    existsSync(resolve(ROOT, 'src/routes/Editor.tsx'))
+      ? resolve(ROOT, 'src/routes/Editor.tsx')
+      : resolve(ROOT, 'src/routes/Editor.jsx'),
+    'utf8',
+  )
 
   it('imports Modal from ../components/Modal.jsx', () => {
     expect(src).toMatch(/from ['"]\.\.\/components\/Modal\.jsx['"]/)

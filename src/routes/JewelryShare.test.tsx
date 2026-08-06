@@ -360,9 +360,11 @@ describe('detectWebGL', () => {
 
   it('returns false when document.createElement throws', () => {
     const origDoc = globalThis.document
+    // Boundary fake: a partial `document` stand-in for a Node env with no jsdom.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     globalThis.document = {
       createElement: () => { throw new Error('no canvas') },
-    }
+    } as any
     try {
       expect(detectWebGL()).toBe(false)
     } finally {
@@ -372,9 +374,11 @@ describe('detectWebGL', () => {
 
   it('returns false when getContext returns null for all contexts', () => {
     const origDoc = globalThis.document
+    // Boundary fake: a partial `document` stand-in for a Node env with no jsdom.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     globalThis.document = {
       createElement: () => ({ getContext: () => null }),
-    }
+    } as any
     try {
       expect(detectWebGL()).toBe(false)
     } finally {
@@ -384,9 +388,11 @@ describe('detectWebGL', () => {
 
   it('returns false when context object has no createBuffer method', () => {
     const origDoc = globalThis.document
+    // Boundary fake: a partial `document` stand-in for a Node env with no jsdom.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     globalThis.document = {
       createElement: () => ({ getContext: () => ({}) }),
-    }
+    } as any
     try {
       expect(detectWebGL()).toBe(false)
     } finally {
@@ -397,11 +403,13 @@ describe('detectWebGL', () => {
   it('returns true when a WebGL2 context with createBuffer is available', () => {
     const origDoc = globalThis.document
     const fakeCtx = { createBuffer: () => {} }
+    // Boundary fake: a partial `document` stand-in for a Node env with no jsdom.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     globalThis.document = {
       createElement: () => ({
-        getContext: (type) => (type === 'webgl2' ? fakeCtx : null),
+        getContext: (type: string) => (type === 'webgl2' ? fakeCtx : null),
       }),
-    }
+    } as any
     try {
       expect(detectWebGL()).toBe(true)
     } finally {
@@ -412,11 +420,13 @@ describe('detectWebGL', () => {
   it('falls back to webgl1 when webgl2 is unavailable', () => {
     const origDoc = globalThis.document
     const fakeCtx = { createBuffer: () => {} }
+    // Boundary fake: a partial `document` stand-in for a Node env with no jsdom.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     globalThis.document = {
       createElement: () => ({
-        getContext: (type) => (type === 'webgl' ? fakeCtx : null),
+        getContext: (type: string) => (type === 'webgl' ? fakeCtx : null),
       }),
-    }
+    } as any
     try {
       expect(detectWebGL()).toBe(true)
     } finally {

@@ -331,7 +331,8 @@ export interface AdminPublisher {
 }
 
 export interface AdminPublishersPage {
-  publishers: AdminPublisher[]
+  /** `rows`, not `publishers` — the server sends PublisherListResponse(rows=...). */
+  rows: AdminPublisher[]
   next_cursor: string | null
 }
 

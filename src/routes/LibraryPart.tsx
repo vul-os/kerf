@@ -214,8 +214,9 @@ export default function LibraryPart() {
       .then((resp) => {
         if (cancelled) return
         // The endpoint may return either the row directly or wrap it in
-        // `{ part: ... }` — accept both for resilience.
-        const r = resp?.part || resp
+        // `{ part: ... }` — accept both for resilience. (routes.py currently
+        // returns it directly; the cast keeps the fallback typeable.)
+        const r = (resp as (typeof resp & { part?: typeof resp }) | null)?.part || resp
         if (!r || (typeof r === 'object' && !Object.keys(r).length)) {
           setRow(null)
           setError('Part not found.')

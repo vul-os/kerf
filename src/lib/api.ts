@@ -732,7 +732,8 @@ export const api = {
   // unconfigured rows too, so the UI can render a stub "configure"
   // affordance for each known distributor.
   admin: {
-    listDistributors: () => request<AdminDistributor[]>('/api/admin/distributors'),
+    // Wrapped in a `distributors` key, not a bare array — see list_distributors in routes.py.
+    listDistributors: () => request<{ distributors: AdminDistributor[] }>('/api/admin/distributors'),
     updateDistributor: (name: string, payload: Record<string, unknown>) =>
       request<AdminDistributor>(`/api/admin/distributors/${encodeURIComponent(name)}`, {
         method: 'PUT',

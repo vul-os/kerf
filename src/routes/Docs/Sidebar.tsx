@@ -38,7 +38,7 @@ const COLLAPSED_LS_KEY = 'kerf.docs.sidebar.collapsed.v1'
 export default function Sidebar({ drawerOpen = false, onDrawerClose }) {
   const { status, index, manifest } = useDocs()
   const inputRef = useRef(null)
-  const drawerRef = useRef(null)
+  const drawerRef = useRef<HTMLElement | null>(null)
   const reduced = usePrefersReducedMotion()
   const [query, setQuery] = useState('')
   const location = useLocation()
@@ -79,7 +79,7 @@ export default function Sidebar({ drawerOpen = false, onDrawerClose }) {
     if (!drawerOpen || !drawerRef.current) return
     const FOCUSABLE =
       'a[href], button:not([disabled]), input, textarea, select, [tabindex]:not([tabindex="-1"])'
-    const nodes = Array.from(drawerRef.current.querySelectorAll(FOCUSABLE))
+    const nodes = Array.from(drawerRef.current.querySelectorAll<HTMLElement>(FOCUSABLE))
     if (!nodes.length) return
 
     // Move focus to the first focusable element inside the drawer.
@@ -373,7 +373,6 @@ function SidebarGroup({ group, collapsed, onToggle, activeSlug, activePathname, 
                 <SidebarLink
                   to={item.to}
                   active={active}
-                  external={false}
                   isRoute={item.kind === 'route'}
                 >
                   {item.title}

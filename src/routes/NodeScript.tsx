@@ -19,6 +19,7 @@ import NodePalette       from '../components/nodescript/NodePalette.jsx'
 import PropertyInspector from '../components/nodescript/PropertyInspector.jsx'
 import { Graph, CycleError } from '../components/nodescript/graph_engine.js'
 import { getNodeDef }        from '../components/nodescript/node_library.js'
+import { isNodeError, type GraphResults } from '../components/nodescript/nodescriptTypes'
 
 // ---------------------------------------------------------------------------
 // Default starting graph
@@ -57,7 +58,7 @@ export default function NodeScriptPage() {
 
   const [graph, setGraph]             = useState(makeDefaultGraph)
   const [selectedNodeId, setSelected] = useState(null)
-  const [results, setResults]         = useState({})
+  const [results, setResults]         = useState<GraphResults>({})
   const [running, setRunning]         = useState(false)
   const [runError, setRunError]       = useState(null)
   const [paletteCollapsed, setPaletteCollapsed] = useState(false)
@@ -125,7 +126,8 @@ export default function NodeScriptPage() {
     const reader = new FileReader()
     reader.onload = (ev) => {
       try {
-        const json = JSON.parse(ev.target.result)
+        // FileReader.result is string | ArrayBuffer; readAsText is used below, so it is a string.
+        const json = JSON.parse(String(ev.target?.result ?? ''))
         setGraph(Graph.fromJSON(json))
         setResults({})
         setSelected(null)
@@ -335,7 +337,7 @@ export default function NodeScriptPage() {
                     <p style={{ margin: '0 0 3px', fontSize: 10, fontWeight: 600, color: '#8a93a6', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {node?.label ?? nodeId}
                     </p>
-                    <pre style={{ margin: 0, fontSize: 9, color: val?.error ? '#ef4444' : '#34d399', fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 100, overflowY: 'auto' }}>
+                    <pre style={{ margin: 0, fontSize: 9, color: isNodeError(val) ? '#ef4444' : '#34d399', fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 100, overflowY: 'auto' }}>
                       {JSON.stringify(val, null, 1)}
                     </pre>
                   </div>

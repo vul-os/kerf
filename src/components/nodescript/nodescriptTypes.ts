@@ -105,3 +105,12 @@ export type NodeResult =
 
 /** `Graph.run()`'s return value: node id → its result. */
 export type GraphResults = Record<string, NodeResult>
+
+/**
+ * Narrow a `NodeResult` to the error case. Needed because the union includes bare `number` and
+ * `null`, so a plain `result?.error` probe does not typecheck — callers rendering a run's output
+ * have to distinguish "this node threw" from "this node returned 0".
+ */
+export function isNodeError(result: NodeResult): result is NodeErrorResult {
+  return typeof result === 'object' && result !== null && 'error' in result
+}

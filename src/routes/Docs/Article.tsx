@@ -584,7 +584,7 @@ const mdComponents = {
 // hash on the current URL and copies the full URL to the clipboard so users
 // can share a deep link. Falls back to just setting the hash if Clipboard
 // API is unavailable (no SSL, ancient browsers).
-function AnchorButton({ id, small }) {
+function AnchorButton({ id, small }: { id: string; small?: boolean }) {
   const [copied, setCopied] = useState(false)
   const onClick = (e) => {
     e.preventDefault()

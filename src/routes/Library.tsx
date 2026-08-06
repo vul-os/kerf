@@ -219,7 +219,9 @@ function SubmitPartModal({ open, onClose, onSubmitted }) {
         return
       }
     }
-    const payload = {
+    // Widened because datasheet_url and photos are attached conditionally below; inferring the
+    // literal shape here would make those assignments errors.
+    const payload: Record<string, unknown> = {
       version: 1,
       visibility: 'public',
       ...fields,
@@ -329,7 +331,19 @@ function SubmitPartModal({ open, onClose, onSubmitted }) {
 
 // Field — small reusable text-input row. Inline rather than a Card sub
 // so the modal stays self-contained.
-function Field({ label, value, onChange, placeholder, required }) {
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  required,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  required?: boolean
+}) {
   return (
     <div>
       <label className="block text-[11px] font-medium text-ink-300 mb-1">

@@ -17,14 +17,14 @@
 //   againstSha   {string}   The SHA of the other side (parent or branch tip).
 //   onResolved   {(path, pick) => void}  Called after a successful resolve.
 
-import { useState, useCallback, lazy, Suspense } from 'react'
+import { useState, useCallback, lazy, Suspense as _Suspense } from 'react'
 import { useAuth } from '../store/auth.js'
 import { ApiError } from '../lib/api.js'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
 // Renderer is large (Three.js + OCCT) — lazy-load only when needed.
-const Renderer = lazy(() => import('./Renderer.jsx'))
+const _Renderer = lazy(() => import('./Renderer.jsx'))
 
 // ---------------------------------------------------------------------------
 // Blob-URL preview helper

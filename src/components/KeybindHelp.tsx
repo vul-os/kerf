@@ -73,6 +73,7 @@ const GROUPS = [
  * Format a binding object into a human-readable key chord string.
  * e.g. { key: 'z', shift: true } → 'Shift+Z'
  */
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper exported alongside the component; pre-existing before this migration.
 export function formatBinding(binding: KeyBinding | null | undefined) {
   if (!binding) return ''
   const parts = []
@@ -94,6 +95,7 @@ export function formatBinding(binding: KeyBinding | null | undefined) {
 /**
  * Given a bindings array, return the first binding entry for a given action.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper exported alongside the component; pre-existing before this migration.
 export function bindingForAction(bindings: KeyBinding[], action: string) {
   return bindings.find((b) => b.action === action) ?? null
 }
@@ -101,6 +103,7 @@ export function bindingForAction(bindings: KeyBinding[], action: string) {
 /**
  * Return all binding entries for a given action (an action may have multiple).
  */
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper exported alongside the component; pre-existing before this migration.
 export function bindingsForAction(bindings: KeyBinding[], action: string) {
   return bindings.filter((b) => b.action === action)
 }

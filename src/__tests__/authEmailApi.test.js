@@ -4,12 +4,16 @@
 // route/banner wiring at the source level.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const read = (p) => readFileSync(join(root, p), 'utf8')
+// Extension-agnostic: a .jsx -> .tsx migration must not break these probes.
+const read = (p) => {
+  const ts = join(root, p.replace(/\.jsx$/, '.tsx').replace(/\.js$/, '.ts'))
+  return readFileSync(existsSync(ts) ? ts : join(root, p), 'utf8')
+}
 
 describe('auth email API client', () => {
   let api, lastFetch

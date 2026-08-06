@@ -7,13 +7,17 @@
 // internal open-state, so this pins the wiring contract at the source
 // level — same approach as the Python source-contract regressions.
 
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const read = (p) => readFileSync(join(root, p), 'utf8')
+// Extension-agnostic: a .jsx -> .tsx migration must not break these probes.
+const read = (p) => {
+  const ts = join(root, p.replace(/\.jsx$/, '.tsx').replace(/\.js$/, '.ts'))
+  return readFileSync(existsSync(ts) ? ts : join(root, p), 'utf8')
+}
 
 describe('Hero capture lives in the Export dropdown', () => {
   const exportBtn = read('components/ExportButton.jsx')
@@ -21,7 +25,9 @@ describe('Hero capture lives in the Export dropdown', () => {
   const editor = read('routes/Editor.jsx')
 
   it('ExportButton accepts an onCaptureHero prop', () => {
-    expect(exportBtn).toMatch(/function ExportButton\(\{\s*onCaptureHero\s*\}\)/)
+    // Tolerates an optional TypeScript parameter annotation — after migration this
+    // reads `function ExportButton({ onCaptureHero }: Props)`.
+    expect(exportBtn).toMatch(/function ExportButton\(\{\s*onCaptureHero\s*\}(?::\s*\w+)?\)/)
   })
 
   it('ExportButton has a hero capture handler that downloads a kerf-hero PNG', () => {

@@ -262,7 +262,7 @@ function CrackGrowthPanel({
     max_steps: '#f59e0b',
     max_crack_length: '#f59e0b',
   }
-  const stopColor = (stop_reason && stopColors[stop_reason]) ?? '#64748b'
+  const _stopColor = (stop_reason && stopColors[stop_reason]) ?? '#64748b'
   const K_Ic = paris_params?.K_Ic_pa_sqrt_m
 
   // Determine max K from history

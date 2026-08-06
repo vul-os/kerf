@@ -4,7 +4,7 @@
 // (renderToStaticMarkup) for structural HTML assertions, mirroring the
 // project's existing Loader.test.jsx pattern.
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi as _vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import ShadowSettings, { type Props } from './ShadowSettings.jsx'
 import { defaultShadowSettings, SHADOW_TYPES, SHADOW_MAP_SIZES } from '../lib/shadowSettings.js'
@@ -44,7 +44,7 @@ describe('ShadowSettings root structure', () => {
 describe('ShadowSettings — shadow type buttons', () => {
   it('renders a button for each SHADOW_TYPE', () => {
     const html = render({ settings: defaultShadowSettings() })
-    SHADOW_TYPES.forEach((type) => {
+    SHADOW_TYPES.forEach((_type) => {
       // Each button has an aria-label containing the display label
       expect(html).toMatch(new RegExp(`Shadow type`))
     })

@@ -130,7 +130,7 @@ describe('DerivedCacheOverlay — event bus subscription', () => {
   it('assembly.js exports addDerivedCacheListener', async () => {
     // Structural: the real assembly.js source must export addDerivedCacheListener
     const assemblySrc = readFileSync(
-      path.resolve(__dirname, '../lib/assembly.js'),
+      path.resolve(__dirname, '../lib/assembly.ts'),
       'utf8',
     )
     expect(assemblySrc).toContain('export function addDerivedCacheListener')
@@ -138,7 +138,7 @@ describe('DerivedCacheOverlay — event bus subscription', () => {
 
   it('assembly.js exports _emitDerivedCacheEvent for internal use', () => {
     const assemblySrc = readFileSync(
-      path.resolve(__dirname, '../lib/assembly.js'),
+      path.resolve(__dirname, '../lib/assembly.ts'),
       'utf8',
     )
     expect(assemblySrc).toContain('function _emitDerivedCacheEvent')

@@ -42,6 +42,15 @@
 import * as THREE from 'three'
 import { applyMatrixToGeom } from './geom3.js'
 import { library } from '../cloud/api.js'
+import type {
+  AssemblyDocument,
+  AssemblyComponent,
+  AssemblyBomOverride,
+  AssemblyMate,
+  AssemblyMateRef,
+  AssemblyExternalRef,
+  Vec3,
+} from '@/types'
 
 const DEG = Math.PI / 180
 
@@ -67,19 +76,31 @@ export const LOD_THRESHOLD = 500
 export const LOD_FULL = 'full'
 export const LOD_PROXY = 'proxy'
 
+export type AssemblyLodLevel = typeof LOD_FULL | typeof LOD_PROXY
+
 /**
  * selectLOD: given the 0-based index of a component in the visible list and
  * the active threshold, return 'full' or 'proxy'.
  *
  * Pure function — no side effects. The test suite exercises this directly.
  *
- * @param {number} visibleIndex  0-based position in the visible-component list
- * @param {number} threshold     components ≥ threshold get LOD_PROXY
- * @returns {'full'|'proxy'}
+ * @param visibleIndex  0-based position in the visible-component list
+ * @param threshold     components ≥ threshold get LOD_PROXY
  */
-export function selectLOD(visibleIndex, threshold) {
+export function selectLOD(visibleIndex: number, threshold: number): AssemblyLodLevel {
   if (!Number.isFinite(threshold) || threshold <= 0) return LOD_FULL
   return visibleIndex < threshold ? LOD_FULL : LOD_PROXY
+}
+
+/** Synthetic bounding-box proxy part entry — see {@link buildBBoxProxy}. */
+export interface AssemblyBBoxProxy {
+  id: string
+  geom: null
+  _lodProxy: true
+  _proxySize: number
+  _transform: number[]
+  componentId: string
+  origPartId: string
 }
 
 /**
@@ -91,17 +112,14 @@ export function selectLOD(visibleIndex, threshold) {
  * can recognise proxy entries by the `_lodProxy: true` flag and render them
  * as wireframe boxes rather than solid meshes.
  *
- * Shape: { id, geom: null, _lodProxy: true, _proxySize, componentId, origPartId }
- *
  * `geom` is null because the renderer detects `_lodProxy` and renders a
  * THREE.BoxHelper instead of a THREE.Mesh — the resolver itself never calls
  * applyMatrixToGeom for proxies. The `transform` is preserved so the renderer
  * can position the box correctly.
  *
- * @param {object} component  a parsed assembly component
- * @returns {object}          proxy part entry
+ * @param component  a parsed assembly component
  */
-export function buildBBoxProxy(component) {
+export function buildBBoxProxy(component: Pick<AssemblyComponent, 'id' | 'transform' | 'object_id'>): AssemblyBBoxProxy {
   // Estimate a display size from the translation magnitude (row 3 of the
   // row-major 4×4: indices 3, 7, 11). Fall back to 1 when the transform is
   // degenerate or missing.
@@ -124,7 +142,7 @@ export function buildBBoxProxy(component) {
 // Three's Matrix4.elements is column-major. We persist row-major to keep the
 // JSON readable (rows of [Rxx Rxy Rxz Tx, ...]) — convert at the boundary.
 
-function matrixToRowMajor(m4) {
+function matrixToRowMajor(m4: THREE.Matrix4): number[] {
   const e = m4.elements
   // e is column-major: [m11 m21 m31 m41 m12 m22 m32 m42 ...]. Transpose.
   return [
@@ -135,7 +153,7 @@ function matrixToRowMajor(m4) {
   ]
 }
 
-function matrixFromRowMajor(arr) {
+function matrixFromRowMajor(arr: number[]): THREE.Matrix4 {
   const m = new THREE.Matrix4()
   // arr is row-major; THREE.Matrix4.set takes row-major args.
   m.set(
@@ -147,7 +165,7 @@ function matrixFromRowMajor(arr) {
   return m
 }
 
-export function identityMatrix() {
+export function identityMatrix(): number[] {
   return [
     1, 0, 0, 0,
     0, 1, 0, 0,
@@ -156,7 +174,7 @@ export function identityMatrix() {
   ]
 }
 
-export function translationMatrix([x = 0, y = 0, z = 0] = []) {
+export function translationMatrix([x = 0, y = 0, z = 0]: number[] = []): number[] {
   return [
     1, 0, 0, x,
     0, 1, 0, y,
@@ -166,13 +184,19 @@ export function translationMatrix([x = 0, y = 0, z = 0] = []) {
 }
 
 // XYZ Euler order (Three's default). Inputs in radians.
-export function rotationMatrixXYZ([rx = 0, ry = 0, rz = 0] = []) {
+export function rotationMatrixXYZ([rx = 0, ry = 0, rz = 0]: number[] = []): number[] {
   const m = new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(rx, ry, rz, 'XYZ'))
   return matrixToRowMajor(m)
 }
 
+export interface ComposeMatrixOptions {
+  position?: number[]
+  rotationEuler?: number[]
+  scale?: number | number[]
+}
+
 // Compose translation + rotation (radians, XYZ Euler) + uniform-or-vector scale.
-export function composeMatrix({ position = [0, 0, 0], rotationEuler = [0, 0, 0], scale = 1 } = {}) {
+export function composeMatrix({ position = [0, 0, 0], rotationEuler = [0, 0, 0], scale = 1 }: ComposeMatrixOptions = {}): number[] {
   const t = new THREE.Vector3(position[0] || 0, position[1] || 0, position[2] || 0)
   const q = new THREE.Quaternion().setFromEuler(
     new THREE.Euler(rotationEuler[0] || 0, rotationEuler[1] || 0, rotationEuler[2] || 0, 'XYZ'),
@@ -184,9 +208,16 @@ export function composeMatrix({ position = [0, 0, 0], rotationEuler = [0, 0, 0],
   return matrixToRowMajor(m)
 }
 
+/** Result of {@link decomposeMatrix}. */
+export interface DecomposedMatrix {
+  position: Vec3
+  rotationEuler: Vec3
+  scale: Vec3
+}
+
 // Inverse of composeMatrix. Returns { position, rotationEuler (radians, XYZ),
 // scale (Vector3) }. Best-effort — if the matrix has shear it'll be approximate.
-export function decomposeMatrix(rowMajorOrM4) {
+export function decomposeMatrix(rowMajorOrM4: number[] | THREE.Matrix4): DecomposedMatrix {
   const m = Array.isArray(rowMajorOrM4) ? matrixFromRowMajor(rowMajorOrM4) : rowMajorOrM4
   const t = new THREE.Vector3()
   const q = new THREE.Quaternion()
@@ -201,14 +232,14 @@ export function decomposeMatrix(rowMajorOrM4) {
 }
 
 // Convert a row-major 16-array to a Three.Matrix4 (used by the renderer path).
-export function toMatrix4(rowMajor) {
+export function toMatrix4(rowMajor: number[] | null | undefined): THREE.Matrix4 {
   if (!Array.isArray(rowMajor) || rowMajor.length !== 16) return new THREE.Matrix4()
   return matrixFromRowMajor(rowMajor)
 }
 
 // ----- Parsing / serialization ----------------------------------------------
 
-const EMPTY = { components: [], overrides: [], mates: [] }
+const EMPTY: AssemblyDocument = { components: [], overrides: [], mates: [] }
 
 // Mate vocabulary — ROADMAP row 49. Dimensional types (distance/angle) carry
 // a numeric `value`; the rest pin geometry directly. SolveSpace is the
@@ -225,6 +256,9 @@ const MATE_FEATURES = new Set(['face', 'edge', 'vertex', 'axis'])
 // it on first display).
 export const LEGACY_WILDCARD = '*'
 
+/** {@link parseAssembly}'s return shape — `_parseError` is set only on the invalid-JSON path. */
+export type ParsedAssembly = AssemblyDocument & { _parseError?: string }
+
 // parseAssembly: tolerant JSON parser. Always returns {components: [...], overrides: [...]} —
 // invalid shapes coerce to an empty assembly so the editor can still render.
 //
@@ -237,58 +271,59 @@ export const LEGACY_WILDCARD = '*'
 //   [{ part_file_id, quantity_override?, non_stocked?, note? }]
 // Items missing part_file_id are dropped. Used by the inline BOM panel and
 // the /bom endpoint to adjust the rolled-up quantities/cost.
-export function parseAssembly(jsonStr) {
+export function parseAssembly(jsonStr: string | null | undefined): ParsedAssembly {
   if (!jsonStr || !jsonStr.trim()) return { components: [], overrides: [] }
-  let raw
+  let raw: unknown
   try {
     raw = JSON.parse(jsonStr)
   } catch {
     return { components: [], overrides: [], _parseError: 'Invalid JSON' }
   }
   if (!raw || typeof raw !== 'object') return { components: [], overrides: [] }
+  const rawObj = raw as Record<string, unknown>
 
   // Back-compat shim: an earlier draft used `children` with `transform`.
-  const list = Array.isArray(raw.components)
-    ? raw.components
-    : (Array.isArray(raw.children) ? raw.children : [])
+  const list = Array.isArray(rawObj.components)
+    ? rawObj.components
+    : (Array.isArray(rawObj.children) ? rawObj.children : [])
 
-  const components = []
-  const seenIds = new Set()
+  const components: AssemblyComponent[] = []
+  const seenIds = new Set<string>()
   for (let i = 0; i < list.length; i++) {
-    const c = list[i] || {}
+    const c = (list[i] || {}) as Record<string, unknown>
     const preRef = parseExternalRef(c.external_ref)
     // External_ref components don't need a local `file_id`; the ref carries
     // the cross-project pointer. Local components still require file_id.
     if (!c.file_id && !preRef) continue
     let id = typeof c.id === 'string' && c.id.trim() ? c.id : `c${i}`
     // Force unique ids by suffixing on collision.
-    let base = id
+    const base = id
     let n = 1
     while (seenIds.has(id)) {
       id = `${base}-${n++}`
     }
     seenIds.add(id)
 
-    let transform = Array.isArray(c.transform) && c.transform.length === 16
+    const transform = Array.isArray(c.transform) && c.transform.length === 16
       ? c.transform.map((x) => Number(x) || 0)
       : identityMatrix()
 
     // Renamed: `part_id` → `object_id`. Accept either; missing/empty defaults
     // to the legacy wildcard `"*"` so resolution still finds geometry. Newly
     // authored data never produces `"*"`.
-    const rawObj = (typeof c.object_id === 'string' && c.object_id.trim())
+    const rawObjId = (typeof c.object_id === 'string' && c.object_id.trim())
       ? c.object_id
       : (typeof c.part_id === 'string' && c.part_id.trim())
         ? c.part_id
         : LEGACY_WILDCARD
 
-    const out = {
+    const out: AssemblyComponent = {
       id,
       file_id: c.file_id ? String(c.file_id) : '',
-      object_id: rawObj,
+      object_id: rawObjId,
       transform,
     }
-    if (c.params && typeof c.params === 'object') out.params = c.params
+    if (c.params && typeof c.params === 'object') out.params = c.params as Record<string, unknown>
     if (c.visible === false) out.visible = false
     if (Array.isArray(c.color) && c.color.length >= 3) {
       out.color = [
@@ -315,13 +350,14 @@ export function parseAssembly(jsonStr) {
 
   // BOM overrides — optional. Tolerant: drop entries without a part_file_id,
   // coerce types so the editor never sees a malformed row.
-  const overrides = []
-  if (Array.isArray(raw.overrides)) {
-    for (const o of raw.overrides) {
-      if (!o || typeof o !== 'object') continue
+  const overrides: AssemblyBomOverride[] = []
+  if (Array.isArray(rawObj.overrides)) {
+    for (const o0 of rawObj.overrides) {
+      if (!o0 || typeof o0 !== 'object') continue
+      const o = o0 as Record<string, unknown>
       const pfid = typeof o.part_file_id === 'string' ? o.part_file_id.trim() : ''
       if (!pfid) continue
-      const row = { part_file_id: pfid }
+      const row: AssemblyBomOverride = { part_file_id: pfid }
       if (o.quantity_override != null) {
         const n = Number(o.quantity_override)
         if (Number.isFinite(n) && n >= 0) row.quantity_override = Math.floor(n)
@@ -335,9 +371,9 @@ export function parseAssembly(jsonStr) {
   // Mates — ROADMAP row 49 (3D assembly mates Tier 0). Shape-only on the
   // frontend; the eventual SolveSpace subprocess writes/reads against this
   // shape. Tolerant parser: drop malformed entries.
-  const mates = []
-  if (Array.isArray(raw.mates)) {
-    for (const m of raw.mates) {
+  const mates: AssemblyMate[] = []
+  if (Array.isArray(rawObj.mates)) {
+    for (const m of rawObj.mates) {
       const parsed = parseMate(m)
       if (parsed) mates.push(parsed)
     }
@@ -345,7 +381,7 @@ export function parseAssembly(jsonStr) {
   return { components, overrides, mates }
 }
 
-function clamp01(n) {
+function clamp01(n: number): number {
   if (!Number.isFinite(n)) return 0
   return Math.max(0, Math.min(1, n))
 }
@@ -361,18 +397,19 @@ const EXTERNAL_REF_KINDS = new Set(['board_3d', 'board_outline_2d'])
 // source's `updated_at`; when the live value is newer, the chip flips to
 // "source advanced". Optional — older data without the field is treated as
 // "never seen" (chip stays hidden until the first fetch records a baseline).
-function parseExternalRef(raw) {
+function parseExternalRef(raw: unknown): AssemblyExternalRef | null {
   if (!raw || typeof raw !== 'object') return null
-  const projectId = typeof raw.project_id === 'string' ? raw.project_id.trim() : ''
-  const fileId = typeof raw.file_id === 'string' ? raw.file_id.trim() : ''
+  const r = raw as Record<string, unknown>
+  const projectId = typeof r.project_id === 'string' ? r.project_id.trim() : ''
+  const fileId = typeof r.file_id === 'string' ? r.file_id.trim() : ''
   if (!projectId || !fileId) return null
-  const rawKind = typeof raw.kind === 'string' ? raw.kind.trim() : ''
-  const kind = EXTERNAL_REF_KINDS.has(rawKind) ? rawKind : 'board_3d'
-  const rawPin = typeof raw.pin === 'string' ? raw.pin.trim() : ''
+  const rawKind = typeof r.kind === 'string' ? r.kind.trim() : ''
+  const kind = (EXTERNAL_REF_KINDS.has(rawKind) ? rawKind : 'board_3d') as AssemblyExternalRef['kind']
+  const rawPin = typeof r.pin === 'string' ? r.pin.trim() : ''
   const pin = rawPin || 'tracking_latest'
-  const out = { project_id: projectId, file_id: fileId, kind, pin }
-  const lastSeen = typeof raw.last_seen_updated_at === 'string'
-    ? raw.last_seen_updated_at.trim()
+  const out: AssemblyExternalRef = { project_id: projectId, file_id: fileId, kind, pin }
+  const lastSeen = typeof r.last_seen_updated_at === 'string'
+    ? r.last_seen_updated_at.trim()
     : ''
   if (lastSeen) out.last_seen_updated_at = lastSeen
   return out
@@ -381,31 +418,33 @@ function parseExternalRef(raw) {
 // parseMate: tolerant — returns null for missing type/a/b, unknown type, or
 // invalid feature on either side. Coerces `value` to a finite number for
 // dimensional mates (distance/angle); non-dimensional types get value=null.
-function parseMate(raw) {
+function parseMate(raw: unknown): AssemblyMate | null {
   if (!raw || typeof raw !== 'object') return null
-  const type = typeof raw.type === 'string' ? raw.type.trim() : ''
+  const r = raw as Record<string, unknown>
+  const type = typeof r.type === 'string' ? r.type.trim() : ''
   if (!MATE_TYPES.has(type)) return null
-  const a = parseMateRef(raw.a)
-  const b = parseMateRef(raw.b)
+  const a = parseMateRef(r.a)
+  const b = parseMateRef(r.b)
   if (!a || !b) return null
-  const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : ''
-  const out = { id, type, a, b, value: null }
-  if (DIMENSIONAL_MATE_TYPES.has(type) && raw.value != null) {
-    const n = Number(raw.value)
+  const id = typeof r.id === 'string' && r.id.trim() ? r.id.trim() : ''
+  const out: AssemblyMate = { id, type: type as AssemblyMate['type'], a, b, value: null }
+  if (DIMENSIONAL_MATE_TYPES.has(type) && r.value != null) {
+    const n = Number(r.value)
     if (Number.isFinite(n)) out.value = n
   }
   return out
 }
 
-function parseMateRef(raw) {
+function parseMateRef(raw: unknown): AssemblyMateRef | null {
   if (!raw || typeof raw !== 'object') return null
-  const componentId = typeof raw.component_id === 'string' ? raw.component_id.trim() : ''
-  const feature = typeof raw.feature === 'string' ? raw.feature.trim() : ''
-  const featureId = typeof raw.feature_id === 'string' ? raw.feature_id.trim() : ''
+  const r = raw as Record<string, unknown>
+  const componentId = typeof r.component_id === 'string' ? r.component_id.trim() : ''
+  const feature = typeof r.feature === 'string' ? r.feature.trim() : ''
+  const featureId = typeof r.feature_id === 'string' ? r.feature_id.trim() : ''
   if (!componentId || !MATE_FEATURES.has(feature) || !featureId) return null
-  const ref = { component_id: componentId, feature, feature_id: featureId }
+  const ref: AssemblyMateRef = { component_id: componentId, feature: feature as AssemblyMateRef['feature'], feature_id: featureId }
   // T6: round-trip persistent face/edge name alongside the legacy integer id.
-  const featureName = typeof raw.feature_name === 'string' ? raw.feature_name.trim() : ''
+  const featureName = typeof r.feature_name === 'string' ? r.feature_name.trim() : ''
   if (featureName) ref.feature_name = featureName
   return ref
 }
@@ -417,38 +456,39 @@ function parseMateRef(raw) {
 // Round-trips an optional `overrides` array (BOM rework). Empty/missing
 // overrides are omitted so legacy assembly files that never gained an override
 // stay byte-identical on save.
-export function serializeAssembly(obj) {
+export function serializeAssembly(obj: Partial<AssemblyDocument> | null | undefined): string {
   const components = (obj && Array.isArray(obj.components) ? obj.components : []).map((c) => {
-    const objectId = (typeof c.object_id === 'string' && c.object_id.trim())
-      ? c.object_id
+    const cAny = c as AssemblyComponent & { part_id?: string }
+    const objectId = (typeof cAny.object_id === 'string' && cAny.object_id.trim())
+      ? cAny.object_id
       // Fall back to legacy field name in case a caller forgot to rename.
-      : (typeof c.part_id === 'string' && c.part_id.trim())
-        ? c.part_id
+      : (typeof cAny.part_id === 'string' && cAny.part_id.trim())
+        ? cAny.part_id
         : LEGACY_WILDCARD
-    const out = {
-      id: c.id,
-      file_id: c.file_id,
+    const out: AssemblyComponent = {
+      id: cAny.id,
+      file_id: cAny.file_id,
       object_id: objectId,
-      transform: Array.isArray(c.transform) && c.transform.length === 16
-        ? c.transform
+      transform: Array.isArray(cAny.transform) && cAny.transform.length === 16
+        ? cAny.transform
         : identityMatrix(),
     }
-    if (c.params && typeof c.params === 'object') out.params = c.params
-    if (c.visible === false) out.visible = false
-    if (Array.isArray(c.color) && c.color.length >= 3) out.color = c.color
-    if (typeof c.config_id === 'string' && c.config_id.trim()) {
-      out.config_id = c.config_id.trim()
+    if (cAny.params && typeof cAny.params === 'object') out.params = cAny.params
+    if (cAny.visible === false) out.visible = false
+    if (Array.isArray(cAny.color) && cAny.color.length >= 3) out.color = cAny.color
+    if (typeof cAny.config_id === 'string' && cAny.config_id.trim()) {
+      out.config_id = cAny.config_id.trim()
     }
-    const ref = parseExternalRef(c.external_ref)
+    const ref = parseExternalRef(cAny.external_ref)
     if (ref) out.external_ref = ref
     return out
   })
   const overrides = (obj && Array.isArray(obj.overrides) ? obj.overrides : [])
-    .map((o) => {
+    .map((o): AssemblyBomOverride | null => {
       if (!o || typeof o !== 'object') return null
       const pfid = typeof o.part_file_id === 'string' ? o.part_file_id.trim() : ''
       if (!pfid) return null
-      const row = { part_file_id: pfid }
+      const row: AssemblyBomOverride = { part_file_id: pfid }
       if (o.quantity_override != null) {
         const n = Number(o.quantity_override)
         if (Number.isFinite(n) && n >= 0) row.quantity_override = Math.floor(n)
@@ -463,19 +503,19 @@ export function serializeAssembly(obj) {
       ) return null
       return row
     })
-    .filter(Boolean)
+    .filter((r): r is AssemblyBomOverride => r !== null)
   // Mates round-trip — drop malformed entries via the same parser.
   const mates = (obj && Array.isArray(obj.mates) ? obj.mates : [])
     .map(parseMate)
-    .filter(Boolean)
-  const doc = { components }
+    .filter((m): m is AssemblyMate => m !== null)
+  const doc: { components: AssemblyComponent[]; overrides?: AssemblyBomOverride[]; mates?: AssemblyMate[] } = { components }
   if (overrides.length > 0) doc.overrides = overrides
   if (mates.length > 0) doc.mates = mates
   return JSON.stringify(doc, null, 2)
 }
 
 /** Append a mate row; returns a new array (input untouched). Drops invalid mates. */
-export function addMate(rows, mate) {
+export function addMate(rows: AssemblyMate[] | null | undefined, mate: unknown): AssemblyMate[] {
   const list = Array.isArray(rows) ? rows : []
   const parsed = parseMate(mate)
   if (!parsed) return list.slice()
@@ -483,7 +523,7 @@ export function addMate(rows, mate) {
 }
 
 /** Filter out the mate with the given id; returns a new array (input untouched). */
-export function removeMate(rows, mateId) {
+export function removeMate(rows: AssemblyMate[] | null | undefined, mateId: string): AssemblyMate[] {
   const list = Array.isArray(rows) ? rows : []
   return list.filter((m) => m && m.id !== mateId)
 }
@@ -502,12 +542,17 @@ export function removeMate(rows, mateId) {
 //
 // Returns { component_id, feature, feature_id[, feature_name] } or null when
 // the pick is unusable (null/empty partId or featureId, unsupported kind).
-export function mateRefFromPick(partId, kind, featureId, featureName = '') {
+export function mateRefFromPick(
+  partId: string | null | undefined,
+  kind: string | null | undefined,
+  featureId: string | number | null | undefined,
+  featureName = '',
+): AssemblyMateRef | null {
   if (!partId || !featureId) return null
   const feature = kind === 'face' ? 'face' : kind === 'edge' ? 'edge' : kind === 'vertex' ? 'vertex' : null
   if (!feature) return null
   const component_id = partId.includes('/') ? partId.split('/')[0] : partId
-  const ref = { component_id, feature, feature_id: String(featureId) }
+  const ref: AssemblyMateRef = { component_id, feature, feature_id: String(featureId) }
   if (featureName && typeof featureName === 'string' && featureName.trim()) {
     ref.feature_name = featureName.trim()
   }
@@ -517,7 +562,11 @@ export function mateRefFromPick(partId, kind, featureId, featureName = '') {
 export const EMPTY_ASSEMBLY = EMPTY
 
 /** Restamp a row's external_ref.last_seen_updated_at; no-op if refId unmatched. */
-export function restampExternalRefSeen(rows, refId, newUpdatedAt) {
+export function restampExternalRefSeen(
+  rows: AssemblyComponent[] | null | undefined,
+  refId: string,
+  newUpdatedAt: string,
+): AssemblyComponent[] | null | undefined {
   if (!Array.isArray(rows)) return rows
   let hit = false
   const next = rows.map((r) => {
@@ -540,12 +589,15 @@ export function restampExternalRefSeen(rows, refId, newUpdatedAt) {
 //
 // Returns { components, changed } — `changed` is true iff any expansion
 // occurred. Callers use this to decide whether to persist a migration.
-export async function expandWildcardComponents(parsed, loadObjectIds) {
+export async function expandWildcardComponents(
+  parsed: Pick<AssemblyDocument, 'components'> | null | undefined,
+  loadObjectIds: (fileId: string) => Promise<string[]>,
+): Promise<{ components: AssemblyComponent[]; changed: boolean }> {
   const list = (parsed && Array.isArray(parsed.components)) ? parsed.components : []
   let changed = false
-  const out = []
-  const seen = new Set()
-  function uniqueId(base) {
+  const out: AssemblyComponent[] = []
+  const seen = new Set<string>()
+  function uniqueId(base: string): string {
     let id = base
     let n = 1
     while (seen.has(id)) id = `${base}-${n++}`
@@ -558,7 +610,7 @@ export async function expandWildcardComponents(parsed, loadObjectIds) {
       out.push({ ...c, id })
       continue
     }
-    let ids
+    let ids: string[]
     try {
       ids = await loadObjectIds(c.file_id)
     } catch {
@@ -588,6 +640,20 @@ export async function expandWildcardComponents(parsed, loadObjectIds) {
 
 // ----- Cycle detection ------------------------------------------------------
 
+/** Minimal project-file shape {@link cycleCheck} needs — the full file record is owned by the store. */
+export interface AssemblyFileLike {
+  id: string
+  kind?: string
+  content?: string | null
+}
+
+export interface CycleCheckArgs {
+  assemblyFileId: string
+  targetFileId: string
+  files?: AssemblyFileLike[]
+  getAssemblyContent?: (file: AssemblyFileLike) => string | null | undefined
+}
+
 // cycleCheck: returns true if adding (or having) a component pointing at
 // `targetFileId` from `assemblyFileId` would form a cycle.
 //
@@ -595,13 +661,13 @@ export async function expandWildcardComponents(parsed, loadObjectIds) {
 // file_ids. We require the caller to pass `getAssemblyContent(file)` — usually
 // just `f => f.content` for files that already have content loaded, otherwise
 // returns null and we treat it as opaque (no cycle through it).
-export function cycleCheck({ assemblyFileId, targetFileId, files, getAssemblyContent }) {
+export function cycleCheck({ assemblyFileId, targetFileId, files, getAssemblyContent }: CycleCheckArgs): boolean {
   if (!assemblyFileId || !targetFileId) return false
   if (assemblyFileId === targetFileId) return true
-  const byId = new Map((files || []).map((f) => [f.id, f]))
-  const visited = new Set()
+  const byId = new Map<string, AssemblyFileLike>((files || []).map((f) => [f.id, f]))
+  const visited = new Set<string>()
 
-  function walk(fileId) {
+  function walk(fileId: string): boolean {
     if (fileId === assemblyFileId) return true
     if (visited.has(fileId)) return false
     visited.add(fileId)
@@ -619,8 +685,8 @@ export function cycleCheck({ assemblyFileId, targetFileId, files, getAssemblyCon
 }
 
 // degToRad / radToDeg helpers for the editor UI.
-export const degToRad = (d) => Number(d) * DEG
-export const radToDeg = (r) => Number(r) / DEG
+export const degToRad = (d: number): number => Number(d) * DEG
+export const radToDeg = (r: number): number => Number(r) / DEG
 
 // ----- Resolution -----------------------------------------------------------
 //
@@ -652,7 +718,41 @@ export const radToDeg = (r) => Number(r) / DEG
 //   - If the named Object isn't found in the source's output, call
 //     onMissing(componentId, objectId, fileId) and contribute zero parts for
 //     that component (don't crash).
-export async function resolveAssemblyParts({ content, loadParts, loadExternalParts, onMissing, lodThreshold } = {}) {
+
+/**
+ * Minimal shape `resolveAssemblyParts` needs from a caller-supplied loader's
+ * returned parts. The real element type (e.g. `RenderablePart`) is owned by
+ * the consumer (`src/store`), which `src/lib` must not import from — same
+ * generic-over-the-consumer's-type pattern as T-502's `meshCache.get<T>`.
+ * `geom` is left `unknown` here and passed straight through to
+ * `applyMatrixToGeom`, which accepts any JSCAD Geom3 or Three.BufferGeometry.
+ */
+export interface AssemblyLoadedPart {
+  id: string
+  geom?: unknown
+  color?: number
+}
+
+/** One resolved, transformed part in {@link resolveAssemblyParts}'s output. */
+export interface AssemblyResolvedPart {
+  id: string
+  geom: THREE.BufferGeometry
+  componentId: string
+  origPartId: string
+  color?: number | null
+}
+
+export interface ResolveAssemblyPartsOptions<TPart extends AssemblyLoadedPart = AssemblyLoadedPart> {
+  content?: string | null
+  loadParts?: (fileId: string, configId?: string | null) => Promise<TPart[]>
+  loadExternalParts?: (ref: AssemblyExternalRef) => Promise<TPart[]>
+  onMissing?: (componentId: string, objectId: string, fileId: string) => void
+  lodThreshold?: number
+}
+
+export async function resolveAssemblyParts<TPart extends AssemblyLoadedPart = AssemblyLoadedPart>(
+  { content, loadParts, loadExternalParts, onMissing, lodThreshold }: ResolveAssemblyPartsOptions<TPart> = {},
+): Promise<Array<AssemblyResolvedPart | AssemblyBBoxProxy>> {
   const parsed = parseAssembly(content)
   if (!parsed.components || parsed.components.length === 0) return []
   // Effective LOD threshold: caller override → module default → Infinity (off).
@@ -660,7 +760,7 @@ export async function resolveAssemblyParts({ content, loadParts, loadExternalPar
   const effectiveLOD = (lodThreshold != null && Number.isFinite(Number(lodThreshold)))
     ? Number(lodThreshold)
     : LOD_THRESHOLD
-  const out = []
+  const out: Array<AssemblyResolvedPart | AssemblyBBoxProxy> = []
   let visibleCount = 0
   for (const c of parsed.components) {
     if (c.visible === false) continue
@@ -680,25 +780,26 @@ export async function resolveAssemblyParts({ content, loadParts, loadExternalPar
     // External_ref dispatch: route to `loadExternalParts(ref)`. When the
     // loader is absent or throws, fall through to `onMissing` so the UI can
     // render a placeholder instead of crashing.
-    let baseParts
+    let baseParts: TPart[] | undefined
     if (isExternal) {
       if (typeof loadExternalParts !== 'function') {
         if (typeof onMissing === 'function') {
-          try { onMissing(c.id, c.object_id || '', c.external_ref.file_id) } catch { /* ignore */ }
+          try { onMissing(c.id, c.object_id || '', c.external_ref?.file_id || '') } catch { /* ignore */ }
         }
         continue
       }
       try {
-        baseParts = await loadExternalParts(c.external_ref)
+        baseParts = await loadExternalParts(c.external_ref as AssemblyExternalRef)
       } catch (err) {
         console.warn(`assembly: external_ref load failed for ${c.id}:`, err)
         if (typeof onMissing === 'function') {
-          try { onMissing(c.id, c.object_id || '', c.external_ref.file_id) } catch { /* ignore */ }
+          try { onMissing(c.id, c.object_id || '', c.external_ref?.file_id || '') } catch { /* ignore */ }
         }
         continue
       }
     } else {
       try {
+        if (!loadParts) continue
         baseParts = await loadParts(c.file_id, c.config_id || null)
       } catch (err) {
         console.warn(`assembly: failed to load component ${c.id}:`, err)
@@ -711,7 +812,7 @@ export async function resolveAssemblyParts({ content, loadParts, loadExternalPar
     // (no object_id filter — the cross-project loader has already resolved
     // the right part). Local components filter by object_id unless wildcard.
     const objectId = c.object_id || LEGACY_WILDCARD
-    let selected
+    let selected: TPart[]
     if (isExternal || objectId === LEGACY_WILDCARD) {
       selected = baseParts
     } else {
@@ -769,14 +870,14 @@ export async function resolveAssemblyParts({ content, loadParts, loadExternalPar
 //   mesh                →  jscad_mesh
 //
 // Unknown kinds → null (caller skips the cache and goes straight to recompile).
-const DERIVED_KIND_BY_REF_KIND = {
+const DERIVED_KIND_BY_REF_KIND: Record<string, string> = {
   board_3d: 'circuit_board_3d',
   board_outline_2d: 'sketch_geom2',
   mesh: 'jscad_mesh',
 }
 
 /** Map an external_ref.kind onto its derived_kind. Returns null when unmapped. */
-export function derivedKindForRefKind(kind) {
+export function derivedKindForRefKind(kind: string | null | undefined): string | null {
   if (!kind || typeof kind !== 'string') return null
   return DERIVED_KIND_BY_REF_KIND[kind] || null
 }
@@ -794,18 +895,53 @@ export function derivedKindForRefKind(kind) {
 //     age: number | null,   ← seconds since last_accessed_at, if server sent it
 //     projectId: string, fileId: string, timestamp: number }
 
-const _derivedCacheListeners = new Set()
+/** Event shape emitted on the derived-cache stats bus — see the section header above. */
+export interface DerivedCacheEvent {
+  hit: boolean
+  derivedKind: string
+  payloadSize: number | null
+  age: number | null
+  projectId: string
+  fileId: string
+  timestamp: number
+}
+
+type DerivedCacheListener = (evt: DerivedCacheEvent) => void
+
+const _derivedCacheListeners = new Set<DerivedCacheListener>()
 
 /** Subscribe to cache hit/miss events. Returns a disposer function. */
-export function addDerivedCacheListener(fn) {
+export function addDerivedCacheListener(fn: DerivedCacheListener): () => void {
   _derivedCacheListeners.add(fn)
   return () => _derivedCacheListeners.delete(fn)
 }
 
-function _emitDerivedCacheEvent(evt) {
+function _emitDerivedCacheEvent(evt: DerivedCacheEvent): void {
   for (const fn of _derivedCacheListeners) {
     try { fn(evt) } catch { /* never let an observer crash the loader */ }
   }
+}
+
+/** Result of a derived-artifact cache lookup — see `library.lookupDerivedArtifact` in `src/cloud/api.js`. */
+interface DerivedLookupResult {
+  cached: boolean
+  payload?: Uint8Array
+  derivedKind?: string
+  last_accessed_at?: string
+  error?: string
+}
+
+export interface LoadExternalPartsOptions<TPart extends AssemblyLoadedPart = AssemblyLoadedPart> {
+  ref: AssemblyExternalRef
+  recompile: (ref: AssemblyExternalRef) => Promise<TPart[]>
+  // Default to the cloud library helpers so callers in production paths get
+  // both the lookup and the populate for free. Tests inject mocks to keep
+  // the module pure.
+  lookup?: (args: { projectId: string; fileId: string; derivedKind: string }) => Promise<DerivedLookupResult>
+  decodePayload?: (derivedKind: string, payload: Uint8Array) => Promise<TPart[]> | TPart[]
+  encodePayload?: (derivedKind: string, parts: TPart[]) => Promise<Uint8Array | null> | Uint8Array | null
+  store?: (args: { projectId: string; fileId: string; derivedKind: string; payload: Uint8Array }) => Promise<unknown>
+  onStats?: (evt: DerivedCacheEvent) => void
 }
 
 // loadExternalParts: cache-aware cross-project loader. Tries the derived
@@ -849,22 +985,21 @@ function _emitDerivedCacheEvent(evt) {
 //   store({projectId, fileId, derivedKind, payload: Uint8Array}) → Promise
 //     - Defaults to `library.storeDerivedArtifact`. Tests inject mocks.
 //     - Any rejection is swallowed (debug-logged only).
-export async function loadExternalParts({
-  ref,
-  recompile,
-  // Default to the cloud library helpers so callers in production paths get
-  // both the lookup and the populate for free. Tests inject mocks to keep
-  // the module pure.
-  lookup = library.lookupDerivedArtifact.bind(library),
-  decodePayload,
-  encodePayload,
-  store = library.storeDerivedArtifact.bind(library),
-  onStats,
-} = {}) {
+export async function loadExternalParts<TPart extends AssemblyLoadedPart = AssemblyLoadedPart>(
+  {
+    ref,
+    recompile,
+    lookup = library.lookupDerivedArtifact.bind(library),
+    decodePayload,
+    encodePayload,
+    store = library.storeDerivedArtifact.bind(library),
+    onStats,
+  }: LoadExternalPartsOptions<TPart> = {} as LoadExternalPartsOptions<TPart>,
+): Promise<TPart[]> {
   if (!ref || typeof recompile !== 'function') return []
   const derivedKind = derivedKindForRefKind(ref.kind)
   if (derivedKind && typeof lookup === 'function') {
-    let res = null
+    let res: DerivedLookupResult | null
     try {
       res = await lookup({
         projectId: ref.project_id,
@@ -885,7 +1020,7 @@ export async function loadExternalParts({
           const age = res.last_accessed_at
             ? Math.round((Date.now() - new Date(res.last_accessed_at).getTime()) / 1000)
             : null
-          const evt = {
+          const evt: DerivedCacheEvent = {
             hit: true,
             derivedKind: res.derivedKind || derivedKind,
             payloadSize,
@@ -904,7 +1039,7 @@ export async function loadExternalParts({
       }
     } else if (res && !res.cached) {
       // Cache miss — emit miss stats before falling through to recompile.
-      const evt = {
+      const evt: DerivedCacheEvent = {
         hit: false,
         derivedKind,
         payloadSize: null,
@@ -930,7 +1065,7 @@ export async function loadExternalParts({
   ) {
     Promise.resolve()
       .then(async () => {
-        let payload
+        let payload: Uint8Array | null | undefined
         try {
           payload = await encodePayload(derivedKind, parts)
         } catch (err) {

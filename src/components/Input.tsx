@@ -1,7 +1,13 @@
 import clsx from 'clsx'
 import { forwardRef } from 'react'
 
-const Input = forwardRef(function Input(
+interface InputProps extends React.ComponentProps<'input'> {
+  label?: string
+  hint?: string
+  error?: string
+}
+
+const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   { className, label, hint, error, id, type = 'text', ...rest },
   ref,
 ) {
@@ -39,7 +45,13 @@ const Input = forwardRef(function Input(
 
 export default Input
 
-export const Textarea = forwardRef(function Textarea(
+interface TextareaProps extends React.ComponentProps<'textarea'> {
+  label?: string
+  hint?: string
+  error?: string
+}
+
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
   { className, label, hint, error, id, rows = 3, ...rest },
   ref,
 ) {

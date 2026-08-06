@@ -12,14 +12,83 @@
 // Both POST to POST /api/projects/:pid/jewelry/metal-cost (pure-math, no file needed).
 
 import { useState, useCallback, useMemo } from 'react'
+import type { ReactNode } from 'react'
 import { Scale, ChevronDown, ChevronUp, RefreshCw, AlertTriangle, Plus, Trash2, Gem } from 'lucide-react'
 import { api } from '../lib/api.js'
+import type { JewelryCostResult } from '../types/api.js'
+
+// ---------------------------------------------------------------------------
+// Local types
+// ---------------------------------------------------------------------------
+
+interface MetalOption {
+  key: string
+  label: string
+  group: string
+  hallmark: number | null
+  density: number
+}
+
+interface Stone {
+  cut?: string
+  carat?: string | number
+  mm?: string | number
+  price_per_carat?: string | number
+  count?: string | number
+  note?: string
+}
+
+interface StoneLineItem {
+  cut: string
+  carat_each: number
+  count: number
+  price_per_carat: number
+  line_total: number
+  note: string
+}
+
+interface StonesTotalResult {
+  line_items: StoneLineItem[]
+  total_carats: number
+  total_stones: number
+  total_cost: number
+}
+
+interface LabourParamsInput {
+  bench_hours: string | number
+  hourly_rate: string | number
+  stones?: Stone[]
+  setting_type?: string
+  setting_fee_per_stone?: number | string | null
+  finishing_type?: string
+  finishing_cost_override?: number | string | null
+}
+
+interface LabourResult {
+  bench_hours: number
+  hourly_rate: number
+  bench_labour_cost: number
+  setting_type: string
+  setting_fee_per_stone: number
+  stone_count: number
+  setting_cost: number
+  finishing_type: string
+  finishing_cost: number
+  total_labour: number
+}
+
+// The local casting estimate, the local full-quote estimate, and the
+// API-augmented full-quote estimate are three overlapping-but-different
+// shapes (mirroring metal_cost.py's casting_cost/full_quote responses plus
+// client-side stone/labour/markup augmentation); not worth modelling as a
+// discriminated union for a display-only panel, so kept as a loose bag.
+type EstimateResult = Record<string, any>
 
 // ---------------------------------------------------------------------------
 // Metal catalogue (mirrors METAL_DENSITY_G_CM3 + METAL_HALLMARK in metal_cost.py)
 // ---------------------------------------------------------------------------
 
-const METAL_OPTIONS = [
+const METAL_OPTIONS: MetalOption[] = [
   { key: '14k_yellow',    label: '14k Yellow Gold',       group: 'Gold',                  hallmark: 583, density: 13.07 },
   { key: '14k_white',     label: '14k White Gold',        group: 'Gold',                  hallmark: 583, density: 13.25 },
   { key: '14k_rose',      label: '14k Rose Gold',         group: 'Gold',                  hallmark: 583, density: 13.20 },
@@ -46,14 +115,14 @@ const METAL_OPTIONS = [
 ]
 
 // Keyed lookup by metal key
-const METAL_MAP = Object.fromEntries(METAL_OPTIONS.map((m) => [m.key, m]))
+const METAL_MAP: Record<string, MetalOption> = Object.fromEntries(METAL_OPTIONS.map((m) => [m.key, m]))
 
 // ---------------------------------------------------------------------------
 // Density table — mirrors METAL_DENSITY_G_CM3 in metal_cost.py (g/cm³)
 // Kept as a flat literal so source-level checks can find individual keys.
 // ---------------------------------------------------------------------------
 
-const DENSITY = {
+const DENSITY: Record<string, number> = {
   '10k_yellow': 11.57, '14k_yellow': 13.07, '18k_yellow': 15.58,
   '22k_yellow': 17.80, '24k_yellow': 19.32,
   '10k_white':  11.61, '14k_white':  13.25, '18k_white':  15.60,
@@ -67,7 +136,7 @@ const DENSITY = {
 }
 
 // Approximate USD/g price presets (orientation only — NOT live prices)
-const PRICE_PRESET = {
+const PRICE_PRESET: Record<string, number> = {
   '10k_yellow': 27.0,  '14k_yellow': 37.5,  '18k_yellow': 48.0,
   '22k_yellow': 58.5,  '24k_yellow': 64.0,
   '10k_white':  27.5,  '14k_white':  38.0,  '18k_white':  49.0,
@@ -98,7 +167,7 @@ const SETTING_TYPES = [
   { key: 'tension',   label: 'Tension',             fee: 25.0 },
   { key: 'bar',       label: 'Bar',                 fee: 10.0 },
 ]
-const SETTING_FEE = Object.fromEntries(SETTING_TYPES.map((s) => [s.key, s.fee]))
+const SETTING_FEE: Record<string, number> = Object.fromEntries(SETTING_TYPES.map((s) => [s.key, s.fee]))
 
 // Finishing types for the UI
 const FINISHING_TYPES = [
@@ -112,7 +181,7 @@ const FINISHING_TYPES = [
   { key: 'antique',      label: 'Antiquing / oxidation',     cost: 20.0 },
   { key: 'sandblast',    label: 'Sandblasted matte',         cost: 18.0 },
 ]
-const FINISHING_COST_MAP = Object.fromEntries(FINISHING_TYPES.map((f) => [f.key, f.cost]))
+const FINISHING_COST_MAP: Record<string, number> = Object.fromEntries(FINISHING_TYPES.map((f) => [f.key, f.cost]))
 
 // Stone cut options
 const CUT_OPTIONS = [
@@ -121,7 +190,7 @@ const CUT_OPTIONS = [
 ]
 
 // mm→carat factors (approximate, round brilliant default)
-const MM_TO_CARAT_FACTOR = {
+const MM_TO_CARAT_FACTOR: Record<string, number> = {
   round_brilliant: 0.00370,
   princess:        0.00390,
   oval:            0.00280,
@@ -141,24 +210,24 @@ const MM_TO_CARAT_FACTOR = {
 const GRAMS_PER_DWT = 1.55517384
 const GRAMS_PER_OZT = 31.1034768
 
-function mmToCarat(mm, cut) {
+function mmToCarat(mm: number, cut: string): number {
   const factor = MM_TO_CARAT_FACTOR[cut] ?? 0.00370
   return mm ** 3 * factor
 }
 
-function stonesTotal(stones) {
+function stonesTotal(stones: Stone[] | null | undefined): StonesTotalResult {
   // stones: [{ cut, carat, mm, price_per_carat, count, note }]
   if (!stones || stones.length === 0) return { line_items: [], total_carats: 0, total_stones: 0, total_cost: 0 }
-  const line_items = []
+  const line_items: StoneLineItem[] = []
   let total_carats = 0
   let total_cost = 0
   let total_stones = 0
   for (const s of stones) {
-    const ppc = parseFloat(s.price_per_carat) || 0
-    const count = parseInt(s.count, 10) || 1
-    let carat_each = parseFloat(s.carat)
+    const ppc = parseFloat(String(s.price_per_carat)) || 0
+    const count = parseInt(String(s.count), 10) || 1
+    let carat_each = parseFloat(String(s.carat))
     if (!carat_each && s.mm) {
-      const mm = parseFloat(s.mm)
+      const mm = parseFloat(String(s.mm))
       carat_each = mm > 0 ? mmToCarat(mm, s.cut || 'round_brilliant') : 0
     }
     if (!(carat_each > 0)) continue
@@ -171,22 +240,22 @@ function stonesTotal(stones) {
   return { line_items, total_carats, total_stones, total_cost }
 }
 
-function labourTotal({ bench_hours, hourly_rate, stones, setting_type, setting_fee_per_stone, finishing_type, finishing_cost_override }) {
-  const bench = (parseFloat(bench_hours) || 0) * (parseFloat(hourly_rate) || 0)
-  const stoneCount = stones ? stones.reduce((acc, s) => acc + (parseInt(s.count, 10) || 1), 0) : 0
+function labourTotal({ bench_hours, hourly_rate, stones, setting_type, setting_fee_per_stone, finishing_type, finishing_cost_override }: LabourParamsInput): LabourResult {
+  const bench = (parseFloat(String(bench_hours)) || 0) * (parseFloat(String(hourly_rate)) || 0)
+  const stoneCount = stones ? stones.reduce((acc, s) => acc + (parseInt(String(s.count), 10) || 1), 0) : 0
   const feePerStone = setting_fee_per_stone != null
-    ? parseFloat(setting_fee_per_stone)
-    : (SETTING_FEE[setting_type] ?? SETTING_FEE.prong)
+    ? parseFloat(String(setting_fee_per_stone))
+    : (SETTING_FEE[setting_type as string] ?? SETTING_FEE.prong)
   const settingCost = feePerStone * stoneCount
   let finCost = 0
   if (finishing_cost_override != null && finishing_cost_override !== '') {
-    finCost = parseFloat(finishing_cost_override) || 0
+    finCost = parseFloat(String(finishing_cost_override)) || 0
   } else if (finishing_type) {
     finCost = FINISHING_COST_MAP[finishing_type] ?? 0
   }
   return {
-    bench_hours: parseFloat(bench_hours) || 0,
-    hourly_rate: parseFloat(hourly_rate) || 0,
+    bench_hours: parseFloat(String(bench_hours)) || 0,
+    hourly_rate: parseFloat(String(hourly_rate)) || 0,
     bench_labour_cost: bench,
     setting_type: setting_type || 'prong',
     setting_fee_per_stone: feePerStone,
@@ -198,7 +267,14 @@ function labourTotal({ bench_hours, hourly_rate, stones, setting_type, setting_f
   }
 }
 
-function localEstimate(volumeMm3, metalKey, pricePerGram, labor, finishing, allowancePct) {
+function localEstimate(
+  volumeMm3: number,
+  metalKey: string,
+  pricePerGram: number,
+  labor: number,
+  finishing: number,
+  allowancePct: number,
+): EstimateResult | null {
   const d = DENSITY[metalKey]
   if (!d || volumeMm3 <= 0) return null
   const netG   = d * (volumeMm3 / 1000)
@@ -225,14 +301,22 @@ function localEstimate(volumeMm3, metalKey, pricePerGram, labor, finishing, allo
  * metal_cost.py. Used for instant feedback before the API round-trip, and as
  * the stone/labour/markup layer on top of the API metal cost.
  */
-function localFullQuote({ volumeMm3, metalKey, pricePerGram, allowancePct, stones, labourParams, markupPct }) {
+function localFullQuote({ volumeMm3, metalKey, pricePerGram, allowancePct, stones, labourParams, markupPct }: {
+  volumeMm3: number
+  metalKey: string
+  pricePerGram: number
+  allowancePct: number
+  stones: Stone[]
+  labourParams: LabourParamsInput
+  markupPct: number
+}): EstimateResult | null {
   const d = DENSITY[metalKey]
   if (!d || volumeMm3 <= 0) return null
 
   const netG   = d * (volumeMm3 / 1000)
   const grossG = netG * (1 + allowancePct / 100)
   const metalCost = grossG * pricePerGram
-  const metalMeta = METAL_MAP[metalKey] || {}
+  const metalMeta: Partial<MetalOption> = METAL_MAP[metalKey] || {}
 
   const stonesResult = stonesTotal(stones)
   const labourResult = labourTotal({ ...labourParams, stones })
@@ -273,18 +357,18 @@ function localFullQuote({ volumeMm3, metalKey, pricePerGram, allowancePct, stone
 // Helpers
 // ---------------------------------------------------------------------------
 
-function fmt(n, decimals = 2) {
+function fmt(n: number | null | undefined, decimals = 2): string {
   if (n == null || isNaN(n)) return '—'
   return n.toFixed(decimals)
 }
 
-function fmtCost(n) {
+function fmtCost(n: number | null | undefined): string {
   if (n == null || isNaN(n)) return '—'
   return `$${n.toFixed(2)}`
 }
 
 // Group METAL_OPTIONS by group for rendering a grouped <select>.
-const METAL_GROUPS = METAL_OPTIONS.reduce((acc, opt) => {
+const METAL_GROUPS: Record<string, MetalOption[]> = METAL_OPTIONS.reduce((acc: Record<string, MetalOption[]>, opt) => {
   if (!acc[opt.group]) acc[opt.group] = []
   acc[opt.group].push(opt)
   return acc
@@ -294,7 +378,7 @@ const METAL_GROUPS = METAL_OPTIONS.reduce((acc, opt) => {
 // Subcomponents
 // ---------------------------------------------------------------------------
 
-function FieldRow({ label, children, hint }) {
+function FieldRow({ label, children, hint }: { label: string; children: ReactNode; hint?: string | null }) {
   return (
     <div className="flex items-start gap-2 mb-2">
       <label className="text-[11px] text-ink-400 w-28 flex-shrink-0 pt-1.5">
@@ -306,7 +390,14 @@ function FieldRow({ label, children, hint }) {
   )
 }
 
-function NumInput({ value, onChange, placeholder, min, step = 'any', disabled }) {
+function NumInput({ value, onChange, placeholder, min, step = 'any', disabled }: {
+  value: string | number
+  onChange: (v: string) => void
+  placeholder?: string
+  min?: number
+  step?: string | number
+  disabled?: boolean
+}) {
   return (
     <input
       type="number"
@@ -321,7 +412,7 @@ function NumInput({ value, onChange, placeholder, min, step = 'any', disabled })
   )
 }
 
-function WeightRow({ label, grams, dwt, ozt }) {
+function WeightRow({ label, grams, dwt, ozt }: { label: string; grams?: number; dwt?: number; ozt?: number }) {
   return (
     <div className="flex items-center justify-between py-1.5 border-b border-ink-800 last:border-0">
       <span className="text-[11px] text-ink-400">{label}</span>
@@ -334,7 +425,13 @@ function WeightRow({ label, grams, dwt, ozt }) {
   )
 }
 
-function CostRow({ label, value, accent, indent, total }) {
+function CostRow({ label, value, accent, indent, total }: {
+  label: string
+  value?: number
+  accent?: boolean
+  indent?: boolean
+  total?: boolean
+}) {
   return (
     <div className={`flex items-center justify-between py-1 border-b border-ink-800 last:border-0 ${indent ? 'pl-4' : ''}`}>
       <span className={`${total ? 'text-sm font-display font-semibold text-ink-100' : indent ? 'text-[11px] text-ink-500' : 'text-[11px] text-ink-400'}`}>
@@ -347,13 +444,13 @@ function CostRow({ label, value, accent, indent, total }) {
   )
 }
 
-function SectionHeader({ children }) {
+function SectionHeader({ children }: { children: ReactNode }) {
   return (
     <div className="text-[10px] uppercase tracking-wider text-ink-500 mb-2">{children}</div>
   )
 }
 
-function CompareTable({ rows }) {
+function CompareTable({ rows }: { rows: EstimateResult[] }) {
   return (
     <div className="overflow-x-auto mt-2">
       <table className="w-full text-[11px]" aria-label="Metal cost comparison">
@@ -383,8 +480,13 @@ function CompareTable({ rows }) {
 }
 
 // Stone row component — table layout on ≥ sm, stacked card on < sm
-function StoneRow({ stone, idx, onChange, onRemove }) {
-  const update = (field, val) => onChange(idx, { ...stone, [field]: val })
+function StoneRow({ stone, idx, onChange, onRemove }: {
+  stone: Stone
+  idx: number
+  onChange: (idx: number, updated: Stone) => void
+  onRemove: (idx: number) => void
+}) {
+  const update = (field: keyof Stone, val: string) => onChange(idx, { ...stone, [field]: val })
 
   const useMm = !stone.carat && stone.mm !== undefined
   const [inputMode, setInputMode] = useState(useMm ? 'mm' : 'carat')
@@ -550,7 +652,12 @@ function StoneRow({ stone, idx, onChange, onRemove }) {
 
 const DEFAULT_STONE = () => ({ cut: 'round_brilliant', carat: '', price_per_carat: '', count: 1, note: '' })
 
-export default function JewelryCostPanel({ projectId, onClose }) {
+interface JewelryCostPanelProps {
+  projectId?: string | null
+  onClose?: () => void
+}
+
+export default function JewelryCostPanel({ projectId, onClose }: JewelryCostPanelProps) {
   // Mode toggle
   const [mode, setMode] = useState('full_quote')  // 'full_quote' | 'casting_cost'
 
@@ -566,7 +673,7 @@ export default function JewelryCostPanel({ projectId, onClose }) {
 
   // --- Full quote inputs ---
   // Stones table
-  const [stones, setStones]               = useState([DEFAULT_STONE()])
+  const [stones, setStones]               = useState<Stone[]>([DEFAULT_STONE()])
   // Labour
   const [benchHours, setBenchHours]       = useState('')
   const [hourlyRate, setHourlyRate]       = useState('')
@@ -583,20 +690,20 @@ export default function JewelryCostPanel({ projectId, onClose }) {
 
   // API state
   const [loading, setLoading]             = useState(false)
-  const [apiResult, setApiResult]         = useState(null)
-  const [error, setError]                 = useState(null)
+  const [apiResult, setApiResult]         = useState<JewelryCostResult | null>(null)
+  const [error, setError]                 = useState<string | null>(null)
 
   // Selected metal metadata (hallmark + preset price)
-  const metalMeta = METAL_MAP[metal] || {}
+  const metalMeta: Partial<MetalOption> = METAL_MAP[metal] || {}
   const presetPrice = PRICE_PRESET[metal] ?? null
 
   // --- Stones table helpers ---
-  const handleStoneChange = useCallback((idx, updated) => {
+  const handleStoneChange = useCallback((idx: number, updated: Stone) => {
     setStones((prev) => prev.map((s, i) => (i === idx ? updated : s)))
     setApiResult(null)
   }, [])
 
-  const handleStoneRemove = useCallback((idx) => {
+  const handleStoneRemove = useCallback((idx: number) => {
     setStones((prev) => prev.filter((_, i) => i !== idx))
     setApiResult(null)
   }, [])
@@ -651,11 +758,14 @@ export default function JewelryCostPanel({ projectId, onClose }) {
   const localResult = mode === 'full_quote' ? localQuoteResult : localCastingResult
 
   // Merge: prefer API result, fallback to local
-  const estimate = useMemo(() => {
+  const estimate: EstimateResult | null = useMemo(() => {
     if (!apiResult) return localResult
     if (mode === 'full_quote') {
-      // API returns casting_cost schema; augment with client-side stones/labour/markup
-      const apiEst = apiResult.estimate
+      // API returns casting_cost schema; augment with client-side stones/labour/markup.
+      // JewelryMetalEstimate (src/types/api.ts) doesn't declare `metal` /
+      // `density_g_cm3`, but the live response carries them — schema drift
+      // at a boundary this component doesn't own.
+      const apiEst: any = apiResult.estimate
       const vol   = parseFloat(volumeMm3)
       const allow = parseFloat(allowancePct) || 15
       const markup = parseFloat(markupPct) || 0
@@ -694,7 +804,7 @@ export default function JewelryCostPanel({ projectId, onClose }) {
     return apiResult.estimate
   }, [apiResult, localResult, mode, volumeMm3, allowancePct, markupPct, stones, labourParams, metalMeta])
 
-  const comparison = apiResult?.comparison ?? null
+  const comparison = (apiResult?.comparison as EstimateResult[] | undefined) ?? null
 
   // --- Calculate handler ---
   const handleCalculate = useCallback(async () => {
@@ -711,7 +821,7 @@ export default function JewelryCostPanel({ projectId, onClose }) {
     setError(null)
     setApiResult(null)
     try {
-      const params = {
+      const params: Record<string, unknown> = {
         volume_mm3:           vol,
         metal,
         casting_allowance_pct: parseFloat(allowancePct) || 15,
@@ -719,7 +829,7 @@ export default function JewelryCostPanel({ projectId, onClose }) {
       if (pricePerGram) params.metal_price_per_gram = parseFloat(pricePerGram)
       if (showCompare)  params.compare_metals        = DEFAULT_COMPARE
 
-      let result
+      let result: JewelryCostResult
       if (mode === 'casting_cost') {
         if (labor)        params.labor     = parseFloat(labor)
         if (finishing)    params.finishing = parseFloat(finishing)
@@ -729,8 +839,8 @@ export default function JewelryCostPanel({ projectId, onClose }) {
         result = await api.jewelryQuote(projectId, params)
       }
       setApiResult(result)
-    } catch (err) {
-      setError(err.message || 'API error')
+    } catch (err: any) {
+      setError(err?.message || 'API error')
     } finally {
       setLoading(false)
     }
@@ -739,7 +849,7 @@ export default function JewelryCostPanel({ projectId, onClose }) {
   // Has any cost input that makes the cost section visible
   const hasCostInput = mode === 'full_quote'
     ? (parseFloat(pricePerGram) > 0 ||
-       stones.some((s) => parseFloat(s.price_per_carat) > 0) ||
+       stones.some((s) => parseFloat(String(s.price_per_carat)) > 0) ||
        parseFloat(benchHours) > 0 || parseFloat(hourlyRate) > 0 ||
        parseFloat(markupPct) > 0)
     : (parseFloat(pricePerGram) > 0 || parseFloat(labor) > 0 || parseFloat(finishing) > 0)

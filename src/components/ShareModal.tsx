@@ -1,12 +1,19 @@
-import { useState } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Copy, Trash2, Link as LinkIcon, UserPlus, Check, Loader2 } from 'lucide-react'
-import { api } from '../lib/api.js'
-import Modal from './Modal.jsx'
+import { api } from '../lib/api'
+import Modal from './Modal'
+import type { ProjectMember, ProjectRole, ShareLink, ShareLinkRole } from '@/types'
 
-const ROLES = ['viewer', 'editor', 'owner']
-const LINK_ROLES = ['viewer', 'editor']
+const ROLES: ProjectRole[] = ['viewer', 'editor', 'owner']
+const LINK_ROLES: ShareLinkRole[] = ['viewer', 'editor']
 
-function Tab({ active, onClick, children }) {
+interface TabProps {
+  active: boolean
+  onClick: () => void
+  children: ReactNode
+}
+
+function Tab({ active, onClick, children }: TabProps) {
   return (
     <button
       type="button"
@@ -22,10 +29,14 @@ function Tab({ active, onClick, children }) {
   )
 }
 
-function MembersTab({ projectId }) {
-  const [members, setMembers] = useState(null)
+interface MembersTabProps {
+  projectId: string
+}
+
+function MembersTab({ projectId }: MembersTabProps) {
+  const [members, setMembers] = useState<ProjectMember[] | null>(null)
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState('editor')
+  const [role, setRole] = useState<ProjectRole>('editor')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
@@ -40,7 +51,7 @@ function MembersTab({ projectId }) {
 
   const reload = () => setReloadKey((k) => k + 1)
 
-  async function invite(e) {
+  async function invite(e: FormEvent) {
     e.preventDefault()
     if (!email.trim()) return
     setBusy(true); setErr('')
@@ -49,28 +60,28 @@ function MembersTab({ projectId }) {
       setEmail('')
       reload()
     } catch (ex) {
-      setErr(ex?.message || 'Failed to invite')
+      setErr((ex as Error)?.message || 'Failed to invite')
     } finally {
       setBusy(false)
     }
   }
 
-  async function changeRole(uid, r) {
+  async function changeRole(uid: string, r: string) {
     try {
       await api.updateMember(projectId, uid, { role: r })
       reload()
     } catch (e) {
-      setErr(e?.message || String(e))
+      setErr((e as Error)?.message || String(e))
     }
   }
 
-  async function remove(uid) {
+  async function remove(uid: string) {
     if (!confirm('Remove this member?')) return
     try {
       await api.removeMember(projectId, uid)
       reload()
     } catch (e) {
-      setErr(e?.message || String(e))
+      setErr((e as Error)?.message || String(e))
     }
   }
 
@@ -86,7 +97,7 @@ function MembersTab({ projectId }) {
         />
         <select
           value={role}
-          onChange={(e) => setRole(e.target.value)}
+          onChange={(e) => setRole(e.target.value as ProjectRole)}
           className="bg-ink-850 border border-ink-700 rounded-md px-2 py-1.5 text-sm text-ink-100 outline-none focus:border-kerf-300/60"
         >
           {LINK_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
@@ -109,12 +120,12 @@ function MembersTab({ projectId }) {
         ) : members.map((m) => (
           <div key={m.user_id} className="flex items-center gap-3 py-2 px-2 rounded hover:bg-ink-800">
             <div className="w-7 h-7 rounded-full bg-ink-700 flex items-center justify-center text-[11px] text-ink-200 font-semibold flex-shrink-0">
-              {(m.user?.name || m.user?.email || '?').slice(0, 1).toUpperCase()}
+              {(m.name || m.email || '?').slice(0, 1).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm text-ink-100 truncate">{m.user?.name || m.user?.email}</div>
-              {m.user?.name && (
-                <div className="text-[11px] text-ink-400 truncate">{m.user?.email}</div>
+              <div className="text-sm text-ink-100 truncate">{m.name || m.email}</div>
+              {m.name && (
+                <div className="text-[11px] text-ink-400 truncate">{m.email}</div>
               )}
             </div>
             <select
@@ -142,20 +153,28 @@ function MembersTab({ projectId }) {
   )
 }
 
-function LinksTab({ projectId }) {
-  const [links, setLinks] = useState(null)
-  const [role, setRole] = useState('viewer')
+interface LinksTabProps {
+  projectId: string
+}
+
+// The API's list endpoint returns every share_links column (`SELECT *`),
+// including `revoked_at`, which src/types/api.ts's ShareLink doesn't model.
+type ShareLinkRow = ShareLink & { revoked_at?: string | null }
+
+function LinksTab({ projectId }: LinksTabProps) {
+  const [links, setLinks] = useState<ShareLinkRow[] | null>(null)
+  const [role, setRole] = useState<ShareLinkRole>('viewer')
   const [expiresIn, setExpiresIn] = useState('never')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const [copiedId, setCopiedId] = useState(null)
-  const [freshTokens, setFreshTokens] = useState({}) // tokens only available at creation time
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [freshTokens, setFreshTokens] = useState<Record<string, string | undefined>>({}) // tokens only available at creation time
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
     api.listShareLinks(projectId)
-      .then((ls) => { if (!cancelled) setLinks(ls || []) })
+      .then((ls) => { if (!cancelled) setLinks((ls as ShareLinkRow[]) || []) })
       .catch((e) => { if (!cancelled) setErr(e?.message || String(e)) })
     return () => { cancelled = true }
   }, [projectId, reloadKey])
@@ -165,7 +184,7 @@ function LinksTab({ projectId }) {
   async function create() {
     setBusy(true); setErr('')
     try {
-      let expires_at = null
+      let expires_at: string | null = null
       if (expiresIn !== 'never') {
         const days = parseInt(expiresIn, 10)
         expires_at = new Date(Date.now() + days * 86400_000).toISOString()
@@ -174,23 +193,23 @@ function LinksTab({ projectId }) {
       if (link?.token) setFreshTokens((t) => ({ ...t, [link.id]: link.token }))
       reload()
     } catch (ex) {
-      setErr(ex?.message || 'Failed to create link')
+      setErr((ex as Error)?.message || 'Failed to create link')
     } finally {
       setBusy(false)
     }
   }
 
-  async function revoke(id) {
+  async function revoke(id: string) {
     if (!confirm('Revoke this link?')) return
     try {
       await api.revokeShareLink(projectId, id)
       reload()
     } catch (e) {
-      setErr(e?.message || String(e))
+      setErr((e as Error)?.message || String(e))
     }
   }
 
-  function copy(id, token) {
+  function copy(id: string, token: string) {
     if (!token) return
     const url = `${window.location.origin}/share/${token}`
     navigator.clipboard.writeText(url).then(() => {
@@ -206,7 +225,7 @@ function LinksTab({ projectId }) {
           <label className="text-[10px] uppercase tracking-wider text-ink-400">Role</label>
           <select
             value={role}
-            onChange={(e) => setRole(e.target.value)}
+            onChange={(e) => setRole(e.target.value as ShareLinkRole)}
             className="bg-ink-850 border border-ink-700 rounded-md px-2 py-1.5 text-sm text-ink-100 outline-none focus:border-kerf-300/60"
           >
             {LINK_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
@@ -283,8 +302,13 @@ function LinksTab({ projectId }) {
   )
 }
 
-export default function ShareModal({ projectId, onClose }) {
-  const [tab, setTab] = useState('members')
+export interface ShareModalProps {
+  projectId: string
+  onClose: () => void
+}
+
+export default function ShareModal({ projectId, onClose }: ShareModalProps) {
+  const [tab, setTab] = useState<'members' | 'links'>('members')
 
   return (
     <Modal

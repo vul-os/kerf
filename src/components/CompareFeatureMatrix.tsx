@@ -12,16 +12,48 @@
  * removed — the layout does not vary.
  */
 
-import { DOMAIN_META, STATUS_META, TONE_CLASSES, featuresByDomain } from '../lib/compareFeatures.js'
+import { DOMAIN_META, STATUS_META, TONE_CLASSES, featuresByDomain } from '../lib/compareFeatures'
+
+/* -------------------------------------------------------------------------- */
+/* Local types                                                                 */
+/* -------------------------------------------------------------------------- */
+
+interface DomainMeta {
+  code: string
+  slug: string
+  title: string
+  short: string
+  accent: string
+}
+
+interface FeatureSide {
+  status?: string
+  note?: string
+  evidence?: string
+  source?: string
+}
+
+interface FeatureRow {
+  feature: string
+  domain: string
+  kerf?: FeatureSide
+  competitor?: FeatureSide
+}
+
+interface StatusPillProps {
+  status: string
+  note?: string
+  linkHref?: string
+  evidencePath?: string
+}
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                     */
 /* -------------------------------------------------------------------------- */
 
-/** @param {string} status */
-function StatusPill({ status, note, linkHref, evidencePath }) {
+function StatusPill({ status, note, linkHref, evidencePath }: StatusPillProps) {
   const s = STATUS_META[status] ?? STATUS_META.unknown
-  const tone = TONE_CLASSES[s.tone]
+  const tone = TONE_CLASSES[s.tone as keyof typeof TONE_CLASSES]
 
   const pill = (
     <span
@@ -73,7 +105,13 @@ function StatusPill({ status, note, linkHref, evidencePath }) {
 /* Domain section                                                               */
 /* -------------------------------------------------------------------------- */
 
-function DomainSection({ domainMeta, rows, competitor }) {
+interface DomainSectionProps {
+  domainMeta: DomainMeta
+  rows: FeatureRow[]
+  competitor: string
+}
+
+function DomainSection({ domainMeta, rows, competitor }: DomainSectionProps) {
   const matched = rows.filter(
     (r) => r?.kerf?.status === 'yes' && r?.competitor?.status === 'yes',
   ).length
@@ -187,20 +225,19 @@ function DomainSection({ domainMeta, rows, competitor }) {
 /* CompareFeatureMatrix — main component                                        */
 /* -------------------------------------------------------------------------- */
 
-/**
- * @param {{
- *   features: object[] | undefined,
- *   competitor: string,
- * }} props
- */
-export default function CompareFeatureMatrix({ features, competitor }) {
+export interface CompareFeatureMatrixProps {
+  features?: FeatureRow[]
+  competitor: string
+}
+
+export default function CompareFeatureMatrix({ features, competitor }: CompareFeatureMatrixProps) {
   if (!features || features.length === 0) return null
 
   // Group features by domain code
-  const byDomain = featuresByDomain({ features })
+  const byDomain = featuresByDomain({ features }) as Map<string, FeatureRow[]>
 
   // Render only domains that have at least one row, in DOMAIN_META order
-  const domainSections = DOMAIN_META
+  const domainSections = (DOMAIN_META as DomainMeta[])
     .map((dm) => ({ domainMeta: dm, rows: byDomain.get(dm.code) ?? [] }))
     .filter(({ rows }) => rows.length > 0)
 

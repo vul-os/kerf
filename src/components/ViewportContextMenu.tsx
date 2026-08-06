@@ -11,11 +11,31 @@
 // Rendered at fixed screen coords (like FileTree's ContextMenu), flipped when it
 // would overflow the window.
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
   Eye, EyeOff, Focus, Layers, Droplet, Palette, Boxes, RotateCcw,
   Crosshair, Copy, Trash2, ChevronRight, Check, Download,
+  type LucideIcon,
 } from 'lucide-react'
+
+// Local shapes — mirror src/store/workspace.ts AppearancePatch/MaterialMenuEntry
+// (kept independent so this file's standalone type-check doesn't pull in that
+// module's much larger surface).
+export interface AppearancePatch {
+  color?: string | number | null
+  opacity?: number | null
+  material?: string | null
+  metalness?: number | null
+  roughness?: number | null
+}
+
+export interface ViewportMaterial {
+  id?: string
+  name: string
+  color?: string | null
+  metalness?: number | null
+  roughness?: number | null
+}
 
 // Same swatches the renderer cycles through for unstyled parts, so a user can
 // always get back to "what it looked like before" by eye.
@@ -38,7 +58,14 @@ function Divider() {
   return <div className="my-1 border-t border-ink-700" />
 }
 
-function MenuItem({ icon: Icon, label, hint, onClick, disabled, danger }) {
+function MenuItem({ icon: Icon, label, hint, onClick, disabled, danger }: {
+  icon?: LucideIcon
+  label: string
+  hint?: string
+  onClick?: (() => void) | null
+  disabled?: boolean
+  danger?: boolean
+}) {
   if (!onClick) return null
   return (
     <button
@@ -62,7 +89,13 @@ function MenuItem({ icon: Icon, label, hint, onClick, disabled, danger }) {
 // A row that reveals a flyout panel to its right on hover. The flyout stays open
 // while the pointer is anywhere in the row OR the panel (they share the wrapper),
 // which is what makes diagonal travel to the panel work.
-function Submenu({ icon: Icon, label, hint, disabled, children }) {
+function Submenu({ icon: Icon, label, hint, disabled, children }: {
+  icon?: LucideIcon
+  label: string
+  hint?: string
+  disabled?: boolean
+  children?: ReactNode
+}) {
   const [open, setOpen] = useState(false)
   return (
     <div
@@ -95,6 +128,27 @@ function Submenu({ icon: Icon, label, hint, disabled, children }) {
   )
 }
 
+export interface ViewportContextMenuProps {
+  x: number
+  y: number
+  partId?: string
+  isHidden?: boolean
+  appearance?: AppearancePatch
+  materials?: ViewportMaterial[]
+  canEdit?: boolean
+  onClose?: () => void
+  onToggleVisibility?: () => void
+  onIsolate?: () => void
+  onShowAll?: () => void
+  onSetAppearance?: (patch: AppearancePatch) => void
+  onPreviewAppearance?: (patch: AppearancePatch) => void
+  onResetAppearance?: () => void
+  onZoomTo?: () => void
+  onDuplicate?: () => void
+  onDelete?: () => void
+  onExport?: ((format: string) => void) | null
+}
+
 export default function ViewportContextMenu({
   x,
   y,
@@ -114,9 +168,9 @@ export default function ViewportContextMenu({
   onDuplicate,
   onDelete,
   onExport,
-}) {
-  const ref = useRef(null)
-  const colorInputRef = useRef(null)
+}: ViewportContextMenuProps) {
+  const ref = useRef<HTMLDivElement>(null)
+  const colorInputRef = useRef<HTMLInputElement>(null)
   const [pos, setPos] = useState({ x, y })
 
   // Flip the menu back inside the window when it would overflow. Measured after
@@ -145,11 +199,11 @@ export default function ViewportContextMenu({
   // different object: that press closes this menu, and the following pointerup
   // opens a fresh one at the new location.
   useEffect(() => {
-    const close = (ev) => {
-      if (ref.current && ev && ev.target && ref.current.contains(ev.target)) return
+    const close = (ev: PointerEvent) => {
+      if (ref.current && ev && ev.target && ref.current.contains(ev.target as Node)) return
       onClose?.()
     }
-    const onKey = (ev) => {
+    const onKey = (ev: KeyboardEvent) => {
       if (ev.key === 'Escape') onClose?.()
     }
     window.addEventListener('pointerdown', close, true)
@@ -162,14 +216,14 @@ export default function ViewportContextMenu({
 
   // Discrete picks (a swatch, an opacity preset, a material) commit and dismiss,
   // matching the native menus.
-  const dispatch = (patch) => {
+  const dispatch = (patch: AppearancePatch) => {
     onSetAppearance?.(patch)
     onClose?.()
   }
 
   // Continuous controls (the opacity slider) apply WITHOUT dismissing — closing
   // the menu on the first change makes the slider impossible to drag.
-  const dispatchLive = (patch) => {
+  const dispatchLive = (patch: AppearancePatch) => {
     onSetAppearance?.(patch)
   }
 
@@ -260,7 +314,7 @@ export default function ViewportContextMenu({
             step="5"
             aria-label="Custom opacity"
             defaultValue={Math.round(currentOpacity * 100)}
-            onInput={(e) => onPreviewAppearance?.({ opacity: Number(e.target.value) / 100 })}
+            onInput={(e) => onPreviewAppearance?.({ opacity: Number(e.currentTarget.value) / 100 })}
             onChange={(e) => {
               const v = Number(e.target.value) / 100
               dispatchLive({ opacity: v >= 1 ? null : v })

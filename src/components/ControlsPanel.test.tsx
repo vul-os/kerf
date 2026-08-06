@@ -1,5 +1,5 @@
 /**
- * ControlsPanel.test.jsx
+ * ControlsPanel.test.tsx
  *
  * Vitest tests for ControlsPanel — Bode / Nyquist / step-response SVG charts.
  * Uses renderToStaticMarkup (react-dom/server) to avoid jsdom requirement.

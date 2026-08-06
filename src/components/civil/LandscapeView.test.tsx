@@ -37,7 +37,7 @@ const ZONES = [
 const HARDSCAPE = [
   {
     id: 'Patio1',
-    type: 'patio',
+    type: 'patio' as const,
     points: [[5, 8], [12, 8], [12, 14], [5, 14]],
   },
 ]
@@ -77,7 +77,7 @@ describe('LandscapeView — empty state', () => {
 // ---------------------------------------------------------------------------
 
 describe('LandscapeView — with plants, zones, hardscape', () => {
-  let html
+  let html: string
 
   beforeAll(() => {
     html = renderToStaticMarkup(

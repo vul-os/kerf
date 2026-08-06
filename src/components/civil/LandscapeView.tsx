@@ -26,6 +26,45 @@
 
 import { useMemo, useState } from 'react'
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface LandscapePlant {
+  id: string
+  x?: number
+  y?: number
+  species?: string
+  canopy_m?: number
+  type?: string
+}
+
+export interface LandscapeZone {
+  id: string
+  label?: string
+  points?: number[][]
+  area_m2?: number
+  precipitation_rate_mm_hr?: number
+  soil_type?: string
+}
+
+export interface LandscapeHardscape {
+  id: string
+  type?: 'path' | 'patio' | 'deck'
+  points?: number[][]
+}
+
+export interface LandscapeViewProps {
+  plants?: LandscapePlant[]
+  zones?: LandscapeZone[]
+  hardscape?: LandscapeHardscape[]
+  area_m2?: number
+  width?: number
+  height?: number
+  className?: string
+  onDispatch?: (event: { tool: string; params: Record<string, unknown> }) => void
+}
+
 const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
 const PADDING = 50
 
@@ -56,7 +95,7 @@ const PLANT_COLOURS = {
 // Fit coordinates to viewport
 // ---------------------------------------------------------------------------
 
-function fitPlan(allPts, width, height) {
+function fitPlan(allPts: number[][], width: number, height: number) {
   if (!allPts.length) return { scale: 1, offX: 0, offY: 0 }
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
   for (const [x, y] of allPts) {
@@ -81,7 +120,14 @@ function fitPlan(allPts, width, height) {
 // Plant symbol
 // ---------------------------------------------------------------------------
 
-function PlantSymbol({ x, y, canopyPx, type }) {
+interface PlantSymbolProps {
+  x: number
+  y: number
+  canopyPx?: number
+  type: string
+}
+
+function PlantSymbol({ x, y, canopyPx, type }: PlantSymbolProps) {
   const fill = PLANT_COLOURS[type] || PLANT_COLOURS.default
   const isTree = type === 'tree'
   const r = Math.max(6, canopyPx ?? (isTree ? 16 : 10))
@@ -123,16 +169,16 @@ export default function LandscapeView({
   height = 420,
   className = '',
   onDispatch,
-}) {
+}: LandscapeViewProps) {
   const [loading, setLoading] = useState(false)
-  const [schedResult, setSchedResult] = useState(null)
-  const [error, setError] = useState(null)
-  const [activeAction, setActiveAction] = useState(null)
+  const [schedResult, setSchedResult] = useState<{ ok?: boolean; zones?: unknown[]; total_run_time_min?: number; error?: string } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [activeAction, setActiveAction] = useState<'plants' | 'irrigation' | null>(null)
 
   // Collect all 2-D points for viewport fitting
   const allPts = useMemo(() => {
-    const pts = []
-    for (const p of plants) if (p.x != null) pts.push([p.x, p.y])
+    const pts: number[][] = []
+    for (const p of plants) if (p.x != null) pts.push([p.x, p.y as number])
     for (const z of zones) for (const pt of (z.points || [])) pts.push(pt)
     for (const h of hardscape) for (const pt of (h.points || [])) pts.push(pt)
     return pts
@@ -143,8 +189,8 @@ export default function LandscapeView({
     [allPts, width, height],
   )
 
-  function toS(x, y) { return [x * scale + offX, y * scale + offY] }
-  function ptsToPath(pts) {
+  function toS(x: number, y: number): [number, number] { return [x * scale + offX, y * scale + offY] }
+  function ptsToPath(pts?: number[][]) {
     if (!pts?.length) return ''
     const [first, ...rest] = pts
     const [fx, fy] = toS(first[0], first[1])
@@ -180,7 +226,7 @@ export default function LandscapeView({
         await res.json()
       }
     } catch (e) {
-      setError(e.message || 'Dispatch failed')
+      setError(e instanceof Error ? e.message : 'Dispatch failed')
     } finally {
       setLoading(false)
       setActiveAction(null)
@@ -214,7 +260,7 @@ export default function LandscapeView({
         setSchedResult(data)
       }
     } catch (e) {
-      setError(e.message || 'Dispatch failed')
+      setError(e instanceof Error ? e.message : 'Dispatch failed')
     } finally {
       setLoading(false)
       setActiveAction(null)

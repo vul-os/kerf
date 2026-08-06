@@ -15,8 +15,14 @@
 //   G. Announcer text changes on selectedId / selectedFeatures
 
 import { describe, it, expect } from 'vitest'
+// @types/node isn't part of this project's toolchain (tsconfig.json's `types` array is
+// T-500's — see docs/typescript-migration.md), so these Node builtins (used only for this
+// file's source-inspection assertions) are untyped at this boundary.
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
+// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -55,8 +61,8 @@ describe('Renderer T-C5 — canvas ARIA + focusability', () => {
 // ── B. SR announcer ────────────────────────────────────────────────────────
 
 // Find the last (JSX) occurrence of role="status" — the first may be a comment.
-function findStatusDivIdx(source) {
-  let idx = source.lastIndexOf('role="status"')
+function findStatusDivIdx(source: string) {
+  const idx = source.lastIndexOf('role="status"')
   return idx
 }
 
@@ -97,7 +103,7 @@ describe('Renderer T-C5 — role="status" live region', () => {
 // Rather than importing the module (which drags in WebGL / THREE), we parse
 // the exported constant declaration out of the source text.
 
-function parseCanvasKeyMap(source) {
+function parseCanvasKeyMap(source: string): Record<string, string> | null {
   // Match the CANVAS_KEY_MAP object literal block.
   const start = source.indexOf('export const CANVAS_KEY_MAP = {')
   if (start === -1) return null
@@ -115,7 +121,7 @@ function parseCanvasKeyMap(source) {
   }
   const block = source.slice(openBrace, i + 1)
   // Extract key:value pairs — both single-quoted and unquoted keys
-  const pairs = {}
+  const pairs: Record<string, string> = {}
   const re = /['"]?([^'":\s,{}]+)['"]?\s*:\s*['"]([^'"]+)['"]/g
   let m
   while ((m = re.exec(block)) !== null) {

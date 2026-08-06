@@ -1,4 +1,4 @@
-// Pmi3DOverlay.jsx — 3D PMI (Product and Manufacturing Information) overlay.
+// Pmi3DOverlay.tsx — 3D PMI (Product and Manufacturing Information) overlay.
 //
 // Renders FCF callouts and datum labels as HTML overlays positioned in screen
 // space over the three.js canvas. Uses a Three.js Vector3 → screen projection
@@ -18,16 +18,91 @@
 // is set the cursor becomes a crosshair and clicking emits `onPlace`.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type * as ThreeNS from 'three'
 import { renderFcf, GDT_SYMBOL_MAP } from '../lib/gdntAnnotations.js'
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+//
+// KNOWN BUG (report, not fix — see T-513 migration report): both `project()` and
+// `handleCanvasClick()` below read `window.__THREE__`, but nothing in this
+// codebase ever assigns it — grepped the full src/ tree, including Renderer.jsx,
+// which the inline comment claims caches it there. It doesn't. That means `THREE`
+// is always `undefined` at runtime, so both functions hit their `if (!THREE)
+// return` guard on every call: `project()` never populates `positions`, which
+// means any annotation that HAS a `world_pos` (the normal 3D-anchored case) always
+// renders with `visible = false` per the fallback logic below and never appears;
+// only annotations without a world anchor show, at the fixed list fallback
+// position. `handleCanvasClick` likewise always no-ops, so GD&T click-to-place
+// never fires `onPlace`. Preserved exactly as-is (no behavior change) — worth a
+// real look from whoever owns PMI/GD&T next.
+
+export interface GdtDatumRef {
+  label: string
+  modifier?: string | null
+}
+
+export interface PmiFcfAnnotation {
+  id: string
+  kind: 'fcf'
+  symbol_code: string
+  tolerance_value?: number
+  diameter_zone?: boolean
+  tolerance_modifier?: string
+  datum_refs?: GdtDatumRef[]
+  rendered?: string
+  world_pos?: { x: number; y: number; z: number } | null
+}
+
+export interface PmiDatumAnnotation {
+  id: string
+  kind: 'gdt_datum'
+  label: string
+  world_pos?: { x: number; y: number; z: number } | null
+}
+
+/** Other annotation kinds pass through this overlay untouched (filtered out before render). */
+export interface PmiOtherAnnotation {
+  id: string
+  kind: string
+  world_pos?: { x: number; y: number; z: number } | null
+}
+
+export type PmiAnnotation = PmiFcfAnnotation | PmiDatumAnnotation | PmiOtherAnnotation
+
+/**
+ * Renderer.jsx's stateRef shape, as far as this overlay reads it. Three.js itself
+ * has no usable types in this repo (no @types/three, no shipped .d.ts — see the
+ * prior T-513 commits), so these member types resolve to `any` regardless.
+ */
+export interface PmiThreeState {
+  camera?: ThreeNS.Camera
+  renderer?: ThreeNS.WebGLRenderer
+  scene?: ThreeNS.Scene
+}
+
+interface ScreenPos {
+  x: number
+  y: number
+  visible: boolean
+}
+
+export interface Pmi3DOverlayProps {
+  annotations?: PmiAnnotation[]
+  threeState?: PmiThreeState | null
+  selectedId?: string | null
+  onPick?: (ann: PmiAnnotation) => void
+  activeTool?: string | null
+  onPlace?: (placement: { worldPos: { x: number; y: number; z: number }; faceId: string | null }) => void
+}
 
 // ---------------------------------------------------------------------------
 // FcfLabel — a single FCF rendered as a styled HTML chip.
 
-function FcfLabel({ ann, x, y, selected, onClick }) {
+function FcfLabel({ ann, x, y, selected, onClick }: { ann: PmiFcfAnnotation; x: number; y: number; selected: boolean; onClick?: (ann: PmiAnnotation) => void }) {
   const sym = GDT_SYMBOL_MAP[ann.symbol_code]
   const rendered = ann.rendered || renderFcf(ann)
   const diaStr = ann.diameter_zone ? '⌀' : ''
-  const modMap = { M: 'Ⓜ', L: 'Ⓛ', S: 'Ⓢ', F: 'Ⓕ', P: 'Ⓟ', T: 'Ⓣ' }
+  const modMap: Record<string, string> = { M: 'Ⓜ', L: 'Ⓛ', S: 'Ⓢ', F: 'Ⓕ', P: 'Ⓟ', T: 'Ⓣ' }
   const modStr = ann.tolerance_modifier ? ` ${modMap[ann.tolerance_modifier] || ann.tolerance_modifier}` : ''
   const datums = (ann.datum_refs || []).map((d) => d.label)
 
@@ -69,7 +144,7 @@ function FcfLabel({ ann, x, y, selected, onClick }) {
 // ---------------------------------------------------------------------------
 // DatumLabel — datum triangle + letter.
 
-function DatumLabel({ ann, x, y, selected, onClick }) {
+function DatumLabel({ ann, x, y, selected, onClick }: { ann: PmiDatumAnnotation; x: number; y: number; selected: boolean; onClick?: (ann: PmiAnnotation) => void }) {
   return (
     <div
       role="button"
@@ -110,10 +185,10 @@ export default function Pmi3DOverlay({
   onPick,
   activeTool = null,
   onPlace,
-}) {
-  const containerRef = useRef(null)
-  const [positions, setPositions] = useState(new Map()) // annId → {x, y, visible}
-  const rafRef = useRef(null)
+}: Pmi3DOverlayProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const [positions, setPositions] = useState<Map<string, ScreenPos>>(new Map())
+  const rafRef = useRef<number | null>(null)
 
   // Project world-space positions to screen coords on every animation frame.
   // We avoid re-rendering on every frame by comparing old positions.
@@ -127,10 +202,11 @@ export default function Pmi3DOverlay({
     const containerRect = containerRef.current.getBoundingClientRect()
     if (rect.width === 0 || rect.height === 0) return
 
-    const THREE = window.__THREE__ // cached by Renderer.jsx — fallback to import
+    // See the KNOWN BUG note above: this is always undefined at runtime.
+    const THREE = (window as unknown as { __THREE__?: typeof ThreeNS }).__THREE__ // cached by Renderer.jsx — fallback to import
     if (!THREE) return
 
-    const next = new Map()
+    const next = new Map<string, ScreenPos>()
     for (const ann of annotations) {
       if (ann.kind !== 'fcf' && ann.kind !== 'gdt_datum') continue
       if (ann.world_pos == null) continue // no 3D anchor yet
@@ -179,12 +255,13 @@ export default function Pmi3DOverlay({
 
   // Click-to-place handler. When activeTool is set, clicking on the 3D
   // canvas emits onPlace with the cursor position and nearest face id.
-  const handleCanvasClick = useCallback((e) => {
+  const handleCanvasClick = useCallback((e: MouseEvent) => {
     if (!activeTool || !onPlace) return
     const s = threeState
     if (!s || !s.camera || !s.renderer || !s.scene) return
 
-    const THREE = window.__THREE__
+    // See the KNOWN BUG note above: this is always undefined at runtime.
+    const THREE = (window as unknown as { __THREE__?: typeof ThreeNS }).__THREE__
     if (!THREE) return
 
     const rect = s.renderer.domElement.getBoundingClientRect()
@@ -192,19 +269,19 @@ export default function Pmi3DOverlay({
     const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1
 
     const raycaster = new THREE.Raycaster()
-    raycaster.setFromCamera({ x: ndcX, y: ndcY }, s.camera)
+    raycaster.setFromCamera({ x: ndcX, y: ndcY } as ThreeNS.Vector2, s.camera)
 
     // Collect all meshes in the scene for intersection.
-    const meshes = []
+    const meshes: ThreeNS.Object3D[] = []
     s.scene.traverse((obj) => {
-      if (obj.isMesh) meshes.push(obj)
+      if ((obj as ThreeNS.Mesh).isMesh) meshes.push(obj)
     })
     const hits = raycaster.intersectObjects(meshes, false)
     if (hits.length === 0) return
 
     const hit = hits[0]
     const worldPos = hit.point.clone()
-    const faceId = hit.object?.userData?.faceId || hit.object?.name || null
+    const faceId = (hit.object?.userData?.faceId as string | undefined) || hit.object?.name || null
 
     onPlace({ worldPos: { x: worldPos.x, y: worldPos.y, z: worldPos.z }, faceId })
   }, [activeTool, onPlace, threeState])
@@ -238,7 +315,10 @@ export default function Pmi3DOverlay({
           return (
             <FcfLabel
               key={ann.id}
-              ann={ann}
+              // PmiOtherAnnotation's `kind: string` is too wide for TS to exclude via the
+              // `ann.kind === 'fcf'` check above; the runtime discriminant already guarantees
+              // this is a PmiFcfAnnotation.
+              ann={ann as PmiFcfAnnotation}
               x={x}
               y={y}
               selected={ann.id === selectedId}
@@ -250,7 +330,7 @@ export default function Pmi3DOverlay({
           return (
             <DatumLabel
               key={ann.id}
-              ann={ann}
+              ann={ann as PmiDatumAnnotation}
               x={x}
               y={y}
               selected={ann.id === selectedId}

@@ -21,6 +21,31 @@
 
 import { useMemo } from 'react'
 import { layoutNodes, temperatureToRgb } from '../lib/thermalNetworkLayout.js'
+import type { ThermalNode, ThermalLink, NodeLayout, NodePosition } from '../lib/thermalNetworkLayout.js'
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+//
+// thermalNetworkLayout.ts's ThermalNode/ThermalLink intentionally carry only the
+// fields layoutNodes() itself reads (`id`, `from_id`/`to_id`/`natural_length`), plus
+// an open index signature for "whatever else the caller attaches" — this component
+// is exactly that caller, so its extra display fields are modeled as an extension
+// rather than widening the shared shape.
+
+export interface ThermalNetworkNode extends ThermalNode {
+  label?: string
+  temperature_K?: number
+}
+
+export interface ThermalNetworkLink extends ThermalLink {
+  /** Radiative links render dashed; anything else (typically 'conductive') renders solid. */
+  type?: string
+  flux_W?: number
+}
+
+export interface ThermalNetworkData {
+  nodes?: ThermalNetworkNode[]
+  links?: ThermalNetworkLink[]
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -38,21 +63,15 @@ const DEFAULT_T_MAX = 373.15  // 100 °C
 // Helpers
 // ---------------------------------------------------------------------------
 
-function rgbStr({ r, g, b }) {
+function rgbStr({ r, g, b }: { r: number; g: number; b: number }) {
   return `rgb(${r},${g},${b})`
 }
 
 /**
  * Clamp-map node positions into the given SVG viewport, preserving aspect
  * ratio and centring the layout.
- *
- * @param {{ [id]: {x, y} }} rawPos — positions from layoutNodes
- * @param {number} width
- * @param {number} height
- * @param {number} padding
- * @returns {{ [id]: {x, y} }}
  */
-function fitPositions(rawPos, width, height, padding) {
+function fitPositions(rawPos: NodeLayout, width: number, height: number, padding: number): NodeLayout {
   const ids = Object.keys(rawPos)
   if (ids.length === 0) return rawPos
 
@@ -77,7 +96,7 @@ function fitPositions(rawPos, width, height, padding) {
   const offsetX  = padding + (usableW - scaledW) / 2
   const offsetY  = padding + (usableH - scaledH) / 2
 
-  const result = {}
+  const result: NodeLayout = {}
   for (const id of ids) {
     result[id] = {
       x: offsetX + (rawPos[id].x - minX) * scale,
@@ -91,7 +110,7 @@ function fitPositions(rawPos, width, height, padding) {
  * Given two centre points and a node radius offset, compute the arrow shaft
  * endpoints (pulled back from each node's circumference).
  */
-function arrowEndpoints(x1, y1, x2, y2, offset) {
+function arrowEndpoints(x1: number, y1: number, x2: number, y2: number, offset: number) {
   const dx = x2 - x1
   const dy = y2 - y1
   const dist = Math.sqrt(dx * dx + dy * dy) || 1
@@ -109,7 +128,7 @@ function arrowEndpoints(x1, y1, x2, y2, offset) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function ArrowMarkerDef({ id }) {
+function ArrowMarkerDef({ id }: { id: string }) {
   return (
     <defs>
       <marker
@@ -126,7 +145,7 @@ function ArrowMarkerDef({ id }) {
   )
 }
 
-function LinkArrow({ link, positions }) {
+function LinkArrow({ link, positions }: { link: ThermalNetworkLink; positions: NodeLayout }) {
   const pA = positions[link.from_id]
   const pB = positions[link.to_id]
   if (!pA || !pB) return null
@@ -172,7 +191,14 @@ function LinkArrow({ link, positions }) {
   )
 }
 
-function NodeBubble({ node, position, tMin, tMax }) {
+interface NodeBubbleProps {
+  node: ThermalNetworkNode
+  position: NodePosition
+  tMin: number
+  tMax: number
+}
+
+function NodeBubble({ node, position, tMin, tMax }: NodeBubbleProps) {
   const temp = typeof node.temperature_K === 'number'
     ? node.temperature_K
     : (tMin + tMax) / 2
@@ -235,6 +261,15 @@ function NodeBubble({ node, position, tMin, tMax }) {
 // ThermalNetworkViewer (default export)
 // ---------------------------------------------------------------------------
 
+export interface ThermalNetworkViewerProps {
+  network?: ThermalNetworkData | null
+  width?: number
+  height?: number
+  padding?: number
+  iterations?: number
+  className?: string
+}
+
 /**
  * ThermalNetworkViewer
  *
@@ -242,8 +277,6 @@ function NodeBubble({ node, position, tMin, tMax }) {
  * cool, red = hot).  Links are drawn as directed arrows — solid for conductive
  * links, dashed for radiative.  An optional flux label is shown on each link
  * when `flux_W` is present.
- *
- * @param {{ network, width?, height?, padding?, iterations?, className? }} props
  */
 export default function ThermalNetworkViewer({
   network,
@@ -252,7 +285,7 @@ export default function ThermalNetworkViewer({
   padding    = 40,
   iterations = 150,
   className  = '',
-}) {
+}: ThermalNetworkViewerProps) {
   const nodes = network?.nodes ?? []
   const links = network?.links ?? []
 
@@ -260,7 +293,7 @@ export default function ThermalNetworkViewer({
   const { tMin, tMax } = useMemo(() => {
     const temps = nodes
       .filter(n => typeof n.temperature_K === 'number')
-      .map(n => n.temperature_K)
+      .map(n => n.temperature_K as number)
     if (temps.length === 0) return { tMin: DEFAULT_T_MIN, tMax: DEFAULT_T_MAX }
     const mn = Math.min(...temps)
     const mx = Math.max(...temps)

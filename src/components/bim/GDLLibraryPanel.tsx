@@ -19,6 +19,7 @@
  */
 
 import { useState, useCallback, useMemo } from 'react'
+import type { ComponentType } from 'react'
 import {
   Box,
   ChevronDown,
@@ -29,8 +30,6 @@ import {
   Bolt,
   Armchair,
   Lamp,
-  CheckCircle2,
-  AlertCircle,
   Zap,
   Code2,
 } from 'lucide-react'
@@ -39,7 +38,28 @@ import {
 // Constants — mirrors kerf_bim/gdl_library.py DEFAULT_LIBRARY
 // ---------------------------------------------------------------------------
 
-const GDL_OBJECTS = [
+interface GDLParam {
+  name: string
+  type: 'length' | 'angle' | 'material' | 'real'
+  default: number | string
+  min?: number
+  max?: number
+  units?: string
+}
+
+interface GDLObject {
+  id: string
+  name: string
+  subtype: string
+  description: string
+  params: GDLParam[]
+  icon: ComponentType<{ className?: string }>
+  color: string
+  bg: string
+  script: string
+}
+
+const GDL_OBJECTS: GDLObject[] = [
   {
     id: 'DOOR_SINGLE_00001', name: 'Single Swing Door', subtype: 'Door',
     description: 'Simple single-leaf hinged door.',
@@ -124,11 +144,14 @@ const GDL_OBJECTS = [
 
 const SUBTYPES = ['All', 'Door', 'Window', 'Column', 'Beam', 'Furniture', 'Lamp']
 
-function evalGDLObject(obj, overrides = {}) {
-  const ns = { ...Object.fromEntries(obj.params.filter(p => p.type !== 'material').map(p => [p.name, p.default])), ...overrides }
+function evalGDLObject(obj: GDLObject, overrides: Record<string, number> = {}): Record<string, unknown> | null {
+  const ns: Record<string, number> = {
+    ...Object.fromEntries(obj.params.filter(p => p.type !== 'material').map(p => [p.name, p.default as number])),
+    ...overrides,
+  }
   try {
     // Client-side simplified eval (mirrors Python engine)
-    const result = {}
+    const result: Record<string, unknown> = {}
     if (obj.id === 'DOOR_SINGLE_00001') {
       result.panel_width  = ns.WIDTH - 2 * ns.FRAME_THICKNESS
       result.panel_height = ns.HEIGHT - ns.FRAME_THICKNESS
@@ -140,11 +163,13 @@ function evalGDLObject(obj, overrides = {}) {
       result.glass_area = Math.round(gw * gh * 10000) / 10000
       result.bbox = { width: ns.WIDTH, height: ns.HEIGHT }
     } else if (obj.id === 'COLUMN_ROUND_00001') {
-      result.area   = Math.round(Math.PI * (ns.DIAMETER / 2) ** 2 * 1e6) / 1e6
-      result.volume = Math.round(result.area * ns.HEIGHT * 1e6) / 1e6
+      const area = Math.round(Math.PI * (ns.DIAMETER / 2) ** 2 * 1e6) / 1e6
+      result.area   = area
+      result.volume = Math.round(area * ns.HEIGHT * 1e6) / 1e6
     } else if (obj.id === 'BEAM_RECT_00001') {
-      result.area   = ns.WIDTH * ns.DEPTH
-      result.volume = Math.round(result.area * ns.LENGTH * 1e6) / 1e6
+      const area = ns.WIDTH * ns.DEPTH
+      result.area   = area
+      result.volume = Math.round(area * ns.LENGTH * 1e6) / 1e6
     } else if (obj.id === 'DESK_OFFICE_00001') {
       result.footprint_area = Math.round(ns.WIDTH * ns.DEPTH * 10000) / 10000
     } else if (obj.id === 'LIGHT_PENDANT_00001') {
@@ -160,14 +185,14 @@ function evalGDLObject(obj, overrides = {}) {
 // Main panel
 // ---------------------------------------------------------------------------
 
-export default function GDLLibraryPanel({ content, onToast }) {
+export default function GDLLibraryPanel({ content }: { content?: string; onToast?: (msg: string) => void }) {
   // Accept a `content` string (JSON) from the panel registry.
   // content.selectedId can pre-select an object; otherwise the browser opens at default.
-  const _cp = (() => { if (!content) return {}; try { return JSON.parse(content) } catch { return {} } })()
+  const _cp = (() => { if (!content) return {} as { selectedId?: string }; try { return JSON.parse(content) as { selectedId?: string } } catch { return {} as { selectedId?: string } } })()
   const [filter, setFilter] = useState('All')
-  const [selectedId, setSelectedId] = useState(_cp.selectedId ?? null)
-  const [overrides, setOverrides] = useState({})
-  const [evaluated, setEvaluated] = useState(null)
+  const [selectedId, setSelectedId] = useState<string | null>(_cp.selectedId ?? null)
+  const [overrides, setOverrides] = useState<Record<string, number>>({})
+  const [evaluated, setEvaluated] = useState<{ resolved_params: Record<string, number>; geometry: Record<string, unknown> | null } | null>(null)
   const [showScript, setShowScript] = useState(false)
   const [expanded, setExpanded] = useState(true)
   const [activeTab, setActiveTab] = useState('browse')
@@ -179,7 +204,7 @@ export default function GDLLibraryPanel({ content, onToast }) {
 
   const selectedObj = GDL_OBJECTS.find(o => o.id === selectedId)
 
-  const selectObject = useCallback((id) => {
+  const selectObject = useCallback((id: string) => {
     setSelectedId(id)
     setOverrides({})
     setEvaluated(null)
@@ -189,11 +214,13 @@ export default function GDLLibraryPanel({ content, onToast }) {
   const evaluate = useCallback(() => {
     if (!selectedObj) return
     const result = evalGDLObject(selectedObj, overrides)
-    const ns = { ...Object.fromEntries(selectedObj.params.filter(p => p.type !== 'material').map(p => [p.name, overrides[p.name] ?? p.default])) }
+    const ns: Record<string, number> = {
+      ...Object.fromEntries(selectedObj.params.filter(p => p.type !== 'material').map(p => [p.name, overrides[p.name] ?? (p.default as number)])),
+    }
     setEvaluated({ resolved_params: ns, geometry: result })
   }, [selectedObj, overrides])
 
-  const updateOverride = useCallback((name, value) => {
+  const updateOverride = useCallback((name: string, value: string) => {
     setOverrides(prev => ({ ...prev, [name]: parseFloat(value) }))
   }, [])
 
@@ -282,7 +309,7 @@ export default function GDLLibraryPanel({ content, onToast }) {
                   {/* Parameter sliders */}
                   <div className="space-y-2">
                     {selectedObj.params.filter(p => p.type !== 'material').map(p => {
-                      const val = overrides[p.name] ?? p.default
+                      const val = overrides[p.name] ?? (p.default as number)
                       return (
                         <div key={p.name} className="space-y-0.5">
                           <div className="flex justify-between text-xs">
@@ -339,7 +366,7 @@ export default function GDLLibraryPanel({ content, onToast }) {
                           {Object.entries(evaluated.geometry).map(([k, v]) => (
                             <div key={k} className="flex justify-between">
                               <span className="text-ink-500">{k}</span>
-                              <span className="font-mono text-indigo-600 dark:text-indigo-400">{typeof v === 'object' ? JSON.stringify(v) : v}</span>
+                              <span className="font-mono text-indigo-600 dark:text-indigo-400">{typeof v === 'object' ? JSON.stringify(v) : String(v)}</span>
                             </div>
                           ))}
                         </div>

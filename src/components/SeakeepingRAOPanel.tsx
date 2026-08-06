@@ -14,6 +14,54 @@
 import { useMemo } from 'react'
 
 // ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+// Parsed JSON response from the marine_seakeeping_rao / marine_seakeeping_stats
+// LLM tools. No shared type exists for this domain-specific analysis payload.
+interface RaoPoint {
+  omega_rad_s: number
+  omega_e_rad_s?: number
+  rao_heave_amp: number | null
+  rao_heave_phase_deg?: number
+  rao_pitch_amp: number | null
+  rao_pitch_phase_deg?: number
+  rao_roll_amp: number | null
+  rao_roll_phase_deg?: number
+}
+
+interface SeakeepingRaoResult {
+  ok?: boolean
+  rao_points?: RaoPoint[]
+  n_sections?: number
+  L_m?: number
+}
+
+interface MotionStat {
+  motion: string
+  m0?: number
+  m2?: number
+  significant_amplitude?: number
+  mean_zero_crossing_period_s?: number
+  mpm_100_amplitude?: number
+}
+
+interface SeakeepingStatsResult {
+  Hs_input_m?: number
+  Tp_input_s?: number
+  spectrum?: string
+  motions?: MotionStat[]
+}
+
+export interface SeakeepingRAOPanelProps {
+  result?: SeakeepingRaoResult | null
+  statsResult?: SeakeepingStatsResult | null
+  loading?: boolean
+  error?: string | null
+  content?: string
+}
+
+// ---------------------------------------------------------------------------
 // Chart constants
 // ---------------------------------------------------------------------------
 
@@ -23,20 +71,25 @@ const PAD = { top: 18, right: 20, bottom: 40, left: 55 }
 const INNER_W = CHART_W - PAD.left - PAD.right
 const INNER_H = CHART_H - PAD.top - PAD.bottom
 
-const RAO_COLORS = {
+const RAO_COLORS: Record<string, string> = {
   heave: '#34d399',  // green
   pitch: '#60a5fa',  // blue
   roll:  '#f97316',  // orange
 }
 
-function scaleLinear(domain, range) {
+function scaleLinear(domain: [number, number], range: [number, number]) {
   const [d0, d1] = domain
   const [r0, r1] = range
   const dSpan = d1 - d0 || 1
-  return v => r0 + ((v - d0) / dSpan) * (r1 - r0)
+  return (v: number) => r0 + ((v - d0) / dSpan) * (r1 - r0)
 }
 
-function buildPath(xs, ys, xS, yS) {
+function buildPath(
+  xs: number[],
+  ys: (number | null)[],
+  xS: (v: number) => number,
+  yS: (v: number) => number,
+) {
   return xs
     .map((x, i) => {
       const y = ys[i]
@@ -47,7 +100,7 @@ function buildPath(xs, ys, xS, yS) {
     .join(' ')
 }
 
-function axisTicks(min, max, n = 5) {
+function axisTicks(min: number, max: number, n = 5) {
   const step = (max - min) / (n - 1) || 1
   return Array.from({ length: n }, (_, i) => min + i * step)
 }
@@ -56,8 +109,17 @@ function axisTicks(min, max, n = 5) {
 // RAO chart
 // ---------------------------------------------------------------------------
 
-function RAOChart({ omegas, heaveAmps, pitchAmps, rollAmps, mode = 'heave_pitch' }) {
-  const seriesMap = {
+interface RAOChartProps {
+  omegas: number[]
+  heaveAmps: (number | null)[]
+  pitchAmps: (number | null)[]
+  rollAmps: (number | null)[]
+  // Unused by the current renderer; kept for backward-compatible call sites.
+  mode?: string
+}
+
+function RAOChart({ omegas, heaveAmps, pitchAmps, rollAmps, mode: _mode = 'heave_pitch' }: RAOChartProps) {
+  const seriesMap: Record<string, (number | null)[]> = {
     heave: heaveAmps,
     pitch: pitchAmps,
     roll: rollAmps,
@@ -143,25 +205,28 @@ function RAOChart({ omegas, heaveAmps, pitchAmps, rollAmps, mode = 'heave_pitch'
 // SeakeepingRAOPanel
 // ---------------------------------------------------------------------------
 
-export default function SeakeepingRAOPanel({ result, statsResult, loading, error, content }) {
+export default function SeakeepingRAOPanel({ result, statsResult, loading, error, content }: SeakeepingRAOPanelProps) {
   // Backward-compatible content string: JSON.parse it and merge into result/statsResult.
-  if (content != null && result == null) {
+  // (local variables, not reassignments of the `result`/`statsResult` props.)
+  let resolvedResult = result
+  let resolvedStatsResult = statsResult
+  if (content != null && resolvedResult == null) {
     try {
       const parsed = JSON.parse(content)
-      result = parsed.result ?? parsed
-      statsResult = parsed.statsResult ?? statsResult
+      resolvedResult = parsed.result ?? parsed
+      resolvedStatsResult = parsed.statsResult ?? resolvedStatsResult
     } catch { /* ignore */ }
   }
   const data = useMemo(() => {
-    if (!result) return null
+    if (!resolvedResult) return null
     // May come wrapped or unwrapped
-    return result.rao_points ? result : (result.ok ? result : null)
-  }, [result])
+    return resolvedResult.rao_points ? resolvedResult : (resolvedResult.ok ? resolvedResult : null)
+  }, [resolvedResult])
 
   const stats = useMemo(() => {
-    if (!statsResult) return null
-    return statsResult.motions ? statsResult : null
-  }, [statsResult])
+    if (!resolvedStatsResult) return null
+    return resolvedStatsResult.motions ? resolvedStatsResult : null
+  }, [resolvedStatsResult])
 
   if (loading) {
     return (
@@ -270,7 +335,17 @@ export default function SeakeepingRAOPanel({ result, statsResult, loading, error
   )
 }
 
-function SummaryCard({ label, value, color = 'text-gray-200', borderColor = 'border-gray-700' }) {
+function SummaryCard({
+  label,
+  value,
+  color = 'text-gray-200',
+  borderColor = 'border-gray-700',
+}: {
+  label: string
+  value: string
+  color?: string
+  borderColor?: string
+}) {
   return (
     <div className={`rounded p-2 border ${borderColor} bg-gray-800 text-center`}>
       <div className="text-xs text-gray-400">{label}</div>

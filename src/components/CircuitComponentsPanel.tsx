@@ -16,39 +16,50 @@
 // matches ObjectsPanel: ink-900 bg, 11px header label, hover bg-ink-800,
 // kerf-300 accent for selection.
 
-import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Cpu, CircuitBoard, HelpCircle, Link2, Link2Off } from 'lucide-react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { ChevronDown, ChevronRight, Cpu, CircuitBoard, HelpCircle, Link2, Link2Off, type LucideIcon } from 'lucide-react'
 import { useWorkspace, loadFilePartsForProject } from '../store/workspace.js'
 import LibraryPicker from './LibraryPicker.jsx'
 import { parseLibraryMappings } from '../lib/circuitMappings.js'
+import type { CircuitElement, CircuitJson } from '../types'
+
+interface SummarizedComponent {
+  refdes: string
+  value: string
+  footprint: string
+}
+interface SummarizedNet {
+  name: string
+  pins: number
+}
 
 // Roll up the raw CircuitJSON into the two displayable lists. We tolerate
 // transient mid-compile states where some entities are missing pairs.
-function summarize(circuitJson) {
+function summarize(circuitJson: CircuitJson | null | undefined): { components: SummarizedComponent[]; nets: SummarizedNet[] } {
   if (!Array.isArray(circuitJson) || circuitJson.length === 0) {
     return { components: [], nets: [] }
   }
   // refdes (source_component.name) → { value, footprint }
-  const components = []
+  const components: SummarizedComponent[] = []
   // net name → connected pin count (sum of source_trace endpoints touching it)
-  const netCounts = new Map()
+  const netCounts = new Map<string, number>()
   // source_component carries refdes (name) and value/ftype. footprint name
   // is on cad_component or pcb_component depending on the source.
-  const footprintBySrcId = new Map()
-  for (const e of circuitJson) {
+  const footprintBySrcId = new Map<string, string>()
+  for (const e of circuitJson as Array<CircuitElement & Record<string, unknown>>) {
     if (e.type === 'pcb_component' && e.source_component_id) {
       // pcb_component doesn't carry a footprint string directly; the closest
       // useful thing is the layer/size pair. We surface that as fallback.
       const w = Number(e.width)
       const h = Number(e.height)
       if (Number.isFinite(w) && Number.isFinite(h)) {
-        footprintBySrcId.set(e.source_component_id, `${w.toFixed(2)}×${h.toFixed(2)}mm`)
+        footprintBySrcId.set(String(e.source_component_id), `${w.toFixed(2)}×${h.toFixed(2)}mm`)
       }
     }
   }
-  for (const e of circuitJson) {
+  for (const e of circuitJson as Array<CircuitElement & Record<string, unknown>>) {
     if (e.type !== 'source_component') continue
-    const name = e.name || '(unnamed)'
+    const name = String(e.name || '(unnamed)')
     let value = ''
     if (e.resistance != null) value = formatOhms(Number(e.resistance))
     else if (e.capacitance != null) value = formatFarads(Number(e.capacitance))
@@ -56,31 +67,32 @@ function summarize(circuitJson) {
     else if (e.voltage != null) value = `${Number(e.voltage)}V`
     else if (typeof e.value === 'string') value = e.value
     else if (typeof e.ftype === 'string') value = e.ftype.replace(/^simple_/, '')
-    const footprint = e.footprint || footprintBySrcId.get(e.source_component_id) || ''
+    const footprint = String(e.footprint || footprintBySrcId.get(String(e.source_component_id)) || '')
     components.push({ refdes: name, value, footprint })
   }
   components.sort((a, b) => naturalCompare(a.refdes, b.refdes))
 
   // Nets — source_net is the canonical list, source_trace.connected_source_port_ids
   // tells us how many pins each net touches.
-  for (const e of circuitJson) {
+  for (const e of circuitJson as Array<CircuitElement & Record<string, unknown>>) {
     if (e.type === 'source_net') {
-      if (!netCounts.has(e.name)) netCounts.set(e.name, 0)
+      const name = String(e.name)
+      if (!netCounts.has(name)) netCounts.set(name, 0)
     }
   }
   // Build name lookup for source_net id → name.
-  const netNameById = new Map()
-  for (const e of circuitJson) {
-    if (e.type === 'source_net') netNameById.set(e.source_net_id, e.name)
+  const netNameById = new Map<string, string>()
+  for (const e of circuitJson as Array<CircuitElement & Record<string, unknown>>) {
+    if (e.type === 'source_net') netNameById.set(String(e.source_net_id), String(e.name))
   }
   // For each trace, the connected_source_port_ids count contributes to every
   // net it touches.
-  for (const e of circuitJson) {
+  for (const e of circuitJson as Array<CircuitElement & Record<string, unknown>>) {
     if (e.type !== 'source_trace') continue
     const ports = Array.isArray(e.connected_source_port_ids) ? e.connected_source_port_ids.length : 0
     const nets = Array.isArray(e.connected_source_net_ids) ? e.connected_source_net_ids : []
     for (const nid of nets) {
-      const nm = netNameById.get(nid)
+      const nm = netNameById.get(String(nid))
       if (!nm) continue
       netCounts.set(nm, (netCounts.get(nm) || 0) + ports)
     }
@@ -92,28 +104,35 @@ function summarize(circuitJson) {
   return { components, nets }
 }
 
-function naturalCompare(a, b) {
+function naturalCompare(a: string, b: string): number {
   return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' })
 }
 
-function formatOhms(r) {
+function formatOhms(r: number): string {
   if (!Number.isFinite(r)) return ''
   if (r >= 1e6) return `${(r / 1e6).toFixed(r >= 1e7 ? 0 : 1)}MΩ`
   if (r >= 1e3) return `${(r / 1e3).toFixed(r >= 1e4 ? 0 : 1)}kΩ`
   return `${r}Ω`
 }
-function formatFarads(c) {
+function formatFarads(c: number): string {
   if (!Number.isFinite(c)) return ''
   if (c >= 1e-6) return `${(c * 1e6).toFixed(2)}µF`
   if (c >= 1e-9) return `${(c * 1e9).toFixed(2)}nF`
   if (c >= 1e-12) return `${(c * 1e12).toFixed(2)}pF`
   return `${c}F`
 }
-function formatHenries(h) {
+function formatHenries(h: number): string {
   if (!Number.isFinite(h)) return ''
   if (h >= 1) return `${h.toFixed(2)}H`
   if (h >= 1e-3) return `${(h * 1e3).toFixed(2)}mH`
   return `${(h * 1e6).toFixed(2)}µH`
+}
+
+export interface CircuitComponentsPanelProps {
+  selectedRefdes?: string | null
+  selectedNet?: string | null
+  onSelectRefdes?: (refdes: string | null) => void
+  onSelectNet?: (net: string | null) => void
 }
 
 export default function CircuitComponentsPanel({
@@ -121,7 +140,7 @@ export default function CircuitComponentsPanel({
   selectedNet = null,
   onSelectRefdes,
   onSelectNet,
-}) {
+}: CircuitComponentsPanelProps) {
   const currentCircuit = useWorkspace((s) => s.currentCircuit)
   const currentFileContent = useWorkspace((s) => s.currentFileContent)
   const circuitLoading = useWorkspace((s) => s.circuitLoading)
@@ -140,16 +159,16 @@ export default function CircuitComponentsPanel({
   // Display name lookup for mapped Library Parts. We pull a project-wide list
   // of kind='part' files once and resolve names client-side; LibraryPicker
   // offers a richer browse, but the panel just needs `R1 → "Yageo RC0402JR-071K"`.
-  const [partNamesByFileId, setPartNamesByFileId] = useState({})
+  const [partNamesByFileId, setPartNamesByFileId] = useState<Record<string, string>>({})
   useEffect(() => {
     if (!projectId) return
     let cancelled = false
-    loadFilePartsForProject(projectId).then((rows) => {
+    loadFilePartsForProject(projectId, undefined, undefined).then((rows: Array<Record<string, unknown>> | null | undefined) => {
       if (cancelled) return
-      const out = {}
+      const out: Record<string, string> = {}
       for (const r of rows || []) {
         if (r?.id && (r.name || r.label || r.mpn)) {
-          out[r.id] = r.label || r.name || r.mpn
+          out[String(r.id)] = String(r.label || r.name || r.mpn)
         }
       }
       setPartNamesByFileId(out)
@@ -160,7 +179,7 @@ export default function CircuitComponentsPanel({
   // Picker state. `pickFor` holds the refdes whose mapping is being edited;
   // null means closed. Selecting a part calls setCircuitLibraryMapping and
   // closes the picker.
-  const [pickFor, setPickFor] = useState(null)
+  const [pickFor, setPickFor] = useState<string | null>(null)
 
   const [openComponents, setOpenComponents] = useState(true)
   const [openNets, setOpenNets] = useState(true)
@@ -291,11 +310,11 @@ export default function CircuitComponentsPanel({
         <LibraryPicker
           currentProjectId={projectId}
           onClose={() => setPickFor(null)}
-          onSelect={(part) => {
+          onSelect={(part: Record<string, unknown> | null | undefined) => {
             // LibraryPicker emits a row payload; both project-local rows and
             // global library rows carry `id` (file_id) for the part file.
-            const fid = part?.id || part?.file_id
-            if (fid) setCircuitLibraryMapping(pickFor, fid)
+            const fid = (part?.id || part?.file_id) as string | undefined
+            if (fid && pickFor) setCircuitLibraryMapping(pickFor, fid)
             setPickFor(null)
           }}
         />
@@ -304,7 +323,15 @@ export default function CircuitComponentsPanel({
   )
 }
 
-function Section({ icon: Icon, title, open, onToggle, children }) {
+interface SectionProps {
+  icon: LucideIcon
+  title: string
+  open: boolean
+  onToggle: () => void
+  children: ReactNode
+}
+
+function Section({ icon: Icon, title, open, onToggle, children }: SectionProps) {
   return (
     <div className="mb-1">
       <button

@@ -40,24 +40,36 @@
  *     Additive Manufacturing 12.
  */
 
+import type { CSSProperties, ReactNode } from 'react'
 import { AlertTriangle, CheckCircle2, Layers, Activity, Zap, BarChart2, Thermometer, Droplets } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for tests)
 // ---------------------------------------------------------------------------
 
+// am_process_simulate / am_thermomechanical_simulate result payload —
+// JSON boundary we don't own, shape varies by which tool produced it.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AMResultData = any
+
+interface ParsedAMResult {
+  kind: 'ok' | 'empty' | 'invalid'
+  data?: AMResultData | null
+  error?: string
+}
+
 /**
  * Parse raw AM simulation result JSON.
  * Returns { kind: 'ok'|'empty'|'invalid', data, error? }
  */
-export function parseAMResult(content) {
+export function parseAMResult(content: unknown): ParsedAMResult {
   const raw = typeof content === 'string' ? content : ''
   if (!raw.trim()) return { kind: 'empty', data: null }
-  let doc
+  let doc: any
   try {
     doc = JSON.parse(raw)
   } catch (e) {
-    return { kind: 'invalid', error: e.message }
+    return { kind: 'invalid', error: (e as Error).message }
   }
   if (!doc || typeof doc !== 'object') {
     return { kind: 'invalid', error: 'Expected JSON object' }
@@ -75,10 +87,10 @@ export function parseAMResult(content) {
 /**
  * Map a distortion fraction [0..1] to a heat-map CSS colour (blue→cyan→green→yellow→red).
  */
-export function deviationColor(frac) {
+export function deviationColor(frac: number): string {
   const f = Math.max(0, Math.min(1, frac))
   // 5-stop gradient: 0=blue, 0.25=cyan, 0.5=green, 0.75=yellow, 1=red
-  const stops = [
+  const stops: [number, [number, number, number]][] = [
     [0,   [  0,  80, 255]],
     [0.25,[  0, 200, 220]],
     [0.5, [  0, 200,   0]],
@@ -102,7 +114,7 @@ export function deviationColor(frac) {
 /**
  * Classify residual von-Mises stress magnitude.
  */
-export function stressLabel(mpa) {
+export function stressLabel(mpa: number): string {
   if (mpa < 50)  return 'Low'
   if (mpa < 200) return 'Moderate'
   if (mpa < 500) return 'High'
@@ -112,7 +124,7 @@ export function stressLabel(mpa) {
 /**
  * Format mm values with fallback.
  */
-export function fmtMm(mm, digits = 3) {
+export function fmtMm(mm: number | null | undefined, digits = 3): string {
   if (mm == null || !isFinite(mm)) return '—'
   return mm.toFixed(digits)
 }
@@ -121,7 +133,7 @@ export function fmtMm(mm, digits = 3) {
  * Map a temperature [K] to a heat-map CSS colour (blue=cold, red=hot).
  * T_melt_k is used to set the 1.0 anchor (above melt = full red).
  */
-export function tempColor(T_k, T_melt_k = 1878) {
+export function tempColor(T_k: number, T_melt_k = 1878): string {
   const T_ref = 298.15
   const frac = Math.max(0, Math.min(1, (T_k - T_ref) / Math.max(T_melt_k - T_ref, 1)))
   return deviationColor(frac)
@@ -130,7 +142,7 @@ export function tempColor(T_k, T_melt_k = 1878) {
 /**
  * True if the data payload includes thermal fields from am_thermomechanical_simulate.
  */
-export function isThermoMech(data) {
+export function isThermoMech(data: AMResultData): boolean {
   return data != null && Array.isArray(data.layer_peak_temp_k) && data.layer_peak_temp_k.length > 0
 }
 
@@ -138,7 +150,7 @@ export function isThermoMech(data) {
 // Layer sparkline (pure SVG, no d3)
 // ---------------------------------------------------------------------------
 
-function LayerSparkline({ values, width = 280, height = 50 }) {
+function LayerSparkline({ values, width = 280, height = 50 }: { values: number[]; width?: number; height?: number }) {
   if (!values || values.length === 0) return null
   const max = Math.max(...values, 1e-12)
   const pts = values.map((v, i) => {
@@ -174,7 +186,7 @@ function LayerSparkline({ values, width = 280, height = 50 }) {
 // Distortion color bar
 // ---------------------------------------------------------------------------
 
-function DeviationColorBar({ maxMm }) {
+function DeviationColorBar({ maxMm }: { maxMm: number }) {
   const stops = [0, 0.25, 0.5, 0.75, 1.0]
   const gradient = stops.map(s => `${deviationColor(s)} ${s * 100}%`).join(', ')
   return (
@@ -200,7 +212,11 @@ function DeviationColorBar({ maxMm }) {
 // Main panel component
 // ---------------------------------------------------------------------------
 
-export default function AMProcessSimPanel({ parsedContent }) {
+interface AMProcessSimPanelProps {
+  parsedContent?: unknown
+}
+
+export default function AMProcessSimPanel({ parsedContent }: AMProcessSimPanelProps = {}) {
   const parsed = parseAMResult(parsedContent)
 
   if (parsed.kind === 'empty') {
@@ -326,7 +342,7 @@ export default function AMProcessSimPanel({ parsedContent }) {
 // Thermo-mechanical section (rendered only when data is from TM tool)
 // ---------------------------------------------------------------------------
 
-function ThermoMechSection({ data: d }) {
+function ThermoMechSection({ data: d }: { data: AMResultData }) {
   const peakTemps = Array.isArray(d.layer_peak_temp_k) ? d.layer_peak_temp_k : []
   const meltDepths = Array.isArray(d.melt_pool_depth_mm) ? d.melt_pool_depth_mm : []
   const meltWidths = Array.isArray(d.melt_pool_width_mm) ? d.melt_pool_width_mm : []
@@ -425,7 +441,7 @@ function ThermoMechSection({ data: d }) {
 // Temperature sparkline with T_melt reference line
 // ---------------------------------------------------------------------------
 
-function TempSparkline({ values, T_melt, width = 280, height = 60 }) {
+function TempSparkline({ values, T_melt, width = 280, height = 60 }: { values: number[]; T_melt: number; width?: number; height?: number }) {
   if (!values || values.length === 0) return null
   const max = Math.max(...values, T_melt * 1.05)
   const min = 250   // K floor
@@ -457,7 +473,7 @@ function TempSparkline({ values, T_melt, width = 280, height = 60 }) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function StatCard({ icon, label, value, sub, color }) {
+function StatCard({ icon, label, value, sub, color }: { icon: ReactNode; label: string; value: ReactNode; sub?: ReactNode; color?: string }) {
   return (
     <div style={styles.statCard}>
       <div style={{ ...styles.statIcon, color }}>{icon}</div>
@@ -472,7 +488,7 @@ function StatCard({ icon, label, value, sub, color }) {
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   root: {
     fontFamily: 'system-ui, sans-serif',
     fontSize: 13,

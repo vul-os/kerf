@@ -6492,6 +6492,24 @@ this repo as transitive tscircuit dependencies. Both carry
     `point_on_ellipse`, ellipse semi-major/minor/rotation, `bezier_g2`) with cascade tests.
   - **VERIFIED:** typecheck 0, strict 0, ratchet 78/78, vitest 477 files / 13,209 passed.
 
+### T-566 — Dead modules found during migration (delete or wire up)
+- **Tier:** B · **Priority:** P2 · **Status:** ⬜ not started
+- Three modules were found unreachable while typing them. All were **typed and kept** rather than
+  deleted, since removal is a behaviour change and no slice should make one. Verified independently.
+  - **`openscadParser`** (T-502) — no importer anywhere in `src/`.
+  - **`openscadToJscad`** (T-505) — likewise. Together these are the whole OpenSCAD import path,
+    reachable from nothing.
+  - **`stMonacoLanguage`** (T-505) — `registerSTLanguage`, `ST_MONARCH_TOKENS` and the rest have
+    **zero importers** outside the module's own test. Confirmed by grep across all of `src/`.
+    Worse than merely dead: `PLCView`, the one component that registers the `iec61131-st` Monaco
+    language, **reimplements the same tokenizer inline** instead of importing this module. So there
+    are two copies of the grammar and only one is live.
+- **Scope:** decide per module — delete, or wire up the intended consumer. `stMonacoLanguage` is the
+  interesting one: if `PLCView`'s inline copy is authoritative, delete the module; if the module is
+  better, have `PLCView` import it and drop the duplicate. Do not do both halves in one commit.
+- **Note:** dead code is cheap to carry but this pair is not neutral — a duplicated grammar means a
+  fix applied to one copy silently misses the other.
+
 ### T-564 — 🐛 3D PMI annotations never render (`window.__THREE__` is never assigned)
 - **Tier:** A · **Priority:** **P1** · **Status:** ⬜ not started
 - **Found by:** T-513, while migrating `Pmi3DOverlay`. Verified independently — `__THREE__` appears

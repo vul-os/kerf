@@ -1,5 +1,5 @@
 /**
- * CfdViewport.jsx — 2-D CFD results viewport.
+ * CfdViewport.tsx — 2-D CFD results viewport.
  *
  * Renders streamlines, vector-field arrows, and a pressure contour overlay
  * onto a Canvas 2D surface from postprocessed OpenFOAM data.
@@ -38,22 +38,65 @@ import {
   drawVectorArrows,
   drawPressureContour,
   buildTransform,
-  generateSeeds,
   generateInletSeeds,
   scalarToCssColor,
 } from '../lib/cfdViz.js'
 import { cellsToGrid } from '../lib/streamlineIntegrator.js'
-import { scalarToRGB } from '../lib/femDisplacement.js'
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+//
+// Both src/lib/cfdViz.js and src/lib/streamlineIntegrator.js (outside this slice
+// — not part of src/components) are untyped JS, so the CFD field shape is
+// declared locally. Every field is optional because the source branches on
+// `field.cells` truthiness rather than a real discriminant — both the grid form
+// and the flat OpenFOAM-bridge cell-list form fold into one interface here,
+// matching that loose runtime check rather than forcing a discriminated union
+// neither module actually enforces.
+
+export interface CfdCell {
+  x: number
+  y: number
+  Ux: number
+  Uy: number
+  p?: number | null
+}
+
+export interface CfdField {
+  cells?: CfdCell[]
+  x0?: number
+  y0?: number
+  dx?: number
+  dy?: number
+  nx?: number
+  ny?: number
+  u?: number[][]
+  v?: number[][]
+  p?: number[][] | null
+}
+
+export interface CfdViewportProps {
+  vectorField?: CfdField | null
+  pressureField?: CfdField | null
+  showStreamlines?: boolean
+  showArrows?: boolean
+  showPressure?: boolean
+  streamlineCount?: number
+  arrowGridStep?: number
+  pressureAlpha?: number
+  seeds?: Array<{ x: number; y: number }> | null
+  width?: number
+  height?: number
+}
 
 // ── Color-bar legend ─────────────────────────────────────────────────────────
 
-function ColorBar({ label, minVal, maxVal, fmtFn }) {
+function ColorBar({ label, minVal, maxVal, fmtFn }: { label: string; minVal: number; maxVal: number; fmtFn: (v: number) => string }) {
   const stops = 5
-  const swatches = []
+  const swatches: Array<{ t: number; v: number; color: string }> = []
   for (let i = 0; i <= stops; i++) {
     const t = i / stops
     const v = minVal + (maxVal - minVal) * t
-    swatches.push({ t, v, color: scalarToCssColor(t, 1) })
+    swatches.push({ t, v, color: scalarToCssColor(t, 1) as string })
   }
   const gradient = swatches.map(s => s.color).join(', ')
 
@@ -75,7 +118,7 @@ function ColorBar({ label, minVal, maxVal, fmtFn }) {
 
 // ── Layer legend ──────────────────────────────────────────────────────────────
 
-function LayerChip({ color, label }) {
+function LayerChip({ color, label }: { color: string; label: string }) {
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -103,20 +146,21 @@ export default function CfdViewport({
   seeds: seedsProp = null,
   width = 520,
   height = 340,
-}) {
-  const canvasRef = useRef(null)
+}: CfdViewportProps) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
   const render = useCallback(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
+    if (!ctx) return
 
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
     if (!vectorField) return
 
     // Normalise to grid form
-    const field = vectorField.cells ? cellsToGrid(vectorField.cells) : vectorField
+    const field = vectorField.cells ? (cellsToGrid(vectorField.cells) as CfdField) : vectorField
 
     // Build transform once and share across layers
     const transform = buildTransform(field, canvas.width, canvas.height)
@@ -124,23 +168,28 @@ export default function CfdViewport({
     // Layer 1: Pressure contour
     if (showPressure) {
       const pField = pressureField
-        ? (pressureField.cells ? { ...cellsToGrid(pressureField.cells), p: null } : pressureField)
+        ? (pressureField.cells ? { ...(cellsToGrid(pressureField.cells) as CfdField), p: null } : pressureField)
         : (vectorField.cells && vectorField.cells.some(c => c.p != null)
           ? vectorField
           : field)
-      drawPressureContour(ctx, pField, {
+      // cfdViz.js's drawPressureContour reads opts.transform via property access rather than
+      // destructuring, so TS's parameter-shape inference (from the destructured subset) omits
+      // it; assigning to a variable first avoids the excess-property check an inline object
+      // literal would trigger.
+      const pressureOpts = {
         alpha: pressureAlpha,
         transform,
         canvasW: canvas.width,
         canvasH: canvas.height,
-      })
+      }
+      drawPressureContour(ctx, pField, pressureOpts)
     }
 
     // Layer 2: Streamlines
     if (showStreamlines) {
-      const seeds = seedsProp ?? generateInletSeeds(field, streamlineCount)
+      const seeds = seedsProp ?? (generateInletSeeds(field, streamlineCount) as Array<{ x: number; y: number }>)
       drawStreamlines(ctx, field, seeds, {
-        traceOpts: { max_steps: 2000, dt: field.dx * 0.5 },
+        traceOpts: { max_steps: 2000, dt: (field.dx ?? 1) * 0.5 },
         color: 'rgba(100,200,255,0.7)',
         lineWidth: 1.2,
         transform,
@@ -151,14 +200,16 @@ export default function CfdViewport({
 
     // Layer 3: Vector arrows
     if (showArrows) {
-      drawVectorArrows(ctx, field, {
+      // Same TS excess-property-check workaround as drawPressureContour above.
+      const arrowOpts = {
         gridStep: arrowGridStep,
         color: 'rgba(255,220,80,0.9)',
         lineWidth: 1,
         transform,
         canvasW: canvas.width,
         canvasH: canvas.height,
-      })
+      }
+      drawVectorArrows(ctx, field, arrowOpts)
     }
   }, [
     vectorField, pressureField,
@@ -175,7 +226,7 @@ export default function CfdViewport({
   let pMin = 0
   let pMax = 1
   if (vectorField) {
-    const field = vectorField.cells ? cellsToGrid(vectorField.cells) : vectorField
+    const field = vectorField.cells ? (cellsToGrid(vectorField.cells) as CfdField) : vectorField
     if (field.p) {
       for (const row of field.p) {
         for (const pv of row) {

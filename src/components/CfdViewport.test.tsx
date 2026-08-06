@@ -1,5 +1,5 @@
 /**
- * CfdViewport.test.jsx
+ * CfdViewport.test.tsx
  *
  * Uses react-dom/server renderToStaticMarkup (same pattern as Loader.test.jsx)
  * since @testing-library/react is not installed.  All useEffect/useRef hooks
@@ -9,10 +9,11 @@
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import CfdViewport from './CfdViewport.jsx'
+import type { CfdField } from './CfdViewport.jsx'
 
 // ── Minimal field fixtures ────────────────────────────────────────────────────
 
-function makeField({ nx = 5, ny = 5 } = {}) {
+function makeField({ nx = 5, ny = 5 }: { nx?: number; ny?: number } = {}): CfdField {
   const u = Array.from({ length: ny }, () => Array(nx).fill(1))
   const v = Array.from({ length: ny }, () => Array(nx).fill(0))
   const p = Array.from({ length: ny }, (_, row) =>
@@ -21,11 +22,11 @@ function makeField({ nx = 5, ny = 5 } = {}) {
   return { x0: 0, y0: 0, dx: 1, dy: 1, nx, ny, u, v, p }
 }
 
-function makeCellsField({ nx = 4, ny = 4 } = {}) {
-  const cells = []
+function makeCellsField({ nx = 4, ny = 4 }: { nx?: number; ny?: number } = {}): CfdField {
+  const cells: CfdField['cells'] = []
   for (let row = 0; row < ny; row++)
     for (let col = 0; col < nx; col++)
-      cells.push({ x: col, y: row, Ux: 1, Uy: 0, p: col + row })
+      cells!.push({ x: col, y: row, Ux: 1, Uy: 0, p: col + row })
   return { cells }
 }
 

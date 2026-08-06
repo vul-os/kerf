@@ -11,7 +11,11 @@
  *
  * viewBox 320×200. Three panels: 10..104, 110..204, 210..312.
  */
-export default function CircuitIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function CircuitIllustration({ className = '' }: Props) {
   return (
     <svg
       viewBox="0 0 320 200"
@@ -194,11 +198,11 @@ function Pcb() {
   const boardEdge = '#7BB661'
 
   // pad dims: 6 wide × 4 tall, centred on the listed coordinates
-  const pad = (cx, cy) => (
+  const pad = (cx: number, cy: number) => (
     <rect x={cx - 3} y={cy - 2} width="6" height="4" rx="0.5" fill={copper} />
   )
   // body: 14 × 6 centred
-  const body = (cx, cy) => (
+  const body = (cx: number, cy: number) => (
     <rect
       x={cx - 7}
       y={cy - 3}
@@ -443,12 +447,21 @@ function Board3D() {
   )
 }
 
-function Component3D({ topQuad, height, color, label, labelPos, dome }) {
+interface Component3DProps {
+  topQuad: string
+  height: number
+  color: string
+  label: string
+  labelPos: [number, number]
+  dome?: boolean
+}
+
+function Component3D({ topQuad, height, color, label, labelPos, dome }: Component3DProps) {
   // topQuad expects 4 "x,y" points: TL, TR, BR, BL (in same iso convention as board)
   const pts = topQuad.split(' ').map((p) => p.split(',').map(Number))
   const [TL, TR, BR, BL] = pts
   // bottom quad simply shifts every point down by `height` along screen-y
-  const offset = (p) => `${p[0]},${p[1] + height}`
+  const offset = (p: number[]) => `${p[0]},${p[1] + height}`
   const BLb = [BL[0], BL[1] + height]
   const BRb = [BR[0], BR[1] + height]
 

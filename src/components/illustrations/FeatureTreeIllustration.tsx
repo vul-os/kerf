@@ -7,8 +7,23 @@
  * Every row's right-side text terminates at x=292, leaving 20px of slack to
  * the panel border. Five rows at 30px pitch (y=46,76,106,136,166).
  */
-export default function FeatureTreeIllustration({ className = '' }) {
-  const rows = [
+export interface Props {
+  className?: string
+}
+
+type FeatureKind = 'pad' | 'pocket' | 'fillet' | 'shell' | 'hole'
+
+interface Row {
+  y: number
+  icon: FeatureKind
+  label: string
+  sub: string
+  active?: boolean
+  muted?: boolean
+}
+
+export default function FeatureTreeIllustration({ className = '' }: Props) {
+  const rows: Row[] = [
     { y: 46,  icon: 'pad',    label: 'Pad',    sub: '20 mm',         active: true },
     { y: 76,  icon: 'pocket', label: 'Pocket', sub: '8 mm · ø6'      },
     { y: 106, icon: 'fillet', label: 'Fillet', sub: '2 mm · 4 edges' },
@@ -102,7 +117,13 @@ export default function FeatureTreeIllustration({ className = '' }) {
   )
 }
 
-function RowStatus({ y, active, muted }) {
+interface RowStatusProps {
+  y: number
+  active?: boolean
+  muted?: boolean
+}
+
+function RowStatus({ y, active, muted }: RowStatusProps) {
   if (muted) {
     return (
       <text
@@ -161,7 +182,15 @@ function RowStatus({ y, active, muted }) {
   )
 }
 
-function FeatureGlyph({ kind, x, y, muted, active }) {
+interface FeatureGlyphProps {
+  kind: FeatureKind
+  x: number
+  y: number
+  muted?: boolean
+  active?: boolean
+}
+
+function FeatureGlyph({ kind, x, y, muted, active }: FeatureGlyphProps) {
   const stroke = muted ? '#3a4150' : active ? '#ffd633' : '#8a93a6'
   const sw = 1.2
   if (kind === 'pad') {

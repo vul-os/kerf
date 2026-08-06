@@ -9,7 +9,11 @@
  * pane, a real chat exchange in the right pane, and a file tree on the
  * left to anchor the layout.
  */
-export default function HeroIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function HeroIllustration({ className = '' }: Props) {
   return (
     <svg
       viewBox="0 0 720 460"

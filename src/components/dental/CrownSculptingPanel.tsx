@@ -5,7 +5,7 @@
  * occlusion-contact SVG overlay, and Run button that dispatches
  * `dental_crown_design` via POST /api/tools/call.
  *
- * Backend tool: packages/kerf-dental/src/kerf_dental/tools.py → dental_crown_design
+ * Backend tool: packages/kerf-dental/src/kerf_dental/tools.py -> dental_crown_design
  */
 
 import { useState } from 'react'
@@ -14,10 +14,20 @@ import { buildCrownDesignPayload } from './dentalDispatch.js'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
+interface ToothPreset {
+  label: string
+  n_cusps: number
+  cusp_depth_fraction: number
+  margin_line: number[][]
+  opposing_cusp_heights_mm: number[]
+  occlusal_clearance_mm: number
+  description: string
+}
+
 // ---------------------------------------------------------------------------
 // Anatomic presets — margin polygon + opposing cusp heights for each tooth type
 // ---------------------------------------------------------------------------
-const PRESETS = {
+const PRESETS: Record<string, ToothPreset> = {
   incisor: {
     label: 'Incisor',
     n_cusps: 2,
@@ -70,7 +80,11 @@ const MATERIALS = ['zirconia', 'PMMA', 'e.max', 'composite', 'gold alloy']
 // Occlusion contact SVG overlay
 // A simplified 2-D occlusal view: crown outline + cusp contact dots.
 // ---------------------------------------------------------------------------
-function OcclusionOverlay({ preset, nCusps, cuspDepth }) {
+function OcclusionOverlay({ preset, nCusps, cuspDepth }: {
+  preset: ToothPreset | null
+  nCusps: number
+  cuspDepth: number
+}) {
   if (!preset) return null
 
   const W = 200
@@ -85,7 +99,7 @@ function OcclusionOverlay({ preset, nCusps, cuspDepth }) {
   const minY = Math.min(...ys)
   const rangeX = Math.max(...xs) - minX || 1
   const rangeY = Math.max(...ys) - minY || 1
-  const toSvg = (x, y) => [
+  const toSvg = (x: number, y: number): [number, number] => [
     PAD + ((x - minX) / rangeX) * (W - 2 * PAD),
     PAD + ((y - minY) / rangeY) * (H - 2 * PAD),
   ]
@@ -96,7 +110,7 @@ function OcclusionOverlay({ preset, nCusps, cuspDepth }) {
   const cx = PAD + (W - 2 * PAD) / 2
   const cy = PAD + (H - 2 * PAD) / 2
   const cuspRadius = Math.max(3, cuspDepth * 20)
-  const cuspDots = []
+  const cuspDots: Array<[number, number]> = []
   if (nCusps === 2) {
     cuspDots.push([cx - (W - 2 * PAD) * 0.25, cy])
     cuspDots.push([cx + (W - 2 * PAD) * 0.25, cy])
@@ -158,10 +172,23 @@ function OcclusionOverlay({ preset, nCusps, cuspDepth }) {
   )
 }
 
+/** Response shape from dental_crown_design, mined from fields this panel reads. */
+interface CrownDesignResult {
+  crown_radius_mm?: number
+  crown_height_mm?: number
+  material?: string
+  n_cusps?: number
+  validate_body_ok?: boolean
+}
+
+export interface Props {
+  projectId?: string | null
+}
+
 // ---------------------------------------------------------------------------
 // Main panel
 // ---------------------------------------------------------------------------
-export default function CrownSculptingPanel({ projectId }) {
+export default function CrownSculptingPanel(_props: Props) {
   const { accessToken } = useAuth()
   const [presetKey, setPresetKey] = useState('molar')
   const [material, setMaterial] = useState('zirconia')
@@ -169,12 +196,12 @@ export default function CrownSculptingPanel({ projectId }) {
   const [clearance, setClearance] = useState(PRESETS.molar.occlusal_clearance_mm)
   const [nCusps, setNCusps] = useState(PRESETS.molar.n_cusps)
   const [running, setRunning] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<CrownDesignResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const preset = PRESETS[presetKey]
 
-  function handlePresetChange(key) {
+  function handlePresetChange(key: string) {
     const p = PRESETS[key]
     setPresetKey(key)
     setCuspDepth(p.cusp_depth_fraction)
@@ -212,7 +239,7 @@ export default function CrownSculptingPanel({ projectId }) {
         setResult(data)
       }
     } catch (err) {
-      setError(err?.message || String(err))
+      setError((err as { message?: string } | undefined)?.message || String(err))
     } finally {
       setRunning(false)
     }

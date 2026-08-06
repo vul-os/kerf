@@ -21,16 +21,16 @@ const MARGIN_TYPES = ['chamfer', 'shoulder', 'feather', 'knife']
 const MATERIALS = ['zirconia', 'lithium_disilicate', 'metal_ceramic', 'pmma']
 
 // Material min wall thicknesses per clinical guidelines
-const MATERIAL_MIN_WALL = {
+const MATERIAL_MIN_WALL: Record<string, { mm: number; ref: string }> = {
   zirconia: { mm: 0.5, ref: 'Guess 2010 IJPRD' },
   lithium_disilicate: { mm: 0.8, ref: 'IPS e.max clinical guide' },
   metal_ceramic: { mm: 0.3, ref: 'Shillingburg 4e' },
   pmma: { mm: 1.5, ref: 'interim crown standard' },
 }
 
-// Default margin polygon for a molar (16-point ellipse ~10 × 10 mm)
-function makeEllipseMargin(mdMm = 10, blMm = 10, n = 16) {
-  const pts = []
+// Default margin polygon for a molar (16-point ellipse ~10 x 10 mm)
+function makeEllipseMargin(mdMm = 10, blMm = 10, n = 16): number[][] {
+  const pts: number[][] = []
   for (let i = 0; i < n; i++) {
     const a = (2 * Math.PI * i) / n
     pts.push([Math.cos(a) * mdMm / 2, Math.sin(a) * blMm / 2, 0])
@@ -38,8 +38,17 @@ function makeEllipseMargin(mdMm = 10, blMm = 10, n = 16) {
   return pts
 }
 
-// FDI tooth presets by universal number → FDI label
-const TOOTH_PRESETS = [
+interface ToothPreset {
+  label: string
+  universal: number
+  fdi: string
+  type: string
+  md: number
+  bl: number
+}
+
+// FDI tooth presets by universal number -> FDI label
+const TOOTH_PRESETS: ToothPreset[] = [
   { label: 'UR1 (11)', universal: 8, fdi: '11', type: 'incisor', md: 8, bl: 7 },
   { label: 'UR3 (13)', universal: 6, fdi: '13', type: 'canine', md: 7, bl: 8 },
   { label: 'UR4 (14)', universal: 5, fdi: '14', type: 'premolar', md: 7, bl: 9 },
@@ -48,12 +57,29 @@ const TOOTH_PRESETS = [
   { label: 'LR4 (44)', universal: 28, fdi: '44', type: 'premolar', md: 7, bl: 8 },
 ]
 
-export default function CrownBridgePanel({ projectId, content }) {
+/** Response shape from dental_crown_bridge_design, mined from fields this panel reads. */
+interface CrownBridgeResult {
+  is_bridge?: boolean
+  tooth?: string | number
+  tooth_type?: string
+  wall_thickness_min_mm?: number
+  margin_fit_um?: number
+  outer_vertices?: number
+  outer_triangles?: number
+  honest_caveat?: string
+}
+
+export interface Props {
+  projectId?: string | null
+  content?: string | null
+}
+
+export default function CrownBridgePanel({ content }: Props) {
   const { accessToken } = useAuth()
   // Parse content string (from panelRegistry) to seed defaults
   const _defaults = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
 
-  const [toothPreset, setToothPreset] = useState(TOOTH_PRESETS[4]) // LL6 molar default
+  const [toothPreset, setToothPreset] = useState<ToothPreset>(TOOTH_PRESETS[4]) // LL6 molar default
   const [marginType, setMarginType]   = useState('chamfer')
   const [marginWidth, setMarginWidth] = useState(0.8)
   const [material, setMaterial]       = useState('zirconia')
@@ -62,10 +88,12 @@ export default function CrownBridgePanel({ projectId, content }) {
   const [isBridge, setIsBridge]       = useState(false)
   const [ponticCount, setPonticCount] = useState(1)
   const [running, setRunning]         = useState(false)
-  const [result, setResult]           = useState(null)
-  const [error, setError]             = useState(null)
+  const [result, setResult]           = useState<CrownBridgeResult | null>(null)
+  const [error, setError]             = useState<string | null>(null)
 
-  const cementGapMm = cementGapUm / 1000
+  // Computed but never read anywhere below — dead code inherited from the .jsx original
+  // (found during T-512 migration, not fixed per migration convention; flagged for cleanup).
+  const _cementGapMm = cementGapUm / 1000
   const iso4049Compliant = cementGapUm >= 20 && cementGapUm <= 80
   const minWallInfo = MATERIAL_MIN_WALL[material] || MATERIAL_MIN_WALL.zirconia
 
@@ -101,7 +129,7 @@ export default function CrownBridgePanel({ projectId, content }) {
       if (!res.ok) setError(data?.error || `HTTP ${res.status}`)
       else setResult(data)
     } catch (err) {
-      setError(err?.message || String(err))
+      setError((err as { message?: string } | undefined)?.message || String(err))
     } finally {
       setRunning(false)
     }

@@ -55,7 +55,8 @@ describe('equations parse + evaluate', () => {
         { name: 'd', expr: 'b+1' }, // still resolves against a,b
       ],
     }))
-    const { values, errors } = evaluateEquations(doc)
+    // evaluateEquations is untyped JS — values is a dynamic name->number map.
+    const { values, errors } = evaluateEquations(doc) as { values: Record<string, number>; errors: { name: string }[] }
     expect(values.a).toBe(3)
     expect(values.b).toBe(12)
     expect(values.d).toBe(13)
@@ -173,7 +174,7 @@ describe('equations tree + sketch + merge helpers', () => {
       { path: 'a.equations', content: JSON.stringify({ params: [{ name: 'x', expr: '1' }] }) },
       { path: 'b.equations', content: JSON.stringify({ params: [{ name: 'x', expr: '2' }] }) },
     ]
-    const merged = mergeEquationFiles(files)
+    const merged = mergeEquationFiles(files) as { values: Record<string, number>; duplicates: { name: string; files: string[] }[] }
     expect(merged.values.x).toBe(2)
     expect(merged.duplicates).toHaveLength(1)
     expect(merged.duplicates[0].name).toBe('x')

@@ -10,11 +10,12 @@
 //   • dependentsOfSketch  — 0/1/N matches, multi-hop, self-referencing cycles
 
 import { describe, it, expect, vi } from 'vitest'
+import type { ApiFile } from '../types/api.js'
 
 // ---- Mock heavy deps that depGraph.js pulls in transitively ----------------
 
 vi.mock('../lib/jscadRunner.js', async (importOriginal) => {
-  const real = await importOriginal()
+  const real = (await importOriginal()) as object
   return { ...real }
 })
 
@@ -40,10 +41,10 @@ import { buildSketchImports, buildAssemblyDeps, dependentsOfSketch } from '../li
 // Fixtures
 // ---------------------------------------------------------------------------
 
-function makeJscad(id, name, content, parentId = null) {
+function makeJscad(id, name, content, parentId = null): ApiFile {
   return { id, name, kind: 'file', parent_id: parentId, content }
 }
-function makeAssembly(id, name, components = [], parentId = null) {
+function makeAssembly(id, name, components = [], parentId = null): ApiFile {
   return {
     id,
     name,
@@ -52,10 +53,10 @@ function makeAssembly(id, name, components = [], parentId = null) {
     content: JSON.stringify({ components }),
   }
 }
-function makeSketch(id, name, parentId = null) {
+function makeSketch(id, name, parentId = null): ApiFile {
   return { id, name, kind: 'sketch', parent_id: parentId, content: '{}' }
 }
-function makeFolder(id, name, parentId = null) {
+function makeFolder(id, name, parentId = null): ApiFile {
   return { id, name, kind: 'folder', parent_id: parentId }
 }
 function comp(id, fileId, objectId = 'body') {
@@ -85,7 +86,7 @@ describe('buildSketchImports', () => {
   })
 
   it('skips jscad files with no content', () => {
-    const files = [{ id: 'j1', name: 'b.jscad', kind: 'file', parent_id: null }]
+    const files: ApiFile[] = [{ id: 'j1', name: 'b.jscad', kind: 'file', parent_id: null }]
     expect(buildSketchImports(files)).toEqual(new Map())
   })
 
@@ -164,7 +165,7 @@ describe('buildAssemblyDeps', () => {
   })
 
   it('returns empty map when assembly has no content', () => {
-    const files = [{ id: 'asm1', name: 'top.assembly', kind: 'assembly', parent_id: null }]
+    const files: ApiFile[] = [{ id: 'asm1', name: 'top.assembly', kind: 'assembly', parent_id: null }]
     expect(buildAssemblyDeps(files)).toEqual(new Map())
   })
 

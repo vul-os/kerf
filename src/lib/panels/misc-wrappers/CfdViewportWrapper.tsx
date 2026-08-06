@@ -4,8 +4,9 @@
 //   { vectorField?, pressureField?, showStreamlines?, showArrows?, showPressure?,
 //     streamlineCount?, arrowGridStep?, pressureAlpha?, seeds?, width?, height? }
 import Panel from '../../../components/CfdViewport.jsx'
+import type { CfdViewportProps } from '../../../components/CfdViewport.jsx'
 
-const DEFAULTS = {
+const DEFAULTS: CfdViewportProps = {
   vectorField: null,
   pressureField: null,
   showStreamlines: true,
@@ -19,12 +20,16 @@ const DEFAULTS = {
   height: 340,
 }
 
-function parseContent(content) {
+export interface Props {
+  content?: string
+}
+
+function parseContent(content: string | undefined): Partial<CfdViewportProps> {
   if (!content || typeof content !== 'string') return {}
   try { return JSON.parse(content) || {} } catch { return {} }
 }
 
-export default function CfdViewportWrapper({ content }) {
+export default function CfdViewportWrapper({ content }: Props) {
   const props = { ...DEFAULTS, ...parseContent(content) }
   return <Panel {...props} />
 }

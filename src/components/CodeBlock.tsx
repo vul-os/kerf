@@ -37,13 +37,13 @@ hljs.registerLanguage('md', markdown)
  * Highlight a source string for a given language.
  * Returns the highlighted HTML string, or falls back to escaped plain text.
  */
-function highlight(language, source) {
+function highlight(language: string | undefined, source: string): string {
   if (!source) return ''
   try {
     if (language && hljs.getLanguage(language)) {
       return hljs.highlight(source, { language }).value
     }
-  } catch (_) {
+  } catch {
     // fall through
   }
   // Plain text fallback — escape HTML entities.
@@ -57,7 +57,12 @@ function highlight(language, source) {
  * Block code component with syntax highlighting.
  * Usage: <CodeBlock language="python">{code}</CodeBlock>
  */
-export default function CodeBlock({ language, children }) {
+interface CodeBlockProps {
+  language?: string
+  children?: React.ReactNode
+}
+
+export default function CodeBlock({ language, children }: CodeBlockProps) {
   const source = typeof children === 'string' ? children : String(children ?? '')
   const html = highlight(language, source)
 
@@ -75,7 +80,12 @@ export default function CodeBlock({ language, children }) {
  * Inline code pill.
  * Usage: <InlineCode>identifier</InlineCode>
  */
-export function InlineCode({ children, className }) {
+interface InlineCodeProps {
+  children?: React.ReactNode
+  className?: string
+}
+
+export function InlineCode({ children, className }: InlineCodeProps) {
   return (
     <code className={`font-mono text-[0.875em] bg-ink-900 text-ink-100 border border-ink-800 rounded px-1 py-0.5${className ? ` ${className}` : ''}`}>
       {children}

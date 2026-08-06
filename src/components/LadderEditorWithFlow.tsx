@@ -39,6 +39,7 @@
 //   the diagram shows a zeroed/blank energy state.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ComponentType } from 'react'
 import { api } from '../lib/api.js'
 import { buildPowerFlow, emptyPowerFlow } from '../lib/ladderFlowState.js'
 
@@ -46,6 +47,58 @@ import { buildPowerFlow, emptyPowerFlow } from '../lib/ladderFlowState.js'
 // a PLC ladder file is actually open — mirrors the circuit/jscad runner pattern.
 import LadderEditor from './LadderEditor.jsx'
 import LadderPowerFlowOverlay from './LadderPowerFlowOverlay.jsx'
+
+// T-514 bugs (reported, not fixed — no behaviour changes):
+//   * LadderEditor's actual props are { value, onChange, programName,
+//     className } (see LadderEditor.jsx) — this file passes
+//     projectId/fileId/network/onContentChange/viewRef, none of which match,
+//     so the inner editor never receives the network or reports content
+//     changes upward.
+//   * LadderPowerFlowOverlayProps is { rung, powerFlow, strokeWidth,
+//     opacity } — this file passes `network` and `playing` (neither
+//     accepted; likely meant `rung`), and its `powerFlow` is
+//     ladderFlowState's { rungs, variables, tick } shape, not the overlay's
+//     { contactsLit, coilsLit, wiresLit } shape. The overlay has therefore
+//     always rendered blank.
+// Cast to a permissive component type so the existing (broken) calls below
+// keep compiling unchanged rather than being silently "fixed" by the types.
+const UntypedLadderEditor = LadderEditor as unknown as ComponentType<Record<string, unknown>>
+const UntypedLadderPowerFlowOverlay = LadderPowerFlowOverlay as unknown as ComponentType<Record<string, unknown>>
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+//
+// LadderEditor.jsx and LadderPowerFlowOverlay.jsx/tsx are not typed against
+// this shape (see bugs noted below) — these are declared locally from this
+// file's own header-comment doc, matching ladderFlowState.ts's rung-structure
+// doc comment.
+
+interface RungContact {
+  name?: string
+  nc?: boolean
+}
+
+interface RungCoil {
+  name?: string
+}
+
+export interface Rung {
+  id: string
+  contacts?: RungContact[]
+  coils?: RungCoil[]
+}
+
+export interface LadderEditorWithFlowProps {
+  projectId?: string
+  fileId?: string
+  network?: Rung[]
+  playing?: boolean
+  simSessionId?: string | null
+  onContentChange?: (content: unknown) => void
+  className?: string
+  viewRef?: unknown
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -66,9 +119,9 @@ export default function LadderEditorWithFlow({
   onContentChange,
   className = '',
   viewRef,
-}) {
+}: LadderEditorWithFlowProps) {
   const [powerFlow, setPowerFlow] = useState(() => emptyPowerFlow(network))
-  const [pollError, setPollError] = useState(null)
+  const [pollError, setPollError] = useState<string | null>(null)
 
   // Keep a stable ref to the current network so the poll callback can read
   // it without being re-created on every render.
@@ -85,6 +138,10 @@ export default function LadderEditorWithFlow({
 
   // Also reset power flow when network changes (rung added/removed).
   useEffect(() => {
+    // Resets the overlay to a blank skeleton for the new rung set,
+    // pre-existing before this migration (see TopoView.tsx for the same
+    // pattern).
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see above.
     setPowerFlow(emptyPowerFlow(network))
   }, [network])
 
@@ -93,18 +150,25 @@ export default function LadderEditorWithFlow({
   const stepSim = useCallback(async () => {
     if (!projectId || !simSessionId) return
     try {
+      // @ts-expect-error T-514 bug: the api client (src/lib/api.ts) has no
+      // plcSimStep method — this call below has always thrown at runtime,
+      // caught below and surfaced as pollError. Reported, not fixed, per
+      // T-514 scope (no behaviour changes).
       const result = await api.plcSimStep(projectId, simSessionId)
       setPollError(result?.error || null)
       setPowerFlow(buildPowerFlow(result, networkRef.current))
     } catch (err) {
-      setPollError(err?.message || 'sim poll error')
+      setPollError((err as { message?: string } | undefined)?.message || 'sim poll error')
       // Keep existing powerFlow — don't wipe the overlay on transient errors.
     }
   }, [projectId, simSessionId])
 
   useEffect(() => {
     if (!playing) return
-    // Fire the first step immediately so there's no visual delay.
+    // Fire the first step immediately so there's no visual delay. stepSim
+    // eventually calls setState after its own await; kicking off the first
+    // poll synchronously here is pre-existing before this migration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see above.
     stepSim()
     const timer = setInterval(stepSim, POLL_INTERVAL_MS)
     return () => clearInterval(timer)
@@ -126,7 +190,7 @@ export default function LadderEditorWithFlow({
 
       {/* Main ladder editor canvas */}
       <div className="flex-1 min-h-0 relative">
-        <LadderEditor
+        <UntypedLadderEditor
           projectId={projectId}
           fileId={fileId}
           network={network}
@@ -137,7 +201,7 @@ export default function LadderEditorWithFlow({
         {/* Power-flow overlay sits on top, pointer-events-none so clicks fall
             through to the editor beneath. */}
         <div className="absolute inset-0 pointer-events-none">
-          <LadderPowerFlowOverlay
+          <UntypedLadderPowerFlowOverlay
             powerFlow={powerFlow}
             network={network}
             playing={playing}

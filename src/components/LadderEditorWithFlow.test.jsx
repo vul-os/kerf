@@ -47,7 +47,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // ---------------------------------------------------------------------------
 
 const src = readFileSync(
-  path.resolve(__dirname, './LadderEditorWithFlow.jsx'),
+  path.resolve(__dirname, './LadderEditorWithFlow.tsx'),
   'utf8',
 )
 

@@ -4,7 +4,12 @@
 // at render time; ANSI sizes are inch-derived but converted to mm so the rest
 // of the pipeline stays in a single unit.
 
-export const SHEET_SIZES = {
+export interface SheetSize {
+  w: number
+  h: number
+}
+
+export const SHEET_SIZES: Record<string, SheetSize> = {
   // ISO 216
   A4: { w: 297,  h: 210 },
   A3: { w: 420,  h: 297 },
@@ -20,7 +25,7 @@ export const SHEET_SIZES = {
 
 // Resolve the actual width/height in mm for a sheet given its size + orientation.
 // Unknown sizes fall back to A3.
-export function sheetDimensions(size, orientation) {
+export function sheetDimensions(size: string, orientation?: string): SheetSize {
   const base = SHEET_SIZES[size] || SHEET_SIZES.A3
   if (orientation === 'portrait') return { w: base.h, h: base.w }
   return { w: base.w, h: base.h }
@@ -39,8 +44,28 @@ export function sheetDimensions(size, orientation) {
 
 export const TEMPLATES = ['default', 'iso', 'ansi', 'kerf']
 
+export interface TitleBlockCell {
+  x: number
+  y: number
+  w: number
+  h: number
+  label: string
+  key: string
+  /** Set on the 'kerf' template's brand-mark cell; unset elsewhere. */
+  brand?: boolean
+}
+
+export interface TitleBlockLayout {
+  x: number
+  y: number
+  w: number
+  h: number
+  cells: TitleBlockCell[]
+  template: string
+}
+
 // Public: resolve a template by name; falls back to 'default'.
-export function titleBlockLayout(size, orientation, template = 'default') {
+export function titleBlockLayout(size: string, orientation?: string, template = 'default'): TitleBlockLayout {
   switch (template) {
     case 'iso':  return isoLayout(size, orientation)
     case 'ansi': return ansiLayout(size, orientation)
@@ -51,7 +76,7 @@ export function titleBlockLayout(size, orientation, template = 'default') {
 
 // Original 6-cell layout — kept as the default so existing drawings render
 // identically.
-function defaultLayout(size, orientation) {
+function defaultLayout(size: string, orientation?: string): TitleBlockLayout {
   const { w, h } = sheetDimensions(size, orientation)
   const isSmall = size === 'A4' || size === 'ANSI_A'
   const blockW = isSmall ? 130 : 180
@@ -77,7 +102,7 @@ function defaultLayout(size, orientation) {
 }
 
 // ISO-style title block (4-row, project info + tolerances panel).
-function isoLayout(size, orientation) {
+function isoLayout(size: string, orientation?: string): TitleBlockLayout {
   const { w, h } = sheetDimensions(size, orientation)
   const isSmall = size === 'A4'
   const blockW = isSmall ? 150 : 195
@@ -104,7 +129,7 @@ function isoLayout(size, orientation) {
 }
 
 // ANSI-style title block (taller, more cells).
-function ansiLayout(size, orientation) {
+function ansiLayout(size: string, orientation?: string): TitleBlockLayout {
   const { w, h } = sheetDimensions(size, orientation)
   const blockW = 200
   const blockH = 50
@@ -129,7 +154,7 @@ function ansiLayout(size, orientation) {
 
 // Kerf-branded compact layout: a single-row strip with the project, title,
 // scale, sheet — designed to leave most of the sheet free for drawing.
-function kerfLayout(size, orientation) {
+function kerfLayout(size: string, orientation?: string): TitleBlockLayout {
   const { w, h } = sheetDimensions(size, orientation)
   const isSmall = size === 'A4' || size === 'ANSI_A'
   const blockW = isSmall ? 160 : 220
@@ -159,7 +184,20 @@ function kerfLayout(size, orientation) {
 // scale. The bar is `bars` segments wide; each segment represents
 // `unitMm` model millimetres. Caller renders alternating black/white tiles
 // plus tick labels.
-export function scaleBarGeometry(scale, opts = {}) {
+export interface ScaleBarOpts {
+  totalLengthMm?: number
+}
+
+export interface ScaleBarGeometry {
+  bars: number
+  /** model mm per tile. */
+  unit: number
+  tile: number
+  totalPagemm: number
+  label: string
+}
+
+export function scaleBarGeometry(scale: number, opts: ScaleBarOpts = {}): ScaleBarGeometry {
   // `scale` is model-units per page-mm. We pick a "unit" that is a power-of-10
   // divisor so the bar shows nice numbers.
   const targetTotalPagemm = opts.totalLengthMm || 50
@@ -179,7 +217,7 @@ export function scaleBarGeometry(scale, opts = {}) {
   }
 }
 
-function formatRatio(scale) {
+function formatRatio(scale: number): string {
   if (!Number.isFinite(scale) || scale <= 0) return '1:1'
   if (scale >= 1) {
     const n = Math.round(scale)
@@ -190,7 +228,7 @@ function formatRatio(scale) {
 }
 
 // Parse "1:2" or "2:1" into a scale (model-units per page-mm).
-export function parseScaleString(s) {
+export function parseScaleString(s: string | null | undefined): number | null {
   const m = String(s || '').trim().match(/^(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)$/)
   if (!m) return null
   const a = Number(m[1]), b = Number(m[2])

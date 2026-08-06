@@ -31,25 +31,26 @@
  */
 
 import { useEffect, useRef } from 'react'
+import type { CSSProperties } from 'react'
 import { Zap, AlertTriangle, CheckCircle, Activity } from 'lucide-react'
 
 // ── Utilities ────────────────────────────────────────────────────────────────
 
-function fmt(v, digits = 4) {
+function fmt(v: number | null | undefined, digits = 4): string {
   if (v == null || !Number.isFinite(v)) return '—'
   if (v === 0) return '0'
   if (Math.abs(v) < 0.001 || Math.abs(v) >= 10000) return v.toExponential(3)
   return v.toPrecision(digits)
 }
 
-function fmtUnit(v, unit, digits = 4) {
+function fmtUnit(v: number | null | undefined, unit: string, digits = 4): string {
   if (v == null || !Number.isFinite(v)) return '—'
   return `${fmt(v, digits)} ${unit}`
 }
 
 // ── Colour mapping (viridis-like, blue→cyan→green→yellow) ──────────────────
 
-function scalarToRGB(t) {
+function scalarToRGB(t: number): string {
   // t in [0, 1] → viridis-inspired palette
   // r: 0.267→0.993, g: 0.005→0.906, b: 0.329→0.144
   const r = Math.round(255 * (0.267 + 0.726 * t))
@@ -60,13 +61,22 @@ function scalarToRGB(t) {
 
 // ── Colormap canvas ──────────────────────────────────────────────────────────
 
-function FieldColormap({ nodes, elements, values, label, unit }) {
-  const canvasRef = useRef(null)
+interface FieldColormapProps {
+  nodes: [number, number][]
+  elements: number[][]
+  values: number[]
+  label: string
+  unit: string
+}
+
+function FieldColormap({ nodes, elements, values, label, unit }: FieldColormapProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     if (!nodes || !elements || !values || !canvasRef.current) return
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
+    if (!ctx) return
     const W = canvas.width
     const H = canvas.height
 
@@ -157,7 +167,26 @@ function FieldColormap({ nodes, elements, values, label, unit }) {
 
 // ── Main panel ───────────────────────────────────────────────────────────────
 
-export default function EMFieldPanel(props) {
+export interface Props {
+  mode?: 'electrostatics' | 'magnetostatics'
+  ok?: boolean
+  reason?: string
+  // electrostatics
+  phi?: number[]
+  E_field?: [number, number][]
+  capacitance?: number
+  energy?: number
+  // magnetostatics
+  Az?: number[]
+  B_field?: [number, number][]
+  inductance?: number
+  force?: [number, number]
+  // mesh (for colormap)
+  nodes?: [number, number][]
+  elements?: number[][]
+}
+
+export default function EMFieldPanel(props: Props) {
   const {
     mode = 'electrostatics',
     ok,
@@ -341,7 +370,7 @@ export default function EMFieldPanel(props) {
 
 // ── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   root: {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: 12,

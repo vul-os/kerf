@@ -20,8 +20,10 @@
 // matter, the user will already have moved on by the time it returns.
 
 import * as modeling from '@jscad/modeling'
+import type { Geom3, JscadPart } from '../types/geometry.js'
+import type { JscadWorkerRequest, JscadWorkerResponse } from '../types/workers.js'
 
-function transformSource(code) {
+function transformSource(code: string): string {
   let src = code.replace(/^[ \t]*import[^\n;]*['"][^'"\n]+['"][^\n;]*;?[ \t]*$/gm, '')
   if (/export\s+default\s+/.test(src)) {
     src = src.replace(/export\s+default\s+/, 'return ')
@@ -37,19 +39,23 @@ function transformSource(code) {
 // Keep in step with normalizeParts in jscadRunner.js — colors.colorize() stamps
 // geom.color as 0..1 floats, and it must be lifted onto the part or the renderer
 // never sees it (geom3ToBufferGeometry drops it).
-function geomColorToInt(geom) {
+function geomColorToInt(geom: (Geom3 & { color?: number[] }) | null | undefined): number | undefined {
   const c = geom && geom.color
   if (!Array.isArray(c) || c.length < 3) return undefined
-  const ch = (v) => Math.max(0, Math.min(255, Math.round((Number(v) || 0) * 255)))
+  const ch = (v: number) => Math.max(0, Math.min(255, Math.round((Number(v) || 0) * 255)))
   return (ch(c[0]) << 16) | (ch(c[1]) << 8) | ch(c[2])
 }
 
-function toPart(id, geom, explicitColor) {
+function toPart(id: string, geom: Geom3, explicitColor?: number): JscadPart {
   const color = explicitColor != null ? explicitColor : geomColorToInt(geom)
   return color != null ? { id, geom, color } : { id, geom }
 }
 
-function normalizeParts(out) {
+// The user's JSCAD code can return almost any shape — a bare Geom3, a `{id, geom, color}` part, or
+// arrays of either — so this boundary is intentionally loose (`any`) rather than modeled exactly;
+// `normalizeParts` is the runtime contract that narrows it down to `JscadPart[]`.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeParts(out: any): JscadPart[] {
   if (out == null) return []
   if (Array.isArray(out)) {
     if (out.length === 0) return []
@@ -68,9 +74,15 @@ const SCOPE_KEYS = [
   'primitives', 'transforms', 'booleans', 'extrusions', 'expansions',
   'measurements', 'colors', 'utils', 'maths', 'curves', 'geometries',
   'hulls', 'text',
-]
+] as const
 
-async function runJscadInWorker(code, sketchProfiles, equationsValues) {
+type JscadRunOutcome = { parts: JscadPart[] } | { error: string }
+
+async function runJscadInWorker(
+  code: string,
+  sketchProfiles: Record<string, unknown>,
+  equationsValues: Record<string, number>,
+): Promise<JscadRunOutcome> {
   if (!code || !code.trim()) return { parts: [] }
   try {
     const body = transformSource(code)
@@ -96,19 +108,18 @@ async function runJscadInWorker(code, sketchProfiles, equationsValues) {
     // structuredClone handles plain arrays/objects fine; we don't need to do anything extra here.
     return { parts }
   } catch (err) {
-    return { error: err && err.message ? err.message : String(err) }
+    return { error: err && (err as Error).message ? (err as Error).message : String(err) }
   }
 }
 
-self.addEventListener('message', async (ev) => {
-  const msg = ev.data || {}
+self.addEventListener('message', async (ev: MessageEvent<JscadWorkerRequest>) => {
+  const msg = ev.data || ({} as JscadWorkerRequest)
   if (msg.type === 'run') {
     const { runId, code, sketchProfiles, equationsValues } = msg
     const res = await runJscadInWorker(code, sketchProfiles || {}, equationsValues || {})
-    if (res.error) {
-      self.postMessage({ type: 'error', runId, error: res.error })
-    } else {
-      self.postMessage({ type: 'result', runId, parts: res.parts })
-    }
+    const response: JscadWorkerResponse = 'error' in res
+      ? { type: 'error', runId, error: res.error }
+      : { type: 'result', runId, parts: res.parts }
+    self.postMessage(response)
   }
 })

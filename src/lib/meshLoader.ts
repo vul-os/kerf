@@ -1,4 +1,4 @@
-// meshLoader.js — load pre-tessellated .glb assets produced by the
+// meshLoader.ts — load pre-tessellated .glb assets produced by the
 // server-side STEP pre-tessellation pipeline (Performance Phase 3).
 //
 // The server runs occt-import-js once on upload and stores the result as
@@ -14,13 +14,28 @@
 // The shape of the returned `parts` array matches loadStep so the
 // rest of the workspace doesn't need to branch on which loader ran.
 
+import * as THREE from 'three'
+// GLTFLoader ships no .d.ts in this tree (plain JS under three/examples/jsm), so its imports
+// resolve as `any` under allowJs — a boundary this module doesn't own.
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { useAuth } from '../store/auth.js'
 import { api } from './api.js'
 
+/** One renderable mesh part — same shape loadStep produces, so callers don't branch on loader. */
+export interface MeshLoaderPart {
+  id: string
+  geom: THREE.BufferGeometry
+  color: number | null
+}
+
+export interface MeshLoadResult {
+  parts: MeshLoaderPart[]
+}
+
 // Lazy GLTFLoader instance — cheap to construct but no need to spin up
 // more than one.
-let loader = null
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- GLTFLoader has no type declarations
+let loader: any = null
 function getLoader() {
   if (!loader) loader = new GLTFLoader()
   return loader
@@ -29,7 +44,7 @@ function getLoader() {
 // Fetch the .glb via the auth-protected `/api/projects/.../mesh` route.
 // We bounce through the same refresh-on-401 flow the rest of the API
 // surface uses.
-async function fetchMesh(url) {
+async function fetchMesh(url: string): Promise<ArrayBuffer> {
   if (!url.startsWith('/api/')) {
     // Already absolute (CDN, etc.) — fetch directly without bearer.
     const res = await fetch(url)
@@ -38,7 +53,7 @@ async function fetchMesh(url) {
   }
   const apiBase = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
   const full = apiBase ? apiBase + url : url
-  const headers = {}
+  const headers: Record<string, string> = {}
   const token = useAuth.getState().accessToken
   if (token) headers.authorization = `Bearer ${token}`
   let res = await fetch(full, { headers })
@@ -57,7 +72,7 @@ async function fetchMesh(url) {
 
 // Lift one glTF primitive into a kerf-style part. We clone the geometry
 // so disposing one mount doesn't kill the cached source.
-function primitiveToPart(mesh, idCounter) {
+function primitiveToPart(mesh: THREE.Mesh, idCounter: number): MeshLoaderPart | null {
   const geom = mesh.geometry?.clone?.() ?? null
   if (!geom) return null
   // Ensure we have normals for lighting (the server emitter writes them
@@ -72,8 +87,8 @@ function primitiveToPart(mesh, idCounter) {
   // emitter writes pbrMetallicRoughness.baseColorFactor; three.js maps
   // that to material.color (linear). Encode as 0xRRGGBB so the renderer
   // can recolor on hover the same way it does for STEP/JSCAD parts.
-  let color = null
-  const m = mesh.material
+  let color: number | null = null
+  const m = mesh.material as THREE.Material & { color?: THREE.Color }
   if (m && m.color) {
     color = (Math.round(m.color.r * 255) << 16)
           | (Math.round(m.color.g * 255) << 8)
@@ -90,23 +105,24 @@ function primitiveToPart(mesh, idCounter) {
 // loadMeshFromURL fetches and parses a .glb produced by the server-side
 // tessellation worker, returning the parts array shape the workspace's
 // renderer already understands.
-export async function loadMeshFromURL(url) {
+export async function loadMeshFromURL(url: string | null | undefined): Promise<MeshLoadResult> {
   if (!url) return { parts: [] }
   const buf = await fetchMesh(url)
   if (!buf || !buf.byteLength) return { parts: [] }
-  const gltf = await new Promise((resolve, reject) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GLTFLoader has no type declarations
+  const gltf: any = await new Promise((resolve, reject) => {
     try {
       getLoader().parse(buf, '', resolve, reject)
     } catch (err) { reject(err) }
   })
-  const parts = []
+  const parts: MeshLoaderPart[] = []
   let i = 0
   // gltf.scene is a THREE.Group. Walk it and collect every Mesh leaf.
   // glTF lets a single "mesh" have multiple primitives; three's loader
   // unrolls those into separate Mesh nodes already.
-  gltf.scene.traverse((obj) => {
-    if (obj.isMesh) {
-      const part = primitiveToPart(obj, i++)
+  gltf.scene.traverse((obj: THREE.Object3D) => {
+    if ((obj as THREE.Mesh).isMesh) {
+      const part = primitiveToPart(obj as THREE.Mesh, i++)
       if (part) parts.push(part)
     }
   })

@@ -21,7 +21,23 @@
 //   Rev-C.Side.seg-2
 //   Pad-A.h4f7a9c12        (topo-hash fallback)
 
-import { createHash } from 'crypto'
+// @ts-expect-error — 'crypto' has no reachable type declarations in this project:
+// @types/node isn't a devDependency and tsconfig.json's `types` list (T-500's
+// toolchain surface) intentionally excludes "node" project-wide. A
+// `/// <reference types="node" />` here would resolve it, but that reference is
+// global once processed and pulls @types/node's *entire* surface into every other
+// file's program too — verified: it broke already-migrated sibling files'
+// `@ts-expect-error` suppressions and a `process` mock's declared type. `declare
+// module 'crypto'` also doesn't work as a local fix (TS treats 'crypto' as a
+// recognized-but-unresolved module name and rejects it as an "invalid
+// augmentation" rather than accepting a fresh ambient declaration). Narrowed to
+// the one call shape this file actually uses immediately below instead.
+import { createHash as _createHash } from 'crypto'
+import type { FaceDescriptor, FaceNameMap, ModifiedMap, Vec3 } from '@/types'
+
+/** The one createHash(...).update(...).digest(...) shape this file calls — see the import above. */
+type CryptoHash = { update(data: string): { digest(encoding: 'hex'): string } }
+const createHash = _createHash as unknown as (algorithm: string) => CryptoHash
 
 // ---------------------------------------------------------------------------
 // SHA-256 helper — works in both Node (crypto module) and browser
@@ -34,11 +50,8 @@ import { createHash } from 'crypto'
  * In the browser/worker build this module is only called from a helper
  * that already has the adjacency data; the worker does not call sha256
  * at render time (it's pre-computed during shape construction).
- *
- * @param {string} text
- * @returns {string} 8 hex characters
  */
-export function sha256hex8(text) {
+export function sha256hex8(text: string): string {
   try {
     // Node.js path (tests + SSR).
     return createHash('sha256').update(text).digest('hex').slice(0, 8)
@@ -60,22 +73,11 @@ export function sha256hex8(text) {
 // ---------------------------------------------------------------------------
 // Face adjacency structures (normalised, OCCT-independent)
 // ---------------------------------------------------------------------------
-
-/**
- * FaceDescriptor — the normalised per-face descriptor that the worker
- * constructs from OCCT and passes to these helpers.
- *
- * @typedef {Object} FaceDescriptor
- * @property {number}   index           - 0-based position in the TopExp_Explorer walk
- * @property {string}   surfaceKind     - 'plane'|'cylinder'|'cone'|'sphere'|'torus'|'bspline'|'unknown'
- * @property {number}   edgeCount       - total outer-loop edge count
- * @property {string[]} edgeKinds       - sorted array of edge curve types ('line'|'circle'|'ellipse'|'bspline'|'other')
- * @property {number[]} vertexValences  - sorted array of vertex valence counts (how many edges meet each vertex)
- * @property {number[]} normal          - approximate surface normal [nx, ny, nz] at the centroid
- * @property {string|null} sketchEntityId - id of the originating sketch entity, or null
- * @property {boolean}  isCap           - true when classified as a cap face by the caller
- * @property {boolean}  isTop           - true when isCap && face is on the +axis side
- */
+//
+// FaceDescriptor — the normalised per-face descriptor that the worker
+// constructs from OCCT and passes to these helpers. See @/types (geometry.ts)
+// for the shared `FaceDescriptor` shape (including the optional
+// `sharedEdgeIndices` used below).
 
 // ---------------------------------------------------------------------------
 // sortedAdjacentFaceTypes
@@ -89,17 +91,13 @@ export function sha256hex8(text) {
  * The adjacency is encoded as `sharedEdgeIndices` arrays on the faces.
  * If the data isn't available we return an empty array (the hash will
  * still be deterministic but less discriminating).
- *
- * @param {FaceDescriptor & { sharedEdgeIndices?: number[] }} face
- * @param {Array<FaceDescriptor & { sharedEdgeIndices?: number[] }>} allFaces
- * @returns {string[]} sorted
  */
-export function sortedAdjacentFaceTypes(face, allFaces) {
+export function sortedAdjacentFaceTypes(face: FaceDescriptor, allFaces: FaceDescriptor[]): string[] {
   if (!face.sharedEdgeIndices || face.sharedEdgeIndices.length === 0) {
     return []
   }
   const faceEdgeSet = new Set(face.sharedEdgeIndices)
-  const kinds = []
+  const kinds: string[] = []
   for (const other of allFaces) {
     if (other === face || other.index === face.index) continue
     if (!other.sharedEdgeIndices) continue
@@ -116,11 +114,8 @@ export function sortedAdjacentFaceTypes(face, allFaces) {
 /**
  * Return the sorted vertex-valence array for a face.
  * If `face.vertexValences` is already present we just return a sorted copy.
- *
- * @param {FaceDescriptor} face
- * @returns {number[]} sorted
  */
-export function sortedVertexValences(face) {
+export function sortedVertexValences(face: FaceDescriptor): number[] {
   return (face.vertexValences || []).slice().sort((a, b) => a - b)
 }
 
@@ -142,11 +137,9 @@ export function sortedVertexValences(face) {
  *   - sorted vertexValences
  *   - sorted neighbourSurfaceKinds (depth-1)
  *
- * @param {FaceDescriptor} face
- * @param {FaceDescriptor[]} allFaces
- * @returns {string} 'h' + 8 hex chars
+ * @returns 'h' + 8 hex chars
  */
-export function topoHash(face, allFaces) {
+export function topoHash(face: FaceDescriptor, allFaces: FaceDescriptor[]): string {
   const sig = {
     surfaceKind:      face.surfaceKind || 'unknown',
     edgeCount:        face.edgeCount   || 0,
@@ -171,12 +164,9 @@ export function topoHash(face, allFaces) {
  *   'Side.<id>'       — side face with a known sketch entity id
  *   'h<8hex>'         — topo-hash fallback for unanchored side faces
  *
- * @param {FaceDescriptor} face
- * @param {number[]}       axis         - extrusion axis vector [ax, ay, az]
- * @param {FaceDescriptor[]} allFaces
- * @returns {string}
+ * @param axis  extrusion axis vector [ax, ay, az]
  */
-export function classifyFaceForExtrude(face, axis, allFaces) {
+export function classifyFaceForExtrude(face: FaceDescriptor, axis: Vec3, allFaces: FaceDescriptor[]): string {
   const [ax, ay, az] = axis
   const axLen = Math.sqrt(ax * ax + ay * ay + az * az) || 1
   const nx = ax / axLen, ny = ay / axLen, nz = az / axLen
@@ -205,13 +195,8 @@ export function classifyFaceForExtrude(face, axis, allFaces) {
  *
  * Outer / pass-through faces (those that already existed on the input body)
  * are not renamed here — the worker preserves them from the previous mesh.
- *
- * @param {FaceDescriptor} face
- * @param {number[]}       axis
- * @param {FaceDescriptor[]} allFaces
- * @returns {string}
  */
-export function classifyFaceForPocket(face, axis, allFaces) {
+export function classifyFaceForPocket(face: FaceDescriptor, axis: Vec3, allFaces: FaceDescriptor[]): string {
   return 'Inner.' + classifyFaceForExtrude(face, axis, allFaces)
 }
 
@@ -231,14 +216,17 @@ export function classifyFaceForPocket(face, axis, allFaces) {
  * against the revolution axis.  For a revolve the axis is the rotation axis,
  * so cap faces have normals parallel to that axis (they're the planar end caps).
  *
- * @param {FaceDescriptor} face
- * @param {number[]}       axis         - revolution axis [ax, ay, az]
- * @param {boolean}        isFullCircle - true if angle_deg ≈ 360
- * @param {FaceDescriptor[]} allFaces
- * @param {number}         faceIndex    - within the caps: 0 = start, 1 = end
- * @returns {string}
+ * @param axis  revolution axis [ax, ay, az]
+ * @param isFullCircle  true if angle_deg ≈ 360
+ * @param faceIndex  within the caps: 0 = start, 1 = end
  */
-export function classifyFaceForRevolve(face, axis, isFullCircle, allFaces, faceIndex) {
+export function classifyFaceForRevolve(
+  face: FaceDescriptor,
+  axis: Vec3,
+  isFullCircle: boolean,
+  allFaces: FaceDescriptor[],
+  faceIndex: number,
+): string {
   if (!isFullCircle) {
     const [ax, ay, az] = axis
     const axLen = Math.sqrt(ax * ax + ay * ay + az * az) || 1
@@ -268,15 +256,17 @@ export function classifyFaceForRevolve(face, axis, isFullCircle, allFaces, faceI
  *
  * The full name is `<nodeId>.<role>`.
  *
- * @param {string}           nodeId
- * @param {FaceDescriptor[]} faces  - all faces of the result solid in explorer order
- * @param {number[]}         axis   - extrusion axis
- * @param {boolean}         [isPocket=false]
- * @returns {Record<string, string>}
+ * @param faces  all faces of the result solid in explorer order
+ * @param axis  extrusion axis
  */
-export function buildFaceNamesForExtrude(nodeId, faces, axis, isPocket = false) {
-  const names = {}
-  const collisionCount = {}
+export function buildFaceNamesForExtrude(
+  nodeId: string,
+  faces: FaceDescriptor[],
+  axis: Vec3,
+  isPocket = false,
+): FaceNameMap {
+  const names: Record<string, string> = {}
+  const collisionCount: Record<string, number> = {}
 
   for (const face of faces) {
     const role = isPocket
@@ -308,23 +298,11 @@ export function buildFaceNamesForExtrude(nodeId, faces, axis, isPocket = false) 
 // ---------------------------------------------------------------------------
 // T2 helpers: carryForward + nameOpOutput
 // ---------------------------------------------------------------------------
-
-/**
- * ModifiedMap — a normalised representation of OCCT's Modified / Generated /
- * IsDeleted query results for a single op.
- *
- * The worker extracts these from OCCT before calling nameOpOutput; unit tests
- * supply them as plain objects.
- *
- * @typedef {Object} ModifiedMap
- * @property {Record<number, number[]>} modified
- *   inputFaceIndex → array of outputFaceIndices that are "modified" images
- *   of the input face.  Empty array means the face was deleted.
- * @property {number[]}                 generated
- *   indices of output faces that are genuinely new (no input-face parent).
- * @property {Set<number>}              deletedInputs
- *   set of input-face indices that no longer exist in the output.
- */
+//
+// ModifiedMap — a normalised representation of OCCT's Modified / Generated /
+// IsDeleted query results for a single op. See @/types (geometry.ts) for the
+// shared `ModifiedMap` shape. The worker extracts these from OCCT before
+// calling nameOpOutput; unit tests supply them as plain objects.
 
 /**
  * Given the prior name map and a modified-map entry for a single output face,
@@ -337,21 +315,21 @@ export function buildFaceNamesForExtrude(nodeId, faces, axis, isPocket = false) 
  *   - If exactly one input maps to this output, return its prior name.
  *   - If zero or more-than-one inputs map, return null.
  *
- * @param {Record<number, string>} inputFaceNames
- *   Map of inputFaceIndex(number) → prior name string.
- * @param {number}                 outputFaceIndex
- *   Index of the output face being classified.
- * @param {ModifiedMap}            modifiedMap
- * @returns {string | null}
+ * @param inputFaceNames  Map of inputFaceIndex(number) → prior name string.
+ * @param outputFaceIndex  Index of the output face being classified.
  */
-export function carryForward(inputFaceNames, outputFaceIndex, modifiedMap) {
+export function carryForward(
+  inputFaceNames: FaceNameMap,
+  outputFaceIndex: number,
+  modifiedMap: ModifiedMap,
+): string | null {
   // New geometry — no carry-forward.
   if (modifiedMap.generated && modifiedMap.generated.includes(outputFaceIndex)) {
     return null
   }
 
   // Walk all input faces that map to this output face.
-  const parents = []
+  const parents: number[] = []
   for (const [inputIdxStr, outputIndices] of Object.entries(modifiedMap.modified || {})) {
     const inputIdx = Number(inputIdxStr)
     if ((outputIndices || []).includes(outputFaceIndex)) {
@@ -386,33 +364,36 @@ export function carryForward(inputFaceNames, outputFaceIndex, modifiedMap) {
  *   push_pull   → `PushPullCap`, `PushPullSide.<topoHash>`, `Original.<inheritedName>`
  */
 
+/** Op-specific metadata passed to {@link nameOpOutput}. */
+export interface NameOpMeta {
+  /** Feature node id prefix. */
+  nodeId?: string
+  /** For cut_from_sketch: entity ids in profile wire order. */
+  sketchEntityIds?: string[]
+}
+
 /**
  * Orchestrator: given op metadata, old face names, new face descriptors and
  * a ModifiedMap, produce a complete name Map for all output faces.
  *
- * @param {string}               opKind
- *   One of 'fillet'|'chamfer'|'shell'|'cut_from_sketch'|'push_pull'.
- * @param {Record<number,string>} oldFaceNames
- *   Prior name map: inputFaceIndex(number) → name string.
- * @param {FaceDescriptor[]}      newFaces
- *   FaceDescriptor array for every face of the result shape.
- * @param {ModifiedMap}           modifiedMap
- *   OCCT Modified/Generated/Deleted info extracted by the worker.
- * @param {object}               [opMeta={}]
- *   Op-specific metadata:
- *   - nodeId {string} — feature node id prefix
- *   - sketchEntityIds {string[]} — for cut_from_sketch: entity ids in profile wire order
- * @returns {Record<string, string>}  faceIndex(string) → full name
+ * @param opKind  One of 'fillet'|'chamfer'|'shell'|'cut_from_sketch'|'push_pull'.
+ * @param oldFaceNames  Prior name map: inputFaceIndex(number) → name string.
+ * @param newFaces  FaceDescriptor array for every face of the result shape.
+ * @param modifiedMap  OCCT Modified/Generated/Deleted info extracted by the worker.
  */
-export function nameOpOutput(opKind, oldFaceNames, newFaces, modifiedMap, opMeta = {}) {
+export function nameOpOutput(
+  opKind: string,
+  oldFaceNames: FaceNameMap,
+  newFaces: FaceDescriptor[],
+  modifiedMap: ModifiedMap,
+  opMeta: NameOpMeta = {},
+): FaceNameMap {
   const { nodeId = opKind } = opMeta
-  const names = {}
-  const collisionCount = {}
+  const names: Record<string, string> = {}
+  const collisionCount: Record<string, number> = {}
 
-  /**
-   * Register a name, resolving collisions with :0/:1/… suffixes.
-   */
-  function register(idx, fullName) {
+  /** Register a name, resolving collisions with :0/:1/… suffixes. */
+  function register(idx: number, fullName: string): void {
     const existing = Object.values(names).filter(
       (n) => n === fullName || n.startsWith(fullName + ':'),
     )
@@ -433,13 +414,14 @@ export function nameOpOutput(opKind, oldFaceNames, newFaces, modifiedMap, opMeta
   const generatedSet = new Set(modifiedMap.generated || [])
 
   // Build reverse map: outputFaceIndex → [inputFaceIndices]
-  const reverseMap = {}
+  const reverseMap: Record<number, number[]> = {}
   for (const [inputIdxStr, outputIndices] of Object.entries(modifiedMap.modified || {})) {
     for (const oidx of (outputIndices || [])) {
       if (!reverseMap[oidx]) reverseMap[oidx] = []
       reverseMap[oidx].push(Number(inputIdxStr))
     }
   }
+  void reverseMap // built for parity with the source; not read directly (carryForward recomputes its own parents walk)
 
   // side-face counter for cut_from_sketch
   let cutSideIdx = 0
@@ -566,35 +548,41 @@ export function nameOpOutput(opKind, oldFaceNames, newFaces, modifiedMap, opMeta
  * TODO(T3-Q1): revisit if workshop users need to distinguish A/B lineage on
  * boundary faces — see docs/plans/persistent-face-naming.md §"Open questions".
  *
- * @param {string}               nodeId        - feature node id (e.g. 'Cut-F')
- * @param {string}               opKind        - 'cut' | 'fuse' | 'common'
- * @param {Record<number,string>} faceNamesA   - faceIndex → name for shape A
- * @param {Record<number,string>} faceNamesB   - faceIndex → name for shape B
- * @param {FaceDescriptor[]}      outputFaces  - all faces of the result shape
- * @param {ModifiedMap}           modifiedMap  - from extractModifiedMap(oc, builder, combined, result)
- *                                               where `combined` is A fused with B for face-index purposes.
- *                                               In practice the worker builds a merged inputFaceNames map
- *                                               (B indices offset by len(A)) and passes a single combined
- *                                               ModifiedMap — see makeBooleanNamer in occtWorker.js.
- * @returns {Record<string, string>}  faceIndex(string) → full name
+ * @param nodeId  feature node id (e.g. 'Cut-F')
+ * @param opKind  'cut' | 'fuse' | 'common'
+ * @param faceNamesA  faceIndex → name for shape A
+ * @param faceNamesB  faceIndex → name for shape B
+ * @param outputFaces  all faces of the result shape
+ * @param modifiedMap  from extractModifiedMap(oc, builder, combined, result)
+ *   where `combined` is A fused with B for face-index purposes. In practice
+ *   the worker builds a merged inputFaceNames map (B indices offset by
+ *   len(A)) and passes a single combined ModifiedMap — see makeBooleanNamer
+ *   in occtWorker.js.
  */
-export function traceBooleanResult(nodeId, opKind, faceNamesA, faceNamesB, outputFaces, modifiedMap) {
+export function traceBooleanResult(
+  nodeId: string,
+  opKind: string,
+  faceNamesA: FaceNameMap,
+  faceNamesB: FaceNameMap,
+  outputFaces: FaceDescriptor[],
+  modifiedMap: ModifiedMap,
+): FaceNameMap {
   const opSuffix = opKind === 'cut' ? 'cut' : opKind === 'fuse' ? 'union' : 'common'
 
   // Merge both operands' names into one map, offsetting B's indices by the
   // count of A's entries (the caller must have done the same offset when
   // building the modifiedMap).
-  const mergedInputNames = { ...faceNamesA }
+  const mergedInputNames: Record<string, string> = { ...faceNamesA }
   const aCount = Object.keys(faceNamesA).length
   for (const [idxStr, name] of Object.entries(faceNamesB)) {
     mergedInputNames[String(Number(idxStr) + aCount)] = name
   }
 
-  const names = {}
-  const collisionCount = {}
+  const names: Record<string, string> = {}
+  const collisionCount: Record<string, number> = {}
   const generatedSet = new Set(modifiedMap.generated || [])
 
-  function register(idx, fullName) {
+  function register(idx: number, fullName: string): void {
     const existing = Object.values(names).filter(
       (n) => n === fullName || n.startsWith(fullName + ':'),
     )
@@ -620,7 +608,7 @@ export function traceBooleanResult(nodeId, opKind, faceNamesA, faceNamesB, outpu
     }
 
     // Find all input faces that map to this output face.
-    const parents = []
+    const parents: number[] = []
     for (const [inputIdxStr, outputIndices] of Object.entries(modifiedMap.modified || {})) {
       if ((outputIndices || []).includes(idx)) {
         parents.push(Number(inputIdxStr))
@@ -682,18 +670,24 @@ export function traceBooleanResult(nodeId, opKind, faceNamesA, faceNamesB, outpu
  * The seed (instance 0) keeps the original name with a `.0` instance prefix
  * so the naming is uniform across all instances and round-trips cleanly.
  *
- * @param {string}               nodeId      - pattern node id (e.g. 'LinPat-D')
- * @param {number}               count       - total number of instances
- * @param {Record<number,string>} seedFaceNames - faceIndex → name for the seed shape
- * @param {FaceDescriptor[]}     outputFaces - all faces of the fused result
- * @param {number}               seedFaceCount - number of faces in the seed shape
- * @returns {Record<string, string>}
+ * @param nodeId  pattern node id (e.g. 'LinPat-D')
+ * @param count  total number of instances
+ * @param seedFaceNames  faceIndex → name for the seed shape
+ * @param outputFaces  all faces of the fused result
+ * @param seedFaceCount  number of faces in the seed shape
  */
-export function buildFaceNamesForPattern(nodeId, count, seedFaceNames, outputFaces, seedFaceCount) {
-  const names = {}
-  const collisionCount = {}
+export function buildFaceNamesForPattern(
+  nodeId: string,
+  count: number,
+  seedFaceNames: FaceNameMap,
+  outputFaces: FaceDescriptor[],
+  seedFaceCount: number,
+): FaceNameMap {
+  void count // documented parameter, kept for parity with the source signature
+  const names: Record<string, string> = {}
+  const collisionCount: Record<string, number> = {}
 
-  function register(idx, fullName) {
+  function register(idx: number, fullName: string): void {
     const existing = Object.values(names).filter(
       (n) => n === fullName || n.startsWith(fullName + ':'),
     )
@@ -742,18 +736,17 @@ export function buildFaceNamesForPattern(nodeId, count, seedFaceNames, outputFac
  *
  * Result = fuse(original, mirrored). Original faces keep their seed names;
  * mirrored copies get `<patternNodeId>.mirror/<seedFaceName>`.
- *
- * @param {string}               nodeId
- * @param {Record<number,string>} seedFaceNames
- * @param {FaceDescriptor[]}     outputFaces
- * @param {number}               seedFaceCount
- * @returns {Record<string, string>}
  */
-export function buildFaceNamesForMirror(nodeId, seedFaceNames, outputFaces, seedFaceCount) {
-  const names = {}
-  const collisionCount = {}
+export function buildFaceNamesForMirror(
+  nodeId: string,
+  seedFaceNames: FaceNameMap,
+  outputFaces: FaceDescriptor[],
+  seedFaceCount: number,
+): FaceNameMap {
+  const names: Record<string, string> = {}
+  const collisionCount: Record<string, number> = {}
 
-  function register(idx, fullName) {
+  function register(idx: number, fullName: string): void {
     const existing = Object.values(names).filter(
       (n) => n === fullName || n.startsWith(fullName + ':'),
     )
@@ -817,17 +810,19 @@ export function buildFaceNamesForMirror(nodeId, seedFaceNames, outputFaces, seed
  * direction can vary.  When no path direction is supplied we fall back to
  * classifying by surface kind (planar = cap, non-planar = swept).
  *
- * @param {string}           nodeId
- * @param {FaceDescriptor[]} faces
- * @param {number[]|null}    [pathStartDir] - tangent at path start [dx,dy,dz]
- * @param {number[]|null}    [pathEndDir]   - tangent at path end   [dx,dy,dz]
- * @returns {Record<string, string>}
+ * @param pathStartDir  tangent at path start [dx,dy,dz]
+ * @param pathEndDir  tangent at path end   [dx,dy,dz]
  */
-export function buildFaceNamesForSweep(nodeId, faces, pathStartDir, pathEndDir) {
-  const names = {}
-  const collisionCount = {}
+export function buildFaceNamesForSweep(
+  nodeId: string,
+  faces: FaceDescriptor[],
+  pathStartDir: Vec3 | null | undefined,
+  pathEndDir: Vec3 | null | undefined,
+): FaceNameMap {
+  const names: Record<string, string> = {}
+  const collisionCount: Record<string, number> = {}
 
-  function register(idx, fullName) {
+  function register(idx: number, fullName: string): void {
     const existing = Object.values(names).filter(
       (n) => n === fullName || n.startsWith(fullName + ':'),
     )
@@ -852,7 +847,7 @@ export function buildFaceNamesForSweep(nodeId, faces, pathStartDir, pathEndDir) 
   const CAP_THRESHOLD = 0.866  // cos(30°)
 
   // Score each planar face against start/end dirs.
-  const capCandidates = []
+  const capCandidates: Array<{ face: FaceDescriptor; startScore: number; endScore: number }> = []
   for (const face of faces) {
     const kind = face.surfaceKind || 'unknown'
     if (kind !== 'plane') continue
@@ -873,8 +868,8 @@ export function buildFaceNamesForSweep(nodeId, faces, pathStartDir, pathEndDir) 
   }
 
   // Assign start_cap / end_cap to the best match for each dir (no overlap).
-  const assignedStartIdx = new Set()
-  const assignedEndIdx = new Set()
+  const assignedStartIdx = new Set<number>()
+  const assignedEndIdx = new Set<number>()
 
   if (pathStartDir && capCandidates.length > 0) {
     const best = capCandidates.reduce((a, b) => a.startScore >= b.startScore ? a : b)
@@ -923,13 +918,15 @@ export function buildFaceNamesForSweep(nodeId, faces, pathStartDir, pathEndDir) 
  * Cap detection: same planar-face heuristic as sweep; the two cap faces
  * are the outermost planar faces in Z-order (or whichever axis is dominant).
  *
- * @param {string}           nodeId
- * @param {FaceDescriptor[]} faces
- * @param {number[]|null}    [startNormal] - normal at the first profile plane
- * @param {number[]|null}    [endNormal]   - normal at the last profile plane
- * @returns {Record<string, string>}
+ * @param startNormal  normal at the first profile plane
+ * @param endNormal  normal at the last profile plane
  */
-export function buildFaceNamesForLoft(nodeId, faces, startNormal, endNormal) {
+export function buildFaceNamesForLoft(
+  nodeId: string,
+  faces: FaceDescriptor[],
+  startNormal: Vec3 | null | undefined,
+  endNormal: Vec3 | null | undefined,
+): FaceNameMap {
   // Loft caps are planar faces with normals close to the profile-plane normals.
   // Re-use buildFaceNamesForSweep: the cap-detection logic is identical.
   return buildFaceNamesForSweep(nodeId, faces, startNormal, endNormal)
@@ -939,18 +936,15 @@ export function buildFaceNamesForLoft(nodeId, faces, startNormal, endNormal) {
 // T6 continued — buildFaceNamesForRevolve (already in T1, shown below)
 // ---------------------------------------------------------------------------
 
-/**
- * Build face names for a Revolve solid.
- *
- * @param {string}           nodeId
- * @param {FaceDescriptor[]} faces
- * @param {number[]}         axis
- * @param {boolean}          isFullCircle
- * @returns {Record<string, string>}
- */
-export function buildFaceNamesForRevolve(nodeId, faces, axis, isFullCircle) {
-  const names = {}
-  const collisionCount = {}
+/** Build face names for a Revolve solid. */
+export function buildFaceNamesForRevolve(
+  nodeId: string,
+  faces: FaceDescriptor[],
+  axis: Vec3,
+  isFullCircle: boolean,
+): FaceNameMap {
+  const names: Record<string, string> = {}
+  const collisionCount: Record<string, number> = {}
   let capIndex = 0
 
   for (const face of faces) {

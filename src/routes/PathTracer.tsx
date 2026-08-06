@@ -68,7 +68,7 @@ export default function PathTracerPage() {
   }, [])
 
   const handleDownload = useCallback(() => {
-    const canvas = document.querySelector('canvas[data-pt-canvas]')
+    const canvas = document.querySelector<HTMLCanvasElement>('canvas[data-pt-canvas]')
     if (!canvas) return
     const link = document.createElement('a')
     link.href     = canvas.toDataURL('image/png')

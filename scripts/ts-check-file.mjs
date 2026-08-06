@@ -25,10 +25,24 @@
 // Usage:  node scripts/ts-check-file.mjs src/components/Foo.tsx [more.tsx ...]
 // Exits 0 when clean, non-zero with diagnostics otherwise.
 
-import { writeFileSync, unlinkSync, mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync, unlinkSync, readdirSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
+
+// Ambient declarations are reached through `include` in the real config. Clearing `include` (see
+// below) would drop them, and dropping them is not a subtle loss: `src/types/global.d.ts` carries
+// `/// <reference types="@webgpu/types" />`, so without it every GPUDevice/GPUBuffer in the
+// renderer reports TS2304 "cannot find name". Collect them explicitly instead.
+function findAmbient(dir) {
+  const out = []
+  for (const e of readdirSync(dir)) {
+    if (e === 'node_modules' || e.startsWith('.')) continue
+    const p = join(dir, e)
+    if (statSync(p).isDirectory()) out.push(...findAmbient(p))
+    else if (e.endsWith('.d.ts')) out.push(p)
+  }
+  return out
+}
 
 const files = process.argv.slice(2)
 if (files.length === 0) {
@@ -50,7 +64,9 @@ writeFileSync(
       // `include` must be cleared explicitly — it is inherited, and an inherited `src/**/*` would
       // pull in the whole project and give back the slow full check this script exists to avoid.
       include: [],
-      files: files.map((f) => './' + resolve(root, f).slice(root.length + 1)),
+      files: [...findAmbient(join(root, 'src')), ...files.map((f) => resolve(root, f))].map(
+        (f) => './' + f.slice(root.length + 1),
+      ),
     },
     null,
     2,

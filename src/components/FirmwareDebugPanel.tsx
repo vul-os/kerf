@@ -21,10 +21,62 @@ import {
 } from '../lib/firmwareDebugBridge.js'
 
 // ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+//
+// firmwareDebugBridge.ts documents these shapes in JSDoc but leaves its own
+// return types loosely inferred (implicit any fields); redeclared here as a
+// local domain interface so this panel's sub-components get real prop types.
+
+interface FirmwareTask {
+  name: string
+  state: string
+  priority: number
+  stack_high_water: number
+  stack_size: number
+  stack_pct_free?: number
+  stack_warning?: boolean
+}
+
+interface SyncObject {
+  name: string
+  kind: string
+  held_by?: string | null
+  waiters?: string[]
+}
+
+interface DependencyEdge {
+  from: string
+  to: string
+  label?: string
+}
+
+interface DebugSnapshot {
+  ok: boolean
+  error?: string | null
+  message?: string
+  tasks?: FirmwareTask[]
+  sync_objects?: SyncObject[]
+  edges?: DependencyEdge[]
+  warnings?: string[]
+}
+
+export interface FirmwareDebugPanelProps {
+  /** path to ELF file (passed to attach) */
+  elfPath?: string
+  /** OpenOCD target (default "stm32f4") */
+  target?: string
+  /** "kerfrtos" | "freertos" */
+  rtos?: string
+  /** called when the × button is clicked */
+  onClose?: () => void
+}
+
+// ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function SentinelBanner({ message }) {
+function SentinelBanner({ message }: { message?: string }) {
   return (
     <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-[12px] text-amber-200 mx-3 mt-3">
       <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-400" />
@@ -33,7 +85,7 @@ function SentinelBanner({ message }) {
   )
 }
 
-function ErrorBanner({ message, onDismiss }) {
+function ErrorBanner({ message, onDismiss }: { message: string | null; onDismiss?: () => void }) {
   if (!message) return null
   return (
     <div className="flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] text-red-200 mx-3 mt-2">
@@ -57,8 +109,8 @@ function StackWarningBadge() {
   )
 }
 
-function TaskStateChip({ state }) {
-  const colours = {
+function TaskStateChip({ state }: { state: string }) {
+  const colours: Record<string, string> = {
     RUNNING:   'bg-green-500/20 text-green-300 border-green-500/30',
     READY:     'bg-blue-500/20 text-blue-300 border-blue-500/30',
     BLOCKED:   'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
@@ -73,7 +125,7 @@ function TaskStateChip({ state }) {
   )
 }
 
-function TaskRow({ task }) {
+function TaskRow({ task }: { task: FirmwareTask }) {
   const pctFree = task.stack_pct_free ?? (
     task.stack_size > 0
       ? Math.round((task.stack_high_water / task.stack_size) * 1000) / 10
@@ -108,7 +160,7 @@ function TaskRow({ task }) {
   )
 }
 
-function SyncObjectRow({ obj }) {
+function SyncObjectRow({ obj }: { obj: SyncObject }) {
   return (
     <div className="px-3 py-2 text-[11px] border-b border-ink-800 hover:bg-ink-800/50">
       <div className="flex items-center gap-2">
@@ -132,7 +184,7 @@ function SyncObjectRow({ obj }) {
   )
 }
 
-function EdgeRow({ edge }) {
+function EdgeRow({ edge }: { edge: DependencyEdge }) {
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] border-b border-ink-800">
       <span className="font-mono text-ink-300">{edge.from}</span>
@@ -143,7 +195,7 @@ function EdgeRow({ edge }) {
   )
 }
 
-function SectionHeader({ label, count }) {
+function SectionHeader({ label, count }: { label: string; count?: number | null }) {
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 bg-ink-900/60 border-b border-ink-800">
       <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-400">{label}</span>
@@ -175,10 +227,10 @@ export default function FirmwareDebugPanel({
   target = 'stm32f4',
   rtos = 'kerfrtos',
   onClose,
-}) {
-  const [snapshot, setSnapshot] = useState(null)
+}: FirmwareDebugPanelProps) {
+  const [snapshot, setSnapshot] = useState<DebugSnapshot | null>(null)
   const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState(null)
+  const [error, setError]       = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -205,6 +257,7 @@ export default function FirmwareDebugPanel({
 
   // On mount, try to fetch an existing snapshot first
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mount-time fetch kicks off async state updates, pre-existing before this migration.
     refresh()
   }, [refresh])
 

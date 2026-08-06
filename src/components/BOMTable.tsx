@@ -22,9 +22,7 @@ import { useAuth } from '../store/auth.js'
 import type { BOMRow as ApiBOMRow, BOMPart as ApiBOMPart, BOMDistributor as ApiBOMDistributor } from '../types/api'
 import type { AssemblyBomOverride } from '../types/geometry'
 
-// import.meta.env typing isn't configured project-wide yet (see baseline
-// ImportMeta.env errors elsewhere) — boundary this migration doesn't own.
-const API_URL = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL || ''
+const API_URL = import.meta.env.VITE_API_URL || ''
 
 // The shared BOMPart/BOMRow/BOMDistributor types (src/types/api.ts) cover the
 // fields the BOM CSV export cares about; this component also reads photos/
@@ -394,10 +392,10 @@ function QtyOverrideInput({ count, override, onChange }: { count?: number; overr
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') e.target.blur()
+          if (e.key === 'Enter') e.currentTarget.blur()
           else if (e.key === 'Escape') {
             setDraft(override != null ? String(override) : '')
-            e.target.blur()
+            e.currentTarget.blur()
           }
         }}
         title={override != null
@@ -435,7 +433,7 @@ function NoteInput({ value, onChange }: { value?: string; onChange: (v: string |
       placeholder="—"
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
-      onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur() }}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
       className="w-32 bg-ink-950 border border-ink-800 rounded px-1.5 py-0.5 text-[11px] text-ink-100 outline-none focus:border-kerf-300/60"
     />
   )

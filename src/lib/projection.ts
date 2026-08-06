@@ -35,13 +35,50 @@
 // fallback for very large models.
 
 import { Ray, Vector3, DoubleSide } from 'three'
+import type { MeshBVH } from 'three-mesh-bvh'
+import type { Vec3, Vec2 } from '@/types'
+import type { Topology, TopologyEdge, TopologyFace, TopologyMapLike } from './topology.js'
+
+// ── Shapes ─────────────────────────────────────────────────────────────────
+
+/** A renderable part, as consumed by every projector here — only `id` is read. */
+export interface ProjectionPart {
+  id: string
+  [key: string]: unknown
+}
+
+export type ProjectionViewName = 'front' | 'back' | 'top' | 'bottom' | 'right' | 'left' | 'iso'
+
+export type EdgeClassification = 'visible' | 'hidden' | 'silhouette'
+
+export interface ProjectionPolyline {
+  kind: EdgeClassification
+  points: [Vec2, Vec2]
+}
+
+export interface ProjectionBBox {
+  min: Vec2
+  max: Vec2
+}
+
+export interface ProjectionResult {
+  polylines: ProjectionPolyline[]
+  bbox: ProjectionBBox | null
+}
+
+export interface ProjectFileWithHlrOptions {
+  /** Samples per edge (default 8). */
+  samples?: number
+  /** Surface-skin offset to avoid self-hit at the sample point (default 1e-3). */
+  epsilon?: number
+}
 
 // ---------------------------------------------------------------------------
 // Vector helpers (kept local — no Three dep).
 
-function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] }
-function len(a) { return Math.hypot(a[0], a[1], a[2]) }
-function norm(a) {
+function dot(a: Vec3, b: Vec3): number { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] }
+function len(a: Vec3): number { return Math.hypot(a[0], a[1], a[2]) }
+function norm(a: Vec3): Vec3 {
   const l = len(a) || 1
   return [a[0] / l, a[1] / l, a[2] / l]
 }
@@ -52,7 +89,7 @@ function norm(a) {
 //
 // JSCAD is Z-up, X-right, Y-into-screen (right-handed). The 2D projection
 // axes follow the canonical engineering drawing convention.
-const VIEW_DIRS = {
+const VIEW_DIRS: Record<ProjectionViewName, Vec3> = {
   front:  [0,  1, 0], // looking from -Y → +Y
   back:   [0, -1, 0],
   top:    [0, 0, -1], // looking from +Z down
@@ -64,7 +101,7 @@ const VIEW_DIRS = {
 
 // 2D projection of a 3D point for each view. Returns [u, v] in model units
 // where +u is right and +v is DOWN on the page (matches SVG conventions).
-function project(viewName, p) {
+function project(viewName: ProjectionViewName, p: Vec3): Vec2 {
   const x = p[0], y = p[1], z = p[2]
   switch (viewName) {
     case 'front':  return [x, -z]                   // +X right, +Z up
@@ -86,17 +123,17 @@ function project(viewName, p) {
 }
 
 // Public: list of supported view names for UI dropdowns.
-export const PROJECTIONS = ['front', 'top', 'right', 'left', 'back', 'bottom', 'iso']
+export const PROJECTIONS: ProjectionViewName[] = ['front', 'top', 'right', 'left', 'back', 'bottom', 'iso']
 
 // Public: human-readable label for a projection.
-export function projectionLabel(p) {
+export function projectionLabel(p: string | null | undefined): string {
   if (!p) return ''
   return p[0].toUpperCase() + p.slice(1)
 }
 
 // Public: project a 3D point to 2D for the given view (page-mm conventions:
 // +x right, +y down). Used by the dimension snapping code.
-export function projectPoint(viewName, p) {
+export function projectPoint(viewName: ProjectionViewName, p: Vec3): Vec2 {
   return project(viewName, p)
 }
 
@@ -104,8 +141,7 @@ export function projectPoint(viewName, p) {
 // Edge classification
 
 // Classify a single edge against the view direction.
-// Returns 'visible' | 'hidden' | 'silhouette'.
-function classifyEdge(edge, faceById, viewDir) {
+function classifyEdge(edge: TopologyEdge, faceById: Map<string, TopologyFace>, viewDir: Vec3): EdgeClassification {
   const fa = edge.faceA ? faceById.get(edge.faceA) : null
   const fb = edge.faceB ? faceById.get(edge.faceB) : null
   if (!fa && !fb) return 'silhouette'
@@ -131,7 +167,7 @@ const SMOOTH_COS_THRESHOLD = Math.cos((30 * Math.PI) / 180) // ≈ 0.866
 
 // Returns true when the edge sits between two coplanar-ish faces and is NOT
 // a silhouette boundary (so dropping it just removes mesh-tessellation noise).
-function isSmoothEdge(edge, faceById) {
+function isSmoothEdge(edge: TopologyEdge, faceById: Map<string, TopologyFace>): boolean {
   const fa = edge.faceA ? faceById.get(edge.faceA) : null
   const fb = edge.faceB ? faceById.get(edge.faceB) : null
   if (!fa || !fb) return false
@@ -146,26 +182,20 @@ function isSmoothEdge(edge, faceById) {
 
 // projectFile: project every part's classified edges to 2D.
 //
-//   parts:       [{id, geom, ...}]
-//   topologies:  Map<partId, Topology>  (from topology.js)
-//   viewName:    one of PROJECTIONS
-//
-// Returns:
-//   {
-//     polylines: [{ kind, points: [[u,v], [u,v]] }, ...],
-//     bbox: { min: [u,v], max: [u,v] } | null,
-//   }
-//
 // Each polyline is a 2-point segment for v1; the renderer can stroke them
 // with appropriate dash patterns. We deliberately don't merge collinear
 // chains because the per-edge classification is the source of truth for the
 // stroke style — merging across hidden/visible boundaries would smear the
 // dash pattern. A future pass could group same-classification co-linear
 // chains to reduce SVG element counts.
-export function projectFile(parts, topologies, viewName) {
+export function projectFile(
+  parts: ProjectionPart[] | null | undefined,
+  topologies: TopologyMapLike | Map<string, Topology | null> | null | undefined,
+  viewName: ProjectionViewName,
+): ProjectionResult {
   const viewDir = VIEW_DIRS[viewName] || VIEW_DIRS.front
 
-  const polylines = []
+  const polylines: ProjectionPolyline[] = []
   let minU = Infinity, minV = Infinity
   let maxU = -Infinity, maxV = -Infinity
 
@@ -174,7 +204,7 @@ export function projectFile(parts, topologies, viewName) {
     if (!topo || !topo.edges?.length) continue
 
     // Index faces by id for the classifier.
-    const faceById = new Map()
+    const faceById = new Map<string, TopologyFace>()
     for (const f of topo.faces) faceById.set(f.id, f)
 
     for (const e of topo.edges) {
@@ -197,7 +227,7 @@ export function projectFile(parts, topologies, viewName) {
   }
 
   const bbox = isFinite(minU)
-    ? { min: [minU, minV], max: [maxU, maxV] }
+    ? { min: [minU, minV] as Vec2, max: [maxU, maxV] as Vec2 }
     : null
 
   return { polylines, bbox }
@@ -206,8 +236,12 @@ export function projectFile(parts, topologies, viewName) {
 // Project every projected vertex of every part for snapping. Returns a flat
 // list of [u, v] pairs. The dimension tool searches this for the nearest
 // point within tolerance.
-export function projectedVertices(parts, topologies, viewName) {
-  const out = []
+export function projectedVertices(
+  parts: ProjectionPart[] | null | undefined,
+  topologies: TopologyMapLike | Map<string, Topology | null> | null | undefined,
+  viewName: ProjectionViewName,
+): Vec2[] {
+  const out: Vec2[] = []
   for (const part of parts || []) {
     const topo = topologies?.get?.(part.id)
     if (!topo) continue
@@ -221,13 +255,17 @@ export function projectedVertices(parts, topologies, viewName) {
 // Project edges as 2D segments (for snapping to the nearest point on an
 // edge). Includes only edges whose classification is visible/silhouette so
 // the snap doesn't latch onto invisible geometry.
-export function projectedSegments(parts, topologies, viewName) {
+export function projectedSegments(
+  parts: ProjectionPart[] | null | undefined,
+  topologies: TopologyMapLike | Map<string, Topology | null> | null | undefined,
+  viewName: ProjectionViewName,
+): [Vec2, Vec2][] {
   const viewDir = VIEW_DIRS[viewName] || VIEW_DIRS.front
-  const out = []
+  const out: [Vec2, Vec2][] = []
   for (const part of parts || []) {
     const topo = topologies?.get?.(part.id)
     if (!topo) continue
-    const faceById = new Map()
+    const faceById = new Map<string, TopologyFace>()
     for (const f of topo.faces) faceById.set(f.id, f)
     for (const e of topo.edges) {
       const kind = classifyEdge(e, faceById, viewDir)
@@ -252,24 +290,27 @@ export function projectedSegments(parts, topologies, viewName) {
 //   bvhsByPartId:  Map<partId, MeshBVH>   — every part's BVH, including the
 //                                            part being projected (we skip
 //                                            self-tests by id when iterating).
-//   options.samples: int (default 8)      — samples per edge.
-//   options.epsilon: number (default 1e-3) — surface-skin offset to avoid
-//                                            self-hit at the sample point.
-export function projectFileWithHLR(parts, topologies, viewName, bvhsByPartId, options = {}) {
+export function projectFileWithHLR(
+  parts: ProjectionPart[] | null | undefined,
+  topologies: TopologyMapLike | Map<string, Topology | null> | null | undefined,
+  viewName: ProjectionViewName,
+  bvhsByPartId: Map<string, MeshBVH> | null | undefined,
+  options: ProjectFileWithHlrOptions = {},
+): ProjectionResult {
   const viewDir = VIEW_DIRS[viewName] || VIEW_DIRS.front
-  const N = Math.max(2, options.samples | 0 || 8)
+  const N = Math.max(2, (options.samples ?? 0) | 0 || 8)
   const eps = Number(options.epsilon) || 1e-3
   // Camera-direction unit vector — for ortho views, every ray points the
   // opposite direction of viewDir. We bias the start by `eps` along this
   // direction to avoid the ray immediately re-hitting the surface the
   // sample sits on (numerical robustness).
-  const camDir = [-viewDir[0], -viewDir[1], -viewDir[2]]
+  const camDir: Vec3 = [-viewDir[0], -viewDir[1], -viewDir[2]]
 
-  const polylines = []
+  const polylines: ProjectionPolyline[] = []
   let minU = Infinity, minV = Infinity
   let maxU = -Infinity, maxV = -Infinity
 
-  function addPoint(u, v) {
+  function addPoint(u: number, v: number): void {
     if (u < minU) minU = u
     if (u > maxU) maxU = u
     if (v < minV) minV = v
@@ -277,12 +318,12 @@ export function projectFileWithHLR(parts, topologies, viewName, bvhsByPartId, op
   }
 
   // Materialize "other" BVH lists once per part for the inner loop.
-  const otherBVHsByPart = new Map()
+  const otherBVHsByPart = new Map<string, MeshBVH[]>()
   if (bvhsByPartId) {
-    const allIds = []
+    const allIds: string[] = []
     for (const id of bvhsByPartId.keys()) allIds.push(id)
     for (const id of allIds) {
-      const others = []
+      const others: MeshBVH[] = []
       for (const oid of allIds) {
         if (oid === id) continue
         const b = bvhsByPartId.get(oid)
@@ -295,7 +336,7 @@ export function projectFileWithHLR(parts, topologies, viewName, bvhsByPartId, op
   for (const part of parts || []) {
     const topo = topologies?.get?.(part.id)
     if (!topo || !topo.edges?.length) continue
-    const faceById = new Map()
+    const faceById = new Map<string, TopologyFace>()
     for (const f of topo.faces) faceById.set(f.id, f)
     const others = otherBVHsByPart.get(part.id) || []
 
@@ -319,9 +360,9 @@ export function projectFileWithHLR(parts, topologies, viewName, bvhsByPartId, op
         addPoint(a2[0], a2[1]); addPoint(b2[0], b2[1])
         continue
       }
-      const occluded = new Array(N)
-      const samples3d = new Array(N)
-      const samples2d = new Array(N)
+      const occluded: boolean[] = new Array(N)
+      const samples3d: Vec3[] = new Array(N)
+      const samples2d: Vec2[] = new Array(N)
       for (let i = 0; i < N; i++) {
         const t = i / (N - 1)
         const sx = e.a[0] + (e.b[0] - e.a[0]) * t
@@ -343,7 +384,7 @@ export function projectFileWithHLR(parts, topologies, viewName, bvhsByPartId, op
           // Use polyline-style points (sequence of 2D coords). For now the
           // renderer expects 2-point segments, so emit successive 2-point
           // segments along the run.
-          const runKind = runState ? 'hidden' : kind
+          const runKind: EdgeClassification = runState ? 'hidden' : kind
           for (let j = runStart; j < i - 1; j++) {
             polylines.push({
               kind: runKind,
@@ -359,7 +400,7 @@ export function projectFileWithHLR(parts, topologies, viewName, bvhsByPartId, op
     }
   }
   const bbox = isFinite(minU)
-    ? { min: [minU, minV], max: [maxU, maxV] }
+    ? { min: [minU, minV] as Vec2, max: [maxU, maxV] as Vec2 }
     : null
   return { polylines, bbox }
 }
@@ -367,7 +408,7 @@ export function projectFileWithHLR(parts, topologies, viewName, bvhsByPartId, op
 // isSampleOccluded: cast a ray from `sample` along `camDir` (toward camera)
 // and ask each BVH for any hit at distance > eps. Any hit means an opaque
 // face from another part lies between the sample and the camera.
-function isSampleOccluded(sample, camDir, otherBVHs, eps) {
+function isSampleOccluded(sample: Vec3, camDir: Vec3, otherBVHs: MeshBVH[], eps: number): boolean {
   // Lazy-import three at module scope would be cleaner, but we pull it from
   // the BVH's own three reference to avoid a hard dep here. Instead each
   // BVH exposes raycast via the API: bvh.raycast(ray, side, near, far).
@@ -392,8 +433,8 @@ function isSampleOccluded(sample, camDir, otherBVHs, eps) {
 
 // Reuse a single Ray instance across calls to avoid GC churn during the
 // inner sampling loop.
-let _ray = null
-function getRay() {
+let _ray: Ray | null = null
+function getRay(): Ray {
   if (_ray) return _ray
   _ray = new Ray(new Vector3(), new Vector3())
   return _ray

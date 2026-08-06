@@ -23,13 +23,13 @@ import {
   Tag,
   CircleDot,
   Anchor,
-  Box,
   Magnet,
   // NEW: drafting completeness
   Grid2x2,
   ArrowUpRight,
   FileText,
   Link2,
+  type LucideIcon,
 } from 'lucide-react'
 
 // localStorage key for the drawing-canvas snap toggle. Read by both the
@@ -56,7 +56,19 @@ function readSnapEnabled() {
 // DrawingView; some ids (e.g. `add_3view`) are intercepted by Editor /
 // PropertiesPanel and turned into actions instead of dimension/draft modes.
 
-const TOOL_GROUPS = [
+interface ToolItem {
+  id: string
+  icon: LucideIcon | null
+  label: string
+  labelChar?: string
+}
+
+interface ToolGroup {
+  label: string
+  items: ToolItem[]
+}
+
+const TOOL_GROUPS: ToolGroup[] = [
   {
     label: 'Pointer',
     items: [
@@ -149,12 +161,19 @@ const TOOL_GROUPS = [
 // Optional sheet-level actions wired in from the parent. Surfaced as a
 // separate button strip below the tool groups so they don't clutter the main
 // flow.
+export interface DrawingToolbarProps {
+  tool?: string
+  onTool?: (id: string) => void
+  onAddSheet?: () => void
+  showSheetActions?: boolean
+}
+
 export default function DrawingToolbar({
   tool = 'pointer',
   onTool,
   onAddSheet,
   showSheetActions = false,
-}) {
+}: DrawingToolbarProps) {
   // Snap-enabled state. Persisted under `kerf:drawing:snap`; broadcast via a
   // window custom event so DrawingView (mounted as a sibling, not a child)
   // can react without prop-drilling through Editor.jsx.
@@ -170,7 +189,7 @@ export default function DrawingToolbar({
   }, [])
   const toggleSnap = () => {
     const next = !snapEnabled
-    try { window.localStorage.setItem(SNAP_LS_KEY, next ? '1' : '0') } catch {}
+    try { window.localStorage.setItem(SNAP_LS_KEY, next ? '1' : '0') } catch { /* storage unavailable */ }
     setSnapEnabled(next)
     window.dispatchEvent(new CustomEvent('kerf:drawing-snap-changed'))
   }

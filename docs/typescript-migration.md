@@ -72,6 +72,20 @@ building on it would be worse than pausing.
 the integration branch that worktrees heal against, so a stale `main` breaks every subsequent
 agent.
 
+### `node_modules` — symlink it, never reinstall it
+
+Worktrees have no `node_modules`, and this repo's is **982 MB**. Several agents burned their
+opening minutes on `npm ci` / `npm install`, and one stalled before it even finished. Symlink the
+main checkout's instead — verified working for `tsc`, `vitest` and `eslint`:
+
+```
+ln -s /Users/pc/code/vulos/kerf/node_modules node_modules
+```
+
+Add this to the base-fix block of every slice prompt. It is near-instant, costs no disk, and
+removes a long unprotected window at the start of each run. Agents must not run `npm install` in a
+worktree afterwards — it would mutate the shared tree that every other agent is reading.
+
 The cheap base check at the top of a prompt has already converted three would-be wasted runs into
 clean sub-minute no-ops. It earns its lines.
 

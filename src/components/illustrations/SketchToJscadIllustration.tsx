@@ -17,7 +17,11 @@
  * pane at viewBox-native size (max width ≈ 100px at 7pt mono ≈ 24 chars).
  * Palette locked to ink-* / kerf-* (#ffd633 accent).
  */
-export default function SketchToJscadIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function SketchToJscadIllustration({ className = '' }: Props) {
   const codeRows = [
     { y: 72, parts: [
       { text: 'import', fill: '#ff6bd4' },

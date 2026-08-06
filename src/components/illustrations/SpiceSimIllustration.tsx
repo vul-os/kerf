@@ -5,9 +5,13 @@
  *
  * viewBox 320×200. Palette locked.
  */
-export default function SpiceSimIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function SpiceSimIllustration({ className = '' }: Props) {
   // Build the transient sine path. y centered at 132, peak ±18.
-  const wavePoints = []
+  const wavePoints: string[] = []
   const x0 = 178
   const x1 = 296
   const yMid = 132

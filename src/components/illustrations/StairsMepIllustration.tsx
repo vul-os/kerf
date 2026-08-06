@@ -5,7 +5,11 @@
  *
  * viewBox 320×200. Palette locked.
  */
-export default function StairsMepIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function StairsMepIllustration({ className = '' }: Props) {
   // Stair geometry — 5 treads stepping up. Each tread is a flat top with
   // a riser face. Drawn axonometrically.
   const treads = []

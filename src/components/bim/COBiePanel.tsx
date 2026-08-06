@@ -1,5 +1,5 @@
 /**
- * COBiePanel.jsx — COBie FM-handoff deliverable builder.
+ * COBiePanel.tsx — COBie FM-handoff deliverable builder.
  *
  * ArchiCAD Property Mapper equivalent: maps IFC property sets to the
  * COBie spreadsheet that FM teams demand at project handoff.
@@ -20,6 +20,43 @@ import { useState, useCallback } from 'react'
 import { CheckCircle, XCircle, Plus, Trash2, Download, FileText, ShieldCheck } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface Mapping {
+  id: number
+  psetName: string
+  propName: string
+  sheet: string
+  column: string
+}
+
+type MappingDelta = Partial<Pick<Mapping, 'psetName' | 'propName' | 'sheet' | 'column'>>
+
+type IfcData = Record<string, unknown>
+
+interface ExportInfo {
+  format: 'xlsx' | 'xml'
+  path: string
+}
+
+interface ExportMessage {
+  ok: boolean
+  text: string
+}
+
+export interface COBiePanelProps {
+  /** Normalised IFC data dict passed from the parent. */
+  ifcData?: IfcData | null
+  /** Called with {format:'xlsx'|'xml', path} after export. */
+  onExport?: (info: ExportInfo) => void
+  /** Extra Tailwind classes on the root. */
+  className?: string
+  /** Disable all editing. */
+  readOnly?: boolean
+}
+
+// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
@@ -38,7 +75,7 @@ const COBIE_SHEETS = [
 ]
 
 /** Default mapping rows shown when the panel first loads. */
-const DEFAULT_MAPPINGS = [
+const DEFAULT_MAPPINGS: Mapping[] = [
   { id: 1, psetName: 'Pset_SpaceCommon',                    propName: 'GrossFloorArea', sheet: 'Space',    column: 'GrossArea' },
   { id: 2, psetName: 'Pset_SpaceCommon',                    propName: 'NetFloorArea',   sheet: 'Space',    column: 'NetArea' },
   { id: 3, psetName: 'Pset_SpaceCommon',                    propName: 'RoomTag',        sheet: 'Space',    column: 'RoomTag' },
@@ -55,7 +92,7 @@ let _nextId = DEFAULT_MAPPINGS.length + 1
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function CompletenessGauge({ pct }) {
+function CompletenessGauge({ pct }: { pct: number }) {
   const radius = 40
   const stroke = 8
   const normalised = radius - stroke / 2
@@ -101,7 +138,13 @@ function CompletenessGauge({ pct }) {
 }
 
 
-function MappingRow({ mapping, onChange, onDelete }) {
+interface MappingRowProps {
+  mapping: Mapping
+  onChange: (delta: MappingDelta) => void
+  onDelete: () => void
+}
+
+function MappingRow({ mapping, onChange, onDelete }: MappingRowProps) {
   return (
     <tr className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
       <td className="px-2 py-1.5">
@@ -161,7 +204,12 @@ function MappingRow({ mapping, onChange, onDelete }) {
 }
 
 
-function ValidationPanel({ errors, onDismiss }) {
+interface ValidationPanelProps {
+  errors: string[] | null
+  onDismiss: () => void
+}
+
+function ValidationPanel({ errors, onDismiss }: ValidationPanelProps) {
   if (!errors) return null
   const ok = errors.length === 0
   return (
@@ -200,28 +248,18 @@ function ValidationPanel({ errors, onDismiss }) {
 // COBiePanel
 // ---------------------------------------------------------------------------
 
-/**
- * COBiePanel — standalone FM handoff panel.
- *
- * Props
- * -----
- * ifcData        {object|null}   Normalised IFC data dict passed from the parent.
- * onExport       {function}      Called with {format:'xlsx'|'xml', path} after export.
- * className      {string}        Extra Tailwind classes on the root.
- * readOnly       {boolean}       Disable all editing.
- */
-export default function COBiePanel({ ifcData = null, onExport, className = '', readOnly = false }) {
+export default function COBiePanel({ ifcData = null, onExport, className = '', readOnly = false }: COBiePanelProps) {
   const [selectedTemplate, setSelectedTemplate] = useState('standard')
-  const [mappings, setMappings] = useState(DEFAULT_MAPPINGS)
-  const [validationErrors, setValidationErrors] = useState(null)   // null = not run yet
-  const [completeness, setCompleteness] = useState(null)           // null = not computed
+  const [mappings, setMappings] = useState<Mapping[]>(DEFAULT_MAPPINGS)
+  const [validationErrors, setValidationErrors] = useState<string[] | null>(null)   // null = not run yet
+  const [completeness, setCompleteness] = useState<number | null>(null)             // null = not computed
   const [exporting, setExporting] = useState(false)
   const [validating, setValidating] = useState(false)
-  const [exportMsg, setExportMsg] = useState(null)
+  const [exportMsg, setExportMsg] = useState<ExportMessage | null>(null)
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
-  const handleTemplateChange = useCallback((tmpl) => {
+  const handleTemplateChange = useCallback((tmpl: string) => {
     setSelectedTemplate(tmpl)
     setValidationErrors(null)
     setCompleteness(null)
@@ -234,11 +272,11 @@ export default function COBiePanel({ ifcData = null, onExport, className = '', r
     ])
   }, [])
 
-  const handleDeleteMapping = useCallback((id) => {
+  const handleDeleteMapping = useCallback((id: number) => {
     setMappings((prev) => prev.filter((m) => m.id !== id))
   }, [])
 
-  const handleMappingChange = useCallback((id, delta) => {
+  const handleMappingChange = useCallback((id: number, delta: MappingDelta) => {
     setMappings((prev) => prev.map((m) => m.id === id ? { ...m, ...delta } : m))
   }, [])
 
@@ -263,7 +301,7 @@ export default function COBiePanel({ ifcData = null, onExport, className = '', r
           })),
         }),
       })
-      const data = await res.json()
+      const data = await res.json() as { errors?: string[]; completeness?: number }
       setValidationErrors(data.errors ?? [])
       if (data.completeness !== undefined) {
         setCompleteness(Math.round(data.completeness * 1000) / 10)
@@ -277,7 +315,7 @@ export default function COBiePanel({ ifcData = null, onExport, className = '', r
     }
   }, [ifcData, selectedTemplate, mappings])
 
-  const handleExport = useCallback(async (format) => {
+  const handleExport = useCallback(async (format: 'xlsx' | 'xml') => {
     setExporting(true)
     setExportMsg(null)
     try {
@@ -291,7 +329,7 @@ export default function COBiePanel({ ifcData = null, onExport, className = '', r
           output_path: `cobie-handoff.${format}`,
         }),
       })
-      const data = await res.json()
+      const data = await res.json() as { path?: string }
       const path = data.path ?? `cobie-handoff.${format}`
       setExportMsg({ ok: true, text: `Exported: ${path}` })
       onExport?.({ format, path })

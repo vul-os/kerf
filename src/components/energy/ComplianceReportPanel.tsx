@@ -16,27 +16,57 @@
 // make live API calls — the parent passes the report object from the LLM tool.
 
 import { useMemo } from 'react'
+import type { ComponentType } from 'react'
 import {
   Building2, CheckCircle, XCircle, Award, Zap, Thermometer,
   Wind, Lightbulb, AlertTriangle, Info, TrendingDown, TrendingUp,
 } from 'lucide-react'
 
+type EndUseKey = 'heating' | 'cooling' | 'fan_kwh' | 'lighting'
+
+// End-use data as returned by the tool: keys may appear either bare
+// (`heating`) or `_kwh`-suffixed (`heating_kwh`) depending on source, plus
+// an EUI summary field. Indexed dynamically below, so kept as a bounded
+// record rather than an exact shape.
+interface EndUseData {
+  eui_kwh_m2_yr?: number
+  [key: string]: number | undefined
+}
+
+export interface ComplianceReport {
+  baseline_end_use?: EndUseData
+  proposed_end_use?: EndUseData
+  baseline_system_number?: number | string
+  baseline_system_name?: string
+  performance_cost_index: number
+  pct_better_than_baseline: number
+  ashrae_901_compliant: boolean
+  leed_eap2_prerequisite_met: boolean
+  leed_eac2_points: number
+  title24_compliant?: boolean | null
+  title24_margin_pct?: number
+  baseline_annual_cost_usd: number
+  proposed_annual_cost_usd: number
+  recommendations?: string[]
+  honest_caveat?: string
+}
+
 // ---------------------------------------------------------------------------
 // Colours
 // ---------------------------------------------------------------------------
-const END_USE_COLORS = {
+const END_USE_COLORS: Record<EndUseKey, string> = {
   heating:  '#ef4444',   // red
   cooling:  '#3b82f6',   // blue
   fan_kwh:  '#8b5cf6',   // violet
   lighting: '#f59e0b',   // amber
 }
-const END_USE_LABELS = {
+const END_USE_LABELS: Record<EndUseKey, string> = {
   heating:  'Heating',
   cooling:  'Cooling',
   fan_kwh:  'HVAC Fans',
   lighting: 'Lighting',
 }
-const END_USE_ICONS = {
+const END_USE_ICONS: Record<EndUseKey, ComponentType<{ size?: number; className?: string }>> = {
   heating:  Thermometer,
   cooling:  Wind,
   fan_kwh:  Wind,
@@ -46,15 +76,15 @@ const END_USE_ICONS = {
 // ---------------------------------------------------------------------------
 // Helper: format numbers
 // ---------------------------------------------------------------------------
-function fmt0(n) { return n == null ? '—' : n.toLocaleString('en-US', { maximumFractionDigits: 0 }) }
-function fmt1(n) { return n == null ? '—' : n.toFixed(1) }
-function fmt3(n) { return n == null ? '—' : n.toFixed(3) }
-function fmtPct(n) { return n == null ? '—' : `${n > 0 ? '+' : ''}${n.toFixed(1)}%` }
+function fmt0(n: number | null | undefined) { return n == null ? '—' : n.toLocaleString('en-US', { maximumFractionDigits: 0 }) }
+function fmt1(n: number | null | undefined) { return n == null ? '—' : n.toFixed(1) }
+function fmt3(n: number | null | undefined) { return n == null ? '—' : n.toFixed(3) }
+function fmtPct(n: number | null | undefined) { return n == null ? '—' : `${n > 0 ? '+' : ''}${n.toFixed(1)}%` }
 
 // ---------------------------------------------------------------------------
 // PCI Gauge
 // ---------------------------------------------------------------------------
-function PCIGauge({ pci }) {
+function PCIGauge({ pci }: { pci: number }) {
   // Semicircle SVG gauge: 0 = far left (bad), 1 = centre (baseline), 2 = far right (worse)
   // Visual range: 0.5 – 1.5 pci
   const minVal = 0.5
@@ -108,7 +138,14 @@ function PCIGauge({ pci }) {
 // ---------------------------------------------------------------------------
 // End-use bar chart
 // ---------------------------------------------------------------------------
-function EndUseBar({ label, baselineKwh, proposedKwh, maxKwh, color, Icon }) {
+function EndUseBar({ label, baselineKwh, proposedKwh, maxKwh, color, Icon }: {
+  label: string
+  baselineKwh: number
+  proposedKwh: number
+  maxKwh: number
+  color: string
+  Icon?: ComponentType<{ size?: number; className?: string }>
+}) {
   const bWidth = maxKwh > 0 ? (baselineKwh / maxKwh) * 100 : 0
   const pWidth = maxKwh > 0 ? (proposedKwh / maxKwh) * 100 : 0
   const delta = proposedKwh - baselineKwh
@@ -157,7 +194,7 @@ function EndUseBar({ label, baselineKwh, proposedKwh, maxKwh, color, Icon }) {
 // ---------------------------------------------------------------------------
 // Badge
 // ---------------------------------------------------------------------------
-function Badge({ pass, label, sub }) {
+function Badge({ pass, label, sub }: { pass: boolean | null | undefined; label: string; sub?: string }) {
   return (
     <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
       pass
@@ -180,7 +217,7 @@ function Badge({ pass, label, sub }) {
 // ---------------------------------------------------------------------------
 // LEED points display
 // ---------------------------------------------------------------------------
-function LeedPoints({ points, prereqMet }) {
+function LeedPoints({ points, prereqMet }: { points: number; prereqMet: boolean }) {
   const maxPoints = 18
   return (
     <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -226,11 +263,11 @@ function LeedPoints({ points, prereqMet }) {
 // ---------------------------------------------------------------------------
 // Main panel
 // ---------------------------------------------------------------------------
-export default function ComplianceReportPanel({ report }) {
+export default function ComplianceReportPanel({ report }: { report?: ComplianceReport | null }) {
   const b = report?.baseline_end_use
   const p = report?.proposed_end_use
 
-  const endUseKeys = ['heating', 'cooling', 'fan_kwh', 'lighting']
+  const endUseKeys: EndUseKey[] = ['heating', 'cooling', 'fan_kwh', 'lighting']
 
   const maxKwh = useMemo(() => {
     if (!b || !p) return 1
@@ -367,7 +404,7 @@ export default function ComplianceReportPanel({ report }) {
       <LeedPoints points={leedPts} prereqMet={leedPrereq} />
 
       {/* Recommendations */}
-      {report.recommendations?.length > 0 && (
+      {report.recommendations && report.recommendations.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle size={14} className="text-amber-600" />

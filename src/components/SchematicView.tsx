@@ -23,21 +23,33 @@
 //     transforms compose cleanly.
 
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import type {
+  Ref,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+  WheelEvent as ReactWheelEvent,
+} from 'react'
 import { snapshotSvg } from '../lib/snapshotHelpers.js'
 import { Maximize2, RotateCcw, AlertTriangle, Activity } from 'lucide-react'
 import { convertCircuitJsonToSchematicSvg } from 'circuit-to-svg'
 import { parseProbes, appendProbe, removeProbe, renameProbe } from '../lib/circuitTSX.js'
+import type { CircuitJson } from '../types/circuit.js'
 
 const PROBE_NAME_RE = /^[A-Za-z0-9_-]+$/
+
+interface ParsedLibrarySvg {
+  innerHTML: string
+  viewBox: number[] | null
+}
 
 // Parse the library's SVG string and return:
 //   { innerHTML: string, viewBox: [x,y,w,h] | null }
 // We discard the outer <svg> wrapper so we can re-mount the contents inside
 // a controlled group with our own transform. The viewBox is preserved for
 // the initial fit.
-function parseLibrarySvg(svgText) {
+function parseLibrarySvg(svgText?: string): ParsedLibrarySvg {
   if (!svgText || typeof svgText !== 'string') return { innerHTML: '', viewBox: null }
-  let doc
+  let doc: Document
   try {
     doc = new DOMParser().parseFromString(svgText, 'image/svg+xml')
   } catch {
@@ -52,7 +64,7 @@ function parseLibrarySvg(svgText) {
     return { innerHTML: '', viewBox: null }
   }
   const vbAttr = root.getAttribute('viewBox')
-  let viewBox = null
+  let viewBox: number[] | null = null
   if (vbAttr) {
     const parts = vbAttr.trim().split(/\s+/).map(Number)
     if (parts.length === 4 && parts.every((n) => Number.isFinite(n))) {
@@ -62,7 +74,7 @@ function parseLibrarySvg(svgText) {
   // Use innerHTML on the root <svg>. innerHTML on SVG elements is supported
   // by every browser we target (Chromium, WebKit, Gecko via XMLSerializer
   // fallback).
-  let innerHTML = ''
+  let innerHTML: string
   if (typeof root.innerHTML === 'string') {
     innerHTML = root.innerHTML
   } else {
@@ -80,19 +92,47 @@ function parseLibrarySvg(svgText) {
 // Render the schematic with a try/catch around the library call — circuit JSON
 // from a freshly-edited source can be in a transient state where the library
 // throws. We surface the error and let the user keep editing.
-function safeRender(circuitJson) {
+function safeRender(circuitJson?: CircuitJson | null): { svg: string; error: string | null } {
   if (!Array.isArray(circuitJson) || circuitJson.length === 0) return { svg: '', error: null }
   try {
     const svg = convertCircuitJsonToSchematicSvg(circuitJson, {
       // Transparent background so the editor's dark theme shows through. The
       // library defaults to white, which clashes with our ink-900 panels.
+      // BUG (pre-existing, found during TS migration): circuit-to-svg's
+      // `Options$1` for convertCircuitJsonToSchematicSvg has no `backgroundColor`
+      // field — that option only exists on PcbSvgOptions. This has always been a
+      // silent no-op; flagging for the circuit-to-svg integration owner rather
+      // than fixing here (no behaviour change in this slice).
+      // @ts-expect-error — backgroundColor isn't part of Options$1; see BUG note above.
       backgroundColor: 'transparent',
       includeVersion: false,
     })
     return { svg, error: null }
   } catch (err) {
-    return { svg: '', error: err?.message || String(err) }
+    return { svg: '', error: err instanceof Error ? err.message : String(err) }
   }
+}
+
+interface DragState {
+  startX: number
+  startY: number
+  startTx: number
+  startTy: number
+}
+
+export interface SchematicViewHandle {
+  snapshot: (opts?: { size?: number; quality?: number }) => Promise<Blob | null>
+}
+
+export interface SchematicViewProps {
+  circuitJson?: CircuitJson | null
+  highlightRefdes?: string | null
+  onSelectRefdes?: (refdes: string) => void
+  currentSource?: string
+  onEditSource?: (source: string) => void
+  selectedCircuitComponentId?: string | null
+  onSelectComponent?: (id: string | null) => void
+  viewRef?: Ref<SchematicViewHandle>
 }
 
 export default function SchematicView({
@@ -104,22 +144,23 @@ export default function SchematicView({
   selectedCircuitComponentId = null,
   onSelectComponent = () => {},
   viewRef,
-}) {
-  const containerRef = useRef(null)
-  const innerRef = useRef(null)
-  const svgRef = useRef(null)
+}: SchematicViewProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const innerRef = useRef<SVGGElement | null>(null)
+  const svgRef = useRef<SVGSVGElement | null>(null)
 
   useImperativeHandle(viewRef, () => ({
-    snapshot: (opts) => snapshotSvg(svgRef.current, opts),
+    snapshot: (opts?: { size?: number; quality?: number }) =>
+      snapshotSvg(svgRef.current, opts) as Promise<Blob | null>,
   }), [])
 
   // refdes (source_component.name) → schematic_component_id, used to map
   // cross-view selection onto SVG elements (which carry
   // data-schematic-component-id from circuit-to-svg).
   const refdesToSchId = useMemo(() => {
-    const m = new Map()
+    const m = new Map<string, string>()
     if (!Array.isArray(circuitJson)) return m
-    const srcIdToName = new Map()
+    const srcIdToName = new Map<string, string>()
     for (const e of circuitJson) {
       if (e.type === 'source_component') srcIdToName.set(e.source_component_id, e.name)
     }
@@ -132,7 +173,7 @@ export default function SchematicView({
     return m
   }, [circuitJson])
   const schIdToRefdes = useMemo(() => {
-    const m = new Map()
+    const m = new Map<string, string>()
     for (const [k, v] of refdesToSchId) m.set(v, k)
     return m
   }, [refdesToSchId])
@@ -140,7 +181,7 @@ export default function SchematicView({
   // schematic_component_id → source_component_id (the canonical id used by
   // selection state and I-probes).
   const schIdToSrcCompId = useMemo(() => {
-    const m = new Map()
+    const m = new Map<string, string>()
     if (!Array.isArray(circuitJson)) return m
     for (const e of circuitJson) {
       if (e.type === 'schematic_component' && e.source_component_id) {
@@ -150,15 +191,15 @@ export default function SchematicView({
     return m
   }, [circuitJson])
   const srcCompIdToSchId = useMemo(() => {
-    const m = new Map()
+    const m = new Map<string, string>()
     for (const [k, v] of schIdToSrcCompId) m.set(v, k)
     return m
   }, [schIdToSrcCompId])
 
   // Probe authoring state.
   const [probeMode, setProbeMode] = useState(false)
-  const [probeKind, setProbeKind] = useState('V')
-  const [probeToast, setProbeToast] = useState(null)
+  const [probeKind, setProbeKind] = useState<'V' | 'I'>('V')
+  const [probeToast, setProbeToast] = useState<string | null>(null)
 
   // Memoised parse of `// @kerf-probe` lines for outline + duplicate detection.
   const probes = useMemo(() => parseProbes(currentSource || ''), [currentSource])
@@ -173,10 +214,10 @@ export default function SchematicView({
   }, [probeToast])
 
   /** Push a transient amber pill above the schematic. */
-  const flashToast = useCallback((msg) => setProbeToast(msg), [])
+  const flashToast = useCallback((msg: string) => setProbeToast(msg), [])
 
   /** Dispatch the rename-or-delete prompt chain for a duplicate probe name. */
-  const editExistingProbe = useCallback((existing) => {
+  const editExistingProbe = useCallback((existing: { name: string; kind: 'V' | 'I'; portId: string }) => {
     if (typeof window === 'undefined') return false
     const next = window.prompt(
       `Probe "${existing.name}" is already on this point. Enter a new name to rename it, or leave blank to delete.`,
@@ -199,7 +240,7 @@ export default function SchematicView({
   }, [currentSource, onEditSource, flashToast])
 
   /** Prompt the user for a fresh probe name, validate, and splice it in. */
-  const createProbe = useCallback((kind, portId) => {
+  const createProbe = useCallback((kind: 'V' | 'I', portId: string) => {
     if (typeof window === 'undefined') return false
     const raw = window.prompt(`Name for ${kind === 'I' ? 'current' : 'voltage'} probe at ${portId}:`)
     if (raw === null) return false
@@ -242,11 +283,13 @@ export default function SchematicView({
   // with 10% padding.
   useEffect(() => {
     if (!parsed.viewBox || !size.w || !size.h) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing before this migration.
       setView({ tx: 0, ty: 0, scale: 1 })
       return
     }
     const [vx, vy, vw, vh] = parsed.viewBox
     if (vw <= 0 || vh <= 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing before this migration.
       setView({ tx: 0, ty: 0, scale: 1 })
       return
     }
@@ -256,6 +299,7 @@ export default function SchematicView({
     const s = Math.min(sx, sy)
     const tx = (size.w - vw * s) / 2 - vx * s
     const ty = (size.h - vh * s) / 2 - vy * s
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- pre-existing before this migration.
     setView({ tx, ty, scale: s })
   // We deliberately ignore size in the dep list to avoid resetting the
   // user's pan/zoom on a window resize.
@@ -277,7 +321,7 @@ export default function SchematicView({
     const root = innerRef.current
     const legacyTargetSchId = highlightRefdes ? refdesToSchId.get(highlightRefdes) : null
     const selectedSchId = selectedCircuitComponentId ? srcCompIdToSchId.get(selectedCircuitComponentId) : null
-    const comps = root.querySelectorAll('[data-schematic-component-id]')
+    const comps = root.querySelectorAll<SVGElement>('[data-schematic-component-id]')
     for (const el of comps) {
       const schId = el.getAttribute('data-schematic-component-id')
       const srcId = schIdToSrcCompId.get(schId)
@@ -296,7 +340,7 @@ export default function SchematicView({
       el.style.outline = outline
       el.style.opacity = opacity
     }
-    const ports = root.querySelectorAll('[data-schematic-port-id]')
+    const ports = root.querySelectorAll<SVGElement>('[data-schematic-port-id]')
     for (const el of ports) {
       const portId = el.getAttribute('data-schematic-port-id')
       let outline = ''
@@ -321,10 +365,11 @@ export default function SchematicView({
   ])
 
   // Click → either author a probe (probe mode) or drive selection (default).
-  const handleSvgClick = useCallback((e) => {
+  const handleSvgClick = useCallback((e: ReactMouseEvent<SVGSVGElement>) => {
+    const target = e.target as Element
     if (probeMode) {
       if (probeKind === 'V') {
-        const portEl = e.target.closest?.('[data-schematic-port-id]')
+        const portEl = target.closest?.('[data-schematic-port-id]')
         if (!portEl) return
         const portId = portEl.getAttribute('data-schematic-port-id')
         if (!portId) {
@@ -337,7 +382,7 @@ export default function SchematicView({
         return
       }
       // I-probe: target a component.
-      const compEl = e.target.closest?.('[data-schematic-component-id]')
+      const compEl = target.closest?.('[data-schematic-component-id]')
       if (!compEl) return
       const schId = compEl.getAttribute('data-schematic-component-id')
       const srcId = schIdToSrcCompId.get(schId)
@@ -351,7 +396,7 @@ export default function SchematicView({
       return
     }
     // Default: selection. Click on a component toggles; click on empty space clears.
-    const el = e.target.closest?.('[data-schematic-component-id]')
+    const el = target.closest?.('[data-schematic-component-id]')
     if (!el) {
       onSelectComponent(null)
       return
@@ -379,14 +424,14 @@ export default function SchematicView({
 
   // ---- Pan + zoom event handlers --------------------------------------------
 
-  const draggingRef = useRef(null)
-  const onMouseDown = useCallback((e) => {
+  const draggingRef = useRef<DragState | null>(null)
+  const onMouseDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0 && e.button !== 1) return
     draggingRef.current = { startX: e.clientX, startY: e.clientY, startTx: view.tx, startTy: view.ty }
     e.currentTarget.setPointerCapture?.(e.pointerId ?? 0)
   }, [view.tx, view.ty])
 
-  const onMouseMove = useCallback((e) => {
+  const onMouseMove = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     const d = draggingRef.current
     if (!d) return
     const dx = e.clientX - d.startX
@@ -398,7 +443,7 @@ export default function SchematicView({
     draggingRef.current = null
   }, [])
 
-  const onWheel = useCallback((e) => {
+  const onWheel = useCallback((e: ReactWheelEvent<HTMLDivElement>) => {
     e.preventDefault()
     if (!containerRef.current) return
     const r = containerRef.current.getBoundingClientRect()
@@ -455,7 +500,11 @@ export default function SchematicView({
       onPointerCancel={onMouseUp}
       onPointerLeave={onMouseUp}
       className="relative flex-1 min-w-0 h-full overflow-hidden bg-ink-950"
-      style={{ touchAction: 'none', cursor: draggingRef.current ? 'grabbing' : 'grab' }}
+      style={{
+        touchAction: 'none',
+        // eslint-disable-next-line react-hooks/refs -- pre-existing before this migration.
+        cursor: draggingRef.current ? 'grabbing' : 'grab',
+      }}
     >
       <svg
         ref={svgRef}

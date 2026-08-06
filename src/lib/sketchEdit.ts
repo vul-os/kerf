@@ -221,14 +221,12 @@ export function deleteConstraint(sketch: SketchJSON, constraintId: string): Sket
 
 // Helpful: list of entity ids referenced by a constraint.
 //
-// NOTE (found during T-503 typing, not fixed — behavior-preserving migration only):
-// this switch does not cover every `SketchConstraint` variant — 'midpoint', 'fixed',
-// 'collinear', 'ellipse_semi_major'/'ellipse_semi_minor'/'ellipse_rotation',
-// 'point_on_ellipse' and 'bezier_g2' all fall through to the `default: return []`
-// branch. That means deleteEntities's cascade won't drop e.g. a 'fixed' constraint
-// when the point it pins is deleted (leaving a dangling reference), and
-// isEntityReferenced won't count those constraint kinds as "using" an entity either.
-// Pre-existing gap in the source; left as-is since closing it is a behavior change.
+// T-560: this switch used to fall through to `default: return []` for 'midpoint',
+// 'fixed', 'collinear', 'ellipse_semi_major'/'ellipse_semi_minor'/'ellipse_rotation',
+// 'point_on_ellipse' and 'bezier_g2' — meaning deleteEntities's cascade wouldn't drop
+// e.g. a 'fixed' constraint when the point it pins is deleted (leaving a dangling
+// reference), and isEntityReferenced wouldn't count those constraint kinds as "using"
+// an entity either. Filled in below for every SketchConstraint variant.
 export function constraintRefs(c: SketchConstraint): string[] {
   switch (c.type) {
     case 'coincident': return [c.a, c.b]
@@ -257,6 +255,15 @@ export function constraintRefs(c: SketchConstraint): string[] {
     // Bezier continuity constraints reference up to three control points
     case 'bezier_tangent':
     case 'bezier_g1': return [c.p0, c.p1, c.p2].filter(Boolean)
+    case 'bezier_g2': return [c.p_minus2, c.p_minus1, c.p_junction, c.p_plus1, c.p_plus2]
+      .filter((x): x is string => Boolean(x))
+    case 'midpoint': return [c.point, c.line]
+    case 'fixed': return [c.point]
+    case 'collinear': return [c.p1, c.p2, c.p3]
+    case 'point_on_ellipse': return [c.ellipse, c.point]
+    case 'ellipse_semi_major':
+    case 'ellipse_semi_minor':
+    case 'ellipse_rotation': return [c.ellipse]
     default: return []
   }
 }

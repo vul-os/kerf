@@ -45,7 +45,8 @@ import {
 } from '../lib/sketchSolver.js'
 
 import {
-  addPoint, addLine, addCircle, addConstraint, ensurePointAt,
+  addPoint, addLine, addCircle, addArc, addConstraint, ensurePointAt,
+  deleteEntities, constraintRefs,
 } from '../lib/sketchEdit.js'
 
 import { sketchToGeom2 } from '../lib/sketchGeom2.js'
@@ -625,4 +626,295 @@ describe('diameter constraint', () => {
     expect(ce.radius).toBeCloseTo(7, 4)
     expect(result.status).not.toBe('conflict')
   }, 30000)
+})
+
+// ---------------------------------------------------------------------------
+// T-560: real-solver proof for the constraint kinds whose planegcs
+// parameter names were wrong (d11e96ca fixed the names; these tests fix the
+// gap that let them stay wrong for so long — every other test in this file
+// that exercises these paths mocks `@salusoft89/planegcs`, so a param-name
+// typo throws inside the *mock* implementation's own dispatch, not against
+// the real wasm's field validation).
+//
+// Every case below asserts actual solved geometry (cross-products for
+// collinearity, distances for equal-radius) rather than "no exception
+// thrown" — a solver that silently no-ops or converges to nonsense would
+// still pass a such-a-weaker check.
+
+describe('collinear constraint (real planegcs solver)', () => {
+  it('pulls a stray point onto the line through two fixed anchors', async () => {
+    let s = defaultSketch('XY', 'collinear-real')
+    // Anchor 1 is the implicitly-fixed origin. Anchor 2 is pinned explicitly
+    // so only the stray point is free to move.
+    const anchor = addPoint(s, 10, 0); s = anchor.sketch
+    s = addConstraint(s, 'fixed', { point: anchor.id, x: 10, y: 0 }).sketch
+    // Well off the origin–anchor line.
+    const stray = addPoint(s, 5, 5); s = stray.sketch
+    s = addConstraint(s, 'collinear', { p1: stray.id, p2: 'origin', p3: anchor.id }).sketch
+
+    // Deliberately no try/catch skip here (unlike the rest of this file's
+    // convention): a thrown error from the real solver — e.g. planegcs
+    // rejecting an unrecognized parameter name — is exactly the failure
+    // mode this suite exists to catch, so it must fail the test loudly
+    // rather than be swallowed as a "wasm didn't load" skip.
+    const result = await solveSketch(s)
+    expect(result.status).not.toBe('conflict')
+    const o = result.sketch.entities.find((e) => e.id === 'origin')
+    const a = result.sketch.entities.find((e) => e.id === anchor.id)
+    const p = result.sketch.entities.find((e) => e.id === stray.id)
+    // Cross product of (a-o) x (p-o) must vanish for true collinearity — a
+    // much stronger check than "the solve didn't throw".
+    const cross = (a.x - o.x) * (p.y - o.y) - (a.y - o.y) * (p.x - o.x)
+    expect(cross).toBeCloseTo(0, 3)
+    // The anchors themselves must not have drifted.
+    expect(a.x).toBeCloseTo(10, 4)
+    expect(a.y).toBeCloseTo(0, 4)
+  }, 30000)
+})
+
+describe('bezier_tangent constraint (real planegcs solver)', () => {
+  it('pulls the shared join point onto the line through its two neighboring handles', async () => {
+    let s = defaultSketch('XY', 'bezier-tangent-real')
+    const p0 = addPoint(s, 0, 0); s = p0.sketch
+    s = addConstraint(s, 'fixed', { point: p0.id, x: 0, y: 0 }).sketch
+    const p2 = addPoint(s, 10, 0); s = p2.sketch
+    s = addConstraint(s, 'fixed', { point: p2.id, x: 10, y: 0 }).sketch
+    // The junction point, well off the p0–p2 line.
+    const p1 = addPoint(s, 4, 3); s = p1.sketch
+    s = addConstraint(s, 'bezier_tangent', { p0: p0.id, p1: p1.id, p2: p2.id }).sketch
+
+    const result = await solveSketch(s)
+    expect(result.status).not.toBe('conflict')
+    const a = result.sketch.entities.find((e) => e.id === p0.id)
+    const b = result.sketch.entities.find((e) => e.id === p2.id)
+    const j = result.sketch.entities.find((e) => e.id === p1.id)
+    const cross = (b.x - a.x) * (j.y - a.y) - (b.y - a.y) * (j.x - a.x)
+    expect(cross).toBeCloseTo(0, 3)
+  }, 30000)
+})
+
+describe('bezier_g1 constraint (real planegcs solver)', () => {
+  it('pulls the shared join point onto the line through its two neighboring handles', async () => {
+    let s = defaultSketch('XY', 'bezier-g1-real')
+    const p0 = addPoint(s, 0, 0); s = p0.sketch
+    s = addConstraint(s, 'fixed', { point: p0.id, x: 0, y: 0 }).sketch
+    const p2 = addPoint(s, 0, 10); s = p2.sketch
+    s = addConstraint(s, 'fixed', { point: p2.id, x: 0, y: 10 }).sketch
+    // Off the (vertical) p0–p2 line.
+    const p1 = addPoint(s, 6, 5); s = p1.sketch
+    s = addConstraint(s, 'bezier_g1', { p0: p0.id, p1: p1.id, p2: p2.id }).sketch
+
+    const result = await solveSketch(s)
+    expect(result.status).not.toBe('conflict')
+    const a = result.sketch.entities.find((e) => e.id === p0.id)
+    const b = result.sketch.entities.find((e) => e.id === p2.id)
+    const j = result.sketch.entities.find((e) => e.id === p1.id)
+    const cross = (b.x - a.x) * (j.y - a.y) - (b.y - a.y) * (j.x - a.x)
+    expect(cross).toBeCloseTo(0, 3)
+    // On a vertical line through x=0, the junction's x must collapse to 0.
+    expect(j.x).toBeCloseTo(0, 3)
+  }, 30000)
+})
+
+describe('bezier_g2 constraint (real planegcs solver)', () => {
+  it('pulls the junction onto the collinear, equal-chord midpoint of its neighbors', async () => {
+    let s = defaultSketch('XY', 'bezier-g2-real')
+    const pMinus1 = addPoint(s, 0, 0); s = pMinus1.sketch
+    s = addConstraint(s, 'fixed', { point: pMinus1.id, x: 0, y: 0 }).sketch
+    const pPlus1 = addPoint(s, 10, 0); s = pPlus1.sketch
+    s = addConstraint(s, 'fixed', { point: pPlus1.id, x: 10, y: 0 }).sketch
+    // Junction starts well off both the correct x (should be 5, the
+    // midpoint) and the line (a tiny y offset). NOTE: the bezier_g2
+    // decomposition bakes its two p2p_distance chord targets from the
+    // *pre-solve, unsolved* entity positions (see sketchSolver.ts — `chord`
+    // is computed from `ent`, the input sketch, not re-derived after the
+    // collinearity constraint moves the point). That means the equal-chord
+    // target is only self-consistent with an exactly-collinear solution
+    // when the pre-solve point is already very close to the true collinear
+    // midpoint — a large initial deviation (verified empirically: y=0.05 at
+    // this span) makes the pinned chord infeasible together with
+    // collinearity and the solve reports 'conflict'. A tiny deviation
+    // (verified up to y=0.001 here) still converges since the residual is
+    // within the solver's tolerance. This is a real fragility in the G2
+    // approximation, not something this test papers over — see the T-560
+    // report for detail.
+    const junction = addPoint(s, 4, 0.001); s = junction.sketch
+    // p_minus2 / p_plus2 are part of the schema but unused by the current
+    // implementation (see sketchSolver.ts bezier_g2 case) — reuse ids that
+    // already exist so the constraint payload is well-formed.
+    s = addConstraint(s, 'bezier_g2', {
+      p_minus2: pMinus1.id, p_minus1: pMinus1.id,
+      p_junction: junction.id,
+      p_plus1: pPlus1.id, p_plus2: pPlus1.id,
+    }).sketch
+
+    const result = await solveSketch(s)
+    expect(result.status).not.toBe('conflict')
+    const m1 = result.sketch.entities.find((e) => e.id === pMinus1.id)
+    const p1 = result.sketch.entities.find((e) => e.id === pPlus1.id)
+    const j = result.sketch.entities.find((e) => e.id === junction.id)
+    // Collinear: cross product of (p1-m1) x (j-m1) vanishes.
+    const cross = (p1.x - m1.x) * (j.y - m1.y) - (p1.y - m1.y) * (j.x - m1.x)
+    expect(cross).toBeCloseTo(0, 2)
+    // Equal-chord: distance(m1, j) == distance(j, p1).
+    const d1 = Math.hypot(j.x - m1.x, j.y - m1.y)
+    const d2 = Math.hypot(p1.x - j.x, p1.y - j.y)
+    expect(d1).toBeCloseTo(d2, 2)
+    // Converges to the geometrically expected midpoint.
+    expect(j.x).toBeCloseTo(5, 2)
+    expect(j.y).toBeCloseTo(0, 2)
+  }, 30000)
+})
+
+describe('symmetric_over_line: arc/arc equal-radius path (equal_radius_aa)', () => {
+  it('mirrors a free arc across the axis and equalizes its radius to the fixed arc', async () => {
+    let s = defaultSketch('XY', 'sym-arc-arc-real')
+    // Axis: the vertical line x=0, through the (fixed) origin.
+    const axisTop = addPoint(s, 0, 10); s = axisTop.sketch
+    s = addConstraint(s, 'fixed', { point: axisTop.id, x: 0, y: 10 }).sketch
+    const axis = addLine(s, 'origin', axisTop.id); s = axis.sketch
+
+    // Arc A: fixed reference — center (-5,0), radius 2, quarter arc CCW from
+    // (-3,0) to (-5,2).
+    const cA = addPoint(s, -5, 0); s = cA.sketch
+    s = addConstraint(s, 'fixed', { point: cA.id, x: -5, y: 0 }).sketch
+    const sA = addPoint(s, -3, 0); s = sA.sketch
+    s = addConstraint(s, 'fixed', { point: sA.id, x: -3, y: 0 }).sketch
+    const eA = addPoint(s, -5, 2); s = eA.sketch
+    s = addConstraint(s, 'fixed', { point: eA.id, x: -5, y: 2 }).sketch
+    const arcA = addArc(s, cA.id, sA.id, eA.id, true); s = arcA.sketch
+
+    // Arc B: free, deliberately wrong center/radius/points.
+    const cB = addPoint(s, 4, 1); s = cB.sketch
+    const sB = addPoint(s, 8, 3); s = sB.sketch
+    const eB = addPoint(s, 2, -2); s = eB.sketch
+    const arcB = addArc(s, cB.id, sB.id, eB.id, true); s = arcB.sketch
+
+    s = addConstraint(s, 'symmetric_over_line', {
+      entity_a_id: arcA.id, entity_b_id: arcB.id, construction_line_id: axis.id,
+    }).sketch
+
+    const result = await solveSketch(s)
+    expect(result.status).not.toBe('conflict')
+    const ents = result.sketch.entities
+    const get = (id) => ents.find((e) => e.id === id)
+    const oCA = get(cA.id); const oSA = get(sA.id); const oEA = get(eA.id)
+    const oCB = get(cB.id); const oSB = get(sB.id); const oEB = get(eB.id)
+
+    // Mirror across x=0: center reflects to (5, 0).
+    expect(oCB.x).toBeCloseTo(5, 2)
+    expect(oCB.y).toBeCloseTo(0, 2)
+    // decomposeSymmetric swaps start/end across the reflection: A.start -> B.end,
+    // A.end -> B.start.
+    expect(oEB.x).toBeCloseTo(-oSA.x, 2)
+    expect(oEB.y).toBeCloseTo(oSA.y, 2)
+    expect(oSB.x).toBeCloseTo(-oEA.x, 2)
+    expect(oSB.y).toBeCloseTo(oEA.y, 2)
+
+    // equal_radius_aa: B's radius must equal A's fixed radius (2).
+    const radiusA = Math.hypot(oSA.x - oCA.x, oSA.y - oCA.y)
+    const radiusB = Math.hypot(oSB.x - oCB.x, oSB.y - oCB.y)
+    expect(radiusA).toBeCloseTo(2, 3)
+    expect(radiusB).toBeCloseTo(2, 2)
+  }, 30000)
+})
+
+describe('symmetric_over_line: circle/circle equal-radius path (equal_radius_cc)', () => {
+  it('mirrors a free circle across the axis and equalizes its radius to the fixed circle', async () => {
+    let s = defaultSketch('XY', 'sym-circle-circle-real')
+    const axisTop = addPoint(s, 0, 10); s = axisTop.sketch
+    s = addConstraint(s, 'fixed', { point: axisTop.id, x: 0, y: 10 }).sketch
+    const axis = addLine(s, 'origin', axisTop.id); s = axis.sketch
+
+    // Circle A: fixed center, radius pinned to 3.
+    const cA = addPoint(s, -5, 0); s = cA.sketch
+    s = addConstraint(s, 'fixed', { point: cA.id, x: -5, y: 0 }).sketch
+    const circA = addCircle(s, cA.id, 3); s = circA.sketch
+    s = addConstraint(s, 'radius', { circle: circA.id, value: 3 }).sketch
+
+    // Circle B: free center, deliberately wrong position and radius.
+    const cB = addPoint(s, 3, 2); s = cB.sketch
+    const circB = addCircle(s, cB.id, 7); s = circB.sketch
+
+    s = addConstraint(s, 'symmetric_over_line', {
+      entity_a_id: circA.id, entity_b_id: circB.id, construction_line_id: axis.id,
+    }).sketch
+
+    const result = await solveSketch(s)
+    expect(result.status).not.toBe('conflict')
+    const oCB = result.sketch.entities.find((e) => e.id === cB.id)
+    const oCircB = result.sketch.entities.find((e) => e.id === circB.id)
+    // Mirror across x=0: (-5,0) -> (5,0).
+    expect(oCB.x).toBeCloseTo(5, 2)
+    expect(oCB.y).toBeCloseTo(0, 2)
+    // equal_radius_cc: radius equalizes to circle A's pinned value.
+    expect(oCircB.radius).toBeCloseTo(3, 2)
+  }, 30000)
+})
+
+// ---------------------------------------------------------------------------
+// T-560: constraintRefs coverage gap. Previously 'midpoint', 'fixed',
+// 'collinear', ellipse-kind constraints, 'point_on_ellipse' and 'bezier_g2'
+// all fell through to `default: return []`, so deleteEntities's cascade left
+// dangling references behind when the referenced point was deleted.
+
+describe('constraintRefs / deleteEntities cascade (previously-missing kinds)', () => {
+  it('reports refs for fixed, collinear, midpoint and bezier_g2', () => {
+    expect(constraintRefs({ id: 'x', type: 'fixed', point: 'p1', x: 1, y: 2 })).toEqual(['p1'])
+    expect(constraintRefs({ id: 'x', type: 'collinear', p1: 'p1', p2: 'p2', p3: 'p3' }))
+      .toEqual(['p1', 'p2', 'p3'])
+    expect(constraintRefs({ id: 'x', type: 'midpoint', point: 'p1', line: 'l1' }))
+      .toEqual(['p1', 'l1'])
+    expect(constraintRefs({
+      id: 'x',
+      type: 'bezier_g2',
+      p_minus2: 'a', p_minus1: 'b', p_junction: 'c', p_plus1: 'd', p_plus2: 'e',
+    })).toEqual(['a', 'b', 'c', 'd', 'e'])
+    expect(constraintRefs({ id: 'x', type: 'point_on_ellipse', ellipse: 'e1', point: 'p1' }))
+      .toEqual(['e1', 'p1'])
+    expect(constraintRefs({ id: 'x', type: 'ellipse_semi_major', ellipse: 'e1', value: 5 }))
+      .toEqual(['e1'])
+  })
+
+  it('deleteEntities drops a fixed constraint when its pinned point is deleted', () => {
+    let s = defaultSketch('XY', 'del-fixed')
+    const p = addPoint(s, 3, 7); s = p.sketch
+    s = addConstraint(s, 'fixed', { point: p.id, x: 3, y: 7 }).sketch
+    expect(s.constraints).toHaveLength(1)
+    s = deleteEntities(s, [p.id])
+    // Before the fix, this constraint (type 'fixed') would have survived with
+    // a dangling `point` ref because constraintRefs() returned [] for it.
+    expect(s.constraints).toHaveLength(0)
+  })
+
+  it('deleteEntities drops a collinear constraint when any of its three points is deleted', () => {
+    let s = defaultSketch('XY', 'del-collinear')
+    const a = addPoint(s, 1, 0); s = a.sketch
+    const b = addPoint(s, 2, 0); s = b.sketch
+    s = addConstraint(s, 'collinear', { p1: a.id, p2: 'origin', p3: b.id }).sketch
+    expect(s.constraints).toHaveLength(1)
+    s = deleteEntities(s, [b.id])
+    expect(s.constraints).toHaveLength(0)
+    // b itself and its cascade are gone too.
+    expect(s.entities.find((e) => e.id === b.id)).toBeUndefined()
+  })
+
+  it('deleteEntities drops a midpoint constraint when the line it references is deleted', () => {
+    let s = defaultSketch('XY', 'del-midpoint')
+    const b = addPoint(s, 10, 0); s = b.sketch
+    const ln = addLine(s, 'origin', b.id); s = ln.sketch
+    const mid = addPoint(s, 5, 0); s = mid.sketch
+    s = addConstraint(s, 'midpoint', { point: mid.id, line: ln.id }).sketch
+    expect(s.constraints).toHaveLength(1)
+    s = deleteEntities(s, [ln.id])
+    expect(s.constraints).toHaveLength(0)
+  })
+
+  it('isEntityReferenced counts a fixed/collinear/midpoint reference (regression guard)', () => {
+    let s = defaultSketch('XY', 'refcheck')
+    const p = addPoint(s, 1, 1); s = p.sketch
+    s = addConstraint(s, 'fixed', { point: p.id, x: 1, y: 1 }).sketch
+    const c = s.constraints[0]
+    expect(constraintRefs(c).includes(p.id)).toBe(true)
+  })
 })

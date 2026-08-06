@@ -23,14 +23,14 @@ const PAD = { top: 16, right: 20, bottom: 38, left: 60 }
 const INNER_W = CHART_W - PAD.left - PAD.right
 const INNER_H = CHART_H - PAD.top - PAD.bottom
 
-function scaleLinear(domain, range) {
+function scaleLinear(domain: [number, number], range: [number, number]) {
   const [d0, d1] = domain
   const [r0, r1] = range
   const dSpan = d1 - d0 || 1
-  return v => r0 + ((v - d0) / dSpan) * (r1 - r0)
+  return (v: number) => r0 + ((v - d0) / dSpan) * (r1 - r0)
 }
 
-function buildPath(xs, ys, xS, yS) {
+function buildPath(xs: number[], ys: (number | null)[], xS: (v: number) => number, yS: (v: number) => number) {
   return xs
     .map((x, i) => {
       const y = ys[i]
@@ -41,7 +41,7 @@ function buildPath(xs, ys, xS, yS) {
     .join(' ')
 }
 
-function axisTicks(min, max, n = 5) {
+function axisTicks(min: number, max: number, n = 5) {
   const step = (max - min) / (n - 1) || 1
   return Array.from({ length: n }, (_, i) => min + i * step)
 }
@@ -50,7 +50,15 @@ function axisTicks(min, max, n = 5) {
 // Simple line chart
 // ---------------------------------------------------------------------------
 
-function LineChart({ times, values, yLabel, yUnit, color = '#60a5fa' }) {
+interface LineChartProps {
+  times: number[]
+  values: number[]
+  yLabel: string
+  yUnit?: string
+  color?: string
+}
+
+function LineChart({ times, values, yLabel, yUnit, color = '#60a5fa' }: LineChartProps) {
   if (!times || times.length === 0) return null
 
   const xMin = times[0]
@@ -118,15 +126,41 @@ function LineChart({ times, values, yLabel, yUnit, color = '#60a5fa' }) {
 // SixDOFPanel
 // ---------------------------------------------------------------------------
 
-export default function SixDOFPanel({ result, loading, error, content }) {
+interface TrajectoryPoint {
+  t_s: number
+  altitude_m: number
+  airspeed_m_s: number
+}
+
+interface SixDOFResult {
+  ok?: boolean
+  n_steps?: number
+  duration_s?: number
+  final_altitude_m?: number
+  final_airspeed_m_s?: number
+  final_euler_deg?: number[]
+  max_altitude_m?: number
+  min_altitude_m?: number
+  trajectory_summary?: TrajectoryPoint[]
+}
+
+export interface SixDOFPanelProps {
+  result?: SixDOFResult | null
+  loading?: boolean
+  error?: string | null
+  content?: string
+}
+
+export default function SixDOFPanel({ result, loading, error, content }: SixDOFPanelProps) {
   // Backward-compatible content string: JSON.parse it and merge into result.
-  if (content != null && result == null) {
-    try { result = JSON.parse(content) } catch { /* ignore */ }
+  let effectiveResult = result
+  if (content != null && effectiveResult == null) {
+    try { effectiveResult = JSON.parse(content) } catch { /* ignore */ }
   }
   const data = useMemo(() => {
-    if (!result || !result.ok) return null
-    return result
-  }, [result])
+    if (!effectiveResult || !effectiveResult.ok) return null
+    return effectiveResult
+  }, [effectiveResult])
 
   if (loading) {
     return (
@@ -210,7 +244,7 @@ export default function SixDOFPanel({ result, loading, error, content }) {
   )
 }
 
-function SummaryCard({ label, value }) {
+function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded p-2 border border-gray-700 bg-gray-800 text-center">
       <div className="text-xs text-gray-400">{label}</div>

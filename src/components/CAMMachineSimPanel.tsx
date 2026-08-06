@@ -22,16 +22,65 @@
  *   tablePivotZ     — mm (default 0)
  */
 
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { AlertTriangle, CheckCircle, Loader2, Cpu } from 'lucide-react'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
 // ---------------------------------------------------------------------------
+// Local domain types (no shared type exists for CAM machine-sim results)
+// ---------------------------------------------------------------------------
+
+interface JointPoint {
+  x: number
+  y: number
+  z: number
+  a_deg?: number
+  b_deg?: number
+}
+
+interface StockBounds {
+  x_min?: number
+  x_max?: number
+  y_min?: number
+  y_max?: number
+  z_min?: number
+  z_max?: number
+}
+
+interface CollisionEvent {
+  point_index: number
+  component_a: string
+  component_b: string
+  x: number
+  y: number
+  z: number
+  a_deg?: number
+  b_deg?: number
+}
+
+interface MachineSimResult {
+  n_collisions?: number
+  n_points_checked?: number
+  max_overlap_mm: number
+  collisions?: CollisionEvent[]
+  first_collision?: CollisionEvent
+}
+
+// ---------------------------------------------------------------------------
 // Side-view schematic (XZ plane projection)
 // ---------------------------------------------------------------------------
 
-function MachineSchematic({ points, holderLength = 50, toolLength = 80, holderDia = 32, toolDia = 12, collisions }) {
+interface MachineSchematicProps {
+  points?: JointPoint[]
+  holderLength?: number
+  toolLength?: number
+  holderDia?: number
+  toolDia?: number
+  collisions?: CollisionEvent[]
+}
+
+function MachineSchematic({ points, holderLength = 50, toolLength = 80, holderDia = 32, toolDia = 12, collisions }: MachineSchematicProps) {
   const W = 220
   const H = 180
   const originX = W / 2
@@ -39,8 +88,8 @@ function MachineSchematic({ points, holderLength = 50, toolLength = 80, holderDi
 
   const scale = 0.6   // px per mm
 
-  function px(x) { return originX + x * scale }
-  function pz(z) { return originZ - z * scale }
+  function px(x: number) { return originX + x * scale }
+  function pz(z: number) { return originZ - z * scale }
 
   // Sample a few toolpath points to show tool travel
   const samplePts = points && points.length > 0
@@ -127,6 +176,16 @@ function MachineSchematic({ points, holderLength = 50, toolLength = 80, holderDi
 // Main panel
 // ---------------------------------------------------------------------------
 
+export interface Props {
+  toolpathPoints?: JointPoint[]
+  toolDiameter?: number
+  toolLength?: number
+  holderDiameter?: number
+  holderLength?: number
+  stockBounds?: StockBounds
+  tablePivotZ?: number
+}
+
 export default function CAMMachineSimPanel({
   toolpathPoints,
   toolDiameter = 12,
@@ -135,10 +194,10 @@ export default function CAMMachineSimPanel({
   holderLength = 50,
   stockBounds,
   tablePivotZ = 0,
-}) {
+}: Props) {
   const [running, setRunning] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<MachineSimResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   async function handleRun() {
     if (!toolpathPoints || toolpathPoints.length === 0) {
@@ -150,7 +209,15 @@ export default function CAMMachineSimPanel({
     setResult(null)
 
     try {
-      const body = {
+      const body: {
+        toolpath_points: JointPoint[]
+        tool_diameter_mm: number
+        tool_length_mm: number
+        holder_diameter_mm: number
+        holder_length_mm: number
+        table_pivot_z: number
+        stock_bounds?: StockBounds
+      } = {
         toolpath_points: toolpathPoints,
         tool_diameter_mm: toolDiameter,
         tool_length_mm: toolLength,
@@ -169,10 +236,10 @@ export default function CAMMachineSimPanel({
         const txt = await res.text()
         throw new Error(`${res.status}: ${txt}`)
       }
-      const data = await res.json()
+      const data: MachineSimResult = await res.json()
       setResult(data)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setRunning(false)
     }
@@ -182,7 +249,7 @@ export default function CAMMachineSimPanel({
   const hasCollisions = nCollisions > 0
 
   // Collision pair breakdown: count per (componentA, componentB) pair
-  const pairCounts = {}
+  const pairCounts: Record<string, number> = {}
   if (result?.collisions) {
     for (const c of result.collisions) {
       const key = `${c.component_a} ↔ ${c.component_b}`
@@ -293,7 +360,13 @@ export default function CAMMachineSimPanel({
   )
 }
 
-function StatCell({ label, value, accent = '#a78bfa' }) {
+interface StatCellProps {
+  label: string
+  value?: string | number
+  accent?: string
+}
+
+function StatCell({ label, value, accent = '#a78bfa' }: StatCellProps) {
   return (
     <div style={styles.statCell}>
       <span style={{ color: '#6b7280', fontSize: 10 }}>{label}</span>
@@ -304,7 +377,7 @@ function StatCell({ label, value, accent = '#a78bfa' }) {
   )
 }
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   root: {
     fontFamily: 'ui-monospace,SFMono-Regular,Menlo,monospace',
     fontSize: 12,

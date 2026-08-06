@@ -13,8 +13,9 @@
 // The panel calls LLM tools via the Kerf tool invocation helper if available,
 // falling back to clipboard-friendly JSON instructions when the API is absent.
 
-import { useCallback, useState } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import { ArrowDownToLine, ArrowUpFromLine, CheckCircle, CircuitBoard, Info, Loader, XCircle } from 'lucide-react'
+import type { CircuitJson } from '../types'
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -23,9 +24,43 @@ const STEP_RUNNING = 'running'
 const STEP_OK      = 'ok'
 const STEP_ERROR   = 'error'
 
+type StepStatus = typeof STEP_IDLE | typeof STEP_RUNNING | typeof STEP_OK | typeof STEP_ERROR
+
+// ─── domain result shapes ────────────────────────────────────────────────────
+// elec_export_kicad / elec_import_kicad_pcb are LLM tool calls (see api.js's
+// generic dispatcher, ToolCallResult in src/types/api.ts) — their concrete
+// response shapes aren't declared anywhere shared, so redeclared locally
+// from this panel's own field usage below.
+
+interface KiCadExportResult {
+  error?: string
+  num_components: number
+  num_nets: number
+  pcb_path: string
+}
+
+export interface KiCadImportResult {
+  error?: string
+  num_tracks: number
+  num_vias: number
+  num_footprints: number
+  net_names?: string[]
+}
+
+// Ad-hoc browser-preview tool bridge, not part of src/lib/api.js's callTool dispatcher
+// (see ToolCallResult in src/types/api.ts) — set by the embedding host, not declared
+// anywhere shared, so accessed via a local cast rather than augmenting the global Window
+// (that's T-500's file, out of this slice) — same pattern as Pmi3DOverlay.tsx's `__THREE__`.
+type KerfInvokeTool = <T>(name: string, args: Record<string, unknown>) => Promise<T>
+
+function getKerfInvokeTool(): KerfInvokeTool | undefined {
+  if (typeof window === 'undefined') return undefined
+  return (window as unknown as { __kerf_invoke_tool?: KerfInvokeTool }).__kerf_invoke_tool
+}
+
 // ─── StatusBadge ─────────────────────────────────────────────────────────────
 
-function StatusBadge({ status, message }) {
+function StatusBadge({ status, message }: { status: StepStatus; message?: string }) {
   if (status === STEP_IDLE)    return null
   if (status === STEP_RUNNING) return (
     <div className="flex items-center gap-1.5 text-[11px] text-ink-400">
@@ -50,7 +85,7 @@ function StatusBadge({ status, message }) {
 
 // ─── InfoBox ─────────────────────────────────────────────────────────────────
 
-function InfoBox({ children }) {
+function InfoBox({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-start gap-1.5 rounded bg-ink-800/50 border border-ink-700 px-2.5 py-2 text-[10px] text-ink-400 leading-relaxed">
       <Info size={10} className="mt-0.5 flex-shrink-0 text-ink-500" />
@@ -61,19 +96,25 @@ function InfoBox({ children }) {
 
 // ─── KiCadRoundTripPanel ─────────────────────────────────────────────────────
 
-export default function KiCadRoundTripPanel({ circuitJson, onImportResult }) {
+export interface KiCadRoundTripPanelProps {
+  circuitJson: CircuitJson
+  /** Optional; every call site is a plain `onImportResult?.(...)` invocation below. */
+  onImportResult?: (result: KiCadImportResult) => void
+}
+
+export default function KiCadRoundTripPanel({ circuitJson, onImportResult }: KiCadRoundTripPanelProps) {
   // Export state
   const [exportDir, setExportDir]       = useState('')
   const [exportStem, setExportStem]     = useState('board')
-  const [exportStatus, setExportStatus] = useState(STEP_IDLE)
+  const [exportStatus, setExportStatus] = useState<StepStatus>(STEP_IDLE)
   const [exportMsg, setExportMsg]       = useState('')
-  const [exportResult, setExportResult] = useState(null)
+  const [exportResult, setExportResult] = useState<KiCadExportResult | null>(null)
 
   // Import state
   const [importPath, setImportPath]     = useState('')
-  const [importStatus, setImportStatus] = useState(STEP_IDLE)
+  const [importStatus, setImportStatus] = useState<StepStatus>(STEP_IDLE)
   const [importMsg, setImportMsg]       = useState('')
-  const [importResult, setImportResult] = useState(null)
+  const [importResult, setImportResult] = useState<KiCadImportResult | null>(null)
 
   // ── Export ─────────────────────────────────────────────────────────────
 
@@ -102,11 +143,9 @@ export default function KiCadRoundTripPanel({ circuitJson, onImportResult }) {
         stem: exportStem.trim() || 'board',
       }
 
-      let result = null
+      const invokeTool = getKerfInvokeTool()
 
-      if (typeof window !== 'undefined' && window.__kerf_invoke_tool) {
-        result = await window.__kerf_invoke_tool('elec_export_kicad', toolArgs)
-      } else {
+      if (!invokeTool) {
         // Fallback: display the tool call for the user to run via chat
         setExportStatus(STEP_OK)
         setExportMsg(
@@ -115,6 +154,8 @@ export default function KiCadRoundTripPanel({ circuitJson, onImportResult }) {
         )
         return
       }
+
+      const result = await invokeTool<KiCadExportResult>('elec_export_kicad', toolArgs)
 
       if (result?.error) {
         setExportStatus(STEP_ERROR)
@@ -134,7 +175,7 @@ export default function KiCadRoundTripPanel({ circuitJson, onImportResult }) {
       }
     } catch (err) {
       setExportStatus(STEP_ERROR)
-      setExportMsg(`Unexpected error: ${err.message || String(err)}`)
+      setExportMsg(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
     }
   }, [circuitJson, exportDir, exportStem, importPath])
 
@@ -155,17 +196,17 @@ export default function KiCadRoundTripPanel({ circuitJson, onImportResult }) {
     try {
       const toolArgs = { pcb_path: path }
 
-      let result = null
+      const invokeTool = getKerfInvokeTool()
 
-      if (typeof window !== 'undefined' && window.__kerf_invoke_tool) {
-        result = await window.__kerf_invoke_tool('elec_import_kicad_pcb', toolArgs)
-      } else {
+      if (!invokeTool) {
         setImportStatus(STEP_OK)
         setImportMsg(
           `Run this in Kerf Chat:\n\nelec_import_kicad_pcb(${JSON.stringify(toolArgs, null, 2)})`
         )
         return
       }
+
+      const result = await invokeTool<KiCadImportResult>('elec_import_kicad_pcb', toolArgs)
 
       if (result?.error) {
         setImportStatus(STEP_ERROR)
@@ -182,7 +223,7 @@ export default function KiCadRoundTripPanel({ circuitJson, onImportResult }) {
       onImportResult?.(result)
     } catch (err) {
       setImportStatus(STEP_ERROR)
-      setImportMsg(`Unexpected error: ${err.message || String(err)}`)
+      setImportMsg(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`)
     }
   }, [importPath, onImportResult])
 

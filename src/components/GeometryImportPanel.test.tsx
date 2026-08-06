@@ -1,12 +1,19 @@
-// GeometryImportPanel.test.jsx — vitest, renderToStaticMarkup (no jsdom needed)
+// GeometryImportPanel.test.tsx — vitest, renderToStaticMarkup (no jsdom needed)
+import type { ComponentType } from 'react'
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import {
   detectGeometryFormat,
   isGeometryFile,
-  GeometryImportReport,
-  GeometryImportProgress,
+  GeometryImportReport as GeometryImportReportUntyped,
+  GeometryImportProgress as GeometryImportProgressUntyped,
 } from './GeometryImportPanel.jsx'
+
+// GeometryImportPanel.jsx is not yet migrated (T-515); its destructured props
+// read as required by TS's structural inference even though several are
+// optional at runtime (e.g. warnings is omitted in several cases below).
+const GeometryImportReport = GeometryImportReportUntyped as unknown as ComponentType<Record<string, unknown>>
+const GeometryImportProgress = GeometryImportProgressUntyped as unknown as ComponentType<Record<string, unknown>>
 
 // ---------------------------------------------------------------------------
 // detectGeometryFormat — pure function, no render
@@ -127,7 +134,20 @@ describe('isGeometryFile', () => {
 // GeometryImportReport — SSR rendering
 // ---------------------------------------------------------------------------
 
-const IGES_DATA = {
+interface IgesData {
+  ok: boolean
+  units: string
+  product_id: string
+  source_system: string
+  total_entities: number
+  entity_counts: Record<string, number>
+  nurbs_curves: number
+  nurbs_surfaces: number
+  brep_bodies: number
+  warnings: string[]
+}
+
+const IGES_DATA: IgesData = {
   ok: true,
   units: 'MM',
   product_id: 'BRACKET',

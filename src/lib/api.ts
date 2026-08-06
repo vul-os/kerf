@@ -1,13 +1,47 @@
 import { useAuth } from '../store/auth.js'
 import { toast } from '../components/ToastBus.jsx'
 import { streamSse } from './sseClient.js'
+import type {
+  ApiUser,
+  AuthSession,
+  ApiWorkspace,
+  WorkspaceMember,
+  ApiProject,
+  ApiFile,
+  ApiThread,
+  ApiChatMessage,
+  ProjectMember,
+  ShareLink,
+  ShareInfo,
+  FileRevision,
+  RevisionsSize,
+  PurgeRevisionsResult,
+  ActivityPage,
+  BOMResult,
+  UploadInitResponse,
+  ApiToken,
+  AdminDistributor,
+  AdminPublishersPage,
+  AdminPublisher,
+  ImportResult,
+  CompileIfcResult,
+  TopoRunResult,
+  WirevizResult,
+  PlcLintResult,
+  PrintSliceResult,
+  JewelryCostResult,
+  ClashDetectResult,
+  BuildingEnergyResult,
+  PvShadingResult,
+  ToolCallResult,
+} from '../types/api.js'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
 // Single in-flight refresh promise to coalesce concurrent 401s.
-let refreshing = null
+let refreshing: Promise<string> | null = null
 
-async function refreshAccessToken() {
+async function refreshAccessToken(): Promise<string> {
   if (refreshing) return refreshing
   const { refreshToken, setSession, logout } = useAuth.getState()
   if (!refreshToken) throw new Error('no refresh token')
@@ -45,7 +79,7 @@ export const DEFAULT_TIMEOUT_MS = 60_000
 // will see a clear "request timed out" error rather than an indefinite spinner.
 export const CHAT_TIMEOUT_MS = 180_000
 
-async function fetchWithTimeout(url, init, timeoutMs) {
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number | undefined): Promise<Response> {
   if (!timeoutMs || timeoutMs <= 0) return fetch(url, init)
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), timeoutMs)
@@ -56,32 +90,48 @@ async function fetchWithTimeout(url, init, timeoutMs) {
   }
 }
 
-async function request(
-  path,
-  { method = 'GET', body, headers = {}, auth = true, raw = false, timeoutMs = DEFAULT_TIMEOUT_MS } = {},
-) {
+interface RequestOptions {
+  method?: string
+  body?: unknown
+  headers?: Record<string, string>
+  auth?: boolean
+  raw?: boolean
+  timeoutMs?: number
+}
+
+// request() — thin fetch wrapper shared by every api.* method below.
+//
+// Overloaded so `{ raw: true }` callers (fetchRaw) get back the raw Response,
+// while everyone else gets the parsed-JSON type they asked for via <T>.
+function request(path: string, opts: RequestOptions & { raw: true }): Promise<Response>
+function request<T = unknown>(path: string, opts?: RequestOptions): Promise<T>
+async function request<T = unknown>(
+  path: string,
+  { method = 'GET', body, headers = {}, auth = true, raw = false, timeoutMs = DEFAULT_TIMEOUT_MS }: RequestOptions = {},
+): Promise<T | Response> {
   const url = path.startsWith('http') ? path : `${API_URL}${path}`
-  const h = { 'content-type': 'application/json', ...headers }
+  const h: Record<string, string> = { 'content-type': 'application/json', ...headers }
   if (auth) {
     const token = useAuth.getState().accessToken
     if (token) h.authorization = `Bearer ${token}`
   }
-  const init = {
+  const init: RequestInit = {
     method,
     headers: h,
     body: body == null ? undefined : (typeof body === 'string' ? body : JSON.stringify(body)),
   }
-  let res
+  let res: Response
   try {
     res = await fetchWithTimeout(url, init, timeoutMs)
-  } catch (e) {
-    if (e?.name === 'AbortError') {
-      throw new ApiError(0, `Request timed out after ${Math.round(timeoutMs / 1000)}s. Please try again.`)
+  } catch (e: unknown) {
+    if (e instanceof Error && e.name === 'AbortError') {
+      throw new ApiError(0, `Request timed out after ${Math.round((timeoutMs ?? 0) / 1000)}s. Please try again.`)
     }
     // Network errors (DNS, offline, CORS preflight, etc.) reach here as
     // generic TypeError. Surface them as ApiError so call sites can
     // uniformly catch + render instead of swallowing.
-    throw new ApiError(0, e?.message || 'Network error — check your connection.')
+    const message = e instanceof Error ? e.message : undefined
+    throw new ApiError(0, message || 'Network error — check your connection.')
   }
 
   if (res.status === 401 && auth && useAuth.getState().refreshToken) {
@@ -98,7 +148,7 @@ async function request(
 
   if (res.status === 429) {
     const text = await res.text()
-    let retryAfter = null
+    let retryAfter: number | null = null
     try {
       const body = JSON.parse(text)
       retryAfter = body.retry_after ?? null
@@ -116,34 +166,161 @@ async function request(
     try { msg = JSON.parse(text).error || text } catch { /* ignore */ }
     throw new ApiError(res.status, msg || res.statusText)
   }
-  if (res.status === 204) return null
+  if (res.status === 204) return null as T
   return res.json()
 }
 
 export class ApiError extends Error {
-  constructor(status, message) { super(message); this.status = status }
+  status: number
+  /** Set by readErrorJSON() when the server's error body carries a machine-readable `code`. */
+  code?: string
+  constructor(status: number, message: string) { super(message); this.status = status }
+}
+
+// ---------------------------------------------------------------------------
+// Gaps in src/types/api.ts found while migrating this file (T-505): the
+// shared type doesn't model these two shapes, and this slice does not own
+// src/types/ — see the T-505 report rather than editing it here.
+// ---------------------------------------------------------------------------
+
+/**
+ * ApiWorkspace (src/types/api.ts) has no `avatar_url` field, but
+ * src/routes/WorkspaceSettings.jsx reads/falls back on `ws.avatar_url` after
+ * uploadWorkspaceAvatar/deleteWorkspaceAvatar. Extending locally rather than
+ * widening the shared type (T-501's call).
+ */
+interface ApiWorkspaceWithAvatar extends ApiWorkspace {
+  avatar_url?: string | null
+}
+
+/**
+ * inviteWorkspaceMember's response isn't modeled in src/types/api.ts.
+ * src/routes/WorkspaceMembers.jsx branches on `resp.added` (existing user,
+ * added immediately) vs `resp.invite.token` (no account yet — show a
+ * signup-invite link).
+ */
+interface InviteWorkspaceMemberResult {
+  added?: boolean
+  invite?: { token: string }
+}
+
+/**
+ * ApiFile (src/types/api.ts) has no `mesh_url` field, but
+ * src/store/workspace.ts reads `file.mesh_url` off both api.getFile's result
+ * (loadFileForEditor) and a second internal getFile call in
+ * loadComponentParts — the server-tessellated .glb URL for STEP files
+ * (Performance Phase 3). src/store/workspace.ts's own `WorkspaceFile`
+ * already extends `ApiFile` with an optional `mesh_url`; this mirrors that
+ * same extension at the api.ts boundary rather than widening the shared
+ * type (T-501's call).
+ */
+interface ApiFileWithMesh extends ApiFile {
+  mesh_url?: string | null
+}
+
+/**
+ * ApiThread (src/types/api.ts) has no `is_starred` field, but
+ * src/store/workspace.ts's toggleStar action PATCHes `{ is_starred }`.
+ * (workspace.ts's own `WorkspaceThread` already extends `ApiThread` with
+ * this same field for its store-side type — mirrored here for the same
+ * reason as ApiFileWithMesh above.)
+ */
+interface ApiThreadPatch extends Partial<ApiThread> {
+  is_starred?: boolean
+}
+
+/**
+ * sendMessage's real response is NOT a single ApiChatMessage — it is a
+ * composite of the three rows one chat turn produces. src/types/api.ts's
+ * `ApiChatMessage` lives under the "Threads / chat" section as if it also
+ * covered sendMessage, but src/store/workspace.ts's sendMessage action
+ * destructures `res.user_message` / `res.tool_messages` / `res.assistant_message`
+ * — three separate messages, not one. Real T-501 finding: reported (see the
+ * T-505 report), not edited into the shared type from this slice.
+ */
+export interface SendMessageResult {
+  user_message: ChatMessage
+  tool_messages: Array<ChatMessage & { tool_name?: string }>
+  assistant_message: ChatMessage & { tool_calls?: Array<{ name: string; [key: string]: unknown }> }
+}
+
+/**
+ * ApiChatMessage.part_refs is deliberately `unknown[]` in src/types/api.ts —
+ * that file's own header flags it as having no direct evidence of a
+ * stricter shape. src/store/workspace.ts's `WorkspaceMessage` needs the
+ * stricter local `PartRef[]` and validates it itself; `any[]` bridges the
+ * two independently-typed layers at this boundary rather than redeclaring
+ * either type (`any` is a documented boundary tool per
+ * docs/typescript-migration.md's conventions).
+ */
+type ChatMessage = Omit<ApiChatMessage, 'part_refs'> & { part_refs?: any[] }
+
+/**
+ * streamMessage()'s per-event `data` payload shape genuinely varies by
+ * `event` name (assistant_text_delta vs tool_use_start vs assistant_done,
+ * ...) — a discriminated union keyed by `event` would be the fully-typed
+ * version of this but is out of this slice's scope (T-501 owns
+ * `ChatStreamEvent`, and modeled `data` as `Record<string, unknown>` there,
+ * which is honest about "no fixed shape" but still blocks
+ * src/store/workspace.ts's sendMessageStreaming, which already switches on
+ * `event` and reads whichever fields that event carries). `any` is the
+ * pragmatic boundary type here — see docs/typescript-migration.md's
+ * conventions on `any` as a boundary tool.
+ */
+export interface StreamMessageEvent {
+  event: string
+  data: any
+}
+
+/**
+ * The chunked-upload finalize response is the created File row (id, name,
+ * kind, parent_id, ...) PLUS the blob-storage fields — richer than
+ * src/types/api.ts's `UploadFinalizeResult`, which lacks `name` even though
+ * src/store/workspace.ts's uploadAsset/replacePartModel actions both treat
+ * the result as a full file row (spreading it into the file list, reading
+ * `.name`/`.id`) as well as reading `.storage_key`/`.mime_type` directly.
+ * api.js's own uploadPartModel comment claims the narrower
+ * `{storage_key, mime_type}` shape; the actual consumer needs both. Real
+ * T-501 finding: reported, not edited into the shared type from this slice.
+ */
+export interface ChunkedUploadResult extends ApiFile {
+  storage_key: string
+  mime_type?: string
+}
+
+interface CreateFileBody {
+  name: string
+  kind?: string
+  parent_id?: string | null
+  content?: string
+}
+
+interface SendMessageBody {
+  content: string
+  part_refs?: unknown[]
+  model?: string
 }
 
 export const api = {
   // ---- Auth ----
-  register: (email, password, name) =>
-    request('/auth/register', { method: 'POST', body: { email, password, name }, auth: false }),
-  login: (email, password) =>
-    request('/auth/login', { method: 'POST', body: { email, password }, auth: false }),
-  forgotPassword: (email) =>
-    request('/auth/forgot-password', { method: 'POST', body: { email }, auth: false }),
-  resetPassword: (token, password) =>
-    request('/auth/reset-password', { method: 'POST', body: { token, password }, auth: false }),
+  register: (email: string, password: string, name: string) =>
+    request<AuthSession>('/auth/register', { method: 'POST', body: { email, password, name }, auth: false }),
+  login: (email: string, password: string) =>
+    request<AuthSession>('/auth/login', { method: 'POST', body: { email, password }, auth: false }),
+  forgotPassword: (email: string) =>
+    request<void>('/auth/forgot-password', { method: 'POST', body: { email }, auth: false }),
+  resetPassword: (token: string, password: string) =>
+    request<AuthSession>('/auth/reset-password', { method: 'POST', body: { token, password }, auth: false }),
   requestVerification: () =>
-    request('/auth/request-verification', { method: 'POST', body: {} }),
+    request<void>('/auth/request-verification', { method: 'POST', body: {} }),
   googleAuthUrl: () => `${API_URL}/auth/google/start`,
   githubAuthUrl: () => `${API_URL}/auth/github/login/start`,
   refresh: () => refreshAccessToken(),
-  me: () => request('/api/me'),
-  updateMe: (patch) => request('/api/me', { method: 'PATCH', body: patch }),
-  changePassword: (current_password, new_password) =>
-    request('/api/me/password', { method: 'POST', body: { current_password, new_password } }),
-  deleteMe: () => request('/api/me?confirm=DELETE', { method: 'DELETE' }),
+  me: () => request<ApiUser>('/api/me'),
+  updateMe: (patch: Partial<ApiUser>) => request<ApiUser>('/api/me', { method: 'PATCH', body: patch }),
+  changePassword: (current_password: string, new_password: string) =>
+    request<void>('/api/me/password', { method: 'POST', body: { current_password, new_password } }),
+  deleteMe: () => request<void>('/api/me?confirm=DELETE', { method: 'DELETE' }),
   logout: () => {
     const { refreshToken, logout } = useAuth.getState()
     logout()
@@ -153,26 +330,32 @@ export const api = {
   },
 
   // ---- Workspaces ----
-  listWorkspaces: () => request('/api/workspaces'),
-  getWorkspace: (slug) => request(`/api/workspaces/${encodeURIComponent(slug)}`),
-  createWorkspace: (body) => request('/api/workspaces', { method: 'POST', body }),
-  updateWorkspace: (slug, patch) =>
-    request(`/api/workspaces/${encodeURIComponent(slug)}`, { method: 'PATCH', body: patch }),
-  deleteWorkspace: (slug) =>
-    request(`/api/workspaces/${encodeURIComponent(slug)}`, { method: 'DELETE' }),
-  inviteWorkspaceMember: (slug, email, role) =>
-    request(`/api/workspaces/${encodeURIComponent(slug)}/members`, { method: 'POST', body: { email, role } }),
-  removeWorkspaceMember: (slug, userId) =>
-    request(`/api/workspaces/${encodeURIComponent(slug)}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' }),
-  changeWorkspaceMemberRole: (slug, userId, role) =>
-    request(`/api/workspaces/${encodeURIComponent(slug)}/members/${encodeURIComponent(userId)}`, { method: 'PATCH', body: { role } }),
-  uploadWorkspaceAvatar: async (slug, blob) => {
+  // src/store/workspaces.ts's loadAll defensively accepts either a bare
+  // array OR a `{ workspaces: [...] }` wrapper (`Array.isArray(list) ? list
+  // : list?.workspaces || []`) — real finding: api.js's own comment gives no
+  // evidence either way, and this union is honest about that rather than
+  // asserting the bare-array shape workspaces.ts's fallback implies might
+  // not always hold. Reported in the T-505 report, not resolved here.
+  listWorkspaces: () => request<ApiWorkspace[] | { workspaces: ApiWorkspace[] }>('/api/workspaces'),
+  getWorkspace: (slug: string) => request<ApiWorkspace>(`/api/workspaces/${encodeURIComponent(slug)}`),
+  createWorkspace: (body: Partial<ApiWorkspace>) => request<ApiWorkspace>('/api/workspaces', { method: 'POST', body }),
+  updateWorkspace: (slug: string, patch: Partial<ApiWorkspace>) =>
+    request<ApiWorkspace>(`/api/workspaces/${encodeURIComponent(slug)}`, { method: 'PATCH', body: patch }),
+  deleteWorkspace: (slug: string) =>
+    request<void>(`/api/workspaces/${encodeURIComponent(slug)}`, { method: 'DELETE' }),
+  inviteWorkspaceMember: (slug: string, email: string, role: string) =>
+    request<InviteWorkspaceMemberResult>(`/api/workspaces/${encodeURIComponent(slug)}/members`, { method: 'POST', body: { email, role } }),
+  removeWorkspaceMember: (slug: string, userId: string) =>
+    request<void>(`/api/workspaces/${encodeURIComponent(slug)}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' }),
+  changeWorkspaceMemberRole: (slug: string, userId: string, role: string) =>
+    request<WorkspaceMember>(`/api/workspaces/${encodeURIComponent(slug)}/members/${encodeURIComponent(userId)}`, { method: 'PATCH', body: { role } }),
+  uploadWorkspaceAvatar: async (slug: string, blob: Blob & { name?: string }): Promise<ApiWorkspaceWithAvatar> => {
     const fd = new FormData()
     const name = (blob && blob.name) || 'avatar.png'
     fd.append('file', blob, name)
     const url = `${API_URL}/api/workspaces/${encodeURIComponent(slug)}/avatar`
     const token = useAuth.getState().accessToken
-    const headers = {}
+    const headers: Record<string, string> = {}
     if (token) headers.authorization = `Bearer ${token}`
     let res = await fetch(url, { method: 'POST', headers, body: fd })
     if (res.status === 401 && useAuth.getState().refreshToken) {
@@ -190,15 +373,15 @@ export const api = {
     }
     return res.json()
   },
-  deleteWorkspaceAvatar: (slug) =>
-    request(`/api/workspaces/${encodeURIComponent(slug)}/avatar`, { method: 'DELETE' }),
+  deleteWorkspaceAvatar: (slug: string) =>
+    request<ApiWorkspaceWithAvatar>(`/api/workspaces/${encodeURIComponent(slug)}/avatar`, { method: 'DELETE' }),
 
   // ---- Projects ----
   // listProjects(workspaceId, { tag })
   // - workspaceId: optional. When set, scopes the listing to that workspace.
   // - tag: optional string or string[] of tag filters; multiple tags are
   //   ANDed server-side (every tag must be present on the row).
-  listProjects: (workspaceId, opts = {}) => {
+  listProjects: (workspaceId?: string | null, opts: { tag?: string | string[] } = {}) => {
     const q = new URLSearchParams()
     if (workspaceId) q.set('workspace_id', workspaceId)
     const tags = Array.isArray(opts.tag) ? opts.tag : (opts.tag ? [opts.tag] : [])
@@ -206,34 +389,34 @@ export const api = {
       if (t) q.append('tag', t)
     }
     const qs = q.toString()
-    return request(`/api/projects${qs ? `?${qs}` : ''}`)
+    return request<ApiProject[]>(`/api/projects${qs ? `?${qs}` : ''}`)
   },
   // createProject — body is `{ workspace_id, name, description, tags?, starter? }`.
   // - tags: array of free-form strings; the backend trims+dedupes.
   // - starter: "jscad" | "circuit" | "blank"; defaults to "jscad" server-side.
   // Old (name, description) positional shape is still accepted for
   // back-compat — the workspace store fills workspace_id when it's missing.
-  createProject: (nameOrBody, description) => {
+  createProject: (nameOrBody: string | Partial<ApiProject>, description?: string) => {
     if (nameOrBody && typeof nameOrBody === 'object') {
-      return request('/api/projects', { method: 'POST', body: nameOrBody })
+      return request<ApiProject>('/api/projects', { method: 'POST', body: nameOrBody })
     }
     const body = { name: nameOrBody, description }
-    return request('/api/projects', { method: 'POST', body })
+    return request<ApiProject>('/api/projects', { method: 'POST', body })
   },
-  getProject: (id) => request(`/api/projects/${id}`),
-  updateProject: (id, patch) =>
-    request(`/api/projects/${id}`, { method: 'PATCH', body: patch }),
-  deleteProject: (id) =>
-    request(`/api/projects/${id}`, { method: 'DELETE' }),
+  getProject: (id: string) => request<ApiProject>(`/api/projects/${id}`),
+  updateProject: (id: string, patch: Partial<ApiProject>) =>
+    request<ApiProject>(`/api/projects/${id}`, { method: 'PATCH', body: patch }),
+  deleteProject: (id: string) =>
+    request<void>(`/api/projects/${id}`, { method: 'DELETE' }),
 
   // Upload a JPEG thumbnail rendered client-side. Multipart, so we
   // bypass the JSON request() helper.
-  uploadProjectThumbnail: async (projectId, blob) => {
+  uploadProjectThumbnail: async (projectId: string, blob: Blob): Promise<ApiProject> => {
     const fd = new FormData()
     fd.append('file', blob, 'thumbnail.jpg')
     const url = `${API_URL}/api/projects/${projectId}/thumbnail`
     const token = useAuth.getState().accessToken
-    const headers = {}
+    const headers: Record<string, string> = {}
     if (token) headers.authorization = `Bearer ${token}`
     let res = await fetch(url, { method: 'POST', headers, body: fd })
     if (res.status === 401 && useAuth.getState().refreshToken) {
@@ -254,23 +437,27 @@ export const api = {
   // `workshop/` folder); the old DB-gallery endpoints were retired.
 
   // ---- Files / Assemblies ----
-  listFiles: (projectId) => request(`/api/projects/${projectId}/files`),
-  createFile: (projectId, { name, kind = 'file', parent_id = null, content = '' }) =>
-    request(`/api/projects/${projectId}/files`, { method: 'POST', body: { name, kind, parent_id, content } }),
-  getFile: (projectId, fileId) => request(`/api/projects/${projectId}/files/${fileId}`),
-  updateFile: (projectId, fileId, patch) =>
-    request(`/api/projects/${projectId}/files/${fileId}`, { method: 'PATCH', body: patch }),
-  deleteFile: (projectId, fileId) =>
-    request(`/api/projects/${projectId}/files/${fileId}`, { method: 'DELETE' }),
+  listFiles: (projectId: string) => request<ApiFileWithMesh[]>(`/api/projects/${projectId}/files`),
+  createFile: (projectId: string, { name, kind = 'file', parent_id = null, content = '' }: CreateFileBody) =>
+    request<ApiFileWithMesh>(`/api/projects/${projectId}/files`, { method: 'POST', body: { name, kind, parent_id, content } }),
+  getFile: (projectId: string, fileId: string) => request<ApiFileWithMesh>(`/api/projects/${projectId}/files/${fileId}`),
+  updateFile: (projectId: string, fileId: string, patch: Partial<ApiFile>) =>
+    request<ApiFileWithMesh>(`/api/projects/${projectId}/files/${fileId}`, { method: 'PATCH', body: patch }),
+  deleteFile: (projectId: string, fileId: string) =>
+    request<void>(`/api/projects/${projectId}/files/${fileId}`, { method: 'DELETE' }),
 
   // fetchRaw — returns the raw Response (not parsed JSON). Used by the
   // component-substitution path to fetch STEP blob bytes.
-  fetchRaw: (path, init = {}) => request(path, { ...init, raw: true }),
+  fetchRaw: (path: string, init: RequestOptions = {}) => request(path, { ...init, raw: true }),
 
   // Upload a binary asset (e.g. STEP file). The backend should return a File row.
   // We use multipart/form-data; do NOT set content-type — the browser will set
   // the correct boundary header automatically.
-  uploadAsset: async (projectId, file, { kind = 'step', parent_id = null } = {}) => {
+  uploadAsset: async (
+    projectId: string,
+    file: File,
+    { kind = 'step', parent_id = null }: { kind?: string; parent_id?: string | null } = {},
+  ): Promise<ApiFile> => {
     const fd = new FormData()
     fd.append('file', file)
     fd.append('name', file.name)
@@ -278,7 +465,7 @@ export const api = {
     if (parent_id) fd.append('parent_id', parent_id)
     const url = `${API_URL}/api/projects/${projectId}/assets`
     const token = useAuth.getState().accessToken
-    const headers = {}
+    const headers: Record<string, string> = {}
     if (token) headers.authorization = `Bearer ${token}`
     let res = await fetch(url, { method: 'POST', headers, body: fd })
     if (res.status === 401 && useAuth.getState().refreshToken) {
@@ -298,10 +485,10 @@ export const api = {
   },
 
   // Download a binary file. Returns an ArrayBuffer; uses bearer auth.
-  downloadFileURL: async (projectId, fileId) => {
+  downloadFileURL: async (projectId: string, fileId: string): Promise<ArrayBuffer> => {
     const url = `${API_URL}/api/projects/${projectId}/files/${fileId}/download`
     const token = useAuth.getState().accessToken
-    const headers = {}
+    const headers: Record<string, string> = {}
     if (token) headers.authorization = `Bearer ${token}`
     let res = await fetch(url, { headers })
     if (res.status === 401 && useAuth.getState().refreshToken) {
@@ -319,10 +506,10 @@ export const api = {
   },
 
   // ---- Chat ----
-  listMessages: (projectId, threadId) =>
-    request(`/api/projects/${projectId}/threads/${threadId}/messages`),
-  sendMessage: (projectId, threadId, { content, part_refs, model }) =>
-    request(`/api/projects/${projectId}/threads/${threadId}/messages`, {
+  listMessages: (projectId: string, threadId: string) =>
+    request<ChatMessage[]>(`/api/projects/${projectId}/threads/${threadId}/messages`),
+  sendMessage: (projectId: string, threadId: string, { content, part_refs, model }: SendMessageBody) =>
+    request<SendMessageResult>(`/api/projects/${projectId}/threads/${threadId}/messages`, {
       method: 'POST',
       body: { content, part_refs, model },
       // Chat can legitimately take 30-90s with tool calls; allow up to 3 min
@@ -335,14 +522,13 @@ export const api = {
    *
    * Returns an AsyncIterable<{ event: string, data: object }>.
    * The caller owns the AbortController; call abortController.abort() to cancel.
-   *
-   * @param {string} projectId
-   * @param {string} threadId
-   * @param {{ content: string, part_refs?: any[], model?: string }} body
-   * @param {AbortSignal} [abortSignal]
-   * @returns {AsyncIterable<{ event: string, data: object }>}
    */
-  streamMessage(projectId, threadId, { content, part_refs, model }, abortSignal) {
+  streamMessage(
+    projectId: string,
+    threadId: string,
+    { content, part_refs, model }: SendMessageBody,
+    abortSignal?: AbortSignal,
+  ): AsyncIterable<StreamMessageEvent> {
     const url = `${API_URL}/api/projects/${projectId}/threads/${threadId}/messages/stream`
     const token = useAuth.getState().accessToken
     const headers = token ? { authorization: `Bearer ${token}` } : {}
@@ -350,58 +536,58 @@ export const api = {
   },
 
   // ---- Threads ----
-  listThreads: (projectId, fileId) => {
+  listThreads: (projectId: string, fileId?: string) => {
     const q = fileId ? `?file_id=${fileId}` : ''
-    return request(`/api/projects/${projectId}/threads${q}`)
+    return request<ApiThread[]>(`/api/projects/${projectId}/threads${q}`)
   },
-  createThread: (projectId, { title, file_id, model } = {}) =>
-    request(`/api/projects/${projectId}/threads`, {
+  createThread: (projectId: string, { title, file_id, model }: Partial<ApiThread> = {}) =>
+    request<ApiThread>(`/api/projects/${projectId}/threads`, {
       method: 'POST',
       body: { title, file_id, model },
     }),
-  updateThread: (projectId, threadId, patch) =>
-    request(`/api/projects/${projectId}/threads/${threadId}`, {
+  updateThread: (projectId: string, threadId: string, patch: ApiThreadPatch) =>
+    request<ApiThread>(`/api/projects/${projectId}/threads/${threadId}`, {
       method: 'PATCH',
       body: patch,
     }),
-  deleteThread: (projectId, threadId) =>
-    request(`/api/projects/${projectId}/threads/${threadId}`, { method: 'DELETE' }),
+  deleteThread: (projectId: string, threadId: string) =>
+    request<void>(`/api/projects/${projectId}/threads/${threadId}`, { method: 'DELETE' }),
 
   // ---- Members ----
-  listMembers: (projectId) => request(`/api/projects/${projectId}/members`),
-  inviteMember: (projectId, { email, role }) =>
-    request(`/api/projects/${projectId}/members`, {
+  listMembers: (projectId: string) => request<ProjectMember[]>(`/api/projects/${projectId}/members`),
+  inviteMember: (projectId: string, { email, role }: { email: string; role: string }) =>
+    request<ProjectMember>(`/api/projects/${projectId}/members`, {
       method: 'POST',
       body: { email, role },
     }),
-  updateMember: (projectId, userId, { role }) =>
-    request(`/api/projects/${projectId}/members/${userId}`, {
+  updateMember: (projectId: string, userId: string, { role }: { role: string }) =>
+    request<ProjectMember>(`/api/projects/${projectId}/members/${userId}`, {
       method: 'PATCH',
       body: { role },
     }),
-  removeMember: (projectId, userId) =>
-    request(`/api/projects/${projectId}/members/${userId}`, { method: 'DELETE' }),
+  removeMember: (projectId: string, userId: string) =>
+    request<void>(`/api/projects/${projectId}/members/${userId}`, { method: 'DELETE' }),
 
   // ---- Share Links ----
-  listShareLinks: (projectId) => request(`/api/projects/${projectId}/share/links`),
-  createShareLink: (projectId, { role, expires_at, max_uses } = {}) =>
-    request(`/api/projects/${projectId}/share/links`, {
+  listShareLinks: (projectId: string) => request<ShareLink[]>(`/api/projects/${projectId}/share/links`),
+  createShareLink: (projectId: string, { role, expires_at, max_uses }: Partial<ShareLink> = {}) =>
+    request<ShareLink>(`/api/projects/${projectId}/share/links`, {
       method: 'POST',
       body: { role, expires_at, max_uses },
     }),
-  revokeShareLink: (projectId, linkId) =>
-    request(`/api/projects/${projectId}/share/links/${linkId}`, { method: 'DELETE' }),
-  getShareInfo: (token) =>
-    request(`/api/share/${token}`, { auth: false }),
-  acceptShareLink: (token) =>
-    request(`/api/share/${token}/accept`, { method: 'POST' }),
-  addShareComment: (token, customerName, body) =>
-    request(`/api/share/${token}/comments`, { method: 'POST', body: { customer_name: customerName, body }, auth: false }),
-  recordShareApproval: (token, customerName, signature) =>
-    request(`/api/share/${token}/approve`, { method: 'POST', body: { customer_name: customerName, signature }, auth: false }),
+  revokeShareLink: (projectId: string, linkId: string) =>
+    request<void>(`/api/projects/${projectId}/share/links/${linkId}`, { method: 'DELETE' }),
+  getShareInfo: (token: string) =>
+    request<ShareInfo>(`/api/share/${token}`, { auth: false }),
+  acceptShareLink: (token: string) =>
+    request<void>(`/api/share/${token}/accept`, { method: 'POST' }),
+  addShareComment: (token: string, customerName: string, body: string) =>
+    request<void>(`/api/share/${token}/comments`, { method: 'POST', body: { customer_name: customerName, body }, auth: false }),
+  recordShareApproval: (token: string, customerName: string, signature: string) =>
+    request<void>(`/api/share/${token}/approve`, { method: 'POST', body: { customer_name: customerName, signature }, auth: false }),
 
   // ---- Models ----
-  listModels: () => request('/api/models'),
+  listModels: () => request<unknown[]>('/api/models'),
 
   // Chunked, resumable binary upload (Phase 2). Used for STEP files; see
   // ROADMAP.md "Performance roadmap". Computes a SHA-256 of the file, asks the backend for a
@@ -409,31 +595,31 @@ export const api = {
   // with bounded concurrency + per-chunk retry, then finalizes.
   //
   // onProgress({received, total, bytes}) fires after each chunk completes.
-  uploadAssetChunked: (projectId, file, opts = {}) =>
+  uploadAssetChunked: (projectId: string, file: File, opts: UploadAssetChunkedOpts = {}) =>
     uploadAssetChunked(projectId, file, opts),
-  cancelUpload: (projectId, uploadId) => cancelUpload(projectId, uploadId),
+  cancelUpload: (projectId: string, uploadId: string) => cancelUpload(projectId, uploadId),
 
   // ---- Bill of Materials ----
-  getBOM: (projectId) => request(`/api/projects/${projectId}/bom`),
+  getBOM: (projectId: string) => request<BOMResult>(`/api/projects/${projectId}/bom`),
 
   // ---- Activity timeline ----
   // Per-project merged feed of recent events (file revisions, chat messages,
   // file lifecycle, project_created). `before` is an ISO timestamp returned
   // as `next_cursor` by the previous page; pass it to walk further back.
-  getActivity: (projectId, before, limit) =>
-    request(`/api/projects/${projectId}/activity?limit=${limit ?? 50}${before ? `&before=${encodeURIComponent(before)}` : ''}`),
+  getActivity: (projectId: string, before?: string | null, limit?: number) =>
+    request<ActivityPage>(`/api/projects/${projectId}/activity?limit=${limit ?? 50}${before ? `&before=${encodeURIComponent(before)}` : ''}`),
 
   // ---- Library: Part photos ----
   // Multipart upload of a single image. Backend resizes (longest side ≤
   // 1024 px), stores as JPEG, and appends to the Part's photos array. The
   // first photo on a Part is auto-promoted to primary.
-  uploadPartPhoto: async (projectId, fileId, blob) => {
+  uploadPartPhoto: async (projectId: string, fileId: string, blob: Blob & { name?: string }): Promise<ApiFileWithMesh> => {
     const fd = new FormData()
     const name = (blob && blob.name) || 'photo.jpg'
     fd.append('file', blob, name)
     const url = `${API_URL}/api/projects/${projectId}/files/${fileId}/photos`
     const token = useAuth.getState().accessToken
-    const headers = {}
+    const headers: Record<string, string> = {}
     if (token) headers.authorization = `Bearer ${token}`
     let res = await fetch(url, { method: 'POST', headers, body: fd })
     if (res.status === 401 && useAuth.getState().refreshToken) {
@@ -451,11 +637,11 @@ export const api = {
     }
     return res.json()
   },
-  deletePartPhoto: (projectId, fileId, storageKey) =>
-    request(`/api/projects/${projectId}/files/${fileId}/photos?key=${encodeURIComponent(storageKey)}`,
+  deletePartPhoto: (projectId: string, fileId: string, storageKey: string) =>
+    request<ApiFileWithMesh>(`/api/projects/${projectId}/files/${fileId}/photos?key=${encodeURIComponent(storageKey)}`,
       { method: 'DELETE' }),
-  setPrimaryPartPhoto: (projectId, fileId, storageKey) =>
-    request(`/api/projects/${projectId}/files/${fileId}/photos/primary?key=${encodeURIComponent(storageKey)}`,
+  setPrimaryPartPhoto: (projectId: string, fileId: string, storageKey: string) =>
+    request<ApiFileWithMesh>(`/api/projects/${projectId}/files/${fileId}/photos/primary?key=${encodeURIComponent(storageKey)}`,
       { method: 'PATCH' }),
 
   // ---- Library: Part 3D model ----
@@ -463,7 +649,12 @@ export const api = {
   // {storage_key, mime_type} pair. Used by LibraryEditor's "Attach model"
   // affordance — the workspace store also has a higher-level
   // `replacePartModel` action that wraps this with revision recording.
-  uploadPartModel: async (projectId, blob, fileName, opts = {}) => {
+  uploadPartModel: async (
+    projectId: string,
+    blob: Blob,
+    fileName?: string,
+    opts: UploadAssetChunkedOpts = {},
+  ): Promise<ChunkedUploadResult> => {
     const file = blob instanceof File
       ? blob
       : new File([blob], fileName || 'model.step', { type: blob.type || 'model/step' })
@@ -476,31 +667,25 @@ export const api = {
   },
 
   // ---- File revisions (per-file undo history) ----
-  getRevisionsSize: (projectId) =>
-    request(`/api/projects/${projectId}/revisions/size`),
-  listRevisions: (projectId, fileId, limit) =>
-    request(`/api/projects/${projectId}/files/${fileId}/revisions${limit ? `?limit=${limit}` : ''}`),
-  getRevision: (projectId, fileId, revisionId) =>
-    request(`/api/projects/${projectId}/files/${fileId}/revisions/${revisionId}`),
+  getRevisionsSize: (projectId: string) =>
+    request<RevisionsSize>(`/api/projects/${projectId}/revisions/size`),
+  listRevisions: (projectId: string, fileId: string, limit?: number) =>
+    request<FileRevision[]>(`/api/projects/${projectId}/files/${fileId}/revisions${limit ? `?limit=${limit}` : ''}`),
+  getRevision: (projectId: string, fileId: string, revisionId: string) =>
+    request<FileRevision>(`/api/projects/${projectId}/files/${fileId}/revisions/${revisionId}`),
   // Lazy-load the full reconstructed content for a single revision.
   // The list endpoint intentionally omits content; call this only when the
   // user explicitly requests it (e.g. "Show full content" in the panel).
-  getRevisionContent: (projectId, fileId, revisionId) =>
-    request(`/api/projects/${projectId}/files/${fileId}/revisions/${revisionId}/content`),
-  restoreRevision: (projectId, fileId, revisionId) =>
-    request(`/api/projects/${projectId}/files/${fileId}/restore/${revisionId}`, { method: 'POST' }),
-
-  // Get total storage estimate for a project's file_revisions.
-  // Returns {total_bytes, revision_count, by_file: [{file_id, file_name, bytes, count}]}
-  getRevisionsSize: (projectId) =>
-    request(`/api/projects/${projectId}/revisions/size`),
+  getRevisionContent: (projectId: string, fileId: string, revisionId: string) =>
+    request<FileRevision & { content: string }>(`/api/projects/${projectId}/files/${fileId}/revisions/${revisionId}/content`),
+  restoreRevision: (projectId: string, fileId: string, revisionId: string) =>
+    request<ApiFileWithMesh>(`/api/projects/${projectId}/files/${fileId}/restore/${revisionId}`, { method: 'POST' }),
 
   // Purge old per-keystroke revision history for a project.
   // keepLast: number of most-recent revisions to retain per file (min 1).
-  // Returns {removed_rows, freed_bytes}.
-  purgeRevisions: (projectId, { keepLast = 5 } = {}) =>
-    request(
-      `/api/projects/${projectId}/revisions?keep_last=${encodeURIComponent(keepLast)}&confirm=PURGE`,
+  purgeRevisions: (projectId: string, { keepLast = 5 }: { keepLast?: number } = {}) =>
+    request<PurgeRevisionsResult>(
+      `/api/projects/${projectId}/revisions?keep_last=${encodeURIComponent(String(keepLast))}&confirm=PURGE`,
       { method: 'DELETE' },
     ),
 
@@ -508,13 +693,13 @@ export const api = {
   // Upload a new avatar from the user's local picker. The backend
   // resizes server-side (256x256, JPEG q=85) and returns the updated
   // user row with a freshly resolved avatar_url.
-  uploadAvatar: async (blob) => {
+  uploadAvatar: async (blob: Blob & { name?: string }): Promise<ApiUser> => {
     const fd = new FormData()
     const name = (blob && blob.name) || 'avatar.jpg'
     fd.append('file', blob, name)
     const url = `${API_URL}/api/me/avatar`
     const token = useAuth.getState().accessToken
-    const headers = {}
+    const headers: Record<string, string> = {}
     if (token) headers.authorization = `Bearer ${token}`
     let res = await fetch(url, { method: 'POST', headers, body: fd })
     if (res.status === 401 && useAuth.getState().refreshToken) {
@@ -532,26 +717,26 @@ export const api = {
     }
     return res.json()
   },
-  deleteAvatar: () => request('/api/me/avatar', { method: 'DELETE' }),
+  deleteAvatar: () => request<void>('/api/me/avatar', { method: 'DELETE' }),
 
   // ---- API Tokens ----
-  createAPIToken: (name) => request('/api-tokens', { method: 'POST', body: { name } }),
-  listAPITokens: () => request('/api-tokens'),
-  revokeAPIToken: (tokenID) => request(`/api-tokens/${encodeURIComponent(tokenID)}`, { method: 'DELETE' }),
+  createAPIToken: (name: string) => request<ApiToken>('/api-tokens', { method: 'POST', body: { name } }),
+  listAPITokens: () => request<ApiToken[]>('/api-tokens'),
+  revokeAPIToken: (tokenID: string) => request<void>(`/api-tokens/${encodeURIComponent(tokenID)}`, { method: 'DELETE' }),
 
   // ---- Admin: distributor credentials (Library Phase 2) ----
   // All admin-only (account_role='admin'). The list endpoint returns
   // unconfigured rows too, so the UI can render a stub "configure"
   // affordance for each known distributor.
   admin: {
-    listDistributors: () => request('/api/admin/distributors'),
-    updateDistributor: (name, payload) =>
-      request(`/api/admin/distributors/${encodeURIComponent(name)}`, {
+    listDistributors: () => request<AdminDistributor[]>('/api/admin/distributors'),
+    updateDistributor: (name: string, payload: Record<string, unknown>) =>
+      request<AdminDistributor>(`/api/admin/distributors/${encodeURIComponent(name)}`, {
         method: 'PUT',
         body: payload,
       }),
-    deleteDistributor: (name) =>
-      request(`/api/admin/distributors/${encodeURIComponent(name)}`, {
+    deleteDistributor: (name: string) =>
+      request<void>(`/api/admin/distributors/${encodeURIComponent(name)}`, {
         method: 'DELETE',
       }),
 
@@ -559,17 +744,22 @@ export const api = {
     // returns user rows with a library_count rollup and a
     // next_cursor for pagination. Search filters on email + name
     // server-side; verified_only=true narrows to flagged accounts.
-    listPublishers: ({ search, verifiedOnly, cursor, limit } = {}) => {
+    listPublishers: ({ search, verifiedOnly, cursor, limit }: {
+      search?: string
+      verifiedOnly?: boolean
+      cursor?: string
+      limit?: number
+    } = {}) => {
       const qs = []
       if (search) qs.push(`search=${encodeURIComponent(search)}`)
       if (verifiedOnly) qs.push('verified_only=true')
       if (cursor) qs.push(`cursor=${encodeURIComponent(cursor)}`)
       if (limit) qs.push(`limit=${limit}`)
       const tail = qs.length ? `?${qs.join('&')}` : ''
-      return request(`/api/admin/publishers${tail}`)
+      return request<AdminPublishersPage>(`/api/admin/publishers${tail}`)
     },
-    setPublisherVerified: (userId, isVerified) =>
-      request(`/api/admin/publishers/${encodeURIComponent(userId)}`, {
+    setPublisherVerified: (userId: string, isVerified: boolean) =>
+      request<AdminPublisher>(`/api/admin/publishers/${encodeURIComponent(userId)}`, {
         method: 'PUT',
         body: { is_verified_publisher: !!isVerified },
       }),
@@ -577,15 +767,21 @@ export const api = {
 
   // ---- Library Phase 2: per-Part distributor refresh ----
   // Synchronous. The endpoint returns {updated: N, content: "<JSON>"}.
-  refreshPartDistributors: (projectId, fileId) =>
-    request(
+  refreshPartDistributors: (projectId: string, fileId: string) =>
+    request<{ updated: number; content: string }>(
       `/api/projects/${projectId}/files/${fileId}/distributors/refresh`,
       { method: 'POST' },
     ),
 
   // ---- Tolerance stack-up run ----
-  runTolerance: (projectId, fileId, { method = 'monte_carlo', samples = 10000, rss_k = 3.0 } = {}) =>
-    request(
+  // Response shape is not documented in api.js and not modeled in
+  // src/types/api.ts — genuinely open-ended here, same as ToolCallResult.
+  runTolerance: (projectId: string, fileId: string, { method = 'monte_carlo', samples = 10000, rss_k = 3.0 }: {
+    method?: string
+    samples?: number
+    rss_k?: number
+  } = {}) =>
+    request<unknown>(
       `/api/projects/${projectId}/files/${fileId}/tolerance/run`,
       { method: 'POST', body: { method, samples, rss_k } },
     ),
@@ -594,8 +790,8 @@ export const api = {
   // Kick off a FreeCAD import given a blob/asset id returned by uploadAsset
   // or uploadAssetChunked. Calls the import_freecad_project LLM tool via the
   // standard project-level tool-call route.
-  importFreecadProject: (projectId, fileBlobId, opts = {}) =>
-    request(`/api/projects/${projectId}/imports/freecad`, {
+  importFreecadProject: (projectId: string, fileBlobId: string, opts: { importFolder?: string; mode?: string } = {}) =>
+    request<ImportResult>(`/api/projects/${projectId}/imports/freecad`, {
       method: 'POST',
       body: {
         file_blob_id: fileBlobId,
@@ -606,9 +802,8 @@ export const api = {
 
   // ---- IFC import ----
   // Import a .ifc file into a project as a .bim architecture file.
-  // Returns { created_file, stats, warnings, import_folder }.
-  importIFC: (projectId, fileBlobId, opts = {}) =>
-    request(`/api/projects/${projectId}/imports/ifc`, {
+  importIFC: (projectId: string, fileBlobId: string, opts: { importFolder?: string; mode?: string } = {}) =>
+    request<ImportResult>(`/api/projects/${projectId}/imports/ifc`, {
       method: 'POST',
       body: {
         file_blob_id: fileBlobId,
@@ -619,27 +814,23 @@ export const api = {
 
   // ---- BIM → IFC compile ----
   // Compiles a .bim file's content to IFC4 (via IfcOpenShell) for the viewer.
-  // Returns { ifc_base64: string, warnings: string[], errors: string[] }.
-  compileIfc: (bimContent) =>
-    request(`/compile-ifc`, { method: 'POST', body: { bim_content: bimContent } }),
+  compileIfc: (bimContent: string) =>
+    request<CompileIfcResult>(`/compile-ifc`, { method: 'POST', body: { bim_content: bimContent } }),
 
   // ---- Topology optimisation run ----
   // POSTs to the kerf-api thin handler which forwards to pyworker /run-topo.
-  // Returns { job_id, status } or { status: 'pending' } when engine not deployed.
-  runTopo: (projectId, fileId) =>
-    request(`/api/projects/${projectId}/files/${fileId}/topo/run`, { method: 'POST' }),
+  runTopo: (projectId: string, fileId: string) =>
+    request<TopoRunResult>(`/api/projects/${projectId}/files/${fileId}/topo/run`, { method: 'POST' }),
 
   // ---- Wiring diagram render ----
   // POSTs to the kerf-api thin handler which forwards to pyworker /run-wireviz.
-  // Returns { svg: string|null, warnings: string[] }.
-  runWireviz: (projectId, fileId) =>
-    request(`/api/projects/${projectId}/files/${fileId}/wiring/run`, { method: 'POST' }),
+  runWireviz: (projectId: string, fileId: string) =>
+    request<WirevizResult>(`/api/projects/${projectId}/files/${fileId}/wiring/run`, { method: 'POST' }),
 
   // ---- PLC lint ----
-  // POSTs ST source directly to pyworker POST /lint-plc via the kerf-api thin
-  // handler.  Returns { diagnostics: [...], warnings: [...] }.
-  lintPLC: (projectId, source) =>
-    request(`/api/projects/${projectId}/plc/lint`, {
+  // POSTs ST source directly to pyworker POST /lint-plc via the kerf-api thin handler.
+  lintPLC: (projectId: string, source: string) =>
+    request<PlcLintResult>(`/api/projects/${projectId}/plc/lint`, {
       method: 'POST',
       body: { source },
     }),
@@ -647,23 +838,15 @@ export const api = {
   // ---- 3D-print slicing (kerf-slicing plugin, CuraEngine subprocess) ----
   // Slices the STL mesh referenced by the .print config file via the
   // pyworker POST /run-print-slice route. Returns G-code metadata + preview.
-  // Response shape: { gcode, layer_count, print_time_s, filament_mm,
-  //                   gcode_bytes, warnings, error }
-  runPrintSlice: (projectId, fileId) =>
-    request(`/api/projects/${projectId}/files/${fileId}/print-slice`, {
+  runPrintSlice: (projectId: string, fileId: string) =>
+    request<PrintSliceResult>(`/api/projects/${projectId}/files/${fileId}/print-slice`, {
       method: 'POST',
     }),
 
   // ---- Jewelry metal-cost estimator ----
   // Pure-math endpoint — no file required.
-  // Body: { volume_mm3, metal, density_g_cm3?, metal_price_per_gram?,
-  //         labor?, finishing?, casting_allowance_pct?,
-  //         compare_metals?, compare_prices? }
-  // Response: { estimate: {...}, comparison?: [...] }
-  // estimate fields: net_grams, net_dwt, net_ozt, gross_grams, gross_dwt,
-  //   gross_ozt, metal_cost, labor, finishing, total_cost, allowance_pct, label
-  jewelryMetalCost: (projectId, params) =>
-    request(`/api/projects/${projectId}/jewelry/metal-cost`, {
+  jewelryMetalCost: (projectId: string, params: Record<string, unknown>) =>
+    request<JewelryCostResult>(`/api/projects/${projectId}/jewelry/metal-cost`, {
       method: 'POST',
       body: params,
     }),
@@ -676,24 +859,11 @@ export const api = {
   // into the final result. This method sends all params so the backend can
   // compute the metal cost portion; unknown params are silently ignored.
   //
-  // Signature:
-  //   jewelryQuote(projectId, {
-  //     volume_mm3, metal, density_g_cm3?,
-  //     metal_price_per_gram?,  price_preset?,
-  //     casting_allowance_pct?,
-  //     stones?: [{ cut, carat?, mm?, price_per_carat, count?, note? }, ...],
-  //     bench_hours?, hourly_rate?,
-  //     setting_type?, setting_fee_per_stone?,
-  //     finishing_type?, finishing_cost?,
-  //     markup_pct?,
-  //     compare_metals?, compare_prices?,
-  //   }) → { estimate, comparison? }
-  //
   // The returned `estimate` will be the casting_cost schema (legacy mode)
   // from the backend; JewelryCostPanel augments it with stone/labour/markup
   // to produce the full_quote result on the client.
-  jewelryQuote: (projectId, params) =>
-    request(`/api/projects/${projectId}/jewelry/metal-cost`, {
+  jewelryQuote: (projectId: string, params: Record<string, unknown>) =>
+    request<JewelryCostResult>(`/api/projects/${projectId}/jewelry/metal-cost`, {
       method: 'POST',
       body: params,
     }),
@@ -702,9 +872,8 @@ export const api = {
   // Runs OBB-SAT + BVH clash detection on the components of a given assembly
   // file.  The backend fetches bbox/transform data from the file store and
   // runs kerf_cad_core.clash.detect.clash_detect inline.
-  // Returns { ok, clashes, clash_count, by_discipline_pair, errors }.
-  runClashDetect: (projectId, fileId, opts = {}) =>
-    request(`/api/projects/${projectId}/files/${fileId}/clash`, {
+  runClashDetect: (projectId: string, fileId: string, opts: { minClearance?: number } = {}) =>
+    request<ClashDetectResult>(`/api/projects/${projectId}/files/${fileId}/clash`, {
       method: 'POST',
       body: { min_clearance: opts.minClearance ?? 0 },
     }),
@@ -712,13 +881,8 @@ export const api = {
   // ---- Building energy simulation ----
   // POST /api/projects/:pid/energy/building
   // Body: { zones: [...], location: {...}, export_idf: bool }
-  // Response: { totals, monthly, idf? }
-  // ---- Energy simulation ----
-  // POST /api/projects/:pid/energy/building
-  // Body: { zones: [...], location: {...}, export_idf: bool }
-  // Returns { totals, monthly, idf? }
-  buildingEnergy: (projectId, body) =>
-    request(`/api/projects/${projectId}/energy/building`, {
+  buildingEnergy: (projectId: string, body: Record<string, unknown>) =>
+    request<BuildingEnergyResult>(`/api/projects/${projectId}/energy/building`, {
       method: 'POST',
       body,
       timeoutMs: 30_000,
@@ -726,12 +890,8 @@ export const api = {
 
   // ---- PV partial-shading + bypass-diode + MPPT simulation ----
   // POST /api/projects/:pid/energy/pv-shading
-  // Body: { modules_per_string, strings_in_parallel, module, shading_pattern,
-  //         bypass_diodes, bypass_fwd_v, poa_annual_kWh_m2, pr, latitude }
-  // Returns { string_gmpp_p_w, mismatch_loss_pct, annual_yield_yr1_kWh,
-  //           monthly_yield (latitude-aware TMY), ... }
-  pvShading: (projectId, body) =>
-    request(`/api/projects/${projectId}/energy/pv-shading`, {
+  pvShading: (projectId: string, body: Record<string, unknown>) =>
+    request<PvShadingResult>(`/api/projects/${projectId}/energy/pv-shading`, {
       method: 'POST',
       body,
       timeoutMs: 30_000,
@@ -742,8 +902,8 @@ export const api = {
   // Used by SpiceRunPanel (and any other UI that needs to invoke a registered
   // backend tool directly without going through the chat thread flow).
   // ---------------------------------------------------------------------------
-  callTool: (toolName, params = {}) =>
-    request('/api/tools/call', {
+  callTool: (toolName: string, params: Record<string, unknown> = {}) =>
+    request<ToolCallResult>('/api/tools/call', {
       method: 'POST',
       body: { tool: toolName, params },
     }),
@@ -765,7 +925,7 @@ const CHUNK_RETRIES = 3
 // Web Crypto's `crypto.subtle.digest` doesn't expose an incremental API, so
 // we feed it the entire ArrayBuffer in one shot. Fine within the 200 MB cap;
 // switch to `js-sha256` streaming if we ever raise the cap.
-async function sha256OfFile(file) {
+async function sha256OfFile(file: File): Promise<string> {
   const buf = await file.arrayBuffer()
   const digest = await crypto.subtle.digest('SHA-256', buf)
   const bytes = new Uint8Array(digest)
@@ -779,9 +939,9 @@ async function sha256OfFile(file) {
 // authedFetch: a thin fetch wrapper that injects the bearer token and
 // transparently refreshes on 401. Returns the raw Response so the caller
 // can decide what to do (we use it for both JSON and 204 responses).
-async function authedFetch(url, init = {}) {
+async function authedFetch(url: string, init: RequestInit = {}): Promise<Response> {
   const token = useAuth.getState().accessToken
-  const headers = { ...(init.headers || {}) }
+  const headers: Record<string, string> = { ...(init.headers as Record<string, string> || {}) }
   if (token) headers.authorization = `Bearer ${token}`
   let res = await fetch(url, { ...init, headers })
   if (res.status === 401 && useAuth.getState().refreshToken) {
@@ -794,10 +954,10 @@ async function authedFetch(url, init = {}) {
   return res
 }
 
-async function readErrorJSON(res) {
+async function readErrorJSON(res: Response): Promise<ApiError> {
   const text = await res.text().catch(() => '')
   let msg = text || res.statusText
-  let code
+  let code: string | undefined
   try {
     const j = JSON.parse(text)
     msg = j.error || msg
@@ -808,8 +968,20 @@ async function readErrorJSON(res) {
   return err
 }
 
+interface UploadAssetChunkedOpts {
+  kind?: string
+  parent_id?: string | null
+  onProgress?: (progress: { received: number; total: number; bytes: number }) => void
+  onInit?: (info: { uploadId: string; chunkSize: number; totalChunks: number }) => void
+  signal?: AbortSignal
+}
+
 // uploadAssetChunked: the main entry point — see api.uploadAssetChunked.
-async function uploadAssetChunked(projectId, file, { kind = 'step', parent_id = null, onProgress, onInit, signal } = {}) {
+async function uploadAssetChunked(
+  projectId: string,
+  file: File,
+  { kind = 'step', parent_id = null, onProgress, onInit, signal }: UploadAssetChunkedOpts = {},
+): Promise<ChunkedUploadResult> {
   if (!file) throw new Error('uploadAssetChunked: file required')
 
   const sha256 = await sha256OfFile(file)
@@ -826,9 +998,9 @@ async function uploadAssetChunked(projectId, file, { kind = 'step', parent_id = 
     }),
   })
   if (!initRes.ok) throw await readErrorJSON(initRes)
-  const init = await initRes.json()
+  const init: UploadInitResponse = await initRes.json()
   const { upload_id: uploadId, chunk_size: chunkSize, total_chunks: totalChunks } = init
-  let received = new Set((init.received_chunks || []).map((n) => Number(n)))
+  const received = new Set((init.received_chunks || []).map((n) => Number(n)))
   // Surface the upload_id so the caller (e.g. workspace store) can wire a
   // proper DELETE on cancel.
   if (typeof onInit === 'function') {
@@ -837,13 +1009,13 @@ async function uploadAssetChunked(projectId, file, { kind = 'step', parent_id = 
 
   // Helper: drive a clean abort by DELETE-ing the session on the server,
   // then surfacing a recognisable error to the caller.
-  async function abortAndThrow() {
+  async function abortAndThrow(): Promise<never> {
     try {
       await authedFetch(`${API_URL}/api/projects/${projectId}/uploads/${uploadId}`, {
         method: 'DELETE',
       })
     } catch { /* best-effort */ }
-    const err = new Error('upload aborted')
+    const err: Error & { aborted?: boolean } = new Error('upload aborted')
     err.aborted = true
     throw err
   }
@@ -852,7 +1024,7 @@ async function uploadAssetChunked(projectId, file, { kind = 'step', parent_id = 
   // the same SHA), skip straight to finalize.
   if (!init.complete) {
     // 3. Build the missing-chunk worklist.
-    const missing = []
+    const missing: number[] = []
     for (let i = 0; i < totalChunks; i++) {
       if (!received.has(i)) missing.push(i)
     }
@@ -875,14 +1047,14 @@ async function uploadAssetChunked(projectId, file, { kind = 'step', parent_id = 
     if (signal?.aborted) await abortAndThrow()
 
     let nextIdx = 0
-    let firstError = null
-    const workers = []
+    let firstError: (Error & { aborted?: boolean }) | null = null
+    const workers: Promise<void>[] = []
     const concurrency = Math.min(CHUNK_CONCURRENCY, missing.length || 1)
     for (let w = 0; w < concurrency; w++) {
       workers.push((async () => {
         while (firstError == null) {
           if (signal?.aborted) {
-            firstError = new Error('upload aborted')
+            firstError = new Error('upload aborted') as Error & { aborted?: boolean }
             firstError.aborted = true
             return
           }
@@ -896,8 +1068,8 @@ async function uploadAssetChunked(projectId, file, { kind = 'step', parent_id = 
             await uploadOneChunk(projectId, uploadId, chunkIndex, blob, signal)
             received.add(chunkIndex)
             fireProgress()
-          } catch (err) {
-            firstError = err
+          } catch (err: unknown) {
+            firstError = err as Error & { aborted?: boolean }
             return
           }
         }
@@ -905,8 +1077,9 @@ async function uploadAssetChunked(projectId, file, { kind = 'step', parent_id = 
     }
     await Promise.all(workers)
     if (firstError) {
-      if (firstError.aborted || signal?.aborted) await abortAndThrow()
-      throw firstError
+      const err: Error & { aborted?: boolean } = firstError
+      if (err.aborted || signal?.aborted) await abortAndThrow()
+      throw err
     }
   }
 
@@ -923,9 +1096,15 @@ async function uploadAssetChunked(projectId, file, { kind = 'step', parent_id = 
 }
 
 // uploadOneChunk: PUT a single chunk with retries + exponential backoff.
-async function uploadOneChunk(projectId, uploadId, chunkIndex, blob, signal) {
+async function uploadOneChunk(
+  projectId: string,
+  uploadId: string,
+  chunkIndex: number,
+  blob: Blob,
+  signal: AbortSignal | undefined,
+): Promise<void> {
   let attempt = 0
-  let lastErr
+  let lastErr: unknown
   while (attempt <= CHUNK_RETRIES) {
     if (signal?.aborted) throw new Error('upload aborted')
     try {
@@ -942,7 +1121,7 @@ async function uploadOneChunk(projectId, uploadId, chunkIndex, blob, signal) {
         throw await readErrorJSON(res)
       }
       lastErr = await readErrorJSON(res)
-    } catch (err) {
+    } catch (err: unknown) {
       lastErr = err
     }
     attempt++
@@ -954,7 +1133,7 @@ async function uploadOneChunk(projectId, uploadId, chunkIndex, blob, signal) {
 }
 
 // cancelUpload: best-effort DELETE of an in-flight upload session.
-export async function cancelUpload(projectId, uploadId) {
+export async function cancelUpload(projectId: string, uploadId: string): Promise<void> {
   try {
     await authedFetch(`${API_URL}/api/projects/${projectId}/uploads/${uploadId}`, {
       method: 'DELETE',

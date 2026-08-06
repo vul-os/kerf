@@ -246,7 +246,7 @@ export default function Tools() {
     setProp('og:description', META.description)
     setProp('og:url', META.canonicalUrl)
     setProp('og:image', META.ogImage)
-    let canon = document.querySelector('link[rel="canonical"]')
+    let canon = document.querySelector<HTMLLinkElement>('link[rel="canonical"]')
     if (!canon) { canon = document.createElement('link'); canon.rel = 'canonical'; document.head.appendChild(canon) }
     canon.href = META.canonicalUrl
   }, [])

@@ -26,7 +26,30 @@
 
 import Panel from '../../../components/RoomCfdPanel.jsx'
 
-const DEFAULTS = {
+// Field shapes are dictated by the cfd_room_airflow_3d tool payload documented above;
+// every key is nullable because the tool omits sections it did not compute.
+interface RoomCfdProps {
+  grid_dims: number[] | null
+  grid_spacing_m: number[] | null
+  room_dims_m: number[] | null
+  plan_velocity_mag: number[][] | null
+  plan_temperature_C: number[][] | null
+  plan_age_of_air_min: number[][] | null
+  section_velocity_w: number[][] | null
+  section_temperature_C: number[][] | null
+  T_mean_C: number | null
+  T_max_C: number | null
+  T_min_C: number | null
+  velocity_max_m_s: number | null
+  velocity_mean_m_s: number | null
+  mass_continuity_residual: number | null
+  ventilation_effectiveness: number | null
+  max_vertical_dT_K_m: number | null
+  occupant_comfort: Record<string, unknown>[]
+  model_notes: string | null
+}
+
+const DEFAULTS: RoomCfdProps = {
   grid_dims: null,
   grid_spacing_m: null,
   room_dims_m: null,
@@ -47,12 +70,16 @@ const DEFAULTS = {
   model_notes: null,
 }
 
-function parseContent(content) {
+function parseContent(content?: string): Partial<RoomCfdProps> {
   if (!content || typeof content !== 'string') return {}
   try { return JSON.parse(content) || {} } catch { return {} }
 }
 
-export default function RoomCfdWrapper({ content }) {
+export interface Props {
+  content?: string
+}
+
+export default function RoomCfdWrapper({ content }: Props) {
   const props = { ...DEFAULTS, ...parseContent(content) }
   return <Panel {...props} />
 }

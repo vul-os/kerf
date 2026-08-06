@@ -717,7 +717,10 @@ export const api = {
     }
     return res.json()
   },
-  deleteAvatar: () => request<void>('/api/me/avatar', { method: 'DELETE' }),
+  // Returns the updated user, same as uploadAvatar — DELETE /api/me/avatar responds with the
+  // full user row, not 204. Was declared `void`, which made the Profile page's use of the
+  // response un-typeable.
+  deleteAvatar: () => request<ApiUser>('/api/me/avatar', { method: 'DELETE' }),
 
   // ---- API Tokens ----
   createAPIToken: (name: string) => request<ApiToken>('/api-tokens', { method: 'POST', body: { name } }),

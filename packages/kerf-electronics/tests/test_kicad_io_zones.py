@@ -47,10 +47,19 @@ class TestZonesAndKeepouts(unittest.TestCase):
         self.assertEqual(pour["layer"], "bottom_copper")
 
     def test_copper_pour_polygon_outline(self):
+        """T-538: this used to assert {"x": 100.0, "y": 80.0} — the raw
+        KiCad Y-down outline coordinate passed straight through, unflipped.
+        That was the bug the fixture happened to pin: the zone's fixture
+        text (`tests/fixtures/zones_keepout_board.kicad_pcb`) authors this
+        vertex as KiCad `(xy 100 80)`, and kicad_io.py now correctly emits
+        it as Circuit JSON's Y-up `{"x": 100.0, "y": -80.0}` (see
+        `_flip_kicad_y_to_circuit_json_y` in kicad_io.py). The old value was
+        wrong, not this one — updating it is fixing the bug's fingerprint,
+        not relabeling it."""
         pour = self._by_type("pcb_copper_pour")[0]
         self.assertEqual(len(pour["polygon"]), 4)
         self.assertEqual(pour["polygon"][0], {"x": 0.0, "y": 0.0})
-        self.assertEqual(pour["polygon"][2], {"x": 100.0, "y": 80.0})
+        self.assertEqual(pour["polygon"][2], {"x": 100.0, "y": -80.0})
 
     def test_copper_pour_fill_settings(self):
         pour = self._by_type("pcb_copper_pour")[0]
@@ -121,6 +130,35 @@ class TestZonesAndKeepouts(unittest.TestCase):
         self.assertEqual(len(comps), 1)
         self.assertTrue(comps[0].get("locked"))
 
+    # ── T-538: absolute position, not merely self-consistent ────────────────
+    #
+    # The bug this guards against is invisible to any test that only checks
+    # internal consistency (e.g. a pour's vias landing inside its own
+    # bounding box) — a whole-file mirror is self-consistent with itself.
+    # This test instead hand-computes the expected Circuit JSON position
+    # directly from the fixture's own KiCad source text, independent of
+    # kicad_io.py, so it fails if the flip axis (or its sign) is wrong even
+    # though everything *else* in the file still lines up with everything
+    # else.
+
+    def test_footprint_lands_at_correct_absolute_position_not_just_self_consistent(self):
+        """Ground truth, read directly from
+        tests/fixtures/zones_keepout_board.kicad_pcb line 26: the only
+        footprint on this board is authored as `(at 10 10)` — KiCad
+        Y-down, so 10mm to the right of and 10mm *below* the sheet origin.
+        Circuit JSON is Y-up, so the correct absolute position is
+        (10, -10): x is unaffected by the flip (KiCad and Circuit JSON
+        agree on the X direction), y is negated about the fixed origin
+        kicad_io.py's flip uses (see `_flip_kicad_y_to_circuit_json_y` in
+        kicad_io.py) — not (10, 10) (the old, unflipped bug) and not some
+        other value a board-bbox-relative or page-relative axis would have
+        produced.
+        """
+        comps = self._by_type("pcb_component")
+        self.assertEqual(len(comps), 1)
+        self.assertEqual(comps[0]["x"], 10.0)
+        self.assertEqual(comps[0]["y"], -10.0)
+
     def test_footprint_attributes(self):
         comps = self._by_type("pcb_component")
         attrs = comps[0]["kicad_footprint_attributes"]
@@ -132,11 +170,16 @@ class TestZonesAndKeepouts(unittest.TestCase):
     # ── gr_text ──────────────────────────────────────────────────────────────
 
     def test_gr_text_recovered_as_pcb_text(self):
+        """T-538: this used to assert y == 75.0 — the fixture's raw KiCad
+        `(at 5 75 0)` passed straight through unflipped. kicad_io.py now
+        emits Circuit JSON's Y-up `y == -75.0` (x is unaffected by the
+        flip). The old value encoded the mirror bug, not a real
+        expectation."""
         texts = self._by_type("pcb_text")
         self.assertEqual(len(texts), 1)
         self.assertEqual(texts[0]["text"], "REV A")
         self.assertEqual(texts[0]["x"], 5.0)
-        self.assertEqual(texts[0]["y"], 75.0)
+        self.assertEqual(texts[0]["y"], -75.0)
         self.assertEqual(texts[0]["layer"], "Cmts.User")
 
     # ── passthrough for unmodelled top-level nodes (group) ───────────────────

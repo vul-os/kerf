@@ -20,6 +20,10 @@ kicad_pcb_to_circuit_json(text) -> dict
     dimensions, vias, other graphic items) is retained verbatim in a single
     `kicad_passthrough` entry so a future writer can re-emit it rather than
     silently losing it.
+    T-538: applies the KiCad (Y-down) -> Circuit JSON (Y-up) axis flip once,
+    over every emitted geometry path (component positions, trace routes,
+    zone/keepout polygons, free-floating text) — see
+    `_flip_kicad_y_to_circuit_json_y` for the axis rationale.
 
 Parsing is pure Python plus `sexpdata` (BSD-2), a solid, general-purpose
 S-expression parser — see `_parse_sexpr` below for why it's used the way it
@@ -861,6 +865,112 @@ def _parse_footprint_attr(child: list) -> dict[str, bool]:
     }
 
 
+# ─── T-538: KiCad Y-down → Circuit JSON Y-up axis flip ────────────────────────
+#
+# KiCad's `.kicad_pcb` coordinates are Y-down (Y increases toward the bottom
+# of the sheet); Circuit JSON's are Y-up. Before this fix, this reader passed
+# KiCad's raw Y straight through for every geometry path (component
+# positions, trace routes, zone/keepout polygons, free-floating text) — a
+# whole-file vertical mirror, found by the T-526b conformance oracle (see
+# tasks.md T-538 and the (now-corrected) test that used to be named
+# test_component_position_agrees_modulo_y_axis_convention in
+# test_kicad_oracle.py).
+#
+# Mirror axis chosen: a FIXED origin at y=0 — `cj_y = -kicad_y`, x unchanged.
+# Not the board's Y extent, not the KiCad page height. Evidence for each:
+#
+# - Page height: ruled out directly. This module's own writer only ever
+#   stores KiCad's page *size* as an opaque template name (`root.child
+#   ("paper").atom("A4")`, see circuit_json_to_kicad_pcb above) — never a
+#   height in mm participating in geometry. KiCad's own `.kicad_pcb` Y
+#   values are absolute-mm in the board's world coordinate system,
+#   independent of which paper size is selected for printing; there is no
+#   "page height" quantity in the geometry at all to flip about.
+#
+# - Board's Y extent (bounding-box center of the Edge.Cuts outline): this is
+#   what the independent oracle, kicad-to-circuit-json, actually implements
+#   — verified by reading its source directly (not just its .d.ts comment):
+#   `node_modules/kicad-to-circuit-json/dist/index.js`,
+#   `InitializePcbContextStage.step()`:
+#     `const center = this.calculateBoardCenter();`
+#     `this.ctx.k2cMatPcb = compose(scale(1, -1), translate(-center.x, -center.y));`
+#   `calculateBoardCenter()` walks the `Edge.Cuts` graphic lines/arcs/
+#   circles/curves and returns the midpoint of their bounding box — falling
+#   back to `{x: 0, y: 0}` when the board has *no* Edge.Cuts geometry at all.
+#   That fallback is exactly this repo's own conformance fixture
+#   (`tests/fixtures/zones_keepout_board.kicad_pcb` has no `Edge.Cuts` node
+#   whatsoever — grep it) — which is why the oracle test's own finding
+#   ("x, y -> x, -y with no additional offset") looked like a pure origin
+#   flip: it wasn't evidence of an origin-based convention, it was the
+#   oracle degenerating to one because this fixture has no board outline.
+#   Rejected as the general rule for two reasons: (1) it recenters *x* too
+#   (`translate(-center.x, ...)`), which is a second, independent
+#   translation unrelated to the Y-down/Y-up question this task is scoped
+#   to fixing; (2) Kerf's own KiCad fixtures are hand-authored, not pcbnew
+#   exports (`docs/ecad-gap-analysis.md`), and are not guaranteed to carry
+#   an Edge.Cuts outline — building the axis out of geometry that may not
+#   exist makes the transform silently degrade to something else (or a
+#   no-op offset) depending on data that has nothing to do with the
+#   Y-convention bug being fixed here.
+#
+# - Fixed origin (chosen): `cj_y = -kicad_y` is well-defined for every board
+#   regardless of whether it has an Edge.Cuts outline, touches only the axis
+#   this bug is actually about (Y direction, not X placement), and is the
+#   simplest transform that is correct wherever the oracle's board-center
+#   correction is a no-op (as it is on every fixture in this repo). It also
+#   composes correctly with `circuit_json_to_kicad_pcb` above, which writes
+#   positions verbatim with no offset — a future writer built with the flip
+#   in mind (T-527) has a stable, geometry-independent rule to invert.
+#
+# Deliberately NOT touched: `rotation` on `pcb_component`. A mirror transform
+# does, in general, invert the sense of a rotation angle (kicad-to-circuit-
+# json's own source negates it: `dist/index.js`, `processFootprint`,
+# `rotation: -rotation, // Negate rotation due to Y-axis flip in coordinate
+# transform`) — but this reader never derives any geometry from that angle
+# (no pads, no rotated courtyard/body shapes are emitted here), so there is
+# no place in this module where getting its sign wrong would be observable,
+# and negating it would be a second, untested behavioral change beyond the
+# geometry paths tasks.md's T-538 entry and the oracle actually exercise.
+# Flagged here rather than silently decided either way; revisit when this
+# reader grows footprint-body geometry that actually uses `rotation`.
+#
+# Deliberately NOT touched: `kicad_passthrough` / `_kicad_passthrough`
+# payloads (unmodeled top-level nodes like `group`, vias, dimensions, and a
+# zone's own leftover children like `filled_polygon`). Those are raw KiCad
+# source s-expr fragments, never translated into Circuit JSON's coordinate
+# space to begin with (that's the whole point of passthrough — round-trip
+# fidelity for a future writer, not semantic modeling) — the Y-up/Y-down
+# question doesn't apply to data that was never converted.
+
+def _flip_kicad_y_to_circuit_json_y(cj: list[dict]) -> None:
+    """Mirror every KiCad Y-down coordinate this reader emits to Circuit
+    JSON's Y-up convention, in place, over the whole output list.
+
+    Applied once, here, after every element has been parsed — not at each
+    individual coordinate assignment scattered through the parsing loops
+    above — so there is exactly one place in this module where the flip
+    could be wrong, not one per element type. See the module-level note
+    above for why `-y` (a fixed origin) rather than a board- or page-relative
+    axis.
+
+    Covers every geometry-bearing shape this reader produces:
+    - top-level `y` (pcb_component, pcb_text/gr_text)
+    - `polygon` point lists (pcb_keepout, pcb_copper_pour, pcb_ground_plane)
+    - `route` point lists (pcb_trace)
+    """
+    for entry in cj:
+        if not isinstance(entry, dict):
+            continue
+        if isinstance(entry.get("y"), (int, float)):
+            entry["y"] = -entry["y"]
+        for list_key in ("polygon", "route"):
+            points = entry.get(list_key)
+            if isinstance(points, list):
+                for pt in points:
+                    if isinstance(pt, dict) and isinstance(pt.get("y"), (int, float)):
+                        pt["y"] = -pt["y"]
+
+
 # ─── kicad_pcb_to_circuit_json ─────────────────────────────────────────────────
 
 def kicad_pcb_to_circuit_json(text: str) -> list:
@@ -1151,6 +1261,11 @@ def kicad_pcb_to_circuit_json(text: str) -> list:
             "type": "kicad_passthrough",
             "kicad_nodes": passthrough_nodes,
         })
+
+    # T-538: apply the KiCad Y-down -> Circuit JSON Y-up flip, once, at the
+    # boundary, over every geometry-bearing element just built above. See
+    # `_flip_kicad_y_to_circuit_json_y`'s docstring for the axis rationale.
+    _flip_kicad_y_to_circuit_json_y(cj)
 
     return cj
 

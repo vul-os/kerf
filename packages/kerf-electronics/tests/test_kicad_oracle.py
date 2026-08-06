@@ -10,12 +10,19 @@ the same fixture `kicad_io.py`'s own tests use, and compares.
 
 The two implementations disagree in several places. Each disagreement below
 is investigated, not assumed away — see each test's docstring for the
-verdict. Two disagreements are genuine, documented findings for a follow-up
-task (see test_component_position_agrees_modulo_y_axis_convention and the
-module docstring below); this test does not silently paper over them, and it
-does not fix kicad_io.py's *behaviour* either — T-526b's scope is the
-lexer swap (a separate commit) and this oracle, not a rewrite of the frozen
-T-526 semantic mapping.
+verdict. One disagreement was a genuine, documented finding that became its
+own follow-up task: the Y-axis convention (see
+test_component_position_agrees_with_axis_convention) was pinned here as a
+divergence by T-526b and is now *fixed* by T-538 in kicad_io.py itself — the
+assertion below is a straight equality check, not equality-modulo-flip.
+Another remains open and out of scope here: the oracle's own parser
+(`kicadts`) has a real compliance gap against KiCad's documented `group`
+node format (see test_oracle_chokes_on_kicads_own_documented_group_id_field).
+This test does not silently paper over either, and beyond the T-538 axis fix
+it does not otherwise change kicad_io.py's *behaviour* — T-526b's scope was
+the lexer swap (a separate commit) and this oracle; T-538's scope is
+narrowly the coordinate flip, not a rewrite of the frozen T-526 semantic
+mapping.
 
 This is a **required** check, never a skip: `_run_oracle_converter` raises
 (not `pytest.importorskip`) if Node or the `kicad-to-circuit-json` package
@@ -206,14 +213,16 @@ class TestKicadOracleConformance(unittest.TestCase):
         )
 
         our_bbox = _bbox(ours["polygon"])
-        # Oracle emits Y flipped (KiCad Y-down -> Circuit JSON Y-up, see
-        # test_component_position_agrees_modulo_y_axis_convention); flip
-        # back to compare on kicad_io.py's own (unflipped) convention.
-        oracle_bbox_kicad_y = _bbox([{"x": p["x"], "y": -p["y"]} for p in oracle["points"]])
+        # T-538: kicad_io.py now applies the same KiCad Y-down -> Circuit
+        # JSON Y-up flip the oracle applies (see
+        # test_component_position_agrees_with_axis_convention below), so
+        # both bounding boxes are already in the same (CJ Y-up) convention —
+        # no manual un-flip needed here any more.
+        oracle_bbox = _bbox(oracle["points"])
 
         clearance = ours["clearance_mm"]
         minx, miny, maxx, maxy = our_bbox
-        ominx, ominy, omaxx, omaxy = oracle_bbox_kicad_y
+        ominx, ominy, omaxx, omaxy = oracle_bbox
 
         for inset in (ominx - minx, ominy - miny, maxx - omaxx, maxy - omaxy):
             self.assertGreaterEqual(inset, -_EPS)
@@ -251,9 +260,10 @@ class TestKicadOracleConformance(unittest.TestCase):
 
         self.assertEqual(oracle["layer"], _KERF_LAYER_TO_ORACLE_LAYER[ours["layer"]])
 
+        # T-538: both sides are now in the same (CJ Y-up) convention.
         our_bbox = _bbox(ours["polygon"])
-        oracle_bbox_kicad_y = _bbox([{"x": p["x"], "y": -p["y"]} for p in oracle["points"]])
-        for a, b in zip(our_bbox, oracle_bbox_kicad_y):
+        oracle_bbox = _bbox(oracle["points"])
+        for a, b in zip(our_bbox, oracle_bbox):
             self.assertAlmostEqual(a, b, places=6)
 
     # ── keepout: a real scope gap in the oracle, not a defect in ours ──────
@@ -272,11 +282,12 @@ class TestKicadOracleConformance(unittest.TestCase):
         self.assertNotIn("pcb_keepout", oracle_types)
 
         # Nothing else in the oracle output claims the keepout's own polygon
-        # region either — it's dropped outright, not re-typed.
+        # region either — it's dropped outright, not re-typed. (T-538: both
+        # sides are now in the same CJ Y-up convention.)
         keepout_bbox = _bbox(ours_keepout["polygon"])
         for e in self.oracle:
             if e["type"] == "pcb_copper_pour":
-                other_bbox = _bbox([{"x": p["x"], "y": -p["y"]} for p in e["points"]])
+                other_bbox = _bbox(e["points"])
                 self.assertNotEqual(other_bbox, keepout_bbox)
 
     # ── gr_text off silk/fab layers: a real scope gap in the oracle ────────
@@ -295,32 +306,29 @@ class TestKicadOracleConformance(unittest.TestCase):
         oracle_texts = {e.get("text") for e in self.oracle if "text" in e}
         self.assertNotIn("REV A", oracle_texts)
 
-    # ── coordinate convention: a genuine, pre-existing, out-of-scope gap ───
+    # ── coordinate convention: T-538, fixed — straight equality now ────────
 
-    def test_component_position_agrees_modulo_y_axis_convention(self):
-        """GENUINE FINDING (not fixed here): the oracle applies the
-        documented KiCad(Y-down) -> Circuit JSON(Y-up) axis flip
-        (node_modules/kicad-to-circuit-json/dist/index.d.ts,
-        InitializePcbContextStage's doc comment: "KiCad->CJ PCB transform...
-        scale(1, -1)"). kicad_io.py does not flip Y *anywhere* in this
-        module — not for components, not for traces, not for zone
-        polygons — it passes KiCad's raw Y straight through. Once that flip
-        is accounted for, the two agree exactly on this fixture (x, y ->
-        x, -y with no additional offset, since this board's geometry
-        happens to sit with its origin already at KiCad (0, 0)).
+    def test_component_position_agrees_with_axis_convention(self):
+        """T-538 (was test_component_position_agrees_modulo_y_axis_convention):
+        this used to be a pinned, documented DIVERGENCE — the oracle applies
+        the KiCad(Y-down) -> Circuit JSON(Y-up) axis flip
+        (node_modules/kicad-to-circuit-json/dist/index.js,
+        InitializePcbContextStage: `compose(scale(1, -1), translate(-center.x,
+        -center.y))`) and kicad_io.py did not flip Y anywhere in the module.
 
-        This is real and predates T-526/T-536 — it is a property of the
-        whole reader, not the zone/keepout code this task touches — and
-        fixing it would be a behavioural change across every geometry path
-        in kicad_io.py, which is explicitly out of this task's scope ("do
-        not change the semantic mapping's behaviour"). Flagging for a
-        follow-up task rather than silently accepting or silently fixing.
+        `kicad_io.py` now applies that flip too (see
+        `_flip_kicad_y_to_circuit_json_y` in kicad_io.py for the axis
+        rationale — a fixed origin, `cj_y = -kicad_y`, not the oracle's
+        board-bounding-box recentering, which this fixture's lack of an
+        Edge.Cuts outline degenerates to `{0, 0}` anyway). The two now agree
+        exactly, with no modulo/flip-back needed in this assertion — this is
+        a straight equality check, not equality-modulo-convention.
         """
         ours = next(e for e in self.ours if e["type"] == "pcb_component")
         oracle = next(e for e in self.oracle if e["type"] == "pcb_component")
 
         self.assertAlmostEqual(oracle["center"]["x"], ours["x"], places=6)
-        self.assertAlmostEqual(oracle["center"]["y"], -ours["y"], places=6)
+        self.assertAlmostEqual(oracle["center"]["y"], ours["y"], places=6)
 
 
 if __name__ == "__main__":

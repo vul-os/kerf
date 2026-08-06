@@ -67,13 +67,22 @@ class TestPourReachesAllConsumersUnchanged(unittest.TestCase):
         self.assertEqual(types, {"pcb_copper_pour", "pcb_ground_plane"})
 
     def test_gerber_emits_pour_region_unchanged(self):
+        """T-538: this used to assert the raw KiCad Y-down vertex
+        (100, 80) mm verbatim in Gerber units. `self.cj` comes from
+        `kicad_pcb_to_circuit_json`, which now correctly emits that same
+        fixture vertex (KiCad `(xy 100 80)`) as Circuit JSON's Y-up
+        (100, -80) — so Gerber, which emits the pour's `polygon` field
+        completely unchanged (that's what this test proves), now emits
+        Y=-80,000,000 too. The Gerber writer did nothing wrong here; the
+        input coordinate it was faithfully passing through was wrong before
+        T-538, and this assertion was pinned to that wrong value."""
         files = export_gerber(self.cj, stem="t536gerber")
         gbl = files["t536gerber.GBL"]  # bottom_copper
         self.assertIn("G36*", gbl)
         self.assertIn("G37*", gbl)
-        # Exact vertex from the pour's own `polygon` field (100, 80) mm, in
+        # Exact vertex from the pour's own `polygon` field (100, -80) mm, in
         # Gerber's 4.6 integer format — no re-derivation, no translation.
-        self.assertIn(f"X{100 * 1_000_000}Y{80 * 1_000_000}", gbl)
+        self.assertIn(f"X{100 * 1_000_000}Y{-80 * 1_000_000}", gbl)
 
     def test_gerber_emits_ground_plane_on_its_inner_layer(self):
         files = export_gerber(self.cj, stem="t536gerber2")

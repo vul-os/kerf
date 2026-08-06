@@ -13,11 +13,19 @@
 // The marker line is recreated on every write — drift between content and
 // mappings can't happen as long as you go through these helpers.
 
+import type { JscadPart } from '../types/geometry.js'
+
+/** refdes → Library-Part file id. */
+export type LibraryMappings = Record<string, string>
+
 const MARKER = '// kerf:library-mappings='
 
 // parseLibraryMappings reads the marker comment and returns a refdes → file_id
-// map. Missing or malformed → empty object (never throws).
-export function parseLibraryMappings(content) {
+// map. Missing or malformed → empty object (never throws). `content` is typed
+// `unknown` (not `string`) because callers pass whatever a file's content
+// field happens to hold, and this function's whole job is to defend against
+// it being the wrong shape.
+export function parseLibraryMappings(content: unknown): LibraryMappings {
   if (typeof content !== 'string' || content.length === 0) return {}
   // The marker must be on a line of its own. Use a forgiving scan over the
   // first ~32 lines so users editing inside the file don't displace it
@@ -28,10 +36,10 @@ export function parseLibraryMappings(content) {
     if (!trimmed.startsWith(MARKER)) continue
     const json = trimmed.slice(MARKER.length).trim()
     try {
-      const obj = JSON.parse(json)
+      const obj: unknown = JSON.parse(json)
       if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
-        const out = {}
-        for (const [k, v] of Object.entries(obj)) {
+        const out: LibraryMappings = {}
+        for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
           if (typeof v === 'string' && v.length > 0) out[String(k)] = v
         }
         return out
@@ -45,7 +53,7 @@ export function parseLibraryMappings(content) {
 
 // writeLibraryMappings replaces (or inserts) the marker comment, returning the
 // updated content. Empty mappings clear the marker entirely.
-export function writeLibraryMappings(content, mappings) {
+export function writeLibraryMappings(content: unknown, mappings: LibraryMappings | null | undefined): string {
   const safe = typeof content === 'string' ? content : ''
   const lines = safe.split('\n')
   // Locate an existing marker — only consider the first ~32 lines like above.
@@ -76,7 +84,11 @@ export function writeLibraryMappings(content, mappings) {
 
 // setCircuitMapping is a tiny convenience: returns updated mappings and content
 // for a single refdes change. Pass partFileId=null/undefined to clear.
-export function setCircuitMapping(content, refdes, partFileId) {
+export function setCircuitMapping(
+  content: unknown,
+  refdes: string,
+  partFileId: string | null | undefined,
+): { mappings: LibraryMappings; content: string } {
   const cur = parseLibraryMappings(content)
   if (partFileId) cur[refdes] = partFileId
   else delete cur[refdes]
@@ -91,11 +103,34 @@ export function setCircuitMapping(content, refdes, partFileId) {
 // This is the seam the 3D tab uses to decide whether a `cad_component` box
 // should be visually flagged as "Library-linked" (and, in a future slice,
 // replaced with the Part's real STEP/JSCAD geometry).
-export function resolveLibraryCadComponent(refdes, mappings) {
+export function resolveLibraryCadComponent(refdes: unknown, mappings: unknown): string | null {
   if (typeof refdes !== 'string' || refdes.length === 0) return null
   if (!mappings || typeof mappings !== 'object' || Array.isArray(mappings)) return null
-  const v = mappings[refdes]
+  const v = (mappings as Record<string, unknown>)[refdes]
   return typeof v === 'string' && v.length > 0 ? v : null
+}
+
+// ── Geometry substitution ────────────────────────────────────────────────────
+
+export interface JscadSubstitution {
+  kind: 'jscad'
+  parts: JscadPart[]
+}
+
+export interface StepSubstitution {
+  kind: 'step'
+  parts: JscadPart[]
+}
+
+export type ComponentGeometrySubstitution = JscadSubstitution | StepSubstitution
+
+/** Fetches STEP bytes for a Library Part's relative model path. */
+export type FetchStep = (relativePath: string) => Promise<ArrayBuffer>
+
+interface LibraryPartJson {
+  model_3d?: unknown
+  model_3d_paths?: unknown
+  [key: string]: unknown
 }
 
 // substituteComponentGeometry — full substitution seam for a Library Part.
@@ -116,9 +151,12 @@ export function resolveLibraryCadComponent(refdes, mappings) {
 //
 // Exported for testing. Callers that don't need STEP substitution can omit
 // fetchStep (pass null / undefined) — the function will still try JSCAD.
-export async function substituteComponentGeometry(content, fetchStep) {
+export async function substituteComponentGeometry(
+  content: unknown,
+  fetchStep?: FetchStep | null,
+): Promise<ComponentGeometrySubstitution | null> {
   if (typeof content !== 'string' || content.length === 0) return null
-  let raw = null
+  let raw: LibraryPartJson
   try { raw = JSON.parse(content) } catch { return null }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
 
@@ -136,12 +174,12 @@ export async function substituteComponentGeometry(content, fetchStep) {
 
   // 2. STEP path — requires a fetchStep injector (so tests can stub it).
   if (typeof fetchStep === 'function') {
-    const paths = Array.isArray(raw.model_3d_paths) ? raw.model_3d_paths : []
+    const paths = Array.isArray(raw.model_3d_paths) ? (raw.model_3d_paths as unknown[]) : []
     // Also accept a model_3d that looks like a /api/blobs/... URL.
     const maybeUrl = typeof raw.model_3d === 'string' ? raw.model_3d : null
     const stepUrl = maybeUrl && /\.(step|stp)($|\?)/i.test(maybeUrl) ? maybeUrl : null
     const stepPath = stepUrl || paths.find(
-      (p) => typeof p === 'string' && /\.(step|stp)$/i.test(p),
+      (p): p is string => typeof p === 'string' && /\.(step|stp)$/i.test(p),
     )
     if (stepPath) {
       try {
@@ -184,9 +222,9 @@ export async function substituteComponentGeometry(content, fetchStep) {
 //
 // Async because runJscad is async (worker-driven, with a main-thread
 // fallback under vitest). Caller must await.
-export async function evalLibraryModel3D(content) {
+export async function evalLibraryModel3D(content: unknown): Promise<{ parts: JscadPart[] } | null> {
   if (typeof content !== 'string' || content.length === 0) return null
-  let raw = null
+  let raw: LibraryPartJson
   try { raw = JSON.parse(content) } catch { return null }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
   const src = raw.model_3d
@@ -209,7 +247,9 @@ export async function evalLibraryModel3D(content) {
   }
   // Lazy import so this module stays tree-shakable for non-3D callers and
   // tests that don't exercise the JSCAD path don't pay the import cost.
-  let runJscad
+  // jscadRunner.js is not part of this slice (T-506/507) and stays untyped,
+  // so its return shape is asserted against the shared JscadRunResult union.
+  let runJscad: (src: string) => Promise<{ parts?: JscadPart[]; error?: string; stale?: boolean } | null | undefined>
   try {
     ({ runJscad } = await import('./jscadRunner.js'))
   } catch (err) {
@@ -218,14 +258,14 @@ export async function evalLibraryModel3D(content) {
     }
     return null
   }
-  let res
+  let res: { parts?: JscadPart[]; error?: string; stale?: boolean } | null | undefined
   try {
     // Race against a 3s timeout — runJscad can hang in test environments
     // (worker stub, no Worker context). Falling through is fine; the teal
     // box is the visible payoff.
     res = await Promise.race([
       runJscad(src),
-      new Promise((_, reject) =>
+      new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('runJscad timeout')), 3000),
       ),
     ])

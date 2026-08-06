@@ -15,7 +15,18 @@ import { useCallback } from 'react'
 
 // ── Defaults ───────────────────────────────────────────────────────────────────
 
-export const DEFAULT_SKY_SETTINGS = {
+export interface SkySettingsValue {
+  kind: 'none' | 'procedural' | 'hdri'
+  elevation_deg: number
+  azimuth_deg: number
+  turbidity: number
+  rayleigh: number
+  mieCoefficient: number
+  mieDirectionalG: number
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- constant export alongside component, pre-existing before this migration.
+export const DEFAULT_SKY_SETTINGS: SkySettingsValue = {
   kind:             'procedural',
   elevation_deg:    15,
   azimuth_deg:      180,
@@ -27,7 +38,17 @@ export const DEFAULT_SKY_SETTINGS = {
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-function SliderRow({ label, value, min, max, step = 1, decimals = 0, onChange }) {
+interface SliderRowProps {
+  label: string
+  value: number
+  min: number
+  max: number
+  step?: number
+  decimals?: number
+  onChange: (value: number) => void
+}
+
+function SliderRow({ label, value, min, max, step = 1, decimals = 0, onChange }: SliderRowProps) {
   return (
     <div className="flex flex-col gap-0.5">
       <div className="flex items-center justify-between text-[11px] font-mono">
@@ -49,9 +70,15 @@ function SliderRow({ label, value, min, max, step = 1, decimals = 0, onChange })
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function SkySettings({ settings = DEFAULT_SKY_SETTINGS, onChange }) {
+export interface Props {
+  settings?: SkySettingsValue
+  onChange?: (settings: SkySettingsValue) => void
+}
+
+export default function SkySettings({ settings = DEFAULT_SKY_SETTINGS, onChange }: Props) {
   const set = useCallback(
-    (key, value) => onChange?.({ ...settings, [key]: value }),
+    <K extends keyof SkySettingsValue>(key: K, value: SkySettingsValue[K]) =>
+      onChange?.({ ...settings, [key]: value }),
     [settings, onChange],
   )
 
@@ -64,7 +91,7 @@ export default function SkySettings({ settings = DEFAULT_SKY_SETTINGS, onChange 
       <div className="flex flex-col gap-1">
         <span className="text-ink-400 font-mono uppercase tracking-wider text-[9px]">Environment</span>
         <div className="flex gap-2">
-          {['none', 'procedural', 'hdri'].map(k => (
+          {(['none', 'procedural', 'hdri'] as const).map(k => (
             <label key={k} className="flex items-center gap-1 cursor-pointer group">
               <input
                 type="radio"

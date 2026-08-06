@@ -1,4 +1,4 @@
-// sketchOps.js — focused pure helpers for the Trim and Extend sketch
+// sketchOps.ts — focused pure helpers for the Trim and Extend sketch
 // operations.
 //
 // These complement the broader edit toolbox in `sketchEdit.js` (which carries
@@ -24,16 +24,64 @@
 // Both helpers operate on plain Sketch JSON objects (the same shape produced
 // by `parseSketch` / serialised through `serializeSketch`). They never touch
 // React state, the planegcs solver, or the workspace store.
+//
+// NOTE: like sketchValidate.ts / sketchCarbonCopy.ts, nothing outside this module's own
+// test imports trim()/extend() (verified via repo-wide grep during the T-505 migration) —
+// `sketch_trim`/`sketch_extend` only appear as node-type name strings in graphOps.ts /
+// GraphEditor.jsx, not as calls into this file. Reported as dead code, left as found.
 
 import { lineLine, intersectPosed, poseEntity } from './sketchIntersect.js'
+import type { SketchJSON, SketchEntity, SketchPoint, SketchConstraint } from '../types/geometry.js'
+
+interface Point2 {
+  x: number
+  y: number
+}
+
+interface Seg2 {
+  p1: Point2
+  p2: Point2
+}
+
+// The `{kind, id, ...}` shape sketchIntersect.ts's poseEntity() actually returns (that file
+// predates typing and carries no annotations of its own — see its header comment — so
+// these mirror its three branches by inspection rather than importing a type from it).
+interface PosedLineEntity extends Seg2 {
+  kind: 'line'
+  id: string
+}
+interface PosedCircleEntity {
+  kind: 'circle'
+  id: string
+  center: Point2
+  radius: number
+}
+interface PosedArcEntity {
+  kind: 'arc'
+  id: string
+  center: Point2
+  radius: number
+  startAngle: number
+  endAngle: number
+  ccw: boolean
+}
+type PosedEntity = PosedLineEntity | PosedCircleEntity | PosedArcEntity
+
+// The `{x, y, ta?, tb?}` hit shape intersectPosed()/lineLine() actually return.
+interface IntersectHit {
+  x: number
+  y: number
+  ta?: number
+  tb?: number
+}
 
 // ---------------------------------------------------------------------------
 // Geometry helpers (re-exported for callers / tests).
 
 // Infinite-line intersection of (p1→p2) with (p3→p4). Returns {x,y} or null
 // when the lines are parallel.
-export function lineLineIntersection(p1, p2, p3, p4) {
-  const hit = lineLine(p1, p2, p3, p4)
+export function lineLineIntersection(p1: Point2, p2: Point2, p3: Point2, p4: Point2): Point2 | null {
+  const hit: IntersectHit | null = lineLine(p1, p2, p3, p4)
   if (!hit) return null
   return { x: hit.x, y: hit.y }
 }
@@ -41,7 +89,7 @@ export function lineLineIntersection(p1, p2, p3, p4) {
 // Boolean: do the two SEGMENTs (not infinite lines) cross? Endpoints touching
 // counts as an intersection — callers that need strict-interior crosses can
 // re-test the hit point against endpoints separately.
-export function lineSegmentsIntersect(seg1, seg2) {
+export function lineSegmentsIntersect(seg1: Seg2, seg2: Seg2): boolean {
   // Each seg is { p1: {x,y}, p2: {x,y} }.
   const r = { x: seg1.p2.x - seg1.p1.x, y: seg1.p2.y - seg1.p1.y }
   const s = { x: seg2.p2.x - seg2.p1.x, y: seg2.p2.y - seg2.p1.y }
@@ -57,15 +105,21 @@ export function lineSegmentsIntersect(seg1, seg2) {
 // ---------------------------------------------------------------------------
 // Internal: build a posed-entity index for intersection math.
 
-function indexEntities(sketch) {
+interface EntityIndex {
+  ent: SketchEntity[]
+  pointById: Map<string, SketchPoint>
+  posedById: Map<string, PosedEntity>
+}
+
+function indexEntities(sketch: SketchJSON): EntityIndex {
   const ent = sketch.entities || []
-  const pointById = new Map()
+  const pointById = new Map<string, SketchPoint>()
   for (const e of ent) if (e.type === 'point') pointById.set(e.id, e)
-  const posedById = new Map()
+  const posedById = new Map<string, PosedEntity>()
   for (const e of ent) {
     if (e.construction) continue
     if (e.type === 'line' || e.type === 'circle' || e.type === 'arc') {
-      const pose = poseEntity(e, pointById)
+      const pose = poseEntity(e, pointById) as PosedEntity | null
       if (pose) posedById.set(e.id, pose)
     }
   }
@@ -76,8 +130,8 @@ function indexEntities(sketch) {
 // vanish, plus any constraint that references a doomed id. Mirrors
 // deleteEntities in sketchEdit.js but inlined here so this module has no
 // runtime dependency on it.
-function cascadeDelete(sketch, ids) {
-  const dead = new Set(ids)
+function cascadeDelete(sketch: SketchJSON, ids: string[]): SketchJSON {
+  const dead = new Set<string>(ids)
   const ent = sketch.entities || []
   let grew = true
   while (grew) {
@@ -98,13 +152,17 @@ function cascadeDelete(sketch, ids) {
   const nextEntities = ent.filter((e) => !dead.has(e.id))
   const nextConstraints = (sketch.constraints || []).filter((c) => {
     const refs = constraintRefs(c)
-    for (const r of refs) if (dead.has(r)) return false
+    // `r` may be undefined for constraint variants with an optional ref field (e.g.
+    // 'symmetric's `line`) — `dead` only ever holds entity ids (always strings), so
+    // this guard is a type narrowing, not a behavior change (dead.has(undefined)
+    // would just have returned false).
+    for (const r of refs) if (r && dead.has(r)) return false
     return true
   })
   return { ...sketch, entities: nextEntities, constraints: nextConstraints }
 }
 
-function constraintRefs(c) {
+function constraintRefs(c: SketchConstraint): Array<string | undefined> {
   switch (c.type) {
     case 'coincident': return [c.a, c.b]
     case 'horizontal':
@@ -149,9 +207,19 @@ function constraintRefs(c) {
 //                    either side, leaving a trimmed-out gap (p1/p2 are
 //                    relocated to the inner cut points).
 //
+interface TrimHit {
+  x: number
+  y: number
+  ta: number
+}
+
+export interface SketchOpResult {
+  sketch: SketchJSON
+}
+
 // Always returns { sketch }. When nothing changes the original object is
 // returned (callers use `next === sketch` as a no-op signal).
-export function trim(sketch, lineId, clickPoint) {
+export function trim(sketch: SketchJSON, lineId: string, clickPoint: Point2): SketchOpResult {
   if (!sketch || !lineId || !clickPoint) return { sketch }
   const { ent, pointById, posedById } = indexEntities(sketch)
   // Bezier entities are free-form curves — trim semantics are not
@@ -162,7 +230,7 @@ export function trim(sketch, lineId, clickPoint) {
     console.warn('sketch_trim: Bezier trim not yet supported — entity untouched')
     return { sketch }
   }
-  const line = ent.find((e) => e.id === lineId && e.type === 'line')
+  const line = ent.find((e) => e.id === lineId && e.type === 'line') as Extract<SketchEntity, { type: 'line' }> | undefined
   if (!line) return { sketch }
   const linePose = posedById.get(lineId)
   const p1 = pointById.get(line.p1)
@@ -171,10 +239,10 @@ export function trim(sketch, lineId, clickPoint) {
 
   // Collect curve-curve intersections involving this line, parameterised
   // along the line (ta in [0,1]).
-  const hits = []
+  const hits: TrimHit[] = []
   for (const [oid, other] of posedById) {
     if (oid === lineId) continue
-    const got = intersectPosed(linePose, other)
+    const got: IntersectHit[] = intersectPosed(linePose, other)
     for (const h of got) {
       if (typeof h.ta !== 'number') continue
       hits.push({ x: h.x, y: h.y, ta: h.ta })
@@ -209,12 +277,12 @@ export function trim(sketch, lineId, clickPoint) {
   if (lo === 0 && hi === 1) return { sketch }
 
   // Locate hit positions for the boundaries.
-  const findHit = (t) => interior.find((h) => Math.abs(h.ta - t) < 1e-6)
+  const findHit = (t: number) => interior.find((h) => Math.abs(h.ta - t) < 1e-6)
   const next = { ...sketch, entities: (sketch.entities || []).map((e) => ({ ...e })) }
-  const movePoint = (id, x, y) => {
+  const movePoint = (id: string, x: number, y: number) => {
     const idx = next.entities.findIndex((e) => e.id === id && e.type === 'point')
     if (idx < 0) return false
-    next.entities[idx] = { ...next.entities[idx], x, y }
+    next.entities[idx] = { ...next.entities[idx], x, y } as SketchEntity
     return true
   }
 
@@ -256,7 +324,7 @@ export function trim(sketch, lineId, clickPoint) {
 //   * `endpointId` isn't a point at the end of any line,
 //   * the target can't be posed (missing referenced points / unsupported kind),
 //   * the extended ray never meets the target.
-export function extend(sketch, endpointId, targetCurveId) {
+export function extend(sketch: SketchJSON, endpointId: string, targetCurveId: string): SketchOpResult {
   if (!sketch || !endpointId || !targetCurveId) return { sketch }
   const { ent, pointById, posedById } = indexEntities(sketch)
   // Check if the target is a Bezier — extending onto a Bezier is not well-
@@ -274,7 +342,7 @@ export function extend(sketch, endpointId, targetCurveId) {
     return { sketch }
   }
   // Find the line that owns this endpoint.
-  const line = ent.find((e) => e.type === 'line' && (e.p1 === endpointId || e.p2 === endpointId))
+  const line = ent.find((e) => e.type === 'line' && (e.p1 === endpointId || e.p2 === endpointId)) as Extract<SketchEntity, { type: 'line' }> | undefined
   if (!line) return { sketch }
   const moving = pointById.get(endpointId)
   const otherId = line.p1 === endpointId ? line.p2 : line.p1
@@ -294,8 +362,8 @@ export function extend(sketch, endpointId, targetCurveId) {
   // handles every supported curve kind uniformly.
   const FAR = 1e6
   const farEnd = { x: moving.x + ux * FAR, y: moving.y + uy * FAR }
-  const ray = { kind: 'line', p1: moving, p2: farEnd }
-  const hits = intersectPosed(ray, target)
+  const ray = { kind: 'line' as const, p1: moving, p2: farEnd }
+  const hits: IntersectHit[] = intersectPosed(ray, target)
   if (!hits.length) return { sketch }
   // Pick the closest hit beyond the moving point (intersectPosed already
   // restricts to the ray segment, so any returned hit is in front).

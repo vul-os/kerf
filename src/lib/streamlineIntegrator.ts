@@ -27,13 +27,64 @@
  * including the seed as the first point.
  */
 
+export interface VectorFieldGrid {
+  /** World x-coordinate of the col=0 grid line. */
+  x0: number
+  /** World y-coordinate of the row=0 grid line. */
+  y0: number
+  /** Grid spacing (world units per cell), x and y. */
+  dx: number
+  dy: number
+  /** Column / row count. */
+  nx: number
+  ny: number
+  /** `u[row][col]` — x-component; `v[row][col]` — y-component. */
+  u: number[][]
+  v: number[][]
+}
+
+/** The flat OpenFOAM bridge shape — converted to {@link VectorFieldGrid} via cellsToGrid(). */
+export interface OpenFoamCell {
+  x: number
+  y: number
+  Ux?: number
+  Uy?: number
+}
+
+export interface VectorFieldCells {
+  cells: OpenFoamCell[]
+}
+
+export type VectorField = VectorFieldGrid | VectorFieldCells
+
+export interface Point2 {
+  x: number
+  y: number
+}
+
+export interface FieldSample {
+  vx: number
+  vy: number
+}
+
+export interface TraceOpts {
+  /** Iteration cap. Default 2000. */
+  max_steps?: number
+  /** Euler/RK4 step size in world units. Default 0.05. */
+  dt?: number
+  /** Bail when |v| drops below this. Default 1e-6. */
+  min_speed?: number
+  /** Squared distance for closed-loop detection. Default 1e-3. */
+  loop_tol?: number
+}
+
 // ── Bilinear sampling ────────────────────────────────────────────────────────
 
 /**
  * Bilinearly sample the vector field at world position (wx, wy).
  * Returns {vx, vy} or null when outside the domain.
  */
-export function sampleField(field, wx, wy) {
+export function sampleField(field: VectorFieldGrid, wx: number, wy: number): FieldSample | null {
   const { x0, y0, dx, dy, nx, ny, u, v } = field
 
   // Map to fractional grid indices
@@ -72,7 +123,9 @@ export function sampleField(field, wx, wy) {
  * Advance position (px, py) by one RK4 step of size dt.
  * Returns {x, y, vx, vy} or null if any intermediate sample leaves the domain.
  */
-function rk4Step(field, px, py, dt) {
+interface Rk4Result extends Point2, FieldSample {}
+
+function rk4Step(field: VectorFieldGrid, px: number, py: number, dt: number): Rk4Result | null {
   const k1 = sampleField(field, px, py)
   if (!k1) return null
 
@@ -102,7 +155,7 @@ function rk4Step(field, px, py, dt) {
  * Returns a grid object usable by sampleField/traceStreamline.
  * If the cell list is empty, returns a 1×1 zero-field grid.
  */
-export function cellsToGrid(cells) {
+export function cellsToGrid(cells: OpenFoamCell[] | null | undefined): VectorFieldGrid {
   if (!cells || cells.length === 0) {
     return { x0: 0, y0: 0, dx: 1, dy: 1, nx: 1, ny: 1, u: [[0]], v: [[0]] }
   }
@@ -116,13 +169,13 @@ export function cellsToGrid(cells) {
   const dy = ny > 1 ? ys[1] - ys[0] : 1
 
   // Build lookup map
-  const map = new Map()
+  const map = new Map<string, OpenFoamCell>()
   for (const c of cells) {
     map.set(`${c.x},${c.y}`, c)
   }
 
-  const u = []
-  const v = []
+  const u: number[][] = []
+  const v: number[][] = []
   for (let row = 0; row < ny; row++) {
     u.push([])
     v.push([])
@@ -142,16 +195,11 @@ export function cellsToGrid(cells) {
 /**
  * Trace a streamline through the vector field using RK4 integration.
  *
- * @param {object} vectorField  Grid field (see module doc) or {cells:[...]} shape
- * @param {{x:number, y:number}} seed  World-space starting position
- * @param {object} [opts]
- * @param {number} [opts.max_steps=2000]
- * @param {number} [opts.dt=0.05]
- * @param {number} [opts.min_speed=1e-6]
- * @param {number} [opts.loop_tol=1e-3]  Squared-distance threshold for closed-loop
- * @returns {{x:number, y:number}[]}  Array of world-space points
+ * @param vectorField  Grid field (see module doc) or {cells:[...]} shape
+ * @param seed  World-space starting position
+ * @returns Array of world-space points, including the seed as the first point.
  */
-export function traceStreamline(vectorField, seed, opts = {}) {
+export function traceStreamline(vectorField: VectorField, seed: Point2, opts: TraceOpts = {}): Point2[] {
   const {
     max_steps = 2000,
     dt = 0.05,
@@ -159,10 +207,13 @@ export function traceStreamline(vectorField, seed, opts = {}) {
     loop_tol = 1e-3,
   } = opts
 
-  // Normalise to grid form if needed
-  const field = vectorField.cells ? cellsToGrid(vectorField.cells) : vectorField
+  // Normalise to grid form if needed. Matches the original untyped truthiness check
+  // (`vectorField.cells ? ... : ...`) rather than `'cells' in vectorField`, which would
+  // subtly differ if a caller ever passed `{ cells: undefined, ... }`.
+  const cells = (vectorField as VectorFieldCells).cells
+  const field = cells ? cellsToGrid(cells) : (vectorField as VectorFieldGrid)
 
-  const points = [{ x: seed.x, y: seed.y }]
+  const points: Point2[] = [{ x: seed.x, y: seed.y }]
   let px = seed.x
   let py = seed.y
 
@@ -197,11 +248,8 @@ export function traceStreamline(vectorField, seed, opts = {}) {
 /**
  * Trace multiple streamlines from an array of seed positions.
  *
- * @param {object} vectorField
- * @param {{x:number, y:number}[]} seeds
- * @param {object} [opts]  Same as traceStreamline opts
- * @returns {{x:number, y:number}[][]}  One array of points per seed
+ * @returns One array of points per seed.
  */
-export function traceStreamlines(vectorField, seeds, opts = {}) {
+export function traceStreamlines(vectorField: VectorField, seeds: Point2[], opts: TraceOpts = {}): Point2[][] {
   return seeds.map(seed => traceStreamline(vectorField, seed, opts))
 }

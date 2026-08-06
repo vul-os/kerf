@@ -1,5 +1,5 @@
 /**
- * HorologyPanel.test.jsx — Pure-helper unit tests (no DOM, no fetch).
+ * HorologyPanel.test.tsx — Pure-helper unit tests (no DOM, no fetch).
  *
  * Tests the exported helpers:
  *   fmtNum(n, digits?)         → formatted string

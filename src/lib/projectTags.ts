@@ -18,6 +18,7 @@ import {
   Plane,
   Lightbulb,
 } from 'lucide-react'
+import type { ProjectStarter } from '@/types/api'
 
 // TAG_PRESETS is the curated list of "popular" tags with icons + colors.
 // Order matches the visual order in the create dialog and the Workshop
@@ -156,7 +157,7 @@ export const STARTER_OPTIONS = [
   },
 ]
 
-export const DEFAULT_STARTER = 'jscad'
+export const DEFAULT_STARTER: ProjectStarter = 'jscad'
 
 // presetById returns a TAG_PRESETS entry by id, or null. We use null
 // (not a fallback to the first preset) so the caller can decide how to
@@ -171,10 +172,10 @@ export function presetById(id) {
 // returns the first starter id any tag suggests. Falls back to
 // DEFAULT_STARTER if none match. Used by the create dialog to nudge
 // the starter dropdown when the user picks a tag.
-export function suggestStarterFor(tags) {
+export function suggestStarterFor(tags): ProjectStarter {
   for (const t of tags || []) {
     const p = presetById(t)
-    if (p && p.suggestStarter) return p.suggestStarter
+    if (p && p.suggestStarter) return p.suggestStarter as ProjectStarter
   }
   return DEFAULT_STARTER
 }

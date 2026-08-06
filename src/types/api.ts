@@ -72,7 +72,19 @@ export interface WorkspaceMember {
 // ---------------------------------------------------------------------------
 
 /** createProject's body shape (api.js ~line 211); the response row is inferred to mirror it plus `id`. */
-export type ProjectStarter = 'jscad' | 'circuit' | 'blank'
+/**
+ * Must mirror STARTER_SEEDS in packages/kerf-api/src/kerf_api/routes.py, which is also what
+ * STARTER_OPTIONS offers in the create dialog. Previously listed only jscad/circuit/blank, so
+ * assembly, feature and drawing — all selectable in the UI and accepted by the server — were
+ * not expressible.
+ */
+export type ProjectStarter =
+  | 'jscad'
+  | 'assembly'
+  | 'feature'
+  | 'drawing'
+  | 'circuit'
+  | 'blank'
 
 export interface ApiProject {
   id: string

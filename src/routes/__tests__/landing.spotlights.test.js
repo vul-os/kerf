@@ -216,7 +216,7 @@ describe('DomainSpotlights design constraints', () => {
 
 describe('Landing.jsx — PerDomain section removed', () => {
   const landingSrc = readFileSync(
-    resolve(__dirname, '../Landing.jsx'),
+    (existsSync(resolve(__dirname, '../Landing.tsx')) ? resolve(__dirname, '../Landing.tsx') : (existsSync(resolve(__dirname, '../Landing.tsx')) ? resolve(__dirname, '../Landing.tsx') : resolve(__dirname, '../Landing.jsx'))),
     'utf8',
   )
 

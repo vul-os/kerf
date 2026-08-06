@@ -664,7 +664,7 @@ function useThumbnailBlob(thumbnailUrl) {
     let created = null
     const API_URL = import.meta.env.VITE_API_URL || ''
     const token = useAuth.getState().accessToken
-    const headers = {}
+    const headers: Record<string, string> = {}
     if (token) headers.authorization = `Bearer ${token}`
     fetch(`${API_URL}${thumbnailUrl}`, { headers })
       .then((res) => res.ok ? res.blob() : null)
@@ -1035,8 +1035,7 @@ export default function Projects() {
       />
       {ShareModal && shareOf && (
         <ShareModal
-          project={shareOf}
-          open={!!shareOf}
+          projectId={shareOf.id}
           onClose={() => setShareOf(null)}
         />
       )}

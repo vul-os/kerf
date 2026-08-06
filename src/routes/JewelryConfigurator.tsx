@@ -168,7 +168,9 @@ export function buildToolPayload(state) {
   const pricePerGram = PRICE_PRESET[state.metal] ?? 0
   const finishCost = FINISH_OPTIONS.find((f) => f.key === state.finish)?.cost ?? 0
 
-  const payload = {
+  // Widened: `stones` is attached conditionally below, so the inferred literal shape
+  // would reject it.
+  const payload: Record<string, unknown> = {
     volume_mm3:           volumeMm3,
     metal:                state.metal,
     metal_price_per_gram: pricePerGram,

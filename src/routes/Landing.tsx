@@ -1368,7 +1368,7 @@ function LocalVsHosted() {
   )
 }
 
-function RunCard({ icon, label, sub, ctaText, ctaTo, features, extras = [], extra, highlighted }) {
+function RunCard({ icon, label, sub, ctaText, ctaTo, features, extras = [], extra, highlighted = false }) {
   return (
     <div
       className={
@@ -1556,8 +1556,8 @@ function LandingHead() {
   useEffect(() => {
     const prev = document.title
     document.title = META_TITLE
-    const tags = []
-    function addMeta(attrs) {
+    const tags: HTMLElement[] = []
+    function addMeta(attrs: Record<string, string>) {
       const el = document.createElement('meta')
       Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v))
       document.head.appendChild(el)

@@ -7,14 +7,14 @@
  * Pattern mirrors src/__tests__/docsSidebarDrawer.test.js.
  */
 
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import path from 'path'
 import { describe, it, expect } from 'vitest'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const articleSrc = readFileSync(
-  path.resolve(__dirname, '../Article.jsx'),
+  (existsSync(path.resolve(__dirname, '../Article.tsx')) ? path.resolve(__dirname, '../Article.tsx') : (existsSync(path.resolve(__dirname, '../Article.tsx')) ? path.resolve(__dirname, '../Article.tsx') : path.resolve(__dirname, '../Article.jsx'))),
   'utf8',
 )
 

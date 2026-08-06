@@ -12,24 +12,60 @@
  */
 
 import { useCallback, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import {
   Lock, Unlock, RefreshCw, Users, AlertTriangle, CheckCircle2, Layers,
 } from 'lucide-react'
 
-function parseContent(content) {
+interface Workset {
+  id?: string
+  name?: string
+  owner?: string
+  element_ids?: string[]
+}
+
+interface Borrow {
+  element_id?: string
+}
+
+interface Conflict {
+  element_id?: string
+  other_user?: string
+}
+
+interface WorksharingElement {
+  id?: string
+  element_id?: string
+  name?: string
+}
+
+interface WorksharingState {
+  worksets?: Workset[]
+  borrows?: Borrow[]
+  conflicts?: Conflict[]
+  elements?: WorksharingElement[]
+  [key: string]: unknown
+}
+
+function parseContent(content: unknown): WorksharingState {
   if (!content) return {}
   try {
-    return typeof content === 'string' ? JSON.parse(content) : content
+    return (typeof content === 'string' ? JSON.parse(content) : content) as WorksharingState
   } catch {
     return {}
   }
 }
 
-export default function WorksharingPanel({ content, projectId, fileId, callTool }) {
+export default function WorksharingPanel({ content, projectId, fileId, callTool }: {
+  content?: unknown
+  projectId?: string
+  fileId?: string
+  callTool?: (tool: string, args: Record<string, unknown>) => Promise<unknown>
+}) {
   const initial = useMemo(() => parseContent(content), [content])
-  const [state, setState] = useState(initial)
-  const [busy, setBusy] = useState(null)
-  const [error, setError] = useState(null)
+  const [state, setState] = useState<WorksharingState>(initial)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const dispatch = callTool
 
@@ -38,16 +74,17 @@ export default function WorksharingPanel({ content, projectId, fileId, callTool 
   const conflicts = state.conflicts || []
   const elements = state.elements || []
 
-  const run = useCallback(async (tool, args, key) => {
+  const run = useCallback(async (tool: string, args: Record<string, unknown>, key: string) => {
     if (!dispatch) return
     setBusy(key)
     setError(null)
     try {
       const res = await dispatch(tool, { project_id: projectId, file_id: fileId, ...args })
-      const next = res?.result ?? res
-      if (next && typeof next === 'object') setState((s) => ({ ...s, ...next }))
+      const resObj = res as { result?: unknown } | undefined
+      const next = resObj?.result ?? res
+      if (next && typeof next === 'object') setState((s) => ({ ...s, ...(next as WorksharingState) }))
     } catch (e) {
-      setError(String(e?.message || e))
+      setError(String(e instanceof Error ? e.message : e))
     } finally {
       setBusy(null)
     }
@@ -166,13 +203,13 @@ const card = {
   padding: '8px 10px', marginBottom: '6px',
 }
 
-function SectionHeader({ icon, title }) {
+function SectionHeader({ icon, title }: { icon: ReactNode; title: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '12px 0 6px', fontWeight: 600, fontSize: '12px', color: '#475569' }}>
       {icon} {title}
     </div>
   )
 }
-function Empty({ children }) {
+function Empty({ children }: { children: ReactNode }) {
   return <div style={{ fontSize: '12px', color: '#94a3b8', padding: '6px 0' }}>{children}</div>
 }

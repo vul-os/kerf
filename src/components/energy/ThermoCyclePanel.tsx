@@ -14,6 +14,7 @@
  */
 
 import { useState, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import { Activity, Play, AlertTriangle, Info } from 'lucide-react'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -22,7 +23,9 @@ const API_URL = import.meta.env.VITE_API_URL || ''
 // Utility
 // ---------------------------------------------------------------------------
 
-async function callTool(toolName, args) {
+type ToolResult<T> = T & { ok?: boolean; reason?: string }
+
+async function callTool<T>(toolName: string, args: Record<string, unknown>): Promise<ToolResult<T>> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -37,17 +40,17 @@ async function callTool(toolName, args) {
   return res.json()
 }
 
-function fmt(n, dp = 4) {
+function fmt(n: number | null | undefined, dp = 4) {
   if (n == null || !Number.isFinite(n)) return '—'
   return n.toFixed(dp)
 }
 
-function fmtPct(n) {
+function fmtPct(n: number | null | undefined) {
   if (n == null || !Number.isFinite(n)) return '—'
   return `${(n * 100).toFixed(2)}%`
 }
 
-function fmtKJ(n) {
+function fmtKJ(n: number | null | undefined) {
   if (n == null || !Number.isFinite(n)) return '—'
   return `${(n / 1000).toFixed(2)} kJ/kg`
 }
@@ -56,7 +59,15 @@ function fmtKJ(n) {
 // Common UI primitives
 // ---------------------------------------------------------------------------
 
-function NumInput({ value, onChange, min, max, step = 'any', disabled, unit }) {
+function NumInput({ value, onChange, min, max, step = 'any', disabled, unit }: {
+  value: number | string
+  onChange: (v: string) => void
+  min?: number
+  max?: number
+  step?: number | string
+  disabled?: boolean
+  unit?: string
+}) {
   return (
     <div className="flex items-center gap-1">
       <input
@@ -74,7 +85,7 @@ function NumInput({ value, onChange, min, max, step = 'any', disabled, unit }) {
   )
 }
 
-function FieldRow({ label, hint, children }) {
+function FieldRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div className="flex items-start gap-2 mb-1.5">
       <label className="text-[11px] text-ink-400 w-32 flex-shrink-0 pt-1.5 leading-tight">
@@ -86,7 +97,7 @@ function FieldRow({ label, hint, children }) {
   )
 }
 
-function ResultRow({ label, value, highlight }) {
+function ResultRow({ label, value, highlight }: { label: string; value: ReactNode; highlight?: boolean }) {
   return (
     <div className={`flex justify-between items-center py-1 border-b border-ink-800/50`}>
       <span className="text-[11px] text-ink-400">{label}</span>
@@ -97,7 +108,7 @@ function ResultRow({ label, value, highlight }) {
   )
 }
 
-function SectionHeader({ children }) {
+function SectionHeader({ children }: { children: ReactNode }) {
   return (
     <div className="text-[10px] uppercase tracking-wider text-ink-600 mb-1.5 mt-3 first:mt-0">
       {children}
@@ -105,7 +116,7 @@ function SectionHeader({ children }) {
   )
 }
 
-function RunButton({ loading, label, onClick }) {
+function RunButton({ loading, label, onClick }: { loading: boolean; label: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
@@ -118,7 +129,7 @@ function RunButton({ loading, label, onClick }) {
   )
 }
 
-function ErrorAlert({ error }) {
+function ErrorAlert({ error }: { error: string | null }) {
   if (!error) return null
   return (
     <div className="flex items-start gap-2 mt-2 p-2 bg-amber-950/40 border border-amber-800/50 rounded text-[11px] text-amber-300">
@@ -132,20 +143,38 @@ function ErrorAlert({ error }) {
 // Otto cycle sub-panel
 // ---------------------------------------------------------------------------
 
+interface OttoInputs {
+  r: number
+  T1: number
+  T3: number
+  k: number
+}
+
+interface OttoResult {
+  eta: number
+  w_net_J_kg: number
+  q_in_J_kg: number
+  q_out_J_kg: number
+  T2_K: number
+  T3_K: number
+  T4_K: number
+  BWR: number
+}
+
 function OttoPanel() {
-  const [inp, setInp] = useState({ r: 9.0, T1: 300, T3: 2000, k: 1.4 })
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [inp, setInp] = useState<OttoInputs>({ r: 9.0, T1: 300, T3: 2000, k: 1.4 })
+  const [result, setResult] = useState<OttoResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const set = (k, v) => setInp((p) => ({ ...p, [k]: parseFloat(v) || v }))
+  const set = (k: keyof OttoInputs, v: string) => setInp((p) => ({ ...p, [k]: parseFloat(v) || v }) as OttoInputs)
 
   const run = useCallback(async () => {
     setLoading(true); setError(null); setResult(null)
     try {
-      const r = await callTool('thermo_otto_cycle', { r: inp.r, T1: inp.T1, T3: inp.T3, k: inp.k })
-      if (r.ok === false) { setError(r.reason); return }
+      const r = await callTool<OttoResult>('thermo_otto_cycle', { r: inp.r, T1: inp.T1, T3: inp.T3, k: inp.k })
+      if (r.ok === false) { setError(r.reason ?? null); return }
       setResult(r)
-    } catch (e) { setError(e.message) }
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setLoading(false) }
   }, [inp])
 
@@ -183,20 +212,36 @@ function OttoPanel() {
 // Diesel cycle sub-panel
 // ---------------------------------------------------------------------------
 
+interface DieselInputs {
+  r: number
+  r_c: number
+  T1: number
+  k: number
+}
+
+interface DieselResult {
+  eta: number
+  w_net_J_kg: number
+  q_in_J_kg: number
+  T2_K: number
+  T3_K: number
+  T4_K: number
+}
+
 function DieselPanel() {
-  const [inp, setInp] = useState({ r: 18.0, r_c: 2.0, T1: 300, k: 1.4 })
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [inp, setInp] = useState<DieselInputs>({ r: 18.0, r_c: 2.0, T1: 300, k: 1.4 })
+  const [result, setResult] = useState<DieselResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const set = (k, v) => setInp((p) => ({ ...p, [k]: parseFloat(v) || v }))
+  const set = (k: keyof DieselInputs, v: string) => setInp((p) => ({ ...p, [k]: parseFloat(v) || v }) as DieselInputs)
 
   const run = useCallback(async () => {
     setLoading(true); setError(null); setResult(null)
     try {
-      const r = await callTool('thermo_diesel_cycle', { r: inp.r, r_c: inp.r_c, T1: inp.T1, k: inp.k })
-      if (r.ok === false) { setError(r.reason); return }
+      const r = await callTool<DieselResult>('thermo_diesel_cycle', { r: inp.r, r_c: inp.r_c, T1: inp.T1, k: inp.k })
+      if (r.ok === false) { setError(r.reason ?? null); return }
       setResult(r)
-    } catch (e) { setError(e.message) }
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setLoading(false) }
   }, [inp])
 
@@ -232,27 +277,51 @@ function DieselPanel() {
 // Brayton cycle sub-panel
 // ---------------------------------------------------------------------------
 
+interface BraytonInputs {
+  r_p: number
+  T1: number
+  T3: number
+  k: number
+  eta_c: number
+  eta_t: number
+  eta_regen: number
+}
+
+interface BraytonResult {
+  eta: number
+  w_net_J_kg: number
+  BWR: number
+  w_c_J_kg: number
+  w_t_J_kg: number
+  q_in_J_kg: number
+  T2s_K: number
+  T2_K: number
+  T4s_K: number
+  T4_K: number
+  T_regen_K?: number
+}
+
 function BraytonPanel() {
-  const [inp, setInp] = useState({
+  const [inp, setInp] = useState<BraytonInputs>({
     r_p: 10.0, T1: 300, T3: 1400,
     k: 1.4, eta_c: 0.85, eta_t: 0.90, eta_regen: 0.0,
   })
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<BraytonResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const set = (k, v) => setInp((p) => ({ ...p, [k]: parseFloat(v) || v }))
+  const set = (k: keyof BraytonInputs, v: string) => setInp((p) => ({ ...p, [k]: parseFloat(v) || v }) as BraytonInputs)
 
   const run = useCallback(async () => {
     setLoading(true); setError(null); setResult(null)
     try {
-      const r = await callTool('thermo_brayton_cycle', {
+      const r = await callTool<BraytonResult>('thermo_brayton_cycle', {
         r_p: inp.r_p, T1: inp.T1, T3: inp.T3,
         k: inp.k, eta_c: inp.eta_c, eta_t: inp.eta_t,
         ...(inp.eta_regen > 0 ? { eta_regen: inp.eta_regen } : {}),
       })
-      if (r.ok === false) { setError(r.reason); return }
+      if (r.ok === false) { setError(r.reason ?? null); return }
       setResult(r)
-    } catch (e) { setError(e.message) }
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setLoading(false) }
   }, [inp])
 
@@ -298,8 +367,29 @@ function BraytonPanel() {
 // Rankine cycle sub-panel
 // ---------------------------------------------------------------------------
 
+interface RankineInputs {
+  p_high: number | null
+  p_low: number | null
+  T_superheat: number | null
+  eta_pump: number | null
+  eta_turbine: number | null
+  T_reheat: number | null
+  p_reheat: number | null
+}
+
+interface RankineResult {
+  eta: number
+  w_net_J_kg: number
+  w_t_J_kg: number
+  w_p_J_kg: number
+  q_in_J_kg: number
+  T_sat_high_K: number
+  T_sat_low_K: number
+  eta_carnot: number
+}
+
 function RankinePanel() {
-  const [inp, setInp] = useState({
+  const [inp, setInp] = useState<RankineInputs>({
     p_high: 5_000_000,   // 5 MPa
     p_low: 10_000,       // 10 kPa
     T_superheat: null,
@@ -310,15 +400,15 @@ function RankinePanel() {
   })
   const [useSuperheat, setUseSuperheat] = useState(false)
   const [useReheat, setUseReheat] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<RankineResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const set = (k, v) => setInp((p) => ({ ...p, [k]: v === '' ? null : (parseFloat(v) || null) }))
+  const set = (k: keyof RankineInputs, v: string) => setInp((p) => ({ ...p, [k]: v === '' ? null : (parseFloat(v) || null) }))
 
   const run = useCallback(async () => {
     setLoading(true); setError(null); setResult(null)
     try {
-      const args = {
+      const args: Record<string, unknown> = {
         p_high: inp.p_high,
         p_low: inp.p_low,
         eta_pump: inp.eta_pump,
@@ -329,10 +419,10 @@ function RankinePanel() {
         args.T_reheat = inp.T_reheat
         if (inp.p_reheat) args.p_reheat = inp.p_reheat
       }
-      const r = await callTool('thermo_rankine_cycle_ideal', args)
-      if (r.ok === false) { setError(r.reason); return }
+      const r = await callTool<RankineResult>('thermo_rankine_cycle_ideal', args)
+      if (r.ok === false) { setError(r.reason ?? null); return }
       setResult(r)
-    } catch (e) { setError(e.message) }
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setLoading(false) }
   }, [inp, useSuperheat, useReheat])
 
@@ -343,10 +433,10 @@ function RankinePanel() {
         For accurate steam tables, also see fluids_steam_if97.
       </div>
       <div className="grid grid-cols-2 gap-x-3">
-        <FieldRow label="p_high" hint="Pa"><NumInput value={inp.p_high} onChange={(v) => set('p_high', v)} min={0} unit="Pa" /></FieldRow>
-        <FieldRow label="p_low" hint="Pa"><NumInput value={inp.p_low} onChange={(v) => set('p_low', v)} min={0} unit="Pa" /></FieldRow>
-        <FieldRow label="η_pump"><NumInput value={inp.eta_pump} onChange={(v) => set('eta_pump', v)} min={0.5} max={1.0} step="0.01" /></FieldRow>
-        <FieldRow label="η_turbine"><NumInput value={inp.eta_turbine} onChange={(v) => set('eta_turbine', v)} min={0.5} max={1.0} step="0.01" /></FieldRow>
+        <FieldRow label="p_high" hint="Pa"><NumInput value={inp.p_high ?? ''} onChange={(v) => set('p_high', v)} min={0} unit="Pa" /></FieldRow>
+        <FieldRow label="p_low" hint="Pa"><NumInput value={inp.p_low ?? ''} onChange={(v) => set('p_low', v)} min={0} unit="Pa" /></FieldRow>
+        <FieldRow label="η_pump"><NumInput value={inp.eta_pump ?? ''} onChange={(v) => set('eta_pump', v)} min={0.5} max={1.0} step="0.01" /></FieldRow>
+        <FieldRow label="η_turbine"><NumInput value={inp.eta_turbine ?? ''} onChange={(v) => set('eta_turbine', v)} min={0.5} max={1.0} step="0.01" /></FieldRow>
       </div>
 
       {/* Options */}
@@ -396,25 +486,38 @@ function RankinePanel() {
 // Carnot sub-panel
 // ---------------------------------------------------------------------------
 
+interface CarnotInputs {
+  T_H: number
+  T_L: number
+}
+
+interface CarnotResult {
+  eta_carnot: number
+  T_H_K?: number
+  T_L_K?: number
+  COP_R?: number
+  COP_HP?: number
+}
+
 function CarnotPanel() {
-  const [inp, setInp] = useState({ T_H: 1000, T_L: 300 })
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [inp, setInp] = useState<CarnotInputs>({ T_H: 1000, T_L: 300 })
+  const [result, setResult] = useState<CarnotResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const set = (k, v) => setInp((p) => ({ ...p, [k]: parseFloat(v) || v }))
+  const set = (k: keyof CarnotInputs, v: string) => setInp((p) => ({ ...p, [k]: parseFloat(v) || v }) as CarnotInputs)
 
   const run = useCallback(async () => {
     setLoading(true); setError(null); setResult(null)
     try {
-      const r = await callTool('thermo_carnot_efficiency', { T_H: inp.T_H, T_L: inp.T_L })
-      if (r.ok === false) { setError(r.reason); return }
+      const r = await callTool<CarnotResult>('thermo_carnot_efficiency', { T_H: inp.T_H, T_L: inp.T_L })
+      if (r.ok === false) { setError(r.reason ?? null); return }
       // Also compute COP_R and COP_HP
       const [rr, rHP] = await Promise.all([
-        callTool('thermo_carnot_cop_refrigeration', { T_H: inp.T_H, T_L: inp.T_L }),
-        callTool('thermo_carnot_cop_heat_pump', { T_H: inp.T_H, T_L: inp.T_L }),
+        callTool<{ COP_R: number }>('thermo_carnot_cop_refrigeration', { T_H: inp.T_H, T_L: inp.T_L }),
+        callTool<{ COP_HP: number }>('thermo_carnot_cop_heat_pump', { T_H: inp.T_H, T_L: inp.T_L }),
       ])
       setResult({ ...r, COP_R: rr.COP_R, COP_HP: rHP.COP_HP })
-    } catch (e) { setError(e.message) }
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     finally { setLoading(false) }
   }, [inp])
 
@@ -459,7 +562,7 @@ const CYCLES = [
   { id: 'carnot',  label: 'Carnot' },
 ]
 
-export default function ThermoCyclePanel({ projectId: _projectId }) {
+export default function ThermoCyclePanel({ projectId: _projectId }: { projectId?: string }) {
   const [cycle, setCycle] = useState('brayton')
 
   return (

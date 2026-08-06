@@ -18,7 +18,7 @@
  *   8. Mouse click path (separate from pointer path) → firePick still reached
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 
 // ---------------------------------------------------------------------------
 // Re-implement the minimal tap-vs-drag discriminator exactly as written in
@@ -28,30 +28,41 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const TAP_MS = 250
 const TAP_PX = 8
 
+/** Synthetic stand-in for the subset of PointerEvent/MouseEvent this discriminator reads. */
+interface SyntheticPointerEvent {
+  pointerType: string
+  pointerId?: number
+  clientX: number
+  clientY: number
+  shiftKey: boolean
+  /** Synthetic timestamp (ms), replacing Date.now() so tests are deterministic. */
+  _t?: number
+}
+
 /**
  * Build a discriminator instance that mirrors the closure in FeatureRenderer.
  * Returns { onPointerDown, onPointerUp, calls } where calls is the array of
  * firePick invocations.
  */
 function makeDiscriminator() {
-  const calls = []
-  function firePick(ev) {
+  const calls: Array<{ clientX: number; clientY: number; shiftKey: boolean }> = []
+  function firePick(ev: SyntheticPointerEvent) {
     calls.push({ clientX: ev.clientX, clientY: ev.clientY, shiftKey: ev.shiftKey })
   }
 
-  const tapState = new Map()
+  const tapState = new Map<number, { x: number; y: number; t: number }>()
 
-  function onPointerDown(ev) {
+  function onPointerDown(ev: SyntheticPointerEvent) {
     if (ev.pointerType === 'mouse') return
-    tapState.set(ev.pointerId, { x: ev.clientX, y: ev.clientY, t: ev._t })
+    tapState.set(ev.pointerId as number, { x: ev.clientX, y: ev.clientY, t: ev._t as number })
   }
 
-  function onPointerUp(ev) {
+  function onPointerUp(ev: SyntheticPointerEvent) {
     if (ev.pointerType === 'mouse') return
-    const start = tapState.get(ev.pointerId)
-    tapState.delete(ev.pointerId)
+    const start = tapState.get(ev.pointerId as number)
+    tapState.delete(ev.pointerId as number)
     if (!start) return
-    const dt = ev._t - start.t
+    const dt = (ev._t as number) - start.t
     const dx = ev.clientX - start.x
     const dy = ev.clientY - start.y
     const dist = Math.sqrt(dx * dx + dy * dy)
@@ -62,7 +73,7 @@ function makeDiscriminator() {
 
   // Mouse click path mirrors the onClick handler in FeatureRenderer:
   // skip when ev.pointerType is touch/pen.
-  function onClick(ev) {
+  function onClick(ev: SyntheticPointerEvent) {
     if (ev.pointerType === 'touch' || ev.pointerType === 'pen') return
     firePick(ev)
   }
@@ -76,7 +87,10 @@ function makeDiscriminator() {
 // deterministic without mocking timers.
 // ---------------------------------------------------------------------------
 
-function ptr({ type = 'touch', id = 1, x = 100, y = 100, dx = 0, dy = 0, dt = 0, shift = false } = {}) {
+// Dead code (found during T-513, left alone per migration rules): unused by any test below —
+// makeDownUp (next) is used instead. Kept as-is; not this slice's call to remove.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- pre-existing dead code, reported not fixed (see comment above).
+function ptr({ type = 'touch', id = 1, x = 100, y = 100, dx = 0, dy = 0, dt = 0, shift = false } = {}): SyntheticPointerEvent & { _dx: number; _dy: number; _dt: number } {
   return {
     pointerType: type,
     pointerId: id,
@@ -92,7 +106,7 @@ function ptr({ type = 'touch', id = 1, x = 100, y = 100, dx = 0, dy = 0, dt = 0,
 }
 
 function makeDownUp({ pointerType = 'touch', id = 1, startX = 100, startY = 100,
-                       dx = 0, dy = 0, dt = 0, shift = false } = {}) {
+                       dx = 0, dy = 0, dt = 0, shift = false } = {}): { down: SyntheticPointerEvent; up: SyntheticPointerEvent } {
   const baseT = 1000
   const down = {
     pointerType, pointerId: id,

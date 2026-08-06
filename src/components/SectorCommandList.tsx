@@ -27,7 +27,7 @@ import { fuzzyMatch, SECTOR_COMMANDS } from '../lib/sectorCommandIndex.js'
 // Sector badge colours (maps sector slug → Tailwind colour classes)
 // ---------------------------------------------------------------------------
 
-const SECTOR_BADGE = {
+const SECTOR_BADGE: Record<string, string> = {
   silicon:   'bg-violet-900/50 text-violet-300 border-violet-700/40',
   firmware:  'bg-blue-900/50   text-blue-300   border-blue-700/40',
   aerospace: 'bg-cyan-900/50   text-cyan-300   border-cyan-700/40',
@@ -41,7 +41,7 @@ const DEFAULT_BADGE = 'bg-ink-800/50 text-ink-400 border-ink-700/40'
 // Action-type icon labels (text, no asset dependency)
 // ---------------------------------------------------------------------------
 
-const ACTION_ICON = {
+const ACTION_ICON: Record<string, string> = {
   route:       '→',
   create_file: '+',
   open_docs:   '?',
@@ -51,17 +51,26 @@ const ACTION_ICON = {
 // SectorCommandList
 // ---------------------------------------------------------------------------
 
-/**
- * @param {{
- *   query?:              string,
- *   entries?:           Array<object>,
- *   activeIndex?:        number,
- *   onActiveIndexChange?: (i: number) => void,
- *   onSelect?:           (entry: object) => void,
- *   maxResults?:         number,
- *   className?:          string,
- * }} props
- */
+interface SectorCommandEntry {
+  id: string
+  sector: string
+  label: string
+  description: string
+  keywords: string[]
+  action_type: string
+  target: string
+}
+
+export interface Props {
+  query?: string
+  entries?: SectorCommandEntry[]
+  activeIndex?: number
+  onActiveIndexChange?: (i: number) => void
+  onSelect?: (entry: SectorCommandEntry) => void
+  maxResults?: number
+  className?: string
+}
+
 export default function SectorCommandList({
   query = '',
   entries = SECTOR_COMMANDS,
@@ -70,14 +79,14 @@ export default function SectorCommandList({
   onSelect,
   maxResults = 12,
   className = '',
-}) {
+}: Props) {
   const results = useMemo(
     () => (query.trim() ? fuzzyMatch(query, entries).slice(0, maxResults) : []),
     [query, entries, maxResults],
   )
 
   // Auto-scroll the active item into view
-  const listRef = useRef(null)
+  const listRef = useRef<HTMLUListElement>(null)
   useEffect(() => {
     if (!listRef.current || activeIndex < 0) return
     const el = listRef.current.querySelector(`[data-index="${activeIndex}"]`)

@@ -9,9 +9,12 @@
 // analysis via POST /api/projects/{pid}/files/{fid}/fem.
 
 import { useEffect, useImperativeHandle, useRef, useState } from 'react'
+import type { CSSProperties, Ref } from 'react'
+import type * as ThreeNS from 'three'
 import { Activity, AlertTriangle, CheckCircle, Loader2, Play } from 'lucide-react'
 import { useAuth } from '../store/auth.js'
 import DeformedShapeOverlay from './FEMDeformedShape.jsx'
+import type { NodeDisplacement, FemColorMode } from './FEMDeformedShape.jsx'
 import { snapshotCanvas } from '../lib/snapshotHelpers.js'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -21,60 +24,97 @@ const MATERIAL_PRESETS = {
   aluminium: { label: 'Aluminium 6061-T6', E: 68.9e9, nu: 0.33, rho: 2700, yield_strength: 276e6 },
   titanium: { label: 'Titanium Ti-6Al-4V', E: 113.8e9, nu: 0.342, rho: 4430, yield_strength: 880e6 },
   pla: { label: 'PLA (3D-print)', E: 3.5e9, nu: 0.36, rho: 1250, yield_strength: 50e6 },
-}
+} as const
+
+type MaterialPreset = keyof typeof MATERIAL_PRESETS
 
 const ANALYSIS_TYPES = [
   { value: 'linear_static', label: 'Linear Static' },
   { value: 'modal', label: 'Modal (Natural Frequencies)' },
 ]
 
-function fmt(v, digits = 3) {
-  if (v == null || !Number.isFinite(v)) return '—'
-  return v.toExponential(digits)
-}
-
-function fmtMPa(pa) {
+function fmtMPa(pa?: number | null) {
   if (pa == null || !Number.isFinite(pa)) return '—'
   return (pa / 1e6).toFixed(2) + ' MPa'
 }
 
-function fmtMm(m) {
+function fmtMm(m?: number | null) {
   if (m == null || !Number.isFinite(m)) return '—'
   return (m * 1000).toFixed(4) + ' mm'
 }
 
-// geometry: optional THREE.BufferGeometry from the linked source part/feature
-// (passed in by Editor.jsx when a source mesh is available). Forwarded to
-// DeformedShapeOverlay so it renders an actual morphed surface instead of the
-// point-cloud proxy.
-export default function FEMView({ file, projectId, geometry, viewRef }) {
-  const { accessToken } = useAuth()
-  const [preset, setPreset] = useState('steel')
-  const rootRef = useRef(null)
+// ── Types ──────────────────────────────────────────────────────────────────────
+//
+// 'three' ships no .d.ts and this repo has no @types/three — THREE.X positions
+// below resolve to `any` because noImplicitAny is off, same as the rest of this
+// slice (see prior T-513 commits, e.g. BIMView.tsx).
+
+interface FemJobResult {
+  node_displacements?: NodeDisplacement[]
+  stresses?: number[]
+  max_vonmises_stress?: number | null
+  max_displacement?: number | null
+  fos?: number | null
+  frequencies?: number[]
+  warnings?: string[]
+}
+
+type FemJobStatusValue = 'queued' | 'running' | 'done' | 'error' | 'not_found'
+
+interface FemJobStatus {
+  status?: FemJobStatusValue
+  job_id?: string
+  result?: FemJobResult | null
+  error?: string
+}
+
+/** file.kind === 'fem'; not yet in the shared FileKind union (src/types/api.ts) — flagging for T-500/T-501. */
+interface FemFile {
+  id?: string
+  kind?: string
+}
+
+export interface FEMViewHandle {
+  snapshot: (opts?: { size?: number; quality?: number }) => Promise<Blob | null>
+}
+
+export interface FEMViewProps {
+  file?: FemFile
+  projectId?: string
+  /** Optional THREE.BufferGeometry from the linked source part/feature (passed in by
+   * Editor.jsx when a source mesh is available). Forwarded to DeformedShapeOverlay so
+   * it renders an actual morphed surface instead of the point-cloud proxy. */
+  geometry?: ThreeNS.BufferGeometry
+  viewRef?: Ref<FEMViewHandle>
+}
+
+export default function FEMView({ file, projectId, geometry, viewRef }: FEMViewProps) {
+  const [preset, setPreset] = useState<MaterialPreset>('steel')
+  const rootRef = useRef<HTMLDivElement | null>(null)
 
   // The "visual" part of FEMView is the deformed-shape overlay, which
   // mounts its own <canvas>. We can find it via a descendant query —
   // when no analysis has run yet the panel is just controls, which
   // we don't have a useful image for.
   useImperativeHandle(viewRef, () => ({
-    snapshot: (opts) => {
-      const canvas = rootRef.current?.querySelector?.('canvas')
-      return snapshotCanvas(canvas, opts)
+    snapshot: (opts?: { size?: number; quality?: number }) => {
+      const canvas = rootRef.current?.querySelector?.('canvas') ?? null
+      return snapshotCanvas(canvas, opts) as Promise<Blob | null>
     },
   }), [])
   const [analysisType, setAnalysisType] = useState('linear_static')
   const [solver, setSolver] = useState('fenicsx')
   const [meshSize, setMeshSize] = useState('0.01')
   const [running, setRunning] = useState(false)
-  const [jobStatus, setJobStatus] = useState(null)
-  const [error, setError] = useState(null)
+  const [jobStatus, setJobStatus] = useState<FemJobStatus | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   // Deformed-shape overlay state
   const [showOverlay, setShowOverlay] = useState(false)
   const [dispScale, setDispScale] = useState(10)
-  const [colorMode, setColorMode] = useState('displacement') // 'displacement' | 'vonmises'
+  const [colorMode, setColorMode] = useState<FemColorMode>('displacement')
 
-  const pollingRef = useRef(null)
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fid = file?.id
   const pid = projectId
@@ -98,7 +138,7 @@ export default function FEMView({ file, projectId, geometry, viewRef }) {
         headers: { authorization: `Bearer ${token}` },
       })
       if (!res.ok) return
-      const data = await res.json()
+      const data: FemJobStatus = await res.json()
       setJobStatus(data)
       if (data.status === 'queued' || data.status === 'running') {
         startPolling()
@@ -106,7 +146,7 @@ export default function FEMView({ file, projectId, geometry, viewRef }) {
         stopPolling()
         setRunning(false)
       }
-    } catch (_e) {
+    } catch {
       // Network error — silent
     }
   }
@@ -120,13 +160,13 @@ export default function FEMView({ file, projectId, geometry, viewRef }) {
           headers: { authorization: `Bearer ${token}` },
         })
         if (!res.ok) return
-        const data = await res.json()
+        const data: FemJobStatus = await res.json()
         setJobStatus(data)
         if (data.status === 'done' || data.status === 'error') {
           stopPolling()
           setRunning(false)
         }
-      } catch (_e) {
+      } catch {
         // ignore
       }
     }, 3000)
@@ -175,18 +215,18 @@ export default function FEMView({ file, projectId, geometry, viewRef }) {
         const txt = await res.text()
         throw new Error(`${res.status}: ${txt}`)
       }
-      const data = await res.json()
+      const data: { job_id?: string } = await res.json()
       setJobStatus({ status: 'queued', job_id: data.job_id })
       startPolling()
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
       setRunning(false)
     }
   }
 
   const result = jobStatus?.result && typeof jobStatus.result === 'object' ? jobStatus.result : null
   const status = jobStatus?.status
-  const hasDeformedShape = result?.node_displacements?.length > 0
+  const hasDeformedShape = (result?.node_displacements?.length ?? 0) > 0
 
   return (
     <div ref={rootRef} style={styles.root}>
@@ -205,7 +245,7 @@ export default function FEMView({ file, projectId, geometry, viewRef }) {
           <label style={styles.label}>Material</label>
           <select
             value={preset}
-            onChange={e => setPreset(e.target.value)}
+            onChange={e => setPreset(e.target.value as MaterialPreset)}
             style={styles.select}
             disabled={running}
           >
@@ -351,7 +391,7 @@ export default function FEMView({ file, projectId, geometry, viewRef }) {
                     <label style={styles.label}>Colour by</label>
                     <select
                       value={colorMode}
-                      onChange={e => setColorMode(e.target.value)}
+                      onChange={e => setColorMode(e.target.value as FemColorMode)}
                       style={styles.select}
                     >
                       <option value="displacement">Displacement magnitude</option>
@@ -363,8 +403,8 @@ export default function FEMView({ file, projectId, geometry, viewRef }) {
                     stresses={result.stresses}
                     scale={dispScale}
                     colorMode={colorMode}
-                    maxDisplacement={result.max_displacement}
-                    maxStress={result.max_vonmises_stress}
+                    maxDisplacement={result.max_displacement ?? undefined}
+                    maxStress={result.max_vonmises_stress ?? undefined}
                     geometry={geometry}
                   />
                 </>
@@ -399,8 +439,8 @@ export default function FEMView({ file, projectId, geometry, viewRef }) {
   )
 }
 
-function StatusBadge({ status }) {
-  const colors = {
+function StatusBadge({ status }: { status: FemJobStatusValue }) {
+  const colors: Record<FemJobStatusValue, string> = {
     queued: '#f59e0b',
     running: '#22d3ee',
     done: '#34d399',
@@ -423,7 +463,7 @@ function StatusBadge({ status }) {
   )
 }
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   root: {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: 13,

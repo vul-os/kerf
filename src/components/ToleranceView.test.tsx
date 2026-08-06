@@ -21,18 +21,18 @@ describe('parseToleranceFile', () => {
   })
 
   it('returns invalid kind for bad JSON', () => {
-    const r = parseToleranceFile('not json')
+    const r: any = parseToleranceFile('not json')
     expect(r.kind).toBe('invalid')
     expect(typeof r.error).toBe('string')
   })
 
   it('returns invalid for non-object JSON', () => {
-    const r = parseToleranceFile('[1, 2, 3]')
+    const r: any = parseToleranceFile('[1, 2, 3]')
     expect(r.kind).toBe('invalid')
   })
 
   it('returns unsupported when kind is unknown', () => {
-    const r = parseToleranceFile(JSON.stringify({ kind: 'assembly' }))
+    const r: any = parseToleranceFile(JSON.stringify({ kind: 'assembly' }))
     expect(r.kind).toBe('unsupported')
   })
 
@@ -46,7 +46,7 @@ describe('parseToleranceFile', () => {
         { id: 'B', nominal: 25.0, plus: 0.05, minus: 0.05, unit: 'mm' },
       ],
     }
-    const r = parseToleranceFile(JSON.stringify(doc))
+    const r: any = parseToleranceFile(JSON.stringify(doc))
     expect(r.kind).toBe('ok')
     expect(r.id).toBe('tol-001')
     expect(r.name).toBe('shaft_assembly')
@@ -60,13 +60,13 @@ describe('parseToleranceFile', () => {
         { id: 'X', nominal: 10.0, plus: 0.02, minus: 0.02 },
       ],
     }
-    const r = parseToleranceFile(JSON.stringify(doc))
+    const r: any = parseToleranceFile(JSON.stringify(doc))
     expect(r.kind).toBe('ok')
     expect(r.tolerances).toHaveLength(1)
   })
 
   it('returns empty tolerances for missing tolerances field', () => {
-    const r = parseToleranceFile(JSON.stringify({ kind: 'tolerance', id: 'x' }))
+    const r: any = parseToleranceFile(JSON.stringify({ kind: 'tolerance', id: 'x' }))
     expect(r.kind).toBe('ok')
     expect(r.tolerances).toEqual([])
   })
@@ -77,7 +77,7 @@ describe('parseToleranceFile', () => {
         { id: 'Y', nominal: 20.0, upper: 20.1, lower: 19.9 },
       ],
     }
-    const r = parseToleranceFile(JSON.stringify(doc))
+    const r: any = parseToleranceFile(JSON.stringify(doc))
     expect(r.kind).toBe('ok')
     expect(r.tolerances[0].upper).toBe(20.1)
     expect(r.tolerances[0].lower).toBe(19.9)

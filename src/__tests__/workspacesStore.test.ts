@@ -21,9 +21,14 @@ import { useWorkspaces } from '../store/workspaces.js'
 
 const WS = { id: 'ws-1', slug: 'personal-abc', name: 'Personal' }
 
+// vi.mock() above replaces api.listWorkspaces with a vi.fn() at runtime, but
+// its static type is still the real api.js signature (owned by another
+// slice) — cast to the mock surface for .mockReset()/.mockResolvedValueOnce().
+const listWorkspaces = api.listWorkspaces as unknown as ReturnType<typeof vi.fn>
+
 beforeEach(() => {
   vi.useRealTimers()
-  api.listWorkspaces.mockReset()
+  listWorkspaces.mockReset()
   try { localStorage.clear() } catch {}
   useWorkspaces.setState({
     workspaces: [], currentSlug: null, loading: false, loaded: false, error: null,
@@ -32,7 +37,7 @@ beforeEach(() => {
 
 describe('useWorkspaces.loadAll resilience', () => {
   it('success: populates workspaces, marks loaded, picks current slug', async () => {
-    api.listWorkspaces.mockResolvedValueOnce([WS])
+    listWorkspaces.mockResolvedValueOnce([WS])
     const arr = await useWorkspaces.getState().loadAll()
     expect(arr).toEqual([WS])
     const s = useWorkspaces.getState()
@@ -44,7 +49,7 @@ describe('useWorkspaces.loadAll resilience', () => {
 
   it('all retries fail: does NOT latch loaded:true (stays retryable)', async () => {
     vi.useFakeTimers()
-    api.listWorkspaces.mockRejectedValue(new Error('cold start / 502'))
+    listWorkspaces.mockRejectedValue(new Error('cold start / 502'))
     const p = useWorkspaces.getState().loadAll()
     await vi.runAllTimersAsync()
     const arr = await p
@@ -55,12 +60,12 @@ describe('useWorkspaces.loadAll resilience', () => {
     expect(s.error).toBeTruthy()
     expect(s.workspaces).toEqual([])
     // 1 initial + 4 backoff retries
-    expect(api.listWorkspaces).toHaveBeenCalledTimes(5)
+    expect(listWorkspaces).toHaveBeenCalledTimes(5)
   })
 
   it('transient failure then success: eventually populates', async () => {
     vi.useFakeTimers()
-    api.listWorkspaces
+    listWorkspaces
       .mockRejectedValueOnce(new Error('cold'))
       .mockRejectedValueOnce(new Error('cold'))
       .mockResolvedValueOnce([WS])

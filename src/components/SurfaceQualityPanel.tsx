@@ -11,7 +11,7 @@
 // Pattern mirrors SurfacingPanel.jsx (dark mono palette, callTool helper).
 // Props: none — standalone analysis panel.
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, type CSSProperties } from 'react'
 import {
   Activity,
   Eye,
@@ -29,7 +29,7 @@ const API_URL =
     ? import.meta.env.VITE_API_URL || ''
     : ''
 
-async function callTool(toolName, args) {
+async function callTool(toolName: string, args: Record<string, unknown>) {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -50,14 +50,41 @@ async function callTool(toolName, args) {
   return data
 }
 
-function fmtNum(v, digits = 6) {
+function fmtNum(v: number | null | undefined, digits = 6) {
   if (v === null || v === undefined || Number.isNaN(v)) return '—'
   if (typeof v !== 'number') return String(v)
   if (v !== 0 && (Math.abs(v) < 1e-3 || Math.abs(v) >= 1e5)) return v.toExponential(2)
   return v.toFixed(digits)
 }
 
-const s = {
+function gateStyle(ok: boolean): CSSProperties {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '6px 12px',
+    borderRadius: 6,
+    border: `1px solid ${ok ? '#15803d' : '#7f1d1d'}`,
+    background: ok ? '#0f2a18' : '#2a1010',
+    color: ok ? '#86efac' : '#fca5a5',
+    fontSize: 12,
+  }
+}
+
+function gradeStyle(g: string | null | undefined): CSSProperties {
+  return {
+    fontSize: 22,
+    fontWeight: 800,
+    color:
+      g === 'G3' ? '#86efac'
+      : g === 'G2' ? '#a7f3d0'
+      : g === 'G1' ? '#fde68a'
+      : g === 'G0' ? '#fdba74'
+      : '#fca5a5',
+  }
+}
+
+const s: Record<string, CSSProperties> = {
   root: {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: 13,
@@ -114,27 +141,6 @@ const s = {
     gap: 8,
     flexWrap: 'wrap',
   },
-  gate: (ok) => ({
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '6px 12px',
-    borderRadius: 6,
-    border: `1px solid ${ok ? '#15803d' : '#7f1d1d'}`,
-    background: ok ? '#0f2a18' : '#2a1010',
-    color: ok ? '#86efac' : '#fca5a5',
-    fontSize: 12,
-  }),
-  grade: (g) => ({
-    fontSize: 22,
-    fontWeight: 800,
-    color:
-      g === 'G3' ? '#86efac'
-      : g === 'G2' ? '#a7f3d0'
-      : g === 'G1' ? '#fde68a'
-      : g === 'G0' ? '#fdba74'
-      : '#fca5a5',
-  }),
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 12 },
   th: { textAlign: 'left', padding: '6px 8px', color: '#9ca3af', borderBottom: '1px solid #1f2937' },
   td: { padding: '6px 8px', borderBottom: '1px solid #11161d' },
@@ -170,10 +176,32 @@ const s = {
  * `surface_class_a_analyze` and renders the G0/G1/G2/G3 gate report, the
  * highest achieved grade, and the zebra / isophote continuity classification.
  */
-export default function SurfaceQualityPanel({ surfA, surfB, sharedEdge }) {
+/** Parsed JSON payload from the surface_class_a_analyze tool. */
+interface ClassAReport {
+  ok?: boolean
+  reason?: string
+  gates?: Record<string, boolean>
+  continuity?: {
+    G0_max?: number
+    G1_max_deg?: number
+    G2_max?: number
+    G3_max?: number
+  }
+  highest_grade?: string
+  zebra_grade?: string
+  isophote_grade?: string
+}
+
+export interface Props {
+  surfA?: unknown
+  surfB?: unknown
+  sharedEdge?: unknown
+}
+
+export default function SurfaceQualityPanel({ surfA, surfB, sharedEdge }: Props) {
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(null)
-  const [report, setReport] = useState(null)
+  const [error, setError] = useState<string | null>(null)
+  const [report, setReport] = useState<ClassAReport | null>(null)
 
   const analyze = useCallback(async () => {
     setBusy(true)
@@ -185,13 +213,13 @@ export default function SurfaceQualityPanel({ surfA, surfB, sharedEdge }) {
         shared_edge_pts: sharedEdge,
         num_samples: 20,
         n_stripes: 8,
-      })
+      }) as ClassAReport
       if (res && res.ok === false) {
         throw new Error(res.reason || 'analysis failed')
       }
       setReport(res)
     } catch (e) {
-      setError(e.message || String(e))
+      setError((e as Error).message || String(e))
     } finally {
       setBusy(false)
     }
@@ -239,14 +267,14 @@ export default function SurfaceQualityPanel({ surfA, surfB, sharedEdge }) {
           <>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
               <span style={{ color: '#9ca3af', fontSize: 12 }}>Highest grade:</span>
-              <span style={s.grade(report.highest_grade)}>
+              <span style={gradeStyle(report.highest_grade)}>
                 {report.highest_grade || '—'}
               </span>
             </div>
 
             <div style={s.gateRow}>
               {GATES.map((g) => (
-                <div key={g.key} style={s.gate(gates[g.key])}>
+                <div key={g.key} style={gateStyle(gates[g.key])}>
                   {gates[g.key] ? <CheckCircle size={13} /> : <XCircle size={13} />}
                   {g.label}
                 </div>
@@ -275,10 +303,10 @@ export default function SurfaceQualityPanel({ surfA, surfB, sharedEdge }) {
             </table>
 
             <div style={s.gateRow}>
-              <div style={{ ...s.gate(true), borderColor: '#374151', background: '#11161d', color: '#cbd5e1' }}>
+              <div style={{ ...gateStyle(true), borderColor: '#374151', background: '#11161d', color: '#cbd5e1' }}>
                 <Eye size={13} /> Zebra: {report.zebra_grade || '—'}
               </div>
-              <div style={{ ...s.gate(true), borderColor: '#374151', background: '#11161d', color: '#cbd5e1' }}>
+              <div style={{ ...gateStyle(true), borderColor: '#374151', background: '#11161d', color: '#cbd5e1' }}>
                 <Eye size={13} /> Isophote: {report.isophote_grade || '—'}
               </div>
             </div>

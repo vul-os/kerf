@@ -1,13 +1,19 @@
 /**
- * Vitest structural tests for CAMMachineSimPanel.
+ * CAMMachineSimPanel.test.tsx — Vitest structural tests for CAMMachineSimPanel.
  *
  * Uses renderToStaticMarkup (react-dom/server) — no @testing-library/react,
  * following the project pattern from CameraLensPicker.test.jsx.
  */
 
+import type { ComponentType } from 'react'
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import CAMMachineSimPanel from './CAMMachineSimPanel.jsx'
+import CAMMachineSimPanelUntyped from './CAMMachineSimPanel.jsx'
+
+// CAMMachineSimPanel.jsx is not yet migrated (T-515); its destructured props
+// read as required by TS's structural inference even though several are
+// optional at runtime (e.g. stockBounds={undefined} is exercised below).
+const CAMMachineSimPanel = CAMMachineSimPanelUntyped as unknown as ComponentType<Record<string, unknown>>
 
 const defaultPoints = [
   { x: 0, y: 0, z: 50 },

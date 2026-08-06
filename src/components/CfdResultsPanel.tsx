@@ -26,9 +26,60 @@
  * converged     {boolean} overall convergence flag
  */
 
+// ── Local domain types (no shared type exists for CFD results) ───────────────
+
+interface FieldStat {
+  min?: number
+  max?: number
+  mean?: number
+  rms?: number
+  min_mag?: number
+  max_mag?: number
+  mean_mag?: number
+  rms_mag?: number
+  n_cells?: number
+}
+
+type FieldStats = Record<string, FieldStat>
+
+interface ResidualData {
+  initial?: number
+  final?: number
+  last_5?: number[]
+  converged?: boolean
+}
+
+type Residuals = Record<string, ResidualData>
+
+interface Probe {
+  probe_id: string | number
+  x?: number
+  y?: number
+  z?: number
+  U_mag?: number
+  p?: number
+  k?: number
+  epsilon?: number
+  omega?: number
+  distance_m?: number
+  nearest_cell_idx?: number
+  note?: string
+  [key: string]: unknown
+}
+
+interface Yplus {
+  error?: string
+  first_cell_height_m?: number
+  Re_L?: number
+  u_tau_m_s?: number
+  Cf_schlichting?: number
+  target_yplus?: number
+  note?: string
+}
+
 // ── Utilities ────────────────────────────────────────────────────────────────
 
-function fmt(v, digits = 4) {
+function fmt(v: unknown, digits = 4): string {
   if (v == null) return '—'
   if (typeof v !== 'number') return String(v)
   if (Math.abs(v) === 0) return '0'
@@ -38,7 +89,7 @@ function fmt(v, digits = 4) {
 
 // ── Colour helpers ────────────────────────────────────────────────────────────
 
-function residualColor(r) {
+function residualColor(r?: number | null): string {
   if (r == null) return '#6b7280'
   if (r < 1e-6) return '#10b981'  // emerald — converged
   if (r < 1e-4) return '#34d399'  // green-ish
@@ -48,7 +99,7 @@ function residualColor(r) {
 
 // ── Field statistics table ────────────────────────────────────────────────────
 
-const FIELD_LABELS = {
+const FIELD_LABELS: Record<string, { label: string; unit: string; isVec: boolean }> = {
   U:       { label: 'Velocity U',         unit: 'm/s',    isVec: true },
   p:       { label: 'Pressure p',         unit: 'Pa',     isVec: false },
   k:       { label: 'TKE k',              unit: 'm²/s²',  isVec: false },
@@ -57,7 +108,7 @@ const FIELD_LABELS = {
   nut:     { label: 'Eddy viscosity νt',  unit: 'm²/s',   isVec: false },
 }
 
-function FieldStatsTable({ fieldStats }) {
+function FieldStatsTable({ fieldStats }: { fieldStats?: FieldStats | null }) {
   if (!fieldStats || Object.keys(fieldStats).length === 0) return null
   const rows = Object.entries(FIELD_LABELS)
     .map(([key, meta]) => ({ key, meta, stats: fieldStats[key] }))
@@ -120,7 +171,7 @@ function FieldStatsTable({ fieldStats }) {
 
 // ── Residuals panel ───────────────────────────────────────────────────────────
 
-function ResidualsPanel({ residuals, converged }) {
+function ResidualsPanel({ residuals, converged }: { residuals?: Residuals | null; converged?: boolean }) {
   if (!residuals || Object.keys(residuals).length === 0) return null
   const fields = Object.entries(residuals)
 
@@ -192,18 +243,8 @@ function ResidualsPanel({ residuals, converged }) {
 
 // ── Probes table ──────────────────────────────────────────────────────────────
 
-function ProbesTable({ probes }) {
+function ProbesTable({ probes }: { probes?: Probe[] | null }) {
   if (!probes || probes.length === 0) return null
-
-  // Detect available fields from first probe
-  const sampleFields = Object.keys(probes[0]).filter(k =>
-    !['probe_id', 'x', 'y', 'z', 'nearest_cell_idx', 'distance_m', 'note'].includes(k) &&
-    !k.endsWith('_mag')
-  )
-
-  const magFields = ['U_mag', 'p', 'k', 'epsilon', 'omega'].filter(k =>
-    probes.some(p => p[k] != null || p[`${k}`] != null)
-  )
 
   const dispFields = ['U_mag', 'p', 'k'].filter(f => probes.some(p => p[f] != null))
 
@@ -264,7 +305,7 @@ function ProbesTable({ probes }) {
 
 // ── Wall y⁺ card ──────────────────────────────────────────────────────────────
 
-function YplusCard({ yplus }) {
+function YplusCard({ yplus }: { yplus?: Yplus | null }) {
   if (!yplus || yplus.error || Object.keys(yplus).length === 0) return null
   const good = yplus.first_cell_height_m != null
 
@@ -313,12 +354,19 @@ function YplusCard({ yplus }) {
 
 // ── Header bar ────────────────────────────────────────────────────────────────
 
-function HeaderBar({ n_cells, time_value, turbulenceModel, converged }) {
+interface HeaderBarProps {
+  n_cells?: number | null
+  time_value?: number | null
+  turbulenceModel?: string | null
+  converged?: boolean
+}
+
+function HeaderBar({ n_cells, time_value, turbulenceModel }: HeaderBarProps) {
   const chips = [
     n_cells != null && { label: 'Cells', value: n_cells.toLocaleString() },
     time_value != null && { label: 'Time / Iter', value: fmt(time_value, 4) },
     turbulenceModel && { label: 'Turbulence', value: turbulenceModel },
-  ].filter(Boolean)
+  ].filter((c): c is { label: string; value: string } => Boolean(c))
 
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
@@ -339,6 +387,17 @@ function HeaderBar({ n_cells, time_value, turbulenceModel, converged }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+export interface Props {
+  fieldStats?: FieldStats | null
+  residuals?: Residuals | null
+  probes?: Probe[] | null
+  yplus?: Yplus | null
+  n_cells?: number | null
+  time_value?: number | null
+  turbulenceModel?: string | null
+  converged?: boolean
+}
+
 export default function CfdResultsPanel({
   fieldStats = null,
   residuals = null,
@@ -348,7 +407,7 @@ export default function CfdResultsPanel({
   time_value = null,
   turbulenceModel = null,
   converged = false,
-}) {
+}: Props) {
   const hasAny = fieldStats || residuals || probes || yplus
 
   return (

@@ -534,7 +534,7 @@ export default function SketchView({
 
   // Forward refs so handleToolClick (defined here) can call edit-tool
   // callbacks that are declared later without violating temporal access.
-  const editHandlersRef = useRef({})
+  const editHandlersRef = useRef<{ trim?: (w: any) => void; extend?: (w: any) => void; fillet?: (w: any) => void }>({})
   const handleToolClick = useCallback((w, sn) => {
     if (tool === 'trim') { editHandlersRef.current.trim?.(w); return }
     if (tool === 'extend') { editHandlersRef.current.extend?.(w); return }
@@ -616,7 +616,7 @@ export default function SketchView({
       // If the user typed a length / angle, override the cursor target. The
       // snapTarget is computed continuously by the live-input strip and
       // reflects the current cursor when nothing is locked.
-      const draft = lineDraftRef.current || {}
+      const draft: LineDraft = lineDraftRef.current || INITIAL_LINE_DRAFT
       const target = draft.snapTarget || w
       // Resolve the second endpoint against the current sketch (which already
       // includes the first click's commit). ensurePointAt either snaps to an
@@ -1056,7 +1056,10 @@ export default function SketchView({
     })
   }, [selection, sketch])
 
-  const commitPattern = useCallback((prompt, opts = {}) => {
+  // opts' shape varies by prompt.kind (mirror: addSymmetric; linear: dx/dy/count;
+  // polar: totalAngleDeg/count) — loosely typed rather than a 3-way union for a
+  // single small options bag.
+  const commitPattern = useCallback((prompt: any, opts: any = {}) => {
     if (!prompt) return
     let next = null
     if (prompt.kind === 'mirror') {
@@ -1590,7 +1593,7 @@ export default function SketchView({
 // ---------------------------------------------------------------------------
 // Sub-components.
 
-function ToolButton({ tool, active, onClick, disabled }) {
+function ToolButton({ tool, active, onClick, disabled }: { tool: any; active?: boolean; onClick: () => void; disabled?: boolean }) {
   const Icon = tool.icon
   return (
     <button
@@ -2041,7 +2044,7 @@ function DimensionLabel({ c, sketch, worldToScreen, onDragStart }) {
 // SymmetricOverLineGlyph — renders a small ⟺ mirror badge at the midpoint of
 // the construction line for each symmetric_over_line constraint. Hovering the
 // badge highlights all three involved entities (entity_a, entity_b, the line).
-function SymmetricOverLineGlyph({ c, sketch, worldToScreen, onHover }) {
+function SymmetricOverLineGlyph({ c, sketch, worldToScreen, onHover }: { c: any; sketch: any; worldToScreen: any; onHover?: (id: string | null) => void }) {
   if (c.type !== 'symmetric_over_line') return null
   // See the boundary comment on the other `ent` declarations in this file:
   // looked up by id and read generically without re-narrowing SketchEntity's
@@ -3238,7 +3241,7 @@ function ConstraintRow({ c, onChangeValue, onDelete }) {
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => { const v = Number(draft); if (Number.isFinite(v)) onChangeValue(v) }}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.target.blur() } }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur() } }}
           className="w-full bg-ink-950 border border-ink-800 rounded px-2 py-1 font-mono text-[11px] text-ink-100 outline-none focus-visible:border-kerf-300/60 focus-visible:ring-2 focus-visible:ring-kerf-300/50"
         />
       )}

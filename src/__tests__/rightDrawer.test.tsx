@@ -25,7 +25,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 // Minimal create() re-implementation so the store can run in Node.
 function createStore(init) {
   let state
-  const subscribers = new Set()
+  const subscribers = new Set<(s: any) => void>()
   const set = (partial) => {
     state = typeof partial === 'function'
       ? { ...state, ...partial(state) }
@@ -42,7 +42,7 @@ function createStore(init) {
 }
 
 // Build a store with only the rightDrawer-related slice.
-function makeStore(opts = {}) {
+function makeStore(opts: any = {}) {
   return createStore((set, get) => ({
     rightDrawer: { open: false, tab: 'chat' },
     activityOpen: false,

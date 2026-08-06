@@ -3871,10 +3871,13 @@ async function loadExternalComponentParts(ref) {
 
 async function loadBoardOutlineParts(file) {
   const res = await runCircuit(file?.content || '')
-  if (res && res.error) {
+  // res is CircuitCompileResult (a discriminated union) — narrow via 'in'
+  // rather than bare `res.error`/`res.raw`, which only some branches have.
+  if (res && 'error' in res && res.error) {
     console.warn(`board_outline_2d: compile failed for ${file.id}: ${res.error}`)
   }
-  const sketchLike = extractBoardOutline(Array.isArray(res?.raw) ? res.raw : null)
+  const raw = res && 'raw' in res ? res.raw : null
+  const sketchLike = extractBoardOutline(Array.isArray(raw) ? raw : null)
   let geom
   try {
     geom = sketchToGeom2(sketchLike)
@@ -3887,10 +3890,13 @@ async function loadBoardOutlineParts(file) {
 
 async function loadBoard3DParts(file) {
   const res = await runCircuit(file?.content || '')
-  if (res && res.error) {
+  // res is CircuitCompileResult (a discriminated union) — narrow via 'in'
+  // rather than bare `res.error`/`res.raw`, which only some branches have.
+  if (res && 'error' in res && res.error) {
     console.warn(`board_3d: compile failed for ${file.id}: ${res.error}`)
   }
-  return buildCircuitBoardParts(Array.isArray(res?.raw) ? res.raw : [])
+  const raw = res && 'raw' in res ? res.raw : null
+  return buildCircuitBoardParts(Array.isArray(raw) ? raw : [])
 }
 
 async function loadMeshParts(file) {

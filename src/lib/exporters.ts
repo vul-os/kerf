@@ -22,6 +22,9 @@
 //   [Content_Types].xml  → MIME types for .model and .rels
 //   _rels/.rels          → root relationship to 3D/3dmodel.model
 //   3D/3dmodel.model     → XML mesh per object, single build item per object
+//
+// `three` ships no type declarations in this project, so every `THREE.*`
+// reference below resolves to `any` — annotated anyway for documentation.
 import * as THREE from 'three'
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js'
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js'
@@ -29,11 +32,40 @@ import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import { PLYExporter } from 'three/examples/jsm/exporters/PLYExporter.js'
 import { zipSync, strToU8 } from 'fflate'
 import { geom3ToBufferGeometry } from './geom3.js'
+import type { Geom3 } from '../types/geometry.js'
+
+// A part's geom is either a JSCAD Geom3 (has `.polygons`, e.g. from jscadRunner)
+// or a THREE.BufferGeometry (e.g. STEP-derived, from stepLoader) — mirrors
+// src/types/geometry.ts's JscadPart but widened since exporters must also
+// accept the BufferGeometry-only (STEP) case that JscadPart doesn't cover.
+export interface ExportPart {
+  id?: string | null
+  geom: Geom3 | THREE.BufferGeometry
+  color?: number | null
+}
+
+export interface ExportFormat {
+  id: string
+  label: string
+  ext: string
+  acceptsAll: boolean
+  jscadOnly?: boolean
+}
+
+export interface ExportOpts {
+  baseName?: string
+  singlePartId?: string | null
+}
+
+export interface ExportResult {
+  blob: Blob
+  filename: string
+}
 
 // Must match Renderer.jsx so exported colors match what the user sees.
 const PALETTE = [0xc9a96b, 0x6b9bc9, 0xc96b89, 0x89c96b, 0xc9b86b, 0x9b6bc9]
 
-export const FORMATS = [
+export const FORMATS: ExportFormat[] = [
   { id: 'stl-binary', label: 'STL (binary)', ext: 'stl',  acceptsAll: true },
   { id: 'stl-ascii',  label: 'STL (ASCII)',  ext: 'stl',  acceptsAll: true },
   { id: 'obj',        label: 'OBJ',          ext: 'obj',  acceptsAll: true },
@@ -44,13 +76,13 @@ export const FORMATS = [
   { id: 'jscad-json', label: 'JSCAD JSON',   ext: 'json', acceptsAll: true, jscadOnly: true },
 ]
 
-const FORMAT_BY_ID = Object.fromEntries(FORMATS.map((f) => [f.id, f]))
+const FORMAT_BY_ID: Record<string, ExportFormat> = Object.fromEntries(FORMATS.map((f) => [f.id, f]))
 
 // ---------- helpers ----------
 
 // Sanitise unsafe filename characters. Browsers tolerate most things but we
 // prefer something that doesn't get mangled by user shells either.
-export function sanitizeFilename(name) {
+export function sanitizeFilename(name: unknown): string {
   if (!name) return 'untitled'
   return String(name)
     .replace(/[/\\?%*:|"<>]/g, '_')
@@ -61,39 +93,45 @@ export function sanitizeFilename(name) {
 
 // Strip a known extension from a basename (case-insensitive). Used so we get
 // `cube.stl` instead of `cube.jscad.stl`.
-function stripExtension(name) {
+function stripExtension(name: string): string {
   if (!name) return ''
   return name.replace(/\.[^./\\]+$/, '')
 }
 
-function pickColor(part, index) {
+function pickColor(part: ExportPart, index: number): number {
   if (part && part.color != null) return part.color
   return PALETTE[index % PALETTE.length]
 }
 
 // Coerce a part's geom into a Three.BufferGeometry. Returns null if the geom
 // is missing or empty.
-function partToBufferGeometry(part) {
+function partToBufferGeometry(part: ExportPart | null | undefined): THREE.BufferGeometry | null {
   const g = part?.geom
   if (!g) return null
-  if (g.isBufferGeometry) return g
-  if (Array.isArray(g.polygons)) return geom3ToBufferGeometry(g)
+  if ((g as THREE.BufferGeometry).isBufferGeometry) return g as THREE.BufferGeometry
+  if (Array.isArray((g as Geom3).polygons)) return geom3ToBufferGeometry(g as Geom3)
   return null
+}
+
+interface BuiltGroup {
+  group: THREE.Group
+  ownedGeoms: THREE.BufferGeometry[]
+  ownedMats: THREE.Material[]
 }
 
 // Build a temporary THREE.Group containing one Mesh per part. Caller owns
 // disposal of the materials/geometries that we *create* here (the BufferGeometry
 // for JSCAD parts, and all materials).
-function buildGroup(parts) {
+function buildGroup(parts: ExportPart[]): BuiltGroup {
   const group = new THREE.Group()
   group.name = 'kerf-export'
-  const ownedGeoms = []
-  const ownedMats = []
+  const ownedGeoms: THREE.BufferGeometry[] = []
+  const ownedMats: THREE.Material[] = []
   parts.forEach((part, i) => {
     const bg = partToBufferGeometry(part)
     if (!bg) return
     // For JSCAD parts we built a fresh BufferGeometry; track for disposal.
-    if (!part.geom.isBufferGeometry) ownedGeoms.push(bg)
+    if (!(part.geom as THREE.BufferGeometry).isBufferGeometry) ownedGeoms.push(bg)
     const colorInt = pickColor(part, i)
     const material = new THREE.MeshStandardMaterial({
       color: colorInt,
@@ -108,13 +146,13 @@ function buildGroup(parts) {
   return { group, ownedGeoms, ownedMats }
 }
 
-function disposeOwned({ ownedGeoms, ownedMats }) {
+function disposeOwned({ ownedGeoms, ownedMats }: BuiltGroup): void {
   for (const g of ownedGeoms) g.dispose?.()
   for (const m of ownedMats) m.dispose?.()
 }
 
 // Trigger a download via a transient anchor.
-export function downloadBlob(blob, filename) {
+export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -128,23 +166,24 @@ export function downloadBlob(blob, filename) {
 
 // ---------- per-format exporters ----------
 
-function exportSTL(parts, { binary = true } = {}) {
+function exportSTL(parts: ExportPart[], { binary = true }: { binary?: boolean } = {}): Blob {
   const owned = buildGroup(parts)
   try {
     const exporter = new STLExporter()
     const data = exporter.parse(owned.group, { binary })
     if (binary) {
       // parse() returns a DataView for binary STL.
-      const ab = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
+      const dv = data as unknown as DataView
+      const ab = dv.buffer.slice(dv.byteOffset, dv.byteOffset + dv.byteLength) as ArrayBuffer
       return new Blob([ab], { type: 'application/sla' })
     }
-    return new Blob([data], { type: 'application/sla' })
+    return new Blob([data as unknown as string], { type: 'application/sla' })
   } finally {
     disposeOwned(owned)
   }
 }
 
-function exportOBJ(parts) {
+function exportOBJ(parts: ExportPart[]): Blob {
   const owned = buildGroup(parts)
   try {
     const exporter = new OBJExporter()
@@ -155,14 +194,14 @@ function exportOBJ(parts) {
   }
 }
 
-function exportPLY(parts) {
+function exportPLY(parts: ExportPart[]): Promise<Blob> {
   const owned = buildGroup(parts)
   try {
     const exporter = new PLYExporter()
     return new Promise((resolve) => {
       exporter.parse(
         owned.group,
-        (result) => {
+        (result: ArrayBuffer | string) => {
           // Binary PLY → ArrayBuffer; ASCII would be a string. We pass binary:true.
           const blob = result instanceof ArrayBuffer
             ? new Blob([result], { type: 'application/octet-stream' })
@@ -179,17 +218,17 @@ function exportPLY(parts) {
   }
 }
 
-function exportGLTF(parts, { binary = true } = {}) {
+function exportGLTF(parts: ExportPart[], { binary = true }: { binary?: boolean } = {}): Promise<Blob> {
   const owned = buildGroup(parts)
   return new Promise((resolve, reject) => {
     const exporter = new GLTFExporter()
     exporter.parse(
       owned.group,
-      (result) => {
+      (result: ArrayBuffer | object) => {
         try {
           if (binary) {
             // result is an ArrayBuffer.
-            resolve(new Blob([result], { type: 'model/gltf-binary' }))
+            resolve(new Blob([result as ArrayBuffer], { type: 'model/gltf-binary' }))
           } else {
             const text = JSON.stringify(result, null, 2)
             resolve(new Blob([text], { type: 'model/gltf+json' }))
@@ -198,7 +237,7 @@ function exportGLTF(parts, { binary = true } = {}) {
           disposeOwned(owned)
         }
       },
-      (err) => {
+      (err: unknown) => {
         disposeOwned(owned)
         reject(err)
       },
@@ -209,10 +248,11 @@ function exportGLTF(parts, { binary = true } = {}) {
 
 // JSCAD-native: serialise polygons directly. Only works for parts whose source
 // was a Geom3 — STEP parts have only a BufferGeometry and would lose fidelity.
-function exportJscadJson(parts) {
-  const out = { format: 'kerf-jscad-json', version: 1, parts: [] }
+function exportJscadJson(parts: ExportPart[]): Blob {
+  const out: { format: string; version: number; parts: Array<{ id?: string | null; color: number | null; polygons: Array<{ vertices: number[][] }> }> } =
+    { format: 'kerf-jscad-json', version: 1, parts: [] }
   for (const p of parts) {
-    const g = p.geom
+    const g = p.geom as Geom3
     if (!g || !Array.isArray(g.polygons)) {
       throw new Error(
         `Part "${p.id}" is not a JSCAD Geom3 (likely from a STEP file). ` +
@@ -237,19 +277,24 @@ function exportJscadJson(parts) {
 // not encoded — 3MF supports them via materials but it's significantly more
 // XML; v1 keeps the geometry and lets the consumer assign materials.
 
-function tessellateForThreeMF(part) {
+interface Tessellation {
+  vertices: number[][]
+  triangles: number[][]
+}
+
+function tessellateForThreeMF(part: ExportPart): Tessellation | null {
   const bg = partToBufferGeometry(part)
   if (!bg) return null
   const posAttr = bg.getAttribute('position')
   if (!posAttr) return null
 
-  const vertices = []
-  const triangles = []
+  const vertices: number[][] = []
+  const triangles: number[][] = []
   const indexAttr = bg.getIndex()
   // Dedupe vertices using a simple key-string map; 3MF files are smaller and
   // most CAD viewers prefer indexed meshes anyway.
-  const keyToIndex = new Map()
-  function pushVertex(x, y, z) {
+  const keyToIndex = new Map<string, number>()
+  function pushVertex(x: number, y: number, z: number): number {
     // Round to 6 decimals so floating-point near-duplicates collapse.
     const k = `${x.toFixed(6)},${y.toFixed(6)},${z.toFixed(6)}`
     let idx = keyToIndex.get(k)
@@ -279,19 +324,19 @@ function tessellateForThreeMF(part) {
     }
   }
   // If we created a geom for a JSCAD part, dispose it now — we copied the data.
-  if (!part.geom.isBufferGeometry) bg.dispose?.()
+  if (!(part.geom as THREE.BufferGeometry).isBufferGeometry) bg.dispose?.()
   return { vertices, triangles }
 }
 
-function escapeXml(s) {
+function escapeXml(s: unknown): string {
   return String(s).replace(/[<>&"']/g, (c) => ({
     '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', '\'': '&apos;',
-  }[c]))
+  }[c] as string))
 }
 
-function buildThreeMFModelXml(parts) {
-  const objectsXml = []
-  const buildItems = []
+function buildThreeMFModelXml(parts: ExportPart[]): string {
+  const objectsXml: string[] = []
+  const buildItems: string[] = []
   let nextId = 1
   for (const p of parts) {
     const tess = tessellateForThreeMF(p)
@@ -323,7 +368,7 @@ function buildThreeMFModelXml(parts) {
   )
 }
 
-function exportThreeMF(parts) {
+function exportThreeMF(parts: ExportPart[]): Blob {
   const modelXml = buildThreeMFModelXml(parts)
   const contentTypesXml =
     '<?xml version="1.0" encoding="UTF-8"?>' +
@@ -343,12 +388,12 @@ function exportThreeMF(parts) {
     '_rels/.rels':         strToU8(relsXml),
     '3D/3dmodel.model':    strToU8(modelXml),
   })
-  return new Blob([zipped], { type: 'model/3mf' })
+  return new Blob([zipped as BlobPart], { type: 'model/3mf' })
 }
 
 // ---------- public entry ----------
 
-export async function exportParts(parts, format, opts = {}) {
+export async function exportParts(parts: ExportPart[], format: string, opts: ExportOpts = {}): Promise<ExportResult> {
   const fmt = FORMAT_BY_ID[format]
   if (!fmt) throw new Error(`Unknown export format: ${format}`)
   if (!Array.isArray(parts) || parts.length === 0) {
@@ -361,7 +406,7 @@ export async function exportParts(parts, format, opts = {}) {
     ? `${stem}-${sanitizeFilename(singlePartId)}.${fmt.ext}`
     : `${stem}.${fmt.ext}`
 
-  let blob
+  let blob: Blob
   switch (format) {
     case 'stl-binary': blob = exportSTL(parts, { binary: true });  break
     case 'stl-ascii':  blob = exportSTL(parts, { binary: false }); break

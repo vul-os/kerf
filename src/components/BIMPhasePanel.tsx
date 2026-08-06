@@ -18,12 +18,50 @@
  */
 
 import { useState, useCallback, useMemo } from 'react'
+import type { ReactNode } from 'react'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type PhaseValue = 'existing' | 'new_construction' | 'demolish' | 'future' | 'alternate_a' | 'alternate_b'
+
+interface PhaseTagInfo {
+  value: PhaseValue
+  label: string
+  colour: string
+}
+
+interface ElementPhase {
+  element_id: string
+  primary_phase: PhaseValue
+  demolish_phase?: PhaseValue | null
+  notes?: string
+}
+
+interface PhaseFilter {
+  name: string
+  visible_phases: PhaseValue[]
+  demolished_visible: boolean
+  future_visible: boolean
+}
+
+interface PhaseFilterResult {
+  filter_name: string
+  total_elements: number
+  visible_count: number
+  hidden_count: number
+  demolished_ghost_count: number
+  visible_element_ids: string[]
+  hidden_element_ids: string[]
+  demolished_ghost_ids: string[]
+}
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const PHASE_TAGS = [
+const PHASE_TAGS: PhaseTagInfo[] = [
   { value: 'existing',         label: 'Existing',         colour: '#6b7280' },
   { value: 'new_construction', label: 'New Construction',  colour: '#22c55e' },
   { value: 'demolish',         label: 'Demolish',          colour: '#ef4444' },
@@ -32,9 +70,9 @@ const PHASE_TAGS = [
   { value: 'alternate_b',      label: 'Alternate B',       colour: '#a855f7' },
 ]
 
-const PHASE_MAP = Object.fromEntries(PHASE_TAGS.map((p) => [p.value, p]))
+const PHASE_MAP: Record<string, PhaseTagInfo> = Object.fromEntries(PHASE_TAGS.map((p) => [p.value, p]))
 
-const DEFAULT_FILTERS = [
+const DEFAULT_FILTERS: PhaseFilter[] = [
   {
     name: 'Existing Plan',
     visible_phases: ['existing'],
@@ -65,7 +103,7 @@ const DEFAULT_FILTERS = [
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function SectionHeader({ title, description }) {
+function SectionHeader({ title, description }: { title: string; description?: string }) {
   return (
     <div className="mb-3">
       <h3 className="text-sm font-semibold text-ink-800 dark:text-ink-200">{title}</h3>
@@ -80,7 +118,7 @@ function Divider() {
   return <hr className="my-4 border-ink-200 dark:border-ink-700" />
 }
 
-function PhaseTag({ phase }) {
+function PhaseTag({ phase }: { phase: string }) {
   const info = PHASE_MAP[phase]
   if (!info) return <span className="text-xs text-ink-400">{phase}</span>
   return (
@@ -93,7 +131,7 @@ function PhaseTag({ phase }) {
   )
 }
 
-function PhaseDot({ phase }) {
+function PhaseDot({ phase }: { phase: string }) {
   const info = PHASE_MAP[phase]
   if (!info) return null
   return (
@@ -109,10 +147,10 @@ function PhaseDot({ phase }) {
 // Phase Tagger
 // ---------------------------------------------------------------------------
 
-function PhaseTagger({ onTag }) {
+function PhaseTagger({ onTag }: { onTag: (entry: ElementPhase) => void }) {
   const [elementId, setElementId] = useState('')
-  const [phase, setPhase] = useState('existing')
-  const [demolishPhase, setDemolishPhase] = useState('')
+  const [phase, setPhase] = useState<PhaseValue>('existing')
+  const [demolishPhase, setDemolishPhase] = useState<PhaseValue | ''>('')
   const [notes, setNotes] = useState('')
 
   const handleApply = useCallback(() => {
@@ -146,7 +184,7 @@ function PhaseTagger({ onTag }) {
             <label className="mb-1 block text-xs text-ink-500 dark:text-ink-400">Primary phase</label>
             <select
               value={phase}
-              onChange={(e) => setPhase(e.target.value)}
+              onChange={(e) => setPhase(e.target.value as PhaseValue)}
               className="w-full rounded border border-ink-200 bg-white px-2 py-1.5 text-sm dark:border-ink-600 dark:bg-ink-800 dark:text-ink-100"
               aria-label="Primary phase"
             >
@@ -160,7 +198,7 @@ function PhaseTagger({ onTag }) {
             <label className="mb-1 block text-xs text-ink-500 dark:text-ink-400">Demolish in phase</label>
             <select
               value={demolishPhase}
-              onChange={(e) => setDemolishPhase(e.target.value)}
+              onChange={(e) => setDemolishPhase(e.target.value as PhaseValue | '')}
               className="w-full rounded border border-ink-200 bg-white px-2 py-1.5 text-sm dark:border-ink-600 dark:bg-ink-800 dark:text-ink-100"
               aria-label="Demolish phase"
             >
@@ -197,20 +235,20 @@ function PhaseTagger({ onTag }) {
 // Active Filter Selector + Custom Filter Editor
 // ---------------------------------------------------------------------------
 
-function FilterSelector({ activeFilter, onFilterChange }) {
-  const [mode, setMode] = useState('preset')  // 'preset' | 'custom'
+function FilterSelector({ activeFilter, onFilterChange }: { activeFilter: PhaseFilter; onFilterChange: (f: PhaseFilter) => void }) {
+  const [mode, setMode] = useState<'preset' | 'custom'>('preset')
   const [selectedPreset, setSelectedPreset] = useState(DEFAULT_FILTERS[0].name)
-  const [customPhases, setCustomPhases] = useState(['existing'])
+  const [customPhases, setCustomPhases] = useState<PhaseValue[]>(['existing'])
   const [demolishedVisible, setDemolishedVisible] = useState(false)
   const [futureVisible, setFutureVisible] = useState(false)
 
-  const handlePresetChange = useCallback((name) => {
+  const handlePresetChange = useCallback((name: string) => {
     setSelectedPreset(name)
     const preset = DEFAULT_FILTERS.find((f) => f.name === name)
     if (preset) onFilterChange(preset)
   }, [onFilterChange])
 
-  const handleCustomToggle = useCallback((phase) => {
+  const handleCustomToggle = useCallback((phase: PhaseValue) => {
     setCustomPhases((prev) => {
       const next = prev.includes(phase) ? prev.filter((p) => p !== phase) : [...prev, phase]
       onFilterChange({
@@ -223,7 +261,7 @@ function FilterSelector({ activeFilter, onFilterChange }) {
     })
   }, [demolishedVisible, futureVisible, onFilterChange])
 
-  const handleDemolishedToggle = useCallback((v) => {
+  const handleDemolishedToggle = useCallback((v: boolean) => {
     setDemolishedVisible(v)
     onFilterChange({
       name: 'custom',
@@ -233,7 +271,7 @@ function FilterSelector({ activeFilter, onFilterChange }) {
     })
   }, [customPhases, futureVisible, onFilterChange])
 
-  const handleFutureToggle = useCallback((v) => {
+  const handleFutureToggle = useCallback((v: boolean) => {
     setFutureVisible(v)
     onFilterChange({
       name: 'custom',
@@ -351,7 +389,7 @@ function FilterSelector({ activeFilter, onFilterChange }) {
 // Phase Statistics bar chart
 // ---------------------------------------------------------------------------
 
-function PhaseStats({ elementPhases }) {
+function PhaseStats({ elementPhases }: { elementPhases: ElementPhase[] }) {
   const counts = useMemo(() => {
     const c = Object.fromEntries(PHASE_TAGS.map((p) => [p.value, 0]))
     for (const ep of elementPhases) {
@@ -398,7 +436,7 @@ function PhaseStats({ elementPhases }) {
 // Filter Result display
 // ---------------------------------------------------------------------------
 
-function FilterResultPanel({ result }) {
+function FilterResultPanel({ result }: { result: PhaseFilterResult | null }) {
   if (!result) return null
 
   const { visible_count = 0, hidden_count = 0, demolished_ghost_count = 0, filter_name } = result
@@ -430,7 +468,7 @@ function FilterResultPanel({ result }) {
 // Element list
 // ---------------------------------------------------------------------------
 
-function ElementList({ elementPhases, onRemove }) {
+function ElementList({ elementPhases, onRemove }: { elementPhases: ElementPhase[]; onRemove?: (id: string) => void }) {
   if (!elementPhases.length) {
     return (
       <p className="text-xs text-ink-400 dark:text-ink-500 italic">
@@ -475,21 +513,32 @@ function ElementList({ elementPhases, onRemove }) {
 // Main BIMPhasePanel
 // ---------------------------------------------------------------------------
 
+interface BIMPhasePanelProps {
+  /** Current list of ElementPhase records (id, primary_phase, demolish_phase) */
+  elementPhases?: ElementPhase[]
+  /** Called with updated elementPhases array */
+  onPhasesChange?: (phases: ElementPhase[]) => void
+  /** Called with PhaseFilterResult when filter is applied */
+  onFilterResult?: (result: PhaseFilterResult) => void
+  /** Extra Tailwind classes */
+  className?: string
+}
+
 export default function BIMPhasePanel({
   elementPhases: externalPhases,
   onPhasesChange,
   onFilterResult,
   className = '',
-}) {
-  const [localPhases, setLocalPhases] = useState([])
-  const [activeFilter, setActiveFilter] = useState(DEFAULT_FILTERS[0])
-  const [filterResult, setFilterResult] = useState(null)
+}: BIMPhasePanelProps) {
+  const [localPhases, setLocalPhases] = useState<ElementPhase[]>([])
+  const [activeFilter, setActiveFilter] = useState<PhaseFilter>(DEFAULT_FILTERS[0])
+  const [filterResult, setFilterResult] = useState<PhaseFilterResult | null>(null)
   const [applying, setApplying] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   // Use controlled or uncontrolled mode
   const elementPhases = externalPhases ?? localPhases
-  const setElementPhases = useCallback((phases) => {
+  const setElementPhases = useCallback((phases: ElementPhase[]) => {
     if (onPhasesChange) {
       onPhasesChange(phases)
     } else {
@@ -497,7 +546,7 @@ export default function BIMPhasePanel({
     }
   }, [onPhasesChange])
 
-  const handleTag = useCallback((entry) => {
+  const handleTag = useCallback((entry: ElementPhase) => {
     setElementPhases(
       elementPhases.some((ep) => ep.element_id === entry.element_id)
         ? elementPhases.map((ep) => ep.element_id === entry.element_id ? entry : ep)
@@ -505,7 +554,7 @@ export default function BIMPhasePanel({
     )
   }, [elementPhases, setElementPhases])
 
-  const handleRemove = useCallback((id) => {
+  const handleRemove = useCallback((id: string) => {
     setElementPhases(elementPhases.filter((ep) => ep.element_id !== id))
   }, [elementPhases, setElementPhases])
 
@@ -553,7 +602,7 @@ export default function BIMPhasePanel({
       setFilterResult(result)
       if (onFilterResult) onFilterResult(result)
     } catch (e) {
-      setError(e.message)
+      setError((e as Error).message)
     } finally {
       setApplying(false)
     }

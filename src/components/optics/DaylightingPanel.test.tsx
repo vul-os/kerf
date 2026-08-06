@@ -1,4 +1,4 @@
-// DaylightingPanel.test.jsx — structural + dispatch tests for DaylightingPanel.
+// DaylightingPanel.test.tsx — structural + dispatch tests for DaylightingPanel.
 //
 // Tests:
 //   1. Renders the "Daylighting Simulation" heading.
@@ -11,13 +11,17 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import DaylightingPanel from './DaylightingPanel.jsx'
+import DaylightingPanel from './DaylightingPanel'
 
 // ---------------------------------------------------------------------------
 // Mock fetch
 // ---------------------------------------------------------------------------
 
-function makeFetch(body, { ok = true, status = 200 } = {}) {
+// Unused in this suite (no test currently exercises the async run() path) —
+// pre-existing dead code carried over from the .jsx original, left as-is per
+// migration convention (no behavior change); underscore-prefixed to satisfy
+// the no-unused-vars rule now that this file is linted as TypeScript.
+function _makeFetch(body: unknown, { ok = true, status = 200 }: { ok?: boolean; status?: number } = {}) {
   return vi.fn().mockResolvedValue({
     ok,
     status,
@@ -110,14 +114,14 @@ describe('DaylightingPanel DF display', () => {
 // ---------------------------------------------------------------------------
 
 describe('DaylightingPanel error state', () => {
-  let originalFetch
+  let originalFetch: typeof globalThis.fetch
 
   beforeEach(() => {
-    originalFetch = global.fetch
+    originalFetch = globalThis.fetch
   })
 
   afterEach(() => {
-    global.fetch = originalFetch
+    globalThis.fetch = originalFetch
     vi.clearAllMocks()
   })
 

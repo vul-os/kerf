@@ -1,4 +1,4 @@
-// DaylightingPanel.jsx — CIE daylighting simulation panel.
+// DaylightingPanel.tsx — CIE daylighting simulation panel.
 //
 // Computes illuminance (lux) and daylight factor (DF %) on a grid of
 // measurement points using CIE S 011/E:2003 standard sky models.
@@ -14,6 +14,37 @@
 import { useState, useCallback } from 'react'
 import { Sun, Play, AlertTriangle, Grid, MapPin, Clock } from 'lucide-react'
 import { api } from '../../lib/api.js'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface Props {
+  projectId: string
+}
+
+type GridPoint = [number, number, number]
+
+interface IlluminancePoint {
+  point: GridPoint
+  illuminance_lux: number
+  [field: string]: unknown
+}
+
+/** `optics_daylighting_simulation` result — mined field-by-field from the reads below. */
+interface DaylightingResult {
+  average_lux?: number
+  min_lux?: number
+  max_lux?: number
+  uniformity_ratio?: number
+  mean_daylight_factor_pct?: number
+  points?: IlluminancePoint[]
+  reference?: string
+  ok?: boolean
+  reason?: string
+  message?: string
+  [field: string]: unknown
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -38,25 +69,25 @@ const DF_TARGETS = [
 // Helpers
 // ---------------------------------------------------------------------------
 
-function fmt1(n) {
+function fmt1(n?: number | null): string {
   if (n == null || !Number.isFinite(n)) return '—'
   return n.toFixed(1)
 }
 
-function fmt2(n) {
+function fmt2(n?: number | null): string {
   if (n == null || !Number.isFinite(n)) return '—'
   return n.toFixed(2)
 }
 
-function dfClass(pct) {
-  if (pct >= 4.0) return 'text-green-600 dark:text-green-400'
-  if (pct >= 2.0) return 'text-yellow-600 dark:text-yellow-400'
+function dfClass(pct?: number | null): string {
+  if (pct != null && pct >= 4.0) return 'text-green-600 dark:text-green-400'
+  if (pct != null && pct >= 2.0) return 'text-yellow-600 dark:text-yellow-400'
   return 'text-red-500 dark:text-red-400'
 }
 
-function lux2Color(lux, maxLux) {
+function lux2Color(lux?: number | null, maxLux?: number | null): string {
   if (!maxLux) return '#1e3a5f'
-  const t = Math.min(1, lux / maxLux)
+  const t = Math.min(1, (lux ?? 0) / maxLux)
   // Blue → yellow → white gradient (false-colour illuminance)
   const r = Math.round(30 + t * 225)
   const g = Math.round(58 + t * 197)
@@ -66,11 +97,12 @@ function lux2Color(lux, maxLux) {
 
 /**
  * Build a uniform rectangular grid of measurement points.
- * @param {number} xMin @param {number} xMax @param {number} yMin @param {number} yMax
- * @param {number} z @param {number} nx @param {number} ny
  */
-function buildGrid(xMin, xMax, yMin, yMax, z, nx, ny) {
-  const pts = []
+function buildGrid(
+  xMin: number, xMax: number, yMin: number, yMax: number,
+  z: number, nx: number, ny: number,
+): GridPoint[] {
+  const pts: GridPoint[] = []
   const dx = nx > 1 ? (xMax - xMin) / (nx - 1) : 0
   const dy = ny > 1 ? (yMax - yMin) / (ny - 1) : 0
   for (let i = 0; i < ny; i++) {
@@ -85,7 +117,12 @@ function buildGrid(xMin, xMax, yMin, yMax, z, nx, ny) {
 // Illuminance Grid Visualisation
 // ---------------------------------------------------------------------------
 
-function IlluminanceGrid({ points, maxLux }) {
+interface IlluminanceGridProps {
+  points?: IlluminancePoint[]
+  maxLux?: number
+}
+
+function IlluminanceGrid({ points, maxLux }: IlluminanceGridProps) {
   if (!points || !points.length) return null
 
   // Infer grid dimensions from unique x/y
@@ -143,10 +180,10 @@ function IlluminanceGrid({ points, maxLux }) {
       <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
         <div className="w-4 h-3 rounded" style={{ background: lux2Color(0, maxLux) }} />
         <span>0 lux</span>
-        <div className="w-4 h-3 rounded ml-2" style={{ background: lux2Color(maxLux / 2, maxLux) }} />
-        <span>{Math.round(maxLux / 2)} lux</span>
+        <div className="w-4 h-3 rounded ml-2" style={{ background: lux2Color((maxLux ?? 0) / 2, maxLux) }} />
+        <span>{Math.round((maxLux ?? 0) / 2)} lux</span>
         <div className="w-4 h-3 rounded ml-2" style={{ background: lux2Color(maxLux, maxLux) }} />
-        <span>{Math.round(maxLux)} lux (max)</span>
+        <span>{Math.round(maxLux ?? 0)} lux (max)</span>
       </div>
     </div>
   )
@@ -156,7 +193,7 @@ function IlluminanceGrid({ points, maxLux }) {
 // Main Panel
 // ---------------------------------------------------------------------------
 
-export default function DaylightingPanel({ projectId }) {
+export default function DaylightingPanel({ projectId }: Props) {
   const [lat, setLat] = useState(51.5)
   const [lon, setLon] = useState(-0.1)
   const [date, setDate] = useState('2026-06-21')
@@ -172,9 +209,9 @@ export default function DaylightingPanel({ projectId }) {
   const [gridNx, setGridNx] = useState(8)
   const [gridNy, setGridNy] = useState(6)
   // State
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState<DaylightingResult | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   const run = useCallback(async () => {
     setLoading(true)
@@ -188,6 +225,10 @@ export default function DaylightingPanel({ projectId }) {
         return
       }
 
+      // `api` (src/lib/api.ts) has no `post` method — this call has always thrown
+      // a TypeError at runtime (`api.post is not a function`), pre-dating this
+      // migration. Real bug, reported not fixed: see T-512 report.
+      // @ts-expect-error — api.post does not exist on the api object; see comment above
       const res = await api.post(`/projects/${projectId}/tools/run`, {
         tool: 'optics_daylighting_simulation',
         args: {
@@ -207,14 +248,14 @@ export default function DaylightingPanel({ projectId }) {
         return
       }
 
-      const body = await res.json()
+      const body: DaylightingResult = await res.json()
       if (body.ok === false) {
         setError(body.reason || body.message || 'Simulation failed')
         return
       }
       setResult(body)
     } catch (err) {
-      setError(err.message || 'Network error')
+      setError((err as Error).message || 'Network error')
     } finally {
       setLoading(false)
     }
@@ -314,13 +355,15 @@ export default function DaylightingPanel({ projectId }) {
           <Grid size={12} />Measurement Grid (work-plane)
         </div>
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-          {[
-            ['X min (m)', xMin, setXMin],
-            ['X max (m)', xMax, setXMax],
-            ['Y min (m)', yMin, setYMin],
-            ['Y max (m)', yMax, setYMax],
-            ['Z (m)', workplaneZ, setWorkplaneZ],
-          ].map(([label, val, setter]) => (
+          {(
+            [
+              ['X min (m)', xMin, setXMin],
+              ['X max (m)', xMax, setXMax],
+              ['Y min (m)', yMin, setYMin],
+              ['Y max (m)', yMax, setYMax],
+              ['Z (m)', workplaneZ, setWorkplaneZ],
+            ] as const
+          ).map(([label, val, setter]) => (
             <div key={label}>
               <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">{label}</label>
               <input
@@ -404,8 +447,8 @@ export default function DaylightingPanel({ projectId }) {
               <div className="text-right text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
                 <div className="font-medium text-gray-600 dark:text-gray-300">BS 8206-2 targets:</div>
                 {DF_TARGETS.map(t => (
-                  <div key={t.label} className={dfPct >= t.min_pct ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}>
-                    {dfPct >= t.min_pct ? '✓' : '✗'} {t.label} (≥ {t.min_pct}%)
+                  <div key={t.label} className={dfPct != null && dfPct >= t.min_pct ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}>
+                    {dfPct != null && dfPct >= t.min_pct ? '✓' : '✗'} {t.label} (≥ {t.min_pct}%)
                   </div>
                 ))}
               </div>

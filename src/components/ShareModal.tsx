@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Copy, Trash2, Link as LinkIcon, UserPlus, Check, Loader2 } from 'lucide-react'
-import { api } from '../lib/api'
-import Modal from './Modal'
+import { api } from '../lib/api.js'
+import Modal from './Modal.jsx'
 import type { ProjectMember, ProjectRole, ShareLink, ShareLinkRole } from '@/types'
 
 const ROLES: ProjectRole[] = ['viewer', 'editor', 'owner']

@@ -35,10 +35,10 @@ import {
   _resetBus,
   VARIANT_CONFIG,
   type ToastOptions,
-} from './ToastBus'
+} from './ToastBus.jsx'
 
 // Also import the default export
-import ToastBusDefault from './ToastBus'
+import ToastBusDefault from './ToastBus.jsx'
 
 // ── _resetBus / bus mechanics ─────────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-// LadderEditor.test.jsx — Vitest structural tests for the LadderEditor component.
+// LadderEditor.test.tsx — Vitest structural tests for the LadderEditor component.
 //
 // Following the project's established pattern (see Loader.test.jsx, PLCView, etc.):
 // @testing-library/react is NOT a project dependency. We use react-dom/server's
@@ -18,8 +18,11 @@ import { createRung, addContact, addCoil } from '../lib/ladderCanvas.js'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function render(props = {}) {
-  return renderToStaticMarkup(<LadderEditor {...props} />)
+function render(props: Record<string, unknown> = {}) {
+  // LadderEditor requires onChange; tests only assert on rendered markup, so a
+  // no-op default keeps every existing call site (which never passed one)
+  // behaviourally identical while satisfying the component's prop type.
+  return renderToStaticMarkup(<LadderEditor onChange={() => {}} {...props} />)
 }
 
 function makeRungWithContact(type = 'no', pos = 0) {
@@ -297,8 +300,8 @@ describe('LadderEditor — contact count via value prop', () => {
     const html2 = render({ value: [rung] })
 
     // Count name label occurrences as proxy for rendered contacts
-    const countC1 = (s) => (s.match(/C1/g) || []).length
-    const countC2 = (s) => (s.match(/C2/g) || []).length
+    const countC1 = (s: string) => (s.match(/C1/g) || []).length
+    const countC2 = (s: string) => (s.match(/C2/g) || []).length
 
     expect(countC1(html0)).toBe(0)
     expect(countC1(html1)).toBeGreaterThan(0)

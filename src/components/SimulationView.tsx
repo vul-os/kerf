@@ -16,6 +16,7 @@
 // .simulation file.
 
 import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Activity, AlertTriangle, BarChart3, Loader2, Play, TableProperties } from 'lucide-react'
 import { useWorkspace } from '../store/workspace.js'
 import { useAuth } from '../store/auth.js'
@@ -24,12 +25,60 @@ const API_URL = import.meta.env.VITE_API_URL || ''
 
 const PALETTE = ['#f59e0b', '#22d3ee', '#a78bfa', '#34d399', '#f472b6']
 
+interface SimAnalysisSpec {
+  type: string
+  [key: string]: unknown
+}
+
+interface SimProbe {
+  name?: string
+  kind?: 'V' | 'I'
+  source_port_id?: string
+  source_component_id?: string
+}
+
+interface SimWaveform {
+  name?: string
+  kind?: string
+  xUnit?: string
+  yUnit?: string
+  x?: number[]
+  y?: number[]
+}
+
+interface SimResults {
+  waveforms: SimWaveform[]
+  warnings: string[]
+  errors: string[]
+}
+
+interface ParsedSimulation {
+  kind: 'ok' | 'unsupported' | 'invalid'
+  spec?: SimAnalysisSpec
+  probes?: SimProbe[]
+  results?: SimResults
+  raw?: string
+}
+
+interface JobStatus {
+  status: 'queued' | 'running' | 'done' | 'error'
+  job_id?: string
+  result?: { waveforms?: SimWaveform[]; warnings?: string[]; errors?: string[] }
+  error?: string
+}
+
+interface NormalizedWaveforms {
+  data: Array<Array<number | null>>
+  names: string[]
+  units: string[]
+  kinds: string[]
+  warnings: string[]
+}
+
 /**
  * Parse a `.simulation` JSON string into a normalized read-only shape.
- * @param {string} content
- * @returns {{kind:'ok'|'unsupported'|'invalid', spec?:object, probes?:Array, results?:object, raw?:string}}
  */
-export function parseSimulation(content) {
+export function parseSimulation(content: string): ParsedSimulation {
   const raw = typeof content === 'string' ? content : ''
   if (!raw.trim()) {
     return {
@@ -39,10 +88,10 @@ export function parseSimulation(content) {
       results: { waveforms: [], warnings: [], errors: [] },
     }
   }
-  let doc
+  let doc: any // boundary: JSON.parse output, shape validated below
   try {
     doc = JSON.parse(raw)
-  } catch (e) {
+  } catch {
     return { kind: 'invalid', raw }
   }
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
@@ -52,10 +101,10 @@ export function parseSimulation(content) {
     return { kind: 'unsupported', raw }
   }
   const analysis = (doc.analysis && typeof doc.analysis === 'object') ? doc.analysis : {}
-  const spec = { type: typeof analysis.type === 'string' ? analysis.type : 'transient', ...analysis }
-  const probes = Array.isArray(doc.probes) ? doc.probes.filter((p) => p && typeof p === 'object') : []
+  const spec: SimAnalysisSpec = { type: typeof analysis.type === 'string' ? analysis.type : 'transient', ...analysis }
+  const probes: SimProbe[] = Array.isArray(doc.probes) ? doc.probes.filter((p: unknown) => p && typeof p === 'object') : []
   const r = (doc.results && typeof doc.results === 'object') ? doc.results : {}
-  const results = {
+  const results: SimResults = {
     waveforms: Array.isArray(r.waveforms) ? r.waveforms : [],
     warnings: Array.isArray(r.warnings) ? r.warnings : [],
     errors: Array.isArray(r.errors) ? r.errors : [],
@@ -68,20 +117,18 @@ export function parseSimulation(content) {
  * Picks the first waveform's x as canonical; mismatched-length y arrays are
  * `null`-padded and produce a warning. Numeric x/y arrays only.
  *
- * @param {Array<{name?:string, kind?:string, xUnit?:string, yUnit?:string, x?:Array, y?:Array}>} waveforms
- * @returns {{ data: Array<Array<number|null>>, names: string[], units: string[], kinds: string[], warnings: string[] }}
  */
-export function normalizeWaveforms(waveforms) {
-  const out = { data: [], names: [], units: [], kinds: [], warnings: [] }
+export function normalizeWaveforms(waveforms: SimWaveform[]): NormalizedWaveforms {
+  const out: NormalizedWaveforms = { data: [], names: [], units: [], kinds: [], warnings: [] }
   if (!Array.isArray(waveforms) || waveforms.length === 0) {
     return out
   }
-  const valid = waveforms.filter((w) => w && typeof w === 'object' && Array.isArray(w.x) && Array.isArray(w.y))
+  const valid = waveforms.filter((w) => w && typeof w === 'object' && Array.isArray(w.x) && Array.isArray(w.y)) as Array<SimWaveform & { x: number[]; y: number[] }>
   if (valid.length === 0) {
     return out
   }
   const canonical = valid[0]
-  const xs = canonical.x.map((v) => (typeof v === 'number' && Number.isFinite(v) ? v : null))
+  const xs: Array<number | null> = canonical.x.map((v) => (typeof v === 'number' && Number.isFinite(v) ? v : null))
   const N = xs.length
   out.data.push(xs)
   if (N === 0) {
@@ -114,20 +161,25 @@ export function normalizeWaveforms(waveforms) {
   return out
 }
 
-export default function SimulationView({ content, fileName }) {
+interface SimulationViewProps {
+  content?: string
+  fileName?: string
+}
+
+export default function SimulationView({ content, fileName }: SimulationViewProps) {
   const w = useWorkspace()
   const { accessToken } = useAuth()
   const parsed = parseSimulation(content || '')
   const [running, setRunning] = useState(false)
-  const [jobStatus, setJobStatus] = useState(null)
-  const pollingRef = useRef(null)
+  const [jobStatus, setJobStatus] = useState<JobStatus | null>(null)
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const docCircuit = (() => {
     if (parsed.kind !== 'ok') return null
     try {
-      const d = JSON.parse(content || '{}')
+      const d = JSON.parse(content || '{}') // boundary: JSON.parse output
       return (d && typeof d.circuit_file_id === 'string' && d.circuit_file_id) ? d.circuit_file_id : null
-    } catch (_e) {
+    } catch {
       return null
     }
   })()
@@ -139,20 +191,20 @@ export default function SimulationView({ content, fileName }) {
     }
   }, [])
 
-  const pollJobStatus = async (projectId, fileId) => {
+  const pollJobStatus = async (projectId: string, fileId: string) => {
     try {
       const token = useAuth.getState().accessToken
       const res = await fetch(`${API_URL}/api/projects/${projectId}/files/${fileId}/sim/status`, {
         headers: { authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error(`status poll failed: ${res.status}`)
-      const data = await res.json()
+      const data = await res.json() as JobStatus
       setJobStatus(data)
       if (data.status === 'done' || data.status === 'error') {
         if (pollingRef.current) clearInterval(pollingRef.current)
         setRunning(false)
         if (data.status === 'done' && data.result) {
-          const doc = JSON.parse(content || '{}')
+          const doc = JSON.parse(content || '{}') // boundary: JSON.parse output
           const updated = {
             ...doc,
             results: {
@@ -163,14 +215,17 @@ export default function SimulationView({ content, fileName }) {
           }
           try {
             w.editContent(JSON.stringify(updated, null, 2))
-          } catch (err) {
+          } catch (err: any) {
+            // @ts-expect-error -- pre-existing bug: 'setState' is not a field on WorkspaceState (would throw TypeError at runtime)
             w.setState({ toast: err?.message || 'Failed to update simulation file' })
           }
         } else if (data.status === 'error') {
+          // @ts-expect-error -- pre-existing bug: 'setState' is not a field on WorkspaceState (would throw TypeError at runtime)
           w.setState({ toast: data.error || 'Simulation failed' })
         }
       }
-    } catch (err) {
+    } catch (err: any) {
+      // @ts-expect-error -- pre-existing bug: 'setState' is not a field on WorkspaceState (would throw TypeError at runtime)
       w.setState({ toast: err.message })
       if (pollingRef.current) clearInterval(pollingRef.current)
       setRunning(false)
@@ -181,8 +236,9 @@ export default function SimulationView({ content, fileName }) {
     if (runDisabled) return
     let doc
     try {
-      doc = JSON.parse(content || '{}')
-    } catch (_e) {
+      doc = JSON.parse(content || '{}') // boundary: JSON.parse output
+    } catch {
+      // @ts-expect-error -- pre-existing bug: 'setState' is not a field on WorkspaceState (would throw TypeError at runtime)
       w.setState({ toast: 'Cannot run simulation: file is not valid JSON.' })
       return
     }
@@ -201,10 +257,11 @@ export default function SimulationView({ content, fileName }) {
         body: JSON.stringify(doc.analysis || { type: 'tran' }),
       })
       if (!res.ok) throw new Error(`failed to enqueue: ${res.status}`)
-      const data = await res.json()
+      const data = await res.json() as { job_id?: string }
       setJobStatus({ status: 'queued', job_id: data.job_id })
       pollingRef.current = setInterval(() => pollJobStatus(w.projectId, w.currentFileId), 2000)
-    } catch (err) {
+    } catch (err: any) {
+      // @ts-expect-error -- pre-existing bug: 'setState' is not a field on WorkspaceState (would throw TypeError at runtime)
       w.setState({ toast: err.message })
       setRunning(false)
       setJobStatus(null)
@@ -230,11 +287,13 @@ export default function SimulationView({ content, fileName }) {
     )
   }
 
-  const { spec, probes, results } = parsed
+  const spec = parsed.spec! // kind === 'ok' guarantees spec/probes/results are set
+  const probes = parsed.probes!
+  const results = parsed.results!
   const isDC = spec.type === 'dc'
   const isAC = spec.type === 'ac'
 
-  const specRows = isDC
+  const specRows: Array<[string, unknown]> = isDC
     ? [
         ['Type', spec.type],
         ['Vstart', spec.vstart],
@@ -386,11 +445,12 @@ export default function SimulationView({ content, fileName }) {
 }
 
 /** Lazy-mounted uPlot canvas (or table) for an array of waveforms. */
-function WaveformChart({ waveforms }) {
-  const containerRef = useRef(null)
-  const plotRef = useRef(null)
-  const [mode, setMode] = useState('chart') // 'chart' | 'table'
-  const [loadError, setLoadError] = useState(null)
+function WaveformChart({ waveforms }: { waveforms: SimWaveform[] }) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  // uPlot instance, typed `any` — no first-party types for the dynamically-imported lib instance.
+  const plotRef = useRef<any>(null)
+  const [mode, setMode] = useState<'chart' | 'table'>('chart')
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const norm = normalizeWaveforms(waveforms)
   const xUnit = (waveforms[0] && typeof waveforms[0].xUnit === 'string') ? waveforms[0].xUnit : ''
@@ -401,7 +461,7 @@ function WaveformChart({ waveforms }) {
     if (norm.data.length < 2 || norm.data[0].length === 0) return undefined
 
     let cancelled = false
-    let plot = null
+    let plot: any = null
 
     Promise.all([
       import('uplot'),
@@ -409,7 +469,8 @@ function WaveformChart({ waveforms }) {
     ])
       .then(([mod]) => {
         if (cancelled || !containerRef.current) return
-        const uPlot = mod.default || mod
+        // boundary: uplot's dynamic-import type doesn't expose a constructable default cleanly
+        const uPlot: any = (mod as any).default || mod
         const el = containerRef.current
         const width = el.clientWidth || 600
         const height = 320

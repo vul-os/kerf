@@ -1,5 +1,5 @@
 /**
- * sheetRevisions.js — pure JS revision tracking for .sheet.json files.
+ * sheetRevisions.ts — pure JS revision tracking for .sheet.json files.
  * Each sheet may carry a `revisions` array alongside its `titleblock`.
  *
  * Schema extension (partial):
@@ -8,17 +8,42 @@
  *     { "letter": "A", "date": "2026-05-14", "description": "Initial issue", "by": "Jane Smith" }
  *   ]
  * }
+ *
+ * NOTE: none of this module's exports are imported anywhere outside its own test file
+ * (verified via repo-wide grep during the T-505 migration) — `sheetFrames.ts`'s title-block
+ * layouts have a `sheet_number`/`revision` cell but no drawing UI wires up add/validate/history
+ * for a revisions list. Reported as dead code, left as found per migration convention.
  */
+
+export interface Revision {
+  letter: string
+  date?: string
+  description?: string
+  by?: string
+}
+
+export interface RevisionSheet {
+  revisions?: Revision[]
+  titleblock?: {
+    revision?: string
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
+export interface ValidateRevisionListResult {
+  ok: boolean
+  errors: string[]
+}
 
 /**
  * Return the next alphabetic revision letter after the given list.
  * A → B → … → Z → AA → AB → … → AZ → BA → …
  */
-function _nextLetter(existing) {
+function _nextLetter(existing: string): string {
   if (!existing || existing.length === 0) return "A";
 
   const MAX_CHAR = "Z".charCodeAt(0);
-  const A_CHAR = "A".charCodeAt(0);
 
   const chars = existing.toUpperCase().split("");
 
@@ -34,30 +59,22 @@ function _nextLetter(existing) {
   return "A".repeat(chars.length + 1);
 }
 
-function _revIndex(sheet) {
-  if (!sheet.revisions || !Array.isArray(sheet.revisions)) return -1;
-  return sheet.revisions.findIndex(r => r.letter === sheet.titleblock?.revision);
-}
-
 /**
  * Append a new revision entry to sheet.revisions.
- * @param {object} sheet
- * @param {{letter: string, date: string, description: string, by: string}} opts
- * @returns {object} the appended revision object
+ * @returns the appended revision object
  */
-function addRevision(sheet, { letter, date, description, by }) {
+function addRevision(sheet: RevisionSheet, { letter, date, description, by }: Partial<Revision>): Revision {
   if (!sheet.revisions) sheet.revisions = [];
-  const entry = { letter: (letter || "").toUpperCase(), date: date || "", description: description || "", by: by || "" };
+  const entry: Revision = { letter: (letter || "").toUpperCase(), date: date || "", description: description || "", by: by || "" };
   sheet.revisions.push(entry);
   return entry;
 }
 
 /**
  * Return the next revision letter that should be assigned.
- * @param {object} sheet
- * @returns {string} next available letter
+ * @returns next available letter
  */
-function nextRevisionLetter(sheet) {
+function nextRevisionLetter(sheet: RevisionSheet): string {
   const revs = (sheet.revisions || []).map(r => r.letter).filter(Boolean);
   if (revs.length === 0) return "A";
   revs.sort();
@@ -66,20 +83,16 @@ function nextRevisionLetter(sheet) {
 
 /**
  * Set the active revision (titleblock.revision) by letter.
- * @param {object} sheet
- * @param {string} letter
  */
-function setActiveRevision(sheet, letter) {
+function setActiveRevision(sheet: RevisionSheet, letter: string): void {
   if (!sheet.titleblock) sheet.titleblock = {};
   sheet.titleblock.revision = (letter || "").toUpperCase();
 }
 
 /**
  * Return the revision history sorted by letter order.
- * @param {object} sheet
- * @returns {Array<object>}
  */
-function getRevisionHistory(sheet) {
+function getRevisionHistory(sheet: RevisionSheet): Revision[] {
   if (!sheet.revisions || !Array.isArray(sheet.revisions)) return [];
   return [...sheet.revisions].sort((a, b) => a.letter.localeCompare(b.letter, undefined, { sensitivity: "base" }));
 }
@@ -90,18 +103,16 @@ function getRevisionHistory(sheet) {
  * - each entry must have a letter
  * - no duplicate letters
  * - active revision (titleblock.revision) must exist in revisions list
- * @param {object} sheet
- * @returns {{ok: boolean, errors: string[]}}
  */
-function validateRevisionList(sheet) {
-  const errors = [];
+function validateRevisionList(sheet: RevisionSheet): ValidateRevisionListResult {
+  const errors: string[] = [];
 
   if (!Array.isArray(sheet.revisions)) {
     errors.push("sheet.revisions must be an array");
     return { ok: false, errors };
   }
 
-  const seen = new Set();
+  const seen = new Set<string>();
   for (const rev of sheet.revisions) {
     if (!rev.letter) {
       errors.push("Each revision entry must have a 'letter' field");
@@ -123,7 +134,7 @@ function validateRevisionList(sheet) {
   return { ok: errors.length === 0, errors };
 }
 
-module.exports = {
+export {
   addRevision,
   nextRevisionLetter,
   setActiveRevision,

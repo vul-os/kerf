@@ -9,6 +9,7 @@ import {
   getRevisionHistory,
   validateRevisionList,
   _nextLetter,
+  type RevisionSheet,
 } from "./sheetRevisions.js";
 
 describe("nextRevisionLetter", () => {
@@ -47,10 +48,10 @@ describe("nextRevisionLetter", () => {
 
 describe("addRevision", () => {
   it("creates revisions array if missing", () => {
-    const sheet = {};
+    const sheet: RevisionSheet = {};
     addRevision(sheet, { letter: "A", date: "2026-05-14", description: "Initial", by: "Jane" });
     expect(sheet.revisions).toHaveLength(1);
-    expect(sheet.revisions[0].letter).toBe("A");
+    expect(sheet.revisions![0].letter).toBe("A");
   });
 
   it("appends to existing revisions", () => {
@@ -61,29 +62,29 @@ describe("addRevision", () => {
   });
 
   it("uppercases the letter", () => {
-    const sheet = {};
+    const sheet: RevisionSheet = {};
     addRevision(sheet, { letter: "a", date: "", description: "", by: "" });
-    expect(sheet.revisions[0].letter).toBe("A");
+    expect(sheet.revisions![0].letter).toBe("A");
   });
 });
 
 describe("setActiveRevision", () => {
   it("sets titleblock.revision", () => {
-    const sheet = { titleblock: {} };
+    const sheet: RevisionSheet = { titleblock: {} };
     setActiveRevision(sheet, "B");
-    expect(sheet.titleblock.revision).toBe("B");
+    expect(sheet.titleblock!.revision).toBe("B");
   });
 
   it("creates titleblock if missing", () => {
-    const sheet = {};
+    const sheet: RevisionSheet = {};
     setActiveRevision(sheet, "C");
-    expect(sheet.titleblock.revision).toBe("C");
+    expect(sheet.titleblock!.revision).toBe("C");
   });
 
   it("uppercases the letter", () => {
-    const sheet = {};
+    const sheet: RevisionSheet = {};
     setActiveRevision(sheet, "c");
-    expect(sheet.titleblock.revision).toBe("C");
+    expect(sheet.titleblock!.revision).toBe("C");
   });
 });
 
@@ -124,7 +125,10 @@ describe("validateRevisionList", () => {
   });
 
   it("rejects missing letter field", () => {
-    const sheet = { revisions: [{ date: "2026-05-14" }] };
+    // Deliberately malformed input (missing `letter`) — the point of this test is that
+    // validateRevisionList() catches it at runtime, so it's cast rather than typed as a
+    // well-formed RevisionSheet.
+    const sheet = { revisions: [{ date: "2026-05-14" }] } as unknown as RevisionSheet;
     const result = validateRevisionList(sheet);
     expect(result.ok).toBe(false);
     expect(result.errors.some(e => e.includes("letter"))).toBe(true);

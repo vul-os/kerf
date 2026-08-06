@@ -14,10 +14,57 @@
 
 import { useCallback, useState } from 'react'
 import { X, Activity, Zap } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface SIPanelProps {
+  onClose?: () => void
+}
+
+interface CrosstalkResult {
+  NEXT?: { next_mv?: number }
+  FEXT?: { fext_mv?: number }
+}
+
+interface TerminationResult {
+  scheme?: string
+  r_ohms?: number
+}
+
+interface SIReportResult {
+  _demo?: boolean
+  z0_ohms?: number
+  zdiff_ohms?: number
+  td_ps_per_mm?: number
+  flight_time_ps?: number
+  crosstalk?: CrosstalkResult
+  gamma_open_load?: number
+  termination?: TerminationResult
+  formulas?: string
+}
+
+interface IbisChannelResult {
+  eye_high_V?: number
+  eye_low_V?: number
+  eye_height_V?: number
+  waveform?: unknown[]
+}
 
 // ── Numeric field helper ──────────────────────────────────────────────────────
 
-function Field({ label, value, unit, type = 'number', step = 'any', min, onChange, testId }) {
+interface FieldProps {
+  label: string
+  value: string
+  unit?: string
+  type?: string
+  step?: string
+  min?: string
+  onChange: (value: string) => void
+  testId?: string
+}
+
+function Field({ label, value, unit, type = 'number', step = 'any', min, onChange, testId }: FieldProps) {
   return (
     <label className="flex flex-col gap-0.5">
       <span className="text-gray-500 text-[10px]">{label}</span>
@@ -37,7 +84,15 @@ function Field({ label, value, unit, type = 'number', step = 'any', min, onChang
   )
 }
 
-function Select({ label, value, options, onChange, testId }) {
+interface SelectProps {
+  label: string
+  value: string
+  options: { value: string; label: string }[]
+  onChange: (value: string) => void
+  testId?: string
+}
+
+function Select({ label, value, options, onChange, testId }: SelectProps) {
   return (
     <label className="flex flex-col gap-0.5">
       <span className="text-gray-500 text-[10px]">{label}</span>
@@ -57,7 +112,14 @@ function Select({ label, value, options, onChange, testId }) {
 
 // ── Result value display ──────────────────────────────────────────────────────
 
-function ResultVal({ label, value, unit, highlight = false }) {
+interface ResultValProps {
+  label: string
+  value: number | string | null | undefined
+  unit?: string
+  highlight?: boolean
+}
+
+function ResultVal({ label, value, unit, highlight = false }: ResultValProps) {
   if (value == null) return null
   return (
     <div className="flex items-baseline justify-between gap-2 text-[11px]">
@@ -82,15 +144,15 @@ function SIReportTab() {
   const [topology, setTopology]    = useState('point_to_point')
   const [spacing, setSpacing]      = useState('')
   const [aggLen, setAggLen]        = useState('')
-  const [result, setResult]        = useState(null)
+  const [result, setResult]        = useState<SIReportResult | null>(null)
   const [loading, setLoading]      = useState(false)
-  const [error, setError]          = useState(null)
+  const [error, setError]          = useState<string | null>(null)
 
   const run = useCallback(async () => {
     setLoading(true)
     setError(null)
     setResult(null)
-    const body = {
+    const body: Record<string, unknown> = {
       structure,
       trace_width_mm:      parseFloat(width),
       dielectric_height_mm: parseFloat(height),
@@ -229,9 +291,9 @@ function IBISEyeTab() {
   const [z0, setZ0]               = useState('50')
   const [length, setLength]       = useState('100')
   const [bitrate, setBitrate]     = useState('1e9')
-  const [result, setResult]       = useState(null)
+  const [result, setResult]       = useState<IbisChannelResult | null>(null)
   const [loading, setLoading]     = useState(false)
-  const [error, setError]         = useState(null)
+  const [error, setError]         = useState<string | null>(null)
 
   const run = useCallback(async () => {
     if (!ibsText.trim()) {
@@ -273,7 +335,7 @@ function IBISEyeTab() {
         setError(chanData?.message ?? 'Channel simulation failed.')
       }
     } catch (err) {
-      setError(`Backend error: ${err.message}`)
+      setError(`Backend error: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setLoading(false)
     }
@@ -333,8 +395,8 @@ function IBISEyeTab() {
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
-export default function SIPanel({ onClose }) {
-  const [tab, setTab] = useState('si')
+export default function SIPanel({ onClose }: SIPanelProps) {
+  const [tab, setTab] = useState<'si' | 'ibis'>('si')
 
   return (
     <div
@@ -360,10 +422,10 @@ export default function SIPanel({ onClose }) {
 
       {/* Tabs */}
       <div className="flex border-b border-white/10">
-        {[
+        {([
           { key: 'si',   label: 'Z0 / Delay / Crosstalk', Icon: Zap },
           { key: 'ibis', label: 'IBIS Eye Diagram',        Icon: Activity },
-        ].map(({ key, label, Icon }) => (
+        ] as { key: 'si' | 'ibis'; label: string; Icon: LucideIcon }[]).map(({ key, label, Icon }) => (
           <button
             key={key}
             data-testid={`si-tab-${key}`}

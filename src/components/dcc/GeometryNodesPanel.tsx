@@ -1,5 +1,5 @@
 /**
- * GeometryNodesPanel.jsx — Blender-parity Geometry Nodes workspace.
+ * GeometryNodesPanel.tsx — Blender-parity Geometry Nodes workspace.
  *
  * Parity target: Blender Geometry Nodes editor
  *
@@ -21,23 +21,29 @@
  *
  * Default tools used during Evaluate:
  *   geometry_nodes_evaluate_graph — new minimal tool added in this commit
- *
- * Props
- * -----
- * file       {object|null}
- * content    {object|string|null}  — serialised graph JSON (Graph.toJSON()) or null
- * projectId  {string|null}
- * fileId     {string|null}
- * callTool   {(name:string, args:object) => Promise<any>}
- * onDispatch {(action:object) => void}
  */
 
 import { useState, useCallback, useMemo } from 'react'
+import type { ComponentType, CSSProperties, ReactNode } from 'react'
 import { Cpu, Play, Layers, ChevronDown, ChevronRight, Activity, RefreshCw } from 'lucide-react'
 import NodeGraphCanvas from '../nodescript/NodeGraphCanvas.jsx'
 import NodePalette from '../nodescript/NodePalette.jsx'
 import { Graph } from '../nodescript/graph_engine.js'
 import { getNodeDef } from '../nodescript/node_library.js'
+import type { GraphJSON, GraphResults, NodeDef, NodePosition, NodeResult } from '../nodescript/nodescriptTypes'
+
+/** Backend tool-call dispatcher, as passed down from the panel host. */
+export type CallToolFn = (name: string, args?: Record<string, unknown>) => Promise<unknown>
+
+export interface Props {
+  file?: { name?: string } | null
+  /** Serialised graph JSON (Graph.toJSON()) or null. */
+  content?: string | GraphJSON | null
+  projectId?: string | null
+  fileId?: string | null
+  callTool?: CallToolFn
+  onDispatch?: (action: { type: string; payload?: unknown }) => void
+}
 
 // ---------------------------------------------------------------------------
 // Geometry-specific extra nodes that extend the generic node_library palette.
@@ -46,6 +52,7 @@ import { getNodeDef } from '../nodescript/node_library.js'
 // ---------------------------------------------------------------------------
 
 /** Geometry node IDs we treat as output sinks for result display. */
+// eslint-disable-next-line react-refresh/only-export-components -- data export, not a component
 export const GEO_OUTPUT_NODE_IDS = ['mesh_sphere', 'mesh_cylinder', 'mesh_torus', 'mesh_extrude', 'output']
 
 // ---------------------------------------------------------------------------
@@ -53,11 +60,20 @@ export const GEO_OUTPUT_NODE_IDS = ['mesh_sphere', 'mesh_cylinder', 'mesh_torus'
 // ---------------------------------------------------------------------------
 
 /**
+ * Minimal shape this helper needs from a Graph instance — deliberately loose (not `GraphJSON`):
+ * the function only ever forwards `nodes`/`connections` verbatim, so it never actually depends
+ * on them being arrays vs. plain records, and the test suite exercises it with both shapes.
+ */
+interface EvaluatableGraph {
+  toJSON: () => { nodes: unknown; connections: unknown }
+}
+
+/**
  * Convert a Graph instance into args for the geometry_nodes_evaluate_graph tool.
  * Returns { nodes: {...}, connections: {...} } as plain objects.
- * @param {Graph} graph
  */
-export function makeEvaluateGraphArgs(graph) {
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper, not a component
+export function makeEvaluateGraphArgs(graph: EvaluatableGraph) {
   const json = graph.toJSON()
   return {
     nodes: json.nodes,
@@ -69,13 +85,20 @@ export function makeEvaluateGraphArgs(graph) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function parseContent(content) {
+function parseContent(content: Props['content']): GraphJSON | null {
   if (!content) return null
   if (typeof content === 'object') return content
   try { return JSON.parse(content) } catch { return null }
 }
 
-function Section({ title, icon: Icon, children, defaultOpen = true }) {
+interface SectionProps {
+  title: string
+  icon?: ComponentType<{ size?: number; style?: CSSProperties }>
+  children: ReactNode
+  defaultOpen?: boolean
+}
+
+function Section({ title, icon: Icon, children, defaultOpen = true }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div style={{ borderBottom: '1px solid #1a1d24', paddingBottom: open ? 10 : 0, marginBottom: 2 }}>
@@ -103,43 +126,46 @@ function Section({ title, icon: Icon, children, defaultOpen = true }) {
 // Main component
 // ---------------------------------------------------------------------------
 
+interface OutputSummary {
+  nodeId: string
+  result: GraphResults[string]
+}
+
 export default function GeometryNodesPanel({
   file,
   content,
-  projectId,
-  fileId,
   callTool,
   onDispatch,
-}) {
+}: Props) {
   const parsed = useMemo(() => parseContent(content), [content])
 
   // Graph state — immutable value from graph_engine.js
-  const [graph, setGraph] = useState(() => {
+  const [graph, setGraph] = useState<Graph>(() => {
     if (parsed?.nodes) {
       try { return Graph.fromJSON(parsed) } catch { /* fall through */ }
     }
     return new Graph()
   })
 
-  const [selectedNodeId, setSelectedNodeId] = useState(null)
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [paletteCollapsed, setPaletteCollapsed] = useState(false)
 
   // Evaluation state
-  const [evalResults, setEvalResults] = useState({}) // nodeId → result
+  const [evalResults, setEvalResults] = useState<GraphResults>({}) // nodeId → result
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [outputSummary, setOutputSummary] = useState(null)
+  const [error, setError] = useState<string | null>(null)
+  const [outputSummary, setOutputSummary] = useState<OutputSummary | null>(null)
 
   // ---------------------------------------------------------------------------
   // Graph mutations
   // ---------------------------------------------------------------------------
 
-  const handleGraphChange = useCallback((newGraph) => {
+  const handleGraphChange = useCallback((newGraph: Graph) => {
     setGraph(newGraph)
     onDispatch?.({ type: 'GEONODES_GRAPH_CHANGED', payload: newGraph.toJSON() })
   }, [onDispatch])
 
-  const handleAddNode = useCallback((def, position) => {
+  const handleAddNode = useCallback((def: NodeDef, position?: NodePosition) => {
     const pos = position ?? { x: 200 + Math.random() * 100, y: 200 + Math.random() * 100 }
     handleGraphChange(graph.addNode(def, pos))
   }, [graph, handleGraphChange])
@@ -149,7 +175,7 @@ export default function GeometryNodesPanel({
   // ---------------------------------------------------------------------------
 
   const doCallTool = useCallback(
-    async (name, args) => {
+    async (name: string, args?: Record<string, unknown>): Promise<unknown> => {
       if (!callTool) throw new Error('callTool prop not provided')
       const raw = await callTool(name, args)
       if (typeof raw === 'string') return JSON.parse(raw)
@@ -170,12 +196,12 @@ export default function GeometryNodesPanel({
     setOutputSummary(null)
     try {
       // Build a lightweight API object for Graph.run()
-      const results = {}
-      let order
+      const results: GraphResults = {}
+      let order: string[]
       try {
         order = graph.topoSort()
       } catch (err) {
-        setError(`Cycle or sort error: ${err.message}`)
+        setError(`Cycle or sort error: ${(err as Error).message}`)
         return
       }
 
@@ -190,9 +216,10 @@ export default function GeometryNodesPanel({
               ...nodeRecord.params,
               _node_id: nodeId,
             })
-            results[nodeId] = res
+            results[nodeId] = res as NodeResult
           } catch (toolErr) {
-            results[nodeId] = { ok: false, reason: String(toolErr?.message ?? toolErr) }
+            const e = toolErr as { message?: string } | undefined
+            results[nodeId] = { ok: false, reason: String(e?.message ?? toolErr) }
           }
         } else {
           results[nodeId] = { ok: true, client_only: true }
@@ -214,7 +241,7 @@ export default function GeometryNodesPanel({
         setOutputSummary({ nodeId: lastId, result: results[lastId] })
       }
     } catch (err) {
-      setError(String(err?.message ?? err))
+      setError(String((err as { message?: string } | undefined)?.message ?? err))
     } finally {
       setLoading(false)
     }
@@ -368,7 +395,7 @@ export default function GeometryNodesPanel({
                   </div>
                 ))}
                 {/* Result for this node */}
-                {evalResults[selectedNodeId] && (
+                {evalResults[selectedNodeId as string] && (
                   <div
                     data-testid="selected-node-result"
                     style={{
@@ -382,11 +409,11 @@ export default function GeometryNodesPanel({
                       wordBreak: 'break-all',
                     }}
                   >
-                    <div style={{ color: evalResults[selectedNodeId]?.ok === false ? '#f16f8e' : '#6fe06f', fontWeight: 600, marginBottom: 3 }}>
+                    <div style={{ color: (evalResults[selectedNodeId as string] as { ok?: boolean })?.ok === false ? '#f16f8e' : '#6fe06f', fontWeight: 600, marginBottom: 3 }}>
                       Result
                     </div>
                     <pre style={{ margin: 0, whiteSpace: 'pre-wrap', maxHeight: 120, overflow: 'auto' }}>
-                      {JSON.stringify(evalResults[selectedNodeId], null, 2)}
+                      {JSON.stringify(evalResults[selectedNodeId as string], null, 2)}
                     </pre>
                   </div>
                 )}

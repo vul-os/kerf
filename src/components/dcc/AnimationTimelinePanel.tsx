@@ -1,5 +1,5 @@
 /**
- * AnimationTimelinePanel.jsx — Blender-parity DCC animation workspace.
+ * AnimationTimelinePanel.tsx — Blender-parity DCC animation workspace.
  *
  * Parity target: Blender NLA Editor / F-Curve editor + Pose Mode
  *
@@ -17,18 +17,10 @@
  * - animation_evaluate_clip  (packages/kerf-cad-core/animation/tools.py)
  * - animation_solve_ik       (packages/kerf-cad-core/animation/tools.py)
  * - animation_apply_pose     (packages/kerf-cad-core/animation/tools.py)
- *
- * Props
- * -----
- * file      {object|null}
- * content   {object|string|null}  — parsed .anim clip JSON or null
- * projectId {string|null}
- * fileId    {string|null}
- * callTool  {(name:string, args:object) => Promise<any>}
- * onDispatch {(action:object) => void}
  */
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import type { ComponentType, CSSProperties, ReactNode } from 'react'
 import {
   Play,
   Pause,
@@ -42,11 +34,48 @@ import {
   Zap,
 } from 'lucide-react'
 
+/** Backend tool-call dispatcher, as passed down from the panel host. */
+export type CallToolFn = (name: string, args?: Record<string, unknown>) => Promise<unknown>
+
+export type Interpolation = 'step' | 'linear' | 'bezier'
+
+export interface Keyframe {
+  t: number
+  value: number
+  interpolation: Interpolation
+  tangent_in?: [number, number]
+  tangent_out?: [number, number]
+}
+
+export interface AnimClip {
+  name: string
+  duration: number
+  fcurves: Record<string, Keyframe[]>
+}
+
+export interface Bone {
+  name: string
+  head: number[]
+  tail: number[]
+  parent: string | null
+}
+
+export interface Props {
+  file?: { name?: string } | null
+  /** Parsed .anim clip JSON or null. */
+  content?: string | (Partial<AnimClip> & { bones?: Bone[] }) | null
+  projectId?: string | null
+  fileId?: string | null
+  callTool?: CallToolFn
+  onDispatch?: (action: { type: string; payload?: unknown }) => void
+}
+
 // ---------------------------------------------------------------------------
 // Default clip (one channel, two keyframes)
 // ---------------------------------------------------------------------------
 
-export const DEFAULT_CLIP = {
+// eslint-disable-next-line react-refresh/only-export-components -- data export, not a component
+export const DEFAULT_CLIP: AnimClip = {
   name: 'Take001',
   duration: 2.0,
   fcurves: {
@@ -62,7 +91,8 @@ export const DEFAULT_CLIP = {
   },
 }
 
-export const DEFAULT_BONES = [
+// eslint-disable-next-line react-refresh/only-export-components -- data export, not a component
+export const DEFAULT_BONES: Bone[] = [
   { name: 'root', head: [0, 0, 0], tail: [0, 1, 0], parent: null },
   { name: 'forearm', head: [0, 1, 0], tail: [0, 2, 0], parent: 'root' },
   { name: 'hand', head: [0, 2, 0], tail: [0, 2.5, 0], parent: 'forearm' },
@@ -72,11 +102,13 @@ export const DEFAULT_BONES = [
 // Exported pure helpers — used by the component and directly unit-testable
 // ---------------------------------------------------------------------------
 
-/**
- * Build args for animation_solve_ik.
- * @param {{bones, ikTarget, ikAlgorithm}} opts
- */
-export function makeIKArgs({ bones, ikTarget, ikAlgorithm }) {
+/** Build args for animation_solve_ik. */
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper, not a component
+export function makeIKArgs({ bones, ikTarget, ikAlgorithm }: {
+  bones: Bone[]
+  ikTarget: number[]
+  ikAlgorithm: string
+}) {
   return {
     bones,
     chain: bones.map((b) => b.name),
@@ -87,19 +119,18 @@ export function makeIKArgs({ bones, ikTarget, ikAlgorithm }) {
   }
 }
 
-/**
- * Build args for animation_apply_pose.
- * @param {{bones, rotations}} opts
- */
-export function makeApplyPoseArgs({ bones, rotations }) {
+/** Build args for animation_apply_pose. */
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper, not a component
+export function makeApplyPoseArgs({ bones, rotations }: {
+  bones: Bone[]
+  rotations: Record<string, number[][]>
+}) {
   return { bones, rotations }
 }
 
-/**
- * Build args for animation_evaluate_clip.
- * @param {{clip, evalTime}} opts
- */
-export function makeEvaluateClipArgs({ clip, evalTime }) {
+/** Build args for animation_evaluate_clip. */
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper, not a component
+export function makeEvaluateClipArgs({ clip, evalTime }: { clip: AnimClip; evalTime: number }) {
   return {
     name: clip.name,
     duration: clip.duration,
@@ -112,14 +143,14 @@ export function makeEvaluateClipArgs({ clip, evalTime }) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function parseContent(content) {
+function parseContent(content: Props['content']): (Partial<AnimClip> & { bones?: Bone[] }) | null {
   if (!content) return null
   if (typeof content === 'object') return content
   try { return JSON.parse(content) } catch { return null }
 }
 
-function fmtT(t) { return typeof t === 'number' ? t.toFixed(3) : String(t) }
-function fmtV(v) {
+function fmtT(t: unknown): string { return typeof t === 'number' ? t.toFixed(3) : String(t) }
+function fmtV(v: unknown): string {
   if (typeof v === 'number') return v.toFixed(4)
   if (Array.isArray(v)) return `[${v.map((x) => fmtV(x)).join(', ')}]`
   return String(v)
@@ -129,7 +160,15 @@ function fmtV(v) {
 // FCurve SVG Chart
 // ---------------------------------------------------------------------------
 
-function FCurveChart({ fcurves, evalTime, duration, width = 320, height = 120 }) {
+interface FCurveChartProps {
+  fcurves: Record<string, Keyframe[]>
+  evalTime: number | null
+  duration: number
+  width?: number
+  height?: number
+}
+
+function FCurveChart({ fcurves, evalTime, duration, width = 320, height = 120 }: FCurveChartProps) {
   const MARGIN = { top: 8, right: 8, bottom: 18, left: 32 }
   const W = width - MARGIN.left - MARGIN.right
   const H = height - MARGIN.top - MARGIN.bottom
@@ -142,8 +181,8 @@ function FCurveChart({ fcurves, evalTime, duration, width = 320, height = 120 })
   const maxV = allValues.length ? Math.max(...allValues) : 1
   const rangeV = maxV - minV || 1
 
-  const toX = (t) => (t / (duration || 1)) * W
-  const toY = (v) => H - ((v - minV) / rangeV) * H
+  const toX = (t: number) => (t / (duration || 1)) * W
+  const toY = (v: number) => H - ((v - minV) / rangeV) * H
 
   const COLORS = ['#4e9af1', '#f1a94e', '#6fe06f', '#f16f8e', '#b36ff1']
 
@@ -240,7 +279,14 @@ function FCurveChart({ fcurves, evalTime, duration, width = 320, height = 120 })
 // Section accordion
 // ---------------------------------------------------------------------------
 
-function Section({ title, icon: Icon, children, defaultOpen = true }) {
+interface SectionProps {
+  title: string
+  icon?: ComponentType<{ size?: number; style?: CSSProperties }>
+  children: ReactNode
+  defaultOpen?: boolean
+}
+
+function Section({ title, icon: Icon, children, defaultOpen = true }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div style={{ borderBottom: '1px solid #1a1d24', paddingBottom: open ? 10 : 0, marginBottom: 2 }}>
@@ -271,58 +317,59 @@ function Section({ title, icon: Icon, children, defaultOpen = true }) {
 export default function AnimationTimelinePanel({
   file,
   content,
-  projectId,
-  fileId,
   callTool,
   onDispatch,
-}) {
+}: Props) {
   const parsed = useMemo(() => parseContent(content), [content])
 
   // Clip state
-  const [clip, setClip] = useState(() => {
-    if (parsed?.fcurves) return parsed
+  const [clip, setClip] = useState<AnimClip>(() => {
+    if (parsed?.fcurves) return parsed as AnimClip
     return DEFAULT_CLIP
   })
 
   // Playback
   const [evalTime, setEvalTime] = useState(0)
   const [playing, setPlaying] = useState(false)
-  const [playbackRate, setPlaybackRate] = useState(1)
-  const animRef = useRef(null)
-  const lastTickRef = useRef(null)
+  const [playbackRate] = useState(1)
+  const animRef = useRef<number | null>(null)
+  const lastTickRef = useRef<number | null>(null)
 
   // Evaluated channel values
-  const [channelValues, setChannelValues] = useState({})
+  const [channelValues, setChannelValues] = useState<Record<string, unknown>>({})
 
   // IK solver
   const [ikAlgorithm, setIkAlgorithm] = useState('fabrik')
   const [ikEnabled, setIkEnabled] = useState(false)
-  const [ikTarget, setIkTarget] = useState([0, 1.5, 0])
-  const [ikRotations, setIkRotations] = useState({})
+  const [ikTarget, setIkTarget] = useState<number[]>([0, 1.5, 0])
+  const [ikRotations, setIkRotations] = useState<Record<string, number[][]>>({})
 
   // Armature
-  const [bones, setBones] = useState(() => {
+  const [bones] = useState<Bone[]>(() => {
     if (parsed?.bones) return parsed.bones
     return DEFAULT_BONES
   })
-  const [worldMatrices, setWorldMatrices] = useState([])
+  const [worldMatrices, setWorldMatrices] = useState<unknown[]>([])
 
   // Loading/error
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   // New keyframe form
   const [newKfChannel, setNewKfChannel] = useState(Object.keys(clip.fcurves)[0] || 'location.x')
   const [newKfTime, setNewKfTime] = useState(0)
   const [newKfValue, setNewKfValue] = useState(0)
-  const [newKfInterp, setNewKfInterp] = useState('bezier')
+  const [newKfInterp, setNewKfInterp] = useState<Interpolation>('bezier')
 
   // ---------------------------------------------------------------------------
   // Tool helpers
   // ---------------------------------------------------------------------------
 
+  // `any` here is a boundary tool: the animation_* backend tool responses are shaped
+  // per-call (channels/rotations/world_matrices) and this slice does not own that
+  // response contract.
   const doCallTool = useCallback(
-    async (name, args) => {
+    async (name: string, args?: Record<string, unknown>): Promise<any> => {
       if (!callTool) throw new Error('callTool prop not provided')
       const raw = await callTool(name, args)
       if (typeof raw === 'string') return JSON.parse(raw)
@@ -331,9 +378,25 @@ export default function AnimationTimelinePanel({
     [callTool],
   )
 
+  // Apply pose
+  const applyPose = useCallback(
+    async (rotations: Record<string, number[][]>) => {
+      try {
+        const result = await doCallTool('animation_apply_pose', makeApplyPoseArgs({ bones, rotations }))
+        if (result?.ok !== false) {
+          setWorldMatrices(result.world_matrices || [])
+          onDispatch?.({ type: 'ANIM_POSE_APPLIED', payload: result })
+        }
+      } catch (err) {
+        setError(String((err as { message?: string } | undefined)?.message ?? err))
+      }
+    },
+    [bones, doCallTool, onDispatch],
+  )
+
   // Evaluate clip at current time
   const evaluateClip = useCallback(
-    async (t) => {
+    async (t: number) => {
       if (!callTool) return
       try {
         const result = await doCallTool('animation_evaluate_clip', makeEvaluateClipArgs({ clip, evalTime: t }))
@@ -341,7 +404,7 @@ export default function AnimationTimelinePanel({
           setChannelValues(result.channels || {})
           onDispatch?.({ type: 'ANIM_CLIP_EVALUATED', payload: result })
         }
-      } catch (err) {
+      } catch {
         // Silently fail during playback to avoid spamming errors
       }
     },
@@ -354,7 +417,7 @@ export default function AnimationTimelinePanel({
       if (animRef.current) cancelAnimationFrame(animRef.current)
       return
     }
-    const tick = (ts) => {
+    const tick = (ts: number) => {
       if (lastTickRef.current == null) lastTickRef.current = ts
       const dt = (ts - lastTickRef.current) / 1000
       lastTickRef.current = ts
@@ -372,8 +435,11 @@ export default function AnimationTimelinePanel({
     return () => { if (animRef.current) cancelAnimationFrame(animRef.current) }
   }, [playing, playbackRate, clip.duration])
 
-  // Evaluate whenever evalTime changes (debounced by rAF granularity)
+  // Evaluate whenever evalTime changes (debounced by rAF granularity). Pre-existing pattern:
+  // evaluateClip is async and its setState calls happen after the callTool round-trip, not
+  // synchronously in this effect body; not a behavior change for this slice.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     evaluateClip(evalTime)
   }, [evalTime]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -392,32 +458,16 @@ export default function AnimationTimelinePanel({
         await applyPose(result.rotations || {})
       }
     } catch (err) {
-      setError(String(err?.message ?? err))
+      setError(String((err as { message?: string } | undefined)?.message ?? err))
     } finally {
       setLoading(false)
     }
-  }, [bones, ikTarget, ikAlgorithm, doCallTool, onDispatch])
-
-  // Apply pose
-  const applyPose = useCallback(
-    async (rotations) => {
-      try {
-        const result = await doCallTool('animation_apply_pose', makeApplyPoseArgs({ bones, rotations }))
-        if (result?.ok !== false) {
-          setWorldMatrices(result.world_matrices || [])
-          onDispatch?.({ type: 'ANIM_POSE_APPLIED', payload: result })
-        }
-      } catch (err) {
-        setError(String(err?.message ?? err))
-      }
-    },
-    [bones, doCallTool, onDispatch],
-  )
+  }, [bones, ikTarget, ikAlgorithm, doCallTool, onDispatch, applyPose])
 
   // Add keyframe
   const addKeyframe = useCallback(() => {
     const ch = newKfChannel
-    const kf = { t: newKfTime, value: newKfValue, interpolation: newKfInterp }
+    const kf: Keyframe = { t: newKfTime, value: newKfValue, interpolation: newKfInterp }
     setClip((prev) => {
       const prevKeys = prev.fcurves[ch] || []
       const sorted = [...prevKeys.filter((k) => k.t !== newKfTime), kf].sort((a, b) => a.t - b.t)
@@ -426,7 +476,7 @@ export default function AnimationTimelinePanel({
   }, [newKfChannel, newKfTime, newKfValue, newKfInterp])
 
   // Remove keyframe
-  const removeKeyframe = useCallback((ch, t) => {
+  const removeKeyframe = useCallback((ch: string, t: number) => {
     setClip((prev) => ({
       ...prev,
       fcurves: {
@@ -437,7 +487,7 @@ export default function AnimationTimelinePanel({
   }, [])
 
   // Scrub to time
-  const scrub = useCallback((t) => {
+  const scrub = useCallback((t: number) => {
     setEvalTime(t)
     lastTickRef.current = null
   }, [])
@@ -620,7 +670,7 @@ export default function AnimationTimelinePanel({
             <div style={{ marginBottom: 6 }}>
               <span style={{ fontSize: 10, color: '#8a909e', display: 'block', marginBottom: 3 }}>Interpolation</span>
               <div style={{ display: 'flex', gap: 3 }}>
-                {['step', 'linear', 'bezier'].map((interp) => (
+                {(['step', 'linear', 'bezier'] as const).map((interp) => (
                   <button
                     key={interp}
                     type="button"
@@ -868,7 +918,7 @@ export default function AnimationTimelinePanel({
                   {ikRotations[bone.name] && (
                     <span style={{ fontSize: 9, color: '#4e9af1', fontFamily: 'monospace' }}>IK</span>
                   )}
-                  {worldMatrices[bi] && (
+                  {worldMatrices[bi] != null && (
                     <span style={{ fontSize: 9, color: '#6fe06f', fontFamily: 'monospace' }}>posed</span>
                   )}
                 </div>
@@ -902,7 +952,7 @@ export default function AnimationTimelinePanel({
 // Shared micro-styles
 // ---------------------------------------------------------------------------
 
-const iconBtnStyle = {
+const iconBtnStyle: CSSProperties = {
   background: '#14171c',
   border: '1px solid #2d323d',
   borderRadius: 4,
@@ -914,7 +964,7 @@ const iconBtnStyle = {
   padding: '5px 8px',
 }
 
-const inputStyle = {
+const inputStyle: CSSProperties = {
   width: '100%',
   background: '#14171c',
   border: '1px solid #2d323d',

@@ -12,21 +12,21 @@
 // the responsive behaviour is pure Tailwind (max-[360px]:* utilities).
 
 import { describe, it, expect, vi, beforeAll } from 'vitest'
-import { renderToStaticMarkup } from 'react-dom/server'
 
 // ── mocks (must match Layout.test.jsx stubs) ─────────────────────────────────
 
-vi.mock('react-router-dom', () => ({
-  Link: ({ to, children, ...rest }) => {
-    const React = require('react')
-    return React.createElement('a', { href: to, ...rest }, children)
-  },
-  useNavigate: () => () => {},
-}))
+vi.mock('react-router-dom', async () => {
+  const React = (await import('react')).default
+  return {
+    Link: ({ to, children, ...rest }: { to: string; children?: React.ReactNode; [key: string]: unknown }) =>
+      React.createElement('a', { href: to, ...rest }, children),
+    useNavigate: () => () => {},
+  }
+})
 
-vi.mock('lucide-react', () => {
-  const React = require('react')
-  const stub = (name) => () => React.createElement('span', { 'data-icon': name })
+vi.mock('lucide-react', async () => {
+  const React = (await import('react')).default
+  const stub = (name: string) => () => React.createElement('span', { 'data-icon': name })
   return {
     ChevronDown: stub('ChevronDown'),
     LogOut: stub('LogOut'),
@@ -44,7 +44,7 @@ vi.mock('./Logo.jsx', () => ({ LogoWordmark: () => null }))
 
 // WorkspaceSwitcher is rendered inline — import the real module so we can
 // assert on the classes it emits.
-vi.mock('./WorkspaceSwitcher.jsx', async (importOriginal) => {
+vi.mock('./WorkspaceSwitcher.jsx', async () => {
   // We want the real WorkspaceSwitcher HTML, so stub only its deps.
   // Lucide is already mocked above; stub store deps here.
   const React = (await import('react')).default

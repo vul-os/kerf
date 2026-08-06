@@ -28,10 +28,34 @@
 import { useState } from 'react'
 
 // ---------------------------------------------------------------------------
+// Local domain types (no shared type exists for Ashby chart data)
+// ---------------------------------------------------------------------------
+
+export interface MaterialPoint {
+  name: string
+  x: number
+  y: number
+  family?: string
+}
+
+export interface IndexLine {
+  slope: number
+  label: string
+}
+
+interface TooltipState {
+  svgX: number
+  svgY: number
+  name: string
+  x: number
+  y: number
+}
+
+// ---------------------------------------------------------------------------
 // Colour palette per family
 // ---------------------------------------------------------------------------
 
-const FAMILY_COLORS = {
+const FAMILY_COLORS: Record<string, string> = {
   steel:           '#ef5350',
   stainless_steel: '#ff7043',
   aluminium:       '#42a5f5',
@@ -46,8 +70,8 @@ const FAMILY_COLORS = {
   _default:        '#bdbdbd',
 }
 
-function familyColor(family) {
-  return FAMILY_COLORS[family] || FAMILY_COLORS._default
+function familyColor(family?: string) {
+  return (family && FAMILY_COLORS[family]) || FAMILY_COLORS._default
 }
 
 // ---------------------------------------------------------------------------
@@ -60,18 +84,18 @@ const MAR = { top: 40, right: 30, bottom: 56, left: 68 }
 // Scale helpers (log10)
 // ---------------------------------------------------------------------------
 
-function scaleLog(domMin, domMax, rangeMin, rangeMax) {
+function scaleLog(domMin: number, domMax: number, rangeMin: number, rangeMax: number) {
   const lmin = Math.log10(domMin)
   const lmax = Math.log10(domMax)
   const den = lmax - lmin
-  return (v) => {
+  return (v: number) => {
     if (v <= 0) return rangeMin
     return rangeMin + ((Math.log10(v) - lmin) / den) * (rangeMax - rangeMin)
   }
 }
 
-function logTicks(min, max) {
-  const ticks = []
+function logTicks(min: number, max: number) {
+  const ticks: number[] = []
   for (let e = Math.floor(Math.log10(min)); e <= Math.ceil(Math.log10(max)); e++) {
     const v = Math.pow(10, e)
     if (v >= min * 0.9 && v <= max * 1.1) ticks.push(v)
@@ -83,7 +107,18 @@ function logTicks(min, max) {
 // Guide-line helper (y = C · x^slope in log-log space is a straight line)
 // ---------------------------------------------------------------------------
 
-function guideLine(slope, xMin, xMax, xScale, yScale, yMin, yMax, color, label, idx) {
+function guideLine(
+  slope: number,
+  xMin: number,
+  xMax: number,
+  xScale: (v: number) => number,
+  yScale: (v: number) => number,
+  yMin: number,
+  yMax: number,
+  color: string,
+  label: string,
+  idx: number,
+) {
   // Pick C so the line passes through the middle of the chart
   const xMid = Math.sqrt(xMin * xMax)
   const yMid = Math.sqrt(yMin * yMax)
@@ -128,7 +163,18 @@ function guideLine(slope, xMin, xMax, xScale, yScale, yMin, yMax, color, label, 
 // Tooltip
 // ---------------------------------------------------------------------------
 
-function Tooltip({ x, y, name, xVal, yVal, xLabel, yLabel, show }) {
+interface TooltipProps {
+  x: number
+  y: number
+  name: string
+  xVal: number
+  yVal: number
+  xLabel: string
+  yLabel: string
+  show: boolean
+}
+
+function Tooltip({ x, y, name, xVal, yVal, xLabel, yLabel, show }: TooltipProps) {
   if (!show) return null
   return (
     <g transform={`translate(${x + 10},${y - 10})`} style={{ pointerEvents: 'none' }}>
@@ -146,7 +192,7 @@ function Tooltip({ x, y, name, xVal, yVal, xLabel, yLabel, show }) {
 // Legend
 // ---------------------------------------------------------------------------
 
-function Legend({ families, width }) {
+function Legend({ families, width }: { families: string[]; width: number }) {
   if (!families.length) return null
   const cols = Math.min(3, families.length)
   return (
@@ -172,6 +218,18 @@ function Legend({ families, width }) {
 // Main component
 // ---------------------------------------------------------------------------
 
+export interface Props {
+  points?: MaterialPoint[]
+  pareto?: MaterialPoint[]
+  xLabel?: string
+  yLabel?: string
+  title?: string
+  indexLines?: IndexLine[]
+  width?: number
+  height?: number
+  className?: string
+}
+
 export default function AshbyChartPanel({
   points = [],
   pareto = [],
@@ -182,8 +240,8 @@ export default function AshbyChartPanel({
   width = 560,
   height = 460,
   className = '',
-}) {
-  const [tooltip, setTooltip] = useState(null)
+}: Props) {
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null)
 
   const innerW = width - MAR.left - MAR.right
   const innerH = height - MAR.top - MAR.bottom
@@ -346,7 +404,7 @@ export default function AshbyChartPanel({
               strokeWidth={isPareto ? 2 : 0}
               opacity={0.85}
               style={{ cursor: 'pointer' }}
-              onMouseEnter={(e) =>
+              onMouseEnter={() =>
                 setTooltip({
                   svgX: x,
                   svgY: y,

@@ -36,7 +36,7 @@ const RASTER_KINDS = new Set(['image', 'svg'])
 // File kinds that can be previewed in the 3D renderer
 const RENDERER_KINDS = new Set(['step', 'stl', 'obj', 'iges', 'brep', '3mf'])
 
-function previewType(kind) {
+function previewType(kind: string): '3d' | 'image' | 'none' {
   if (RENDERER_KINDS.has(kind)) return '3d'
   if (RASTER_KINDS.has(kind)) return 'image'
   return 'none'
@@ -46,9 +46,15 @@ function previewType(kind) {
 // API helpers
 // ---------------------------------------------------------------------------
 
-async function callResolve(projectId, path, pick, againstSha, accessToken) {
+async function callResolve(
+  projectId: string,
+  path: string,
+  pick: 'yours' | 'theirs',
+  againstSha: string,
+  accessToken?: string | null,
+) {
   const url = `${API_URL}/api/workspaces/${projectId}/git/resolve`
-  const headers = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   }
   if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
@@ -70,7 +76,7 @@ async function callResolve(projectId, path, pick, againstSha, accessToken) {
 // PreviewSlot — one half of the side-by-side panel
 // ---------------------------------------------------------------------------
 
-function ThreeDPreview({ oid, label }) {
+function ThreeDPreview({ oid, label }: { oid: string; label: string }) {
   // Placeholder for 3D renderer — Renderer.jsx needs a geometry stream URL
   // and project context that would require a separate blob-serve endpoint.
   // For now, show a labelled placeholder that makes the intent clear.
@@ -83,7 +89,7 @@ function ThreeDPreview({ oid, label }) {
   )
 }
 
-function ImagePreview({ thumbUrl, oid, label }) {
+function ImagePreview({ thumbUrl, oid, label }: { thumbUrl?: string | null; oid: string; label: string }) {
   if (thumbUrl) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center min-h-0 overflow-hidden p-1">
@@ -104,7 +110,7 @@ function ImagePreview({ thumbUrl, oid, label }) {
   )
 }
 
-function NoPreview({ oid, label }) {
+function NoPreview({ oid, label }: { oid?: string | null; label: string }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center bg-zinc-950 rounded text-zinc-600 text-xs p-2 gap-1">
       <span className="text-zinc-500 text-sm">No preview available</span>
@@ -118,7 +124,7 @@ function NoPreview({ oid, label }) {
   )
 }
 
-function PreviewSlot({ kind, oid, thumbUrl, label }) {
+function PreviewSlot({ kind, oid, thumbUrl, label }: { kind: string; oid?: string | null; thumbUrl?: string | null; label: string }) {
   const type = previewType(kind)
 
   return (
@@ -151,14 +157,31 @@ function PreviewSlot({ kind, oid, thumbUrl, label }) {
 // BinarySideBySide
 // ---------------------------------------------------------------------------
 
-export default function BinarySideBySide({ file, projectId, againstSha, onResolved }) {
+export interface BinaryDiffFile {
+  path: string
+  kind: string
+  change?: string
+  binary?: boolean
+  oid_old?: string | null
+  oid_new?: string | null
+  preview_thumb_url?: string | null
+}
+
+export interface Props {
+  file: BinaryDiffFile
+  projectId: string
+  againstSha: string
+  onResolved?: (path: string, pick: 'yours' | 'theirs') => void
+}
+
+export default function BinarySideBySide({ file, projectId, againstSha, onResolved }: Props) {
   const [resolving, setResolving] = useState(false)
-  const [resolveError, setResolveError] = useState(null)
-  const [resolvedPick, setResolvedPick] = useState(null)
+  const [resolveError, setResolveError] = useState<string | null>(null)
+  const [resolvedPick, setResolvedPick] = useState<'yours' | 'theirs' | null>(null)
   const accessToken = useAuth((s) => s.accessToken)
 
   const handlePick = useCallback(
-    async (pick) => {
+    async (pick: 'yours' | 'theirs') => {
       setResolving(true)
       setResolveError(null)
       try {
@@ -166,7 +189,7 @@ export default function BinarySideBySide({ file, projectId, againstSha, onResolv
         setResolvedPick(pick)
         if (onResolved) onResolved(file.path, pick)
       } catch (err) {
-        setResolveError(err.message || String(err))
+        setResolveError((err as Error)?.message || String(err))
       } finally {
         setResolving(false)
       }

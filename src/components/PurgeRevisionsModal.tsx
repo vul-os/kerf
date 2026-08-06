@@ -21,13 +21,14 @@ import { AlertTriangle, X } from 'lucide-react'
 import Button from './Button.jsx'
 import { toast } from './ToastBus.jsx'
 import { api } from '../lib/api.js'
+import type { RevisionsSize } from '../types/api.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 /** Format bytes to a human-readable string (e.g. "4.2 MB"). */
-function fmtBytes(bytes) {
+function fmtBytes(bytes: number | null | undefined) {
   if (bytes == null || bytes < 0) return '—'
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -38,15 +39,22 @@ function fmtBytes(bytes) {
 // Component
 // ---------------------------------------------------------------------------
 
+export interface Props {
+  open: boolean
+  onClose: () => void
+  projectId: string
+  currentSize: RevisionsSize | null
+}
+
 export default function PurgeRevisionsModal({
   open,
   onClose,
   projectId,
   currentSize,
-}) {
+}: Props) {
   const [confirmed, setConfirmed] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   if (!open) return null
 

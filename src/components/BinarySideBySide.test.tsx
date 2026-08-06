@@ -15,17 +15,17 @@ import { describe, it, expect } from 'vitest'
 const RASTER_KINDS = new Set(['image', 'svg'])
 const RENDERER_KINDS = new Set(['step', 'stl', 'obj', 'iges', 'brep', '3mf'])
 
-function previewType(kind) {
+function previewType(kind: string) {
   if (RENDERER_KINDS.has(kind)) return '3d'
   if (RASTER_KINDS.has(kind)) return 'image'
   return 'none'
 }
 
-function buildResolvePayload(path, pick, againstSha) {
+function buildResolvePayload(path: string, pick: string, againstSha: string) {
   return { path, pick, against_sha: againstSha }
 }
 
-function shortOid(oid) {
+function shortOid(oid: string | null | undefined) {
   if (!oid || typeof oid !== 'string') return ''
   return oid.replace('sha256:', '').slice(0, 12)
 }
@@ -157,7 +157,16 @@ describe('shortOid', () => {
 // ---------------------------------------------------------------------------
 
 describe('binary file manifest shape', () => {
-  const validBinaryFile = {
+  const validBinaryFile: {
+    path: string
+    kind: string
+    change: string
+    binary: boolean
+    preview_thumb_url: string | null
+    oid_old: string
+    oid_new: string
+    text_diff?: string
+  } = {
     path: 'cad/assembly.step',
     kind: 'step',
     change: 'modified',

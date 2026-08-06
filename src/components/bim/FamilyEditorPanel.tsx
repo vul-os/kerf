@@ -37,7 +37,38 @@ import {
 // Static catalogue of the 10 starter families (mirrors kerf_bim/families/)
 // ---------------------------------------------------------------------------
 
-const CATEGORY_META = {
+type ParamType = 'number' | 'boolean' | 'choice' | 'text'
+type ParamValue = number | boolean | string
+
+interface FamilyParameter {
+  name: string
+  type: ParamType
+  default: ParamValue
+  min?: number
+  max?: number
+  units?: string
+  description?: string
+  choices?: string[]
+}
+
+interface FamilyFormula {
+  name: string
+  expression: string
+}
+
+interface FamilyDef {
+  module: string
+  name: string
+  category: string
+  description: string
+  parameters: FamilyParameter[]
+  formulas: FamilyFormula[]
+}
+
+type ParamValues = Record<string, ParamValue>
+type ResolvedNs = Record<string, ParamValue>
+
+const CATEGORY_META: Record<string, { label: string; color: string; bg: string; icon: React.ComponentType<{ size?: number; className?: string }> }> = {
   door:      { label: 'Door',      color: 'text-amber-600 dark:text-amber-400',  bg: 'bg-amber-50 dark:bg-amber-900/20',  icon: DoorOpen   },
   window:    { label: 'Window',    color: 'text-sky-600 dark:text-sky-400',      bg: 'bg-sky-50 dark:bg-sky-900/20',      icon: Square     },
   furniture: { label: 'Furniture', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', icon: Armchair },
@@ -47,7 +78,7 @@ const CATEGORY_META = {
   generic:   { label: 'Generic',   color: 'text-ink-600 dark:text-ink-400',      bg: 'bg-ink-50 dark:bg-ink-800',         icon: LayoutGrid },
 }
 
-const STARTER_FAMILIES = [
+const STARTER_FAMILIES: FamilyDef[] = [
   {
     module: 'door_single_swing',
     name: 'Single Swing Door',
@@ -216,8 +247,8 @@ const STARTER_FAMILIES = [
 // Formula evaluator (pure JS, mirrors Python evaluator)
 // ---------------------------------------------------------------------------
 
-function evalFormulas(family, paramValues) {
-  const ns = { ...paramValues }
+function evalFormulas(family: FamilyDef, paramValues: ParamValues): ResolvedNs {
+  const ns: ResolvedNs = { ...paramValues }
   for (const f of family.formulas) {
     try {
       // eslint-disable-next-line no-new-func
@@ -230,12 +261,24 @@ function evalFormulas(family, paramValues) {
   return ns
 }
 
-function buildDefaultValues(family) {
-  const vals = {}
+function buildDefaultValues(family: FamilyDef): ParamValues {
+  const vals: ParamValues = {}
   for (const p of family.parameters) {
     vals[p.name] = p.default
   }
   return vals
+}
+
+function fmtResolved(v: ParamValue): string {
+  if (typeof v === 'number') return v.toFixed(3)
+  return String(v ?? '—')
+}
+
+// Resolved parameter/formula values are typed as ParamValue (number | boolean | string)
+// because the parameter catalogue is heterogeneous, but the specific keys used for
+// geometry math below (width/height/angles/etc.) are always numeric at runtime.
+function asNum(v: ParamValue | undefined, fallback: number): number {
+  return typeof v === 'number' ? v : fallback
 }
 
 // ---------------------------------------------------------------------------
@@ -249,7 +292,7 @@ const TABS = [
   { id: 'instantiate',label: 'Instantiate',      icon: Zap        },
 ]
 
-function TabBar({ activeTab, onTabChange }) {
+function TabBar({ activeTab, onTabChange }: { activeTab: string; onTabChange: (id: string) => void }) {
   return (
     <div className="flex gap-0 border-b border-ink-200 dark:border-ink-700 overflow-x-auto flex-shrink-0">
       {TABS.map(({ id, label, icon: Icon }) => (
@@ -271,7 +314,7 @@ function TabBar({ activeTab, onTabChange }) {
   )
 }
 
-function CategoryPill({ category }) {
+function CategoryPill({ category }: { category: string }) {
   const meta = CATEGORY_META[category] ?? CATEGORY_META.generic
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${meta.color} ${meta.bg}`}>
@@ -282,7 +325,12 @@ function CategoryPill({ category }) {
 
 // ── Browse tab ─────────────────────────────────────────────────────────────
 
-function BrowseTab({ onSelect, selectedFamily }) {
+interface BrowseTabProps {
+  onSelect: (family: FamilyDef) => void
+  selectedFamily: FamilyDef | null
+}
+
+function BrowseTab({ onSelect, selectedFamily }: BrowseTabProps) {
   const [query, setQuery] = useState('')
   const [filterCat, setFilterCat] = useState('all')
 
@@ -395,7 +443,13 @@ function BrowseTab({ onSelect, selectedFamily }) {
 
 // ── Parameter Editor tab ───────────────────────────────────────────────────
 
-function ParamRow({ param, value, onChange }) {
+interface ParamRowProps {
+  param: FamilyParameter
+  value: ParamValue
+  onChange: (name: string, value: ParamValue) => void
+}
+
+function ParamRow({ param, value, onChange }: ParamRowProps) {
   if (param.type === 'boolean') {
     return (
       <div className="flex items-center justify-between py-2 border-b border-ink-100 dark:border-ink-800 last:border-0">
@@ -407,7 +461,7 @@ function ParamRow({ param, value, onChange }) {
         </div>
         <button
           role="switch"
-          aria-checked={value}
+          aria-checked={Boolean(value)}
           onClick={() => onChange(param.name, !value)}
           className={[
             'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
@@ -512,7 +566,14 @@ function ParamRow({ param, value, onChange }) {
   )
 }
 
-function ParameterEditorTab({ family, paramValues, onParamChange, resolvedNs }) {
+interface ParameterEditorTabProps {
+  family: FamilyDef | null
+  paramValues: ParamValues
+  onParamChange: (name: string, value: ParamValue) => void
+  resolvedNs: ResolvedNs
+}
+
+function ParameterEditorTab({ family, paramValues, onParamChange, resolvedNs }: ParameterEditorTabProps) {
   if (!family) {
     return (
       <div className="flex flex-col items-center justify-center h-full py-12 text-center">
@@ -563,9 +624,7 @@ function ParameterEditorTab({ family, paramValues, onParamChange, resolvedNs }) 
                   <span className="ml-2 text-[10px] text-ink-400 dark:text-ink-500">= {f.expression}</span>
                 </div>
                 <span className="text-[11px] font-mono font-semibold text-accent-600 dark:text-accent-400">
-                  {typeof resolvedNs[f.name] === 'number'
-                    ? resolvedNs[f.name].toFixed(3)
-                    : String(resolvedNs[f.name] ?? '—')}
+                  {fmtResolved(resolvedNs[f.name])}
                 </span>
               </div>
             ))}
@@ -578,7 +637,12 @@ function ParameterEditorTab({ family, paramValues, onParamChange, resolvedNs }) 
 
 // ── Geometry Preview tab ───────────────────────────────────────────────────
 
-function GeometrySvg({ family, resolvedNs }) {
+interface GeometrySvgProps {
+  family: FamilyDef | null
+  resolvedNs: ResolvedNs
+}
+
+function GeometrySvg({ family, resolvedNs }: GeometrySvgProps) {
   if (!family) return null
 
   const W = 260, H = 180
@@ -586,8 +650,8 @@ function GeometrySvg({ family, resolvedNs }) {
 
   // Draw a simple schematic based on category.
   const cat = family.category
-  const w = Math.min(resolvedNs.width ?? resolvedNs.seat_width ?? resolvedNs.bowl_width ?? resolvedNs.shade_diameter ?? 600, 3000)
-  const h = Math.min(resolvedNs.height ?? resolvedNs.back_height ?? resolvedNs.total_height ?? resolvedNs.drop_height ?? 1000, 3000)
+  const w = Math.min(asNum(resolvedNs.width ?? resolvedNs.seat_width ?? resolvedNs.bowl_width ?? resolvedNs.shade_diameter, 600), 3000)
+  const h = Math.min(asNum(resolvedNs.height ?? resolvedNs.back_height ?? resolvedNs.total_height ?? resolvedNs.drop_height, 1000), 3000)
 
   const drawW = W - 2 * pad
   const drawH = H - 2 * pad
@@ -620,8 +684,8 @@ function GeometrySvg({ family, resolvedNs }) {
 
       {/* Swing arc for doors */}
       {cat === 'door' && (() => {
-        const sa = resolvedNs.swing_angle ?? 90
-        const pw = (resolvedNs.panel_width ?? resolvedNs.leaf_width ?? w * 0.8) * scale
+        const sa = asNum(resolvedNs.swing_angle, 90)
+        const pw = asNum(resolvedNs.panel_width ?? resolvedNs.leaf_width, w * 0.8) * scale
         const r = Math.min(pw, rw * 0.9)
         const rad = (sa * Math.PI) / 180
         const x2 = ox + r * Math.cos(rad)
@@ -643,8 +707,8 @@ function GeometrySvg({ family, resolvedNs }) {
 
       {/* Grid lines for furniture */}
       {cat === 'furniture' && (() => {
-        const drawers = Math.round(resolvedNs.num_drawers ?? resolvedNs.back_net_height ?? 0)
-        const lines = []
+        const drawers = Math.round(asNum(resolvedNs.num_drawers ?? resolvedNs.back_net_height, 0))
+        const lines: React.ReactElement[] = []
         for (let i = 1; i <= Math.min(drawers, 4); i++) {
           const y = oy + (rh * i) / (drawers + 1)
           lines.push(
@@ -679,7 +743,14 @@ function GeometrySvg({ family, resolvedNs }) {
   )
 }
 
-function GeometryPreviewTab({ family, resolvedNs }) {
+interface PreviewRow {
+  name: string
+  isFormula: boolean
+  units?: string
+  expression?: string
+}
+
+function GeometryPreviewTab({ family, resolvedNs }: GeometrySvgProps) {
   if (!family) {
     return (
       <div className="flex flex-col items-center justify-center h-full py-12 text-center">
@@ -689,9 +760,9 @@ function GeometryPreviewTab({ family, resolvedNs }) {
     )
   }
 
-  const allParams = [
-    ...family.parameters.map((p) => ({ ...p, isFormula: false })),
-    ...family.formulas.map((f) => ({ name: f.name, isFormula: true, expression: f.expression })),
+  const allParams: PreviewRow[] = [
+    ...family.parameters.map((p): PreviewRow => ({ ...p, isFormula: false })),
+    ...family.formulas.map((f): PreviewRow => ({ name: f.name, isFormula: true, expression: f.expression })),
   ]
 
   return (
@@ -721,11 +792,7 @@ function GeometryPreviewTab({ family, resolvedNs }) {
                   <span className="font-mono text-ink-700 dark:text-ink-200">{p.name}</span>
                 </td>
                 <td className="px-3 py-1.5 text-right font-mono font-semibold text-accent-600 dark:text-accent-400">
-                  {typeof resolvedNs[p.name] === 'number'
-                    ? resolvedNs[p.name].toFixed(3)
-                    : typeof resolvedNs[p.name] === 'boolean'
-                    ? String(resolvedNs[p.name])
-                    : String(resolvedNs[p.name] ?? '—')}
+                  {fmtResolved(resolvedNs[p.name])}
                 </td>
                 <td className="px-3 py-1.5 text-[10px] text-ink-400 dark:text-ink-500">
                   {p.isFormula ? `= ${p.expression}` : (p.units ? `[${p.units}]` : '')}
@@ -741,9 +808,24 @@ function GeometryPreviewTab({ family, resolvedNs }) {
 
 // ── Instantiate tab ────────────────────────────────────────────────────────
 
-function InstantiateTab({ family, paramValues, resolvedNs }) {
+interface InstantiateResult {
+  family: string
+  category: string
+  parameter_values: ParamValues
+  resolved: ResolvedNs
+  bounding_box_mm: { x: number; y: number; z: number }
+  result_type: string
+}
+
+interface InstantiateTabProps {
+  family: FamilyDef | null
+  paramValues: ParamValues
+  resolvedNs: ResolvedNs
+}
+
+function InstantiateTab({ family, paramValues, resolvedNs }: InstantiateTabProps) {
   const [status, setStatus] = useState('idle')  // idle | running | success | error
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState<InstantiateResult | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
 
   const handleInstantiate = useCallback(async () => {
@@ -764,9 +846,9 @@ function InstantiateTab({ family, paramValues, resolvedNs }) {
         parameter_values: { ...paramValues },
         resolved: { ...resolvedNs },
         bounding_box_mm: (() => {
-          const w = resolvedNs.width ?? resolvedNs.seat_width ?? resolvedNs.shade_diameter ?? 600
-          const d = resolvedNs.depth ?? resolvedNs.seat_depth ?? resolvedNs.bowl_depth ?? resolvedNs.shade_diameter ?? 500
-          const h = resolvedNs.height ?? resolvedNs.back_height ?? resolvedNs.total_height ?? resolvedNs.bottom_clearance ?? 400
+          const w = asNum(resolvedNs.width ?? resolvedNs.seat_width ?? resolvedNs.shade_diameter, 600)
+          const d = asNum(resolvedNs.depth ?? resolvedNs.seat_depth ?? resolvedNs.bowl_depth ?? resolvedNs.shade_diameter, 500)
+          const h = asNum(resolvedNs.height ?? resolvedNs.back_height ?? resolvedNs.total_height ?? resolvedNs.bottom_clearance, 400)
           return { x: w, y: d, z: h }
         })(),
         result_type: 'BodySummary',
@@ -901,6 +983,11 @@ ${family.parameters
 // Main component
 // ---------------------------------------------------------------------------
 
+interface Props {
+  className?: string
+  onClose?: () => void
+}
+
 /**
  * FamilyEditorPanel — GDL-replacement parametric Family Editor.
  *
@@ -909,24 +996,24 @@ ${family.parameters
  * className {string}   Extra CSS classes on root.
  * onClose   {function} Optional close/back handler.
  */
-export default function FamilyEditorPanel({ className = '', onClose }) {
+export default function FamilyEditorPanel({ className = '', onClose }: Props) {
   const [activeTab, setActiveTab] = useState('browse')
-  const [selectedFamily, setSelectedFamily] = useState(null)
-  const [paramValues, setParamValues] = useState({})
+  const [selectedFamily, setSelectedFamily] = useState<FamilyDef | null>(null)
+  const [paramValues, setParamValues] = useState<ParamValues>({})
 
-  const resolvedNs = useMemo(() => {
+  const resolvedNs: ResolvedNs = useMemo(() => {
     if (!selectedFamily) return {}
     const merged = { ...buildDefaultValues(selectedFamily), ...paramValues }
     return evalFormulas(selectedFamily, merged)
   }, [selectedFamily, paramValues])
 
-  const handleSelectFamily = useCallback((family) => {
+  const handleSelectFamily = useCallback((family: FamilyDef) => {
     setSelectedFamily(family)
     setParamValues(buildDefaultValues(family))
     setActiveTab('params')
   }, [])
 
-  const handleParamChange = useCallback((name, value) => {
+  const handleParamChange = useCallback((name: string, value: ParamValue) => {
     setParamValues((prev) => ({ ...prev, [name]: value }))
   }, [])
 

@@ -61,6 +61,13 @@ import {
 
 import fs from 'node:fs'
 
+// Throughout this file, `sketch.entities.find((e) => e.id === X) as any` casts
+// the SketchEntity union (SketchPoint | SketchLine | ...) down to whatever
+// shape the test needs (.x/.y, .p1/.p2, .radius, ...). SketchEntity's real
+// per-kind typing lives in src/lib/sketchSolver.js, owned by another slice;
+// narrowing it here properly would mean a discriminated-union check per call
+// site for a test file that's purely about solver behavior.
+
 // ---------------------------------------------------------------------------
 // Pure helpers.
 
@@ -170,7 +177,7 @@ describe('sketch JSON round-trip', () => {
 
   it('parses an empty body to a default sketch', () => {
     const def = parseSketch('')
-    expect(def.entities.find((e) => e.id === 'origin')).toBeTruthy()
+    expect(def.entities.find((e) => e.id === 'origin') as any).toBeTruthy()
     expect(def.constraints).toEqual([])
   })
 })
@@ -236,7 +243,7 @@ describe('planegcs integration: line + distance + horizontal → fully constrain
     // constraint (-1) → 0. The status should be "fully" once that's true.
     expect(result.dofCount).toBe(0)
     // The free point should be at (10, 0) post-solve.
-    const p = result.sketch.entities.find((e) => e.id === r1.id)
+    const p = result.sketch.entities.find((e) => e.id === r1.id) as any
     expect(p.x).toBeCloseTo(10, 4)
     expect(p.y).toBeCloseTo(0, 4)
     // No conflicts.
@@ -280,7 +287,7 @@ describe('multi-click line tool data flow', () => {
     // Click 1: cursor at (5, 0) with no snap (kind === 'grid' or null).
     const c1 = ensurePointAt(s, null, { x: 5, y: 0 })
     s = c1.sketch
-    expect(s.entities.find((e) => e.id === c1.id)).toBeTruthy()
+    expect(s.entities.find((e) => e.id === c1.id) as any).toBeTruthy()
     // Pretend the parent's commit has flowed through and arrived back as the
     // current sketch — same object reference (matches updateSketch + the
     // SketchView's lastSketchRef self-write trick).
@@ -365,7 +372,7 @@ describe('sketchSolver equations resolver registration', () => {
         console.warn('[skip] planegcs wasm did not load in node:', err?.message)
         return
       }
-      const p = result.sketch.entities.find((e) => e.id === r1.id)
+      const p = result.sketch.entities.find((e) => e.id === r1.id) as any
       expect(p.x).toBeCloseTo(10, 4)
       expect(p.y).toBeCloseTo(0, 4)
     } finally {
@@ -384,6 +391,8 @@ describe('sketchSolver equations resolver registration', () => {
 describe('public planegcs.wasm asset presence', () => {
   it('public/planegcs.wasm exists and is non-empty', () => {
     const target = path.resolve(here, '../../public/planegcs.wasm')
+    // @ts-expect-error - no @types/node in this toolchain (the repo's node:fs
+    // ambient shim only declares readFileSync)
     const stats = fs.statSync(target)
     expect(stats.isFile()).toBe(true)
     // Should be hundreds of KB — a non-empty wasm binary, not a stub.
@@ -439,7 +448,7 @@ describe('midpoint constraint', () => {
       console.warn('[skip] planegcs wasm did not load in node:', err?.message)
       return
     }
-    const p = result.sketch.entities.find((e) => e.id === mid.id)
+    const p = result.sketch.entities.find((e) => e.id === mid.id) as any
     expect(p.x).toBeCloseTo(5, 4)
     expect(p.y).toBeCloseTo(0, 4)
   }, 30000)
@@ -459,7 +468,7 @@ describe('midpoint constraint', () => {
       console.warn('[skip] planegcs wasm did not load in node:', err?.message)
       return
     }
-    const p = result.sketch.entities.find((e) => e.id === mid.id)
+    const p = result.sketch.entities.find((e) => e.id === mid.id) as any
     expect(p.x).toBeCloseTo(5, 4)
     expect(p.y).toBeCloseTo(0, 4)
     // Status should at minimum not be 'conflict'.
@@ -493,11 +502,11 @@ describe('fixed constraint', () => {
       console.warn('[skip] planegcs wasm did not load in node:', err?.message)
       return
     }
-    const pa = result.sketch.entities.find((e) => e.id === a.id)
+    const pa = result.sketch.entities.find((e) => e.id === a.id) as any
     expect(pa.x).toBeCloseTo(4, 4)
     expect(pa.y).toBeCloseTo(2, 4)
     // The other point is untouched (no constraints reference it).
-    const pb = result.sketch.entities.find((e) => e.id === b.id)
+    const pb = result.sketch.entities.find((e) => e.id === b.id) as any
     expect(pb.x).toBeCloseTo(9, 4)
     expect(pb.y).toBeCloseTo(9, 4)
   }, 30000)
@@ -518,7 +527,7 @@ describe('fixed constraint', () => {
       return
     }
     expect(result.status).not.toBe('conflict')
-    const pa = result.sketch.entities.find((e) => e.id === a.id)
+    const pa = result.sketch.entities.find((e) => e.id === a.id) as any
     expect(pa.x).toBeCloseTo(4, 4)
     expect(pa.y).toBeCloseTo(0, 4)
   }, 30000)
@@ -577,7 +586,7 @@ describe('radius constraint', () => {
       console.warn('[skip] planegcs wasm did not load in node:', err?.message)
       return
     }
-    const ce = result.sketch.entities.find((e) => e.id === c.id)
+    const ce = result.sketch.entities.find((e) => e.id === c.id) as any
     expect(ce.radius).toBeCloseTo(7, 4)
     expect(result.status).not.toBe('conflict')
   }, 30000)
@@ -593,7 +602,7 @@ describe('radius constraint', () => {
       console.warn('[skip] planegcs wasm did not load in node:', err?.message)
       return
     }
-    const ce = result.sketch.entities.find((e) => e.id === c.id)
+    const ce = result.sketch.entities.find((e) => e.id === c.id) as any
     expect(ce.radius).toBeCloseTo(12, 4)
   }, 30000)
 })
@@ -622,7 +631,7 @@ describe('diameter constraint', () => {
       console.warn('[skip] planegcs wasm did not load in node:', err?.message)
       return
     }
-    const ce = result.sketch.entities.find((e) => e.id === c.id)
+    const ce = result.sketch.entities.find((e) => e.id === c.id) as any
     expect(ce.radius).toBeCloseTo(7, 4)
     expect(result.status).not.toBe('conflict')
   }, 30000)
@@ -659,9 +668,9 @@ describe('collinear constraint (real planegcs solver)', () => {
     // rather than be swallowed as a "wasm didn't load" skip.
     const result = await solveSketch(s)
     expect(result.status).not.toBe('conflict')
-    const o = result.sketch.entities.find((e) => e.id === 'origin')
-    const a = result.sketch.entities.find((e) => e.id === anchor.id)
-    const p = result.sketch.entities.find((e) => e.id === stray.id)
+    const o = result.sketch.entities.find((e) => e.id === 'origin') as any
+    const a = result.sketch.entities.find((e) => e.id === anchor.id) as any
+    const p = result.sketch.entities.find((e) => e.id === stray.id) as any
     // Cross product of (a-o) x (p-o) must vanish for true collinearity — a
     // much stronger check than "the solve didn't throw".
     const cross = (a.x - o.x) * (p.y - o.y) - (a.y - o.y) * (p.x - o.x)
@@ -685,9 +694,9 @@ describe('bezier_tangent constraint (real planegcs solver)', () => {
 
     const result = await solveSketch(s)
     expect(result.status).not.toBe('conflict')
-    const a = result.sketch.entities.find((e) => e.id === p0.id)
-    const b = result.sketch.entities.find((e) => e.id === p2.id)
-    const j = result.sketch.entities.find((e) => e.id === p1.id)
+    const a = result.sketch.entities.find((e) => e.id === p0.id) as any
+    const b = result.sketch.entities.find((e) => e.id === p2.id) as any
+    const j = result.sketch.entities.find((e) => e.id === p1.id) as any
     const cross = (b.x - a.x) * (j.y - a.y) - (b.y - a.y) * (j.x - a.x)
     expect(cross).toBeCloseTo(0, 3)
   }, 30000)
@@ -706,9 +715,9 @@ describe('bezier_g1 constraint (real planegcs solver)', () => {
 
     const result = await solveSketch(s)
     expect(result.status).not.toBe('conflict')
-    const a = result.sketch.entities.find((e) => e.id === p0.id)
-    const b = result.sketch.entities.find((e) => e.id === p2.id)
-    const j = result.sketch.entities.find((e) => e.id === p1.id)
+    const a = result.sketch.entities.find((e) => e.id === p0.id) as any
+    const b = result.sketch.entities.find((e) => e.id === p2.id) as any
+    const j = result.sketch.entities.find((e) => e.id === p1.id) as any
     const cross = (b.x - a.x) * (j.y - a.y) - (b.y - a.y) * (j.x - a.x)
     expect(cross).toBeCloseTo(0, 3)
     // On a vertical line through x=0, the junction's x must collapse to 0.
@@ -750,9 +759,9 @@ describe('bezier_g2 constraint (real planegcs solver)', () => {
 
     const result = await solveSketch(s)
     expect(result.status).not.toBe('conflict')
-    const m1 = result.sketch.entities.find((e) => e.id === pMinus1.id)
-    const p1 = result.sketch.entities.find((e) => e.id === pPlus1.id)
-    const j = result.sketch.entities.find((e) => e.id === junction.id)
+    const m1 = result.sketch.entities.find((e) => e.id === pMinus1.id) as any
+    const p1 = result.sketch.entities.find((e) => e.id === pPlus1.id) as any
+    const j = result.sketch.entities.find((e) => e.id === junction.id) as any
     // Collinear: cross product of (p1-m1) x (j-m1) vanishes.
     const cross = (p1.x - m1.x) * (j.y - m1.y) - (p1.y - m1.y) * (j.x - m1.x)
     expect(cross).toBeCloseTo(0, 2)
@@ -797,7 +806,9 @@ describe('symmetric_over_line: arc/arc equal-radius path (equal_radius_aa)', () 
     const result = await solveSketch(s)
     expect(result.status).not.toBe('conflict')
     const ents = result.sketch.entities
-    const get = (id) => ents.find((e) => e.id === id)
+    // See file-top note on `as any`: narrows the SketchEntity union to the
+    // shape each assertion below needs (.x/.y).
+    const get = (id: string): any => ents.find((e) => e.id === id)
     const oCA = get(cA.id); const oSA = get(sA.id); const oEA = get(eA.id)
     const oCB = get(cB.id); const oSB = get(sB.id); const oEB = get(eB.id)
 
@@ -842,8 +853,8 @@ describe('symmetric_over_line: circle/circle equal-radius path (equal_radius_cc)
 
     const result = await solveSketch(s)
     expect(result.status).not.toBe('conflict')
-    const oCB = result.sketch.entities.find((e) => e.id === cB.id)
-    const oCircB = result.sketch.entities.find((e) => e.id === circB.id)
+    const oCB = result.sketch.entities.find((e) => e.id === cB.id) as any
+    const oCircB = result.sketch.entities.find((e) => e.id === circB.id) as any
     // Mirror across x=0: (-5,0) -> (5,0).
     expect(oCB.x).toBeCloseTo(5, 2)
     expect(oCB.y).toBeCloseTo(0, 2)
@@ -896,7 +907,7 @@ describe('constraintRefs / deleteEntities cascade (previously-missing kinds)', (
     s = deleteEntities(s, [b.id])
     expect(s.constraints).toHaveLength(0)
     // b itself and its cascade are gone too.
-    expect(s.entities.find((e) => e.id === b.id)).toBeUndefined()
+    expect(s.entities.find((e) => e.id === b.id) as any).toBeUndefined()
   })
 
   it('deleteEntities drops a midpoint constraint when the line it references is deleted', () => {

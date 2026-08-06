@@ -85,7 +85,9 @@ describe('tessellateBspline', () => {
 
   it('starts at the first control point and ends at the last (clamped knots)', () => {
     const cps = [[0, 0], [1, 2], [3, 2], [4, 0]]
-    const out = tessellateBspline(cps, 16)
+    // number[][] vs Point2's 2-tuple; tessellateBspline (src/lib/sketchGeom2.js,
+    // owned by another slice) accepts array-format points at runtime.
+    const out = tessellateBspline(cps as any, 16)
     expect(out[0][0]).toBeCloseTo(0, 6)
     expect(out[0][1]).toBeCloseTo(0, 6)
     expect(out[out.length - 1][0]).toBeCloseTo(4, 6)
@@ -105,7 +107,7 @@ describe('tessellateBspline', () => {
     // For a degree-3 B-spline, every output point is a convex combination of
     // a sliding window of 4 control points → values stay within their range.
     const cps = [[0, 1], [1, 1], [2, 1], [3, 1], [4, 1]]
-    const out = tessellateBspline(cps, 16)
+    const out = tessellateBspline(cps as any, 16)
     for (const [, y] of out) expect(y).toBeCloseTo(1, 6)
   })
 

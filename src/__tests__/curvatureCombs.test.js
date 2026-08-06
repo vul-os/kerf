@@ -26,7 +26,7 @@ const workerSrc = readFileSync(
   'utf8',
 )
 const bridgeSrc = readFileSync(
-  path.resolve(__dirname, '../lib/occtBridge.js'),
+  path.resolve(__dirname, '../lib/occtBridge.ts'),
   'utf8',
 )
 

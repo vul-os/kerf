@@ -13,7 +13,7 @@
 //                                the dominant cost and scales with face area
 //                                / linear deflection.
 //   * cleanupShape             — < 1 ms; just decrements OCCT refcounts.
-//   * serializeStep            — ~200-800 ms for a moderate B-rep. STEP
+//   * serializeStep             — ~200-800 ms for a moderate B-rep. STEP
 //                                writers are not particularly fast in OCCT
 //                                regardless of the binding layer.
 //
@@ -33,20 +33,52 @@
 //   across re-evaluations of an unchanged tree. *Across* feature edits ids
 //   may shuffle — this is the persistent-naming problem; v1 accepts it and
 //   leaves the cross-edit identity layer to a later phase.
+//
+// Typing note (T-503): `opencascade.js` ships zero type declarations (no
+// `.d.ts` anywhere in the package) — its ~2,000 emscripten-bound OCCT classes
+// are a fundamentally untyped boundary this slice doesn't own. `OcInstance`
+// (the resolved `oc` module) and `OcHandle` (any OCCT object flowing through:
+// shape/face/edge/wire/solid/law/etc.) are both `any` under the hood; naming
+// them documents intent at every call site instead of scattering bare `any`.
+// Everything that IS Kerf domain data (meshes, face metadata, sketches, axis/
+// plane refs) is typed precisely against `@/types`.
+
+import type {
+  Vec2,
+  Vec3,
+  Geom2,
+  Mesh,
+  FaceMeta,
+  EdgeMap,
+  SketchJSON,
+  SketchPlane,
+  SketchFrame,
+  AxisRef,
+  PlaneRef,
+} from '@/types'
+
+/** The resolved `opencascade.js` module (from `initOpenCascade()`) — see the header note above. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type OcInstance = any
+/** Any OCCT object flowing through this file: TopoDS_Shape/Face/Edge/Wire, gp_* handles, Law_* handles, etc. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type OcHandle = any
+
+type OcTracker = OcHandle[]
 
 // ---------------------------------------------------------------------------
 // Tracker for transient OCCT handles. Push everything you allocate onto
 // `tracked`, then call freeAll(tracked) in finally{}.
-export function makeTracker() {
+export function makeTracker(): OcTracker {
   return []
 }
 
-export function track(tracker, obj) {
+export function track<T extends OcHandle>(tracker: OcTracker, obj: T): T {
   if (obj) tracker.push(obj)
   return obj
 }
 
-export function freeAll(tracker) {
+export function freeAll(tracker: OcTracker | null | undefined): void {
   if (!tracker) return
   for (let i = tracker.length - 1; i >= 0; i--) {
     const obj = tracker[i]
@@ -62,7 +94,7 @@ export function freeAll(tracker) {
 }
 
 // Final shape cleanup. Caller passes the TopoDS_Shape returned by an op.
-export function cleanupShape(_oc, shape) {
+export function cleanupShape(_oc: OcInstance, shape: OcHandle): void {
   if (!shape) return
   try {
     if (typeof shape.delete === 'function') shape.delete()
@@ -85,11 +117,11 @@ export function cleanupShape(_oc, shape) {
 //
 // Returns a fresh TopoDS_Face. Caller owns + deletes it.
 
-function _ringFromPoints(oc, ring, tracker) {
+function _ringFromPoints(oc: OcInstance, ring: Vec2[], tracker: OcTracker): OcHandle | null {
   // Build a closed polyline wire on the XY plane (Z=0).
   if (!Array.isArray(ring) || ring.length < 3) return null
   const wireBuilder = track(tracker, new oc.BRepBuilderAPI_MakeWire_1())
-  let last = null
+  let last: Vec2 | null = null
   for (let i = 0; i < ring.length; i++) {
     const cur = ring[i]
     if (!cur || cur.length < 2) continue
@@ -115,9 +147,14 @@ function _ringFromPoints(oc, ring, tracker) {
   return wireBuilder.Wire()
 }
 
+/** A jscad Geom2, or a plain polyline-like `{sides: [[a,b], ...]}` structure. */
+interface Geom2Like {
+  sides?: Array<[Vec2, Vec2]>
+}
+
 // Convert a JSCAD Geom2 (or a plain {sides:[[ax,ay],[bx,by]]} polylike
 // structure) → an array of rings. Each ring is an [x,y] vertex list.
-export function geom2ToRings(geom2) {
+export function geom2ToRings(geom2: Geom2 | Geom2Like | null | undefined): Vec2[][] {
   if (!geom2) return []
   // JSCAD Geom2 internal: { sides: [[[ax,ay],[bx,by]], ...], transforms }
   // Each side is an edge from a→b. Stitch them into rings by chasing endpoints.
@@ -125,17 +162,17 @@ export function geom2ToRings(geom2) {
   if (sides.length === 0) return []
   // Build adjacency keyed by quantized vertex.
   const Q = 1e6 // ~1µm quantization keyed
-  function key(p) { return `${Math.round(p[0] * Q)},${Math.round(p[1] * Q)}` }
-  const startMap = new Map() // start key → side index
+  function key(p: Vec2): string { return `${Math.round(p[0] * Q)},${Math.round(p[1] * Q)}` }
+  const startMap = new Map<string, number>() // start key → side index
   for (let i = 0; i < sides.length; i++) {
     startMap.set(key(sides[i][0]), i)
   }
-  const used = new Set()
-  const loops = []
+  const used = new Set<number>()
+  const loops: Vec2[][] = []
   for (let i = 0; i < sides.length; i++) {
     if (used.has(i)) continue
-    const ring = []
-    let cur = i
+    const ring: Vec2[] = []
+    let cur: number | undefined = i
     let safety = 0
     while (cur !== undefined && !used.has(cur) && safety++ < 10000) {
       used.add(cur)
@@ -152,7 +189,7 @@ export function geom2ToRings(geom2) {
 
 // Create a TopoDS_Face on Z=0 from a list of rings (first = outer, rest = holes).
 // `loops` is an array of [x,y] arrays.
-export function ringsToFace(oc, loops, tracker) {
+export function ringsToFace(oc: OcInstance, loops: Vec2[][] | null | undefined, tracker: OcTracker): OcHandle | null {
   if (!loops || loops.length === 0) return null
   const outer = _ringFromPoints(oc, loops[0], tracker)
   if (!outer) return null
@@ -166,7 +203,7 @@ export function ringsToFace(oc, loops, tracker) {
 }
 
 // Convenience: take a Geom2 directly and produce a face.
-export function geom2ToBRepFace(oc, geom2, tracker) {
+export function geom2ToBRepFace(oc: OcInstance, geom2: Geom2 | Geom2Like | null | undefined, tracker: OcTracker): OcHandle | null {
   const loops = geom2ToRings(geom2)
   if (loops.length === 0) return null
   return ringsToFace(oc, loops, tracker)
@@ -184,13 +221,13 @@ export function geom2ToBRepFace(oc, geom2, tracker) {
 //
 // `closed=true` adds a closing edge from last → first if not coincident.
 
-function _polylineToWire(oc, points, plane, closed, tracker) {
+function _polylineToWire(oc: OcInstance, points: number[][], plane: unknown, closed: boolean, tracker: OcTracker): OcHandle | null {
   if (!Array.isArray(points) || points.length < 2) return null
   const wireBuilder = track(tracker, new oc.BRepBuilderAPI_MakeWire_1())
   // For 2D points we elevate to 3D using the plane (default XY at Z=0).
   // The placeFaceOnPlane / wire-on-plane transform happens later for spine
   // paths whose sketch declares a non-XY plane.
-  const pZ = (xy) => {
+  const pZ = (xy: number[]): Vec3 => {
     if (xy.length >= 3) return [xy[0], xy[1], xy[2]]
     return [xy[0], xy[1], 0]
   }
@@ -220,24 +257,37 @@ function _polylineToWire(oc, points, plane, closed, tracker) {
   return wireBuilder.Wire()
 }
 
+/** Result of {@link sketchToWirePoints}. */
+export interface SketchWirePoints {
+  points: number[][]
+  closed: boolean
+}
+
 // Walk a Sketch's adjacency to extract a connected polyline. Unlike Geom2
 // extraction (which only emits closed loops), this emits the longest open or
 // closed chain we can find — sweep paths are usually open.
 //
 // Returns:
 //   { points: [[x,y]...], closed: bool } — or null if no chain.
-export function sketchToWirePoints(sketch) {
+export function sketchToWirePoints(sketch: SketchJSON | null | undefined): SketchWirePoints | null {
   if (!sketch || !Array.isArray(sketch.entities)) return null
   // Build vertex map.
-  const points = new Map()
+  const points = new Map<string, Vec2>()
   for (const e of sketch.entities) {
     if (e.type === 'point') points.set(e.id, [e.x || 0, e.y || 0])
   }
   // Build adjacency: pointId → [{otherId, kind, e, fromStart}].
-  const adj = new Map()
-  function addEdge(pid, edge) {
+  interface AdjEdge {
+    otherId: string
+    edgeId: string
+    kind: 'line' | 'arc'
+    e: SketchJSON['entities'][number]
+    fromStart?: boolean
+  }
+  const adj = new Map<string, AdjEdge[]>()
+  function addEdge(pid: string, edge: AdjEdge): void {
     if (!adj.has(pid)) adj.set(pid, [])
-    adj.get(pid).push(edge)
+    adj.get(pid)?.push(edge)
   }
   for (const e of sketch.entities) {
     if (e.construction) continue
@@ -252,20 +302,20 @@ export function sketchToWirePoints(sketch) {
   if (adj.size === 0) return null
   // Find an endpoint (vertex with degree 1) to start from; fall back to any
   // vertex if the chain is closed (all degree 2).
-  let start = null
+  let start: string | null = null
   for (const [pid, edges] of adj) {
     if (edges.length === 1) { start = pid; break }
   }
   let isClosed = false
   if (!start) {
-    start = adj.keys().next().value
+    start = adj.keys().next().value ?? null
     isClosed = true
   }
   // Walk the chain, tessellating arcs as we go.
-  const used = new Set()
-  const out = []
-  let prev = null
-  let cur = start
+  const used = new Set<string>()
+  const out: number[][] = []
+  let prev: string | null = null
+  let cur: string | null = start
   let safety = 0
   while (cur != null && safety++ < 4096) {
     const p = points.get(cur)
@@ -277,7 +327,7 @@ export function sketchToWirePoints(sketch) {
     if (candidates.length === 0) break
     const pick = candidates[0]
     used.add(pick.edgeId)
-    if (pick.kind === 'arc') {
+    if (pick.kind === 'arc' && pick.e.type === 'arc') {
       const arc = pick.e
       const c = points.get(arc.center)
       const s = points.get(arc.start)
@@ -324,7 +374,12 @@ export function sketchToWirePoints(sketch) {
 // Build a TopoDS_Wire on the XY plane from a Sketch. Used for sweep paths
 // (open) and as profile cross-sections for loft (closed). Returns the wire
 // (caller still owns it via tracker), or null.
-export function sketchToWire(oc, sketch, { closed = null } = {}, tracker) {
+export function sketchToWire(
+  oc: OcInstance,
+  sketch: SketchJSON | null | undefined,
+  { closed = null }: { closed?: boolean | null } = {},
+  tracker: OcTracker,
+): OcHandle | null {
   if (!sketch) return null
   const chain = sketchToWirePoints(sketch)
   if (!chain) return null
@@ -335,7 +390,7 @@ export function sketchToWire(oc, sketch, { closed = null } = {}, tracker) {
 // Produce a TopoDS_Wire from a JSCAD Geom2 (multi-loop) — picks the largest
 // outer loop. Intended for loft profiles built from `.sketch` files that
 // already form closed regions.
-export function geom2ToWire(oc, geom2, tracker) {
+export function geom2ToWire(oc: OcInstance, geom2: Geom2 | Geom2Like | null | undefined, tracker: OcTracker): OcHandle | null {
   const loops = geom2ToRings(geom2)
   if (loops.length === 0) return null
   // Pick largest by signed-area magnitude.
@@ -360,11 +415,11 @@ export function geom2ToWire(oc, geom2, tracker) {
 // any base plane). Face-anchored sketches are deliberately rejected for
 // sweep paths in v1 — the OCCT MakePipeShell needs a continuous spine and we
 // don't yet stitch face-anchored chains.
-export function placeWireOnPlane(oc, wire, plane, tracker) {
+export function placeWireOnPlane(oc: OcInstance, wire: OcHandle, plane: SketchPlane | null | undefined, tracker: OcTracker): OcHandle {
   if (!wire || !plane) return wire
   if (plane.type === 'face' && plane.frame
       && plane.frame.origin && plane.frame.normal && plane.frame.uDir && plane.frame.vDir) {
-    const f = plane.frame
+    const f: SketchFrame = plane.frame
     const trsf = track(tracker, new oc.gp_Trsf_1())
     const o = track(tracker, new oc.gp_Pnt_3(f.origin[0], f.origin[1], f.origin[2]))
     const dN = track(tracker, new oc.gp_Dir_4(f.normal[0], f.normal[1], f.normal[2]))
@@ -415,7 +470,11 @@ export function placeWireOnPlane(oc, wire, plane, tracker) {
 //   - between each consecutive pair (t_i, r_i) → (t_{i+1}, r_{i+1}) build
 //     a Law_Linear segment; chain them via Law_Composite::ChangeLaws.
 
-export function buildVariableRadiusLaw(oc, radii, tracker) {
+export function buildVariableRadiusLaw(
+  oc: OcInstance,
+  radii: Array<{ at: number; radius: number }> | null | undefined,
+  tracker: OcTracker,
+): OcHandle | null {
   if (!Array.isArray(radii) || radii.length < 2) return null
   // Defensive copy + sort + clamp.
   const pairs = radii
@@ -430,13 +489,13 @@ export function buildVariableRadiusLaw(oc, radii, tracker) {
   if (pairs[pairs.length - 1].at < 1) pairs.push({ at: 1, radius: pairs[pairs.length - 1].radius })
   // We must produce a Law_Function the runtime can pass to MakeFillet::Add.
   // The Composite chain is built segment-by-segment.
-  let composite
+  let composite: OcHandle
   try {
     composite = track(tracker, new oc.Law_Composite_1())
   } catch {
     return null
   }
-  let laws
+  let laws: OcHandle
   try {
     laws = composite.ChangeLaws?.()
   } catch {
@@ -458,7 +517,7 @@ export function buildVariableRadiusLaw(oc, radii, tracker) {
     const a = pairs[i]
     const b = pairs[i + 1]
     if (b.at - a.at < 1e-9) continue
-    let linear
+    let linear: OcHandle
     try {
       linear = track(tracker, new oc.Law_Linear_1())
       linear.Set?.(a.at, a.radius, b.at, b.radius)
@@ -487,24 +546,17 @@ export function buildVariableRadiusLaw(oc, radii, tracker) {
 // and walk every TopoDS_Edge to extract polyline segments with stable edge
 // ids (also TopExp order).
 //
-// Returns:
-//   {
-//     vertices:    Float32Array (xyz tuples per mesh vertex),
-//     indices:     Uint32Array  (triangle indices),
-//     normals:     Float32Array,
-//     faceIds:     Uint32Array  (per-triangle face id),
-//     faceMeta:    [{ id, planar, origin: [x,y,z], normal: [x,y,z],
-//                     uDir: [x,y,z], vDir: [x,y,z], centroid: [x,y,z] }]
-//     edgeSegs:    Float32Array (xyz, two consecutive xyz triples = one segment),
-//     edgeIds:     Uint32Array  (one edge id per segment),
-//     // Legacy edgeMap kept for the LLM filter helpers (edge_filter='manual')
-//     edgeMap:     { count, edges: [{id, vertices: Float32Array}] }
-//   }
+// Returns a Mesh (`@/types`) minus `id`/`faceNames` — those two fields are
+// added by occtWorker.js when it pushes the mesh entry onto the postMessage
+// result (see geometry.ts's Mesh doc comment).
 
 const MESH_LINEAR_DEFLECTION = 0.1   // mm
 const MESH_ANGULAR_DEFLECTION = 0.5  // radians
 
-export function breptToMesh(oc, shape) {
+/** {@link Mesh} minus the two fields occtWorker.js attaches at push time. */
+export type BareMesh = Omit<Mesh, 'id' | 'faceNames'>
+
+export function breptToMesh(oc: OcInstance, shape: OcHandle | null | undefined): BareMesh {
   if (!shape) {
     return _emptyMesh()
   }
@@ -525,11 +577,11 @@ export function breptToMesh(oc, shape) {
     } catch { /* tolerate; we'll still try to read what's there */ }
   }
 
-  const vertList = []
-  const idxList = []
-  const normList = []
-  const faceIdList = []
-  const faceMeta = [] // per-face: {id, planar, origin, normal, uDir, vDir, centroid}
+  const vertList: number[] = []
+  const idxList: number[] = []
+  const normList: number[] = []
+  const faceIdList: number[] = []
+  const faceMeta: FaceMeta[] = [] // per-face: {id, planar, origin, normal, uDir, vDir, centroid}
 
   let faceId = 0
   const explorer = new oc.TopExp_Explorer_2(shape, oc.TopAbs_ShapeEnum.TopAbs_FACE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE)
@@ -565,9 +617,8 @@ export function breptToMesh(oc, shape) {
       // Triangle indices are 1-based; convert + offset by vertBase.
       // Use the Get() helper that some opencascade.js builds expose; fall
       // back to Value()-based access otherwise.
-      let i1, i2, i3
+      let i1: number, i2: number, i3: number
       try {
-        const o = { current: 0 }
         // OCCT triangle Get returns indices into Node() (1..N).
         const idx = t.Get_1?.() || null
         if (idx) {
@@ -579,7 +630,7 @@ export function breptToMesh(oc, shape) {
         i1 = t.Value(1); i2 = t.Value(2); i3 = t.Value(3)
       }
       // Convert to 0-based + add vertex offset.
-      let a = vertBase + (i1 - 1)
+      const a = vertBase + (i1 - 1)
       let b = vertBase + (i2 - 1)
       let c = vertBase + (i3 - 1)
       if (reversed) { const tmp = b; b = c; c = tmp }
@@ -620,8 +671,8 @@ export function breptToMesh(oc, shape) {
 
   // Flatten edges into a contiguous segment buffer for renderer consumption.
   // Each segment is two xyz triples; edgeIds[i] is the edge id of segment i.
-  const segXyzList = []
-  const segIdList = []
+  const segXyzList: number[] = []
+  const segIdList: number[] = []
   for (const e of edgeMap.edges) {
     const v = e.vertices
     if (!v || v.length < 6) continue
@@ -648,15 +699,15 @@ export function breptToMesh(oc, shape) {
 // Returns null only when the face has no usable surface (degenerate). For
 // non-planar faces we still set planar=false but report a sample point + the
 // surface normal at the parametric midpoint, which is enough for hover labels.
-function _extractFaceMeta(oc, face, faceId) {
+function _extractFaceMeta(oc: OcInstance, face: OcHandle, faceId: number): FaceMeta {
   try {
     const surf = oc.BRep_Tool.Surface_2(face)
     // Try to recognize the surface as a plane by downcasting to Geom_Plane.
     let planar = false
-    let origin = [0, 0, 0]
-    let normal = [0, 0, 1]
-    let uDir = [1, 0, 0]
-    let vDir = [0, 1, 0]
+    let origin: Vec3 = [0, 0, 0]
+    let normal: Vec3 = [0, 0, 1]
+    let uDir: Vec3 = [1, 0, 0]
+    let vDir: Vec3 = [0, 1, 0]
     try {
       const handle = surf
       // Geom_Plane has DynamicType - we test by attempting to cast.
@@ -722,19 +773,19 @@ function _extractFaceMeta(oc, face, faceId) {
   }
 }
 
-function _setNormal(arr, idx, x, y, z) {
+function _setNormal(arr: number[], idx: number, x: number, y: number, z: number): void {
   const o = idx * 3
   arr[o] = x; arr[o + 1] = y; arr[o + 2] = z
 }
 
 // Pad or trim normals to exactly `n` triplets so the typed-array view matches.
-function _normalsAligned(arr, n) {
+function _normalsAligned(arr: number[], n: number): number[] {
   const out = new Array(n * 3).fill(0)
   for (let i = 0; i < arr.length && i < out.length; i++) out[i] = arr[i]
   return out
 }
 
-function _emptyMesh() {
+function _emptyMesh(): BareMesh {
   return {
     vertices: new Float32Array(0),
     indices: new Uint32Array(0),
@@ -749,10 +800,10 @@ function _emptyMesh() {
 
 // Walk every edge in the shape; for each, sample the underlying curve into a
 // polyline of N segments. Returns { count, edges: [{id, vertices: Float32Array}] }.
-function _extractEdges(oc, shape) {
-  const edges = []
+function _extractEdges(oc: OcInstance, shape: OcHandle): EdgeMap {
+  const edges: EdgeMap['edges'] = []
   let id = 0
-  let exp
+  let exp: OcHandle
   try {
     exp = new oc.TopExp_Explorer_2(shape, oc.TopAbs_ShapeEnum.TopAbs_EDGE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE)
   } catch {
@@ -770,11 +821,9 @@ function _extractEdges(oc, shape) {
   return { count: edges.length, edges }
 }
 
-function _sampleEdge(oc, edge) {
-  const out = []
+function _sampleEdge(oc: OcInstance, edge: OcHandle): number[] {
+  const out: number[] = []
   try {
-    const first = { current: 0 }
-    const last = { current: 0 }
     // BRepAdaptor_Curve gives a uniform parametric curve over the edge
     // regardless of the underlying geometry kind.
     const curve = new oc.BRepAdaptor_Curve_2(edge)
@@ -788,7 +837,6 @@ function _sampleEdge(oc, edge) {
       try { p.delete() } catch { /* */ }
     }
     try { curve.delete() } catch { /* */ }
-    void first; void last
   } catch {
     // Curve adapter unavailable for this edge kind — return empty so the
     // caller can skip it gracefully.
@@ -804,7 +852,7 @@ function _sampleEdge(oc, edge) {
 // then read it back. opencascade.js exposes the FS via `oc.FS` (emscripten
 // MEMFS by default).
 
-export function serializeStep(oc, shape) {
+export function serializeStep(oc: OcInstance, shape: OcHandle | null | undefined): string {
   if (!shape) return ''
   const writer = new oc.STEPControl_Writer_1()
   try {
@@ -837,10 +885,15 @@ export function serializeStep(oc, shape) {
 // the global X/Y axis (useful for a "round all top edges" call). "manual"
 // expects an explicit array of edge ids and ignores the filter logic.
 
-export function filterEdges(oc, shape, mode, manualIds) {
-  const out = []
+export function filterEdges(
+  oc: OcInstance,
+  shape: OcHandle,
+  mode: string | null | undefined,
+  manualIds: number[] | null | undefined,
+): Array<{ id: number; edge: OcHandle }> {
+  const out: Array<{ id: number; edge: OcHandle }> = []
   let id = 0
-  let exp
+  let exp: OcHandle
   try {
     exp = new oc.TopExp_Explorer_2(shape, oc.TopAbs_ShapeEnum.TopAbs_EDGE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE)
   } catch {
@@ -865,9 +918,9 @@ export function filterEdges(oc, shape, mode, manualIds) {
 // Used by direct-modeling ops + sketch-on-face which carry a face id selected
 // in the viewport.
 
-export function faceById(oc, shape, id) {
+export function faceById(oc: OcInstance, shape: OcHandle | null | undefined, id: number | null | undefined): OcHandle | null {
   if (!shape || id == null || id < 0) return null
-  let exp
+  let exp: OcHandle
   try {
     exp = new oc.TopExp_Explorer_2(shape, oc.TopAbs_ShapeEnum.TopAbs_FACE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE)
   } catch {
@@ -888,9 +941,9 @@ export function faceById(oc, shape, id) {
 
 // Edge-by-id lookup, mirroring faceById. Returns null if the id is out of
 // range or the shape is missing.
-export function edgeById(oc, shape, id) {
+export function edgeById(oc: OcInstance, shape: OcHandle | null | undefined, id: number | null | undefined): OcHandle | null {
   if (!shape || id == null || id < 0) return null
-  let exp
+  let exp: OcHandle
   try {
     exp = new oc.TopExp_Explorer_2(shape, oc.TopAbs_ShapeEnum.TopAbs_EDGE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE)
   } catch {
@@ -913,7 +966,7 @@ export function edgeById(oc, shape, id) {
 // `{ origin: [x,y,z], normal: [x,y,z], uDir: [x,y,z], vDir: [x,y,z], planar: bool }`.
 // If the face is non-planar, returns `planar: false` and the analytic normal
 // at the parametric midpoint (used to refuse sketch-on-face there).
-export function faceFrame(oc, face) {
+export function faceFrame(oc: OcInstance, face: OcHandle | null | undefined): FaceMeta | null {
   if (!face) return null
   return _extractFaceMeta(oc, face, -1)
 }
@@ -924,12 +977,12 @@ export function faceFrame(oc, face) {
 //
 // Used by push/pull: we extrude this profile along the face's normal to
 // build the Pad/Pocket prism.
-export function faceTo2DOutline(oc, face) {
+export function faceTo2DOutline(oc: OcInstance, face: OcHandle | null | undefined): Vec2[] | null {
   if (!face) return null
   const frame = faceFrame(oc, face)
   if (!frame || !frame.planar) return null
   // Find the outer wire (BRepTools.OuterWire returns the outer boundary).
-  let wire
+  let wire: OcHandle
   try {
     wire = oc.BRepTools.OuterWire(face)
   } catch {
@@ -937,16 +990,14 @@ export function faceTo2DOutline(oc, face) {
   }
   if (!wire || wire.IsNull?.()) return null
   // Walk edges of the wire, sample, project into the (u,v) frame.
-  const out = []
-  const nx = frame.normal[0], ny = frame.normal[1], nz = frame.normal[2]
+  const out: Vec2[] = []
   const ux = frame.uDir[0], uy = frame.uDir[1], uz = frame.uDir[2]
   const vx = frame.vDir[0], vy = frame.vDir[1], vz = frame.vDir[2]
   const ox = frame.origin[0], oy = frame.origin[1], oz = frame.origin[2]
-  void nx; void ny; void nz
   const exp = new oc.TopExp_Explorer_2(wire, oc.TopAbs_ShapeEnum.TopAbs_EDGE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE)
   for (; exp.More(); exp.Next()) {
     const e = oc.TopoDS.Edge_1(exp.Current())
-    let curve
+    let curve: OcHandle
     try {
       curve = new oc.BRepAdaptor_Curve_2(e)
     } catch { continue }
@@ -967,7 +1018,7 @@ export function faceTo2DOutline(oc, face) {
   try { exp.delete() } catch { /* */ }
   // Deduplicate adjacent identical points (shared end/start of consecutive
   // edges) so the polyline doesn't degenerate.
-  const dedup = []
+  const dedup: Vec2[] = []
   for (const p of out) {
     const last = dedup[dedup.length - 1]
     if (!last || Math.hypot(last[0] - p[0], last[1] - p[1]) > 1e-6) dedup.push(p)
@@ -980,7 +1031,7 @@ export function faceTo2DOutline(oc, face) {
 // boolean-fuse them. Used by linear_pattern / polar_pattern / mirror_pattern.
 
 // Translate a shape by a vector. Returns a fresh TopoDS_Shape.
-export function translateShape(oc, shape, [dx, dy, dz], tracker) {
+export function translateShape(oc: OcInstance, shape: OcHandle, [dx, dy, dz]: Vec3, tracker: OcTracker): OcHandle {
   const trsf = track(tracker, new oc.gp_Trsf_1())
   const v = track(tracker, new oc.gp_Vec_4(dx, dy, dz))
   trsf.SetTranslation_1(v)
@@ -990,7 +1041,7 @@ export function translateShape(oc, shape, [dx, dy, dz], tracker) {
 }
 
 // Rotate a shape around an axis (origin + dir) by `angle` radians.
-export function rotateShape(oc, shape, origin, dir, angle, tracker) {
+export function rotateShape(oc: OcInstance, shape: OcHandle, origin: Vec3, dir: Vec3, angle: number, tracker: OcTracker): OcHandle {
   const trsf = track(tracker, new oc.gp_Trsf_1())
   const o = track(tracker, new oc.gp_Pnt_3(origin[0], origin[1], origin[2]))
   const d = track(tracker, new oc.gp_Dir_4(dir[0], dir[1], dir[2]))
@@ -1002,7 +1053,7 @@ export function rotateShape(oc, shape, origin, dir, angle, tracker) {
 }
 
 // Mirror a shape across a plane (origin + normal).
-export function mirrorShape(oc, shape, origin, normal, tracker) {
+export function mirrorShape(oc: OcInstance, shape: OcHandle, origin: Vec3, normal: Vec3, tracker: OcTracker): OcHandle {
   const trsf = track(tracker, new oc.gp_Trsf_1())
   const o = track(tracker, new oc.gp_Pnt_3(origin[0], origin[1], origin[2]))
   const d = track(tracker, new oc.gp_Dir_4(normal[0], normal[1], normal[2]))
@@ -1015,7 +1066,7 @@ export function mirrorShape(oc, shape, origin, normal, tracker) {
 
 // Boolean union of an array of shapes via repeated BRepAlgoAPI_Fuse. The
 // caller manages tracker lifetime — we don't delete the input shapes.
-export function fuseShapes(oc, shapes, tracker) {
+export function fuseShapes(oc: OcInstance, shapes: OcHandle[] | null | undefined, tracker: OcTracker): OcHandle | null {
   if (!shapes || shapes.length === 0) return null
   if (shapes.length === 1) return shapes[0]
   let cur = shapes[0]
@@ -1027,10 +1078,16 @@ export function fuseShapes(oc, shapes, tracker) {
   return cur
 }
 
+/** Result of {@link resolveAxisRef}. */
+export interface ResolvedAxis {
+  origin: Vec3
+  dir: Vec3
+}
+
 // Resolve an "axis_ref" — string ('x'|'y'|'z') OR an edge id — into
 // `{ origin: [...], dir: [...] }` in world coords. For an edge id we fetch
 // the edge from `shape` and use its endpoints.
-export function resolveAxisRef(oc, shape, axisRef) {
+export function resolveAxisRef(oc: OcInstance, shape: OcHandle, axisRef: AxisRef): ResolvedAxis | null {
   if (typeof axisRef === 'string') {
     const a = axisRef.toLowerCase()
     if (a === 'x') return { origin: [0, 0, 0], dir: [1, 0, 0] }
@@ -1058,9 +1115,15 @@ export function resolveAxisRef(oc, shape, axisRef) {
   }
 }
 
+/** Result of {@link resolvePlaneRef}. */
+export interface ResolvedPlane {
+  origin: Vec3
+  normal: Vec3
+}
+
 // Resolve a "plane_ref" — string ('xy'|'xz'|'yz') OR a face id — into
 // `{ origin: [...], normal: [...] }` in world coords. Used by mirror_pattern.
-export function resolvePlaneRef(oc, shape, planeRef) {
+export function resolvePlaneRef(oc: OcInstance, shape: OcHandle, planeRef: PlaneRef): ResolvedPlane | null {
   if (typeof planeRef === 'string') {
     const p = planeRef.toLowerCase()
     if (p === 'xy') return { origin: [0, 0, 0], normal: [0, 0, 1] }
@@ -1076,19 +1139,17 @@ export function resolvePlaneRef(oc, shape, planeRef) {
   return { origin: meta.origin, normal: meta.normal }
 }
 
-function _edgeAxisDominant(oc, edge) {
+function _edgeAxisDominant(oc: OcInstance, edge: OcHandle): 'horizontal' | 'vertical' | null {
   try {
     const curve = new oc.BRepAdaptor_Curve_2(edge)
     const t0 = curve.FirstParameter()
     const t1 = curve.LastParameter()
-    const tm = (t0 + t1) * 0.5
     const p0 = curve.Value(t0)
     const p1 = curve.Value(t1)
     const dx = Math.abs(p1.X() - p0.X())
     const dy = Math.abs(p1.Y() - p0.Y())
     const dz = Math.abs(p1.Z() - p0.Z())
     try { p0.delete?.(); p1.delete?.(); curve.delete?.() } catch { /* */ }
-    void tm
     // "horizontal" = parallel to XY plane (Z component small)
     if (dz < 1e-6 && dx + dy > 0) return 'horizontal'
     // "vertical" = aligned with Z
@@ -1098,6 +1159,9 @@ function _edgeAxisDominant(oc, edge) {
     return null
   }
 }
+
+/** An `Error` with the ad-hoc `.code` tag several throw sites in this file attach. */
+type CodedError = Error & { code?: string }
 
 // ---------------------------------------------------------------------------
 // NURBS booleans v1 — T1: surfaceToSolid helper
@@ -1109,11 +1173,18 @@ function _edgeAxisDominant(oc, edge) {
  * to the operator and halt T2+ work until the binding ships.
  */
 export class SurfaceToSolidUnsupportedError extends Error {
-  constructor(msg) {
+  code: string
+  constructor(msg?: string) {
     super(msg || 'surfaceToSolid: BRepBuilderAPI_Sewing is not bound in this OCCT build — rebuild opencascade.js with the Sewing binding to proceed')
     this.name = 'SurfaceToSolidUnsupportedError'
     this.code = 'OCCT_BINDING_MISSING'
   }
+}
+
+/** Result of {@link surfaceToSolid}. */
+export interface SurfaceToSolidResult {
+  solid: OcHandle
+  warnings: string[]
 }
 
 /**
@@ -1124,15 +1195,18 @@ export class SurfaceToSolidUnsupportedError extends Error {
  *   - `BRepBuilderAPI_Sewing` missing  → throws SurfaceToSolidUnsupportedError
  *   - `BRepBuilderAPI_MakeSolid_1` missing → hand-rolls via BRep_Builder.MakeSolid + Add
  *
- * @param {object}        oc     — opencascade.js handle
- * @param {object}        shape  — TopoDS_Shape input (face, shell, or sewn-face collection)
- * @param {Array}         tracker — makeTracker() accumulator for OCCT handles
- * @param {{ tolerance?: number }} opts
- * @returns {{ solid: object, warnings: string[] }}
+ * @param oc     — opencascade.js handle
+ * @param shape  — TopoDS_Shape input (face, shell, or sewn-face collection)
+ * @param tracker — makeTracker() accumulator for OCCT handles
  */
-export function surfaceToSolid(oc, shape, tracker, opts = {}) {
+export function surfaceToSolid(
+  oc: OcInstance,
+  shape: OcHandle,
+  tracker: OcTracker,
+  opts: { tolerance?: number } = {},
+): SurfaceToSolidResult {
   if (!shape) {
-    const e = new Error('surfaceToSolid: shape is required')
+    const e = new Error('surfaceToSolid: shape is required') as CodedError
     e.code = 'BAD_ARGS'
     throw e
   }
@@ -1148,11 +1222,11 @@ export function surfaceToSolid(oc, shape, tracker, opts = {}) {
 
   // Step 1: sew the input faces / shells into a closed shell.
   // BRepBuilderAPI_Sewing(tolerance, option_sewing, option_analyse, option_cut, option_non_manifold)
-  let sewer
+  let sewer: OcHandle
   try {
     sewer = track(tracker, new oc.BRepBuilderAPI_Sewing(tolerance, true, true, true, false))
   } catch (err) {
-    const e = new Error(`surfaceToSolid: BRepBuilderAPI_Sewing constructor failed: ${err?.message || err}`)
+    const e = new Error(`surfaceToSolid: BRepBuilderAPI_Sewing constructor failed: ${(err as Error)?.message || err}`) as CodedError
     e.code = 'OP_FAILED'
     throw e
   }
@@ -1165,14 +1239,14 @@ export function surfaceToSolid(oc, shape, tracker, opts = {}) {
       sewer.Perform()
     }
   } catch (err) {
-    const e = new Error(`surfaceToSolid: Sewing.Perform() failed: ${err?.message || err}`)
+    const e = new Error(`surfaceToSolid: Sewing.Perform() failed: ${(err as Error)?.message || err}`) as CodedError
     e.code = 'OP_FAILED'
     throw e
   }
   const sewed = sewer.SewedShape()
 
   // Step 2: extract the first shell from the sewing result.
-  let shell = null
+  let shell: OcHandle = null
   try {
     const SHELL = oc.TopAbs_ShapeEnum?.TopAbs_SHELL ?? 3
     const SHAPE = oc.TopAbs_ShapeEnum?.TopAbs_SHAPE ?? 8
@@ -1185,17 +1259,17 @@ export function surfaceToSolid(oc, shape, tracker, opts = {}) {
     shell = sewed
   }
 
-  const warnings = []
+  const warnings: string[] = []
 
   // Step 3: promote shell → solid.
   if (typeof oc.BRepBuilderAPI_MakeSolid_1 === 'function') {
     // Primary path: use BRepBuilderAPI_MakeSolid_1.
     // The constructor can accept a TopoDS_Shell directly or be built via Add().
-    let ms
+    let ms: OcHandle
     try {
       ms = track(tracker, new oc.BRepBuilderAPI_MakeSolid_1())
     } catch (err) {
-      const e = new Error(`surfaceToSolid: BRepBuilderAPI_MakeSolid_1 constructor failed: ${err?.message || err}`)
+      const e = new Error(`surfaceToSolid: BRepBuilderAPI_MakeSolid_1 constructor failed: ${(err as Error)?.message || err}`) as CodedError
       e.code = 'OP_FAILED'
       throw e
     }
@@ -1232,7 +1306,7 @@ export function surfaceToSolid(oc, shape, tracker, opts = {}) {
       builder.Add(solid, shellTarget)
       return { solid, warnings }
     } catch (err) {
-      warnings.push(`BRep_Builder fallback failed: ${err?.message || err}`)
+      warnings.push(`BRep_Builder fallback failed: ${(err as Error)?.message || err}`)
     }
   }
 
@@ -1290,7 +1364,8 @@ export function surfaceToSolid(oc, shape, tracker, opts = {}) {
  * This is unrecoverable without a WASM rebuild or the C2-T12 fallback.
  */
 export class TrimByCurveUnsupportedError extends Error {
-  constructor(msg) {
+  code: string
+  constructor(msg?: string) {
     super(
       msg ||
       'trim_by_curve: required OCCT bindings absent — ' +
@@ -1310,17 +1385,19 @@ export class TrimByCurveUnsupportedError extends Error {
  * Fallback path: sample the wire → GeomAPI_ProjectPointOnSurf per point →
  *   build a 3D polyline on the surface via BRepBuilderAPI_MakeEdge + MakeWire.
  *
- * @param {object}  oc       — opencascade.js handle
- * @param {object}  face     — TopoDS_Face to project onto
- * @param {object}  wire3d   — TopoDS_Wire or TopoDS_Shape (the 3D cutter)
- * @param {Array}   tracker  — OCCT object lifetime tracker
- * @param {{ tolerance?: number, samples?: number, direction?: [number,number,number] }} opts
- * @returns {object}         — TopoDS_Wire projected onto the face
+ * @param oc       — opencascade.js handle
+ * @param face     — TopoDS_Face to project onto
+ * @param wire3d   — TopoDS_Wire or TopoDS_Shape (the 3D cutter)
+ * @param tracker  — OCCT object lifetime tracker
+ * @returns TopoDS_Wire projected onto the face
  */
-export function projectCurveOntoSurface(oc, face, wire3d, tracker, opts = {}) {
-  const tolerance = (typeof opts.tolerance === 'number' && opts.tolerance > 0)
-    ? opts.tolerance
-    : 1e-3
+export function projectCurveOntoSurface(
+  oc: OcInstance,
+  face: OcHandle,
+  wire3d: OcHandle,
+  tracker: OcTracker,
+  opts: { tolerance?: number; samples?: number; direction?: Vec3 } = {},
+): OcHandle {
   const samples   = (typeof opts.samples === 'number' && opts.samples > 2)
     ? opts.samples
     : 32
@@ -1364,7 +1441,7 @@ export function projectCurveOntoSurface(oc, face, wire3d, tracker, opts = {}) {
   }
 
   // Extract underlying surface from the face.
-  let surface = null
+  let surface: OcHandle = null
   if (typeof oc.BRep_Tool === 'function' && typeof oc.BRep_Tool.Surface_2 === 'function') {
     try { surface = oc.BRep_Tool.Surface_2(face) } catch { /* */ }
   }
@@ -1391,7 +1468,7 @@ export function projectCurveOntoSurface(oc, face, wire3d, tracker, opts = {}) {
   const EDGE  = oc.TopAbs_ShapeEnum?.TopAbs_EDGE  ?? 6
   const SHAPE = oc.TopAbs_ShapeEnum?.TopAbs_SHAPE ?? 8
 
-  const sampledPoints = []
+  const sampledPoints: OcHandle[] = []
   try {
     const exp = track(tracker, new oc.TopExp_Explorer_2(wire3d, EDGE, SHAPE))
     while (exp.More()) {
@@ -1399,8 +1476,8 @@ export function projectCurveOntoSurface(oc, face, wire3d, tracker, opts = {}) {
       exp.Next()
       // Get curve + parameter range from the edge.
       const loc   = track(tracker, new oc.TopLoc_Location_1())
-      let first = { current: 0 }, last = { current: 1 }
-      let curve3d = null
+      const first = { current: 0 }, last = { current: 1 }
+      let curve3d: OcHandle = null
       try {
         // BRep_Tool.Curve_3 returns (Geom_Curve, location, first, last)
         if (typeof oc.BRep_Tool?.Curve_3 === 'function') {
@@ -1430,7 +1507,7 @@ export function projectCurveOntoSurface(oc, face, wire3d, tracker, opts = {}) {
   }
 
   // Project each sampled point onto the surface, collect the 3D surface-lying point.
-  const projectedPts = []
+  const projectedPts: OcHandle[] = []
   for (const pt of sampledPoints) {
     try {
       const pOnS = track(tracker, new oc.GeomAPI_ProjectPointOnSurf(pt, surface))
@@ -1483,6 +1560,14 @@ export function projectCurveOntoSurface(oc, face, wire3d, tracker, opts = {}) {
   return projectedWire
 }
 
+/** Result of {@link splitFaceAlongCurve}: both are TopoDS_Face (or a TopoDS_Compound of face fragments). */
+export interface SplitFaceResult {
+  /** BRepFeat_SplitShape.Left() (first result). */
+  keepFace: OcHandle
+  /** BRepFeat_SplitShape.Right() (second result). */
+  discardFace: OcHandle
+}
+
 /**
  * Split a face along a projected wire.
  *
@@ -1493,16 +1578,12 @@ export function projectCurveOntoSurface(oc, face, wire3d, tracker, opts = {}) {
  * Fallback: throws TrimByCurveUnsupportedError with a C2-T12 escalation hint.
  *   The Section+prism fallback is a separate task (C2-T12) to keep scope clean.
  *
- * @param {object}  oc            — opencascade.js handle
- * @param {object}  face          — TopoDS_Face to split
- * @param {object}  projectedWire — wire lying on the face (from projectCurveOntoSurface)
- * @param {Array}   tracker       — OCCT object lifetime tracker
- * @returns {{ keepFace: object, discardFace: object }}
- *   Both are TopoDS_Face (or TopoDS_Compound of face fragments).
- *   'keepFace' corresponds to BRepFeat_SplitShape.Left() (first result).
- *   'discardFace' corresponds to BRepFeat_SplitShape.Right() (second result).
+ * @param oc            — opencascade.js handle
+ * @param face          — TopoDS_Face to split
+ * @param projectedWire — wire lying on the face (from projectCurveOntoSurface)
+ * @param tracker       — OCCT object lifetime tracker
  */
-export function splitFaceAlongCurve(oc, face, projectedWire, tracker) {
+export function splitFaceAlongCurve(oc: OcInstance, face: OcHandle, projectedWire: OcHandle, tracker: OcTracker): SplitFaceResult {
   if (typeof oc.BRepFeat_SplitShape === 'function') {
     try {
       const splitter = track(tracker, new oc.BRepFeat_SplitShape(face))
@@ -1514,8 +1595,8 @@ export function splitFaceAlongCurve(oc, face, projectedWire, tracker) {
       }
 
       // Retrieve both sides.
-      let keepFace    = null
-      let discardFace = null
+      let keepFace: OcHandle    = null
+      let discardFace: OcHandle = null
 
       // Left() and Right() return TopTools_ListOfShape.
       // We extract the first shape from each via a list iterator.
@@ -1563,7 +1644,7 @@ export function splitFaceAlongCurve(oc, face, projectedWire, tracker) {
       if (err instanceof TrimByCurveUnsupportedError) throw err
       // Other runtime failure — escalate.
       throw new TrimByCurveUnsupportedError(
-        `splitFaceAlongCurve: BRepFeat_SplitShape failed: ${err?.message || err}. ` +
+        `splitFaceAlongCurve: BRepFeat_SplitShape failed: ${(err as Error)?.message || err}. ` +
         'If the projected wire does not fully cross the face boundary, re-check ' +
         'trim_curve_ref positioning.  For the Section+prism fallback, escalate to C2-T12.'
       )
@@ -1604,40 +1685,44 @@ export function splitFaceAlongCurve(oc, face, projectedWire, tracker) {
 //   IsCurvatureDefined / MaxCurvature / MinCurvature / MaxCurvatureDirection
 //   are new call sites for this codebase but are part of the same class.
 //
-// Returns:
-//   {
-//     points: [{
-//       u, v,               — parameter coords
-//       x, y, z,            — 3D world position
-//       nx, ny, nz,         — surface normal unit vector (or 0,0,1 fallback)
-//       normalDefined: bool,
-//       k1, k2,             — min/max principal curvatures (signed, 1/mm)
-//       mean,               — mean curvature (k1+k2)/2
-//       gaussian,           — Gaussian curvature k1*k2
-//       maxAbs,             — max(|k1|, |k2|) — used for comb scale
-//       curvatureDefined: bool,
-//       pdx, pdy, pdz,      — principal direction of max curvature (or 0,0,0)
-//     }],
-//     stats: {
-//       minMean, maxMean,   — range for colormap normalisation
-//       minGaussian, maxGaussian,
-//       minK1, maxK1, minK2, maxK2,
-//       sampleCount,
-//       curvatureDefinedCount,
-//     },
-//     geomLPropSLPropsPresent: bool,  — true when GeomLProp_SLProps_2 is callable
-//   }
-//
-// @param {object} oc          — opencascade.js handle
-// @param {object} face        — TopoDS_Face (OCCT topology)
-// @param {number} uvDensity   — grid step in UV parameter space; 0.1 = 10×10
-//                               grid; smaller = more samples
-// @param {Array}  tracker     — OCCT object lifetime tracker (optional; pass []
-//                               when calling from a standalone context)
-// @returns {object} — described above
-export function sampleSurfaceCurvature(oc, face, uvDensity = 0.1, tracker = []) {
-  const points = []
-  const stats = {
+// @param oc          — opencascade.js handle
+// @param face        — TopoDS_Face (OCCT topology)
+// @param uvDensity   — grid step in UV parameter space; 0.1 = 10×10
+//                       grid; smaller = more samples
+// @param tracker     — OCCT object lifetime tracker (optional; pass []
+//                       when calling from a standalone context)
+
+/** One UV-grid sample from {@link sampleSurfaceCurvature}. */
+export interface CurvaturePoint {
+  u: number; v: number
+  x: number; y: number; z: number
+  nx: number; ny: number; nz: number
+  normalDefined: boolean
+  k1: number; k2: number; mean: number; gaussian: number; maxAbs: number
+  curvatureDefined: boolean
+  pdx: number; pdy: number; pdz: number
+}
+
+/** Aggregate stats over all {@link CurvaturePoint}s — used for colormap normalisation. */
+export interface CurvatureStats {
+  minMean: number; maxMean: number
+  minGaussian: number; maxGaussian: number
+  minK1: number; maxK1: number; minK2: number; maxK2: number
+  sampleCount: number
+  curvatureDefinedCount: number
+}
+
+/** Result of {@link sampleSurfaceCurvature}. */
+export interface SampleSurfaceCurvatureResult {
+  points: CurvaturePoint[]
+  stats: CurvatureStats
+  /** True when GeomLProp_SLProps_2 is callable on this OCCT build. */
+  geomLPropSLPropsPresent: boolean
+}
+
+export function sampleSurfaceCurvature(oc: OcInstance, face: OcHandle, uvDensity = 0.1, tracker: OcTracker = []): SampleSurfaceCurvatureResult {
+  const points: CurvaturePoint[] = []
+  const stats: CurvatureStats = {
     minMean: Infinity, maxMean: -Infinity,
     minGaussian: Infinity, maxGaussian: -Infinity,
     minK1: Infinity, maxK1: -Infinity,
@@ -1656,7 +1741,7 @@ export function sampleSurfaceCurvature(oc, face, uvDensity = 0.1, tracker = []) 
 
   // Get the parametric bounds of the face via BRep_Tool.
   let uMin = 0, uMax = 1, vMin = 0, vMax = 1
-  let surf = null
+  let surf: OcHandle
   try {
     // BRep_Tool.Surface_2(face) returns the underlying Geom_Surface handle.
     surf = oc.BRep_Tool.Surface_2(face)
@@ -1709,7 +1794,7 @@ export function sampleSurfaceCurvature(oc, face, uvDensity = 0.1, tracker = []) 
     const u = uMin + i * uInc
     for (let j = 0; j < vSteps; j++) {
       const v = vMin + j * vInc
-      let props = null
+      let props: OcHandle = null
       try {
         // order=2 unlocks curvature computation (order=1 gives only normal).
         props = new oc.GeomLProp_SLProps_2(surf, u, v, 2, 1e-7)
@@ -1822,7 +1907,8 @@ export function sampleSurfaceCurvature(oc, face, uvDensity = 0.1, tracker = []) 
 // ---------------------------------------------------------------------------
 
 export class OcctG3UnsupportedError extends Error {
-  constructor(msg) {
+  code: string
+  constructor(msg?: string) {
     super(
       msg ||
       'occt_g3: Geom_BSplineSurface.DN(u,v,*,*) with derivative order >= 3 is ' +
@@ -1836,14 +1922,18 @@ export class OcctG3UnsupportedError extends Error {
   }
 }
 
+/** Result of {@link probeOcctG3Bindings}. */
+export interface OcctG3BindingsProbe {
+  downCast: boolean
+  dn: boolean
+  all: boolean
+}
+
 /**
  * Probe whether the OCCT build exposes the bindings needed to sample third
  * derivatives of a B-spline surface (the GK-P43 best-effort G3 analyzer path).
- *
- * @param {object} oc — opencascade.js handle
- * @returns {{ downCast: boolean, dn: boolean, all: boolean }}
  */
-export function probeOcctG3Bindings(oc) {
+export function probeOcctG3Bindings(oc: OcInstance): OcctG3BindingsProbe {
   const downCast = !!(oc && oc.Handle_Geom_BSplineSurface
     && typeof oc.Handle_Geom_BSplineSurface.DownCast === 'function')
   // BRep_Tool.Surface_2 yields a Handle_Geom_Surface; the underlying
@@ -1852,6 +1942,27 @@ export function probeOcctG3Bindings(oc) {
   // BRep_Tool as the gate and verify DN's order-3 overload at call time.
   const dn = !!(oc && oc.BRep_Tool && typeof oc.BRep_Tool.Surface_2 === 'function')
   return { downCast, dn, all: downCast && dn }
+}
+
+/** One UV sample's derivative tensor from {@link sampleSurfaceThirdDeriv}. */
+export interface ThirdDerivSample {
+  u: number
+  v: number
+  S: Vec3
+  dU: Vec3
+  dV: Vec3
+  dUU: Vec3
+  dUV: Vec3
+  dVV: Vec3
+  dVVV: Vec3
+  dUUU: Vec3
+}
+
+/** Result of {@link sampleSurfaceThirdDeriv}. */
+export interface SampleSurfaceThirdDerivResult {
+  samples: ThirdDerivSample[]
+  /** True by construction — see the function's closing comment. */
+  dnPresent: true
 }
 
 /**
@@ -1864,28 +1975,29 @@ export function probeOcctG3Bindings(oc) {
  * derivative samples to occt_g3_residual_from_poles (or, equivalently, extracts
  * the poles and runs the pure-Python NurbsSurface oracle directly).
  *
- * @param {object} oc      — opencascade.js handle
- * @param {object} face    — TopoDS_Face (read-only)
- * @param {Array<[number,number]>} uvSamples — UV parameter pairs to sample
- * @param {Array}  tracker — OCCT object lifetime tracker (optional)
- * @returns {{ samples: Array, dnPresent: boolean }}
- *   samples: [{ u, v, S, dU, dV, dUU, dUV, dVV, dVVV, dUUU }] where each value
- *   is a [x,y,z] vector (DN(u,v,nu,nv) result). dnPresent reflects whether the
- *   order-3 DN overload was callable on this surface.
+ * @param oc         — opencascade.js handle
+ * @param face       — TopoDS_Face (read-only)
+ * @param uvSamples  — UV parameter pairs to sample
+ * @param tracker    — OCCT object lifetime tracker (optional)
  * @throws {OcctG3UnsupportedError} when the DN third-derivative overload is absent.
  */
-export function sampleSurfaceThirdDeriv(oc, face, uvSamples = [], tracker = []) {
+export function sampleSurfaceThirdDeriv(
+  oc: OcInstance,
+  face: OcHandle,
+  uvSamples: Array<[number, number]> = [],
+  tracker: OcTracker = [],
+): SampleSurfaceThirdDerivResult {
   const probe = probeOcctG3Bindings(oc)
   if (!probe.all || !face) {
     throw new OcctG3UnsupportedError()
   }
 
-  let surf
+  let surf: OcHandle
   try {
     surf = oc.BRep_Tool.Surface_2(face)
   } catch (err) {
     throw new OcctG3UnsupportedError(
-      `occt_g3: BRep_Tool.Surface_2 failed: ${err?.message || err}`
+      `occt_g3: BRep_Tool.Surface_2 failed: ${(err as Error)?.message || err}`
     )
   }
   // Track the surface handle for cleanup if it is an OCCT allocation.
@@ -1898,8 +2010,8 @@ export function sampleSurfaceThirdDeriv(oc, face, uvSamples = [], tracker = []) 
     )
   }
 
-  const toVec = (gpVec) => [gpVec.X(), gpVec.Y(), gpVec.Z()]
-  const samples = []
+  const toVec = (gpVec: OcHandle): Vec3 => [gpVec.X(), gpVec.Y(), gpVec.Z()]
+  const samples: ThirdDerivSample[] = []
 
   for (const [u, v] of uvSamples) {
     try {
@@ -1917,7 +2029,7 @@ export function sampleSurfaceThirdDeriv(oc, face, uvSamples = [], tracker = []) 
     } catch (err) {
       // The order-3 overload threw → the build lacks it. Bail out cleanly.
       throw new OcctG3UnsupportedError(
-        `occt_g3: DN order-3 sampling failed at (u=${u}, v=${v}): ${err?.message || err}`
+        `occt_g3: DN order-3 sampling failed at (u=${u}, v=${v}): ${(err as Error)?.message || err}`
       )
     }
   }

@@ -42,18 +42,30 @@ import { Component } from 'react'
 import clsx from 'clsx'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 
-export default class ErrorBoundary extends Component {
-  constructor(props) {
+interface Props {
+  fallback?: React.ReactNode | ((error: Error, reset: () => void) => React.ReactNode)
+  onError?: (error: Error, info: React.ErrorInfo) => void
+  resetKeys?: unknown[]
+  children?: React.ReactNode
+}
+
+interface State {
+  error: Error | null
+  errorInfo: React.ErrorInfo | null
+}
+
+export default class ErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
     super(props)
     this.state = { error: null, errorInfo: null }
     this.reset = this.reset.bind(this)
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(error: Error) {
     return { error }
   }
 
-  componentDidCatch(error, errorInfo) {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({ errorInfo })
     // Built-in log; callers can suppress by providing onError that doesn't
     // call console.error.
@@ -61,7 +73,7 @@ export default class ErrorBoundary extends Component {
     this.props.onError?.(error, errorInfo)
   }
 
-  componentDidUpdate(prevProps) {
+  componentDidUpdate(prevProps: Props) {
     const { resetKeys } = this.props
     if (
       this.state.error &&

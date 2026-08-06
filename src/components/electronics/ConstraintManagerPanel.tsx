@@ -1,4 +1,4 @@
-// ConstraintManagerPanel.jsx — Allegro-style Constraint Manager spreadsheet UI.
+// ConstraintManagerPanel.tsx — Allegro-style Constraint Manager spreadsheet UI.
 //
 // Provides an editable spreadsheet grid where rows = net-classes or per-net
 // overrides and columns = constraint properties.  Loads via constraint_table_get
@@ -11,15 +11,97 @@
 // References: Allegro Constraint Manager Design Guide; IPC-2221B trace rules.
 //
 // Props:
-//   circuitJson — CircuitJSON board object (defaults to DEMO_BOARD)
+//   circuitJson — the legacy constraint-manager "board" object (name predates the
+//                 tscircuit CircuitJson element-array format; NOT that type —
+//                 defaults to DEMO_BOARD)
 //   onClose     — () => void
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Table2, CheckCircle2, AlertTriangle, X, RefreshCw, Plus, Save } from 'lucide-react'
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface NetClass {
+  name: string
+  trace_width_mm?: number
+  clearance_mm?: number
+  via_diameter_mm?: number
+  via_drill_mm?: number
+  target_impedance_ohms?: number
+  via_type?: string
+  length_match_group?: string
+}
+
+interface NetRule {
+  trace_width_mm?: number
+  clearance_mm?: number
+}
+
+// The board shape this panel's `circuitJson` prop actually carries — a legacy
+// constraint-manager document, distinct from the tscircuit CircuitJson element array.
+interface ConstraintBoard {
+  type?: string
+  width?: number
+  height?: number
+  net_classes?: NetClass[]
+  net_rules?: Record<string, NetRule>
+  net_class_assignments?: Record<string, string>
+}
+
+type ColumnType = 'text' | 'number' | 'badge' | 'select'
+
+interface ColumnConfig {
+  key: string
+  label: string
+  width: number
+  readonly: boolean
+  type: ColumnType
+  options?: string[]
+}
+
+type CellValue = string | number | null | undefined
+
+interface ConstraintTableRow {
+  name: string
+  kind: 'net_class' | 'net'
+  [key: string]: CellValue | string
+}
+
+interface ApiResult {
+  error?: string
+}
+
+interface ConstraintTableGetResponse extends ApiResult {
+  rows?: ConstraintTableRow[]
+}
+
+interface RejectedEdit {
+  reason?: string
+  [key: string]: unknown
+}
+
+interface ConstraintTableSetResponse extends ApiResult {
+  applied?: unknown[]
+  rejected?: RejectedEdit[]
+  circuit_json?: ConstraintBoard
+  table?: { rows?: ConstraintTableRow[] }
+}
+
+interface CommitResult {
+  error?: string
+  applied?: number
+  rejected?: number
+  rejectedDetails?: RejectedEdit[]
+}
+
+export interface ConstraintManagerPanelProps {
+  circuitJson?: ConstraintBoard | null
+  onClose?: () => void
+}
+
 // ── Demo board ────────────────────────────────────────────────────────────────
 
-const DEMO_BOARD = {
+const DEMO_BOARD: ConstraintBoard = {
   type: 'pcb_board',
   width: 100,
   height: 80,
@@ -42,7 +124,7 @@ const DEMO_BOARD = {
 
 // ── Column config ─────────────────────────────────────────────────────────────
 
-const DISPLAY_COLUMNS = [
+const DISPLAY_COLUMNS: ColumnConfig[] = [
   { key: 'name',                  label: 'Name',        width: 130, readonly: true,  type: 'text'   },
   { key: 'kind',                  label: 'Kind',        width: 80,  readonly: true,  type: 'badge'  },
   { key: 'trace_width_mm',        label: 'W (mm)',      width: 72,  readonly: false, type: 'number' },
@@ -57,28 +139,28 @@ const DISPLAY_COLUMNS = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function apiPost(endpoint, body) {
+async function apiPost<T extends ApiResult>(endpoint: string, body: unknown): Promise<T> {
   try {
     const r = await fetch(`/api/llm-tools/${endpoint}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     })
-    return r.ok ? r.json() : { error: `HTTP ${r.status}` }
+    return r.ok ? ((await r.json()) as T) : ({ error: `HTTP ${r.status}` } as T)
   } catch (e) {
-    return { error: e.message }
+    return { error: (e as Error).message } as T
   }
 }
 
-function fmt(val, type) {
+function fmt(val: CellValue, type: ColumnType): string {
   if (val == null || val === '') return '—'
-  if (type === 'number') return Number(val).toFixed(val < 1 ? 2 : 1)
+  if (type === 'number') return Number(val).toFixed(Number(val) < 1 ? 2 : 1)
   return String(val)
 }
 
 // ── Kind badge ────────────────────────────────────────────────────────────────
 
-function KindBadge({ kind }) {
+function KindBadge({ kind }: { kind: CellValue }) {
   return (
     <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono
       ${kind === 'net_class'
@@ -91,21 +173,29 @@ function KindBadge({ kind }) {
 
 // ── Editable cell ─────────────────────────────────────────────────────────────
 
-function Cell({ col, value, pendingValue, onEdit, edited }) {
+interface CellProps {
+  col: ColumnConfig
+  value: CellValue
+  pendingValue: CellValue
+  onEdit: (val: CellValue) => void
+  edited: boolean
+}
+
+function Cell({ col, value, pendingValue, onEdit, edited }: CellProps) {
   const [editing, setEditing] = useState(false)
   const [draft,   setDraft]   = useState('')
-  const inputRef = useRef(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const start = () => {
     if (col.readonly) return
-    setDraft(value ?? '')
+    setDraft(value != null ? String(value) : '')
     setEditing(true)
     setTimeout(() => inputRef.current?.select(), 0)
   }
 
   const commit = () => {
     setEditing(false)
-    let v = draft.trim()
+    const v = draft.trim()
     if (v === '' || v === '—') { onEdit(null); return }
     if (col.type === 'number') {
       const n = parseFloat(v)
@@ -137,7 +227,7 @@ function Cell({ col, value, pendingValue, onEdit, edited }) {
           onBlur={commit}
           className="w-full bg-gray-800 border border-blue-500 rounded px-1 py-0.5 text-[11px]
                      text-gray-200 focus:outline-none">
-          {col.options.map(o => <option key={o} value={o}>{o || '—'}</option>)}
+          {(col.options ?? []).map(o => <option key={o} value={o}>{o || '—'}</option>)}
         </select>
       </td>
     )
@@ -178,7 +268,13 @@ function Cell({ col, value, pendingValue, onEdit, edited }) {
 
 // ── Row ───────────────────────────────────────────────────────────────────────
 
-function Row({ row, pending, onCellEdit }) {
+interface RowProps {
+  row: ConstraintTableRow
+  pending: Record<string, CellValue> | undefined
+  onCellEdit: (rowName: string, kind: string, col: string, val: CellValue) => void
+}
+
+function Row({ row, pending, onCellEdit }: RowProps) {
   return (
     <tr className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
       {DISPLAY_COLUMNS.map(col => {
@@ -187,7 +283,7 @@ function Row({ row, pending, onCellEdit }) {
           <Cell
             key={col.key}
             col={col}
-            value={row[col.key]}
+            value={row[col.key] as CellValue}
             pendingValue={pending?.[col.key]}
             edited={edited}
             onEdit={val => onCellEdit(row.name, row.kind, col.key, val)}
@@ -200,31 +296,32 @@ function Row({ row, pending, onCellEdit }) {
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
-export default function ConstraintManagerPanel({ circuitJson: circuitJsonProp, onClose }) {
-  const [circuitJson, setCircuitJson] = useState(circuitJsonProp ?? DEMO_BOARD)
-  const [rows,        setRows]        = useState([])
+export default function ConstraintManagerPanel({ circuitJson: circuitJsonProp, onClose }: ConstraintManagerPanelProps) {
+  const [circuitJson, setCircuitJson] = useState<ConstraintBoard>(circuitJsonProp ?? DEMO_BOARD)
+  const [rows,        setRows]        = useState<ConstraintTableRow[]>([])
   const [loading,     setLoading]     = useState(false)
-  const [error,       setError]       = useState(null)
+  const [error,       setError]       = useState<string | null>(null)
   // pending[rowName][col] = newValue
-  const [pending, setPending]         = useState({})
+  const [pending, setPending]         = useState<Record<string, Record<string, CellValue>>>({})
   // last commit result
-  const [commitResult, setCommitResult] = useState(null)
+  const [commitResult, setCommitResult] = useState<CommitResult | null>(null)
   // new net/class form
   const [addName, setAddName]         = useState('')
   const [addKind, setAddKind]         = useState('net_class')
 
-  const loadTable = useCallback(async (cj) => {
+  const loadTable = useCallback(async (cj?: ConstraintBoard) => {
     setLoading(true)
     setError(null)
-    const r = await apiPost('constraint_table_get', { circuit_json: cj ?? circuitJson })
+    const r = await apiPost<ConstraintTableGetResponse>('constraint_table_get', { circuit_json: cj ?? circuitJson })
     setLoading(false)
     if (r.error) { setError(r.error); return }
     setRows(r.rows ?? [])
   }, [circuitJson])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- initial table load on mount, pre-existing before this migration.
   useEffect(() => { loadTable() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const onCellEdit = (rowName, kind, col, val) => {
+  const onCellEdit = (rowName: string, _kind: string, col: string, val: CellValue) => {
     setPending(prev => ({
       ...prev,
       [rowName]: { ...(prev[rowName] ?? {}), [col]: val },
@@ -235,7 +332,7 @@ export default function ConstraintManagerPanel({ circuitJson: circuitJsonProp, o
   const hasPending = Object.keys(pending).some(k => Object.keys(pending[k] ?? {}).length > 0)
 
   const commitEdits = useCallback(async () => {
-    const edits = []
+    const edits: { row_name: string; col: string; value: CellValue; kind: string }[] = []
     for (const [rowName, cols] of Object.entries(pending)) {
       for (const [col, value] of Object.entries(cols)) {
         const row = rows.find(r => r.name === rowName)
@@ -246,7 +343,7 @@ export default function ConstraintManagerPanel({ circuitJson: circuitJsonProp, o
     if (edits.length === 0) return
 
     setLoading(true)
-    const r = await apiPost('constraint_table_set', { circuit_json: circuitJson, edits })
+    const r = await apiPost<ConstraintTableSetResponse>('constraint_table_set', { circuit_json: circuitJson, edits })
     setLoading(false)
 
     if (r.error) { setCommitResult({ error: r.error }); return }
@@ -269,7 +366,7 @@ export default function ConstraintManagerPanel({ circuitJson: circuitJsonProp, o
     const name = addName.trim()
     if (!name) return
     const col = addKind === 'net_class' ? 'trace_width_mm' : 'trace_width_mm'
-    const r = await apiPost('constraint_table_set', {
+    const r = await apiPost<ConstraintTableSetResponse>('constraint_table_set', {
       circuit_json: circuitJson,
       edits: [{ row_name: name, col, value: 0.25, kind: addKind }],
     })
@@ -330,9 +427,9 @@ export default function ConstraintManagerPanel({ circuitJson: circuitJsonProp, o
         <div className="flex items-center gap-2 px-3 py-1.5 bg-green-900/10 border-b border-green-800/30 text-[11px] shrink-0">
           <CheckCircle2 size={11} className="text-green-400" />
           <span className="text-green-300">{commitResult.applied} edit{commitResult.applied !== 1 ? 's' : ''} applied</span>
-          {commitResult.rejected > 0 && (
+          {(commitResult.rejected ?? 0) > 0 && (
             <span className="text-yellow-400 ml-2">
-              {commitResult.rejected} rejected: {commitResult.rejectedDetails.map(r => r.reason).join('; ')}
+              {commitResult.rejected} rejected: {(commitResult.rejectedDetails ?? []).map(r => r.reason).join('; ')}
             </span>
           )}
         </div>

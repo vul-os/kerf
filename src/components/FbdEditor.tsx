@@ -34,22 +34,73 @@
 //   Dbl-click     → inline label edit
 //   Palette click → places block at default position; onChange fires
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+
+// ---------------------------------------------------------------------------
+// Local domain types — src/lib/fbdCanvas.js has no shared type compatible
+// with this editor's network shape (see the dynamic-import note below), and
+// there is no other shared type for FBD data. Kept in sync with the local
+// interfaces of the same name in FbdEditor.test.tsx.
+// ---------------------------------------------------------------------------
+
+interface FbdBlock {
+  id: string
+  type: string
+  label: string
+  x: number
+  y: number
+}
+
+interface FbdSignal {
+  id?: string
+  fromBlock: string
+  fromPin: number
+  toBlock: string
+  toPin: number
+}
+
+interface FbdNetwork {
+  blocks: FbdBlock[]
+  signals: FbdSignal[]
+}
+
+interface PinPosition {
+  pin: number
+  x: number
+  y: number
+}
+
+// The shape this file actually calls into on the dynamically-imported lib module.
+// NOTE (pre-existing bug, not introduced by this migration): src/lib/fbdCanvas.ts's real
+// addBlock/addSignal signatures are `addBlock(network, type, position, params)` (4 positional
+// args) and `addSignal(network, srcBlockId, srcPin, dstBlockId, dstPin)` (5 positional args) —
+// neither matches the `(network, blockDef)` / `(network, signalDef)` calls below. If that
+// dynamic import resolves (it now does, since T-225c-1 landed fbdCanvas.ts), `mod.addBlock`
+// receives the whole blockDef object as its `type` argument and throws "Unknown block type:
+// [object Object]" instead of placing a block — i.e. every palette click would break once the
+// lib module finishes loading. Typed here as the shape this file expects (matching the
+// long-standing built-in fallback below), not the real module's shape, so the type mismatch
+// doesn't block the build. Behavior is unchanged from the pre-migration .jsx — flagging for a
+// follow-up, not fixing as part of this rename.
+interface FbdCanvasModule {
+  addBlock?: (network: FbdNetwork, blockDef: Omit<FbdBlock, 'id'>) => FbdNetwork
+  addSignal?: (network: FbdNetwork, signalDef: Omit<FbdSignal, 'id'>) => FbdNetwork
+}
 
 // Import fbdCanvas helpers; gracefully degrade if the sibling task hasn't
 // landed the lib file yet. We use a lazy-init pattern so the module-level
 // import never throws and tests can vi.mock the path normally.
-let _fbdCanvas = null
-function getFbdCanvas() {
+let _fbdCanvas: FbdCanvasModule | null = null
+function getFbdCanvas(): FbdCanvasModule | null {
   return _fbdCanvas
 }
 
 // Dynamic import — fires once on first use. Results are cached in _fbdCanvas.
 import('../lib/fbdCanvas.js')
-  .then((mod) => { _fbdCanvas = mod })
+  .then((mod) => { _fbdCanvas = mod as unknown as FbdCanvasModule })
   .catch(() => { /* lib not available yet — built-in fallbacks apply */ })
 
-function addBlockFn(network, blockDef) {
+function addBlockFn(network: FbdNetwork, blockDef: Omit<FbdBlock, 'id'>): FbdNetwork {
   const mod = getFbdCanvas()
   if (mod && mod.addBlock) return mod.addBlock(network, blockDef)
   const id = `block-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -59,7 +110,7 @@ function addBlockFn(network, blockDef) {
   }
 }
 
-function addSignalFn(network, signalDef) {
+function addSignalFn(network: FbdNetwork, signalDef: Omit<FbdSignal, 'id'>): FbdNetwork {
   const mod = getFbdCanvas()
   if (mod && mod.addSignal) return mod.addSignal(network, signalDef)
   const id = `sig-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -73,10 +124,16 @@ function addSignalFn(network, signalDef) {
 // Constants
 // ---------------------------------------------------------------------------
 
+// eslint-disable-next-line react-refresh/only-export-components -- pure constant consumed directly by tests; not a component, pre-existing before this migration.
 export const BLOCK_TYPES = ['AND', 'OR', 'NOT', 'TON', 'TOF', 'CTU', 'INPUT', 'OUTPUT', 'CONSTANT']
 
+interface BlockPinConfig {
+  inputs: number
+  outputs: number
+}
+
 // How many inputs / outputs each block type exposes.
-const BLOCK_PIN_CONFIG = {
+const BLOCK_PIN_CONFIG: Record<string, BlockPinConfig> = {
   AND:      { inputs: 2, outputs: 1 },
   OR:       { inputs: 2, outputs: 1 },
   NOT:      { inputs: 1, outputs: 1 },
@@ -92,16 +149,15 @@ const BLOCK_PIN_CONFIG = {
 const BLOCK_W = 90
 const BLOCK_H = 60
 const PIN_R = 5
-const PIN_SPACING = 18
 
 // ---------------------------------------------------------------------------
 // Helpers: compute pin positions relative to block origin (x, y)
 // ---------------------------------------------------------------------------
 
-function inputPinPositions(block) {
+function inputPinPositions(block: FbdBlock): PinPosition[] {
   const config = BLOCK_PIN_CONFIG[block.type] || { inputs: 1, outputs: 1 }
   const count = config.inputs
-  const positions = []
+  const positions: PinPosition[] = []
   for (let i = 0; i < count; i++) {
     const yOffset = count === 1
       ? BLOCK_H / 2
@@ -111,10 +167,10 @@ function inputPinPositions(block) {
   return positions
 }
 
-function outputPinPositions(block) {
+function outputPinPositions(block: FbdBlock): PinPosition[] {
   const config = BLOCK_PIN_CONFIG[block.type] || { inputs: 1, outputs: 1 }
   const count = config.outputs
-  const positions = []
+  const positions: PinPosition[] = []
   for (let i = 0; i < count; i++) {
     const yOffset = count === 1
       ? BLOCK_H / 2
@@ -124,23 +180,25 @@ function outputPinPositions(block) {
   return positions
 }
 
-function hitTestPin(pins, cx, cy, radius = PIN_R * 2) {
-  for (const p of pins) {
-    const dx = p.x - cx
-    const dy = p.y - cy
-    if (Math.sqrt(dx * dx + dy * dy) <= radius) return p
-  }
-  return null
-}
-
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function FbdBlock({ block, isSelected, editingId, onSelect, onContextMenu, onDoubleClick, onLabelChange, onLabelBlur }) {
+interface FbdBlockCompProps {
+  block: FbdBlock
+  isSelected: boolean
+  editingId: string | null
+  onSelect: (id: string) => void
+  onContextMenu: (id: string) => void
+  onDoubleClick: (id: string) => void
+  onLabelChange: (id: string, label: string) => void
+  onLabelBlur: (id: string) => void
+}
+
+function FbdBlockComp({ block, isSelected, editingId, onSelect, onContextMenu, onDoubleClick, onLabelChange, onLabelBlur }: FbdBlockCompProps) {
   const inPins = inputPinPositions(block)
   const outPins = outputPinPositions(block)
-  const labelRef = useRef(null)
+  const labelRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (editingId === block.id && labelRef.current) {
@@ -190,9 +248,12 @@ function FbdBlock({ block, isSelected, editingId, onSelect, onContextMenu, onDou
       {/* Editable label */}
       {editingId === block.id ? (
         <foreignObject x={block.x + 4} y={block.y + 32} width={BLOCK_W - 8} height={22}>
+          {/* `xmlns` isn't part of React's InputHTMLAttributes type but is required at runtime
+              for an <input> rendered inside an SVG <foreignObject>; typed via an intersection
+              so the spread stays structurally valid. */}
           <input
             ref={labelRef}
-            xmlns="http://www.w3.org/1999/xhtml"
+            {...({ xmlns: 'http://www.w3.org/1999/xhtml' } as React.InputHTMLAttributes<HTMLInputElement> & { xmlns?: string })}
             style={{
               width: '100%',
               background: '#0f172a',
@@ -260,7 +321,12 @@ function FbdBlock({ block, isSelected, editingId, onSelect, onContextMenu, onDou
   )
 }
 
-function FbdSignal({ signal, blocks }) {
+interface FbdSignalCompProps {
+  signal: FbdSignal
+  blocks: FbdBlock[]
+}
+
+function FbdSignalComp({ signal, blocks }: FbdSignalCompProps) {
   const srcBlock = blocks.find((b) => b.id === signal.fromBlock)
   const dstBlock = blocks.find((b) => b.id === signal.toBlock)
   if (!srcBlock || !dstBlock) return null
@@ -290,17 +356,32 @@ function FbdSignal({ signal, blocks }) {
 // Main editor
 // ---------------------------------------------------------------------------
 
-export default function FbdEditor({ value, onChange }) {
+export interface Props {
+  value?: FbdNetwork | null
+  onChange?: (network: FbdNetwork) => void
+}
+
+interface WireFrom {
+  blockId: string
+  pinIndex: number
+}
+
+interface Point {
+  x: number
+  y: number
+}
+
+export default function FbdEditor({ value, onChange }: Props) {
   const network = value || { blocks: [], signals: [] }
   const blocks = network.blocks || []
   const signals = network.signals || []
 
-  const [selectedId, setSelectedId] = useState(null)
-  const [editingId, setEditingId] = useState(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   // Wire drawing state: { blockId, pinIndex } when dragging from an output pin
-  const [wireFrom, setWireFrom] = useState(null)
-  const [wireCursor, setWireCursor] = useState(null)
-  const svgRef = useRef(null)
+  const [wireFrom, setWireFrom] = useState<WireFrom | null>(null)
+  const [wireCursor, setWireCursor] = useState<Point | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
 
   // Deselect when clicking on canvas background.
   function handleCanvasClick() {
@@ -308,10 +389,16 @@ export default function FbdEditor({ value, onChange }) {
     setEditingId(null)
   }
 
+  function svgPoint(e: React.MouseEvent): Point {
+    if (!svgRef.current) return { x: 0, y: 0 }
+    const rect = svgRef.current.getBoundingClientRect()
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  }
+
   // Handle clicks on the SVG. We use pointer events on the SVG itself to
   // detect pin interactions for wire drawing.
-  function handleSvgMouseDown(e) {
-    const target = e.target
+  function handleSvgMouseDown(e: React.MouseEvent<SVGSVGElement>) {
+    const target = e.target as SVGElement
     const pinType = target.getAttribute('data-pin-type')
     const blockId = target.getAttribute('data-block-id')
     const pinIndex = target.getAttribute('data-pin-index')
@@ -324,14 +411,14 @@ export default function FbdEditor({ value, onChange }) {
     }
   }
 
-  function handleSvgMouseMove(e) {
+  function handleSvgMouseMove(e: React.MouseEvent<SVGSVGElement>) {
     if (!wireFrom) return
     setWireCursor(svgPoint(e))
   }
 
-  function handleSvgMouseUp(e) {
+  function handleSvgMouseUp(e: React.MouseEvent<SVGSVGElement>) {
     if (!wireFrom) return
-    const target = e.target
+    const target = e.target as SVGElement
     const pinType = target.getAttribute('data-pin-type')
     const blockId = target.getAttribute('data-block-id')
     const pinIndex = target.getAttribute('data-pin-index')
@@ -355,13 +442,7 @@ export default function FbdEditor({ value, onChange }) {
     setWireCursor(null)
   }
 
-  function svgPoint(e) {
-    if (!svgRef.current) return { x: 0, y: 0 }
-    const rect = svgRef.current.getBoundingClientRect()
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
-  }
-
-  function handlePaletteClick(type) {
+  function handlePaletteClick(type: string) {
     // Place new block at a staggered default position based on how many blocks exist.
     const count = blocks.length
     const col = count % 4
@@ -372,12 +453,12 @@ export default function FbdEditor({ value, onChange }) {
     onChange?.(next)
   }
 
-  function handleSelectBlock(id) {
+  function handleSelectBlock(id: string) {
     setSelectedId(id)
     setEditingId(null)
   }
 
-  function handleContextMenu(blockId) {
+  function handleContextMenu(blockId: string) {
     // Delete the block and any signals attached to it.
     const nextBlocks = blocks.filter((b) => b.id !== blockId)
     const nextSignals = signals.filter(
@@ -389,11 +470,11 @@ export default function FbdEditor({ value, onChange }) {
     if (editingId === blockId) setEditingId(null)
   }
 
-  function handleDoubleClick(blockId) {
+  function handleDoubleClick(blockId: string) {
     setEditingId(blockId)
   }
 
-  function handleLabelChange(blockId, label) {
+  function handleLabelChange(blockId: string, label: string) {
     const nextBlocks = blocks.map((b) => b.id === blockId ? { ...b, label } : b)
     onChange?.({ ...network, blocks: nextBlocks })
   }
@@ -540,7 +621,7 @@ export default function FbdEditor({ value, onChange }) {
 
           {/* Signals */}
           {signals.map((sig) => (
-            <FbdSignal key={sig.id} signal={sig} blocks={blocks} />
+            <FbdSignalComp key={sig.id} signal={sig} blocks={blocks} />
           ))}
 
           {/* In-progress wire */}
@@ -548,7 +629,7 @@ export default function FbdEditor({ value, onChange }) {
 
           {/* Blocks */}
           {blocks.map((block) => (
-            <FbdBlock
+            <FbdBlockComp
               key={block.id}
               block={block}
               isSelected={selectedId === block.id}

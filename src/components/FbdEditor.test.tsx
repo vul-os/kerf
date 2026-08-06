@@ -110,9 +110,8 @@ describe('FbdEditor — render without crashing', () => {
   })
 
   it('accepts value=undefined without crashing', () => {
-    // @ts-expect-error -- FbdEditor.jsx is not yet migrated (T-514); TS infers `value` as
-    // required from the untyped .jsx source, but this test intentionally omits it to verify
-    // the component's runtime empty-network fallback.
+    // FbdEditor's `value` prop is optional (T-514) — this verifies the component's
+    // runtime empty-network fallback when it's omitted entirely.
     const html = renderToStaticMarkup(<FbdEditor onChange={() => {}} />)
     expect(html).toBeTruthy()
   })

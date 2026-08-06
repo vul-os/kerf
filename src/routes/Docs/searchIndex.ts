@@ -19,6 +19,44 @@
 //     tokens in the snippet for the UI to render bold/yellow.
 // ----------------------------------------------------------------------------
 
+// A single doc entry as emitted by scripts/build-docs-manifest.mjs. Both the
+// flat (`entries`/`items`) and grouped (`groups[].items`) manifest shapes
+// resolve to this record — see docsStore.ts's flattenManifest().
+export interface DocEntry {
+  slug: string
+  title: string
+  body: string
+  source?: string
+  summary?: string
+  group?: string
+  mtime?: number
+  order?: number
+}
+
+export interface Heading {
+  depth: number
+  text: string
+}
+
+interface EntryMeta {
+  entry: DocEntry
+  headings: Heading[]
+  summary?: string
+}
+
+export interface SearchIndexData {
+  index: Map<string, Map<number, number>>
+  meta: EntryMeta[]
+}
+
+export interface SearchResult {
+  entry: DocEntry
+  headings: Heading[]
+  score: number
+  hits: Set<string>
+  snippet: string
+}
+
 const TOKEN_RE = /[a-z0-9][a-z0-9'_-]{1,}/gi
 const STOP = new Set([
   'the','a','an','and','or','of','to','in','on','for','at','by','with','from',
@@ -26,9 +64,9 @@ const STOP = new Set([
   'as','if','so','but','not','no','you','your','we','our','i','can','will','any',
 ])
 
-function tokenize(s) {
+function tokenize(s: string | undefined | null): string[] {
   if (!s) return []
-  const out = []
+  const out: string[] = []
   for (const m of String(s).toLowerCase().matchAll(TOKEN_RE)) {
     const t = m[0]
     if (STOP.has(t)) continue
@@ -37,8 +75,8 @@ function tokenize(s) {
   return out
 }
 
-function extractHeadings(md) {
-  const out = []
+function extractHeadings(md: string): Heading[] {
+  const out: Heading[] = []
   for (const line of md.split('\n')) {
     const m = line.match(/^(#{1,3})\s+(.+?)\s*$/)
     if (m) out.push({ depth: m[1].length, text: m[2].replace(/`/g, '') })
@@ -46,14 +84,14 @@ function extractHeadings(md) {
   return out
 }
 
-export function buildIndex(entries) {
-  const index = new Map() // token → Map(entryIdx → score)
+export function buildIndex(entries: DocEntry[]): SearchIndexData {
+  const index = new Map<string, Map<number, number>>() // token → Map(entryIdx → score)
   const meta = entries.map((e, i) => {
     const headings = extractHeadings(e.body)
     const titleTokens = tokenize(e.title)
     const headingTokens = headings.flatMap((h) => tokenize(h.text))
     const bodyTokens = tokenize(e.body)
-    const all = [
+    const all: [string[], number][] = [
       [titleTokens, 8],
       [headingTokens, 4],
       [bodyTokens, 1],
@@ -70,13 +108,13 @@ export function buildIndex(entries) {
   return { index, meta }
 }
 
-export function search(query, idx, limit = 12) {
+export function search(query: string, idx: SearchIndexData, limit = 12): SearchResult[] {
   const tokens = tokenize(query)
   if (!tokens.length) return []
-  const scores = new Map() // entryIdx → { score, hits }
+  const scores = new Map<number, { score: number; hits: Set<string> }>() // entryIdx → { score, hits }
   for (const t of tokens) {
     // Exact match plus a single prefix fallback so "draw" finds "drawing".
-    const buckets = []
+    const buckets: Map<number, number>[] = []
     const exact = idx.index.get(t)
     if (exact) buckets.push(exact)
     if (!exact && t.length >= 3) {
@@ -86,7 +124,7 @@ export function search(query, idx, limit = 12) {
     }
     for (const postings of buckets) {
       for (const [entryIdx, score] of postings) {
-        const cur = scores.get(entryIdx) || { score: 0, hits: new Set() }
+        const cur = scores.get(entryIdx) || { score: 0, hits: new Set<string>() }
         cur.score += score
         cur.hits.add(t)
         scores.set(entryIdx, cur)
@@ -108,7 +146,7 @@ export function search(query, idx, limit = 12) {
   }))
 }
 
-function makeSnippet(body, hits) {
+function makeSnippet(body: string, hits: Set<string>): string {
   const lc = body.toLowerCase()
   let bestIdx = -1
   for (const t of hits) {

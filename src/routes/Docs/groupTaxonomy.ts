@@ -27,6 +27,8 @@
 // sidebar even if the manifest still ships them.
 // ----------------------------------------------------------------------------
 
+import type { DocEntry } from './searchIndex.js'
+
 // Regex matching any internal-planning / audit slug or source. Hits on:
 //   * leading `plans/` segment (`docs/plans/...` or just `plans/...`)
 //   * the substring `audit` anywhere in the slug or source path (e.g.
@@ -39,7 +41,47 @@
 export const INTERNAL_PATTERN =
   /(^|\/)plans\/|audit|geometry-kernel-roadmap|testing-breakdown|frontend-audit/i
 
-export function isInternalPlanning(entry) {
+// Manifest shapes tolerated by flattenManifest/indexManifest — see the
+// module comment above for the flat-vs-grouped rationale.
+export interface DocsManifest {
+  items?: DocEntry[]
+  entries?: DocEntry[]
+  groups?: { label: string; items: DocEntry[] }[]
+}
+
+export interface DomainLink {
+  slug: string
+  title: string
+  to: string
+}
+
+interface UserGroupDef {
+  label: string
+  key: string
+  slugs?: string[]
+  kind?: 'routes'
+  items?: DomainLink[]
+}
+
+export interface SidebarDocItem {
+  slug: string
+  title: string
+  summary?: string
+  to: string
+  kind: 'doc'
+}
+
+export interface SidebarRouteItem extends DomainLink {
+  kind: 'route'
+}
+
+export type SidebarGroup =
+  | { label: string; key: string; kind: 'docs'; items: SidebarDocItem[] }
+  | { label: string; key: string; kind: 'routes'; items: SidebarRouteItem[] }
+
+export function isInternalPlanning(
+  entry: Pick<DocEntry, 'slug' | 'source' | 'group'> | null | undefined,
+): boolean {
   if (!entry) return false
   const slug = String(entry.slug || '')
   const source = String(entry.source || '')
@@ -51,7 +93,7 @@ export function isInternalPlanning(entry) {
 }
 
 // Hardcoded domain links — these are React routes, not markdown.
-export const DOMAIN_LINKS = [
+export const DOMAIN_LINKS: DomainLink[] = [
   { slug: 'architecture', title: 'Architecture', to: '/domains/architecture' },
   { slug: 'automotive',   title: 'Automotive',   to: '/domains/automotive' },
   { slug: 'electronics',  title: 'Electronics',  to: '/domains/electronics' },
@@ -66,7 +108,7 @@ export const DOMAIN_LINKS = [
 // NOTE: the Domains group is intentionally OMITTED here. Domain pages are
 // React routes under /domains/<slug> and belong to a different navigation
 // context — they should not appear in the docs sidebar or docs home grid.
-export const USER_GROUPS = [
+export const USER_GROUPS: UserGroupDef[] = [
   {
     label: 'Get started',
     key: 'get-started',
@@ -137,8 +179,8 @@ export const USER_GROUPS = [
 
 // Flatten a manifest into a slug→entry lookup. Tolerates both the historical
 // flat shape and the future grouped shape.
-export function indexManifest(manifest) {
-  const out = new Map()
+export function indexManifest(manifest: DocsManifest | null | undefined): Map<string, DocEntry> {
+  const out = new Map<string, DocEntry>()
   if (!manifest) return out
   if (Array.isArray(manifest.groups)) {
     for (const g of manifest.groups) {
@@ -165,21 +207,21 @@ export function indexManifest(manifest) {
 //
 // Items with `kind: 'route'` link to a non-/docs path (e.g. /domains/jewelry).
 // Items with `kind: 'doc'` link to `/docs/<slug>`.
-export function buildSidebarGroups(manifest) {
+export function buildSidebarGroups(manifest: DocsManifest | null | undefined): SidebarGroup[] {
   const bySlug = indexManifest(manifest)
-  const out = []
+  const out: SidebarGroup[] = []
   for (const group of USER_GROUPS) {
     if (group.kind === 'routes') {
       out.push({
         label: group.label,
         key: group.key,
         kind: 'routes',
-        items: group.items.map((d) => ({ ...d, kind: 'route' })),
+        items: (group.items || []).map((d) => ({ ...d, kind: 'route' as const })),
       })
       continue
     }
-    const items = []
-    for (const slug of group.slugs) {
+    const items: SidebarDocItem[] = []
+    for (const slug of group.slugs || []) {
       const e = bySlug.get(slug)
       if (!e) continue // doc not in manifest yet — skip silently
       if (isInternalPlanning(e)) continue // defensive — manifest should have done this
@@ -199,9 +241,9 @@ export function buildSidebarGroups(manifest) {
 
 // Flat ordered list of all sidebar doc entries (in the user-facing order),
 // used for prev/next on article pages.
-export function flatDocOrder(manifest) {
+export function flatDocOrder(manifest: DocsManifest | null | undefined): SidebarDocItem[] {
   const groups = buildSidebarGroups(manifest)
-  const out = []
+  const out: SidebarDocItem[] = []
   for (const g of groups) {
     if (g.kind !== 'docs') continue
     for (const item of g.items) out.push(item)
@@ -211,7 +253,7 @@ export function flatDocOrder(manifest) {
 
 // Look up the user-facing group label for a given slug. Used by the article
 // breadcrumb. Returns null if the slug is not in our taxonomy.
-export function groupForSlug(manifest, slug) {
+export function groupForSlug(manifest: DocsManifest | null | undefined, slug: string | undefined): string | null {
   const groups = buildSidebarGroups(manifest)
   for (const g of groups) {
     if (g.kind !== 'docs') continue

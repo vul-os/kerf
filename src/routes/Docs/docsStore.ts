@@ -1,6 +1,23 @@
 import { create } from 'zustand'
-import { buildIndex } from './searchIndex.js'
-import { isInternalPlanning } from './groupTaxonomy.js'
+import { buildIndex, type DocEntry, type SearchIndexData } from './searchIndex.js'
+import { isInternalPlanning, type DocsManifest } from './groupTaxonomy.js'
+
+export interface DocGroupBucket {
+  group?: string
+  items: DocEntry[]
+}
+
+export interface DocsState {
+  status: 'idle' | 'loading' | 'ready' | 'error'
+  error: string | null
+  manifest: DocsManifest | null // raw manifest (flat or grouped — taxonomy helpers normalize)
+  entries: DocEntry[]           // flat, internal-planning entries already stripped
+  bySlug: Map<string, DocEntry>
+  byGroup: DocGroupBucket[]     // legacy by-manifest-group buckets (still consumed by search results)
+  recent: DocEntry[]            // top 5 by mtime, descending
+  index: SearchIndexData | null // search index from buildIndex(entries)
+  load: () => Promise<void>
+}
 
 // Single in-memory store for the docs corpus. The manifest is a static asset
 // emitted by `scripts/build-docs-manifest.mjs` at build time, so we just fetch
@@ -8,7 +25,7 @@ import { isInternalPlanning } from './groupTaxonomy.js'
 // session. The store is also the cache layer when the user navigates between
 // articles — we don't refetch the manifest on /docs/:slug pages.
 
-export const useDocs = create((set, get) => ({
+export const useDocs = create<DocsState>()((set, get) => ({
   status: 'idle', // idle | loading | ready | error
   error: null,
   manifest: null, // raw manifest (flat or grouped — taxonomy helpers normalize)
@@ -24,7 +41,7 @@ export const useDocs = create((set, get) => ({
     try {
       const res = await fetch('/docs-manifest.json', { cache: 'no-cache' })
       if (!res.ok) throw new Error(`manifest fetch failed: ${res.status}`)
-      const manifest = await res.json()
+      const manifest: DocsManifest = await res.json()
       // Tolerate either { entries: [...] } (flat) or { groups: [{ items }] }
       // (grouped). We extract a flat entries[] for the legacy consumers
       // (search, recent, articles) and hand the raw manifest to the new
@@ -33,12 +50,12 @@ export const useDocs = create((set, get) => ({
       const entries = flat.filter((e) => !isInternalPlanning(e))
       const bySlug = new Map(entries.map((e) => [e.slug, e]))
       const byGroup = groupEntries(entries)
-      const recent = [...entries].sort((a, b) => b.mtime - a.mtime).slice(0, 5)
+      const recent = [...entries].sort((a, b) => (b.mtime ?? 0) - (a.mtime ?? 0)).slice(0, 5)
       const index = buildIndex(entries)
       set({ status: 'ready', manifest, entries, bySlug, byGroup, recent, index })
     } catch (e) {
       console.error('[docs] manifest load failed', e)
-      set({ status: 'error', error: e.message })
+      set({ status: 'error', error: e instanceof Error ? e.message : String(e) })
     }
   },
 }))
@@ -52,10 +69,10 @@ export const useDocs = create((set, get) => ({
 // first and marked every slug seen, so the body-bearing flat entries were all
 // skipped — every article rendered blank. Prefer the flat list; fall back to
 // group items only for a true legacy grouped-only manifest (no flat list).
-export function flattenManifest(manifest) {
+export function flattenManifest(manifest: DocsManifest | null | undefined): DocEntry[] {
   if (!manifest) return []
-  const out = []
-  const seen = new Set()
+  const out: DocEntry[] = []
+  const seen = new Set<string>()
 
   const flat = Array.isArray(manifest.items)
     ? manifest.items
@@ -95,8 +112,8 @@ const GROUP_ORDER = [
   'Legal',
 ]
 
-function groupEntries(entries) {
-  const map = new Map()
+function groupEntries(entries: DocEntry[]): DocGroupBucket[] {
+  const map = new Map<string | undefined, DocEntry[]>()
   for (const e of entries) {
     let bucket = map.get(e.group)
     if (!bucket) { bucket = []; map.set(e.group, bucket) }
@@ -107,10 +124,10 @@ function groupEntries(entries) {
   }
   return GROUP_ORDER
     .filter((g) => map.has(g))
-    .map((group) => ({ group, items: map.get(group) }))
+    .map((group) => ({ group, items: map.get(group)! }))
     .concat(
       [...map.keys()]
-        .filter((g) => !GROUP_ORDER.includes(g))
-        .map((group) => ({ group, items: map.get(group) })),
+        .filter((g) => !GROUP_ORDER.includes(g as string))
+        .map((group) => ({ group, items: map.get(group)! })),
     )
 }

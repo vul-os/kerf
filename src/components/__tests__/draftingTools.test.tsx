@@ -111,7 +111,8 @@ describe('addHatch', () => {
 
   it('hatch annotation has kind=hatch and a polygon', () => {
     const d = addHatch(flatDrawing(), TRIANGLE, 'ansi31')
-    const ann = d.annotations[0]
+    // Annotation union member is narrowed at runtime via `kind`, not by TS; probe as any.
+    const ann = d.annotations[0] as any
     expect(ann.kind).toBe('hatch')
     expect(Array.isArray(ann.polygon)).toBe(true)
     expect(ann.polygon).toHaveLength(3)
@@ -119,7 +120,8 @@ describe('addHatch', () => {
 
   it('hatch annotation carries patternDef with an id', () => {
     const d = addHatch(flatDrawing(), TRIANGLE, 'ansi32', 1.5, 30)
-    const ann = d.annotations[0]
+    // See probe note above.
+    const ann = d.annotations[0] as any
     expect(ann.patternDef).toBeDefined()
     expect(typeof ann.patternDef.id).toBe('string')
   })
@@ -145,7 +147,8 @@ describe('addLeader', () => {
 
   it('leader annotation has kind=leader, from, to, text', () => {
     const d = addLeader(flatDrawing(), FROM, TO, 'R3.2')
-    const ann = d.annotations[0]
+    // See probe note above.
+    const ann = d.annotations[0] as any
     expect(ann.kind).toBe('leader')
     expect(ann.from).toEqual(FROM)
     expect(ann.to).toEqual(TO)
@@ -179,7 +182,8 @@ describe('addRichText', () => {
 
   it('annotation has kind=rich_text, x, y, text', () => {
     const d = addRichText(flatDrawing(), 20, 30, 'NOTE 1')
-    const ann = d.annotations[0]
+    // See probe note above.
+    const ann = d.annotations[0] as any
     expect(ann.kind).toBe('rich_text')
     expect(ann.x).toBe(20)
     expect(ann.y).toBe(30)
@@ -188,7 +192,8 @@ describe('addRichText', () => {
 
   it('opts bold/italic/fontSize are set on the entity', () => {
     const d = addRichText(flatDrawing(), 0, 0, 'TITLE', { bold: true, italic: true, fontSize: 5 })
-    const ann = d.annotations[0]
+    // See probe note above.
+    const ann = d.annotations[0] as any
     expect(ann.bold).toBe(true)
     expect(ann.italic).toBe(true)
     expect(ann.fontSize).toBe(5)
@@ -216,7 +221,8 @@ describe('addDimensionChain', () => {
 
   it('dimension has kind=chain and the supplied picks', () => {
     const d = addDimensionChain(flatDrawing(), PICKS, 'view-1')
-    const dim = d.dimensions[0]
+    // See probe note above.
+    const dim = d.dimensions[0] as any
     expect(dim.kind).toBe('chain')
     expect(dim.picks).toHaveLength(3)
     expect(dim.picks[0]).toEqual(PICKS[0])
@@ -224,7 +230,8 @@ describe('addDimensionChain', () => {
 
   it('view_id is stored on the dimension', () => {
     const d = addDimensionChain(flatDrawing(), PICKS, 'view-abc')
-    expect(d.dimensions[0].view_id).toBe('view-abc')
+    // See probe note above.
+    expect((d.dimensions[0] as any).view_id).toBe('view-abc')
   })
 
   it('appends to multi-sheet drawing correctly', () => {
@@ -234,7 +241,8 @@ describe('addDimensionChain', () => {
 
   it('opts.offset is forwarded', () => {
     const d = addDimensionChain(flatDrawing(), PICKS, 'v', { offset: 12 })
-    expect(d.dimensions[0].offset).toBe(12)
+    // See probe note above.
+    expect((d.dimensions[0] as any).offset).toBe(12)
   })
 
   it('does not mutate the original drawing', () => {

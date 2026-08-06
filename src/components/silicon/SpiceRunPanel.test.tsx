@@ -158,7 +158,11 @@ describe('SpiceRunPanel — api.callTool dispatch', () => {
 
   it('api.callTool mock resolves with waveform data', async () => {
     const { api } = await import('../../lib/api.js')
-    const result = await api.callTool('silicon_spice_transient', {})
+    // callTool is generic in its result — the shape is the caller's knowledge,
+    // so name it here exactly as the production call site does.
+    const result = await api.callTool<{ ok: boolean; waveforms: { time: number[] } }>(
+      'silicon_spice_transient', {},
+    )
     expect(result.ok).toBe(true)
     expect(result.waveforms).toBeDefined()
     expect(Array.isArray(result.waveforms.time)).toBe(true)

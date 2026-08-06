@@ -902,8 +902,14 @@ export const api = {
   // Used by SpiceRunPanel (and any other UI that needs to invoke a registered
   // backend tool directly without going through the chat thread flow).
   // ---------------------------------------------------------------------------
-  callTool: (toolName: string, params: Record<string, unknown> = {}) =>
-    request<ToolCallResult>('/api/tools/call', {
+  // Generic in its result: this dispatcher can invoke ANY registered backend
+  // tool, so the response shape is the caller's knowledge, not this module's.
+  // Callers name it — `api.callTool<SpiceToolResponse>(...)` — the same pattern
+  // as `meshCache.get<T>` in src/lib/meshCache.ts, and for the same reason:
+  // the concrete type is owned by the consumer, and src/lib must not reach into
+  // it. Defaults to `ToolCallResult` so untyped callers keep the old behaviour.
+  callTool: <T = ToolCallResult>(toolName: string, params: Record<string, unknown> = {}) =>
+    request<T>('/api/tools/call', {
       method: 'POST',
       body: { tool: toolName, params },
     }),

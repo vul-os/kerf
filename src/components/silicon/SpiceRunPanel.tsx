@@ -333,7 +333,7 @@ export default function SpiceRunPanel({
     try {
       const payload = buildPayload()
 
-      const resp: SpiceToolResponse = await api.callTool(payload.tool, payload.params)
+      const resp = await api.callTool<SpiceToolResponse>(payload.tool, payload.params)
 
       const toolResult = resp?.result || resp
 

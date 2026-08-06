@@ -19,7 +19,11 @@ import { tessellateBezier } from '../lib/sketchGeom2.js'
 
 // ---------- helpers -----------------------------------------------------------
 
-function emptySketch() {
+// Untyped on purpose: this is a partial SketchJSON fixture threaded through
+// addPoint/addBezier/etc. (src/lib/sketchEdit.js, owned by another slice),
+// whose real SketchJSON type requires fields (version, plane, ...) these
+// pure-helper tests don't care about.
+function emptySketch(): any {
   return { entities: [{ id: 'origin', type: 'point', x: 0, y: 0 }], constraints: [] }
 }
 

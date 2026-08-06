@@ -6448,6 +6448,34 @@ this repo as transitive tscircuit dependencies. Both carry
     the self-consistency that let this hide.
   - **VERIFIED:** 6852 → 6853 passed, 187 skipped. Oracle tests ran for real, not skipped.
 
+### T-560 — 🐛 Sketch solver pushes wrong parameter names to planegcs
+- **Tier:** A · **Priority:** **P0** · **Status:** ⬜ not started
+- **Found by:** T-503, while typing `sketchSolver` against `@salusoft89/planegcs`'s real (fully
+  typed) `Constraint` union. Verified independently against the package's own
+  `planegcs_dist/constraints.ts`.
+- **The bug:** `src/lib/sketchSolver.ts` pushes `point_on_line_ppp` with `p_id` / **`p1_id`** /
+  **`p2_id`**, but the real `PointOnLine_PPP` interface (constraints.ts:109-117) declares
+  `p_id` / **`lp1_id`** / **`lp2_id`**. Against the real wasm wrapper this throws
+  *"unhandled parameter lp1_id type: object_id"*. Affects **`collinear`, `bezier_tangent`,
+  `bezier_g1`, `bezier_g2`** — every one of them fails at runtime.
+  Separately, `symmetric_over_line`'s equal-radius path pushes `c1_id`/`c2_id` where
+  `equal_radius_aa` (constraints.ts:623-630) declares **`a1_id`/`a2_id`**.
+- **Why it was never caught:** every test exercising these paths **mocks
+  `@salusoft89/planegcs` wholesale** (e.g. `sketchGKP36.test.js`), so the real constraint schema is
+  never touched. The same failure mode as T-538's mirror — self-referential tests confirming the
+  code against itself.
+- **T-503 deliberately preserved the behaviour** with a documented `as unknown as GcsConstraint`
+  cast rather than fixing it mid-migration. That was correct: changing constraint semantics is not
+  a migration slice's job. The cast marks the exact site.
+- **Scope:** correct the parameter names; add a test that exercises the **real** planegcs wrapper
+  (not a mock) for at least one constraint per affected kind. Without that, the fix is unverifiable
+  by the same mechanism that hid the bug.
+- **Also worth fixing nearby (found by T-503, lower priority):** `sketchEdit`'s `constraintRefs`
+  omits `'midpoint'`, `'fixed'`, `'collinear'`, ellipse-constraint kinds, `'point_on_ellipse'` and
+  `'bezier_g2'`, falling through to `default: []` — so `deleteEntities`' cascade fails to drop those
+  constraints when a referenced entity is deleted, leaving dangling references.
+- **Depends-on:** T-503 (landed)
+
 ### T-539 — ⚠️ Validate the T-538 axis choice against a real board outline
 - **Tier:** A · **Priority:** P1 · **Status:** ⬜ not started
 - **Why this is not settled.** T-538's oracle test currently agrees **for a degenerate reason.**

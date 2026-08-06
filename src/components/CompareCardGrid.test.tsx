@@ -7,10 +7,11 @@
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
+import type { ReactElement } from 'react'
 import CompareCardGrid from './CompareCardGrid.jsx'
 
 /** Wrap in a MemoryRouter so <Link> renders without error. */
-function render(ui) {
+function render(ui: ReactElement) {
   return renderToStaticMarkup(<MemoryRouter>{ui}</MemoryRouter>)
 }
 
@@ -93,7 +94,9 @@ describe('CompareCardGrid', () => {
   })
 
   it('null items renders the empty state message', () => {
-    const html = render(<CompareCardGrid items={null} />)
+    // Component's Props type is non-nullable, but its runtime guard (`!items`)
+    // still handles null — exercise that defensive path deliberately.
+    const html = render(<CompareCardGrid items={null as unknown as typeof ITEMS} />)
     expect(html).toMatch(/No comparisons match your search/)
   })
 

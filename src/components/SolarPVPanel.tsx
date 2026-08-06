@@ -28,7 +28,7 @@
  *   photovoltaic array performance." Solar Energy 80(1).
  */
 
-import { useState } from 'react'
+import { useState, type MouseEvent } from 'react'
 
 // ---------------------------------------------------------------------------
 // Layout
@@ -37,21 +37,53 @@ import { useState } from 'react'
 const MAR = { top: 36, right: 60, bottom: 52, left: 60 }
 
 // ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface IvPoint {
+  v: number
+  i: number
+  p?: number
+}
+
+interface Mpp {
+  p_w: number
+  v_v: number
+  i_a: number
+}
+
+interface IvData {
+  iv_curve: IvPoint[]
+  isc_a?: number | null
+  voc_v?: number | null
+  mpp?: Mpp | null
+  power_loss_vs_uniform_pct?: number | null
+}
+
+interface TooltipState {
+  svgX: number
+  svgY: number
+  v: number
+  i: number
+  p: number
+}
+
+// ---------------------------------------------------------------------------
 // Scale helpers
 // ---------------------------------------------------------------------------
 
-function scaleLinear(domMin, domMax, rangeMin, rangeMax) {
+function scaleLinear(domMin: number, domMax: number, rangeMin: number, rangeMax: number) {
   const den = domMax - domMin
-  return (v) => den === 0 ? rangeMin : rangeMin + ((v - domMin) / den) * (rangeMax - rangeMin)
+  return (v: number) => den === 0 ? rangeMin : rangeMin + ((v - domMin) / den) * (rangeMax - rangeMin)
 }
 
-function niceTicks(min, max, count = 6) {
+function niceTicks(min: number, max: number, count = 6): number[] {
   if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) return [min]
   const step = (max - min) / Math.max(count - 1, 1)
   const mag = Math.pow(10, Math.floor(Math.log10(Math.abs(step) || 1)))
   const niceStep = Math.ceil(step / mag) * mag
   const start = Math.ceil(min / niceStep) * niceStep
-  const ticks = []
+  const ticks: number[] = []
   for (let v = start; v <= max + niceStep * 0.01; v += niceStep) {
     ticks.push(+v.toPrecision(5))
     if (ticks.length > 12) break
@@ -59,7 +91,7 @@ function niceTicks(min, max, count = 6) {
   return ticks.length ? ticks : [min, max]
 }
 
-function polylinePts(data, xFn, yFn) {
+function polylinePts<T>(data: T[], xFn: (d: T) => number, yFn: (d: T) => number): string {
   return data
     .map((d) => {
       const x = xFn(d)
@@ -74,7 +106,16 @@ function polylinePts(data, xFn, yFn) {
 // Tooltip
 // ---------------------------------------------------------------------------
 
-function Tooltip({ x, y, v, i, p, show }) {
+interface TooltipProps {
+  x: number
+  y: number
+  v: number
+  i: number
+  p: number
+  show: boolean
+}
+
+function Tooltip({ x, y, v, i, p, show }: TooltipProps) {
   if (!show) return null
   return (
     <g transform={`translate(${x + 10},${y - 10})`} style={{ pointerEvents: 'none' }}>
@@ -92,6 +133,15 @@ function Tooltip({ x, y, v, i, p, show }) {
 // Main component
 // ---------------------------------------------------------------------------
 
+interface SolarPVPanelProps {
+  ivData?: IvData | null
+  title?: string
+  showPV?: boolean
+  width?: number
+  height?: number
+  className?: string
+}
+
 export default function SolarPVPanel({
   ivData = null,
   title = 'PV I-V / P-V Curve',
@@ -99,8 +149,8 @@ export default function SolarPVPanel({
   width = 560,
   height = 340,
   className = '',
-}) {
-  const [tooltip, setTooltip] = useState(null)
+}: SolarPVPanelProps) {
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null)
 
   const innerW = width - MAR.left - MAR.right
   const innerH = height - MAR.top - MAR.bottom
@@ -273,7 +323,7 @@ export default function SolarPVPanel({
           width={innerW}
           height={innerH}
           fill="transparent"
-          onMouseMove={(e) => {
+          onMouseMove={(e: MouseEvent<SVGRectElement>) => {
             const svgEl = e.currentTarget.closest('svg')
             if (!svgEl) return
             const rect = svgEl.getBoundingClientRect()

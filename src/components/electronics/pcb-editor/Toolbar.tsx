@@ -1,33 +1,45 @@
-// Toolbar.jsx — PCB editor toolbar: tool-mode toggles, layer selector,
+// Toolbar.tsx — PCB editor toolbar: tool-mode toggles, layer selector,
 // DRC indicator, and undo/redo controls.
-//
-// Props:
-//   tool          — 'select' | 'route' | 'push-shove' | 'delete'
-//   onToolChange  — (tool) => void
-//   layer         — 'top' | 'bottom' | 'inner1' | 'inner2'
-//   onLayerChange — (layer) => void
-//   drcOk         — boolean | null (null = unknown/loading)
-//   canUndo       — boolean
-//   canRedo       — boolean
-//   onUndo        — () => void
-//   onRedo        — () => void
 
-import { MousePointer2, Route, Zap, Trash2, Layers, CheckCircle2, XCircle, Undo2, Redo2, Loader, Ruler, Activity, Cpu, ShieldAlert, Box, Layers3, Thermometer } from 'lucide-react'
+import { MousePointer2, Route, Zap, Trash2, Layers, CheckCircle2, XCircle, Undo2, Redo2, Loader, Ruler, Activity, Cpu, ShieldAlert, Box, Layers3, Thermometer, type LucideIcon } from 'lucide-react'
 
-const TOOLS = [
-  { id: 'select',     label: 'Select',      Icon: MousePointer2 },
-  { id: 'route',      label: 'Route',       Icon: Route },
-  { id: 'push-shove', label: 'Push-Shove',  Icon: Zap },
-  { id: 'delete',     label: 'Delete',      Icon: Trash2 },
+export type PcbTool = 'select' | 'route' | 'push-shove' | 'delete' | 'tune-length'
+export type PcbLayer = 'top' | 'bottom' | 'inner1' | 'inner2'
+
+const TOOLS: Array<{ id: PcbTool; label: string; Icon: LucideIcon }> = [
+  { id: 'select',      label: 'Select',      Icon: MousePointer2 },
+  { id: 'route',       label: 'Route',       Icon: Route },
+  { id: 'push-shove',  label: 'Push-Shove',  Icon: Zap },
+  { id: 'delete',      label: 'Delete',      Icon: Trash2 },
   { id: 'tune-length', label: 'Tune Length', Icon: Ruler },
 ]
 
-const LAYERS = [
+const LAYERS: Array<{ id: PcbLayer; label: string; color: string }> = [
   { id: 'top',    label: 'Top',    color: '#ef4444' },
   { id: 'bottom', label: 'Bottom', color: '#3b82f6' },
   { id: 'inner1', label: 'Inner1', color: '#f59e0b' },
   { id: 'inner2', label: 'Inner2', color: '#8b5cf6' },
 ]
+
+export interface ToolbarProps {
+  tool: PcbTool
+  onToolChange: (tool: PcbTool) => void
+  layer: PcbLayer
+  onLayerChange: (layer: PcbLayer) => void
+  /** null = unknown/loading */
+  drcOk: boolean | null
+  canUndo: boolean
+  canRedo: boolean
+  onUndo: () => void
+  onRedo: () => void
+  onToggleDrcPanel?: () => void
+  onToggleSIPanel?: () => void
+  onToggleSiliconPanel?: () => void
+  onToggleMultiBoardPanel?: () => void
+  onTogglePCB3DPanel?: () => void
+  onToggleEMCPanel?: () => void
+  onTogglePCBThermalPanel?: () => void
+}
 
 export default function Toolbar({
   tool,
@@ -46,7 +58,7 @@ export default function Toolbar({
   onTogglePCB3DPanel,
   onToggleEMCPanel,
   onTogglePCBThermalPanel,
-}) {
+}: ToolbarProps) {
   return (
     <div className="flex items-center gap-2 px-3 py-2 bg-[#1a1a2e] border-b border-white/10 text-sm select-none flex-wrap">
       {/* Tool toggles */}

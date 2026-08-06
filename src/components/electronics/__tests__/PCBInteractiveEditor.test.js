@@ -32,8 +32,22 @@ beforeAll(() => {
 
 const root = resolve(__dirname, '../../..')
 
+// Extension-agnostic: a source-contract probe should keep working across a
+// slice's .jsx/.js -> .tsx/.ts rename, not re-pin to whichever extension
+// happened to exist when the probe was written.
 function src(relPath) {
-  return readFileSync(resolve(root, relPath), 'utf8')
+  try {
+    return readFileSync(resolve(root, relPath), 'utf8')
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err
+    const swapped = relPath.endsWith('.jsx')
+      ? relPath.slice(0, -4) + '.tsx'
+      : relPath.endsWith('.js')
+        ? relPath.slice(0, -3) + '.ts'
+        : null
+    if (!swapped) throw err
+    return readFileSync(resolve(root, swapped), 'utf8')
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

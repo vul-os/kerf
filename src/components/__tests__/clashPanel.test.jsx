@@ -30,10 +30,7 @@ function readComponentSource(baseName) {
 }
 
 const CLASH_SRC = readComponentSource('ClashPanel')
-const ASSEMBLY_SRC = readFileSync(
-  resolve(__dirname, '../AssemblyEditor.jsx'),
-  'utf8',
-)
+const ASSEMBLY_SRC = readComponentSource('AssemblyEditor')
 const API_SRC = readFileSync(
   // api.js was migrated to api.ts (T-505); this reads the shipped source, not an import specifier.
   resolve(__dirname, '../../lib/api.ts'),

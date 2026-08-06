@@ -6492,6 +6492,29 @@ this repo as transitive tscircuit dependencies. Both carry
     `point_on_ellipse`, ellipse semi-major/minor/rotation, `bezier_g2`) with cascade tests.
   - **VERIFIED:** typecheck 0, strict 0, ratchet 78/78, vitest 477 files / 13,209 passed.
 
+### T-568 — 🐛 Four defects found while migrating component subdirectories (T-510/T-511)
+- **Tier:** A · **Priority:** P1 · **Status:** ⬜ not started
+- All four were typed around and **reported rather than fixed**, per the migration rule that a slice
+  never changes behaviour. Each is documented in-place at the site.
+  - **`bim/EnergyReportPanel` silently drops its `Authorization` header.** The token-fetch branch
+    reads `useAuth`, which is **never imported or declared anywhere in the file** — verified: zero
+    imports, one guarded reference. Because it is written as
+    `typeof useAuth !== 'undefined' ? useAuth.getState().accessToken : null`, it does not throw; it
+    just always evaluates to `null`. So authenticated `projectId` calls go out unauthenticated and
+    nothing reports it. **Most serious of the four.**
+  - **`bim/EnergyReportPanel`'s "Annual operating hours" field ignores its `max`.** The `<Field>`
+    call passes `max`, but `Field` never reads or forwards it to the `<input>`, so the UI never
+    enforces the bound — only `buildSpec()`'s clamp does.
+  - **`electronics/PCBInteractiveEditor`: type gap between two sibling components.** `Toolbar`'s
+    `PcbTool` union includes `'tune-length'`; `Canvas`'s `ActiveTool` union does not. Cast at the
+    call site with a comment; Canvas's runtime handling of an unrecognised tool is unchanged.
+  - **`electronics/PCBInteractiveEditor`: a response is fetched, parsed, then discarded.**
+    `handleRouteCommit` posts to `electronics_route_trace`, awaits and parses the JSON, then calls
+    `pcb_shove_trace` without ever reading the result. The `await` was kept (request/response
+    timing is load-bearing); only the unused binding was dropped.
+- **Scope:** fix each on its own terms. The `useAuth` one is a genuine auth bug and should go first.
+- **Depends-on:** T-510/T-511 (landed)
+
 ### T-567 — Worker protocol drift found by typing the workers (T-506/T-507)
 - **Tier:** A · **Priority:** P1 · **Status:** ⬜ not started
 - T-501 built `src/types/workers.ts` by reading the workers' header comments. Migrating the workers

@@ -25,10 +25,15 @@
  *   label   string  Visible + accessible link text. Default 'Skip to main content'.
  */
 
+interface Props {
+  target?: string
+  label?: string
+}
+
 export default function SkipToContent({
   target = '#main-content',
   label = 'Skip to main content',
-}) {
+}: Props) {
   return (
     <a
       href={target}

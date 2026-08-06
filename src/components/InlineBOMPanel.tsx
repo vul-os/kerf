@@ -24,16 +24,41 @@
 // merges our overrides patch on save.
 
 import { useEffect, useRef, useState } from 'react'
+import type { ComponentType } from 'react'
 import { ChevronDown, ChevronRight, Package, RefreshCw, Loader2, AlertTriangle } from 'lucide-react'
 import { useWorkspace } from '../store/workspace.js'
-import BOMTable, { formatUSD, totalQty } from './BOMTable.jsx'
+import BOMTableUntyped, { formatUSD, totalQty } from './BOMTable.jsx'
+
+// BOMTable.jsx is owned by a sibling slice (T-516) and not yet migrated;
+// several of its props (onOpenRow, overrides, onChangeOverride) have no
+// defaults so TS's structural inference reads them as required. Cast to a
+// loose prop type until BOMTable itself gets typed.
+const BOMTable = BOMTableUntyped as unknown as ComponentType<Record<string, unknown>>
+
+export interface BomOverride {
+  part_file_id: string
+  quantity_override?: number
+  non_stocked?: boolean
+  note?: string
+}
+
+export interface InlineBOMPanelProps {
+  /** Project the assembly belongs to. */
+  projectId?: string | null
+  /** Id of the .assembly file this panel is attached to. */
+  assemblyFileId?: string | null
+  /** Current overrides array on the assembly (round-tripped via parseAssembly/serializeAssembly). */
+  overrides?: BomOverride[]
+  /** Parent persists into the assembly file content + triggers a re-resolve. */
+  onChangeOverrides?: (next: BomOverride[]) => void
+}
 
 export default function InlineBOMPanel({
   projectId,
   assemblyFileId,
   overrides = [],
   onChangeOverrides,
-}) {
+}: InlineBOMPanelProps) {
   const [expanded, setExpanded] = useState(false)
   const bomState = useWorkspace((s) => s.bomState)
   const loadBOM = useWorkspace((s) => s.loadBOM)
@@ -73,13 +98,13 @@ export default function InlineBOMPanel({
   // Apply override patch to the assembly's overrides list. Patch shape is a
   // partial override row; null fields are removed; if all fields end up empty
   // we drop the row entirely so a noop edit doesn't dirty the file.
-  function applyOverridePatch(fileId, patch) {
+  function applyOverridePatch(fileId: string, patch: Partial<BomOverride>) {
     if (!fileId || !onChangeOverrides) return
     const list = Array.isArray(overrides) ? overrides : []
     const idx = list.findIndex((o) => o && o.part_file_id === fileId)
     const cur = idx >= 0 ? list[idx] : { part_file_id: fileId }
-    const next = { ...cur }
-    for (const k of Object.keys(patch)) {
+    const next: Record<string, unknown> = { ...cur }
+    for (const k of Object.keys(patch) as Array<keyof BomOverride>) {
       const v = patch[k]
       if (v == null || v === '' || v === false) {
         delete next[k]
@@ -92,13 +117,13 @@ export default function InlineBOMPanel({
       next.quantity_override != null ||
       next.non_stocked === true ||
       (typeof next.note === 'string' && next.note.trim())
-    let outList
+    let outList: BomOverride[]
     if (!hasContent) {
       outList = idx >= 0 ? list.filter((_, i) => i !== idx) : list
     } else if (idx >= 0) {
-      outList = list.map((o, i) => i === idx ? next : o)
+      outList = list.map((o, i) => i === idx ? (next as unknown as BomOverride) : o)
     } else {
-      outList = [...list, next]
+      outList = [...list, next as unknown as BomOverride]
     }
     onChangeOverrides(outList)
   }

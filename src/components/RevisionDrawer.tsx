@@ -21,7 +21,7 @@
 // a row of source-toggle chips (You / AI / Tool / Restore). Filtering is
 // purely client-side — no API roundtrip.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import {
   History, RotateCcw, X, RefreshCw, Search, Check, ChevronRight,
   FileText, Eye, EyeOff, Loader,
@@ -31,11 +31,27 @@ import { sourceMeta } from '../lib/revisionMeta.js'
 import { relativeTime, dayKey, dayLabel } from '../lib/relativeTime.js'
 import { api } from '../lib/api.js'
 
+// Local shape mirroring src/types/api.ts FileRevision — kept independent of
+// the shared type (rather than importing WorkspaceRevision) so this file's
+// standalone type-check doesn't have to resolve the '@/types' path alias.
+export interface Revision {
+  id: string
+  source: string
+  created_at: string
+  user_name?: string
+  user_avatar_url?: string
+  content_preview?: string
+  diff_added?: number
+  diff_removed?: number
+  added_lines?: number
+  removed_lines?: number
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────
 
-function initials(name) {
+function initials(name?: string | null) {
   const s = (name || '').trim()
   if (!s) return '·'
   const parts = s.split(/\s+/).filter(Boolean)
@@ -46,7 +62,7 @@ function initials(name) {
 // Avatar resolver: human authors prefer their photo, then initials. Non-human
 // sources (llm/tool/restore) get the source icon in a tinted circle so the
 // row's identity is legible at a glance.
-function RowAvatar({ rev }) {
+function RowAvatar({ rev }: { rev: Revision }) {
   const meta = sourceMeta(rev.source)
   const Icon = meta.icon
   if (rev.source === 'user') {
@@ -81,7 +97,12 @@ function RowAvatar({ rev }) {
 
 // Source-toggle chip. Multi-select — clicking adds/removes from the active
 // filter set. When `active` is empty the panel shows everything.
-function SourceChip({ kind, active, onToggle, count }) {
+function SourceChip({ kind, active, onToggle, count }: {
+  kind: string
+  active: Set<string>
+  onToggle: (kind: string) => void
+  count: number
+}) {
   const meta = sourceMeta(kind)
   const Icon = meta.icon
   const on = active.has(kind)
@@ -108,7 +129,7 @@ function SourceChip({ kind, active, onToggle, count }) {
 // Inline restore confirmation. We deliberately swap the row's content
 // (rather than opening a dialog) so the user's eye stays on the entry they
 // just clicked. Cmd+Z stays available after the fact.
-function ConfirmRestoreStrip({ onConfirm, onCancel }) {
+function ConfirmRestoreStrip({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
   return (
     <div
       className="mt-1.5 rounded border border-kerf-300/40 bg-kerf-300/[0.06] px-2 py-1.5"
@@ -142,6 +163,21 @@ function ConfirmRestoreStrip({ onConfirm, onCancel }) {
 // Row
 // ─────────────────────────────────────────────────────────────────────────
 
+interface RevisionRowProps {
+  rev: Revision
+  isCurrent: boolean
+  isFocused: boolean
+  isFirstInGroup: boolean
+  isLastInGroup: boolean
+  confirming: boolean
+  onFocus: () => void
+  onRequestRestore: () => void
+  onConfirmRestore: () => void
+  onCancelRestore: () => void
+  projectId?: string | null
+  fileId?: string | null
+}
+
 function RevisionRow({
   rev,
   isCurrent,
@@ -155,7 +191,7 @@ function RevisionRow({
   onCancelRestore,
   projectId,
   fileId,
-}) {
+}: RevisionRowProps) {
   const meta = sourceMeta(rev.source)
   const Icon = meta.icon
   const preview = (rev.content_preview || '').replace(/\s+/g, ' ').trim()
@@ -165,12 +201,12 @@ function RevisionRow({
   }, [rev.created_at])
 
   // Lazy full-content state for this row.
-  const [fullContent, setFullContent] = useState(null)
+  const [fullContent, setFullContent] = useState<string | null>(null)
   const [loadingContent, setLoadingContent] = useState(false)
-  const [contentError, setContentError] = useState(null)
+  const [contentError, setContentError] = useState<string | null>(null)
   const [showFull, setShowFull] = useState(false)
 
-  const handleToggleFullContent = useCallback(async (e) => {
+  const handleToggleFullContent = useCallback(async (e: { stopPropagation: () => void }) => {
     e.stopPropagation()
     if (showFull) {
       setShowFull(false)
@@ -188,7 +224,7 @@ function RevisionRow({
       setFullContent(data?.content ?? '')
       setShowFull(true)
     } catch (err) {
-      setContentError(err?.message || 'Failed to load content')
+      setContentError((err as Error)?.message || 'Failed to load content')
     } finally {
       setLoadingContent(false)
     }
@@ -346,15 +382,22 @@ function RevisionRow({
 
 const FILTER_KINDS = ['user', 'llm', 'tool', 'restore']
 
-export default function RevisionDrawer({ revisions, loading, onRestore, onClose }) {
+export interface RevisionDrawerProps {
+  revisions: Revision[]
+  loading?: boolean
+  onRestore?: (id: string) => void
+  onClose?: () => void
+}
+
+export default function RevisionDrawer({ revisions, loading, onRestore, onClose }: RevisionDrawerProps) {
   const currentFile = useWorkspace((s) => s.currentFile)
   const currentFileId = useWorkspace((s) => s.currentFileId)
   const projectId = useWorkspace((s) => s.projectId)
 
   const [query, setQuery] = useState('')
-  const [activeKinds, setActiveKinds] = useState(() => new Set())
-  const [confirmingId, setConfirmingId] = useState(null)
-  const [focusedId, setFocusedId] = useState(null)
+  const [activeKinds, setActiveKinds] = useState<Set<string>>(() => new Set())
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  const [focusedId, setFocusedId] = useState<string | null>(null)
 
   // Reset transient UI state when the underlying file changes.
   useEffect(() => {
@@ -369,7 +412,7 @@ export default function RevisionDrawer({ revisions, loading, onRestore, onClose 
   // Per-kind counts for the chip badges. Computed off the unfiltered list
   // so toggling a chip doesn't make the others' counts vanish.
   const kindCounts = useMemo(() => {
-    const out = { user: 0, llm: 0, tool: 0, restore: 0 }
+    const out: Record<string, number> = { user: 0, llm: 0, tool: 0, restore: 0 }
     for (const r of list) {
       if (out[r.source] !== undefined) out[r.source] += 1
     }
@@ -390,8 +433,8 @@ export default function RevisionDrawer({ revisions, loading, onRestore, onClose 
   // Group by local-day. We keep insertion order (newest-first from the API)
   // so each day-group is also newest-first within itself.
   const groups = useMemo(() => {
-    const out = []
-    const byKey = new Map()
+    const out: { key: string; label: string; items: Revision[] }[] = []
+    const byKey = new Map<string, { key: string; label: string; items: Revision[] }>()
     for (const r of filtered) {
       const k = dayKey(r.created_at)
       let g = byKey.get(k)
@@ -427,7 +470,7 @@ export default function RevisionDrawer({ revisions, loading, onRestore, onClose 
     }
   }, [filtered, focusedId])
 
-  const onToggleKind = (kind) => {
+  const onToggleKind = (kind: string) => {
     setActiveKinds((prev) => {
       const next = new Set(prev)
       if (next.has(kind)) next.delete(kind)
@@ -436,9 +479,9 @@ export default function RevisionDrawer({ revisions, loading, onRestore, onClose 
     })
   }
 
-  const onRequestRestore = (id) => setConfirmingId(id)
+  const onRequestRestore = (id: string) => setConfirmingId(id)
   const onCancelRestore = () => setConfirmingId(null)
-  const onConfirmRestore = (id) => {
+  const onConfirmRestore = (id: string) => {
     setConfirmingId(null)
     try { onRestore?.(id) } catch { /* surfaced via store toast */ }
   }
@@ -447,13 +490,14 @@ export default function RevisionDrawer({ revisions, loading, onRestore, onClose 
   // mount it only while this panel is on screen. We bail out when the
   // event target is an editable element (the search input, primarily) so
   // users can still type "j" or "k" into the search box.
-  const rootRef = useRef(null)
+  const rootRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    const handler = (e) => {
-      const tag = (e.target?.tagName || '').toLowerCase()
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const tag = (target?.tagName || '').toLowerCase()
       const editable =
         tag === 'input' || tag === 'textarea' || tag === 'select' ||
-        e.target?.isContentEditable
+        target?.isContentEditable
       if (e.key === 'Escape') {
         e.preventDefault()
         onClose?.()
@@ -501,9 +545,9 @@ export default function RevisionDrawer({ revisions, loading, onRestore, onClose 
             <span className="text-xs font-medium text-ink-200 uppercase tracking-wider leading-none">
               History
             </span>
-            {currentFile?.name && (
+            {(currentFile as { name?: string } | null)?.name && (
               <span className="mt-0.5 text-[10px] font-mono text-ink-500 truncate leading-none">
-                {currentFile.name}
+                {(currentFile as { name?: string }).name}
               </span>
             )}
           </div>

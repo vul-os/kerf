@@ -20,23 +20,28 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { MoreHorizontal } from 'lucide-react'
 
+interface Props {
+  children?: React.ReactNode
+  hiddenFrom?: string
+}
+
 // Exported so tests can import it without mounting the full Editor component.
-export function TopBarMoreMenu({ children, hiddenFrom = 'xl' }) {
+export function TopBarMoreMenu({ children, hiddenFrom = 'xl' }: Props) {
   const [open, setOpen] = useState(false)
-  const wrapRef = useRef(null)
-  const buttonRef = useRef(null)
-  const menuRef = useRef(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   // ── Keyboard: arrow navigation + Escape ──────────────────────────────────
-  const handleMenuKeyDown = useCallback((e) => {
+  const handleMenuKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!menuRef.current) return
     const items = Array.from(
-      menuRef.current.querySelectorAll('[role="menuitem"]:not([disabled])')
+      menuRef.current.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])')
     )
     if (!items.length) return
 
-    const focused = document.activeElement
-    const idx = items.indexOf(focused)
+    const focused = document.activeElement as HTMLElement | null
+    const idx = focused ? items.indexOf(focused) : -1
 
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -62,10 +67,10 @@ export function TopBarMoreMenu({ children, hiddenFrom = 'xl' }) {
   useEffect(() => {
     if (!open) return
 
-    function onDocMouseDown(e) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
+    function onDocMouseDown(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
     }
-    function onDocKey(e) {
+    function onDocKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         setOpen(false)
         buttonRef.current?.focus?.()
@@ -83,7 +88,7 @@ export function TopBarMoreMenu({ children, hiddenFrom = 'xl' }) {
   // Move focus to first menuitem when the menu opens.
   useEffect(() => {
     if (!open || !menuRef.current) return
-    const first = menuRef.current.querySelector('[role="menuitem"]:not([disabled])')
+    const first = menuRef.current.querySelector<HTMLElement>('[role="menuitem"]:not([disabled])')
     first?.focus?.()
   }, [open])
 
@@ -116,7 +121,7 @@ export function TopBarMoreMenu({ children, hiddenFrom = 'xl' }) {
           onClick={(e) => {
             // Auto-close after a menuitem click so the trigger doesn't have
             // to wire this explicitly.
-            const t = e.target
+            const t = e.target as HTMLElement | null
             if (t && t.closest && t.closest('[role="menuitem"]')) setOpen(false)
           }}
         >

@@ -29,7 +29,38 @@
 // no-DOM vitest suite can exercise the layout/scale logic without mounting.
 
 import { useCallback, useRef, useState } from 'react'
+import type { CSSProperties, MouseEvent as ReactMouseEvent, WheelEvent as ReactWheelEvent } from 'react'
 import { ChevronLeft, ChevronRight, Scissors, AlertTriangle } from 'lucide-react'
+
+// ---------------------------------------------------------------------------
+// Local types — mirrors NestResult serialised by kerf_cad_core.nesting's
+// result_to_dict (see file-shape comment above). No shared type exists for
+// this Python-tool JSON shape yet; kept local rather than invented in
+// src/types/ for a single consumer.
+// ---------------------------------------------------------------------------
+
+export interface NestPlacement {
+  part: string
+  x: number
+  y: number
+  w: number
+  h: number
+  rot?: number
+}
+
+export interface NestSheet {
+  sheet?: number
+  placements: NestPlacement[]
+}
+
+export interface NestResult {
+  ok?: boolean
+  sheets_used?: number
+  utilization?: number | null
+  cut_length?: number | null
+  errors?: string[]
+  sheets?: NestSheet[]
+}
 
 // ---------------------------------------------------------------------------
 // Pure layout / scale helpers (exported for tests)
@@ -45,7 +76,8 @@ import { ChevronLeft, ChevronRight, Scissors, AlertTriangle } from 'lucide-react
  *   scale    — user-space units per pixel (useful for strokeWidth)
  *   padded*  — sheet rect in user space after padding
  */
-export function nestViewport(sheetW, sheetH, viewW, viewH, padding = 12) {
+// eslint-disable-next-line react-refresh/only-export-components -- pre-existing before this migration; exported alongside the component for the no-DOM vitest suite.
+export function nestViewport(sheetW: number, sheetH: number, viewW: number, viewH: number, padding = 12) {
   if (!sheetW || !sheetH || !viewW || !viewH) {
     return { viewBox: '0 0 100 100', scale: 1, paddedX: 0, paddedY: 0, paddedW: 100, paddedH: 100 }
   }
@@ -71,7 +103,8 @@ export function nestViewport(sheetW, sheetH, viewW, viewH, padding = 12) {
  * Map a part name to a stable colour-palette index (0-based).
  * Uses a simple djb2-style hash so the same name always maps to the same colour.
  */
-export function partColorIndex(name, paletteSize = PART_COLORS.length) {
+// eslint-disable-next-line react-refresh/only-export-components -- pre-existing before this migration; exported alongside the component for the no-DOM vitest suite.
+export function partColorIndex(name: string, paletteSize = PART_COLORS.length) {
   let h = 5381
   for (let i = 0; i < name.length; i++) {
     h = ((h << 5) + h + name.charCodeAt(i)) >>> 0
@@ -83,7 +116,8 @@ export function partColorIndex(name, paletteSize = PART_COLORS.length) {
  * Format a utilization fraction (0-1) as a percentage string.
  * Returns e.g. "74.3%".
  */
-export function fmtUtilization(u) {
+// eslint-disable-next-line react-refresh/only-export-components -- pre-existing before this migration; exported alongside the component for the no-DOM vitest suite.
+export function fmtUtilization(u: number | null | undefined) {
   if (u == null || !Number.isFinite(u)) return '—'
   return (u * 100).toFixed(1) + '%'
 }
@@ -91,7 +125,8 @@ export function fmtUtilization(u) {
 /**
  * Format a cut-length value in mm, abbreviating to metres when >= 1000 mm.
  */
-export function fmtCutLength(mm) {
+// eslint-disable-next-line react-refresh/only-export-components -- pre-existing before this migration; exported alongside the component for the no-DOM vitest suite.
+export function fmtCutLength(mm: number | null | undefined) {
   if (mm == null || !Number.isFinite(mm)) return '—'
   if (mm >= 1000) return (mm / 1000).toFixed(2) + ' m'
   return mm.toFixed(1) + ' mm'
@@ -104,7 +139,8 @@ export function fmtCutLength(mm) {
  *
  * Returns { w, h } — the bounding box of all placed parts plus a 10% margin.
  */
-export function inferSheetSize(placements) {
+// eslint-disable-next-line react-refresh/only-export-components -- pre-existing before this migration; exported alongside the component for the no-DOM vitest suite.
+export function inferSheetSize(placements: NestPlacement[] | null | undefined) {
   if (!placements || placements.length === 0) return { w: 100, h: 100 }
   let maxX = 0
   let maxY = 0
@@ -122,6 +158,7 @@ export function inferSheetSize(placements) {
 // Colour palette — muted fills that work on a dark background
 // ---------------------------------------------------------------------------
 
+// eslint-disable-next-line react-refresh/only-export-components -- pre-existing before this migration; exported alongside the component for the no-DOM vitest suite.
 export const PART_COLORS = [
   { fill: '#3b3f6b', stroke: '#818cf8' },  // indigo
   { fill: '#2d4a3e', stroke: '#34d399' },  // emerald
@@ -140,16 +177,20 @@ export const PART_COLORS = [
 // ---------------------------------------------------------------------------
 
 /**
- * NestingLayoutView
- *
  * Props:
  *   parsedContent — the already-parsed JSON of a `.nest` file, or null.
  *   sheetW        — optional explicit sheet width  (mm); inferred if omitted.
  *   sheetH        — optional explicit sheet height (mm); inferred if omitted.
  */
-export default function NestingLayoutView({ parsedContent, sheetW: propSheetW, sheetH: propSheetH }) {
+export interface Props {
+  parsedContent: NestResult | null
+  sheetW?: number
+  sheetH?: number
+}
+
+export default function NestingLayoutView({ parsedContent, sheetW: propSheetW, sheetH: propSheetH }: Props) {
   const [sheetIdx, setSheetIdx] = useState(0)
-  const svgRef = useRef(null)
+  const svgRef = useRef<SVGSVGElement>(null)
 
   // Pan/zoom state
   const [zoom, setZoom] = useState(1)
@@ -157,14 +198,14 @@ export default function NestingLayoutView({ parsedContent, sheetW: propSheetW, s
   const isPanning = useRef(false)
   const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 })
 
-  const onMouseDown = useCallback((e) => {
+  const onMouseDown = useCallback((e: ReactMouseEvent) => {
     if (e.button !== 0 && e.button !== 1) return
     isPanning.current = true
     panStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y }
     e.preventDefault()
   }, [pan])
 
-  const onMouseMove = useCallback((e) => {
+  const onMouseMove = useCallback((e: ReactMouseEvent) => {
     if (!isPanning.current) return
     setPan({
       x: panStart.current.panX + (e.clientX - panStart.current.x),
@@ -174,7 +215,7 @@ export default function NestingLayoutView({ parsedContent, sheetW: propSheetW, s
 
   const onMouseUp = useCallback(() => { isPanning.current = false }, [])
 
-  const onWheel = useCallback((e) => {
+  const onWheel = useCallback((e: ReactWheelEvent) => {
     e.preventDefault()
     setZoom((z) => Math.max(0.05, Math.min(50, z * (e.deltaY > 0 ? 0.9 : 1.1))))
   }, [])
@@ -183,6 +224,10 @@ export default function NestingLayoutView({ parsedContent, sheetW: propSheetW, s
 
   // -- Parse content --
   const data = parsedContent
+  // Dead code inherited from the .jsx: `ok` is computed but never read anywhere
+  // below — rendering branches on `isEmpty`/`errors` instead. Reported, not
+  // removed — see the T-513 migration report.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const ok = data?.ok ?? false
   const sheets = Array.isArray(data?.sheets) ? data.sheets : []
   const sheetsUsed = data?.sheets_used ?? sheets.length
@@ -435,7 +480,13 @@ export default function NestingLayoutView({ parsedContent, sheetW: propSheetW, s
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function StatItem({ label, value, mono }) {
+interface StatItemProps {
+  label: string
+  value: string | number
+  mono?: boolean
+}
+
+function StatItem({ label, value, mono }: StatItemProps) {
   return (
     <div style={styles.statItem}>
       <span style={styles.statLabel}>{label}</span>
@@ -444,10 +495,10 @@ function StatItem({ label, value, mono }) {
   )
 }
 
-function PartLegend({ placements }) {
+function PartLegend({ placements }: { placements: NestPlacement[] }) {
   // Deduplicate by part name
-  const seen = new Set()
-  const parts = []
+  const seen = new Set<string>()
+  const parts: string[] = []
   for (const p of placements) {
     if (!seen.has(p.part)) {
       seen.add(p.part)
@@ -477,7 +528,7 @@ function PartLegend({ placements }) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function utilizationBg(u) {
+function utilizationBg(u: number) {
   if (u >= 0.8) return '#14532d44'
   if (u >= 0.6) return '#1e3a5f44'
   return '#3b2f0044'
@@ -487,7 +538,7 @@ function utilizationBg(u) {
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   root: {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: 13,

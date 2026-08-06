@@ -74,9 +74,9 @@ describe('LadderPowerFlowOverlay — null / empty inputs', () => {
   it('renders without crashing when powerFlow sets are empty', () => {
     const rung = [noContact('c1', 'x'), coil('q1', 'out')]
     const powerFlow = {
-      contactsLit: new Set(),
-      coilsLit: new Set(),
-      wiresLit: new Set(),
+      contactsLit: new Set<string>(),
+      coilsLit: new Set<string>(),
+      wiresLit: new Set<string>(),
     }
     expect(() => {
       renderToStaticMarkup(<LadderPowerFlowOverlay rung={rung} powerFlow={powerFlow} />)
@@ -119,7 +119,7 @@ describe('LadderPowerFlowOverlay — root element', () => {
 describe('LadderPowerFlowOverlay — contact overlays', () => {
   it('renders a rect for each contact element', () => {
     const rung = [noContact('c1', 'x'), noContact('c2', 'y')]
-    const powerFlow = { contactsLit: new Set(['c1']), coilsLit: new Set(), wiresLit: new Set() }
+    const powerFlow = { contactsLit: new Set(['c1']), coilsLit: new Set<string>(), wiresLit: new Set<string>() }
     const html = renderToStaticMarkup(
       <LadderPowerFlowOverlay rung={rung} powerFlow={powerFlow} />,
     )
@@ -130,7 +130,7 @@ describe('LadderPowerFlowOverlay — contact overlays', () => {
 
   it('lit contact uses green stroke (#34d399)', () => {
     const rung = [noContact('c1', 'x')]
-    const powerFlow = { contactsLit: new Set(['c1']), coilsLit: new Set(), wiresLit: new Set() }
+    const powerFlow = { contactsLit: new Set(['c1']), coilsLit: new Set<string>(), wiresLit: new Set<string>() }
     const html = renderToStaticMarkup(
       <LadderPowerFlowOverlay rung={rung} powerFlow={powerFlow} />,
     )
@@ -139,7 +139,7 @@ describe('LadderPowerFlowOverlay — contact overlays', () => {
 
   it('unlit contact uses dim grey stroke (#6b7280)', () => {
     const rung = [noContact('c1', 'x')]
-    const powerFlow = { contactsLit: new Set(), coilsLit: new Set(), wiresLit: new Set() }
+    const powerFlow = { contactsLit: new Set<string>(), coilsLit: new Set<string>(), wiresLit: new Set<string>() }
     const html = renderToStaticMarkup(
       <LadderPowerFlowOverlay rung={rung} powerFlow={powerFlow} />,
     )
@@ -164,7 +164,7 @@ describe('LadderPowerFlowOverlay — contact overlays', () => {
 describe('LadderPowerFlowOverlay — coil overlays', () => {
   it('renders a circle for each coil element', () => {
     const rung = [coil('q1', 'out')]
-    const powerFlow = { contactsLit: new Set(), coilsLit: new Set(['q1']), wiresLit: new Set() }
+    const powerFlow = { contactsLit: new Set<string>(), coilsLit: new Set(['q1']), wiresLit: new Set<string>() }
     const html = renderToStaticMarkup(
       <LadderPowerFlowOverlay rung={rung} powerFlow={powerFlow} />,
     )
@@ -175,7 +175,7 @@ describe('LadderPowerFlowOverlay — coil overlays', () => {
 
   it('lit coil uses green fill / stroke', () => {
     const rung = [coil('q1', 'out')]
-    const powerFlow = { contactsLit: new Set(), coilsLit: new Set(['q1']), wiresLit: new Set() }
+    const powerFlow = { contactsLit: new Set<string>(), coilsLit: new Set(['q1']), wiresLit: new Set<string>() }
     const html = renderToStaticMarkup(
       <LadderPowerFlowOverlay rung={rung} powerFlow={powerFlow} />,
     )
@@ -184,7 +184,7 @@ describe('LadderPowerFlowOverlay — coil overlays', () => {
 
   it('unlit coil uses red stroke (#f87171) — broken wire indicator', () => {
     const rung = [coil('q1', 'out')]
-    const powerFlow = { contactsLit: new Set(), coilsLit: new Set(), wiresLit: new Set() }
+    const powerFlow = { contactsLit: new Set<string>(), coilsLit: new Set<string>(), wiresLit: new Set<string>() }
     const html = renderToStaticMarkup(
       <LadderPowerFlowOverlay rung={rung} powerFlow={powerFlow} />,
     )
@@ -230,9 +230,9 @@ describe('LadderPowerFlowOverlay — wire segments', () => {
     const c = { id: 'c1', type: 'NO', variable: 'x', x: 0, y: 20, width: 40, height: 20 }
     const q = { id: 'q1', type: 'COIL', variable: 'out', x: 60, y: 20, width: 40, height: 20 }
     const powerFlow = {
-      contactsLit: new Set(),      // c1 NOT lit
-      coilsLit: new Set(),
-      wiresLit: new Set(),
+      contactsLit: new Set<string>(),      // c1 NOT lit
+      coilsLit: new Set<string>(),
+      wiresLit: new Set<string>(),
     }
     const html = renderToStaticMarkup(
       <LadderPowerFlowOverlay rung={[c, q]} powerFlow={powerFlow} />,
@@ -243,7 +243,7 @@ describe('LadderPowerFlowOverlay — wire segments', () => {
   it('no wire segments rendered when elements have no positional data', () => {
     const c = { id: 'c1', type: 'NO', variable: 'x' }
     const q = { id: 'q1', type: 'COIL', variable: 'out' }
-    const powerFlow = { contactsLit: new Set(['c1']), coilsLit: new Set(['q1']), wiresLit: new Set() }
+    const powerFlow = { contactsLit: new Set(['c1']), coilsLit: new Set(['q1']), wiresLit: new Set<string>() }
     const html = renderToStaticMarkup(
       <LadderPowerFlowOverlay rung={[c, q]} powerFlow={powerFlow} />,
     )
@@ -273,7 +273,7 @@ describe('LadderPowerFlowOverlay — opacity and strokeWidth props', () => {
 
   it('uses strokeWidth for contact rect stroke-width', () => {
     const rung = [noContact('c1', 'x')]
-    const powerFlow = { contactsLit: new Set(), coilsLit: new Set(), wiresLit: new Set() }
+    const powerFlow = { contactsLit: new Set<string>(), coilsLit: new Set<string>(), wiresLit: new Set<string>() }
     const html = renderToStaticMarkup(
       <LadderPowerFlowOverlay rung={rung} powerFlow={powerFlow} strokeWidth={5} />,
     )
@@ -290,7 +290,7 @@ describe('LadderPowerFlowOverlay — unknown element types', () => {
     const rung = [
       { id: 'u1', type: 'UNKNOWN_BLOCK', variable: 'foo', x: 0, y: 0, width: 40, height: 40 },
     ]
-    const powerFlow = { contactsLit: new Set(), coilsLit: new Set(), wiresLit: new Set() }
+    const powerFlow = { contactsLit: new Set<string>(), coilsLit: new Set<string>(), wiresLit: new Set<string>() }
     expect(() => {
       renderToStaticMarkup(
         <LadderPowerFlowOverlay rung={rung} powerFlow={powerFlow} />,
@@ -302,7 +302,7 @@ describe('LadderPowerFlowOverlay — unknown element types', () => {
     const rung = [
       { type: 'NO', variable: 'x', x: 0, y: 0, width: 40, height: 40 },
     ]
-    const powerFlow = { contactsLit: new Set(), coilsLit: new Set(), wiresLit: new Set() }
+    const powerFlow = { contactsLit: new Set<string>(), coilsLit: new Set<string>(), wiresLit: new Set<string>() }
     expect(() => {
       renderToStaticMarkup(
         <LadderPowerFlowOverlay rung={rung} powerFlow={powerFlow} />,
@@ -327,7 +327,7 @@ describe('LadderPowerFlowOverlay — parallel branch rendering', () => {
     const powerFlow = {
       contactsLit: new Set(['c1']),
       coilsLit: new Set(['q1']),
-      wiresLit: new Set(),
+      wiresLit: new Set<string>(),
     }
     const html = renderToStaticMarkup(
       <LadderPowerFlowOverlay rung={rung} powerFlow={powerFlow} />,

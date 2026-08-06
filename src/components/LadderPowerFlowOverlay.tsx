@@ -40,6 +40,52 @@
 
 import { colorForState } from '../lib/ladderPowerFlow.js'
 
+// ── Types ──────────────────────────────────────────────────────────────────
+//
+// ladderPowerFlow.ts (already migrated) leaves rung/element/powerFlow shapes
+// as implicit `any`. Declared locally here from this file's own header-comment
+// doc rather than trusted as `any` at the call sites below.
+
+/** A single ladder element (contact, coil, etc). May be nested inside a
+ *  parallel-branch sub-array — see {@link RungItem}. */
+export interface RungElement {
+  // Both optional in practice — the renderer defensively skips elements
+  // missing either (see the `if (!elem || !elem.id || !elem.type)` guard below).
+  id?: string
+  type?: string
+  variable?: string
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+  [key: string]: unknown
+}
+
+/** A rung entry is either a leaf element or a nested parallel-branch array. */
+export type RungItem = RungElement | RungItem[]
+
+export interface PowerFlowResult {
+  contactsLit?: Set<string> | string[]
+  coilsLit?: Set<string> | string[]
+  wiresLit?: Set<string> | string[]
+}
+
+interface BoundingRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+interface WireSegment {
+  id: string
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  lit: boolean
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -48,7 +94,7 @@ const CONTACT_TYPES = new Set(['NO', 'NC', 'R_TRIG', 'F_TRIG'])
 const COIL_TYPES = new Set(['COIL', 'COIL_NC', 'SET', 'RESET'])
 
 // Fallback geometry used when the element has no positional metadata.
-const FALLBACK_RECT = { x: 0, y: 0, width: 40, height: 40 }
+const FALLBACK_RECT: BoundingRect = { x: 0, y: 0, width: 40, height: 40 }
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -57,11 +103,8 @@ const FALLBACK_RECT = { x: 0, y: 0, width: 40, height: 40 }
 /**
  * Normalise a Set or Array into a plain Set for O(1) lookup.
  * Returns an empty Set for null / undefined.
- *
- * @param {Set|Array|null|undefined} input
- * @returns {Set}
  */
-function toSet(input) {
+function toSet(input: Set<string> | string[] | null | undefined): Set<string> {
   if (!input) return new Set()
   if (input instanceof Set) return input
   return new Set(input)
@@ -70,11 +113,8 @@ function toSet(input) {
 /**
  * Return the bounding rect object for an element, falling back to a default
  * if the element has no position data.
- *
- * @param {{ x?: number, y?: number, width?: number, height?: number }} elem
- * @returns {{ x: number, y: number, width: number, height: number }}
  */
-function boundingRect(elem) {
+function boundingRect(elem: RungElement): BoundingRect {
   if (elem && elem.x != null && elem.y != null && elem.width && elem.height) {
     return { x: elem.x, y: elem.y, width: elem.width, height: elem.height }
   }
@@ -89,7 +129,7 @@ function boundingRect(elem) {
  * Render overlay glyphs for a contact element.
  * Draws a highlighted rectangle matching the element's bounding box.
  */
-function ContactOverlay({ elem, lit, strokeWidth }) {
+function ContactOverlay({ elem, lit, strokeWidth }: { elem: RungElement; lit: boolean; strokeWidth: number }) {
   const { x, y, width, height } = boundingRect(elem)
   const color = colorForState(lit, elem.type)
 
@@ -130,7 +170,7 @@ function ContactOverlay({ elem, lit, strokeWidth }) {
  * Render overlay glyphs for a coil element.
  * Draws a circle (matching the classic coil symbol) and a coloured fill.
  */
-function CoilOverlay({ elem, lit, strokeWidth }) {
+function CoilOverlay({ elem, lit, strokeWidth }: { elem: RungElement; lit: boolean; strokeWidth: number }) {
   const { x, y, width, height } = boundingRect(elem)
   const color = colorForState(lit, elem.type)
   const cx = x + width / 2
@@ -158,12 +198,16 @@ function CoilOverlay({ elem, lit, strokeWidth }) {
 
 /**
  * Render a horizontal wire segment between two elements.
- *
- * @param {{ x1, y1, x2, y2 }} props  SVG line endpoints.
- * @param {boolean}             lit    Whether this wire segment is energised.
- * @param {number}              strokeWidth
  */
-function WireOverlay({ x1, y1, x2, y2, lit, strokeWidth, wireId }) {
+function WireOverlay({ x1, y1, x2, y2, lit, strokeWidth, wireId }: {
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  lit: boolean
+  strokeWidth: number
+  wireId: string
+}) {
   const color = lit ? '#34d399' : '#f87171'
 
   return (
@@ -185,18 +229,23 @@ function WireOverlay({ x1, y1, x2, y2, lit, strokeWidth, wireId }) {
 // Main component
 // ---------------------------------------------------------------------------
 
+export interface LadderPowerFlowOverlayProps {
+  rung?: RungItem[] | null
+  powerFlow?: PowerFlowResult | null
+  strokeWidth?: number
+  opacity?: number
+}
+
 /**
  * LadderPowerFlowOverlay — renders colour-coded SVG overlays for a single
  * ladder rung based on the supplied power-flow computation result.
- *
- * @param {{ rung: Array, powerFlow: object, strokeWidth?: number, opacity?: number }}
  */
 export default function LadderPowerFlowOverlay({
   rung,
   powerFlow,
   strokeWidth = 3,
   opacity = 0.85,
-}) {
+}: LadderPowerFlowOverlayProps) {
   // Normalise inputs — treat null/undefined gracefully.
   const safeRung = Array.isArray(rung) ? rung : []
   const contactsLit = toSet(powerFlow?.contactsLit)
@@ -205,7 +254,7 @@ export default function LadderPowerFlowOverlay({
 
   // Flatten the rung into a list of leaf elements for overlay rendering.
   // Nested arrays (parallel groups) are unwrapped.
-  const leafElements = []
+  const leafElements: RungElement[] = []
   flattenRung(safeRung, leafElements)
 
   // Build wire segments between adjacent contact elements and coils.
@@ -219,7 +268,7 @@ export default function LadderPowerFlowOverlay({
       style={{ pointerEvents: 'none' }}
     >
       {/* Wire segments first (rendered behind element overlays) */}
-      {wireSegments.map((seg) => (
+      {wireSegments.map((seg: WireSegment) => (
         <WireOverlay
           key={seg.id}
           wireId={seg.id}
@@ -233,7 +282,7 @@ export default function LadderPowerFlowOverlay({
       ))}
 
       {/* Element overlays */}
-      {leafElements.map((elem) => {
+      {leafElements.map((elem: RungElement) => {
         if (!elem || !elem.id || !elem.type) return null
 
         if (CONTACT_TYPES.has(elem.type)) {
@@ -271,11 +320,8 @@ export default function LadderPowerFlowOverlay({
 /**
  * Recursively flatten a rung array (which may contain nested parallel-branch
  * sub-arrays) into a flat list of leaf element objects.
- *
- * @param {Array} arr   Rung or branch array.
- * @param {Array} out   Output accumulator.
  */
-function flattenRung(arr, out) {
+function flattenRung(arr: RungItem[], out: RungElement[]): void {
   for (const item of arr) {
     if (Array.isArray(item)) {
       flattenRung(item, out)
@@ -294,20 +340,19 @@ function flattenRung(arr, out) {
  *
  * If elements have no positional data the function returns an empty array —
  * the caller is responsible for providing positioned elements.
- *
- * @param {Array}  rung
- * @param {Set}    contactsLit
- * @param {Set}    coilsLit
- * @param {Set}    wiresLit
- * @param {number} strokeWidth
- * @returns {Array<{ id, x1, y1, x2, y2, lit }>}
  */
-function buildWireSegments(rung, contactsLit, coilsLit, wiresLit, strokeWidth) {
-  const segments = []
+function buildWireSegments(
+  rung: RungItem[],
+  contactsLit: Set<string>,
+  coilsLit: Set<string>,
+  wiresLit: Set<string>,
+  _strokeWidth: number,
+): WireSegment[] {
+  const segments: WireSegment[] = []
 
   // Only build segments when rung elements carry positional info.
   const positioned = rung.filter(
-    (e) => !Array.isArray(e) && e && e.x != null && e.y != null,
+    (e): e is RungElement => !Array.isArray(e) && e != null && (e as RungElement).x != null && (e as RungElement).y != null,
   )
 
   if (positioned.length < 2) return segments

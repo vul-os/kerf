@@ -27,23 +27,27 @@
  */
 
 import clsx from 'clsx'
-import { useBreakpoint, BREAKPOINTS } from '../lib/useBreakpoint.js'
+import { useBreakpoint } from '../lib/useBreakpoint.js'
 
 const BREAKPOINT_ORDER = ['sm', 'md', 'lg', 'xl', '2xl']
 
 /**
  * Returns true when `current` is >= `threshold` in the breakpoint hierarchy.
  *
- * @param {string|null} current    — active breakpoint name (from useBreakpoint)
- * @param {string}      threshold  — the stackedAt prop value
- * @returns {boolean}
+ * @param current    — active breakpoint name (from useBreakpoint)
+ * @param threshold  — the stackedAt prop value
  */
-function isAtOrAbove(current, threshold) {
+function isAtOrAbove(current: string | null, threshold: string): boolean {
   if (!current) return false
   const currentIdx  = BREAKPOINT_ORDER.indexOf(current)
   const thresholdIdx = BREAKPOINT_ORDER.indexOf(threshold)
   if (currentIdx === -1 || thresholdIdx === -1) return false
   return currentIdx >= thresholdIdx
+}
+
+interface Props extends React.ComponentProps<'div'> {
+  stackedAt?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'
+  gap?: string
 }
 
 export default function ResponsiveContainer({
@@ -52,7 +56,7 @@ export default function ResponsiveContainer({
   className,
   children,
   ...rest
-}) {
+}: Props) {
   const breakpoint = useBreakpoint()
   const isRow = isAtOrAbove(breakpoint, stackedAt)
 

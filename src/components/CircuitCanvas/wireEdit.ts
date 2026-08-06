@@ -1,4 +1,4 @@
-// wireEdit.js — Pure-logic wire drag + nudge for Circuit JSON editing.
+// wireEdit.ts — Pure-logic wire drag + nudge for Circuit JSON editing.
 //
 // No React or browser imports — safe in vitest and workers.
 //
@@ -15,18 +15,23 @@
 //   }
 //
 // All coordinates are in millimetres (PCB space).
+//
+// See circuitCanvasTypes.ts's header comment for why this module's element/point types
+// (`PcbElementArray`/`PcbTraceLike`/`TraceRoutePoint`) are looser than the real
+// `CircuitJson`/`CircuitElement` seam in `src/types` — real Circuit JSON values are
+// structurally compatible with the types used here, but the reverse isn't true.
+
+import type {
+  PcbPoint, PcbElementArray, PcbTraceLike, TraceRoutePoint,
+  WireHit, DragWireOpts, WireDragSession, NudgeDirection,
+} from './circuitCanvasTypes'
 
 // ---------------------------------------------------------------------------
 // Geometry helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Squared distance between two points.
- * @param {{x:number,y:number}} a
- * @param {{x:number,y:number}} b
- * @returns {number}
- */
-function dist2Sq(a, b) {
+/** Squared distance between two points. */
+function dist2Sq(a: PcbPoint, b: PcbPoint): number {
   const dx = b.x - a.x
   const dy = b.y - a.y
   return dx * dx + dy * dy
@@ -35,12 +40,8 @@ function dist2Sq(a, b) {
 /**
  * Point-to-segment distance.  Returns the distance from point `p` to the
  * line segment [a, b], plus the parameter `t` (0..1) of the closest point.
- * @param {{x:number,y:number}} p
- * @param {{x:number,y:number}} a
- * @param {{x:number,y:number}} b
- * @returns {{ dist: number, t: number, closest: {x:number,y:number} }}
  */
-export function pointSegmentDist(p, a, b) {
+export function pointSegmentDist(p: PcbPoint, a: PcbPoint, b: PcbPoint): { dist: number; t: number; closest: PcbPoint } {
   const dx = b.x - a.x
   const dy = b.y - a.y
   const lenSq = dx * dx + dy * dy
@@ -54,23 +55,13 @@ export function pointSegmentDist(p, a, b) {
   return { dist, t, closest }
 }
 
-/**
- * Round a value to the nearest grid step.
- * @param {number} v
- * @param {number} grid — grid pitch in mm (default 0.5)
- * @returns {number}
- */
-export function snapToGrid(v, grid = 0.5) {
+/** Round a value to the nearest grid step (default 0.5mm). */
+export function snapToGrid(v: number, grid = 0.5): number {
   return Math.round(v / grid) * grid
 }
 
-/**
- * Snap a point to the grid.
- * @param {{x:number,y:number}} pt
- * @param {number} grid
- * @returns {{x:number,y:number}}
- */
-export function snapPoint(pt, grid = 0.5) {
+/** Snap a point to the grid. */
+export function snapPoint(pt: PcbPoint, grid = 0.5): PcbPoint {
   return { x: snapToGrid(pt.x, grid), y: snapToGrid(pt.y, grid) }
 }
 
@@ -81,22 +72,17 @@ export function snapPoint(pt, grid = 0.5) {
 /**
  * Hit-test a point against all pcb_trace segments in a Circuit JSON array.
  * Returns the closest hit within `threshold` mm, or null.
- *
- * @param {Array} circuitJson — flat AnyCircuitElement[]
- * @param {{x:number,y:number}} point — pointer position in PCB mm space
- * @param {number} threshold — pick radius in mm (default 0.3)
- * @returns {{ traceId: string, segIndex: number, t: number, dist: number } | null}
  */
-export function hitTestWire(circuitJson, point, threshold = 0.3) {
+export function hitTestWire(circuitJson: PcbElementArray, point: PcbPoint, threshold = 0.3): WireHit | null {
   if (!Array.isArray(circuitJson)) return null
 
-  let best = null
+  let best: WireHit | null = null
 
   for (const el of circuitJson) {
     if (el?.type !== 'pcb_trace') continue
     const route = el.route ?? el.points ?? []
     if (route.length < 2) continue
-    const id = el.pcb_trace_id ?? el.id
+    const id = el.pcb_trace_id ?? el.id ?? ''
 
     for (let i = 0; i < route.length - 1; i++) {
       const a = route[i]
@@ -128,25 +114,26 @@ export function hitTestWire(circuitJson, point, threshold = 0.3) {
  * If `anchorIndex` is provided (a prior midpoint is being dragged), that
  * point is moved instead of inserting a new one.
  *
- * @param {Array} circuitJson — Circuit JSON to patch (not mutated)
- * @param {string} traceId
- * @param {number} segIndex — segment index within trace.route
- * @param {{x:number,y:number}} newMidpoint — new midpoint in PCB mm space
- * @param {{ anchorIndex?: number, grid?: number }} [opts]
- * @returns {Array} patched Circuit JSON (new array, trace object replaced)
+ * @returns patched Circuit JSON (new array, trace object replaced)
  */
-export function dragWireSegment(circuitJson, traceId, segIndex, newMidpoint, opts = {}) {
+export function dragWireSegment(
+  circuitJson: PcbElementArray,
+  traceId: string,
+  segIndex: number,
+  newMidpoint: PcbPoint,
+  opts: DragWireOpts = {},
+): PcbElementArray {
   const { anchorIndex, grid = 0.5 } = opts
 
   if (!Array.isArray(circuitJson)) return circuitJson
 
   const snapped = snapPoint(newMidpoint, grid)
 
-  return circuitJson.map((el) => {
+  return circuitJson.map((el): PcbTraceLike => {
     const id = el?.pcb_trace_id ?? el?.id
     if (el?.type !== 'pcb_trace' || id !== traceId) return el
 
-    const route = (el.route ?? el.points ?? []).map((pt) => ({ ...pt }))
+    const route: TraceRoutePoint[] = (el.route ?? el.points ?? []).map((pt) => ({ ...pt }))
 
     if (anchorIndex !== undefined && anchorIndex > 0 && anchorIndex < route.length - 1) {
       // Move an existing interior anchor point.
@@ -170,25 +157,24 @@ export function dragWireSegment(circuitJson, traceId, segIndex, newMidpoint, opt
 /**
  * Nudge a wire anchor point by `delta` in mm.
  * `direction` is 'up'|'down'|'left'|'right'.
- *
- * @param {Array} circuitJson
- * @param {string} traceId
- * @param {number} anchorIndex — index within route (must be > 0 and < route.length-1)
- * @param {'up'|'down'|'left'|'right'} direction
- * @param {number} delta — step size in mm (default 0.5)
- * @returns {Array} patched Circuit JSON
  */
-export function nudgeWireAnchor(circuitJson, traceId, anchorIndex, direction, delta = 0.5) {
+export function nudgeWireAnchor(
+  circuitJson: PcbElementArray,
+  traceId: string,
+  anchorIndex: number,
+  direction: NudgeDirection,
+  delta = 0.5,
+): PcbElementArray {
   if (!Array.isArray(circuitJson)) return circuitJson
 
   const dx = direction === 'left' ? -delta : direction === 'right' ? delta : 0
   const dy = direction === 'up' ? -delta : direction === 'down' ? delta : 0
 
-  return circuitJson.map((el) => {
+  return circuitJson.map((el): PcbTraceLike => {
     const id = el?.pcb_trace_id ?? el?.id
     if (el?.type !== 'pcb_trace' || id !== traceId) return el
 
-    const route = (el.route ?? el.points ?? []).map((pt) => ({ ...pt }))
+    const route: TraceRoutePoint[] = (el.route ?? el.points ?? []).map((pt) => ({ ...pt }))
     if (anchorIndex <= 0 || anchorIndex >= route.length - 1) return el
 
     route[anchorIndex] = {
@@ -206,14 +192,8 @@ export function nudgeWireAnchor(circuitJson, traceId, anchorIndex, direction, de
 // Context-menu actions
 // ---------------------------------------------------------------------------
 
-/**
- * Delete a wire from the Circuit JSON.
- *
- * @param {Array} circuitJson
- * @param {string} traceId
- * @returns {Array} patched Circuit JSON (trace removed)
- */
-export function deleteWire(circuitJson, traceId) {
+/** Delete a wire from the Circuit JSON. */
+export function deleteWire(circuitJson: PcbElementArray, traceId: string): PcbElementArray {
   if (!Array.isArray(circuitJson)) return circuitJson
   return circuitJson.filter((el) => {
     const id = el?.pcb_trace_id ?? el?.id
@@ -225,15 +205,11 @@ export function deleteWire(circuitJson, traceId) {
  * Re-route a wire using a simple L-shaped (orthogonal) path between its
  * first and last route points.  All interior anchors are discarded and
  * replaced with a single elbow at (end.x, start.y).
- *
- * @param {Array} circuitJson
- * @param {string} traceId
- * @returns {Array} patched Circuit JSON
  */
-export function rerouteWire(circuitJson, traceId) {
+export function rerouteWire(circuitJson: PcbElementArray, traceId: string): PcbElementArray {
   if (!Array.isArray(circuitJson)) return circuitJson
 
-  return circuitJson.map((el) => {
+  return circuitJson.map((el): PcbTraceLike => {
     const id = el?.pcb_trace_id ?? el?.id
     if (el?.type !== 'pcb_trace' || id !== traceId) return el
 
@@ -256,16 +232,11 @@ export function rerouteWire(circuitJson, traceId) {
 /**
  * Pin a wire's interior anchors to the grid.  All points except first and
  * last are snapped to the nearest grid position.
- *
- * @param {Array} circuitJson
- * @param {string} traceId
- * @param {number} grid — grid pitch in mm (default 0.5)
- * @returns {Array} patched Circuit JSON
  */
-export function pinWireToGrid(circuitJson, traceId, grid = 0.5) {
+export function pinWireToGrid(circuitJson: PcbElementArray, traceId: string, grid = 0.5): PcbElementArray {
   if (!Array.isArray(circuitJson)) return circuitJson
 
-  return circuitJson.map((el) => {
+  return circuitJson.map((el): PcbTraceLike => {
     const id = el?.pcb_trace_id ?? el?.id
     if (el?.type !== 'pcb_trace' || id !== traceId) return el
 
@@ -297,22 +268,21 @@ export function pinWireToGrid(circuitJson, traceId, grid = 0.5) {
  *   const next = session.move(circuitJson, { x, y })
  *   // on pointerup:
  *   const final = session.end(circuitJson, { x, y })
- *
- * @param {Array} circuitJson — snapshot at drag-start
- * @param {{ traceId: string, segIndex: number }} hit — result from hitTestWire
- * @param {{ grid?: number }} [opts]
- * @returns {{ move: Function, end: Function, traceId: string, segIndex: number }}
  */
-export function beginWireDrag(circuitJson, hit, opts = {}) {
+export function beginWireDrag(
+  circuitJson: PcbElementArray,
+  hit: { traceId: string; segIndex: number },
+  opts: { grid?: number } = {},
+): WireDragSession {
   const { grid = 0.5 } = opts
   const { traceId, segIndex } = hit
 
   // Find the trace and record the anchor index that will be created or moved.
   // If the hit midpoint is already an existing interior point we reuse it;
   // otherwise we insert a new anchor at segIndex+1 on the first move.
-  let anchorIndex = null  // determined lazily on first move
+  let anchorIndex: number | null = null  // determined lazily on first move
 
-  function apply(json, point) {
+  function apply(json: PcbElementArray, point: PcbPoint): PcbElementArray {
     const snap = snapPoint(point, grid)
 
     if (anchorIndex === null) {

@@ -1,4 +1,4 @@
-// FootprintLibrary.jsx — searchable catalogue of @tscircuit/footprinter parts.
+// FootprintLibrary.tsx — searchable catalogue of @tscircuit/footprinter parts.
 //
 // This panel lets the user browse and pick a footprint to place on the PCB.
 // It reads the catalogue from getFootprintNames() + getFootprintNamesByType()
@@ -34,9 +34,15 @@
 import { useMemo, useState } from 'react'
 import { X, Search, Package } from 'lucide-react'
 import { getFootprintNames, getFootprintNamesByType } from '@tscircuit/footprinter'
+import type { FootprintParams } from './circuitCanvasTypes'
+
+export interface Props {
+  onSelect?: (footprintFn: string, params: FootprintParams) => void
+  onClose?: () => void
+}
 
 // Human-readable labels for the two groups.
-const GROUP_LABELS = {
+const GROUP_LABELS: Record<string, string> = {
   passive: 'Passives',
   normal: 'ICs & Connectors',
 }
@@ -57,7 +63,7 @@ const PIN_COUNTS = [4, 6, 8, 10, 12, 14, 16, 20, 24, 28, 32, 44, 48, 64, 100, 14
 
 // Short descriptions for common families to make the catalogue more
 // informative. Falls back to the raw name if not listed here.
-const DESCRIPTIONS = {
+const DESCRIPTIONS: Record<string, string> = {
   res: 'Resistor (SMD)',
   cap: 'Capacitor (SMD)',
   led: 'LED (SMD)',
@@ -85,7 +91,13 @@ const DESCRIPTIONS = {
   axial: 'Axial component (THT)',
 }
 
-function FootprintCard({ name, isSelected, onClick }) {
+interface FootprintCardProps {
+  name: string
+  isSelected: boolean
+  onClick: (name: string) => void
+}
+
+function FootprintCard({ name, isSelected, onClick }: FootprintCardProps) {
   const desc = DESCRIPTIONS[name] || name
   return (
     <button
@@ -106,12 +118,12 @@ function FootprintCard({ name, isSelected, onClick }) {
   )
 }
 
-export default function FootprintLibrary({ onSelect, onClose }) {
+export default function FootprintLibrary({ onSelect, onClose }: Props) {
   const [query, setQuery] = useState('')
-  const [selectedName, setSelectedName] = useState(null)
+  const [selectedName, setSelectedName] = useState<string | null>(null)
   const [imperial, setImperial] = useState('0402')
   const [numPins, setNumPins] = useState(8)
-  const [activeGroup, setActiveGroup] = useState('all') // 'all' | 'passive' | 'normal'
+  const [activeGroup, setActiveGroup] = useState<'all' | 'passive' | 'normal'>('all')
 
   // Categorise footprint names once.
   const { passiveFootprintNames, normalFootprintNames } = useMemo(
@@ -132,12 +144,12 @@ export default function FootprintLibrary({ onSelect, onClose }) {
     return lower ? source.filter((n) => n.includes(lower)) : source
   }, [query, activeGroup, allNames, passiveFootprintNames, normalFootprintNames])
 
-  const isPassive = selectedName && PASSIVE_FNS.has(selectedName)
-  const needsPins = selectedName && !isPassive
+  const isPassive = !!selectedName && PASSIVE_FNS.has(selectedName)
+  const needsPins = !!selectedName && !isPassive
 
   function handlePlace() {
     if (!selectedName) return
-    const params = {}
+    const params: FootprintParams = {}
     if (isPassive) {
       params.imperial = imperial
     } else if (needsPins) {
@@ -187,7 +199,7 @@ export default function FootprintLibrary({ onSelect, onClose }) {
 
       {/* Group tabs */}
       <div className="flex gap-1 px-3 pb-1">
-        {(['all', 'passive', 'normal']).map((g) => (
+        {(['all', 'passive', 'normal'] as const).map((g) => (
           <button
             key={g}
             type="button"

@@ -1,4 +1,4 @@
-// ContextMenu.jsx — Right-click context menu for wire editing actions.
+// ContextMenu.tsx — Right-click context menu for wire editing actions.
 //
 // Appears when the user right-clicks (or long-presses) a pcb_trace on the
 // canvas.  Calls pure wireEdit.js helpers to produce patched Circuit JSON and
@@ -12,22 +12,33 @@
 //   onClose()     — called when the menu should close without an action
 
 import { useEffect, useRef } from 'react'
+import type { MouseEvent as ReactMouseEvent, CSSProperties } from 'react'
 import { deleteWire, rerouteWire, pinWireToGrid } from './wireEdit.js'
+import type { PcbElementArray } from './circuitCanvasTypes'
+
+export interface Props {
+  x: number
+  y: number
+  traceId: string
+  circuitJson: PcbElementArray
+  onPatch?: (next: PcbElementArray) => void
+  onClose?: () => void
+}
 
 // Default grid used for "pin to grid" action (mm)
 const DEFAULT_GRID_MM = 0.5
 
-export default function ContextMenu({ x, y, traceId, circuitJson, onPatch, onClose }) {
-  const menuRef = useRef(null)
+export default function ContextMenu({ x, y, traceId, circuitJson, onPatch, onClose }: Props) {
+  const menuRef = useRef<HTMLDivElement | null>(null)
 
   // Close on outside click or Escape
   useEffect(() => {
-    function handlePointerDown(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
+    function handlePointerDown(e: PointerEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         onClose?.()
       }
     }
-    function handleKeyDown(e) {
+    function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose?.()
     }
     document.addEventListener('pointerdown', handlePointerDown, { capture: true })
@@ -38,21 +49,21 @@ export default function ContextMenu({ x, y, traceId, circuitJson, onPatch, onClo
     }
   }, [onClose])
 
-  function handleDelete(e) {
+  function handleDelete(e: ReactMouseEvent) {
     e.stopPropagation()
     const next = deleteWire(circuitJson, traceId)
     onPatch?.(next)
     onClose?.()
   }
 
-  function handleReroute(e) {
+  function handleReroute(e: ReactMouseEvent) {
     e.stopPropagation()
     const next = rerouteWire(circuitJson, traceId)
     onPatch?.(next)
     onClose?.()
   }
 
-  function handlePin(e) {
+  function handlePin(e: ReactMouseEvent) {
     e.stopPropagation()
     const next = pinWireToGrid(circuitJson, traceId, DEFAULT_GRID_MM)
     onPatch?.(next)
@@ -62,13 +73,13 @@ export default function ContextMenu({ x, y, traceId, circuitJson, onPatch, onClo
   // "Convert to bus" is listed in the spec as a menu item but is a Phase-2
   // feature (requires net grouping which is not yet implemented).  We render
   // it disabled so the menu matches the spec without crashing.
-  function handleConvertToBus(e) {
+  function handleConvertToBus(e: ReactMouseEvent) {
     e.stopPropagation()
     // TODO(phase-2): implement bus conversion
     onClose?.()
   }
 
-  const menuStyle = {
+  const menuStyle: CSSProperties = {
     position: 'fixed',
     left: x,
     top: y,

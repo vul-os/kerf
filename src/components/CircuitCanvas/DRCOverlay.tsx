@@ -20,17 +20,25 @@
 //       handler if you want a tooltip rendered in the parent.
 
 import { useCallback, useState } from 'react'
+import type { DrcViolation, DrcSeverity } from './circuitCanvasTypes'
+
+export interface Props {
+  violations?: DrcViolation[]
+  visible?: boolean
+  markerRadius?: number
+  onHover?: ((violation: DrcViolation | null) => void) | null
+}
 
 // ---------------------------------------------------------------------------
 // Colour helpers
 // ---------------------------------------------------------------------------
 
-const SEVERITY_COLORS = {
+const SEVERITY_COLORS: Record<DrcSeverity, string> = {
   error:   '#ef4444', // red-500
   warning: '#f59e0b', // amber-500
 }
 
-const KIND_ICONS = {
+const KIND_ICONS: Record<string, string> = {
   pad_clearance:       'C',
   pad_trace_clearance: 'C',
   trace_clearance:     'C',
@@ -38,11 +46,11 @@ const KIND_ICONS = {
   missing_footprint:   'F',
 }
 
-function markerColor(severity) {
+function markerColor(severity: DrcSeverity): string {
   return SEVERITY_COLORS[severity] ?? '#94a3b8'
 }
 
-function markerLabel(kind) {
+function markerLabel(kind: string): string {
   return KIND_ICONS[kind] ?? '!'
 }
 
@@ -50,7 +58,13 @@ function markerLabel(kind) {
 // Single violation marker
 // ---------------------------------------------------------------------------
 
-function ViolationMarker({ violation, radius, onHover }) {
+interface ViolationMarkerProps {
+  violation: DrcViolation
+  radius: number
+  onHover?: (v: DrcViolation | null) => void
+}
+
+function ViolationMarker({ violation, radius, onHover }: ViolationMarkerProps) {
   const { x, y, kind, severity, message } = violation
   const color = markerColor(severity)
   const label = markerLabel(kind)
@@ -112,11 +126,11 @@ export default function DRCOverlay({
   visible = true,
   markerRadius = 0.3,
   onHover = null,
-}) {
-  const [localHovered, setLocalHovered] = useState(null)
+}: Props) {
+  const [, setLocalHovered] = useState<DrcViolation | null>(null)
 
   const handleHover = useCallback(
-    (v) => {
+    (v: DrcViolation | null) => {
       setLocalHovered(v)
       if (onHover) onHover(v)
     },

@@ -1,4 +1,4 @@
-// PlacementMode.jsx — ghost-cursor overlay for PCB footprint placement.
+// PlacementMode.tsx — ghost-cursor overlay for PCB footprint placement.
 //
 // Wrap this around (or alongside) the PCB canvas when the user has selected
 // a footprint to place. It intercepts mouse events on the canvas element,
@@ -37,13 +37,26 @@
 //      the result is pushed into the workspace store / file content.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { RefObject } from 'react'
 import { RotateCw } from 'lucide-react'
+import type { FootprintParams, FootprintPlacement, PcbPoint, PlacementCanvasElement } from './circuitCanvasTypes'
+
+export interface Props {
+  canvasRef?: RefObject<PlacementCanvasElement | null>
+  footprintFn?: string
+  params?: FootprintParams
+  snapMm?: number
+  /** (pixelX, pixelY) => { x: mm, y: mm } */
+  coordTransform?: ((pixelX: number, pixelY: number) => PcbPoint) | null
+  onPlace?: (placement: FootprintPlacement) => void
+  onCancel?: () => void
+}
 
 // Default snap grid in mm (0.1mm = typical PCB fine grid).
 const DEFAULT_SNAP_MM = 0.1
 
 // Snap a value to the nearest grid multiple.
-function snap(value, grid) {
+function snap(value: number, grid: number): number {
   if (!grid || grid <= 0) return value
   return Math.round(value / grid) * grid
 }
@@ -52,7 +65,7 @@ function snap(value, grid) {
 // render as the ghost. We don't run the full footprinter here — the ghost just
 // needs to be visually suggestive, not geometrically exact.
 // Returns an SVG string sized in pixels, not mm.
-function ghostSvg(rotation) {
+function ghostSvg(rotation: number): string {
   // Simple 2-pad footprint indicator, 32×16px display size.
   const w = 32
   const h = 16
@@ -77,19 +90,19 @@ export default function PlacementMode({
   footprintFn = 'res',
   params = {},
   snapMm = DEFAULT_SNAP_MM,
-  coordTransform = null, // (pixelX, pixelY) => { x: mm, y: mm } | null
+  coordTransform = null,
   onPlace,
   onCancel,
-}) {
-  const [pos, setPos] = useState(null)       // { x, y } in mm (or pixels if no transform)
+}: Props) {
+  const [pos, setPos] = useState<PcbPoint | null>(null)       // { x, y } in mm (or pixels if no transform)
   const [rotation, setRotation] = useState(0) // degrees, accumulated by R key
-  const ghostRef = useRef(null)
+  const ghostRef = useRef<HTMLDivElement | null>(null)
 
   // Track raw pixel position for the ghost overlay element.
-  const [pixelPos, setPixelPos] = useState(null)
+  const [pixelPos, setPixelPos] = useState<PcbPoint | null>(null)
 
   const handleMouseMove = useCallback(
-    (e) => {
+    (e: MouseEvent) => {
       if (!canvasRef?.current) return
       const rect = canvasRef.current.getBoundingClientRect()
       const px = e.clientX - rect.left
@@ -108,7 +121,7 @@ export default function PlacementMode({
   )
 
   const handleClick = useCallback(
-    (e) => {
+    (e: MouseEvent) => {
       if (e.button !== 0) return
       if (!pos) return
       e.preventDefault()
@@ -118,7 +131,7 @@ export default function PlacementMode({
   )
 
   const handleContextMenu = useCallback(
-    (e) => {
+    (e: MouseEvent) => {
       e.preventDefault()
       onCancel?.()
     },
@@ -126,7 +139,7 @@ export default function PlacementMode({
   )
 
   const handleKeyDown = useCallback(
-    (e) => {
+    (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onCancel?.()
       } else if (e.key === 'r' || e.key === 'R') {
@@ -145,7 +158,10 @@ export default function PlacementMode({
     el.addEventListener('contextmenu', handleContextMenu)
     window.addEventListener('keydown', handleKeyDown)
     // Cursor change.
+    // Pre-existing: mutates the DOM element behind the canvasRef prop directly rather than
+    // through a local copy; not a behavior change for this slice.
     const prev = el.style.cursor
+    // eslint-disable-next-line react-hooks/immutability
     el.style.cursor = 'crosshair'
     return () => {
       el.removeEventListener('mousemove', handleMouseMove)
@@ -236,6 +252,16 @@ export default function PlacementMode({
 // the same footprint in one session.
 // ---------------------------------------------------------------------------
 
+export interface ControllerProps {
+  canvasRef?: RefObject<PlacementCanvasElement | null>
+  footprintFn?: string
+  params?: FootprintParams
+  snapMm?: number
+  coordTransform?: ((pixelX: number, pixelY: number) => PcbPoint) | null
+  onCommit?: (placements: FootprintPlacement[]) => void
+  onCancel?: () => void
+}
+
 export function PlacementModeController({
   canvasRef,
   footprintFn,
@@ -244,10 +270,10 @@ export function PlacementModeController({
   coordTransform,
   onCommit,
   onCancel,
-}) {
-  const [placements, setPlacements] = useState([])
+}: ControllerProps) {
+  const [placements, setPlacements] = useState<FootprintPlacement[]>([])
 
-  function handlePlace(placement) {
+  function handlePlace(placement: FootprintPlacement) {
     setPlacements((prev) => [...prev, placement])
     // Stay in placement mode to allow placing multiple instances.
     // TODO: if the user wants single-shot placement, call onCommit here.

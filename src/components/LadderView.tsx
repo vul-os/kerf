@@ -19,8 +19,45 @@
  *   fires on a 600 ms debounce via POST /api/projects/:pid/plc/lint-ld.
  */
 import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import type { ReactElement, Ref } from 'react'
 import MonacoEditor from '@monaco-editor/react'
 import { SquareCode, List, Code2, AlertTriangle, CheckCircle } from 'lucide-react'
+
+// ---------------------------------------------------------------------------
+// LD program types (mirrored from kerf_plc.ld.schema for client-side use)
+// ---------------------------------------------------------------------------
+
+interface LDElement {
+  type: string
+  var?: string
+  fb_type?: string
+  fb_instance?: string
+}
+
+interface LDRung {
+  label?: string
+  comment?: string
+  branches: LDElement[][]
+  output?: LDElement | null
+}
+
+interface LDVariable {
+  name: string
+}
+
+interface LDProgram {
+  program?: string
+  variables?: LDVariable[]
+  rungs: LDRung[]
+}
+
+interface SymbolProps {
+  x: number
+  y: number
+  w?: number
+  h?: number
+  varName?: string
+}
 
 // ---------------------------------------------------------------------------
 // LD schema constants (mirrored from kerf_plc.ld.schema for client-side use)
@@ -50,7 +87,7 @@ const ELEMENT_LABELS = {
 // SVG symbol components (React / inline SVG)
 // ---------------------------------------------------------------------------
 
-function ContactNO({ x, y, w = 80, h = 60, varName = '' }) {
+function ContactNO({ x, y, w = 80, h = 60, varName = '' }: SymbolProps) {
   const gap = 8
   const barH = h * 0.35
   const cy = y + h / 2
@@ -65,7 +102,7 @@ function ContactNO({ x, y, w = 80, h = 60, varName = '' }) {
   )
 }
 
-function ContactNC({ x, y, w = 80, h = 60, varName = '' }) {
+function ContactNC({ x, y, w = 80, h = 60, varName = '' }: SymbolProps) {
   const gap = 8
   const barH = h * 0.35
   const cy = y + h / 2
@@ -82,7 +119,7 @@ function ContactNC({ x, y, w = 80, h = 60, varName = '' }) {
   )
 }
 
-function ContactTransition({ x, y, w = 80, h = 60, varName = '', label = 'P' }) {
+function ContactTransition({ x, y, w = 80, h = 60, varName = '', label = 'P' }: SymbolProps & { label?: string }) {
   const gap = 8
   const barH = h * 0.35
   const cy = y + h / 2
@@ -98,7 +135,7 @@ function ContactTransition({ x, y, w = 80, h = 60, varName = '', label = 'P' }) 
   )
 }
 
-function Coil({ x, y, w = 80, h = 60, varName = '', label = '' }) {
+function Coil({ x, y, w = 80, h = 60, varName = '', label = '' }: SymbolProps & { label?: string }) {
   const r = h * 0.28
   const cy = y + h / 2
   const cx = x + w / 2
@@ -116,7 +153,7 @@ function Coil({ x, y, w = 80, h = 60, varName = '', label = '' }) {
   )
 }
 
-function FBCall({ x, y, w = 80, h = 60, fbType = '', fbInstance = '' }) {
+function FBCall({ x, y, w = 80, h = 60, fbType = '', fbInstance = '' }: { x: number; y: number; w?: number; h?: number; fbType?: string; fbInstance?: string }) {
   const bw = w - 8
   const bh = h - 8
   const bx = x + 4
@@ -137,7 +174,7 @@ function FBCall({ x, y, w = 80, h = 60, fbType = '', fbInstance = '' }) {
 // Element dispatcher
 // ---------------------------------------------------------------------------
 
-function LDElement({ elem, x, y, w = 80, h = 60 }) {
+function LDElement({ elem, x, y, w = 80, h = 60 }: { elem: LDElement; x: number; y: number; w?: number; h?: number }): ReactElement | null {
   if (elem.type === 'contact_no') return <ContactNO x={x} y={y} w={w} h={h} varName={elem.var} />
   if (elem.type === 'contact_nc') return <ContactNC x={x} y={y} w={w} h={h} varName={elem.var} />
   if (elem.type === 'contact_pos') return <ContactTransition x={x} y={y} w={w} h={h} varName={elem.var} label="P" />
@@ -168,7 +205,7 @@ const CONTENT_X0_OFFSET = RAIL_W + 4
 // LadderDiagram — SVG rendering of the full program
 // ---------------------------------------------------------------------------
 
-function LadderDiagram({ prog }) {
+function LadderDiagram({ prog }: { prog: LDProgram | null }) {
   if (!prog || !Array.isArray(prog.rungs)) return null
 
   const rungs = prog.rungs || []
@@ -193,7 +230,7 @@ function LadderDiagram({ prog }) {
   const railTop = PADDING_Y
   const railBottom = PADDING_Y + rungHeights.reduce((s, h) => s + h, 0)
 
-  const elements = []
+  const elements: ReactElement[] = []
   let yCursor = PADDING_Y
 
   rungs.forEach((rung, ri) => {
@@ -336,9 +373,9 @@ function LadderDiagram({ prog }) {
 // Client-side structural lint (mirrors kerf_plc.ld.lint._structural_lint)
 // ---------------------------------------------------------------------------
 
-function clientLint(prog) {
-  const errors = []
-  const warnings = []
+function clientLint(prog: LDProgram | null): { errors: string[]; warnings: string[] } {
+  const errors: string[] = []
+  const warnings: string[] = []
   if (!prog || !Array.isArray(prog.rungs)) return { errors, warnings }
 
   const declaredVars = new Set((prog.variables || []).map(v => v.name))
@@ -386,10 +423,10 @@ const JSON_EDITOR_OPTIONS = {
   minimap: { enabled: false },
   fontFamily: 'JetBrains Mono, Geist Mono, ui-monospace, monospace',
   fontSize: 12,
-  lineNumbers: 'on',
+  lineNumbers: 'on' as const,
   scrollBeyondLastLine: false,
   tabSize: 2,
-  wordWrap: 'off',
+  wordWrap: 'off' as const,
   automaticLayout: true,
   padding: { top: 8, bottom: 8 },
 }
@@ -400,6 +437,16 @@ const JSON_EDITOR_OPTIONS = {
 
 const LINT_DEBOUNCE_MS = 600
 
+interface LadderViewProps {
+  content?: string
+  projectId?: string
+  fileId?: string
+  fileName?: string
+  onContentChange?: (val: string) => void
+  viewRef?: Ref<{ snapshot: (opts?: { size?: number; quality?: number }) => Promise<Blob | null> }>
+  className?: string
+}
+
 export default function LadderView({
   content = '',
   projectId,
@@ -408,15 +455,15 @@ export default function LadderView({
   onContentChange,
   viewRef,
   className = '',
-}) {
-  const [mode, setMode] = useState('diagram')   // 'diagram' | 'source'
-  const [prog, setProg] = useState(null)
-  const [parseError, setParseError] = useState(null)
-  const [lintErrors, setLintErrors] = useState([])
-  const [lintWarnings, setLintWarnings] = useState([])
-  const [backendWarnings, setBackendWarnings] = useState([])
-  const lintTimerRef = useRef(null)
-  const svgContainerRef = useRef(null)
+}: LadderViewProps) {
+  const [mode, setMode] = useState<'diagram' | 'source'>('diagram')
+  const [prog, setProg] = useState<LDProgram | null>(null)
+  const [parseError, setParseError] = useState<string | null>(null)
+  const [lintErrors, setLintErrors] = useState<string[]>([])
+  const [lintWarnings, setLintWarnings] = useState<string[]>([])
+  const [backendWarnings, setBackendWarnings] = useState<string[]>([])
+  const lintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const svgContainerRef = useRef<HTMLDivElement | null>(null)
 
   // Parse content whenever it changes
   useEffect(() => {
@@ -436,7 +483,7 @@ export default function LadderView({
       setLintWarnings(warnings)
     } catch (e) {
       setProg(null)
-      setParseError(e.message)
+      setParseError(e instanceof Error ? e.message : String(e))
     }
   }, [content])
 
@@ -453,7 +500,7 @@ export default function LadderView({
           credentials: 'include',
         })
         if (resp.ok) {
-          const data = await resp.json()
+          const data = await resp.json() as { warnings?: string[] }
           setBackendWarnings(data.warnings || [])
         }
       } catch {

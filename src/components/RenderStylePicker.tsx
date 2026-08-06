@@ -1,23 +1,24 @@
 /**
- * RenderStylePicker.jsx — Toolbar dropdown for switching viewport render styles.
+ * RenderStylePicker.tsx — Toolbar dropdown for switching viewport render styles.
  *
- * Displays the six render-style presets from renderStyles.js as a compact
+ * Displays the six render-style presets from renderStyles.ts as a compact
  * dropdown menu. The active style is highlighted; selecting one calls the
  * onChange callback with the new style name.
- *
- * Props:
- *   activeStyle  {string}   currently selected style (one of RENDER_STYLES)
- *   onChange     {Function} called with (styleName: string) when user picks one
- *   className    {string=}  additional CSS classes on the root element
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { ChevronDown, Check } from 'lucide-react'
-import { RENDER_STYLES } from '../lib/renderStyles.js'
+import { RENDER_STYLES } from '../lib/renderStyles'
 
 // ── Style metadata ─────────────────────────────────────────────────────────────
 
-const STYLE_META = {
+interface StyleMeta {
+  label: string
+  icon: string
+  description: string
+}
+
+const STYLE_META: Record<string, StyleMeta> = {
   realistic:    { label: 'Realistic',    icon: '🪞', description: 'Default PBR pipeline' },
   cel:          { label: 'Cel',          icon: '🎨', description: 'Toon shading + outline' },
   wireframe:    { label: 'Wireframe',    icon: '⬡',  description: 'Edge mesh overlay' },
@@ -28,15 +29,24 @@ const STYLE_META = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function RenderStylePicker({ activeStyle = 'realistic', onChange, className = '' }) {
+export interface Props {
+  /** Currently selected style (one of RENDER_STYLES). */
+  activeStyle?: string
+  /** Called with (styleName) when the user picks one. */
+  onChange?: (styleName: string) => void
+  /** Additional CSS classes on the root element. */
+  className?: string
+}
+
+export default function RenderStylePicker({ activeStyle = 'realistic', onChange, className = '' }: Props) {
   const [open, setOpen] = useState(false)
-  const rootRef = useRef(null)
+  const rootRef = useRef<HTMLDivElement>(null)
 
   // Close when user clicks outside.
   useEffect(() => {
     if (!open) return
-    function handlePointerDown(e) {
-      if (rootRef.current && !rootRef.current.contains(e.target)) {
+    function handlePointerDown(e: PointerEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
         setOpen(false)
       }
     }
@@ -47,14 +57,14 @@ export default function RenderStylePicker({ activeStyle = 'realistic', onChange,
   // Close on Escape.
   useEffect(() => {
     if (!open) return
-    function handleKeyDown(e) {
+    function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpen(false)
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [open])
 
-  const handleSelect = useCallback((style) => {
+  const handleSelect = useCallback((style: string) => {
     setOpen(false)
     if (style !== activeStyle) onChange?.(style)
   }, [activeStyle, onChange])

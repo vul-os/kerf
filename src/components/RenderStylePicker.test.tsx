@@ -1,5 +1,5 @@
 /**
- * RenderStylePicker.test.jsx — Vitest suite for the render-style picker UI.
+ * RenderStylePicker.test.tsx — Vitest suite for the render-style picker UI.
  *
  * Uses react-dom/server (renderToStaticMarkup) to test the rendered HTML
  * structure without a DOM or browser, following the pattern in Loader.test.jsx.
@@ -13,38 +13,44 @@ import { renderToStaticMarkup } from 'react-dom/server'
 // ── Stub lucide-react icons ───────────────────────────────────────────────────
 // lucide-react ships SVG components; stub them for static render speed.
 
+interface StubIconProps {
+  size?: number
+  className?: string
+  'aria-hidden'?: boolean
+}
+
 vi.mock('lucide-react', () => ({
-  ChevronDown: ({ size, className, 'aria-hidden': ah }) =>
+  ChevronDown: ({ size, className, 'aria-hidden': ah }: StubIconProps) =>
     `<svg data-icon="chevron-down" width="${size}" class="${className ?? ''}" aria-hidden="${ah ?? false}"></svg>`,
-  Check: ({ size, className, 'aria-hidden': ah }) =>
+  Check: ({ size, className, 'aria-hidden': ah }: StubIconProps) =>
     `<svg data-icon="check" width="${size}" class="${className ?? ''}" aria-hidden="${ah ?? false}"></svg>`,
 }))
 
-// ── Stub three (imported transitively via renderStyles.js) ────────────────────
+// ── Stub three (imported transitively via renderStyles.ts) ────────────────────
 
 vi.mock('three', () => {
-  class Color { constructor(v) { this.v = v } }
-  class Vector2 { constructor(x, y) { this.x = x; this.y = y } }
-  class Vector3 { constructor(x, y, z) { this.x = x; this.y = y; this.z = z } }
-  class MeshBasicMaterial { constructor(o={}) { Object.assign(this, o) } }
-  class ShaderMaterial { constructor(o={}) { Object.assign(this, o) } }
-  const UniformsUtils = { merge: (a) => Object.assign({}, ...a) }
+  class Color { v: unknown; constructor(v: unknown) { this.v = v } }
+  class Vector2 { x: number; y: number; constructor(x: number, y: number) { this.x = x; this.y = y } }
+  class Vector3 { x: number; y: number; z: number; constructor(x: number, y: number, z: number) { this.x = x; this.y = y; this.z = z } }
+  class MeshBasicMaterial { constructor(o: Record<string, unknown> = {}) { Object.assign(this, o) } }
+  class ShaderMaterial { constructor(o: Record<string, unknown> = {}) { Object.assign(this, o) } }
+  const UniformsUtils = { merge: (a: object[]) => Object.assign({}, ...a) }
   const UniformsLib   = { lights: {} }
   return { Color, Vector2, Vector3, MeshBasicMaterial, ShaderMaterial, UniformsUtils, UniformsLib, FrontSide: 0, BackSide: 1, DoubleSide: 2 }
 })
 
 vi.mock('three/examples/jsm/postprocessing/ShaderPass.js', () => ({
-  ShaderPass: class { constructor(s) { this.isShaderPass = true; this.uniforms = s?.uniforms ?? {} } },
+  ShaderPass: class { isShaderPass: boolean; uniforms: unknown; constructor(s?: { uniforms?: unknown }) { this.isShaderPass = true; this.uniforms = s?.uniforms ?? {} } },
 }))
 
 vi.mock('three/examples/jsm/postprocessing/RenderPass.js', () => ({
-  RenderPass: class { constructor() { this.isRenderPass = true } },
+  RenderPass: class { isRenderPass: boolean; constructor() { this.isRenderPass = true } },
 }))
 
 // ── Import after mocks ─────────────────────────────────────────────────────────
 
-import RenderStylePicker from './RenderStylePicker.jsx'
-import { RENDER_STYLES } from '../lib/renderStyles.js'
+import RenderStylePicker from './RenderStylePicker'
+import { RENDER_STYLES } from '../lib/renderStyles'
 
 // ── 1. Default render (closed state) ─────────────────────────────────────────
 

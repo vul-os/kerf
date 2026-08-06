@@ -1,5 +1,5 @@
 /**
- * BimFamilyEditor.jsx — Parametric BIM family-authoring panel (T-109).
+ * BimFamilyEditor.tsx — Parametric BIM family-authoring panel (T-109).
  *
  * Lets users load a FamilyTemplate, edit each numeric parameter via a
  * slider + text input, pick a material from the T-115 catalogue dropdown,
@@ -25,16 +25,54 @@ import {
   resolveParamValues,
   previewGeometry,
   MATERIAL_CATALOGUE,
-  materialCategories,
-  materialsByCategory,
   NUMERIC_KINDS,
 } from '../lib/bimFamilyOps.js'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+// bimFamilyOps.ts (already migrated, outside this slice) leaves its params
+// untyped, so there's no shared FamilyTemplate/TemplateParameter type to
+// import — these mirror the shapes documented in that module's header
+// comment (data model section).
+export interface TemplateParameter {
+  name: string
+  kind: string
+  default: number | string
+  min_val?: number | null
+  max_val?: number | null
+  expression?: string | null
+  description?: string
+}
+
+export interface FamilyTemplate {
+  name: string
+  category: string
+  geometry_type: string
+  parameters: TemplateParameter[]
+  description?: string
+}
+
+interface GeometryPreview {
+  volume?: number
+  diameter?: number
+  width?: number
+  depth?: number
+  height?: number
+}
+
+type ResolvedParams = Record<string, number | string>
 
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function ValidationBanner({ errors }) {
+interface ValidationBannerProps {
+  errors: string[]
+}
+
+function ValidationBanner({ errors }: ValidationBannerProps) {
   if (!errors.length) return null
   return (
     <div
@@ -50,7 +88,14 @@ function ValidationBanner({ errors }) {
   )
 }
 
-function NumericParamRow({ param, value, onChange, readOnly }) {
+interface NumericParamRowProps {
+  param: TemplateParameter
+  value: number | string
+  onChange: (paramName: string, value: number) => void
+  readOnly: boolean
+}
+
+function NumericParamRow({ param, value, onChange, readOnly }: NumericParamRowProps) {
   const min = param.min_val ?? 0
   const max = param.max_val ?? 1000
   const step = (max - min) / 200
@@ -98,7 +143,14 @@ function NumericParamRow({ param, value, onChange, readOnly }) {
   )
 }
 
-function MaterialParamRow({ param, value, onChange, readOnly }) {
+interface MaterialParamRowProps {
+  param: TemplateParameter
+  value: number | string
+  onChange: (paramName: string, value: string) => void
+  readOnly: boolean
+}
+
+function MaterialParamRow({ param, value, onChange, readOnly }: MaterialParamRowProps) {
   return (
     <div className="flex items-center justify-between gap-2">
       <label
@@ -128,7 +180,12 @@ function MaterialParamRow({ param, value, onChange, readOnly }) {
   )
 }
 
-function GeometryPreviewPanel({ preview, geometryType }) {
+interface GeometryPreviewPanelProps {
+  preview: GeometryPreview | null
+  geometryType: string
+}
+
+function GeometryPreviewPanel({ preview, geometryType }: GeometryPreviewPanelProps) {
   if (!preview) {
     return (
       <p className="text-xs text-ink-400 dark:text-ink-500 italic">
@@ -137,7 +194,7 @@ function GeometryPreviewPanel({ preview, geometryType }) {
     )
   }
 
-  const rows = []
+  const rows: { label: string; value: string; highlight?: boolean }[] = []
   if (preview.diameter != null)
     rows.push({ label: 'Diameter', value: `${preview.diameter.toFixed(3)} m` })
   if (preview.width != null)
@@ -177,6 +234,14 @@ function GeometryPreviewPanel({ preview, geometryType }) {
 // Main component
 // ---------------------------------------------------------------------------
 
+export interface BimFamilyEditorProps {
+  template?: FamilyTemplate | null
+  onTemplateChange?: (template: FamilyTemplate) => void
+  onPreviewChange?: (preview: GeometryPreview | null) => void
+  readOnly?: boolean
+  className?: string
+}
+
 /**
  * BimFamilyEditor — parametric family authoring + flex panel.
  */
@@ -186,14 +251,16 @@ export default function BimFamilyEditor({
   onPreviewChange,
   readOnly = false,
   className = '',
-}) {
-  const [template, setTemplate] = useState(() => templateProp ?? defaultColumnTemplate())
-  const [overrides, setOverrides] = useState({})
-  const [validationErrors, setValidationErrors] = useState(() => {
+}: BimFamilyEditorProps) {
+  const [template, setTemplate] = useState<FamilyTemplate>(
+    () => templateProp ?? defaultColumnTemplate()
+  )
+  const [overrides, setOverrides] = useState<Record<string, number | string>>({})
+  const [validationErrors, setValidationErrors] = useState<string[]>(() => {
     const { errors } = validateTemplate(templateProp ?? defaultColumnTemplate())
     return errors
   })
-  const [preview, setPreview] = useState(() => {
+  const [preview, setPreview] = useState<GeometryPreview | null>(() => {
     const t = templateProp ?? defaultColumnTemplate()
     const resolved = resolveParamValues(t, {})
     return previewGeometry(t, resolved)
@@ -202,6 +269,7 @@ export default function BimFamilyEditor({
   // Sync if external template prop changes (e.g. user opens a different family).
   useEffect(() => {
     if (templateProp) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- template-prop sync, pre-existing before this migration.
       setTemplate(templateProp)
       setOverrides({})
     }
@@ -210,6 +278,7 @@ export default function BimFamilyEditor({
   // Re-validate and re-preview whenever template or overrides change.
   useEffect(() => {
     const { errors } = validateTemplate(template)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- derived validation/preview sync, pre-existing before this migration.
     setValidationErrors(errors)
 
     const resolved = resolveParamValues(template, overrides)
@@ -218,11 +287,11 @@ export default function BimFamilyEditor({
     onPreviewChange?.(geo)
   }, [template, overrides, onPreviewChange])
 
-  const handleParamChange = useCallback((paramName, value) => {
+  const handleParamChange = useCallback((paramName: string, value: number | string) => {
     setOverrides((prev) => ({ ...prev, [paramName]: value }))
   }, [])
 
-  const handleNameChange = useCallback((e) => {
+  const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setTemplate((t) => {
       const updated = { ...t, name: e.target.value }
       onTemplateChange?.(updated)
@@ -230,7 +299,7 @@ export default function BimFamilyEditor({
     })
   }, [onTemplateChange])
 
-  const handleCategoryChange = useCallback((e) => {
+  const handleCategoryChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setTemplate((t) => {
       const updated = { ...t, category: e.target.value }
       onTemplateChange?.(updated)
@@ -238,7 +307,7 @@ export default function BimFamilyEditor({
     })
   }, [onTemplateChange])
 
-  const resolved = resolveParamValues(template, overrides)
+  const resolved: ResolvedParams = resolveParamValues(template, overrides)
 
   return (
     <div
@@ -326,6 +395,7 @@ export default function BimFamilyEditor({
                 )
               }
               // Expression / formula parameter — show as read-only.
+              const resolvedValue = resolved[param.name]
               return (
                 <div key={param.name} className="flex items-center justify-between gap-2">
                   <span className="text-sm text-ink-600 dark:text-ink-400">
@@ -333,9 +403,9 @@ export default function BimFamilyEditor({
                     <em className="ml-1 text-xs text-ink-400">= {param.expression}</em>
                   </span>
                   <span className="font-mono text-sm text-ink-500">
-                    {typeof resolved[param.name] === 'number'
-                      ? resolved[param.name].toFixed(4)
-                      : String(resolved[param.name] ?? '')}
+                    {typeof resolvedValue === 'number'
+                      ? resolvedValue.toFixed(4)
+                      : String(resolvedValue ?? '')}
                   </span>
                 </div>
               )

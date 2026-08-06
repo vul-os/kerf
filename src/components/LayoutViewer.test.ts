@@ -25,12 +25,13 @@ import {
   getPaletteColor,
   defaultLayerColor,
 } from '../lib/layoutPalette.js'
+import type { LayerId, LayoutShape, LayoutTree } from './LayoutViewer.jsx'
 
 // ── Utilities mirrored from LayoutViewer ─────────────────────────────────────
 
-function collectLayers(shapes) {
-  const ids = new Set()
-  function visit(s) {
+function collectLayers(shapes: LayoutShape[]): LayerId[] {
+  const ids = new Set<LayerId>()
+  function visit(s: LayoutShape | null | undefined) {
     if (!s) return
     if (s.layer != null) ids.add(s.layer)
     if (s.kind === 'ref' && Array.isArray(s.shapes)) s.shapes.forEach(visit)
@@ -39,7 +40,7 @@ function collectLayers(shapes) {
   return [...ids].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
 }
 
-function resolveTopShapes(layout) {
+function resolveTopShapes(layout: LayoutTree | null | undefined): LayoutShape[] {
   if (!layout) return []
   const topName = layout.topCell
   const cells   = layout.cells ?? []
@@ -47,8 +48,19 @@ function resolveTopShapes(layout) {
   return top ? (top.shapes ?? []) : []
 }
 
+interface View {
+  offsetX: number
+  offsetY: number
+  zoom: number
+}
+
+type ViewAction =
+  | { type: 'SET'; view: View }
+  | { type: 'PAN'; dx: number; dy: number }
+  | { type: 'ZOOM_TO'; factor: number; px: number; py: number }
+
 // Simple view reducer (mirrors the one in the component)
-function viewReducer(state, action) {
+function viewReducer(state: View, action: ViewAction): View {
   switch (action.type) {
     case 'SET': return action.view
     case 'PAN': return { ...state, offsetX: state.offsetX + action.dx, offsetY: state.offsetY + action.dy }
@@ -74,7 +86,7 @@ describe('resolveTopShapes', () => {
   })
 
   it('returns shapes of the named topCell', () => {
-    const layout = {
+    const layout: LayoutTree = {
       topCell: 'top',
       cells: [
         { name: 'other', shapes: [{ kind: 'box', layer: 1, x: 0, y: 0, w: 5, h: 5 }] },
@@ -87,7 +99,7 @@ describe('resolveTopShapes', () => {
   })
 
   it('falls back to first cell when topCell is not specified', () => {
-    const layout = {
+    const layout: LayoutTree = {
       cells: [
         { name: 'first', shapes: [{ kind: 'polygon', layer: 66, points: [] }] },
         { name: 'second', shapes: [] },
@@ -99,7 +111,9 @@ describe('resolveTopShapes', () => {
   })
 
   it('returns empty when topCell name not found', () => {
-    const layout = { topCell: 'missing', cells: [{ name: 'real', shapes: [{}] }] }
+    // shapes is empty here (not [{}]) only because LayoutShape's discriminated union
+    // requires `kind`; the test never reaches shapes since topName doesn't match.
+    const layout: LayoutTree = { topCell: 'missing', cells: [{ name: 'real', shapes: [] }] }
     expect(resolveTopShapes(layout)).toEqual([])
   })
 })
@@ -112,7 +126,7 @@ describe('collectLayers', () => {
   })
 
   it('collects unique layer ids', () => {
-    const shapes = [
+    const shapes: LayoutShape[] = [
       { kind: 'box',     layer: 68, x: 0, y: 0, w: 1, h: 1 },
       { kind: 'polygon', layer: 66, points: [] },
       { kind: 'box',     layer: 68, x: 1, y: 0, w: 1, h: 1 }, // duplicate
@@ -124,7 +138,7 @@ describe('collectLayers', () => {
   })
 
   it('recurses into ref shapes', () => {
-    const shapes = [
+    const shapes: LayoutShape[] = [
       {
         kind: 'ref',
         shapes: [
@@ -136,7 +150,7 @@ describe('collectLayers', () => {
   })
 
   it('ignores shapes without a layer', () => {
-    const shapes = [{ kind: 'text', x: 0, y: 0, label: 'hi' }]
+    const shapes: LayoutShape[] = [{ kind: 'text', x: 0, y: 0, label: 'hi' }]
     expect(collectLayers(shapes)).toHaveLength(0)
   })
 })
@@ -187,7 +201,7 @@ describe('fitBounds integration — centroid at viewport centre', () => {
 
   it('inverter-style multi-layer layout: centroid at screen centre', () => {
     // Simulate a small inverter layout with shapes on several SKY130 layers
-    const shapes = [
+    const shapes: LayoutShape[] = [
       { kind: 'box', layer: 64, x:   0, y:   0, w: 200, h: 100 }, // nwell
       { kind: 'box', layer: 65, x:  20, y:  10, w:  40, h:  80 }, // diff
       { kind: 'box', layer: 66, x:  80, y:   0, w:  20, h: 100 }, // poly
@@ -204,7 +218,7 @@ describe('fitBounds integration — centroid at viewport centre', () => {
   })
 
   it('zoom from fitBounds lets at least the full layout fit on screen', () => {
-    const shapes = [{ kind: 'box', layer: 68, x: 0, y: 0, w: 500, h: 300 }]
+    const shapes: LayoutShape[] = [{ kind: 'box', layer: 68, x: 0, y: 0, w: 500, h: 300 }]
     const view = fitBounds(shapes, viewport)
 
     const corners = [
@@ -238,7 +252,7 @@ describe('layer colour integration with SKY130 palette', () => {
   })
 
   it('layerColors map built from collectLayers has entry for every layer', () => {
-    const shapes = [
+    const shapes: LayoutShape[] = [
       { kind: 'box', layer: 68, x: 0, y: 0, w: 1, h: 1 },
       { kind: 'box', layer: 66, x: 0, y: 0, w: 1, h: 1 },
     ]
@@ -282,7 +296,7 @@ describe('hitTest contract — Box (spec oracle)', () => {
 
 describe('shapeBounds', () => {
   it('handles a path shape', () => {
-    const shapes = [
+    const shapes: LayoutShape[] = [
       { kind: 'path', points: [{ x: -10, y: 5 }, { x: 30, y: 5 }], width: 2 },
     ]
     const bb = shapeBounds(shapes)

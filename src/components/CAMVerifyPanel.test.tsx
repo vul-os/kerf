@@ -1,13 +1,19 @@
 /**
- * Vitest structural tests for CAMVerifyPanel.
+ * CAMVerifyPanel.test.tsx — Vitest structural tests for CAMVerifyPanel.
  *
  * Uses renderToStaticMarkup (react-dom/server) — no @testing-library/react
  * needed, following the project pattern from CameraLensPicker.test.jsx.
  */
 
+import type { ComponentType } from 'react'
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import CAMVerifyPanel from './CAMVerifyPanel.jsx'
+import CAMVerifyPanelUntyped from './CAMVerifyPanel.jsx'
+
+// CAMVerifyPanel.jsx is not yet migrated (T-515); most of its destructured
+// params (gcode, partSurfaceZ, ...) read as required by TS's structural
+// inference even though they're all optional at runtime.
+const CAMVerifyPanel = CAMVerifyPanelUntyped as unknown as ComponentType<Record<string, unknown>>
 
 const defaultProps = {
   projectId: 'proj-1',

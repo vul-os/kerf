@@ -24,7 +24,10 @@ import { constraintEntityRefs } from '../lib/sketchUI.js'
 // ---------------------------------------------------------------------------
 // helpers
 
-function emptySketch() {
+// Untyped on purpose: a partial SketchJSON fixture threaded through the
+// sketchEdit.js pure helpers (owned by another slice), whose real SketchJSON
+// type requires fields (version, plane, ...) these tests don't care about.
+function emptySketch(): any {
   return {
     entities: [{ id: 'origin', type: 'point', x: 0, y: 0 }],
     constraints: [],
@@ -68,7 +71,7 @@ describe('symmetric_over_line schema', () => {
       entity_b_id: pB,
       construction_line_id: lineId,
     })
-    const c = cn.sketch.constraints.find((x) => x.id === cn.id)
+    const c = cn.sketch.constraints.find((x) => x.id === cn.id) as any
     expect(c.type).toBe('symmetric_over_line')
     expect(c.entity_a_id).toBe(pA)
     expect(c.entity_b_id).toBe(pB)
@@ -164,7 +167,7 @@ describe('composite entity decomposition shapes', () => {
       entity_b_id: lineB.id,
       construction_line_id: axis.id,
     })
-    const c = cn.sketch.constraints.find((x) => x.id === cn.id)
+    const c = cn.sketch.constraints.find((x) => x.id === cn.id) as any
     expect(c.entity_a_id).toBe(lineA.id)
     expect(c.entity_b_id).toBe(lineB.id)
     expect(c.construction_line_id).toBe(axis.id)
@@ -290,7 +293,7 @@ describe('symmetric_over_line edge cases', () => {
       entity_b_id: pB.id,
       construction_line_id: axis.id,
     })
-    const c = cn.sketch.constraints.find((x) => x.id === cn.id)
+    const c = cn.sketch.constraints.find((x) => x.id === cn.id) as any
     expect(c).toBeDefined()
     expect(c.type).toBe('symmetric_over_line')
     expect(c.entity_a_id).toBe(pA.id)

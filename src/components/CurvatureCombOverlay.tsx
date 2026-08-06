@@ -1,4 +1,4 @@
-// CurvatureCombOverlay.jsx — Three.js curvature-comb overlay for NURBS surfaces.
+// CurvatureCombOverlay.tsx — Three.js curvature-comb overlay for NURBS surfaces.
 //
 // NURBS Phase 4 Capability 4 (C4): visualise principal curvatures on NURBS faces
 // so practitioners can EYEBALL G2/G3 continuity at face junctions.
@@ -46,7 +46,50 @@
 // `import * as THREE from 'three'` is available.
 
 import { useEffect, useRef, useCallback } from 'react'
+import type { RefObject } from 'react'
 import * as THREE from 'three'
+import type { CurvaturePoint, CurvatureStats } from '../lib/occtBridge.js'
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+//
+// CurvaturePoint / CurvatureStats come straight from occtBridge.ts's
+// sampleSurfaceCurvature() — the worker-side producer of this overlay's data —
+// so they're imported rather than redeclared. The postMessage envelope itself
+// (surface_curvature_combs_result) isn't in src/types/workers.ts, so its shape
+// is declared locally here, the sole consumer.
+//
+// 'three' ships no .d.ts and this repo has no @types/three (see prior T-513
+// commits) — THREE.X positions resolve to `any` because noImplicitAny is off.
+// The scene ref is narrowed to the minimal add/remove shape CloudLayer.tsx
+// already established, rather than the full THREE.Scene type.
+
+export interface CurvatureCombScene {
+  add?: (obj: THREE.Object3D) => void
+  remove?: (obj: THREE.Object3D) => void
+}
+
+export interface CurvatureFaceSample {
+  faceName: string
+  points: CurvaturePoint[]
+  stats: CurvatureStats
+  geomLPropSLPropsPresent: boolean
+}
+
+export interface SurfaceCurvatureCombsResultMessage {
+  type: 'surface_curvature_combs_result'
+  nodeId: string | null
+  targetRef: string
+  faceSamples: CurvatureFaceSample[]
+  scaleFactor: number
+  showCombs: boolean
+}
+
+export interface CurvatureCombOverlayProps {
+  sceneRef?: RefObject<CurvatureCombScene | null>
+  workerRef?: RefObject<Worker | null>
+  enabled?: boolean
+  scaleFactor?: number
+}
 
 // ---------------------------------------------------------------------------
 // Colormap: mean curvature → RGB (blue=concave, white=flat, red=convex)
@@ -61,7 +104,8 @@ import * as THREE from 'three'
 //
 // The colormap is symmetric so equal-magnitude concave/convex regions read
 // at equal visual intensity — important for Class-A blend inspection.
-export function curvatureToColor(t) {
+// eslint-disable-next-line react-refresh/only-export-components -- pre-existing before this migration.
+export function curvatureToColor(t: number): { r: number; g: number; b: number } {
   const tc = Math.max(-1, Math.min(1, t))
   if (tc < 0) {
     // Concave: white → blue
@@ -78,7 +122,8 @@ export function curvatureToColor(t) {
 // Normalise a mean curvature value to [-1, 1] given a symmetric range.
 // maxAbsMean = max(|mean curvature|) across all sampled points.
 // We use a soft 10% threshold so near-zero still renders as white.
-export function normaliseMeanCurvature(mean, maxAbsMean) {
+// eslint-disable-next-line react-refresh/only-export-components -- pre-existing before this migration.
+export function normaliseMeanCurvature(mean: number, maxAbsMean: number): number {
   if (!maxAbsMean || maxAbsMean === 0) return 0
   return Math.max(-1, Math.min(1, mean / maxAbsMean))
 }
@@ -94,7 +139,8 @@ export function normaliseMeanCurvature(mean, maxAbsMean) {
 //   color = curvatureToColor(normaliseMeanCurvature(mean, maxAbsMean))
 //
 // Returns null if the sample array is empty.
-export function buildCombGeometry(points, scaleFactor, maxAbsMean) {
+// eslint-disable-next-line react-refresh/only-export-components -- pre-existing before this migration.
+export function buildCombGeometry(points: CurvaturePoint[] | null | undefined, scaleFactor: number, maxAbsMean: number): THREE.BufferGeometry | null {
   if (!points || points.length === 0) return null
 
   const positions = new Float32Array(points.length * 6)  // 2 vertices × 3 floats
@@ -131,16 +177,16 @@ export function buildCombGeometry(points, scaleFactor, maxAbsMean) {
 // ---------------------------------------------------------------------------
 // Component
 
-export default function CurvatureCombOverlay({ sceneRef, workerRef, enabled, scaleFactor = 10 }) {
+export default function CurvatureCombOverlay({ sceneRef, workerRef, enabled, scaleFactor = 10 }: CurvatureCombOverlayProps) {
   // Hold refs to all Three.js objects we create so we can dispose them on
   // unmount or on the next result message.
-  const combObjectsRef = useRef([])
+  const combObjectsRef = useRef<THREE.LineSegments[]>([])
 
   // Dispose and remove all current comb objects from the scene.
   const clearCombs = useCallback(() => {
     const scene = sceneRef?.current
     for (const obj of combObjectsRef.current) {
-      if (scene) scene.remove(obj)
+      if (scene) scene.remove?.(obj)
       obj.geometry?.dispose()
       obj.material?.dispose()
     }
@@ -148,8 +194,8 @@ export default function CurvatureCombOverlay({ sceneRef, workerRef, enabled, sca
   }, [sceneRef])
 
   // Handle incoming curvature data from the worker.
-  const handleWorkerMessage = useCallback((ev) => {
-    const msg = ev.data || {}
+  const handleWorkerMessage = useCallback((ev: MessageEvent) => {
+    const msg = (ev.data || {}) as Partial<SurfaceCurvatureCombsResultMessage>
     if (msg.type !== 'surface_curvature_combs_result') return
     if (!enabled) return
 
@@ -185,7 +231,7 @@ export default function CurvatureCombOverlay({ sceneRef, workerRef, enabled, sca
       })
       const lines = new THREE.LineSegments(geo, mat)
       lines.name = `curvature_combs_${faceData.faceName || 'face'}`
-      scene.add(lines)
+      scene.add?.(lines)
       combObjectsRef.current.push(lines)
     }
   }, [enabled, scaleFactor, clearCombs, sceneRef])
@@ -223,6 +269,17 @@ export default function CurvatureCombOverlay({ sceneRef, workerRef, enabled, sca
 //   scaleFactor    — number
 //   onScaleFactor  — (v: number) => void
 //   geomLPropOk    — boolean | null (null = not yet probed)
+
+export interface CurvatureCombPanelProps {
+  enabled: boolean
+  onToggle: () => void
+  uvDensity: number
+  onUvDensity: (v: number) => void
+  scaleFactor: number
+  onScaleFactor: (v: number) => void
+  geomLPropOk: boolean | null
+}
+
 export function CurvatureCombPanel({
   enabled,
   onToggle,
@@ -231,7 +288,7 @@ export function CurvatureCombPanel({
   scaleFactor,
   onScaleFactor,
   geomLPropOk,
-}) {
+}: CurvatureCombPanelProps) {
   return (
     <section
       aria-label="Curvature Combs overlay controls"

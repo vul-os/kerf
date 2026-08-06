@@ -1,4 +1,4 @@
-// CurvatureCombOverlay.test.jsx — T-K2: curvature comb overlay contrast/labelling.
+// CurvatureCombOverlay.test.tsx — T-K2: curvature comb overlay contrast/labelling.
 //
 // Strategy: source-file structural checks via readFileSync.  The component
 // depends on THREE.js and a Web Worker which cannot be instantiated in a Vitest
@@ -17,32 +17,38 @@
 // Contrast check helper — pure JS, no DOM required.
 
 import { describe, it, expect } from 'vitest'
+// @types/node isn't part of this project's toolchain (tsconfig.json's `types` array is
+// T-500's — see docs/typescript-migration.md), so these Node builtins (used only for this
+// file's source-inspection assertions) are untyped at this boundary.
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
+// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const src = readFileSync(
-  path.resolve(__dirname, './CurvatureCombOverlay.jsx'),
+  path.resolve(__dirname, './CurvatureCombOverlay.tsx'),
   'utf8',
 )
 
 // ---------------------------------------------------------------------------
 // Inline WCAG contrast helper (no external deps)
 // ---------------------------------------------------------------------------
-function toLinear(c) {
+function toLinear(c: number) {
   const s = c / 255
   return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
 }
-function luminance(r, g, b) {
+function luminance(r: number, g: number, b: number) {
   return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b)
 }
-function contrastRatio(l1, l2) {
+function contrastRatio(l1: number, l2: number) {
   const lighter = Math.max(l1, l2)
   const darker  = Math.min(l1, l2)
   return (lighter + 0.05) / (darker + 0.05)
 }
-function hexToRgb(hex) {
+function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '')
   return [
     parseInt(h.slice(0, 2), 16),
@@ -52,7 +58,7 @@ function hexToRgb(hex) {
 }
 
 // Panel background: rgba(18,18,24,0.92) treated as opaque
-const BG = [18, 18, 24]
+const BG: [number, number, number] = [18, 18, 24]
 
 describe('CurvatureCombOverlay T-K2 — contrast + labelling', () => {
   // --- Contrast checks ---

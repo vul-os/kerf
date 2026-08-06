@@ -14,7 +14,7 @@
 // projectId      — for context (passed through; not used in dispatch)
 // onToast        — (msg) => void  optional toast for errors
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject, type ChangeEvent } from 'react'
 import { ChevronDown, ChevronRight, Play, Square, Loader2, Zap, Plus, Trash2 } from 'lucide-react'
 import { useAuth } from '../store/auth.js'
 
@@ -24,10 +24,67 @@ const API_URL = import.meta.env.VITE_API_URL || ''
 // Constants
 // ---------------------------------------------------------------------------
 
-export const JOINT_TYPES = ['revolute', 'prismatic', 'cylindrical']
-export const DRIVER_TYPES = ['constant_velocity', 'sinusoidal', 'table']
+export const JOINT_TYPES = ['revolute', 'prismatic', 'cylindrical'] as const
+export const DRIVER_TYPES = ['constant_velocity', 'sinusoidal', 'table'] as const
 
-const DEFAULT_SIM = {
+export type JointType = typeof JOINT_TYPES[number]
+export type DriverType = typeof DRIVER_TYPES[number]
+
+// ---------------------------------------------------------------------------
+// Data shapes
+// ---------------------------------------------------------------------------
+
+export interface AssemblyComponentRow {
+  id: string
+  [key: string]: unknown
+}
+
+export interface JointSpec {
+  type: JointType
+  componentA?: string
+  componentB?: string
+  axis?: [number, number, number]
+}
+
+export interface DriverSpec {
+  type: DriverType
+  velocity?: number
+  amplitude?: number
+  frequency?: number
+  table?: string
+  inertia?: number
+  damping?: number
+}
+
+export interface SimParams {
+  dt: number
+  duration: number
+}
+
+// Raw simulate_motion tool response — heterogeneous JSON from the backend
+// tool we don't own the types for.
+export interface MotionResult {
+  trajectories?: Array<Array<{ t?: number; position?: number[]; [key: string]: unknown }>>
+  t?: number[]
+  [key: string]: unknown
+}
+
+export interface ComponentTransform {
+  x: number
+  y: number
+  z: number
+  qw: number
+  qx: number
+  qy: number
+  qz: number
+}
+
+export interface RendererHandle {
+  setComponentTransforms?: (transforms: Map<string, ComponentTransform>) => void
+  [key: string]: unknown
+}
+
+const DEFAULT_SIM: SimParams = {
   dt: 0.01,
   duration: 2.0,
 }
@@ -44,9 +101,9 @@ const DEFAULT_SIM = {
  * @param {string} raw  — textarea content, e.g. "0.0 0\n0.5 1.57\n1.0 3.14"
  * @returns {{ times: number[], thetas: number[] }}
  */
-export function parseTableDriver(raw) {
-  const times = []
-  const thetas = []
+export function parseTableDriver(raw: string | undefined | null): { times: number[]; thetas: number[] } {
+  const times: number[] = []
+  const thetas: number[] = []
   for (const line of (raw || '').split('\n')) {
     const parts = line.trim().split(/\s+/)
     if (parts.length < 2) continue
@@ -60,6 +117,31 @@ export function parseTableDriver(raw) {
   return { times, thetas }
 }
 
+export interface SimBody {
+  name: string
+  mass: number
+  inertia: number[][]
+  position: number[]
+  velocity: number[]
+}
+
+export type SimForce =
+  | { type: 'gravity'; g: number }
+  | { type: 'applied'; body_idx: number; force: number[]; torque: number[] }
+  | { type: 'table_driver'; body_idx: number; table_times: number[]; table_thetas: number[]; inertia: number; damping: number; axis: number[] }
+
+export interface SimPayload {
+  tool: 'simulate_motion'
+  args: {
+    bodies: SimBody[]
+    forces: SimForce[]
+    joints: { type: JointType; component_a?: string; component_b?: string; axis: number[] }[]
+    dt: number
+    n_steps: number
+    record_every: number
+  }
+}
+
 /**
  * Build the `simulate_motion` tool payload from panel state.
  *
@@ -68,20 +150,20 @@ export function parseTableDriver(raw) {
  * @param {object}   sim     — {dt, duration}
  * @returns {object}  payload for POST /api/tools/call
  */
-export function buildSimPayload(joints, driver, sim) {
+export function buildSimPayload(joints: JointSpec[], driver: DriverSpec, sim: SimParams): SimPayload {
   const n_steps = Math.max(1, Math.round(sim.duration / sim.dt))
 
   // One rigid body per unique component id referenced in joints, plus a
   // ground body (index 0).  For a simple planar analysis we give everything
   // unit mass / inertia so the integrator runs; real geometry would fill these.
-  const componentIds = []
+  const componentIds: string[] = []
   for (const j of joints) {
     if (j.componentA && !componentIds.includes(j.componentA)) componentIds.push(j.componentA)
     if (j.componentB && !componentIds.includes(j.componentB)) componentIds.push(j.componentB)
   }
   if (componentIds.length === 0) componentIds.push('body_0')
 
-  const bodies = componentIds.map((id, i) => ({
+  const bodies: SimBody[] = componentIds.map((id, i) => ({
     name: id,
     mass: 1.0,
     inertia: [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
@@ -90,7 +172,7 @@ export function buildSimPayload(joints, driver, sim) {
   }))
 
   // Driver → force/torque on body 0
-  const forces = [{ type: 'gravity', g: 9.80665 }]
+  const forces: SimForce[] = [{ type: 'gravity', g: 9.80665 }]
   if (bodies.length > 0) {
     const dv = _driverForce(driver, sim)
     if (dv) forces.push(dv)
@@ -124,7 +206,7 @@ export function buildSimPayload(joints, driver, sim) {
  * @param {object} sim  — {dt, duration} used for inertia default
  * @returns {object|null}  force spec, or null if driver applies no force
  */
-function _driverForce(driver, sim) {
+function _driverForce(driver: DriverSpec | null | undefined, sim: SimParams): SimForce | null {
   if (!driver) return null
   switch (driver.type) {
     case 'constant_velocity':
@@ -160,8 +242,12 @@ function _driverForce(driver, sim) {
  * @param {object}   result        — raw simulate_motion response
  * @param {number}   frameIdx      — 0-based frame index
  */
-export function extractTransformsAtFrame(componentIds, result, frameIdx) {
-  const map = new Map()
+export function extractTransformsAtFrame(
+  componentIds: string[],
+  result: MotionResult | null | undefined,
+  frameIdx: number,
+): Map<string, ComponentTransform> {
+  const map = new Map<string, ComponentTransform>()
   if (!result?.trajectories) return map
   result.trajectories.forEach((traj, i) => {
     const id = componentIds[i]
@@ -178,7 +264,15 @@ export function extractTransformsAtFrame(componentIds, result, frameIdx) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function JointRow({ joint, index, components, onChange, onRemove }) {
+interface JointRowProps {
+  joint: JointSpec
+  index: number
+  components?: AssemblyComponentRow[]
+  onChange: (index: number, next: JointSpec) => void
+  onRemove: (index: number) => void
+}
+
+function JointRow({ joint, index, components, onChange, onRemove }: JointRowProps) {
   return (
     <div
       className="flex flex-col gap-1 bg-ink-900 border border-ink-800 rounded p-2 text-[11px]"
@@ -188,7 +282,7 @@ function JointRow({ joint, index, components, onChange, onRemove }) {
         <select
           className="flex-1 bg-ink-950 border border-ink-800 rounded px-1.5 py-0.5 text-[11px] text-ink-200"
           value={joint.type}
-          onChange={(e) => onChange(index, { ...joint, type: e.target.value })}
+          onChange={(e) => onChange(index, { ...joint, type: e.target.value as JointType })}
           aria-label={`Joint ${index + 1} type`}
         >
           {JOINT_TYPES.map((t) => (
@@ -232,7 +326,12 @@ function JointRow({ joint, index, components, onChange, onRemove }) {
   )
 }
 
-function DriverEditor({ driver, onChange }) {
+interface DriverEditorProps {
+  driver: DriverSpec
+  onChange: (next: DriverSpec) => void
+}
+
+function DriverEditor({ driver, onChange }: DriverEditorProps) {
   return (
     <div className="flex flex-col gap-1.5 text-[11px]" data-testid="driver-editor">
       <div className="flex items-center gap-2">
@@ -240,7 +339,7 @@ function DriverEditor({ driver, onChange }) {
         <select
           className="flex-1 bg-ink-950 border border-ink-800 rounded px-1.5 py-0.5 text-[11px] text-ink-200"
           value={driver.type}
-          onChange={(e) => onChange({ ...driver, type: e.target.value })}
+          onChange={(e) => onChange({ ...driver, type: e.target.value as DriverType })}
           aria-label="Driver type"
         >
           <option value="constant_velocity">Constant velocity</option>
@@ -310,23 +409,30 @@ function DriverEditor({ driver, onChange }) {
 // Main component
 // ---------------------------------------------------------------------------
 
+export interface AssemblyMotionPanelProps {
+  components?: AssemblyComponentRow[]
+  rendererRef?: RefObject<RendererHandle | null> | null
+  projectId?: string | null
+  onToast?: (message: string) => void
+}
+
 export default function AssemblyMotionPanel({
   components = [],
   rendererRef = null,
   projectId = null,
   onToast,
-}) {
+}: AssemblyMotionPanelProps) {
   const [open, setOpen] = useState(false)
-  const [joints, setJoints] = useState([])
-  const [driver, setDriver] = useState({ type: 'constant_velocity', velocity: 1.0 })
-  const [sim, setSim] = useState({ ...DEFAULT_SIM })
+  const [joints, setJoints] = useState<JointSpec[]>([])
+  const [driver, setDriver] = useState<DriverSpec>({ type: 'constant_velocity', velocity: 1.0 })
+  const [sim, setSim] = useState<SimParams>({ ...DEFAULT_SIM })
   const [running, setRunning] = useState(false)
-  const [result, setResult] = useState(null)     // simulate_motion response
+  const [result, setResult] = useState<MotionResult | null>(null)     // simulate_motion response
   const [frameIdx, setFrameIdx] = useState(0)
   const [totalFrames, setTotalFrames] = useState(0)
   // Component IDs extracted from the last successful simulation (ordered to
   // match result.trajectories)
-  const componentIdsRef = useRef([])
+  const componentIdsRef = useRef<string[]>([])
 
   // ── Joint list mutations ────────────────────────────────────────────────
 
@@ -337,11 +443,11 @@ export default function AssemblyMotionPanel({
     ])
   }
 
-  function updateJoint(idx, next) {
+  function updateJoint(idx: number, next: JointSpec) {
     setJoints((prev) => prev.map((j, i) => (i === idx ? next : j)))
   }
 
-  function removeJoint(idx) {
+  function removeJoint(idx: number) {
     setJoints((prev) => prev.filter((_, i) => i !== idx))
   }
 
@@ -362,7 +468,7 @@ export default function AssemblyMotionPanel({
 
     try {
       const token = useAuth.getState().accessToken
-      const headers = { 'Content-Type': 'application/json' }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
 
       const res = await fetch(`${API_URL}/api/tools/call`, {
@@ -380,7 +486,7 @@ export default function AssemblyMotionPanel({
       if (data.error) throw new Error(data.error)
 
       // data may be wrapped in an outer `result` key depending on the route
-      const inner = data.result ?? data
+      const inner: MotionResult = data.result ?? data
 
       if (!inner?.trajectories) throw new Error('No trajectory data returned')
 
@@ -391,8 +497,8 @@ export default function AssemblyMotionPanel({
 
       // Drive renderer to frame 0
       _applyFrame(inner, 0)
-    } catch (err) {
-      onToast?.(err.message || 'Motion simulation failed')
+    } catch (err: any) {
+      onToast?.(err?.message || 'Motion simulation failed')
     } finally {
       setRunning(false)
     }
@@ -400,13 +506,13 @@ export default function AssemblyMotionPanel({
 
   // ── Scrubber ────────────────────────────────────────────────────────────
 
-  function _applyFrame(r, idx) {
+  function _applyFrame(r: MotionResult, idx: number) {
     if (!rendererRef?.current?.setComponentTransforms) return
     const transforms = extractTransformsAtFrame(componentIdsRef.current, r, idx)
     rendererRef.current.setComponentTransforms(transforms)
   }
 
-  function handleScrub(e) {
+  function handleScrub(e: ChangeEvent<HTMLInputElement>) {
     const idx = parseInt(e.target.value, 10)
     setFrameIdx(idx)
     if (result) _applyFrame(result, idx)
@@ -414,7 +520,7 @@ export default function AssemblyMotionPanel({
 
   // ── Playback (simple rAF loop) ──────────────────────────────────────────
 
-  const playbackRef = useRef(null)
+  const playbackRef = useRef<number | null>(null)
   const [playing, setPlaying] = useState(false)
 
   function startPlayback() {

@@ -12,7 +12,8 @@
  */
 
 import { useState, useCallback } from 'react'
-import { Thermometer, Sun, Users, Zap, Wind, BarChart2, Loader2, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
+import type { ComponentType, ReactNode } from 'react'
+import { Thermometer, Sun, Users, Wind, BarChart2, Loader2, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
 import { useAuth } from '../../store/auth.js'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -21,7 +22,7 @@ const API_URL = import.meta.env.VITE_API_URL || ''
 // Helper: POST /api/tools/call
 // ---------------------------------------------------------------------------
 
-async function callTool(toolName, args, token) {
+async function callTool<T>(toolName: string, args: Record<string, unknown>, token: string | null | undefined): Promise<T> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: {
@@ -43,7 +44,42 @@ async function callTool(toolName, args, token) {
 // CLTD/RTS cooling load engine (client-side approximation using ASHRAE method)
 // ---------------------------------------------------------------------------
 
-export function computeCoolingLoad(inputs) {
+export interface CoolingLoadInputs {
+  wallArea: number
+  wallUValue: number
+  roofArea: number
+  roofUValue: number
+  glazingArea: number
+  solarHeatGainCoeff: number
+  uValueGlazing: number
+  occupantCount: number
+  lightingWatts: number
+  equipmentWatts: number
+  infiltrationACH: number
+  floorArea: number
+  ceilingHeight: number
+  outdoorDesignTemp: number
+  indoorTemp: number
+}
+
+export interface CoolingLoadBreakdown {
+  wall: number
+  roof: number
+  solar: number
+  glazingConduction: number
+  occupants: number
+  lighting: number
+  equipment: number
+  infiltration: number
+}
+
+export interface CoolingLoadResult {
+  totalCoolingW: number
+  breakdown: CoolingLoadBreakdown
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper, not a component
+export function computeCoolingLoad(inputs: CoolingLoadInputs): CoolingLoadResult {
   const {
     wallArea, wallUValue, roofArea, roofUValue,
     glazingArea, solarHeatGainCoeff, uValueGlazing,
@@ -99,7 +135,15 @@ export function computeCoolingLoad(inputs) {
   return { totalCoolingW: Math.round(totalCoolingW), breakdown }
 }
 
-export function computeHeatingLoad(inputs) {
+export interface HeatingLoadResult {
+  totalHeatingW: number
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper, not a component
+export function computeHeatingLoad(inputs: Pick<CoolingLoadInputs,
+  'wallArea' | 'wallUValue' | 'roofArea' | 'roofUValue' | 'glazingArea' | 'uValueGlazing' |
+  'infiltrationACH' | 'floorArea' | 'ceilingHeight' | 'outdoorDesignTemp' | 'indoorTemp'
+>): HeatingLoadResult {
   const {
     wallArea, wallUValue, roofArea, roofUValue,
     glazingArea, uValueGlazing,
@@ -128,7 +172,13 @@ export function computeHeatingLoad(inputs) {
  * shape is independently unit-testable (this repo has no jsdom/
  * @testing-library/react install; see HVACLoadPanel.test.jsx).
  */
-export function buildSensibleLoadArgs({ wallArea, wallUValue, outdoorSummer, indoor }) {
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper, not a component
+export function buildSensibleLoadArgs({ wallArea, wallUValue, outdoorSummer, indoor }: {
+  wallArea: number
+  wallUValue: number
+  outdoorSummer: number
+  indoor: number
+}) {
   const sensibleLoad_BTUh = wallArea * wallUValue * 5.678 *
     Math.max(outdoorSummer - indoor, 1) * 3.412
   return { Q_btuh: Math.max(sensibleLoad_BTUh, 100), delta_T_F: 20 }
@@ -143,7 +193,12 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 // BarSparkline
 // ---------------------------------------------------------------------------
 
-function BarSparkline({ values, color, unit, label }) {
+function BarSparkline({ values, color, unit, label }: {
+  values: number[]
+  color: string
+  unit: string
+  label: string
+}) {
   const max = Math.max(...values, 0.01)
   return (
     <div>
@@ -172,7 +227,12 @@ function BarSparkline({ values, color, unit, label }) {
 // Section widget
 // ---------------------------------------------------------------------------
 
-function Section({ icon: Icon, title, children, defaultOpen = true }) {
+function Section({ icon: Icon, title, children, defaultOpen = true }: {
+  icon: ComponentType<{ size?: number; className?: string }>
+  title: string
+  children: ReactNode
+  defaultOpen?: boolean
+}) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div className="border border-ink-800 rounded-md overflow-hidden">
@@ -194,7 +254,15 @@ function Section({ icon: Icon, title, children, defaultOpen = true }) {
 // Label + input row
 // ---------------------------------------------------------------------------
 
-function Field({ label, value, onChange, min, max, step = 'any', unit }) {
+function Field({ label, value, onChange, min, max, step = 'any', unit }: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  min?: string | number
+  max?: string | number
+  step?: string | number
+  unit?: string
+}) {
   return (
     <label className="flex flex-col gap-0.5">
       <span className="text-[10px] text-ink-500 leading-tight">{label}</span>
@@ -217,6 +285,14 @@ function Field({ label, value, onChange, min, max, step = 'any', unit }) {
 // ---------------------------------------------------------------------------
 // HVACLoadPanel
 // ---------------------------------------------------------------------------
+
+interface LoadResult {
+  coolingKW: number
+  heatingKW: number
+  breakdown: CoolingLoadBreakdown
+  coolingProfile: number[]
+  heatingProfile: number[]
+}
 
 export default function HVACLoadPanel() {
   const { accessToken } = useAuth()
@@ -247,8 +323,8 @@ export default function HVACLoadPanel() {
   const [outdoorWinter, setOutdoorWinter] = useState('-5')
   const [indoor,        setIndoor]        = useState('22')
 
-  const [result, setResult] = useState(null)
-  const [error,  setError]  = useState(null)
+  const [result, setResult] = useState<LoadResult | null>(null)
+  const [error,  setError]  = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const calculate = useCallback(async () => {
@@ -275,7 +351,6 @@ export default function HVACLoadPanel() {
 
     try {
       // Try backend tool call first — falls back to client-side
-      let coolingKW, heatingKW, breakdown
       try {
         const args = buildSensibleLoadArgs({
           wallArea: inputs.wallArea,
@@ -283,7 +358,7 @@ export default function HVACLoadPanel() {
           outdoorSummer: parseFloat(outdoorSummer),
           indoor: parseFloat(indoor),
         })
-        const resp = await callTool('hvac_cfm_from_sensible_load', args, accessToken)
+        const resp = await callTool<unknown>('hvac_cfm_from_sensible_load', args, accessToken)
         // cfm result confirms backend is alive; compute loads client-side
         void resp
       } catch {
@@ -300,16 +375,16 @@ export default function HVACLoadPanel() {
         indoorTemp: parseFloat(indoor),
       })
 
-      coolingKW   = +(cooling.totalCoolingW / 1000).toFixed(2)
-      heatingKW   = +(heating.totalHeatingW / 1000).toFixed(2)
-      breakdown   = cooling.breakdown
+      const coolingKW   = +(cooling.totalCoolingW / 1000).toFixed(2)
+      const heatingKW   = +(heating.totalHeatingW / 1000).toFixed(2)
+      const breakdown   = cooling.breakdown
 
       const coolingProfile = MONTH_COOLING_FACTOR.map(f => cooling.totalCoolingW * f)
       const heatingProfile = MONTH_HEATING_FACTOR.map(f => heating.totalHeatingW * f)
 
       setResult({ coolingKW, heatingKW, breakdown, coolingProfile, heatingProfile })
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
     }
@@ -393,7 +468,7 @@ export default function HVACLoadPanel() {
  * @testing-library/react isn't installed and `result` is only reachable
  * through internal `calculate()` state otherwise.
  */
-export function ResultsPanel({ result }) {
+export function ResultsPanel({ result }: { result: LoadResult }) {
   return (
     <div className="border border-ink-800 rounded-md overflow-hidden">
       <div className="bg-ink-900 px-3 py-2 text-[10px] font-semibold text-ink-300 uppercase tracking-wider">

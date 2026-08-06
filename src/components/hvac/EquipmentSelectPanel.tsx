@@ -13,14 +13,30 @@
  */
 
 import { useState, useMemo } from 'react'
-import { Settings2, Filter, TrendingUp, CheckCircle, AlertTriangle } from 'lucide-react'
-import { useAuth } from '../../store/auth.js'
+import { Settings2, Filter, TrendingUp, CheckCircle } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Equipment catalogue (ASHRAE 90.1-2022 minimum-efficiency basis + common OEM)
 // ---------------------------------------------------------------------------
 
-export const EQUIPMENT_CATALOGUE = [
+export type EquipmentCategory = 'ahu' | 'chiller' | 'boiler' | 'heat_pump'
+
+export interface Equipment {
+  id: string
+  category: EquipmentCategory
+  manufacturer: string
+  model: string
+  capacity_kW: number
+  efficiency_metric: string
+  efficiency_rated: number
+  refrigerant: string | null
+  source: string
+  part_load: number[]
+  notes: string
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- data export, not a component
+export const EQUIPMENT_CATALOGUE: Equipment[] = [
   // ---- Air Handling Units ----
   {
     id: 'ahu-01', category: 'ahu', manufacturer: 'Generic AHU',
@@ -126,7 +142,8 @@ export const EQUIPMENT_CATALOGUE = [
   },
 ]
 
-export const CATEGORIES = [
+// eslint-disable-next-line react-refresh/only-export-components -- data export, not a component
+export const CATEGORIES: { key: EquipmentCategory | 'all'; label: string }[] = [
   { key: 'all',       label: 'All' },
   { key: 'ahu',       label: 'AHU' },
   { key: 'chiller',   label: 'Chiller' },
@@ -141,7 +158,7 @@ const PLF_LABELS = ['100%', '75%', '50%', '25%', '10%']
 // Mini sparkline for part-load curve
 // ---------------------------------------------------------------------------
 
-function PartLoadCurve({ values }) {
+function PartLoadCurve({ values }: { values: number[] }) {
   const max = Math.max(...values)
   const points = values.map((v, i) => {
     const x = (i / (values.length - 1)) * 100
@@ -179,7 +196,11 @@ function PartLoadCurve({ values }) {
 // Equipment card
 // ---------------------------------------------------------------------------
 
-export function EquipmentCard({ eq, selected, onSelect }) {
+export function EquipmentCard({ eq, selected, onSelect }: {
+  eq: Equipment
+  selected: boolean
+  onSelect: (eq: Equipment) => void
+}) {
   return (
     <button
       type="button"
@@ -227,7 +248,13 @@ export function EquipmentCard({ eq, selected, onSelect }) {
  * unit-testable (this repo has no jsdom/@testing-library/react install; see
  * EquipmentSelectPanel.test.jsx).
  */
-export function filterEquipment(catalogue, { category, minCap, maxCap, minEff }) {
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper, not a component
+export function filterEquipment(catalogue: Equipment[], { category, minCap, maxCap, minEff }: {
+  category: EquipmentCategory | 'all'
+  minCap: string
+  maxCap: string
+  minEff: string
+}): Equipment[] {
   return catalogue.filter(eq => {
     if (category !== 'all' && eq.category !== category) return false
     if (minCap && eq.capacity_kW < parseFloat(minCap)) return false
@@ -242,7 +269,7 @@ export function filterEquipment(catalogue, { category, minCap, maxCap, minEff })
  * its own component so it can be exercised directly via renderToStaticMarkup
  * (see filterEquipment doc above for why).
  */
-export function ResultsCount({ count, hasSelection }) {
+export function ResultsCount({ count, hasSelection }: { count: number; hasSelection: boolean }) {
   return (
     <div className="text-[10px] text-ink-500">
       {count} unit{count !== 1 ? 's' : ''} match
@@ -259,7 +286,7 @@ export function ResultsCount({ count, hasSelection }) {
  * directly via renderToStaticMarkup, since `selected` is only reachable
  * through internal EquipmentSelectPanel state otherwise.
  */
-export function SelectedUnitDetail({ eq }) {
+export function SelectedUnitDetail({ eq }: { eq: Equipment }) {
   return (
     <div className="border border-kerf-300/40 rounded-md overflow-hidden">
       <div className="flex items-center gap-2 px-3 py-2 bg-kerf-300/10">
@@ -313,11 +340,11 @@ export function SelectedUnitDetail({ eq }) {
 
 export default function EquipmentSelectPanel() {
   // Filter state
-  const [category,    setCategory]    = useState('all')
+  const [category,    setCategory]    = useState<EquipmentCategory | 'all'>('all')
   const [minCap,      setMinCap]      = useState('')
   const [maxCap,      setMaxCap]      = useState('')
   const [minEff,      setMinEff]      = useState('')
-  const [selected,    setSelected]    = useState(null)
+  const [selected,    setSelected]    = useState<Equipment | null>(null)
 
   const filtered = useMemo(
     () => filterEquipment(EQUIPMENT_CATALOGUE, { category, minCap, maxCap, minEff }),

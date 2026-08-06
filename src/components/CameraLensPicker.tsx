@@ -19,7 +19,7 @@
  * in partially-controlled mode.
  */
 
-import { useState } from 'react'
+import { useState, type ChangeEvent } from 'react'
 import { Camera, ChevronDown } from 'lucide-react'
 import {
   CAMERA_PROJECTIONS,
@@ -29,8 +29,11 @@ import {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
+type ProjectionKind = string
+type SensorKey = string
+
 /** Human-readable labels for each projection kind. */
-const PROJECTION_LABELS = {
+const PROJECTION_LABELS: Record<string, string> = {
   'perspective':    'Perspective',
   'orthographic':   'Orthographic',
   'two-point':      'Two-Point',
@@ -39,7 +42,7 @@ const PROJECTION_LABELS = {
 }
 
 /** Short tooltip descriptions shown in the picker. */
-const PROJECTION_DESCRIPTIONS = {
+const PROJECTION_DESCRIPTIONS: Record<string, string> = {
   'perspective':   'Standard rectilinear projection — the default.',
   'orthographic':  'No perspective foreshortening; parallel lines stay parallel.',
   'two-point':     'Verticals remain parallel; horizontals converge to two vanishing points.',
@@ -53,7 +56,7 @@ const USES_FOCAL = new Set(['perspective', 'two-point', 'fisheye'])
 /** Ordered list of sensor display names. */
 const SENSOR_OPTIONS = Object.keys(SENSOR_SIZES).map((key) => ({
   key,
-  label: { 'full-frame': 'Full Frame (36mm)', 'aps-c': 'APS-C (23.6mm)', 'cinema-35': 'Cinema 35 (24.89mm)', 'micro-4-3': 'Micro 4/3 (17.3mm)' }[key] ?? key,
+  label: ({ 'full-frame': 'Full Frame (36mm)', 'aps-c': 'APS-C (23.6mm)', 'cinema-35': 'Cinema 35 (24.89mm)', 'micro-4-3': 'Micro 4/3 (17.3mm)' } as Record<string, string>)[key] ?? key,
 }))
 
 /** Common focal-length presets in mm. */
@@ -61,8 +64,14 @@ const FOCAL_PRESETS = [14, 24, 35, 50, 85, 135, 200]
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
+interface ProjectionOptionProps {
+  kind: ProjectionKind
+  active: boolean
+  onSelect: (kind: ProjectionKind) => void
+}
+
 /** Projection option row inside the dropdown menu. */
-function ProjectionOption({ kind, active, onSelect }) {
+function ProjectionOption({ kind, active, onSelect }: ProjectionOptionProps) {
   return (
     <button
       type="button"
@@ -83,12 +92,18 @@ function ProjectionOption({ kind, active, onSelect }) {
   )
 }
 
+interface FocalLengthRowProps {
+  focalMm: number
+  sensor: SensorKey
+  onFocalMm?: (mm: number) => void
+}
+
 /** Focal-length row: preset chips + numeric input. */
-function FocalLengthRow({ focalMm, sensor, onFocalMm }) {
+function FocalLengthRow({ focalMm, sensor, onFocalMm }: FocalLengthRowProps) {
   const sensorWidth = SENSOR_SIZES[sensor] ?? SENSOR_SIZES['full-frame']
   const fov_deg     = focalToFov(focalMm, sensorWidth) * (180 / Math.PI)
 
-  function handleInput(e) {
+  function handleInput(e: ChangeEvent<HTMLInputElement>) {
     const v = parseFloat(e.target.value)
     if (!isNaN(v) && v > 0 && typeof onFocalMm === 'function') onFocalMm(v)
   }
@@ -140,8 +155,13 @@ function FocalLengthRow({ focalMm, sensor, onFocalMm }) {
   )
 }
 
+interface SensorRowProps {
+  sensor: SensorKey
+  onSensor?: (key: SensorKey) => void
+}
+
 /** Sensor-size row: a compact select. */
-function SensorRow({ sensor, onSensor }) {
+function SensorRow({ sensor, onSensor }: SensorRowProps) {
   return (
     <div className="px-3 py-2 border-t border-ink-800">
       <div className="text-[10px] uppercase tracking-wider text-ink-500 font-semibold mb-1.5">
@@ -163,13 +183,23 @@ function SensorRow({ sensor, onSensor }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+export interface CameraLensPickerProps {
+  /** Current projection kind (one of CAMERA_PROJECTIONS). */
+  projection?: ProjectionKind
+  /** Current focal length in mm (default 50). */
+  focalMm?: number
+  /** Current sensor key (one of SENSOR_SIZES keys). */
+  sensor?: SensorKey
+  /** Called with (kind: string) when the user picks a projection. */
+  onProjection?: (kind: ProjectionKind) => void
+  /** Called with (focal_mm: number) when focal length changes. */
+  onFocalMm?: (mm: number) => void
+  /** Called with (sensor: string) when sensor changes. */
+  onSensor?: (key: SensorKey) => void
+}
+
 /**
  * CameraLensPicker — dropdown widget for picking camera projection + lens settings.
- *
- * @param {{ projection?: string, focalMm?: number, sensor?: string,
- *           onProjection?: (kind: string) => void,
- *           onFocalMm?: (mm: number) => void,
- *           onSensor?: (key: string) => void }} props
  */
 export default function CameraLensPicker({
   projection = 'perspective',
@@ -178,12 +208,12 @@ export default function CameraLensPicker({
   onProjection,
   onFocalMm,
   onSensor,
-}) {
+}: CameraLensPickerProps) {
   const [open, setOpen] = useState(false)
 
   const label = PROJECTION_LABELS[projection] ?? projection
 
-  function handleProjection(kind) {
+  function handleProjection(kind: ProjectionKind) {
     if (typeof onProjection === 'function') onProjection(kind)
     // Close immediately for orthographic / panoramic (no focal sub-controls).
     if (!USES_FOCAL.has(kind)) setOpen(false)

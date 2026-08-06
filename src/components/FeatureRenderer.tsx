@@ -48,6 +48,38 @@ import { cullByFrustum, frustumCullEnabled } from '../lib/frustumCull.js'
 import { materialFor } from '../lib/jewelryMaterials.js'
 import { detectWebGL } from '../lib/detectWebGL.js'
 
+// This component holds a large, densely-interlinked Three.js scene-graph
+// state object (`stateRef.current`) plus loose worker-shaped mesh payloads.
+// Fully modeling both is a refactor-scale effort out of scope for a
+// rename-only TS migration pass, so the internal scene state and the raw
+// worker mesh/part payloads are typed `any` at their entry points below,
+// each annotated at the point of use. Component props and the public
+// surface (selection, callbacks, ref handle) are fully typed.
+type RendererState = any // boundary: internal Three.js scene-graph + per-part bookkeeping blob
+type MeshEntry = any // boundary: raw payload shape from occtRunner's worker (vertices/indices/faceIds/...)
+type NodeMap = Record<string, any> // boundary: feature-node spec consumed by materialFor()
+
+export interface FeatureSelection {
+  faceIds: Set<string>
+  edgeIds: Set<string>
+}
+
+interface FeatureRendererProps {
+  meshes: MeshEntry[]
+  selection: FeatureSelection
+  pickMode: 'face' | 'edge' | 'pushpull' | null
+  onSelectionChange?: (next: FeatureSelection) => void
+  onFacePick?: (info: { id: number; name: string; partId: string }) => void
+  onPushPullCommit?: (info: { partId: string; faceId: number; faceName: string; distance: number }) => void
+  onPushPullPreview?: (info: { partId: string; faceId: number; faceName: string; distance: number }) => void
+  nodeMap?: NodeMap | null
+  className?: string
+}
+
+export interface FeatureRendererHandle {
+  snapshot: () => string | undefined
+}
+
 const BG_COLOR = 0x0f1115
 const HOVER_FACE = 0xffd633
 const SELECTED_FACE = 0xc9a96b
@@ -58,10 +90,10 @@ const EDGE_SELECTED = 0xffa940
 const GHOST_COLOR = 0xffd633
 
 // Tag two refs as the same face/edge across part boundaries.
-function faceKey(partId, faceId) { return `${partId}|${faceId}` }
-function edgeKey(partId, edgeId) { return `e${partId}|${edgeId}` }
+function faceKey(partId: string, faceId: number) { return `${partId}|${faceId}` }
+function edgeKey(partId: string, edgeId: number) { return `e${partId}|${edgeId}` }
 
-const FeatureRenderer = forwardRef(function FeatureRenderer({
+const FeatureRenderer = forwardRef<FeatureRendererHandle, FeatureRendererProps>(function FeatureRenderer({
   meshes,                   // [{ id, mesh, geometry? }] — geometry is optional cached BufferGeometry
   selection,                // { faceIds: Set<string>, edgeIds: Set<string> }
   pickMode,                 // 'face' | 'edge' | 'pushpull' | null
@@ -75,11 +107,11 @@ const FeatureRenderer = forwardRef(function FeatureRenderer({
   nodeMap = null,
   className = '',
 }, ref) {
-  const mountRef = useRef(null)
-  const stateRef = useRef(null)
+  const mountRef = useRef<HTMLDivElement | null>(null)
+  const stateRef = useRef<RendererState>(null)
   // T-C4: WebGL availability + context-lost flag (mirrors Renderer.jsx logic).
   const [webGLUnavailable, setWebGLUnavailable] = useState(() => !detectWebGL())
-  const [hoverInfo, setHoverInfo] = useState(null) // { kind, label }
+  const [hoverInfo, setHoverInfo] = useState<{ kind: string; label: string } | null>(null)
   const pickModeRef = useRef(pickMode)
   const selectionRef = useRef(selection)
   const meshesRef = useRef(meshes)

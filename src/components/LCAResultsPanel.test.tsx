@@ -1,10 +1,18 @@
-// LCAResultsPanel.test.jsx — vitest, renderToStaticMarkup (no jsdom needed)
+// LCAResultsPanel.test.tsx — vitest, renderToStaticMarkup (no jsdom needed)
+import type { ComponentType } from 'react'
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import {
-  LCAResultsPanel,
-  LCABadge,
+  LCAResultsPanel as LCAResultsPanelUntyped,
+  LCABadge as LCABadgeUntyped,
 } from './LCAResultsPanel.jsx'
+
+// LCAResultsPanel.jsx is not yet migrated (T-515); several destructured
+// props (lifecycle, multi, uncertainty, circularity) have no defaults so
+// TS's structural inference reads them as required even though they're
+// optional at runtime.
+const LCAResultsPanel = LCAResultsPanelUntyped as unknown as ComponentType<Record<string, unknown>>
+const LCABadge = LCABadgeUntyped as unknown as ComponentType<Record<string, unknown>>
 
 // ---------------------------------------------------------------------------
 // Fixtures — match the actual component API

@@ -16,6 +16,7 @@
  */
 
 import { useState, useCallback } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import {
   Wind, Thermometer, Droplets, Zap, Activity,
   ChevronDown, ChevronRight, Loader2, AlertTriangle,
@@ -29,7 +30,103 @@ const API_URL = import.meta.env.VITE_API_URL || ''
 // Tool dispatch
 // ---------------------------------------------------------------------------
 
-async function callTool(toolName, args, token) {
+interface AirState {
+  T_db_C: number
+  T_dp_C?: number
+  T_wb_C?: number
+  W_kg_kgda?: number
+  rh_fraction: number
+  h_kj_kgda?: number
+}
+
+interface ZoneInput {
+  name: string
+  design_flow_m3s: number
+  zone_load_W: number
+  zone_T_setpoint_C: number
+  zone_T_current_C: number
+  min_flow_fraction: number
+}
+
+interface AhuConfig {
+  name: string
+  min_oa_fraction: number
+  economizer_setpoint_C: number
+  chw_supply_T_C: number
+  chw_return_T_C: number
+  cooling_coil_bypass_factor: number
+  hw_supply_T_C: number
+  supply_fan_efficiency: number
+  duct_equivalent_length_m: number
+}
+
+interface PlantConfig {
+  chiller_cop: number
+  boiler_efficiency: number
+}
+
+interface VavZoneResult {
+  zone: string
+  supply_flow_m3s?: number
+  supply_T_C?: number
+  damper_position_pct?: number
+  zone_load_met_W?: number
+  unmet_load_W: number
+}
+
+/**
+ * The backend result is a deeply-nested psychrometric/energy report this panel reads
+ * defensively with optional chaining throughout. Modeled as loosely-typed nested records
+ * (rather than `any`) covering every field this file actually accesses; the full schema
+ * lives in the Python HVAC tool, out of this slice's scope.
+ */
+interface AirsideResult {
+  error?: string
+  economizer?: {
+    free_cooling_active?: boolean
+    oa_description?: string
+    oa_fraction?: number
+    free_cooling_load_W?: number
+  }
+  state_points?: Record<string, AirState>
+  cooling_coil?: {
+    Q_total_kW?: number
+    Q_sensible_W?: number
+    Q_latent_W?: number
+    SHR?: number
+    ADP_C?: number
+    bypass_factor?: number
+    effectiveness?: number
+    condensate_L_hr?: number
+  }
+  heating_coil?: {
+    active?: boolean
+    Q_kW?: number
+  }
+  supply_fan?: {
+    motor_power_W?: number
+    static_pressure_pa?: number
+    temp_rise_C?: number
+  }
+  return_fan?: {
+    motor_power_W?: number
+  }
+  total_fan_power_kW?: number
+  duct_system?: {
+    static_pressure_pa?: number
+  }
+  zone_results?: unknown[]
+  vav_zones?: VavZoneResult[]
+  total_zone_flow_m3s?: number
+  plant?: {
+    chiller_load_kW?: number
+    chiller_power_kW?: number
+    boiler_load_W?: number
+    total_system_power_kW?: number
+  }
+}
+
+async function callTool(toolName: string, args: Record<string, unknown>, token: string | undefined): Promise<AirsideResult> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: {
@@ -51,7 +148,12 @@ async function callTool(toolName, args, token) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function Section({ title, icon: Icon, defaultOpen = true, children }) {
+function Section({ title, icon: Icon, defaultOpen = true, children }: {
+  title: string
+  icon?: ComponentType<{ size?: number; className?: string }>
+  defaultOpen?: boolean
+  children: ReactNode
+}) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div className="border border-zinc-700 rounded-lg overflow-hidden mb-3">
@@ -68,7 +170,12 @@ function Section({ title, icon: Icon, defaultOpen = true, children }) {
   )
 }
 
-function Stat({ label, value, unit, highlight }) {
+function Stat({ label, value, unit, highlight }: {
+  label: string
+  value: ReactNode
+  unit?: string
+  highlight?: boolean
+}) {
   return (
     <div className={`flex flex-col gap-0.5 p-2 rounded ${highlight ? 'bg-blue-900/30 border border-blue-700/40' : 'bg-zinc-800'}`}>
       <span className="text-xs text-zinc-500">{label}</span>
@@ -80,11 +187,13 @@ function Stat({ label, value, unit, highlight }) {
 }
 
 // AHU schematic SVG — simple block flow diagram
-function AHUSchematic({ result }) {
+function AHUSchematic({ result }: { result: AirsideResult | null }) {
   const free = result?.economizer?.free_cooling_active
   const boxCls = "fill-zinc-700 stroke-zinc-500"
-  const activeCls = "fill-blue-900 stroke-blue-500"
-  const textCls = "fill-zinc-200 text-xs"
+  // NOTE (found, not fixed — migration is rename-only): both declared but never applied
+  // to any element below; the schematic colors each block inline instead.
+  const _activeCls = "fill-blue-900 stroke-blue-500"
+  const _textCls = "fill-zinc-200 text-xs"
 
   return (
     <svg
@@ -185,10 +294,10 @@ function AHUSchematic({ result }) {
 }
 
 // Psychrometric state points table
-function StatePointsTable({ statePoints }) {
+function StatePointsTable({ statePoints }: { statePoints?: Record<string, AirState> }) {
   if (!statePoints) return null
   const order = ['outdoor_air', 'mixed_air', 'post_cooling_coil', 'supply_air', 'return_air']
-  const labels = {
+  const labels: Record<string, string> = {
     outdoor_air: 'Outdoor Air (OA)',
     mixed_air: 'Mixed Air',
     post_cooling_coil: 'Post Cooling Coil',
@@ -240,7 +349,7 @@ function StatePointsTable({ statePoints }) {
 }
 
 // VAV zone table
-function VAVTable({ zones }) {
+function VAVTable({ zones }: { zones?: VavZoneResult[] }) {
   if (!zones?.length) return <p className="text-zinc-500 text-xs">No zones.</p>
   return (
     <div className="overflow-x-auto">
@@ -287,40 +396,69 @@ function VAVTable({ zones }) {
   )
 }
 
+// Numeric labeled input. `type` supports a hypothetical non-numeric mode (never
+// exercised — every call site in this file passes only numeric fields), so `set`
+// stays numeric and the string branch is unreachable in practice; kept for parity
+// with the original untyped component. Hoisted to module scope (not defined inside
+// AirsideSystemPanel's render) so its identity is stable across renders — a
+// component re-created every render loses its DOM/focus state on each keystroke.
+function F({ label, value, set, type = 'number', step = 0.1 }: {
+  label: string
+  value: number
+  set: (v: number) => void
+  type?: string
+  step?: number
+}) {
+  return (
+    <label className="flex flex-col gap-0.5">
+      <span className="text-xs text-zinc-500">{label}</span>
+      <input
+        type={type} value={value} step={step}
+        onChange={e => set(type === 'number' ? parseFloat(e.target.value) : Number(e.target.value))}
+        className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 w-full font-mono focus:outline-none focus:border-blue-500"
+      />
+    </label>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Default form state
 // ---------------------------------------------------------------------------
 
-const DEFAULT_OA = { T_db_C: 32, rh_fraction: 0.60 }
-const DEFAULT_RA = { T_db_C: 24, rh_fraction: 0.50 }
-const DEFAULT_ZONES = [
+const DEFAULT_OA: AirState = { T_db_C: 32, rh_fraction: 0.60 }
+const DEFAULT_RA: AirState = { T_db_C: 24, rh_fraction: 0.50 }
+const DEFAULT_ZONES: ZoneInput[] = [
   { name: 'Office-A', design_flow_m3s: 0.5, zone_load_W: 5000, zone_T_setpoint_C: 22, zone_T_current_C: 26, min_flow_fraction: 0.25 },
   { name: 'Office-B', design_flow_m3s: 0.3, zone_load_W: 2500, zone_T_setpoint_C: 22, zone_T_current_C: 24.5, min_flow_fraction: 0.25 },
   { name: 'Conference', design_flow_m3s: 0.4, zone_load_W: 7000, zone_T_setpoint_C: 22, zone_T_current_C: 27, min_flow_fraction: 0.25 },
 ]
-const DEFAULT_AHU = {
+const DEFAULT_AHU: AhuConfig = {
   name: 'AHU-1', min_oa_fraction: 0.15, economizer_setpoint_C: 18,
   chw_supply_T_C: 7, chw_return_T_C: 12, cooling_coil_bypass_factor: 0.10,
   hw_supply_T_C: 60, supply_fan_efficiency: 0.70, duct_equivalent_length_m: 100,
 }
-const DEFAULT_PLANT = { chiller_cop: 5.5, boiler_efficiency: 0.92 }
+const DEFAULT_PLANT: PlantConfig = { chiller_cop: 5.5, boiler_efficiency: 0.92 }
 
 // ---------------------------------------------------------------------------
 // Main panel
 // ---------------------------------------------------------------------------
 
 export default function AirsideSystemPanel() {
+  // @ts-expect-error — pre-existing bug (found during migration, not fixed): AuthState
+  // only exposes `accessToken`, never `token`, so this has always destructured to
+  // `undefined` and hvac.airside_system_model calls never carried an Authorization
+  // header. Left as-is — a rename-only slice does not change behaviour.
   const { token } = useAuth()
 
-  const [oa, setOa] = useState(DEFAULT_OA)
-  const [ra, setRa] = useState(DEFAULT_RA)
-  const [zones, setZones] = useState(DEFAULT_ZONES)
-  const [ahuCfg, setAhuCfg] = useState(DEFAULT_AHU)
-  const [plantCfg, setPlantCfg] = useState(DEFAULT_PLANT)
+  const [oa, setOa] = useState<AirState>(DEFAULT_OA)
+  const [ra, setRa] = useState<AirState>(DEFAULT_RA)
+  const [zones, setZones] = useState<ZoneInput[]>(DEFAULT_ZONES)
+  const [ahuCfg, setAhuCfg] = useState<AhuConfig>(DEFAULT_AHU)
+  const [plantCfg, setPlantCfg] = useState<PlantConfig>(DEFAULT_PLANT)
 
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState<AirsideResult | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   const addZone = () => setZones(z => [...z, {
     name: `Zone-${z.length + 1}`,
@@ -331,9 +469,9 @@ export default function AirsideSystemPanel() {
     min_flow_fraction: 0.25,
   }])
 
-  const removeZone = i => setZones(z => z.filter((_, j) => j !== i))
+  const removeZone = (i: number) => setZones(z => z.filter((_, j) => j !== i))
 
-  const updateZone = (i, field, val) => setZones(z =>
+  const updateZone = <K extends keyof ZoneInput>(i: number, field: K, val: ZoneInput[K]) => setZones(z =>
     z.map((zone, j) => j === i ? { ...zone, [field]: val } : zone)
   )
 
@@ -351,22 +489,11 @@ export default function AirsideSystemPanel() {
       if (res.error) throw new Error(res.error)
       setResult(res)
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
   }, [oa, ra, zones, ahuCfg, plantCfg, token])
-
-  const F = ({ label, value, set, type = 'number', step = 0.1 }) => (
-    <label className="flex flex-col gap-0.5">
-      <span className="text-xs text-zinc-500">{label}</span>
-      <input
-        type={type} value={value} step={step}
-        onChange={e => set(type === 'number' ? parseFloat(e.target.value) : e.target.value)}
-        className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 w-full font-mono focus:outline-none focus:border-blue-500"
-      />
-    </label>
-  )
 
   return (
     <div className="flex flex-col gap-4 p-4 text-zinc-200 max-w-4xl">

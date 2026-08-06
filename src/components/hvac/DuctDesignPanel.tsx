@@ -11,7 +11,7 @@
  */
 
 import { useState, useCallback } from 'react'
-import { Wind, Plus, Trash2, Calculator, Loader2, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Trash2, Calculator, Loader2, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react'
 import { useAuth } from '../../store/auth.js'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -20,7 +20,55 @@ const API_URL = import.meta.env.VITE_API_URL || ''
 // Tool dispatch
 // ---------------------------------------------------------------------------
 
-async function callTool(toolName, args, token) {
+type DuctShape = 'round' | 'rectangular'
+
+/** Form-state shape for one duct segment row (string inputs, as typed by the user). */
+export interface DuctSegmentForm {
+  id: number
+  airflow_cfm: string
+  max_velocity_fpm: string
+  shape: DuctShape
+  length_m: string
+  fittings: string[]
+}
+
+/** Backend `hvac.size_duct` response shape this file reads. */
+interface SizeDuctResponse {
+  width_mm?: number
+  height_mm?: number
+  diameter_mm?: number
+  shape?: DuctShape
+  actual_velocity_fpm?: number
+  actual_velocity_m_s: number
+  hydraulic_diameter_mm: number
+}
+
+/** Backend `hvac.pressure_drop` response shape this file reads. */
+interface PressureDropResponse {
+  friction_pa?: number
+  fittings_pa?: number
+  total_pa?: number
+  friction_factor?: number
+  reynolds_number?: number
+}
+
+/** Per-segment computed/merged result the UI renders (backend or client fallback). */
+export interface DuctSegmentResult {
+  w_mm?: number
+  h_mm?: number
+  d_mm?: number
+  shape?: DuctShape
+  actual_velocity_fpm?: number
+  actual_velocity_m_s?: number
+  hydraulic_diameter_mm?: number
+  friction_pa?: number
+  fittings_pa?: number
+  total_pa?: number
+  friction_factor?: number
+  reynolds?: number
+}
+
+async function callTool<T>(toolName: string, args: Record<string, unknown>, token: string | null | undefined): Promise<T> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: {
@@ -42,7 +90,14 @@ async function callTool(toolName, args, token) {
 // ASHRAE roughness catalogue
 // ---------------------------------------------------------------------------
 
-export const MATERIAL_OPTIONS = [
+interface MaterialOption {
+  key: string
+  label: string
+  roughness_mm: number
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- data export, not a component
+export const MATERIAL_OPTIONS: MaterialOption[] = [
   { key: 'galvanised_steel', label: 'Galvanised steel',    roughness_mm: 0.09 },
   { key: 'aluminium',        label: 'Aluminium (flexible)', roughness_mm: 0.2  },
   { key: 'fibreglass_liner', label: 'Fibreglass liner',    roughness_mm: 0.9  },
@@ -54,7 +109,7 @@ export const MATERIAL_OPTIONS = [
 // Client-side Darcy-Weisbach (mirrors kerf-hvac pressure.py)
 // ---------------------------------------------------------------------------
 
-function colebrook(re, epsD) {
+function colebrook(re: number, epsD: number): number {
   if (re < 2300) return 64 / re
   let f = 0.25 / (Math.log10(epsD / 3.7 + 5.74 / Math.pow(re, 0.9))) ** 2
   for (let i = 0; i < 50; i++) {
@@ -68,7 +123,7 @@ function colebrook(re, epsD) {
 const RHO = 1.204 // kg/m³
 const MU  = 1.81e-5
 
-const FITTING_K = {
+const FITTING_K: Record<string, number> = {
   elbow_90_rect:  0.30,
   elbow_90_round: 0.11,
   elbow_45_rect:  0.15,
@@ -77,10 +132,20 @@ const FITTING_K = {
   reducer:        0.05,
 }
 
-function sizeRect(q_m3s, v_max_ms, maxAR = 4) {
+interface RectSize {
+  w_mm: number
+  h_mm: number
+  area: number
+  v: number
+  dh: number
+  perim: number
+  ar: number
+}
+
+function sizeRect(q_m3s: number, v_max_ms: number, maxAR = 4): RectSize | null {
   const A_min = q_m3s / v_max_ms
   const GRID = 0.025 // 25 mm modules
-  let best = null
+  let best: RectSize | null = null
   for (let h = 0.100; h <= 2.0; h += GRID) {
     const w_min = A_min / h
     const w = Math.ceil(w_min / GRID) * GRID
@@ -97,23 +162,34 @@ function sizeRect(q_m3s, v_max_ms, maxAR = 4) {
   return best
 }
 
-export function computeDuctSegment(seg, roughness_mm) {
+/** Input to the client-side fallback calculation — parsed numeric fields, unlike the form state. */
+export interface DuctSegmentCalcInput {
+  airflow_cfm: number
+  max_velocity_fpm: number
+  shape: DuctShape
+  length_m: number
+  fittings?: string[]
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper, not a component
+export function computeDuctSegment(seg: DuctSegmentCalcInput, roughness_mm: number): DuctSegmentResult | null {
   const { airflow_cfm, max_velocity_fpm, shape, length_m, fittings } = seg
   const q_m3s  = airflow_cfm * 4.719474432e-4
   const v_max  = max_velocity_fpm * 0.00508
 
-  let w_mm, h_mm, d_mm, area, v, dh_m
+  let w_mm: number | undefined, h_mm: number | undefined, d_mm: number | undefined
+  let v: number, dh_m: number
 
   if (shape === 'round') {
     const d = Math.ceil(Math.sqrt(4 * q_m3s / (Math.PI * v_max)) / 0.025) * 0.025
     d_mm = Math.round(d * 1000)
-    area = Math.PI * d * d / 4
+    const area = Math.PI * d * d / 4
     v    = q_m3s / area
     dh_m = d
   } else {
     const r = sizeRect(q_m3s, v_max)
     if (!r) return null
-    w_mm = r.w_mm; h_mm = r.h_mm; area = r.area; v = r.v; dh_m = r.dh
+    w_mm = r.w_mm; h_mm = r.h_mm; v = r.v; dh_m = r.dh
   }
 
   const re    = RHO * v * dh_m / MU
@@ -145,7 +221,8 @@ export function computeDuctSegment(seg, roughness_mm) {
 // ---------------------------------------------------------------------------
 
 /** Build the args object for the `hvac.size_duct` tool call from a segment. */
-export function buildSizeDuctArgs(seg) {
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper, not a component
+export function buildSizeDuctArgs(seg: Pick<DuctSegmentForm, 'airflow_cfm' | 'max_velocity_fpm' | 'shape'>) {
   return {
     airflow_cfm: parseFloat(seg.airflow_cfm),
     max_velocity_fpm: parseFloat(seg.max_velocity_fpm),
@@ -157,7 +234,12 @@ export function buildSizeDuctArgs(seg) {
  * Build the args object for the `hvac.pressure_drop` tool call from the
  * `hvac.size_duct` response + the originating segment + duct roughness.
  */
-export function buildPressureDropArgs(sizeResp, seg, roughness_mm) {
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper, not a component
+export function buildPressureDropArgs(
+  sizeResp: Pick<SizeDuctResponse, 'actual_velocity_m_s' | 'hydraulic_diameter_mm'>,
+  seg: { length_m: string; fittings?: string[] },
+  roughness_mm: number,
+) {
   return {
     velocity_m_s:          sizeResp.actual_velocity_m_s,
     hydraulic_diameter_mm: sizeResp.hydraulic_diameter_mm,
@@ -178,7 +260,7 @@ export function buildPressureDropArgs(sizeResp, seg, roughness_mm) {
  * @testing-library/react isn't installed and the total is only reachable
  * through internal `calculate()` state otherwise.
  */
-export function TotalPressureDisplay({ total }) {
+export function TotalPressureDisplay({ total }: { total: number }) {
   return (
     <div className="flex items-center justify-between p-2.5 rounded-md bg-kerf-300/5 border border-kerf-300/30">
       <span className="text-[11px] text-ink-300 font-medium">Total system pressure</span>
@@ -187,7 +269,13 @@ export function TotalPressureDisplay({ total }) {
   )
 }
 
-function SegmentRow({ seg, idx, onChange, onRemove, result }) {
+function SegmentRow({ seg, idx, onChange, onRemove, result }: {
+  seg: DuctSegmentForm
+  idx: number
+  onChange: (next: DuctSegmentForm) => void
+  onRemove: () => void
+  result?: DuctSegmentResult
+}) {
   const [expanded, setExpanded] = useState(false)
 
   return (
@@ -229,7 +317,7 @@ function SegmentRow({ seg, idx, onChange, onRemove, result }) {
           </label>
           <label className="flex flex-col gap-0.5">
             <span className="text-[10px] text-ink-500">Shape</span>
-            <select value={seg.shape} onChange={e => onChange({ ...seg, shape: e.target.value })}
+            <select value={seg.shape} onChange={e => onChange({ ...seg, shape: e.target.value as DuctShape })}
               className="bg-ink-900 border border-ink-700 rounded px-2 py-1 text-[11px] text-ink-100 focus:outline-none focus:border-kerf-300/60">
               <option value="rectangular">Rectangular</option>
               <option value="round">Round</option>
@@ -300,29 +388,29 @@ export default function DuctDesignPanel() {
   const { accessToken } = useAuth()
 
   const [material, setMaterial] = useState('galvanised_steel')
-  const [segments, setSegments] = useState([
+  const [segments, setSegments] = useState<DuctSegmentForm[]>([
     { id: mkId(), airflow_cfm: '1000', max_velocity_fpm: '2000', shape: 'rectangular', length_m: '10', fittings: [] },
   ])
-  const [results,  setResults]  = useState({})
+  const [results,  setResults]  = useState<Record<number, DuctSegmentResult> & { _total?: number }>({})
   const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState(null)
+  const [error,    setError]    = useState<string | null>(null)
 
   const roughness_mm = MATERIAL_OPTIONS.find(m => m.key === material)?.roughness_mm ?? 0.09
 
   const addSegment = () =>
     setSegments(prev => [...prev, { id: mkId(), airflow_cfm: '500', max_velocity_fpm: '1500', shape: 'rectangular', length_m: '6', fittings: [] }])
 
-  const updateSegment = (id, next) =>
+  const updateSegment = (id: number, next: DuctSegmentForm) =>
     setSegments(prev => prev.map(s => s.id === id ? { ...s, ...next } : s))
 
-  const removeSegment = (id) =>
+  const removeSegment = (id: number) =>
     setSegments(prev => prev.filter(s => s.id !== id))
 
   const calculate = useCallback(async () => {
     setLoading(true)
     setError(null)
 
-    const newResults = {}
+    const newResults: Record<number, DuctSegmentResult> = {}
     let totalLoss = 0
 
     try {
@@ -332,11 +420,11 @@ export default function DuctDesignPanel() {
         const L     = parseFloat(seg.length_m)
 
         // Try backend first
-        let segResult = null
+        let segResult: DuctSegmentResult | null = null
         try {
-          const sizeResp = await callTool('hvac.size_duct', buildSizeDuctArgs(seg), accessToken)
+          const sizeResp = await callTool<SizeDuctResponse>('hvac.size_duct', buildSizeDuctArgs(seg), accessToken)
 
-          const dpResp = await callTool(
+          const dpResp = await callTool<PressureDropResponse>(
             'hvac.pressure_drop',
             buildPressureDropArgs(sizeResp, seg, roughness_mm),
             accessToken,
@@ -375,7 +463,7 @@ export default function DuctDesignPanel() {
 
       setResults({ ...newResults, _total: +totalLoss.toFixed(2) })
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
     }

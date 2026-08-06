@@ -6492,6 +6492,32 @@ this repo as transitive tscircuit dependencies. Both carry
     `point_on_ellipse`, ellipse semi-major/minor/rotation, `bezier_g2`) with cascade tests.
   - **VERIFIED:** typecheck 0, strict 0, ratchet 78/78, vitest 477 files / 13,209 passed.
 
+### T-564 — 🐛 3D PMI annotations never render (`window.__THREE__` is never assigned)
+- **Tier:** A · **Priority:** **P1** · **Status:** ⬜ not started
+- **Found by:** T-513, while migrating `Pmi3DOverlay`. Verified independently — `__THREE__` appears
+  exactly three times in `src/`: one comment and **two reads**, zero assignments.
+- **The bug:** `Pmi3DOverlay`'s `project()` and `handleCanvasClick()` both read
+  `window.__THREE__`, with a comment asserting `Renderer.jsx` caches it there. **Nothing anywhere
+  in `src/` ever assigns it.** Both functions therefore no-op on every call: 3D-anchored PMI/GD&T
+  annotations always render invisible, and click-to-place never fires.
+- **Scope:** either have `Renderer` actually publish the instance as the comment claims, or drop
+  the global entirely and import `three` directly in the overlay (the simpler fix, and the module
+  is already imported there for types). Add a test asserting an annotation projects to a real
+  screen position rather than silently returning nothing — the current failure mode is invisible,
+  which is why it survived.
+- **Depends-on:** T-513
+
+### T-565 — `src/types/geometry.ts`: `SectionFeatureNode.plane` has the wrong shape
+- **Tier:** B · **Priority:** P2 · **Status:** ⬜ not started
+- Found by T-513. `plane` is typed `string`, but `occtWorker.js`'s header comment — the source
+  T-501 mined to build these types — documents the real shape as
+  `{ point: [x,y,z], normal: [x,y,z] }`. `SectionView.tsx` had to declare a local
+  `SectionPlaneSpec` instead of importing the shared type.
+- **Scope:** correct the shared type and drop the local one. Check whether other consumers were
+  working around the same mismatch.
+- **Note:** T-501's types were derived from real sources and have otherwise held up across seven
+  slices; this is the first substantive shape error found in them.
+
 ### T-562 — 🐛 User preferences have never worked (`api.getPreferences` does not exist)
 - **Tier:** A · **Priority:** **P0** · **Status:** ⬜ not started
 - **Found by:** T-505, on typing `api.js` → `api.ts`. Verified against the pre-migration `api.js`:

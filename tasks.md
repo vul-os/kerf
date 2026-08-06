@@ -6475,6 +6475,37 @@ this repo as transitive tscircuit dependencies. Both carry
   `'bezier_g2'`, falling through to `default: []` — so `deleteEntities`' cascade fails to drop those
   constraints when a referenced entity is deleted, leaving dangling references.
 - **Depends-on:** T-503 (landed)
+- **Status:** ✅ shipped (2026-08-06) — `d11e96ca` (fix) + `fb061767` (proof).
+  - `point_on_line_ppp` → `p_id`/`lp1_id`/`lp2_id`. Equal-radius correctly split by entity kind:
+    `equal_radius_aa` (`a1_id`/`a2_id`, arc/arc) vs `equal_radius_cc` (`c1_id`/`c2_id`,
+    circle/circle) — previously `c1_id`/`c2_id` was pushed regardless. All four
+    `as unknown as GcsConstraint` casts removed; constraints now satisfy planegcs's real union.
+  - **Proven against the real solver**, not mocks: 6 tests in `sketcher.test.js` drive
+    `public/planegcs.wasm` and assert solved *geometry* (cross-products ≈ 0, mirrored
+    centres/endpoints, equal radii) rather than "no exception".
+  - **Deliberate-break check performed** — reverting the fix made 5 of 6 fail with exactly the
+    predicted real-wasm errors (`unhandled parameter lp1_id type: object_id`,
+    `unhandled parameter a1_id type: object_id`). The circle/circle test stayed green in **both**
+    states, independently confirming that path was never broken. This is what makes the fix
+    trustworthy — without it, a passing test proves nothing.
+  - `sketchEdit`'s `constraintRefs` gaps filled (`midpoint`, `fixed`, `collinear`,
+    `point_on_ellipse`, ellipse semi-major/minor/rotation, `bezier_g2`) with cascade tests.
+  - **VERIFIED:** typecheck 0, strict 0, ratchet 78/78, vitest 477 files / 13,209 passed.
+
+### T-561 — `bezier_g2` only converges when already near its solution
+- **Tier:** A · **Priority:** P2 · **Status:** ⬜ not started
+- **Found by:** T-560b, while writing real-solver tests — invisible to mocked tests.
+- **The issue:** `bezier_g2`'s two `p2p_distance` chord targets are baked from the **pre-solve**
+  entity positions rather than re-derived after collinearity moves the junction point. So the
+  constraint converges only when the starting geometry is already close to the true
+  collinear/equidistant solution. Measured: a 0.05-unit off-line perturbation over a 10-unit span
+  reports `conflict`; 0.001 converges.
+- **Nature:** a design limitation of the G2 approximation, **not** the parameter-name bug T-560
+  fixed. Documented in a code comment at the site.
+- **Scope:** re-derive the chord targets as part of the solve, or model G2 continuity with a
+  constraint that does not depend on pre-solve distances. Needs a real-solver test showing
+  convergence from a genuinely perturbed start.
+- **Depends-on:** T-560 (landed)
 
 ### T-539 — ⚠️ Validate the T-538 axis choice against a real board outline
 - **Tier:** A · **Priority:** P1 · **Status:** ⬜ not started

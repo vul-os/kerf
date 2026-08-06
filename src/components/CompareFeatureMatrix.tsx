@@ -33,7 +33,7 @@ interface FeatureSide {
   source?: string
 }
 
-interface FeatureRow {
+export interface FeatureRow {
   feature: string
   domain: string
   kerf?: FeatureSide

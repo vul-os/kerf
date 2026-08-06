@@ -9,16 +9,63 @@
  * Deliberately minimal: no editing of OpticsDesignPanel.jsx.
  */
 
-import React, { useState } from "react";
+import { useState } from "react";
 
-const DEFAULT_SURFACES = [
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface OpticalSurface {
+  radius_mm: number;
+  thickness_mm: number;
+  n_next: number;
+  label: string;
+}
+
+interface SeidelCoefficients {
+  spherical?: number;
+  coma?: number;
+  astigmatism?: number;
+  field_curvature?: number;
+  distortion?: number;
+  [field: string]: unknown;
+}
+
+/** `optics_sequential_trace` result — mined field-by-field from the reads below. */
+interface TraceResult {
+  efl_d_mm?: number;
+  bfd_mm?: number;
+  ffd_mm?: number;
+  longitudinal_chromatic_aberration_mm?: number;
+  rms_spot_mm: number;
+  strehl_ratio?: number;
+  efl_per_wavelength?: Record<string, number | string | null>;
+  seidel_coefficients?: SeidelCoefficients;
+  honest_caveat?: string;
+  ok?: boolean;
+  reason?: string;
+  [field: string]: unknown;
+}
+
+export interface Props {
+  onCallTool: (toolName: string, args: Record<string, unknown>) => Promise<unknown>;
+}
+
+const DEFAULT_SURFACES: OpticalSurface[] = [
   { radius_mm: 103.36, thickness_mm: 5, n_next: 1.5168, label: "BK7 front" },
   { radius_mm: -103.36, thickness_mm: 95, n_next: 1.0, label: "BK7 rear" },
 ];
 
 const DEFAULT_WAVELENGTHS = [486.1, 587.6, 656.3];
 
-function SurfaceRow({ surf, index, onChange, onRemove }) {
+interface SurfaceRowProps {
+  surf: OpticalSurface;
+  index: number;
+  onChange: <K extends keyof OpticalSurface>(index: number, field: K, value: OpticalSurface[K]) => void;
+  onRemove: (index: number) => void;
+}
+
+function SurfaceRow({ surf, index, onChange, onRemove }: SurfaceRowProps) {
   return (
     <tr>
       <td className="px-2 py-1 text-xs text-gray-400">{index + 1}</td>
@@ -67,7 +114,12 @@ function SurfaceRow({ surf, index, onChange, onRemove }) {
   );
 }
 
-function SeidelRow({ label, value }) {
+interface SeidelRowProps {
+  label: string;
+  value: number | undefined;
+}
+
+function SeidelRow({ label, value }: SeidelRowProps) {
   const v = typeof value === "number" ? value.toExponential(3) : value;
   return (
     <tr>
@@ -77,16 +129,16 @@ function SeidelRow({ label, value }) {
   );
 }
 
-export default function SequentialTracePanel({ onCallTool }) {
-  const [surfaces, setSurfaces] = useState(DEFAULT_SURFACES);
+export default function SequentialTracePanel({ onCallTool }: Props) {
+  const [surfaces, setSurfaces] = useState<OpticalSurface[]>(DEFAULT_SURFACES);
   const [wavelengths, setWavelengths] = useState(DEFAULT_WAVELENGTHS.join(", "));
   const [objectDist, setObjectDist] = useState(1000);
   const [primaryWl, setPrimaryWl] = useState(587.6);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
+  const [result, setResult] = useState<TraceResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSurfaceChange = (idx, field, value) => {
+  const handleSurfaceChange = <K extends keyof OpticalSurface>(idx: number, field: K, value: OpticalSurface[K]) => {
     setSurfaces((prev) => prev.map((s, i) => (i === idx ? { ...s, [field]: value } : s)));
   };
 
@@ -97,7 +149,7 @@ export default function SequentialTracePanel({ onCallTool }) {
     ]);
   };
 
-  const handleRemoveSurface = (idx) => {
+  const handleRemoveSurface = (idx: number) => {
     setSurfaces((prev) => prev.filter((_, i) => i !== idx));
   };
 
@@ -124,14 +176,14 @@ export default function SequentialTracePanel({ onCallTool }) {
       };
 
       const raw = await onCallTool("optics_sequential_trace", args);
-      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      const parsed: TraceResult = typeof raw === "string" ? JSON.parse(raw) : (raw as TraceResult);
       if (parsed.ok === false) {
         setError(parsed.reason || "Tool returned error");
       } else {
         setResult(parsed);
       }
     } catch (e) {
-      setError(e.message);
+      setError((e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -249,7 +301,7 @@ export default function SequentialTracePanel({ onCallTool }) {
                   <div key={wl} className="bg-gray-800 rounded px-2 py-1 text-xs">
                     <span className="text-gray-400">{wl} nm: </span>
                     <span className="text-white font-mono">
-                      {efl != null ? `${parseFloat(efl).toFixed(2)} mm` : "—"}
+                      {efl != null ? `${parseFloat(String(efl)).toFixed(2)} mm` : "—"}
                     </span>
                   </div>
                 ))}
@@ -263,13 +315,15 @@ export default function SequentialTracePanel({ onCallTool }) {
               <div className="text-xs text-gray-400 mb-1">Seidel aberration coefficients</div>
               <table className="text-xs border-collapse">
                 <tbody>
-                  {[
-                    ["W040 spherical", result.seidel_coefficients.spherical],
-                    ["W131 coma", result.seidel_coefficients.coma],
-                    ["W222 astigmatism", result.seidel_coefficients.astigmatism],
-                    ["W220 field curvature", result.seidel_coefficients.field_curvature],
-                    ["W311 distortion", result.seidel_coefficients.distortion],
-                  ].map(([label, val]) => (
+                  {(
+                    [
+                      ["W040 spherical", result.seidel_coefficients.spherical],
+                      ["W131 coma", result.seidel_coefficients.coma],
+                      ["W222 astigmatism", result.seidel_coefficients.astigmatism],
+                      ["W220 field curvature", result.seidel_coefficients.field_curvature],
+                      ["W311 distortion", result.seidel_coefficients.distortion],
+                    ] as const
+                  ).map(([label, val]) => (
                     <SeidelRow key={label} label={label} value={val} />
                   ))}
                 </tbody>

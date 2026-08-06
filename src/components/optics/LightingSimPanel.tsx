@@ -9,9 +9,67 @@
  * + Lambert cosine photometric model.
  */
 
-import React, { useState } from "react";
+import { useState } from "react";
+import type { ReactElement } from "react";
 
-const DEFAULT_SOURCES = [
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type Vec3 = [number, number, number];
+
+interface LightSource {
+  source_id: string;
+  position: Vec3;
+  direction: Vec3;
+  luminous_flux_lm: number;
+  distribution: string;
+  colour_temperature_K: number;
+}
+
+interface ReceiverSurface {
+  surface_id: string;
+  centre: Vec3;
+  normal: Vec3;
+  area_m2: number;
+  reflectance: number;
+}
+
+interface SurfaceResult {
+  surface_id: string;
+  illuminance_lux: number;
+  luminance_cdpm2: number;
+  luminous_flux_received_lm: number;
+  [field: string]: unknown;
+}
+
+interface CctInfo {
+  cct_K: number;
+  cie_x?: number;
+  cie_y?: number;
+  [field: string]: unknown;
+}
+
+/** `optics_lighting_simulation` result — mined field-by-field from the reads below. */
+interface LightingSimResult {
+  mean_illuminance_lux: number;
+  min_illuminance_lux: number;
+  max_illuminance_lux: number;
+  uniformity_ratio: number;
+  n_sources: number;
+  n_surfaces: number;
+  surfaces: SurfaceResult[];
+  source_cct?: Record<string, CctInfo>;
+  ok?: boolean;
+  reason?: string;
+  [field: string]: unknown;
+}
+
+export interface Props {
+  onCallTool: (toolName: string, args: Record<string, unknown>) => Promise<unknown>;
+}
+
+const DEFAULT_SOURCES: LightSource[] = [
   {
     source_id: "L1",
     position: [0.0, 0.0, 3.0],
@@ -22,7 +80,7 @@ const DEFAULT_SOURCES = [
   },
 ];
 
-const DEFAULT_SURFACES = [
+const DEFAULT_SURFACES: ReceiverSurface[] = [
   {
     surface_id: "workplane",
     centre: [0.0, 0.0, 0.0],
@@ -39,7 +97,7 @@ const DEFAULT_SURFACES = [
   },
 ];
 
-function vec3Input(label, value, onChange) {
+function vec3Input(label: string, value: Vec3, onChange: (v: Vec3) => void): ReactElement {
   return (
     <div>
       <label className="block text-xs text-gray-400 mb-0.5">{label}</label>
@@ -52,7 +110,7 @@ function vec3Input(label, value, onChange) {
             className="w-16 bg-gray-800 border border-gray-600 rounded px-1 py-0.5 text-xs text-white"
             value={v}
             onChange={(e) => {
-              const next = [...value];
+              const next = [...value] as Vec3;
               next[i] = parseFloat(e.target.value) || 0;
               onChange(next);
             }}
@@ -63,7 +121,13 @@ function vec3Input(label, value, onChange) {
   );
 }
 
-function IlluminanceBar({ value, max, label }) {
+interface IlluminanceBarProps {
+  value: number;
+  max: number;
+  label: string;
+}
+
+function IlluminanceBar({ value, max, label }: IlluminanceBarProps) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   return (
     <div className="mb-1">
@@ -81,13 +145,13 @@ function IlluminanceBar({ value, max, label }) {
   );
 }
 
-export default function LightingSimPanel({ onCallTool }) {
-  const [sources, setSources] = useState(DEFAULT_SOURCES);
-  const [surfaces, setSurfaces] = useState(DEFAULT_SURFACES);
+export default function LightingSimPanel({ onCallTool }: Props) {
+  const [sources, setSources] = useState<LightSource[]>(DEFAULT_SOURCES);
+  const [surfaces, setSurfaces] = useState<ReceiverSurface[]>(DEFAULT_SURFACES);
   const [ambientLux, setAmbientLux] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
+  const [result, setResult] = useState<LightingSimResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleRun = async () => {
     setLoading(true);
@@ -100,24 +164,24 @@ export default function LightingSimPanel({ onCallTool }) {
         ambient_lux: ambientLux,
       };
       const raw = await onCallTool("optics_lighting_simulation", args);
-      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      const parsed: LightingSimResult = typeof raw === "string" ? JSON.parse(raw) : (raw as LightingSimResult);
       if (parsed.ok === false) {
         setError(parsed.reason || "Tool returned error");
       } else {
         setResult(parsed);
       }
     } catch (e) {
-      setError(e.message);
+      setError((e as Error).message);
     } finally {
       setLoading(false);
     }
   };
 
-  const updateSource = (idx, field, value) => {
+  const updateSource = <K extends keyof LightSource>(idx: number, field: K, value: LightSource[K]) => {
     setSources((prev) => prev.map((s, i) => (i === idx ? { ...s, [field]: value } : s)));
   };
 
-  const updateSurface = (idx, field, value) => {
+  const updateSurface = <K extends keyof ReceiverSurface>(idx: number, field: K, value: ReceiverSurface[K]) => {
     setSurfaces((prev) => prev.map((s, i) => (i === idx ? { ...s, [field]: value } : s)));
   };
 
@@ -319,8 +383,8 @@ export default function LightingSimPanel({ onCallTool }) {
               ["Min illum.", `${result.min_illuminance_lux.toFixed(1)} lx`],
               ["Max illum.", `${result.max_illuminance_lux.toFixed(1)} lx`],
               ["Uniformity U₀", result.uniformity_ratio.toFixed(3)],
-              ["Sources", result.n_sources],
-              ["Surfaces", result.n_surfaces],
+              ["Sources", String(result.n_sources)],
+              ["Surfaces", String(result.n_surfaces)],
             ].map(([k, v]) => (
               <div key={k} className="bg-gray-800 rounded p-2">
                 <div className="text-xs text-gray-400">{k}</div>
@@ -360,7 +424,7 @@ export default function LightingSimPanel({ onCallTool }) {
                     <span className="text-white">{cct.cct_K} K</span>
                     {cct.cie_x != null && (
                       <span className="text-gray-400 ml-1">
-                        (x={cct.cie_x.toFixed(3)}, y={cct.cie_y.toFixed(3)})
+                        (x={cct.cie_x.toFixed(3)}, y={cct.cie_y?.toFixed(3)})
                       </span>
                     )}
                   </div>

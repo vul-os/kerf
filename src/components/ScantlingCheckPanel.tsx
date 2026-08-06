@@ -419,7 +419,7 @@ export default function ScantlingCheckPanel({ result: propResult, loading: propL
         Cw,
         draft_m: draft,
         both_ends_fixed: fixedEnds,
-      }
+      } as Record<string, unknown>
       // Optional actuals
       if (tActual !== '') args.t_actual_mm = parseFloat(tActual)
       if (smActual !== '') args.SM_actual_cm3 = parseFloat(smActual)

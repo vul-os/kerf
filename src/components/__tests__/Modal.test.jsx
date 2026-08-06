@@ -17,7 +17,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement } from 'react'
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
 
 const ROOT = resolve(__dirname, '../../..')
@@ -189,7 +189,11 @@ describe('Modal — source contracts (Modal.jsx)', () => {
 // ── 6. Ad-hoc modal retirement ────────────────────────────────────────────────
 
 describe('ShareModal — uses canonical Modal', () => {
-  const src = readFileSync(resolve(ROOT, 'src/components/ShareModal.jsx'), 'utf8')
+  const shareModalTsx = resolve(ROOT, 'src/components/ShareModal.tsx')
+  const src = readFileSync(
+    existsSync(shareModalTsx) ? shareModalTsx : resolve(ROOT, 'src/components/ShareModal.jsx'),
+    'utf8',
+  )
 
   it('imports Modal from ./Modal.jsx', () => {
     expect(src).toMatch(/from ['"]\.\/Modal\.jsx['"]/)
@@ -208,7 +212,11 @@ describe('ShareModal — uses canonical Modal', () => {
 })
 
 describe('ShortcutsModal — uses canonical Modal', () => {
-  const src = readFileSync(resolve(ROOT, 'src/components/ShortcutsModal.jsx'), 'utf8')
+  const shortcutsModalTsx = resolve(ROOT, 'src/components/ShortcutsModal.tsx')
+  const src = readFileSync(
+    existsSync(shortcutsModalTsx) ? shortcutsModalTsx : resolve(ROOT, 'src/components/ShortcutsModal.jsx'),
+    'utf8',
+  )
 
   it('imports Modal from ./Modal.jsx', () => {
     expect(src).toMatch(/from ['"]\.\/Modal\.jsx['"]/)

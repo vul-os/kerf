@@ -22,35 +22,49 @@
  *   fmtVal(n, digits, unit)   → formatted string
  */
 
+import type { CSSProperties, ReactNode, ComponentType } from 'react'
 import { AlertTriangle, CheckCircle2, Thermometer, Activity, Zap } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for tests)
 // ---------------------------------------------------------------------------
 
+export type MoldParseKind = 'ok' | 'empty' | 'invalid'
+export type MoldToolKind = 'cooling' | 'runner_balance' | 'warpage' | 'unknown'
+
+// Tool result payloads are heterogeneous JSON from the LLM tool layer we don't own.
+export type MoldToolData = Record<string, any>
+
+export interface MoldParseResult {
+  kind: MoldParseKind
+  tool: MoldToolKind | null
+  data?: MoldToolData | null
+  error?: string
+}
+
 /**
  * Parse raw mold tool result JSON content.
  * Returns { kind: 'ok'|'empty'|'invalid', tool, data, error? }
  */
-export function parseMoldResult(content) {
+export function parseMoldResult(content: string): MoldParseResult {
   const raw = typeof content === 'string' ? content : ''
   if (!raw.trim()) return { kind: 'empty', tool: null, data: null }
-  let doc
+  let doc: any
   try {
     doc = JSON.parse(raw)
-  } catch (e) {
-    return { kind: 'invalid', error: e.message }
+  } catch (e: any) {
+    return { kind: 'invalid', tool: null, error: e.message }
   }
   if (!doc || typeof doc !== 'object') {
-    return { kind: 'invalid', error: 'Expected JSON object' }
+    return { kind: 'invalid', tool: null, error: 'Expected JSON object' }
   }
-  const data = doc.result && typeof doc.result === 'object' ? doc.result : doc
+  const data: MoldToolData = doc.result && typeof doc.result === 'object' ? doc.result : doc
   if (data.ok === false) {
-    return { kind: 'invalid', error: data.reason || data.error || 'Tool returned ok:false' }
+    return { kind: 'invalid', tool: null, error: data.reason || data.error || 'Tool returned ok:false' }
   }
   const tool = detectTool(data)
   if (tool === 'unknown') {
-    return { kind: 'invalid', error: 'Unrecognised mold tool output format' }
+    return { kind: 'invalid', tool: null, error: 'Unrecognised mold tool output format' }
   }
   return { kind: 'ok', tool, data }
 }
@@ -58,7 +72,7 @@ export function parseMoldResult(content) {
 /**
  * Detect which mold tool produced this result.
  */
-export function detectTool(data) {
+export function detectTool(data: MoldToolData | null | undefined): MoldToolKind {
   if (!data || typeof data !== 'object') return 'unknown'
   // Cooling analysis: has htc_w_m2_k or cooling_time_s and reynolds
   if ('htc_w_m2_k' in data || ('cooling_time_s' in data && 'reynolds' in data)) return 'cooling'
@@ -73,7 +87,7 @@ export function detectTool(data) {
  * Return CSS colour for a warpage index (0–100).
  * 0–25: green (low); 25–50: amber (moderate); 50–75: orange (high); >75: red (severe)
  */
-export function warpageColor(index) {
+export function warpageColor(index: number | null | undefined): string {
   if (index == null || !Number.isFinite(index)) return '#9ca3af'
   if (index <= 25) return '#34d399'
   if (index <= 50) return '#fbbf24'
@@ -85,7 +99,7 @@ export function warpageColor(index) {
  * Return CSS colour for a runner imbalance percentage.
  * <5 %: green; 5–15 %: amber; >15 %: red
  */
-export function balanceColor(pct) {
+export function balanceColor(pct: number | null | undefined): string {
   if (pct == null || !Number.isFinite(pct)) return '#9ca3af'
   if (pct < 5)  return '#34d399'
   if (pct < 15) return '#fbbf24'
@@ -96,7 +110,7 @@ export function balanceColor(pct) {
  * Format a numeric value, optionally appending a unit.
  * Returns "—" for null/non-finite.
  */
-export function fmtVal(n, digits = 2, unit = '') {
+export function fmtVal(n: number | null | undefined, digits = 2, unit = ''): string {
   if (n == null || !Number.isFinite(n)) return '—'
   const s = n.toFixed(digits)
   return unit ? `${s} ${unit}` : s
@@ -106,7 +120,7 @@ export function fmtVal(n, digits = 2, unit = '') {
 // Styles
 // ---------------------------------------------------------------------------
 
-const S = {
+const S: Record<string, CSSProperties> = {
   container: {
     fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace',
     fontSize: 12,
@@ -229,7 +243,15 @@ const S = {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function MetricCard({ label, value, unit, accent, icon: Icon }) {
+interface MetricCardProps {
+  label: string
+  value?: ReactNode
+  unit?: string
+  accent?: string
+  icon?: ComponentType<{ size?: number }>
+}
+
+function MetricCard({ label, value, unit, accent, icon: Icon }: MetricCardProps) {
   return (
     <div style={S.metricCard}>
       <div style={S.metricLabel}>
@@ -246,7 +268,13 @@ function MetricCard({ label, value, unit, accent, icon: Icon }) {
   )
 }
 
-function IndexGauge({ value, color, label }) {
+interface IndexGaugeProps {
+  value?: number | null
+  color: string
+  label: string
+}
+
+function IndexGauge({ value, color, label }: IndexGaugeProps) {
   const clampedPct = Math.min(100, Math.max(0, value ?? 0))
   return (
     <div style={S.metricCard}>
@@ -263,7 +291,11 @@ function IndexGauge({ value, color, label }) {
 // Tool-specific renderers
 // ---------------------------------------------------------------------------
 
-function CoolingView({ data: d }) {
+interface ToolViewProps {
+  data: MoldToolData
+}
+
+function CoolingView({ data: d }: ToolViewProps) {
   return (
     <>
       <div style={S.metricsGrid}>
@@ -291,7 +323,7 @@ function CoolingView({ data: d }) {
   )
 }
 
-function RunnerBalanceView({ data: d }) {
+function RunnerBalanceView({ data: d }: ToolViewProps) {
   const paths     = Array.isArray(d.cavity_paths) ? d.cavity_paths : []
   const imbalPct  = d.max_imbalance_pct ?? 0
   const color     = balanceColor(imbalPct)
@@ -308,7 +340,7 @@ function RunnerBalanceView({ data: d }) {
       {paths.length > 0 && (
         <>
           <div style={S.sectionTitle}>Cavity Paths</div>
-          {paths.slice(0, SHOW_MAX).map((cp, i) => (
+          {paths.slice(0, SHOW_MAX).map((cp: MoldToolData, i: number) => (
             <div key={i} style={S.row}>
               <span style={{ color: '#94a3b8', minWidth: 70 }}>{cp.cavity_id || `C${i}`}</span>
               <span>fill ratio: </span>
@@ -331,10 +363,10 @@ function RunnerBalanceView({ data: d }) {
   )
 }
 
-function WarpageView({ data: d }) {
+function WarpageView({ data: d }: ToolViewProps) {
   const color       = warpageColor(d.warpage_index)
   const mitigations = Array.isArray(d.mitigation_suggestions) ? d.mitigation_suggestions : []
-  const subScores   = d.sub_scores && typeof d.sub_scores === 'object' ? d.sub_scores : {}
+  const subScores: Record<string, number> = d.sub_scores && typeof d.sub_scores === 'object' ? d.sub_scores : {}
 
   return (
     <>
@@ -372,6 +404,10 @@ function WarpageView({ data: d }) {
 // Main component
 // ---------------------------------------------------------------------------
 
+export interface MoldCoolingWarpagePanelProps {
+  parsedContent?: string | Record<string, unknown> | null
+}
+
 /**
  * MoldCoolingWarpagePanel renders the output of mold_cooling_analysis,
  * mold_check_runner_balance, or mold_compute_warpage_index.
@@ -379,10 +415,10 @@ function WarpageView({ data: d }) {
  * Props:
  *   parsedContent — string | object  (raw tool JSON output)
  */
-export default function MoldCoolingWarpagePanel({ parsedContent }) {
+export default function MoldCoolingWarpagePanel({ parsedContent }: MoldCoolingWarpagePanelProps) {
   const raw = typeof parsedContent === 'object' && parsedContent !== null
     ? JSON.stringify(parsedContent)
-    : (parsedContent ?? '')
+    : ((parsedContent as string | null | undefined) ?? '')
 
   const { kind, tool, data, error } = parseMoldResult(raw)
 
@@ -405,14 +441,18 @@ export default function MoldCoolingWarpagePanel({ parsedContent }) {
     )
   }
 
-  const icons = { cooling: Thermometer, runner_balance: Activity, warpage: Zap }
-  const titles = {
+  const icons: Partial<Record<MoldToolKind, ComponentType<{ size?: number; color?: string }>>> = {
+    cooling: Thermometer,
+    runner_balance: Activity,
+    warpage: Zap,
+  }
+  const titles: Partial<Record<MoldToolKind, string>> = {
     cooling: 'Cooling Channel Analysis',
     runner_balance: 'Runner Balance',
     warpage: 'Warpage Index',
   }
-  const Icon  = icons[tool] || Activity
-  const title = titles[tool] || 'Mold Analysis'
+  const Icon  = (tool && icons[tool]) || Activity
+  const title = (tool && titles[tool]) || 'Mold Analysis'
 
   return (
     <div style={S.container}>
@@ -421,11 +461,11 @@ export default function MoldCoolingWarpagePanel({ parsedContent }) {
         <span style={S.title}>{title}</span>
       </div>
 
-      {tool === 'cooling'         && <CoolingView data={data} />}
-      {tool === 'runner_balance'  && <RunnerBalanceView data={data} />}
-      {tool === 'warpage'         && <WarpageView data={data} />}
+      {tool === 'cooling'         && <CoolingView data={data ?? {}} />}
+      {tool === 'runner_balance'  && <RunnerBalanceView data={data ?? {}} />}
+      {tool === 'warpage'         && <WarpageView data={data ?? {}} />}
 
-      {data.honest_caveat && (
+      {data?.honest_caveat && (
         <div style={S.caveat}>
           <AlertTriangle size={11} style={{ display: 'inline', marginRight: 4 }} />
           {data.honest_caveat}

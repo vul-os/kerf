@@ -4,8 +4,9 @@ import {
   meshDocToBufferGeometryArgs,
   subdToBufferGeometry,
   meshDocToBufferGeometry,
+  type MeshDoc,
 } from './subdToBufferGeometry.js'
-import { cubeMesh, subdivide, defaultSubD } from './subd.js'
+import { cubeMesh, subdivide } from './subd.js'
 
 // ── fixtures ───────────────────────────────────────────────────────────────────
 
@@ -18,16 +19,16 @@ function makeCubeSubdDoc(level = 1) {
   }
 }
 
-function makeSimpleMeshDoc(withNormals = false) {
+function makeSimpleMeshDoc(withNormals = false): MeshDoc {
   // A single tetrahedron — 4 vertices, 4 triangular faces.
-  const vertices = [
+  const vertices: Array<[number, number, number]> = [
     [0, 0, 0],
     [1, 0, 0],
     [0.5, 1, 0],
     [0.5, 0.5, 1],
   ]
   const indices = [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3]
-  const normals = withNormals
+  const normals: Array<[number, number, number]> | undefined = withNormals
     ? vertices.map(() => [0, 0, 1])   // dummy normals — just for testing presence
     : undefined
   return withNormals ? { vertices, indices, normals } : { vertices, indices }

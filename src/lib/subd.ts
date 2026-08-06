@@ -1,5 +1,5 @@
 /**
- * subd.js — Pure-JS Catmull-Clark subdivision surface library.
+ * subd.ts — Pure-JS Catmull-Clark subdivision surface library.
  *
  * File format (.subd):
  * {
@@ -14,13 +14,65 @@
  * }
  */
 
+export interface SubdVertex {
+  id: number
+  x: number
+  y: number
+  z: number
+}
+
+export interface SubdFace {
+  id: number
+  vertex_ids: number[]
+  crease_value?: number
+}
+
+export interface SubdEdge {
+  v1: number
+  v2: number
+  crease_value: number
+}
+
+export interface SubdControlMesh {
+  vertices: SubdVertex[]
+  faces: SubdFace[]
+  edges: SubdEdge[]
+}
+
+export interface SubdDisplayMesh {
+  /** [[x,y,z], ...] positions, indexed by the same ids as `control_mesh.vertices` post-subdivision. */
+  vertices: Array<[number, number, number]>
+  faces: SubdFace[]
+  /** Flat triangle indices, three per triangle (fan-triangulated from `faces`). */
+  indices: number[]
+}
+
+export interface SubdDocument {
+  version: number
+  control_mesh: SubdControlMesh
+  subdivision_level: number
+  display_mesh: SubdDisplayMesh | null
+}
+
+/** The flat-array form consumed/produced by {@link subdToMesh}/{@link meshToSubd}. */
+export interface FlatMesh {
+  vertices: Array<[number, number, number]>
+  indices: number[]
+}
+
+interface Point3 {
+  x: number
+  y: number
+  z: number
+}
+
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
-function edgeKey(a, b) {
+function edgeKey(a: number, b: number): string {
   return a < b ? `${a}:${b}` : `${b}:${a}`;
 }
 
-function avgVerts(verts) {
+function avgVerts(verts: Point3[]): Point3 {
   const n = verts.length;
   if (n === 0) return { x: 0, y: 0, z: 0 };
   let x = 0, y = 0, z = 0;
@@ -28,13 +80,13 @@ function avgVerts(verts) {
   return { x: x / n, y: y / n, z: z / n };
 }
 
-function lerp3(a, b, t) {
+function lerp3(a: Point3, b: Point3, t: number): Point3 {
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t };
 }
 
 // ── Default doc ───────────────────────────────────────────────────────────────
 
-export function defaultSubD() {
+export function defaultSubD(): SubdDocument {
   return {
     version: 1,
     control_mesh: { vertices: [], faces: [], edges: [] },
@@ -45,39 +97,39 @@ export function defaultSubD() {
 
 // ── Crease lookup ─────────────────────────────────────────────────────────────
 
-function buildCreaseMap(edges) {
-  const map = new Map();
+function buildCreaseMap(edges: SubdEdge[]): Map<string, number> {
+  const map = new Map<string, number>();
   for (const e of edges) {
     map.set(edgeKey(e.v1, e.v2), e.crease_value ?? 0);
   }
   return map;
 }
 
-function getCrease(creaseMap, a, b) {
+function getCrease(creaseMap: Map<string, number>, a: number, b: number): number {
   return creaseMap.get(edgeKey(a, b)) ?? 0;
 }
 
 // ── One level of Catmull-Clark ─────────────────────────────────────────────
 
-function catmullClarkOnce(mesh) {
+function catmullClarkOnce(mesh: SubdControlMesh): SubdControlMesh {
   const { vertices, faces, edges: meshEdges } = mesh;
 
   // index vertices by id
-  const vertMap = new Map();
+  const vertMap = new Map<number, SubdVertex>();
   for (const v of vertices) vertMap.set(v.id, v);
 
   const creaseMap = buildCreaseMap(meshEdges);
 
   // ── 1. Face points ──────────────────────────────────────────────────────────
-  const facePoints = new Map(); // face.id → {x,y,z}
+  const facePoints = new Map<number, Point3>(); // face.id → {x,y,z}
   for (const f of faces) {
-    const verts = f.vertex_ids.map(id => vertMap.get(id));
+    const verts = f.vertex_ids.map(id => vertMap.get(id) as SubdVertex);
     facePoints.set(f.id, avgVerts(verts));
   }
 
   // ── 2. Edge adjacency ───────────────────────────────────────────────────────
   // For each edge key → list of adjacent face ids
-  const edgeFaces = new Map();
+  const edgeFaces = new Map<string, number[]>();
   for (const f of faces) {
     const ids = f.vertex_ids;
     const n = ids.length;
@@ -85,16 +137,16 @@ function catmullClarkOnce(mesh) {
       const a = ids[i], b = ids[(i + 1) % n];
       const key = edgeKey(a, b);
       if (!edgeFaces.has(key)) edgeFaces.set(key, []);
-      edgeFaces.get(key).push(f.id);
+      edgeFaces.get(key)!.push(f.id);
     }
   }
 
   // ── 3. Edge points ──────────────────────────────────────────────────────────
   // key → {x,y,z} new edge midpoint
-  const edgePointMap = new Map();
+  const edgePointMap = new Map<string, Point3>();
 
   // Collect all unique edges from faces
-  const allEdgeKeys = new Set();
+  const allEdgeKeys = new Set<string>();
   for (const f of faces) {
     const ids = f.vertex_ids;
     const n = ids.length;
@@ -105,7 +157,7 @@ function catmullClarkOnce(mesh) {
 
   for (const key of allEdgeKeys) {
     const [a, b] = key.split(':').map(Number);
-    const va = vertMap.get(a), vb = vertMap.get(b);
+    const va = vertMap.get(a) as SubdVertex, vb = vertMap.get(b) as SubdVertex;
     const adjFaces = edgeFaces.get(key) ?? [];
     const crease = getCrease(creaseMap, a, b);
 
@@ -115,8 +167,8 @@ function catmullClarkOnce(mesh) {
       // Boundary or fully creased: midpoint only
       edgePointMap.set(key, mid);
     } else {
-      const fp1 = facePoints.get(adjFaces[0]);
-      const fp2 = facePoints.get(adjFaces[1]);
+      const fp1 = facePoints.get(adjFaces[0]) as Point3;
+      const fp2 = facePoints.get(adjFaces[1]) as Point3;
       const faceAvg = avgVerts([fp1, fp2]);
       const smooth = {
         x: (va.x + vb.x + faceAvg.x * 2) / 4,
@@ -130,24 +182,24 @@ function catmullClarkOnce(mesh) {
 
   // ── 4. Updated original vertex positions ───────────────────────────────────
   // For each original vertex, gather adjacent faces and edges
-  const vertFaces = new Map(); // vertex id → [face]
+  const vertFaces = new Map<number, SubdFace[]>(); // vertex id → [face]
   for (const f of faces) {
     for (const vid of f.vertex_ids) {
       if (!vertFaces.has(vid)) vertFaces.set(vid, []);
-      vertFaces.get(vid).push(f);
+      vertFaces.get(vid)!.push(f);
     }
   }
 
-  const vertEdges = new Map(); // vertex id → [other vertex id]
+  const vertEdges = new Map<number, number[]>(); // vertex id → [other vertex id]
   for (const key of allEdgeKeys) {
     const [a, b] = key.split(':').map(Number);
     if (!vertEdges.has(a)) vertEdges.set(a, []);
     if (!vertEdges.has(b)) vertEdges.set(b, []);
-    vertEdges.get(a).push(b);
-    vertEdges.get(b).push(a);
+    vertEdges.get(a)!.push(b);
+    vertEdges.get(b)!.push(a);
   }
 
-  const newVertPositions = new Map();
+  const newVertPositions = new Map<number, Point3>();
   for (const v of vertices) {
     const adjFacesForV = vertFaces.get(v.id) ?? [];
     const adjNeighbors = vertEdges.get(v.id) ?? [];
@@ -162,9 +214,9 @@ function catmullClarkOnce(mesh) {
     } else if (creasedNeighbors.length === 1 || adjFacesForV.length < adjNeighbors.length) {
       // Boundary / single crease: use edge midpoints of creased/boundary edges only
       const edgeMidpoints = adjNeighbors.map(nb => ({
-        x: (v.x + vertMap.get(nb).x) / 2,
-        y: (v.y + vertMap.get(nb).y) / 2,
-        z: (v.z + vertMap.get(nb).z) / 2,
+        x: (v.x + (vertMap.get(nb) as SubdVertex).x) / 2,
+        y: (v.y + (vertMap.get(nb) as SubdVertex).y) / 2,
+        z: (v.z + (vertMap.get(nb) as SubdVertex).z) / 2,
       }));
       const avgMid = avgVerts(edgeMidpoints);
       newVertPositions.set(v.id, {
@@ -175,12 +227,12 @@ function catmullClarkOnce(mesh) {
     } else {
       // Interior smooth: standard Catmull-Clark
       // F = avg of adjacent face points
-      const F = avgVerts(adjFacesForV.map(f => facePoints.get(f.id)));
+      const F = avgVerts(adjFacesForV.map(f => facePoints.get(f.id) as Point3));
       // R = avg of edge midpoints touching v
       const edgeMids = adjNeighbors.map(nb => ({
-        x: (v.x + vertMap.get(nb).x) / 2,
-        y: (v.y + vertMap.get(nb).y) / 2,
-        z: (v.z + vertMap.get(nb).z) / 2,
+        x: (v.x + (vertMap.get(nb) as SubdVertex).x) / 2,
+        y: (v.y + (vertMap.get(nb) as SubdVertex).y) / 2,
+        z: (v.z + (vertMap.get(nb) as SubdVertex).z) / 2,
       }));
       const R = avgVerts(edgeMids);
       newVertPositions.set(v.id, {
@@ -193,13 +245,13 @@ function catmullClarkOnce(mesh) {
 
   // ── 5. Build new mesh ───────────────────────────────────────────────────────
   let nextId = 0;
-  const newVertices = [];
-  const newFaces = [];
-  const newEdges = [];
+  const newVertices: SubdVertex[] = [];
+  const newFaces: SubdFace[] = [];
+  const newEdges: SubdEdge[] = [];
 
   // New vertex id generators
   // orig vertices get new positions
-  const origVertNewId = new Map(); // old id → new id
+  const origVertNewId = new Map<number, number>(); // old id → new id
   for (const v of vertices) {
     const newId = nextId++;
     const pos = newVertPositions.get(v.id) ?? v;
@@ -208,16 +260,16 @@ function catmullClarkOnce(mesh) {
   }
 
   // Face points
-  const facePointNewId = new Map(); // face.id → new vertex id
+  const facePointNewId = new Map<number, number>(); // face.id → new vertex id
   for (const f of faces) {
     const newId = nextId++;
-    const fp = facePoints.get(f.id);
+    const fp = facePoints.get(f.id) as Point3;
     newVertices.push({ id: newId, x: fp.x, y: fp.y, z: fp.z });
     facePointNewId.set(f.id, newId);
   }
 
   // Edge points
-  const edgePointNewId = new Map(); // edge key → new vertex id
+  const edgePointNewId = new Map<string, number>(); // edge key → new vertex id
   for (const [key, ep] of edgePointMap) {
     const newId = nextId++;
     newVertices.push({ id: newId, x: ep.x, y: ep.y, z: ep.z });
@@ -226,9 +278,9 @@ function catmullClarkOnce(mesh) {
 
   // New faces: for each original face with N vertices, create N quads
   let faceNextId = 0;
-  const newEdgeSet = new Map(); // edge key → crease_value
+  const newEdgeSet = new Map<string, number>(); // edge key → crease_value
 
-  function addEdge(a, b, crease = 0) {
+  function addEdge(a: number, b: number, crease = 0) {
     const key = edgeKey(a, b);
     if (!newEdgeSet.has(key)) newEdgeSet.set(key, crease);
   }
@@ -236,18 +288,18 @@ function catmullClarkOnce(mesh) {
   for (const f of faces) {
     const ids = f.vertex_ids;
     const n = ids.length;
-    const fpId = facePointNewId.get(f.id);
+    const fpId = facePointNewId.get(f.id) as number;
 
     for (let i = 0; i < n; i++) {
       const va = ids[i];
       const vb = ids[(i + 1) % n];
       const vc = ids[(i - 1 + n) % n];
 
-      const epAB = edgePointNewId.get(edgeKey(va, vb));
-      const epCA = edgePointNewId.get(edgeKey(vc, va));
+      const epAB = edgePointNewId.get(edgeKey(va, vb)) as number;
+      const epCA = edgePointNewId.get(edgeKey(vc, va)) as number;
 
       const quadIds = [
-        origVertNewId.get(va),
+        origVertNewId.get(va) as number,
         epAB,
         fpId,
         epCA,
@@ -259,10 +311,10 @@ function catmullClarkOnce(mesh) {
       const creaseAB = getCrease(creaseMap, va, vb);
       const creaseCA = getCrease(creaseMap, vc, va);
 
-      addEdge(origVertNewId.get(va), epAB, creaseAB);
+      addEdge(origVertNewId.get(va) as number, epAB, creaseAB);
       addEdge(epAB, fpId, 0);
       addEdge(fpId, epCA, 0);
-      addEdge(epCA, origVertNewId.get(va), creaseCA);
+      addEdge(epCA, origVertNewId.get(va) as number, creaseCA);
     }
   }
 
@@ -276,8 +328,8 @@ function catmullClarkOnce(mesh) {
 
 // ── Triangulate a face (fan triangulation) ────────────────────────────────────
 
-function triangulateFace(vertIds) {
-  const tris = [];
+function triangulateFace(vertIds: number[]): number[][] {
+  const tris: number[][] = [];
   for (let i = 1; i < vertIds.length - 1; i++) {
     tris.push([vertIds[0], vertIds[i], vertIds[i + 1]]);
   }
@@ -286,8 +338,8 @@ function triangulateFace(vertIds) {
 
 // ── subdivide() ───────────────────────────────────────────────────────────────
 
-export function subdivide(subd_doc) {
-  const doc = JSON.parse(JSON.stringify(subd_doc)); // deep clone
+export function subdivide(subd_doc: SubdDocument): SubdDocument {
+  const doc: SubdDocument = JSON.parse(JSON.stringify(subd_doc)); // deep clone
   let mesh = doc.control_mesh;
   const levels = Math.max(0, Math.floor(doc.subdivision_level ?? 1));
 
@@ -296,11 +348,8 @@ export function subdivide(subd_doc) {
   }
 
   // Build display mesh (triangulated)
-  const vertMap = new Map();
-  for (const v of mesh.vertices) vertMap.set(v.id, v);
-
-  const positions = mesh.vertices.map(v => [v.x, v.y, v.z]);
-  const indices = [];
+  const positions: Array<[number, number, number]> = mesh.vertices.map(v => [v.x, v.y, v.z]);
+  const indices: number[] = [];
 
   for (const f of mesh.faces) {
     const tris = triangulateFace(f.vertex_ids);
@@ -315,23 +364,23 @@ export function subdivide(subd_doc) {
 
 // ── extrudeFace() ─────────────────────────────────────────────────────────────
 
-export function extrudeFace(subd_doc, face_id, distance) {
-  const doc = JSON.parse(JSON.stringify(subd_doc));
+export function extrudeFace(subd_doc: SubdDocument, face_id: number, distance: number): SubdDocument {
+  const doc: SubdDocument = JSON.parse(JSON.stringify(subd_doc));
   const mesh = doc.control_mesh;
 
   const faceIdx = mesh.faces.findIndex(f => f.id === face_id);
   if (faceIdx === -1) return doc;
 
   const face = mesh.faces[faceIdx];
-  const vertMap = new Map();
+  const vertMap = new Map<number, SubdVertex>();
   for (const v of mesh.vertices) vertMap.set(v.id, v);
 
   // Compute face normal via Newell's method
   const ids = face.vertex_ids;
   let nx = 0, ny = 0, nz = 0;
   for (let i = 0; i < ids.length; i++) {
-    const curr = vertMap.get(ids[i]);
-    const next = vertMap.get(ids[(i + 1) % ids.length]);
+    const curr = vertMap.get(ids[i]) as SubdVertex;
+    const next = vertMap.get(ids[(i + 1) % ids.length]) as SubdVertex;
     nx += (curr.y - next.y) * (curr.z + next.z);
     ny += (curr.z - next.z) * (curr.x + next.x);
     nz += (curr.x - next.x) * (curr.y + next.y);
@@ -345,7 +394,7 @@ export function extrudeFace(subd_doc, face_id, distance) {
 
   // Create new top vertices
   const newTopIds = ids.map(id => {
-    const v = vertMap.get(id);
+    const v = vertMap.get(id) as SubdVertex;
     const newId = ++maxId;
     mesh.vertices.push({ id: newId, x: v.x + nx * distance, y: v.y + ny * distance, z: v.z + nz * distance });
     return newId;
@@ -368,18 +417,18 @@ export function extrudeFace(subd_doc, face_id, distance) {
 
 // ── bevelEdge() ───────────────────────────────────────────────────────────────
 
-export function bevelEdge(subd_doc, edge_v1_id, edge_v2_id, width) {
-  const doc = JSON.parse(JSON.stringify(subd_doc));
+export function bevelEdge(subd_doc: SubdDocument, edge_v1_id: number, edge_v2_id: number, width: number): SubdDocument {
+  const doc: SubdDocument = JSON.parse(JSON.stringify(subd_doc));
   const mesh = doc.control_mesh;
 
-  const vertMap = new Map();
+  const vertMap = new Map<number, SubdVertex>();
   for (const v of mesh.vertices) vertMap.set(v.id, v);
 
   const va = vertMap.get(edge_v1_id);
   const vb = vertMap.get(edge_v2_id);
   if (!va || !vb) return doc;
 
-  let maxId = Math.max(0, ...mesh.vertices.map(v => v.id));
+  const maxId = Math.max(0, ...mesh.vertices.map(v => v.id));
 
   // Offset t = width / 2 along edge from each end
   const t = Math.min(0.5, Math.abs(width) / (2 * Math.sqrt(
@@ -389,8 +438,8 @@ export function bevelEdge(subd_doc, edge_v1_id, edge_v2_id, width) {
   const p1 = lerp3(va, vb, t);
   const p2 = lerp3(va, vb, 1 - t);
 
-  const id1 = ++maxId;
-  const id2 = ++maxId;
+  const id1 = maxId + 1;
+  const id2 = maxId + 2;
   mesh.vertices.push({ id: id1, x: p1.x, y: p1.y, z: p1.z });
   mesh.vertices.push({ id: id2, x: p2.x, y: p2.y, z: p2.z });
 
@@ -427,8 +476,8 @@ export function bevelEdge(subd_doc, edge_v1_id, edge_v2_id, width) {
 
 // ── setEdgeCrease() ───────────────────────────────────────────────────────────
 
-export function setEdgeCrease(subd_doc, v1_id, v2_id, crease_value) {
-  const doc = JSON.parse(JSON.stringify(subd_doc));
+export function setEdgeCrease(subd_doc: SubdDocument, v1_id: number, v2_id: number, crease_value: number): SubdDocument {
+  const doc: SubdDocument = JSON.parse(JSON.stringify(subd_doc));
   const mesh = doc.control_mesh;
   const key = edgeKey(v1_id, v2_id);
 
@@ -443,9 +492,9 @@ export function setEdgeCrease(subd_doc, v1_id, v2_id, crease_value) {
 
 // ── subdToMesh() ──────────────────────────────────────────────────────────────
 
-export function subdToMesh(subd_doc) {
+export function subdToMesh(subd_doc: SubdDocument): FlatMesh {
   const subdivided = subdivide(subd_doc);
-  const dm = subdivided.display_mesh;
+  const dm = subdivided.display_mesh as SubdDisplayMesh;
   return {
     vertices: dm.vertices,  // [[x,y,z], ...]
     indices: dm.indices,    // [i0, i1, i2, ...]
@@ -454,19 +503,19 @@ export function subdToMesh(subd_doc) {
 
 // ── meshToSubd() ──────────────────────────────────────────────────────────────
 
-export function meshToSubd(mesh) {
+export function meshToSubd(mesh: FlatMesh): SubdDocument {
   // mesh: { vertices: [[x,y,z]], indices: [i0,i1,i2,...] }
-  const vertices = mesh.vertices.map((v, i) => ({ id: i, x: v[0], y: v[1], z: v[2] }));
+  const vertices: SubdVertex[] = mesh.vertices.map((v, i) => ({ id: i, x: v[0], y: v[1], z: v[2] }));
 
-  const faces = [];
+  const faces: SubdFace[] = [];
   const indices = mesh.indices;
   for (let i = 0; i < indices.length; i += 3) {
     faces.push({ id: i / 3, vertex_ids: [indices[i], indices[i + 1], indices[i + 2]] });
   }
 
   // Build edge list from faces
-  const edgeSet = new Set();
-  const edges = [];
+  const edgeSet = new Set<string>();
+  const edges: SubdEdge[] = [];
   for (const f of faces) {
     const ids = f.vertex_ids;
     for (let i = 0; i < ids.length; i++) {
@@ -489,8 +538,8 @@ export function meshToSubd(mesh) {
 
 // ── Primitives (used by Python tools via JSON) ────────────────────────────────
 
-export function cubeMesh() {
-  const vertices = [
+export function cubeMesh(): SubdControlMesh {
+  const vertices: SubdVertex[] = [
     { id: 0, x: -1, y: -1, z: -1 },
     { id: 1, x:  1, y: -1, z: -1 },
     { id: 2, x:  1, y:  1, z: -1 },
@@ -500,7 +549,7 @@ export function cubeMesh() {
     { id: 6, x:  1, y:  1, z:  1 },
     { id: 7, x: -1, y:  1, z:  1 },
   ];
-  const faces = [
+  const faces: SubdFace[] = [
     { id: 0, vertex_ids: [0, 1, 2, 3] }, // bottom
     { id: 1, vertex_ids: [4, 5, 6, 7] }, // top
     { id: 2, vertex_ids: [0, 1, 5, 4] }, // front
@@ -508,7 +557,7 @@ export function cubeMesh() {
     { id: 4, vertex_ids: [0, 3, 7, 4] }, // left
     { id: 5, vertex_ids: [1, 2, 6, 5] }, // right
   ];
-  const edges = [
+  const edges: SubdEdge[] = [
     { v1: 0, v2: 1, crease_value: 0 }, { v1: 1, v2: 2, crease_value: 0 },
     { v1: 2, v2: 3, crease_value: 0 }, { v1: 3, v2: 0, crease_value: 0 },
     { v1: 4, v2: 5, crease_value: 0 }, { v1: 5, v2: 6, crease_value: 0 },
@@ -519,10 +568,10 @@ export function cubeMesh() {
   return { vertices, faces, edges };
 }
 
-export function sphereMesh(rings = 4, segments = 8) {
-  const vertices = [];
-  const faces = [];
-  const edges = [];
+export function sphereMesh(rings = 4, segments = 8): SubdControlMesh {
+  const vertices: SubdVertex[] = [];
+  const faces: SubdFace[] = [];
+  const edges: SubdEdge[] = [];
   let vid = 0;
 
   for (let r = 0; r <= rings; r++) {
@@ -539,8 +588,8 @@ export function sphereMesh(rings = 4, segments = 8) {
   }
 
   let fid = 0;
-  const edgeSet = new Set();
-  function addEdge(a, b) {
+  const edgeSet = new Set<string>();
+  function addEdge(a: number, b: number) {
     const key = edgeKey(a, b);
     if (!edgeSet.has(key)) { edgeSet.add(key); edges.push({ v1: a, v2: b, crease_value: 0 }); }
   }
@@ -559,14 +608,14 @@ export function sphereMesh(rings = 4, segments = 8) {
   return { vertices, faces, edges };
 }
 
-export function cylinderMesh(segments = 8) {
-  const vertices = [];
-  const faces = [];
-  const edges = [];
+export function cylinderMesh(segments = 8): SubdControlMesh {
+  const vertices: SubdVertex[] = [];
+  const faces: SubdFace[] = [];
+  const edges: SubdEdge[] = [];
   let vid = 0;
 
-  const bottomIds = [];
-  const topIds = [];
+  const bottomIds: number[] = [];
+  const topIds: number[] = [];
   for (let s = 0; s < segments; s++) {
     const theta = (2 * Math.PI * s) / segments;
     const x = Math.cos(theta), y = Math.sin(theta);
@@ -574,8 +623,8 @@ export function cylinderMesh(segments = 8) {
     vertices.push({ id: vid, x, y, z:  1 }); topIds.push(vid++);
   }
 
-  const edgeSet = new Set();
-  function addEdge(a, b, c = 0) {
+  const edgeSet = new Set<string>();
+  function addEdge(a: number, b: number, c = 0) {
     const key = edgeKey(a, b);
     if (!edgeSet.has(key)) { edgeSet.add(key); edges.push({ v1: a, v2: b, crease_value: c }); }
   }
@@ -591,7 +640,7 @@ export function cylinderMesh(segments = 8) {
 
   // Cap faces
   faces.push({ id: fid++, vertex_ids: [...bottomIds].reverse() });
-  faces.push({ id: fid++, vertex_ids: [...topIds] });
+  faces.push({ id: fid, vertex_ids: [...topIds] });
   for (let s = 0; s < segments; s++) {
     addEdge(bottomIds[s], bottomIds[(s + 1) % segments]);
     addEdge(topIds[s], topIds[(s + 1) % segments]);

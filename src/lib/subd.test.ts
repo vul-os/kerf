@@ -10,6 +10,7 @@ import {
   cubeMesh,
   sphereMesh,
   cylinderMesh,
+  type FlatMesh,
 } from './subd.js';
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -215,7 +216,7 @@ describe('subdToMesh', () => {
 
 describe('meshToSubd', () => {
   it('wraps a flat mesh as a level-0 SubD doc', () => {
-    const flatMesh = {
+    const flatMesh: FlatMesh = {
       vertices: [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]],
       indices: [0, 1, 2, 0, 2, 3],
     };
@@ -228,7 +229,7 @@ describe('meshToSubd', () => {
   });
 
   it('round-trip: meshToSubd then subdToMesh preserves vertex count', () => {
-    const flatMesh = {
+    const flatMesh: FlatMesh = {
       vertices: [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]],
       indices: [0, 1, 2, 0, 2, 3],
     };

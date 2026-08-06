@@ -1,5 +1,5 @@
 /**
- * subdToBufferGeometry.js — Convert .subd and .mesh documents to
+ * subdToBufferGeometry.ts — Convert .subd and .mesh documents to
  * THREE.BufferGeometry for the 3D viewport.
  *
  * Exports two layers:
@@ -11,7 +11,23 @@
  */
 
 import * as THREE from 'three'
-import { subdivide } from './subd.js'
+import { subdivide, type SubdDocument } from './subd.js'
+
+/** The `.mesh` document format — not `subd.ts`'s `FlatMesh` (that one lacks normals). */
+export interface MeshDoc {
+  vertices: Array<[number, number, number]>
+  indices: number[]
+  normals?: Array<[number, number, number]>
+}
+
+export interface BufferGeometryArgs {
+  positions: Float32Array
+  indices: Uint32Array
+}
+
+export interface MeshDocBufferGeometryArgs extends BufferGeometryArgs {
+  normals?: Float32Array
+}
 
 // ── Pure helpers (no THREE dep; THREE is imported at the top but not used
 //   in these functions — they return plain typed arrays) ────────────────────────
@@ -19,13 +35,10 @@ import { subdivide } from './subd.js'
 /**
  * Convert a subd document into flat typed arrays suitable for BufferGeometry
  * attributes.  Calls `subdivide()` if `doc.display_mesh` is not yet populated.
- *
- * @param {object} doc - Subd document (may or may not have display_mesh).
- * @returns {{ positions: Float32Array, indices: Uint32Array }}
  */
-export function subdToBufferGeometryArgs(doc) {
+export function subdToBufferGeometryArgs(doc: SubdDocument): BufferGeometryArgs {
   const resolved = doc.display_mesh ? doc : subdivide(doc)
-  const dm = resolved.display_mesh
+  const dm = resolved.display_mesh!
 
   const verts = dm.vertices   // [[x,y,z], ...]
   const idxArr = dm.indices   // [i0, i1, i2, ...]
@@ -45,14 +58,8 @@ export function subdToBufferGeometryArgs(doc) {
 
 /**
  * Convert a .mesh document into flat typed arrays for BufferGeometry.
- *
- * @param {object} meshDoc
- * @param {Array<[number,number,number]>} meshDoc.vertices
- * @param {number[]} meshDoc.indices
- * @param {Array<[number,number,number]>} [meshDoc.normals]
- * @returns {{ positions: Float32Array, indices: Uint32Array, normals?: Float32Array }}
  */
-export function meshDocToBufferGeometryArgs(meshDoc) {
+export function meshDocToBufferGeometryArgs(meshDoc: MeshDoc): MeshDocBufferGeometryArgs {
   const { vertices, indices: idxArr, normals: normalsIn } = meshDoc
 
   const positions = new Float32Array(vertices.length * 3)
@@ -65,7 +72,7 @@ export function meshDocToBufferGeometryArgs(meshDoc) {
   const indices = new Uint32Array(idxArr.length)
   for (let i = 0; i < idxArr.length; i++) indices[i] = idxArr[i]
 
-  let normals
+  let normals: Float32Array | undefined
   if (normalsIn && normalsIn.length === vertices.length) {
     normals = new Float32Array(normalsIn.length * 3)
     for (let i = 0; i < normalsIn.length; i++) {
@@ -83,11 +90,8 @@ export function meshDocToBufferGeometryArgs(meshDoc) {
 /**
  * Build a THREE.BufferGeometry from a .subd document.
  * Uses subdToBufferGeometryArgs internally; normals are computed by Three.js.
- *
- * @param {object} subdDoc
- * @returns {THREE.BufferGeometry}
  */
-export function subdToBufferGeometry(subdDoc) {
+export function subdToBufferGeometry(subdDoc: SubdDocument): THREE.BufferGeometry {
   const { positions, indices } = subdToBufferGeometryArgs(subdDoc)
   const g = new THREE.BufferGeometry()
   g.setAttribute('position', new THREE.BufferAttribute(positions, 3))
@@ -101,11 +105,8 @@ export function subdToBufferGeometry(subdDoc) {
 /**
  * Build a THREE.BufferGeometry from a .mesh document.
  * Uses provided normals when present; falls back to computeVertexNormals().
- *
- * @param {object} meshDoc
- * @returns {THREE.BufferGeometry}
  */
-export function meshDocToBufferGeometry(meshDoc) {
+export function meshDocToBufferGeometry(meshDoc: MeshDoc): THREE.BufferGeometry {
   const { positions, indices, normals } = meshDocToBufferGeometryArgs(meshDoc)
   const g = new THREE.BufferGeometry()
   g.setAttribute('position', new THREE.BufferAttribute(positions, 3))

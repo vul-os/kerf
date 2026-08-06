@@ -1,5 +1,5 @@
 /**
- * AtopileEditor.test.jsx (T-196)
+ * AtopileEditor.test.tsx (T-196)
  *
  * Tests for:
  *   1. atopileMonacoLanguage.js — tokenizer recognises all keywords +
@@ -12,23 +12,29 @@
  * on the Monaco integration being covered by manual browser testing.
  *
  * Run:
- *   npm test -- src/components/AtopileEditor.test.jsx
+ *   npm test -- src/components/AtopileEditor.test.tsx
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { tokenizeLine, KEYWORDS, LANGUAGE_ID } from '../lib/atopileMonacoLanguage.js'
 import { compileAtopile } from '../lib/atopileCompileBridge.js'
 
+// atopileMonacoLanguage.ts and atopileCompileBridge.ts (already migrated, T-560-adjacent)
+// don't export shared token/result types, so derive them locally from the functions
+// themselves rather than redeclaring their shapes by hand.
+type Token = ReturnType<typeof tokenizeLine>[number]
+type CompileResult = Awaited<ReturnType<typeof compileAtopile>>
+
 // ---------------------------------------------------------------------------
 // Tokenizer tests — atopileMonacoLanguage.tokenizeLine
 // ---------------------------------------------------------------------------
 
 describe('atopileMonacoLanguage — keyword recognition', () => {
-  it.each(KEYWORDS)('keyword "%s" is classified as keyword token', (kw) => {
+  it.each(KEYWORDS)('keyword "%s" is classified as keyword token', (kw: string) => {
     const tokens = tokenizeLine(kw)
     const kwToken = tokens.find((t) => t.value === kw)
     expect(kwToken, `token for "${kw}" not found in ${JSON.stringify(tokens)}`).toBeTruthy()
-    expect(kwToken.type).toBe('keyword')
+    expect((kwToken as Token).type).toBe('keyword')
   })
 
   it('identifies all 8 keywords as the canonical set', () => {
@@ -123,11 +129,11 @@ describe('atopileMonacoLanguage — number+unit tokens', () => {
     ['100p',    '100p'],
   ]
 
-  it.each(cases)('value "%s" is classified as number.unit', (input, expected) => {
+  it.each(cases)('value "%s" is classified as number.unit', (input: string, expected: string) => {
     const tokens = tokenizeLine(input)
     const tok = tokens.find((t) => t.value === expected)
     expect(tok, `token for "${expected}" not found in ${JSON.stringify(tokens)}`).toBeTruthy()
-    expect(tok.type).toBe('number.unit')
+    expect((tok as Token).type).toBe('number.unit')
   })
 
   it('number+unit in assignment line', () => {
@@ -270,12 +276,14 @@ describe('atopileCompileBridge — normalisation', () => {
     vi.unstubAllGlobals()
   })
 
-  function mockFetch(status, body) {
-    globalThis.fetch = vi.fn().mockResolvedValue({
+  function mockFetch(status: number, body: unknown) {
+    const mockFn = vi.fn().mockResolvedValue({
       ok: status >= 200 && status < 300,
       status,
       json: async () => body,
     })
+    globalThis.fetch = mockFn as unknown as typeof fetch
+    return mockFn
   }
 
   it('returns ok=true with circuit array on successful compile', async () => {
@@ -328,30 +336,30 @@ describe('atopileCompileBridge — normalisation', () => {
   it('returns ok=false when fetch is aborted', async () => {
     const err = new Error('aborted')
     err.name = 'AbortError'
-    globalThis.fetch = vi.fn().mockRejectedValue(err)
+    globalThis.fetch = vi.fn().mockRejectedValue(err) as unknown as typeof fetch
 
-    const result = await compileAtopile('module T:', { signal: { aborted: true } })
+    const result: CompileResult = await compileAtopile('module T:', { signal: AbortSignal.abort() })
     expect(result.ok).toBe(false)
-    expect(result.errors[0].message).toBe('aborted')
+    expect((result.errors as NonNullable<CompileResult['errors']>)[0].message).toBe('aborted')
   })
 
   it('passes module param to the request body when provided', async () => {
-    mockFetch(200, { ok: true, circuit: [], warnings: [] })
+    const fetchMock = mockFetch(200, { ok: true, circuit: [], warnings: [] })
 
     await compileAtopile('module A:\nmodule B:', { module: 'A' })
 
-    const calls = globalThis.fetch.mock.calls
+    const calls = fetchMock.mock.calls
     expect(calls.length).toBe(1)
-    const body = JSON.parse(calls[0][1].body)
+    const body = JSON.parse((calls[0][1] as RequestInit).body as string)
     expect(body.module).toBe('A')
   })
 
   it('omits module param from body when not provided', async () => {
-    mockFetch(200, { ok: true, circuit: [], warnings: [] })
+    const fetchMock = mockFetch(200, { ok: true, circuit: [], warnings: [] })
 
     await compileAtopile('module A:')
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body)
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)
     expect(body).not.toHaveProperty('module')
   })
 

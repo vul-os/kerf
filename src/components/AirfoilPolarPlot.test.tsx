@@ -93,7 +93,7 @@ describe('AirfoilPolarPlot', () => {
   })
 
   it('renders an empty state when alpha array is empty', () => {
-    const empty = { airfoil: 'naca0012', alpha: [], CL: [], CD: [] }
+    const empty = { airfoil: 'naca0012', alpha: [] as number[], CL: [] as number[], CD: [] as number[] }
     const html = renderToStaticMarkup(<AirfoilPolarPlot polar={empty} />)
     expect(html).toContain('No polar data')
   })

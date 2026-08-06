@@ -17,6 +17,33 @@
  */
 
 import { useState } from 'react'
+import type { MouseEvent as ReactMouseEvent } from 'react'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/** Polar data returned by /api/aero/airfoil/polar. */
+interface Polar {
+  airfoil: string
+  alpha: number[]
+  CL: number[]
+  CD: number[]
+}
+
+interface ScaleFn {
+  (v: number): number
+  domain: [number, number]
+  range: [number, number]
+}
+
+interface TooltipState {
+  x: number
+  y: number
+  alpha: number
+  CL: number
+  CD: number | null
+}
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -28,16 +55,16 @@ const MARGIN = { top: 24, right: 16, bottom: 40, left: 52 }
 // Helpers
 // ---------------------------------------------------------------------------
 
-function scaleLinear(domain, range) {
+function scaleLinear(domain: [number, number], range: [number, number]): ScaleFn {
   const [d0, d1] = domain
   const [r0, r1] = range
-  const scale = (v) => r0 + ((v - d0) / (d1 - d0)) * (r1 - r0)
+  const scale = ((v: number) => r0 + ((v - d0) / (d1 - d0)) * (r1 - r0)) as ScaleFn
   scale.domain = domain
   scale.range = range
   return scale
 }
 
-function niceTicks(min, max, count = 6) {
+function niceTicks(min: number, max: number, count = 6): number[] {
   const step = (max - min) / (count - 1)
   const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(step) || 1)))
   const niceStep = Math.ceil(step / magnitude) * magnitude
@@ -50,7 +77,7 @@ function niceTicks(min, max, count = 6) {
   return ticks
 }
 
-function polylinePts(xs, ys, xScale, yScale) {
+function polylinePts(xs: number[], ys: number[], xScale: ScaleFn, yScale: ScaleFn): string {
   return xs.map((a, i) => `${xScale(a)},${yScale(ys[i])}`).join(' ')
 }
 
@@ -58,7 +85,16 @@ function polylinePts(xs, ys, xScale, yScale) {
 // Tooltip
 // ---------------------------------------------------------------------------
 
-function Tooltip({ x, y, alpha, CL, CD, show }) {
+interface TooltipProps {
+  x: number
+  y: number
+  alpha: number
+  CL: number
+  CD: number | null
+  show: boolean
+}
+
+function Tooltip({ x, y, alpha, CL, CD, show }: TooltipProps) {
   if (!show) return null
   return (
     <g transform={`translate(${x + 8},${y - 8})`} style={{ pointerEvents: 'none' }}>
@@ -86,23 +122,22 @@ function Tooltip({ x, y, alpha, CL, CD, show }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-/**
- * @param {{
- *   polar: { airfoil: string, alpha: number[], CL: number[], CD: number[] },
- *   width?: number,
- *   height?: number,
- *   showCD?: boolean,
- *   className?: string,
- * }} props
- */
+interface Props {
+  polar: Polar | null
+  width?: number
+  height?: number
+  showCD?: boolean
+  className?: string
+}
+
 export default function AirfoilPolarPlot({
   polar,
   width = 480,
   height = 300,
   showCD = false,
   className = '',
-}) {
-  const [tooltip, setTooltip] = useState(null)
+}: Props) {
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null)
 
   if (!polar || !polar.alpha || polar.alpha.length === 0) {
     return (
@@ -136,7 +171,7 @@ export default function AirfoilPolarPlot({
   const clTicks = niceTicks(clMin - clPad, clMax + clPad, 6)
 
   // Mouse interaction
-  function handleMouseMove(e) {
+  function handleMouseMove(e: ReactMouseEvent<SVGSVGElement>) {
     const svg = e.currentTarget
     const rect = svg.getBoundingClientRect()
     const mx = e.clientX - rect.left - MARGIN.left

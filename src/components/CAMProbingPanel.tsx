@@ -22,6 +22,7 @@
  */
 
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { Target, Download, AlertTriangle, CheckCircle, Loader2, MapPin } from 'lucide-react'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -45,13 +46,24 @@ const DIALECTS = [
 
 const AXES = ['X', 'Y', 'Z']
 const WCS_OPTIONS = [1, 2, 3, 4, 5, 6]
-const WCS_LABELS = { 1: 'G54', 2: 'G55', 3: 'G56', 4: 'G57', 5: 'G58', 6: 'G59' }
+const WCS_LABELS: Record<number, string> = { 1: 'G54', 2: 'G55', 3: 'G56', 4: 'G57', 5: 'G58', 6: 'G59' }
+
+// Nominal geometry state — free-form per feature type; consumed by the
+// cam_onmachine_probing tool call (JSON boundary we don't own).
+interface GeomState {
+  [key: string]: number | string | undefined
+}
+
+interface SelectOption {
+  value: string | number
+  label: string
+}
 
 // ---------------------------------------------------------------------------
 // Small helpers
 // ---------------------------------------------------------------------------
 
-function Label({ children }) {
+function Label({ children }: { children: ReactNode }) {
   return (
     <span style={{ fontSize: 11, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
       {children}
@@ -59,7 +71,7 @@ function Label({ children }) {
   )
 }
 
-function Field({ label, children }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Label>{label}</Label>
@@ -68,7 +80,14 @@ function Field({ label, children }) {
   )
 }
 
-function NumInput({ value, onChange, step = 0.1, min }) {
+interface NumInputProps {
+  value: number | string
+  onChange: (v: number) => void
+  step?: number
+  min?: number
+}
+
+function NumInput({ value, onChange, step = 0.1, min }: NumInputProps) {
   return (
     <input
       type="number"
@@ -84,7 +103,13 @@ function NumInput({ value, onChange, step = 0.1, min }) {
   )
 }
 
-function Select({ value, onChange, options }) {
+interface SelectProps {
+  value: string | number
+  onChange: (v: string) => void
+  options: SelectOption[]
+}
+
+function Select({ value, onChange, options }: SelectProps) {
   return (
     <select
       value={value}
@@ -95,8 +120,8 @@ function Select({ value, onChange, options }) {
       }}
     >
       {options.map(o => (
-        <option key={o.value ?? o} value={o.value ?? o}>
-          {o.label ?? o}
+        <option key={o.value} value={o.value}>
+          {o.label}
         </option>
       ))}
     </select>
@@ -107,7 +132,7 @@ function Select({ value, onChange, options }) {
 // Geometry sub-forms per feature type
 // ---------------------------------------------------------------------------
 
-function BoreBossForm({ geom, setGeom, label }) {
+function BoreBossForm({ geom, setGeom, label }: { geom: GeomState; setGeom: (g: GeomState) => void; label: string }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
       <Field label="Centre X (mm)">
@@ -135,7 +160,7 @@ function BoreBossForm({ geom, setGeom, label }) {
   )
 }
 
-function SurfaceMeasureForm({ geom, setGeom }) {
+function SurfaceMeasureForm({ geom, setGeom }: { geom: GeomState; setGeom: (g: GeomState) => void }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
       <Field label="X (mm)">
@@ -169,7 +194,7 @@ function SurfaceMeasureForm({ geom, setGeom }) {
   )
 }
 
-function WebPocketForm({ geom, setGeom }) {
+function WebPocketForm({ geom, setGeom }: { geom: GeomState; setGeom: (g: GeomState) => void }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
       <Field label="Centre X (mm)">
@@ -194,7 +219,7 @@ function WebPocketForm({ geom, setGeom }) {
   )
 }
 
-function ToolLengthForm({ geom, setGeom }) {
+function ToolLengthForm({ geom, setGeom }: { geom: GeomState; setGeom: (g: GeomState) => void }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
       <Field label="Tool number">
@@ -222,7 +247,13 @@ function ToolLengthForm({ geom, setGeom }) {
 // Measurement points table
 // ---------------------------------------------------------------------------
 
-function MeasurementPointsTable({ points }) {
+// Measurement point / tool result payloads — JSON boundary we don't own.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ProbingPoint = any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ProbingResult = any
+
+function MeasurementPointsTable({ points }: { points: ProbingPoint[] }) {
   if (!points || points.length === 0) return null
   return (
     <div>
@@ -256,10 +287,10 @@ function MeasurementPointsTable({ points }) {
 // G-code preview with basic keyword colouring
 // ---------------------------------------------------------------------------
 
-function GCodePreview({ gcode }) {
+function GCodePreview({ gcode }: { gcode?: string | null }) {
   if (!gcode) return null
 
-  const colourLine = (line) => {
+  const colourLine = (line: string) => {
     if (line.startsWith('%') || line.startsWith('(')) {
       return <span style={{ color: '#6b7280' }}>{line}</span>
     }
@@ -292,10 +323,17 @@ function GCodePreview({ gcode }) {
 // Main panel
 // ---------------------------------------------------------------------------
 
-export default function CAMProbingPanel({ projectId, fileId }) {
+interface CAMProbingPanelProps {
+  /** current project UUID (optional) */
+  projectId?: string
+  /** associated file UUID (optional) */
+  fileId?: string
+}
+
+export default function CAMProbingPanel({ projectId, fileId }: CAMProbingPanelProps) {
   const [featureType, setFeatureType] = useState('bore_centre_find')
   const [dialect, setDialect] = useState('fanuc_g31')
-  const [geom, setGeom] = useState({})
+  const [geom, setGeom] = useState<GeomState>({})
   const [probeParams, setProbeParams] = useState({
     probe_feed_mm_min: 300,
     retract_mm: 2.0,
@@ -303,8 +341,8 @@ export default function CAMProbingPanel({ projectId, fileId }) {
   })
 
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<ProbingResult>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const featureLabel = FEATURE_TYPES.find(f => f.value === featureType)?.label ?? featureType
 
@@ -331,7 +369,7 @@ export default function CAMProbingPanel({ projectId, fileId }) {
       if (data.error) throw new Error(data.error)
       setResult(data)
     } catch (e) {
-      setError(e.message)
+      setError((e as Error).message)
     } finally {
       setLoading(false)
     }

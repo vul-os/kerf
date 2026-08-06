@@ -13,11 +13,19 @@
 //      anti-pattern documented in the planning doc for dormant ops).
 
 import { describe, it, expect } from 'vitest'
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
+// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 
 import { parseFeature, serializeFeature, newFeatureId } from '../lib/occtRunner.js'
+import type { CutFromSketchFeatureNode } from '../types/geometry.js'
+
+// This suite's sample node includes a legacy `target_id` field alongside the
+// CutFromSketchFeatureNode shape — cast covers both without editing the type.
+type SampleCutNode = CutFromSketchFeatureNode & { target_id: string }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -45,7 +53,7 @@ describe('cut_from_sketch node round-trip', () => {
     })
     const parsed = parseFeature(json)
     expect(parsed.features).toHaveLength(2)
-    const node = parsed.features[1]
+    const node = parsed.features[1] as SampleCutNode
     expect(node.op).toBe('cut_from_sketch')
     expect(node.target_id).toBe('pad-1')
     expect(node.target_face_id).toBe(7)
@@ -62,7 +70,7 @@ describe('cut_from_sketch node round-trip', () => {
       default_config: '',
       configurations: [],
     }
-    const serialised = serializeFeature(tree)
+    const serialised = serializeFeature(tree as unknown as Parameters<typeof serializeFeature>[0])
     const back = JSON.parse(serialised)
     expect(back.features[0]).toMatchObject(sampleNode)
   })
@@ -71,7 +79,7 @@ describe('cut_from_sketch node round-trip', () => {
     const node = { ...sampleNode, id: 'cut-2', reverse: true }
     const json = JSON.stringify({ version: 1, name: 'T', features: [node] })
     const parsed = parseFeature(json)
-    expect(parsed.features[0].reverse).toBe(true)
+    expect((parsed.features[0] as SampleCutNode).reverse).toBe(true)
   })
 })
 

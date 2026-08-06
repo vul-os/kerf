@@ -12,8 +12,11 @@
 //      field kinds match spec.
 
 import { describe, it, expect } from 'vitest'
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync, existsSync } from 'fs'
+// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -228,6 +231,8 @@ function makeShell(tag = 'shell') {
 // Build a mock algo class factory.
 function makeAlgoClass(resultShape, isDone = true) {
   return class MockAlgo {
+    _result: typeof resultShape
+    _done: typeof isDone
     constructor(_a, _b, _pr) {
       this._result = resultShape
       this._done = isDone
@@ -296,6 +301,7 @@ describe('opBoolean — dispatch by kind', () => {
     const innerResult = makeSolid('inner_cut')
     const outerResult = makeSolid('outer_cut')
     class MockCut {
+      _result: typeof innerResult | typeof outerResult
       constructor(_a, _b) {
         cutCallCount++
         this._result = cutCallCount === 1 ? innerResult : outerResult

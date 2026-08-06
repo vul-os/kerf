@@ -18,9 +18,15 @@
  * n_cells      {number}  total mesh cell count
  */
 
+import type { ReactNode } from 'react'
+
 // ── Utilities ────────────────────────────────────────────────────────────────
 
-function fmt(v, digits = 4) {
+// CFD tool result payloads — shape varies per filter, JSON boundary we don't own.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type CfdResult = any
+
+function fmt(v: unknown, digits = 4): string {
   if (v == null) return '—'
   if (typeof v !== 'number') return String(v)
   if (Math.abs(v) === 0) return '0'
@@ -28,7 +34,7 @@ function fmt(v, digits = 4) {
   return v.toPrecision(digits)
 }
 
-function fmtBytes(n) {
+function fmtBytes(n: number | null | undefined): string {
   if (n == null) return '—'
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
@@ -37,7 +43,7 @@ function fmtBytes(n) {
 
 // ── Colour helpers ────────────────────────────────────────────────────────────
 
-const FILTER_COLORS = {
+const FILTER_COLORS: Record<string, string> = {
   slice:      '#3b82f6',
   contour:    '#8b5cf6',
   streamline: '#10b981',
@@ -46,7 +52,7 @@ const FILTER_COLORS = {
   derived:    '#06b6d4',
 }
 
-const FILTER_DESCRIPTIONS = {
+const FILTER_DESCRIPTIONS: Record<string, string> = {
   slice:      'Cut-plane extraction — field values near an arbitrary plane',
   contour:    'Iso-surface — cells straddling a scalar value',
   streamline: 'RK4 streamline integration through velocity field',
@@ -59,7 +65,7 @@ const FILTER_DESCRIPTIONS = {
 
 const FILTERS = ['slice', 'contour', 'streamline', 'integral', 'probe', 'derived']
 
-function FilterPicker({ active }) {
+function FilterPicker({ active }: { active?: string | null }) {
   return (
     <section>
       <p style={{ fontSize: 10, fontFamily: 'monospace', color: '#6b7280',
@@ -117,7 +123,7 @@ function FilterPicker({ active }) {
 
 // ── Filter result viewer ──────────────────────────────────────────────────────
 
-function StatRow({ label, value }) {
+function StatRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between',
                   padding: '3px 0', borderBottom: '1px solid #111827' }}>
@@ -127,7 +133,7 @@ function StatRow({ label, value }) {
   )
 }
 
-function StatsBlock({ stats, title }) {
+function StatsBlock({ stats, title }: { stats: CfdResult; title?: string }) {
   if (!stats || Object.keys(stats).length === 0) return null
   return (
     <div style={{ marginTop: 8 }}>
@@ -145,7 +151,7 @@ function StatsBlock({ stats, title }) {
   )
 }
 
-function SliceResult({ result }) {
+function SliceResult({ result }: { result: CfdResult }) {
   if (!result) return null
   return (
     <div>
@@ -160,7 +166,7 @@ function SliceResult({ result }) {
   )
 }
 
-function ContourResult({ result }) {
+function ContourResult({ result }: { result: CfdResult }) {
   if (!result) return null
   return (
     <div>
@@ -172,7 +178,7 @@ function ContourResult({ result }) {
   )
 }
 
-function StreamlineResult({ result }) {
+function StreamlineResult({ result }: { result: CfdResult }) {
   if (!result) return null
   const lines = result.streamlines || []
   return (
@@ -211,7 +217,7 @@ function StreamlineResult({ result }) {
   )
 }
 
-function IntegralResult({ result }) {
+function IntegralResult({ result }: { result: CfdResult }) {
   if (!result) return null
   return (
     <div>
@@ -225,7 +231,7 @@ function IntegralResult({ result }) {
   )
 }
 
-function ProbeResult({ result }) {
+function ProbeResult({ result }: { result: CfdResult }) {
   if (!result) return null
   const probes = result.probes || []
   const dispFields = result.fields?.slice(0, 3) || ['p']
@@ -289,7 +295,7 @@ function ProbeResult({ result }) {
   )
 }
 
-function DerivedResult({ result }) {
+function DerivedResult({ result }: { result: CfdResult }) {
   if (!result) return null
   return (
     <div>
@@ -306,7 +312,7 @@ function DerivedResult({ result }) {
   )
 }
 
-function FilterResultPanel({ filter, result }) {
+function FilterResultPanel({ filter, result }: { filter: string; result: CfdResult }) {
   if (!result) return null
 
   const color = FILTER_COLORS[filter] || '#6b7280'
@@ -349,7 +355,7 @@ function FilterResultPanel({ filter, result }) {
 
 // ── VTU Export card ───────────────────────────────────────────────────────────
 
-function ExportCard({ exportPath, exportMeta }) {
+function ExportCard({ exportPath, exportMeta }: { exportPath?: string | null; exportMeta?: CfdResult }) {
   if (!exportPath && !exportMeta) return null
 
   const fmt_label = exportMeta?.format_label ?? exportMeta?.format ?? 'VTK'
@@ -429,6 +435,21 @@ function ExportCard({ exportPath, exportMeta }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+interface CfdPostProcessPanelProps {
+  /** active filter type */
+  filter?: string | null
+  /** JSON result from cfd_postprocess_filter */
+  filterResult?: CfdResult
+  /** path to exported .vtk/.vtu file */
+  exportPath?: string | null
+  /** {n_points, n_cells, format, file_size_bytes} */
+  exportMeta?: CfdResult
+  /** optional field statistics */
+  fieldStats?: CfdResult
+  /** total mesh cell count */
+  n_cells?: number | null
+}
+
 export default function CfdPostProcessPanel({
   filter = null,
   filterResult = null,
@@ -436,7 +457,7 @@ export default function CfdPostProcessPanel({
   exportMeta = null,
   fieldStats = null,
   n_cells = null,
-}) {
+}: CfdPostProcessPanelProps) {
   const hasAny = filter || filterResult || exportPath || exportMeta
 
   return (

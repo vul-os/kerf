@@ -15,24 +15,36 @@
 //   inTolerance(value, tol)  → boolean
 //   detectCMMTool(tool, r)   → string
 
+import type { CSSProperties, ReactNode } from 'react'
 import { AlertTriangle, CheckCircle2, Crosshair } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for tests)
 // ---------------------------------------------------------------------------
 
+// CMM tool result payload — shape varies per tool, JSON boundary we don't own.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type CMMResult = any
+
+interface ParsedCMMFile {
+  kind: 'ok' | 'empty' | 'invalid'
+  tool?: string | null
+  result?: CMMResult | null
+  error?: string
+}
+
 /**
  * Parse raw CMM file content.
  * Returns { kind: 'ok'|'empty'|'invalid', tool, result, error? }
  */
-export function parseCMMFile(content) {
+export function parseCMMFile(content: unknown): ParsedCMMFile {
   const raw = typeof content === 'string' ? content : ''
   if (!raw.trim()) return { kind: 'empty', tool: null, result: null }
-  let doc
+  let doc: any
   try {
     doc = JSON.parse(raw)
   } catch (e) {
-    return { kind: 'invalid', error: e.message }
+    return { kind: 'invalid', error: (e as Error).message }
   }
   if (!doc || typeof doc !== 'object') return { kind: 'invalid', error: 'Expected JSON object' }
   const tool   = doc.tool || null
@@ -46,7 +58,7 @@ export function parseCMMFile(content) {
  * Format a number as a mm dimension string.
  * Returns "—" for non-finite values.
  */
-export function fmtMm(n, digits = 4) {
+export function fmtMm(n: number | null | undefined, digits = 4): string {
   if (n == null || !Number.isFinite(n)) return '—'
   return n.toFixed(digits) + ' mm'
 }
@@ -55,7 +67,7 @@ export function fmtMm(n, digits = 4) {
  * Return true if the measured value is within ±tolerance.
  * When tolerance is null/undefined, returns null (unknown).
  */
-export function inTolerance(value, tol) {
+export function inTolerance(value: number | null | undefined, tol: number | null | undefined): boolean | null {
   if (tol == null || value == null) return null
   return Math.abs(value) <= Math.abs(tol)
 }
@@ -63,7 +75,7 @@ export function inTolerance(value, tol) {
 /**
  * Detect which CMM tool produced the result from the tool name and keys.
  */
-export function detectCMMTool(tool, r) {
+export function detectCMMTool(tool: string | null | undefined, r: CMMResult): string {
   if (tool) {
     if (tool.includes('fit_geometry'))      return 'fit_geometry'
     if (tool.includes('align_datum'))       return 'align_datum'
@@ -94,7 +106,15 @@ export function detectCMMTool(tool, r) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function MetricCard({ label, value, mono, highlight, unit }) {
+interface MetricCardProps {
+  label: string
+  value: ReactNode
+  mono?: boolean
+  highlight?: string
+  unit?: string
+}
+
+function MetricCard({ label, value, mono, highlight, unit }: MetricCardProps) {
   const displayVal = unit ? `${value ?? '—'} ${unit}` : (value ?? '—')
   return (
     <div style={styles.metricCard}>
@@ -106,7 +126,12 @@ function MetricCard({ label, value, mono, highlight, unit }) {
   )
 }
 
-function PassFailBadge({ pass, label }) {
+interface PassFailBadgeProps {
+  pass: boolean | null | undefined
+  label?: string
+}
+
+function PassFailBadge({ pass, label }: PassFailBadgeProps) {
   if (pass == null) return null
   return (
     <span style={{ ...styles.badge, background: pass ? '#14532d44' : '#7f1d1d44', color: pass ? '#34d399' : '#f87171', borderColor: pass ? '#15803d66' : '#b91c1c66' }}>
@@ -118,7 +143,7 @@ function PassFailBadge({ pass, label }) {
   )
 }
 
-function SectionTitle({ children }) {
+function SectionTitle({ children }: { children: ReactNode }) {
   return <div style={styles.sectionTitle}>{children}</div>
 }
 
@@ -126,7 +151,7 @@ function SectionTitle({ children }) {
 // Tool-specific result renderers
 // ---------------------------------------------------------------------------
 
-function FitGeometryResult({ r }) {
+function FitGeometryResult({ r }: { r: CMMResult }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={styles.metricsGrid}>
@@ -159,7 +184,7 @@ function FitGeometryResult({ r }) {
   )
 }
 
-function EvalGDTResult({ r }) {
+function EvalGDTResult({ r }: { r: CMMResult }) {
   const pass = r.in_tolerance != null ? r.in_tolerance : inTolerance(r.zone_width, r.tolerance)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -182,7 +207,7 @@ function EvalGDTResult({ r }) {
   )
 }
 
-function EvalPositionResult({ r }) {
+function EvalPositionResult({ r }: { r: CMMResult }) {
   const pass = r.in_tolerance != null ? r.in_tolerance : inTolerance(r.positional_deviation, r.effective_tolerance)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -200,7 +225,7 @@ function EvalPositionResult({ r }) {
   )
 }
 
-function ProcessCapabilityResult({ r }) {
+function ProcessCapabilityResult({ r }: { r: CMMResult }) {
   const capable = r.cpk != null ? r.cpk >= 1.33 : null
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -229,7 +254,7 @@ function ProcessCapabilityResult({ r }) {
   )
 }
 
-function GaugeRRResult({ r }) {
+function GaugeRRResult({ r }: { r: CMMResult }) {
   const capable = r.pct_study_var != null ? r.pct_study_var <= 10 : null
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -253,7 +278,7 @@ function GaugeRRResult({ r }) {
   )
 }
 
-function GumUncertaintyResult({ r }) {
+function GumUncertaintyResult({ r }: { r: CMMResult }) {
   return (
     <div style={styles.metricsGrid}>
       <MetricCard label="Combined uc"      value={r.uc?.toFixed(6)}        mono />
@@ -263,7 +288,7 @@ function GumUncertaintyResult({ r }) {
   )
 }
 
-function RecommendSamplesResult({ r }) {
+function RecommendSamplesResult({ r }: { r: CMMResult }) {
   return (
     <div style={styles.metricsGrid}>
       <MetricCard label="Recommended N"   value={r.n_recommended} />
@@ -274,7 +299,7 @@ function RecommendSamplesResult({ r }) {
   )
 }
 
-function GenericResult({ r }) {
+function GenericResult({ r }: { r: CMMResult }) {
   return (
     <pre style={{ fontSize: 10, color: '#9ca3af', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }}>
       {JSON.stringify(r, null, 2)}
@@ -286,7 +311,7 @@ function GenericResult({ r }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-const TOOL_LABELS = {
+const TOOL_LABELS: Record<string, string> = {
   fit_geometry:      'CMM Geometry Fit',
   align_datum:       'CMM Datum Alignment',
   eval_gdt:          'GD&T Evaluation',
@@ -300,6 +325,15 @@ const TOOL_LABELS = {
   unknown:           'CMM Inspection Results',
 }
 
+interface CMMInspectionPanelProps {
+  /** Already-parsed JSON of a `.cmm` file, or null. */
+  parsedContent?: CMMResult
+  /** Raw string content (used when parsedContent is absent). */
+  rawContent?: string
+  /** Display name. */
+  fileName?: string
+}
+
 /**
  * CMMInspectionPanel
  *
@@ -308,7 +342,7 @@ const TOOL_LABELS = {
  *   rawContent    — raw string content (used when parsedContent is absent).
  *   fileName      — display name.
  */
-export default function CMMInspectionPanel({ parsedContent, rawContent, fileName }) {
+export default function CMMInspectionPanel({ parsedContent, rawContent, fileName }: CMMInspectionPanelProps) {
   const source = parsedContent ?? (rawContent ? (() => {
     try { return JSON.parse(rawContent) } catch { return null }
   })() : null)
@@ -362,7 +396,7 @@ export default function CMMInspectionPanel({ parsedContent, rawContent, fileName
 // Header
 // ---------------------------------------------------------------------------
 
-function Header({ fileName, title }) {
+function Header({ fileName, title }: { fileName?: string; title: string }) {
   return (
     <div style={styles.header}>
       <Crosshair size={14} style={{ color: '#34d399', flexShrink: 0 }} />
@@ -376,7 +410,7 @@ function Header({ fileName, title }) {
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   root: {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: 13,

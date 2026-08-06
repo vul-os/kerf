@@ -3,7 +3,18 @@
 Public API
 ----------
 circuit_json_to_kicad_pcb(circuit_json) -> str
-    Emit a KiCad v6/v7 .kicad_pcb s-expression string.
+    Emit a KiCad v6/v7 .kicad_pcb s-expression string — the inverse of
+    `kicad_pcb_to_circuit_json` (T-527). Covers everything the reader below
+    recovers: footprints (position/rotation/`locked`/`attr` flags),
+    nets/traces, `pcb_via` (one-way — see the caveat in the function's own
+    docstring), zones (`pcb_copper_pour` / `pcb_ground_plane` / `pcb_keepout`,
+    incl. thermal reliefs and per-restriction keepout flags), `pcb_text` ->
+    `gr_text`, and — the load-bearing piece — every `kicad_passthrough` /
+    zone-level `_kicad_passthrough` node the reader retained verbatim,
+    re-emitted so a second read recovers it again. Verified against both
+    this module's own reader (self round-trip) and the independent
+    `kicad-to-circuit-json` oracle re-reading the *written* file — see
+    `tests/test_t527_kicad_writer.py`.
 
 circuit_json_to_kicad_sch(circuit_json) -> str
     Emit a KiCad v6 .kicad_sch s-expression string.
@@ -258,6 +269,64 @@ def _looks_like_number(s: str) -> bool:
         return False
 
 
+# ─── T-527: Circuit JSON (Y-up) → KiCad (Y-down) axis flip ────────────────────
+#
+# The exact inverse of `_flip_kicad_y_to_circuit_json_y` (see its docstring,
+# far below, for the fixed-origin rationale settled by T-538/T-539): KiCad's
+# `.kicad_pcb` is Y-down, Circuit JSON is Y-up, and the chosen convention is a
+# fixed origin at y=0 — `kicad_y = -cj_y`, x untouched. Applied pointwise at
+# each geometry-emitting site in the writer below (footprint `at`, segment/
+# via endpoints, zone/keepout polygon vertices, `gr_text` `at`) rather than a
+# whole-list pre-pass, since the writer builds its output incrementally
+# per-element rather than transforming an already-complete list.
+def _kicad_y(cj_y: Any) -> float:
+    """`kicad_y = -cj_y` — the write-side half of the fixed-origin Y flip."""
+    return -float(cj_y or 0.0)
+
+
+# ─── T-527: raw-node re-emission (passthrough) ────────────────────────────────
+#
+# `kicad_pcb_to_circuit_json` retains every s-expression node it does not
+# semantically model — either at the top level (`kicad_passthrough`) or
+# nested inside a zone (`_kicad_passthrough`, e.g. `hatch`, `filled_polygon`)
+# — as a plain Python nested list of `str` (see `_parse_sexpr`'s contract).
+# The writer's job for those nodes is simply to print that same tree back out
+# as text; `_render_raw_node` is the inverse of `_parse_sexpr`.
+#
+# One real limitation, inherent to the shape `_to_plain_tree` produces (see
+# the module docstring above `_KicadRawParser`): whether a given atom was
+# originally a *bare* symbol or a *quoted* string is not preserved — both
+# collapse to plain `str`. So this renderer quotes an atom only when
+# re-parsing would otherwise break (it contains whitespace, a paren, or a
+# quote character, or is empty) rather than replicating the source file's
+# original quoting choice byte-for-byte. That is sufficient for round-trip
+# *value* equality (parsing the re-emitted text yields the same strings back
+# out — the guarantee this module's tests hold it to) but not for
+# byte-identical re-emission of already-bare-vs-quoted atoms that didn't need
+# quoting either way (e.g. a bare UUID stays bare either way; a tag name
+# stays bare). Documented here rather than silently assumed.
+
+def _raw_atom_needs_quoting(s: str) -> bool:
+    if s == "":
+        return True
+    return any(c.isspace() or c in "()\"" for c in s)
+
+
+def _render_raw_atom(a: str) -> str:
+    return _quote(a) if _raw_atom_needs_quoting(a) else a
+
+
+def _render_raw_node(node: Any) -> str:
+    """Render one passthrough node (a `_parse_sexpr`-shaped nested list of
+    `str`, or a bare `str`) back into KiCad s-expression text."""
+    if isinstance(node, list):
+        if not node:
+            return "()"
+        parts = [_render_raw_node(child) for child in node]
+        return "(" + " ".join(parts) + ")"
+    return _render_raw_atom(str(node))
+
+
 # ─── Circuit-JSON helpers ──────────────────────────────────────────────────────
 
 def _by_type(circuit_json: list, *types: str) -> list[dict]:
@@ -357,14 +426,44 @@ _KICAD_IGNORED_TOP_TAGS = {"version", "generator", "general", "paper", "layers",
 # ─── circuit_json_to_kicad_pcb ─────────────────────────────────────────────────
 
 def circuit_json_to_kicad_pcb(circuit_json: list) -> str:
-    """Convert Circuit JSON to a KiCad v6 .kicad_pcb s-expression string.
+    """Convert Circuit JSON to a KiCad v6/v7 .kicad_pcb s-expression string —
+    the inverse of `kicad_pcb_to_circuit_json` (T-527).
 
-    Covers:
-    - Standard layer table
-    - Setup block with default rules
+    Covers, matching what the reader (T-526, frozen) recovers:
+    - Standard layer table + setup block (structural boilerplate — the
+      reader never models the original layer/setup content either, see
+      `_KICAD_IGNORED_TOP_TAGS`, so re-deriving it here loses nothing)
     - Net declarations (net 0 = empty, then one per source_net / source_trace)
-    - Footprints (one per pcb_component) with ref and value text
-    - PCB trace segments on F.Cu
+    - Footprints: position, rotation (T-538/T-539 Y-flip applied), `locked`,
+      `kicad_footprint_attributes` (`attr` flags), ref/value text
+    - PCB trace segments, net-indexed
+    - `pcb_via` → `(via ...)` nodes (see the caveat below — this is a
+      one-way convenience, not a round-trip-stable construct)
+    - Zones: `pcb_copper_pour` / `pcb_ground_plane` / `pcb_keepout`, incl.
+      thermal reliefs and per-restriction keepout flags
+    - `pcb_text` → `gr_text`
+    - `kicad_passthrough` / a zone's own `_kicad_passthrough` — every node
+      the reader retained verbatim is re-emitted verbatim (see
+      `_render_raw_node`), which is what makes read→write→read round-trip
+      for constructs this module does not semantically model.
+
+    **Known, honest limitations (not fixed here — the reader is frozen):**
+    - Footprint internals the reader never captures at all — pads,
+      silkscreen graphics, 3D model references — have no Circuit-JSON home
+      and cannot be reconstructed. A written footprint contains only what
+      `kicad_pcb_to_circuit_json` recovers: ref/value text, `at`, `layer`,
+      `locked`, `attr`.
+    - `pcb_via` is a one-way write: `kicad_pcb_to_circuit_json` does not
+      model `(via ...)` as a first-class type (it falls into the top-level
+      `kicad_passthrough` bag like any other unmodelled node), so a via
+      written from a `pcb_via` Circuit JSON entry re-reads as inert
+      passthrough content, not as `pcb_via` again. Provided anyway because
+      it produces a well-formed, kicad-cli-openable board; just don't rely
+      on it for `pcb_via` round-trip identity.
+    - Multiple distinct `pcb_trace` entries that happen to share the same
+      (net, layer, width) are merged into one on read (a pre-existing
+      reader behavior, not introduced here) — writing them as separate
+      segment runs does not undo that merge on the next read.
     """
     cj = circuit_json or []
 
@@ -373,6 +472,10 @@ def circuit_json_to_kicad_pcb(circuit_json: list) -> str:
     source_nets       = _by_type(cj, "source_net")
     source_traces     = _by_type(cj, "source_trace")
     pcb_traces        = _by_type(cj, "pcb_trace")
+    pcb_vias          = _by_type(cj, "pcb_via")
+    pcb_zones         = _by_type(cj, "pcb_copper_pour", "pcb_ground_plane", "pcb_keepout")
+    pcb_texts         = _by_type(cj, "pcb_text")
+    passthrough_bags  = _by_type(cj, "kicad_passthrough")
 
     # Build component lookup: source_component_id → source_component
     sc_by_id = _index_by(source_components, "source_component_id")
@@ -399,15 +502,23 @@ def circuit_json_to_kicad_pcb(circuit_json: list) -> str:
 
     # ── Root node ─────────────────────────────────────────────────────────────
     root = _Sexp("kicad_pcb")
-    root.atom("version 20211014")
-    root.atom("generator kerf_electronics")
+    # T-527: `version`/`generator` must be their own `(tag value)` nodes, not
+    # one bare unparenthesized atom string — the old form parsed fine under
+    # this module's own lenient reader (bare top-level atoms are simply
+    # skipped, see `_KICAD_IGNORED_TOP_TAGS`'s `isinstance(node, list)`
+    # guard) but is not valid KiCad grammar and made the independent oracle
+    # (`kicadts`, via `kicad-to-circuit-json`) hard-fail with "unsupported
+    # primitive child: version" on a written file. Fixed here so the writer's
+    # output is actually oracle-parseable, which the round-trip DoD requires.
+    root.child("version").atom("20211014")
+    root.child("generator").quoted("kerf_electronics")
 
     # general
     gen = root.child("general")
     gen.attr("thickness", 1.6)
 
     # paper
-    root.child("paper").atom("A4")
+    root.child("paper").quoted("A4")
 
     # layers
     layers = root.child("layers")
@@ -416,18 +527,18 @@ def circuit_json_to_kicad_pcb(circuit_json: list) -> str:
         ln.quoted(lname)
         ln.atom(ltype)
 
-    # setup
+    # setup: kept minimal and flat (`grid_origin` only), not the old nested
+    # `(rules ...)` wrapper T-527 removed — `setup` is purely structural
+    # boilerplate to this module's own reader (`_KICAD_IGNORED_TOP_TAGS`,
+    # never modelled either way) but the old `(rules ...)` form is not valid
+    # KiCad grammar either: the independent oracle (`kicadts`) hard-fails
+    # with `Class "rules" not registered` on it, since real `.kicad_pcb`
+    # files place these settings as flat `setup` children, not nested under
+    # a `rules` node. Matches the minimal, oracle-parseable form this
+    # module's own hand-authored fixtures already use (see
+    # `tests/fixtures/zones_keepout_board.kicad_pcb`).
     setup = root.child("setup")
-    rules = setup.child("rules")
-    rules.attr("min_clearance", "0.0")
-    rules.attr("min_track_width", "0.0")
-    rules.attr("min_via_annular_width", "0.0")
-    rules.attr("min_via_diameter", "0.0")
-    rules.attr("min_hole_to_hole", "0.0")
-    rules.attr("allow_microvias", 0)
-    rules.attr("allow_blind_buried_vias", 0)
-    rules.attr("aux_axis_origin", 0)
-    setup.attr("grid_origin", "0 0")
+    setup.child("grid_origin").atom("0").atom("0")
 
     # nets
     for i, name in enumerate(net_names):
@@ -443,7 +554,7 @@ def circuit_json_to_kicad_pcb(circuit_json: list) -> str:
         value = sc.get("value", "")
         fp_name = sc.get("footprint", "Device:R")
         x = float(pcb_comp.get("x", 0.0))
-        y = float(pcb_comp.get("y", 0.0))
+        y_kicad = _kicad_y(pcb_comp.get("y", 0.0))
         rot = float(pcb_comp.get("rotation", 0.0))
         layer_cj = pcb_comp.get("layer", "top_copper")
         layer_kicad = _CJ_TO_KICAD_LAYER.get(layer_cj, "F.Cu")
@@ -451,13 +562,28 @@ def circuit_json_to_kicad_pcb(circuit_json: list) -> str:
         fp = root.child("footprint")
         fp.quoted(fp_name)
         fp.attr("layer", layer_kicad, quote_value=True)
-        tstamp = f"fp_{scid}"
+        if pcb_comp.get("locked"):
+            fp.child("locked")
+        # tstamp: preserve the CJ id verbatim so a re-read recovers the same
+        # `pcb_component_id` (kicad_pcb_to_circuit_json uses `tstamp` as the
+        # id whenever present) — a stable fallback otherwise.
+        tstamp = pcb_comp.get("pcb_component_id") or f"fp_{scid}"
         fp.attr("tstamp", tstamp, quote_value=True)
+
+        fp_attrs = pcb_comp.get("kicad_footprint_attributes")
+        if fp_attrs is not None:
+            attr_node = fp.child("attr")
+            for flag in (
+                "smd", "through_hole", "exclude_from_pos_files",
+                "exclude_from_bom", "allow_missing_courtyard", "board_only",
+            ):
+                if fp_attrs.get(flag):
+                    attr_node.atom(flag)
 
         # at
         at = fp.child("at")
         at.atom(f"{x:.4f}")
-        at.atom(f"{y:.4f}")
+        at.atom(f"{y_kicad:.4f}")
         if rot != 0.0:
             at.atom(f"{rot:.4f}")
 
@@ -516,15 +642,159 @@ def circuit_json_to_kicad_pcb(circuit_json: list) -> str:
             seg = root.child("segment")
             s = seg.child("start")
             s.atom(f"{float(p1['x']):.4f}")
-            s.atom(f"{float(p1['y']):.4f}")
+            s.atom(f"{_kicad_y(p1['y']):.4f}")
             e = seg.child("end")
             e.atom(f"{float(p2['x']):.4f}")
-            e.atom(f"{float(p2['y']):.4f}")
+            e.atom(f"{_kicad_y(p2['y']):.4f}")
             seg.attr("width", f"{width:.4f}")
             seg.attr("layer", layer_kicad, quote_value=True)
             seg.attr("net", trace_net_index)
 
+    # ── vias (pcb_via → `(via ...)`) ─────────────────────────────────────────
+    # See the module-level caveat above: this is a one-way convenience, not
+    # a round-trip-stable construct — kicad_pcb_to_circuit_json never reads
+    # `via` back as `pcb_via`.
+    for via in pcb_vias:
+        vx = float(via.get("x", 0.0))
+        vy_kicad = _kicad_y(via.get("y", 0.0))
+        size = float(via.get("outer_diameter", via.get("diameter", 0.8)))
+        drill = float(via.get("drill_diameter", via.get("drill", 0.4)))
+        via_net_name = via.get("net_id") or via.get("net_name") or ""
+        via_net_index = net_index.get(via_net_name, 0)
+        from_layer_kicad = _CJ_TO_KICAD_LAYER.get(via.get("from_layer", "top_copper"), "F.Cu")
+        to_layer_kicad = _CJ_TO_KICAD_LAYER.get(via.get("to_layer", "bottom_copper"), "B.Cu")
+
+        v = root.child("via")
+        v_at = v.child("at")
+        v_at.atom(f"{vx:.4f}")
+        v_at.atom(f"{vy_kicad:.4f}")
+        v.attr("size", f"{size:.4f}")
+        v.attr("drill", f"{drill:.4f}")
+        v_layers = v.child("layers")
+        v_layers.quoted(from_layer_kicad)
+        v_layers.quoted(to_layer_kicad)
+        v.attr("net", via_net_index)
+
+    # ── zones: pcb_copper_pour / pcb_ground_plane / pcb_keepout (T-527) ─────
+    for zone_entry in pcb_zones:
+        _write_zone_node(root, zone_entry)
+
+    # ── free-floating board text (pcb_text → gr_text) ───────────────────────
+    for text_idx, txt in enumerate(pcb_texts):
+        text_val = txt.get("text", "")
+        tx = float(txt.get("x", 0.0))
+        ty_kicad = _kicad_y(txt.get("y", 0.0))
+        layer_cj = txt.get("layer")
+        layer_kicad = _CJ_TO_KICAD_LAYER.get(layer_cj, layer_cj) if layer_cj else "Cmts.User"
+        if layer_kicad is None:
+            layer_kicad = "Cmts.User"
+
+        gt = root.child("gr_text")
+        gt.quoted(text_val)
+        gt_at = gt.child("at")
+        gt_at.atom(f"{tx:.4f}")
+        gt_at.atom(f"{ty_kicad:.4f}")
+        gt_at.atom("0")
+        gt.attr("layer", layer_kicad, quote_value=True)
+        # kicad_pcb_to_circuit_json never reads a gr_text's own tstamp (its
+        # `pcb_text_id` is always a fresh `text_{index}`, independent of any
+        # tstamp in the source), so any stable value round-trips identically
+        # here — but the KiCad grammar (and the oracle's stricter parser)
+        # requires *some* tstamp/uuid child to be present.
+        gt.attr("tstamp", txt.get("pcb_text_id") or f"text_{text_idx}", quote_value=True)
+        if txt.get("locked"):
+            gt.child("locked")
+        gt_eff = gt.child("effects")
+        gt_font = gt_eff.child("font")
+        gt_font.attr("size", "1.5 1.5")
+        gt_font.attr("thickness", "0.3")
+
+    # ── passthrough: every top-level node the reader could not model,
+    # re-emitted verbatim so it survives the round trip (T-527's whole
+    # point — see the module docstring's passthrough section) ─────────────
+    for bag in passthrough_bags:
+        for raw_node in bag.get("kicad_nodes", []):
+            root.atom(_render_raw_node(raw_node))
+
     return root.render(0)
+
+
+# ─── T-527: zone/keepout writer — the inverse of `_parse_zone_node` ───────────
+
+def _write_zone_node(root: "_Sexp", entry: dict) -> None:
+    """Emit one `(zone ...)` node from a `pcb_copper_pour` / `pcb_ground_plane`
+    / `pcb_keepout` Circuit-JSON dict — the exact inverse of
+    `_parse_zone_node`. Any `_kicad_passthrough` children recorded on read
+    (`hatch`, `filled_polygon`, `name`, ...) are re-emitted verbatim, in
+    their originally-recorded relative order — that is what
+    `_parse_zone_node` needs to recover an identical `_kicad_passthrough`
+    list on the next read; *where* they sit relative to the modelled fields
+    below does not matter, since each zone's passthrough list is rebuilt
+    fresh from that zone's own children in file order.
+    """
+    etype = entry.get("type")
+    zone = root.child("zone")
+
+    if etype == "pcb_keepout":
+        zone.attr("net", 0)
+        zone.attr("net_name", "", quote_value=True)
+    else:
+        net_index_val = entry.get("net_index", 0)
+        net_name = entry.get("net_id", "") if etype == "pcb_copper_pour" else ""
+        zone.attr("net", net_index_val)
+        zone.attr("net_name", net_name, quote_value=True)
+
+    layer_cj = entry.get("layer")
+    layer_kicad = _CJ_TO_KICAD_LAYER.get(layer_cj, layer_cj) if layer_cj else "F.Cu"
+    if layer_kicad is None:
+        layer_kicad = "F.Cu"
+    zone.attr("layer", layer_kicad, quote_value=True)
+
+    id_key = {
+        "pcb_copper_pour": "pcb_copper_pour_id",
+        "pcb_ground_plane": "pcb_ground_plane_id",
+        "pcb_keepout": "pcb_keepout_id",
+    }.get(etype, "")
+    zone_id = entry.get(id_key) if id_key else None
+    if zone_id:
+        zone.attr("tstamp", zone_id, quote_value=True)
+
+    if entry.get("locked"):
+        zone.child("locked")
+
+    for raw_child in entry.get("_kicad_passthrough", []):
+        zone.atom(_render_raw_node(raw_child))
+
+    if etype == "pcb_keepout":
+        ko = zone.child("keepout")
+        ko.child("tracks").atom("not_allowed" if entry.get("no_tracks") else "allowed")
+        ko.child("vias").atom("not_allowed" if entry.get("no_vias") else "allowed")
+        ko.child("pads").atom("not_allowed" if entry.get("no_pads") else "allowed")
+        ko.child("copperpour").atom("not_allowed" if entry.get("no_copperpour") else "allowed")
+        ko.child("footprints").atom("not_allowed" if entry.get("no_footprints") else "allowed")
+        zone.child("fill").atom("no")
+    else:
+        if "priority" in entry:
+            zone.attr("priority", entry["priority"])
+        if "clearance_mm" in entry:
+            cp = zone.child("connect_pads")
+            cp.attr("clearance", entry["clearance_mm"])
+        if "min_thickness_mm" in entry:
+            zone.attr("min_thickness", entry["min_thickness_mm"])
+        thermal = entry.get("thermal_relief") or {}
+        fill = zone.child("fill")
+        fill.atom("yes")
+        if "gap" in thermal:
+            fill.attr("thermal_gap", thermal["gap"])
+        if "spoke_width" in thermal:
+            fill.attr("thermal_bridge_width", thermal["spoke_width"])
+
+    poly = zone.child("polygon")
+    pts = poly.child("pts")
+    for pt in entry.get("polygon", []):
+        xy = pts.child("xy")
+        xy.atom(f"{float(pt.get('x', 0.0)):.4f}")
+        xy.atom(f"{_kicad_y(pt.get('y', 0.0)):.4f}")
 
 
 # ─── circuit_json_to_kicad_sch ─────────────────────────────────────────────────

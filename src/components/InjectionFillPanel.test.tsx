@@ -1,5 +1,5 @@
 /**
- * InjectionFillPanel.test.jsx
+ * InjectionFillPanel.test.tsx
  *
  * Tests for pure helpers + basic rendering of the injection fill panel.
  * Uses renderToStaticMarkup (no @testing-library/react).

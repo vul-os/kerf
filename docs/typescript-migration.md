@@ -102,17 +102,82 @@ clean sub-minute no-ops. It earns its lines.
 
    The ratchet enforces the invariant that actually matters: **the count may never rise**, and
    when it falls you must lower `BASELINE` in `scripts/lint-ts-ratchet.mjs` so the cleanup is
-   locked in. Current baseline: **78** inherited errors. Target is 0.
+   locked in. Target is 0.
 
    If your slice raises the count, you added the debt — fix it. Never raise the baseline.
 
-4. **Tests that read source by literal path will break on rename.** Several suites do
+   **Correction (2026-08-07) — the gate counted the wrong thing for two weeks.** It measured only
+   `src/**/*.ts(x)`, which contradicts the paragraph directly above it. If migrating a file MOVES
+   its debt from the JS bucket into the TS bucket, then a TS-only count *must* rise on every
+   slice — the gate was mathematically guaranteed to fail the work it was written to protect.
+   It did: a 43-file integration took the TS bucket 73 → 268, reading as "195 errors added",
+   while the combined total across both buckets fell **1,184 → 662**. Nothing was added; 522
+   were fixed. The gate now counts `.ts`, `.tsx`, `.js` and `.jsx` together, and the baseline is
+   the combined figure.
+
+   The general lesson, worth more than the specific fix: **a ratchet must measure a quantity the
+   intended work does not mechanically inflate.** Check that property explicitly when you write
+   one — the reasoning for why this gate was a ratchet and not a hard zero was correct and was
+   written down, and the implementation still contradicted it.
+
+2. **Check a single file against the REAL config: `node scripts/ts-check-file.mjs <file>`.**
+   ~6s, versus 1–3 minutes for `npm run typecheck`. This matters more than it sounds: the Bash
+   tool auto-backgrounds any command over 120s, so an agent that runs a project-wide gate
+   mid-slice silently loses its run waiting for output that never arrives. That single fact
+   accounted for most of the ~70 lost agent runs in this program.
+
+   **Do not hand-roll the equivalent with a bare `npx tsc --jsx react-jsx … <file>`.** Passing
+   files positionally makes tsc ignore `tsconfig.json` entirely, so the check loses `paths`
+   (every `@/types` import reports TS2307, plus a cascade on the types that failed to load),
+   `types` (`import.meta.env` reports TS2339 without `vite/client`), and the ambient
+   `src/types/global.d.ts` (every `GPUDevice`/`GPUBuffer` reports TS2304 — the WebGPU reference
+   lives there). Observed: 30+ phantom errors from one file.
+
+   The dangerous failure mode is not the noise, it is an agent "fixing" a phantom with a
+   `@ts-expect-error`. That suppression is unnecessary under the real config, where an
+   unnecessary `@ts-expect-error` is *itself* an error — so the phantom fix becomes a genuine
+   integration break. This happened.
+
+3. **Two slices must never declare the same type.** The single biggest source of integration
+   failures once slices ran in parallel: a wrapper and its panel each declaring `PaschenCurve`,
+   `ElementPhase`, `SolarPVPanelProps`. The copies drift — optional vs required, `string` vs a
+   literal union — and then the props are un-assignable and nothing typechecks. If a component's
+   props are read by a consumer, **the component exports the interface and the consumer imports
+   it.** Never copy a type across a module boundary.
+
+4. **Do not put `[key: string]: unknown` on a props or data interface.** TypeScript does not give
+   interfaces implicit index signatures, so an index signature makes every *concrete* interface
+   (`WorkspaceFile`, `ApiFile`) permanently un-assignable to yours. It reads like a convenience
+   and behaves like a wall. Bit us twice (`TreeFile`, `FirmwareFile`); both compiled fine once
+   the signature was dropped.
+
+5. **Props that a consumer passes partially must be optional.** JS destructuring
+   (`function Panel({ a, b, c })`) infers all three as *required*, so any caller or test
+   rendering `<Panel a={x} />` fails. Panel tests do this constantly. Type props as optional
+   with defaults rather than transcribing the destructure.
+
+6. **Tests that read source by literal path will break on rename.** Several suites do
    "source-text inspection" — e.g. `GdsLayoutPage.test.jsx` did `readFileSync('lib/gdsLoader.js')`.
    Renaming the module broke it, and it is not caught by typecheck, only by running the suite.
    After migrating, grep for literal `'lib/<name>.js'` style references and update them. Note the
    distinction: an **import specifier** ending `.js` is still correct (it resolves to `.ts` under
    `moduleResolution: bundler`); only literal filesystem paths need changing.
-2. **`npm test` is flaky in two distinct ways. Neither is yours; both need a re-run, not a fix.**
+
+   These have been swept centrally four times and a new *shape* turned up each time — the sweep
+   is not a one-off. Shapes seen so far: `resolve(__dirname, '../X.jsx')`; the `read('components/X.jsx')`
+   helper built on `join(root, p)` (fix the helper, not the call sites); a sibling path with no
+   `../` prefix; the `require('fs')` CommonJS form; and root-relative `resolve(ROOT, 'src/routes/X.jsx')`.
+   The durable fix is always the same: `existsSync(p('tsx')) ? p('tsx') : p('jsx')`, so the probe
+   works before *and* after the rename.
+
+   **A second class of this trap cannot be swept, only met as it arises:** assertions coupled to
+   *untyped* syntax. `toContain('const KIND_ROWS = {')` stops matching once the source reads
+   `const KIND_ROWS: Record<…> = {`; a regex for `function ExportButton({ onCaptureHero })` stops
+   matching at `({ onCaptureHero }: Props)`; `toContain('querySelectorAll(FOCUSABLE)')` stops
+   matching at `querySelectorAll<HTMLElement>(FOCUSABLE)`. Each reveals itself only when its own
+   subject migrates, and typecheck never sees it — only running the suite does. When you write
+   such an assertion, make the pattern tolerate an annotation up front.
+7. **`npm test` is flaky in two distinct ways. Neither is yours; both need a re-run, not a fix.**
 
    **(a) Exit 1 with every test passing.** An `EnvironmentTeardownError` unhandled rejection — a
    late dynamic import racing environment teardown, seen in
@@ -132,7 +197,7 @@ clean sub-minute no-ops. It earns its lines.
    separate step. Chaining `npm test` and a `git merge` into one command means the merge runs
    regardless of the result — which is how a red state reached the integration branch once. It was
    a flake, but the sequencing was wrong either way.
-3. **Do not run full-package Python/pytest suites** from a frontend slice, and **do not spawn
+8. **Do not run full-package Python/pytest suites** from a frontend slice, and **do not spawn
    sub-agents.** Both consumed large amounts of time earlier in this program for zero benefit. An
    additive diff cannot regress a suite it does not touch.
 

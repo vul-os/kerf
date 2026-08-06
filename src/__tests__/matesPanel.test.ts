@@ -109,7 +109,10 @@ describe('MatesPanel — solve result shape round-trip', () => {
         { type: 'distance', a: face(COMP_A, 'face-3'), b: face(COMP_B, 'face-4'), value: 15 },
       ],
     }
-    const json = serializeAssembly(doc)
+    // Fixture mates omit `id` on purpose — serializeAssembly's parseMate()
+    // generates ids for raw input; the AssemblyDocument type is stricter than
+    // what the function actually accepts. src/lib is owned by another slice.
+    const json = serializeAssembly(doc as any)
     const parsed = parseAssembly(json)
     expect(parsed.mates).toHaveLength(2)
     expect(parsed.mates[0].type).toBe('coincident')

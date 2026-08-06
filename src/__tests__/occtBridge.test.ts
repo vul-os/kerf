@@ -83,7 +83,9 @@ describe('geom2ToRings', () => {
         [[0, 1], [0, 0]],
       ],
     }
-    const rings = geom2ToRings(geom2)
+    // Geom2Like's `sides` type wants Vec2 tuples; plain number[][] fixtures
+    // are what geom2ToRings actually consumes. occtBridge.js owned by another slice.
+    const rings = geom2ToRings(geom2 as any)
     expect(rings).toHaveLength(1)
     expect(rings[0]).toHaveLength(4)
     // Ring vertices are the start of each side, walked via adjacency.
@@ -104,7 +106,7 @@ describe('geom2ToRings', () => {
         [[3, 3], [3, 7]], [[3, 7], [7, 7]], [[7, 7], [7, 3]], [[7, 3], [3, 3]],
       ],
     }
-    const rings = geom2ToRings(geom2)
+    const rings = geom2ToRings(geom2 as any)
     expect(rings).toHaveLength(2)
     expect(rings[0]).toHaveLength(4)
     expect(rings[1]).toHaveLength(4)
@@ -118,20 +120,22 @@ describe('geom2ToRings', () => {
         [[1, 0], [0, 0]], // closes back immediately → ring of length 2
       ],
     }
-    const rings = geom2ToRings(geom2)
+    const rings = geom2ToRings(geom2 as any)
     expect(rings).toEqual([])
   })
 })
 
 describe('sketchToWirePoints', () => {
   it('returns null for missing or invalid sketch', () => {
+    // Fixtures are intentionally malformed/partial SketchJSON — that's what's
+    // under test. occtBridge.js owned by another slice.
     expect(sketchToWirePoints(null)).toBeNull()
-    expect(sketchToWirePoints({})).toBeNull()
-    expect(sketchToWirePoints({ entities: 'not-an-array' })).toBeNull()
+    expect(sketchToWirePoints({} as any)).toBeNull()
+    expect(sketchToWirePoints({ entities: 'not-an-array' } as any)).toBeNull()
   })
 
   it('returns null when sketch has no edges', () => {
-    expect(sketchToWirePoints({ entities: [] })).toBeNull()
+    expect(sketchToWirePoints({ entities: [] } as any)).toBeNull()
   })
 
   it('walks an open polyline of 3 line segments and reports closed=false', () => {
@@ -146,7 +150,7 @@ describe('sketchToWirePoints', () => {
         { id: 'l2', type: 'line', p1: 'p2', p2: 'p3' },
       ],
     }
-    const r = sketchToWirePoints(sketch)
+    const r = sketchToWirePoints(sketch as any)
     expect(r).not.toBeNull()
     expect(r.closed).toBe(false)
     expect(r.points).toHaveLength(4)
@@ -166,7 +170,7 @@ describe('sketchToWirePoints', () => {
         { id: 'l3', type: 'line', p1: 'c', p2: 'a' },
       ],
     }
-    const r = sketchToWirePoints(sketch)
+    const r = sketchToWirePoints(sketch as any)
     expect(r).not.toBeNull()
     expect(r.closed).toBe(true)
     // Three unique vertices plus the closing duplicate.
@@ -181,7 +185,7 @@ describe('sketchToWirePoints', () => {
         { id: 'l0', type: 'line', p1: 'p0', p2: 'p1', construction: true },
       ],
     }
-    const r = sketchToWirePoints(sketch)
+    const r = sketchToWirePoints(sketch as any)
     // No real edges → no chain.
     expect(r).toBeNull()
   })
@@ -196,7 +200,7 @@ describe('sketchToWirePoints', () => {
         { id: 'a1', type: 'arc', center: 'c', start: 's', end: 'e', sweep_ccw: true },
       ],
     }
-    const r = sketchToWirePoints(sketch)
+    const r = sketchToWirePoints(sketch as any)
     expect(r).not.toBeNull()
     // Tessellation factor is ceil(|sweep|*12) per source, so π/2 → ~19 segments
     // → at least a few intermediate points beyond the two endpoints.

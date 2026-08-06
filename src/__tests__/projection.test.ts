@@ -101,7 +101,8 @@ describe('projection — projectPoint', () => {
     expect(v).toBeCloseTo(Math.sin(Math.PI / 6), 6)
   })
   it('unknown view falls back to front', () => {
-    expect(projectPoint('garbage', [3, 99, 5])).toEqual([3, -5])
+    // Intentionally invalid view name to exercise the runtime fallback.
+    expect(projectPoint('garbage' as any, [3, 99, 5])).toEqual([3, -5])
   })
 })
 

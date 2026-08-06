@@ -6,8 +6,11 @@
 // guided UI (domain card grid + guidance copy + "More options").
 
 import { describe, it, expect } from 'vitest'
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync, existsSync } from 'fs'
+// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 import {
   STARTER_OPTIONS,

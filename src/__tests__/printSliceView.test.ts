@@ -10,6 +10,12 @@ import {
   parseGcodeLayers,
   DEFAULT_SETTINGS,
 } from '../components/PrintSliceView.jsx'
+import type { PrintConfig } from '../components/PrintSliceView.jsx'
+
+// PrintConfig is a discriminated union on `kind`; these tests assert `kind`
+// via a separate expect() call rather than an `if`, so TS can't narrow.
+// Cast to the 'ok' branch where the test's own logic already guarantees it.
+type PrintConfigOk = Extract<PrintConfig, { kind: 'ok' }>
 
 // ---------------------------------------------------------------------------
 // parsePrintConfig
@@ -33,7 +39,7 @@ describe('parsePrintConfig', () => {
       version: 1,
       mesh_ref: '/models/bracket.stl',
       settings: { layer_height: 0.15, infill_density: 30 },
-    }))
+    })) as PrintConfigOk
     expect(r.kind).toBe('ok')
     expect(r.meshRef).toBe('/models/bracket.stl')
     expect(r.settings.layer_height).toBe(0.15)
@@ -41,7 +47,7 @@ describe('parsePrintConfig', () => {
   })
 
   it('merges missing settings with defaults', () => {
-    const r = parsePrintConfig(JSON.stringify({ version: 1 }))
+    const r = parsePrintConfig(JSON.stringify({ version: 1 })) as PrintConfigOk
     expect(r.kind).toBe('ok')
     expect(r.settings.layer_height).toBe(DEFAULT_SETTINGS.layer_height)
     expect(r.settings.infill_density).toBe(DEFAULT_SETTINGS.infill_density)
@@ -52,13 +58,13 @@ describe('parsePrintConfig', () => {
   })
 
   it('meshRef defaults to empty string when absent', () => {
-    const r = parsePrintConfig(JSON.stringify({ version: 1 }))
+    const r = parsePrintConfig(JSON.stringify({ version: 1 })) as PrintConfigOk
     expect(r.kind).toBe('ok')
     expect(r.meshRef).toBe('')
   })
 
   it('meshRef defaults to empty string when not a string', () => {
-    const r = parsePrintConfig(JSON.stringify({ mesh_ref: 42 }))
+    const r = parsePrintConfig(JSON.stringify({ mesh_ref: 42 })) as PrintConfigOk
     expect(r.kind).toBe('ok')
     expect(r.meshRef).toBe('')
   })
@@ -66,7 +72,7 @@ describe('parsePrintConfig', () => {
   it('settings override defaults key-by-key', () => {
     const r = parsePrintConfig(JSON.stringify({
       settings: { layer_height: 0.3, perimeters: 5 },
-    }))
+    })) as PrintConfigOk
     expect(r.settings.layer_height).toBe(0.3)
     expect(r.settings.perimeters).toBe(5)
     // others are defaults
@@ -98,7 +104,8 @@ describe('parseGcodeLayers', () => {
   it('returns empty array for null / empty input', () => {
     expect(parseGcodeLayers(null)).toEqual([])
     expect(parseGcodeLayers('')).toEqual([])
-    expect(parseGcodeLayers(42)).toEqual([])
+    // Intentionally wrong-typed input to exercise the runtime guard.
+    expect(parseGcodeLayers(42 as any)).toEqual([])
   })
 
   it('parses 3 layers from sample G-code', () => {

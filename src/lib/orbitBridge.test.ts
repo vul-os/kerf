@@ -11,7 +11,6 @@ import { propagateOrbit, orbitalPeriod } from './orbitBridge.js'
 // ---------------------------------------------------------------------------
 
 const R_EARTH = 6_378.137  // km
-const MU = 398_600.4418    // km³/s²
 
 /** Build a valid LEO request body (400 km circular orbit). */
 function leoParams(overrides = {}) {
@@ -54,7 +53,7 @@ let fetchMock
 
 beforeEach(() => {
   fetchMock = vi.fn()
-  global.fetch = fetchMock
+  globalThis.fetch = fetchMock
 })
 
 afterEach(() => {

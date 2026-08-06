@@ -1,5 +1,5 @@
 /**
- * orbitBridge.js — Fetch wrapper for POST /aero/orbit/propagate.
+ * orbitBridge.ts — Fetch wrapper for POST /aero/orbit/propagate.
  *
  * Sends classical orbital elements + propagation parameters to the backend
  * and returns the trajectory point array (IJK frame, km).
@@ -30,27 +30,54 @@
 
 const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
 
+/** Orbital elements + propagation settings for {@link propagateOrbit}. */
+export interface OrbitPropagateParams {
+  /** Semi-major axis (km), > 0. */
+  a: number
+  /** Eccentricity, [0, 1). */
+  e: number
+  /** Inclination (rad). */
+  i: number
+  /** RAAN Ω (rad). */
+  Omega: number
+  /** Argument of perigee ω (rad). */
+  omega: number
+  /** Initial true anomaly ν₀ (rad). */
+  nu0: number
+  /** Propagation duration (s), > 0. */
+  duration_s: number
+  /** Number of trajectory points (2–10000). Defaults to 200. */
+  n_steps?: number
+}
+
+/** A single trajectory sample (km, IJK/ECI frame). */
+export interface OrbitTrajectoryPoint {
+  x: number
+  y: number
+  z: number
+}
+
+/** Response body for POST /aero/orbit/propagate. */
+export interface OrbitPropagateResult {
+  ok: boolean
+  n_steps: number
+  duration_s: number
+  a_km: number
+  e: number
+  trajectory: OrbitTrajectoryPoint[]
+}
+
 /**
  * Propagate a Keplerian orbit.
  *
- * @param {object} params - Orbital elements + propagation settings.
- * @param {number} params.a          - Semi-major axis (km), > 0.
- * @param {number} params.e          - Eccentricity, [0, 1).
- * @param {number} params.i          - Inclination (rad).
- * @param {number} params.Omega      - RAAN Ω (rad).
- * @param {number} params.omega      - Argument of perigee ω (rad).
- * @param {number} params.nu0        - Initial true anomaly ν₀ (rad).
- * @param {number} params.duration_s - Propagation duration (s), > 0.
- * @param {number} [params.n_steps=200] - Number of trajectory points (2–10000).
- * @param {string} [accessToken]     - Optional Bearer token for authenticated requests.
- *
- * @returns {Promise<{ok: boolean, n_steps: number, duration_s: number,
- *                    a_km: number, e: number,
- *                    trajectory: Array<{x: number, y: number, z: number}>}>}
- *
+ * @param params - Orbital elements + propagation settings.
+ * @param accessToken - Optional Bearer token for authenticated requests.
  * @throws {Error} On HTTP error (4xx / 5xx) or network failure.
  */
-export async function propagateOrbit(params, accessToken = null) {
+export async function propagateOrbit(
+  params: OrbitPropagateParams,
+  accessToken: string | null = null,
+): Promise<OrbitPropagateResult> {
   const {
     a,
     e,
@@ -62,7 +89,7 @@ export async function propagateOrbit(params, accessToken = null) {
     n_steps = 200,
   } = params
 
-  const headers = { 'content-type': 'application/json' }
+  const headers: Record<string, string> = { 'content-type': 'application/json' }
   if (accessToken) {
     headers.authorization = `Bearer ${accessToken}`
   }
@@ -76,11 +103,11 @@ export async function propagateOrbit(params, accessToken = null) {
   })
 
   if (!resp.ok) {
-    let detail = resp.statusText
+    let detail: string = resp.statusText
     try {
       const errJson = await resp.json()
       detail = errJson.detail ?? JSON.stringify(errJson)
-    } catch (_) {
+    } catch {
       // keep statusText
     }
     throw new Error(`propagateOrbit: HTTP ${resp.status} — ${detail}`)
@@ -94,10 +121,10 @@ export async function propagateOrbit(params, accessToken = null) {
  *
  * T = 2π √(a³ / μ)
  *
- * @param {number} a_km - Semi-major axis (km).
- * @param {number} [mu=398600.4418] - Gravitational parameter (km³/s²).
- * @returns {number} Orbital period in seconds.
+ * @param a_km - Semi-major axis (km).
+ * @param mu - Gravitational parameter (km³/s²). Defaults to Earth's.
+ * @returns Orbital period in seconds.
  */
-export function orbitalPeriod(a_km, mu = 398_600.4418) {
+export function orbitalPeriod(a_km: number, mu = 398_600.4418): number {
   return 2 * Math.PI * Math.sqrt(a_km ** 3 / mu)
 }

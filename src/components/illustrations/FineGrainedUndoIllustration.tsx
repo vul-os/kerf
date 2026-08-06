@@ -7,13 +7,17 @@
  *
  * viewBox 320×200. Palette locked.
  */
-export default function FineGrainedUndoIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function FineGrainedUndoIllustration({ className = '' }: Props) {
   // 8 revisions evenly spaced along the timeline.
   const dotCount = 8
   const x0 = 40
   const x1 = 282
   const yTimeline = 90
-  const dots = []
+  const dots: number[] = []
   for (let i = 0; i < dotCount; i++) {
     dots.push(x0 + (i / (dotCount - 1)) * (x1 - x0))
   }

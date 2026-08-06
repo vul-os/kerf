@@ -14,7 +14,11 @@
  *
  * viewBox 320×200. Palette locked.
  */
-export default function TolerancePlusMatesIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function TolerancePlusMatesIllustration({ className = '' }: Props) {
   // Three parts along x: bases at 36, 110, 188, lengths 60, 64, 60.
   const parts = [
     { x: 36, w: 60, label: 'A', nom: '20.0', tol: '±0.05' },

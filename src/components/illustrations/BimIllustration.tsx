@@ -14,16 +14,20 @@
  *
  * viewBox 320×200.
  */
-export default function BimIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function BimIllustration({ className = '' }: Props) {
   // Project a point in wall A's local plane (s along wall, h above floor)
   // to screen coords. Wall A runs along world X at world Y=0; its base
   // start (world origin) sits at screen `(baseX, baseY)`.
-  const wallA = (baseX, baseY) => (s, h) => [
+  const wallA = (baseX: number, baseY: number) => (s: number, h: number): [number, number] => [
     baseX + s * 11.25,
     baseY + s * 1.5 - h * 12.67,
   ]
   // Same for wall B which runs along world Y at world X=8m.
-  const wallB = (baseX, baseY) => (s, h) => [
+  const wallB = (baseX: number, baseY: number) => (s: number, h: number): [number, number] => [
     baseX + s * 5,
     baseY - s * 2.33 - h * 12.67,
   ]
@@ -63,7 +67,7 @@ export default function BimIllustration({ className = '' }) {
   const winB_TR = bPoint(3.4, 2.3)
   const winB_TL = bPoint(2.0, 2.3)
 
-  const ptStr = (p) => `${p[0].toFixed(2)},${p[1].toFixed(2)}`
+  const ptStr = (p: [number, number]) => `${p[0].toFixed(2)},${p[1].toFixed(2)}`
 
   return (
     <svg

@@ -17,15 +17,17 @@ import { useEffect, useMemo } from 'react'
 import {
   Activity, AlertCircle, ChevronDown, Clock, FileText, Folder,
   Loader2, MessageSquare, Plus, RefreshCw, Sparkles, Trash2, Wrench,
+  type LucideIcon,
 } from 'lucide-react'
 import { useWorkspace } from '../store/workspace.js'
 import usePrefersReducedMotion from '../lib/usePrefersReducedMotion.js'
+import type { ActivityEvent } from '@/types'
 
 // ─────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────
 
-function relativeTime(iso) {
+function relativeTime(iso: string | undefined): string {
   if (!iso) return ''
   const t = new Date(iso).getTime()
   if (Number.isNaN(t)) return ''
@@ -41,7 +43,7 @@ function relativeTime(iso) {
 
 // initials("Imran Patel") → "IP"; initials("alice") → "A".
 // Caps at two characters and uppercases for the avatar fallback.
-function initials(name) {
+function initials(name: string | undefined): string {
   const s = (name || '').trim()
   if (!s) return '·'
   const parts = s.split(/\s+/).filter(Boolean)
@@ -52,7 +54,7 @@ function initials(name) {
 // Stable pastel for the initial-fallback avatar pill. Same name → same color
 // so the same user shows the same chip across rows. Hash → HSL so we don't
 // have to maintain a fixed palette.
-function colorForName(name) {
+function colorForName(name: string | undefined): string {
   const s = name || ''
   let h = 0
   for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0
@@ -61,7 +63,11 @@ function colorForName(name) {
   return `hsl(${hue}, 32%, 35%)`
 }
 
-function Avatar({ user }) {
+interface AvatarProps {
+  user: ActivityEvent['user']
+}
+
+function Avatar({ user }: AvatarProps) {
   const url = user?.avatar_url
   const name = user?.name || ''
   if (url) {
@@ -85,9 +91,15 @@ function Avatar({ user }) {
   )
 }
 
+interface EventGlyph {
+  icon: LucideIcon
+  verb: string
+  accent: string
+}
+
 // Per-event-kind metadata: an icon, the verb to read after the username, and
 // a kerf accent class. Keeps the row markup uniform.
-function eventGlyph(ev) {
+function eventGlyph(ev: ActivityEvent): EventGlyph {
   switch (ev.kind) {
     case 'edit':
       switch (ev.source) {
@@ -106,7 +118,7 @@ function eventGlyph(ev) {
 
 // Source badge for edit events ("via LLM", "via tool"). Returns null for
 // other kinds so the secondary line falls through to other content.
-function sourceBadge(ev) {
+function sourceBadge(ev: ActivityEvent): { label: string; cls: string } | null {
   if (ev.kind !== 'edit') return null
   switch (ev.source) {
     case 'llm':     return { label: 'via AI',       cls: 'text-purple-300/80' }
@@ -119,7 +131,7 @@ function sourceBadge(ev) {
 
 // Compact target string for the headline. We render `<user> <verb> <target>`
 // where target is the file name, thread title, or empty (project_created).
-function targetLabel(ev) {
+function targetLabel(ev: ActivityEvent): string {
   if (ev.file?.name) return ev.file.name
   if (ev.thread?.title) return ev.thread.title || 'Untitled thread'
   if (ev.kind === 'chat') return 'Untitled thread'
@@ -130,7 +142,13 @@ function targetLabel(ev) {
 // Row
 // ─────────────────────────────────────────────────────────────────────────
 
-function EventRow({ ev, onSelectFile, onSelectThread }) {
+interface EventRowProps {
+  ev: ActivityEvent
+  onSelectFile: (fileId: string) => void
+  onSelectThread: (threadId: string) => void
+}
+
+function EventRow({ ev, onSelectFile, onSelectThread }: EventRowProps) {
   const glyph = eventGlyph(ev)
   const Icon = glyph.icon
   const badge = sourceBadge(ev)
@@ -241,7 +259,13 @@ function EventRow({ ev, onSelectFile, onSelectThread }) {
 // Panel
 // ─────────────────────────────────────────────────────────────────────────
 
-export default function ActivityTimeline({ projectId, open, onClose }) {
+export interface ActivityTimelineProps {
+  projectId?: string | null
+  open: boolean
+  onClose: () => void
+}
+
+export default function ActivityTimeline({ projectId, open, onClose }: ActivityTimelineProps) {
   const events = useWorkspace((s) => s.activityEvents)
   const loading = useWorkspace((s) => s.activityLoading)
   const error = useWorkspace((s) => s.activityError)
@@ -265,10 +289,10 @@ export default function ActivityTimeline({ projectId, open, onClose }) {
 
   // Bridge to file/thread navigation. We pull the actions imperatively so
   // the rows can fire them without subscribing to every store change.
-  const onSelectFile = (fid) => {
+  const onSelectFile = (fid: string) => {
     try { void useWorkspace.getState().selectFile(fid) } catch { /* ignore */ }
   }
-  const onSelectThread = (tid) => {
+  const onSelectThread = (tid: string) => {
     try { void useWorkspace.getState().selectThread(tid) } catch { /* ignore */ }
   }
 
@@ -316,9 +340,11 @@ export default function ActivityTimeline({ projectId, open, onClose }) {
           </div>
         ) : (
           <ul className="divide-y divide-ink-850">
-            {events.map((ev) => (
+            {events.map((ev, i) => (
               <EventRow
-                key={ev.id}
+                // ActivityEvent has no stable id from the API; index is safe
+                // here since the list is append-only (pagination adds pages).
+                key={i}
                 ev={ev}
                 onSelectFile={onSelectFile}
                 onSelectThread={onSelectThread}

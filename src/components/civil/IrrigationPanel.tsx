@@ -1,5 +1,5 @@
 /**
- * IrrigationPanel.jsx — Sprinkler layout visualiser + zone flow demand panel.
+ * IrrigationPanel.tsx — Sprinkler layout visualiser + zone flow demand panel.
  *
  * Renders:
  *   • SVG plan showing sprinkler head positions with arc coverage circles
@@ -10,18 +10,6 @@
  *   • `landscape_layout_sprinkler` — head placement grid (Hunter/Rain Bird/Toro models)
  *   • `landscape_flow_demand`      — per-zone GPM breakdown
  *   via POST /api/tools/call
- *
- * Props
- * ─────
- *   width_ft      {number}  Rectangle width [ft] (default 60).
- *   length_ft     {number}  Rectangle length [ft] (default 40).
- *   sprinklerKind {string}  Key from SPRINKLER_CATALOG (default 'Hunter_PGP').
- *   pattern       {string}  'square'|'triangular'|'oblong' (default 'square').
- *   zoneCount     {number}  Number of irrigation zones (default 4).
- *   svgWidth      {number}  Canvas pixel width (default 560).
- *   svgHeight     {number}  Canvas pixel height (default 360).
- *   className     {string}
- *   onDispatch    {function}  Called with { tool, params } instead of fetch.
  */
 
 import { useMemo, useState } from 'react'
@@ -33,13 +21,13 @@ const PADDING = 40
 // Sprinkler arc colours by arc degree
 // ---------------------------------------------------------------------------
 
-const ARC_FILL = {
+const ARC_FILL: Record<number, string> = {
   90:  'rgba(59,130,246,0.18)',
   180: 'rgba(34,197,94,0.15)',
   270: 'rgba(245,158,11,0.12)',
   360: 'rgba(168,85,247,0.10)',
 }
-const ARC_STROKE = {
+const ARC_STROKE: Record<number, string> = {
   90:  '#3b82f6',
   180: '#22c55e',
   270: '#f59e0b',
@@ -50,7 +38,7 @@ const ARC_STROKE = {
 // Arc SVG path helper (sector)
 // ---------------------------------------------------------------------------
 
-function arcPath(cx, cy, r, arcDeg) {
+function arcPath(cx: number, cy: number, r: number, arcDeg: number): string {
   if (arcDeg >= 360) {
     return `M ${cx} ${cy} m -${r} 0 a ${r} ${r} 0 1 0 ${r * 2} 0 a ${r} ${r} 0 1 0 -${r * 2} 0`
   }
@@ -62,6 +50,60 @@ function arcPath(cx, cy, r, arcDeg) {
   const y2 = cy + r * Math.sin(endRad)
   const largeArc = arcDeg > 180 ? 1 : 0
   return `M ${cx} ${cy} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${largeArc} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`
+}
+
+// ---------------------------------------------------------------------------
+// Backend response shapes (POST /api/tools/call)
+// ---------------------------------------------------------------------------
+
+interface SprinklerPosition {
+  x: number
+  y: number
+  arc_deg: number
+}
+
+interface SprinklerMeta {
+  radius_ft?: number
+}
+
+interface LayoutSprinklerResponse {
+  ok: boolean
+  positions?: SprinklerPosition[]
+  sprinkler?: SprinklerMeta
+  error?: string
+}
+
+interface FlowZone {
+  zone: number | string
+  head_count: number
+  total_gpm: number
+}
+
+interface FlowDemandResponse {
+  ok: boolean
+  zone_count?: number
+  total_flow_gpm?: number
+  zones?: FlowZone[]
+  error?: string
+}
+
+export interface DispatchPayload {
+  tool: string
+  params: Record<string, unknown>
+}
+
+export interface IrrigationPanelProps {
+  /** JSON string of prop overrides, from the panel registry. */
+  content?: string
+  width_ft?: number
+  length_ft?: number
+  sprinklerKind?: string
+  pattern?: string
+  zoneCount?: number
+  svgWidth?: number
+  svgHeight?: number
+  className?: string
+  onDispatch?: (payload: DispatchPayload) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -79,20 +121,20 @@ export default function IrrigationPanel({
   svgHeight = 360,
   className = '',
   onDispatch,
-}) {
+}: IrrigationPanelProps) {
   // Accept a `content` string (JSON) from the panel registry.
-  const _p = (() => { if (!content) return {}; try { return JSON.parse(content) } catch { return {} } })()
+  const _p: Partial<IrrigationPanelProps> = (() => { if (!content) return {}; try { return JSON.parse(content) } catch { return {} } })()
   const width_ft     = _p.width_ft     ?? width_ft_prop
   const length_ft    = _p.length_ft    ?? length_ft_prop
   const sprinklerKind = _p.sprinklerKind ?? sprinklerKind_prop
   const pattern      = _p.pattern      ?? pattern_prop
   const zoneCount    = _p.zoneCount    ?? zoneCount_prop
   const [loading, setLoading] = useState(false)
-  const [positions, setPositions] = useState(null)
-  const [sprinklerMeta, setSprinklerMeta] = useState(null)
-  const [zoneResult, setZoneResult] = useState(null)
-  const [error, setError] = useState(null)
-  const [activeAction, setActiveAction] = useState(null)
+  const [positions, setPositions] = useState<SprinklerPosition[] | null>(null)
+  const [sprinklerMeta, setSprinklerMeta] = useState<SprinklerMeta | null>(null)
+  const [zoneResult, setZoneResult] = useState<FlowDemandResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [activeAction, setActiveAction] = useState<'layout' | 'flow' | null>(null)
 
   // Compute scale to fit the rectangle
   const { scaleX, scaleY, offX, offY } = useMemo(() => {
@@ -109,7 +151,7 @@ export default function IrrigationPanel({
     }
   }, [svgWidth, svgHeight, width_ft, length_ft])
 
-  function toSVG(xFt, yFt) {
+  function toSVG(xFt: number, yFt: number): [number, number] {
     return [xFt * scaleX + offX, yFt * scaleY + offY]
   }
 
@@ -131,16 +173,16 @@ export default function IrrigationPanel({
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ tool_name: 'landscape_layout_sprinkler', params }),
         })
-        const data = await res.json()
+        const data: LayoutSprinklerResponse = await res.json()
         if (data.ok) {
-          setPositions(data.positions)
-          setSprinklerMeta(data.sprinkler)
+          setPositions(data.positions ?? null)
+          setSprinklerMeta(data.sprinkler ?? null)
         } else {
           setError(data.error || 'Layout failed')
         }
       }
     } catch (e) {
-      setError(e.message || 'Layout dispatch failed')
+      setError((e as Error).message || 'Layout dispatch failed')
     } finally {
       setLoading(false)
       setActiveAction(null)
@@ -167,7 +209,7 @@ export default function IrrigationPanel({
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ tool_name: 'landscape_flow_demand', params }),
         })
-        const data = await res.json()
+        const data: FlowDemandResponse = await res.json()
         if (data.ok) {
           setZoneResult(data)
         } else {
@@ -175,7 +217,7 @@ export default function IrrigationPanel({
         }
       }
     } catch (e) {
-      setError(e.message || 'Flow demand dispatch failed')
+      setError((e as Error).message || 'Flow demand dispatch failed')
     } finally {
       setLoading(false)
       setActiveAction(null)
@@ -289,11 +331,11 @@ export default function IrrigationPanel({
         {positions && (
           <g transform={`translate(${svgWidth - 130}, 8)`} aria-label="Arc legend">
             <rect x="0" y="0" width="122" height="74" rx="4" fill="#1e293b" opacity="0.9" />
-            {[
+            {([
               [90,  '90° corner'],
               [180, '180° edge'],
               [360, '360° interior'],
-            ].map(([deg, label], i) => (
+            ] as Array<[number, string]>).map(([deg, label], i) => (
               <g key={deg} transform={`translate(6, ${6 + i * 20})`}>
                 <circle cx="6" cy="8" r="4" fill={ARC_STROKE[deg]} opacity="0.8" />
                 <text x="16" y="12" fontSize="9" fill="#94a3b8" fontFamily="monospace">
@@ -312,7 +354,7 @@ export default function IrrigationPanel({
       {zoneResult && zoneResult.zones && (
         <div className="text-xs font-mono px-1" data-testid="zone-flow-table">
           <div className="text-slate-400 mb-1">
-            Zone flow demand — {zoneResult.zone_count} zones · total {zoneResult.total_flow_gpm.toFixed(2)} GPM
+            Zone flow demand — {zoneResult.zone_count} zones · total {(zoneResult.total_flow_gpm ?? 0).toFixed(2)} GPM
           </div>
           <table className="w-full text-slate-300 border-collapse">
             <thead>

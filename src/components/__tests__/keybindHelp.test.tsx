@@ -14,34 +14,37 @@ import { DEFAULT_BINDINGS, ACTIONS } from '../../lib/viewportKeybinds.js'
 
 // ── 1. formatBinding ──────────────────────────────────────────────────────────
 
+// formatBinding only reads key/ctrl/shift/alt; these fixtures omit `action`
+// (KeyBinding requires it, but KeybindHelp is owned by another slice) — cast
+// at the call site rather than pad every fixture with an unused field.
 describe('formatBinding', () => {
   it('formats a plain letter key', () => {
-    expect(formatBinding({ key: 'g' })).toBe('G')
+    expect(formatBinding({ key: 'g' } as any)).toBe('G')
   })
 
   it('formats Shift+letter as "Shift+X"', () => {
-    expect(formatBinding({ key: 'z', shift: true })).toBe('Shift+Z')
+    expect(formatBinding({ key: 'z', shift: true } as any)).toBe('Shift+Z')
   })
 
   it('formats Ctrl+key', () => {
-    expect(formatBinding({ key: 'z', ctrl: true })).toBe('Ctrl+Z')
+    expect(formatBinding({ key: 'z', ctrl: true } as any)).toBe('Ctrl+Z')
   })
 
   it('formats Ctrl+Shift+key with correct order', () => {
-    expect(formatBinding({ key: 's', ctrl: true, shift: true })).toBe('Ctrl+Shift+S')
+    expect(formatBinding({ key: 's', ctrl: true, shift: true } as any)).toBe('Ctrl+Shift+S')
   })
 
   it('formats special keys (Escape, Tab) without uppercasing', () => {
-    expect(formatBinding({ key: 'Escape' })).toBe('Escape')
-    expect(formatBinding({ key: 'Tab' })).toBe('Tab')
+    expect(formatBinding({ key: 'Escape' } as any)).toBe('Escape')
+    expect(formatBinding({ key: 'Tab' } as any)).toBe('Tab')
   })
 
   it('formats numeric key', () => {
-    expect(formatBinding({ key: '1' })).toBe('1')
+    expect(formatBinding({ key: '1' } as any)).toBe('1')
   })
 
   it('formats backtick key', () => {
-    expect(formatBinding({ key: '`' })).toBe('`')
+    expect(formatBinding({ key: '`' } as any)).toBe('`')
   })
 
   it('returns empty string for null', () => {
@@ -49,7 +52,7 @@ describe('formatBinding', () => {
   })
 
   it('formats Alt+key', () => {
-    expect(formatBinding({ key: 'r', alt: true })).toBe('Alt+R')
+    expect(formatBinding({ key: 'r', alt: true } as any)).toBe('Alt+R')
   })
 })
 

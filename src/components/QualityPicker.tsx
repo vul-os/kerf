@@ -1,9 +1,9 @@
 // QualityPicker — segmented control for selecting a render quality preset.
 //
 // Props:
-//   value    {string}   - Current preset name, one of QUALITY_PRESETS.
-//   onChange {Function} - Called with the new preset name when user clicks.
-//   disabled {boolean}  - When true, all buttons are inert (default false).
+//   value    - Current preset name, one of QUALITY_PRESETS.
+//   onChange - Called with the new preset name when user clicks.
+//   disabled - When true, all buttons are inert (default false).
 //
 // Exports getPresetMeta for test access to label/description data.
 
@@ -11,7 +11,13 @@ import { QUALITY_PRESETS } from '../lib/qualityPresets.js'
 
 // ── Preset display metadata ────────────────────────────────────────────────────
 
-const PRESET_META = {
+export interface QualityPresetMeta {
+  label: string
+  description: string
+  shortDesc: string
+}
+
+const PRESET_META: Record<string, QualityPresetMeta> = {
   draft: {
     label: 'Draft',
     description: '1 sample · no AA',
@@ -36,26 +42,31 @@ const PRESET_META = {
 
 /**
  * Return display metadata for a preset name.
- * @param {string} name
- * @returns {{ label: string, description: string, shortDesc: string }}
  */
-export function getPresetMeta(name) {
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper consumed directly by tests; not a component
+export function getPresetMeta(name: string): QualityPresetMeta {
   return PRESET_META[name] ?? { label: name, description: '', shortDesc: '' }
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
+export interface QualityPickerProps {
+  value?: string
+  onChange?: (name: string) => void
+  disabled?: boolean
+}
+
 /**
  * QualityPicker — segmented button strip for choosing a render quality preset.
  */
-export default function QualityPicker({ value, onChange, disabled = false }) {
+export default function QualityPicker({ value, onChange, disabled = false }: QualityPickerProps) {
   return (
     <div
       role="radiogroup"
       aria-label="Render quality"
       className="inline-flex rounded-md border border-ink-800 overflow-hidden bg-ink-950"
     >
-      {QUALITY_PRESETS.map((name) => {
+      {QUALITY_PRESETS.map((name: string) => {
         const meta = getPresetMeta(name)
         const isActive = value === name
         return (

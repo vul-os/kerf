@@ -1,10 +1,10 @@
-// QualityPicker.test.jsx — Vitest assertions for QualityPicker helpers.
+// QualityPicker.test.tsx — Vitest assertions for QualityPicker helpers.
 //
 // Pure data-layer tests: verifies getPresetMeta logic without React render
 // overhead, following the project's established pattern for component tests.
 
 import { describe, it, expect } from 'vitest'
-import { getPresetMeta } from './QualityPicker.jsx'
+import { getPresetMeta } from './QualityPicker'
 import { QUALITY_PRESETS } from '../lib/qualityPresets.js'
 
 // ── getPresetMeta — all four presets ──────────────────────────────────────────
@@ -96,28 +96,28 @@ describe('getPresetMeta — unknown name', () => {
 
 describe('getPresetMeta — coverage for all QUALITY_PRESETS', () => {
   it('every preset in QUALITY_PRESETS has a non-empty label', () => {
-    QUALITY_PRESETS.forEach((name) => {
+    QUALITY_PRESETS.forEach((name: string) => {
       const meta = getPresetMeta(name)
       expect(meta.label).toBeTruthy()
     })
   })
 
   it('every preset in QUALITY_PRESETS has a non-empty description', () => {
-    QUALITY_PRESETS.forEach((name) => {
+    QUALITY_PRESETS.forEach((name: string) => {
       const meta = getPresetMeta(name)
       expect(meta.description).toBeTruthy()
     })
   })
 
   it('every preset in QUALITY_PRESETS has a non-empty shortDesc', () => {
-    QUALITY_PRESETS.forEach((name) => {
+    QUALITY_PRESETS.forEach((name: string) => {
       const meta = getPresetMeta(name)
       expect(meta.shortDesc).toBeTruthy()
     })
   })
 
   it('labels are distinct across all presets', () => {
-    const labels = QUALITY_PRESETS.map((name) => getPresetMeta(name).label)
+    const labels = QUALITY_PRESETS.map((name: string) => getPresetMeta(name).label)
     const unique = new Set(labels)
     expect(unique.size).toBe(QUALITY_PRESETS.length)
   })

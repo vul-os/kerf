@@ -159,7 +159,8 @@ describe('buildPanelData — selection contract', () => {
   it('every row has a string id matching some source_component_id', () => {
     const json = rDivider()
     const knownIds = new Set(
-      json.filter((r) => r.type === 'source_component').map((r) => r.source_component_id),
+      // filter() doesn't narrow the row union for TS; cast at the map step.
+      json.filter((r) => r.type === 'source_component').map((r: any) => r.source_component_id),
     )
     const out = buildPanelData(json)
     for (const c of out.components) {

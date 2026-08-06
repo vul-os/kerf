@@ -89,7 +89,7 @@ describe('parseAssembly / serializeAssembly — external_ref round-trip', () => 
         },
       ],
     }
-    const text = serializeAssembly(original)
+    const text = serializeAssembly(original as any)
     const parsed = parseAssembly(text)
     expect(parsed.components).toHaveLength(2)
     expect(parsed.components[0].external_ref).toEqual({
@@ -142,7 +142,7 @@ describe('parseAssembly / serializeAssembly — external_ref round-trip', () => 
         },
       ],
     }
-    const text = serializeAssembly(original)
+    const text = serializeAssembly(original as any)
     const parsed = parseAssembly(text)
     expect(parsed.components[0].external_ref.last_seen_updated_at)
       .toBe('2026-04-01T12:00:00Z')
@@ -305,7 +305,9 @@ describe('resolveAssemblyParts — external_ref dispatch', () => {
 })
 
 describe('restampExternalRefSeen — acknowledge "out of date" chip', () => {
-  function rowsFixture() {
+  // Loosely-typed fixture rows — the lib's AssemblyComponent union is
+  // stricter (literal `kind` values) than these plain-string test fixtures.
+  function rowsFixture(): any[] {
     return [
       {
         id: 'pcb',
@@ -374,7 +376,7 @@ describe('restampExternalRefSeen — acknowledge "out of date" chip', () => {
         },
       ],
     }
-    const text = serializeAssembly(original)
+    const text = serializeAssembly(original as any)
     const parsed = parseAssembly(text)
     const stamped = restampExternalRefSeen(
       parsed.components,
@@ -395,7 +397,7 @@ describe('loadExternalParts — derived-artifacts cache lookup (ROADMAP row 67)'
   // falls through to `recompile(ref)` on miss / 501 / decoder failure /
   // network error. The recompile path is the source of truth.
 
-  const REF = { project_id: 'pid-1', file_id: 'fid-1', kind: 'board_3d', pin: 'tracking_latest' }
+  const REF: any = { project_id: 'pid-1', file_id: 'fid-1', kind: 'board_3d', pin: 'tracking_latest' }
 
   it('maps ref.kind onto the backend derived_kind vocab (board_3d / board_outline_2d / mesh)', () => {
     // Standalone helper assertion — the rest of the integration is covered by
@@ -484,7 +486,7 @@ describe('loadExternalParts — write-back populate (ROADMAP row 67 Phase 2)', (
   // so the next consumer skips the recompile. Strict best-effort: failures
   // never block or alter the returned parts.
 
-  const REF = { project_id: 'pid-1', file_id: 'fid-1', kind: 'board_3d', pin: 'tracking_latest' }
+  const REF: any = { project_id: 'pid-1', file_id: 'fid-1', kind: 'board_3d', pin: 'tracking_latest' }
   // Helper: wait long enough for a microtask-scheduled fire-and-forget to run.
   const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 
@@ -671,7 +673,8 @@ describe('mates — schema-only round-trip (ROADMAP row 49)', () => {
   })
 
   it('addMate appends a valid mate; rejects malformed and is immutable', () => {
-    const rows = [
+    // Loosely-typed fixture — lib's AssemblyMate union has literal `type` values.
+    const rows: any[] = [
       { id: 'm-1', type: 'coincident', a: { component_id: COMP_A, feature: 'face', feature_id: 'f-1' }, b: { component_id: COMP_B, feature: 'face', feature_id: 'f-2' }, value: null },
     ]
     const before = JSON.stringify(rows)
@@ -693,7 +696,7 @@ describe('mates — schema-only round-trip (ROADMAP row 49)', () => {
   })
 
   it('removeMate filters by id and returns a new array', () => {
-    const rows = [
+    const rows: any[] = [
       { id: 'm-1', type: 'coincident', a: { component_id: COMP_A, feature: 'face', feature_id: 'f-1' }, b: { component_id: COMP_B, feature: 'face', feature_id: 'f-2' }, value: null },
       { id: 'm-2', type: 'parallel', a: { component_id: COMP_A, feature: 'axis', feature_id: 'x-1' }, b: { component_id: COMP_B, feature: 'axis', feature_id: 'x-2' }, value: null },
     ]
@@ -822,7 +825,7 @@ describe('buildBBoxProxy — bounding-box proxy shape (T-16)', () => {
       0, 0, 1, 0,
       0, 0, 0, 1,
     ]
-    const proxy = buildBBoxProxy({ id: 'c', file_id: 'f', object_id: 'o', transform })
+    const proxy = buildBBoxProxy({ id: 'c', file_id: 'f', object_id: 'o', transform } as any)
     expect(proxy._proxySize).toBeGreaterThan(0)
     // magnitude = 5, proxySize = max(1, 5 * 0.05) = max(1, 0.25) = 1
     expect(proxy._proxySize).toBe(1)
@@ -835,20 +838,20 @@ describe('buildBBoxProxy — bounding-box proxy shape (T-16)', () => {
       0, 0, 1, 0,
       0, 0, 0, 1,
     ]
-    const proxy = buildBBoxProxy({ id: 'c', file_id: 'f', object_id: 'o', transform })
+    const proxy = buildBBoxProxy({ id: 'c', file_id: 'f', object_id: 'o', transform } as any)
     // magnitude ≈ 5000, proxySize = max(1, 5000 * 0.05) = 250
     expect(proxy._proxySize).toBeCloseTo(250, 0)
   })
 
   it('falls back gracefully when transform is missing or invalid', () => {
-    const proxy = buildBBoxProxy({ id: 'x', file_id: 'f', object_id: '' })
+    const proxy = buildBBoxProxy({ id: 'x', file_id: 'f', object_id: '' } as any)
     expect(proxy._lodProxy).toBe(true)
     expect(proxy._proxySize).toBeGreaterThanOrEqual(1)
   })
 
   it('preserves the original transform for renderer positioning', () => {
     const t = [1, 0, 0, 10, 0, 1, 0, 20, 0, 0, 1, 30, 0, 0, 0, 1]
-    const proxy = buildBBoxProxy({ id: 'c', file_id: 'f', object_id: 'o', transform: t })
+    const proxy = buildBBoxProxy({ id: 'c', file_id: 'f', object_id: 'o', transform: t } as any)
     expect(proxy._transform).toEqual(t)
   })
 })
@@ -881,7 +884,9 @@ describe('resolveAssemblyParts — LOD / lazy-load integration (T-16)', () => {
     const n = 3
     const content = JSON.stringify({ components: makeComponents(n) })
     const loadParts = makeLoadParts()
-    const out = await resolveAssemblyParts({
+    // Cast: entries here are the LOD-proxy union, which carries `_lodProxy`
+    // (the lib's stricter member type doesn't).
+    const out: any[] = await resolveAssemblyParts({
       content,
       loadParts,
       // threshold well above component count — all full
@@ -901,7 +906,7 @@ describe('resolveAssemblyParts — LOD / lazy-load integration (T-16)', () => {
     const threshold = 3
     const content = JSON.stringify({ components: makeComponents(n) })
     const loadParts = makeLoadParts()
-    const out = await resolveAssemblyParts({ content, loadParts, lodThreshold: threshold })
+    const out: any[] = await resolveAssemblyParts({ content, loadParts, lodThreshold: threshold })
     expect(out).toHaveLength(n)
     // First `threshold` components: full load.
     for (let i = 0; i < threshold; i++) {
@@ -929,7 +934,7 @@ describe('resolveAssemblyParts — LOD / lazy-load integration (T-16)', () => {
     ]
     const content = JSON.stringify({ components })
     const loadParts = vi.fn(async (fileId) => [{ id: 'body', geom: { tag: 'mesh' } }])
-    const out = await resolveAssemblyParts({ content, loadParts, lodThreshold: 2 })
+    const out: any[] = await resolveAssemblyParts({ content, loadParts, lodThreshold: 2 })
     // hidden is excluded from output entirely.
     expect(out).toHaveLength(3)
     expect(out.find((p) => p.id === 'hidden')).toBeUndefined()
@@ -943,7 +948,7 @@ describe('resolveAssemblyParts — LOD / lazy-load integration (T-16)', () => {
     const n = 5
     const content = JSON.stringify({ components: makeComponents(n) })
     const loadParts = makeLoadParts()
-    const out = await resolveAssemblyParts({ content, loadParts, lodThreshold: Infinity })
+    const out: any[] = await resolveAssemblyParts({ content, loadParts, lodThreshold: Infinity })
     expect(out).toHaveLength(n)
     out.forEach((p) => expect(p._lodProxy).toBeFalsy())
     expect(loadParts).toHaveBeenCalledTimes(n)
@@ -956,7 +961,7 @@ describe('resolveAssemblyParts — LOD / lazy-load integration (T-16)', () => {
     const components = makeComponents(n)
     const content = JSON.stringify({ components })
     const loadParts = makeLoadParts()
-    const out = await resolveAssemblyParts({ content, loadParts })
+    const out: any[] = await resolveAssemblyParts({ content, loadParts })
     expect(out).toHaveLength(n)
     // Component at index LOD_THRESHOLD is the first proxy.
     expect(out[LOD_THRESHOLD - 1]._lodProxy).toBeFalsy()
@@ -974,7 +979,7 @@ describe('resolveAssemblyParts — LOD / lazy-load integration (T-16)', () => {
     const components = makeComponents(n)
     const content = JSON.stringify({ components })
     const loadParts = makeLoadParts()
-    const out = await resolveAssemblyParts({ content, loadParts, lodThreshold: threshold })
+    const out: any[] = await resolveAssemblyParts({ content, loadParts, lodThreshold: threshold })
     expect(out).toHaveLength(n)
     // Full-mesh entries: first `threshold`.
     const fullCount = out.filter((p) => !p._lodProxy).length

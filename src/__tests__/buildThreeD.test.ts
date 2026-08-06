@@ -33,7 +33,8 @@ const { mockRunJscad, mockCreateFile } = vi.hoisted(() => ({
 }))
 
 vi.mock('../lib/jscadRunner.js', async (importOriginal) => {
-  const real = await importOriginal()
+  // importOriginal() is typed unknown; the actual module shape is an object.
+  const real = (await importOriginal()) as object
   return {
     ...real,
     runJscad: mockRunJscad,
@@ -106,7 +107,8 @@ import { _internalLoops } from '../lib/sketchGeom2.js'
 // ---------------------------------------------------------------------------
 
 // Minimal sketch with one closed square loop (4 lines, 4 points).
-function makeClosedSketch() {
+// Loosely-typed fixture — the lib's SketchEntity union has stricter members.
+function makeClosedSketch(): any {
   return {
     version: 1,
     plane: { type: 'base', name: 'XY' },
@@ -128,7 +130,7 @@ function makeClosedSketch() {
 }
 
 // Minimal sketch with no closed loops.
-function makeOpenSketch() {
+function makeOpenSketch(): any {
   return {
     version: 1,
     plane: { type: 'base', name: 'XY' },
@@ -158,7 +160,7 @@ describe('sketchHasClosedLoops (via _internalLoops)', () => {
   })
 
   it('returns empty array for an empty sketch', () => {
-    const loops = _internalLoops({ entities: [], constraints: [] })
+    const loops = _internalLoops({ entities: [], constraints: [] } as any)
     expect(loops.length).toBe(0)
   })
 })

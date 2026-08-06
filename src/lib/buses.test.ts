@@ -7,11 +7,12 @@ import {
   getDifferentialPair,
   listDifferentialPairs,
   listBuses,
+  type BoardLike,
 } from './buses.js'
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
-function makeCircuit(overrides = {}) {
+function makeCircuit(overrides: Partial<BoardLike> = {}): BoardLike {
   return {
     type: 'pcb_board',
     width: 50,

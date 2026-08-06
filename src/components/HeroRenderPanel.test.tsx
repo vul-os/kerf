@@ -1,5 +1,5 @@
 /**
- * HeroRenderPanel.test.jsx — Vitest suite for the Hero Render drawer (T-106c).
+ * HeroRenderPanel.test.tsx — Vitest suite for the Hero Render drawer (T-106c).
  *
  * Pattern: renderToStaticMarkup (react-dom/server) — no @testing-library,
  * consistent with the project's other component tests (see Loader.test.jsx).
@@ -10,19 +10,24 @@
  * the exported constants and helpers.
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import type { ComponentType } from 'react'
+import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import HeroRenderPanel, {
+import HeroRenderPanelUntyped, {
   QUALITY_PRESETS,
   POLL_INTERVAL_MS,
   JOB_TERMINAL,
 } from './HeroRenderPanel.jsx'
 
+// HeroRenderPanel.jsx is not yet migrated (T-515); cast to a loose prop
+// type so this test can render it with arbitrary/partial prop combinations.
+const HeroRenderPanel = HeroRenderPanelUntyped as unknown as ComponentType<Record<string, unknown>>
+
 // ── renderToStaticMarkup renders hooks in a server env where useState gives
 // the initial value and useEffect never fires.  That is exactly what we want:
 // we verify the static DOM skeleton of the idle panel.
 
-function render(props = {}) {
+function render(props: Record<string, unknown> = {}) {
   return renderToStaticMarkup(
     <HeroRenderPanel onClose={() => {}} {...props} />,
   )

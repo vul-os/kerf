@@ -1,5 +1,5 @@
 /**
- * SheetManagerPanel.jsx — ArchiCAD Layout Book equivalent.
+ * SheetManagerPanel.tsx — ArchiCAD Layout Book equivalent.
  *
  * A self-contained panel that manages a construction document drawing set:
  *   - Sheet list table (AIA NCS sheet number, title, discipline, size, scale)
@@ -17,9 +17,39 @@
 import { useState, useCallback, useId } from 'react'
 import { Plus, Trash2, Hash, CheckCircle, AlertTriangle, ArrowRight } from 'lucide-react'
 
+// ── types ──────────────────────────────────────────────────────────────────────
+
+type Discipline = 'architectural' | 'structural' | 'mep' | 'civil' | 'interior' | 'general'
+
+interface Viewport {
+  view_ref?: string
+  [field: string]: unknown
+}
+
+interface Sheet {
+  _id: string
+  sheet_number: string
+  title: string
+  discipline: Discipline
+  sheet_size: string
+  scale: string
+  viewports: Viewport[]
+}
+
+interface CrossRef {
+  from: string
+  to: string
+  marker: string
+}
+
+export interface Props {
+  initialSheets?: Sheet[]
+  onChange?: (sheets: Sheet[]) => void
+}
+
 // ── constants ──────────────────────────────────────────────────────────────────
 
-const DISCIPLINES = [
+const DISCIPLINES: Array<{ value: Discipline; label: string }> = [
   { value: 'architectural', label: 'Architectural' },
   { value: 'structural',    label: 'Structural'    },
   { value: 'mep',           label: 'MEP'           },
@@ -31,16 +61,16 @@ const DISCIPLINES = [
 const SHEET_SIZES = ['A0', 'A1', 'A2', 'A3', 'A4', 'ANSI-A', 'ANSI-B', 'ANSI-C', 'ANSI-D', 'ANSI-E']
 
 // AIA NCS prefixes and series start numbers.
-const AIA_PREFIX  = { architectural: 'A', structural: 'S', mep: 'M', civil: 'C', interior: 'I', general: 'G' }
-const AIA_BASE    = { architectural: 100, structural: 200, mep: 300, civil: 600, interior: 700, general: 0 }
+const AIA_PREFIX: Record<Discipline, string> = { architectural: 'A', structural: 'S', mep: 'M', civil: 'C', interior: 'I', general: 'G' }
+const AIA_BASE: Record<Discipline, number> = { architectural: 100, structural: 200, mep: 300, civil: 600, interior: 700, general: 0 }
 
 // Detail marker pattern: "<n>/<LETTER>-<digits>"
 const DETAIL_MARKER_RE = /\b(\d+)\/([A-Z]-\d{3})\b/g
 
 let _uid = 0
-function nextId() { return `sheet-${++_uid}` }
+function nextId(): string { return `sheet-${++_uid}` }
 
-function makeBlankSheet() {
+function makeBlankSheet(): Sheet {
   return {
     _id:          nextId(),
     sheet_number: '',
@@ -54,8 +84,8 @@ function makeBlankSheet() {
 
 // ── auto-numbering (mirrors drawing_list.py logic) ────────────────────────────
 
-function autoNumberSheets(sheets) {
-  const counters = {}
+function autoNumberSheets(sheets: Sheet[]): Sheet[] {
+  const counters: Partial<Record<Discipline, number>> = {}
   return sheets.map((s) => {
     const disc   = s.discipline
     const prefix = AIA_PREFIX[disc] ?? 'X'
@@ -68,9 +98,9 @@ function autoNumberSheets(sheets) {
 
 // ── validation (mirrors drawing_list.py logic) ─────────────────────────────────
 
-function validateSheets(sheets) {
-  const errors = []
-  const seen = {}
+function validateSheets(sheets: Sheet[]): string[] {
+  const errors: string[] = []
+  const seen: Record<string, number> = {}
 
   sheets.forEach((s, i) => {
     const label = s.sheet_number || `sheets[${i}]`
@@ -103,9 +133,9 @@ function validateSheets(sheets) {
 
 // ── cross-reference computation ───────────────────────────────────────────────
 
-function computeCrossRefs(sheets) {
+function computeCrossRefs(sheets: Sheet[]): CrossRef[] {
   const validNums = new Set(sheets.map((s) => s.sheet_number).filter(Boolean))
-  const refs = []
+  const refs: CrossRef[] = []
   sheets.forEach((s) => {
     for (const vp of s.viewports || []) {
       const ref = vp.view_ref || ''
@@ -123,7 +153,11 @@ function computeCrossRefs(sheets) {
 
 // ── sub-components ─────────────────────────────────────────────────────────────
 
-function ValidationBanner({ errors }) {
+interface ValidationBannerProps {
+  errors: string[] | null
+}
+
+function ValidationBanner({ errors }: ValidationBannerProps) {
   if (errors === null) return null
   if (errors.length === 0) {
     return (
@@ -148,7 +182,11 @@ function ValidationBanner({ errors }) {
   )
 }
 
-function CrossRefTable({ refs }) {
+interface CrossRefTableProps {
+  refs: CrossRef[] | null
+}
+
+function CrossRefTable({ refs }: CrossRefTableProps) {
   if (!refs || refs.length === 0) {
     return (
       <p className="text-[11px] text-ink-500 py-1">
@@ -185,15 +223,15 @@ function CrossRefTable({ refs }) {
 
 // ── main component ─────────────────────────────────────────────────────────────
 
-export default function SheetManagerPanel({ initialSheets = [], onChange }) {
-  const [sheets, setSheets]         = useState(() => initialSheets.length ? initialSheets : [makeBlankSheet()])
-  const [validErrors, setValidErrors] = useState(null)   // null = not yet run
-  const [crossRefs, setCrossRefs]   = useState(null)
-  const [activeTab, setActiveTab]   = useState('sheets') // 'sheets' | 'xrefs'
+export default function SheetManagerPanel({ initialSheets = [], onChange }: Props) {
+  const [sheets, setSheets]         = useState<Sheet[]>(() => initialSheets.length ? initialSheets : [makeBlankSheet()])
+  const [validErrors, setValidErrors] = useState<string[] | null>(null)   // null = not yet run
+  const [crossRefs, setCrossRefs]   = useState<CrossRef[] | null>(null)
+  const [activeTab, setActiveTab]   = useState<'sheets' | 'xrefs'>('sheets')
 
   const labelId = useId()
 
-  const commit = useCallback((next) => {
+  const commit = useCallback((next: Sheet[]) => {
     setSheets(next)
     onChange?.(next)
     // Clear stale validation results on any edit.
@@ -205,11 +243,11 @@ export default function SheetManagerPanel({ initialSheets = [], onChange }) {
     commit([...sheets, makeBlankSheet()])
   }
 
-  function removeSheet(id) {
+  function removeSheet(id: string) {
     commit(sheets.filter((s) => s._id !== id))
   }
 
-  function patchSheet(id, patch) {
+  function patchSheet(id: string, patch: Partial<Sheet>) {
     commit(sheets.map((s) => s._id === id ? { ...s, ...patch } : s))
   }
 
@@ -229,7 +267,7 @@ export default function SheetManagerPanel({ initialSheets = [], onChange }) {
     setActiveTab('xrefs')
   }
 
-  const disciplineCount = sheets.reduce((acc, s) => {
+  const disciplineCount = sheets.reduce<Partial<Record<Discipline, number>>>((acc, s) => {
     acc[s.discipline] = (acc[s.discipline] ?? 0) + 1
     return acc
   }, {})
@@ -283,8 +321,8 @@ export default function SheetManagerPanel({ initialSheets = [], onChange }) {
       {/* Tab bar */}
       <div className="flex gap-1 border-b border-ink-700">
         {[
-          { key: 'sheets', label: `Sheets (${sheets.length})` },
-          { key: 'xrefs',  label: `Cross-refs${crossRefs ? ` (${crossRefs.length})` : ''}` },
+          { key: 'sheets' as const, label: `Sheets (${sheets.length})` },
+          { key: 'xrefs' as const,  label: `Cross-refs${crossRefs ? ` (${crossRefs.length})` : ''}` },
         ].map(({ key, label }) => (
           <button
             key={key}
@@ -324,7 +362,7 @@ export default function SheetManagerPanel({ initialSheets = [], onChange }) {
                 key={disc}
                 className="px-2 py-0.5 rounded-full bg-ink-800 text-[10px] text-ink-300"
               >
-                {AIA_PREFIX[disc] || '?'} · {disc} · {cnt}
+                {AIA_PREFIX[disc as Discipline] || '?'} · {disc} · {cnt}
               </span>
             ))}
           </div>
@@ -378,7 +416,14 @@ export default function SheetManagerPanel({ initialSheets = [], onChange }) {
 
 // ── SheetRow — a single editable table row ────────────────────────────────────
 
-function SheetRow({ sheet, rowIndex, onPatch, onRemove }) {
+interface SheetRowProps {
+  sheet: Sheet
+  rowIndex: number
+  onPatch: (patch: Partial<Sheet>) => void
+  onRemove: () => void
+}
+
+function SheetRow({ sheet, rowIndex, onPatch, onRemove }: SheetRowProps) {
   return (
     <tr className="border-b border-ink-800 last:border-0 group hover:bg-ink-800/40">
       <td className="px-2 py-1 text-ink-500 tabular-nums">{rowIndex}</td>
@@ -403,7 +448,7 @@ function SheetRow({ sheet, rowIndex, onPatch, onRemove }) {
       <td className="px-2 py-1">
         <select
           value={sheet.discipline}
-          onChange={(e) => onPatch({ discipline: e.target.value })}
+          onChange={(e) => onPatch({ discipline: e.target.value as Discipline })}
           aria-label="Discipline"
           className="h-6 bg-ink-900 border border-ink-700 rounded px-1.5 text-[11px] text-ink-100 focus-visible:ring-1 focus-visible:ring-kerf-300 focus-visible:outline-none"
         >

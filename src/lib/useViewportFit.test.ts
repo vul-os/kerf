@@ -15,7 +15,7 @@
  *   - ResizeObserver stub integration
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import React from 'react'
 import { useViewportFit } from './useViewportFit.js'
@@ -77,7 +77,7 @@ describe('useViewportFit — scale arithmetic', () => {
 // We render a thin probe component that serialises the hook's output into
 // data-* attributes on a span so we can inspect them from the HTML string.
 
-function ViewportFitProbe({ designWidth, designHeight }) {
+function ViewportFitProbe({ designWidth, designHeight }: { designWidth?: number; designHeight?: number } = {}) {
   const { width, height, scaleX, scaleY, ref } = useViewportFit({ designWidth, designHeight })
   return React.createElement('span', {
     'data-width': width,
@@ -88,7 +88,7 @@ function ViewportFitProbe({ designWidth, designHeight }) {
   })
 }
 
-function parseAttr(html, attr) {
+function parseAttr(html: string, attr: string): string | null {
   const match = html.match(new RegExp(`${attr}="([^"]*)"`) )
   return match ? match[1] : null
 }
@@ -168,23 +168,32 @@ describe('useViewportFit — returns numeric width/height/scaleX/scaleY', () => 
 
 // ── ResizeObserver stub integration ───────────────────────────────────────────
 
+type FakeResizeCallback = (entries: Array<{
+  target: unknown
+  contentBoxSize: Array<{ inlineSize: number; blockSize: number }>
+  contentRect: { width: number; height: number }
+}>) => void
+
 class FakeResizeObserver {
-  static _instances = []
+  static _instances: FakeResizeObserver[] = []
   static reset() { FakeResizeObserver._instances = [] }
   static latest() {
     return FakeResizeObserver._instances[FakeResizeObserver._instances.length - 1]
   }
 
-  constructor(callback) {
+  _callback: FakeResizeCallback
+  _observed: unknown[]
+
+  constructor(callback: FakeResizeCallback) {
     this._callback = callback
     this._observed = []
     FakeResizeObserver._instances.push(this)
   }
-  observe(el)    { this._observed.push(el) }
-  unobserve(el)  { this._observed = this._observed.filter((e) => e !== el) }
+  observe(el: unknown)    { this._observed.push(el) }
+  unobserve(el: unknown)  { this._observed = this._observed.filter((e) => e !== el) }
   disconnect()   { this._observed = [] }
 
-  trigger(width, height) {
+  trigger(width: number, height: number) {
     for (const el of this._observed) {
       this._callback([{
         target: el,
@@ -196,11 +205,12 @@ class FakeResizeObserver {
 }
 
 describe('useViewportFit — ResizeObserver stub integration', () => {
-  let origRO
+  let origRO: typeof ResizeObserver | undefined
 
   beforeEach(() => {
     origRO = globalThis.ResizeObserver
     FakeResizeObserver.reset()
+    // @ts-expect-error test stub does not implement the full ResizeObserver interface
     globalThis.ResizeObserver = FakeResizeObserver
   })
 

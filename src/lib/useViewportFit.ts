@@ -24,28 +24,28 @@
  * and does not update further.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, type RefObject } from 'react'
 
-/**
- * @typedef {Object} ViewportFitResult
- * @property {React.RefObject<HTMLElement>} ref
- * @property {number} width
- * @property {number} height
- * @property {number} scaleX
- * @property {number} scaleY
- */
+export interface ViewportFitResult {
+  ref: RefObject<HTMLElement | null>
+  width: number
+  height: number
+  scaleX: number
+  scaleY: number
+}
 
-/**
- * @param {Object} [opts]
- * @param {number} [opts.designWidth]   — logical canvas width  (default: actual width → scaleX = 1)
- * @param {number} [opts.designHeight]  — logical canvas height (default: actual height → scaleY = 1)
- * @returns {ViewportFitResult}
- */
-export function useViewportFit({ designWidth, designHeight } = {}) {
-  const ref = useRef(null)
+export interface UseViewportFitOptions {
+  /** logical canvas width  (default: actual width → scaleX = 1) */
+  designWidth?: number
+  /** logical canvas height (default: actual height → scaleY = 1) */
+  designHeight?: number
+}
+
+export function useViewportFit({ designWidth, designHeight }: UseViewportFitOptions = {}): ViewportFitResult {
+  const ref = useRef<HTMLElement | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
 
-  const measure = useCallback((el) => {
+  const measure = useCallback((el: HTMLElement | null) => {
     if (!el) return
     const rect = el.getBoundingClientRect()
     setSize({ width: rect.width, height: rect.height })
@@ -63,7 +63,7 @@ export function useViewportFit({ designWidth, designHeight } = {}) {
       return
     }
 
-    const ro = new ResizeObserver((entries) => {
+    const ro = new ResizeObserver((entries: ResizeObserverEntry[]) => {
       for (const entry of entries) {
         if (entry.target === el) {
           // Prefer contentBoxSize when available (more precise than

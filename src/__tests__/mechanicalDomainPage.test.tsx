@@ -180,7 +180,9 @@ describe('Mechanical page component', () => {
 
   it('has the display name "Mechanical" or is unnamed', () => {
     // Either explicitly named or anonymous (arrow-function-with-name is fine)
-    const name = Mechanical.name || Mechanical.displayName || ''
+    // Mechanical's type doesn't declare `displayName`; components live outside
+    // src/__tests__ (owned by another slice), so cast at the call site.
+    const name = Mechanical.name || (Mechanical as { displayName?: string }).displayName || ''
     expect(
       name === 'Mechanical' || name === '',
       `Component name should be "Mechanical" or ""; got "${name}"`

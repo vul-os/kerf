@@ -12,6 +12,23 @@ import {
   MATERIAL_FIELD_META,
 } from '../lib/material.js'
 
+// src/lib/material.ts's pickGroup() returns an untyped {}; cast to the
+// known numeric-group shape here for assertions (src/lib is owned by
+// another migration slice).
+type NumGroup = Record<string, number | null>
+interface MaterialDoc {
+  version: number
+  name: string
+  category: string
+  common_names: string[]
+  color_hex: string
+  mechanical: NumGroup
+  thermal: NumGroup
+  physical: NumGroup
+  callout: string
+  notes: string
+}
+
 describe('parseMaterial', () => {
   it('returns the empty default for null/undefined/empty input', () => {
     expect(parseMaterial(null)).toEqual(defaultMaterial())
@@ -21,26 +38,26 @@ describe('parseMaterial', () => {
   })
 
   it('returns the empty default for malformed JSON', () => {
-    const out = parseMaterial('{not json')
+    const out = parseMaterial('{not json') as MaterialDoc
     expect(out.name).toBe('')
     expect(out.mechanical.E_GPa).toBeNull()
   })
 
   it('accepts a plain object as input (not just a JSON string)', () => {
     const obj = { name: 'Steel', mechanical: { E_GPa: 200 } }
-    const out = parseMaterial(obj)
+    const out = parseMaterial(obj) as MaterialDoc
     expect(out.name).toBe('Steel')
     expect(out.mechanical.E_GPa).toBe(200)
   })
 
   it('coerces numeric strings inside groups to numbers', () => {
-    const out = parseMaterial({ mechanical: { E_GPa: '205', nu: '0.29' } })
+    const out = parseMaterial({ mechanical: { E_GPa: '205', nu: '0.29' } }) as MaterialDoc
     expect(out.mechanical.E_GPa).toBe(205)
     expect(out.mechanical.nu).toBe(0.29)
   })
 
   it('keeps unknown numeric fields as null on partial groups', () => {
-    const out = parseMaterial({ mechanical: { E_GPa: 70 } })
+    const out = parseMaterial({ mechanical: { E_GPa: 70 } }) as MaterialDoc
     expect(out.mechanical.E_GPa).toBe(70)
     expect(out.mechanical.G_GPa).toBeNull()
     expect(out.mechanical.yield_MPa).toBeNull()
@@ -49,7 +66,7 @@ describe('parseMaterial', () => {
   })
 
   it('maps non-finite numbers and bad strings to null', () => {
-    const out = parseMaterial({ mechanical: { E_GPa: 'foo', nu: NaN } })
+    const out = parseMaterial({ mechanical: { E_GPa: 'foo', nu: NaN } }) as MaterialDoc
     expect(out.mechanical.E_GPa).toBeNull()
     expect(out.mechanical.nu).toBeNull()
   })
@@ -97,7 +114,7 @@ describe('serializeMaterial', () => {
 
 describe('defaultMaterial', () => {
   it('seeds an empty material with version 1 and null numerics', () => {
-    const m = defaultMaterial()
+    const m = defaultMaterial() as MaterialDoc
     expect(m.version).toBe(1)
     expect(m.name).toBe('')
     expect(m.mechanical.E_GPa).toBeNull()

@@ -29,7 +29,7 @@
 
 // ── Utilities ────────────────────────────────────────────────────────────────
 
-function fmt(v, digits = 4) {
+function fmt(v: number | string | null | undefined, digits = 4): string {
   if (v == null) return '—'
   if (typeof v !== 'number') return String(v)
   if (v === 0) return '0'
@@ -37,13 +37,13 @@ function fmt(v, digits = 4) {
   return v.toPrecision(digits)
 }
 
-function pct(v) {
+function pct(v: number | null | undefined): string {
   if (v == null) return '—'
   return `${(v * 100).toFixed(1)}%`
 }
 
 // Temperature-mapped colour: blue (cold) → orange → red (hot)
-function tempColor(T, T_min = 300, T_max = 2500) {
+function tempColor(T: number, T_min = 300, T_max = 2500): string {
   const t = Math.max(0, Math.min(1, (T - T_min) / (T_max - T_min)))
   // Blue → cyan → orange → red
   if (t < 0.33) {
@@ -59,7 +59,7 @@ function tempColor(T, T_min = 300, T_max = 2500) {
 }
 
 // Species colour palette (consistent across charts)
-const SPECIES_COLORS = {
+const SPECIES_COLORS: Record<string, string> = {
   CH4:  '#f59e0b',  // amber — fuel
   H2:   '#fbbf24',  // yellow — fuel
   A:    '#f59e0b',  // amber — generic fuel
@@ -74,13 +74,22 @@ const SPECIES_COLORS = {
   M:    '#6b7280',  // grey — bath gas
 }
 
-function speciesColor(name) {
+function speciesColor(name: string): string {
   return SPECIES_COLORS[name] ?? '#9ca3af'
+}
+
+interface ScalarCardProps {
+  label: string
+  value: string | number
+  unit?: string
+  sub?: string
+  color?: string
+  warn?: boolean
 }
 
 // ── Scalar card ───────────────────────────────────────────────────────────────
 
-function ScalarCard({ label, value, unit, sub, color = '#e5e7eb', warn }) {
+function ScalarCard({ label, value, unit, sub, color = '#e5e7eb', warn }: ScalarCardProps) {
   return (
     <div style={{
       flex: '1 1 120px', borderRadius: 6,
@@ -107,7 +116,12 @@ function ScalarCard({ label, value, unit, sub, color = '#e5e7eb', warn }) {
 
 // ── Species mass-fraction bar chart ───────────────────────────────────────────
 
-function SpeciesBarChart({ outletMF, speciesNames }) {
+interface SpeciesBarChartProps {
+  outletMF: Record<string, number> | null
+  speciesNames: string[]
+}
+
+function SpeciesBarChart({ outletMF, speciesNames }: SpeciesBarChartProps) {
   if (!outletMF || speciesNames.length === 0) return null
   const entries = speciesNames.map(name => ({
     name,
@@ -160,7 +174,17 @@ function SpeciesBarChart({ outletMF, speciesNames }) {
 
 // ── Inline SVG profile plot ───────────────────────────────────────────────────
 
-function ProfilePlot({ xArr, yArr, label, unit, color = '#60a5fa', yMin, yMax }) {
+interface ProfilePlotProps {
+  xArr: number[] | null
+  yArr: number[] | null
+  label: string
+  unit: string
+  color?: string
+  yMin?: number
+  yMax?: number
+}
+
+function ProfilePlot({ xArr, yArr, label, unit, color = '#60a5fa', yMin, yMax }: ProfilePlotProps) {
   if (!xArr || !yArr || xArr.length < 2) return null
   const W = 260, H = 80, PAD = 4
   const xMin = xArr[0], xMaxV = xArr[xArr.length - 1]
@@ -207,7 +231,15 @@ function ProfilePlot({ xArr, yArr, label, unit, color = '#60a5fa', yMin, yMax })
 
 // ── Mechanism info header ─────────────────────────────────────────────────────
 
-function MechanismHeader({ mechanism, fuel, nSpecies, length, velocity }) {
+interface MechanismHeaderProps {
+  mechanism: string | null
+  fuel: string | null
+  nSpecies: number | null
+  length: number | null
+  velocity: number | null
+}
+
+function MechanismHeader({ mechanism, fuel, nSpecies, length, velocity }: MechanismHeaderProps) {
   const chips = [
     mechanism  && { label: 'Mechanism', value: mechanism },
     fuel       && { label: 'Fuel', value: fuel },
@@ -235,6 +267,24 @@ function MechanismHeader({ mechanism, fuel, nSpecies, length, velocity }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+interface ReactingFlowPanelProps {
+  mechanism?: string | null
+  n_species?: number | null
+  species_names?: string[]
+  outlet_mass_fractions?: Record<string, number> | null
+  outlet_temperature_K?: number | null
+  max_temperature_K?: number | null
+  adiabatic_flame_temperature_K?: number | null
+  fuel?: string | null
+  outlet_fuel_conversion?: number | null
+  mean_fuel_conversion?: number | null
+  reactor_length_m?: number | null
+  velocity_m_per_s?: number | null
+  x_m?: number[] | null
+  temperature_K_profile?: number[] | null
+  fuel_conversion_profile?: number[] | null
+}
+
 export default function ReactingFlowPanel({
   mechanism = null,
   n_species = null,
@@ -251,16 +301,16 @@ export default function ReactingFlowPanel({
   x_m = null,
   temperature_K_profile = null,
   fuel_conversion_profile = null,
-}) {
+}: ReactingFlowPanelProps) {
   const hasResults = outlet_mass_fractions || outlet_temperature_K != null
 
-  const conversionColor = outlet_fuel_conversion >= 0.95
+  const conversionColor = (outlet_fuel_conversion ?? 0) >= 0.95
     ? '#34d399'
-    : outlet_fuel_conversion >= 0.7
+    : (outlet_fuel_conversion ?? 0) >= 0.7
     ? '#fbbf24'
     : '#f87171'
 
-  const TadWarn = adiabatic_flame_temperature_K > 3000
+  const TadWarn = (adiabatic_flame_temperature_K ?? 0) > 3000
 
   return (
     <div style={{

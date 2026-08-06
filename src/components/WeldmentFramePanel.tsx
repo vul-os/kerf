@@ -23,7 +23,7 @@
  * onToast  (msg) => void  — optional
  */
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Frame, ChevronDown, ChevronRight, Loader2, AlertTriangle } from 'lucide-react'
 import { api } from '../lib/api.js'
 
@@ -33,25 +33,33 @@ import { api } from '../lib/api.js'
 
 /**
  * Format a number to `dp` decimal places; returns '—' for null/NaN/Infinity.
- * @param {number|null|undefined} v
- * @param {number} dp
  */
-export function fmtNum(v, dp = 2) {
+export function fmtNum(v: number | null | undefined, dp = 2): string {
   if (v == null || !isFinite(v)) return '—'
   return v.toFixed(dp)
+}
+
+export interface SkeletonEdge {
+  start: [number, number, number]
+  end: [number, number, number]
+}
+
+interface SkeletonParseResult {
+  ok: boolean
+  edges?: SkeletonEdge[]
+  error?: string
 }
 
 /**
  * Parse a skeleton JSON string.
  * Returns { ok: true, edges } or { ok: false, error }.
- * @param {string} raw
  */
-export function parseSkeleton(raw) {
+export function parseSkeleton(raw: string): SkeletonParseResult {
   if (!raw || !raw.trim()) return { ok: false, error: 'Empty skeleton' }
   let parsed
   try {
     parsed = JSON.parse(raw)
-  } catch (e) {
+  } catch (e: any) {
     return { ok: false, error: `JSON parse error: ${e.message}` }
   }
   if (!Array.isArray(parsed)) return { ok: false, error: 'Skeleton must be a JSON array' }
@@ -66,14 +74,18 @@ export function parseSkeleton(raw) {
   return { ok: true, edges: parsed }
 }
 
+interface FrameForm {
+  skeleton: string
+  profile: string
+}
+
 /**
  * Build weldment_frame params from form state.
- * @param {object} s
  */
-export function buildFrameParams(s) {
+export function buildFrameParams(s: FrameForm) {
   const sk = parseSkeleton(s.skeleton)
   return {
-    skeleton: sk.ok ? sk.edges : [],
+    skeleton: sk.ok ? (sk.edges ?? []) : [],
     profile: s.profile || 'SHS-50x50x3',
   }
 }
@@ -82,7 +94,7 @@ export function buildFrameParams(s) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function FieldRow({ label, children, hint }) {
+function FieldRow({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return (
     <div className="flex items-start gap-2 py-0.5">
       <label className="text-[11px] text-ink-400 w-32 flex-shrink-0 pt-1">{label}</label>
@@ -92,7 +104,14 @@ function FieldRow({ label, children, hint }) {
   )
 }
 
-function TextInput({ value, onChange, placeholder, 'data-testid': testid }) {
+interface TextInputProps {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  'data-testid'?: string
+}
+
+function TextInput({ value, onChange, placeholder, 'data-testid': testid }: TextInputProps) {
   return (
     <input
       type="text"
@@ -105,7 +124,15 @@ function TextInput({ value, onChange, placeholder, 'data-testid': testid }) {
   )
 }
 
-function TextArea({ value, onChange, placeholder, rows, 'data-testid': testid }) {
+interface TextAreaProps {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  rows?: number
+  'data-testid'?: string
+}
+
+function TextArea({ value, onChange, placeholder, rows, 'data-testid': testid }: TextAreaProps) {
   return (
     <textarea
       value={value}
@@ -118,7 +145,7 @@ function TextArea({ value, onChange, placeholder, rows, 'data-testid': testid })
   )
 }
 
-function ResultKV({ label, value, unit }) {
+function ResultKV({ label, value, unit }: { label: string; value: ReactNode; unit?: string }) {
   return (
     <div className="flex items-center justify-between py-0.5 border-b border-ink-900">
       <span className="text-[11px] text-ink-400">{label}</span>
@@ -129,7 +156,7 @@ function ResultKV({ label, value, unit }) {
   )
 }
 
-function WarningList({ warnings }) {
+function WarningList({ warnings }: { warnings?: string[] }) {
   if (!warnings?.length) return null
   return (
     <div className="mt-2 space-y-0.5">
@@ -147,18 +174,23 @@ function WarningList({ warnings }) {
 // Mode: weldment_profile_lookup
 // ---------------------------------------------------------------------------
 
-function ProfileLookupMode({ onToast }) {
+interface ModeProps {
+  onToast?: (msg: string) => void
+}
+
+function ProfileLookupMode({ onToast }: ModeProps) {
   const [profile, setProfile] = useState('SHS-50x50x3')
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
+  // Tool result shape is dynamic per-tool and not modeled in shared types — boundary we don't own.
+  const [result, setResult] = useState<any>(null)
 
   async function run() {
     setLoading(true)
     setResult(null)
     try {
       const data = await api.callTool('weldment_profile_lookup', { profile })
-      setResult(data?.result ?? data)
-    } catch (e) {
+      setResult((data as any)?.result ?? data)
+    } catch (e: any) {
       onToast?.(e?.message || 'weldment_profile_lookup failed')
     } finally {
       setLoading(false)
@@ -213,16 +245,17 @@ const SKELETON_EXAMPLE = JSON.stringify([
   { start: [0, 0, 1000], end: [0, 0, 0] },
 ], null, 2)
 
-function FrameMode({ onToast }) {
-  const [form, setForm] = useState({
+function FrameMode({ onToast }: ModeProps) {
+  const [form, setForm] = useState<FrameForm>({
     skeleton: SKELETON_EXAMPLE,
     profile: 'SHS-50x50x3',
   })
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
+  // Tool result shape is dynamic per-tool and not modeled in shared types — boundary we don't own.
+  const [result, setResult] = useState<any>(null)
 
-  function set(k) {
-    return (v) => setForm((f) => ({ ...f, [k]: v }))
+  function set(k: keyof FrameForm) {
+    return (v: string) => setForm((f) => ({ ...f, [k]: v }))
   }
 
   const skeletonStatus = parseSkeleton(form.skeleton)
@@ -236,8 +269,8 @@ function FrameMode({ onToast }) {
     setResult(null)
     try {
       const data = await api.callTool('weldment_frame', buildFrameParams(form))
-      setResult(data?.result ?? data)
-    } catch (e) {
+      setResult((data as any)?.result ?? data)
+    } catch (e: any) {
       onToast?.(e?.message || 'weldment_frame failed')
     } finally {
       setLoading(false)
@@ -325,16 +358,21 @@ function FrameMode({ onToast }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-const MODES = [
+const MODES: [string, string][] = [
   ['profile', 'Profile Lookup'],
   ['frame', 'Generate Frame'],
 ]
 
-export default function WeldmentFramePanel({ onToast, content } = {}) {
+interface WeldmentFramePanelProps {
+  onToast?: (msg: string) => void
+  content?: string
+}
+
+export default function WeldmentFramePanel({ onToast, content }: WeldmentFramePanelProps = {}) {
   // content prop: JSON string optionally pre-seeding mode/open state.
   const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
-  const [open, setOpen] = useState(_parsed.open ?? false)
-  const [mode, setMode] = useState(_parsed.mode || 'profile')
+  const [open, setOpen] = useState<boolean>(_parsed.open ?? false)
+  const [mode, setMode] = useState<string>(_parsed.mode || 'profile')
 
   return (
     <div className="border-t border-ink-800 flex-shrink-0" data-testid="weldment-frame-panel">

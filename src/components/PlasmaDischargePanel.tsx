@@ -35,8 +35,8 @@
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
-function fmt(v, sig = 3) {
-  if (v == null || v === '' || isNaN(v)) return '—'
+function fmt(v: number | null | undefined, sig = 3): string {
+  if (v == null || (v as any) === '' || isNaN(v)) return '—'
   if (!isFinite(v)) return v > 0 ? '∞' : '-∞'
   const av = Math.abs(v)
   if (av === 0) return '0'
@@ -44,14 +44,22 @@ function fmt(v, sig = 3) {
   return Number(v.toPrecision(sig)).toString()
 }
 
-function fmtSI(v, unit) {
+function fmtSI(v: number | null | undefined, unit: string): string {
   if (v == null || !isFinite(v)) return '—'
   return `${fmt(v)} ${unit}`
 }
 
 // ── SVG Sparkline helper ──────────────────────────────────────────────────────
 
-function Sparkline({ xs, ys, color = '#60a5fa', width = 280, height = 80 }) {
+interface SparklineProps {
+  xs: number[] | null
+  ys: number[] | null
+  color?: string
+  width?: number
+  height?: number
+}
+
+function Sparkline({ xs, ys, color = '#60a5fa', width = 280, height = 80 }: SparklineProps) {
   if (!xs || !ys || xs.length < 2) return <text fontSize="11" fill="#9ca3af">No data</text>
 
   const xMin = Math.min(...xs)
@@ -60,8 +68,8 @@ function Sparkline({ xs, ys, color = '#60a5fa', width = 280, height = 80 }) {
   const yMax = Math.max(...ys.filter(isFinite))
   const pad = 6
 
-  const scaleX = v => pad + ((v - xMin) / Math.max(xMax - xMin, 1e-30)) * (width - 2 * pad)
-  const scaleY = v => (height - pad) - ((v - yMin) / Math.max(yMax - yMin, 1e-30)) * (height - 2 * pad)
+  const scaleX = (v: number) => pad + ((v - xMin) / Math.max(xMax - xMin, 1e-30)) * (width - 2 * pad)
+  const scaleY = (v: number) => (height - pad) - ((v - yMin) / Math.max(yMax - yMin, 1e-30)) * (height - 2 * pad)
 
   const pts = xs
     .map((x, i) => `${scaleX(x)},${scaleY(ys[i])}`)
@@ -80,7 +88,17 @@ function Sparkline({ xs, ys, color = '#60a5fa', width = 280, height = 80 }) {
 
 // ── Dual sparkline chart ──────────────────────────────────────────────────────
 
-function LineChart({ xs, series, labels, yLabel, xLabel, width = 320, height = 120 }) {
+interface LineChartProps {
+  xs: number[] | null
+  series: (number[] | null | undefined)[]
+  labels?: string[]
+  yLabel?: string
+  xLabel?: string
+  width?: number
+  height?: number
+}
+
+function LineChart({ xs, series, labels, yLabel, xLabel, width = 320, height = 120 }: LineChartProps) {
   const COLORS = ['#60a5fa', '#f87171', '#34d399', '#fbbf24']
   const pad = { top: 10, right: 10, bottom: 28, left: 48 }
   const W = width - pad.left - pad.right
@@ -96,12 +114,12 @@ function LineChart({ xs, series, labels, yLabel, xLabel, width = 320, height = 1
 
   const xMin = Math.min(...xs)
   const xMax = Math.max(...xs)
-  const allY = series.flatMap(s => s.filter(isFinite))
+  const allY = series.flatMap(s => (s ?? []).filter(isFinite))
   const yMin = Math.min(...allY)
   const yMax = Math.max(...allY)
 
-  const sx = v => pad.left + ((v - xMin) / Math.max(xMax - xMin, 1e-30)) * W
-  const sy = v => pad.top + H - ((v - yMin) / Math.max(yMax - yMin, 1e-30)) * H
+  const sx = (v: number) => pad.left + ((v - xMin) / Math.max(xMax - xMin, 1e-30)) * W
+  const sy = (v: number) => pad.top + H - ((v - yMin) / Math.max(yMax - yMin, 1e-30)) * H
 
   return (
     <svg width={width} height={height} style={{ overflow: 'visible' }}>
@@ -135,7 +153,7 @@ function LineChart({ xs, series, labels, yLabel, xLabel, width = 320, height = 1
       {/* Series lines */}
       {series.map((ys, si) => {
         const pts = xs.map((x, i) => {
-          const y = ys[i]
+          const y = (ys ?? [])[i]
           if (!isFinite(y)) return null
           return `${sx(x)},${sy(y)}`
         }).filter(Boolean).join(' ')
@@ -157,10 +175,21 @@ function LineChart({ xs, series, labels, yLabel, xLabel, width = 320, height = 1
 
 // ── Summary Card ─────────────────────────────────────────────────────────────
 
+interface SummaryCardProps {
+  gas: string | null
+  pressure_Pa: number | null
+  gap_m: number | null
+  voltage_V: number | null
+  breakdown_estimate_V: number | null
+  sheath_thickness_m: number | null
+  current_density_A_m2: number | null
+  converged: boolean
+}
+
 function SummaryCard({
   gas, pressure_Pa, gap_m, voltage_V,
   breakdown_estimate_V, sheath_thickness_m, current_density_A_m2, converged,
-}) {
+}: SummaryCardProps) {
   const above = voltage_V != null && breakdown_estimate_V != null && isFinite(breakdown_estimate_V)
     ? voltage_V > breakdown_estimate_V
     : null
@@ -175,7 +204,7 @@ function SummaryCard({
         ['Pressure', fmtSI(pressure_Pa, 'Pa')],
         ['Gap', fmtSI(gap_m, 'm')],
         ['Voltage', fmtSI(voltage_V, 'V')],
-        ['Breakdown V (Paschen)', isFinite(breakdown_estimate_V) ? fmtSI(breakdown_estimate_V, 'V') : '∞'],
+        ['Breakdown V (Paschen)', (breakdown_estimate_V == null || isFinite(breakdown_estimate_V)) ? fmtSI(breakdown_estimate_V, 'V') : '∞'],
         ['Above Breakdown?', above == null ? '—' : above ? '✅ Yes' : '❌ No'],
         ['Sheath Thickness', fmtSI(sheath_thickness_m, 'm')],
         ['Current Density', fmtSI(current_density_A_m2, 'A/m²')],
@@ -195,7 +224,20 @@ function SummaryCard({
 
 // ── Paschen Curve Chart ───────────────────────────────────────────────────────
 
-function PaschenChart({ paschen_curve, pressure_Pa, gap_m, voltage_V, breakdown_estimate_V }) {
+interface PaschenCurve {
+  pd_Pa_m: number[]
+  V_bd_V: number[]
+}
+
+interface PaschenChartProps {
+  paschen_curve: PaschenCurve | null
+  pressure_Pa: number | null
+  gap_m: number | null
+  voltage_V: number | null
+  breakdown_estimate_V: number | null
+}
+
+function PaschenChart({ paschen_curve, pressure_Pa, gap_m, voltage_V, breakdown_estimate_V }: PaschenChartProps) {
   if (!paschen_curve) return <div style={{ color: '#6b7280', fontSize: '12px' }}>No Paschen data</div>
 
   const { pd_Pa_m, V_bd_V } = paschen_curve
@@ -217,8 +259,8 @@ function PaschenChart({ paschen_curve, pressure_Pa, gap_m, voltage_V, breakdown_
   const yMin = 0
   const yMax = Math.min(Math.max(...valid.map(p => p.V)) * 1.1, 5000)
 
-  const sx = pd => pad.left + ((Math.log10(pd) - xMin) / Math.max(xMax - xMin, 0.01)) * w
-  const sy = V => pad.top + h - ((V - yMin) / Math.max(yMax - yMin, 1)) * h
+  const sx = (pd: number) => pad.left + ((Math.log10(pd) - xMin) / Math.max(xMax - xMin, 0.01)) * w
+  const sy = (V: number) => pad.top + h - ((V - yMin) / Math.max(yMax - yMin, 1)) * h
 
   const pts = valid.map(p => `${sx(p.pd)},${sy(p.V)}`).join(' ')
 
@@ -276,7 +318,7 @@ function PaschenChart({ paschen_curve, pressure_Pa, gap_m, voltage_V, breakdown_
 
 // ── Model Notes Banner ────────────────────────────────────────────────────────
 
-function ModelNotesBanner({ notes }) {
+function ModelNotesBanner({ notes }: { notes: string | null }) {
   if (!notes) return null
   return (
     <div style={{
@@ -293,12 +335,31 @@ function ModelNotesBanner({ notes }) {
 
 // ── Main Panel ────────────────────────────────────────────────────────────────
 
+interface PlasmaDischargePanelProps {
+  x_m: number[] | null
+  n_e_m3: number[] | null
+  n_i_m3: number[] | null
+  E_field_V_m: number[] | null
+  phi_V: number[] | null
+  ionization_rate_m3_s: number[] | null
+  paschen_curve: PaschenCurve | null
+  current_density_A_m2: number | null
+  sheath_thickness_m: number | null
+  breakdown_estimate_V: number | null
+  converged: boolean
+  gas: string | null
+  pressure_Pa: number | null
+  gap_m: number | null
+  voltage_V: number | null
+  model_notes: string | null
+}
+
 export default function PlasmaDischargePanel({
   x_m, n_e_m3, n_i_m3, E_field_V_m, phi_V, ionization_rate_m3_s,
   paschen_curve: paschenData, current_density_A_m2, sheath_thickness_m,
   breakdown_estimate_V, converged, gas, pressure_Pa, gap_m, voltage_V,
   model_notes,
-}) {
+}: PlasmaDischargePanelProps) {
   const hasProfiles = x_m && x_m.length > 1
 
   return (

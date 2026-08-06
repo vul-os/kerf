@@ -14,11 +14,12 @@
 // body (article render) plus entries/recent/index (index render).
 
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { flattenManifest, useDocs } from '../routes/Docs/docsStore.js'
 
 const REAL_MANIFEST = JSON.parse(
-  readFileSync(new URL('../../public/docs-manifest.json', import.meta.url), 'utf8'),
+  readFileSync(fileURLToPath(new URL('../../public/docs-manifest.json', import.meta.url)), 'utf8'),
 )
 
 describe('flattenManifest — prefers the body-bearing flat list', () => {
@@ -43,7 +44,9 @@ describe('flattenManifest — prefers the body-bearing flat list', () => {
           body: '# Getting started\n\nReal article body.', source: 'docs/getting-started.md' },
       ],
     }
-    const flat = flattenManifest(manifest)
+    // Partial fixture — deliberately mixes shapes to test flattenManifest's
+    // preference for the body-bearing flat list over the bodyless group projection.
+    const flat = flattenManifest(manifest as unknown as Parameters<typeof flattenManifest>[0])
     expect(flat).toHaveLength(1)
     expect(flat[0].slug).toBe('getting-started')
     expect(flat[0].body).toContain('Real article body.')

@@ -5,13 +5,18 @@
  * assert on structure. No @testing-library or DOM required.
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import SkySettings, { DEFAULT_SKY_SETTINGS } from './SkySettings.jsx'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function render(props = {}) {
+interface RenderProps {
+  settings?: Partial<typeof DEFAULT_SKY_SETTINGS>
+  onChange?: (settings: typeof DEFAULT_SKY_SETTINGS) => void
+}
+
+function render(props: RenderProps = {}) {
   return renderToStaticMarkup(
     <SkySettings settings={{ ...DEFAULT_SKY_SETTINGS, ...props.settings }} onChange={props.onChange} />
   )

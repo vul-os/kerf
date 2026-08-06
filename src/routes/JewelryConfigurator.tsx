@@ -169,8 +169,12 @@ export function buildToolPayload(state) {
   const finishCost = FINISH_OPTIONS.find((f) => f.key === state.finish)?.cost ?? 0
 
   // Widened: `stones` is attached conditionally below, so the inferred literal shape
-  // would reject it.
-  const payload: Record<string, unknown> = {
+  // would reject it. The `stones` field is typed explicitly (rather than left as
+  // `unknown` via the index signature) so callers — including tests — can read
+  // `payload.stones.length` / `payload.stones[0].cut` without a cast.
+  const payload: Record<string, unknown> & {
+    stones?: Array<{ cut: string; carat: number; price_per_carat: number; count: number }>
+  } = {
     volume_mm3:           volumeMm3,
     metal:                state.metal,
     metal_price_per_gram: pricePerGram,

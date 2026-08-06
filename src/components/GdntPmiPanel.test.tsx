@@ -1,12 +1,18 @@
-// GdntPmiPanel.test.jsx — component tests for the GD&T PMI placement panel.
+// GdntPmiPanel.test.tsx — component tests for the GD&T PMI placement panel.
 //
 // Uses renderToStaticMarkup (react-dom/server) — no browser DOM, no fetch,
 // mirrors the pattern in gdntToolbar.test.jsx and LayoutViewer.test.jsx.
 
-import { describe, it, expect, vi } from 'vitest'
+import type { ComponentType } from 'react'
+import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import GdntPmiPanel from './GdntPmiPanel.jsx'
+import GdntPmiPanelUntyped from './GdntPmiPanel.jsx'
 import { addFcf, addDatumLabel } from '../lib/gdntAnnotations.js'
+
+// GdntPmiPanel.jsx is not yet migrated (T-515); its destructured props read
+// as required by TS's structural inference even though onDeleteAnn and
+// onAutoCallout are optional at runtime.
+const GdntPmiPanel = GdntPmiPanelUntyped as unknown as ComponentType<Record<string, unknown>>
 
 // ---------------------------------------------------------------------------
 // Fixtures

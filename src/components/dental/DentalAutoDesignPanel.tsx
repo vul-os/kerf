@@ -16,12 +16,22 @@
  */
 
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { useAuth } from '../../store/auth.js'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
-// Tooth presets (universal → FDI label, anatomy dimensions in mm)
-const TOOTH_PRESETS = [
+interface ToothPreset {
+  label: string
+  universal: number
+  md: number
+  bl: number
+  h: number
+  type: string
+}
+
+// Tooth presets (universal -> FDI label, anatomy dimensions in mm)
+const TOOTH_PRESETS: ToothPreset[] = [
   { label: 'UR1 (11) — Central incisor', universal: 8,  md: 8.5, bl: 7.0,  h: 10.5, type: 'incisor' },
   { label: 'UR3 (13) — Canine',          universal: 6,  md: 7.5, bl: 8.0,  h: 10.0, type: 'canine'  },
   { label: 'UR4 (14) — 1st premolar',    universal: 5,  md: 7.0, bl: 9.0,  h: 8.5,  type: 'premolar'},
@@ -31,10 +41,10 @@ const TOOTH_PRESETS = [
 ]
 
 const MATERIALS = [
-  { key: 'zirconia',           label: 'Zirconia (≥0.5 mm wall, ≥0.5 mm clearance)' },
-  { key: 'lithium_disilicate', label: 'Lithium disilicate e.max (≥0.8 mm)' },
-  { key: 'metal_ceramic',      label: 'Metal-ceramic (≥0.3 mm metal)' },
-  { key: 'pmma',               label: 'PMMA interim (≥1.5 mm)' },
+  { key: 'zirconia',           label: 'Zirconia (>=0.5 mm wall, >=0.5 mm clearance)' },
+  { key: 'lithium_disilicate', label: 'Lithium disilicate e.max (>=0.8 mm)' },
+  { key: 'metal_ceramic',      label: 'Metal-ceramic (>=0.3 mm metal)' },
+  { key: 'pmma',               label: 'PMMA interim (>=1.5 mm)' },
 ]
 
 const STATUS_COLOR = {
@@ -44,7 +54,7 @@ const STATUS_COLOR = {
   neutral: '#6b7280',
 }
 
-function CheckBadge({ ok, label, value }) {
+function CheckBadge({ ok, label, value }: { ok: boolean; label: string; value?: string }) {
   const color = ok ? STATUS_COLOR.ok : STATUS_COLOR.fail
   const icon = ok ? '✓' : '✗'
   return (
@@ -60,7 +70,7 @@ function CheckBadge({ ok, label, value }) {
   )
 }
 
-function Section({ title, children }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div style={{ marginBottom: 16 }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase',
@@ -73,9 +83,9 @@ function Section({ title, children }) {
 }
 
 /** Build a synthetic crown-prep mesh (tapered cylinder) for a given tooth geometry. */
-function buildPrepMesh(mdMm, blMm, heightMm, nRing = 16) {
-  const verts = []
-  const tris = []
+function buildPrepMesh(mdMm: number, blMm: number, heightMm: number, nRing = 16) {
+  const verts: number[][] = []
+  const tris: number[][] = []
   const N = nRing
 
   for (let i = 0; i < N; i++) {
@@ -105,8 +115,8 @@ function buildPrepMesh(mdMm, blMm, heightMm, nRing = 16) {
 }
 
 /** Build a simple elliptical neighbour mesh at a given x-offset. */
-function buildNeighbourMesh(xOffset, n = 10) {
-  const verts = []
+function buildNeighbourMesh(xOffset: number, n = 10): number[][] {
+  const verts: number[][] = []
   for (let i = 0; i < n; i++) {
     const a = (2 * Math.PI * i) / n
     verts.push([xOffset + 5 * Math.cos(a), 5 * Math.sin(a), 4])
@@ -115,8 +125,8 @@ function buildNeighbourMesh(xOffset, n = 10) {
 }
 
 /** Build antagonist mesh (flat ring above the crown). */
-function buildAntagonistMesh(zOffset, n = 10) {
-  const verts = []
+function buildAntagonistMesh(zOffset: number, n = 10): number[][] {
+  const verts: number[][] = []
   for (let i = 0; i < n; i++) {
     const a = (2 * Math.PI * i) / n
     verts.push([5 * Math.cos(a), 5 * Math.sin(a), zOffset])
@@ -124,22 +134,60 @@ function buildAntagonistMesh(zOffset, n = 10) {
   return verts
 }
 
-export default function DentalAutoDesignPanel({ projectId, content }) {
+/** Response shapes from the three backend tools, mined from fields this panel reads. */
+interface MarginResult {
+  margin_points?: unknown[]
+  margin_perimeter_mm?: number
+  mean_curvature_at_margin?: number
+  margin_type?: string
+}
+
+interface AxisResult {
+  insertion_axis?: number[]
+  undercut_fraction?: number
+  max_undercut_depth_mm?: number
+  candidate_axes_tested?: number
+}
+
+interface CrownDesignResult {
+  tooth_fdi?: string | number
+  tooth_type?: string
+  fdi_template_used?: string
+  wall_thickness_ok?: boolean
+  wall_thickness_min_mm?: number
+  proximal_contacts_ok?: boolean
+  proximal_contact_mesial_mm?: number | null
+  proximal_contact_distal_mm?: number | null
+  occlusal_clearance_ok?: boolean
+  occlusal_clearance_mm?: number
+  margin_fit_um?: number
+  passes_all_checks?: boolean
+  crown_outer_vertices?: number
+  crown_outer_triangles?: number
+  honest_caveat?: string
+}
+
+export interface Props {
+  projectId?: string | null
+  content?: string | null
+}
+
+export default function DentalAutoDesignPanel(_props: Props) {
   const { accessToken } = useAuth()
 
-  const [toothPreset, setToothPreset] = useState(TOOTH_PRESETS[4])   // LL6 default
+  const [toothPreset, setToothPreset] = useState<ToothPreset>(TOOTH_PRESETS[4])   // LL6 default
   const [material, setMaterial]       = useState('zirconia')
   const [withNeighbours, setWithNeighbours] = useState(true)
   const [withAntagonist, setWithAntagonist] = useState(true)
   const [prepHeight, setPrepHeight]   = useState(8.0)
 
   const [running, setRunning]         = useState(false)
-  const [result, setResult]           = useState(null)
-  const [marginResult, setMarginResult] = useState(null)
-  const [axisResult, setAxisResult]   = useState(null)
-  const [error, setError]             = useState(null)
+  const [result, setResult]           = useState<CrownDesignResult | null>(null)
+  const [marginResult, setMarginResult] = useState<MarginResult | null>(null)
+  const [axisResult, setAxisResult]   = useState<AxisResult | null>(null)
+  const [error, setError]             = useState<string | null>(null)
 
-  async function callTool(tool, args) {
+  async function callTool(tool: string, args: Record<string, unknown>) {
     const resp = await fetch(`${API_URL}/api/tool`, {
       method: 'POST',
       headers: {
@@ -185,7 +233,7 @@ export default function DentalAutoDesignPanel({ projectId, content }) {
       setAxisResult(aResult)
 
       // 3. Full auto crown design
-      const crownArgs = {
+      const crownArgs: Record<string, unknown> = {
         prep_vertices: prepV,
         prep_triangles: prepT,
         universal_tooth_number: toothPreset.universal,
@@ -203,7 +251,7 @@ export default function DentalAutoDesignPanel({ projectId, content }) {
       const dResult = await callTool('dental_auto_design_crown', crownArgs)
       setResult(dResult)
     } catch (e) {
-      setError(e.message)
+      setError((e as { message?: string }).message ?? String(e))
     } finally {
       setRunning(false)
     }
@@ -233,7 +281,7 @@ export default function DentalAutoDesignPanel({ projectId, content }) {
           </label>
           <select
             value={toothPreset.universal}
-            onChange={e => setToothPreset(TOOTH_PRESETS.find(p => p.universal === +e.target.value))}
+            onChange={e => setToothPreset(TOOTH_PRESETS.find(p => p.universal === +e.target.value) ?? TOOTH_PRESETS[4])}
             style={{ width: '100%', background: '#1f2937', color: '#f9fafb', border: '1px solid #374151',
                      borderRadius: 6, padding: '6px 8px', fontSize: 13 }}
           >
@@ -343,7 +391,7 @@ export default function DentalAutoDesignPanel({ projectId, content }) {
               </span>
               <span style={{ color: '#d1d5db' }}>Undercut fraction:</span>
               <span style={{
-                color: axisResult.undercut_fraction < 0.1 ? STATUS_COLOR.ok : STATUS_COLOR.warn,
+                color: (axisResult.undercut_fraction ?? 1) < 0.1 ? STATUS_COLOR.ok : STATUS_COLOR.warn,
                 fontFamily: 'monospace',
               }}>
                 {((axisResult.undercut_fraction ?? 0) * 100).toFixed(1)}%
@@ -372,12 +420,12 @@ export default function DentalAutoDesignPanel({ projectId, content }) {
               </div>
 
               <CheckBadge
-                ok={result.wall_thickness_ok}
+                ok={!!result.wall_thickness_ok}
                 label="Min wall thickness"
                 value={`${result.wall_thickness_min_mm?.toFixed(2)} mm`}
               />
               <CheckBadge
-                ok={result.proximal_contacts_ok}
+                ok={!!result.proximal_contacts_ok}
                 label="Proximal contacts"
                 value={
                   result.proximal_contact_mesial_mm !== null
@@ -386,12 +434,12 @@ export default function DentalAutoDesignPanel({ projectId, content }) {
                 }
               />
               <CheckBadge
-                ok={result.occlusal_clearance_ok}
+                ok={!!result.occlusal_clearance_ok}
                 label="Occlusal clearance"
                 value={`${result.occlusal_clearance_mm?.toFixed(2)} mm`}
               />
               <CheckBadge
-                ok={result.margin_fit_um <= 100}
+                ok={(result.margin_fit_um ?? Infinity) <= 100}
                 label="Margin fit"
                 value={`${result.margin_fit_um?.toFixed(0)} µm`}
               />

@@ -5,7 +5,7 @@
  * Filter by manufacturer, diameter, length.
  * Click-to-place dispatches `dental_surgical_guide` via POST /api/tools/call.
  *
- * Backend tool: packages/kerf-dental/src/kerf_dental/tools.py → dental_surgical_guide
+ * Backend tool: packages/kerf-dental/src/kerf_dental/tools.py -> dental_surgical_guide
  */
 
 import { useMemo, useState } from 'react'
@@ -14,11 +14,22 @@ import { buildSurgicalGuidePayload } from './dentalDispatch.js'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
+interface Implant {
+  id: string
+  manufacturer: string
+  system: string
+  diameter_mm: number
+  length_mm: number
+  connection: string
+  material: string
+  note: string
+}
+
 // ---------------------------------------------------------------------------
 // Implant catalogue (representative geometry — not a clinical implant library)
 // Each entry maps to the dental_surgical_guide `implants` schema.
 // ---------------------------------------------------------------------------
-const IMPLANT_CATALOGUE = [
+const IMPLANT_CATALOGUE: Implant[] = [
   // Straumann
   { id: 'str-rc-33-10', manufacturer: 'Straumann', system: 'Bone Level RC', diameter_mm: 3.3, length_mm: 10, connection: 'RC', material: 'Ti Grade 4', note: 'Narrow platform' },
   { id: 'str-rc-41-10', manufacturer: 'Straumann', system: 'Bone Level RC', diameter_mm: 4.1, length_mm: 10, connection: 'RC', material: 'Ti Grade 4', note: 'Standard platform' },
@@ -56,10 +67,26 @@ const DEFAULT_JAW_PTS = [
 // Default implant axis (upward into jaw)
 const DEFAULT_AXIS = [0, 0, 1]
 
+/** Response shape from dental_surgical_guide, mined from fields this panel reads. */
+interface PlaceResult {
+  implant: Implant
+  response: {
+    sleeve_count?: number
+    max_angular_error_deg?: number
+    [key: string]: unknown
+  }
+}
+
 // ---------------------------------------------------------------------------
 // ImplantCard — renders one entry in the list
 // ---------------------------------------------------------------------------
-function ImplantCard({ implant, selected, onSelect, onPlace, placing }) {
+function ImplantCard({ implant, selected, onSelect, onPlace, placing }: {
+  implant: Implant
+  selected: boolean
+  onSelect: (id: string) => void
+  onPlace: (implant: Implant) => void
+  placing: boolean
+}) {
   return (
     <div
       className={`flex items-center gap-2 px-3 py-2 rounded border text-xs cursor-pointer transition-colors ${
@@ -98,18 +125,22 @@ function ImplantCard({ implant, selected, onSelect, onPlace, placing }) {
   )
 }
 
+export interface Props {
+  projectId?: string | null
+}
+
 // ---------------------------------------------------------------------------
 // Main panel
 // ---------------------------------------------------------------------------
-export default function ImplantLibrary({ projectId }) {
+export default function ImplantLibrary(_props: Props) {
   const { accessToken } = useAuth()
   const [manufacturer, setManufacturer] = useState('All')
   const [diameter, setDiameter]         = useState('All')
   const [length, setLength]             = useState('All')
-  const [selectedId, setSelectedId]     = useState(null)
+  const [selectedId, setSelectedId]     = useState<string | null>(null)
   const [placing, setPlacing]           = useState(false)
-  const [result, setResult]             = useState(null)
-  const [error, setError]               = useState(null)
+  const [result, setResult]             = useState<PlaceResult | null>(null)
+  const [error, setError]               = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     return IMPLANT_CATALOGUE.filter((imp) => {
@@ -120,13 +151,13 @@ export default function ImplantLibrary({ projectId }) {
     })
   }, [manufacturer, diameter, length])
 
-  function handleSelect(id) {
+  function handleSelect(id: string) {
     setSelectedId((prev) => (prev === id ? null : id))
     setResult(null)
     setError(null)
   }
 
-  async function handlePlace(implant) {
+  async function handlePlace(implant: Implant) {
     setPlacing(true)
     setResult(null)
     setError(null)
@@ -157,7 +188,7 @@ export default function ImplantLibrary({ projectId }) {
         setResult({ implant, response: data })
       }
     } catch (err) {
-      setError(err?.message || String(err))
+      setError((err as { message?: string } | undefined)?.message || String(err))
     } finally {
       setPlacing(false)
     }

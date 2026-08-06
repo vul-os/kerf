@@ -12,13 +12,19 @@
  */
 
 import { describe, it, expect } from 'vitest'
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync, existsSync } from 'fs'
-import { resolve } from 'path'
+// @ts-expect-error - no @types/node in this toolchain
+import { resolve, dirname } from 'path'
+// @ts-expect-error - no @types/node in this toolchain
+import { fileURLToPath } from 'url'
 import {
   DOMAINS_META,
   DOMAINS,
   buildDomainsJsonLd,
 } from '../routes/domains/index.jsx'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const HUB_SRC = readFileSync(
   (existsSync(resolve(__dirname, '../routes/domains/index.tsx')) ? resolve(__dirname, '../routes/domains/index.tsx') : resolve(__dirname, '../routes/domains/index.jsx')),

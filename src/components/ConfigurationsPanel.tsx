@@ -23,7 +23,20 @@ import { Plus, X, Star, AlertTriangle } from 'lucide-react'
 
 const NEW_ID_PREFIX = 'cfg'
 
-function nextConfigId(existing) {
+export interface Configuration {
+  id: string
+  label: string
+  params: Record<string, unknown>
+}
+
+export interface ConfigurationsPanelProps {
+  configurations?: Configuration[]
+  defaultConfig?: string
+  onChange?: (next: { configurations: Configuration[]; default_config: string }) => void
+  onClose?: () => void
+}
+
+function nextConfigId(existing: Configuration[]) {
   // Fresh, short, sortable id. Assembly references store this id so it
   // must NOT collide with an existing one.
   for (let i = 1; i < 1024; i++) {
@@ -39,10 +52,10 @@ export default function ConfigurationsPanel({
   defaultConfig = '',
   onChange,
   onClose,
-}) {
+}: ConfigurationsPanelProps) {
   const list = useMemo(() => Array.isArray(configurations) ? configurations : [], [configurations])
 
-  const updateAll = (next) => {
+  const updateAll = (next: { configurations?: Configuration[]; default_config?: string }) => {
     const cfgs = Array.isArray(next.configurations) ? next.configurations : list
     const def = typeof next.default_config === 'string' ? next.default_config : defaultConfig
     // Auto-correct dangling default: if the picked id no longer exists,
@@ -58,17 +71,17 @@ export default function ConfigurationsPanel({
     updateAll({ configurations: next, default_config: defaultConfig || id })
   }
 
-  const removeConfig = (id) => {
+  const removeConfig = (id: string) => {
     const next = list.filter((c) => c.id !== id)
     updateAll({ configurations: next, default_config: defaultConfig === id ? '' : defaultConfig })
   }
 
-  const updateConfig = (id, patch) => {
+  const updateConfig = (id: string, patch: Partial<Configuration>) => {
     const next = list.map((c) => (c.id === id ? { ...c, ...patch } : c))
     updateAll({ configurations: next, default_config: defaultConfig })
   }
 
-  const setDefault = (id) => {
+  const setDefault = (id: string) => {
     updateAll({ configurations: list, default_config: id })
   }
 
@@ -128,9 +141,17 @@ export default function ConfigurationsPanel({
   )
 }
 
-function ConfigRow({ cfg, isDefault, onSetDefault, onRemove, onUpdate }) {
+interface ConfigRowProps {
+  cfg: Configuration
+  isDefault: boolean
+  onSetDefault: () => void
+  onRemove: () => void
+  onUpdate: (patch: Partial<Configuration>) => void
+}
+
+function ConfigRow({ cfg, isDefault, onSetDefault, onRemove, onUpdate }: ConfigRowProps) {
   const [paramsDraft, setParamsDraft] = useState(() => paramsToText(cfg.params))
-  const [paramsErr, setParamsErr] = useState(null)
+  const [paramsErr, setParamsErr] = useState<string | null>(null)
 
   const commitParams = () => {
     if (paramsDraft.trim() === '') {
@@ -147,7 +168,7 @@ function ConfigRow({ cfg, isDefault, onSetDefault, onRemove, onUpdate }) {
       setParamsErr(null)
       onUpdate({ params: parsed })
     } catch (err) {
-      setParamsErr(err?.message || 'Invalid JSON')
+      setParamsErr((err as { message?: string } | undefined)?.message || 'Invalid JSON')
     }
   }
 
@@ -204,7 +225,7 @@ function ConfigRow({ cfg, isDefault, onSetDefault, onRemove, onUpdate }) {
   )
 }
 
-function paramsToText(p) {
+function paramsToText(p: Record<string, unknown>) {
   if (!p || typeof p !== 'object') return ''
   try {
     return JSON.stringify(p, null, 2)

@@ -8,27 +8,52 @@
 //   result  — parsed simulation result object or null
 //   raw     — raw string content (for parse fallback)
 
-import { Activity, AlertTriangle } from 'lucide-react'
+import { Activity } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function parseResult(raw) {
+interface MotionBody {
+  name?: string
+}
+
+interface MotionTrajectory {
+  positions?: number[][]
+  velocities?: number[][]
+}
+
+interface MotionResult {
+  trajectories?: MotionTrajectory[]
+  bodies?: MotionBody[]
+  t_end?: number
+  dt?: number
+  joint_angles_rad?: number[]
+  joint_angles?: number[]
+  reachable?: boolean
+  target?: number[]
+  workspace_cloud?: unknown[]
+  points?: unknown[]
+  [key: string]: unknown
+}
+
+function parseResult(raw?: string | null): MotionResult | null {
   if (!raw || typeof raw !== 'string' || !raw.trim()) return null
   try {
     const doc = JSON.parse(raw)
     if (doc && typeof doc === 'object') return doc
-  } catch (_) {}
+  } catch {
+    // malformed JSON — fall through to null
+  }
   return null
 }
 
-function fmtNum(v, decimals = 4) {
+function fmtNum(v: unknown, decimals = 4) {
   if (v == null || !Number.isFinite(Number(v))) return '—'
   return Number(v).toFixed(decimals)
 }
 
-function Vec3({ v }) {
+function Vec3({ v }: { v?: number[] | null }) {
   if (!Array.isArray(v) || v.length < 3) return <span className="text-ink-500">—</span>
   return (
     <span className="font-mono text-[10px] text-ink-200">
@@ -39,7 +64,7 @@ function Vec3({ v }) {
 
 // ── Simulation trajectory table ───────────────────────────────────────────
 
-function TrajectoryTable({ bodies, trajectories }) {
+function TrajectoryTable({ bodies, trajectories }: { bodies?: MotionBody[]; trajectories?: MotionTrajectory[] }) {
   if (!Array.isArray(trajectories) || trajectories.length === 0) {
     return (
       <div className="text-[11px] text-ink-500 italic py-4 text-center">
@@ -84,7 +109,7 @@ function TrajectoryTable({ bodies, trajectories }) {
 
 // ── IK result panel ───────────────────────────────────────────────────────
 
-function IkResultPanel({ result }) {
+function IkResultPanel({ result }: { result: MotionResult }) {
   const angles = result?.joint_angles_rad ?? result?.joint_angles ?? []
   const reachable = result?.reachable
   const target = result?.target
@@ -122,7 +147,7 @@ function IkResultPanel({ result }) {
 
 // ── Workspace cloud panel ─────────────────────────────────────────────────
 
-function WorkspacePanel({ result }) {
+function WorkspacePanel({ result }: { result: MotionResult }) {
   const cloud = result?.workspace_cloud ?? result?.points ?? []
   const count = Array.isArray(cloud) ? cloud.length : 0
 
@@ -143,7 +168,7 @@ function WorkspacePanel({ result }) {
 
 // ── Dispatcher ────────────────────────────────────────────────────────────
 
-function ResultBody({ parsed }) {
+function ResultBody({ parsed }: { parsed: MotionResult | null }) {
   if (!parsed) return null
 
   // Distinguish result types by shape
@@ -178,7 +203,12 @@ function ResultBody({ parsed }) {
 // Main export
 // ---------------------------------------------------------------------------
 
-export default function MotionResultsPanel({ result, raw }) {
+export interface MotionResultsPanelProps {
+  result?: MotionResult | null
+  raw?: string | null
+}
+
+export default function MotionResultsPanel({ result, raw }: MotionResultsPanelProps) {
   const parsed = result ?? parseResult(raw)
 
   return (

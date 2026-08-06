@@ -25,7 +25,7 @@ import { Plus, Trash2, Layers, RefreshCw, CheckCircle, XCircle } from 'lucide-re
 
 const ATTR_KEYS = ['region', 'color', 'market_segment', 'options', 'grade', 'language']
 
-const ATTR_VALUES = {
+const ATTR_VALUES: Record<string, string[]> = {
   region:         ['GLOBAL', 'EU', 'US', 'APAC', 'LATAM', 'MEA'],
   color:          ['black', 'white', 'silver', 'red', 'blue', 'green'],
   market_segment: ['consumer', 'enterprise', 'oem', 'aftermarket'],
@@ -34,7 +34,7 @@ const ATTR_VALUES = {
   language:       ['en', 'de', 'fr', 'zh', 'ja'],
 }
 
-const PLACEHOLDER_BOM = [
+const PLACEHOLDER_BOM: [string, number][] = [
   ['P-001', 1],
   ['P-002', 2],
   ['P-003', 1],
@@ -42,7 +42,30 @@ const PLACEHOLDER_BOM = [
   ['P-005', 1],
 ]
 
-const PLACEHOLDER_RULES = [
+type Condition = 'include' | 'exclude'
+
+interface VariantRule {
+  id: number
+  part_number: string
+  variant_attribute_key: string
+  variant_attribute_value: string
+  condition: Condition
+}
+
+interface AttrRowData {
+  id: number
+  key: string
+  value: string
+}
+
+interface ResultRow {
+  part_number: string
+  qty?: number
+  included: boolean
+  reason?: string
+}
+
+const PLACEHOLDER_RULES: VariantRule[] = [
   { id: 1, part_number: 'P-002', variant_attribute_key: 'color',   variant_attribute_value: 'red',     condition: 'exclude' },
   { id: 2, part_number: 'P-004', variant_attribute_key: 'region',  variant_attribute_value: 'EU',      condition: 'include' },
   { id: 3, part_number: 'P-005', variant_attribute_key: 'options', variant_attribute_value: 'premium', condition: 'include' },
@@ -54,7 +77,11 @@ let _nextRuleId = PLACEHOLDER_RULES.length + 1
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function AttrRow({ row, onChange, onDelete }) {
+function AttrRow({ row, onChange, onDelete }: {
+  row: AttrRowData
+  onChange: (delta: Partial<AttrRowData>) => void
+  onDelete: () => void
+}) {
   const vals = ATTR_VALUES[row.key] ?? []
   return (
     <div className="flex items-center gap-2">
@@ -91,7 +118,11 @@ function AttrRow({ row, onChange, onDelete }) {
 }
 
 
-function RuleRow({ rule, onChange, onDelete }) {
+function RuleRow({ rule, onChange, onDelete }: {
+  rule: VariantRule
+  onChange: (delta: Partial<VariantRule>) => void
+  onDelete: () => void
+}) {
   return (
     <tr className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
       <td className="px-2 py-1.5">
@@ -127,7 +158,7 @@ function RuleRow({ rule, onChange, onDelete }) {
       <td className="px-2 py-1.5">
         <select
           value={rule.condition}
-          onChange={(e) => onChange({ condition: e.target.value })}
+          onChange={(e) => onChange({ condition: e.target.value as Condition })}
           className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
           aria-label="Condition"
         >
@@ -150,7 +181,7 @@ function RuleRow({ rule, onChange, onDelete }) {
 }
 
 
-function ResultTable({ rows }) {
+function ResultTable({ rows }: { rows: ResultRow[] }) {
   const total    = rows.length
   const included = rows.filter((r) => r.included).length
   const excluded = total - included
@@ -222,18 +253,21 @@ function ResultTable({ rows }) {
  * parentPn     {string}    Pre-filled parent part number.
  * className    {string}    Extra Tailwind classes.
  */
-export default function ConfiguratorPanel({ parentPn: initialPn = '', className = '' }) {
+export default function ConfiguratorPanel({ parentPn: initialPn = '', className = '' }: {
+  parentPn?: string
+  className?: string
+}) {
   const [parentPn,    setParentPn]    = useState(initialPn || 'ASSY-001')
   const [variantId,   setVariantId]   = useState('MY_VARIANT')
-  const [attrRows,    setAttrRows]    = useState([
+  const [attrRows,    setAttrRows]    = useState<AttrRowData[]>([
     { id: 1, key: 'region', value: 'EU' },
     { id: 2, key: 'color',  value: 'red' },
   ])
   const [nextAttrId,  setNextAttrId]  = useState(3)
-  const [rules,       setRules]       = useState(PLACEHOLDER_RULES)
-  const [resultRows,  setResultRows]  = useState(null)
+  const [rules,       setRules]       = useState<VariantRule[]>(PLACEHOLDER_RULES)
+  const [resultRows,  setResultRows]  = useState<ResultRow[] | null>(null)
   const [loading,     setLoading]     = useState(false)
-  const [error,       setError]       = useState(null)
+  const [error,       setError]       = useState<string | null>(null)
 
   // ── Attr handlers ─────────────────────────────────────────────────────────
 
@@ -242,11 +276,11 @@ export default function ConfiguratorPanel({ parentPn: initialPn = '', className 
     setNextAttrId((n) => n + 1)
   }, [nextAttrId])
 
-  const handleAttrChange = useCallback((id, delta) => {
+  const handleAttrChange = useCallback((id: number, delta: Partial<AttrRowData>) => {
     setAttrRows((prev) => prev.map((r) => r.id === id ? { ...r, ...delta } : r))
   }, [])
 
-  const handleAttrDelete = useCallback((id) => {
+  const handleAttrDelete = useCallback((id: number) => {
     setAttrRows((prev) => prev.filter((r) => r.id !== id))
   }, [])
 
@@ -259,11 +293,11 @@ export default function ConfiguratorPanel({ parentPn: initialPn = '', className 
     ])
   }, [])
 
-  const handleRuleChange = useCallback((id, delta) => {
+  const handleRuleChange = useCallback((id: number, delta: Partial<VariantRule>) => {
     setRules((prev) => prev.map((r) => r.id === id ? { ...r, ...delta } : r))
   }, [])
 
-  const handleRuleDelete = useCallback((id) => {
+  const handleRuleDelete = useCallback((id: number) => {
     setRules((prev) => prev.filter((r) => r.id !== id))
   }, [])
 

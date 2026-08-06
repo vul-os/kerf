@@ -20,7 +20,45 @@ import { ArrowRight, RefreshCw, CheckCircle, AlertTriangle, Clock, TrendingUp } 
 // Constants
 // ---------------------------------------------------------------------------
 
-const STATUSES = [
+type Status =
+  | 'quoted'
+  | 'quote_accepted'
+  | 'design'
+  | 'mold_making'
+  | 'sampling'
+  | 'production'
+  | 'qc_hold'
+  | 'shipped'
+  | 'delivered'
+  | 'invoiced'
+
+interface HistoryEntry {
+  status: Status
+  timestamp_iso: string
+  actor: string
+  notes: string
+}
+
+interface Job {
+  job_id: string
+  customer_id: string
+  quote_id: string
+  quoted_amount_usd: number
+  promised_delivery_iso: string
+  current_status: Status
+  history: HistoryEntry[]
+  days_in_status: number
+  is_overdue: boolean
+}
+
+interface StatusReport {
+  by_status?: Record<string, number>
+  overdue_count?: number
+  avg_cycle_days?: number
+  throughput_per_week?: number
+}
+
+const STATUSES: Status[] = [
   'quoted',
   'quote_accepted',
   'design',
@@ -33,7 +71,7 @@ const STATUSES = [
   'invoiced',
 ]
 
-const STATUS_LABELS = {
+const STATUS_LABELS: Record<Status, string> = {
   quoted:          'Quoted',
   quote_accepted:  'Quote Accepted',
   design:          'Design',
@@ -46,7 +84,7 @@ const STATUS_LABELS = {
   invoiced:        'Invoiced',
 }
 
-const STATUS_COLORS = {
+const STATUS_COLORS: Record<Status, string> = {
   quoted:          'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
   quote_accepted:  'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
   design:          'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
@@ -59,7 +97,7 @@ const STATUS_COLORS = {
   invoiced:        'bg-green-200 text-green-800 dark:bg-green-900/60 dark:text-green-200',
 }
 
-const VALID_NEXT = {
+const VALID_NEXT: Record<Status, Status[]> = {
   quoted:         ['quote_accepted'],
   quote_accepted: ['design'],
   design:         ['mold_making'],
@@ -72,7 +110,7 @@ const VALID_NEXT = {
   invoiced:       [],
 }
 
-const SEED_JOB = {
+const SEED_JOB: Job = {
   job_id:                'JOB-2026-001',
   customer_id:           'CUST-ACME',
   quote_id:              'Q-2026-042',
@@ -95,16 +133,16 @@ const SEED_JOB = {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function StatusBadge({ status }) {
-  const color = STATUS_COLORS[status] ?? 'bg-gray-100 text-gray-700'
+function StatusBadge({ status }: { status: Status | string }) {
+  const color = STATUS_COLORS[status as Status] ?? 'bg-gray-100 text-gray-700'
   return (
     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${color}`}>
-      {STATUS_LABELS[status] ?? status}
+      {STATUS_LABELS[status as Status] ?? status}
     </span>
   )
 }
 
-function StageTimeline({ currentStatus }) {
+function StageTimeline({ currentStatus }: { currentStatus: Status }) {
   const mainFlow = [
     'quoted', 'quote_accepted', 'design', 'mold_making',
     'sampling', 'production', 'shipped', 'delivered', 'invoiced',
@@ -127,7 +165,7 @@ function StageTimeline({ currentStatus }) {
                     ? 'bg-green-500 text-white'
                     : 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
               }`}
-              title={STATUS_LABELS[s]}
+              title={STATUS_LABELS[s as Status]}
             >
               {done ? <CheckCircle size={13} /> : i + 1}
             </div>
@@ -146,7 +184,7 @@ function StageTimeline({ currentStatus }) {
   )
 }
 
-function MilestoneList({ history }) {
+function MilestoneList({ history }: { history: HistoryEntry[] }) {
   if (!history || history.length === 0) {
     return <p className="text-xs text-gray-400 italic">No milestones yet.</p>
   }
@@ -184,17 +222,17 @@ function MilestoneList({ history }) {
  * -----
  * className  {string}   Extra Tailwind classes.
  */
-export default function QuoteToDeliveryPanel({ className = '' }) {
-  const [job,        setJob]        = useState(SEED_JOB)
+export default function QuoteToDeliveryPanel({ className = '' }: { className?: string }) {
+  const [job,        setJob]        = useState<Job>(SEED_JOB)
   const [actor,      setActor]      = useState('engineer')
   const [notes,      setNotes]      = useState('')
   const [loading,    setLoading]    = useState(false)
-  const [error,      setError]      = useState(null)
-  const [lastReport, setLastReport] = useState(null)
+  const [error,      setError]      = useState<string | null>(null)
+  const [lastReport, setLastReport] = useState<StatusReport | null>(null)
 
   const nextStatuses = VALID_NEXT[job.current_status] ?? []
 
-  const handleTransition = useCallback(async (newStatus) => {
+  const handleTransition = useCallback(async (newStatus: Status) => {
     setLoading(true)
     setError(null)
 
@@ -253,7 +291,7 @@ export default function QuoteToDeliveryPanel({ className = '' }) {
       setLastReport(data)
     } catch {
       // Demo fallback
-      const byStatus = {}
+      const byStatus: Record<string, number> = {}
       STATUSES.forEach((s) => { byStatus[s] = job.current_status === s ? 1 : 0 })
       setLastReport({
         by_status: byStatus,

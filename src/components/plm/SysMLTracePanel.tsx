@@ -11,14 +11,48 @@
  *   POST /api/llm-tools/sysml_export_xmi      → {ok, path, ...} (XMI text in body or fetched)
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useMemo } from 'react'
+import type { JSX } from 'react'
 import { Download, RefreshCw, GitBranch, Table2, FileCode } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Demo seed data
 // ---------------------------------------------------------------------------
 
-const DEMO_REQUIREMENTS = [
+interface Requirement {
+  id: string
+  text: string
+  parent_id?: string
+  satisfied_by: string[]
+  verified_by: string[]
+}
+
+interface DesignElement {
+  id: string
+  kind: string
+  name: string
+  properties?: Record<string, unknown>
+  allocated_to: string[]
+}
+
+interface TestCase {
+  id: string
+  name: string
+  verifies: string[]
+}
+
+interface CoverageReport {
+  ok?: boolean
+  covered: number
+  uncovered: number
+  total: number
+  coverage_pct: number
+  orphaned_requirements: string[]
+  unverified_requirements: string[]
+  orphaned_tests: string[]
+}
+
+const DEMO_REQUIREMENTS: Requirement[] = [
   { id: 'REQ-001', text: 'System shall support 1000 concurrent users',    satisfied_by: ['BLK-001'],          verified_by: ['TC-001', 'TC-002'] },
   { id: 'REQ-002', text: 'Response time < 200 ms at p99',                  satisfied_by: ['BLK-001', 'BLK-002'], verified_by: ['TC-003'] },
   { id: 'REQ-003', text: 'Data encrypted at rest (AES-256)',               satisfied_by: ['BLK-003'],          verified_by: ['TC-004'] },
@@ -26,13 +60,13 @@ const DEMO_REQUIREMENTS = [
   { id: 'REQ-005', text: 'API versioned; breaking changes require semver', satisfied_by: ['BLK-002'],          verified_by: [] },
 ]
 
-const DEMO_DESIGN_ELEMENTS = [
+const DEMO_DESIGN_ELEMENTS: DesignElement[] = [
   { id: 'BLK-001', kind: 'block', name: 'LoadBalancer',    allocated_to: ['REQ-001', 'REQ-002'] },
   { id: 'BLK-002', kind: 'block', name: 'APIGateway',      allocated_to: ['REQ-002', 'REQ-005'] },
   { id: 'BLK-003', kind: 'block', name: 'EncryptionLayer', allocated_to: ['REQ-003'] },
 ]
 
-const DEMO_TEST_CASES = [
+const DEMO_TEST_CASES: TestCase[] = [
   { id: 'TC-001', name: 'Load test 1000 users',       verifies: ['REQ-001'] },
   { id: 'TC-002', name: 'Spike load test',            verifies: ['REQ-001'] },
   { id: 'TC-003', name: 'Latency regression suite',   verifies: ['REQ-002'] },
@@ -44,7 +78,7 @@ const DEMO_TEST_CASES = [
 // Helpers
 // ---------------------------------------------------------------------------
 
-function pctBar(pct, color = 'bg-blue-500') {
+function pctBar(pct: number, color = 'bg-blue-500'): JSX.Element {
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
@@ -64,7 +98,7 @@ function pctBar(pct, color = 'bg-blue-500') {
   )
 }
 
-function coverageColor(pct) {
+function coverageColor(pct: number): string {
   if (pct >= 80) return 'bg-green-500'
   if (pct >= 50) return 'bg-amber-500'
   return 'bg-red-500'
@@ -74,7 +108,12 @@ function coverageColor(pct) {
 // Tab: Coverage Matrix
 // ---------------------------------------------------------------------------
 
-function CoverageMatrixTab({ report, requirements, designElements, testCases }) {
+function CoverageMatrixTab({ report, requirements, designElements, testCases }: {
+  report: CoverageReport | null
+  requirements: Requirement[]
+  designElements: DesignElement[]
+  testCases: TestCase[]
+}) {
   if (!report) {
     return (
       <p className="text-sm text-gray-400 dark:text-gray-500 italic mt-4">
@@ -83,7 +122,9 @@ function CoverageMatrixTab({ report, requirements, designElements, testCases }) 
     )
   }
 
-  const { covered, uncovered, total, coverage_pct, orphaned_requirements, unverified_requirements, orphaned_tests } = report
+  // `uncovered` is part of the report shape but unused by this view (kept for parity with the
+  // API response destructure; prefixed per the `_`-unused convention).
+  const { covered, uncovered: _uncovered, total, coverage_pct, orphaned_requirements, unverified_requirements, orphaned_tests } = report
 
   // Per-requirement coverage
   const reqRows = requirements.map((req) => {
@@ -209,35 +250,69 @@ const NODE_RADIUS = 20
 const WIDTH  = 640
 const HEIGHT = 360
 
-function TraceGraphTab({ requirements, designElements, testCases }) {
-  const svgRef = useRef(null)
-  const animRef = useRef(null)
+/**
+ * Deterministic pseudo-random jitter in [0, 1), keyed by `seed`. Replaces `Math.random()`
+ * so node layout stays a pure function of its inputs — required by the `react-hooks/purity`
+ * lint rule, which forbids impure calls (including `Math.random`) during render. Same visual
+ * effect (small per-node scatter), just reproducible instead of changing every re-render.
+ */
+function jitter(seed: number): number {
+  const x = Math.sin(seed * 12.9898) * 43758.5453
+  return x - Math.floor(x)
+}
 
-  // Build nodes + edges
-  const nodes = [
+interface GraphNode {
+  id: string
+  label: string
+  kind: 'req' | 'design' | 'test'
+  x: number
+  y: number
+  vx: number
+  vy: number
+}
+
+interface GraphEdge {
+  source: string
+  target: string
+  kind: 'satisfies' | 'verifies'
+}
+
+function TraceGraphTab({ requirements, designElements, testCases }: {
+  requirements: Requirement[]
+  designElements: DesignElement[]
+  testCases: TestCase[]
+}) {
+  const svgRef = useRef<SVGSVGElement>(null)
+  // NOTE (found, not fixed — migration is rename-only): _animRef is declared but never
+  // attached to anything or read anywhere in this file. Likely a leftover from an
+  // abandoned force-directed animation loop; the graph below is laid out once and static.
+  const _animRef = useRef<number | null>(null)
+
+  // Build nodes + edges. Memoized so layout stays stable across unrelated re-renders.
+  const nodes: GraphNode[] = useMemo(() => [
     ...requirements.map((r, i) => ({
-      id: r.id, label: r.id, kind: 'req',
-      x: 80 + (i % 3) * 90 + Math.random() * 20,
-      y: 60 + Math.floor(i / 3) * 80 + Math.random() * 20,
+      id: r.id, label: r.id, kind: 'req' as const,
+      x: 80 + (i % 3) * 90 + jitter(i * 2) * 20,
+      y: 60 + Math.floor(i / 3) * 80 + jitter(i * 2 + 1) * 20,
       vx: 0, vy: 0,
     })),
     ...designElements.map((d, i) => ({
-      id: d.id, label: d.name ?? d.id, kind: 'design',
-      x: 200 + i * 100 + Math.random() * 20,
-      y: 200 + Math.random() * 20,
+      id: d.id, label: d.name ?? d.id, kind: 'design' as const,
+      x: 200 + i * 100 + jitter(1000 + i * 2) * 20,
+      y: 200 + jitter(1000 + i * 2 + 1) * 20,
       vx: 0, vy: 0,
     })),
     ...testCases.map((t, i) => ({
-      id: t.id, label: t.id, kind: 'test',
-      x: 80 + (i % 4) * 110 + Math.random() * 20,
-      y: 300 + Math.random() * 20,
+      id: t.id, label: t.id, kind: 'test' as const,
+      x: 80 + (i % 4) * 110 + jitter(2000 + i * 2) * 20,
+      y: 300 + jitter(2000 + i * 2 + 1) * 20,
       vx: 0, vy: 0,
     })),
-  ]
+  ], [requirements, designElements, testCases])
 
-  const nodeMap = Object.fromEntries(nodes.map((n) => [n.id, n]))
+  const nodeMap: Record<string, GraphNode> = Object.fromEntries(nodes.map((n) => [n.id, n]))
 
-  const edges = []
+  const edges: GraphEdge[] = []
   for (const req of requirements) {
     for (const de of (req.satisfied_by ?? [])) {
       if (nodeMap[de]) edges.push({ source: req.id, target: de, kind: 'satisfies' })
@@ -247,8 +322,8 @@ function TraceGraphTab({ requirements, designElements, testCases }) {
     }
   }
 
-  const nodeColor = { req: '#3b82f6', design: '#a855f7', test: '#14b8a6' }
-  const edgeColor = { satisfies: '#a855f7', verifies: '#14b8a6' }
+  const nodeColor: Record<GraphNode['kind'], string> = { req: '#3b82f6', design: '#a855f7', test: '#14b8a6' }
+  const edgeColor: Record<GraphEdge['kind'], string> = { satisfies: '#a855f7', verifies: '#14b8a6' }
 
   return (
     <div className="mt-4 flex flex-col gap-2">
@@ -329,10 +404,14 @@ function TraceGraphTab({ requirements, designElements, testCases }) {
 // Tab: XMI Export
 // ---------------------------------------------------------------------------
 
-function XMIExportTab({ requirements, designElements, testCases }) {
+function XMIExportTab({ requirements, designElements, testCases }: {
+  requirements: Requirement[]
+  designElements: DesignElement[]
+  testCases: TestCase[]
+}) {
   const [xmiText,  setXmiText]  = useState('')
   const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState(null)
+  const [error,    setError]    = useState<string | null>(null)
   const [version,  setVersion]  = useState('1.7')
 
   const handleExport = useCallback(async () => {
@@ -466,7 +545,9 @@ function XMIExportTab({ requirements, designElements, testCases }) {
 // SysMLTracePanel
 // ---------------------------------------------------------------------------
 
-const TABS = [
+type TabId = 'matrix' | 'graph' | 'xmi'
+
+const TABS: { id: TabId; label: string; icon: typeof Table2 }[] = [
   { id: 'matrix', label: 'Coverage Matrix', icon: Table2 },
   { id: 'graph',  label: 'Trace Graph',     icon: GitBranch },
   { id: 'xmi',    label: 'XMI Export',      icon: FileCode },
@@ -479,14 +560,17 @@ const TABS = [
  * -----
  * className   {string}   Extra Tailwind classes.
  */
-export default function SysMLTracePanel({ className = '' }) {
-  const [activeTab,    setActiveTab]    = useState('matrix')
-  const [requirements, setRequirements] = useState(DEMO_REQUIREMENTS)
-  const [designEls,    setDesignEls]    = useState(DEMO_DESIGN_ELEMENTS)
-  const [testCases,    setTestCases]    = useState(DEMO_TEST_CASES)
-  const [report,       setReport]       = useState(null)
+export default function SysMLTracePanel({ className = '' }: { className?: string }) {
+  const [activeTab,    setActiveTab]    = useState<TabId>('matrix')
+  // NOTE (found, not fixed — migration is rename-only): these setters are never called.
+  // The panel has no UI to add/edit requirements, design elements, or test cases — it only
+  // ever displays DEMO_*. Editing is state-ready but not wired to any control.
+  const [requirements, _setRequirements] = useState<Requirement[]>(DEMO_REQUIREMENTS)
+  const [designEls,    _setDesignEls]    = useState<DesignElement[]>(DEMO_DESIGN_ELEMENTS)
+  const [testCases,    _setTestCases]    = useState<TestCase[]>(DEMO_TEST_CASES)
+  const [report,       setReport]       = useState<CoverageReport | null>(null)
   const [computing,    setComputing]    = useState(false)
-  const [error,        setError]        = useState(null)
+  const [error,        setError]        = useState<string | null>(null)
 
   const handleComputeCoverage = useCallback(async () => {
     setComputing(true)

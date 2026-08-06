@@ -16,9 +16,9 @@ import { resolve } from 'path'
 
 const PLM_DIR = resolve(__dirname, '../plm')
 
-const Q2D_SRC = readFileSync(resolve(PLM_DIR, 'QuoteToDeliveryPanel.jsx'), 'utf8')
-const CONF_SRC = readFileSync(resolve(PLM_DIR, 'ConfiguratorPanel.jsx'), 'utf8')
-const SYSML_SRC = readFileSync(resolve(PLM_DIR, 'SysMLTracePanel.jsx'), 'utf8')
+const Q2D_SRC = readFileSync(resolve(PLM_DIR, 'QuoteToDeliveryPanel.tsx'), 'utf8')
+const CONF_SRC = readFileSync(resolve(PLM_DIR, 'ConfiguratorPanel.tsx'), 'utf8')
+const SYSML_SRC = readFileSync(resolve(PLM_DIR, 'SysMLTracePanel.tsx'), 'utf8')
 
 
 // ===========================================================================

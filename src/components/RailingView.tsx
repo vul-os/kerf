@@ -1,13 +1,53 @@
-// RailingView.jsx — Viewer/editor for .railing.json files.
+// RailingView.tsx — Viewer/editor for .railing.json files.
 import { useState, useEffect, useRef, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import {
   defaultRailing, validateRailing,
-  computePostPositions, computeBalusterPositions, railingFromSketch,
+  computePostPositions, computeBalusterPositions,
 } from '../lib/railings.js'
 
+// ── Types ──────────────────────────────────────────────────────────────────────
+//
+// src/lib/railings.js is plain JS (outside this slice — not part of src/components)
+// documented with loose JSDoc (`@returns {object}` / `{x,y,z}` shorthand that isn't a
+// real annotated shape), so its exports don't carry usable inferred types. The railing
+// JSON shape is modeled locally here and applied via casts at each call site instead.
+
+export interface RailingPoint {
+  x: number
+  y: number
+  z: number
+}
+
+export interface RailingProfileSpec {
+  profile: string
+  size_mm: number
+  offset_mm?: number
+  height_mm?: number
+  spacing_mm?: number
+}
+
+export interface Railing {
+  version: number
+  name?: string
+  path: RailingPoint[]
+  height_mm: number
+  top_rail: RailingProfileSpec
+  posts: RailingProfileSpec
+  balusters: RailingProfileSpec
+}
+
+export interface RailingViewProps {
+  content: string
+  fileName?: string
+  onContentChange?: (json: string) => void
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
-function parse(c) { try { return JSON.parse(c) } catch { return null } }
+function parse(c: string): Railing | null {
+  try { return JSON.parse(c) as Railing } catch { return null }
+}
 
 const iCls = 'w-full bg-ink-950 border border-ink-700 rounded px-2 py-0.5 text-[12px] text-ink-200 focus:outline-none focus:border-kerf-300/60'
 const sCls = 'bg-ink-950 border border-ink-700 rounded px-1.5 py-0.5 text-[11px] text-ink-200 focus:outline-none focus:border-kerf-300/60'
@@ -15,7 +55,7 @@ const btnCls = 'inline-flex items-center gap-1 text-[11px] text-kerf-300 hover:t
 
 const PROFILES = ['round', 'square', 'flat']
 
-function Section({ title, action, children }) {
+function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
@@ -26,8 +66,8 @@ function Section({ title, action, children }) {
     </div>
   )
 }
-const Empty = ({ children }) => <p className="text-[11px] text-ink-600 italic py-1">{children}</p>
-const Stat = ({ label, value }) => (
+const Empty = ({ children }: { children: ReactNode }) => <p className="text-[11px] text-ink-600 italic py-1">{children}</p>
+const Stat = ({ label, value }: { label: string; value: ReactNode }) => (
   <div className="flex flex-col gap-0.5">
     <span className="text-[10px] text-ink-500 uppercase tracking-wide">{label}</span>
     <span className="font-mono text-kerf-300 text-[13px]">{value}</span>
@@ -35,9 +75,8 @@ const Stat = ({ label, value }) => (
 )
 
 // ── SVG side-view preview ──────────────────────────────────────────────────────
-function RailingSVG({ railing }) {
+function RailingSVG({ railing }: { railing: Railing }) {
   const path = railing.path || []
-  const h = railing.height_mm || 1000
   if (path.length < 2) return <Empty>Add at least 2 path points to preview.</Empty>
 
   const W = 260
@@ -51,13 +90,13 @@ function RailingSVG({ railing }) {
 
   const scale = (W - margin * 2) / spanX
 
-  function toSvg(p, elevated = false) {
+  function toSvg(p: RailingPoint, elevated = false): [string, string] {
     const x = margin + (p.x - minX) * scale
     const y = elevated ? (margin + 10) : (H - margin)
     return [x.toFixed(1), y.toFixed(1)]
   }
 
-  const posts = computePostPositions(path, railing.posts?.spacing_mm || 1200)
+  const posts = computePostPositions(path, railing.posts?.spacing_mm || 1200) as RailingPoint[]
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto rounded border border-ink-800 bg-ink-950">
@@ -77,29 +116,30 @@ function RailingSVG({ railing }) {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function RailingView({ content, fileName, onContentChange }) {
-  const [railing, setRailing] = useState(() =>
-    parse(content) || defaultRailing({ path: [{ x: 0, y: 0, z: 0 }, { x: 3000, y: 0, z: 0 }] })
+export default function RailingView({ content, onContentChange }: RailingViewProps) {
+  const [railing, setRailing] = useState<Railing>(() =>
+    parse(content) || (defaultRailing({ path: [{ x: 0, y: 0, z: 0 }, { x: 3000, y: 0, z: 0 }] }) as Railing)
   )
-  const debRef = useRef(null)
+  const debRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- content-prop sync, pre-existing before this migration.
   useEffect(() => { const n = parse(content); if (n) setRailing(n) }, [content])
 
-  const commit = useCallback((next) => {
+  const commit = useCallback((next: Railing) => {
     setRailing(next)
     if (debRef.current) clearTimeout(debRef.current)
     debRef.current = setTimeout(() => onContentChange?.(JSON.stringify(next, null, 2)), 250)
   }, [onContentChange])
 
-  const patch = (u) => commit({ ...railing, ...u })
-  const patchTopRail = (u) => patch({ top_rail: { ...railing.top_rail, ...u } })
-  const patchPosts = (u) => patch({ posts: { ...railing.posts, ...u } })
-  const patchBalusters = (u) => patch({ balusters: { ...railing.balusters, ...u } })
+  const patch = (u: Partial<Railing>) => commit({ ...railing, ...u })
+  const patchTopRail = (u: Partial<RailingProfileSpec>) => patch({ top_rail: { ...railing.top_rail, ...u } })
+  const patchPosts = (u: Partial<RailingProfileSpec>) => patch({ posts: { ...railing.posts, ...u } })
+  const patchBalusters = (u: Partial<RailingProfileSpec>) => patch({ balusters: { ...railing.balusters, ...u } })
 
   const path = railing.path || []
-  const postPositions = computePostPositions(path, railing.posts?.spacing_mm || 1200)
-  const balPositions = computeBalusterPositions(path, railing.balusters?.spacing_mm || 120)
-  const validation = validateRailing(railing)
+  const postPositions = computePostPositions(path, railing.posts?.spacing_mm || 1200) as RailingPoint[]
+  const balPositions = computeBalusterPositions(path, railing.balusters?.spacing_mm || 120) as RailingPoint[]
+  const validation = validateRailing(railing) as { ok: boolean; errors: string[] }
 
   function fromStair() {
     const fileId = prompt('Stair file ID (for reference):')
@@ -114,7 +154,7 @@ export default function RailingView({ content, fileName, onContentChange }) {
     commit({ ...railing, path: [...path, { x: last.x + 1000, y: last.y, z: last.z }] })
   }
 
-  function updatePoint(idx, raw) {
+  function updatePoint(idx: number, raw: string) {
     const parts = raw.split(',').map(Number)
     if (parts.length !== 3 || parts.some(Number.isNaN)) return
     const next = path.map((p, i) => i === idx ? { x: parts[0], y: parts[1], z: parts[2] } : p)
@@ -142,7 +182,7 @@ export default function RailingView({ content, fileName, onContentChange }) {
       {/* Top rail */}
       <Section title="Top rail">
         <div className="grid grid-cols-3 gap-3 text-[12px]">
-          {[
+          {([
             ['Profile', (
               <select className={sCls} value={railing.top_rail?.profile || 'round'}
                 onChange={(e) => patchTopRail({ profile: e.target.value })}>
@@ -151,7 +191,7 @@ export default function RailingView({ content, fileName, onContentChange }) {
             )],
             ['Size (mm)', <input className={iCls} type="number" value={railing.top_rail?.size_mm ?? 50} onChange={(e) => patchTopRail({ size_mm: parseFloat(e.target.value) || 50 })} />],
             ['Offset (mm)', <input className={iCls} type="number" value={railing.top_rail?.offset_mm ?? 0} onChange={(e) => patchTopRail({ offset_mm: parseFloat(e.target.value) || 0 })} />],
-          ].map(([label, field]) => (
+          ] as Array<[string, ReactNode]>).map(([label, field]) => (
             <div key={label} className="flex flex-col gap-1">
               <span className="text-[10px] text-ink-500 uppercase tracking-wide">{label}</span>
               {field}
@@ -163,7 +203,7 @@ export default function RailingView({ content, fileName, onContentChange }) {
       {/* Posts */}
       <Section title="Posts">
         <div className="grid grid-cols-2 gap-3 text-[12px]">
-          {[
+          {([
             ['Spacing (mm)', <input className={iCls} type="number" value={railing.posts?.spacing_mm ?? 1200} onChange={(e) => patchPosts({ spacing_mm: parseFloat(e.target.value) || 1200 })} />],
             ['Profile', (
               <select className={sCls} value={railing.posts?.profile || 'round'} onChange={(e) => patchPosts({ profile: e.target.value })}>
@@ -172,7 +212,7 @@ export default function RailingView({ content, fileName, onContentChange }) {
             )],
             ['Size (mm)', <input className={iCls} type="number" value={railing.posts?.size_mm ?? 40} onChange={(e) => patchPosts({ size_mm: parseFloat(e.target.value) || 40 })} />],
             ['Height (mm)', <input className={iCls} type="number" value={railing.posts?.height_mm ?? 1000} onChange={(e) => patchPosts({ height_mm: parseFloat(e.target.value) || 1000 })} />],
-          ].map(([label, field]) => (
+          ] as Array<[string, ReactNode]>).map(([label, field]) => (
             <div key={label} className="flex flex-col gap-1">
               <span className="text-[10px] text-ink-500 uppercase tracking-wide">{label}</span>
               {field}
@@ -184,7 +224,7 @@ export default function RailingView({ content, fileName, onContentChange }) {
       {/* Balusters */}
       <Section title="Balusters">
         <div className="grid grid-cols-2 gap-3 text-[12px]">
-          {[
+          {([
             ['Spacing (mm)', <input className={iCls} type="number" value={railing.balusters?.spacing_mm ?? 120} onChange={(e) => patchBalusters({ spacing_mm: parseFloat(e.target.value) || 120 })} />],
             ['Profile', (
               <select className={sCls} value={railing.balusters?.profile || 'round'} onChange={(e) => patchBalusters({ profile: e.target.value })}>
@@ -193,7 +233,7 @@ export default function RailingView({ content, fileName, onContentChange }) {
             )],
             ['Size (mm)', <input className={iCls} type="number" value={railing.balusters?.size_mm ?? 14} onChange={(e) => patchBalusters({ size_mm: parseFloat(e.target.value) || 14 })} />],
             ['Height (mm)', <input className={iCls} type="number" value={railing.balusters?.height_mm ?? 900} onChange={(e) => patchBalusters({ height_mm: parseFloat(e.target.value) || 900 })} />],
-          ].map(([label, field]) => (
+          ] as Array<[string, ReactNode]>).map(([label, field]) => (
             <div key={label} className="flex flex-col gap-1">
               <span className="text-[10px] text-ink-500 uppercase tracking-wide">{label}</span>
               {field}

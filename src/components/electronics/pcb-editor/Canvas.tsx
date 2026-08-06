@@ -26,6 +26,67 @@
 //   pushedTraceIds — [id]  — traces currently being shoved (highlighted)
 
 import { useCallback, useRef, useState } from 'react'
+import type { MouseEvent as ReactMouseEvent } from 'react'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export type PCBLayer = 'top' | 'bottom' | 'inner1' | 'inner2'
+export type ActiveTool = 'select' | 'route' | 'push-shove' | 'delete'
+export type ObjectType = 'pad' | 'trace'
+
+export interface Pad {
+  id: string
+  x: number
+  y: number
+  layer: PCBLayer
+  net?: string
+  drill?: number
+  size?: number
+}
+
+export interface TracePoint { x: number; y: number }
+
+export interface Trace {
+  id: string
+  points: TracePoint[]
+  layer: PCBLayer
+  width?: number
+  net?: string
+}
+
+export interface Keepout {
+  id: string
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+export interface RouteCommit {
+  start_pad: string
+  end_pad: string
+  layer?: PCBLayer
+  width: number
+}
+
+export interface ShoveCommit {
+  trace_id: string
+  push_vector: [number, number]
+}
+
+export interface CanvasProps {
+  pads?: Pad[]
+  traces?: Trace[]
+  keepouts?: Keepout[]
+  activeTool?: ActiveTool
+  activeLayer?: PCBLayer
+  selectedId?: string | null
+  onSelectObject?: (id: string | null, type: ObjectType | null) => void
+  onRouteCommit?: (event: RouteCommit) => void
+  onShoveCommit?: (event: ShoveCommit) => void
+  onDeleteObject?: (id: string, type: ObjectType) => void
+  pushedTraceIds?: string[]
+}
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -34,14 +95,14 @@ const VIEW_H = 800
 const GRID   = 25   // mil
 const TRACE_DEFAULT_WIDTH = 10  // mil
 
-const LAYER_COLOR = {
+const LAYER_COLOR: Record<PCBLayer, string> = {
   top:    '#ef4444',
   bottom: '#3b82f6',
   inner1: '#f59e0b',
   inner2: '#8b5cf6',
 }
 
-const LAYER_OPACITY = {
+const LAYER_OPACITY: Record<PCBLayer, number> = {
   top:    1,
   bottom: 0.7,
   inner1: 0.85,
@@ -50,11 +111,11 @@ const LAYER_OPACITY = {
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function snapToGrid(v) {
+function snapToGrid(v: number) {
   return Math.round(v / GRID) * GRID
 }
 
-function svgPoint(svgEl, clientX, clientY) {
+function svgPoint(svgEl: SVGSVGElement, clientX: number, clientY: number) {
   const pt = svgEl.createSVGPoint()
   pt.x = clientX
   pt.y = clientY
@@ -95,7 +156,7 @@ function BoardOutline() {
 
 // ─── Keepout ──────────────────────────────────────────────────────────────────
 
-function Keepouts({ keepouts }) {
+function Keepouts({ keepouts }: { keepouts: Keepout[] }) {
   return (
     <g data-layer="keepout">
       {keepouts.map((k) => (
@@ -109,7 +170,15 @@ function Keepouts({ keepouts }) {
 
 // ─── Traces ───────────────────────────────────────────────────────────────────
 
-function Traces({ traces, activeLayer, selectedId, pushedTraceIds, onSelect }) {
+interface TracesProps {
+  traces: Trace[]
+  activeLayer?: PCBLayer
+  selectedId?: string | null
+  pushedTraceIds?: string[]
+  onSelect: (id: string, type: ObjectType) => void
+}
+
+function Traces({ traces, selectedId, pushedTraceIds, onSelect }: TracesProps) {
   return (
     <g data-layer="traces">
       {traces.map((tr) => {
@@ -141,7 +210,15 @@ function Traces({ traces, activeLayer, selectedId, pushedTraceIds, onSelect }) {
 
 // ─── Pads ─────────────────────────────────────────────────────────────────────
 
-function Pads({ pads, activeLayer, selectedId, routingFromId, onSelect }) {
+interface PadsProps {
+  pads: Pad[]
+  activeLayer?: PCBLayer
+  selectedId?: string | null
+  routingFromId?: string
+  onSelect: (id: string, type: ObjectType) => void
+}
+
+function Pads({ pads, selectedId, routingFromId, onSelect }: PadsProps) {
   return (
     <g data-layer="pads">
       {pads.map((pad) => {
@@ -179,7 +256,13 @@ function Pads({ pads, activeLayer, selectedId, routingFromId, onSelect }) {
 
 // ─── Route preview ────────────────────────────────────────────────────────────
 
-function RoutePreview({ from, cursor, layer }) {
+interface RoutePreviewProps {
+  from: { x: number; y: number } | null
+  cursor: { x: number; y: number } | null
+  layer?: PCBLayer
+}
+
+function RoutePreview({ from, cursor, layer }: RoutePreviewProps) {
   if (!from || !cursor) return null
   const color = LAYER_COLOR[layer] ?? '#888'
   return (
@@ -196,7 +279,13 @@ function RoutePreview({ from, cursor, layer }) {
 
 // ─── ShovePreview ─────────────────────────────────────────────────────────────
 
-function ShovePreview({ shoveTrace, dx, dy }) {
+interface ShovePreviewProps {
+  shoveTrace: Trace | null
+  dx: number
+  dy: number
+}
+
+function ShovePreview({ shoveTrace, dx, dy }: ShovePreviewProps) {
   if (!shoveTrace || (dx === 0 && dy === 0)) return null
   const pts = shoveTrace.points.map((p) => `${p.x + dx},${p.y + dy}`).join(' ')
   return (
@@ -221,16 +310,16 @@ export default function Canvas({
   onShoveCommit,
   onDeleteObject,
   pushedTraceIds = [],
-}) {
-  const svgRef = useRef(null)
-  const [cursor, setCursor] = useState(null)     // snapped cursor position
-  const [routingFrom, setRoutingFrom] = useState(null)   // {id, x, y}
-  const [shoveState, setShoveState] = useState(null)     // {trace, startPt}
+}: CanvasProps) {
+  const svgRef = useRef<SVGSVGElement>(null)
+  const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null)     // snapped cursor position
+  const [routingFrom, setRoutingFrom] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [shoveState, setShoveState] = useState<{ trace: Trace; startPt: { x: number; y: number } } | null>(null)
   const [shoveDelta, setShoveDelta] = useState({ dx: 0, dy: 0 })
 
   // ── pointer helpers ─────────────────────────────────────────────────────────
 
-  const getSvgPos = useCallback((e) => {
+  const getSvgPos = useCallback((e: ReactMouseEvent<SVGSVGElement>) => {
     if (!svgRef.current) return { x: 0, y: 0 }
     const raw = svgPoint(svgRef.current, e.clientX, e.clientY)
     return { x: snapToGrid(raw.x), y: snapToGrid(raw.y) }
@@ -238,7 +327,7 @@ export default function Canvas({
 
   // ── pointer move ────────────────────────────────────────────────────────────
 
-  const handleMouseMove = useCallback((e) => {
+  const handleMouseMove = useCallback((e: ReactMouseEvent<SVGSVGElement>) => {
     const pos = getSvgPos(e)
     setCursor(pos)
 
@@ -251,20 +340,20 @@ export default function Canvas({
 
   // ── click on background ─────────────────────────────────────────────────────
 
-  const handleBgClick = useCallback((e) => {
+  const handleBgClick = useCallback(() => {
     if (activeTool === 'route' && routingFrom) {
       // cancel routing if clicking on empty space
       setRoutingFrom(null)
     } else {
-      onSelectObject && onSelectObject(null, null)
+      onSelectObject?.(null, null)
     }
   }, [activeTool, routingFrom, onSelectObject])
 
   // ── pad / trace click ───────────────────────────────────────────────────────
 
-  const handleObjectSelect = useCallback((id, type) => {
+  const handleObjectSelect = useCallback((id: string, type: ObjectType) => {
     if (activeTool === 'delete') {
-      onDeleteObject && onDeleteObject(id, type)
+      onDeleteObject?.(id, type)
       return
     }
 
@@ -277,7 +366,7 @@ export default function Canvas({
         } else {
           // Complete route to this pad
           if (id !== routingFrom.id) {
-            onRouteCommit && onRouteCommit({
+            onRouteCommit?.({
               start_pad: routingFrom.id,
               end_pad: id,
               layer: activeLayer,
@@ -302,7 +391,7 @@ export default function Canvas({
     }
 
     // select mode
-    onSelectObject && onSelectObject(id, type)
+    onSelectObject?.(id, type)
   }, [activeTool, routingFrom, pads, traces, cursor, activeLayer, onRouteCommit, onDeleteObject, onSelectObject])
 
   // ── pointer up (commit shove) ────────────────────────────────────────────────
@@ -311,7 +400,7 @@ export default function Canvas({
     if (activeTool === 'push-shove' && shoveState) {
       const { dx, dy } = shoveDelta
       if (Math.abs(dx) > GRID || Math.abs(dy) > GRID) {
-        onShoveCommit && onShoveCommit({
+        onShoveCommit?.({
           trace_id: shoveState.trace.id,
           push_vector: [dx, dy],
         })

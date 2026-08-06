@@ -23,6 +23,77 @@ import { useMemo } from 'react'
 import { Ruler, TrendingUp } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
+// Types — apparel grading tool output isn't declared elsewhere, so its shape
+// is captured here from how this panel destructures it.
+// ---------------------------------------------------------------------------
+
+export interface GradingBbox {
+  width?: number
+  height?: number
+}
+
+export interface GradingSizeSpec {
+  bust_girth_cm?: number
+  width_cm?: number
+  height_cm?: number
+  area_cm2?: number
+  grade_dx_mm?: number
+  grade_dy_mm?: number
+}
+
+export interface SizeRunData {
+  block?: string | null
+  base_size?: string | null
+  spec?: string | null
+  sizes: Record<string, GradingSizeSpec>
+}
+
+export interface SingleGradeData {
+  block?: string
+  from_size?: string
+  to_size?: string
+  spec?: string
+  grade_dx_mm?: number
+  grade_dy_mm?: number
+  from_bbox_cm?: GradingBbox
+  to_bbox_cm?: GradingBbox
+  from_area_cm2?: number
+  to_area_cm2?: number
+}
+
+export interface GradingRaw {
+  error?: string
+  from_size?: string
+  to_size?: string
+  from_bbox_cm?: GradingBbox
+  to_bbox_cm?: GradingBbox
+  block?: string
+  spec?: string
+  grade_dx_mm?: number
+  grade_dy_mm?: number
+  from_area_cm2?: number
+  to_area_cm2?: number
+  sizes?: Record<string, GradingSizeSpec>
+  base_size?: string
+  [key: string]: unknown
+}
+
+export type ParsedGradingResult =
+  | { kind: 'empty' }
+  | { kind: 'invalid'; error: string }
+  | { kind: 'ok'; type: 'single'; data: SingleGradeData }
+  | { kind: 'ok'; type: 'size_run'; data: SizeRunData }
+
+export interface ApparelGradingPanelProps {
+  /** Parsed or raw JSON-string output from an apparel grading tool. */
+  result?: GradingRaw | string | null
+  /** Raw content string (from panelRegistry); parsed and merged over `result` when present. */
+  content?: string
+  /** Extra CSS classes on root. */
+  className?: string
+}
+
+// ---------------------------------------------------------------------------
 // Pure helpers (exported for tests)
 // ---------------------------------------------------------------------------
 
@@ -31,10 +102,15 @@ import { Ruler, TrendingUp } from 'lucide-react'
  * Returns { kind: 'ok'|'empty'|'invalid', type, data, error? }
  *
  * type is 'size_run' (grade_bodice / pattern_grade) or 'single' (apply_grading).
+ *
+ * Exported alongside the default ApparelGradingPanel component (module's own
+ * pure helpers, exercised directly by vitest) — pre-existing; splitting into
+ * a separate module is a refactor out of scope for a rename-only migration (T-515).
  */
-export function parseGradingResult(raw) {
+// eslint-disable-next-line react-refresh/only-export-components -- see comment above.
+export function parseGradingResult(raw: GradingRaw | string | null | undefined): ParsedGradingResult {
   if (raw == null) return { kind: 'empty' }
-  const obj = typeof raw === 'string'
+  const obj: GradingRaw | null = typeof raw === 'string'
     ? (() => { try { return JSON.parse(raw) } catch { return null } })()
     : raw
   if (!obj || typeof obj !== 'object') return { kind: 'invalid', error: 'Expected JSON object' }
@@ -80,9 +156,10 @@ export function parseGradingResult(raw) {
 /**
  * Format grade deltas as a compact string.
  */
-export function formatGradeDelta(dx_mm, dy_mm) {
+// eslint-disable-next-line react-refresh/only-export-components -- see parseGradingResult above.
+export function formatGradeDelta(dx_mm?: number | null, dy_mm?: number | null) {
   if (dx_mm == null && dy_mm == null) return '—'
-  const fmt = (n) => {
+  const fmt = (n?: number | null) => {
     if (n == null || !Number.isFinite(n)) return '—'
     const sign = n >= 0 ? '+' : '−'
     return `${sign}${Math.abs(n).toFixed(1)}`
@@ -94,8 +171,9 @@ export function formatGradeDelta(dx_mm, dy_mm) {
  * Return a Tailwind text-colour class for a size label.
  * Maps standard alpha sizes to a spectrum.
  */
-export function sizeColor(size) {
-  const map = {
+// eslint-disable-next-line react-refresh/only-export-components -- see parseGradingResult above.
+export function sizeColor(size?: string) {
+  const map: Record<string, string> = {
     XS: 'text-sky-400',
     S:  'text-teal-400',
     M:  'text-emerald-400',
@@ -110,7 +188,7 @@ export function sizeColor(size) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function SizeRunTable({ sizes, baseSize }) {
+function SizeRunTable({ sizes, baseSize }: { sizes: Record<string, GradingSizeSpec>; baseSize?: string | null }) {
   const rows = Object.entries(sizes)
   if (rows.length === 0) return <p className="text-xs text-ink-500 mt-2">No sizes found.</p>
   return (
@@ -165,7 +243,7 @@ function SizeRunTable({ sizes, baseSize }) {
   )
 }
 
-function SingleGradeView({ data }) {
+function SingleGradeView({ data }: { data: SingleGradeData }) {
   const { block, from_size, to_size, spec, grade_dx_mm, grade_dy_mm,
           from_bbox_cm, to_bbox_cm, from_area_cm2, to_area_cm2 } = data
   return (
@@ -218,14 +296,10 @@ function SingleGradeView({ data }) {
 
 /**
  * ApparelGradingPanel — renders pattern grading results.
- *
- * @param {Object} props
- * @param {Object|string|null} props.result  — grading tool output
- * @param {string} [props.className]
  */
-export default function ApparelGradingPanel({ result = null, content, className = '' }) {
+export default function ApparelGradingPanel({ result = null, content, className = '' }: ApparelGradingPanelProps) {
   // content prop (from panelRegistry) is a JSON string; parse and use as result
-  const effectiveResult = useMemo(() => {
+  const effectiveResult: GradingRaw | string | null = useMemo(() => {
     if (content != null) {
       try { return { ...JSON.parse(content), ...((result != null && typeof result === 'object') ? result : {}) } } catch { return result }
     }

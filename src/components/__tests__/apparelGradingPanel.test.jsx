@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { resolve } from 'path'
 
 import {
@@ -14,8 +14,13 @@ import {
   sizeColor,
 } from '../ApparelGradingPanel.jsx'
 
+// Extension-agnostic source read: components migrate from .jsx to .tsx one
+// at a time (T-513..T-517), so a literal `.jsx` path here would break the
+// moment its target is renamed. Try .tsx first, then fall back to .jsx.
+const APPAREL_TSX = resolve(__dirname, '../ApparelGradingPanel.tsx')
+const APPAREL_JSX = resolve(__dirname, '../ApparelGradingPanel.jsx')
 const SRC = readFileSync(
-  resolve(__dirname, '../ApparelGradingPanel.jsx'),
+  existsSync(APPAREL_TSX) ? APPAREL_TSX : APPAREL_JSX,
   'utf8',
 )
 

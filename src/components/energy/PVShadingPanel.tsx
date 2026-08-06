@@ -19,15 +19,31 @@
 // Props: { projectId: string }
 
 import { useState, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import { Sun, Play, AlertTriangle, Plus, Trash2, Zap, MapPin } from 'lucide-react'
 import { api } from '../../lib/api.js'
+import type { PvShadingResult } from '../../types'
 import MonthlyLoadChart from './MonthlyLoadChart.jsx'
 
 // ---------------------------------------------------------------------------
 // Default values
 // ---------------------------------------------------------------------------
 
-const DEFAULT_MODULE = {
+// Numeric fields double as free-text-while-editing state: onChange hands back
+// the raw <input> string verbatim (matching the original untyped behaviour),
+// so values are `number | string` until parsed at submit-time in handleRun.
+interface ModuleParams {
+  Iph: number | string
+  Io: number | string
+  Rs: number | string
+  Rsh: number | string
+  n: number | string
+  T_C: number | string
+  n_cells: number | string
+  cells_per_bypass: number | string
+}
+
+const DEFAULT_MODULE: ModuleParams = {
   // Single-diode defaults for a ~255 Wp 60-cell module at STC
   Iph: 9.0,
   Io: 1.5e-10,
@@ -39,7 +55,12 @@ const DEFAULT_MODULE = {
   cells_per_bypass: 20,  // 3 bypass diodes
 }
 
-const DEFAULT_SHADING_PATTERN = [
+interface ShadingSubstring {
+  cells: number | string
+  irradiance: number | string
+}
+
+const DEFAULT_SHADING_PATTERN: ShadingSubstring[] = [
   { cells: 20, irradiance: 200 },   // one substring shaded
   { cells: 40, irradiance: 1000 },  // rest unshaded
 ]
@@ -48,7 +69,20 @@ const DEFAULT_SHADING_PATTERN = [
 // Helpers
 // ---------------------------------------------------------------------------
 
-function NumInput({ value, onChange, min, max, step = 'any', disabled, placeholder, className }) {
+// Note: `aria-label` is accepted (one call site below passes it) but was
+// never destructured/forwarded to the underlying <input> in the original
+// JS — pre-existing accessibility bug, kept as-is, not fixed here.
+function NumInput({ value, onChange, min, max, step = 'any', disabled, placeholder, className }: {
+  value: number | string
+  onChange: (v: string) => void
+  min?: number
+  max?: number
+  step?: number | string
+  disabled?: boolean
+  placeholder?: string
+  className?: string
+  'aria-label'?: string
+}) {
   return (
     <input
       type="number"
@@ -64,7 +98,7 @@ function NumInput({ value, onChange, min, max, step = 'any', disabled, placehold
   )
 }
 
-function FieldRow({ label, hint, children }) {
+function FieldRow({ label, hint, children }: { label: ReactNode; hint?: string; children: ReactNode }) {
   return (
     <div className="flex items-start gap-2 mb-1.5">
       <label className="text-[11px] text-ink-400 w-36 flex-shrink-0 pt-1.5 leading-tight">
@@ -76,7 +110,7 @@ function FieldRow({ label, hint, children }) {
   )
 }
 
-function ResultRow({ label, value, unit, accent }) {
+function ResultRow({ label, value, unit, accent }: { label: string; value: string; unit?: string; accent?: boolean }) {
   return (
     <div className="flex items-center justify-between py-1 border-b border-ink-800 last:border-0">
       <span className="text-[11px] text-ink-400">{label}</span>
@@ -87,12 +121,12 @@ function ResultRow({ label, value, unit, accent }) {
   )
 }
 
-function fmt2(n) {
+function fmt2(n: number | null | undefined) {
   if (n == null || !Number.isFinite(n)) return '—'
   return n.toFixed(2)
 }
 
-function fmt0(n) {
+function fmt0(n: number | null | undefined) {
   if (n == null || !Number.isFinite(n)) return '—'
   return n.toFixed(0)
 }
@@ -101,7 +135,12 @@ function fmt0(n) {
 // Obstruction row
 // ---------------------------------------------------------------------------
 
-function ObstructionRow({ obs, idx, onChange, onRemove }) {
+function ObstructionRow({ obs, idx, onChange, onRemove }: {
+  obs: ShadingSubstring
+  idx: number
+  onChange: (idx: number, updated: ShadingSubstring) => void
+  onRemove: (idx: number) => void
+}) {
   const inputCls = 'bg-ink-900 border border-ink-700 rounded px-1 py-0.5 text-[11px] text-ink-100 focus:outline-none focus:border-kerf-300 w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none'
 
   return (
@@ -144,38 +183,38 @@ function ObstructionRow({ obs, idx, onChange, onRemove }) {
 // Main panel
 // ---------------------------------------------------------------------------
 
-export default function PVShadingPanel({ projectId }) {
+export default function PVShadingPanel({ projectId }: { projectId: string }) {
   // Array layout
-  const [modulesPerString, setModulesPerString] = useState(10)
-  const [stringsInParallel, setStringsInParallel] = useState(2)
-  const [tiltDeg, setTiltDeg] = useState(30)
-  const [azimuthDeg, setAzimuthDeg] = useState(180)  // South
+  const [modulesPerString, setModulesPerString] = useState<number | string>(10)
+  const [stringsInParallel, setStringsInParallel] = useState<number | string>(2)
+  const [tiltDeg, setTiltDeg] = useState<number | string>(30)
+  const [azimuthDeg, setAzimuthDeg] = useState<number | string>(180)  // South
   // Latitude — drives TMY-aware monthly yield fractions; default 30°N for compat
-  const [latitude, setLatitude] = useState(30)
-  const [poa_annual, setPoa_annual] = useState(1200)  // kWh/m²/yr
-  const [pr, setPr] = useState(0.80)  // Performance ratio
+  const [latitude, setLatitude] = useState<number | string>(30)
+  const [poa_annual, setPoa_annual] = useState<number | string>(1200)  // kWh/m²/yr
+  const [pr, setPr] = useState<number | string>(0.80)  // Performance ratio
 
   // Module params
-  const [module, setModule] = useState(DEFAULT_MODULE)
+  const [module, setModule] = useState<ModuleParams>(DEFAULT_MODULE)
 
   // Shading pattern (cells + irradiance per substring)
-  const [shadingPattern, setShadingPattern] = useState(DEFAULT_SHADING_PATTERN)
+  const [shadingPattern, setShadingPattern] = useState<ShadingSubstring[]>(DEFAULT_SHADING_PATTERN)
 
   // Bypass diodes
   const [bypassDiodes, setBypassDiodes] = useState(true)
-  const [bypassFwdV, setBypassFwdV] = useState(0.7)
+  const [bypassFwdV, setBypassFwdV] = useState<number | string>(0.7)
 
   // State
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [result, setResult] = useState(null)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<PvShadingResult | null>(null)
 
-  const handleObsChange = useCallback((idx, updated) => {
+  const handleObsChange = useCallback((idx: number, updated: ShadingSubstring) => {
     setShadingPattern((prev) => prev.map((o, i) => (i === idx ? updated : o)))
     setResult(null)
   }, [])
 
-  const handleObsRemove = useCallback((idx) => {
+  const handleObsRemove = useCallback((idx: number) => {
     setShadingPattern((prev) => prev.filter((_, i) => i !== idx))
     setResult(null)
   }, [])
@@ -191,40 +230,40 @@ export default function PVShadingPanel({ projectId }) {
     setError(null)
     setResult(null)
     try {
-      const latVal = parseFloat(latitude)
+      const latVal = parseFloat(String(latitude))
       const body = {
         // Array geometry
-        modules_per_string: parseInt(modulesPerString, 10) || 10,
-        strings_in_parallel: parseInt(stringsInParallel, 10) || 1,
-        tilt_deg: parseFloat(tiltDeg) || 30,
-        azimuth_deg: parseFloat(azimuthDeg) || 180,
+        modules_per_string: parseInt(String(modulesPerString), 10) || 10,
+        strings_in_parallel: parseInt(String(stringsInParallel), 10) || 1,
+        tilt_deg: parseFloat(String(tiltDeg)) || 30,
+        azimuth_deg: parseFloat(String(azimuthDeg)) || 180,
         // Latitude drives TMY monthly fractions on the backend
         latitude: Number.isFinite(latVal) ? latVal : 30,
-        poa_annual_kWh_m2: parseFloat(poa_annual) || 1200,
-        pr: parseFloat(pr) || 0.80,
+        poa_annual_kWh_m2: parseFloat(String(poa_annual)) || 1200,
+        pr: parseFloat(String(pr)) || 0.80,
         // Module
         module: {
-          Iph: parseFloat(module.Iph) || 9.0,
-          Io: parseFloat(module.Io) || 1.5e-10,
-          Rs: parseFloat(module.Rs) || 0.005,
-          Rsh: parseFloat(module.Rsh) || 400,
-          n: parseFloat(module.n) || 1.3,
-          T_C: parseFloat(module.T_C) || 25,
-          n_cells: parseInt(module.n_cells, 10) || 60,
-          cells_per_bypass: parseInt(module.cells_per_bypass, 10) || 20,
+          Iph: parseFloat(String(module.Iph)) || 9.0,
+          Io: parseFloat(String(module.Io)) || 1.5e-10,
+          Rs: parseFloat(String(module.Rs)) || 0.005,
+          Rsh: parseFloat(String(module.Rsh)) || 400,
+          n: parseFloat(String(module.n)) || 1.3,
+          T_C: parseFloat(String(module.T_C)) || 25,
+          n_cells: parseInt(String(module.n_cells), 10) || 60,
+          cells_per_bypass: parseInt(String(module.cells_per_bypass), 10) || 20,
         },
         // Shading: each string gets the same pattern for now (homogeneous)
         shading_pattern: shadingPattern.map((o) => ({
-          cells: parseInt(o.cells, 10) || 20,
-          irradiance: parseFloat(o.irradiance) ?? 1000,
+          cells: parseInt(String(o.cells), 10) || 20,
+          irradiance: parseFloat(String(o.irradiance)) ?? 1000,
         })),
         bypass_diodes: bypassDiodes,
-        bypass_fwd_v: parseFloat(bypassFwdV) || 0.7,
+        bypass_fwd_v: parseFloat(String(bypassFwdV)) || 0.7,
       }
       const data = await api.pvShading(projectId, body)
       setResult(data)
     } catch (err) {
-      setError(err?.message || 'API error')
+      setError(err instanceof Error ? err.message : 'API error')
     } finally {
       setLoading(false)
     }
@@ -240,17 +279,19 @@ export default function PVShadingPanel({ projectId }) {
         heating_kWh:   0,
         cooling_kWh:   0,
         lighting_kWh:  0,
-        equipment_kWh: m.yield_kWh ?? 0,
+        equipment_kWh: (m as { yield_kWh?: number })?.yield_kWh ?? 0,
       }))
     : null
 
   // Hemisphere label for UI hint
-  const latVal = parseFloat(latitude)
+  const latVal = parseFloat(String(latitude))
   const hemisphereHint = Number.isFinite(latVal)
     ? latVal >= 0
       ? `${latVal.toFixed(1)}°N — NH profile`
       : `${Math.abs(latVal).toFixed(1)}°S — SH flipped`
     : ''
+
+  const latitudeDeg = typeof result?.latitude_deg === 'number' ? result.latitude_deg : null
 
   return (
     <div className="h-full flex flex-col min-h-0 bg-ink-950 text-ink-100" data-testid="pv-shading-panel">
@@ -434,12 +475,12 @@ export default function PVShadingPanel({ projectId }) {
                 />
                 <ResultRow
                   label="Sum module GMPPs"
-                  value={fmt2(result.sum_module_gmpp_p_w)}
+                  value={fmt2(result.sum_module_gmpp_p_w as number | undefined)}
                   unit="W"
                 />
                 <ResultRow
                   label="Mismatch loss"
-                  value={fmt2(result.mismatch_loss_w)}
+                  value={fmt2(result.mismatch_loss_w as number | undefined)}
                   unit="W"
                 />
                 <ResultRow
@@ -456,12 +497,12 @@ export default function PVShadingPanel({ projectId }) {
                 />
                 <ResultRow
                   label="Specific yield"
-                  value={fmt0(result.specific_yield_kWh_kWp)}
+                  value={fmt0(result.specific_yield_kWh_kWp as number | undefined)}
                   unit="kWh/kWp"
                 />
                 <ResultRow
                   label="Array kWp"
-                  value={fmt2(result.array_kWp)}
+                  value={fmt2(result.array_kWp as number | undefined)}
                   unit="kWp"
                 />
               </div>
@@ -472,11 +513,11 @@ export default function PVShadingPanel({ projectId }) {
               <section>
                 <div className="text-[10px] uppercase tracking-wider text-ink-500 mb-2">
                   Monthly Energy Yield
-                  {result.latitude_deg != null && (
+                  {latitudeDeg != null && (
                     <span className="ml-2 normal-case text-ink-600">
-                      ({result.latitude_deg >= 0
-                        ? `${result.latitude_deg}°N`
-                        : `${Math.abs(result.latitude_deg)}°S`} TMY profile)
+                      ({latitudeDeg >= 0
+                        ? `${latitudeDeg}°N`
+                        : `${Math.abs(latitudeDeg)}°S`} TMY profile)
                     </span>
                   )}
                 </div>

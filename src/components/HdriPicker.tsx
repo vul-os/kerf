@@ -1,5 +1,5 @@
 /**
- * HdriPicker.jsx — UI widget for selecting an HDRI sky preset.
+ * HdriPicker.tsx — UI widget for selecting an HDRI sky preset.
  *
  * Renders a horizontal strip of thumbnail cards, one per preset. The selected
  * card gets a kerf-accent ring. Clicking a card calls `onSelect(preset)`.
@@ -20,15 +20,27 @@
  */
 
 import clsx from 'clsx'
-import { HDRI_PRESETS } from '../lib/hdriPresets.js'
+import { HDRI_PRESETS } from '../lib/hdriPresets'
 
 // ── Internal sub-components ────────────────────────────────────────────────────
+
+/** Shape of one entry in `HDRI_PRESETS` (see src/lib/hdriPresets.ts). */
+interface HdriPreset {
+  slug: string
+  name: string
+  file_url: string
+  license: string
+  source: string
+  intensity: number
+  description: string
+  thumbnail_url: string | null
+}
 
 /**
  * Fallback shown when a preset has no thumbnail_url.
  * A simple gradient that vaguely evokes the preset's mood.
  */
-const PRESET_GRADIENTS = {
+const PRESET_GRADIENTS: Record<string, string> = {
   'clear-noon':   'from-sky-400 to-blue-600',
   'overcast':     'from-slate-400 to-slate-600',
   'sunset':       'from-orange-400 to-rose-600',
@@ -36,7 +48,13 @@ const PRESET_GRADIENTS = {
   'night-stars':  'from-indigo-900 to-slate-950',
 }
 
-function PresetThumbnail({ preset, selected, onClick }) {
+interface PresetThumbnailProps {
+  preset: HdriPreset
+  selected: string | null
+  onClick: (preset: HdriPreset) => void
+}
+
+function PresetThumbnail({ preset, selected, onClick }: PresetThumbnailProps) {
   const isSelected = selected === preset.slug
 
   return (
@@ -101,11 +119,14 @@ function PresetThumbnail({ preset, selected, onClick }) {
 
 // ── HdriPicker (default export) ────────────────────────────────────────────────
 
-/**
- * @param {{ value?: string|null, onSelect?: (preset: object) => void, className?: string }} props
- */
-export default function HdriPicker({ value = null, onSelect, className }) {
-  function handleClick(preset) {
+export interface Props {
+  value?: string | null
+  onSelect?: (preset: HdriPreset) => void
+  className?: string
+}
+
+export default function HdriPicker({ value = null, onSelect, className }: Props) {
+  function handleClick(preset: HdriPreset) {
     onSelect?.(preset)
   }
 

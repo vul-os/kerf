@@ -1,14 +1,14 @@
 /**
- * HdriPicker.test.jsx — Vitest suite for the HDRI sky preset picker component.
+ * HdriPicker.test.tsx — Vitest suite for the HDRI sky preset picker component.
  *
  * Uses react-dom/server renderToStaticMarkup (no @testing-library required),
  * following the established pattern in Loader.test.jsx.
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import HdriPicker from './HdriPicker.jsx'
-import { HDRI_PRESETS } from '../lib/hdriPresets.js'
+import HdriPicker from './HdriPicker'
+import { HDRI_PRESETS } from '../lib/hdriPresets'
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
 
@@ -85,7 +85,7 @@ describe('HdriPicker selection', () => {
   it('selected button title includes the preset description', () => {
     const preset = HDRI_PRESETS.find((p) => p.slug === 'clear-noon')
     const html = renderToStaticMarkup(<HdriPicker value="clear-noon" />)
-    expect(html).toContain(preset.description)
+    expect(html).toContain(preset?.description)
   })
 
   it('renders the check badge svg only for the selected preset', () => {

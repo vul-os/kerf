@@ -19,6 +19,54 @@
 // renders → reused topology object.
 
 import * as THREE from 'three'
+import type { Geom3, Vec3 } from '../types/geometry.js'
+import type Poly3 from '@jscad/modeling/src/geometries/poly3/type'
+
+export interface TopologyFace {
+  id: string
+  planeKey: string
+  normal: Vec3
+  /** Indices into the source Geom3's `polygons` array (empty for STEP/BufferGeometry parts). */
+  polygons: number[]
+  triangles: Array<[Vec3, Vec3, Vec3]>
+  centroid: Vec3
+  area: number
+}
+
+export interface TopologyEdge {
+  id: string
+  a: Vec3
+  b: Vec3
+  faceA: string | null
+  faceB: string | null
+  length: number
+}
+
+export interface TopologyVertex {
+  id: string
+  position: Vec3
+  faces: string[]
+}
+
+export interface Topology {
+  faces: TopologyFace[]
+  edges: TopologyEdge[]
+  vertices: TopologyVertex[]
+}
+
+/** A renderable part, as produced by runJscad/loadStep — the input to {@link getTopology}. */
+export interface TopologyPart {
+  id?: string
+  geom: Geom3 | THREE.BufferGeometry
+  color?: number
+}
+
+interface PlaneKeyResult {
+  key: string
+  normal: Vec3
+  canonicalNormal: Vec3
+  offset: number
+}
 
 const EPS = 1e-4
 const KEY_DECIMALS = 4 // matches EPS
@@ -26,37 +74,37 @@ const KEY_DECIMALS = 4 // matches EPS
 // ---------------------------------------------------------------------------
 // Helpers
 
-function roundKey(v) {
+function roundKey(v: number): string {
   return v.toFixed(KEY_DECIMALS)
 }
 
-function vKey(v) {
+function vKey(v: Vec3): string {
   // Round to KEY_DECIMALS to canonicalize "the same vertex".
   return `${roundKey(v[0])}|${roundKey(v[1])}|${roundKey(v[2])}`
 }
 
-function edgeKey(ka, kb) {
+function edgeKey(ka: string, kb: string): string {
   // Undirected edge: sort endpoints lexicographically.
   return ka < kb ? `${ka}__${kb}` : `${kb}__${ka}`
 }
 
-function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]] }
-function cross(a, b) {
+function sub(a: Vec3, b: Vec3): Vec3 { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]] }
+function cross(a: Vec3, b: Vec3): Vec3 {
   return [
     a[1] * b[2] - a[2] * b[1],
     a[2] * b[0] - a[0] * b[2],
     a[0] * b[1] - a[1] * b[0],
   ]
 }
-function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] }
-function len(a) { return Math.hypot(a[0], a[1], a[2]) }
-function norm(a) {
+function dot(a: Vec3, b: Vec3): number { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] }
+function len(a: Vec3): number { return Math.hypot(a[0], a[1], a[2]) }
+function norm(a: Vec3): Vec3 {
   const l = len(a) || 1
   return [a[0] / l, a[1] / l, a[2] / l]
 }
-function dist(a, b) { return len(sub(a, b)) }
+function dist(a: Vec3, b: Vec3): number { return len(sub(a, b)) }
 
-function planeKeyForPolygon(poly) {
+function planeKeyForPolygon(poly: Poly3): PlaneKeyResult | null {
   // Compute a normal from the first triangle of the polygon, then a
   // canonicalized plane key as `nx,ny,nz|offset` rounded so coplanar polys
   // share a key.
@@ -70,21 +118,21 @@ function planeKeyForPolygon(poly) {
   // (which would only happen for degenerate inputs) still cluster together.
   // We DO want to distinguish two parallel planes though, so include offset.
   const sign = (n[0] !== 0 ? n[0] : n[1] !== 0 ? n[1] : n[2]) < 0 ? -1 : 1
-  const cn = [n[0] * sign, n[1] * sign, n[2] * sign]
+  const cn: Vec3 = [n[0] * sign, n[1] * sign, n[2] * sign]
   const offset = dot(cn, a)
   const key = `${roundKey(cn[0])},${roundKey(cn[1])},${roundKey(cn[2])}|${roundKey(offset)}`
   return { key, normal: n, canonicalNormal: cn, offset }
 }
 
-function triangleArea(a, b, c) {
+function triangleArea(a: Vec3, b: Vec3, c: Vec3): number {
   return 0.5 * len(cross(sub(b, a), sub(c, a)))
 }
 
 // Fan-triangulate a polygon's vertices (matches geom3.js convention).
 // Returns a flat list of triangles: [[v0, v1, v2], …] using vertex indices
 // into a per-face vertex list.
-function triangulatePolygon(verts) {
-  const tris = []
+function triangulatePolygon(verts: Vec3[]): number[][] {
+  const tris: number[][] = []
   for (let i = 1; i < verts.length - 1; i++) {
     tris.push([0, i, i + 1])
   }
@@ -94,12 +142,21 @@ function triangulatePolygon(verts) {
 // ---------------------------------------------------------------------------
 // JSCAD topology
 
-function deriveJscadTopology(geom) {
-  const polygons = (geom && geom.polygons) || []
+interface PolyCluster {
+  normal: Vec3
+  canonicalNormal: Vec3
+  offset: number
+  polyIdxs: number[]
+}
+
+function deriveJscadTopology(geom: Geom3): Topology {
+  const polygons: Poly3[] = (geom && geom.polygons) || []
 
   // 1. Cluster polygons by plane key.
-  const clusters = new Map() // planeKey → { normal, offset, polyIdxs: number[] }
-  const polyMeta = [] // index-aligned with `polygons`
+  const clusters = new Map<string, PolyCluster>() // planeKey → { normal, offset, polyIdxs: number[] }
+  // Index-aligned with `polygons`. Computed but never read back — dead output, kept as
+  // found (T-505 migration convention: report, don't fix).
+  const polyMeta: Array<PlaneKeyResult | null> = []
 
   polygons.forEach((poly, i) => {
     const verts = poly?.vertices
@@ -127,13 +184,13 @@ function deriveJscadTopology(geom) {
   })
 
   // 2. Build faces with triangles + centroid + area, and a polygon→faceId map.
-  const faces = []
-  const polyToFace = new Map() // polyIdx → faceId
+  const faces: TopologyFace[] = []
+  const polyToFace = new Map<number, string>() // polyIdx → faceId
 
   let faceIdx = 0
   for (const [planeKey, cluster] of clusters.entries()) {
     const id = `face-${faceIdx++}`
-    const triangles = []        // array of [Vec3, Vec3, Vec3]
+    const triangles: Array<[Vec3, Vec3, Vec3]> = []
     let area = 0
     let cx = 0, cy = 0, cz = 0  // area-weighted centroid accumulator
 
@@ -184,7 +241,13 @@ function deriveJscadTopology(geom) {
   // cluster (one planar disk). That's NOT a boundary edge — it's interior
   // tessellation. Only edges where polyCount === 1 are real boundary edges
   // (open mesh / sheet bodies). Real BREP edges have faceIds.size >= 2.
-  const edgeMap = new Map() // edgeKey → { a, b, faceIds: Set<string>, polyCount: int }
+  interface EdgeEntry {
+    a: Vec3
+    b: Vec3
+    faceIds: Set<string>
+    polyCount: number
+  }
+  const edgeMap = new Map<string, EdgeEntry>()
 
   polygons.forEach((poly, pIdx) => {
     const verts = poly?.vertices
@@ -208,7 +271,7 @@ function deriveJscadTopology(geom) {
     }
   })
 
-  const edges = []
+  const edges: TopologyEdge[] = []
   let edgeIdx = 0
   for (const entry of edgeMap.values()) {
     const length = dist(entry.a, entry.b)
@@ -244,7 +307,7 @@ function deriveJscadTopology(geom) {
   }
 
   // 4. Vertices: each canonical vertex on ≥1 real edge.
-  const vertById = new Map() // key → { id, position, faceIds: Set }
+  const vertById = new Map<string, { id: string; position: Vec3; faces: Set<string> }>()
   let vertIdx = 0
   for (const e of edges) {
     for (const p of [e.a, e.b]) {
@@ -279,7 +342,7 @@ function deriveJscadTopology(geom) {
 // This is enough to make STEP parts measurable (vertex↔vertex, edge↔edge,
 // part-bounding distances) without owning a CAD kernel.
 
-function deriveBufferGeometryTopology(geom) {
+function deriveBufferGeometryTopology(geom: THREE.BufferGeometry): Topology {
   const pos = geom.getAttribute('position')
   if (!pos) return { faces: [], edges: [], vertices: [] }
 
@@ -287,7 +350,7 @@ function deriveBufferGeometryTopology(geom) {
   // centroid for STEP — they're not used in the inspector for STEP parts and
   // computing for huge meshes is wasteful. Centroid = bounding-box center
   // as a cheap proxy when needed.
-  const triangles = []
+  const triangles: Array<[Vec3, Vec3, Vec3]> = []
   if (geom.index) {
     const idx = geom.index.array
     for (let i = 0; i < idx.length; i += 3) {
@@ -310,7 +373,7 @@ function deriveBufferGeometryTopology(geom) {
 
   if (!geom.boundingBox) geom.computeBoundingBox()
   const bb = geom.boundingBox
-  const center = bb
+  const center: Vec3 = bb
     ? [
       (bb.min.x + bb.max.x) / 2,
       (bb.min.y + bb.max.y) / 2,
@@ -318,7 +381,7 @@ function deriveBufferGeometryTopology(geom) {
     ]
     : [0, 0, 0]
 
-  const face = {
+  const face: TopologyFace = {
     id: 'face-0',
     planeKey: 'mesh',
     normal: [0, 0, 1], // placeholder — STEP face has no single plane
@@ -332,12 +395,12 @@ function deriveBufferGeometryTopology(geom) {
   // normals differ by more than this become hard edges.
   const edgesGeom = new THREE.EdgesGeometry(geom, 1)
   const epos = edgesGeom.getAttribute('position')
-  const edges = []
-  const vertById = new Map()
+  const edges: TopologyEdge[] = []
+  const vertById = new Map<string, TopologyVertex>()
   let vertIdx = 0
   for (let i = 0; i < epos.count; i += 2) {
-    const a = [epos.getX(i), epos.getY(i), epos.getZ(i)]
-    const b = [epos.getX(i + 1), epos.getY(i + 1), epos.getZ(i + 1)]
+    const a: Vec3 = [epos.getX(i), epos.getY(i), epos.getZ(i)]
+    const b: Vec3 = [epos.getX(i + 1), epos.getY(i + 1), epos.getZ(i + 1)]
     const length = dist(a, b)
     if (length < EPS) continue
     edges.push({
@@ -362,16 +425,21 @@ function deriveBufferGeometryTopology(geom) {
 // ---------------------------------------------------------------------------
 // Cache + public API
 
-const cache = new WeakMap() // part.geom → { hash, topology }
+interface CacheEntry {
+  hash: string
+  topology: Topology
+}
 
-function partHash(part) {
+const cache = new WeakMap<Geom3 | THREE.BufferGeometry, CacheEntry>()
+
+function partHash(part: TopologyPart): string {
   // Cheap content hash: polygon count + first/last poly's first vertex (JSCAD)
   // or buffer-geom signature (STEP). Sufficient to detect content-level swaps;
   // a JSCAD source change re-runs and produces fresh `geom` objects, so the
   // WeakMap key changes too — the hash is just a defensive secondary check.
   const g = part.geom
   if (!g) return 'empty'
-  if (g.isBufferGeometry) {
+  if ('isBufferGeometry' in g && g.isBufferGeometry) {
     const pos = g.getAttribute('position')
     const c = pos ? pos.count : 0
     return `bg:${c}:${g.index ? g.index.count : 0}`
@@ -383,14 +451,14 @@ function partHash(part) {
   return `g3:${polys.length}:${first.join(',')}:${last.join(',')}`
 }
 
-export function getTopology(part) {
+export function getTopology(part: TopologyPart | null | undefined): Topology {
   if (!part || !part.geom) return { faces: [], edges: [], vertices: [] }
   const cached = cache.get(part.geom)
   const hash = partHash(part)
   if (cached && cached.hash === hash) return cached.topology
-  const topology = part.geom.isBufferGeometry
+  const topology = 'isBufferGeometry' in part.geom && part.geom.isBufferGeometry
     ? deriveBufferGeometryTopology(part.geom)
-    : deriveJscadTopology(part.geom)
+    : deriveJscadTopology(part.geom as Geom3)
   cache.set(part.geom, { hash, topology })
   return topology
 }
@@ -407,51 +475,69 @@ export function getTopology(part) {
 // part.geom (via the existing WeakMap cache inside getTopology) AND on the
 // LazyTopologyMap instance — the per-instance cache lets us skip the WeakMap
 // hash check on repeated lookups for the same part within one render pass.
-class LazyTopologyMap {
-  constructor(parts) {
+/** The subset of the `Map<string, Topology | null>` API that renderer/measure callers rely on. */
+export interface TopologyMapLike {
+  get(partId: string): Topology | null
+  has(partId: string): boolean
+  readonly size: number
+  keys(): IterableIterator<string>
+  values(): IterableIterator<Topology | null>
+  entries(): IterableIterator<[string, Topology | null]>
+  forEach(fn: (value: Topology | null, key: string, map: TopologyMapLike) => void): void
+  [Symbol.iterator](): IterableIterator<[string, Topology | null]>
+}
+
+class LazyTopologyMap implements TopologyMapLike {
+  private _parts: Map<string, TopologyPart>
+  private _cache: Map<string, Topology | null>
+
+  constructor(parts: TopologyPart[] | null | undefined) {
     this._parts = new Map() // partId → part
     this._cache = new Map() // partId → topology
     for (const p of parts || []) {
       if (p && p.id) this._parts.set(p.id, p)
     }
   }
-  _compute(partId) {
-    if (this._cache.has(partId)) return this._cache.get(partId)
+  _compute(partId: string): Topology | null {
+    if (this._cache.has(partId)) return this._cache.get(partId)!
     const part = this._parts.get(partId)
     const t = part ? getTopology(part) : null
     this._cache.set(partId, t)
     return t
   }
-  get(partId) {
+  get(partId: string): Topology | null {
     return this._compute(partId)
   }
-  has(partId) {
+  has(partId: string): boolean {
     return this._parts.has(partId)
   }
-  get size() { return this._parts.size }
-  *keys() { yield* this._parts.keys() }
-  *values() {
+  get size(): number { return this._parts.size }
+  *keys(): IterableIterator<string> { yield* this._parts.keys() }
+  *values(): IterableIterator<Topology | null> {
     for (const id of this._parts.keys()) yield this._compute(id)
   }
-  *entries() {
+  *entries(): IterableIterator<[string, Topology | null]> {
     for (const id of this._parts.keys()) yield [id, this._compute(id)]
   }
-  forEach(fn) {
+  forEach(fn: (value: Topology | null, key: string, map: TopologyMapLike) => void): void {
     for (const id of this._parts.keys()) fn(this._compute(id), id, this)
   }
-  [Symbol.iterator]() { return this.entries() }
+  [Symbol.iterator](): IterableIterator<[string, Topology | null]> { return this.entries() }
 }
 
 // Build a Map-shaped wrapper that derives each part's topology lazily — only
 // when the consumer actually calls `.get(partId)`. Use this in render/effect
 // dependencies in place of the old eager `new Map(parts.map(p => [p.id,
 // getTopology(p)]))` pattern.
-export function getTopologyLazy(parts) {
+export function getTopologyLazy(parts: TopologyPart[] | null | undefined): TopologyMapLike {
   return new LazyTopologyMap(parts)
 }
 
+export type FeatureKind = 'face' | 'edge' | 'vertex'
+export type Feature = TopologyFace | TopologyEdge | TopologyVertex
+
 // Helper used by measure.js and the inspector to look up a feature by id.
-export function findFeature(topology, kind, featureId) {
+export function findFeature(topology: Topology | null | undefined, kind: FeatureKind, featureId: string): Feature | null {
   if (!topology) return null
   if (kind === 'face') return topology.faces.find((f) => f.id === featureId) || null
   if (kind === 'edge') return topology.edges.find((e) => e.id === featureId) || null
@@ -461,14 +547,21 @@ export function findFeature(topology, kind, featureId) {
 
 // Snap a feature to a representative point: face → centroid, edge → midpoint,
 // vertex → its position. Used by measure.js + leader-line rendering.
-export function featureSnapPoint(kind, feature) {
+//
+// `kind` and `feature`'s concrete shape are correlated by the caller (same contract as
+// findFeature() above), not by a discriminant field on Feature itself, so each branch
+// asserts the shape kind promises rather than narrowing structurally.
+export function featureSnapPoint(kind: FeatureKind, feature: Feature | null | undefined): Vec3 | null {
   if (!feature) return null
-  if (kind === 'face') return feature.centroid
-  if (kind === 'edge') return [
-    (feature.a[0] + feature.b[0]) / 2,
-    (feature.a[1] + feature.b[1]) / 2,
-    (feature.a[2] + feature.b[2]) / 2,
-  ]
-  if (kind === 'vertex') return feature.position
+  if (kind === 'face') return (feature as TopologyFace).centroid
+  if (kind === 'edge') {
+    const e = feature as TopologyEdge
+    return [
+      (e.a[0] + e.b[0]) / 2,
+      (e.a[1] + e.b[1]) / 2,
+      (e.a[2] + e.b[2]) / 2,
+    ]
+  }
+  if (kind === 'vertex') return (feature as TopologyVertex).position
   return null
 }

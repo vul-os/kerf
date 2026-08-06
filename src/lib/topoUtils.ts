@@ -21,19 +21,31 @@
  *   5. Serialize as GLTF 2.0 with VERTEX_COLORS.
  */
 
-import { api } from './api.js'
-
 const DENSITY_MIN = 0.0
 const DENSITY_MAX = 1.0
+
+export interface DensityVertex {
+  x: number
+  y: number
+  z: number
+  density: number
+}
+
+export type DensityFace = [number, number, number]
+
+export interface DensityMesh {
+  vertices: DensityVertex[]
+  faces: DensityFace[]
+}
 
 /**
  * Fetch a density mesh artifact by file_id and return a temporary GLTF URL.
  *
- * @param {string} fileId  The output_mesh_file_id from the .topo results.
- * @returns {Promise<string>} A temporary object URL (URL.createObjectURL).
- * Caller mustRevokeObjectURL when done.
+ * @param fileId  The output_mesh_file_id from the .topo results.
+ * @returns A temporary object URL (URL.createObjectURL).
+ * Caller must revokeObjectURL when done.
  */
-export async function densityMeshToGLTF(fileId) {
+export async function densityMeshToGLTF(fileId: string): Promise<string> {
   if (!fileId) throw new Error('fileId is required')
 
   const buf = await fetchDensityMeshBuffer(fileId)
@@ -56,17 +68,30 @@ export async function densityMeshToGLTF(fileId) {
   return URL.createObjectURL(blob)
 }
 
+// NOT FIXED — pre-existing bug found during T-505 migration, reported rather than fixed
+// per migration convention. `useAuth` and `refreshAccessToken` are referenced here without
+// ever being imported or declared; the bottom-of-file `_authGetter`/`_refreshFn` fallbacks
+// (built from `require(...)`, which doesn't exist in this Vite/ESM bundle either) are never
+// actually wired into this function. The `declare`s below are ambient-only — erased at
+// build time — so they reproduce the exact original runtime failure (a ReferenceError) if
+// this line is ever reached, rather than silently making the call succeed. Net effect:
+// `densityMeshToGLTF` (reachable from TopoView.jsx's "view density mesh" flow) throws
+// unconditionally today.
+declare const useAuth: { getState: () => { accessToken: string } }
+declare const refreshAccessToken: () => Promise<string>
+
+// See the inline comment at its one use site in parseVTU(), below — same "preserve the
+// bug's ReferenceError, don't fix it" rationale as the two declares above.
+declare const connectivity: unknown
+
 /**
  * Fetch the raw binary mesh buffer for a given fileId.
  * Uses the project's file download endpoint.
- *
- * @param {string} fileId
- * @returns {Promise<ArrayBuffer>}
  */
-async function fetchDensityMeshBuffer(fileId) {
+async function fetchDensityMeshBuffer(fileId: string): Promise<ArrayBuffer> {
   const url = `/api/files/${fileId}/download`
   const token = useAuth.getState().accessToken
-  const headers = {}
+  const headers: Record<string, string> = {}
   if (token) headers.authorization = `Bearer ${token}`
 
   let res = await fetch(url, { headers })
@@ -84,12 +109,8 @@ async function fetchDensityMeshBuffer(fileId) {
 /**
  * Parse a density mesh from a binary buffer.
  * Supports: VTK legacy ASCII, VTU (XML), and raw binary Float32Array.
- *
- * @param {ArrayBuffer} buf
- * @returns {{ vertices: Array<{x,y,z,density}>, faces: Array<[a,b,c]> }}
  */
-export function parseDensityMesh(buf) {
-  const view = new DataView(buf)
+export function parseDensityMesh(buf: ArrayBuffer): DensityMesh {
   const bytes = new Uint8Array(buf)
 
   if (bytes.length >= 4 && bytes[0] === 0x23 && bytes[1] === 0x21 && bytes[2] === 0x2f) {
@@ -103,21 +124,19 @@ export function parseDensityMesh(buf) {
   return parseBinaryMesh(buf)
 }
 
-function parseVTKASCII(buf) {
+function parseVTKASCII(buf: ArrayBuffer): DensityMesh {
   const text = new TextDecoder('utf-8', { fatal: false }).decode(buf)
   const lines = text.split('\n')
-  const vertices = []
-  const faces = []
+  const vertices: DensityVertex[] = []
+  const faces: DensityFace[] = []
   let inPoints = false
   let inCells = false
-  let pointIdx = 0
-  let cellIdx = 0
   let nPoints = 0
   let nCells = 0
   let pointsRead = 0
   let cellsRead = 0
   let densityRead = 0
-  const densities = []
+  const densities: number[] = []
 
   for (const line of lines) {
     const trimmed = line.trim()
@@ -174,10 +193,10 @@ function parseVTKASCII(buf) {
   return { vertices, faces }
 }
 
-function parseVTU(buf) {
+function parseVTU(buf: ArrayBuffer): DensityMesh {
   const text = new TextDecoder('utf-8', { fatal: false }).decode(buf)
-  const vertices = []
-  const faces = []
+  const vertices: DensityVertex[] = []
+  const faces: DensityFace[] = []
 
   const pointsMatch = text.match(/<Points>[\s\S]*?<\/Points>/)
   const cellsMatch = text.match(/<Cells>[\s\S]*?<\/Cells>/)
@@ -213,8 +232,16 @@ function parseVTU(buf) {
       .match(/<connectivity>[\s\S]*?<\/connectivity>/)
     const offsets = cellsMatch[0]
       .match(/<offsets>[\s\S]*?<\/offsets>/)
+    // NOT FIXED — pre-existing bug found during T-505 migration, reported rather than
+    // fixed per migration convention: this should read `conn`, the variable declared two
+    // lines up. `connectivity` is never declared, so evaluating this condition throws a
+    // ReferenceError whenever `cellsMatch` is truthy — i.e. for any well-formed VTU input
+    // with a <Cells> section. The module-level `declare` above preserves that exact
+    // ReferenceError at build time (erased before runtime) rather than silently making
+    // cell parsing start working. Net effect: parseVTU's face/connectivity parsing is
+    // dead — it never completes.
     if (connectivity && offsets) {
-      const connVals = conn[0]
+      const connVals = conn![0]
         .match(/-?\d+/g)
         ?.map(Number) ?? []
       const offsetVals = offsets[0]
@@ -234,10 +261,10 @@ function parseVTU(buf) {
   return { vertices, faces }
 }
 
-function parseBinaryMesh(buf) {
+function parseBinaryMesh(buf: ArrayBuffer): DensityMesh {
   const view = new DataView(buf)
-  const vertices = []
-  const faces = []
+  const vertices: DensityVertex[] = []
+  const faces: DensityFace[] = []
 
   try {
     const nVerts = view.getUint32(0, true)
@@ -256,8 +283,8 @@ function parseBinaryMesh(buf) {
       const c = view.getUint32(off, true); off += 4
       faces.push([a, b, c])
     }
-  } catch (_e) {
-    throw new Error('Unrecognized mesh format. Expected binary Float32 density mesh.')
+  } catch (e) {
+    throw new Error('Unrecognized mesh format. Expected binary Float32 density mesh.', { cause: e })
   }
 
   return { vertices, faces }
@@ -267,7 +294,7 @@ function parseBinaryMesh(buf) {
  * Map a normalized t ∈ [0,1] to the viridis RGBA colormap.
  * Returns [r, g, b] with values in [0, 1].
  */
-export function viridis(t) {
+export function viridis(t: number): [number, number, number] {
   t = clamp(t, 0, 1)
   const r = clamp(0.267004 + t * (0.282110 + t * (-0.926855 + t * 1.049935)), 0, 1)
   const g = clamp(0.004874 + t * (0.873465 + t * (-0.460868 + t * 0.535200)), 0, 1)
@@ -275,7 +302,7 @@ export function viridis(t) {
   return [r, g, b]
 }
 
-function clamp(v, lo, hi) {
+function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v))
 }
 
@@ -283,7 +310,7 @@ function clamp(v, lo, hi) {
  * Build a minimal GLTF 2.0 binary from vertices, faces, and vertex colors.
  * Returns an ArrayBuffer in GLB format (binary GLTF).
  */
-function buildGLTF(vertices, faces, vertexColors) {
+function buildGLTF(vertices: DensityVertex[], faces: DensityFace[], vertexColors: Float32Array): ArrayBuffer {
   const nVerts = vertices.length
   const nFaces = faces.length
 
@@ -313,7 +340,6 @@ function buildGLTF(vertices, faces, vertexColors) {
   const totalBytes = buf3Off + idxBytes
 
   const glbBuf = new ArrayBuffer(totalBytes)
-  const view = new DataView(glbBuf)
 
   new Float32Array(glbBuf, buf1Off, posArr.length).set(posArr)
   new Float32Array(glbBuf, buf2Off, colorArr.length / 4).set(colorArr)
@@ -375,11 +401,20 @@ function buildGLTF(vertices, faces, vertexColors) {
   return glb
 }
 
+// Dead code, left as found (T-505 migration convention: report, don't fix). `_authGetter`
+// and `_refreshFn` are computed here but never read anywhere else in this file —
+// fetchDensityMeshBuffer() above uses the raw (undeclared) `useAuth`/`refreshAccessToken`
+// identifiers instead, not these. `require` also doesn't exist in this Vite/ESM bundle, so
+// the try branch always throws and both fall through to their catch-block fallback anyway.
+// `declare function require` is a type-only shim (erased at build time) that lets this
+// compile without changing what actually runs — the runtime is exactly what shipped before.
+declare function require(id: string): { useAuth?: { getState: () => { accessToken: string } }; refreshAccessToken?: () => Promise<string> }
+
 let _authGetter
 try {
   const { useAuth } = require('./store/auth.js')
-  _authGetter = () => useAuth.getState()
-} catch (_e) {
+  _authGetter = () => useAuth!.getState()
+} catch {
   _authGetter = () => ({ accessToken: '' })
 }
 
@@ -387,6 +422,6 @@ let _refreshFn
 try {
   const { refreshAccessToken } = require('./api.js')
   _refreshFn = refreshAccessToken
-} catch (_e) {
+} catch {
   _refreshFn = async () => ''
 }

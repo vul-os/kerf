@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import ReentryHeatFluxPanel from './ReentryHeatFluxPanel.jsx'
+import ReentryHeatFluxPanel from './ReentryHeatFluxPanel'
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -48,27 +48,27 @@ const TRAJ_RESULT = {
 
 describe('ReentryHeatFluxPanel — point mode', () => {
   it('renders without crashing', () => {
-    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={POINT_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={POINT_RESULT} loading={false} error={null} content={null} />)
     expect(html).toBeTruthy()
   })
 
   it('shows altitude', () => {
-    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={POINT_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={POINT_RESULT} loading={false} error={null} content={null} />)
     expect(html).toContain('70')
   })
 
   it('shows velocity in km/s', () => {
-    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={POINT_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={POINT_RESULT} loading={false} error={null} content={null} />)
     expect(html).toContain('7.80')
   })
 
   it('shows Sutton-Graves in method', () => {
-    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={POINT_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={POINT_RESULT} loading={false} error={null} content={null} />)
     expect(html.toLowerCase()).toContain('sutton')
   })
 
   it('shows nose radius', () => {
-    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={POINT_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={POINT_RESULT} loading={false} error={null} content={null} />)
     expect(html).toContain('0.2')
   })
 })
@@ -79,27 +79,27 @@ describe('ReentryHeatFluxPanel — point mode', () => {
 
 describe('ReentryHeatFluxPanel — trajectory mode', () => {
   it('renders without crashing', () => {
-    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={TRAJ_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={TRAJ_RESULT} loading={false} error={null} content={null} />)
     expect(html).toBeTruthy()
   })
 
   it('shows trajectory label', () => {
-    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={TRAJ_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={TRAJ_RESULT} loading={false} error={null} content={null} />)
     expect(html.toLowerCase()).toContain('trajectory')
   })
 
   it('shows n_points', () => {
-    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={TRAJ_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={TRAJ_RESULT} loading={false} error={null} content={null} />)
     expect(html).toContain('5')
   })
 
   it('renders an SVG chart', () => {
-    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={TRAJ_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={TRAJ_RESULT} loading={false} error={null} content={null} />)
     expect(html).toContain('<svg')
   })
 
   it('shows MW/m² unit in peak', () => {
-    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={TRAJ_RESULT} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={TRAJ_RESULT} loading={false} error={null} content={null} />)
     expect(html).toContain('MW/m')
   })
 })
@@ -110,21 +110,21 @@ describe('ReentryHeatFluxPanel — trajectory mode', () => {
 
 describe('ReentryHeatFluxPanel — loading state', () => {
   it('shows loading message', () => {
-    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={null} loading={true} error={null} />)
+    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={null} loading={true} error={null} content={null} />)
     expect(html).toContain('heat flux')
   })
 })
 
 describe('ReentryHeatFluxPanel — error state', () => {
   it('shows error message', () => {
-    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={null} loading={false} error="Bad inputs" />)
+    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={null} loading={false} error="Bad inputs" content={null} />)
     expect(html).toContain('Bad inputs')
   })
 })
 
 describe('ReentryHeatFluxPanel — null result', () => {
   it('renders nothing', () => {
-    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={null} loading={false} error={null} />)
+    const html = renderToStaticMarkup(<ReentryHeatFluxPanel result={null} loading={false} error={null} content={null} />)
     expect(html).toBe('')
   })
 })

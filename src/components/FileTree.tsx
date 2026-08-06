@@ -19,7 +19,6 @@ export interface TreeFile {
   kind: string
   parent_id: string | null
   tessellation_status?: 'running' | 'queued' | 'error' | string | null
-  [key: string]: unknown
 }
 
 type ByParentMap = Map<string, TreeFile[]>
@@ -198,7 +197,7 @@ interface NodeProps {
   toggle: (id: string) => void
   currentFileId?: string | null
   onSelect?: (id: string) => void
-  onCreate?: (parentId: string | null, kind: NewFileKind | string) => void
+  onCreate?: (parentId: string | null, kind: NewFileKind) => void
   onRename?: (id: string, name: string) => void
   onDelete?: (id: string) => void
   onImportStep?: (parentId: string | null) => void
@@ -468,7 +467,7 @@ function UploadProgressStrip({ onRetry }: { onRetry?: () => void }) {
 // project types removed (May 2026), CreateMenu shows the full union
 // unconditionally — every project can create every canonical kind.
 // `hint` doubles as the row tooltip explaining what the kind is for.
-const KIND_ROWS = {
+const KIND_ROWS: Record<string, { icon: LucideIcon; label: string; hint: string; color?: string }> = {
   folder:    { icon: FolderPlus,   label: 'Folder',    hint: 'Group related files' },
   file:      { icon: FilePlus,     label: 'File',      hint: 'Generic .jscad code module',                color: 'text-kerf-300' },
   sketch:    { icon: PenTool,      label: 'Sketch',    hint: '2D parametric profile for features',        color: 'text-amber-300' },
@@ -491,7 +490,7 @@ const KIND_ROWS = {
 // followed by domain-specific kinds in roughly mechanical → drawings →
 // library → electronics order. The `step` and `jscad` aliases are
 // import-only / synthetic and intentionally absent here.
-const KIND_ORDER = ['folder', 'file', 'sketch', 'assembly', 'drawing', 'feature', 'section', 'cam_layered', 'part', 'circuit', 'atopile', 'equations', 'wiring', 'tool', 'plc_st', 'quadmesh']
+const KIND_ORDER = ['folder', 'file', 'sketch', 'assembly', 'drawing', 'feature', 'section', 'cam_layered', 'part', 'circuit', 'atopile', 'equations', 'wiring', 'tool', 'plc_st', 'quadmesh'] as const satisfies readonly NewFileKind[]
 
 // Import entries shown alongside the create-kinds in the New file dialog.
 const IMPORT_ROWS = [
@@ -528,7 +527,7 @@ function CreateCard({ icon: Icon, label, hint, color = 'text-ink-200', onClick }
 // (replaces the long dropdown). Every canonical kind is offered as a
 // card plus an Import group; type to filter. Escape / backdrop closes.
 function CreateMenu({ onCreate, openImportPicker, openKicadPicker, openFreecadPicker }: {
-  onCreate?: (parentId: string | null, kind: NewFileKind | string) => void
+  onCreate?: (parentId: string | null, kind: NewFileKind) => void
   openImportPicker?: () => void
   openKicadPicker?: () => void
   openFreecadPicker?: () => void
@@ -725,7 +724,7 @@ export interface FileTreeProps {
   files: TreeFile[]
   currentFileId?: string | null
   onSelect?: (id: string) => void
-  onCreate?: (parentId: string | null, kind: NewFileKind | string) => void
+  onCreate?: (parentId: string | null, kind: NewFileKind) => void
   onRename?: (id: string, name: string) => void
   onDelete?: (id: string) => void
   onImportStep?: (file: File, parentId: string | null) => void

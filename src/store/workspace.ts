@@ -20,6 +20,8 @@ import { withColorizedPart, withTranslatedPart } from '../lib/sourceEdit.js'
 import { parseAppearance, writeAppearance, mergeAppearance } from '../lib/appearance.js'
 import { parseMaterial } from '../lib/material.js'
 import { parseAssembly, resolveAssemblyParts as resolveAssemblyPartsHelper, loadExternalParts } from '../lib/assembly.js'
+import type { AssemblyResolvedPart, AssemblyBBoxProxy } from '../lib/assembly.js'
+import type { FeatureKind } from '../lib/topology.js'
 import { encodePayload, decodePayload } from '../lib/derivedPayload.js'
 import { parseSketch, serializeSketch, defaultSketch, setSketchEquationsResolverSync } from '../lib/sketchSolver.js'
 import { mergeEquationFiles } from '../lib/equations.js'
@@ -75,7 +77,11 @@ import type { JscadRunResult } from '@/types'
 // ---------------------------------------------------------------------------
 
 /** kind values createFile() accepts that FileKind (src/types/api.ts) doesn't cover yet. */
-export type NewFileKind = FileKind | 'section' | 'cam_layered' | 'tool' | 'plc_st' | 'quadmesh'
+// NOTE: 'atopile' is offered by FileTree's "+ New" menu and has a dedicated editor
+// (AtopileEditor.tsx), but it is NOT in the backend's FILE_KINDS allow-list in routes.py, so
+// createFile('atopile') is rejected server-side. Included here so the menu entry is expressible;
+// the server-side gap is a separate fix, not a migration change.
+export type NewFileKind = FileKind | 'section' | 'cam_layered' | 'tool' | 'plc_st' | 'quadmesh' | 'atopile'
 
 /** A File row as this store actually uses it — ApiFile plus two fields it reads but that aren't in the shared type. */
 export interface WorkspaceFile extends ApiFile {
@@ -137,7 +143,14 @@ export interface PartRef {
 }
 
 /** parts / drawingSourceParts entries: JSCAD parts (Geom3-backed) or STEP/mesh/subd-loaded parts (BufferGeometry-backed, three.js — no @types/three in this repo, so the geom field there is a boundary this slice doesn't own). */
-export type RenderablePart = JscadPart | { id: string; geom: BufferGeometry; color?: number }
+// Includes the assembly shapes because `parts` genuinely holds them when an .assembly file is
+// open — resolveAssemblyParts and buildBBoxProxy both feed this array, and both carry
+// componentId, which the union previously could not express.
+export type RenderablePart =
+  | JscadPart
+  | { id: string; geom: BufferGeometry; color?: number }
+  | AssemblyResolvedPart
+  | AssemblyBBoxProxy
 
 /** Per-part appearance override patch (src/lib/appearance.js's mergeAppearance/writeAppearance). */
 export interface AppearancePatch {
@@ -323,7 +336,7 @@ export interface MaterialMenuEntry {
   color: string | null
 }
 
-export type RightDrawerTab = 'chat' | 'activity' | 'git' | 'history'
+export type RightDrawerTab = 'chat' | 'activity' | 'git' | 'history' | 'fea'
 
 /** File-kind discriminant this store's editor pipeline routes on (fileKindFor()). */
 export type EditorFileKind =
@@ -365,7 +378,7 @@ export interface WorkspaceData {
   sessionAppearance: Map<string, Record<string, AppearancePatch>>
 
   measureMode: 'object' | 'face' | 'edge' | 'vertex'
-  selectedFeatures: Array<{ partId: string; kind: string; featureId: string }>
+  selectedFeatures: Array<{ partId: string; kind: FeatureKind; featureId: string }>
   toast: string | null
 
   parsedAssembly: AssemblyDocument | null
@@ -1068,7 +1081,8 @@ function strHash(s: string | null | undefined): string {
 // field, so callers need an `in`-guarded unpack rather than direct property
 // access. Centralised here since every runJscad() call site in this file
 // follows the same stale/error/parts branching.
-function unpackJscadResult(res: JscadRunResult): { stale: boolean; error?: string; parts?: JscadPart[] } {
+// Exported because Editor.tsx's cache-miss path is a second call site with identical branching.
+export function unpackJscadResult(res: JscadRunResult): { stale: boolean; error?: string; parts?: JscadPart[] } {
   return {
     stale: 'stale' in res,
     error: 'error' in res ? res.error : undefined,
@@ -2244,7 +2258,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
   // partId/kind/featureId may all be null → clears selection.
   // shift=true → append (cap 2). Otherwise replace the first slot (so single-
   // click swaps).
-  pickFeature: (partId, kind, featureId, shift = false) => {
+  pickFeature: (partId, kind: FeatureKind, featureId, shift = false) => {
     if (!partId || !kind || !featureId) {
       set({ selectedFeatures: [] })
       return
@@ -4135,7 +4149,7 @@ async function fetchStorageBlob(storageKey: string) {
 // dropdown without poking at module-private internals. `configId` is
 // optional — pass it when previewing a specific configuration (e.g. the
 // component's pinned config); otherwise the file's default_config wins.
-export function loadFilePartsForProject(projectId, fileId, configId) {
+export function loadFilePartsForProject(projectId, fileId, configId?) {
   return loadComponentParts(projectId, fileId, configId || null)
 }
 

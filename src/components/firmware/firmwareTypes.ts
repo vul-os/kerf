@@ -55,10 +55,13 @@ export interface FirmwareMonitorResult {
   [field: string]: unknown
 }
 
-/** Minimal workspace file-registry shape read by FirmwareProjectPanel.tsx. */
+/**
+ * Minimal workspace file-registry shape read by FirmwareProjectPanel.tsx.
+ * No index signature: it would make every concrete interface (WorkspaceFile, ApiFile)
+ * un-assignable here, since TypeScript does not give interfaces implicit index signatures.
+ */
 export interface FirmwareFile {
   name?: string
   id?: string
   kind?: string
-  [field: string]: unknown
 }

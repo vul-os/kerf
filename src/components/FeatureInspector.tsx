@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Square, Minus, Circle, EyeOff, MessageSquare, Copy, X } from 'lucide-react'
 import { findFeature } from '../lib/topology.js'
-import type { Topology, TopologyPart, TopologyFace, TopologyEdge, TopologyVertex, FeatureKind } from '../lib/topology.js'
+import type { Topology, TopologyPart, TopologyFace, TopologyEdge, TopologyVertex, FeatureKind, TopologyMapLike } from '../lib/topology.js'
 
 const KIND_ICON = { face: Square, edge: Minus, vertex: Circle }
 
@@ -37,7 +37,8 @@ export interface FeatureSelection {
 export interface Props {
   selection: FeatureSelection | null
   parts?: TopologyPart[]
-  topologies: Map<string, Topology>
+  // Read-only: only .get() is used, so a plain Map and the store's TopologyMapLike both fit.
+  topologies: TopologyMapLike
   onClose?: () => void
   onHidePart?: (partId: string) => void
   onReferenceInChat?: (partId: string, kind: FeatureKind, featureId: string) => void

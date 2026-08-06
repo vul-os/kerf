@@ -293,7 +293,7 @@ function mintCopyId(base, taken) {
 //
 // `newId` is optional; when omitted we mint `<objectId>-copy[-N]` against
 // the existing ids.
-export function duplicateObject(source, objectId, newId) {
+export function duplicateObject(source, objectId, newId?) {
   if (!source || !objectId) return null
   const found = findObjectEntry(source, objectId)
   if (!found) return null

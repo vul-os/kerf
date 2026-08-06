@@ -28,18 +28,39 @@
 // file id.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ComponentType } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Package, Camera, ExternalLink, Star, Trash2, Plus, Upload,
   AlertTriangle, Layers, Eye, Lock, Globe, X, MoreHorizontal,
   RefreshCw, Loader2, Clock,
 } from 'lucide-react'
-import { useWorkspace } from '../store/workspace.js'
+import { useWorkspace, type PartDocument, type PartDistributor, type PartPhoto, type WorkspaceFile } from '../store/workspace.js'
 import { useAuth } from '../store/auth.js'
 import { validatePart, PART_VISIBILITY_VALUES } from '../lib/part.js'
 import { api } from '../lib/api.js'
 import { loadStep } from '../lib/stepLoader.js'
 import Renderer from './Renderer.jsx'
+
+// Renderer.jsx (not part of this slice — src/components/Renderer.jsx is untyped, owned
+// elsewhere) infers `onContextPick`/`onPickFeature` as *required* props because they have
+// no destructuring default in its untyped source, even though callers throughout this
+// codebase (this one included) have always omitted them safely. Same "no default → TS
+// infers required" gap as T-514's LadderEditor.onChange, just in a file outside this
+// slice's scope — cast to a permissive component type so this call keeps compiling
+// unchanged rather than being silently "fixed" by passing new no-op props into it.
+const UntypedRenderer = Renderer as unknown as ComponentType<Record<string, unknown>>
+
+// `PartDocument` (src/store/workspace.ts) doesn't include `material_path`, but this
+// component (and its consumers below) reads/writes it via updatePart(patch) — a
+// pre-existing gap between the store's PartDocument type and the data it actually
+// carries. Reported, not fixed (widening the shared PartDocument type is out of this
+// slice's scope). Extended locally so the read/write here still compiles.
+type PartWithMaterialPath = PartDocument & { material_path?: string }
+
+interface MaterialFileOption extends WorkspaceFile {
+  materialPath: string
+}
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 const ACCEPTED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -48,7 +69,7 @@ const ACCEPTED_MODEL_EXT = ['.step', '.stp', '.glb']
 export default function LibraryEditor() {
   const projectId = useWorkspace((s) => s.projectId)
   const currentFile = useWorkspace((s) => s.currentFile)
-  const currentPart = useWorkspace((s) => s.currentPart)
+  const currentPart = useWorkspace((s) => s.currentPart) as PartWithMaterialPath | null
   const updatePart = useWorkspace((s) => s.updatePart)
   const replacePartModel = useWorkspace((s) => s.replacePartModel)
   const files = useWorkspace((s) => s.files)
@@ -57,12 +78,12 @@ export default function LibraryEditor() {
   // Validation surface used by the metadata form. Re-runs on every change
   // because validatePart is cheap.
   const validation = useMemo(() => {
-    if (!currentPart) return { ok: true }
+    if (!currentPart) return { ok: true, errors: [] as string[] }
     return validatePart(currentPart)
   }, [currentPart])
 
   // Material files with computed full paths for the material_path field.
-  const materialFilesWithPaths = useMemo(() => {
+  const materialFilesWithPaths = useMemo<MaterialFileOption[]>(() => {
     if (!files.length) return []
     const byId = new Map(files.map((f) => [f.id, f]))
     return files
@@ -99,7 +120,7 @@ export default function LibraryEditor() {
           <MetadataForm
             part={currentPart}
             onChange={updatePart}
-            errors={validation.ok ? [] : validation.errors}
+            errors={validation.ok ? [] : (validation.errors ?? [])}
             materialFiles={materialFilesWithPaths}
           />
         </aside>
@@ -127,7 +148,7 @@ export default function LibraryEditor() {
             fileId={currentFile.id}
             onRefreshed={(parsed) => {
               if (parsed && Array.isArray(parsed.distributors)) {
-                updatePart({ distributors: parsed.distributors })
+                updatePart({ distributors: parsed.distributors as PartDistributor[] })
               }
             }}
           />
@@ -144,7 +165,12 @@ export default function LibraryEditor() {
 
 // -- Header --------------------------------------------------------------
 
-function Header({ part, onOpenBOM }) {
+interface HeaderProps {
+  part: PartWithMaterialPath
+  onOpenBOM: () => void
+}
+
+function Header({ part, onOpenBOM }: HeaderProps) {
   return (
     <div className="flex items-center justify-between px-3 py-2 border-b border-ink-800 flex-shrink-0">
       <div className="flex items-center gap-2 min-w-0">
@@ -175,8 +201,12 @@ function Header({ part, onOpenBOM }) {
   )
 }
 
-function VisibilityBadge({ value }) {
-  const map = {
+interface VisibilityBadgeProps {
+  value: string
+}
+
+function VisibilityBadge({ value }: VisibilityBadgeProps) {
+  const map: Record<string, { Icon: typeof Lock; label: string; cls: string }> = {
     private:  { Icon: Lock,  label: 'Private',  cls: 'text-ink-500 border-ink-700' },
     unlisted: { Icon: Eye,   label: 'Unlisted', cls: 'text-amber-300 border-amber-500/30' },
     public:   { Icon: Globe, label: 'Public',   cls: 'text-kerf-300 border-kerf-300/40' },
@@ -193,7 +223,14 @@ function VisibilityBadge({ value }) {
 
 // -- Metadata form -------------------------------------------------------
 
-function MetadataForm({ part, onChange, errors, materialFiles = [] }) {
+interface MetadataFormProps {
+  part: PartWithMaterialPath
+  onChange: (patch: Partial<PartWithMaterialPath>) => void
+  errors: string[]
+  materialFiles?: MaterialFileOption[]
+}
+
+function MetadataForm({ part, onChange, errors, materialFiles = [] }: MetadataFormProps) {
   return (
     <div className="px-4 py-4 space-y-4">
       <div className="text-[10px] uppercase tracking-wider text-ink-500 font-medium">
@@ -274,7 +311,7 @@ function MetadataForm({ part, onChange, errors, materialFiles = [] }) {
       <Field label="Visibility">
         <select
           value={part.visibility || 'private'}
-          onChange={(e) => onChange({ visibility: e.target.value })}
+          onChange={(e) => onChange({ visibility: e.target.value as PartDocument['visibility'] })}
           className="w-full bg-ink-900 border border-ink-800 rounded px-2 py-1.5 text-xs text-ink-100 outline-none focus:border-kerf-300/60"
         >
           {PART_VISIBILITY_VALUES.map((v) => (
@@ -320,7 +357,13 @@ function MetadataForm({ part, onChange, errors, materialFiles = [] }) {
   )
 }
 
-function Field({ label, required, children }) {
+interface FieldProps {
+  label: string
+  required?: boolean
+  children: React.ReactNode
+}
+
+function Field({ label, required, children }: FieldProps) {
   return (
     <label className="block">
       <div className="text-[10px] uppercase tracking-wider text-ink-500 font-medium mb-1">
@@ -331,7 +374,15 @@ function Field({ label, required, children }) {
   )
 }
 
-function Input({ value, onChange, placeholder, type = 'text', mono = false }) {
+interface InputProps {
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  type?: string
+  mono?: boolean
+}
+
+function Input({ value, onChange, placeholder, type = 'text', mono = false }: InputProps) {
   return (
     <input
       type={type}
@@ -343,7 +394,14 @@ function Input({ value, onChange, placeholder, type = 'text', mono = false }) {
   )
 }
 
-function Textarea({ value, onChange, placeholder, rows = 2 }) {
+interface TextareaProps {
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  rows?: number
+}
+
+function Textarea({ value, onChange, placeholder, rows = 2 }: TextareaProps) {
   return (
     <textarea
       value={value}
@@ -357,17 +415,24 @@ function Textarea({ value, onChange, placeholder, rows = 2 }) {
 
 // -- 3D preview ----------------------------------------------------------
 
-function ModelPreview({ part, onReplaceModel }) {
-  const [parts, setParts] = useState([])
+interface ModelPreviewProps {
+  part: PartWithMaterialPath
+  onReplaceModel: (browserFile: File) => void
+}
+
+function ModelPreview({ part, onReplaceModel }: ModelPreviewProps) {
+  const [parts, setParts] = useState<unknown[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const fileInputRef = useRef(null)
+  const [error, setError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Fetch + parse on storage_key change. We re-derive on the cached binary
   // when present (the underlying loadStep memoizes on SHA-256 of the bytes).
   useEffect(() => {
     const key = part?.model_storage_key
     if (!key) {
+      // Resets preview state when the model is detached, pre-existing before this migration.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- see above.
       setParts([])
       setError(null)
       setLoading(false)
@@ -379,7 +444,7 @@ function ModelPreview({ part, onReplaceModel }) {
     ;(async () => {
       try {
         const token = useAuth.getState().accessToken
-        const headers = {}
+        const headers: Record<string, string> = {}
         if (token) headers.authorization = `Bearer ${token}`
         const res = await fetch(`${API_URL}/api/blobs/${encodeURI(key)}`, { headers })
         if (!res.ok) throw new Error(`fetch ${res.status}`)
@@ -389,7 +454,7 @@ function ModelPreview({ part, onReplaceModel }) {
         setParts(out.parts || [])
       } catch (err) {
         if (cancelled) return
-        setError(err?.message || String(err))
+        setError((err as Error)?.message || String(err))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -397,7 +462,7 @@ function ModelPreview({ part, onReplaceModel }) {
     return () => { cancelled = true }
   }, [part?.model_storage_key])
 
-  const onPickModel = (browserFile) => {
+  const onPickModel = (browserFile: File | null | undefined) => {
     if (!browserFile) return
     const lower = (browserFile.name || '').toLowerCase()
     if (!ACCEPTED_MODEL_EXT.some((e) => lower.endsWith(e))) {
@@ -452,7 +517,7 @@ function ModelPreview({ part, onReplaceModel }) {
           {error}
         </div>
       ) : (
-        <Renderer
+        <UntypedRenderer
           parts={parts}
           selectedId={null}
           hiddenIds={new Set()}
@@ -483,16 +548,24 @@ function ModelPreview({ part, onReplaceModel }) {
 
 // -- Photos panel --------------------------------------------------------
 
-function PhotosPanel({ projectId, fileId, photos, onChange }) {
+interface PhotosPanelProps {
+  projectId: string | null
+  fileId: string
+  photos: PartPhoto[]
+  onChange: (patch: Partial<PartWithMaterialPath>) => void
+}
+
+function PhotosPanel({ projectId, fileId, photos, onChange }: PhotosPanelProps) {
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(null)
-  const [enlarged, setEnlarged] = useState(null) // {storage_key, mime_type, ...}
-  const fileInputRef = useRef(null)
+  const [error, setError] = useState<string | null>(null)
+  const [enlarged, setEnlarged] = useState<PartPhoto | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Re-fetch the Part doc after a server-side mutation so the photos array
   // reflects the canonical server shape (the backend may promote a new
   // photo to primary, etc.).
   const reloadPart = async () => {
+    if (!projectId) return
     try {
       const fresh = await api.getFile(projectId, fileId)
       const parsed = JSON.parse(fresh.content || '{}')
@@ -500,9 +573,9 @@ function PhotosPanel({ projectId, fileId, photos, onChange }) {
     } catch { /* tolerate */ }
   }
 
-  const handlePick = async (browserFile) => {
+  const handlePick = async (browserFile: File | null | undefined) => {
     setError(null)
-    if (!browserFile) return
+    if (!browserFile || !projectId) return
     if (!ACCEPTED_PHOTO_TYPES.includes(browserFile.type)) {
       setError('JPEG / PNG / WebP only')
       return
@@ -516,34 +589,36 @@ function PhotosPanel({ projectId, fileId, photos, onChange }) {
       await api.uploadPartPhoto(projectId, fileId, browserFile)
       await reloadPart()
     } catch (err) {
-      setError(err?.message || 'Upload failed')
+      setError((err as Error)?.message || 'Upload failed')
     } finally {
       setBusy(false)
     }
   }
 
-  const handleSetPrimary = async (storageKey) => {
+  const handleSetPrimary = async (storageKey: string) => {
+    if (!projectId) return
     setBusy(true)
     setError(null)
     try {
       await api.setPrimaryPartPhoto(projectId, fileId, storageKey)
       await reloadPart()
     } catch (err) {
-      setError(err?.message || 'Failed to set primary')
+      setError((err as Error)?.message || 'Failed to set primary')
     } finally {
       setBusy(false)
     }
   }
 
-  const handleRemove = async (storageKey) => {
+  const handleRemove = async (storageKey: string) => {
     if (!confirm('Remove this photo?')) return
+    if (!projectId) return
     setBusy(true)
     setError(null)
     try {
       await api.deletePartPhoto(projectId, fileId, storageKey)
       await reloadPart()
     } catch (err) {
-      setError(err?.message || 'Failed to remove')
+      setError((err as Error)?.message || 'Failed to remove')
     } finally {
       setBusy(false)
     }
@@ -607,18 +682,26 @@ function PhotosPanel({ projectId, fileId, photos, onChange }) {
   )
 }
 
-function PhotoTile({ photo, onEnlarge, onSetPrimary, onRemove, disabled }) {
-  const [src, setSrc] = useState(null)
+interface PhotoTileProps {
+  photo: PartPhoto
+  onEnlarge: () => void
+  onSetPrimary: () => void
+  onRemove: () => void
+  disabled: boolean
+}
+
+function PhotoTile({ photo, onEnlarge, onSetPrimary, onRemove, disabled }: PhotoTileProps) {
+  const [src, setSrc] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     if (!photo?.storage_key) return undefined
     let cancelled = false
-    let url = null
+    let url: string | null = null
     ;(async () => {
       try {
         const token = useAuth.getState().accessToken
-        const headers = {}
+        const headers: Record<string, string> = {}
         if (token) headers.authorization = `Bearer ${token}`
         const res = await fetch(`${API_URL}/api/blobs/${encodeURI(photo.storage_key)}`, { headers })
         if (!res.ok) return
@@ -695,16 +778,21 @@ function PhotoTile({ photo, onEnlarge, onSetPrimary, onRemove, disabled }) {
   )
 }
 
-function PhotoLightbox({ photo, onClose }) {
-  const [src, setSrc] = useState(null)
+interface PhotoLightboxProps {
+  photo: PartPhoto
+  onClose: () => void
+}
+
+function PhotoLightbox({ photo, onClose }: PhotoLightboxProps) {
+  const [src, setSrc] = useState<string | null>(null)
   useEffect(() => {
     if (!photo?.storage_key) return undefined
     let cancelled = false
-    let url = null
+    let url: string | null = null
     ;(async () => {
       try {
         const token = useAuth.getState().accessToken
-        const headers = {}
+        const headers: Record<string, string> = {}
         if (token) headers.authorization = `Bearer ${token}`
         const res = await fetch(`${API_URL}/api/blobs/${encodeURI(photo.storage_key)}`, { headers })
         if (!res.ok) return
@@ -721,7 +809,7 @@ function PhotoLightbox({ photo, onClose }) {
   }, [photo?.storage_key])
 
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
@@ -755,20 +843,28 @@ function PhotoLightbox({ photo, onClose }) {
 
 // -- Distributors panel --------------------------------------------------
 
-function DistributorsPanel({ distributors, onChange, projectId, fileId, onRefreshed }) {
+interface DistributorsPanelProps {
+  distributors: PartDistributor[]
+  onChange: (next: PartDistributor[]) => void
+  projectId: string | null
+  fileId: string
+  onRefreshed: (parsed: { distributors?: unknown } | null) => void
+}
+
+function DistributorsPanel({ distributors, onChange, projectId, fileId, onRefreshed }: DistributorsPanelProps) {
   const [adding, setAdding] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  const [refreshError, setRefreshError] = useState(null)
-  const [refreshNote, setRefreshNote] = useState(null)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [refreshNote, setRefreshNote] = useState<string | null>(null)
 
-  const update = (idx, patch) => {
+  const update = (idx: number, patch: Partial<PartDistributor>) => {
     const next = distributors.map((d, i) => i === idx ? { ...d, ...patch } : d)
     onChange(next)
   }
-  const remove = (idx) => {
+  const remove = (idx: number) => {
     onChange(distributors.filter((_, i) => i !== idx))
   }
-  const add = (row) => {
+  const add = (row: PartDistributor) => {
     onChange([...distributors, row])
     setAdding(false)
   }
@@ -784,7 +880,7 @@ function DistributorsPanel({ distributors, onChange, projectId, fileId, onRefres
     setRefreshNote(null)
     try {
       const out = await api.refreshPartDistributors(projectId, fileId)
-      let parsed = null
+      let parsed: { distributors?: unknown } | null = null
       try { parsed = JSON.parse(out?.content || '{}') } catch { /* ignore */ }
       if (typeof onRefreshed === 'function') onRefreshed(parsed)
       const n = Number(out?.updated || 0)
@@ -794,10 +890,11 @@ function DistributorsPanel({ distributors, onChange, projectId, fileId, onRefres
     } catch (err) {
       // 502/503 typically means no credentials configured. Hint at
       // the admin path so the user knows where to look.
-      const hint = err?.status === 502 || err?.status === 503
+      const e = err as { status?: number; message?: string } | undefined
+      const hint = e?.status === 502 || e?.status === 503
         ? ' — check that an admin has configured the distributor at /admin/distributors.'
         : ''
-      setRefreshError((err?.message || 'Refresh failed') + hint)
+      setRefreshError((e?.message || 'Refresh failed') + hint)
     } finally {
       setRefreshing(false)
     }
@@ -882,7 +979,13 @@ function DistributorsPanel({ distributors, onChange, projectId, fileId, onRefres
   )
 }
 
-function DistributorRow({ row, onChange, onRemove }) {
+interface DistributorRowProps {
+  row: PartDistributor
+  onChange: (patch: Partial<PartDistributor>) => void
+  onRemove: () => void
+}
+
+function DistributorRow({ row, onChange, onRemove }: DistributorRowProps) {
   const [expanded, setExpanded] = useState(false)
   const fetchedAtRel = formatFetchedAt(row.fetched_at)
   return (
@@ -986,8 +1089,21 @@ function DistributorRow({ row, onChange, onRemove }) {
   )
 }
 
-function DistributorEditor({ initial, onSave, onCancel }) {
-  const [draft, setDraft] = useState(initial)
+interface DistributorDraft {
+  name: string
+  sku?: string
+  url: string
+  price_usd?: number
+}
+
+interface DistributorEditorProps {
+  initial: DistributorDraft
+  onSave: (row: PartDistributor) => void
+  onCancel: () => void
+}
+
+function DistributorEditor({ initial, onSave, onCancel }: DistributorEditorProps) {
+  const [draft, setDraft] = useState<DistributorDraft>(initial)
   const valid = (draft.name || '').trim() && /^https?:\/\//i.test(draft.url || '')
   return (
     <div className="rounded border border-kerf-300/40 bg-ink-900 p-2 space-y-1.5">
@@ -1001,7 +1117,7 @@ function DistributorEditor({ initial, onSave, onCancel }) {
         />
         <SmallInput
           label="SKU"
-          value={draft.sku}
+          value={draft.sku ?? ''}
           onChange={(v) => setDraft((s) => ({ ...s, sku: v }))}
           placeholder="311-…"
           mono
@@ -1049,7 +1165,17 @@ function DistributorEditor({ initial, onSave, onCancel }) {
   )
 }
 
-function SmallInput({ label, value, onChange, placeholder, type = 'text', mono = false, autoFocus = false }) {
+interface SmallInputProps {
+  label: string
+  value: string | number
+  onChange: (value: string) => void
+  placeholder?: string
+  type?: string
+  mono?: boolean
+  autoFocus?: boolean
+}
+
+function SmallInput({ label, value, onChange, placeholder, type = 'text', mono = false, autoFocus = false }: SmallInputProps) {
   return (
     <label className="block">
       <div className="text-[9px] uppercase tracking-wider text-ink-500 mb-0.5">{label}</div>
@@ -1067,12 +1193,23 @@ function SmallInput({ label, value, onChange, placeholder, type = 'text', mono =
 
 // -- Where used panel ----------------------------------------------------
 
-function WhereUsedPanel({ files, currentFileId, onOpen }) {
+interface WhereUsedPanelProps {
+  files: WorkspaceFile[]
+  currentFileId: string
+  onOpen: (fileId: string) => void
+}
+
+interface AssemblyComponentRef {
+  file_id?: string
+  [key: string]: unknown
+}
+
+function WhereUsedPanel({ files, currentFileId, onOpen }: WhereUsedPanelProps) {
   // An assembly references this Part if any of its components has
   // file_id === currentFileId. We parse content lazily on render — the
   // file list usually has content cached on the row.
   const refs = useMemo(() => {
-    const out = []
+    const out: { file: WorkspaceFile; count: number }[] = []
     for (const f of files || []) {
       if (f?.kind !== 'assembly') continue
       const components = parseAssemblyComponents(f.content)
@@ -1125,21 +1262,21 @@ function WhereUsedPanel({ files, currentFileId, onOpen }) {
 // fetched_at ISO string. `stale` is true when the value is > 7 days old
 // — matches the BOM panel's stale-warning threshold so the two surfaces
 // agree.
-function formatFetchedAt(iso) {
+function formatFetchedAt(iso: string | undefined): { relative: string; absolute: string; stale: boolean } | null {
   if (!iso) return null
   const t = new Date(iso).getTime()
   if (Number.isNaN(t)) return null
   const ageMs = Date.now() - t
   const days = Math.floor(ageMs / (24 * 60 * 60 * 1000))
   const stale = days >= 7
-  let relative
+  let relative: string
   if (days === 0) {
     const hr = Math.floor(ageMs / (60 * 60 * 1000))
     if (hr <= 0) relative = 'fresh'
     else relative = `${hr}h ago`
   } else if (days === 1) relative = '1 day ago'
   else relative = `${days} days ago`
-  let absolute
+  let absolute: string
   try { absolute = new Date(iso).toLocaleString() } catch { absolute = iso }
   return { relative, absolute, stale }
 }
@@ -1148,12 +1285,13 @@ function formatFetchedAt(iso) {
 // import lib/assembly.js here because that module pulls in matrix math we
 // don't need on this code path — the where-used count only cares about
 // references, not transforms.
-function parseAssemblyComponents(content) {
+function parseAssemblyComponents(content: string | undefined): AssemblyComponentRef[] {
   if (!content || typeof content !== 'string') return []
-  let parsed
+  let parsed: unknown
   try { parsed = JSON.parse(content) } catch { return [] }
   if (!parsed || typeof parsed !== 'object') return []
-  if (Array.isArray(parsed.components)) return parsed.components
-  if (Array.isArray(parsed.children)) return parsed.children
+  const obj = parsed as { components?: unknown; children?: unknown }
+  if (Array.isArray(obj.components)) return obj.components
+  if (Array.isArray(obj.children)) return obj.children
   return []
 }

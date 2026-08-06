@@ -1,5 +1,5 @@
 /**
- * PlantSchedulePanel.jsx — Plant schedule (planting plan) with catalog lookup.
+ * PlantSchedulePanel.tsx — Plant schedule (planting plan) with catalog lookup.
  *
  * Renders:
  *   • Filterable plant schedule table (species, mature dims, zone range, water, etc.)
@@ -10,13 +10,6 @@
  *   • `landscape_lookup_plant`   — single species detail
  *   • `landscape_filter_plants`  — site-filtered catalog query
  *   via POST /api/tools/call
- *
- * Props
- * ─────
- *   plants    {Array<{id, species, count?, x?, y?}>}  Site plant list.
- *   usdaZone  {number}   USDA hardiness zone for filtering (default 6).
- *   className {string}
- *   onDispatch {function}  Called with { tool, params } instead of fetch.
  */
 
 import { useState } from 'react'
@@ -24,18 +17,74 @@ import { useState } from 'react'
 const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
 
 // Water use colour indicators
-const WATER_BADGE = {
+const WATER_BADGE: Record<string, string> = {
   low:    'bg-emerald-900 text-emerald-300',
   medium: 'bg-blue-900 text-blue-300',
   high:   'bg-cyan-900 text-cyan-300',
 }
 
 // Pollinator value dots
-const POLLINATOR_DOT = {
+const POLLINATOR_DOT: Record<string, string> = {
   high:   '●●●',
   medium: '●●○',
   low:    '●○○',
   none:   '○○○',
+}
+
+/** A site plant entry, as passed via the `plants` prop. */
+export interface SitePlant {
+  id?: string
+  species?: string
+  /** Not in the original header-comment prop doc, but read by `displayPlants` below. */
+  type?: string
+  count?: number
+  x?: number
+  y?: number
+}
+
+/** One catalog row, as returned by `landscape_filter_plants` / rendered in the table. */
+interface CatalogPlant {
+  common_name?: string
+  scientific_name?: string
+  kind?: string
+  mature_height_m?: number
+  water?: string
+  pollinator_value?: string
+  deer_resistant?: boolean
+}
+
+/** Full detail returned by `landscape_lookup_plant`. */
+interface LookupResult extends CatalogPlant {
+  mature_spread_m?: number
+  usda_zones_min?: number
+  usda_zones_max?: number
+  light: string
+  notes?: string
+}
+
+interface FilterPlantsResponse {
+  ok: boolean
+  plants?: CatalogPlant[]
+  error?: string
+}
+
+interface LookupPlantResponse extends LookupResult {
+  ok: boolean
+  error?: string
+}
+
+export interface DispatchPayload {
+  tool: string
+  params: Record<string, unknown>
+}
+
+export interface PlantSchedulePanelProps {
+  /** JSON string of prop overrides, from the panel registry. */
+  content?: string
+  plants?: SitePlant[]
+  usdaZone?: number
+  className?: string
+  onDispatch?: (payload: DispatchPayload) => void
 }
 
 export default function PlantSchedulePanel({
@@ -44,17 +93,17 @@ export default function PlantSchedulePanel({
   usdaZone: usdaZone_prop = 6,
   className = '',
   onDispatch,
-}) {
+}: PlantSchedulePanelProps) {
   // Accept a `content` string (JSON) from the panel registry.
-  const _p = (() => { if (!content) return {}; try { return JSON.parse(content) } catch { return {} } })()
+  const _p: Partial<PlantSchedulePanelProps> = (() => { if (!content) return {}; try { return JSON.parse(content) } catch { return {} } })()
   const plants   = _p.plants   ?? plants_prop
   const usdaZone = _p.usdaZone ?? usdaZone_prop
   const [loading, setLoading] = useState(false)
-  const [activeAction, setActiveAction] = useState(null)
-  const [schedule, setSchedule] = useState(null)  // filtered catalog results
-  const [lookupResult, setLookupResult] = useState(null)
+  const [activeAction, setActiveAction] = useState<'filter' | 'lookup' | null>(null)
+  const [schedule, setSchedule] = useState<CatalogPlant[] | null>(null)  // filtered catalog results
+  const [lookupResult, setLookupResult] = useState<LookupPlantResponse | null>(null)
   const [lookupName, setLookupName] = useState('')
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   // ── Filter plants catalog ──────────────────────────────────────────────────
   async function handleFilterPlants() {
@@ -71,15 +120,15 @@ export default function PlantSchedulePanel({
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ tool_name: 'landscape_filter_plants', params }),
         })
-        const data = await res.json()
+        const data: FilterPlantsResponse = await res.json()
         if (data.ok) {
-          setSchedule(data.plants)
+          setSchedule(data.plants ?? null)
         } else {
           setError(data.error || 'Filter failed')
         }
       }
     } catch (e) {
-      setError(e.message || 'Dispatch failed')
+      setError((e as Error).message || 'Dispatch failed')
     } finally {
       setLoading(false)
       setActiveAction(null)
@@ -102,7 +151,7 @@ export default function PlantSchedulePanel({
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ tool_name: 'landscape_lookup_plant', params }),
         })
-        const data = await res.json()
+        const data: LookupPlantResponse = await res.json()
         if (data.ok) {
           setLookupResult(data)
         } else {
@@ -110,7 +159,7 @@ export default function PlantSchedulePanel({
         }
       }
     } catch (e) {
-      setError(e.message || 'Lookup failed')
+      setError((e as Error).message || 'Lookup failed')
     } finally {
       setLoading(false)
       setActiveAction(null)
@@ -118,7 +167,7 @@ export default function PlantSchedulePanel({
   }
 
   // Display list: prefer catalog results, fall back to prop plants
-  const displayPlants = schedule
+  const displayPlants: CatalogPlant[] = schedule
     ? schedule.slice(0, 40)
     : plants.map(p => ({ common_name: p.species || p.id, kind: p.type || 'shrub', count: p.count ?? 1 }))
 
@@ -211,7 +260,7 @@ export default function PlantSchedulePanel({
                     ) : '—'}
                   </td>
                   <td className="text-center pr-2 text-yellow-500 text-[9px]">
-                    {POLLINATOR_DOT[p.pollinator_value] || '○○○'}
+                    {POLLINATOR_DOT[p.pollinator_value ?? ''] || '○○○'}
                   </td>
                   <td className="text-center text-[9px]">
                     {p.deer_resistant === true ? (

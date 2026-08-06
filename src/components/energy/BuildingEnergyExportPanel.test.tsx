@@ -12,22 +12,9 @@
 //   9. Renders "Add Zone" button.
 //  10. Panel renders without crashing.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import BuildingEnergyExportPanel from './BuildingEnergyExportPanel.jsx'
-
-// ---------------------------------------------------------------------------
-// Mock fetch
-// ---------------------------------------------------------------------------
-
-function makeFetch(body, { ok = true } = {}) {
-  return vi.fn().mockResolvedValue({
-    ok,
-    status: ok ? 200 : 400,
-    json: () => Promise.resolve(body),
-    text: () => Promise.resolve(JSON.stringify(body)),
-  })
-}
 
 // ---------------------------------------------------------------------------
 // 1. Heading

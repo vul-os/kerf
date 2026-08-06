@@ -33,7 +33,6 @@ vi.mock('../../components/ToastBus.jsx', () => ({
 }))
 
 let api
-let ApiError
 
 beforeEach(async () => {
   vi.resetModules()
@@ -46,7 +45,6 @@ beforeEach(async () => {
 
   const mod = await import('../../lib/api.js')
   api = mod.api
-  ApiError = mod.ApiError
 })
 
 afterEach(() => {

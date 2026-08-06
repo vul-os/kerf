@@ -18,7 +18,7 @@
 // (isWakeUsableForFollow) rather than silently breaking whichever one was
 // registered second.
 
-import { wake as wakeApi } from '../cloud/api.js'
+import { wake as wakeApi, type PubFollow, type WakeSubscriptionInit } from '../cloud/api.js'
 import { useWake } from '../store/wake.js'
 import { useAuth } from '../store/auth.js'
 import { writeWakeState } from './wakeState.js'
@@ -41,7 +41,7 @@ export function isWakeBrowserSupported() {
 // or names this same origin; false for a genuinely different node's gateway
 // (see module docstring for why). `currentOrigin` is injectable for tests —
 // defaults to the real page origin in the browser.
-export function isWakeUsableForFollow(follow, currentOrigin) {
+export function isWakeUsableForFollow(follow: Partial<PubFollow> | null | undefined, currentOrigin?: string | null) {
   const origin = currentOrigin !== undefined
     ? currentOrigin
     : (typeof window !== 'undefined' ? window.location.origin : null)
@@ -58,7 +58,7 @@ export function isWakeUsableForFollow(follow, currentOrigin) {
 // urlBase64ToUint8Array — the standard Web Push conversion from a
 // base64url-encoded VAPID public key to the Uint8Array PushManager.subscribe
 // wants for `applicationServerKey`.
-export function urlBase64ToUint8Array(base64String) {
+export function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
   const raw = atob(base64)
@@ -67,12 +67,17 @@ export function urlBase64ToUint8Array(base64String) {
   return out
 }
 
-let cachedKeyInfo = null // { available, publicKey } | null — the node's own wake config
+interface WakeKeyInfo {
+  available: boolean
+  publicKey: string | null
+}
+
+let cachedKeyInfo: WakeKeyInfo | null = null // the node's own wake config
 
 // getWakeKeyInfo() -> { available, publicKey } — never throws. Cached for the
 // session (a node's wake config doesn't change without a restart); pass
 // `{ fresh: true }` to bypass the cache.
-export async function getWakeKeyInfo({ fresh = false } = {}) {
+export async function getWakeKeyInfo({ fresh = false }: { fresh?: boolean } = {}): Promise<WakeKeyInfo> {
   if (cachedKeyInfo && !fresh) return cachedKeyInfo
   try {
     const res = await wakeApi.getKey()
@@ -83,7 +88,7 @@ export async function getWakeKeyInfo({ fresh = false } = {}) {
   return cachedKeyInfo
 }
 
-async function ensurePushSubscription(publicKeyB64) {
+async function ensurePushSubscription(publicKeyB64: string) {
   const registration = await navigator.serviceWorker.register('/sw.js')
   await navigator.serviceWorker.ready
 
@@ -116,7 +121,7 @@ function syncWakeState() {
 // -> service worker -> push subscription -> register with this feed's
 // subscribe endpoint -> remember it locally. Returns {ok, error}; never
 // throws — the toggle just surfaces `error`.
-export async function enableWakeNotifications(pubKey) {
+export async function enableWakeNotifications(pubKey: string): Promise<{ ok: boolean; error: string | null }> {
   if (!isWakeBrowserSupported()) {
     return { ok: false, error: "Push notifications aren't supported in this browser." }
   }
@@ -135,7 +140,10 @@ export async function enableWakeNotifications(pubKey) {
       }
     }
     const subscription = await ensurePushSubscription(keyInfo.publicKey)
-    await wakeApi.subscribe(pubKey, subscription.toJSON())
+    // toJSON()'s DOM type is looser than the wire shape (optional `endpoint`,
+    // untyped `keys`); PushManager.subscribe()'s resolved subscription always
+    // matches WakeSubscriptionInit in practice.
+    await wakeApi.subscribe(pubKey, subscription.toJSON() as unknown as WakeSubscriptionInit)
     useWake.getState().setEnabled(pubKey, true)
     await syncWakeState()
     return { ok: true, error: null }
@@ -150,7 +158,7 @@ export async function enableWakeNotifications(pubKey) {
 // the local toggle. If no other follow still has Wake enabled, also tears
 // down the browser-level push subscription so there's no dangling
 // registration with the push service.
-export async function disableWakeNotifications(pubKey) {
+export async function disableWakeNotifications(pubKey: string): Promise<{ ok: boolean; error: string | null }> {
   useWake.getState().setEnabled(pubKey, false)
   let error = null
   try {
@@ -177,9 +185,9 @@ export async function disableWakeNotifications(pubKey) {
 // onWakeMessage(callback) — the service worker postMessages every open
 // window client on each `push` event (public/sw.js's notifyOpenClients).
 // Returns an unsubscribe function.
-export function onWakeMessage(callback) {
+export function onWakeMessage(callback: () => void) {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return () => {}
-  const handler = (event) => {
+  const handler = (event: MessageEvent) => {
     if (event.data && event.data.type === 'kerf-wake') callback()
   }
   navigator.serviceWorker.addEventListener('message', handler)

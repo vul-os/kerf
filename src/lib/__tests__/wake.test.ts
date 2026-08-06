@@ -82,7 +82,9 @@ function withGlobals(overrides, fn) {
   return result
 }
 
-function makeSupportedGlobals({ permission = 'default', registration } = {}) {
+// Fake browser globals — shapes only overlap real DOM types where wake.ts
+// actually reads them, so `any` is the right tool at this test-only boundary.
+function makeSupportedGlobals({ permission = 'default', registration }: { permission?: string; registration?: any } = {}) {
   const reg = registration || {
     pushManager: {
       getSubscription: vi.fn().mockResolvedValue(null),

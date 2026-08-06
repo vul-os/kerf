@@ -42,6 +42,11 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
+// @ts-expect-error — node:vm's ambient types aren't reachable from this program
+// (unlike node:fs/path/url, nothing else in the graph pulls them in); a
+// `/// <reference types="node" />` here would load @types/node globally and
+// break unrelated files that shadow Node globals (e.g. iesLoader.test.ts's
+// `process`), so this is a local, single-line suppression instead.
 import vm from 'node:vm'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -66,7 +71,7 @@ function makeClock(start = 1_770_000_000_000) {
 
 // ---- a minimal Cache Storage that persists across "worker restarts" --------
 
-function makeCacheStorage(store, { failing = false, counters } = {}) {
+function makeCacheStorage(store: Map<string, Map<string, string>>, { failing = false, counters }: { failing?: boolean; counters?: { puts: number } } = {}) {
   return {
     open: async (name) => {
       if (failing) throw new Error('Cache Storage unavailable (private browsing)')
@@ -88,26 +93,41 @@ function makeCacheStorage(store, { failing = false, counters } = {}) {
 
 // ---- boot a fresh "service worker instance" over the real sw.js source -----
 
+interface BootWakeState {
+  apiUrl: string
+  accessToken: string
+  pubs: string[]
+}
+
+// A minimal, DOM-shape-adjacent sandbox — sw.js runs unmodified inside it via
+// vm.runInContext, so these are deliberately loose (`any`) rather than real
+// DOM types: the point is to drive the shipped file, not to typecheck it.
 function bootWorker({
   cacheStore,
   failingCaches = false,
   wakeState = null,
   notificationPermission = 'granted',
   clock = makeClock(),
-} = {}) {
-  const listeners = {}
-  const calls = { fetch: [], postMessage: [], notifications: [], puts: 0 }
+}: {
+  cacheStore: Map<string, Map<string, string>>
+  failingCaches?: boolean
+  wakeState?: BootWakeState | null
+  notificationPermission?: string
+  clock?: ReturnType<typeof makeClock>
+}) {
+  const listeners: Record<string, (event: any) => void> = {}
+  const calls = { fetch: [] as any[], postMessage: [] as any[], notifications: [] as any[], puts: 0 }
 
-  const clientsList = [{ url: 'https://kerf.test/workshop', postMessage: (m) => calls.postMessage.push(m), focus: () => {} }]
+  const clientsList = [{ url: 'https://kerf.test/workshop', postMessage: (m: any) => calls.postMessage.push(m), focus: () => {} }]
 
   const self = {
-    addEventListener: (type, fn) => {
+    addEventListener: (type: string, fn: (event: any) => void) => {
       listeners[type] = fn
     },
     skipWaiting: () => {},
     clients: { claim: async () => {}, matchAll: async () => clientsList, openWindow: async () => {} },
     registration: {
-      showNotification: async (title, opts) => {
+      showNotification: async (title: any, opts: any) => {
         calls.notifications.push({ title, opts })
       },
     },
@@ -119,7 +139,7 @@ function bootWorker({
   // Seed the page-written wake state bucket so the re-crawl path is reachable.
   if (wakeState && !failingCaches) {
     if (!cacheStore.has('kerf-wake-state-v1')) cacheStore.set('kerf-wake-state-v1', new Map())
-    cacheStore.get('kerf-wake-state-v1').set('/__kerf-wake-state', JSON.stringify(wakeState))
+    cacheStore.get('kerf-wake-state-v1')!.set('/__kerf-wake-state', JSON.stringify(wakeState))
   }
 
   const sandbox = {
@@ -129,7 +149,8 @@ function bootWorker({
     // arithmetic under the test's control.
     Date: { now: () => clock.now },
     Response: class {
-      constructor(body) {
+      _body: any
+      constructor(body: any) {
         this._body = body
       }
       async text() {
@@ -139,7 +160,7 @@ function bootWorker({
         return JSON.parse(this._body)
       }
     },
-    fetch: async (url, init) => {
+    fetch: async (url: string, init: any) => {
       calls.fetch.push({ url, init })
       return { ok: true }
     },
@@ -159,12 +180,12 @@ function bootWorker({
 }
 
 // A push event whose decrypted plaintext is `bytes`; `null` means "no payload".
-function pushEvent(bytes) {
-  const waits = []
+function pushEvent(bytes: number[] | null) {
+  const waits: Promise<any>[] = []
   return {
     event: {
       data: bytes === null ? null : { arrayBuffer: async () => Uint8Array.from(bytes).buffer },
-      waitUntil: (p) => waits.push(p),
+      waitUntil: (p: Promise<any>) => waits.push(p),
     },
     settle: async () => {
       await Promise.all(waits)
@@ -172,23 +193,23 @@ function pushEvent(bytes) {
   }
 }
 
-const nonce = (seed) => [seed & 0xff, (seed >> 8) & 0xff, ...Array(14).fill(0)]
-const nonceHex = (seed) =>
+const nonce = (seed: number) => [seed & 0xff, (seed >> 8) & 0xff, ...Array(14).fill(0)]
+const nonceHex = (seed: number) =>
   nonce(seed)
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('')
 
-async function deliver(worker, bytes) {
+async function deliver(worker: ReturnType<typeof bootWorker>, bytes: number[] | null) {
   const { event, settle } = pushEvent(bytes)
   worker.listeners.push(event)
   await settle()
 }
 
-const persisted = (store) => JSON.parse(store.get(REPLAY_BUCKET).get(REPLAY_URL))
+const persisted = (store: Map<string, Map<string, string>>) => JSON.parse(store.get(REPLAY_BUCKET)!.get(REPLAY_URL)!)
 
-function seedReplayRecord(store, record) {
+function seedReplayRecord(store: Map<string, Map<string, string>>, record: unknown) {
   if (!store.has(REPLAY_BUCKET)) store.set(REPLAY_BUCKET, new Map())
-  store.get(REPLAY_BUCKET).set(REPLAY_URL, JSON.stringify(record))
+  store.get(REPLAY_BUCKET)!.set(REPLAY_URL, JSON.stringify(record))
 }
 
 const wakeState = { apiUrl: 'https://kerf.test', accessToken: 'tok', pubs: ['pubA', 'pubB'] }

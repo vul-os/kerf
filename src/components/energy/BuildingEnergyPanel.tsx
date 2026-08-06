@@ -11,15 +11,42 @@
 // Props: { projectId: string }
 
 import { useState, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import { Building2, Play, Download, AlertTriangle, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import { api } from '../../lib/api.js'
+import type { BuildingEnergyResult } from '../../types'
 import MonthlyLoadChart from './MonthlyLoadChart.jsx'
+import type { MonthlyLoadDatum } from './MonthlyLoadChart.jsx'
 
 // ---------------------------------------------------------------------------
 // Default zone template
 // ---------------------------------------------------------------------------
 
-function defaultZone(idx) {
+interface Zone {
+  id: string
+  name: string
+  floor_area_m2: number | string
+  height_m: number | string
+  // Occupancy
+  num_people: number | string
+  schedule: string       // office | residential | retail | warehouse
+  // Envelope
+  wall_u_value: number | string       // W/(m²·K)
+  window_area_m2: number | string
+  window_u_value: number | string
+  window_shgc: number | string
+  infiltration_ach: number | string
+  // Internal gains
+  lighting_w_m2: number | string
+  equipment_w_m2: number | string
+  // HVAC
+  hvac_cop_heating: number | string    // COP (heat pump) or AFUE fraction
+  hvac_cop_cooling: number | string
+  setpoint_heating_c: number | string
+  setpoint_cooling_c: number | string
+}
+
+function defaultZone(idx: number): Zone {
   return {
     id: `zone_${idx}`,
     name: `Zone ${idx + 1}`,
@@ -56,12 +83,12 @@ const SCHEDULES = [
   { value: 'warehouse',   label: 'Warehouse (6-18)' },
 ]
 
-function fmt2(n) {
+function fmt2(n: number | null | undefined) {
   if (n == null || !Number.isFinite(n)) return '—'
   return n.toFixed(2)
 }
 
-function fmtKwh(n) {
+function fmtKwh(n: number | null | undefined) {
   if (n == null || !Number.isFinite(n)) return '—'
   return `${n.toFixed(0)} kWh`
 }
@@ -70,7 +97,7 @@ function fmtKwh(n) {
 // Subcomponents
 // ---------------------------------------------------------------------------
 
-function FieldRow({ label, hint, children }) {
+function FieldRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div className="flex items-start gap-2 mb-1.5">
       <label className="text-[11px] text-ink-400 w-36 flex-shrink-0 pt-1.5 leading-tight">
@@ -82,7 +109,14 @@ function FieldRow({ label, hint, children }) {
   )
 }
 
-function NumInput({ value, onChange, min, step = 'any', disabled, placeholder }) {
+function NumInput({ value, onChange, min, step = 'any', disabled, placeholder }: {
+  value: number | string
+  onChange: (v: string) => void
+  min?: number
+  step?: number | string
+  disabled?: boolean
+  placeholder?: string
+}) {
   return (
     <input
       type="number"
@@ -97,10 +131,15 @@ function NumInput({ value, onChange, min, step = 'any', disabled, placeholder })
   )
 }
 
-function ZoneCard({ zone, idx, onChange, onRemove }) {
+function ZoneCard({ zone, idx, onChange, onRemove }: {
+  zone: Zone
+  idx: number
+  onChange: (idx: number, updated: Zone) => void
+  onRemove: (idx: number) => void
+}) {
   const [expanded, setExpanded] = useState(idx === 0)
 
-  const set = (field, val) => onChange(idx, { ...zone, [field]: val })
+  const set = (field: keyof Zone, val: string) => onChange(idx, { ...zone, [field]: val })
 
   return (
     <div className="border border-ink-800 rounded-md overflow-hidden mb-2">
@@ -225,7 +264,7 @@ function ZoneCard({ zone, idx, onChange, onRemove }) {
 // Result display
 // ---------------------------------------------------------------------------
 
-function ResultRow({ label, value, unit, accent }) {
+function ResultRow({ label, value, unit, accent }: { label: string; value: string; unit?: string; accent?: boolean }) {
   return (
     <div className="flex items-center justify-between py-1 border-b border-ink-800 last:border-0">
       <span className="text-[11px] text-ink-400">{label}</span>
@@ -240,20 +279,31 @@ function ResultRow({ label, value, unit, accent }) {
 // Main panel
 // ---------------------------------------------------------------------------
 
-export default function BuildingEnergyPanel({ projectId }) {
-  const [zones, setZones] = useState([defaultZone(0)])
-  const [location, setLocation] = useState({ latitude: 51.5, longitude: -0.12, hdd: 2700, cdd: 150 })
+interface LocationSettings {
+  latitude: number | string
+  longitude: number | string
+  hdd: number | string
+  cdd: number | string
+}
+
+function num(v: unknown): number | undefined {
+  return typeof v === 'number' ? v : undefined
+}
+
+export default function BuildingEnergyPanel({ projectId }: { projectId: string }) {
+  const [zones, setZones] = useState<Zone[]>([defaultZone(0)])
+  const [location, setLocation] = useState<LocationSettings>({ latitude: 51.5, longitude: -0.12, hdd: 2700, cdd: 150 })
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [result, setResult] = useState(null)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<BuildingEnergyResult | null>(null)
   const [idfExpanded, setIdfExpanded] = useState(false)
 
-  const handleZoneChange = useCallback((idx, updated) => {
+  const handleZoneChange = useCallback((idx: number, updated: Zone) => {
     setZones((prev) => prev.map((z, i) => (i === idx ? updated : z)))
     setResult(null)
   }, [])
 
-  const handleZoneRemove = useCallback((idx) => {
+  const handleZoneRemove = useCallback((idx: number) => {
     setZones((prev) => prev.filter((_, i) => i !== idx))
     setResult(null)
   }, [])
@@ -272,34 +322,34 @@ export default function BuildingEnergyPanel({ projectId }) {
       const body = {
         zones: zones.map((z) => ({
           name: z.name,
-          floor_area_m2: parseFloat(z.floor_area_m2) || 50,
-          height_m: parseFloat(z.height_m) || 3,
-          num_people: parseInt(z.num_people, 10) || 0,
+          floor_area_m2: parseFloat(String(z.floor_area_m2)) || 50,
+          height_m: parseFloat(String(z.height_m)) || 3,
+          num_people: parseInt(String(z.num_people), 10) || 0,
           schedule: z.schedule,
-          wall_u_value: parseFloat(z.wall_u_value) || 0.35,
-          window_area_m2: parseFloat(z.window_area_m2) || 0,
-          window_u_value: parseFloat(z.window_u_value) || 1.8,
-          window_shgc: parseFloat(z.window_shgc) || 0.4,
-          infiltration_ach: parseFloat(z.infiltration_ach) || 0.5,
-          lighting_w_m2: parseFloat(z.lighting_w_m2) || 0,
-          equipment_w_m2: parseFloat(z.equipment_w_m2) || 0,
-          hvac_cop_heating: parseFloat(z.hvac_cop_heating) || 3.5,
-          hvac_cop_cooling: parseFloat(z.hvac_cop_cooling) || 3.0,
-          setpoint_heating_c: parseFloat(z.setpoint_heating_c) ?? 21,
-          setpoint_cooling_c: parseFloat(z.setpoint_cooling_c) ?? 26,
+          wall_u_value: parseFloat(String(z.wall_u_value)) || 0.35,
+          window_area_m2: parseFloat(String(z.window_area_m2)) || 0,
+          window_u_value: parseFloat(String(z.window_u_value)) || 1.8,
+          window_shgc: parseFloat(String(z.window_shgc)) || 0.4,
+          infiltration_ach: parseFloat(String(z.infiltration_ach)) || 0.5,
+          lighting_w_m2: parseFloat(String(z.lighting_w_m2)) || 0,
+          equipment_w_m2: parseFloat(String(z.equipment_w_m2)) || 0,
+          hvac_cop_heating: parseFloat(String(z.hvac_cop_heating)) || 3.5,
+          hvac_cop_cooling: parseFloat(String(z.hvac_cop_cooling)) || 3.0,
+          setpoint_heating_c: parseFloat(String(z.setpoint_heating_c)) ?? 21,
+          setpoint_cooling_c: parseFloat(String(z.setpoint_cooling_c)) ?? 26,
         })),
         location: {
-          latitude: parseFloat(location.latitude) || 51.5,
-          longitude: parseFloat(location.longitude) || -0.12,
-          hdd: parseFloat(location.hdd) || 2700,
-          cdd: parseFloat(location.cdd) || 150,
+          latitude: parseFloat(String(location.latitude)) || 51.5,
+          longitude: parseFloat(String(location.longitude)) || -0.12,
+          hdd: parseFloat(String(location.hdd)) || 2700,
+          cdd: parseFloat(String(location.cdd)) || 150,
         },
         export_idf: true,
       }
       const data = await api.buildingEnergy(projectId, body)
       setResult(data)
     } catch (err) {
-      setError(err?.message || 'API error')
+      setError(err instanceof Error ? err.message : 'API error')
     } finally {
       setLoading(false)
     }
@@ -412,13 +462,13 @@ export default function BuildingEnergyPanel({ projectId }) {
             <section>
               <div className="text-[10px] uppercase tracking-wider text-ink-500 mb-2">Annual Totals</div>
               <div className="bg-ink-900 rounded-md px-3 py-1">
-                <ResultRow label="Heating" value={fmtKwh(result.totals?.heating_kWh)} />
-                <ResultRow label="Cooling" value={fmtKwh(result.totals?.cooling_kWh)} />
-                <ResultRow label="Lighting" value={fmtKwh(result.totals?.lighting_kWh)} />
-                <ResultRow label="Equipment" value={fmtKwh(result.totals?.equipment_kWh)} />
+                <ResultRow label="Heating" value={fmtKwh(num(result.totals?.heating_kWh))} />
+                <ResultRow label="Cooling" value={fmtKwh(num(result.totals?.cooling_kWh))} />
+                <ResultRow label="Lighting" value={fmtKwh(num(result.totals?.lighting_kWh))} />
+                <ResultRow label="Equipment" value={fmtKwh(num(result.totals?.equipment_kWh))} />
                 <ResultRow
                   label="EUI"
-                  value={fmt2(result.totals?.eui_kWh_m2)}
+                  value={fmt2(num(result.totals?.eui_kWh_m2))}
                   unit="kWh/(m²·yr)"
                   accent
                 />
@@ -430,7 +480,7 @@ export default function BuildingEnergyPanel({ projectId }) {
               <section>
                 <div className="text-[10px] uppercase tracking-wider text-ink-500 mb-2">Monthly Profile</div>
                 <div className="bg-ink-900 rounded-md p-3 overflow-x-auto">
-                  <MonthlyLoadChart data={result.monthly} width={480} height={200} title="" />
+                  <MonthlyLoadChart data={result.monthly as MonthlyLoadDatum[]} width={480} height={200} title="" />
                 </div>
               </section>
             )}

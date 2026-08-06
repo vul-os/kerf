@@ -19,11 +19,47 @@
 //   onClose — () => void
 
 import { useCallback, useState } from 'react'
-import { Zap, AlertTriangle, CheckCircle2, X, RefreshCw } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Zap, CheckCircle2, X, RefreshCw } from 'lucide-react'
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface EMCPanelProps {
+  onClose?: () => void
+}
+
+interface ApiError { ok: false; error: string }
+
+interface DmResult {
+  ok: boolean
+  e_field_vpm?: number
+  e_field_dbuvm?: number
+  far_field?: boolean
+}
+
+interface MarginResult {
+  ok: boolean
+  passes?: boolean
+  margin_db?: number
+  limit_dbuvm?: number
+  standard?: string
+  class_?: string
+  distance_m?: number
+}
+
+interface ShieldingResult {
+  ok: boolean
+  se_absorption_db?: number
+  se_reflection_db?: number
+  se_total_db?: number
+  se_aperture_db?: number | null
+  se_effective_db?: number
+  aperture_limited?: boolean
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function apiPost(endpoint, body) {
+async function apiPost<T>(endpoint: string, body: Record<string, unknown>): Promise<T | ApiError> {
   try {
     const r = await fetch(`/api/llm-tools/${endpoint}`, {
       method: 'POST',
@@ -32,11 +68,11 @@ async function apiPost(endpoint, body) {
     })
     return r.ok ? r.json() : { ok: false, error: `HTTP ${r.status}` }
   } catch (e) {
-    return { ok: false, error: e.message }
+    return { ok: false, error: e instanceof Error ? e.message : 'Request failed' }
   }
 }
 
-function ResultRow({ label, value, unit = '', warn = false }) {
+function ResultRow({ label, value, unit = '', warn = false }: { label: string; value: ReactNode; unit?: string; warn?: boolean }) {
   return (
     <div className="flex items-center justify-between text-[11px] py-0.5">
       <span className="text-gray-400">{label}</span>
@@ -49,8 +85,8 @@ function ResultRow({ label, value, unit = '', warn = false }) {
 
 // ── Main panel ───────────────────────────────────────────────────────────────
 
-export default function EMCPanel({ onClose }) {
-  const [tab, setTab] = useState('radiated')
+export default function EMCPanel({ onClose }: EMCPanelProps) {
+  const [tab, setTab] = useState<'radiated' | 'shielding'>('radiated')
   const [loading, setLoading] = useState(false)
   const [offline, setOffline] = useState(false)
 
@@ -59,56 +95,56 @@ export default function EMCPanel({ onClose }) {
   const [dmArea, setDmArea]     = useState('1e-4')
   const [dmCurrent, setDmCurrent] = useState('0.001')
   const [dmDist, setDmDist]     = useState('3')
-  const [dmResult, setDmResult] = useState(null)
+  const [dmResult, setDmResult] = useState<DmResult | null>(null)
 
   // Margin
   const [marginStd, setMarginStd]   = useState('cispr')
   const [marginClass, setMarginClass] = useState('B')
-  const [marginResult, setMarginResult] = useState(null)
+  const [marginResult, setMarginResult] = useState<MarginResult | null>(null)
 
   // Shielding
   const [shFreq, setShFreq]     = useState('1e6')
   const [shThick, setShThick]   = useState('1e-3')
   const [shSlot, setShSlot]     = useState('0')
-  const [shResult, setShResult] = useState(null)
+  const [shResult, setShResult] = useState<ShieldingResult | null>(null)
 
   const runDM = useCallback(async () => {
     setLoading(true)
-    const r = await apiPost('emc_radiated_differential', {
+    const r = await apiPost<DmResult>('emc_radiated_differential', {
       freq_hz: parseFloat(dmFreq),
       loop_area_m2: parseFloat(dmArea),
       current_a: parseFloat(dmCurrent),
       distance_m: parseFloat(dmDist),
     })
     setLoading(false)
-    if (!r || r.error) { setOffline(true); return }
+    if (!r || 'error' in r) { setOffline(true); return }
     setDmResult(r)
     if (r.ok) {
       // Auto-compute emission margin
-      const mr = await apiPost('emc_emission_margin', {
+      const mr = await apiPost<MarginResult>('emc_emission_margin', {
         e_field_dbuvm: r.e_field_dbuvm,
         freq_hz: parseFloat(dmFreq),
         standard: marginStd,
         class_: marginClass,
         distance_m: parseFloat(dmDist),
       })
-      if (mr && mr.ok) setMarginResult(mr)
+      if (mr && !('error' in mr) && mr.ok) setMarginResult(mr)
     }
   }, [dmFreq, dmArea, dmCurrent, dmDist, marginStd, marginClass])
 
   const runShielding = useCallback(async () => {
     setLoading(true)
-    const r = await apiPost('emc_shielding', {
+    const r = await apiPost<ShieldingResult>('emc_shielding', {
       freq_hz: parseFloat(shFreq),
       thickness_m: parseFloat(shThick),
       aperture_length_m: parseFloat(shSlot) || 0,
     })
     setLoading(false)
-    if (!r || r.error) { setOffline(true); return }
+    if (!r || 'error' in r) { setOffline(true); return }
     setShResult(r)
   }, [shFreq, shThick, shSlot])
 
-  const TABS = [
+  const TABS: { id: 'radiated' | 'shielding'; label: string }[] = [
     { id: 'radiated', label: 'Radiated' },
     { id: 'shielding', label: 'Shielding' },
   ]

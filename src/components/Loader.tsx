@@ -68,6 +68,13 @@ const T3 = '38,40 64,86 90,40' //  apex-down,  bottom-right (overlaps t2 edge �
 // CSS class names are namespaced with `kerf-loader-` so they never collide
 // with anything else in the app.
 
+export interface Props {
+  size?: number
+  label?: string
+  variant?: 'inline' | 'block'
+  className?: string
+}
+
 /**
  * Loader — small, drop-in animated SVG triangles spinner.
  *
@@ -82,7 +89,7 @@ export default function Loader({
   label = 'Loading…',
   variant = 'inline',
   className,
-}) {
+}: Props) {
   const wrapperBase =
     variant === 'block'
       ? 'flex flex-col items-center justify-center gap-2 py-6 text-kerf-400'
@@ -117,6 +124,11 @@ export default function Loader({
   )
 }
 
+export interface FullPageLoaderProps {
+  label?: string
+  sub?: string
+}
+
 /**
  * FullPageLoader — Suspense fallback overlay covering the viewport.
  *
@@ -124,7 +136,7 @@ export default function Loader({
  * @param {string} [props.label='Loading…']  primary text + aria-label
  * @param {string} [props.sub]               optional secondary line
  */
-export function FullPageLoader({ label = 'Loading…', sub }) {
+export function FullPageLoader({ label = 'Loading…', sub }: FullPageLoaderProps) {
   return (
     <div
       role="status"
@@ -165,7 +177,7 @@ export function FullPageLoader({ label = 'Loading…', sub }) {
  * Provided so callers can `import { InlineLoader }` for self-documenting
  * usage inside buttons / table rows / etc.
  */
-export function InlineLoader(props) {
+export function InlineLoader(props: Props) {
   return <Loader {...props} variant="inline" />
 }
 

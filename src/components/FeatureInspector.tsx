@@ -1,30 +1,48 @@
 import { useState } from 'react'
 import { Square, Minus, Circle, EyeOff, MessageSquare, Copy, X } from 'lucide-react'
 import { findFeature } from '../lib/topology.js'
+import type { Topology, TopologyPart, TopologyFace, TopologyEdge, TopologyVertex, FeatureKind } from '../lib/topology.js'
 
 const KIND_ICON = { face: Square, edge: Minus, vertex: Circle }
 
-function fmt(n) {
+function fmt(n: number) {
   if (!isFinite(n)) return '—'
   return n.toFixed(3)
 }
-function fmtVec(v) {
+function fmtVec(v: [number, number, number] | null | undefined) {
   if (!v) return '—'
   return `(${fmt(v[0])}, ${fmt(v[1])}, ${fmt(v[2])})`
 }
-function rgbToHex([r, g, b]) {
-  const c = (x) => Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16).padStart(2, '0')
+function rgbToHex([r, g, b]: [number, number, number]) {
+  const c = (x: number) => Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16).padStart(2, '0')
   return `#${c(r)}${c(g)}${c(b)}`
 }
-function hexToRgb(hex) {
+function hexToRgb(hex: string): [number, number, number] {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex)
   if (!m) return [1, 1, 1]
   const n = parseInt(m[1], 16)
   return [((n >> 16) & 0xff) / 255, ((n >> 8) & 0xff) / 255, (n & 0xff) / 255]
 }
-function intColorToRgb(c) {
+function intColorToRgb(c: number | null | undefined): [number, number, number] {
   if (c == null) return [0.79, 0.66, 0.42]
   return [((c >> 16) & 0xff) / 255, ((c >> 8) & 0xff) / 255, (c & 0xff) / 255]
+}
+
+export interface FeatureSelection {
+  partId: string
+  kind: FeatureKind
+  featureId: string
+}
+
+export interface Props {
+  selection: FeatureSelection | null
+  parts?: TopologyPart[]
+  topologies: Map<string, Topology>
+  onClose?: () => void
+  onHidePart?: (partId: string) => void
+  onReferenceInChat?: (partId: string, kind: FeatureKind, featureId: string) => void
+  onRecolorPart?: (partId: string, rgb: [number, number, number]) => void
+  isStepFile?: boolean
 }
 
 export default function FeatureInspector({
@@ -36,7 +54,7 @@ export default function FeatureInspector({
   onReferenceInChat,
   onRecolorPart,
   isStepFile = false,
-}) {
+}: Props) {
   const [copied, setCopied] = useState(false)
 
   if (!selection) return null
@@ -47,9 +65,13 @@ export default function FeatureInspector({
   const feature = findFeature(topology, kind, featureId)
   if (!feature) return null
 
+  const face = kind === 'face' ? (feature as TopologyFace) : null
+  const edge = kind === 'edge' ? (feature as TopologyEdge) : null
+  const vertex = kind === 'vertex' ? (feature as TopologyVertex) : null
+
   const Icon = KIND_ICON[kind] || Square
 
-  function copyText(text) {
+  function copyText(text: string) {
     navigator.clipboard?.writeText(text).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1200)
@@ -75,25 +97,25 @@ export default function FeatureInspector({
       </header>
 
       <div className="px-3 py-2 space-y-1.5">
-        {kind === 'face' && (
+        {face && (
           <>
-            <Row label="Area"   value={`${fmt(feature.area)} mm²`} />
-            <Row label="Normal" value={fmtVec(feature.normal)} />
-            <Row label="Centroid" value={fmtVec(feature.centroid)} />
-            <Row label="Polygons" value={String(feature.polygons.length)} />
+            <Row label="Area"   value={`${fmt(face.area)} mm²`} />
+            <Row label="Normal" value={fmtVec(face.normal)} />
+            <Row label="Centroid" value={fmtVec(face.centroid)} />
+            <Row label="Polygons" value={String(face.polygons.length)} />
           </>
         )}
-        {kind === 'edge' && (
+        {edge && (
           <>
-            <Row label="Length" value={`${fmt(feature.length)} mm`} />
-            <Row label="A" value={fmtVec(feature.a)} />
-            <Row label="B" value={fmtVec(feature.b)} />
+            <Row label="Length" value={`${fmt(edge.length)} mm`} />
+            <Row label="A" value={fmtVec(edge.a)} />
+            <Row label="B" value={fmtVec(edge.b)} />
           </>
         )}
-        {kind === 'vertex' && (
+        {vertex && (
           <>
-            <Row label="Position" value={fmtVec(feature.position)} />
-            <Row label="On faces" value={feature.faces.join(', ') || '—'} />
+            <Row label="Position" value={fmtVec(vertex.position)} />
+            <Row label="On faces" value={vertex.faces.join(', ') || '—'} />
           </>
         )}
       </div>
@@ -138,10 +160,10 @@ export default function FeatureInspector({
         <button
           type="button"
           onClick={() => {
-            const point =
-              kind === 'face'   ? feature.centroid :
-              kind === 'edge'   ? [(feature.a[0] + feature.b[0]) / 2, (feature.a[1] + feature.b[1]) / 2, (feature.a[2] + feature.b[2]) / 2] :
-              feature.position
+            const point: [number, number, number] | undefined =
+              face   ? face.centroid :
+              edge   ? [(edge.a[0] + edge.b[0]) / 2, (edge.a[1] + edge.b[1]) / 2, (edge.a[2] + edge.b[2]) / 2] :
+              vertex ? vertex.position : undefined
             copyText(`${partId}#${featureId} ${fmtVec(point)}`)
           }}
           className="flex items-center gap-1 px-2 py-1 text-[11px] text-ink-300 hover:text-kerf-300 hover:bg-ink-800 rounded ml-auto"
@@ -155,7 +177,7 @@ export default function FeatureInspector({
   )
 }
 
-function Row({ label, value }) {
+function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline gap-2">
       <span className="w-16 text-ink-500 text-[10px] uppercase tracking-wider">{label}</span>

@@ -12,6 +12,7 @@
  */
 
 import { useState, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import { Waves, Play, AlertTriangle, ChevronDown, ChevronUp, Info } from 'lucide-react'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -20,7 +21,9 @@ const API_URL = import.meta.env.VITE_API_URL || ''
 // Utility: POST /api/tools/call
 // ---------------------------------------------------------------------------
 
-async function callTool(toolName, args) {
+type ToolResult<T> = T & { ok?: boolean; reason?: string }
+
+async function callTool<T>(toolName: string, args: Record<string, unknown>): Promise<ToolResult<T>> {
   const res = await fetch(`${API_URL}/api/tools/call`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -39,17 +42,29 @@ async function callTool(toolName, args) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function fmt(n, dp = 3) {
+function fmt(n: number | null | undefined, dp = 3) {
   if (n == null || !Number.isFinite(n)) return '—'
   return n.toFixed(dp)
 }
 
-function fmtSI(n, unit, dp = 2) {
+function fmtSI(n: number | null | undefined, unit: string, dp = 2) {
   if (n == null || !Number.isFinite(n)) return '—'
   return `${n.toFixed(dp)} ${unit}`
 }
 
-function NumInput({ value, onChange, min, step = 'any', disabled, placeholder, unit }) {
+// Note: `max` is accepted (one call site below passes it) but was never
+// destructured/forwarded to the underlying <input> in the original JS, so
+// it has always been a silent no-op — real bug, kept as-is, not fixed here.
+function NumInput({ value, onChange, min, step = 'any', disabled, placeholder, unit }: {
+  value: number | string
+  onChange: (v: string) => void
+  min?: number
+  max?: number
+  step?: number | string
+  disabled?: boolean
+  placeholder?: string
+  unit?: string
+}) {
   return (
     <div className="flex items-center gap-1">
       <input
@@ -67,7 +82,12 @@ function NumInput({ value, onChange, min, step = 'any', disabled, placeholder, u
   )
 }
 
-function SelectInput({ value, onChange, options, disabled }) {
+function SelectInput({ value, onChange, options, disabled }: {
+  value: string
+  onChange: (v: string) => void
+  options: { value: string; label: string }[]
+  disabled?: boolean
+}) {
   return (
     <select
       value={value}
@@ -82,7 +102,7 @@ function SelectInput({ value, onChange, options, disabled }) {
   )
 }
 
-function FieldRow({ label, hint, children }) {
+function FieldRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div className="flex items-start gap-2 mb-1.5">
       <label className="text-[11px] text-ink-400 w-32 flex-shrink-0 pt-1.5 leading-tight">
@@ -94,7 +114,7 @@ function FieldRow({ label, hint, children }) {
   )
 }
 
-function ResultRow({ label, value, highlight }) {
+function ResultRow({ label, value, highlight }: { label: string; value: ReactNode; highlight?: boolean }) {
   return (
     <div className={`flex justify-between items-center py-1 border-b border-ink-800/50 ${highlight ? 'text-kerf-300' : ''}`}>
       <span className="text-[11px] text-ink-400">{label}</span>
@@ -103,7 +123,7 @@ function ResultRow({ label, value, highlight }) {
   )
 }
 
-function SectionHeader({ children }) {
+function SectionHeader({ children }: { children: ReactNode }) {
   return (
     <div className="text-[10px] uppercase tracking-wider text-ink-600 mb-1.5 mt-3 first:mt-0">
       {children}
@@ -131,8 +151,27 @@ const FLOW_OPTIONS = [
 // LMTD method panel
 // ---------------------------------------------------------------------------
 
+interface LMTDInputs {
+  T_h_in: number
+  T_h_out: number
+  T_c_in: number
+  T_c_out: number
+  U: number
+  A: number
+  flow: string
+}
+
+interface LMTDResult {
+  Q_W: number
+  LMTD_K: number
+  F: number
+  deltaT1: number
+  deltaT2: number
+  flow: string
+}
+
 function LMTDPanel() {
-  const [inputs, setInputs] = useState({
+  const [inputs, setInputs] = useState<LMTDInputs>({
     T_h_in: 353.15,   // 80°C
     T_h_out: 323.15,  // 50°C
     T_c_in: 293.15,   // 20°C
@@ -141,18 +180,19 @@ function LMTDPanel() {
     A: 10,
     flow: 'counter',
   })
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<LMTDResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const set = (k, v) => setInputs((prev) => ({ ...prev, [k]: parseFloat(v) || v }))
+  const set = (k: keyof LMTDInputs, v: string) =>
+    setInputs((prev) => ({ ...prev, [k]: parseFloat(v) || v }) as LMTDInputs)
 
   const run = useCallback(async () => {
     setLoading(true)
     setError(null)
     setResult(null)
     try {
-      const r = await callTool('hx_lmtd', {
+      const r = await callTool<LMTDResult>('hx_lmtd', {
         T_h_in: inputs.T_h_in,
         T_h_out: inputs.T_h_out,
         T_c_in: inputs.T_c_in,
@@ -164,7 +204,7 @@ function LMTDPanel() {
       setResult(r.ok === false ? null : r)
       if (r.ok === false) setError(r.reason || 'Computation failed')
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
@@ -242,8 +282,26 @@ function LMTDPanel() {
 // ε-NTU method panel
 // ---------------------------------------------------------------------------
 
+interface ENTUInputs {
+  C_min: number
+  C_max: number
+  NTU: number
+  flow: string
+  T_h_in: number
+  T_c_in: number
+}
+
+interface ENTUResult {
+  epsilon: number
+  C_r: number
+  NTU: number
+  C_min: number
+  C_max: number
+  flow: string
+}
+
 function ENTUPanel() {
-  const [inputs, setInputs] = useState({
+  const [inputs, setInputs] = useState<ENTUInputs>({
     C_min: 1000,
     C_max: 2000,
     NTU: 2.0,
@@ -251,18 +309,19 @@ function ENTUPanel() {
     T_h_in: 353.15,
     T_c_in: 293.15,
   })
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<ENTUResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const set = (k, v) => setInputs((prev) => ({ ...prev, [k]: parseFloat(v) || v }))
+  const set = (k: keyof ENTUInputs, v: string) =>
+    setInputs((prev) => ({ ...prev, [k]: parseFloat(v) || v }) as ENTUInputs)
 
   const run = useCallback(async () => {
     setLoading(true)
     setError(null)
     setResult(null)
     try {
-      const r = await callTool('hx_effectiveness_ntu', {
+      const r = await callTool<ENTUResult>('hx_effectiveness_ntu', {
         C_min: inputs.C_min,
         C_max: inputs.C_max,
         NTU: inputs.NTU,
@@ -271,7 +330,7 @@ function ENTUPanel() {
       setResult(r.ok === false ? null : r)
       if (r.ok === false) setError(r.reason || 'Computation failed')
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
@@ -356,8 +415,61 @@ function ENTUPanel() {
 // Bell-Delaware shell-and-tube panel (simplified inputs)
 // ---------------------------------------------------------------------------
 
+interface BellDelawareInputs {
+  duty_W: number
+  t_hot_in: number
+  t_hot_out: number
+  t_cold_in: number
+  t_cold_out: number
+  shell_rho: number
+  shell_mu: number
+  shell_cp: number
+  shell_k: number
+  shell_m_dot: number
+  tube_rho: number
+  tube_mu: number
+  tube_cp: number
+  tube_k: number
+  tube_m_dot: number
+  D_s: number
+  tube_od: number
+  tube_id: number
+  pitch: number
+  layout: string
+  L_tube: number
+  N_t: number
+  n_passes: number
+  N_b: number
+  B: number
+  baffle_cut: number
+  k_wall: number
+  R_foul_t: number
+  R_foul_s: number
+}
+
+interface BellDelawareResult {
+  U_W_m2K: number
+  A_req_m2: number
+  A_actual_m2: number
+  overdesign: number | null
+  LMTD_K: number
+  h_s_W_m2K: number
+  h_t_W_m2K: number
+  Re_t?: number
+  Re_s?: number
+  N_tubes: number
+  N_baffles: number
+  dP_tube_Pa: number
+  dP_shell_Pa: number
+  factors?: {
+    Jc: number
+    Jl: number
+    Jb: number
+  }
+}
+
 function BellDelawarePanel() {
-  const [inputs, setInputs] = useState({
+  const [inputs, setInputs] = useState<BellDelawareInputs>({
     duty_W: 1_000_000,
     t_hot_in: 80,   // °C
     t_hot_out: 50,
@@ -375,19 +487,20 @@ function BellDelawarePanel() {
     n_passes: 2, N_b: 20, B: 0.25, baffle_cut: 0.25,
     k_wall: 50.0, R_foul_t: 0.0002, R_foul_s: 0.0002,
   })
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [result, setResult] = useState<BellDelawareResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
 
-  const set = (k, v) => setInputs((prev) => ({ ...prev, [k]: parseFloat(v) || v }))
+  const set = (k: keyof BellDelawareInputs, v: string) =>
+    setInputs((prev) => ({ ...prev, [k]: parseFloat(v) || v }) as BellDelawareInputs)
 
   const run = useCallback(async () => {
     setLoading(true)
     setError(null)
     setResult(null)
     try {
-      const r = await callTool('hx_shell_tube_bell_delaware', {
+      const r = await callTool<BellDelawareResult>('hx_shell_tube_bell_delaware', {
         duty_W: inputs.duty_W,
         t_hot_in: inputs.t_hot_in,
         t_hot_out: inputs.t_hot_out,
@@ -416,7 +529,7 @@ function BellDelawarePanel() {
       setResult(r.ok === false ? null : r)
       if (r.ok === false) setError(r.reason || 'Computation failed')
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
@@ -563,7 +676,7 @@ function BellDelawarePanel() {
 // Root component
 // ---------------------------------------------------------------------------
 
-export default function HeatExchangerPanel({ projectId: _projectId }) {
+export default function HeatExchangerPanel({ projectId: _projectId }: { projectId?: string }) {
   const [method, setMethod] = useState('lmtd')
 
   return (

@@ -20,6 +20,7 @@
  */
 
 import { useState } from 'react'
+import type { ComponentType } from 'react'
 import { Hammer, Upload, Monitor, Wifi, Loader2, CheckCircle2, AlertCircle, Clock } from 'lucide-react'
 import { buildFirmware, uploadFirmware, monitorFirmware, flashViaWorker } from '../lib/firmwareBridge.js'
 
@@ -31,9 +32,41 @@ const ACTION_SUCCESS = 'success'
 const ACTION_ERROR   = 'error'
 const ACTION_PENDING = 'pending'  // tool not installed / board not connected
 
+type ActionStatus =
+  | typeof ACTION_IDLE
+  | typeof ACTION_LOADING
+  | typeof ACTION_SUCCESS
+  | typeof ACTION_ERROR
+  | typeof ACTION_PENDING
+
+/** Parsed kerf.fw.json content — shape is loose; only the fields this
+ * component reads are declared. */
+interface FwConfig {
+  project_id?: string
+  board?: {
+    target?: string
+    fqbn?: string
+  }
+  [key: string]: unknown
+}
+
+/** Normalised result object returned by src/lib/firmwareBridge.js actions. */
+interface ActionResult {
+  ok?: boolean
+  status: ActionStatus | string
+  errors?: string[]
+  warnings?: string[]
+  lines?: string[]
+  port?: string | null
+  hex_path?: string | null
+  artifact_key?: string | null
+  job_id?: string | null
+  [key: string]: unknown
+}
+
 // ── sub-components ────────────────────────────────────────────────────────────
 
-function StatusBadge({ status }) {
+function StatusBadge({ status }: { status: ActionStatus | string }) {
   if (status === ACTION_LOADING) {
     return <Loader2 size={13} className="animate-spin text-kerf-300 flex-shrink-0" />
   }
@@ -49,7 +82,15 @@ function StatusBadge({ status }) {
   return null
 }
 
-function ActionButton({ icon: Icon, label, onClick, disabled, status }) {
+interface ActionButtonProps {
+  icon: ComponentType<{ size?: number; className?: string }>
+  label: string
+  onClick: () => void
+  disabled: boolean
+  status: ActionStatus | string
+}
+
+function ActionButton({ icon: Icon, label, onClick, disabled, status }: ActionButtonProps) {
   const isLoading = status === ACTION_LOADING
   return (
     <button
@@ -70,7 +111,7 @@ function ActionButton({ icon: Icon, label, onClick, disabled, status }) {
   )
 }
 
-function ResultPanel({ action, result }) {
+function ResultPanel({ action, result }: { action: string; result: ActionResult | null }) {
   if (!result) return null
 
   const { status, errors = [], warnings = [], lines = [], port, hex_path } = result
@@ -165,6 +206,16 @@ function ResultPanel({ action, result }) {
  *   capabilities.firmware_flash=true.  When true the "Via Worker" button is
  *   enabled alongside the local "Upload" button.
  */
+interface Props {
+  sourcePath: string
+  fwConfig?: FwConfig | null
+  onResult?: ((action: string, result: ActionResult) => void) | null
+  projectId?: string | null
+  artifactKey?: string | null
+  boardTarget?: string | null
+  hasWorker?: boolean
+}
+
 export default function FirmwareActions({
   sourcePath,
   fwConfig = null,
@@ -173,21 +224,21 @@ export default function FirmwareActions({
   artifactKey = null,
   boardTarget = null,
   hasWorker = false,
-}) {
-  const [buildState,        setBuildState]        = useState(ACTION_IDLE)
-  const [uploadState,       setUploadState]       = useState(ACTION_IDLE)
-  const [monitorState,      setMonitorState]      = useState(ACTION_IDLE)
-  const [workerFlashState,  setWorkerFlashState]  = useState(ACTION_IDLE)
+}: Props) {
+  const [buildState,        setBuildState]        = useState<ActionStatus | string>(ACTION_IDLE)
+  const [uploadState,       setUploadState]       = useState<ActionStatus | string>(ACTION_IDLE)
+  const [monitorState,      setMonitorState]      = useState<ActionStatus | string>(ACTION_IDLE)
+  const [workerFlashState,  setWorkerFlashState]  = useState<ActionStatus | string>(ACTION_IDLE)
 
-  const [buildResult,       setBuildResult]       = useState(null)
-  const [uploadResult,      setUploadResult]      = useState(null)
-  const [monitorResult,     setMonitorResult]     = useState(null)
-  const [workerFlashResult, setWorkerFlashResult] = useState(null)
+  const [buildResult,       setBuildResult]       = useState<ActionResult | null>(null)
+  const [uploadResult,      setUploadResult]      = useState<ActionResult | null>(null)
+  const [monitorResult,     setMonitorResult]     = useState<ActionResult | null>(null)
+  const [workerFlashResult, setWorkerFlashResult] = useState<ActionResult | null>(null)
 
   // The hex artifact from the most recent successful build — passed to upload.
-  const [lastHexPath,     setLastHexPath]     = useState(null)
+  const [lastHexPath,     setLastHexPath]     = useState<string | null>(null)
   // Effective artifact key: explicit prop or derived from build result.
-  const [lastArtifactKey, setLastArtifactKey] = useState(artifactKey || null)
+  const [lastArtifactKey, setLastArtifactKey] = useState<string | null>(artifactKey || null)
 
   const anyLoading = (
     buildState        === ACTION_LOADING ||

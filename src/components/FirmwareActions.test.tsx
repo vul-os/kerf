@@ -14,13 +14,16 @@
 
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
+import type { ComponentProps } from 'react'
 import FirmwareActions from './FirmwareActions.jsx'
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function render(props = {}) {
+type RenderProps = Partial<Omit<ComponentProps<typeof FirmwareActions>, 'sourcePath'>>
+
+function render(props: RenderProps = {}) {
   return renderToStaticMarkup(
     <FirmwareActions sourcePath="/tmp/sketch" {...props} />
   )

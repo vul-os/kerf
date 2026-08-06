@@ -5,7 +5,7 @@
  * No jsdom / @testing-library required.
  */
 
-import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import CorridorModelPanel from './CorridorModelPanel.jsx'
 

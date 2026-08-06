@@ -13,6 +13,7 @@
 
 import { SKETCH_IMPORT_RE } from './jscadRunner.js'
 import { parseAssembly } from './assembly.js'
+import type { ApiFile } from '../types/api.js'
 
 // ---------------------------------------------------------------------------
 // buildSketchImports
@@ -23,9 +24,9 @@ import { parseAssembly } from './assembly.js'
 // `files` — the array of File rows from the workspace store. Each row has at
 //   minimum: { id, name, kind?, parent_id, content? }.
 // ---------------------------------------------------------------------------
-export function buildSketchImports(files) {
+export function buildSketchImports(files: ApiFile[] | null | undefined): Map<string, Set<string>> {
   if (!Array.isArray(files)) return new Map()
-  const result = new Map()
+  const result = new Map<string, Set<string>>()
   for (const file of files) {
     if (!isJscadFile(file)) continue
     const content = file.content
@@ -45,9 +46,9 @@ export function buildSketchImports(files) {
 // references in its components list.
 // Returns: Map<assemblyFileId, Set<componentFileId>>
 // ---------------------------------------------------------------------------
-export function buildAssemblyDeps(files) {
+export function buildAssemblyDeps(files: ApiFile[] | null | undefined): Map<string, Set<string>> {
   if (!Array.isArray(files)) return new Map()
-  const result = new Map()
+  const result = new Map<string, Set<string>>()
   for (const file of files) {
     if (!isAssemblyFile(file)) continue
     const content = file.content
@@ -58,7 +59,7 @@ export function buildAssemblyDeps(files) {
     } catch {
       continue
     }
-    const deps = new Set()
+    const deps = new Set<string>()
     for (const comp of (parsed?.components || [])) {
       if (comp.file_id) deps.add(comp.file_id)
     }
@@ -89,7 +90,7 @@ export function buildAssemblyDeps(files) {
 // already in `affectedJscads`; a self-referencing assembly would need to be
 // a jscad to be in that set.
 // ---------------------------------------------------------------------------
-export function dependentsOfSketch(sketchAbsPath, files) {
+export function dependentsOfSketch(sketchAbsPath: string | null | undefined, files: ApiFile[] | null | undefined): { jscads: string[]; assemblies: string[] } {
   if (!sketchAbsPath || !Array.isArray(files)) {
     return { jscads: [], assemblies: [] }
   }
@@ -98,7 +99,7 @@ export function dependentsOfSketch(sketchAbsPath, files) {
   const assemblyDeps  = buildAssemblyDeps(files)
 
   // 1. Find jscads that import this sketch.
-  const affectedJscads = new Set()
+  const affectedJscads = new Set<string>()
   for (const [jscadId, sketchPaths] of sketchImports) {
     if (sketchPaths.has(sketchAbsPath)) {
       affectedJscads.add(jscadId)
@@ -106,7 +107,7 @@ export function dependentsOfSketch(sketchAbsPath, files) {
   }
 
   // 2. Find assemblies that reference at least one affected jscad.
-  const affectedAssemblies = new Set()
+  const affectedAssemblies = new Set<string>()
   for (const [assemblyId, componentFileIds] of assemblyDeps) {
     for (const fid of componentFileIds) {
       if (affectedJscads.has(fid)) {
@@ -126,7 +127,7 @@ export function dependentsOfSketch(sketchAbsPath, files) {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function isJscadFile(file) {
+function isJscadFile(file: ApiFile | null | undefined): boolean {
   if (!file) return false
   // kind == 'file' is used for .jscad by workspace.js (not yet tagged as
   // 'jscad' in the DB kind column). Fall back to name-based detection.
@@ -140,7 +141,7 @@ function isJscadFile(file) {
   return false
 }
 
-function isAssemblyFile(file) {
+function isAssemblyFile(file: ApiFile | null | undefined): boolean {
   if (!file) return false
   const name = (file.name || '').toLowerCase()
   return file.kind === 'assembly' || name.endsWith('.assembly')
@@ -151,8 +152,8 @@ function isAssemblyFile(file) {
 // Relative paths (./foo.sketch) are normalised to '/foo.sketch' as a
 // best-effort approximation; workspace.js's jscadImportsSketch does the
 // same thing for the single-file check, so the two are consistent.
-function extractSketchPathsFromSource(source) {
-  const paths = new Set()
+function extractSketchPathsFromSource(source: string): Set<string> {
+  const paths = new Set<string>()
   // Fresh RegExp to avoid stateful lastIndex on the shared /gm export.
   const re = new RegExp(SKETCH_IMPORT_RE.source, SKETCH_IMPORT_RE.flags)
   let m

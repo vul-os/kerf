@@ -12,23 +12,67 @@
 import { CheckCircle, XCircle, AlertTriangle, Shield } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
+// Types — the `gdnt_build_report` tool's payload shape isn't declared
+// elsewhere, so it's captured here from how this panel destructures it.
+// ---------------------------------------------------------------------------
+
+interface GdntDatumReference {
+  datum_label?: string
+}
+
+interface GdntFcf {
+  unicode?: string
+  symbol_code?: string
+  tolerance_zone?: string
+  modifiers?: string[]
+  datum_references?: Array<GdntDatumReference | string>
+}
+
+interface GdntInspectionRow {
+  feature_id?: string
+  feature?: string
+  fcf?: GdntFcf
+  measured_value?: number
+  actual?: number
+  tolerance_value?: number
+  tolerance?: number
+  pass?: boolean
+}
+
+interface GdntReport {
+  rows?: GdntInspectionRow[]
+  inspection_rows?: GdntInspectionRow[]
+  date?: string
+  report_date?: string
+  part_name?: string
+  part?: string
+}
+
+export interface GdntInspectionPanelProps {
+  /** Parsed inspection report object (from file content JSON) or null. */
+  report?: GdntReport | null
+  /** Raw string content of the .gdnt file (for parse fallback). */
+  raw?: string
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function parseReport(raw) {
+function parseReport(raw?: string): GdntReport | null {
   if (!raw || typeof raw !== 'string' || !raw.trim()) return null
   try {
     const doc = JSON.parse(raw)
     // Accept either a top-level report object or a direct rows array.
     if (Array.isArray(doc)) return { rows: doc }
     if (doc && typeof doc === 'object') return doc
-  } catch (_) {
+  } catch {
     return null
   }
   return null
 }
 
-function PassBadge({ pass }) {
+function PassBadge({ pass }: { pass?: boolean }) {
   if (pass === true) {
     return (
       <span className="inline-flex items-center gap-1 text-emerald-400 font-medium text-[11px]">
@@ -53,12 +97,12 @@ function PassBadge({ pass }) {
   )
 }
 
-function FcfChip({ fcf }) {
+function FcfChip({ fcf }: { fcf?: GdntFcf }) {
   if (!fcf) return <span className="text-ink-500 italic">—</span>
   const symbol = fcf.unicode || fcf.symbol_code || '?'
   const zone   = fcf.tolerance_zone ?? ''
   const mods   = (fcf.modifiers || []).join(' ')
-  const datums = (fcf.datum_references || []).map((d) => d.datum_label || d).join(' | ')
+  const datums = (fcf.datum_references || []).map((d) => (typeof d === 'string' ? d : d.datum_label) || d).join(' | ')
   return (
     <span className="inline-flex items-center gap-1 font-mono text-kerf-300 text-[11px]">
       <span>{symbol}</span>
@@ -69,7 +113,7 @@ function FcfChip({ fcf }) {
   )
 }
 
-function InspectionTable({ rows }) {
+function InspectionTable({ rows }: { rows?: GdntInspectionRow[] }) {
   if (!rows || rows.length === 0) {
     return (
       <div className="text-[11px] text-ink-500 italic py-4 text-center">
@@ -115,7 +159,7 @@ function InspectionTable({ rows }) {
   )
 }
 
-function SummaryBar({ rows }) {
+function SummaryBar({ rows }: { rows?: GdntInspectionRow[] }) {
   if (!rows || rows.length === 0) return null
   const passed  = rows.filter((r) => r.pass === true).length
   const failed  = rows.filter((r) => r.pass === false).length
@@ -134,7 +178,7 @@ function SummaryBar({ rows }) {
 // Main export
 // ---------------------------------------------------------------------------
 
-export default function GdntInspectionPanel({ report, raw }) {
+export default function GdntInspectionPanel({ report, raw }: GdntInspectionPanelProps) {
   const parsed = report ?? parseReport(raw)
   const rows   = parsed?.rows ?? parsed?.inspection_rows ?? []
   const date   = parsed?.date ?? parsed?.report_date ?? ''

@@ -1,13 +1,7 @@
-// probe_overlay.jsx — Voltage/current waveform plotter in pure SVG.
+// probe_overlay.tsx — Voltage/current waveform plotter in pure SVG.
 //
 // Renders simulation waveform results returned by the /run-spice endpoint.
 // Each waveform is a {name, kind, x:[...], y:[...]} object from routes_spice.py.
-//
-// Props:
-//   waveforms  — [{name, kind, x, y, xUnit, yUnit}] from backend
-//   height     — panel height in px (default 200)
-//   probes     — [string] — probe labels to highlight
-//   onClose    — () => void
 
 // Palette for up to 8 traces
 const TRACE_COLORS = [
@@ -21,7 +15,16 @@ const TRACE_COLORS = [
   '#4ade80', // green-400
 ]
 
-function formatNum(v) {
+export interface Waveform {
+  name: string
+  kind?: string
+  x?: number[]
+  y?: number[]
+  xUnit?: string
+  yUnit?: string
+}
+
+function formatNum(v: number): string {
   if (Math.abs(v) >= 1e3)  return (v / 1e3).toPrecision(4) + ' k'
   if (Math.abs(v) >= 1)    return v.toPrecision(4)
   if (Math.abs(v) >= 1e-3) return (v * 1e3).toPrecision(3) + ' m'
@@ -29,7 +32,18 @@ function formatNum(v) {
   return v.toExponential(2)
 }
 
-function WaveformPlot({ waveform, color, svgW, svgH, xMin, xMax, yMin, yMax }) {
+interface WaveformPlotProps {
+  waveform: Waveform
+  color: string
+  svgW: number
+  svgH: number
+  xMin: number
+  xMax: number
+  yMin: number
+  yMax: number
+}
+
+function WaveformPlot({ waveform, color, svgW, svgH, xMin, xMax, yMin, yMax }: WaveformPlotProps) {
   if (!waveform.x?.length || !waveform.y?.length) return null
 
   const pad = { top: 14, bottom: 18, left: 50, right: 10 }
@@ -39,10 +53,11 @@ function WaveformPlot({ waveform, color, svgW, svgH, xMin, xMax, yMin, yMax }) {
   const xRange = xMax - xMin || 1
   const yRange = yMax - yMin || 1
 
-  const toSvgX = (v) => pad.left + ((v - xMin) / xRange) * plotW
-  const toSvgY = (v) => pad.top + (1 - (v - yMin) / yRange) * plotH
+  const toSvgX = (v: number) => pad.left + ((v - xMin) / xRange) * plotW
+  const toSvgY = (v: number) => pad.top + (1 - (v - yMin) / yRange) * plotH
 
-  const pts = waveform.x.map((xv, i) => `${toSvgX(xv).toFixed(1)},${toSvgY(waveform.y[i]).toFixed(1)}`).join(' ')
+  const y = waveform.y
+  const pts = waveform.x.map((xv, i) => `${toSvgX(xv).toFixed(1)},${toSvgY(y[i]).toFixed(1)}`).join(' ')
 
   return (
     <polyline
@@ -55,7 +70,16 @@ function WaveformPlot({ waveform, color, svgW, svgH, xMin, xMax, yMin, yMax }) {
   )
 }
 
-function Axes({ svgW, svgH, xMin, xMax, yMin, yMax, xLabel, yLabel }) {
+interface AxesProps {
+  svgW: number
+  svgH: number
+  xMin: number
+  xMax: number
+  yMin: number
+  yMax: number
+}
+
+function Axes({ svgW, svgH, xMin, xMax, yMin, yMax }: AxesProps) {
   const pad = { top: 14, bottom: 18, left: 50, right: 10 }
   const plotW = svgW - pad.left - pad.right
   const plotH = svgH - pad.top - pad.bottom
@@ -103,7 +127,13 @@ function Axes({ svgW, svgH, xMin, xMax, yMin, yMax, xLabel, yLabel }) {
   )
 }
 
-export default function ProbeOverlay({ waveforms = [], height = 200, onClose }) {
+export interface ProbeOverlayProps {
+  waveforms?: Waveform[]
+  height?: number
+  onClose?: () => void
+}
+
+export default function ProbeOverlay({ waveforms = [], height = 200, onClose }: ProbeOverlayProps) {
   if (!waveforms.length) return null
 
   // Compute global x extent

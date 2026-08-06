@@ -19,9 +19,14 @@ import { useWorkspace } from '../store/workspace.js'
 const DRAWER_W = 420
 const EDGE = 12
 
-export default function NavPrefsTab({ value, onChange }) {
+interface Props {
+  value: string
+  onChange?: (id: string) => void
+}
+
+export default function NavPrefsTab({ value, onChange }: Props) {
   const [open, setOpen] = useState(false)
-  const ref = useRef(null)
+  const ref = useRef<HTMLDivElement>(null)
 
   const drawerOpen = useWorkspace((s) => s.rightDrawer?.open)
   const [isLg, setIsLg] = useState(
@@ -40,7 +45,7 @@ export default function NavPrefsTab({ value, onChange }) {
   // opens upward — taller than the viewport pane on a laptop, which pushed the
   // first entries off the top of the screen. Cap it to the room actually
   // available above the tab and let it scroll.
-  const btnRef = useRef(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
   const [maxH, setMaxH] = useState(420)
   useLayoutEffect(() => {
     if (!open || !btnRef.current) return
@@ -50,11 +55,11 @@ export default function NavPrefsTab({ value, onChange }) {
 
   useEffect(() => {
     if (!open) return
-    const close = (ev) => {
-      if (ref.current && ev.target && ref.current.contains(ev.target)) return
+    const close = (ev: Event) => {
+      if (ref.current && ev.target && ref.current.contains(ev.target as Node)) return
       setOpen(false)
     }
-    const onKey = (ev) => ev.key === 'Escape' && setOpen(false)
+    const onKey = (ev: KeyboardEvent) => ev.key === 'Escape' && setOpen(false)
     window.addEventListener('pointerdown', close, true)
     window.addEventListener('keydown', onKey)
     return () => {

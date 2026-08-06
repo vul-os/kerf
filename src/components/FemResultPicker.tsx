@@ -22,14 +22,17 @@
 //     ...
 //   />
 
-import { useMemo } from 'react'
+import { useMemo, type CSSProperties, type ChangeEvent } from 'react'
 import {
   availableFields,
   pickColorConfig,
   fieldLabel,
   FIELD_DISPLACEMENT,
+  parseFEMResult,
 } from '../lib/femResults.js'
 import { COLOR_SCALE_NAMES, scaleToCSS } from '../lib/femColorScales.js'
+
+type NormalisedFEMResult = ReturnType<typeof parseFEMResult>
 
 // ── prop defaults ─────────────────────────────────────────────────────────────
 
@@ -50,25 +53,33 @@ const DEFAULT_SCALE = 'viridis'
  *   onChange    ({field, scaleName}) => void                 optional
  *   compact     boolean  render in single-row compact mode   optional
  */
+export interface FemResultPickerProps {
+  result: NormalisedFEMResult | null
+  field?: string
+  scaleName?: string
+  onChange?: (next: { field: string; scaleName: string }) => void
+  compact?: boolean
+}
+
 export default function FemResultPicker({
   result,
   field = DEFAULT_FIELD,
   scaleName = DEFAULT_SCALE,
   onChange,
   compact = false,
-}) {
+}: FemResultPickerProps) {
   const fields = useMemo(() => availableFields(result), [result])
   const colorConfig = useMemo(
     () => result ? pickColorConfig(result, field, scaleName) : null,
     [result, field, scaleName]
   )
 
-  function handleFieldChange(e) {
+  function handleFieldChange(e: ChangeEvent<HTMLSelectElement>) {
     const nextField = e.target.value
     onChange?.({ field: nextField, scaleName })
   }
 
-  function handleScaleChange(e) {
+  function handleScaleChange(e: ChangeEvent<HTMLSelectElement>) {
     const nextScale = e.target.value
     onChange?.({ field, scaleName: nextScale })
   }
@@ -149,7 +160,7 @@ export default function FemResultPicker({
 
 // ── formatting ────────────────────────────────────────────────────────────────
 
-function fmtValue(value, unit) {
+function fmtValue(value: number | null | undefined, unit: string) {
   if (value == null || !isFinite(value)) return '—'
   switch (unit) {
     case 'mm':  return (value * 1e3).toFixed(3) + ' mm'
@@ -161,7 +172,7 @@ function fmtValue(value, unit) {
 
 // ── styles ────────────────────────────────────────────────────────────────────
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
   wrapper: {
     display: 'flex',
     flexDirection: 'column',

@@ -200,8 +200,8 @@ describe('FemResultPicker onChange prop', () => {
 describe('onChange emission shape', () => {
   it('onChange receives { field, scaleName } shape (documented contract)', () => {
     // Simulate the internal logic manually to verify the shape contract.
-    const received = []
-    const onChange = (payload) => received.push(payload)
+    const received: { field: string; scaleName: string }[] = []
+    const onChange = (payload: { field: string; scaleName: string }) => received.push(payload)
 
     // Simulate field change
     const field = 'displacement'

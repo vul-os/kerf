@@ -1,4 +1,4 @@
-// ICPackagePanel.jsx — IC package / substrate design panel.
+// ICPackagePanel.tsx — IC package / substrate design panel.
 //
 // Provides: substrate/BGA viewer (die + balls + bond wires/bumps + DRC list)
 // and a creation form for wire-bond, flip-chip, and BGA-only packages.
@@ -13,11 +13,95 @@
 //   onClose — () => void
 
 import { useCallback, useState } from 'react'
-import { Cpu, AlertTriangle, CheckCircle2, X, RefreshCw, Grid, Layers } from 'lucide-react'
+import { Cpu, AlertTriangle, CheckCircle2, X, RefreshCw, Layers } from 'lucide-react'
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+// IC package / substrate domain shape — bespoke to this panel's backend tools,
+// not the tscircuit CircuitJson element-array format.
+
+interface DiePad {
+  id: string
+  side: string
+  x_mm: number
+  y_mm: number
+}
+
+interface Die {
+  width_mm: number
+  height_mm: number
+  pad_pitch_um: number
+  pads: DiePad[]
+}
+
+interface Substrate {
+  width_mm: number
+  height_mm: number
+  layers: number
+  material: string
+}
+
+interface Bond {
+  type: string
+  die_pad: string
+  finger_id?: string
+  ball_id?: string
+  length_mm?: number
+  angle_deg?: number
+  wire_diameter_um?: number
+  pitch_um?: number
+}
+
+interface Ball {
+  id: string
+  row: number
+  col: number
+  net: string
+}
+
+interface BallGrid {
+  rows: number
+  cols: number
+  pitch_mm: number
+  ball_diameter_mm: number
+  balls: Ball[]
+}
+
+interface ICPackage {
+  name: string
+  package_type: string
+  die: Die
+  substrate: Substrate
+  bonds: Bond[]
+  ball_grid: BallGrid
+  net_map: Record<string, string>
+}
+
+interface DrcViolation {
+  rule: string
+  message: string
+}
+
+interface ApiResult {
+  error?: string
+}
+
+interface DrcResponse extends ApiResult {
+  pass?: boolean
+  error_count?: number
+  violations?: DrcViolation[]
+}
+
+interface CreateResponse extends ApiResult {
+  ic_package?: ICPackage
+}
+
+export interface ICPackagePanelProps {
+  onClose?: () => void
+}
 
 // ── Demo package ──────────────────────────────────────────────────────────────
 
-const DEMO_PACKAGE = {
+const DEMO_PACKAGE: ICPackage = {
   name: 'BGA256_14x14',
   package_type: 'wire_bond',
   die: {
@@ -60,22 +144,22 @@ const DEMO_PACKAGE = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function apiPost(endpoint, body) {
+async function apiPost<T extends ApiResult>(endpoint: string, body: unknown): Promise<T> {
   try {
     const r = await fetch(`/api/llm-tools/${endpoint}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     })
-    return r.ok ? r.json() : { error: `HTTP ${r.status}` }
+    return r.ok ? ((await r.json()) as T) : ({ error: `HTTP ${r.status}` } as T)
   } catch (e) {
-    return { error: e.message }
+    return { error: (e as Error).message } as T
   }
 }
 
 // ── BGA Canvas Viewer ─────────────────────────────────────────────────────────
 
-function BGAViewer({ pkg }) {
+function BGAViewer({ pkg }: { pkg: ICPackage | null }) {
   if (!pkg) return null
 
   const bg   = pkg.ball_grid
@@ -90,9 +174,6 @@ function BGAViewer({ pkg }) {
   const scaleX = (CANVAS_W - 2 * MARGIN) / (sub?.width_mm  ?? 14)
   const scaleY = (CANVAS_H - 2 * MARGIN) / (sub?.height_mm ?? 14)
   const scale  = Math.min(scaleX, scaleY)
-
-  const sx = (mm) => MARGIN + mm * scale
-  const sy = (mm) => MARGIN + mm * scale
 
   // Substrate rect
   const subW = (sub?.width_mm  ?? 14) * scale
@@ -110,7 +191,7 @@ function BGAViewer({ pkg }) {
   const ballR = Math.min(pitch * 0.35, 6)
 
   // Bond wires: map from finger_id → die_pad x/y (approximate from die centre)
-  const diePads = {}
+  const diePads: Record<string, { x: number; y: number }> = {}
   for (const p of die?.pads ?? []) {
     diePads[p.id] = {
       x: dieX + p.x_mm * scale,
@@ -199,7 +280,7 @@ function BGAViewer({ pkg }) {
 
 // ── Violation row ─────────────────────────────────────────────────────────────
 
-function ViolRow({ v }) {
+function ViolRow({ v }: { v: DrcViolation }) {
   return (
     <div className="flex items-start gap-2 px-2 py-1 text-[11px]">
       <AlertTriangle size={11} className="text-red-400 mt-0.5 shrink-0" />
@@ -213,21 +294,21 @@ function ViolRow({ v }) {
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
-export default function ICPackagePanel({ onClose }) {
-  const [tab,       setTab]       = useState('viewer')
+export default function ICPackagePanel({ onClose }: ICPackagePanelProps) {
+  const [tab,       setTab]       = useState<'viewer' | 'drc' | 'netmap' | 'create'>('viewer')
   const [loading,   setLoading]   = useState(false)
-  const [pkg,       setPkg]       = useState(DEMO_PACKAGE)
-  const [drcResult, setDrcResult] = useState(null)
+  const [pkg,       setPkg]       = useState<ICPackage>(DEMO_PACKAGE)
+  const [drcResult, setDrcResult] = useState<DrcResponse | null>(null)
   // Creation form state
   const [formName, setFormName]           = useState('MyBGA')
   const [formType, setFormType]           = useState('wire_bond')
-  const [createError, setCreateError]     = useState(null)
-  const [createResult, setCreateResult]   = useState(null)
+  const [createError, setCreateError]     = useState<string | null>(null)
+  const [createResult, setCreateResult]   = useState<ICPackage | null>(null)
 
   const runDrc = useCallback(async () => {
     setLoading(true)
     setDrcResult(null)
-    const r = await apiPost('ic_package_drc', { ic_package: pkg })
+    const r = await apiPost<DrcResponse>('ic_package_drc', { ic_package: pkg })
     setLoading(false)
     if (r.error) setDrcResult({ error: r.error })
     else setDrcResult(r)
@@ -237,7 +318,7 @@ export default function ICPackagePanel({ onClose }) {
     setLoading(true)
     setCreateError(null)
     setCreateResult(null)
-    const r = await apiPost('ic_package_create', {
+    const r = await apiPost<CreateResponse>('ic_package_create', {
       name: formName,
       package_type: formType,
       die: { width_mm: 4.0, height_mm: 4.0, pad_pitch_um: 100, pads: [] },
@@ -247,7 +328,7 @@ export default function ICPackagePanel({ onClose }) {
     })
     setLoading(false)
     if (r.error) setCreateError(r.error)
-    else {
+    else if (r.ic_package) {
       setCreateResult(r.ic_package)
       setPkg(r.ic_package)
       setTab('viewer')
@@ -281,7 +362,9 @@ export default function ICPackagePanel({ onClose }) {
 
       {/* Tabs */}
       <div className="flex gap-0.5 px-2 pt-1.5 border-b border-white/10 shrink-0">
-        {[['viewer', 'Viewer'], ['drc', 'DRC'], ['netmap', 'Net Map'], ['create', 'Create']].map(([id, label]) => (
+        {(
+          [['viewer', 'Viewer'], ['drc', 'DRC'], ['netmap', 'Net Map'], ['create', 'Create']] as const
+        ).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
                   className={`px-2.5 py-1 text-[11px] rounded-t transition-colors
                     ${tab === id
@@ -299,14 +382,16 @@ export default function ICPackagePanel({ onClose }) {
           <div className="space-y-3">
             {/* Package stats */}
             <div className="grid grid-cols-3 gap-2">
-              {[
-                ['Die', `${pkg.die?.width_mm}×${pkg.die?.height_mm} mm`],
-                ['Substrate', `${pkg.substrate?.width_mm}×${pkg.substrate?.height_mm} mm ${pkg.substrate?.layers}L`],
-                ['Ball Grid', `${pkg.ball_grid?.rows}×${pkg.ball_grid?.cols} @ ${pkg.ball_grid?.pitch_mm}mm`],
-                ['Bonds', `${(pkg.bonds ?? []).length} ${pkg.package_type === 'flip_chip' ? 'bumps' : 'wires'}`],
-                ['Mapped Nets', `${Object.keys(pkg.net_map ?? {}).length} pads`],
-                ['Material', pkg.substrate?.material ?? '—'],
-              ].map(([label, val]) => (
+              {(
+                [
+                  ['Die', `${pkg.die?.width_mm}×${pkg.die?.height_mm} mm`],
+                  ['Substrate', `${pkg.substrate?.width_mm}×${pkg.substrate?.height_mm} mm ${pkg.substrate?.layers}L`],
+                  ['Ball Grid', `${pkg.ball_grid?.rows}×${pkg.ball_grid?.cols} @ ${pkg.ball_grid?.pitch_mm}mm`],
+                  ['Bonds', `${(pkg.bonds ?? []).length} ${pkg.package_type === 'flip_chip' ? 'bumps' : 'wires'}`],
+                  ['Mapped Nets', `${Object.keys(pkg.net_map ?? {}).length} pads`],
+                  ['Material', pkg.substrate?.material ?? '—'],
+                ] as const
+              ).map(([label, val]) => (
                 <div key={label} className="bg-white/5 rounded p-2">
                   <div className="text-[10px] text-gray-500">{label}</div>
                   <div className="text-gray-200 font-mono mt-0.5 truncate">{val}</div>
@@ -372,7 +457,7 @@ export default function ICPackagePanel({ onClose }) {
                 </div>
                 {(drcResult.violations ?? []).length > 0 && (
                   <div className="bg-white/5 rounded divide-y divide-white/5">
-                    {drcResult.violations.map((v, i) => <ViolRow key={i} v={v} />)}
+                    {drcResult.violations!.map((v, i) => <ViolRow key={i} v={v} />)}
                   </div>
                 )}
                 {drcResult.pass && (

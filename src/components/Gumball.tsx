@@ -41,11 +41,19 @@ import * as THREE from 'three'
 import { useWorkspace } from '../store/workspace.js'
 import { newFeatureId } from '../lib/occtRunner.js'
 
+// This component drives an imperative Three.js gumball attached to a scene
+// supplied by FeatureRenderer's ref-exposed context, plus per-part records
+// shaped by the OCCT worker. Fully modeling the render-context/part shapes
+// is a refactor-scale effort out of scope for a rename-only TS migration
+// pass, so those internal shapes are typed `any` at their entry points,
+// each annotated at the point of use.
+type Point3 = [number, number, number]
+
 // ---------------------------------------------------------------------------
 // Pure helpers — exercised by `src/__tests__/gumball.test.js`.
 
 // Average a list of [x,y,z] points. Returns [0,0,0] for an empty list.
-export function averagePoints(points) {
+export function averagePoints(points: number[][] | null | undefined): Point3 {
   if (!points || points.length === 0) return [0, 0, 0]
   let x = 0, y = 0, z = 0
   for (const p of points) {
@@ -61,10 +69,10 @@ export function averagePoints(points) {
 //      per-tri, with `faceIdPerTri[t]` telling us which face triangle t
 //      belongs to). Average all vertices of matching triangles.
 // Returns null when neither is available.
-export function computeFaceCentroid(part, faceId) {
+export function computeFaceCentroid(part: any, faceId: number): Point3 | null {
   if (!part) return null
   // Prefer OCCT-supplied centroid.
-  const meta = part.faceMeta?.find?.((m) => m && m.id === faceId)
+  const meta = part.faceMeta?.find?.((m: any) => m && m.id === faceId)
   if (meta && Array.isArray(meta.centroid) && meta.centroid.length === 3) {
     return [meta.centroid[0], meta.centroid[1], meta.centroid[2]]
   }
@@ -72,7 +80,7 @@ export function computeFaceCentroid(part, faceId) {
   const positions = part.positions
   const ids = part.faceIdPerTri
   if (!positions || !ids) return null
-  const pts = []
+  const pts: number[][] = []
   const triCount = ids.length
   for (let t = 0; t < triCount; t++) {
     if (ids[t] !== faceId) continue
@@ -101,7 +109,7 @@ export function computeFaceCentroid(part, faceId) {
 // 1 world-unit along the axis corresponds to `len = |tip - origin|` pixels
 // at the axis's depth in screen space, so:
 //   distance_world = (delta · axisScreenUnit) / len
-export function projectScreenDeltaToAxis(dx, dy, originScreen, tipScreen) {
+export function projectScreenDeltaToAxis(dx: number, dy: number, originScreen: [number, number], tipScreen: [number, number]): number {
   const sx = tipScreen[0] - originScreen[0]
   const sy = tipScreen[1] - originScreen[1]
   const len = Math.hypot(sx, sy)
@@ -120,7 +128,7 @@ export function projectScreenDeltaToAxis(dx, dy, originScreen, tipScreen) {
 // drag-start cursor offset (sx0, sy0) and the current offset (sx, sy) from
 // `centerScreen` and return `atan2(sy, sx) - atan2(sy0, sx0)` normalized to
 // [-π, π].
-export function angleBetweenScreenDeltas(sx0, sy0, sx, sy) {
+export function angleBetweenScreenDeltas(sx0: number, sy0: number, sx: number, sy: number): number {
   const a0 = Math.atan2(sy0, sx0)
   const a = Math.atan2(sy, sx)
   let d = a - a0
@@ -138,7 +146,7 @@ export function angleBetweenScreenDeltas(sx0, sy0, sx, sy) {
 //      parallel to the camera axis this is degenerate → fall back to
 //      cross(axis, cameraUp). Last-ditch: cross with a non-parallel world
 //      axis. Always returns a unit-length THREE.Vector3 (or null).
-export function computeRadialBasis(edgeAxisWorld, camera) {
+export function computeRadialBasis(edgeAxisWorld: number[], camera: any): THREE.Vector3 | null {
   const ax = new THREE.Vector3(edgeAxisWorld[0], edgeAxisWorld[1], edgeAxisWorld[2])
   if (ax.lengthSq() < 1e-12) return null
   ax.normalize()
@@ -431,12 +439,17 @@ const AXES = [
   { id: 'z', dir: [0, 0, 1], color: 0x4d9aff },
 ]
 
-export default function Gumball({ getThreeContext, meshes }) {
+interface GumballProps {
+  getThreeContext: (() => any) | null | undefined // boundary: imperative render-context from FeatureRenderer
+  meshes?: any[]
+}
+
+export default function Gumball({ getThreeContext, meshes }: GumballProps) {
   const featureSelection = useWorkspace((s) => s.featureSelection)
   const updateFeature = useWorkspace((s) => s.updateFeature)
-  const groupRef = useRef(null)
-  const dragRef = useRef(null)
-  const overlayRef = useRef(null)
+  const groupRef = useRef<THREE.Group | null>(null)
+  const dragRef = useRef<any>(null)
+  const overlayRef = useRef<any>(null)
 
   // Mount: attach a group to the renderer's scene. Re-runs whenever the
   // selection identity changes so the gumball jumps to the new face.

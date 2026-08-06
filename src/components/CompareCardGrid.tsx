@@ -11,7 +11,7 @@ import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 
 /** Category accent colours keyed by category id. */
-const CATEGORY_ACCENT = {
+const CATEGORY_ACCENT: Record<string, string> = {
   'cad-mechanical':   'text-sky-400 bg-sky-400/10 border-sky-400/25',
   'cad-electronics':  'text-emerald-400 bg-emerald-400/10 border-emerald-400/25',
   'cad-architecture': 'text-violet-400 bg-violet-400/10 border-violet-400/25',
@@ -21,7 +21,7 @@ const CATEGORY_ACCENT = {
   'cad-creative':     'text-pink-400 bg-pink-400/10 border-pink-400/25',
 }
 
-const CATEGORY_LABEL = {
+const CATEGORY_LABEL: Record<string, string> = {
   'cad-mechanical':   'Mechanical',
   'cad-electronics':  'Electronics',
   'cad-architecture': 'Architecture',
@@ -31,10 +31,18 @@ const CATEGORY_LABEL = {
   'cad-creative':     'Creative',
 }
 
-/**
- * @param {{ items: Array<{slug: string, competitor: string, category: string, hero_tagline: string}> }} props
- */
-export default function CompareCardGrid({ items }) {
+interface CompareItem {
+  slug: string
+  competitor: string
+  category: string
+  hero_tagline: string
+}
+
+interface Props {
+  items: CompareItem[]
+}
+
+export default function CompareCardGrid({ items }: Props) {
   if (!items || items.length === 0) {
     return (
       <p className="text-ink-500 text-sm text-center py-12">
@@ -56,7 +64,7 @@ export default function CompareCardGrid({ items }) {
 }
 
 /** Individual comparison card. */
-function CompareCard({ item }) {
+function CompareCard({ item }: { item: CompareItem }) {
   const { slug, competitor, category, hero_tagline } = item
   const accent = CATEGORY_ACCENT[category] ?? 'text-kerf-300 bg-kerf-300/10 border-kerf-300/25'
   const catLabel = CATEGORY_LABEL[category] ?? category

@@ -19,6 +19,7 @@
  */
 
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { Settings, ChevronDown, ChevronRight, Loader2, AlertTriangle } from 'lucide-react'
 import { api } from '../lib/api.js'
 
@@ -26,21 +27,38 @@ import { api } from '../lib/api.js'
 // Pure helpers — export for tests
 // ---------------------------------------------------------------------------
 
-/**
- * Format a number to `dp` decimal places; returns '—' for null/NaN/Infinity.
- * @param {number|null|undefined} v
- * @param {number} dp
- */
-export function fmtNum(v, dp = 3) {
+/** Format a number to `dp` decimal places; returns '—' for null/NaN/Infinity. */
+// eslint-disable-next-line react-refresh/only-export-components -- helper exported alongside the component for tests, pre-existing before this migration.
+export function fmtNum(v: number | null | undefined, dp = 3): string {
   if (v == null || !isFinite(v)) return '—'
   return v.toFixed(dp)
 }
 
-/**
- * Build agma_power_rating params from form state.
- * @param {object} s
- */
-export function buildPowerParams(s) {
+interface PowerForm {
+  S_t: string
+  S_c: string
+  Cp: string
+  b: string
+  m_or_Pd: string
+  d_p: string
+  N_p: string
+  N_g: string
+  psi_deg: string
+  n_rpm: string
+  metric: string | boolean
+  Ko: string
+  Ks: string
+  Km: string
+  KB: string
+  Qv: string
+  K_T: string
+  K_R: string
+  pressure_angle_deg: string
+}
+
+/** Build agma_power_rating params from form state. */
+// eslint-disable-next-line react-refresh/only-export-components -- helper exported alongside the component for tests, pre-existing before this migration.
+export function buildPowerParams(s: PowerForm) {
   return {
     S_t: parseFloat(s.S_t) || 0,
     S_c: parseFloat(s.S_c) || 0,
@@ -64,11 +82,22 @@ export function buildPowerParams(s) {
   }
 }
 
-/**
- * Build agma_bending_stress params from form state.
- * @param {object} s
- */
-export function buildBendingParams(s) {
+interface BendingForm {
+  Wt: string
+  Ko: string
+  Kv: string
+  Ks: string
+  Km: string
+  KB: string
+  b: string
+  m_or_Pd: string
+  J: string
+  metric: string | boolean
+}
+
+/** Build agma_bending_stress params from form state. */
+// eslint-disable-next-line react-refresh/only-export-components -- helper exported alongside the component for tests, pre-existing before this migration.
+export function buildBendingParams(s: BendingForm) {
   return {
     Wt: parseFloat(s.Wt) || 0,
     Ko: parseFloat(s.Ko) || 1.0,
@@ -83,11 +112,15 @@ export function buildBendingParams(s) {
   }
 }
 
-/**
- * Build agma_service_life params from form state.
- * @param {object} s
- */
-export function buildServiceLifeParams(s) {
+interface ServiceLifeForm {
+  N_cycles: string
+  hardness_HB: string
+  gear_type: string
+}
+
+/** Build agma_service_life params from form state. */
+// eslint-disable-next-line react-refresh/only-export-components -- helper exported alongside the component for tests, pre-existing before this migration.
+export function buildServiceLifeParams(s: ServiceLifeForm) {
   return {
     N_cycles: parseFloat(s.N_cycles) || 1e7,
     hardness_HB: parseFloat(s.hardness_HB) || 200,
@@ -99,7 +132,13 @@ export function buildServiceLifeParams(s) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function FieldRow({ label, children, hint }) {
+interface FieldRowProps {
+  label: string
+  children: ReactNode
+  hint?: string
+}
+
+function FieldRow({ label, children, hint }: FieldRowProps) {
   return (
     <div className="flex items-center gap-2 py-0.5">
       <label className="text-[11px] text-ink-400 w-36 flex-shrink-0">{label}</label>
@@ -109,7 +148,17 @@ function FieldRow({ label, children, hint }) {
   )
 }
 
-function NumInput({ value, onChange, placeholder, min, step, 'data-testid': testid }) {
+interface NumInputProps {
+  value: string | number
+  onChange: (v: string) => void
+  placeholder?: string
+  min?: number
+  max?: number
+  step?: number
+  'data-testid'?: string
+}
+
+function NumInput({ value, onChange, placeholder, min, step, 'data-testid': testid }: NumInputProps) {
   return (
     <input
       type="number"
@@ -124,7 +173,14 @@ function NumInput({ value, onChange, placeholder, min, step, 'data-testid': test
   )
 }
 
-function SelectInput({ value, onChange, options, 'data-testid': testid }) {
+interface SelectInputProps {
+  value: string
+  onChange: (v: string) => void
+  options: [string, string][]
+  'data-testid'?: string
+}
+
+function SelectInput({ value, onChange, options, 'data-testid': testid }: SelectInputProps) {
   return (
     <select
       value={value}
@@ -139,7 +195,13 @@ function SelectInput({ value, onChange, options, 'data-testid': testid }) {
   )
 }
 
-function ResultKV({ label, value, unit }) {
+interface ResultKVProps {
+  label: string
+  value: ReactNode
+  unit?: string
+}
+
+function ResultKV({ label, value, unit }: ResultKVProps) {
   return (
     <div className="flex items-center justify-between py-0.5 border-b border-ink-900">
       <span className="text-[11px] text-ink-400">{label}</span>
@@ -150,7 +212,7 @@ function ResultKV({ label, value, unit }) {
   )
 }
 
-function SafetyBadge({ value }) {
+function SafetyBadge({ value }: { value: number | null | undefined }) {
   if (value == null || !isFinite(value)) return <span className="text-ink-500">—</span>
   const cls = value >= 1.2
     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
@@ -164,7 +226,7 @@ function SafetyBadge({ value }) {
   )
 }
 
-function WarningList({ warnings }) {
+function WarningList({ warnings }: { warnings?: string[] }) {
   if (!warnings?.length) return null
   return (
     <div className="mt-2 space-y-0.5">
@@ -182,8 +244,34 @@ function WarningList({ warnings }) {
 // Mode: agma_power_rating
 // ---------------------------------------------------------------------------
 
-function PowerMode({ onToast }) {
-  const [form, setForm] = useState({
+interface PowerRatingResult {
+  ok?: boolean
+  reason?: string
+  power_bending_limit_hp?: number
+  power_bending_limit_kW?: number
+  power_contact_limit_hp?: number
+  power_contact_limit_kW?: number
+  power_hp?: number
+  power_kW?: number
+  torque_lbfin?: number
+  torque_Nmm?: number
+  SF?: number
+  SH?: number
+  warnings?: string[]
+  result?: PowerRatingResult
+}
+
+interface OnToastProps {
+  onToast?: (msg: string) => void
+}
+
+// Local form state always stores `metric` as a string ('true'/'false'); the
+// `boolean` branch in PowerForm.metric only matters to buildPowerParams callers
+// outside this component (see tests).
+type PowerFormState = Omit<PowerForm, 'metric'> & { metric: string }
+
+function PowerMode({ onToast }: OnToastProps) {
+  const [form, setForm] = useState<PowerFormState>({
     S_t: '55000', S_c: '170000', Cp: '2300',
     b: '1.5', m_or_Pd: '8', d_p: '3.0',
     N_p: '20', N_g: '60', psi_deg: '0',
@@ -193,20 +281,20 @@ function PowerMode({ onToast }) {
     pressure_angle_deg: '20',
   })
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState<PowerRatingResult | null>(null)
 
-  function set(k) {
-    return (v) => setForm((f) => ({ ...f, [k]: v }))
+  function set(k: keyof PowerFormState) {
+    return (v: string) => setForm((f) => ({ ...f, [k]: v }))
   }
 
   async function run() {
     setLoading(true)
     setResult(null)
     try {
-      const data = await api.callTool('agma_power_rating', buildPowerParams(form))
+      const data = await api.callTool<PowerRatingResult>('agma_power_rating', buildPowerParams(form))
       setResult(data?.result ?? data)
     } catch (e) {
-      onToast?.(e?.message || 'agma_power_rating failed')
+      onToast?.((e as Error)?.message || 'agma_power_rating failed')
     } finally {
       setLoading(false)
     }
@@ -310,25 +398,34 @@ function PowerMode({ onToast }) {
 // Mode: agma_service_life (stress-cycle factors)
 // ---------------------------------------------------------------------------
 
-function ServiceLifeMode({ onToast }) {
-  const [form, setForm] = useState({
+interface ServiceLifeResult {
+  ok?: boolean
+  reason?: string
+  YN?: number
+  ZN?: number
+  warnings?: string[]
+  result?: ServiceLifeResult
+}
+
+function ServiceLifeMode({ onToast }: OnToastProps) {
+  const [form, setForm] = useState<ServiceLifeForm>({
     N_cycles: '1e7', hardness_HB: '200', gear_type: 'spur',
   })
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState<ServiceLifeResult | null>(null)
 
-  function set(k) {
-    return (v) => setForm((f) => ({ ...f, [k]: v }))
+  function set(k: keyof ServiceLifeForm) {
+    return (v: string) => setForm((f) => ({ ...f, [k]: v }))
   }
 
   async function run() {
     setLoading(true)
     setResult(null)
     try {
-      const data = await api.callTool('agma_service_life', buildServiceLifeParams(form))
+      const data = await api.callTool<ServiceLifeResult>('agma_service_life', buildServiceLifeParams(form))
       setResult(data?.result ?? data)
     } catch (e) {
-      onToast?.(e?.message || 'agma_service_life failed')
+      onToast?.((e as Error)?.message || 'agma_service_life failed')
     } finally {
       setLoading(false)
     }
@@ -378,14 +475,24 @@ function ServiceLifeMode({ onToast }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-const MODES = [
+const MODES: [string, string][] = [
   ['power', 'Power Rating'],
   ['life', 'Service Life'],
 ]
 
-export default function GearRatingPanel({ onToast, content } = {}) {
+export interface Props {
+  onToast?: (msg: string) => void
+  content?: string
+}
+
+interface ParsedContent {
+  open?: boolean
+  mode?: string
+}
+
+export default function GearRatingPanel({ onToast, content }: Props = {}) {
   // content prop: JSON string optionally pre-seeding mode/open state.
-  const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
+  const _parsed: ParsedContent = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
   const [open, setOpen] = useState(_parsed.open ?? false)
   const [mode, setMode] = useState(_parsed.mode || 'power')
 

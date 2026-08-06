@@ -4,6 +4,17 @@
 const VALID_LAYERS = ['top_copper', 'bottom_copper', 'inner_1', 'inner_2'] as const
 type PourLayer = (typeof VALID_LAYERS)[number]
 
+// T-537: the canonical backend shape — emitted by kicad_io.py's
+// `_parse_zone_node`, consumed by Gerber/ODB++/via-stitching — uses
+// `pcb_copper_pour` for a net-bound pour and `pcb_ground_plane` for a
+// no-net fill (T-536 kept those as a distinct type; a ground plane has no
+// net_id at all). `copper_pour` (no `pcb_` prefix) is kept accepted too in
+// case anything still emits the legacy string — grepping the tree found
+// nothing that does today, but removing acceptance is a behaviour change
+// this task doesn't need to make.
+const VALID_TYPES = ['pcb_copper_pour', 'pcb_ground_plane', 'copper_pour'] as const
+type PourType = (typeof VALID_TYPES)[number]
+
 /** A 2-D point, `{x,y}` record form (Circuit-JSON's `Point` convention —
  * deliberately NOT `src/types/geometry.ts`'s `Vec2` tuple, since every
  * polygon point in this file's domain is a named-field record, not a
@@ -62,9 +73,10 @@ export function validatePour(pour: unknown): ValidationResult {
     return { ok: false, errors: ['pour must be an object'] }
   }
   const p = pour as Partial<Pour> & Record<string, unknown>
-  if (p.type !== 'copper_pour') {
-    errors.push('type must be "copper_pour"')
+  if (!VALID_TYPES.includes(p.type as PourType)) {
+    errors.push(`type must be one of: ${VALID_TYPES.join(', ')}`)
   }
+  const isGroundPlane = p.type === 'pcb_ground_plane'
   if (!Array.isArray(p.polygon) || p.polygon.length < 3) {
     errors.push('polygon must be an array of at least 3 {x, y} points')
   } else {
@@ -80,8 +92,14 @@ export function validatePour(pour: unknown): ValidationResult {
   } else if (!VALID_LAYERS.includes(p.layer as PourLayer)) {
     errors.push(`layer must be one of: ${VALID_LAYERS.join(', ')}`)
   }
-  if (!p.net_id || typeof p.net_id !== 'string') {
-    errors.push('net_id must be a non-empty string')
+  // pcb_ground_plane is a no-net fill (T-536) — net_id doesn't apply there,
+  // but if present it must still be a string.
+  if (!isGroundPlane) {
+    if (!p.net_id || typeof p.net_id !== 'string') {
+      errors.push('net_id must be a non-empty string')
+    }
+  } else if (p.net_id !== undefined && typeof p.net_id !== 'string') {
+    errors.push('net_id must be a string')
   }
   if (p.clearance_mm !== undefined && typeof p.clearance_mm !== 'number') {
     errors.push('clearance_mm must be a number')

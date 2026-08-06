@@ -136,6 +136,95 @@ describe('validatePour', () => {
   })
 })
 
+// ---------------------------------------------------------------------------
+// T-537 — the canonical backend pour types
+//
+// Fixtures below are derived by hand-tracing kicad_io.py's `_parse_zone_node`
+// (packages/kerf-electronics/src/kerf_electronics/kicad_io.py) over its own
+// test fixture, packages/kerf-electronics/tests/fixtures/zones_keepout_board.kicad_pcb
+// — a net-bound `(zone (net 1) (net_name "GND") (layer "B.Cu") ...)` and a
+// no-net `(zone (net 0) (net_name "") (layer "In1.Cu") ...)`. These are what
+// the backend actually emits for that board (cross-checked against
+// packages/kerf-electronics/tests/test_kicad_io_zones.py's own assertions:
+// net_id "GND", net_index 1, layer "bottom_copper"/"inner_1", 4-point
+// rectangle 0,0 → 100,80, priority 1, clearance_mm 0.2, min_thickness_mm 0.1,
+// thermal_relief {gap:0.2, spoke_width:0.3}) — not a hand-written literal
+// that merely satisfies the new type check.
+// ---------------------------------------------------------------------------
+
+describe('validatePour — T-537 canonical backend pour types', () => {
+  // Net-bound zone, as kicad_io.py emits it for the GND zone on B.Cu.
+  const backendCopperPour = {
+    type: 'pcb_copper_pour',
+    pcb_copper_pour_id: '5e340a00-2222-4a00-8000-0000000000f2',
+    layer: 'bottom_copper',
+    net_id: 'GND',
+    net_index: 1,
+    polygon: [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 80 },
+      { x: 0, y: 80 },
+    ],
+    priority: 1,
+    clearance_mm: 0.2,
+    min_thickness_mm: 0.1,
+    thermal_relief: { gap: 0.2, spoke_width: 0.3 },
+  }
+
+  // No-net catch-all zone, as kicad_io.py emits it for the same board's
+  // In1.Cu zone — a ground plane has no net_id at all.
+  const backendGroundPlane = {
+    type: 'pcb_ground_plane',
+    pcb_ground_plane_id: '5e340a00-3333-4a00-8000-0000000000f3',
+    layer: 'inner_1',
+    polygon: [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 80 },
+      { x: 0, y: 80 },
+    ],
+    clearance_mm: 0.2,
+    min_thickness_mm: 0.15,
+  }
+
+  it('accepts a real pcb_copper_pour from kicad_io.py unchanged', () => {
+    const { ok, errors } = validatePour(backendCopperPour)
+    expect(errors).toEqual([])
+    expect(ok).toBe(true)
+  })
+
+  it('accepts a real pcb_ground_plane (no net_id) from kicad_io.py unchanged', () => {
+    const { ok, errors } = validatePour(backendGroundPlane)
+    expect(errors).toEqual([])
+    expect(ok).toBe(true)
+  })
+
+  it('rejects a pcb_ground_plane with a non-string net_id', () => {
+    const { ok, errors } = validatePour({ ...backendGroundPlane, net_id: 123 })
+    expect(ok).toBe(false)
+    expect(errors.some((e) => e.includes('net_id'))).toBe(true)
+  })
+
+  it('still accepts the legacy "copper_pour" string (nothing in the tree emits it, but not removed)', () => {
+    const { ok } = validatePour({ ...backendCopperPour, type: 'copper_pour' })
+    expect(ok).toBe(true)
+  })
+
+  it('still rejects an unrelated type string', () => {
+    const { ok, errors } = validatePour({ ...backendCopperPour, type: 'pcb_keepout' })
+    expect(ok).toBe(false)
+    expect(errors.some((e) => e.includes('type'))).toBe(true)
+  })
+
+  it('a pcb_copper_pour still requires net_id (unlike pcb_ground_plane)', () => {
+    const withoutNetId = { ...backendCopperPour, net_id: undefined }
+    const { ok, errors } = validatePour(withoutNetId)
+    expect(ok).toBe(false)
+    expect(errors.some((e) => e.includes('net_id'))).toBe(true)
+  })
+})
+
 describe('thermalReliefSpokes', () => {
   it('generates exactly 4 spokes for spoke_count=4', () => {
     const spokes = thermalReliefSpokes(validPour, { x: 5, y: 5 }, 0.6, 4, 0.5, 0.25)

@@ -7,19 +7,57 @@ import { VALID_KINDS, validateView, addAnnotation, removeAnnotation } from '../l
 // viewFilters.js is declared but not yet shipped.
 // Inline stub: accept any non-empty expression; full validation lands when the
 // module is available and can be wired in here.
-function validateFilterExpr(expr) {
+function validateFilterExpr(expr: string) {
   if (!expr || !expr.trim()) return { ok: false, errors: ['expression is empty'] }
   return { ok: true, errors: [] }
 }
 
 const DEBOUNCE_MS = 250
 
-function parse(content) {
+// view.js doesn't export types, so the doc/filter/annotation/crop-box shapes
+// are declared here to match what validateView/addAnnotation/removeAnnotation
+// expect and produce.
+type Vec3 = [number, number, number]
+
+interface CropBox {
+  min: Vec3
+  max: Vec3
+}
+
+interface ViewFilter {
+  expr: string
+}
+
+interface ViewAnnotation {
+  id: string
+  kind?: string
+  label?: string
+}
+
+interface ViewDoc {
+  version?: number
+  name?: string
+  kind?: string
+  bim_file_id?: string
+  cut_plane_z_mm?: number | null
+  crop_box?: CropBox | null
+  filters?: (ViewFilter | string)[]
+  annotations?: ViewAnnotation[]
+}
+
+function parse(content?: string): ViewDoc {
   try { return JSON.parse(content || '{}') } catch { return {} }
 }
 
+interface NumFieldProps {
+  label: string
+  value: number | null | undefined
+  onChange: (value: number | null) => void
+  placeholder?: string
+}
+
 // Simple numeric input with label.
-function NumField({ label, value, onChange, placeholder = '0' }) {
+function NumField({ label, value, onChange, placeholder = '0' }: NumFieldProps) {
   return (
     <div className="flex items-center gap-2">
       <span className="text-[10px] text-ink-500 uppercase tracking-wider w-24 flex-shrink-0">{label}</span>
@@ -34,12 +72,18 @@ function NumField({ label, value, onChange, placeholder = '0' }) {
   )
 }
 
-export default function ViewEditor({ content, fileName, onContentChange }) {
-  const [view, setView] = useState(() => parse(content))
+export interface ViewEditorProps {
+  content?: string
+  fileName?: string
+  onContentChange?: (content: string) => void
+}
+
+export default function ViewEditor({ content, fileName, onContentChange }: ViewEditorProps) {
+  const [view, setView] = useState<ViewDoc>(() => parse(content))
   const [filterDraft, setFilterDraft] = useState('')
-  const [filterErr, setFilterErr] = useState(null)
+  const [filterErr, setFilterErr] = useState<string | null>(null)
   const lastEmittedRef = useRef(content)
-  const timerRef = useRef(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (content !== lastEmittedRef.current) {
@@ -47,7 +91,7 @@ export default function ViewEditor({ content, fileName, onContentChange }) {
     }
   }, [content])
 
-  const emit = useCallback((next) => {
+  const emit = useCallback((next: ViewDoc) => {
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => {
       const s = JSON.stringify(next, null, 2)
@@ -57,7 +101,7 @@ export default function ViewEditor({ content, fileName, onContentChange }) {
   }, [onContentChange])
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
 
-  function patch(delta) {
+  function patch(delta: Partial<ViewDoc>) {
     setView((v) => {
       const next = { ...v, ...delta }
       emit(next)
@@ -65,11 +109,11 @@ export default function ViewEditor({ content, fileName, onContentChange }) {
     })
   }
 
-  function patchCropBox(axis, minmax, val) {
+  function patchCropBox(axis: number, minmax: 'min' | 'max', val: number) {
     setView((v) => {
-      const box = v.crop_box
-        ? { min: [...(v.crop_box.min || [0,0,0])], max: [...(v.crop_box.max || [0,0,0])] }
-        : { min: [0,0,0], max: [0,0,0] }
+      const box: CropBox = v.crop_box
+        ? { min: [...(v.crop_box.min || [0, 0, 0])] as Vec3, max: [...(v.crop_box.max || [0, 0, 0])] as Vec3 }
+        : { min: [0, 0, 0], max: [0, 0, 0] }
       box[minmax][axis] = val
       const next = { ...v, crop_box: box }
       emit(next)
@@ -82,7 +126,7 @@ export default function ViewEditor({ content, fileName, onContentChange }) {
   }
 
   // Filter expr validation
-  function validateExpr(expr) {
+  function validateExpr(expr: string) {
     if (!expr.trim()) { setFilterErr(null); return }
     const res = validateFilterExpr(expr)
     setFilterErr(res?.ok === false ? (res.errors?.[0] || 'Invalid') : null)
@@ -96,7 +140,7 @@ export default function ViewEditor({ content, fileName, onContentChange }) {
     setFilterErr(null)
   }
 
-  function removeFilter(idx) {
+  function removeFilter(idx: number) {
     patch({ filters: (view.filters || []).filter((_, i) => i !== idx) })
   }
 
@@ -106,7 +150,7 @@ export default function ViewEditor({ content, fileName, onContentChange }) {
     setView(next)
   }
 
-  function handleRemoveAnnotation(id) {
+  function handleRemoveAnnotation(id: string) {
     const next = removeAnnotation(view, id)
     emit(next)
     setView(next)
@@ -172,7 +216,7 @@ export default function ViewEditor({ content, fileName, onContentChange }) {
               ) : (
                 <button
                   type="button"
-                  onClick={() => patch({ crop_box: { min: [0,0,0], max: [1000,1000,3000] } })}
+                  onClick={() => patch({ crop_box: { min: [0, 0, 0], max: [1000, 1000, 3000] } })}
                   className="text-[10px] text-kerf-300 hover:text-kerf-200"
                 >
                   Enable
@@ -181,10 +225,10 @@ export default function ViewEditor({ content, fileName, onContentChange }) {
             </div>
             {cropBox && (
               <div className="ml-6 space-y-1">
-                {(['min', 'max']).map((mm) => (
+                {(['min', 'max'] as const).map((mm) => (
                   <div key={mm} className="flex items-center gap-1.5">
                     <span className="text-[10px] text-ink-500 w-8">{mm}</span>
-                    {[0,1,2].map((axis) => (
+                    {[0, 1, 2].map((axis) => (
                       <input
                         key={axis}
                         type="number"

@@ -24,15 +24,27 @@
 //   - Invalid .print JSON → graceful "not yet configured" empty state.
 
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Printer, Play, AlertTriangle, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 import { api } from '../lib/api.js'
+import type { PrintSliceResult } from '../types/api.js'
 import { useParams } from 'react-router-dom'
 
 // ---------------------------------------------------------------------------
 // .print config helpers (exported for tests)
 // ---------------------------------------------------------------------------
 
-export const DEFAULT_SETTINGS = {
+export interface PrintSettings {
+  layer_height: number
+  infill_density: number
+  perimeters: number
+  retraction_enabled: boolean
+  print_temperature: number
+  bed_temperature: number
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- pre-existing: src/__tests__/printSliceView.test.js imports this constant directly; splitting into a separate module is a refactor out of scope for a rename-only migration (T-513).
+export const DEFAULT_SETTINGS: PrintSettings = {
   layer_height: 0.2,
   infill_density: 20,
   perimeters: 3,
@@ -41,11 +53,17 @@ export const DEFAULT_SETTINGS = {
   bed_temperature: 60,
 }
 
+export type PrintConfig =
+  | { kind: 'empty'; raw: string }
+  | { kind: 'invalid'; raw: string }
+  | { kind: 'ok'; meshRef: string; settings: PrintSettings }
+
 /**
  * Parse a .print file's JSON content into a normalised shape.
  * Returns { kind: 'ok', meshRef, settings } or { kind: 'empty' | 'invalid', raw }.
  */
-export function parsePrintConfig(content) {
+// eslint-disable-next-line react-refresh/only-export-components -- pre-existing, see DEFAULT_SETTINGS above.
+export function parsePrintConfig(content: string | null | undefined): PrintConfig {
   if (!content || !content.trim()) {
     return { kind: 'empty', raw: content || '' }
   }
@@ -64,16 +82,20 @@ export function parsePrintConfig(content) {
   }
 }
 
+/** One [x, y] nozzle position parsed from a G0/G1 move. */
+export type GcodePoint = [number, number]
+
 /**
  * Parse G-code into per-layer X-Y move arrays.
  * Returns an array of layers; each layer is an array of [x, y] points.
  * Only G0 and G1 moves are considered. Called by the 2D layer scrubber.
  */
-export function parseGcodeLayers(gcode) {
+// eslint-disable-next-line react-refresh/only-export-components -- pre-existing, see DEFAULT_SETTINGS above.
+export function parseGcodeLayers(gcode: string | null | undefined): GcodePoint[][] {
   if (!gcode || typeof gcode !== 'string') return []
 
-  const layers = []
-  let current = null
+  const layers: GcodePoint[][] = []
+  let current: GcodePoint[] | null = null
   let lastX = 0
   let lastY = 0
 
@@ -115,7 +137,7 @@ const SCRUB_W = 340
 const SCRUB_H = 220
 const PAD = 16
 
-function LayerScrubber({ layers, layerIndex }) {
+function LayerScrubber({ layers, layerIndex }: { layers: GcodePoint[][]; layerIndex: number }) {
   if (!layers || layers.length === 0) return null
   const idx = Math.max(0, Math.min(layerIndex, layers.length - 1))
   const pts = layers[idx] || []
@@ -142,7 +164,7 @@ function LayerScrubber({ layers, layerIndex }) {
   const scaleY = (SCRUB_H - PAD * 2) / rangeY
   const scale = Math.min(scaleX, scaleY)
 
-  const toSvg = ([x, y]) => [
+  const toSvg = ([x, y]: GcodePoint): GcodePoint => [
     PAD + (x - minX) * scale,
     SCRUB_H - PAD - (y - minY) * scale,
   ]
@@ -173,7 +195,17 @@ function LayerScrubber({ layers, layerIndex }) {
 // Settings panel helpers
 // ---------------------------------------------------------------------------
 
-function NumberField({ label, value, min, max, step, unit, onChange }) {
+interface NumberFieldProps {
+  label: string
+  value: number
+  min?: number
+  max?: number
+  step?: number
+  unit?: string
+  onChange: (value: number) => void
+}
+
+function NumberField({ label, value, min, max, step, unit, onChange }: NumberFieldProps) {
   return (
     <label className="flex flex-col gap-0.5">
       <span className="text-xs text-ink-300">{label}{unit && <span className="text-ink-500 ml-1">{unit}</span>}</span>
@@ -190,7 +222,13 @@ function NumberField({ label, value, min, max, step, unit, onChange }) {
   )
 }
 
-function ToggleField({ label, value, onChange }) {
+interface ToggleFieldProps {
+  label: string
+  value: boolean
+  onChange: (value: boolean) => void
+}
+
+function ToggleField({ label, value, onChange }: ToggleFieldProps) {
   return (
     <label className="flex items-center gap-2 cursor-pointer select-none">
       <span className="text-xs text-ink-300">{label}</span>
@@ -213,7 +251,7 @@ function ToggleField({ label, value, onChange }) {
 // Formatting helpers
 // ---------------------------------------------------------------------------
 
-function fmtTime(seconds) {
+function fmtTime(seconds: number | null | undefined): string | null {
   if (seconds == null) return null
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
@@ -223,7 +261,7 @@ function fmtTime(seconds) {
   return `${s}s`
 }
 
-function fmtFilament(mm) {
+function fmtFilament(mm: number | null | undefined): string | null {
   if (mm == null) return null
   if (mm >= 1000) return `${(mm / 1000).toFixed(2)} m`
   return `${mm.toFixed(1)} mm`
@@ -233,24 +271,33 @@ function fmtFilament(mm) {
 // Main component
 // ---------------------------------------------------------------------------
 
-const PrintSliceView = forwardRef(function PrintSliceView({ content, fileName }, ref) {
+export interface PrintSliceViewProps {
+  content?: string | null
+  fileName?: string
+}
+
+export interface PrintSliceViewHandle {
+  getSnapshotCanvas: () => null
+}
+
+const PrintSliceView = forwardRef<PrintSliceViewHandle, PrintSliceViewProps>(function PrintSliceView({ content, fileName }, ref) {
   const { projectId, fileId } = useParams()
 
   const parsed = parsePrintConfig(content)
-  const [settings, setSettings] = useState(
+  const [settings, setSettings] = useState<PrintSettings>(
     parsed.kind === 'ok' ? parsed.settings : { ...DEFAULT_SETTINGS }
   )
   const [slicing, setSlicing] = useState(false)
-  const [result, setResult] = useState(null)  // SliceResult | null
-  const [error, setError] = useState(null)    // string | null
+  const [result, setResult] = useState<PrintSliceResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [layerIndex, setLayerIndex] = useState(0)
   const [showGcode, setShowGcode] = useState(false)
 
   // Parsed layer data for the 2D scrubber (computed lazily from result.gcode)
-  const layersRef = useRef(null)
-  const gcodeRef = useRef(null)
+  const layersRef = useRef<GcodePoint[][] | null>(null)
+  const gcodeRef = useRef<string | null>(null)
 
-  const getLayers = useCallback(() => {
+  const getLayers = useCallback((): GcodePoint[][] => {
     if (!result?.gcode) return []
     if (gcodeRef.current === result.gcode && layersRef.current) return layersRef.current
     gcodeRef.current = result.gcode
@@ -263,7 +310,7 @@ const PrintSliceView = forwardRef(function PrintSliceView({ content, fileName },
     getSnapshotCanvas: () => null,  // 2D SVG — no canvas; caller handles
   }))
 
-  const handleSetting = (key, val) =>
+  const handleSetting = <K extends keyof PrintSettings,>(key: K, val: PrintSettings[K]) =>
     setSettings((prev) => ({ ...prev, [key]: val }))
 
   const handleSlice = useCallback(async () => {
@@ -289,12 +336,15 @@ const PrintSliceView = forwardRef(function PrintSliceView({ content, fileName },
         setLayerIndex(0)
       }
     } catch (err) {
-      setError(err?.message || 'Slicing failed')
+      setError((err instanceof Error ? err.message : null) || 'Slicing failed')
     } finally {
       setSlicing(false)
     }
   }, [projectId, fileId])
 
+  // getLayers() memoizes via gcodeRef/layersRef and is called directly during render — pre-existing
+  // before this migration, same pattern as LayoutViewer.tsx's visibleLayers.
+  // eslint-disable-next-line react-hooks/refs -- pre-existing before this migration.
   const layers = getLayers()
 
   // ── render ────────────────────────────────────────────────────────────────
@@ -445,7 +495,7 @@ const PrintSliceView = forwardRef(function PrintSliceView({ content, fileName },
               <div className="rounded-md bg-amber-950/40 border border-amber-700/40 px-3 py-2">
                 <p className="text-xs text-amber-300 font-medium mb-1">Warnings</p>
                 <ul className="space-y-0.5">
-                  {result.warnings.map((w, i) => (
+                  {result.warnings.map((w: string, i: number) => (
                     <li key={i} className="text-xs text-amber-200">{w}</li>
                   ))}
                 </ul>
@@ -465,7 +515,7 @@ const PrintSliceView = forwardRef(function PrintSliceView({ content, fileName },
   )
 })
 
-function Chip({ label, value }) {
+function Chip({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-ink-800 border border-ink-700 text-xs">
       <span className="text-ink-400">{label}</span>

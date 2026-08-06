@@ -149,10 +149,32 @@ clean sub-minute no-ops. It earns its lines.
 Directory-scoped slices (T-502…T-512, T-518, T-519) are unambiguous: the task names whole
 directories, and the agent owns every `.js`/`.jsx` in them.
 
-The five `src/components/` top-level slices (T-513…T-517) split one flat 299-file directory by
-role, so they need an **explicit file manifest generated before those agents start**. Generate it
-with `scripts/ts-slice-manifest.mjs` (T-513's first step) and paste the result here. Until that
-manifest exists, do not run T-513…T-517 concurrently.
+The five `src/components/` top-level slices (T-513…T-517) split one flat **299-file** directory by
+role, so per-file ownership must be explicit. `scripts/ts-slice-manifest.mjs` generates it:
+
+```
+node scripts/ts-slice-manifest.mjs
+```
+
+| Slice | Role | Files |
+|---|---|---|
+| **T-513** | viewports & renderers | 57 |
+| **T-514** | editors | 26 |
+| **T-515** | domain panels A–L | 67 |
+| **T-516** | domain panels M–Z + tables/pickers | 66 |
+| **T-517** | chrome, primitives & remainder | 83 |
+
+**Run the script, don't paste its output here.** A pasted list goes stale the moment a file is
+added or migrated, and a stale ownership manifest is worse than none — it looks authoritative
+while silently misassigning. Regenerating is instant and always current.
+
+Classification is **mechanical** (filename role, first match wins, evaluated in slice order) so
+that assignment is reproducible and arguable from outside rather than being one agent's judgement.
+T-517 has no matcher — it is the remainder by construction, so nothing can be silently dropped.
+The script **asserts** every pending file is assigned exactly once and exits non-zero otherwise;
+if that check fails the manifest is unsafe to run concurrently, and the run must not start.
+
+Each slice agent should run the script itself and take only its own section.
 
 ## Shared types (T-501)
 

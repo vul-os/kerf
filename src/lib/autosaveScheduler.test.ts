@@ -6,16 +6,16 @@ const mockStash = vi.fn()
 const mockGetBytes = vi.fn()
 const mockMarkFlushed = vi.fn()
 
-vi.mock('./localStash', () => ({
-  stash: (...args) => mockStash(...args),
-  getBytes: (...args) => mockGetBytes(...args),
-  markFlushed: (...args) => mockMarkFlushed(...args),
+vi.mock('./localStash.js', () => ({
+  stash: (...args: unknown[]) => mockStash(...args),
+  getBytes: (...args: unknown[]) => mockGetBytes(...args),
+  markFlushed: (...args: unknown[]) => mockMarkFlushed(...args),
 }))
 
 // ── Import SUT after mocks are registered ──────────────────────────────────
 
-import { markDirty, _resetForTesting } from './autosaveScheduler'
-import { autosaveStatus } from './autosaveStatusEvents'
+import { markDirty, _resetForTesting } from './autosaveScheduler.js'
+import { autosaveStatus } from './autosaveStatusEvents.js'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -23,9 +23,9 @@ const WS   = 'ws-1'
 const FILE = 'model.json'
 
 /** Collect event names from autosaveStatus in order. */
-function collectEvents(types) {
-  const log = []
-  const handlers = {}
+function collectEvents(types: string[]) {
+  const log: string[] = []
+  const handlers: Record<string, () => void> = {}
   for (const t of types) {
     const h = () => log.push(t)
     handlers[t] = h
@@ -41,17 +41,17 @@ function collectEvents(types) {
 
 /** Make fetch resolve with an ok response. */
 function mockFetchOk() {
-  global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 })
+  globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 })
 }
 
 /** Make fetch resolve with a server error. */
 function mockFetchErr() {
-  global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 })
+  globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 })
 }
 
 /** Make fetch reject (network error). */
 function mockFetchNetworkError() {
-  global.fetch = vi.fn().mockRejectedValue(new Error('network'))
+  globalThis.fetch = vi.fn().mockRejectedValue(new Error('network'))
 }
 
 // ── Setup / teardown ───────────────────────────────────────────────────────
@@ -223,7 +223,7 @@ describe('autosaveScheduler — queued edit during in-flight flush', () => {
     // First fetch call is manually controlled; subsequent calls resolve immediately.
     let resolveFetch
     let callCount = 0
-    global.fetch = vi.fn().mockImplementation(() => {
+    globalThis.fetch = vi.fn().mockImplementation(() => {
       callCount++
       if (callCount === 1) {
         return new Promise((res) => { resolveFetch = () => res({ ok: true, status: 200 }) })
@@ -280,7 +280,7 @@ describe('autosaveScheduler — arity-bug regression (T-309)', () => {
     // getBytes must have been called (not stash) to read bytes for the server.
     expect(mockGetBytes).toHaveBeenCalledWith(WS, FILE)
     // fetch must have been called — confirms no early exit from undefined bytes.
-    expect(global.fetch).toHaveBeenCalledOnce()
+    expect(globalThis.fetch).toHaveBeenCalledOnce()
   })
 
   it('multiple markDirty calls debounce: only one flush fires after idle period', async () => {

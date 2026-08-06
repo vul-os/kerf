@@ -18,30 +18,30 @@
 // exactly one follow-up flush (not multiple) and fire it after the current
 // settles.
 
-import { stash, getBytes, markFlushed } from './localStash'
-import { autosaveStatus } from './autosaveStatusEvents'
+import { stash, getBytes, markFlushed } from './localStash.js'
+import { autosaveStatus } from './autosaveStatusEvents.js'
 
 const IDLE_DELAY_MS   = 2_000
 const HARD_INTERVAL_MS = 30_000
 const BACKOFF_BASE_MS  = 2_000
 const BACKOFF_MAX_MS   = 30_000
 
-// State shape per key:
-// {
-//   idleTimer:    number | null,
-//   hardTimer:    number | null,
-//   inFlight:     boolean,
-//   pendingFlush: boolean,   // queued while in-flight
-//   backoffMs:    number,
-//   backoffTimer: number | null,
-// }
-const _keys = new Map()
+interface SchedulerState {
+  idleTimer: ReturnType<typeof setTimeout> | null
+  hardTimer: ReturnType<typeof setInterval> | null
+  inFlight: boolean
+  pendingFlush: boolean // queued while in-flight
+  backoffMs: number
+  backoffTimer: ReturnType<typeof setTimeout> | null
+}
 
-function keyOf(workspaceId, filePath) {
+const _keys = new Map<string, SchedulerState>()
+
+function keyOf(workspaceId: string, filePath: string) {
   return `${workspaceId}\x00${filePath}`
 }
 
-function getOrInit(workspaceId, filePath) {
+function getOrInit(workspaceId: string, filePath: string): SchedulerState {
   const k = keyOf(workspaceId, filePath)
   if (!_keys.has(k)) {
     _keys.set(k, {
@@ -53,24 +53,24 @@ function getOrInit(workspaceId, filePath) {
       backoffTimer: null,
     })
   }
-  return _keys.get(k)
+  return _keys.get(k)!
 }
 
-function cancelIdle(state) {
+function cancelIdle(state: SchedulerState) {
   if (state.idleTimer !== null) {
     clearTimeout(state.idleTimer)
     state.idleTimer = null
   }
 }
 
-function cancelBackoff(state) {
+function cancelBackoff(state: SchedulerState) {
   if (state.backoffTimer !== null) {
     clearTimeout(state.backoffTimer)
     state.backoffTimer = null
   }
 }
 
-async function flush(workspaceId, filePath) {
+async function flush(workspaceId: string, filePath: string) {
   const state = getOrInit(workspaceId, filePath)
 
   if (state.inFlight) {
@@ -88,7 +88,7 @@ async function flush(workspaceId, filePath) {
   let bytes
   try {
     bytes = await getBytes(workspaceId, filePath)
-  } catch (err) {
+  } catch {
     state.inFlight = false
     handleFlushError(workspaceId, filePath, state)
     return
@@ -108,7 +108,7 @@ async function flush(workspaceId, filePath) {
       headers: { 'content-type': 'application/octet-stream' },
       body: bytes,
     })
-  } catch (err) {
+  } catch {
     state.inFlight = false
     handleFlushError(workspaceId, filePath, state)
     return
@@ -123,7 +123,7 @@ async function flush(workspaceId, filePath) {
   }
 }
 
-function handleFlushSuccess(workspaceId, filePath, state) {
+function handleFlushSuccess(workspaceId: string, filePath: string, state: SchedulerState) {
   state.backoffMs = BACKOFF_BASE_MS
   cancelBackoff(state)
 
@@ -137,7 +137,7 @@ function handleFlushSuccess(workspaceId, filePath, state) {
   }
 }
 
-function handleFlushError(workspaceId, filePath, state) {
+function handleFlushError(workspaceId: string, filePath: string, state: SchedulerState) {
   autosaveStatus.emit('error', { workspaceId, filePath })
 
   // Don't call markFlushed — keep dirty state intact.
@@ -155,7 +155,7 @@ function handleFlushError(workspaceId, filePath, state) {
   }, delay)
 }
 
-function scheduleIdle(workspaceId, filePath, state) {
+function scheduleIdle(workspaceId: string, filePath: string, state: SchedulerState) {
   cancelIdle(state)
   state.idleTimer = setTimeout(() => {
     state.idleTimer = null
@@ -163,7 +163,7 @@ function scheduleIdle(workspaceId, filePath, state) {
   }, IDLE_DELAY_MS)
 }
 
-function ensureHardTimer(workspaceId, filePath, state) {
+function ensureHardTimer(workspaceId: string, filePath: string, state: SchedulerState) {
   if (state.hardTimer !== null) return
   state.hardTimer = setInterval(() => {
     flush(workspaceId, filePath)
@@ -180,7 +180,7 @@ function ensureHardTimer(workspaceId, filePath, state) {
  * Thread-safe (single-threaded JS); idempotent when called rapidly — only
  * the last idle timer survives.
  */
-export function markDirty(workspaceId, filePath, bytes) {
+export function markDirty(workspaceId: string, filePath: string, bytes: Uint8Array | null | undefined) {
   // Write to IDB immediately so the bytes survive a hard close.
   // Fire-and-forget: failures are non-fatal (scheduler retries from IDB).
   if (bytes != null) {

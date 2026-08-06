@@ -1,6 +1,12 @@
 import { X, Hash } from 'lucide-react'
 
-export default function PartChip({ partId, fileName, onRemove }) {
+interface Props {
+  partId: string
+  fileName?: string
+  onRemove?: () => void
+}
+
+export default function PartChip({ partId, fileName, onRemove }: Props) {
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-kerf-300/15 border border-kerf-300/40 text-kerf-100 text-[11px] font-mono max-w-full">
       <Hash size={10} className="flex-shrink-0 text-kerf-300" />

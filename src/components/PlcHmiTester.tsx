@@ -30,6 +30,14 @@ import { stepSim, loadFixture } from '../lib/plcSimBridge.js'
 const TICK_INTERVAL_MS = 500    // play-mode interval between ticks
 const TRACE_WINDOW = 40         // number of ticks visible in the chart
 
+// Input row definition (from a loaded fixture's `inputs[]`, or synthesised
+// locally when a value changes before a fixture has been loaded).
+interface PlcInputDef {
+  name: string
+  type: string
+  default?: unknown
+}
+
 // ---------------------------------------------------------------------------
 // SVG line chart
 // ---------------------------------------------------------------------------
@@ -40,7 +48,10 @@ const TRACE_WINDOW = 40         // number of ticks visible in the chart
  *
  * Props: { signals: { [name]: number[] }, tickWindow: number }
  */
-function SignalChart({ signals, tickWindow = TRACE_WINDOW }) {
+function SignalChart({ signals, tickWindow = TRACE_WINDOW }: {
+  signals: Record<string, number[]>
+  tickWindow?: number
+}) {
   const W = 480
   const ROW_H = 36
   const LABEL_W = 96
@@ -155,7 +166,9 @@ function SignalChart({ signals, tickWindow = TRACE_WINDOW }) {
 // Input row components
 // ---------------------------------------------------------------------------
 
-function ToggleInput({ name, value, onChange }) {
+type InputChangeFn = (name: string, value: unknown) => void
+
+function ToggleInput({ name, value, onChange }: { name: string; value: boolean; onChange: InputChangeFn }) {
   return (
     <div className="flex items-center justify-between py-1">
       <span className="text-xs font-mono text-ink-300">{name}</span>
@@ -182,7 +195,7 @@ function ToggleInput({ name, value, onChange }) {
   )
 }
 
-function MomentaryInput({ name, onChange }) {
+function MomentaryInput({ name, onChange }: { name: string; onChange: InputChangeFn }) {
   const [pressed, setPressed] = useState(false)
 
   const handleDown = () => {
@@ -219,7 +232,7 @@ function MomentaryInput({ name, onChange }) {
   )
 }
 
-function NumericInput({ name, value, onChange }) {
+function NumericInput({ name, value, onChange }: { name: string; value?: number | null; onChange: InputChangeFn }) {
   return (
     <div className="flex items-center justify-between py-1">
       <span className="text-xs font-mono text-ink-300">{name}</span>
@@ -238,7 +251,7 @@ function NumericInput({ name, value, onChange }) {
 // Output row components
 // ---------------------------------------------------------------------------
 
-function LampOutput({ name, value }) {
+function LampOutput({ name, value }: { name: string; value: boolean }) {
   return (
     <div className="flex items-center justify-between py-1">
       <span className="text-xs font-mono text-ink-400">{name}</span>
@@ -256,7 +269,7 @@ function LampOutput({ name, value }) {
   )
 }
 
-function NumericOutput({ name, value }) {
+function NumericOutput({ name, value }: { name: string; value?: number | unknown }) {
   const display = typeof value === 'number'
     ? (Number.isInteger(value) ? value.toString() : value.toFixed(3))
     : String(value ?? '—')
@@ -275,26 +288,32 @@ function NumericOutput({ name, value }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function PlcHmiTester({ program = '', onProgramLoad, className = '' }) {
+export interface PlcHmiTesterProps {
+  program?: string
+  onProgramLoad?: (info: { name: string; program: string; inputs: unknown[] }) => void
+  className?: string
+}
+
+export default function PlcHmiTester({ program = '', onProgramLoad, className = '' }: PlcHmiTesterProps) {
   // Inputs controlled by user
-  const [inputValues, setInputValues] = useState({})
+  const [inputValues, setInputValues] = useState<Record<string, unknown>>({})
   // Input metadata (from fixture load)
-  const [inputDefs, setInputDefs] = useState([])
+  const [inputDefs, setInputDefs] = useState<PlcInputDef[]>([])
   // Output values from last tick
-  const [outputs, setOutputs] = useState({})
+  const [outputs, setOutputs] = useState<Record<string, unknown>>({})
   // Accumulated trace for the chart: { signalName: number[] }
-  const [traceData, setTraceData] = useState({})
+  const [traceData, setTraceData] = useState<Record<string, number[]>>({})
   // Play/pause state
   const [playing, setPlaying] = useState(false)
   // Session token for stateful simulation
-  const sessionRef = useRef(null)
+  const sessionRef = useRef<string | null>(null)
   // Errors / status message
   const [statusMsg, setStatusMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
   // Loading state for fixture fetch
   const [loadingFixture, setLoadingFixture] = useState('')
 
-  const intervalRef = useRef(null)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Reset trace and session when program changes
   useEffect(() => {
@@ -309,7 +328,7 @@ export default function PlcHmiTester({ program = '', onProgramLoad, className = 
   // Core: run a single step
   // ---------------------------------------------------------------------------
 
-  const runStep = useCallback(async (ticks = 1) => {
+  const runStep = useCallback(async (ticks: number = 1) => {
     if (!program?.trim()) {
       setErrorMsg('No program loaded.')
       return
@@ -337,12 +356,12 @@ export default function PlcHmiTester({ program = '', onProgramLoad, className = 
         // Add all input signals to trace
         for (const [k, v] of Object.entries(entry.inputs ?? {})) {
           if (!next[k]) next[k] = []
-          next[k] = [...next[k], typeof v === 'boolean' ? (v ? 1 : 0) : v].slice(-TRACE_WINDOW)
+          next[k] = [...next[k], typeof v === 'boolean' ? (v ? 1 : 0) : v as number].slice(-TRACE_WINDOW)
         }
         // Add all output signals to trace
         for (const [k, v] of Object.entries(entry.outputs ?? {})) {
           if (!next[k]) next[k] = []
-          next[k] = [...next[k], typeof v === 'boolean' ? (v ? 1 : 0) : v].slice(-TRACE_WINDOW)
+          next[k] = [...next[k], typeof v === 'boolean' ? (v ? 1 : 0) : v as number].slice(-TRACE_WINDOW)
         }
       }
       return next
@@ -368,7 +387,7 @@ export default function PlcHmiTester({ program = '', onProgramLoad, className = 
   // Input change handler
   // ---------------------------------------------------------------------------
 
-  const handleInputChange = useCallback((name, value) => {
+  const handleInputChange: InputChangeFn = useCallback((name, value) => {
     setInputValues(prev => ({ ...prev, [name]: value }))
   }, [])
 
@@ -376,7 +395,7 @@ export default function PlcHmiTester({ program = '', onProgramLoad, className = 
   // Fixture loading
   // ---------------------------------------------------------------------------
 
-  const handleLoadFixture = useCallback(async (name) => {
+  const handleLoadFixture = useCallback(async (name: string) => {
     setLoadingFixture(name)
     setPlaying(false)
     const result = await loadFixture(name)
@@ -388,11 +407,12 @@ export default function PlcHmiTester({ program = '', onProgramLoad, className = 
     }
 
     // Initialise input state from fixture definitions
-    const initInputs = {}
-    for (const inp of result.inputs ?? []) {
+    const fixtureInputs = (result.inputs ?? []) as PlcInputDef[]
+    const initInputs: Record<string, unknown> = {}
+    for (const inp of fixtureInputs) {
       initInputs[inp.name] = inp.default ?? (inp.type === 'BOOL' ? false : 0)
     }
-    setInputDefs(result.inputs ?? [])
+    setInputDefs(fixtureInputs)
     setInputValues(initInputs)
     setOutputs({})
     setTraceData({})
@@ -513,7 +533,7 @@ export default function PlcHmiTester({ program = '', onProgramLoad, className = 
                   ? <MomentaryInput key={name} name={name} onChange={handleInputChange} />
                   : <ToggleInput key={name} name={name} value={!!val} onChange={handleInputChange} />
               }
-              return <NumericInput key={name} name={name} value={val} onChange={handleInputChange} />
+              return <NumericInput key={name} name={name} value={val as number} onChange={handleInputChange} />
             })
           )}
         </div>
@@ -526,7 +546,7 @@ export default function PlcHmiTester({ program = '', onProgramLoad, className = 
           ) : (
             <>
               {boolOutputs.map(([name, value]) => (
-                <LampOutput key={name} name={name} value={value} />
+                <LampOutput key={name} name={name} value={value as boolean} />
               ))}
               {numOutputs.map(([name, value]) => (
                 <NumericOutput key={name} name={name} value={value} />

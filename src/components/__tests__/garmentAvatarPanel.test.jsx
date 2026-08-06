@@ -12,10 +12,10 @@ import {
   parseAvatarResult,
   formatGirth,
   landmarkDisplayOrder,
-} from '../GarmentAvatarPanel.jsx'
+} from '../GarmentAvatarPanel.tsx'
 
 const SRC = readFileSync(
-  resolve(__dirname, '../GarmentAvatarPanel.jsx'),
+  resolve(__dirname, '../GarmentAvatarPanel.tsx'),
   'utf8',
 )
 

@@ -22,11 +22,53 @@ import { useMemo } from 'react'
 import { User, Download } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface Landmark {
+  z_cm: number
+  girth_cm?: number
+  half_width_cm?: number
+  half_depth_cm?: number
+}
+
+interface AvatarData {
+  landmarks: Record<string, Landmark>
+  height_cm?: number
+  bust_cm?: number
+  waist_cm?: number
+  hip_cm?: number
+  sex?: string
+  n_vertices?: number
+  n_faces?: number
+  obj?: string
+  method?: string
+}
+
+type ParsedAvatarResult =
+  | { kind: 'empty' }
+  | { kind: 'invalid'; error: string }
+  | { kind: 'ok'; data: AvatarData }
+
+export interface GarmentAvatarPanelProps {
+  result?: unknown
+  content?: string | null
+  className?: string
+}
+
+// ---------------------------------------------------------------------------
 // Pure helpers (exported for tests)
 // ---------------------------------------------------------------------------
 
-/** Ordered landmark names for display (head → feet). */
-export function landmarkDisplayOrder() {
+/**
+ * Ordered landmark names for display (head → feet).
+ *
+ * Exported alongside the default GarmentAvatarPanel component (module's own
+ * pure helpers, exercised directly by vitest) — pre-existing; splitting into
+ * a separate module is a refactor out of scope for a rename-only migration (T-515).
+ */
+// eslint-disable-next-line react-refresh/only-export-components -- see comment above.
+export function landmarkDisplayOrder(): string[] {
   return [
     'crown', 'neck', 'shoulder', 'armscye', 'bust', 'underbust',
     'waist', 'hip', 'crotch', 'knee', 'calf', 'ankle', 'floor',
@@ -37,23 +79,26 @@ export function landmarkDisplayOrder() {
  * Parse raw garment_avatar_body_form result.
  * Returns { kind: 'ok'|'empty'|'invalid', data, error? }
  */
-export function parseAvatarResult(raw) {
+// eslint-disable-next-line react-refresh/only-export-components -- see comment above landmarkDisplayOrder.
+export function parseAvatarResult(raw: unknown): ParsedAvatarResult {
   if (raw == null) return { kind: 'empty' }
-  const obj = typeof raw === 'string'
+  const obj: unknown = typeof raw === 'string'
     ? (() => { try { return JSON.parse(raw) } catch { return null } })()
     : raw
   if (!obj || typeof obj !== 'object') return { kind: 'invalid', error: 'Expected JSON object' }
-  if (obj.error) return { kind: 'invalid', error: obj.error }
-  if (!obj.landmarks || typeof obj.landmarks !== 'object')
+  const rec = obj as Record<string, unknown>
+  if (rec.error) return { kind: 'invalid', error: String(rec.error) }
+  if (!rec.landmarks || typeof rec.landmarks !== 'object')
     return { kind: 'invalid', error: 'Missing landmarks in result' }
 
-  return { kind: 'ok', data: obj }
+  return { kind: 'ok', data: obj as AvatarData }
 }
 
 /**
  * Format a girth value in centimetres.
  */
-export function formatGirth(cm) {
+// eslint-disable-next-line react-refresh/only-export-components -- see comment above landmarkDisplayOrder.
+export function formatGirth(cm: number | null | undefined): string {
   if (cm == null || !Number.isFinite(cm)) return '—'
   return `${cm.toFixed(1)} cm`
 }
@@ -66,7 +111,7 @@ export function formatGirth(cm) {
  * Vertical SVG silhouette — front view of the body form.
  * Draws width-scaled ellipses at each landmark height.
  */
-function BodyFormSilhouette({ landmarks, heightCm }) {
+function BodyFormSilhouette({ landmarks, heightCm }: { landmarks: Record<string, Landmark>; heightCm: number }) {
   const order  = landmarkDisplayOrder().filter((n) => n in landmarks)
   if (order.length === 0) return null
 
@@ -136,7 +181,7 @@ function BodyFormSilhouette({ landmarks, heightCm }) {
   )
 }
 
-function LandmarkTable({ landmarks }) {
+function LandmarkTable({ landmarks }: { landmarks: Record<string, Landmark> }) {
   const order = landmarkDisplayOrder().filter((n) => n in landmarks)
   const highlighted = new Set(['bust', 'waist', 'hip'])
   return (
@@ -181,7 +226,7 @@ function LandmarkTable({ landmarks }) {
   )
 }
 
-function ObjDownload({ obj, fileName }) {
+function ObjDownload({ obj, fileName }: { obj?: string; fileName?: string }) {
   if (!obj) return null
   const href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(obj)
   return (
@@ -203,14 +248,10 @@ function ObjDownload({ obj, fileName }) {
 
 /**
  * GarmentAvatarPanel — renders a parametric dress-form / body-form result.
- *
- * @param {Object} props
- * @param {Object|string|null} props.result  — garment_avatar_body_form output
- * @param {string} [props.className]
  */
-export default function GarmentAvatarPanel({ result = null, content, className = '' }) {
+export default function GarmentAvatarPanel({ result = null, content, className = '' }: GarmentAvatarPanelProps) {
   // content prop (from panelRegistry) is a JSON string; parse and use as result
-  const effectiveResult = useMemo(() => {
+  const effectiveResult: unknown = useMemo(() => {
     if (content != null) {
       try { return JSON.parse(content) } catch { return result }
     }

@@ -124,7 +124,10 @@ describe('tessellateBezier', () => {
     const cpsObj = [{ x: 0, y: 0 }, { x: 5, y: 5 }, { x: 10, y: 0 }]
     const cpsArr = [[0, 0], [5, 5], [10, 0]]
     const a = tessellateBezier(cpsObj, 20)
-    const b = tessellateBezier(cpsArr, 20)
+    // cpsArr is plain number[][]; Point2 wants a 2-tuple. tessellateBezier
+    // (src/lib/sketchGeom2.js, owned by another slice) accepts array-format
+    // points at runtime — that's what this test is verifying.
+    const b = tessellateBezier(cpsArr as any, 20)
     expect(a).toHaveLength(b.length)
     for (let i = 0; i < a.length; i++) {
       expect(a[i][0]).toBeCloseTo(b[i][0], 10)

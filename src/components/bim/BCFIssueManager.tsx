@@ -22,11 +22,11 @@
  */
 
 import { useState, useMemo, useRef, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import {
   Plus,
   Upload,
   Download,
-  ChevronDown,
   MessageSquare,
   Eye,
   Filter,
@@ -37,36 +37,85 @@ import {
   Circle,
 } from 'lucide-react'
 
+// ── Types ────────────────────────────────────────────────────────────────────
+
+type BcfTopicType = 'Clash' | 'Issue' | 'Request' | 'Fault' | 'Inquiry'
+type BcfPriority = 'Critical' | 'Normal' | 'Minor'
+type BcfStatus = 'Open' | 'In Progress' | 'Resolved' | 'Closed'
+
+interface BcfComment {
+  guid: string
+  topic_guid: string
+  comment: string
+  author: string
+  date_iso: string
+  modified_date_iso: string
+}
+
+interface BcfViewpoint {
+  guid: string
+  topic_guid: string
+  snapshot_filename?: string
+}
+
+interface BcfTopic {
+  guid: string
+  title: string
+  description?: string
+  topic_type: BcfTopicType
+  priority: BcfPriority
+  status: BcfStatus
+  assigned_to: string
+  // Raw form field, superseded by due_date_iso below — kept because the
+  // AddTopicModal submit still spreads it onto the created topic. Unused
+  // by any reader; see final report.
+  due_date?: string
+  due_date_iso?: string
+  discipline: string
+  creation_date_iso: string
+  creation_author: string
+  modified_date_iso: string
+  comments: BcfComment[]
+  viewpoints: BcfViewpoint[]
+}
+
+interface TopicFilters {
+  status: string
+  priority: string
+  assignee: string
+  discipline: string
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const TOPIC_TYPES  = ['Clash', 'Issue', 'Request', 'Fault', 'Inquiry']
-const PRIORITIES   = ['Critical', 'Normal', 'Minor']
-const STATUSES     = ['Open', 'In Progress', 'Resolved', 'Closed']
+const TOPIC_TYPES: BcfTopicType[] = ['Clash', 'Issue', 'Request', 'Fault', 'Inquiry']
+const PRIORITIES: BcfPriority[]   = ['Critical', 'Normal', 'Minor']
+const STATUSES: BcfStatus[]       = ['Open', 'In Progress', 'Resolved', 'Closed']
 const DISCIPLINES  = ['Architecture', 'Structure', 'MEP', 'Civil', 'Coordination', 'Other']
 
 // ── Badges ────────────────────────────────────────────────────────────────────
 
-const STATUS_STYLES = {
+const STATUS_STYLES: Record<BcfStatus, string> = {
   'Open':        'bg-blue-500/20 text-blue-300 border-blue-500/40',
   'In Progress': 'bg-amber-500/20 text-amber-300 border-amber-500/40',
   'Resolved':    'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
   'Closed':      'bg-ink-600/40 text-ink-400 border-ink-600/60',
 }
 
-const PRIORITY_STYLES = {
+const PRIORITY_STYLES: Record<BcfPriority, string> = {
   'Critical': 'bg-red-500/20 text-red-300 border-red-500/40',
   'Normal':   'bg-sky-500/20 text-sky-300 border-sky-500/40',
   'Minor':    'bg-ink-600/30 text-ink-400 border-ink-600/50',
 }
 
-const STATUS_ICON = {
+const STATUS_ICON: Record<BcfStatus, ReactNode> = {
   'Open':        <Circle        size={11} className="inline -mt-0.5 mr-0.5" />,
   'In Progress': <Clock         size={11} className="inline -mt-0.5 mr-0.5" />,
   'Resolved':    <CheckCircle2  size={11} className="inline -mt-0.5 mr-0.5" />,
   'Closed':      <CheckCircle2  size={11} className="inline -mt-0.5 mr-0.5 opacity-40" />,
 }
 
-function StatusBadge({ status }) {
+function StatusBadge({ status }: { status: BcfStatus }) {
   const cls = STATUS_STYLES[status] ?? 'bg-ink-700 text-ink-300 border-ink-600'
   return (
     <span className={`inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${cls}`}>
@@ -76,7 +125,7 @@ function StatusBadge({ status }) {
   )
 }
 
-function PriorityBadge({ priority }) {
+function PriorityBadge({ priority }: { priority: BcfPriority }) {
   const cls = PRIORITY_STYLES[priority] ?? 'bg-ink-700 text-ink-300 border-ink-600'
   return (
     <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${cls}`}>
@@ -88,7 +137,14 @@ function PriorityBadge({ priority }) {
 
 // ── Filter bar ────────────────────────────────────────────────────────────────
 
-function FilterSelect({ label, value, options, onChange }) {
+interface FilterSelectProps {
+  label: string
+  value: string
+  options: string[]
+  onChange: (value: string) => void
+}
+
+function FilterSelect({ label, value, options, onChange }: FilterSelectProps) {
   return (
     <div className="flex items-center gap-1.5">
       <span className="text-[11px] text-ink-400 whitespace-nowrap">{label}</span>
@@ -108,8 +164,24 @@ function FilterSelect({ label, value, options, onChange }) {
 
 // ── Add Topic modal ───────────────────────────────────────────────────────────
 
-function AddTopicModal({ onAdd, onClose }) {
-  const [form, setForm] = useState({
+interface TopicFormState {
+  title: string
+  description: string
+  topic_type: string
+  priority: string
+  status: string
+  assigned_to: string
+  due_date: string
+  discipline: string
+}
+
+interface AddTopicModalProps {
+  onAdd: (topic: BcfTopic) => void
+  onClose: () => void
+}
+
+function AddTopicModal({ onAdd, onClose }: AddTopicModalProps) {
+  const [form, setForm] = useState<TopicFormState>({
     title:       '',
     description: '',
     topic_type:  'Issue',
@@ -120,14 +192,19 @@ function AddTopicModal({ onAdd, onClose }) {
     discipline:  'Architecture',
   })
 
-  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
+  const set = (key: keyof TopicFormState) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+      setForm((f) => ({ ...f, [key]: e.target.value }))
   const isValid = form.title.trim().length > 0
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!isValid) return
     onAdd({
       ...form,
+      topic_type: form.topic_type as BcfTopicType,
+      priority:   form.priority as BcfPriority,
+      status:     form.status as BcfStatus,
       guid:               crypto.randomUUID?.() ?? Math.random().toString(36).slice(2),
       creation_date_iso:  new Date().toISOString(),
       creation_author:    '',
@@ -233,7 +310,15 @@ function AddTopicModal({ onAdd, onClose }) {
 
 // ── Detail panel ──────────────────────────────────────────────────────────────
 
-function DetailPanel({ topic, comments, viewpoints, onStatusChange, onAddComment }) {
+interface DetailPanelProps {
+  topic: BcfTopic
+  comments: BcfComment[]
+  viewpoints: BcfViewpoint[]
+  onStatusChange: (topicGuid: string, newStatus: BcfStatus) => void
+  onAddComment: (topicGuid: string, text: string) => void
+}
+
+function DetailPanel({ topic, comments, viewpoints, onStatusChange, onAddComment }: DetailPanelProps) {
   const [commentText, setCommentText] = useState('')
   const topicComments  = comments.filter((c) => c.topic_guid === topic.guid)
   const topicViewpoints = viewpoints.filter((vp) => vp.topic_guid === topic.guid)
@@ -299,7 +384,7 @@ function DetailPanel({ topic, comments, viewpoints, onStatusChange, onAddComment
           <p className="text-xs font-medium text-ink-400 mb-1.5">Status</p>
           <select
             value={topic.status}
-            onChange={(e) => onStatusChange(topic.guid, e.target.value)}
+            onChange={(e) => onStatusChange(topic.guid, e.target.value as BcfStatus)}
             className="rounded border border-ink-700 bg-ink-800 px-2 py-1.5 text-sm text-ink-200 focus:border-kerf-500 focus:outline-none"
           >
             {STATUSES.map((s) => <option key={s}>{s}</option>)}
@@ -357,17 +442,22 @@ function DetailPanel({ topic, comments, viewpoints, onStatusChange, onAddComment
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function BCFIssueManager({ projectId, className = '' }) {
+export interface Props {
+  projectId?: string
+  className?: string
+}
+
+export default function BCFIssueManager({ projectId, className = '' }: Props) {
   // ── State ──────────────────────────────────────────────────────────────────
-  const [topics,     setTopics]     = useState([])
-  const [comments,   setComments]   = useState([])
-  const [viewpoints, setViewpoints] = useState([])
-  const [selected,   setSelected]   = useState(null)  // topic guid
+  const [topics,     setTopics]     = useState<BcfTopic[]>([])
+  const [comments,   setComments]   = useState<BcfComment[]>([])
+  const [viewpoints, setViewpoints] = useState<BcfViewpoint[]>([])
+  const [selected,   setSelected]   = useState<string | null>(null)  // topic guid
   const [showAdd,    setShowAdd]     = useState(false)
-  const [filters,    setFilters]     = useState({ status: '', priority: '', assignee: '', discipline: '' })
+  const [filters,    setFilters]     = useState<TopicFilters>({ status: '', priority: '', assignee: '', discipline: '' })
   const [importError, setImportError] = useState('')
 
-  const fileInputRef = useRef(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // ── Filter logic ──────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -380,16 +470,16 @@ export default function BCFIssueManager({ projectId, className = '' }) {
     })
   }, [topics, filters])
 
-  const setFilter = (key) => (val) => setFilters((f) => ({ ...f, [key]: val }))
+  const setFilter = (key: keyof TopicFilters) => (val: string) => setFilters((f) => ({ ...f, [key]: val }))
   const clearFilters = () => setFilters({ status: '', priority: '', assignee: '', discipline: '' })
   const hasFilters = Object.values(filters).some(Boolean)
 
   // ── CRUD handlers ─────────────────────────────────────────────────────────
-  const handleAddTopic = useCallback((topic) => {
+  const handleAddTopic = useCallback((topic: BcfTopic) => {
     setTopics((prev) => [topic, ...prev])
   }, [])
 
-  const handleStatusChange = useCallback((topicGuid, newStatus) => {
+  const handleStatusChange = useCallback((topicGuid: string, newStatus: BcfStatus) => {
     setTopics((prev) =>
       prev.map((t) =>
         t.guid === topicGuid
@@ -399,8 +489,8 @@ export default function BCFIssueManager({ projectId, className = '' }) {
     )
   }, [])
 
-  const handleAddComment = useCallback((topicGuid, text) => {
-    const c = {
+  const handleAddComment = useCallback((topicGuid: string, text: string) => {
+    const c: BcfComment = {
       guid:             crypto.randomUUID?.() ?? Math.random().toString(36).slice(2),
       topic_guid:       topicGuid,
       comment:          text,
@@ -448,7 +538,7 @@ export default function BCFIssueManager({ projectId, className = '' }) {
   }, [projectId, topics, comments, viewpoints])
 
   // ── Import ────────────────────────────────────────────────────────────────
-  const handleImport = useCallback(async (e) => {
+  const handleImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setImportError('')
@@ -460,7 +550,7 @@ export default function BCFIssueManager({ projectId, className = '' }) {
         body:   form,
       })
       if (!res.ok) throw new Error(await res.text())
-      const data = await res.json()
+      const data: { topics?: BcfTopic[]; comments?: BcfComment[]; viewpoints?: BcfViewpoint[] } = await res.json()
       // Merge imported topics/comments/viewpoints (deduplicate by guid)
       setTopics((prev) => {
         const existing = new Set(prev.map((t) => t.guid))
@@ -475,7 +565,7 @@ export default function BCFIssueManager({ projectId, className = '' }) {
         return [...prev, ...(data.viewpoints ?? []).filter((v) => !existing.has(v.guid))]
       })
     } catch (err) {
-      setImportError(err.message || 'Import failed')
+      setImportError(err instanceof Error ? err.message : 'Import failed')
     } finally {
       e.target.value = ''
     }

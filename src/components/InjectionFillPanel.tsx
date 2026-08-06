@@ -35,7 +35,55 @@
  *   Autodesk Moldflow Insight User Guide (public documentation).
  */
 
+import type { CSSProperties, ReactNode } from 'react'
+import type { LucideIcon } from 'lucide-react'
 import { AlertTriangle, CheckCircle2, Droplets, Wind, Clock, Gauge } from 'lucide-react'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+//
+// Domain shape of the mold_injection_fill_simulate tool output. No shared
+// type exists for this analysis payload — declared locally.
+
+// A weld-line / air-trap / last-to-fill point — either {x,y} or an [x,y] tuple
+// at runtime. The numeric index signature lets `.x`/`.y` and `[0]`/`[1]`
+// access both typecheck without adding a runtime discriminator (no
+// behaviour change).
+interface FillPoint {
+  x?: number
+  y?: number
+  [index: number]: number | undefined
+}
+
+interface FillResultData {
+  ok?: boolean
+  reason?: string
+  error?: string
+  fill_time_s?: number
+  max_pressure_drop_mpa?: number
+  weld_line_count?: number
+  weld_lines?: FillPoint[][]
+  air_trap_count?: number
+  air_traps?: FillPoint[]
+  last_to_fill_count?: number
+  last_to_fill_locations?: FillPoint[]
+  short_shot_risk_pct?: number
+  polymer?: string
+  honest_caveat?: string
+  [key: string]: unknown
+}
+
+interface FillParseResult {
+  kind: 'empty' | 'invalid' | 'ok'
+  data?: FillResultData | null
+  error?: string
+}
+
+export interface InjectionFillPanelProps {
+  /** raw tool JSON output — string or already-parsed object */
+  parsedContent?: string | FillResultData | null
+}
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for tests)
@@ -44,21 +92,26 @@ import { AlertTriangle, CheckCircle2, Droplets, Wind, Clock, Gauge } from 'lucid
 /**
  * Parse raw fill-result JSON content.
  * Returns { kind: 'ok'|'empty'|'invalid', data, error? }
+ *
+ * Exported alongside the component (not moved to a separate module) since
+ * this file's tests import them directly; splitting into a separate module
+ * is a refactor out of scope for a rename-only migration (T-515).
  */
-export function parseFillResult(content) {
+// eslint-disable-next-line react-refresh/only-export-components -- see comment above.
+export function parseFillResult(content: string): FillParseResult {
   const raw = typeof content === 'string' ? content : ''
   if (!raw.trim()) return { kind: 'empty', data: null }
   let doc
   try {
     doc = JSON.parse(raw)
   } catch (e) {
-    return { kind: 'invalid', error: e.message }
+    return { kind: 'invalid', error: (e as Error).message }
   }
   if (!doc || typeof doc !== 'object') {
     return { kind: 'invalid', error: 'Expected JSON object' }
   }
   // Unwrap { result: {...} } wrapper if present
-  const data = doc.result && typeof doc.result === 'object' ? doc.result : doc
+  const data: FillResultData = doc.result && typeof doc.result === 'object' ? doc.result : doc
   if (data.ok === false) {
     return { kind: 'invalid', error: data.reason || data.error || 'Tool returned ok:false' }
   }
@@ -72,7 +125,8 @@ export function parseFillResult(content) {
  * Return a CSS colour string for a short-shot risk percentage.
  * 0–5 %: green; 5–20 %: amber; 20–50 %: orange; >50 %: red
  */
-export function riskColor(pct) {
+// eslint-disable-next-line react-refresh/only-export-components -- see parseFillResult above.
+export function riskColor(pct: number | null | undefined): string {
   if (pct == null || !Number.isFinite(pct)) return '#9ca3af'
   if (pct <= 5)  return '#34d399'
   if (pct <= 20) return '#fbbf24'
@@ -84,7 +138,8 @@ export function riskColor(pct) {
  * Format a number to a given number of decimal places.
  * Returns "—" for null / non-finite.
  */
-export function fmtNum(n, digits = 3) {
+// eslint-disable-next-line react-refresh/only-export-components -- see parseFillResult above.
+export function fmtNum(n: number | null | undefined, digits = 3): string {
   if (n == null || !Number.isFinite(n)) return '—'
   return n.toFixed(digits)
 }
@@ -92,7 +147,8 @@ export function fmtNum(n, digits = 3) {
 /**
  * Return a human-readable short-shot risk label.
  */
-export function shortShotLabel(pct) {
+// eslint-disable-next-line react-refresh/only-export-components -- see parseFillResult above.
+export function shortShotLabel(pct: number | null | undefined): string {
   if (pct == null || !Number.isFinite(pct)) return 'Unknown'
   if (pct <= 5)  return 'Low'
   if (pct <= 20) return 'Moderate'
@@ -104,7 +160,7 @@ export function shortShotLabel(pct) {
 // Styles
 // ---------------------------------------------------------------------------
 
-const S = {
+const S: Record<string, CSSProperties> = {
   container: {
     fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace',
     fontSize: 12,
@@ -240,7 +296,15 @@ const S = {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function MetricCard({ icon: Icon, label, value, unit, accent }) {
+interface MetricCardProps {
+  icon?: LucideIcon
+  label: string
+  value: ReactNode
+  unit?: string
+  accent?: string
+}
+
+function MetricCard({ icon: Icon, label, value, unit, accent }: MetricCardProps) {
   return (
     <div style={S.metricCard}>
       <div style={S.metricLabel}>
@@ -257,7 +321,7 @@ function MetricCard({ icon: Icon, label, value, unit, accent }) {
   )
 }
 
-function RiskGauge({ pct }) {
+function RiskGauge({ pct }: { pct: number | null | undefined }) {
   const label  = shortShotLabel(pct)
   const color  = riskColor(pct)
   const width  = Math.min(100, Math.max(0, pct ?? 0))
@@ -291,10 +355,14 @@ function RiskGauge({ pct }) {
  * Props:
  *   parsedContent — string | object  (raw tool JSON output)
  */
-export default function InjectionFillPanel({ parsedContent }) {
+export default function InjectionFillPanel({ parsedContent }: InjectionFillPanelProps) {
+  // TS doesn't carry the negated "typeof === object && !== null" narrowing
+  // into the ternary's else branch, so the non-object arm is asserted back
+  // to string | null | undefined (parsedContent can only be a string here
+  // at runtime once the object branch is excluded).
   const raw = typeof parsedContent === 'object' && parsedContent !== null
     ? JSON.stringify(parsedContent)
-    : (parsedContent ?? '')
+    : ((parsedContent as string | null | undefined) ?? '')
 
   const { kind, data, error } = parseFillResult(raw)
 

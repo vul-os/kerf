@@ -1,5 +1,5 @@
 /**
- * stMonacoLanguage.js — Monaco Monarch tokenizer for IEC 61131-3 Structured Text.
+ * stMonacoLanguage.ts — Monaco Monarch tokenizer for IEC 61131-3 Structured Text.
  *
  * Usage:
  *   import { ST_LANGUAGE_ID, ST_MONARCH_TOKENS, registerSTLanguage } from './stMonacoLanguage.js'
@@ -78,7 +78,7 @@ const KW_LITERALS = ['TRUE', 'FALSE']
 // Exported flat keyword list (useful for autocompletion)
 // ---------------------------------------------------------------------------
 
-export const ST_KEYWORDS = [
+export const ST_KEYWORDS: string[] = [
   ...KW_STRUCTURE,
   ...KW_VAR,
   ...KW_TYPE,
@@ -87,11 +87,36 @@ export const ST_KEYWORDS = [
   ...KW_LITERALS,
 ]
 
-export const ST_STANDARD_FBS = KW_FB
+export const ST_STANDARD_FBS: string[] = KW_FB
 
 // ---------------------------------------------------------------------------
 // Monarch tokenizer definition
 // ---------------------------------------------------------------------------
+
+/**
+ * One Monarch tokenizer rule: `[pattern, action]` or `[pattern, action, nextState]`. Monaco's
+ * Monarch grammar accepts either a RegExp or a plain string pattern; this module's own rules
+ * happen to be all-RegExp, but the type stays accurate to the wider Monarch contract rather
+ * than narrowing to only what's currently used here.
+ */
+export type MonarchRule = [RegExp | string, unknown] | [RegExp | string, unknown, string]
+
+export interface MonarchTokenizerStates {
+  root: MonarchRule[]
+  blockComment: MonarchRule[]
+  [state: string]: MonarchRule[]
+}
+
+/** Monaco Monarch language definition — the shape `setMonarchTokensProvider` expects. */
+export interface MonarchLanguage {
+  ignoreCase: boolean
+  keywords: string[]
+  typeKeywords: string[]
+  constants: string[]
+  standardFBs: string[]
+  operators: string[]
+  tokenizer: MonarchTokenizerStates
+}
 
 /**
  * Monarch tokenizer for IEC 61131-3 ST.
@@ -107,7 +132,7 @@ export const ST_STANDARD_FBS = KW_FB
  *   operator      — default
  *   delimiter     — default
  */
-export const ST_MONARCH_TOKENS = {
+export const ST_MONARCH_TOKENS: MonarchLanguage = {
   // Case-insensitive matching: IEC 61131-3 identifiers are case-insensitive
   ignoreCase: true,
 
@@ -172,7 +197,7 @@ export const ST_MONARCH_TOKENS = {
       [/[+\-*/=<>]/, 'operator'],
 
       // Delimiters
-      [/[(),;:\[\].]/, 'delimiter'],
+      [/[(),;:[\].]/, 'delimiter'],
 
       // Whitespace
       [/\s+/, 'white'],
@@ -192,7 +217,16 @@ export const ST_MONARCH_TOKENS = {
 // Language configuration (brackets, auto-closing, folding)
 // ---------------------------------------------------------------------------
 
-export const ST_LANGUAGE_CONFIG = {
+export interface MonarchLanguageConfig {
+  comments: { lineComment: string; blockComment: [string, string] }
+  brackets: [string, string][]
+  autoClosingPairs: { open: string; close: string; notIn?: string[] }[]
+  surroundingPairs: { open: string; close: string }[]
+  folding: { markers: { start: RegExp; end: RegExp } }
+  wordPattern: RegExp
+}
+
+export const ST_LANGUAGE_CONFIG: MonarchLanguageConfig = {
   comments: {
     lineComment: '//',
     blockComment: ['(*', '*)'],
@@ -233,24 +267,28 @@ export const ST_LANGUAGE_CONFIG = {
  * an untyped .jsx boundary — CodeEditor.jsx et al. aren't type-checked) and a
  * minimal test double satisfy it structurally, without pulling in Monaco's
  * entire ~20-member module surface for four method calls.
- *
- * @typedef {object} MonacoLanguagesLike
- * @property {object} languages
- * @property {(language: {id: string, extensions?: string[], aliases?: string[], mimetypes?: string[]}) => unknown} languages.register
- * @property {() => Array<{id: string}>} languages.getLanguages
- * @property {(languageId: string, provider: unknown) => unknown} languages.setMonarchTokensProvider
- * @property {(languageId: string, configuration: unknown) => unknown} languages.setLanguageConfiguration
  */
+export interface MonacoLanguagesLike {
+  languages: {
+    register: (language: { id: string; extensions?: string[]; aliases?: string[]; mimetypes?: string[] }) => unknown
+    getLanguages: () => Array<{ id: string }>
+    setMonarchTokensProvider: (languageId: string, provider: unknown) => unknown
+    setLanguageConfiguration: (languageId: string, configuration: unknown) => unknown
+  }
+}
+
+export interface RegisterSTLanguageOptions {
+  /** Override the language ID (default: 'iec61131-st'). */
+  languageId?: string
+}
 
 /**
  * Register the IEC 61131-3 ST language with a Monaco instance.
  *
- * @param {MonacoLanguagesLike} monaco - The Monaco editor instance (or a test double
+ * @param monaco - The Monaco editor instance (or a test double
  *   implementing the same `languages.*` surface).
- * @param {object} [opts]
- * @param {string} [opts.languageId] - Override the language ID (default: 'iec61131-st').
  */
-export function registerSTLanguage(monaco, opts = {}) {
+export function registerSTLanguage(monaco: MonacoLanguagesLike, opts: RegisterSTLanguageOptions = {}): void {
   const id = opts.languageId ?? ST_LANGUAGE_ID
 
   // Avoid double-registration

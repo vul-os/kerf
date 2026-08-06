@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Building2, X, AlertCircle, Loader2, Upload } from 'lucide-react'
 import clsx from 'clsx'
-import { useWorkspaces } from '../store/workspaces.js'
-import { api, ApiError } from '../lib/api.js'
+import { useWorkspaces } from '../store/workspaces'
+import { api, ApiError } from '../lib/api'
+import type { ApiWorkspace } from '@/types'
 
-function slugify(s) {
+function slugify(s?: string): string {
   return (s || '')
     .toLowerCase()
     .trim()
@@ -14,11 +15,17 @@ function slugify(s) {
     .slice(0, 32)
 }
 
-function isValidSlug(s) {
+function isValidSlug(s: string): boolean {
   return /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/.test(s) || /^[a-z0-9]{1,3}$/.test(s)
 }
 
-export default function CreateWorkspaceDialog({ open, onClose, onCreated }) {
+export interface CreateWorkspaceDialogProps {
+  open: boolean
+  onClose: () => void
+  onCreated?: (workspace: ApiWorkspace) => void
+}
+
+export default function CreateWorkspaceDialog({ open, onClose, onCreated }: CreateWorkspaceDialogProps) {
   const create = useWorkspaces((s) => s.create)
   const loadAll = useWorkspaces((s) => s.loadAll)
 
@@ -26,12 +33,12 @@ export default function CreateWorkspaceDialog({ open, onClose, onCreated }) {
   const [slug, setSlug] = useState('')
   const [slugDirty, setSlugDirty] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState(null)
-  const [warning, setWarning] = useState(null)
-  const [avatarFile, setAvatarFile] = useState(null)
-  const [avatarPreview, setAvatarPreview] = useState(null)
-  const nameRef = useRef(null)
-  const fileRef = useRef(null)
+  const [error, setError] = useState<string | null>(null)
+  const [warning, setWarning] = useState<string | null>(null)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const nameRef = useRef<HTMLInputElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -56,7 +63,7 @@ export default function CreateWorkspaceDialog({ open, onClose, onCreated }) {
 
   useEffect(() => {
     if (!open) return
-    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
@@ -68,7 +75,7 @@ export default function CreateWorkspaceDialog({ open, onClose, onCreated }) {
 
   const slugValid = !effectiveSlug || isValidSlug(effectiveSlug)
 
-  const onPickAvatar = (e) => {
+  const onPickAvatar = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
@@ -88,7 +95,7 @@ export default function CreateWorkspaceDialog({ open, onClose, onCreated }) {
     setAvatarPreview(null)
   }
 
-  const submit = async (e) => {
+  const submit = async (e?: FormEvent) => {
     e?.preventDefault?.()
     if (submitting) return
     if (!name.trim()) { setError('Give your workspace a name.'); return }
@@ -97,11 +104,13 @@ export default function CreateWorkspaceDialog({ open, onClose, onCreated }) {
       return
     }
     setSubmitting(true); setError(null); setWarning(null)
-    let created
+    let created: ApiWorkspace
     try {
-      created = await create({ name: name.trim(), slug: effectiveSlug || undefined })
+      // The store's `create` types `slug` as required, but the API accepts
+      // an empty/undefined slug and server-derives one from the name.
+      created = await create({ name: name.trim(), slug: effectiveSlug || undefined } as { name: string; slug: string })
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : (err?.message || 'Could not create workspace.'))
+      setError(err instanceof ApiError ? err.message : ((err as Error)?.message || 'Could not create workspace.'))
       setSubmitting(false)
       return
     }
@@ -111,7 +120,7 @@ export default function CreateWorkspaceDialog({ open, onClose, onCreated }) {
         await api.uploadWorkspaceAvatar(created.slug, avatarFile)
         await loadAll()
       } catch (err) {
-        const msg = err instanceof ApiError ? err.message : (err?.message || 'unknown error')
+        const msg = err instanceof ApiError ? err.message : ((err as Error)?.message || 'unknown error')
         setWarning(`Workspace created, but avatar upload failed: ${msg}`)
         // Keep the dialog open briefly so the user sees the warning, then continue.
         setSubmitting(false)

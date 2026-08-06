@@ -169,8 +169,12 @@ export function buildToolPayload(state) {
   const finishCost = FINISH_OPTIONS.find((f) => f.key === state.finish)?.cost ?? 0
 
   // Widened: `stones` is attached conditionally below, so the inferred literal shape
-  // would reject it.
-  const payload: Record<string, unknown> = {
+  // would reject it. The `stones` field is typed explicitly (rather than left as
+  // `unknown` via the index signature) so callers — including tests — can read
+  // `payload.stones.length` / `payload.stones[0].cut` without a cast.
+  const payload: Record<string, unknown> & {
+    stones?: Array<{ cut: string; carat: number; price_per_carat: number; count: number }>
+  } = {
     volume_mm3:           volumeMm3,
     metal:                state.metal,
     metal_price_per_gram: pricePerGram,
@@ -673,7 +677,7 @@ function EstimateCard({ estimate, loading, error, onRetry }) {
   )
 }
 
-function Step5Review({ state, projectId }) {
+function Step5Review({ state, projectId }: { state: ReturnType<typeof initialState>; projectId?: string }) {
   const [loading, setLoading] = useState(false)
   const [apiEstimate, setApiEstimate] = useState(null)
   const [error, setError] = useState(null)
@@ -839,7 +843,13 @@ function ViewportPlaceholder() {
   )
 }
 
-export default function JewelryConfigurator({ projectId }) {
+export interface JewelryConfiguratorProps {
+  /** Optional — the /jewelry-configurator route renders this with no props, and the server
+   *  estimate is guarded on its presence throughout. */
+  projectId?: string
+}
+
+export default function JewelryConfigurator({ projectId }: JewelryConfiguratorProps) {
   const [step, setStep] = useState(0)
   const [state, setState] = useState(initialState)
   const [validationError, setValidationError] = useState(null)

@@ -12,7 +12,7 @@
 //
 // Pattern: dark mono palette, lucide-react icons, no external deps.
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, type CSSProperties } from 'react'
 import {
   Square,
   Circle,
@@ -66,7 +66,9 @@ function fmt(v) {
 
 const ACCENT = '#fbbf24'
 
-const s = {
+// Typed so literals like flexDirection:'column' keep their CSSProperties meaning rather
+// than widening to `string`.
+const s: Record<string, CSSProperties> = {
   root: {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: 13,
@@ -579,7 +581,12 @@ function MultiFlangeCalc() {
 
 const TABS = ['Flat Pattern', 'Corner Relief', 'Multi-Flange']
 
-export default function SheetMetalPanel({ content } = {}) {
+export interface SheetMetalPanelProps {
+  /** JSON string optionally carrying persisted tab selection. */
+  content?: string
+}
+
+export default function SheetMetalPanel({ content }: SheetMetalPanelProps = {}) {
   // content prop: JSON string optionally carrying persisted tab selection.
   const _parsed = (() => { try { return content ? JSON.parse(content) : {} } catch { return {} } })()
   const [tab, setTab] = useState(_parsed.tab || 'Flat Pattern')

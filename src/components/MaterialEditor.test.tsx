@@ -13,7 +13,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 // ---------------------------------------------------------------------------
 
 vi.mock('./MaterialPbrEditor.jsx', () => ({
-  default: ({ material, onClose, className }) => (
+  default: ({ material, onClose, className }: { material?: { name?: string }, onClose?: () => void, className?: string }) => (
     <div
       data-testid="material-pbr-editor-stub"
       data-mat-name={material?.name ?? ''}
@@ -24,7 +24,7 @@ vi.mock('./MaterialPbrEditor.jsx', () => ({
 }))
 
 vi.mock('../store/workspace.js', () => ({
-  useWorkspace: (sel) => sel({
+  useWorkspace: (sel: (state: unknown) => unknown) => sel({
     currentFile: { name: 'steel.material' },
     currentFileContent: JSON.stringify({
       version: 1,

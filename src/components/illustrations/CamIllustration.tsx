@@ -4,7 +4,11 @@
  *
  * viewBox 320×200.
  */
-export default function CamIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function CamIllustration({ className = '' }: Props) {
   // Concentric-offset pocket toolpath inside a 120×60 rectangle.
   // Outer rect at (110,90,230,150). Concentric offsets inset by 6/12/18.
   const passes = [

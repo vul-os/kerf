@@ -3,7 +3,11 @@
  * profile in green, with dimension callouts (10mm, 30mm) and constraint
  * glyphs (parallel hash, perpendicular tick).
  */
-export default function SketcherIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function SketcherIllustration({ className = '' }: Props) {
   return (
     <svg
       viewBox="0 0 320 200"

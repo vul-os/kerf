@@ -3,7 +3,11 @@
  * the right, dotted arrow connecting them. Communicates "code becomes
  * geometry" without copy.
  */
-export default function JscadIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function JscadIllustration({ className = '' }: Props) {
   return (
     <svg
       viewBox="0 0 320 200"

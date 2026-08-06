@@ -3,7 +3,11 @@
  * orthographic views, dimensions, and a title block. Stylised as a
  * white-on-paper render to evoke real engineering drawings.
  */
-export default function DrawingIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function DrawingIllustration({ className = '' }: Props) {
   return (
     <svg
       viewBox="0 0 320 200"

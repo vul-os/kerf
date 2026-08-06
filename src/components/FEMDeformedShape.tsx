@@ -22,10 +22,44 @@ import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import {
   applyDisplacementScale,
-  displacementMagnitudes,
   buildDisplacementColors,
   scalarToRGB,
 } from '../lib/femDisplacement.js'
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+//
+// 'three' ships no .d.ts and this repo has no @types/three (verified: zero .d.ts
+// files under node_modules/three) — every `THREE.X` reference below type-checks
+// only because noImplicitAny is off (strict: false at the root tsconfig), the same
+// situation already established by the earlier CloudLayer/LightGizmos migrations.
+// This is a real gap worth flagging for T-501/T-500: nothing in src/types models
+// Three.js, so the whole viewport/renderer slice inherits implicit-any interop.
+
+export interface NodeDisplacement {
+  ux?: number
+  uy?: number
+  uz?: number
+  mag?: number
+}
+
+export type FemColorMode = 'displacement' | 'vonmises'
+
+export interface FEMDeformedShapeProps {
+  nodeDisplacements?: NodeDisplacement[]
+  stresses?: number[]
+  scale?: number
+  colorMode?: FemColorMode
+  maxDisplacement?: number
+  maxStress?: number
+  geometry?: THREE.BufferGeometry
+}
+
+interface ThreeState {
+  renderer?: THREE.WebGLRenderer
+  scene?: THREE.Scene
+  camera?: THREE.PerspectiveCamera
+  euler?: THREE.Euler
+}
 
 export default function DeformedShapeOverlay({
   nodeDisplacements,
@@ -35,9 +69,9 @@ export default function DeformedShapeOverlay({
   maxDisplacement,
   maxStress,
   geometry: externalGeometry,
-}) {
-  const canvasRef = useRef(null)
-  const stateRef = useRef({})
+}: FEMDeformedShapeProps) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const stateRef = useRef<ThreeState>({})
 
   // Bootstrap Three.js once
   useEffect(() => {
@@ -58,9 +92,9 @@ export default function DeformedShapeOverlay({
     let lastY = 0
     const euler = new THREE.Euler(0.2, 0.3, 0, 'YXZ')
 
-    function onMouseDown(e) { isDragging = true; lastX = e.clientX; lastY = e.clientY }
+    function onMouseDown(e: MouseEvent) { isDragging = true; lastX = e.clientX; lastY = e.clientY }
     function onMouseUp() { isDragging = false }
-    function onMouseMove(e) {
+    function onMouseMove(e: MouseEvent) {
       if (!isDragging) return
       euler.y += (e.clientX - lastX) * 0.01
       euler.x += (e.clientY - lastY) * 0.01
@@ -71,7 +105,7 @@ export default function DeformedShapeOverlay({
     window.addEventListener('mouseup', onMouseUp)
     window.addEventListener('mousemove', onMouseMove)
 
-    let animId
+    let animId: number
     function animate() {
       animId = requestAnimationFrame(animate)
       renderer.render(scene, camera)
@@ -91,8 +125,8 @@ export default function DeformedShapeOverlay({
 
   // Rebuild mesh/point-cloud whenever data or settings change
   useEffect(() => {
-    const { scene } = stateRef.current
-    if (!scene || !nodeDisplacements?.length) return
+    const { scene, camera } = stateRef.current
+    if (!scene || !camera || !nodeDisplacements?.length) return
 
     // Remove previous mesh
     scene.clear()
@@ -110,9 +144,9 @@ export default function DeformedShapeOverlay({
     // as approximate relative positions (ux,uy,uz are small but nonzero near
     // loaded regions — this is a degenerate proxy; the real use-case is when
     // the caller passes geometry from the mesh viewer).
-    let origPositions
+    let origPositions: Float32Array
     if (externalGeometry) {
-      origPositions = externalGeometry.attributes.position.array
+      origPositions = externalGeometry.attributes.position.array as Float32Array
     } else {
       // Proxy: place nodes on a unit sphere using their index.
       // The morphed shape shows relative displacement topology even without
@@ -127,24 +161,24 @@ export default function DeformedShapeOverlay({
       }
     }
 
-    const morphedPositions = applyDisplacementScale(origPositions, nodeDisplacements, scale)
+    const morphedPositions = applyDisplacementScale(origPositions, nodeDisplacements, scale) as Float32Array
 
     // Build vertex colours
-    let colors
-    if (colorMode === 'vonmises' && stresses?.length > 0) {
+    let colors: Float32Array
+    if (colorMode === 'vonmises' && stresses && stresses.length > 0) {
       // DG0 per-cell → broadcast to vertices.
       // If stresses.length !== n we replicate per-node using index mod stresses.length.
-      const norm = maxStress > 0 ? 1 / maxStress : 1
+      const norm = maxStress && maxStress > 0 ? 1 / maxStress : 1
       colors = new Float32Array(n * 3)
       for (let i = 0; i < n; i++) {
         const s = stresses[i % stresses.length] || 0
-        const [r, g, b] = scalarToRGB(s * norm)
+        const [r, g, b] = scalarToRGB(s * norm) as number[]
         colors[i * 3 + 0] = r
         colors[i * 3 + 1] = g
         colors[i * 3 + 2] = b
       }
     } else {
-      colors = buildDisplacementColors(nodeDisplacements, maxDisplacement || 1)
+      colors = buildDisplacementColors(nodeDisplacements, maxDisplacement || 1) as Float32Array
     }
 
     // If we have external geometry with index buffer use a mesh, otherwise points
@@ -181,7 +215,6 @@ export default function DeformedShapeOverlay({
     tmpGeo.computeBoundingSphere()
     const sphere = tmpGeo.boundingSphere
     if (sphere) {
-      const { scene: sc, camera } = stateRef.current
       camera.position.copy(sphere.center).addScaledVector(new THREE.Vector3(0, 0, 1), sphere.radius * 3)
       camera.lookAt(sphere.center)
     }
@@ -195,7 +228,7 @@ export default function DeformedShapeOverlay({
         height={220}
         style={{ width: '100%', height: 220, borderRadius: 5, border: '1px solid #1f2937', display: 'block' }}
       />
-      {!externalGeometry && nodeDisplacements?.length > 0 && (
+      {!externalGeometry && nodeDisplacements && nodeDisplacements.length > 0 && (
         <div style={{
           position: 'absolute', bottom: 6, left: 8,
           fontSize: 10, color: '#6b7280',
@@ -212,13 +245,13 @@ export default function DeformedShapeOverlay({
   )
 }
 
-function ColorBar({ colorMode, maxValue }) {
+function ColorBar({ colorMode, maxValue }: { colorMode?: FemColorMode; maxValue?: number }) {
   const stops = 6
-  const labels = []
+  const labels: Array<{ t: number; v: number; hex: string }> = []
   for (let i = 0; i <= stops; i++) {
     const t = i / stops
     const v = (maxValue || 1) * t
-    const [r, g, b] = scalarToRGB(t)
+    const [r, g, b] = scalarToRGB(t) as number[]
     const hex = '#' +
       Math.round(r * 255).toString(16).padStart(2, '0') +
       Math.round(g * 255).toString(16).padStart(2, '0') +
@@ -244,7 +277,7 @@ function ColorBar({ colorMode, maxValue }) {
   )
 }
 
-function fmtBar(v, mode) {
+function fmtBar(v: number, mode?: FemColorMode) {
   if (mode === 'vonmises') return (v / 1e6).toFixed(1) + ' MPa'
   return (v * 1e3).toFixed(3) + ' mm'
 }

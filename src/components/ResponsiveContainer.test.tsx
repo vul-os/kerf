@@ -18,12 +18,13 @@ import ResponsiveContainer from './ResponsiveContainer.jsx'
 
 // ── window stub helpers ────────────────────────────────────────────────────────
 
-let savedWindow
+let savedWindow: typeof globalThis.window
 
-function stubWidth(width) {
+function stubWidth(width: number) {
+  // Minimal window stub — not a full Window, cast at the boundary.
   globalThis.window = {
     innerWidth: width,
-    matchMedia: vi.fn((query) => {
+    matchMedia: vi.fn((query: string) => {
       const match = query.match(/\(min-width:\s*(\d+)px\)/)
       const minWidth = match ? parseInt(match[1], 10) : 0
       return {
@@ -35,7 +36,7 @@ function stubWidth(width) {
         dispatchEvent: vi.fn(),
       }
     }),
-  }
+  } as unknown as typeof globalThis.window
 }
 
 beforeEach(() => {

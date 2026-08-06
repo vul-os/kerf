@@ -15,6 +15,12 @@
 import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement, useState } from 'react'
+// @ts-expect-error - no @types/node in this toolchain
+import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
+import { dirname } from 'path'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -119,7 +125,9 @@ const SAMPLE_PROJECT = { id: 'proj-abc', name: 'Robot gripper' }
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('ConfirmDelete modal — source contracts', () => {
+  // @ts-expect-error - no @types/node in this toolchain
   const { readFileSync, existsSync } = require('fs')
+  // @ts-expect-error - no @types/node in this toolchain
   const { resolve } = require('path')
   const projectsPath = existsSync(resolve(__dirname, '../../routes/Projects.tsx'))
     ? resolve(__dirname, '../../routes/Projects.tsx')

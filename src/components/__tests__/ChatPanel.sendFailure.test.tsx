@@ -18,8 +18,14 @@
  *     assistant messages (retryContentByIndex map).
  */
 import { describe, it, expect } from 'vitest'
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync, existsSync } from 'fs'
-import { resolve } from 'path'
+// @ts-expect-error - no @types/node in this toolchain
+import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
+import { resolve, dirname } from 'path'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const SRC = readFileSync(
   (existsSync(resolve(__dirname, '../ChatPanel.tsx')) ? resolve(__dirname, '../ChatPanel.tsx') : resolve(__dirname, '../ChatPanel.jsx')),

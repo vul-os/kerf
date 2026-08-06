@@ -5,8 +5,12 @@
  */
 
 import { describe, it, expect } from 'vitest'
+// @ts-expect-error - no @types/node in this toolchain
 import { existsSync, readFileSync } from 'fs'
-import { resolve } from 'path'
+// @ts-expect-error - no @types/node in this toolchain
+import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
+import { resolve, dirname } from 'path'
 
 import {
   parseDrapeResult,
@@ -14,6 +18,8 @@ import {
   formatTension,
   interpretTension,
 } from '../GarmentDrapePanel.jsx'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 // Extension-agnostic source read: components migrate from .jsx to .tsx one
 // at a time (T-513..T-517), so a literal `.jsx` path here would break the
@@ -136,7 +142,8 @@ describe('parseDrapeResult', () => {
   })
 
   it('returns invalid for ok=false result', () => {
-    const r = parseDrapeResult({ ok: false, error: 'drape simulation failed' })
+    // Discriminated union; `expect().toBe()` doesn't narrow for TS — probe via `any`.
+    const r: any = parseDrapeResult({ ok: false, error: 'drape simulation failed' })
     expect(r.kind).toBe('invalid')
     expect(r.error).toMatch(/drape simulation failed/)
   })
@@ -157,26 +164,30 @@ describe('parseDrapeResult', () => {
   })
 
   it('parses valid full result', () => {
-    const r = parseDrapeResult(SAMPLE_RESULT)
+    // See discriminated-union note above.
+    const r: any = parseDrapeResult(SAMPLE_RESULT)
     expect(r.kind).toBe('ok')
     expect(r.data.target_region).toBe('torso')
     expect(r.data.panel_rows).toBe(3)
   })
 
   it('parses fit_tension array', () => {
-    const r = parseDrapeResult(SAMPLE_RESULT)
+    // See discriminated-union note above.
+    const r: any = parseDrapeResult(SAMPLE_RESULT)
     expect(r.kind).toBe('ok')
     expect(r.data.fit_tension).toHaveLength(9)
   })
 
   it('accepts JSON string input', () => {
-    const r = parseDrapeResult(JSON.stringify(SAMPLE_RESULT))
+    // See discriminated-union note above.
+    const r: any = parseDrapeResult(JSON.stringify(SAMPLE_RESULT))
     expect(r.kind).toBe('ok')
     expect(r.data.converged).toBe(true)
   })
 
   it('parses avatar sub-object', () => {
-    const r = parseDrapeResult(SAMPLE_RESULT)
+    // See discriminated-union note above.
+    const r: any = parseDrapeResult(SAMPLE_RESULT)
     expect(r.kind).toBe('ok')
     expect(r.data.avatar.bust_cm).toBe(92)
     expect(r.data.avatar.sex).toBe('female')

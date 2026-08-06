@@ -17,6 +17,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement } from 'react'
+// @ts-expect-error - no @types/node in this toolchain
+import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
+import { dirname } from 'path'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 // ── Mock lucide-react ────────────────────────────────────────────────────────
 //   ConflictBanner itself doesn't import any icons, but its module-graph
@@ -60,7 +66,10 @@ describe('ConflictBanner — no conflict', () => {
   it('renders null when conflictFile is null', () => {
     const { useWorkspace } = makeMockStore({ conflictFile: null })
     const html = renderToStaticMarkup(
-      createElement(ConflictBanner, { useWorkspace }),
+      // Mock only implements the selector-call shape, not the full
+      // UseBoundStore interface; cast at the boundary (ConflictBanner is
+      // owned by another slice).
+      createElement(ConflictBanner, { useWorkspace: useWorkspace as any }),
     )
     expect(html).toBe('')
   })
@@ -74,7 +83,8 @@ describe('ConflictBanner — conflict present', () => {
   beforeEach(() => {
     mocks = makeMockStore({ conflictFile: CONFLICT })
     html = renderToStaticMarkup(
-      createElement(ConflictBanner, { useWorkspace: mocks.useWorkspace }),
+      // See cast note above.
+      createElement(ConflictBanner, { useWorkspace: mocks.useWorkspace as any }),
     )
   })
 
@@ -108,21 +118,27 @@ describe('ConflictBanner — conflict present', () => {
 
 describe('ConflictBanner — source contracts', () => {
   it('imports from the workspace store', () => {
+    // @ts-expect-error - no @types/node in this toolchain
     const { readFileSync } = require('fs')
+    // @ts-expect-error - no @types/node in this toolchain
     const { resolve } = require('path')
     const src = readFileSync(resolve(__dirname, '../ConflictBanner.tsx'), 'utf8')
     expect(src).toMatch(/from.*store\/workspace/)
   })
 
   it('calls loadFileForEditor on Reload click (via source)', () => {
+    // @ts-expect-error - no @types/node in this toolchain
     const { readFileSync } = require('fs')
+    // @ts-expect-error - no @types/node in this toolchain
     const { resolve } = require('path')
     const src = readFileSync(resolve(__dirname, '../ConflictBanner.tsx'), 'utf8')
     expect(src).toMatch(/loadFileForEditor/)
   })
 
   it('clears conflictFile via setState on Reload', () => {
+    // @ts-expect-error - no @types/node in this toolchain
     const { readFileSync } = require('fs')
+    // @ts-expect-error - no @types/node in this toolchain
     const { resolve } = require('path')
     const src = readFileSync(resolve(__dirname, '../ConflictBanner.tsx'), 'utf8')
     expect(src).toMatch(/setState.*conflictFile.*null|conflictFile.*null.*setState/s)
@@ -143,7 +159,8 @@ describe('ConflictBanner — store action wiring', () => {
     useWorkspace.getState = vi.fn(() => state)
     useWorkspace.setState = vi.fn()
 
-    renderToStaticMarkup(createElement(ConflictBanner, { useWorkspace }))
+    // See cast note above.
+    renderToStaticMarkup(createElement(ConflictBanner, { useWorkspace: useWorkspace as any }))
 
     // At least one selector should access conflictFile.
     const reads = selectors.map((fn) => fn(state))
@@ -160,7 +177,8 @@ describe('ConflictBanner — store action wiring', () => {
     useWorkspace.getState = vi.fn(() => state)
     useWorkspace.setState = vi.fn()
 
-    renderToStaticMarkup(createElement(ConflictBanner, { useWorkspace }))
+    // See cast note above.
+    renderToStaticMarkup(createElement(ConflictBanner, { useWorkspace: useWorkspace as any }))
     // If we got here without error the selector ran fine.
     expect(true).toBe(true)
   })

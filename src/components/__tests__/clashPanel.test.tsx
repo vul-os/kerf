@@ -17,13 +17,19 @@
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest'
+// @ts-expect-error - no @types/node in this toolchain
 import { existsSync, readFileSync } from 'fs'
-import { resolve } from 'path'
+// @ts-expect-error - no @types/node in this toolchain
+import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
+import { resolve, dirname } from 'path'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 // Extension-agnostic source read: components migrate from .jsx to .tsx one
 // at a time (T-513..T-517), so a literal `.jsx` path here would break the
 // moment its target is renamed. Try .tsx first, then fall back to .jsx.
-function readComponentSource(baseName) {
+function readComponentSource(baseName: string) {
   const tsxPath = resolve(__dirname, `../${baseName}.tsx`)
   const jsxPath = resolve(__dirname, `../${baseName}.jsx`)
   return readFileSync(existsSync(tsxPath) ? tsxPath : jsxPath, 'utf8')

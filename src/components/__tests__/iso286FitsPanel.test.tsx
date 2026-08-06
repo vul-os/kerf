@@ -17,8 +17,12 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync, existsSync } from 'fs'
-import { resolve } from 'path'
+// @ts-expect-error - no @types/node in this toolchain
+import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
+import { resolve, dirname } from 'path'
 
 import Iso286FitsPanel, {
   fmtNum,
@@ -27,6 +31,8 @@ import Iso286FitsPanel, {
   buildPreferFitParams,
   buildPressParams,
 } from '../Iso286FitsPanel.jsx'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const SRC = readFileSync(
   (existsSync(resolve(__dirname, '../Iso286FitsPanel.tsx')) ? resolve(__dirname, '../Iso286FitsPanel.tsx') : resolve(__dirname, '../Iso286FitsPanel.jsx')),

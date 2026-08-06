@@ -5,8 +5,12 @@
  */
 
 import { describe, it, expect } from 'vitest'
+// @ts-expect-error - no @types/node in this toolchain
 import { existsSync, readFileSync } from 'fs'
-import { resolve } from 'path'
+// @ts-expect-error - no @types/node in this toolchain
+import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
+import { resolve, dirname } from 'path'
 
 import {
   parseETextilesResult,
@@ -14,6 +18,8 @@ import {
   fmtOhms,
   fmtMilliamps,
 } from '../ETextilesPanel.jsx'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 // Extension-agnostic source read: components migrate from .jsx to .tsx one
 // at a time (T-513..T-517), so a literal `.jsx` path here would break the
@@ -95,7 +101,9 @@ describe('parseETextilesResult', () => {
   })
 
   it('parses heater result', () => {
-    const r = parseETextilesResult({
+    // `r` is a discriminated union; `expect().toBe()` doesn't narrow it for TS,
+    // so we probe at runtime via `any` here rather than the compiler.
+    const r: any = parseETextilesResult({
       ok: true,
       mode: 'heater',
       resistance_ohm: 10.0,
@@ -109,7 +117,8 @@ describe('parseETextilesResult', () => {
   })
 
   it('parses LED layout result', () => {
-    const r = parseETextilesResult({
+    // See note above: probing a discriminated union via runtime assertions.
+    const r: any = parseETextilesResult({
       ok: true,
       mode: 'led_layout',
       n_branches: 3,
@@ -125,7 +134,8 @@ describe('parseETextilesResult', () => {
 
   it('accepts JSON string input', () => {
     const raw = JSON.stringify({ ok: true, mode: 'heater', resistance_ohm: 5.0 })
-    const r = parseETextilesResult(raw)
+    // See note above: probing a discriminated union via runtime assertions.
+    const r: any = parseETextilesResult(raw)
     expect(r.kind).toBe('ok')
     expect(r.mode).toBe('heater')
   })

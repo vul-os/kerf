@@ -5,14 +5,20 @@
  */
 
 import { describe, it, expect } from 'vitest'
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
-import { resolve } from 'path'
+// @ts-expect-error - no @types/node in this toolchain
+import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
+import { resolve, dirname } from 'path'
 
 import {
   parseAvatarResult,
   formatGirth,
   landmarkDisplayOrder,
-} from '../GarmentAvatarPanel.tsx'
+} from '../GarmentAvatarPanel.jsx'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const SRC = readFileSync(
   resolve(__dirname, '../GarmentAvatarPanel.tsx'),
@@ -110,7 +116,8 @@ describe('parseAvatarResult', () => {
   })
 
   it('returns invalid for error key', () => {
-    const r = parseAvatarResult({ error: 'height_cm must be positive' })
+    // Discriminated union; `expect().toBe()` doesn't narrow for TS — probe via `any`.
+    const r: any = parseAvatarResult({ error: 'height_cm must be positive' })
     expect(r.kind).toBe('invalid')
     expect(r.error).toMatch(/height_cm/)
   })
@@ -126,7 +133,8 @@ describe('parseAvatarResult', () => {
   })
 
   it('parses valid full result', () => {
-    const r = parseAvatarResult(SAMPLE_RESULT)
+    // See discriminated-union note above.
+    const r: any = parseAvatarResult(SAMPLE_RESULT)
     expect(r.kind).toBe('ok')
     expect(r.data.height_cm).toBe(168)
     expect(r.data.bust_cm).toBe(92)
@@ -134,7 +142,8 @@ describe('parseAvatarResult', () => {
   })
 
   it('parses landmarks', () => {
-    const r = parseAvatarResult(SAMPLE_RESULT)
+    // See discriminated-union note above.
+    const r: any = parseAvatarResult(SAMPLE_RESULT)
     expect(r.kind).toBe('ok')
     expect(r.data.landmarks.bust.girth_cm).toBe(92)
     expect(r.data.landmarks.waist.girth_cm).toBe(74)
@@ -142,12 +151,14 @@ describe('parseAvatarResult', () => {
 
   it('accepts JSON string input', () => {
     const raw = JSON.stringify(SAMPLE_RESULT)
-    const r = parseAvatarResult(raw)
+    // See discriminated-union note above.
+    const r: any = parseAvatarResult(raw)
     expect(r.kind).toBe('ok')
   })
 
   it('returns ok with obj included in data', () => {
-    const r = parseAvatarResult(SAMPLE_RESULT)
+    // See discriminated-union note above.
+    const r: any = parseAvatarResult(SAMPLE_RESULT)
     expect(r.data.obj).toMatch(/^# kerf-apparel/)
   })
 })

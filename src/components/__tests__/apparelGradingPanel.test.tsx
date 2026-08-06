@@ -5,14 +5,20 @@
  */
 
 import { describe, it, expect } from 'vitest'
+// @ts-expect-error - no @types/node in this toolchain
 import { existsSync, readFileSync } from 'fs'
-import { resolve } from 'path'
+// @ts-expect-error - no @types/node in this toolchain
+import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
+import { resolve, dirname } from 'path'
 
 import {
   parseGradingResult,
   formatGradeDelta,
   sizeColor,
 } from '../ApparelGradingPanel.jsx'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 // Extension-agnostic source read: components migrate from .jsx to .tsx one
 // at a time (T-513..T-517), so a literal `.jsx` path here would break the
@@ -79,7 +85,9 @@ describe('parseGradingResult', () => {
   })
 
   it('detects size_run type from sizes key', () => {
-    const r = parseGradingResult({
+    // `r` is a discriminated union; `expect().toBe()` doesn't narrow it for TS,
+    // so we probe at runtime via `any` here rather than the compiler.
+    const r: any = parseGradingResult({
       base_size: 'M',
       block: 'bodice_front',
       spec: 'women_us',
@@ -96,7 +104,8 @@ describe('parseGradingResult', () => {
   })
 
   it('detects single type from from_size/to_size', () => {
-    const r = parseGradingResult({
+    // See note above: probing a discriminated union via runtime assertions.
+    const r: any = parseGradingResult({
       block: 'bodice_front',
       from_size: 'M',
       to_size: 'L',
@@ -121,7 +130,8 @@ describe('parseGradingResult', () => {
 
   it('accepts JSON string input', () => {
     const raw = JSON.stringify({ base_size: 'M', sizes: { M: { width_cm: 44 } } })
-    const r = parseGradingResult(raw)
+    // See note above: probing a discriminated union via runtime assertions.
+    const r: any = parseGradingResult(raw)
     expect(r.kind).toBe('ok')
     expect(r.type).toBe('size_run')
   })

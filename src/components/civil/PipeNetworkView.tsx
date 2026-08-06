@@ -23,6 +23,59 @@
 
 import { useMemo, useState } from 'react'
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface PipeNetworkNode {
+  id: string
+  x?: number
+  y?: number
+  elevation_m?: number
+  demand_m3s?: number
+  type?: 'junction' | 'reservoir' | 'manhole'
+}
+
+export interface PipeNetworkReservoir {
+  id: string
+  head_m?: number
+  x?: number
+  y?: number
+  type?: 'reservoir'
+}
+
+export interface PipeNetworkPipe {
+  id: string
+  node_a: string
+  node_b: string
+  length_m?: number
+  diameter_m?: number
+  roughness?: number
+  slope?: number
+  manning_n?: number
+}
+
+export interface PipeNetworkResults {
+  pipe_flows_m3s?: Record<string, number>
+  nodal_pressures_m?: Record<string, number>
+  converged?: boolean
+  iterations?: number
+  residual?: number
+  [key: string]: unknown
+}
+
+export interface PipeNetworkViewProps {
+  nodes?: PipeNetworkNode[]
+  pipes?: PipeNetworkPipe[]
+  reservoirs?: PipeNetworkReservoir[]
+  formula?: 'HW' | 'DW'
+  results?: PipeNetworkResults | null
+  width?: number
+  height?: number
+  className?: string
+  onDispatch?: (event: { tool: string; params: Record<string, unknown> }) => void
+}
+
 const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
 
 const NODE_R = 10
@@ -33,7 +86,7 @@ const PADDING = 50
 // Helpers
 // ---------------------------------------------------------------------------
 
-function fitCoords(allPts, width, height) {
+function fitCoords(allPts: number[][], width: number, height: number) {
   if (!allPts.length) return { scale: 1, offX: 0, offY: 0 }
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
   for (const [x, y] of allPts) {
@@ -56,7 +109,7 @@ function fitCoords(allPts, width, height) {
   }
 }
 
-function nodeColour(type, pressure) {
+function nodeColour(type: string | undefined, pressure: number | undefined) {
   if (type === 'reservoir') return '#38bdf8'
   if (typeof pressure === 'number') {
     if (pressure < 5) return '#f87171'
@@ -66,13 +119,13 @@ function nodeColour(type, pressure) {
   return '#64748b'
 }
 
-function flowToStrokeWidth(flow) {
+function flowToStrokeWidth(flow: number | null | undefined) {
   if (!flow && flow !== 0) return 2
   const abs = Math.abs(flow)
   return Math.max(1.5, Math.min(6, abs * 800 + 1.5))
 }
 
-function formatFlow(v) {
+function formatFlow(v: number | null | undefined) {
   if (v == null) return '—'
   return `${(v * 1000).toFixed(2)} L/s`
 }
@@ -81,7 +134,14 @@ function formatFlow(v) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function NodeSymbol({ node, x, y, pressure }) {
+interface NodeSymbolProps {
+  node: PipeNetworkNode | (PipeNetworkReservoir & { type: 'reservoir' })
+  x: number
+  y: number
+  pressure?: number
+}
+
+function NodeSymbol({ node, x, y, pressure }: NodeSymbolProps) {
   const isRes = node.type === 'reservoir'
   const fill = nodeColour(node.type, pressure)
   return (
@@ -120,7 +180,18 @@ function NodeSymbol({ node, x, y, pressure }) {
   )
 }
 
-function PipeEdge({ pipe, x1, y1, x2, y2, flow, selected, onClick }) {
+interface PipeEdgeProps {
+  pipe: PipeNetworkPipe
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  flow?: number
+  selected: boolean
+  onClick: () => void
+}
+
+function PipeEdge({ pipe, x1, y1, x2, y2, flow, selected, onClick }: PipeEdgeProps) {
   const w = flowToStrokeWidth(flow)
   const positive = flow == null || flow >= 0
   const stroke = selected ? '#f59e0b' : (flow == null ? '#475569' : '#60a5fa')
@@ -173,7 +244,13 @@ function PipeEdge({ pipe, x1, y1, x2, y2, flow, selected, onClick }) {
 // Inspector panel
 // ---------------------------------------------------------------------------
 
-function PipeInspector({ pipe, flow, onClose }) {
+interface PipeInspectorProps {
+  pipe: (Partial<PipeNetworkPipe> & { id: string }) | null
+  flow?: number
+  onClose: () => void
+}
+
+function PipeInspector({ pipe, flow, onClose }: PipeInspectorProps) {
   if (!pipe) return null
   return (
     <div
@@ -252,26 +329,26 @@ export default function PipeNetworkView({
   height = 420,
   className = '',
   onDispatch,
-}) {
+}: PipeNetworkViewProps) {
   const [loading, setLoading] = useState(false)
-  const [results, setResults] = useState(propResults)
-  const [error, setError] = useState(null)
-  const [selectedPipe, setSelectedPipe] = useState(null)
+  const [results, setResults] = useState<PipeNetworkResults | null>(propResults)
+  const [error, setError] = useState<string | null>(null)
+  const [selectedPipe, setSelectedPipe] = useState<string | null>(null)
 
   // Merge reservoirs into node list for layout
   const allNodes = useMemo(() => [
     ...nodes,
-    ...reservoirs.map(r => ({ ...r, type: 'reservoir' })),
+    ...reservoirs.map(r => ({ ...r, type: 'reservoir' as const })),
   ], [nodes, reservoirs])
 
   // Compute screen coordinates
   const { scale, offX, offY } = useMemo(() => {
-    const pts = allNodes.filter(n => n.x != null && n.y != null).map(n => [n.x, n.y])
+    const pts = allNodes.filter(n => n.x != null && n.y != null).map(n => [n.x as number, n.y as number])
     return fitCoords(pts, width, height)
   }, [allNodes, width, height])
 
   const posMap = useMemo(() => {
-    const m = {}
+    const m: Record<string, [number, number]> = {}
     for (const n of allNodes) {
       if (n.x != null && n.y != null) {
         m[n.id] = [n.x * scale + offX, n.y * scale + offY]
@@ -318,7 +395,7 @@ export default function PipeNetworkView({
         setResults(data)
       }
     } catch (e) {
-      setError(e.message || 'Solve failed')
+      setError(e instanceof Error ? e.message : 'Solve failed')
     } finally {
       setLoading(false)
     }

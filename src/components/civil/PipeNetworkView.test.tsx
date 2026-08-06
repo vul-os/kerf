@@ -71,7 +71,7 @@ describe('PipeNetworkView — empty state', () => {
 // ---------------------------------------------------------------------------
 
 describe('PipeNetworkView — with nodes, pipes, reservoirs', () => {
-  let html
+  let html: string
 
   beforeAll(() => {
     html = renderToStaticMarkup(
@@ -140,7 +140,7 @@ describe('PipeNetworkView — onDispatch dispatches correct tool', () => {
 // ---------------------------------------------------------------------------
 
 describe('PipeNetworkView — with pre-computed results', () => {
-  let html
+  let html: string
 
   beforeAll(() => {
     html = renderToStaticMarkup(

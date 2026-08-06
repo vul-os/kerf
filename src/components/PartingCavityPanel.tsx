@@ -26,7 +26,63 @@
  *   fmtMm(n, digits)             → string
  */
 
+import type { CSSProperties, ReactNode } from 'react'
 import { AlertTriangle, CheckCircle2, Layers, Scissors } from 'lucide-react'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface PartingSegment {
+  edge_id?: string
+  classification?: string
+  p_start?: number[]
+  p_end?: number[]
+  length_mm?: number
+}
+
+interface PartingSurface {
+  surface_type?: string
+  plane_point?: number[]
+  [key: string]: unknown
+}
+
+interface PartingResultData {
+  ok?: boolean
+  reason?: string
+  error?: string
+  // parting-line mode
+  segments?: PartingSegment[]
+  total_length_mm?: number
+  closed_loops?: number
+  has_undercuts?: boolean
+  undercut_face_ids?: string[]
+  draft_deficient_face_ids?: string[]
+  // split mode
+  parting_surface?: PartingSurface
+  cavity_body?: Record<string, unknown>
+  core_body?: Record<string, unknown>
+  insert_count?: number
+  parting_surface_complexity?: string
+  has_sliders_needed?: boolean
+  has_lifters_needed?: boolean
+  honest_caveat?: string
+  [key: string]: unknown
+}
+
+type PartingMode = 'parting_line' | 'split' | 'unknown'
+
+interface PartingParseResult {
+  kind: 'empty' | 'invalid' | 'ok'
+  mode?: PartingMode | null
+  data?: PartingResultData | null
+  error?: string
+}
+
+export interface PartingCavityPanelProps {
+  /** raw tool JSON output — string or already-parsed object */
+  parsedContent?: string | PartingResultData | null
+}
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for tests)
@@ -36,19 +92,20 @@ import { AlertTriangle, CheckCircle2, Layers, Scissors } from 'lucide-react'
  * Parse raw parting-result JSON content.
  * Returns { kind: 'ok'|'empty'|'invalid', mode, data, error? }
  */
-export function parsePartingResult(content) {
+// eslint-disable-next-line react-refresh/only-export-components -- helper exported for tests, pre-existing before this migration.
+export function parsePartingResult(content: string): PartingParseResult {
   const raw = typeof content === 'string' ? content : ''
   if (!raw.trim()) return { kind: 'empty', mode: null, data: null }
   let doc
   try {
     doc = JSON.parse(raw)
   } catch (e) {
-    return { kind: 'invalid', error: e.message }
+    return { kind: 'invalid', error: (e as Error).message }
   }
   if (!doc || typeof doc !== 'object') {
     return { kind: 'invalid', error: 'Expected JSON object' }
   }
-  const data = doc.result && typeof doc.result === 'object' ? doc.result : doc
+  const data: PartingResultData = doc.result && typeof doc.result === 'object' ? doc.result : doc
   if (data.ok === false) {
     return { kind: 'invalid', error: data.reason || data.error || 'Tool returned ok:false' }
   }
@@ -62,7 +119,8 @@ export function parsePartingResult(content) {
 /**
  * Detect whether the result is from mold_detect_parting_line or mold_split_cavity_core.
  */
-export function detectMode(data) {
+// eslint-disable-next-line react-refresh/only-export-components -- helper exported for tests, pre-existing before this migration.
+export function detectMode(data: unknown): PartingMode {
   if (!data || typeof data !== 'object') return 'unknown'
   if ('segments' in data && 'closed_loops' in data) return 'parting_line'
   if ('parting_surface' in data && 'cavity_body' in data) return 'split'
@@ -72,7 +130,8 @@ export function detectMode(data) {
 /**
  * Return a CSS colour string for an edge classification.
  */
-export function classifyColor(classification) {
+// eslint-disable-next-line react-refresh/only-export-components -- helper exported for tests, pre-existing before this migration.
+export function classifyColor(classification?: string): string {
   if (classification === 'silhouette')       return '#34d399'
   if (classification === 'undercut_boundary') return '#f87171'
   if (classification === 'sharp_edge')        return '#fbbf24'
@@ -82,7 +141,8 @@ export function classifyColor(classification) {
 /**
  * Format mm value.
  */
-export function fmtMm(n, digits = 2) {
+// eslint-disable-next-line react-refresh/only-export-components -- helper exported for tests, pre-existing before this migration.
+export function fmtMm(n: number | null | undefined, digits = 2): string {
   if (n == null || !Number.isFinite(n)) return '—'
   return n.toFixed(digits) + ' mm'
 }
@@ -91,7 +151,7 @@ export function fmtMm(n, digits = 2) {
 // Styles
 // ---------------------------------------------------------------------------
 
-const S = {
+const S: Record<string, CSSProperties> = {
   container: {
     fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace',
     fontSize: 12,
@@ -208,7 +268,7 @@ const S = {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function MetricCard({ label, value, accent }) {
+function MetricCard({ label, value, accent }: { label: string; value?: ReactNode; accent?: string }) {
   return (
     <div style={S.metricCard}>
       <div style={S.metricLabel}>{label}</div>
@@ -219,7 +279,7 @@ function MetricCard({ label, value, accent }) {
   )
 }
 
-function StatusBadge({ pass, label }) {
+function StatusBadge({ pass, label }: { pass: boolean; label?: string }) {
   const color  = pass ? '#34d399' : '#f87171'
   const bg     = pass ? '#14532d44' : '#7f1d1d44'
   const border = pass ? '#15803d66' : '#b91c1c66'
@@ -237,7 +297,7 @@ function StatusBadge({ pass, label }) {
 // Mode renderers
 // ---------------------------------------------------------------------------
 
-function PartingLineView({ data: d }) {
+function PartingLineView({ data: d }: { data: PartingResultData }) {
   const segs          = Array.isArray(d.segments) ? d.segments : []
   const silhouettes   = segs.filter(s => s.classification === 'silhouette')
   const undercuts     = segs.filter(s => s.classification === 'undercut_boundary')
@@ -304,7 +364,7 @@ function PartingLineView({ data: d }) {
   )
 }
 
-function SplitView({ data: d }) {
+function SplitView({ data: d }: { data: PartingResultData }) {
   const ps = d.parting_surface || {}
   return (
     <>
@@ -354,10 +414,10 @@ function SplitView({ data: d }) {
  * Props:
  *   parsedContent — string | object  (raw tool JSON output)
  */
-export default function PartingCavityPanel({ parsedContent }) {
-  const raw = typeof parsedContent === 'object' && parsedContent !== null
-    ? JSON.stringify(parsedContent)
-    : (parsedContent ?? '')
+export default function PartingCavityPanel({ parsedContent }: PartingCavityPanelProps) {
+  const raw: string = typeof parsedContent === 'string'
+    ? parsedContent
+    : (parsedContent != null ? JSON.stringify(parsedContent) : '')
 
   const { kind, mode, data, error } = parsePartingResult(raw)
 

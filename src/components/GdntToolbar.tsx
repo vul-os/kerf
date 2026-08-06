@@ -16,10 +16,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { GDT_SYMBOLS, GDT_SYMBOL_MAP, DATUM_LABELS } from '../lib/gdntAnnotations.js'
 
-// Icon map — use Unicode symbols to avoid needing custom SVGs. Each symbol
-// comes from the ISO 1101 character set already in kerf-gdnt symbols.py.
-const SYMBOL_UNICODE = Object.fromEntries(GDT_SYMBOLS.map((s) => [s.code, s.unicode]))
-
 // Group definitions for the toolbar layout.
 const GROUPS = [
   {
@@ -79,7 +75,14 @@ const GROUPS = [
   },
 ]
 
-export default function GdntToolbar({ tool = '', onTool }) {
+export interface Props {
+  /** Currently active tool id. */
+  tool?: string
+  /** Callback(toolId) when a button is pressed. */
+  onTool?: (toolId: string) => void
+}
+
+export default function GdntToolbar({ tool = '', onTool }: Props) {
   return (
     <div
       className="absolute top-3 right-3 z-10 flex flex-col gap-1 p-1 rounded-md bg-ink-900/85 border border-ink-700 backdrop-blur shadow-lg"
@@ -139,7 +142,28 @@ export default function GdntToolbar({ tool = '', onTool }) {
 //
 // Rendered as an absolutely-positioned popover over the drawing canvas.
 
-export function FcfPlacementModal({ symbolCode, position, onCommit, onCancel }) {
+export interface FcfCommitOptions {
+  x: number
+  y: number
+  symbol_code: string
+  tolerance_value: number
+  diameter_zone: boolean
+  tolerance_modifier: string | null
+  datum_refs: { label: string; modifier: null }[]
+}
+
+export interface FcfPlacementModalProps {
+  /** e.g. 'perpendicularity' */
+  symbolCode: string
+  /** Anchor in page-mm. */
+  position: { x: number; y: number }
+  /** Called with the full FCF options when user confirms. */
+  onCommit?: (opts: FcfCommitOptions) => void
+  /** Called when ESC / Cancel pressed. */
+  onCancel?: () => void
+}
+
+export function FcfPlacementModal({ symbolCode, position, onCommit, onCancel }: FcfPlacementModalProps) {
   const sym = GDT_SYMBOL_MAP[symbolCode]
   const [toleranceValue, setToleranceValue] = useState('0.1')
   const [diameterZone, setDiameterZone] = useState(false)
@@ -147,7 +171,7 @@ export function FcfPlacementModal({ symbolCode, position, onCommit, onCancel }) 
   const [datumA, setDatumA] = useState('')
   const [datumB, setDatumB] = useState('')
   const [datumC, setDatumC] = useState('')
-  const inputRef = useRef(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     inputRef.current?.select()

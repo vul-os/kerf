@@ -32,7 +32,7 @@ const fileTreeSrc = readFileSync(
 )
 
 const quadMeshViewSrc = readFileSync(
-  path.resolve(__dirname, '../components/QuadMeshView.jsx'), 'utf8',
+  path.resolve(__dirname, '../components/QuadMeshView.tsx'), 'utf8',
 )
 
 // After the 66->10 migration fold the per-kind migrations were collapsed

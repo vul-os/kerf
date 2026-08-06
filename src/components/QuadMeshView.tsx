@@ -1,5 +1,5 @@
 /**
- * QuadMeshView.jsx — viewer for .quadmesh files produced by the
+ * QuadMeshView.tsx — viewer for .quadmesh files produced by the
  * Instant Meshes quad-remesh pipeline.
  *
  * Renders the mesh using Three.js with:
@@ -16,17 +16,70 @@
  */
 
 import { useEffect, useImperativeHandle, useRef, useState } from 'react'
+import type { Ref } from 'react'
 import { Grid3x3 } from 'lucide-react'
 import { snapshotCanvas } from '../lib/snapshotHelpers.js'
+import type * as ThreeNS from 'three'
+import type { Vec3 } from '../types/geometry'
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
+// ── Types ──────────────────────────────────────────────────────────────────────
+//
+// 'three' ships no .d.ts and this repo has no @types/three (see prior T-513
+// commits) — THREE.X positions resolve to `any` because noImplicitAny is off.
+// Same applies to 'three/examples/jsm/controls/OrbitControls.js' (no types at
+// all, shipped or otherwise); OrbitControlsLike models the handful of members
+// this component actually touches.
 
 const QUAD_LINE_COLOR   = 0xffd633  // kerf-300 gold
 const TRI_LINE_COLOR    = 0xf59e0b  // amber-500
 const SURFACE_COLOR     = 0x2a3a4a  // dark slate
 const BACKGROUND_COLOR  = 0x0f1116  // ink-950
+
+export interface QuadMeshStats {
+  vertex_count?: number
+  quad_count?: number
+  tri_count?: number
+  elapsed_s?: number
+  target_verts?: number
+  smoothness?: number
+}
+
+export interface QuadMeshData {
+  vertices: Vec3[]
+  quads: number[][]
+  triangles: number[][]
+  stats: QuadMeshStats | null
+}
+
+type ParseQuadMeshResult =
+  | { ok: true; data: QuadMeshData }
+  | { ok: false; error: string }
+
+interface OrbitControlsLike {
+  enableDamping: boolean
+  dampingFactor: number
+  target: ThreeNS.Vector3
+  update: () => void
+}
+type OrbitControlsCtor = new (camera: ThreeNS.Camera, domElement?: HTMLElement) => OrbitControlsLike
+
+interface BuiltScene {
+  renderer: ThreeNS.WebGLRenderer
+  camera: ThreeNS.PerspectiveCamera
+  scene: ThreeNS.Scene
+  controls: OrbitControlsLike
+  _ro?: ResizeObserver
+}
+
+export interface QuadMeshViewHandle {
+  snapshot: (opts?: { size?: number; quality?: number }) => Promise<Blob | null>
+}
+
+export interface QuadMeshViewProps {
+  content?: string
+  fileName?: string
+  viewRef?: Ref<QuadMeshViewHandle>
+}
 
 // ---------------------------------------------------------------------------
 // Data helpers
@@ -36,7 +89,7 @@ const BACKGROUND_COLOR  = 0x0f1116  // ink-950
  * Parse the .quadmesh JSON payload from file content string.
  * Returns { ok: true, data } or { ok: false, error }.
  */
-function parseQuadMesh(content) {
+function parseQuadMesh(content: string | undefined): ParseQuadMeshResult {
   if (!content || !content.trim()) {
     return { ok: false, error: 'Empty file — run the quad remesher to populate this file.' }
   }
@@ -55,7 +108,7 @@ function parseQuadMesh(content) {
       },
     }
   } catch (e) {
-    return { ok: false, error: `JSON parse error: ${e.message}` }
+    return { ok: false, error: `JSON parse error: ${e instanceof Error ? e.message : String(e)}` }
   }
 }
 
@@ -63,7 +116,7 @@ function parseQuadMesh(content) {
  * Build a Float32Array of positions from the vertex list.
  * vertices: [[x, y, z], ...]
  */
-function buildPositionArray(vertices) {
+function buildPositionArray(vertices: Vec3[]): Float32Array {
   const arr = new Float32Array(vertices.length * 3)
   for (let i = 0; i < vertices.length; i++) {
     arr[i * 3]     = vertices[i][0]
@@ -77,8 +130,8 @@ function buildPositionArray(vertices) {
  * Build an index array for triangulated surface from quads + tris.
  * Quads are split into 2 triangles each.
  */
-function buildSurfaceIndices(quads, triangles) {
-  const indices = []
+function buildSurfaceIndices(quads: number[][], triangles: number[][]): Uint32Array {
+  const indices: number[] = []
   for (const q of quads) {
     indices.push(q[0], q[1], q[2])
     indices.push(q[0], q[2], q[3])
@@ -95,10 +148,10 @@ function buildSurfaceIndices(quads, triangles) {
  * faces: [[a, b, c, d?], ...]  (quads or tris)
  * vertices: [[x, y, z], ...]
  */
-function buildWireframePositions(faces, vertices) {
-  const positions = []
+function buildWireframePositions(faces: number[][], vertices: Vec3[]): Float32Array {
+  const positions: number[] = []
 
-  const pushEdge = (a, b) => {
+  const pushEdge = (a: number, b: number) => {
     const va = vertices[a]
     const vb = vertices[b]
     if (!va || !vb) return
@@ -119,7 +172,7 @@ function buildWireframePositions(faces, vertices) {
 // Three.js scene builder
 // ---------------------------------------------------------------------------
 
-async function buildScene(THREE, OrbitControls, meshData, canvas) {
+async function buildScene(THREE: typeof ThreeNS, OrbitControls: OrbitControlsCtor, meshData: QuadMeshData, canvas: HTMLCanvasElement): Promise<BuiltScene> {
   const { vertices, quads, triangles } = meshData
   const positions = buildPositionArray(vertices)
 
@@ -201,21 +254,26 @@ async function buildScene(THREE, OrbitControls, meshData, canvas) {
 // Component
 // ---------------------------------------------------------------------------
 
-export default function QuadMeshView({ content, fileName, viewRef }) {
-  const containerRef = useRef(null)
-  const canvasRef    = useRef(null)
-  const sceneRef     = useRef(null)
-  const rafRef       = useRef(null)
-  const [parseResult, setParseResult] = useState(() => parseQuadMesh(content))
+export default function QuadMeshView({ content, fileName, viewRef }: QuadMeshViewProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const canvasRef    = useRef<HTMLCanvasElement | null>(null)
+  const sceneRef     = useRef<BuiltScene | null>(null)
+  const rafRef       = useRef<number | null>(null)
+  const [parseResult, setParseResult] = useState<ParseQuadMeshResult>(() => parseQuadMesh(content))
 
   // Re-parse when content changes.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- content-prop sync, pre-existing before this migration.
     setParseResult(parseQuadMesh(content))
   }, [content])
 
   // Expose snapshot for thumbnail capture.
   useImperativeHandle(viewRef, () => ({
-    snapshot: (opts) => snapshotCanvas(canvasRef.current, opts),
+    snapshot: (opts?: { size?: number; quality?: number }): Promise<Blob | null> =>
+      // snapshotCanvas (src/lib/snapshotHelpers.ts, outside this slice) has untyped params,
+      // which widens its inferred return to Promise<unknown>; its own JSDoc documents the
+      // real runtime type as Promise<Blob|null>.
+      snapshotCanvas(canvasRef.current, opts) as Promise<Blob | null>,
   }), [])
 
   // Build / rebuild Three.js scene whenever parsed data changes.
@@ -254,7 +312,7 @@ export default function QuadMeshView({ content, fileName, viewRef }) {
       ])
       if (cancelled) return
 
-      const built = await buildScene(THREE, OrbitControls, parseResult.data, canvas)
+      const built = await buildScene(THREE, OrbitControls as OrbitControlsCtor, (parseResult as { ok: true; data: QuadMeshData }).data, canvas)
       if (cancelled) {
         built.renderer.dispose()
         return
@@ -325,7 +383,7 @@ export default function QuadMeshView({ content, fileName, viewRef }) {
       </div>
 
       {/* Error banner */}
-      {!parseResult.ok && (
+      {parseResult.ok === false && (
         <div className="m-3 p-3 rounded-lg bg-ink-800 border border-ink-700 text-ink-300">
           <p className="font-medium text-ink-100 mb-1">No mesh data</p>
           <p>{parseResult.error}</p>

@@ -16,7 +16,16 @@ import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { IES_PRESETS } from '../lib/iesPresets.js'
 
-const CATEGORY_LABELS = {
+/** Shape of one entry in `IES_PRESETS` (see src/lib/iesPresets.ts). */
+interface IesPreset {
+  slug: string
+  name: string
+  category: string
+  file_path: string
+  description: string
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
   downlight: 'Downlights',
   'wall-wash': 'Wall Wash',
   spot: 'Spot',
@@ -29,7 +38,14 @@ const CATEGORY_ORDER = ['downlight', 'wall-wash', 'spot', 'flood', 'specialty']
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-function CategoryTab({ id, label, active, onClick }) {
+interface CategoryTabProps {
+  id: string
+  label: string
+  active: boolean
+  onClick: (id: string) => void
+}
+
+function CategoryTab({ id, label, active, onClick }: CategoryTabProps) {
   return (
     <button
       type="button"
@@ -46,14 +62,21 @@ function CategoryTab({ id, label, active, onClick }) {
   )
 }
 
-function PresetRow({ preset, selected, onSelect }) {
-  const categoryColor = {
-    downlight: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-    'wall-wash': 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-    spot: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-    flood: 'bg-green-500/20 text-green-300 border-green-500/30',
-    specialty: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
-  }[preset.category] || 'bg-ink-700 text-ink-300 border-ink-600'
+interface PresetRowProps {
+  preset: IesPreset
+  selected: boolean
+  onSelect: (preset: IesPreset) => void
+}
+
+function PresetRow({ preset, selected, onSelect }: PresetRowProps) {
+  const categoryColor: string =
+    ({
+      downlight: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+      'wall-wash': 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+      spot: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+      flood: 'bg-green-500/20 text-green-300 border-green-500/30',
+      specialty: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
+    } as Record<string, string>)[preset.category] || 'bg-ink-700 text-ink-300 border-ink-600'
 
   return (
     <button
@@ -98,12 +121,18 @@ function PresetRow({ preset, selected, onSelect }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function IesProfilePicker({ onSelect, selectedSlug, className = '' }) {
+export interface IesProfilePickerProps {
+  onSelect: (preset: IesPreset) => void
+  selectedSlug?: string | null
+  className?: string
+}
+
+export default function IesProfilePicker({ onSelect, selectedSlug, className = '' }: IesProfilePickerProps) {
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('all')
 
   const filteredPresets = useMemo(() => {
-    let presets = IES_PRESETS
+    let presets: IesPreset[] = IES_PRESETS
     if (activeCategory !== 'all') {
       presets = presets.filter((p) => p.category === activeCategory)
     }
@@ -124,7 +153,7 @@ export default function IesProfilePicker({ onSelect, selectedSlug, className = '
     if (activeCategory !== 'all') {
       return [{ category: activeCategory, presets: filteredPresets }]
     }
-    const groups = []
+    const groups: { category: string; presets: IesPreset[] }[] = []
     for (const cat of CATEGORY_ORDER) {
       const presets = filteredPresets.filter((p) => p.category === cat)
       if (presets.length > 0) {

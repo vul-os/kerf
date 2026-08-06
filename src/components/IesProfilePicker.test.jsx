@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import IesProfilePicker from './IesProfilePicker.jsx'
+import IesProfilePicker from './IesProfilePicker'
 import { IES_PRESETS } from '../lib/iesPresets.js'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

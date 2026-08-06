@@ -182,7 +182,8 @@ describe('URL builders + request shape', () => {
   })
 
   it('deleteMe encodes the confirm marker into the query string', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce({ ok: true, status: 204, statusText: 'No Content' })
+    // Partial Response stub — the test only reads the fields it sets.
+    vi.mocked(fetch).mockResolvedValueOnce({ ok: true, status: 204, statusText: 'No Content' } as unknown as Response)
     const res = await api.deleteMe()
     expect(vi.mocked(fetch).mock.calls[0][0]).toBe(`${API_URL}/api/me?confirm=DELETE`)
     expect(vi.mocked(fetch).mock.calls[0][1].method).toBe('DELETE')
@@ -209,7 +210,7 @@ describe('error mapping', () => {
 describe('401 refresh flow', () => {
   it('refreshes the access token and retries the request once', async () => {
     // 1st call: 401. 2nd call: refresh → 200 + new tokens. 3rd call: retry → 200.
-    fetch
+    vi.mocked(fetch)
       .mockResolvedValueOnce(errRes(401, 'expired'))
       .mockResolvedValueOnce(jsonRes({ access_token: 'tok-B', refresh_token: 'r-B', user: { id: 'u1' } }))
       .mockResolvedValueOnce(jsonRes({ id: 'u1', name: 'me' }))
@@ -223,11 +224,11 @@ describe('401 refresh flow', () => {
       user: { id: 'u1' },
     })
     // The retry uses the new token.
-    expect(vi.mocked(fetch).mock.calls[2][1].headers.authorization).toBe('Bearer tok-B')
+    expect((vi.mocked(fetch).mock.calls[2][1] as any).headers.authorization).toBe('Bearer tok-B')
   })
 
   it('logs out + bubbles the original 401 when refresh itself fails', async () => {
-    fetch
+    vi.mocked(fetch)
       .mockResolvedValueOnce(errRes(401, 'expired'))
       .mockResolvedValueOnce(errRes(403, 'no refresh'))
     await expect(api.me()).rejects.toMatchObject({ status: 401 })

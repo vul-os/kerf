@@ -5870,11 +5870,11 @@ export default function FeatureView({
     if (debounceRef.current) clearTimeout(debounceRef.current)
     const seq = ++seqRef.current
     debounceRef.current = setTimeout(async () => {
-      const referenced = new Set()
+      const referenced = new Set<string>()
       for (const node of tree) {
         if (node.sketch_path) referenced.add(node.sketch_path)
       }
-      const sketches = {}
+      const sketches: Record<string, string> = {}
       for (const path of referenced) {
         try {
           if (sketchCacheRef.current.has(path)) {
@@ -5920,8 +5920,8 @@ export default function FeatureView({
       const result = await runFeatures(tree, sketches)
       const ms = Math.round(performance.now() - t0)
       if (seq !== seqRef.current) return
-      if (result.stale) return
-      if (result.error) {
+      if ('stale' in result && result.stale) return
+      if ('error' in result) {
         setEvalState({ loading: false, error: result.error, ms })
         if (result.partial) {
           const fallback = [{ id: 'partial', mesh: result.partial }]

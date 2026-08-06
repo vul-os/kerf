@@ -29,7 +29,7 @@ beforeEach(() => {
       ok: true,
       json: () => Promise.resolve([]),
     })
-  )
+  ) as unknown as typeof fetch
 })
 
 // ---------------------------------------------------------------------------
@@ -104,7 +104,7 @@ describe('WorkersTab with workers', () => {
         ok: true,
         json: () => Promise.resolve([]),
       })
-    )
+    ) as unknown as typeof fetch
     const html = renderToStaticMarkup(createElement(WorkersTab))
     // Static render shows loading/empty skeleton; no crash
     expect(html).toBeTruthy()

@@ -19,8 +19,12 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync, existsSync } from 'fs'
-import { resolve } from 'path'
+// @ts-expect-error - no @types/node in this toolchain
+import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
+import { resolve, dirname } from 'path'
 
 import BearingLifePanel, {
   fmtNum,
@@ -29,6 +33,8 @@ import BearingLifePanel, {
   buildLifeParams,
   buildIso16281Params,
 } from '../BearingLifePanel.jsx'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const SRC = readFileSync(
   (existsSync(resolve(__dirname, '../BearingLifePanel.tsx')) ? resolve(__dirname, '../BearingLifePanel.tsx') : resolve(__dirname, '../BearingLifePanel.jsx')),

@@ -15,7 +15,12 @@
  */
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { Markdown, childrenToText } from '../ChatPanel.jsx'
+import { Markdown as MarkdownImpl, childrenToText } from '../ChatPanel.jsx'
+
+// ChatPanel.jsx (owned by another slice) destructures `projectId` without a
+// default, so TS infers it as required. These tests only exercise the text
+// path, so relax it to optional here at the call boundary.
+const Markdown = MarkdownImpl as (props: { text: string; projectId?: string }) => any
 
 // ── 1. childrenToText helper ─────────────────────────────────────────────────
 

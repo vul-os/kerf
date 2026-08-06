@@ -1,21 +1,56 @@
-// PartLibrary.jsx — Left sidebar showing part symbols grouped by category.
-//
-// Props:
-//   activePart    — currently selected part type id (or null)
-//   onSelectPart  — (partId) => void  called when user clicks a part
-//   onDragStart   — (partId, e) => void  called when drag begins
+// PartLibrary.tsx — Left sidebar showing part symbols grouped by category.
 
 import PARTS, { CATEGORIES } from './parts_library.js'
 
+// ── Symbol shape read from parts_library.js's PART entries ─────────────────
+// parts_library.js is still untyped JS (migrated separately); these interfaces describe only
+// the fields this file actually reads off a part, not the full part record.
+
+// A plain number[] (not a fixed tuple) — parts_library.js's array literals infer as
+// `number[][]`, which isn't assignable to a 4-tuple.
+type SymbolLine = number[]
+
+interface SymbolArc {
+  cx: number
+  cy: number
+  r: number
+  a1?: number
+  a2?: number
+}
+
+interface SymbolCircle {
+  cx: number
+  cy: number
+  r: number
+  fill?: string
+}
+
+interface PartSymbol {
+  lines?: SymbolLine[]
+  arcs?: SymbolArc[]
+  circles?: SymbolCircle[]
+}
+
+interface Part {
+  id: string
+  label: string
+  category: string
+  symbol: PartSymbol
+}
+
 // ── Part symbol mini-renderer ─────────────────────────────────────────────────
 
-function PartSymbolSVG({ part, size = 60 }) {
-  const { symbol } = part
-  const scale = size / 120  // symbols are defined in a ±60mil box
+interface PartSymbolSVGProps {
+  part: Part
+  size?: number
+}
 
-  function arcPath(a) {
+function PartSymbolSVG({ part, size = 60 }: PartSymbolSVGProps) {
+  const { symbol } = part
+
+  function arcPath(a: SymbolArc): string {
     const { cx, cy, r, a1 = 0, a2 = 180 } = a
-    const toRad = (d) => (d * Math.PI) / 180
+    const toRad = (d: number) => (d * Math.PI) / 180
     const x1 = cx + r * Math.cos(toRad(a1))
     const y1 = cy + r * Math.sin(toRad(a1))
     const x2 = cx + r * Math.cos(toRad(a2))
@@ -56,10 +91,16 @@ function PartSymbolSVG({ part, size = 60 }) {
 
 // ── Sidebar component ─────────────────────────────────────────────────────────
 
-export default function PartLibrary({ activePart, onSelectPart, onDragStart }) {
-  const grouped = CATEGORIES.map((cat) => ({
+export interface PartLibraryProps {
+  activePart: string | null
+  onSelectPart?: (partId: string) => void
+  onDragStart?: (partId: string, e: React.DragEvent) => void
+}
+
+export default function PartLibrary({ activePart, onSelectPart, onDragStart }: PartLibraryProps) {
+  const grouped = CATEGORIES.map((cat: string) => ({
     cat,
-    parts: PARTS.filter((p) => p.category === cat),
+    parts: (PARTS as Part[]).filter((p) => p.category === cat),
   })).filter((g) => g.parts.length > 0)
 
   return (

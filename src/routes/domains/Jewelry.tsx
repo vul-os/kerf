@@ -34,6 +34,7 @@ import { JEWELRY_META, JEWELRY_FEATURES, buildJsonLd } from './jewelry.meta.js'
 import { LibraryIllustration, WorkshopIllustration } from '../../components/illustrations/index.js'
 
 export const HERO_ILLUSTRATION = LibraryIllustration
+// eslint-disable-next-line react-refresh/only-export-components -- data export alongside the page component, pre-existing before this migration.
 export const CAPABILITY_ILLUSTRATIONS = [
   { Illustration: WorkshopIllustration, caption: 'Workshop gem and finding library — parametric stone seats auto-seat from cut and carat.' },
 ]
@@ -50,7 +51,7 @@ function JewelryHead() {
     document.title = JEWELRY_META.title
 
     // meta description
-    let desc = document.querySelector('meta[name="description"]')
+    let desc = document.querySelector<HTMLMetaElement>('meta[name="description"]')
     const descCreated = !desc
     if (!desc) {
       desc = document.createElement('meta')
@@ -61,7 +62,7 @@ function JewelryHead() {
     desc.content = JEWELRY_META.description
 
     // canonical
-    let canonical = document.querySelector('link[rel="canonical"]')
+    let canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]')
     const canonicalCreated = !canonical
     if (!canonical) {
       canonical = document.createElement('link')
@@ -83,12 +84,12 @@ function JewelryHead() {
       { name: 'twitter:description', content: JEWELRY_META.description },
       { name: 'twitter:image', content: JEWELRY_META.ogImage },
     ]
-    const createdOg = []
+    const createdOg: HTMLMetaElement[] = []
     for (const tag of ogTags) {
       const sel = tag.property
         ? `meta[property="${tag.property}"]`
         : `meta[name="${tag.name}"]`
-      let el = document.querySelector(sel)
+      let el = document.querySelector<HTMLMetaElement>(sel)
       if (!el) {
         el = document.createElement('meta')
         if (tag.property) el.setAttribute('property', tag.property)

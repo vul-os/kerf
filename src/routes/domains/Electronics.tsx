@@ -23,7 +23,6 @@ import {
   Cpu,
   Layers,
   Zap,
-  Code2,
   Radio,
   TestTube2,
   Package,
@@ -39,6 +38,7 @@ import { meta, jsonLd } from './electronics.meta.js'
 import { CircuitIllustration, SpiceSimIllustration, RfAnalysisIllustration } from '../../components/illustrations/index.js'
 
 export const HERO_ILLUSTRATION = CircuitIllustration
+// eslint-disable-next-line react-refresh/only-export-components -- data export alongside the page component, pre-existing before this migration.
 export const CAPABILITY_ILLUSTRATIONS = [
   { Illustration: SpiceSimIllustration, caption: 'ngspice transient + AC sweep — manufacturer SPICE models attached to footprints.' },
   { Illustration: RfAnalysisIllustration, caption: 'scikit-rf S-parameter sweep and Smith chart for RF board impedance review.' },

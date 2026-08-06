@@ -16,10 +16,10 @@ import Header from '../../components/Header.jsx'
 import Footer from '../../components/Footer.jsx'
 import Button from '../../components/Button.jsx'
 import DomainSwitcher from '../../components/domains/DomainSwitcher.jsx'
-import { meta } from './femcfd.meta.js'
 import { FemIllustration, TopoIllustration } from '../../components/illustrations/index.js'
 
 export const HERO_ILLUSTRATION = FemIllustration
+// eslint-disable-next-line react-refresh/only-export-components -- data export alongside the page component, pre-existing before this migration.
 export const CAPABILITY_ILLUSTRATIONS = [
   { Illustration: FemIllustration, caption: 'von Mises stress overlay on a bracket under 500 N load — FEniCSx result.' },
   { Illustration: TopoIllustration, caption: 'Topology-optimised material distribution from a SIMP solve.' },

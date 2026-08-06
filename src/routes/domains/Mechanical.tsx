@@ -26,7 +26,6 @@ import {
   Layers,
   Package,
   ChevronRight,
-  MessageSquare,
   Wrench,
   FileText,
   Mountain,
@@ -41,6 +40,7 @@ import { META_TITLE, META_DESCRIPTION, META_OG_IMAGE, META_URL, FEATURES, JSON_L
 import { FeatureTreeIllustration, JscadIllustration, SketcherIllustration, SketchToJscadIllustration } from '../../components/illustrations/index.js'
 
 export const HERO_ILLUSTRATION = FeatureTreeIllustration
+// eslint-disable-next-line react-refresh/only-export-components -- data export alongside the page component, pre-existing before this migration.
 export const CAPABILITY_ILLUSTRATIONS = [
   { Illustration: JscadIllustration, caption: 'JSCAD parametric solid — CSG boolean tree rendered in real time.' },
   { Illustration: SketcherIllustration, caption: 'planegcs constraint solver — live DOF feedback as constraints are applied.' },
@@ -66,9 +66,9 @@ function HeadMeta() {
     const prev = document.title
     document.title = META_TITLE
 
-    const tags = []
+    const tags: Element[] = []
 
-    function addMeta(attrs) {
+    function addMeta(attrs: Record<string, string>) {
       const el = document.createElement('meta')
       Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v))
       document.head.appendChild(el)
@@ -751,7 +751,7 @@ open("bracket_flat.dxf", "wb").write(dxf_bytes)`}
   )
 }
 
-function CodeSnippet({ label, code }) {
+function CodeSnippet({ label, code }: { label: string; code: string; lang?: string }) {
   return (
     <div className="rounded-xl border border-ink-800 bg-ink-950/80 overflow-hidden">
       <div className="px-4 py-2 border-b border-ink-800 bg-ink-900/60 flex items-center gap-2">

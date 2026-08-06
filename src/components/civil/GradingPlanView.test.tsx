@@ -1,27 +1,28 @@
 /**
- * GradingPlanView.test.jsx — SSR smoke tests for the grading plan viewport.
+ * GradingPlanView.test.tsx — SSR smoke tests for the grading plan viewport.
  */
 import { describe, it, expect, beforeAll } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import GradingPlanView from './GradingPlanView.jsx'
+import type { Vec3 } from '../../types'
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
 // Flat existing surface at z=0
-const EXISTING = [
+const EXISTING: Vec3[] = [
   [0, 0, 0], [10, 0, 0], [10, 10, 0], [0, 10, 0],
 ]
 
 // Proposed with a berm in the middle (fill) and cut at corners
-const PROPOSED = [
+const PROPOSED: Vec3[] = [
   [0, 0, -1], [10, 0, -1], [10, 10, -1], [0, 10, -1],
   [5, 5, 2],  // raised centre → fill
 ]
 
 // Manual triangles for existing (flat square split into 2 triangles)
-const EX_TRIS = [[0, 1, 2], [0, 2, 3]]
+const EX_TRIS: Array<[number, number, number]> = [[0, 1, 2], [0, 2, 3]]
 
 // ---------------------------------------------------------------------------
 // 1. Empty state

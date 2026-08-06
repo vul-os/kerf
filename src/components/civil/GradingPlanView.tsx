@@ -1,5 +1,5 @@
 /**
- * GradingPlanView.jsx — plan-view cut/fill grading comparison.
+ * GradingPlanView.tsx — plan-view cut/fill grading comparison.
  *
  * Shows two TIN surfaces side by side in 2-D contour plan view:
  *   • Existing surface contours (grey/blue)
@@ -8,31 +8,31 @@
  *
  * A "Compute volumes" button dispatches `civil_tin_terrain` (op='volume') for
  * the proposed surface via POST /api/tools/call and shows the result.
- *
- * Props
- * ─────
- *   existing  {Array<[x,y,z]>}   Existing-ground survey points.
- *   proposed  {Array<[x,y,z]>}   Proposed finished-grade points.
- *   existingTriangles {Array}     Triangle indices for existing (optional).
- *   proposedTriangles {Array}     Triangle indices for proposed (optional).
- *   contourInterval {number}      Contour interval in metres (default 0.5).
- *   datumZ    {number}            Datum elevation for volume calc (default 0).
- *   width     {number}            SVG canvas width  (default 600).
- *   height    {number}            SVG canvas height (default 420).
- *   className {string}
- *   onDispatch {function}         Called with { tool, params } instead of fetch.
  */
 
 import { useMemo, useState } from 'react'
+import type { Vec3 } from '../../types'
 
 const API_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || ''
 const PADDING = 50
+
+/** Triangle indices into a points array. */
+type Triangle = [number, number, number]
+
+/** A 2-D screen-space point (already projected/scaled). */
+type ScreenPoint = [number, number]
+
+interface Transform {
+  scale: number
+  offX: number
+  offY: number
+}
 
 // ---------------------------------------------------------------------------
 // Project 3-D points to 2-D plan (drop z)
 // ---------------------------------------------------------------------------
 
-function fitPlan(points, width, height) {
+function fitPlan(points: Vec3[] | undefined, width: number, height: number): Transform {
   if (!points?.length) return { scale: 1, offX: 0, offY: 0 }
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
   for (const [x, y] of points) {
@@ -57,13 +57,13 @@ function fitPlan(points, width, height) {
 // Extract contour polylines in 2-D plan
 // ---------------------------------------------------------------------------
 
-function planContourSegs(points, triangles, zLevel, transform) {
+function planContourSegs(points: Vec3[], triangles: Triangle[], zLevel: number, transform: Transform): Array<[ScreenPoint, ScreenPoint]> {
   const { scale, offX, offY } = transform
-  const segs = []
+  const segs: Array<[ScreenPoint, ScreenPoint]> = []
   for (const [i, j, k] of triangles) {
     const pts = [points[i], points[j], points[k]]
-    const edges = [[0, 1], [1, 2], [2, 0]]
-    const crossed = []
+    const edges: Array<[number, number]> = [[0, 1], [1, 2], [2, 0]]
+    const crossed: ScreenPoint[] = []
     for (const [a, b] of edges) {
       const za = pts[a][2], zb = pts[b][2]
       if ((za <= zLevel && zb > zLevel) || (za > zLevel && zb <= zLevel)) {
@@ -73,7 +73,7 @@ function planContourSegs(points, triangles, zLevel, transform) {
         crossed.push([x * scale + offX, y * scale + offY])
       }
     }
-    if (crossed.length === 2) segs.push(crossed)
+    if (crossed.length === 2) segs.push([crossed[0], crossed[1]])
   }
   return segs
 }
@@ -83,11 +83,16 @@ function planContourSegs(points, triangles, zLevel, transform) {
 // Interpolates proposed surface at each existing point using nearest centroid
 // ---------------------------------------------------------------------------
 
-function buildCutFillFaces(existingPts, proposedPts, proposedTris, transform) {
+interface CutFillFace {
+  d: string
+  diff: number
+}
+
+function buildCutFillFaces(existingPts: Vec3[], proposedPts: Vec3[], proposedTris: Triangle[], transform: Transform): CutFillFace[] {
   // For each proposed triangle face, compute avg z diff relative to existing
   // (simplified: use proposed centroid z vs existing z at nearest point)
   const { scale, offX, offY } = transform
-  const faces = []
+  const faces: CutFillFace[] = []
 
   for (const [i, j, k] of proposedTris) {
     const pp = [proposedPts[i], proposedPts[j], proposedPts[k]]
@@ -115,7 +120,7 @@ function buildCutFillFaces(existingPts, proposedPts, proposedTris, transform) {
 // Trivial fan triangulation when none provided
 // ---------------------------------------------------------------------------
 
-function buildFanTriangles(points) {
+function buildFanTriangles(points: Vec3[] | undefined): { augPoints: Vec3[]; triangles: Triangle[] } {
   if (!points || points.length < 3) return { augPoints: points || [], triangles: [] }
   const cx = points.reduce((s, p) => s + p[0], 0) / points.length
   const cy = points.reduce((s, p) => s + p[1], 0) / points.length
@@ -123,8 +128,8 @@ function buildFanTriangles(points) {
   const sorted = points
     .map((p, idx) => ({ idx, angle: Math.atan2(p[1] - cy, p[0] - cx) }))
     .sort((a, b) => a.angle - b.angle)
-  const augPoints = [...points, [cx, cy, cz]]
-  const triangles = sorted.map(({ idx }, k) => [
+  const augPoints: Vec3[] = [...points, [cx, cy, cz] as Vec3]
+  const triangles: Triangle[] = sorted.map(({ idx }, k) => [
     idx,
     sorted[(k + 1) % sorted.length].idx,
     points.length,
@@ -135,6 +140,32 @@ function buildFanTriangles(points) {
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
+
+interface VolumeResult {
+  ok: boolean
+  volume_m3?: number
+  error?: string
+}
+
+export interface DispatchPayload {
+  tool: string
+  params: Record<string, unknown>
+}
+
+export interface GradingPlanViewProps {
+  existing?: Vec3[]
+  proposed?: Vec3[]
+  existingTriangles?: Triangle[]
+  proposedTriangles?: Triangle[]
+  /** Contour interval in metres. */
+  contourInterval?: number
+  /** Datum elevation for volume calc. */
+  datumZ?: number
+  width?: number
+  height?: number
+  className?: string
+  onDispatch?: (payload: DispatchPayload) => void
+}
 
 export default function GradingPlanView({
   existing: rawExisting = [],
@@ -147,10 +178,10 @@ export default function GradingPlanView({
   height = 420,
   className = '',
   onDispatch,
-}) {
+}: GradingPlanViewProps) {
   const [loading, setLoading] = useState(false)
-  const [volResult, setVolResult] = useState(null)
-  const [error, setError] = useState(null)
+  const [volResult, setVolResult] = useState<VolumeResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   // Triangulate if needed
   const { existingPts, existingTris, proposedPts, proposedTris } = useMemo(() => {
@@ -189,7 +220,7 @@ export default function GradingPlanView({
   // Existing contours
   const existingContours = useMemo(() => {
     if (!existingPts.length || !existingTris.length) return []
-    const segs = []
+    const segs: Array<[ScreenPoint, ScreenPoint]> = []
     for (let z = Math.ceil(eZMin / contourInterval) * contourInterval; z <= eZMax; z += contourInterval) {
       segs.push(...planContourSegs(existingPts, existingTris, z, transform))
     }
@@ -199,7 +230,7 @@ export default function GradingPlanView({
   // Proposed contours
   const proposedContours = useMemo(() => {
     if (!proposedPts.length || !proposedTris.length) return []
-    const segs = []
+    const segs: Array<[ScreenPoint, ScreenPoint]> = []
     for (let z = Math.ceil(pZMin / contourInterval) * contourInterval; z <= pZMax; z += contourInterval) {
       segs.push(...planContourSegs(proposedPts, proposedTris, z, transform))
     }
@@ -227,11 +258,11 @@ export default function GradingPlanView({
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ tool_name: 'civil_tin_terrain', params }),
         })
-        const data = await res.json()
+        const data: VolumeResult = await res.json()
         setVolResult(data)
       }
     } catch (e) {
-      setError(e.message || 'Dispatch failed')
+      setError((e as Error).message || 'Dispatch failed')
     } finally {
       setLoading(false)
     }

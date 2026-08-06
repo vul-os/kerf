@@ -13,10 +13,12 @@
 
 import { useCallback } from 'react'
 import MonacoEditor from '@monaco-editor/react'
+import type { OnMount } from '@monaco-editor/react'
+import type { editor as MonacoEditorNs } from 'monaco-editor'
 import { useWorkspace } from '../store/workspace.js'
 import { getEditorMode } from '../lib/editorModes.js'
 
-const OPTIONS = {
+const OPTIONS: MonacoEditorNs.IStandaloneEditorConstructionOptions = {
   minimap: { enabled: false },
   fontFamily: 'JetBrains Mono, Geist Mono, ui-monospace, SF Mono, Menlo, monospace',
   fontSize: 13,
@@ -31,13 +33,22 @@ const OPTIONS = {
   automaticLayout: true,
 }
 
-export default function FileEditor({ content, fileName, onChange }) {
+export interface FileEditorProps {
+  /** Current file text. */
+  content?: string
+  /** File name (used to resolve the language ID). */
+  fileName?: string
+  /** Called on every edit (round-trips through the existing workspace save path). */
+  onChange?: (value: string) => void
+}
+
+export default function FileEditor({ content, fileName, onChange }: FileEditorProps) {
   const language = getEditorMode(fileName || '') || 'plaintext'
 
   // Track Monaco focus on the workspace store so the global Cmd+Z handler
   // yields to Monaco's buffer-undo while the editor has focus.
-  const handleMount = useCallback((editor) => {
-    const set = (focused) => useWorkspace.getState().setEditorFocused(focused)
+  const handleMount: OnMount = useCallback((editor) => {
+    const set = (focused: boolean) => useWorkspace.getState().setEditorFocused(focused)
     editor.onDidFocusEditorText(() => set(true))
     editor.onDidBlurEditorText(() => set(false))
   }, [])

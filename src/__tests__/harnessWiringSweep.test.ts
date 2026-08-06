@@ -18,11 +18,15 @@
 // Pattern: mirrors featureBossWithDraft.test.js and sheetMetalFlange.test.js.
 
 import { describe, it, expect } from 'vitest'
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
+// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
+// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 
 import { parseFeature, serializeFeature } from '../lib/occtRunner.js'
+import type { FeatureNode } from '../types/geometry.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -417,6 +421,8 @@ describe('harness_tube_sweep — both dispatch tables wired', () => {
 // ---------------------------------------------------------------------------
 
 describe('harness_tube_sweep node round-trip via parseFeature', () => {
+  // Not modeled in the FeatureNode union (harness_tube_sweep is a
+  // work-in-progress op) — cast so the round-trip helpers accept it.
   const SAMPLE_NODE = {
     id: 'harness-1',
     op: 'harness_tube_sweep',
@@ -424,13 +430,13 @@ describe('harness_tube_sweep node round-trip via parseFeature', () => {
     bundle_diameter_mm: 12.5,
     length_mm: 161.4,
     segment_lengths_mm: [100, 61.4],
-  }
+  } as unknown as FeatureNode
 
   it('parses a harness_tube_sweep node without dropping fields', () => {
     const json = JSON.stringify({ version: 1, name: 'Harness', features: [SAMPLE_NODE] })
     const parsed = parseFeature(json)
     expect(parsed.features).toHaveLength(1)
-    const node = parsed.features[0]
+    const node = parsed.features[0] as any
     expect(node.op).toBe('harness_tube_sweep')
     expect(node.bundle_diameter_mm).toBe(12.5)
     expect(node.waypoints).toHaveLength(3)
@@ -452,7 +458,7 @@ describe('harness_tube_sweep node round-trip via parseFeature', () => {
   it('waypoints array survives serialisation intact', () => {
     const json = JSON.stringify({ version: 1, name: 'H', features: [SAMPLE_NODE] })
     const parsed = parseFeature(json)
-    const wp = parsed.features[0].waypoints
+    const wp = (parsed.features[0] as any).waypoints
     expect(wp[0]).toEqual([0, 0, 0])
     expect(wp[1]).toEqual([100, 0, 0])
     expect(wp[2]).toEqual([100, 50, 30])

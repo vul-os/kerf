@@ -6,7 +6,11 @@
  *
  * viewBox 320×200. Palette locked.
  */
-export default function RevitParityIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function RevitParityIllustration({ className = '' }: Props) {
   const files = [
     { name: '.family.json', y: 70 },
     { name: '.schedule.json', y: 90 },

@@ -4,7 +4,11 @@
  *
  * viewBox 320×200. Palette locked.
  */
-export default function RfAnalysisIllustration({ className = '' }) {
+export interface Props {
+  className?: string
+}
+
+export default function RfAnalysisIllustration({ className = '' }: Props) {
   // Smith chart geometry: outer unit circle radius R centered at (CX, CY).
   // Constant-resistance circles are tangent to the right edge of the
   // outer circle. For normalized resistance r, the circle has

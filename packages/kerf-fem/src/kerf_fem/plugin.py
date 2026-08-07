@@ -48,6 +48,15 @@ _CALCULIX_AVAILABLE = shutil.which("ccx") is not None
 async def register(app: FastAPI, ctx):
     """Plugin entry-point — called by the kerf-core plugin loader at startup."""
 
+    # Bound HERE because the optional-tool blocks below append to it. It used to be
+    # first assigned further down, which made Python treat `provides` as local for the
+    # whole function, so every earlier append raised "cannot access local variable
+    # 'provides' where it is not associated with a value". Each of those appends sits
+    # in a try/except that logged "<module> failed to load" — so the tools registered
+    # fine and only the capability advertisement was lost, while the warning blamed
+    # the module. Six modules reported a bogus load failure on every boot because of it.
+    provides: list[str] = []
+
     from kerf_fem.routes import router
     app.include_router(router)
 
@@ -193,7 +202,7 @@ async def register(app: FastAPI, ctx):
 
     # Build `provides` list based on available deps
     # fem.nonlinear is pure-Python — always available
-    provides = [
+    provides += [
         "fem.nonlinear", "fem.electromagnetics",
         "fem.acoustics", "fem.electrostatics", "fem.magnetostatics",
         "fem.cfd-navier-stokes", "fem.cfd-potential",

@@ -177,7 +177,12 @@ if _REGISTRY_AVAILABLE:
             "Model-space 3D curve caveat: entity-142 CPTR is set equal to BPTR "
             "(the UV-space curve DE pointer) when no separate 3D curve is provided."
         ),
-        parameters={
+        # input_schema, not parameters: this file imports ToolSpec from
+        # kerf_chat.tools.registry (falling back to kerf_cad_core._compat), and BOTH of
+        # those declare `input_schema`. Only kerf_core.plugin.ToolSpec calls the field
+        # `parameters`, and that is a different class. The mismatch made this tool fail
+        # to load on every boot with "unexpected keyword argument 'parameters'".
+        input_schema={
             "type": "object",
             "properties": {
                 "output_path": {

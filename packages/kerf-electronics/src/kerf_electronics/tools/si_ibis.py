@@ -288,5 +288,12 @@ async def si_ibis_channel_response(_ctx, payload: bytes) -> str:
     return ok_payload(result)
 
 
-# Export for the tool loader
-TOOLS = [t for t in [si_ibis_parse, si_ibis_channel_response]]
+# Export for the tool loader.
+# (name, spec, handler) triples — plugin.py does `for name, spec, handler in mod.TOOLS`.
+# This used to be a bare list of the handler functions, so the unpack raised
+# "cannot unpack non-iterable function object" and the whole module was skipped at
+# boot, taking si_ibis_parse and si_ibis_channel_response with it.
+TOOLS = [
+    (_IBIS_PARSE_SPEC.name, _IBIS_PARSE_SPEC, si_ibis_parse),
+    (_IBIS_CHANNEL_SPEC.name, _IBIS_CHANNEL_SPEC, si_ibis_channel_response),
+]

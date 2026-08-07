@@ -20,13 +20,3 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-----
-
-NOTE: This MIT license covers all files in this repository EXCEPT those under
-the following paths, which are proprietary and licensed separately:
-
-  - cloud/**
-  - backend/cloud/**
-  - src/cloud/**
-
-See cloud/LICENSE for the proprietary license terms covering those paths.

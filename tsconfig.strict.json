@@ -17,6 +17,12 @@
   },
   "include": [
     "src/types/**/*.ts",
-    "src/types/**/*.d.ts"
+    "src/types/**/*.d.ts",
+    "src/stores/**/*.ts",
+    "src/hooks/**/*.ts",
+    "src/workers/**/*.ts",
+    "src/utils/**/*.ts",
+    "src/illustrations/**/*.ts",
+    "src/illustrations/**/*.tsx"
   ]
 }

@@ -27,14 +27,16 @@ import {
   CivilIllustration,
   SECTOR_ILLUSTRATIONS,
 } from './index.js'
+import type { ComponentType, ReactElement } from 'react'
+import type { IllustrationProps } from './types.js'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-function render(element) {
+function render(element: ReactElement) {
   return renderToStaticMarkup(element)
 }
 
-function countMatches(html, pattern) {
+function countMatches(html: string, pattern: RegExp) {
   return (html.match(pattern) || []).length
 }
 
@@ -193,7 +195,7 @@ describe('SectorIllustration', () => {
 
 // ── 3. Individual illustration smoke tests ────────────────────────────────────
 
-const ALL_ILLUSTRATIONS = [
+const ALL_ILLUSTRATIONS: Array<[string, ComponentType<IllustrationProps>]> = [
   ['MechanicalIllustration', MechanicalIllustration],
   ['ElectronicsIllustration', ElectronicsIllustration],
   ['ArchitectureIllustration', ArchitectureIllustration],

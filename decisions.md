@@ -1229,3 +1229,41 @@ the app running against a live backend, which this environment cannot do (no
 postgres, kerf packages not importable). Guessing from Playwright output is what
 kept the pygit2 cause hidden; the next pass should install postgres and the
 `mech` persona locally rather than repeat that.
+
+## 2026-08-07 — Undeclared-import sweep: the pygit2 class is nearly closed
+
+**Why swept.** pygit2 cost the entire E2E suite for weeks (see the entry above),
+so the class was worth checking rather than the instance. `scripts/check-undeclared-imports.py`
+now does it repeatably.
+
+**Narrowing matters more than the raw number.** Three passes:
+  * All undeclared imports per package: noisy, dominated by optional deps behind
+    `try/except` that are *meant* to be absent (rocketcea, pyrtl, rhino3dm).
+  * Unguarded module-level only: **147**. Still misleading — fastapi, numpy and
+    pydantic arrive transitively from packages that do declare them.
+  * Unguarded, and declared by **no** package in the workspace: **3**.
+
+Only the third number describes something that can break a boot, which is what
+pygit2 did. The script filters on the union of every declared dependency for
+exactly this reason.
+
+**The three, adjudicated.**
+  * `botocore` (kerf-core/storage/s3.py) — safe. boto3 IS declared and botocore
+    ships with it.
+  * `starlette` (kerf-core/rate_limit.py) — safe. fastapi IS declared and
+    starlette is a hard fastapi dependency.
+  * `sqlalchemy` (kerf-core/db/models/models.py) — **real, but inert.** 416 lines
+    of SQLAlchemy models importing an undeclared package. Nothing in packages/,
+    web/ or scripts/ imports the module; the project uses asyncpg with a
+    hand-rolled ledger migration runner, so these models are vestigial.
+
+**Left in place deliberately.** I did not delete the 416 lines or declare
+sqlalchemy. Deleting removes a schema description that may still document intent,
+and declaring adds a runtime dependency for code nothing runs — both are worse
+than leaving a dead file that cannot currently fail, since no import path reaches
+it. Flagged here so the next person decides with the facts rather than
+discovering it the way pygit2 was discovered.
+
+**Kept as a report, not a gate.** Exit code is always 0: a legitimate new
+transitive can appear at any time, and a red build over `starlette` would train
+people to ignore it.

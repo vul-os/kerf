@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerf-horology"
-version = "0.1.0"
+version = "0.1.3"
 license = { text = "MIT" }
 classifiers = ["License :: OSI Approved :: MIT License"]
 description = "Watchmaking / horology plugin for Kerf — Swiss lever escapement, gear train, mainspring barrel"

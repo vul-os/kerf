@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerf-costing"
-version = "0.1.0"
+version = "0.1.3"
 license = { text = "MIT" }
 classifiers = ["License :: OSI Approved :: MIT License"]
 description = "BIM/AEC material quantity schedules and cost rollup for Kerf"

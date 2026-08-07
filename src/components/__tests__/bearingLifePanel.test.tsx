@@ -37,7 +37,7 @@ import BearingLifePanel, {
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const SRC = readFileSync(
-  (existsSync(resolve(__dirname, '../BearingLifePanel.tsx')) ? resolve(__dirname, '../BearingLifePanel.tsx') : resolve(__dirname, '../BearingLifePanel.jsx')),
+  (existsSync(resolve(__dirname, '../BearingLifePanel.tsx')) ? resolve(__dirname, '../BearingLifePanel.tsx') : (existsSync(resolve(__dirname, '../BearingLifePanel.tsx')) ? resolve(__dirname, '../BearingLifePanel.tsx') : resolve(__dirname, '../BearingLifePanel.jsx'))),
   'utf8',
 )
 

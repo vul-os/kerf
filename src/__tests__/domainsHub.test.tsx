@@ -27,10 +27,10 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const HUB_SRC = readFileSync(
-  (existsSync(resolve(__dirname, '../routes/domains/index.tsx')) ? resolve(__dirname, '../routes/domains/index.tsx') : resolve(__dirname, '../routes/domains/index.jsx')),
+  (existsSync(resolve(__dirname, '../routes/domains/index.tsx')) ? resolve(__dirname, '../routes/domains/index.tsx') : (existsSync(resolve(__dirname, '../routes/domains/index.tsx')) ? resolve(__dirname, '../routes/domains/index.tsx') : resolve(__dirname, '../routes/domains/index.jsx'))),
   'utf8',
 )
-const APP_SRC = readFileSync((existsSync(resolve(__dirname, '../App.tsx')) ? resolve(__dirname, '../App.tsx') : resolve(__dirname, '../App.jsx')), 'utf8')
+const APP_SRC = readFileSync((existsSync(resolve(__dirname, '../App.tsx')) ? resolve(__dirname, '../App.tsx') : (existsSync(resolve(__dirname, '../App.tsx')) ? resolve(__dirname, '../App.tsx') : resolve(__dirname, '../App.jsx'))), 'utf8')
 const HEADER_SRC = readFileSync(
   resolve(__dirname, '../components/Header.tsx'),
   'utf8',

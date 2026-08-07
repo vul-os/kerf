@@ -35,7 +35,7 @@ const panelPath = (ext: string) => path.resolve(__dirname, `./AssemblyMotionPane
 const src = readFileSync(existsSync(panelPath('tsx')) ? panelPath('tsx') : panelPath('jsx'), 'utf8')
 // Extension-agnostic: Renderer migrated from .jsx to .tsx (T-513).
 const rendererTsxPath = path.resolve(__dirname, './Renderer.tsx')
-const rendererJsxPath = path.resolve(__dirname, './Renderer.jsx')
+const rendererJsxPath = (existsSync(path.resolve(__dirname, './Renderer.tsx')) ? path.resolve(__dirname, './Renderer.tsx') : path.resolve(__dirname, './Renderer.jsx'))
 const rendererSrc = readFileSync(existsSync(rendererTsxPath) ? rendererTsxPath : rendererJsxPath, 'utf8')
 
 // ── Mock Vite env + store so the module can be imported server-side ──────────
@@ -132,20 +132,26 @@ describe('Renderer source: setComponentTransforms in imperative handle', () => {
   })
 
   it('setComponentTransforms calls obj.position.set', () => {
-    const idx = rendererSrc.indexOf('setComponentTransforms:')
-    const block = rendererSrc.slice(idx, idx + 800)
+    // lastIndexOf: the imperative-handle implementation comes after the Props interface
+    // declaration of the same name. Window widened for the added type annotations.
+    const idx = rendererSrc.lastIndexOf('setComponentTransforms:')
+    const block = rendererSrc.slice(idx, idx + 1600)
     expect(block).toContain('position.set')
   })
 
   it('setComponentTransforms calls obj.quaternion.set', () => {
-    const idx = rendererSrc.indexOf('setComponentTransforms:')
-    const block = rendererSrc.slice(idx, idx + 800)
+    // lastIndexOf: the imperative-handle implementation comes after the Props interface
+    // declaration of the same name. Window widened for the added type annotations.
+    const idx = rendererSrc.lastIndexOf('setComponentTransforms:')
+    const block = rendererSrc.slice(idx, idx + 1600)
     expect(block).toContain('quaternion.set')
   })
 
   it('setComponentTransforms calls updateMatrixWorld', () => {
-    const idx = rendererSrc.indexOf('setComponentTransforms:')
-    const block = rendererSrc.slice(idx, idx + 800)
+    // lastIndexOf: the imperative-handle implementation comes after the Props interface
+    // declaration of the same name. Window widened for the added type annotations.
+    const idx = rendererSrc.lastIndexOf('setComponentTransforms:')
+    const block = rendererSrc.slice(idx, idx + 1600)
     expect(block).toContain('updateMatrixWorld')
   })
 

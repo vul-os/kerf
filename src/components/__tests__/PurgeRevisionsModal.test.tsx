@@ -175,7 +175,7 @@ describe('PurgeRevisionsModal — source contracts', () => {
   const { readFileSync, existsSync } = require('fs')
   // @ts-expect-error - no @types/node in this toolchain
   const { resolve } = require('path')
-  const src = readFileSync((existsSync(resolve(__dirname, '../PurgeRevisionsModal.tsx')) ? resolve(__dirname, '../PurgeRevisionsModal.tsx') : resolve(__dirname, '../PurgeRevisionsModal.jsx')), 'utf8')
+  const src = readFileSync((existsSync(resolve(__dirname, '../PurgeRevisionsModal.tsx')) ? resolve(__dirname, '../PurgeRevisionsModal.tsx') : (existsSync(resolve(__dirname, '../PurgeRevisionsModal.tsx')) ? resolve(__dirname, '../PurgeRevisionsModal.tsx') : resolve(__dirname, '../PurgeRevisionsModal.jsx'))), 'utf8')
 
   it('imports toast from ToastBus', () => {
     expect(src).toMatch(/from.*ToastBus/)
@@ -216,7 +216,7 @@ describe('PurgeRevisionsModal — purge call shape', () => {
     const { readFileSync, existsSync } = require('fs')
     // @ts-expect-error - no @types/node in this toolchain
     const { resolve } = require('path')
-    const src = readFileSync((existsSync(resolve(__dirname, '../PurgeRevisionsModal.tsx')) ? resolve(__dirname, '../PurgeRevisionsModal.tsx') : resolve(__dirname, '../PurgeRevisionsModal.jsx')), 'utf8')
+    const src = readFileSync((existsSync(resolve(__dirname, '../PurgeRevisionsModal.tsx')) ? resolve(__dirname, '../PurgeRevisionsModal.tsx') : (existsSync(resolve(__dirname, '../PurgeRevisionsModal.tsx')) ? resolve(__dirname, '../PurgeRevisionsModal.tsx') : resolve(__dirname, '../PurgeRevisionsModal.jsx'))), 'utf8')
     // The call should pass { keepLast: 5 } (the default safety net).
     expect(src).toMatch(/purgeRevisions\(projectId.*keepLast.*5/s)
   })
@@ -226,7 +226,7 @@ describe('PurgeRevisionsModal — purge call shape', () => {
     const { readFileSync, existsSync } = require('fs')
     // @ts-expect-error - no @types/node in this toolchain
     const { resolve } = require('path')
-    const src = readFileSync((existsSync(resolve(__dirname, '../PurgeRevisionsModal.tsx')) ? resolve(__dirname, '../PurgeRevisionsModal.tsx') : resolve(__dirname, '../PurgeRevisionsModal.jsx')), 'utf8')
+    const src = readFileSync((existsSync(resolve(__dirname, '../PurgeRevisionsModal.tsx')) ? resolve(__dirname, '../PurgeRevisionsModal.tsx') : (existsSync(resolve(__dirname, '../PurgeRevisionsModal.tsx')) ? resolve(__dirname, '../PurgeRevisionsModal.tsx') : resolve(__dirname, '../PurgeRevisionsModal.jsx'))), 'utf8')
     // There should be exactly one call site to purgeRevisions.
     const matches = src.match(/api\.purgeRevisions/g) || []
     expect(matches).toHaveLength(1)

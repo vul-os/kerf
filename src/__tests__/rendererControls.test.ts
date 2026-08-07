@@ -14,7 +14,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 // Extension-agnostic: Renderer migrated from .jsx to .tsx (T-513).
 const rendererPath = existsSync(join(root, 'components/Renderer.tsx'))
   ? join(root, 'components/Renderer.tsx')
-  : join(root, 'components/Renderer.jsx')
+  : (existsSync(join(root, 'components/Renderer.tsx')) ? join(root, 'components/Renderer.tsx') : join(root, 'components/Renderer.jsx'))
 const src = readFileSync(rendererPath, 'utf8')
 
 describe('3D render controls', () => {

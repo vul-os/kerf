@@ -51,6 +51,6 @@ describe('Hero capture lives in the Export dropdown', () => {
   })
 
   it('Renderer still exposes captureHeroShot via its imperative handle', () => {
-    expect(renderer).toMatch(/captureHeroShot:\s*\(opts\s*=\s*\{\}\)\s*=>\s*doCaptureHeroShot\(opts\)/)
+    expect(renderer).toMatch(/captureHeroShot:\s*\(opts(?::\s*[\w<>[\]| ]+)?\s*=\s*\{\}\)\s*=>\s*doCaptureHeroShot\(opts\)/)
   })
 })

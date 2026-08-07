@@ -393,7 +393,7 @@ describe('opBoolean — error paths', () => {
 
 describe('FeatureView.jsx to_solid + boolean inspector entries', () => {
   const viewSrc = readFileSync(
-    (existsSync(path.resolve(__dirname, '../components/FeatureView.tsx')) ? path.resolve(__dirname, '../components/FeatureView.tsx') : path.resolve(__dirname, '../components/FeatureView.jsx')),
+    (existsSync(path.resolve(__dirname, '../components/FeatureView.tsx')) ? path.resolve(__dirname, '../components/FeatureView.tsx') : (existsSync(path.resolve(__dirname, '../components/FeatureView.tsx')) ? path.resolve(__dirname, '../components/FeatureView.tsx') : path.resolve(__dirname, '../components/FeatureView.jsx'))),
     'utf8',
   )
 

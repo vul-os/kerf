@@ -54,7 +54,11 @@ describe('ChatPanel — message error affordance', () => {
   it('uses a TriangleAlert icon (visual cue, not just colour)', () => {
     // Colour-only error indicators are inaccessible. The icon must be present.
     expect(SRC).toMatch(/<TriangleAlert\b/)
-    expect(SRC).toMatch(/TriangleAlert,?\s*\n?\s*\}\s*from\s*'lucide-react'/m)
+    // Checks TriangleAlert is imported from lucide-react without requiring it to be the LAST
+    // name in the block — the migration added imports after it.
+    const lucideImport = SRC.match(/import \{([\s\S]*?)\} from 'lucide-react'/)
+    expect(lucideImport).toBeTruthy()
+    expect(lucideImport[1]).toContain('TriangleAlert')
   })
 
   it('does NOT regress to the tiny one-line text-red-400 treatment', () => {

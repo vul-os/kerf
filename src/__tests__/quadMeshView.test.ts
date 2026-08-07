@@ -31,7 +31,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // ── 0. Source readers ─────────────────────────────────────────────────────────
 
 const fileTreeSrc = readFileSync(
-  (existsSync(path.resolve(__dirname, '../components/FileTree.tsx')) ? path.resolve(__dirname, '../components/FileTree.tsx') : path.resolve(__dirname, '../components/FileTree.jsx')), 'utf8',
+  (existsSync(path.resolve(__dirname, '../components/FileTree.tsx')) ? path.resolve(__dirname, '../components/FileTree.tsx') : (existsSync(path.resolve(__dirname, '../components/FileTree.tsx')) ? path.resolve(__dirname, '../components/FileTree.tsx') : path.resolve(__dirname, '../components/FileTree.jsx'))), 'utf8',
 )
 
 const quadMeshViewSrc = readFileSync(
@@ -57,11 +57,11 @@ const migrationSrc = (() => {
 })()
 
 const editorSrc = readFileSync(
-  (existsSync(path.resolve(__dirname, '../routes/Editor.tsx')) ? path.resolve(__dirname, '../routes/Editor.tsx') : path.resolve(__dirname, '../routes/Editor.jsx')), 'utf8',
+  (existsSync(path.resolve(__dirname, '../routes/Editor.tsx')) ? path.resolve(__dirname, '../routes/Editor.tsx') : (existsSync(path.resolve(__dirname, '../routes/Editor.tsx')) ? path.resolve(__dirname, '../routes/Editor.tsx') : path.resolve(__dirname, '../routes/Editor.jsx'))), 'utf8',
 )
 
 const featureViewSrc = readFileSync(
-  (existsSync(path.resolve(__dirname, '../components/FeatureView.tsx')) ? path.resolve(__dirname, '../components/FeatureView.tsx') : path.resolve(__dirname, '../components/FeatureView.jsx')), 'utf8',
+  (existsSync(path.resolve(__dirname, '../components/FeatureView.tsx')) ? path.resolve(__dirname, '../components/FeatureView.tsx') : (existsSync(path.resolve(__dirname, '../components/FeatureView.tsx')) ? path.resolve(__dirname, '../components/FeatureView.tsx') : path.resolve(__dirname, '../components/FeatureView.jsx'))), 'utf8',
 )
 
 // ── 1. FileTree kind registration ─────────────────────────────────────────────

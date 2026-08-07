@@ -131,7 +131,7 @@ describe('ConfirmDelete modal — source contracts', () => {
   const { resolve } = require('path')
   const projectsPath = existsSync(resolve(__dirname, '../../routes/Projects.tsx'))
     ? resolve(__dirname, '../../routes/Projects.tsx')
-    : resolve(__dirname, '../../routes/Projects.jsx')
+    : (existsSync(resolve(__dirname, '../../routes/Projects.tsx')) ? resolve(__dirname, '../../routes/Projects.tsx') : resolve(__dirname, '../../routes/Projects.jsx'))
   const src = readFileSync(projectsPath, 'utf8')
 
   it('disables confirm button until name matches (disabled={!confirmed})', () => {

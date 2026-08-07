@@ -150,7 +150,7 @@ describe('Modal — source contracts (Modal.jsx)', () => {
   const src = readFileSync(
     existsSync(resolve(ROOT, 'src/components/Modal.tsx'))
       ? resolve(ROOT, 'src/components/Modal.tsx')
-      : resolve(ROOT, 'src/components/Modal.jsx'),
+      : (existsSync(resolve(ROOT, 'src/components/Modal.tsx')) ? resolve(ROOT, 'src/components/Modal.tsx') : resolve(ROOT, 'src/components/Modal.jsx')),
     'utf8',
   )
 
@@ -201,7 +201,7 @@ describe('Modal — source contracts (Modal.jsx)', () => {
 describe('ShareModal — uses canonical Modal', () => {
   const shareModalTsx = resolve(ROOT, 'src/components/ShareModal.tsx')
   const src = readFileSync(
-    existsSync(shareModalTsx) ? shareModalTsx : resolve(ROOT, 'src/components/ShareModal.jsx'),
+    existsSync(shareModalTsx) ? shareModalTsx : (existsSync(resolve(ROOT, 'src/components/ShareModal.tsx')) ? resolve(ROOT, 'src/components/ShareModal.tsx') : resolve(ROOT, 'src/components/ShareModal.jsx')),
     'utf8',
   )
 
@@ -224,7 +224,7 @@ describe('ShareModal — uses canonical Modal', () => {
 describe('ShortcutsModal — uses canonical Modal', () => {
   const shortcutsModalTsx = resolve(ROOT, 'src/components/ShortcutsModal.tsx')
   const src = readFileSync(
-    existsSync(shortcutsModalTsx) ? shortcutsModalTsx : resolve(ROOT, 'src/components/ShortcutsModal.jsx'),
+    existsSync(shortcutsModalTsx) ? shortcutsModalTsx : (existsSync(resolve(ROOT, 'src/components/ShortcutsModal.tsx')) ? resolve(ROOT, 'src/components/ShortcutsModal.tsx') : resolve(ROOT, 'src/components/ShortcutsModal.jsx')),
     'utf8',
   )
 
@@ -246,7 +246,7 @@ describe('Editor.jsx Build3DModal — uses canonical Modal', () => {
   const src = readFileSync(
     existsSync(resolve(ROOT, 'src/routes/Editor.tsx'))
       ? resolve(ROOT, 'src/routes/Editor.tsx')
-      : resolve(ROOT, 'src/routes/Editor.jsx'),
+      : (existsSync(resolve(ROOT, 'src/routes/Editor.tsx')) ? resolve(ROOT, 'src/routes/Editor.tsx') : resolve(ROOT, 'src/routes/Editor.jsx')),
     'utf8',
   )
 
@@ -265,7 +265,7 @@ describe('Projects.jsx — uses shared Modal, local copy removed', () => {
   const src = readFileSync(
     existsSync(resolve(ROOT, 'src/routes/Projects.tsx'))
       ? resolve(ROOT, 'src/routes/Projects.tsx')
-      : resolve(ROOT, 'src/routes/Projects.jsx'),
+      : (existsSync(resolve(ROOT, 'src/routes/Projects.tsx')) ? resolve(ROOT, 'src/routes/Projects.tsx') : resolve(ROOT, 'src/routes/Projects.jsx')),
     'utf8',
   )
 

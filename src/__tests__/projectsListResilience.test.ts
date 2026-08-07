@@ -16,7 +16,7 @@ import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const src = readFileSync(
-  (existsSync(path.resolve(__dirname, '../routes/Projects.tsx')) ? path.resolve(__dirname, '../routes/Projects.tsx') : path.resolve(__dirname, '../routes/Projects.jsx')), 'utf8',
+  (existsSync(path.resolve(__dirname, '../routes/Projects.tsx')) ? path.resolve(__dirname, '../routes/Projects.tsx') : (existsSync(path.resolve(__dirname, '../routes/Projects.tsx')) ? path.resolve(__dirname, '../routes/Projects.tsx') : path.resolve(__dirname, '../routes/Projects.jsx'))), 'utf8',
 )
 
 describe('Projects list resilience', () => {

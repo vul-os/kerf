@@ -17,7 +17,7 @@
  */
 import { describe, it, expect } from 'vitest'
 // @ts-expect-error - no @types/node in this toolchain
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 // @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
 // @ts-expect-error - no @types/node in this toolchain
@@ -26,7 +26,7 @@ import { resolve, dirname } from 'path'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const SRC = readFileSync(
-  resolve(__dirname, '../../routes/Editor.jsx'),
+  (existsSync(resolve(__dirname, '../../routes/Editor.tsx')) ? resolve(__dirname, '../../routes/Editor.tsx') : resolve(__dirname, '../../routes/Editor.jsx')),
   'utf8',
 )
 

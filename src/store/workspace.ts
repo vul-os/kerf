@@ -202,13 +202,24 @@ export interface PartDocument {
 }
 
 /** Drawing document — src/store/workspace.js's own parseDrawing/serializeDrawing (not owned by any other slice). Deliberately loose: see header note. */
+// Index signatures removed across these drawing types: TypeScript gives interfaces no implicit
+// index signature, so `[key: string]: unknown` made every concrete interface un-assignable and
+// forced DrawingPropertiesPanel to keep a parallel set of declarations, which then drifted. The
+// explicit fields below are the union of both sets.
+/** planegcs solver outcome for the open sketch. */
+export type SketchSolveStatus = 'fully' | 'under' | 'over' | 'conflict'
+
 export interface DrawingFrame {
   size?: string
   orientation?: string
   title?: string
   template?: string
   sheet_number?: string
-  [key: string]: unknown
+  author?: string
+  date?: string
+  scale_label?: string
+  notes?: string
+  material?: string
 }
 export interface DrawingView {
   id: string
@@ -221,40 +232,61 @@ export interface DrawingView {
   show_hidden?: boolean
   show_silhouette?: boolean
   label?: string
-  [key: string]: unknown
 }
 export interface DrawingDimension {
   id: string
   kind: string
   view_id?: string
-  [key: string]: unknown
+  value?: string | number | null
+  text_override?: string
+  offset?: number
+  radius?: number
+  /** Geometry the dimension is anchored to — set by the drawing tools in this store. */
+  position?: { x?: number; y?: number }
+  origin?: { x?: number; y?: number }
+  vertex?: { x?: number; y?: number }
+  a?: unknown
+  b?: unknown
+  picks?: unknown[]
 }
 export interface DrawingAnnotation {
   id: string
   kind?: string
   view_id?: string
-  [key: string]: unknown
+  text?: string
+  fontSize?: number
+  color?: string
+  side?: string
+  stroke?: string
+  fill?: string
+  width?: number
+  dashed?: boolean
 }
 export interface DrawingCenterline {
   id: string
   view_id?: string
   style?: string
-  [key: string]: unknown
+  cx?: number
+  cy?: number
+  r?: number
+  refs?: unknown[]
+  custom?: unknown
 }
 export interface DrawingBreak {
   id: string
   view_id?: string
   orientation?: string
   style?: string
-  [key: string]: unknown
+  p1?: { x?: number; y?: number }
+  p2?: { x?: number; y?: number }
 }
 export interface DrawingSymbol {
   id: string
   kind?: string
   view_id?: string
-  position?: { x: number; y: number }
+  position?: { x?: number; y?: number }
   params?: Record<string, unknown>
-  [key: string]: unknown
+  leader?: unknown
 }
 export interface DrawingSheet {
   id: string
@@ -392,7 +424,7 @@ export interface WorkspaceData {
   selectedAnnotationId: string | null
 
   parsedSketch: SketchJSON | null
-  sketchStatus: 'fully' | 'under' | 'over' | 'conflict' | null
+  sketchStatus: SketchSolveStatus | null
   sketchDof: number
   sketchConflicts: string[]
 

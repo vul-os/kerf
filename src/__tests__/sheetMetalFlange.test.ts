@@ -25,7 +25,7 @@ const workerSrc = readFileSync(
   'utf8',
 )
 const featureViewSrc = readFileSync(
-  (existsSync(path.resolve(__dirname, '../components/FeatureView.tsx')) ? path.resolve(__dirname, '../components/FeatureView.tsx') : path.resolve(__dirname, '../components/FeatureView.jsx')),
+  (existsSync(path.resolve(__dirname, '../components/FeatureView.tsx')) ? path.resolve(__dirname, '../components/FeatureView.tsx') : (existsSync(path.resolve(__dirname, '../components/FeatureView.tsx')) ? path.resolve(__dirname, '../components/FeatureView.tsx') : path.resolve(__dirname, '../components/FeatureView.jsx'))),
   'utf8',
 )
 

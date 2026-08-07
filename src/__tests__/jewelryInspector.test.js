@@ -19,7 +19,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // ---------------------------------------------------------------------------
 
 const src = readFileSync(
-  (existsSync(path.resolve(__dirname, '../components/FeatureView.tsx')) ? path.resolve(__dirname, '../components/FeatureView.tsx') : path.resolve(__dirname, '../components/FeatureView.jsx')),
+  (existsSync(path.resolve(__dirname, '../components/FeatureView.tsx')) ? path.resolve(__dirname, '../components/FeatureView.tsx') : (existsSync(path.resolve(__dirname, '../components/FeatureView.tsx')) ? path.resolve(__dirname, '../components/FeatureView.tsx') : path.resolve(__dirname, '../components/FeatureView.jsx'))),
   'utf8',
 )
 

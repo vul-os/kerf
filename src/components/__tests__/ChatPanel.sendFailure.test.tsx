@@ -28,7 +28,7 @@ import { resolve, dirname } from 'path'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const SRC = readFileSync(
-  (existsSync(resolve(__dirname, '../ChatPanel.tsx')) ? resolve(__dirname, '../ChatPanel.tsx') : resolve(__dirname, '../ChatPanel.jsx')),
+  (existsSync(resolve(__dirname, '../ChatPanel.tsx')) ? resolve(__dirname, '../ChatPanel.tsx') : (existsSync(resolve(__dirname, '../ChatPanel.tsx')) ? resolve(__dirname, '../ChatPanel.tsx') : resolve(__dirname, '../ChatPanel.jsx'))),
   'utf8',
 )
 
@@ -75,12 +75,12 @@ describe('ChatPanel — T-B3 send-failure announcer', () => {
   // ----- state and clear-on-send -----
 
   it('sendError is declared as useState', () => {
-    expect(SRC).toMatch(/const \[sendError, setSendError\] = useState\(null\)/)
+    expect(SRC).toMatch(/const \[sendError, setSendError\] = useState(?:<[^>]+>)?\(null\)/)
   })
 
   it('handleSend clears sendError before calling onSend (transient)', () => {
     // setSendError(null) must appear inside handleSend before onSend call
-    const handleSendBody = SRC.match(/const handleSend = useCallback\(\(content\)([\s\S]*?)\}, \[onSend/)
+    const handleSendBody = SRC.match(/const handleSend = useCallback\(\(content(?::\s*\w+)?\)([\s\S]*?)\}, \[onSend/)
     expect(handleSendBody).toBeTruthy()
     const body = handleSendBody[0]
     const clearPos = body.indexOf('setSendError(null)')

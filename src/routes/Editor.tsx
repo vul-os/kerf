@@ -47,7 +47,8 @@ import QuadMeshView from '../components/QuadMeshView.jsx'
 import PrintSliceView from '../components/PrintSliceView.jsx'
 import ConfigurationsPanel from '../components/ConfigurationsPanel.jsx'
 import ActivityTimeline from '../components/ActivityTimeline.jsx'
-import { useWorkspace, loadFilePartsForProject } from '../store/workspace.js'
+import { useWorkspace, loadFilePartsForProject, unpackJscadResult } from '../store/workspace.js'
+import type { RenderablePart } from '../store/workspace.js'
 import { useWorkspaces } from '../store/workspaces.js'
 import { useAuth } from '../store/auth.js'
 import { GitPanel, PublishButton } from '../cloud/index.js'
@@ -869,7 +870,10 @@ function BIMFileView({ content, fileName, viewRef }) {
   )
 }
 
-function AirfoilFileView({ content, fileName }) {
+// NOTE: `viewRef` is accepted but not wired to a snapshot() handle, unlike the other file
+// views (see the thumbnail-capture comment below). Thumbnail capture is therefore a no-op for
+// .airfoil files. Tracked separately — implementing it is a behaviour change, not a migration.
+function AirfoilFileView({ content, fileName }: { content?: string; fileName?: string; viewRef?: unknown }) {
   const [polar, setPolar] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -926,8 +930,10 @@ function AirfoilFileView({ content, fileName }) {
 //
 // Currently renders whatever trajectory array is present in the file.
 // ---------------------------------------------------------------------------
-function OrbitFileView({ content, fileName }) {
-  let parsed = {}
+// NOTE: same as AirfoilFileView — `viewRef` is accepted but has no snapshot() handle, so
+// thumbnail capture no-ops for .orbit files.
+function OrbitFileView({ content, fileName }: { content?: string; fileName?: string; viewRef?: unknown }) {
+  let parsed: { trajectory?: unknown } = {}
   try { parsed = JSON.parse(content || '{}') } catch { /* ignore */ }
   const trajectory = Array.isArray(parsed.trajectory) ? parsed.trajectory : []
 
@@ -1067,16 +1073,16 @@ export default function Editor() {
       // circuits back to the previous parts without re-running JSCAD.
       try {
         const key = await meshCache.hashContent(code)
-        const hit = await meshCache.get(key)
+        const hit = await meshCache.get<RenderablePart>(key)
         if (hit) {
           useWorkspace.getState().setPartsError(null)
           useWorkspace.getState().setLiveParts(hit.parts || [])
           return
         }
-        const res = await runJscad(code)
+        const res = unpackJscadResult(await runJscad(code))
         // Stale: a newer run superseded this one (also covers cancelJscad on
         // file-switch). The newer call's result will land separately.
-        if (res?.stale) return
+        if (res.stale) return
         if (res.error) {
           // Keep last successful parts visible; just record the error.
           useWorkspace.getState().setPartsError(res.error)
@@ -1217,7 +1223,10 @@ export default function Editor() {
     if (id) w.attachPickedToChat()
     if (id && useWorkspace.getState().currentFile?.kind === 'assembly') {
       const part = useWorkspace.getState().parts.find((p) => p.id === id)
-      if (part?.componentId) useWorkspace.getState().selectComponent(part.componentId)
+      // `componentId` is only on the assembly members of the RenderablePart union.
+      if (part && 'componentId' in part && part.componentId) {
+        useWorkspace.getState().selectComponent(part.componentId)
+      }
     } else if (!id) {
       useWorkspace.getState().selectComponent(null)
     }
@@ -1439,7 +1448,7 @@ export default function Editor() {
 
   // Visibility set for the current file (may be undefined).
   const hiddenIds = useMemo(() => {
-    return w.hiddenPartIds.get(w.currentFileId) || new Set()
+    return w.hiddenPartIds.get(w.currentFileId) || new Set<string>()
   }, [w.hiddenPartIds, w.currentFileId])
 
   // ----- Per-object appearance -----
@@ -2359,7 +2368,6 @@ export default function Editor() {
                 parsedContent={(() => {
                   try { return JSON.parse(w.currentFileContent || '') } catch { return null }
                 })()}
-                fileName={w.currentFile?.name}
               />
             </div>
           ) : spcFile ? (

@@ -31,7 +31,7 @@ import ShaftStressPanel, {
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const SRC = readFileSync(
-  (existsSync(resolve(__dirname, '../ShaftStressPanel.tsx')) ? resolve(__dirname, '../ShaftStressPanel.tsx') : resolve(__dirname, '../ShaftStressPanel.jsx')),
+  (existsSync(resolve(__dirname, '../ShaftStressPanel.tsx')) ? resolve(__dirname, '../ShaftStressPanel.tsx') : (existsSync(resolve(__dirname, '../ShaftStressPanel.tsx')) ? resolve(__dirname, '../ShaftStressPanel.tsx') : resolve(__dirname, '../ShaftStressPanel.jsx'))),
   'utf8',
 )
 

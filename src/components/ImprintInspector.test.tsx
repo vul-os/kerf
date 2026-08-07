@@ -33,7 +33,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // Extension-agnostic: FeatureView migrated from .jsx to .tsx (T-513).
 const featureViewTsxPath = path.resolve(__dirname, './FeatureView.tsx')
-const featureViewJsxPath = path.resolve(__dirname, './FeatureView.jsx')
+const featureViewJsxPath = (existsSync(path.resolve(__dirname, './FeatureView.tsx')) ? path.resolve(__dirname, './FeatureView.tsx') : path.resolve(__dirname, './FeatureView.jsx'))
 const src = readFileSync(
   existsSync(featureViewTsxPath) ? featureViewTsxPath : featureViewJsxPath,
   'utf8',

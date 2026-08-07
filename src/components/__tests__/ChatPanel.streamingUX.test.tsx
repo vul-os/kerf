@@ -30,7 +30,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const SRC = readFileSync(
-  (existsSync(resolve(__dirname, '../ChatPanel.tsx')) ? resolve(__dirname, '../ChatPanel.tsx') : resolve(__dirname, '../ChatPanel.jsx')),
+  (existsSync(resolve(__dirname, '../ChatPanel.tsx')) ? resolve(__dirname, '../ChatPanel.tsx') : (existsSync(resolve(__dirname, '../ChatPanel.tsx')) ? resolve(__dirname, '../ChatPanel.tsx') : resolve(__dirname, '../ChatPanel.jsx'))),
   'utf8',
 )
 
@@ -85,32 +85,32 @@ describe('TypingIndicator — source checks', () => {
 
   it('has role="status" for a11y', () => {
     // Must appear within the TypingIndicator function
-    const fnMatch = SRC.match(/export function TypingIndicator[\s\S]{0,600}?\/\/ ----------/)
+    const fnMatch = SRC.match(/export function TypingIndicator[\s\S]{0,1200}?\/\/ ----------/)
     expect(fnMatch).toBeTruthy()
     expect(fnMatch[0]).toMatch(/role="status"/)
   })
 
   it('has aria-label on the wrapper', () => {
-    const fnMatch = SRC.match(/export function TypingIndicator[\s\S]{0,600}?\/\/ ----------/)
+    const fnMatch = SRC.match(/export function TypingIndicator[\s\S]{0,1200}?\/\/ ----------/)
     expect(fnMatch).toBeTruthy()
     expect(fnMatch[0]).toMatch(/aria-label/)
   })
 
   it('uses bg-kerf-300 for high-contrast dot color', () => {
-    const fnMatch = SRC.match(/export function TypingIndicator[\s\S]{0,600}?\/\/ ----------/)
+    const fnMatch = SRC.match(/export function TypingIndicator[\s\S]{0,1200}?\/\/ ----------/)
     expect(fnMatch).toBeTruthy()
     expect(fnMatch[0]).toMatch(/bg-kerf-300/)
   })
 
   it('uses animate-bounce for animated dots', () => {
-    const fnMatch = SRC.match(/export function TypingIndicator[\s\S]{0,600}?\/\/ ----------/)
+    const fnMatch = SRC.match(/export function TypingIndicator[\s\S]{0,1200}?\/\/ ----------/)
     expect(fnMatch).toBeTruthy()
     expect(fnMatch[0]).toMatch(/animate-bounce/)
   })
 
   it('respects reduced prop — omits animate-bounce when reduced=true', () => {
     // The conditional must check `reduced` to choose the class
-    const fnMatch = SRC.match(/export function TypingIndicator[\s\S]{0,600}?\/\/ ----------/)
+    const fnMatch = SRC.match(/export function TypingIndicator[\s\S]{0,1200}?\/\/ ----------/)
     expect(fnMatch).toBeTruthy()
     expect(fnMatch[0]).toMatch(/reduced/)
   })

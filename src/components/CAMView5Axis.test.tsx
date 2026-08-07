@@ -38,7 +38,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const camViewSrc = readFileSync(
   existsSync(path.resolve(__dirname, 'CAMView.tsx'))
     ? path.resolve(__dirname, 'CAMView.tsx')
-    : path.resolve(__dirname, 'CAMView.jsx'),
+    : (existsSync(path.resolve(__dirname, 'CAMView.tsx')) ? path.resolve(__dirname, 'CAMView.tsx') : path.resolve(__dirname, 'CAMView.jsx')),
   'utf8',
 )
 

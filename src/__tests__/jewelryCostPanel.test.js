@@ -16,7 +16,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // ---------------------------------------------------------------------------
 
 const panelSrc = readFileSync(
-  (existsSync(path.resolve(__dirname, '../components/JewelryCostPanel.tsx')) ? path.resolve(__dirname, '../components/JewelryCostPanel.tsx') : path.resolve(__dirname, '../components/JewelryCostPanel.jsx')), 'utf8',
+  (existsSync(path.resolve(__dirname, '../components/JewelryCostPanel.tsx')) ? path.resolve(__dirname, '../components/JewelryCostPanel.tsx') : (existsSync(path.resolve(__dirname, '../components/JewelryCostPanel.tsx')) ? path.resolve(__dirname, '../components/JewelryCostPanel.tsx') : path.resolve(__dirname, '../components/JewelryCostPanel.jsx'))), 'utf8',
 )
 
 const apiSrc = readFileSync(

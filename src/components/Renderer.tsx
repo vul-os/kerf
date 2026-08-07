@@ -68,11 +68,14 @@ export interface RendererFeatureSelection {
 }
 
 /** Per-part appearance override (mirrors lib/appearance.js's private AppearanceEntry shape). */
+// Accepts what the app actually produces: lib/appearance.ts's AppearanceEntry (which carries
+// `material`) and the store's AppearancePatch (whose fields are nullable).
 export interface RendererAppearanceOverride {
-  color?: string
-  opacity?: number
-  metalness?: number
-  roughness?: number
+  color?: string | number | null
+  opacity?: number | null
+  metalness?: number | null
+  roughness?: number | null
+  material?: string | null
 }
 
 /** A `doc.lights[]` entry from a .render document (see lib/applyDocLightsToScene.js). */

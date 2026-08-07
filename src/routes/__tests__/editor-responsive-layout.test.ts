@@ -35,7 +35,7 @@ import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-const EDITOR_SRC = readFileSync((existsSync(resolve(__dirname, '../Editor.tsx')) ? resolve(__dirname, '../Editor.tsx') : (existsSync(resolve(__dirname, '../Editor.tsx')) ? resolve(__dirname, '../Editor.tsx') : resolve(__dirname, '../Editor.jsx'))), 'utf8')
+const EDITOR_SRC = readFileSync((existsSync(resolve(__dirname, '../Editor.tsx')) ? resolve(__dirname, '../Editor.tsx') : (existsSync(resolve(__dirname, '../Editor.tsx')) ? resolve(__dirname, '../Editor.tsx') : (existsSync(resolve(__dirname, '../Editor.tsx')) ? resolve(__dirname, '../Editor.tsx') : resolve(__dirname, '../Editor.jsx')))), 'utf8')
 const INDEX_CSS = readFileSync(resolve(__dirname, '../../index.css'), 'utf8')
 
 // ---------------------------------------------------------------------------

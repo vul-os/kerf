@@ -22,17 +22,17 @@ import { fileURLToPath } from 'url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const PAGE_SRC = readFileSync(
-  (existsSync(resolve(__dirname, '../routes/domains/Automotive.tsx')) ? resolve(__dirname, '../routes/domains/Automotive.tsx') : resolve(__dirname, '../routes/domains/Automotive.jsx')),
+  (existsSync(resolve(__dirname, '../routes/domains/Automotive.tsx')) ? resolve(__dirname, '../routes/domains/Automotive.tsx') : (existsSync(resolve(__dirname, '../routes/domains/Automotive.tsx')) ? resolve(__dirname, '../routes/domains/Automotive.tsx') : resolve(__dirname, '../routes/domains/Automotive.jsx'))),
   'utf8',
 )
 
 const META_SRC = readFileSync(
-  (existsSync(resolve(__dirname, '../routes/domains/automotive.meta.ts')) ? resolve(__dirname, '../routes/domains/automotive.meta.ts') : resolve(__dirname, '../routes/domains/automotive.meta.js')),
+  (existsSync(resolve(__dirname, '../routes/domains/automotive.meta.ts')) ? resolve(__dirname, '../routes/domains/automotive.meta.ts') : (existsSync(resolve(__dirname, '../routes/domains/automotive.meta.ts')) ? resolve(__dirname, '../routes/domains/automotive.meta.ts') : resolve(__dirname, '../routes/domains/automotive.meta.js'))),
   'utf8',
 )
 
 const APP_SRC = readFileSync(
-  (existsSync(resolve(__dirname, '../App.tsx')) ? resolve(__dirname, '../App.tsx') : resolve(__dirname, '../App.jsx')),
+  (existsSync(resolve(__dirname, '../App.tsx')) ? resolve(__dirname, '../App.tsx') : (existsSync(resolve(__dirname, '../App.tsx')) ? resolve(__dirname, '../App.tsx') : resolve(__dirname, '../App.jsx'))),
   'utf8',
 )
 

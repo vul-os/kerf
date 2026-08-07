@@ -22,7 +22,7 @@ import { resolve, dirname } from 'path'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const SRC = readFileSync(
-  (existsSync(resolve(__dirname, '../ChatPanel.tsx')) ? resolve(__dirname, '../ChatPanel.tsx') : resolve(__dirname, '../ChatPanel.jsx')),
+  (existsSync(resolve(__dirname, '../ChatPanel.tsx')) ? resolve(__dirname, '../ChatPanel.tsx') : (existsSync(resolve(__dirname, '../ChatPanel.tsx')) ? resolve(__dirname, '../ChatPanel.tsx') : resolve(__dirname, '../ChatPanel.jsx'))),
   'utf8',
 )
 

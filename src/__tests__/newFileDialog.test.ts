@@ -14,7 +14,7 @@ import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const src = readFileSync(
-  (existsSync(path.resolve(__dirname, '../components/FileTree.tsx')) ? path.resolve(__dirname, '../components/FileTree.tsx') : path.resolve(__dirname, '../components/FileTree.jsx')), 'utf8',
+  (existsSync(path.resolve(__dirname, '../components/FileTree.tsx')) ? path.resolve(__dirname, '../components/FileTree.tsx') : (existsSync(path.resolve(__dirname, '../components/FileTree.tsx')) ? path.resolve(__dirname, '../components/FileTree.tsx') : path.resolve(__dirname, '../components/FileTree.jsx'))), 'utf8',
 )
 
 describe('New file: dialog (not dropdown)', () => {

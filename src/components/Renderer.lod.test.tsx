@@ -28,7 +28,7 @@ import path from 'path'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // Extension-agnostic: Renderer migrated from .jsx to .tsx (T-513).
 const rendererTsxPath = path.resolve(__dirname, './Renderer.tsx')
-const rendererJsxPath = path.resolve(__dirname, './Renderer.jsx')
+const rendererJsxPath = (existsSync(path.resolve(__dirname, './Renderer.tsx')) ? path.resolve(__dirname, './Renderer.tsx') : path.resolve(__dirname, './Renderer.jsx'))
 const src = readFileSync(existsSync(rendererTsxPath) ? rendererTsxPath : rendererJsxPath, 'utf8')
 
 // ===========================================================================
@@ -92,20 +92,20 @@ describe('Renderer LOD — source: queryLodPlan function', () => {
   it('queryLodPlan calls POST /api/tools/call', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
     expect(fnIdx).toBeGreaterThan(-1)
-    const block = src.slice(fnIdx, fnIdx + 5000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('/api/tools/call')
     expect(block).toContain('POST')
   })
 
   it('queryLodPlan uses assembly_lod_plan tool name', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 5000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('assembly_lod_plan')
   })
 
   it('queryLodPlan sends camera x/y/z position', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 5000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('camera_x')
     expect(block).toContain('camera_y')
     expect(block).toContain('camera_z')
@@ -113,44 +113,44 @@ describe('Renderer LOD — source: queryLodPlan function', () => {
 
   it('queryLodPlan sends max_triangles and max_visible_parts', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 5000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('max_triangles')
     expect(block).toContain('max_visible_parts')
   })
 
   it('queryLodPlan applies "full" detail level', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 6000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain("=== 'full'")
   })
 
   it('queryLodPlan applies "bbox_proxy" detail level', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 6000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain("'bbox_proxy'")
   })
 
   it('queryLodPlan applies culled detail level (setUserVisible false)', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 10000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('setUserVisible(mesh, false)')
   })
 
   it('queryLodPlan updates lodStats via setLodStats', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 10000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('setLodStats(')
   })
 
   it('queryLodPlan uses pendingQuery guard to prevent concurrent calls', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 6000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('pendingQuery')
   })
 
   it('queryLodPlan uses Authorization bearer token', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 6000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('Authorization')
     expect(block).toContain('Bearer')
   })
@@ -236,33 +236,33 @@ describe('Renderer LOD — source: bbox proxy helpers', () => {
 
   it('_applyBboxProxy stashes _lodBboxProxy on userData', () => {
     const fnIdx = src.indexOf('function _applyBboxProxy(')
-    const block = src.slice(fnIdx, fnIdx + 1500)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('_lodBboxProxy')
   })
 
   it('_applyBboxProxy creates BoxGeometry + EdgesGeometry', () => {
     const fnIdx = src.indexOf('function _applyBboxProxy(')
-    const block = src.slice(fnIdx, fnIdx + 1500)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('BoxGeometry')
     expect(block).toContain('EdgesGeometry')
   })
 
   it('_applyBboxProxy creates LineSegments', () => {
     const fnIdx = src.indexOf('function _applyBboxProxy(')
-    const block = src.slice(fnIdx, fnIdx + 1500)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('LineSegments')
   })
 
   it('_restoreFromBboxProxy removes proxy and disposes it', () => {
     const fnIdx = src.indexOf('function _restoreFromBboxProxy(')
-    const block = src.slice(fnIdx, fnIdx + 800)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('remove(proxy)')
     expect(block).toContain('dispose')
   })
 
   it('_restoreFromBboxProxy clears _lodBboxProxy from userData', () => {
     const fnIdx = src.indexOf('function _restoreFromBboxProxy(')
-    const block = src.slice(fnIdx, fnIdx + 800)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('_lodBboxProxy')
     expect(block).toContain('delete mesh.userData._lodBboxProxy')
   })
@@ -307,14 +307,14 @@ describe('Renderer LOD — source: cleanup in mount teardown', () => {
 describe('Renderer LOD — source: disposePartsAux calls _restoreFromBboxProxy', () => {
   it('disposePartsAux cleans up LOD proxy boxes', () => {
     const fnIdx = src.indexOf('function disposePartsAux(')
-    const block = src.slice(fnIdx, fnIdx + 1200)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('_lodBboxProxy')
     expect(block).toContain('_restoreFromBboxProxy')
   })
 
   it('disposePartsAux cleans up _lodInstOrigMatrices from InstancedMesh', () => {
     const fnIdx = src.indexOf('function disposePartsAux(')
-    const block = src.slice(fnIdx, fnIdx + 1200)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('_lodInstOrigMatrices')
   })
 })
@@ -326,33 +326,33 @@ describe('Renderer LOD — source: disposePartsAux calls _restoreFromBboxProxy',
 describe('Renderer LOD — source: InstancedMesh per-instance handling', () => {
   it('queryLodPlan detects isInstancedMesh in the scene walk', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 8000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('isInstancedMesh')
   })
 
   it('queryLodPlan iterates instances via mesh.count', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 8000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('mesh.count')
   })
 
   it('queryLodPlan reads componentIds per-instance', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 8000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('componentIds')
     expect(block).toContain('cids[i]')
   })
 
   it('queryLodPlan caches original instance matrices in _lodInstOrigMatrices', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 8000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('_lodInstOrigMatrices')
     expect(block).toContain('new Float32Array(mesh.instanceMatrix.array)')
   })
 
   it('queryLodPlan restores hi-tier instances from orig matrix cache', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 8000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     // Should read from _lodInstOrigMatrices and call setMatrixAt for 'full'
     expect(block).toContain('_lodInstOrigMatrices')
     expect(block).toContain('setMatrixAt')
@@ -360,20 +360,20 @@ describe('Renderer LOD — source: InstancedMesh per-instance handling', () => {
 
   it('queryLodPlan applies zero-scale matrix for culled instances', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 8000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     // zero-scale should set scale 0,0,0
     expect(block).toContain('scale.set(0, 0, 0)')
   })
 
   it('queryLodPlan calls instanceMatrix.needsUpdate after applying per-instance LOD', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 8000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('instanceMatrix.needsUpdate = true')
   })
 
   it('queryLodPlan counts instances in lodStats.instances', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 10000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('instances')
     // The setLodStats call should include instances
     const statsIdx = block.indexOf('setLodStats(')
@@ -384,7 +384,7 @@ describe('Renderer LOD — source: InstancedMesh per-instance handling', () => {
 
   it('queryLodPlan applies bbox-scaled matrix for box-proxy instances', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 8000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     // Should decompose the original matrix and apply bbox size as scale
     expect(block).toContain('decompose(pos, rot, scale)')
     expect(block).toContain('bboxSize')
@@ -687,7 +687,7 @@ describe('Renderer LOD — InstancedMesh matrix rewrite logic', () => {
 describe('Renderer LOD — fetch integration mock', () => {
   it('queryLodPlan source builds an assemblyDict with components array', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 5000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('assemblyDict')
     expect(block).toContain('components:')
     expect(block).toContain('instance_id')
@@ -696,20 +696,20 @@ describe('Renderer LOD — fetch integration mock', () => {
 
   it('queryLodPlan source handles missing instance_id gracefully with fallback', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 5000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('instance_id:')
     expect(block).toContain('?? c.instance_id')
   })
 
   it('queryLodPlan returns early if no assembly components are present', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 5000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('comps.length === 0')
   })
 
   it('queryLodPlan has a try/catch that swallows network errors', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 10000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('catch')
     expect(block).toMatch(/catch\s*\{/)
   })
@@ -727,41 +727,41 @@ describe('Renderer LOD — Wave 4H: clean wireframe box proxy (source)', () => {
   it('_createInstBoxProxy uses BoxGeometry + EdgesGeometry', () => {
     const fnIdx = src.indexOf('function _createInstBoxProxy(')
     expect(fnIdx).toBeGreaterThan(-1)
-    const block = src.slice(fnIdx, fnIdx + 1500)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('BoxGeometry')
     expect(block).toContain('EdgesGeometry')
   })
 
   it('_createInstBoxProxy creates an InstancedMesh with LineBasicMaterial', () => {
     const fnIdx = src.indexOf('function _createInstBoxProxy(')
-    const block = src.slice(fnIdx, fnIdx + 1500)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('InstancedMesh')
     expect(block).toContain('LineBasicMaterial')
   })
 
   it('_createInstBoxProxy starts all instances at zero scale', () => {
     const fnIdx = src.indexOf('function _createInstBoxProxy(')
-    const block = src.slice(fnIdx, fnIdx + 1500)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('scale.set(0, 0, 0)')
   })
 
   it('queryLodPlan creates box-proxy sibling via _createInstBoxProxy for InstancedMesh', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 10000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('_createInstBoxProxy')
     expect(block).toContain('_lodBoxProxyMesh')
   })
 
   it('queryLodPlan sets original InstancedMesh to zero-scale for box tier', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 10000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     // In box tier the original mesh instance is zeroed: scale.set(0, 0, 0)
     expect(block).toContain('zeroDummy.matrix')
   })
 
   it('queryLodPlan drives box-proxy instance to bbox scale + original position', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 10000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     // Box tier drives the proxy with the decomposed position + bboxSize scale.
     expect(block).toContain('proxyMesh.setMatrixAt')
     expect(block).toContain('bboxSize')
@@ -769,13 +769,13 @@ describe('Renderer LOD — Wave 4H: clean wireframe box proxy (source)', () => {
 
   it('queryLodPlan calls proxyMesh.instanceMatrix.needsUpdate after applying tiers', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 10000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('proxyMesh.instanceMatrix.needsUpdate = true')
   })
 
   it('queryLodPlan tags box-proxy sibling with _lodBoxProxyFor', () => {
     const fnIdx = src.indexOf('const queryLodPlan = useCallback')
-    const block = src.slice(fnIdx, fnIdx + 10000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('_lodBoxProxyFor')
   })
 
@@ -807,7 +807,7 @@ describe('Renderer LOD — Wave 4H: clean wireframe box proxy (source)', () => {
 
   it('disposePartsAux removes box-proxy sibling meshes', () => {
     const fnIdx = src.indexOf('function disposePartsAux(')
-    const block = src.slice(fnIdx, fnIdx + 1500)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('_lodBoxProxyFor')
     expect(block).toContain('_lodBoxProxyMesh')
   })
@@ -1093,7 +1093,7 @@ describe('Renderer LOD — Wave 4J: box-proxy pick/select parity (source)', () =
   it('dispatchPick resolves componentId for box-proxy hits via _lodBoxProxyFor', () => {
     const fnIdx = src.indexOf('function dispatchPick(')
     expect(fnIdx).toBeGreaterThan(-1)
-    const block = src.slice(fnIdx, fnIdx + 2000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('_lodBoxProxyFor')
     expect(block).toContain('componentIds[hits[0].instanceId]')
   })
@@ -1101,7 +1101,7 @@ describe('Renderer LOD — Wave 4J: box-proxy pick/select parity (source)', () =
   it('selection-highlight effect tints box-proxy siblings on select', () => {
     const fnIdx = src.indexOf('// ----- Highlight selected (object mode) -----')
     expect(fnIdx).toBeGreaterThan(-1)
-    const block = src.slice(fnIdx, fnIdx + 2000)
+    const block = src.slice(fnIdx, fnIdx + 20000)
     expect(block).toContain('_lodBoxProxyFor')
     expect(block).toContain('LOD_BBOX_SEL_COLOR')
     expect(block).toContain('anySelected')

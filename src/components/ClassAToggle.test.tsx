@@ -30,7 +30,7 @@ import path from 'path'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // Extension-agnostic: Renderer migrated from .jsx to .tsx (T-513).
 const rendererTsxPath = path.resolve(__dirname, './Renderer.tsx')
-const rendererJsxPath = path.resolve(__dirname, './Renderer.jsx')
+const rendererJsxPath = (existsSync(path.resolve(__dirname, './Renderer.tsx')) ? path.resolve(__dirname, './Renderer.tsx') : path.resolve(__dirname, './Renderer.jsx'))
 const src = readFileSync(
   existsSync(rendererTsxPath) ? rendererTsxPath : rendererJsxPath,
   'utf8',

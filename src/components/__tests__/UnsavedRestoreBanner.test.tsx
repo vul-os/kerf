@@ -188,7 +188,7 @@ describe('UnsavedRestoreBanner — file list truncation', () => {
 
 describe('UnsavedRestoreBanner — source contracts', () => {
   const src = readFileSync(
-    (existsSync(resolve(__dirname, '../UnsavedRestoreBanner.tsx')) ? resolve(__dirname, '../UnsavedRestoreBanner.tsx') : resolve(__dirname, '../UnsavedRestoreBanner.jsx')),
+    (existsSync(resolve(__dirname, '../UnsavedRestoreBanner.tsx')) ? resolve(__dirname, '../UnsavedRestoreBanner.tsx') : (existsSync(resolve(__dirname, '../UnsavedRestoreBanner.tsx')) ? resolve(__dirname, '../UnsavedRestoreBanner.tsx') : resolve(__dirname, '../UnsavedRestoreBanner.jsx'))),
     'utf8',
   )
 

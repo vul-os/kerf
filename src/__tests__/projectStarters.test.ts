@@ -21,7 +21,7 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectsSrc = readFileSync(
-  (existsSync(path.resolve(__dirname, '../routes/Projects.tsx')) ? path.resolve(__dirname, '../routes/Projects.tsx') : path.resolve(__dirname, '../routes/Projects.jsx')), 'utf8',
+  (existsSync(path.resolve(__dirname, '../routes/Projects.tsx')) ? path.resolve(__dirname, '../routes/Projects.tsx') : (existsSync(path.resolve(__dirname, '../routes/Projects.tsx')) ? path.resolve(__dirname, '../routes/Projects.tsx') : path.resolve(__dirname, '../routes/Projects.jsx'))), 'utf8',
 )
 
 const starterIds = new Set(STARTER_OPTIONS.map((s) => s.id))

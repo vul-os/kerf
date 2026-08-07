@@ -25,7 +25,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 // at a time (T-513..T-517), so a literal `.jsx` path here would break the
 // moment its target is renamed. Try .tsx first, then fall back to .jsx.
 const DRAPE_TSX = resolve(__dirname, '../GarmentDrapePanel.tsx')
-const DRAPE_JSX = (existsSync(resolve(__dirname, '../GarmentDrapePanel.tsx')) ? resolve(__dirname, '../GarmentDrapePanel.tsx') : resolve(__dirname, '../GarmentDrapePanel.jsx'))
+const DRAPE_JSX = (existsSync(resolve(__dirname, '../GarmentDrapePanel.tsx')) ? resolve(__dirname, '../GarmentDrapePanel.tsx') : (existsSync(resolve(__dirname, '../GarmentDrapePanel.tsx')) ? resolve(__dirname, '../GarmentDrapePanel.tsx') : resolve(__dirname, '../GarmentDrapePanel.jsx')))
 const SRC = readFileSync(
   existsSync(DRAPE_TSX) ? DRAPE_TSX : DRAPE_JSX,
   'utf8',

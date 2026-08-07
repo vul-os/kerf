@@ -33,7 +33,7 @@ import GearRatingPanel, {
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const SRC = readFileSync(
-  (existsSync(resolve(__dirname, '../GearRatingPanel.tsx')) ? resolve(__dirname, '../GearRatingPanel.tsx') : resolve(__dirname, '../GearRatingPanel.jsx')),
+  (existsSync(resolve(__dirname, '../GearRatingPanel.tsx')) ? resolve(__dirname, '../GearRatingPanel.tsx') : (existsSync(resolve(__dirname, '../GearRatingPanel.tsx')) ? resolve(__dirname, '../GearRatingPanel.tsx') : resolve(__dirname, '../GearRatingPanel.jsx'))),
   'utf8',
 )
 

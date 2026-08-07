@@ -19,7 +19,7 @@ import { describe, it, expect, vi } from 'vitest'
 // T-500's — see docs/typescript-migration.md), so these Node builtins (used only for this
 // file's source-inspection assertions) are untyped at this boundary.
 // @ts-expect-error - no @types/node in this toolchain
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 // @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
 // @ts-expect-error - no @types/node in this toolchain
@@ -34,7 +34,7 @@ import React from 'react'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const editorSrc = readFileSync(
-  path.resolve(__dirname, '../routes/Editor.jsx'),
+  (existsSync(path.resolve(__dirname, '../routes/Editor.tsx')) ? path.resolve(__dirname, '../routes/Editor.tsx') : path.resolve(__dirname, '../routes/Editor.jsx')),
   'utf8',
 )
 

@@ -4,6 +4,26 @@ import { Plus, Trash2, Eye, EyeOff, Loader2, Scissors } from 'lucide-react'
 import { PROJECTIONS, projectionLabel } from '../lib/projection.js'
 import { sheetDimensions, titleBlockLayout, TEMPLATES, parseScaleString } from '../lib/sheetFrames.js'
 import { useWorkspace, loadFilePartsForProject } from '../store/workspace.js'
+// These mirrored the store's drawing types one-for-one. Parallel declarations drift — the local
+// copies had already diverged enough that a DrawingDoc from the store was not assignable — so the
+// panel now aliases the canonical shapes instead of restating them.
+import type {
+  DrawingFrame, DrawingView, DrawingAnnotation, DrawingDimension,
+  DrawingSymbol, DrawingCenterline, DrawingBreak, DrawingSheet, DrawingDoc,
+} from '../store/workspace.js'
+
+type FrameSpec = DrawingFrame
+type ViewSpec = DrawingView
+type AnnotationSpec = DrawingAnnotation
+type DimensionSpec = DrawingDimension
+type SymbolSpec = DrawingSymbol
+type CenterlineSpec = DrawingCenterline
+type BreakSpec = DrawingBreak
+type SheetSpec = DrawingSheet
+// The panel accepts either the multi-sheet document or a legacy bare sheet — `drawing.sheets ||
+// [drawing]` below is that fallback — so the prop is genuinely the union of the two.
+type DrawingSpec = DrawingDoc | DrawingSheet
+
 
 // Right-side floating panel for editing the drawing's frame and managing
 // views. Compact on purpose so it doesn't dominate the sheet.
@@ -16,91 +36,14 @@ import { useWorkspace, loadFilePartsForProject } from '../store/workspace.js'
 // so it's modelled here loosely — fields that are read/written are typed,
 // everything else stays open via an index signature.
 
-interface FrameSpec {
-  title?: string
-  size?: string
-  orientation?: string
-  template?: string
-  author?: string
-  date?: string
-  scale_label?: string
-  sheet_number?: string
-  notes?: string
-  material?: string
-  [key: string]: any
-}
 
-interface ViewSpec {
-  id: string
-  source_file_id?: string
-  part_id?: string
-  projection?: string
-  show_hidden?: boolean
-  is_section?: boolean
-  position?: [number, number]
-  scale?: number
-  [key: string]: any
-}
 
-interface AnnotationSpec {
-  id: string
-  kind: string
-  text?: string
-  fontSize?: number
-  color?: string
-  side?: string
-  stroke?: string
-  fill?: string
-  width?: number
-  dashed?: boolean
-  [key: string]: any
-}
 
-interface DimensionSpec {
-  id: string
-  kind: string
-  value?: string | number | null
-  text_override?: string
-  offset?: number
-  radius?: number
-  [key: string]: any
-}
 
-interface SymbolSpec {
-  id: string
-  kind: string
-  params?: Record<string, any>
-  position?: { x?: number; y?: number }
-  [key: string]: any
-}
 
-interface CenterlineSpec {
-  id: string
-  [key: string]: any
-}
 
-interface BreakSpec {
-  id: string
-  orientation?: string
-  [key: string]: any
-}
 
-interface SheetSpec {
-  id?: string
-  annotations?: AnnotationSpec[]
-  dimensions?: DimensionSpec[]
-  symbols?: SymbolSpec[]
-  centerlines?: CenterlineSpec[]
-  breaks?: BreakSpec[]
-  views?: ViewSpec[]
-  frame?: FrameSpec
-  [key: string]: any
-}
 
-interface DrawingSpec extends SheetSpec {
-  sheets?: SheetSpec[]
-  currentSheet?: number
-}
 
 interface FileEntry {
   id: string
@@ -141,11 +84,13 @@ interface DrawingPropertiesPanelProps {
   onRemoveSymbol?: (id: string) => void
   onRemoveCenterline?: (id: string) => void
   onRemoveBreak?: (id: string) => void
-  onAddSheet?: () => void
-  onRemoveSheet?: () => void
-  onExportSvg?: () => void
-  onExportPng?: () => void
-  onExportPdf?: () => void
+  // The store's addSheet/removeSheet are async (they persist), so the handler returns a promise.
+  onAddSheet?: (opts?: Record<string, unknown>) => void | Promise<void>
+  onRemoveSheet?: (idx?: number) => void | Promise<void>
+  // exportPng/exportPdf are async; the handler returns their promise.
+  onExportSvg?: () => void | Promise<void>
+  onExportPng?: () => void | Promise<void>
+  onExportPdf?: () => void | Promise<void>
 }
 
 export default function DrawingPropertiesPanel({
@@ -172,8 +117,12 @@ export default function DrawingPropertiesPanel({
   onExportPdf,
 }: DrawingPropertiesPanelProps) {
   // Resolve the active sheet (multi-sheet shape).
-  const sheets = drawing.sheets || [drawing]
-  const sheetIdx = Math.min(drawing.currentSheet ?? 0, sheets.length - 1)
+  const sheets: DrawingSheet[] =
+    'sheets' in drawing && drawing.sheets ? drawing.sheets : [drawing as DrawingSheet]
+  const sheetIdx = Math.min(
+    ('currentSheet' in drawing ? drawing.currentSheet : 0) ?? 0,
+    sheets.length - 1,
+  )
   const sheet = sheets[sheetIdx] || sheets[0]
   const annotations = sheet?.annotations || []
   const dimensions = sheet?.dimensions || []
@@ -181,7 +130,7 @@ export default function DrawingPropertiesPanel({
   const centerlines = sheet?.centerlines || []
   const breaks = sheet?.breaks || []
   const views = sheet?.views || []
-  const frame = sheet?.frame || drawing.frame || { size: 'A3', orientation: 'landscape' }
+  const frame = sheet?.frame || ('frame' in drawing ? drawing.frame : undefined) || { size: 'A3', orientation: 'landscape' }
 
   const selectedAnnotation = annotations.find((a) => a.id === selectedAnnotationId) || null
   const selectedSymbol = symbols.find((y) => y.id === selectedAnnotationId) || null
@@ -910,9 +859,13 @@ function layoutStandardViews({ drawing, source_file_id, part_id, bbox, layout }:
   const SAFE_MARGIN = 10
   // Pull the active sheet's frame (multi-sheet shape) with a back-compat
   // fallback to the legacy top-level frame.
-  const sheets = drawing.sheets || [drawing]
-  const activeSheet = sheets[Math.min(drawing.currentSheet ?? 0, sheets.length - 1)] || sheets[0]
-  const fr = activeSheet?.frame || drawing.frame || { size: 'A3', orientation: 'landscape' }
+  const sheets: DrawingSheet[] =
+    'sheets' in drawing && drawing.sheets ? drawing.sheets : [drawing as DrawingSheet]
+  const activeSheet =
+    sheets[Math.min(('currentSheet' in drawing ? drawing.currentSheet : 0) ?? 0, sheets.length - 1)] ||
+    sheets[0]
+  const fr = activeSheet?.frame || ('frame' in drawing ? drawing.frame : undefined) ||
+    { size: 'A3', orientation: 'landscape' }
   const { w: sheetW, h: sheetH } = sheetDimensions(fr.size, fr.orientation)
   const block = titleBlockLayout(fr.size, fr.orientation, fr.template)
   // Printable area excludes the title-block. We use the area above the block.
@@ -1111,7 +1064,7 @@ function SymbolInspector({ sym, onUpdate, onDelete }: {
       {keys.map(([k, label]) => (
         <Row key={k} label={label}>
           <input
-            value={params[k] ?? ''}
+            value={String(params[k] ?? '')}
             onChange={(e) => onUpdate({ params: { ...params, [k]: e.target.value } })}
             className="flex-1 h-8 bg-ink-900 border border-ink-800 rounded px-2 text-xs text-ink-100 font-mono focus-visible:ring-2 focus-visible:ring-kerf-300 focus-visible:outline-none"
           />

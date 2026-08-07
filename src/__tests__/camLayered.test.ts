@@ -26,10 +26,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // ── 0. File path helpers ─────────────────────────────────────────────────────
 
 const fileTreeSrc = readFileSync(
-  (existsSync(path.resolve(__dirname, '../components/FileTree.tsx')) ? path.resolve(__dirname, '../components/FileTree.tsx') : path.resolve(__dirname, '../components/FileTree.jsx')), 'utf8',
+  (existsSync(path.resolve(__dirname, '../components/FileTree.tsx')) ? path.resolve(__dirname, '../components/FileTree.tsx') : (existsSync(path.resolve(__dirname, '../components/FileTree.tsx')) ? path.resolve(__dirname, '../components/FileTree.tsx') : path.resolve(__dirname, '../components/FileTree.jsx'))), 'utf8',
 )
 const camViewSrc = readFileSync(
-  (existsSync(path.resolve(__dirname, '../components/CAMView.tsx')) ? path.resolve(__dirname, '../components/CAMView.tsx') : path.resolve(__dirname, '../components/CAMView.jsx')), 'utf8',
+  (existsSync(path.resolve(__dirname, '../components/CAMView.tsx')) ? path.resolve(__dirname, '../components/CAMView.tsx') : (existsSync(path.resolve(__dirname, '../components/CAMView.tsx')) ? path.resolve(__dirname, '../components/CAMView.tsx') : path.resolve(__dirname, '../components/CAMView.jsx'))), 'utf8',
 )
 // After the 66->10 migration fold the per-kind migrations were collapsed
 // into the consolidated baseline. Use whichever migration carries the

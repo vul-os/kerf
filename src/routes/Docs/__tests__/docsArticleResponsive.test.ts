@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const articleSrc = readFileSync(
-  (existsSync(path.resolve(__dirname, '../Article.tsx')) ? path.resolve(__dirname, '../Article.tsx') : (existsSync(path.resolve(__dirname, '../Article.tsx')) ? path.resolve(__dirname, '../Article.tsx') : path.resolve(__dirname, '../Article.jsx'))),
+  (existsSync(path.resolve(__dirname, '../Article.tsx')) ? path.resolve(__dirname, '../Article.tsx') : (existsSync(path.resolve(__dirname, '../Article.tsx')) ? path.resolve(__dirname, '../Article.tsx') : (existsSync(path.resolve(__dirname, '../Article.tsx')) ? path.resolve(__dirname, '../Article.tsx') : path.resolve(__dirname, '../Article.jsx')))),
   'utf8',
 )
 

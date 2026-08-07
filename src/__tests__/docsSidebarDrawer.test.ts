@@ -28,15 +28,15 @@ import { describe, it, expect } from 'vitest'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const sidebarSrc = readFileSync(
-  (existsSync(path.resolve(__dirname, '../routes/Docs/Sidebar.tsx')) ? path.resolve(__dirname, '../routes/Docs/Sidebar.tsx') : path.resolve(__dirname, '../routes/Docs/Sidebar.jsx')),
+  (existsSync(path.resolve(__dirname, '../routes/Docs/Sidebar.tsx')) ? path.resolve(__dirname, '../routes/Docs/Sidebar.tsx') : (existsSync(path.resolve(__dirname, '../routes/Docs/Sidebar.tsx')) ? path.resolve(__dirname, '../routes/Docs/Sidebar.tsx') : path.resolve(__dirname, '../routes/Docs/Sidebar.jsx'))),
   'utf8',
 )
 const indexSrc = readFileSync(
-  (existsSync(path.resolve(__dirname, '../routes/Docs/index.tsx')) ? path.resolve(__dirname, '../routes/Docs/index.tsx') : path.resolve(__dirname, '../routes/Docs/index.jsx')),
+  (existsSync(path.resolve(__dirname, '../routes/Docs/index.tsx')) ? path.resolve(__dirname, '../routes/Docs/index.tsx') : (existsSync(path.resolve(__dirname, '../routes/Docs/index.tsx')) ? path.resolve(__dirname, '../routes/Docs/index.tsx') : path.resolve(__dirname, '../routes/Docs/index.jsx'))),
   'utf8',
 )
 const articleSrc = readFileSync(
-  (existsSync(path.resolve(__dirname, '../routes/Docs/Article.tsx')) ? path.resolve(__dirname, '../routes/Docs/Article.tsx') : path.resolve(__dirname, '../routes/Docs/Article.jsx')),
+  (existsSync(path.resolve(__dirname, '../routes/Docs/Article.tsx')) ? path.resolve(__dirname, '../routes/Docs/Article.tsx') : (existsSync(path.resolve(__dirname, '../routes/Docs/Article.tsx')) ? path.resolve(__dirname, '../routes/Docs/Article.tsx') : path.resolve(__dirname, '../routes/Docs/Article.jsx'))),
   'utf8',
 )
 

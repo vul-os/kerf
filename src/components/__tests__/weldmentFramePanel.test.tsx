@@ -31,7 +31,7 @@ import WeldmentFramePanel, {
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const SRC = readFileSync(
-  (existsSync(resolve(__dirname, '../WeldmentFramePanel.tsx')) ? resolve(__dirname, '../WeldmentFramePanel.tsx') : resolve(__dirname, '../WeldmentFramePanel.jsx')),
+  (existsSync(resolve(__dirname, '../WeldmentFramePanel.tsx')) ? resolve(__dirname, '../WeldmentFramePanel.tsx') : (existsSync(resolve(__dirname, '../WeldmentFramePanel.tsx')) ? resolve(__dirname, '../WeldmentFramePanel.tsx') : resolve(__dirname, '../WeldmentFramePanel.jsx'))),
   'utf8',
 )
 

@@ -25,10 +25,10 @@ import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-const PROJECTS_SRC = readFileSync((existsSync(resolve(__dirname, '../Projects.tsx')) ? resolve(__dirname, '../Projects.tsx') : (existsSync(resolve(__dirname, '../Projects.tsx')) ? resolve(__dirname, '../Projects.tsx') : resolve(__dirname, '../Projects.jsx'))), 'utf8')
-const LIBRARY_SRC = readFileSync((existsSync(resolve(__dirname, '../Library.tsx')) ? resolve(__dirname, '../Library.tsx') : (existsSync(resolve(__dirname, '../Library.tsx')) ? resolve(__dirname, '../Library.tsx') : resolve(__dirname, '../Library.jsx'))), 'utf8')
-const LIBRARY_PART_SRC = readFileSync((existsSync(resolve(__dirname, '../LibraryPart.tsx')) ? resolve(__dirname, '../LibraryPart.tsx') : (existsSync(resolve(__dirname, '../LibraryPart.tsx')) ? resolve(__dirname, '../LibraryPart.tsx') : resolve(__dirname, '../LibraryPart.jsx'))), 'utf8')
-const PROFILE_SRC = readFileSync((existsSync(resolve(__dirname, '../Profile.tsx')) ? resolve(__dirname, '../Profile.tsx') : (existsSync(resolve(__dirname, '../Profile.tsx')) ? resolve(__dirname, '../Profile.tsx') : resolve(__dirname, '../Profile.jsx'))), 'utf8')
+const PROJECTS_SRC = readFileSync((existsSync(resolve(__dirname, '../Projects.tsx')) ? resolve(__dirname, '../Projects.tsx') : (existsSync(resolve(__dirname, '../Projects.tsx')) ? resolve(__dirname, '../Projects.tsx') : (existsSync(resolve(__dirname, '../Projects.tsx')) ? resolve(__dirname, '../Projects.tsx') : resolve(__dirname, '../Projects.jsx')))), 'utf8')
+const LIBRARY_SRC = readFileSync((existsSync(resolve(__dirname, '../Library.tsx')) ? resolve(__dirname, '../Library.tsx') : (existsSync(resolve(__dirname, '../Library.tsx')) ? resolve(__dirname, '../Library.tsx') : (existsSync(resolve(__dirname, '../Library.tsx')) ? resolve(__dirname, '../Library.tsx') : resolve(__dirname, '../Library.jsx')))), 'utf8')
+const LIBRARY_PART_SRC = readFileSync((existsSync(resolve(__dirname, '../LibraryPart.tsx')) ? resolve(__dirname, '../LibraryPart.tsx') : (existsSync(resolve(__dirname, '../LibraryPart.tsx')) ? resolve(__dirname, '../LibraryPart.tsx') : (existsSync(resolve(__dirname, '../LibraryPart.tsx')) ? resolve(__dirname, '../LibraryPart.tsx') : resolve(__dirname, '../LibraryPart.jsx')))), 'utf8')
+const PROFILE_SRC = readFileSync((existsSync(resolve(__dirname, '../Profile.tsx')) ? resolve(__dirname, '../Profile.tsx') : (existsSync(resolve(__dirname, '../Profile.tsx')) ? resolve(__dirname, '../Profile.tsx') : (existsSync(resolve(__dirname, '../Profile.tsx')) ? resolve(__dirname, '../Profile.tsx') : resolve(__dirname, '../Profile.jsx')))), 'utf8')
 
 // ---------------------------------------------------------------------------
 // Projects.jsx — page-level error banner

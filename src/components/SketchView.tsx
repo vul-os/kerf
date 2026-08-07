@@ -44,6 +44,7 @@ import {
   friendlyConstraintLabel, formatConstraintValue,
   constraintEntityRefs,
 } from '../lib/sketchUI.js'
+import type { SketchSolveStatus } from '../store/workspace.js'
 
 const DEBOUNCE_SOLVE_MS = 80
 const DEFAULT_VIEW = { cx: 0, cy: 0, scale: 6 } // world units per pixel: scale=6 → 1mm = 6px
@@ -117,7 +118,7 @@ export interface SketchViewProps {
   /** Debounced upstream — called with the next sketch after every edit. */
   onChange: (next: SketchJSON) => void
   /** Called with the solver's result after every solve pass. */
-  onSolved: (next: SketchJSON, status: string | null, dof: number, conflicts: string[]) => void
+  onSolved: (next: SketchJSON, status: SketchSolveStatus | null, dof: number, conflicts: string[]) => void
   status?: 'fully' | 'under' | 'over' | 'conflict' | null
   dofCount?: number
   conflicts?: string[]

@@ -35,7 +35,7 @@ import Iso286FitsPanel, {
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const SRC = readFileSync(
-  (existsSync(resolve(__dirname, '../Iso286FitsPanel.tsx')) ? resolve(__dirname, '../Iso286FitsPanel.tsx') : resolve(__dirname, '../Iso286FitsPanel.jsx')),
+  (existsSync(resolve(__dirname, '../Iso286FitsPanel.tsx')) ? resolve(__dirname, '../Iso286FitsPanel.tsx') : (existsSync(resolve(__dirname, '../Iso286FitsPanel.tsx')) ? resolve(__dirname, '../Iso286FitsPanel.tsx') : resolve(__dirname, '../Iso286FitsPanel.jsx'))),
   'utf8',
 )
 

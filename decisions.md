@@ -1118,3 +1118,42 @@ provider-comparison and migration-command tables.
 
 **Left alone deliberately.** `docker-compose.yml` and the root `Dockerfile` — an
 installed application still ships as a container, and both are how you run it.
+
+## 2026-08-07 — Security pass: findings and what I did not change
+
+**Fixed.** `CompareByDomain.tsx` injected JSON-LD into a `<script>` tag via
+`JSON.stringify` + `dangerouslySetInnerHTML`. `JSON.stringify` does not escape
+`</script>`, so a title or description containing one would close the tag and let
+what follows be parsed as markup. Now escapes `<` as `\u003c`, which is still
+valid JSON. The values are repo-local today — that is a property of the data
+source, not a guarantee of the component, so the escape belongs there anyway.
+
+**Reviewed and judged fine.**
+- 16 `dangerouslySetInnerHTML` sites. The user-content-facing one is `CodeBlock`,
+  which renders highlight.js output; hljs escapes its input. The rest render
+  generated SVG (drawings, schematic, wiring, RF, textiles, optics).
+- 5 `new Function` sites. These are the product working as designed: JSCAD script
+  execution and BIM formula evaluation, running the user's own document in their
+  own browser. `jscadWorker.ts` runs its one inside a Worker.
+- No hardcoded secrets or tokens found in `web/src`.
+
+**RAISED, NOT FIXED — needs a decision.** `kerf.sh` appears 83 times in
+`web/src` and 4 times in `site/index.html`, including the advertised install
+one-liner `curl -fsSL https://kerf.sh/install.sh | sh`, plus ~40 canonical URLs
+and OpenGraph image URLs.
+
+The domain resolves (149.248.203.139, Namecheap nameservers) but **HTTPS
+connection-resets**, so the install command as published does not work. Commit
+`d61f2f4a` called kerf.sh "unowned" while `06dccd7c` deliberately put the
+one-liner back, so I cannot tell from the repo whether the project controls it.
+
+Both readings are bad and they need different fixes:
+  * If the project does NOT control kerf.sh, `curl … | sh` against it is a
+    supply-chain hazard — whoever holds the domain can execute arbitrary code on
+    any user who runs the documented install. That is urgent.
+  * If it DOES control it, the domain is simply down and the install path is
+    broken for everyone.
+
+I did not mass-rewrite the URLs to `vulos.org/projects/kerf`: which host serves
+installs and which host is canonical for SEO is a product decision, and guessing
+wrong would break installs or scatter canonical tags across two domains.

@@ -239,7 +239,12 @@ export default function CompareByDomain() {
       {jsonLd && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: jsonLd }}
+          // JSON.stringify does not escape "</script>", so a title or description
+          // containing one would close this tag and let following text be parsed as
+          // markup. Escaping "<" as \u003c is the standard mitigation and is still
+          // valid JSON. The values are repo-local today, but that is a property of
+          // the data source, not a guarantee of this component.
+          dangerouslySetInnerHTML={{ __html: jsonLd.replace(/</g, '\\u003c') }}
         />
       )}
 

@@ -41,7 +41,7 @@ const NEW_SLUGS = [
  *
  * Returns null if the file does not start with `---`.
  */
-function parseFrontMatter(content) {
+function parseFrontMatter(content: string): Record<string, string> | null {
   if (!content.startsWith('---')) return null
 
   const end = content.indexOf('\n---', 3)

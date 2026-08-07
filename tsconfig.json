@@ -43,7 +43,7 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "tests/unit/**/*.ts", "tests/unit/**/*.tsx"],
   "exclude": [
     "node_modules",
     "dist",

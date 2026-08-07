@@ -8,17 +8,18 @@
 
 Parametric sketching &amp; modeling across five geometry kernels · drawings · FEM/CFD · CAM · electronics · slicing · rendering — across 37 engineering domains, with an LLM that edits the underlying source for you. Browse and publish parts on a **distributed Workshop** with no accounts and no central server.
 
-<sub><img src="docs/assets/vulos-logo.png" height="14" alt="VulOS"> Part of <strong><a href="https://vulos.org">VulOS</a></strong> — the open, self-hostable web OS &amp; app suite. Runs standalone, or as an app hosted by the Vulos OS.</sub>
+<a href="https://vulos.org" title="Vulos — open, self-hostable software"><img src="docs/assets/vulos-logo.png" height="26" alt="Vulos"></a>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-FFD633.svg?style=flat-square)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/vul-os/kerf?style=flat-square&color=FFD633&label=release)](https://github.com/vul-os/kerf/releases/latest)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB.svg?style=flat-square&logo=python&logoColor=white)](pyproject.toml)
 [![Node 22+](https://img.shields.io/badge/Node-22+-339933.svg?style=flat-square&logo=node.js&logoColor=white)](package.json)
+[![TypeScript](https://img.shields.io/badge/TypeScript-100%25-3178C6.svg?style=flat-square&logo=typescript&logoColor=white)](#development)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-FFD633.svg?style=flat-square)](#contributing)
 
-[Website](https://vulos.org/projects/kerf/) · [Docs](https://vulos.org/projects/kerf/docs.html) · [Releases](https://github.com/vul-os/kerf/releases) · [Roadmap](./ROADMAP.md) · [Contributing](#contributing)
+[Website](https://vulos.org/projects/kerf/) · [Docs](https://vulos.org/projects/kerf/docs.html) · [Feature parity](https://vulos.org/projects/kerf/parity.html) · [Releases](https://github.com/vul-os/kerf/releases) · [Roadmap](./ROADMAP.md) · [Contributing](#contributing)
 
-<img src="docs/screenshots/hero.png" alt="The Kerf editor: file tree, 3D viewport, and the LLM chat panel" width="900">
+<img src="public/screenshots/editor.png" alt="The Kerf editor: file tree, 3D viewport, and the LLM chat panel" width="900">
 
 </div>
 
@@ -88,13 +89,13 @@ File revisions (per-file undo history) + local git (commits, branches, GitHub sy
 ## Screenshots
 
 <p align="center">
-  <img src="public/screenshots/editor.png" alt="The Kerf editor: file tree, 3D viewport, chat panel" width="100%">
-  <em>The editor — file tree, 3D viewport, and the LLM chat panel side by side.</em>
+  <img src="public/screenshots/sketcher-features.png" alt="2D parametric sketch with constraints, ready to drive an OCCT feature timeline" width="100%">
+  <em>The 2D parametric sketcher — constrained geometry that feeds the OpenCascade B-rep feature tree via "New feature from sketch".</em>
 </p>
 
 <p align="center">
-  <img src="public/screenshots/sketcher-features.png" alt="2D parametric sketch with constraints, ready to drive an OCCT feature timeline" width="100%">
-  <em>The 2D parametric sketcher — constrained geometry that feeds the OpenCascade B-rep feature tree via "New feature from sketch".</em>
+  <img src="docs/screenshots/parity.png" alt="The feature-parity index: 57 tools surveyed across 1,397 sourced capability rows" width="100%">
+  <em>The <a href="https://vulos.org/projects/kerf/parity.html">feature-parity report</a> — 57 tools, 1,397 capability rows, every claim linked to the vendor's own documentation. It leads with the 16 rows Kerf does <strong>not</strong> cover.</em>
 </p>
 
 ## Quick start (standalone)
@@ -286,6 +287,24 @@ something downstream.
 
 ## License
 
-[MIT](./LICENSE) — free to use, modify, and distribute.
+Kerf's own source is **[MIT](./LICENSE)** — free to use, modify and distribute, with no
+excluded paths and no proprietary tier.
 
-Built in Durban by a small team. Engineered for engineers everywhere.
+The application it builds links libraries under other licences: the OpenCascade B-rep kernel
+(`opencascade.js`, LGPL-2.1), STEP/IGES import (`occt-import-js`, LGPL-2.1), the sketch solver
+(`planegcs`, LGPL-2.0+) and IFC read/write (`web-ifc`, MPL-2.0). All permit use from MIT code —
+which is why they were chosen where GPL alternatives were not — but if you redistribute a build,
+[THIRD-PARTY-LICENSES.md](./THIRD-PARTY-LICENSES.md) lists what you need to carry with it.
+
+---
+
+<div align="center">
+
+<a href="https://vulos.org" title="Vulos — open, self-hostable software"><img src="docs/assets/vulos-logo.png" height="30" alt="Vulos"></a>
+
+**Part of [Vulos](https://vulos.org)** — open, self-hostable software.<br>
+Kerf runs standalone, or as an app hosted by Vulos.
+
+<sub>Built in Durban 🇿🇦 by a small team. Engineered for engineers everywhere.</sub>
+
+</div>

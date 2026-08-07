@@ -266,6 +266,18 @@ for (const it of items) {
 }
 const totalRows = items.reduce((n, it) => n + it.features.length, 0)
 
+// Kerf's own gaps. Surfaced deliberately: with the rows drawn from Kerf's capability list it
+// scores "yes" on 98.9% of them, so a page that does not lead with the exceptions is marketing.
+const shortfalls = []
+for (const it of items) {
+  for (const f of it.features) {
+    const st = f.kerf?.status
+    if (st !== 'yes') shortfalls.push({ tool: it.competitor, slug: it.slug, name: f.name, status: st })
+  }
+}
+const kerfNo = shortfalls.filter((s) => s.status === 'no').length
+const kerfPartial = shortfalls.filter((s) => s.status !== 'no').length
+
 const catSections = [...byCat.entries()]
   .sort((a, b) => b[1].length - a[1].length)
   .map(([label, list]) => {
@@ -276,7 +288,7 @@ const catSections = [...byCat.entries()]
           <h3>Kerf vs ${esc(it.competitor)}</h3>
           <p>${esc(it.hero_tagline || '')}</p>
           ${bar(kerf, total)}
-          <span class="bar-key">kerf ${kerf.yes}/${total} · ${esc(it.competitor)} ${comp.yes}/${total}${comp.paid ? ` (+${comp.paid} paid tier)` : ''}</span>
+          <span class="bar-key">${comp.yes} of these ${total} are included in ${esc(it.competitor)}${comp.paid ? `, ${comp.paid} behind a paid tier` : ''}</span>
           <span class="meta"><span>${total} capabilities</span><span>reviewed ${esc(it.reviewed_at || '—')}</span></span>
         </a>`
     }).join('')
@@ -292,20 +304,37 @@ const indexBody = `
   <div class="container">
     <p class="eyebrow">Feature parity</p>
     <h1>Feature parity, line by line</h1>
-    <p class="lede">Every row below is a specific capability, checked against the competitor's own documentation and against a named file in this repository. No marketing claims, no scores — just what each tool does, with a source you can open.</p>
+    <p class="lede">Every row is a specific capability, checked against the competitor's own documentation and against a named file in this repository. Each claim links to its source.</p>
+    <p class="lede" style="margin-top:.9rem"><strong style="color:var(--text-2)">Read this first:</strong> the rows are <em>Kerf's</em> capability list, so this measures how much of what Kerf does a given tool also does — not how much of that tool Kerf replaces. Every one of these products does things Kerf has no answer for at all, and those things are not rows here. Treat it as a coverage map, never as a score.</p>
     <div class="stat-strip">
-      <div class="stat"><b>${items.length}</b><span>tools compared</span></div>
-      <div class="stat"><b>${totalRows.toLocaleString('en')}</b><span>capability rows</span></div>
+      <div class="stat"><b>${items.length}</b><span>tools surveyed</span></div>
+      <div class="stat"><b>${totalRows.toLocaleString('en')}</b><span>sourced capability rows</span></div>
       <div class="stat"><b>${byCat.size}</b><span>disciplines</span></div>
-      <div class="stat"><b>MIT</b><span>every capability, no tier</span></div>
+      <div class="stat"><b>${kerfNo + kerfPartial}</b><span>rows Kerf does not fully cover</span></div>
     </div>
   </div>
 </section>
 <section>
   <div class="container">
+    <div class="cat">
+      <div class="cat-head"><h2>Where Kerf falls short</h2><span class="count">${shortfalls.length} of ${totalRows} rows</span></div>
+      <p class="lede" style="margin:0 0 1.1rem">These are every row across all ${items.length} reports where Kerf is not a straight yes. It is a short list because of how the rows were chosen, not because the gaps are small — see the note above.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Capability</th><th>Kerf</th><th>Surfaced comparing against</th></tr></thead>
+          <tbody>${shortfalls.map((g) => `
+            <tr>
+              <td class="feat">${esc(g.name)}</td>
+              <td><span class="chip ${g.status === 'no' ? 'no' : 'partial'}">${esc(g.status || 'unknown')}</span></td>
+              <td><a href="./parity/${esc(g.slug)}.html">${esc(g.tool)}</a></td>
+            </tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>
     ${catSections}
     <div class="honest">
-      <p><strong>How to read this.</strong> A competitor row marked <em>paid tier</em> means the tool does have the capability, but behind an extension, add-on or metered service — it is counted separately from “included” because those are different answers to “can I do this today”. Kerf has no tiers, so its rows are only yes, partial or no. Where Kerf says no, it says no.</p>
+      <p><strong>How to read this.</strong> A competitor row marked <em>paid tier</em> means the tool does have the capability, but behind an extension, add-on or metered service — a different answer to “can I do this today” than “included”, so it is counted separately rather than folded into either. Kerf has no tiers, so its rows are only yes, partial or no.</p>
+      <p style="margin-top:.8rem"><strong>What this page is not.</strong> It is not a verdict, and the totals are not scores. The rows were written from Kerf's feature set, which is why Kerf is a yes on ${((totalRows - shortfalls.length) / totalRows * 100).toFixed(1)}% of them — that number says something about how the list was built, not about the products. A tool scoring low here may be far better than Kerf at the work you actually do. If you are choosing between them, read the rows in your discipline and ignore the counts.</p>
     </div>
   </div>
 </section>`

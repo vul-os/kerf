@@ -13,11 +13,8 @@
 //      anti-pattern documented in the planning doc for dormant ops).
 
 import { describe, it, expect } from 'vitest'
-// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
-// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
-// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 
 import { parseFeature, serializeFeature, newFeatureId } from '../lib/occtRunner.js'

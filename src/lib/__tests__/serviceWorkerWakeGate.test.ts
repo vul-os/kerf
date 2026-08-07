@@ -42,7 +42,6 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
-// @ts-expect-error — node:vm's ambient types aren't reachable from this program
 // (unlike node:fs/path/url, nothing else in the graph pulls them in); a
 // `/// <reference types="node" />` here would load @types/node globally and
 // break unrelated files that shadow Node globals (e.g. iesLoader.test.ts's

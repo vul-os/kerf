@@ -18,11 +18,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement, useCallback } from 'react'
-// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync, existsSync } from 'fs'
-// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
-// @ts-expect-error - no @types/node in this toolchain
 import { resolve, dirname } from 'path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))

@@ -13,17 +13,10 @@ import { IES_PRESETS } from './iesPresets.js'
 // array is T-500's — see docs/typescript-migration.md), so these Node
 // builtins (used only by this file's fixture-existence check) are untyped at
 // this boundary.
-// @ts-expect-error - no @types/node in this toolchain
 import { existsSync } from 'fs'
-// @ts-expect-error - no @types/node in this toolchain
 import { join } from 'path'
 
  
-declare global {
-   
-  // env is read by sketcher.test.ts to point the planegcs loader at the wasm file.
-  var process: { cwd(): string; env: Record<string, string | undefined> }
-}
 
 // ── Synthetic IES fixture strings ─────────────────────────────────────────────
 

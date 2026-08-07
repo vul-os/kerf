@@ -11,6 +11,13 @@
 //   • LLM-tool path: `updateSketch` calls `_reEvalJscadForSketch` after save.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import type { SketchJSON } from '@/types'
+
+// runJscad returns an untagged {parts}|{error}|{stale} union (see src/types/workers.ts), so a
+// direct `res.error` / `res.parts` probe does not narrow. These assertions are about which key is
+// present, so widen at the declaration and leave the assertions untouched.
+const asAny = <T>(v: T) => v as T & Record<string, any>
+
 
 // ---- Mock heavy dependencies before importing workspace.js -----------------
 // meshCache.prune() runs at module load time; stub it out.
@@ -35,7 +42,7 @@ const { mockRunJscad, mockDependentsOfSketch, mockResolveAssemblyPartsHelper } =
 
 vi.mock('../lib/jscadRunner.js', async (importOriginal) => {
   // We still need SKETCH_IMPORT_RE from the real module.
-  const real = await importOriginal()
+  const real = (await importOriginal()) as Record<string, unknown>
   return {
     ...real,
     runJscad: mockRunJscad,
@@ -66,10 +73,10 @@ vi.mock('../lib/api.js', () => ({
       id: _fid,
       content,
       name: 'a.sketch',
-      kind: 'sketch',
+      kind: 'sketch' as const,
       parent_id: null,
     })),
-    getFile: vi.fn(async (_pid, fid) => ({ id: fid, content: '', kind: 'jscad', name: 'b.jscad', parent_id: null })),
+    getFile: vi.fn(async (_pid, fid) => ({ id: fid, content: '', kind: 'jscad' as const, name: 'b.jscad', parent_id: null })),
     listFiles: vi.fn(async () => []),
   },
   ApiError: class ApiError extends Error {},
@@ -119,10 +126,10 @@ import { SKETCH_IMPORT_RE } from '../lib/jscadRunner.js'
 // ---------------------------------------------------------------------------
 describe('fileAbsPath', () => {
   const files = [
-    { id: 'root-folder', name: 'parts', parent_id: null, kind: 'folder' },
-    { id: 'sketch-a', name: 'a.sketch', parent_id: 'root-folder', kind: 'sketch' },
-    { id: 'jscad-b', name: 'b.jscad', parent_id: 'root-folder', kind: 'file' },
-    { id: 'top-sketch', name: 'top.sketch', parent_id: null, kind: 'sketch' },
+    { id: 'root-folder', name: 'parts', parent_id: null, kind: 'folder' as const },
+    { id: 'sketch-a', name: 'a.sketch', parent_id: 'root-folder', kind: 'sketch' as const },
+    { id: 'jscad-b', name: 'b.jscad', parent_id: 'root-folder', kind: 'file' as const },
+    { id: 'top-sketch', name: 'top.sketch', parent_id: null, kind: 'sketch' as const },
   ]
 
   it('builds the correct abs path for a nested file', () => {
@@ -236,7 +243,7 @@ describe('_reEvalJscadForSketch store action', () => {
 
     useWorkspace.setState({
       currentFileId: 'jscad-b',
-      currentFile: { id: 'jscad-b', name: 'b.jscad', kind: 'file', parent_id: null },
+      currentFile: { id: 'jscad-b', name: 'b.jscad', kind: 'file' as const, parent_id: null },
       currentFileContent: jscadSrc,
       getActiveConfigParams: () => null,
     })
@@ -255,7 +262,7 @@ describe('_reEvalJscadForSketch store action', () => {
     const jscadSrc = `import profile from '/other.sketch'\nexport default function () { return [] }`
     useWorkspace.setState({
       currentFileId: 'jscad-b',
-      currentFile: { id: 'jscad-b', name: 'b.jscad', kind: 'file', parent_id: null },
+      currentFile: { id: 'jscad-b', name: 'b.jscad', kind: 'file' as const, parent_id: null },
       currentFileContent: jscadSrc,
       getActiveConfigParams: () => null,
     })
@@ -268,7 +275,7 @@ describe('_reEvalJscadForSketch store action', () => {
   it('does NOT re-eval when the currently-open file is NOT a .jscad (e.g. a sketch is open)', async () => {
     useWorkspace.setState({
       currentFileId: 'sketch-a',
-      currentFile: { id: 'sketch-a', name: 'a.sketch', kind: 'sketch', parent_id: null },
+      currentFile: { id: 'sketch-a', name: 'a.sketch', kind: 'sketch' as const, parent_id: null },
       currentFileContent: '{"version":1,"entities":[],"constraints":[]}',
       getActiveConfigParams: () => null,
     })
@@ -296,7 +303,7 @@ describe('_reEvalJscadForSketch store action', () => {
 
     useWorkspace.setState({
       currentFileId: 'jscad-b',
-      currentFile: { id: 'jscad-b', name: 'b.jscad', kind: 'file', parent_id: null },
+      currentFile: { id: 'jscad-b', name: 'b.jscad', kind: 'file' as const, parent_id: null },
       currentFileContent: jscadSrc,
       getActiveConfigParams: () => null,
     })
@@ -346,9 +353,9 @@ describe('updateSketch cascades to JSCAD re-eval', () => {
     // Pre-set store: JSCAD is open, but currentFileId is the sketch (as if
     // sketch editor panel is active). The files array contains both files so
     // fileAbsPath can resolve the sketch path.
-    const sketchFile = { id: 'sketch-a', name: 'a.sketch', kind: 'sketch', parent_id: 'folder-parts' }
-    const folderFile = { id: 'folder-parts', name: 'parts', kind: 'folder', parent_id: null }
-    const jscadFile = { id: 'jscad-b', name: 'b.jscad', kind: 'file', parent_id: null }
+    const sketchFile = { id: 'sketch-a', name: 'a.sketch', kind: 'sketch' as const, parent_id: 'folder-parts' }
+    const folderFile = { id: 'folder-parts', name: 'parts', kind: 'folder' as const, parent_id: null }
+    const jscadFile = { id: 'jscad-b', name: 'b.jscad', kind: 'file' as const, parent_id: null }
 
     // To test the cascade, we set currentFile to the JSCAD (simulating the
     // split-pane scenario where JSCAD is the main view) but use updateSketch
@@ -361,7 +368,8 @@ describe('updateSketch cascades to JSCAD re-eval', () => {
       currentFile: jscadFile,
       currentFileContent: jscadSrc,
       files: [folderFile, sketchFile, jscadFile],
-      parsedSketch: { version: 1, entities: [], constraints: [] },
+      // Minimal sketch — this test only needs the store to hold something sketch-shaped.
+      parsedSketch: { version: 1, entities: [], constraints: [] } as unknown as SketchJSON,
       parts: [],
       partsError: null,
       getActiveConfigParams: () => null,
@@ -384,9 +392,9 @@ describe('updateSketch cascades to JSCAD re-eval', () => {
   it('does NOT re-eval when updateSketch fires but open JSCAD does not import the sketch', async () => {
     const jscadSrc = `import profile from '/parts/other.sketch'\nexport default function () { return [] }`
 
-    const sketchFile = { id: 'sketch-a', name: 'a.sketch', kind: 'sketch', parent_id: 'folder-parts' }
-    const folderFile = { id: 'folder-parts', name: 'parts', kind: 'folder', parent_id: null }
-    const jscadFile = { id: 'jscad-b', name: 'b.jscad', kind: 'file', parent_id: null }
+    const sketchFile = { id: 'sketch-a', name: 'a.sketch', kind: 'sketch' as const, parent_id: 'folder-parts' }
+    const folderFile = { id: 'folder-parts', name: 'parts', kind: 'folder' as const, parent_id: null }
+    const jscadFile = { id: 'jscad-b', name: 'b.jscad', kind: 'file' as const, parent_id: null }
 
     useWorkspace.setState({
       projectId: 'proj-1',
@@ -448,14 +456,14 @@ describe('_reEvalJscadForSketch cross-file: cache eviction and assembly re-resol
 
   it('calls dependentsOfSketch with the sketch path and current files', async () => {
     const files = [
-      { id: 'folder-parts', name: 'parts', kind: 'folder', parent_id: null },
-      { id: 'sketch-a', name: 'a.sketch', kind: 'sketch', parent_id: 'folder-parts' },
+      { id: 'folder-parts', name: 'parts', kind: 'folder' as const, parent_id: null },
+      { id: 'sketch-a', name: 'a.sketch', kind: 'sketch' as const, parent_id: 'folder-parts' },
     ]
     mockDependentsOfSketch.mockReturnValue({ jscads: [], assemblies: [] })
 
     useWorkspace.setState({
       currentFileId: 'sketch-a',
-      currentFile: { id: 'sketch-a', name: 'a.sketch', kind: 'sketch', parent_id: null },
+      currentFile: { id: 'sketch-a', name: 'a.sketch', kind: 'sketch' as const, parent_id: null },
       currentFileContent: '{}',
       files,
       getActiveConfigParams: () => null,
@@ -476,7 +484,7 @@ describe('_reEvalJscadForSketch cross-file: cache eviction and assembly re-resol
     useWorkspace.setState({
       projectId: 'proj-1',
       currentFileId: 'asm-top',
-      currentFile: { id: 'asm-top', name: 'top.assembly', kind: 'assembly', parent_id: null },
+      currentFile: { id: 'asm-top', name: 'top.assembly', kind: 'assembly' as const, parent_id: null },
       currentFileContent: assemblyContent,
       files: [],
       parts: [],
@@ -504,7 +512,7 @@ describe('_reEvalJscadForSketch cross-file: cache eviction and assembly re-resol
     useWorkspace.setState({
       projectId: 'proj-1',
       currentFileId: 'asm-unrelated',
-      currentFile: { id: 'asm-unrelated', name: 'unrelated.assembly', kind: 'assembly', parent_id: null },
+      currentFile: { id: 'asm-unrelated', name: 'unrelated.assembly', kind: 'assembly' as const, parent_id: null },
       currentFileContent: '{"components":[]}',
       files: [],
     })
@@ -525,7 +533,7 @@ describe('_reEvalJscadForSketch cross-file: cache eviction and assembly re-resol
     useWorkspace.setState({
       projectId: 'proj-1',
       currentFileId: 'jscad-b',
-      currentFile: { id: 'jscad-b', name: 'b.jscad', kind: 'file', parent_id: null },
+      currentFile: { id: 'jscad-b', name: 'b.jscad', kind: 'file' as const, parent_id: null },
       currentFileContent: jscadSrc,
       files: [],
       parts: [],
@@ -547,7 +555,7 @@ describe('_reEvalJscadForSketch cross-file: cache eviction and assembly re-resol
     useWorkspace.setState({
       projectId: 'proj-1',
       currentFileId: 'asm-top',
-      currentFile: { id: 'asm-top', name: 'top.assembly', kind: 'assembly', parent_id: null },
+      currentFile: { id: 'asm-top', name: 'top.assembly', kind: 'assembly' as const, parent_id: null },
       currentFileContent: '{"components":[]}',
       files: [],
       parts: [],

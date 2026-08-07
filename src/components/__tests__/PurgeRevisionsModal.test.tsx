@@ -17,9 +17,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement } from 'react'
-// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
-// @ts-expect-error - no @types/node in this toolchain
 import { dirname } from 'path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -171,9 +169,7 @@ describe('PurgeRevisionsModal — size stats', () => {
 // ── 4. Source-contract assertions ─────────────────────────────────────────────
 
 describe('PurgeRevisionsModal — source contracts', () => {
-  // @ts-expect-error - no @types/node in this toolchain
   const { readFileSync, existsSync } = require('fs')
-  // @ts-expect-error - no @types/node in this toolchain
   const { resolve } = require('path')
   const src = readFileSync((existsSync(resolve(__dirname, '../PurgeRevisionsModal.tsx')) ? resolve(__dirname, '../PurgeRevisionsModal.tsx') : (existsSync(resolve(__dirname, '../PurgeRevisionsModal.tsx')) ? resolve(__dirname, '../PurgeRevisionsModal.tsx') : resolve(__dirname, '../PurgeRevisionsModal.jsx'))), 'utf8')
 
@@ -212,9 +208,7 @@ describe('PurgeRevisionsModal — source contracts', () => {
 
 describe('PurgeRevisionsModal — purge call shape', () => {
   it('calls purgeRevisions with projectId and keepLast=5', () => {
-    // @ts-expect-error - no @types/node in this toolchain
     const { readFileSync, existsSync } = require('fs')
-    // @ts-expect-error - no @types/node in this toolchain
     const { resolve } = require('path')
     const src = readFileSync((existsSync(resolve(__dirname, '../PurgeRevisionsModal.tsx')) ? resolve(__dirname, '../PurgeRevisionsModal.tsx') : (existsSync(resolve(__dirname, '../PurgeRevisionsModal.tsx')) ? resolve(__dirname, '../PurgeRevisionsModal.tsx') : resolve(__dirname, '../PurgeRevisionsModal.jsx'))), 'utf8')
     // The call should pass { keepLast: 5 } (the default safety net).
@@ -222,9 +216,7 @@ describe('PurgeRevisionsModal — purge call shape', () => {
   })
 
   it('calls purgeRevisions once per confirm click (source contract)', () => {
-    // @ts-expect-error - no @types/node in this toolchain
     const { readFileSync, existsSync } = require('fs')
-    // @ts-expect-error - no @types/node in this toolchain
     const { resolve } = require('path')
     const src = readFileSync((existsSync(resolve(__dirname, '../PurgeRevisionsModal.tsx')) ? resolve(__dirname, '../PurgeRevisionsModal.tsx') : (existsSync(resolve(__dirname, '../PurgeRevisionsModal.tsx')) ? resolve(__dirname, '../PurgeRevisionsModal.tsx') : resolve(__dirname, '../PurgeRevisionsModal.jsx'))), 'utf8')
     // There should be exactly one call site to purgeRevisions.

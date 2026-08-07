@@ -9,6 +9,12 @@ import { readFileSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import path from 'path'
 
+// FeatureNode is a discriminated union over `op`; these assertions read op-specific fields
+// (target_id, sketch_path, diameter, ...). Widen where the node is pulled out of the doc and
+// leave the assertions themselves alone.
+const asAny = <T>(v: T) => v as T & Record<string, any>
+
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // ---------------------------------------------------------------------------
@@ -428,22 +434,30 @@ function stonesTotal(stones) {
   return { line_items, total_carats, total_stones, total_cost }
 }
 
-function labourTotal({ bench_hours, hourly_rate, stones, setting_type, setting_fee_per_stone, finishing_type, finishing_cost_override }) {
-  const bench = (parseFloat(bench_hours) || 0) * (parseFloat(hourly_rate) || 0)
-  const stoneCount = stones ? stones.reduce((acc, s) => acc + (parseInt(s.count, 10) || 1), 0) : 0
+function labourTotal({ bench_hours, hourly_rate, stones, setting_type, setting_fee_per_stone, finishing_type, finishing_cost_override }: {
+  bench_hours: string | number
+  hourly_rate: string | number
+  stones?: any[]
+  setting_type?: string
+  setting_fee_per_stone?: number | string | null
+  finishing_type?: string
+  finishing_cost_override?: number | string | null
+}) {
+  const bench = (parseFloat(String(bench_hours)) || 0) * (parseFloat(String(hourly_rate)) || 0)
+  const stoneCount = stones ? stones.reduce((acc, s) => acc + (parseInt(String(s.count), 10) || 1), 0) : 0
   const feePerStone = setting_fee_per_stone != null
-    ? parseFloat(setting_fee_per_stone)
+    ? parseFloat(String(setting_fee_per_stone))
     : (SETTING_FEE[setting_type] ?? SETTING_FEE.prong)
   const settingCost = feePerStone * stoneCount
   let finCost = 0
   if (finishing_cost_override != null && finishing_cost_override !== '') {
-    finCost = parseFloat(finishing_cost_override) || 0
+    finCost = parseFloat(String(finishing_cost_override)) || 0
   } else if (finishing_type) {
     finCost = FINISHING_COST_MAP[finishing_type] ?? 0
   }
   return {
-    bench_hours: parseFloat(bench_hours) || 0,
-    hourly_rate: parseFloat(hourly_rate) || 0,
+    bench_hours: parseFloat(String(bench_hours)) || 0,
+    hourly_rate: parseFloat(String(hourly_rate)) || 0,
     bench_labour_cost: bench,
     setting_type: setting_type || 'prong',
     setting_fee_per_stone: feePerStone,
@@ -777,7 +791,9 @@ describe('legacy casting_cost mode', () => {
   })
 
   it('does not include stone / labour / markup fields', () => {
-    const r = localEstimate(300, '18k_yellow', 48, 80, 20)
+    // Asserting ABSENCE, so the access must be widened — reading a field TypeScript knows is
+    // missing is exactly what this test is for.
+    const r = asAny(localEstimate(300, '18k_yellow', 48, 80, 20))
     expect(r.stone_cost).toBeUndefined()
     expect(r.markup_pct).toBeUndefined()
     expect(r.subtotal).toBeUndefined()

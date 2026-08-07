@@ -21,11 +21,8 @@
  */
 
 import { describe, it, expect, vi } from 'vitest'
-// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync, existsSync } from 'fs'
-// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
-// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'

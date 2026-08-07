@@ -4,11 +4,8 @@
 // route/banner wiring at the source level.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync, existsSync } from 'fs'
-// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
-// @ts-expect-error - no @types/node in this toolchain
 import { dirname, join } from 'path'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')

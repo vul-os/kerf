@@ -67,6 +67,7 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@types/node": "^22.19.17",
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.0.0",
     "@types/react": "^19.2.14",

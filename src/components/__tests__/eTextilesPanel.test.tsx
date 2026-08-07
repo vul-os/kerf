@@ -5,11 +5,8 @@
  */
 
 import { describe, it, expect } from 'vitest'
-// @ts-expect-error - no @types/node in this toolchain
 import { existsSync, readFileSync } from 'fs'
-// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
-// @ts-expect-error - no @types/node in this toolchain
 import { resolve, dirname } from 'path'
 
 import {

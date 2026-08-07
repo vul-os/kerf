@@ -21,7 +21,6 @@
 //   Rev-C.Side.seg-2
 //   Pad-A.h4f7a9c12        (topo-hash fallback)
 
-// @ts-expect-error — 'crypto' has no reachable type declarations in this project:
 // @types/node isn't a devDependency and tsconfig.json's `types` list (T-500's
 // toolchain surface) intentionally excludes "node" project-wide. A
 // `/// <reference types="node" />` here would resolve it, but that reference is

@@ -158,6 +158,8 @@ function makeSolid(tag = 'solid') {
 // Build a mock BRepAlgoAPI_Section class factory.
 function makeSectionClass(resultShape = null, isDone = true) {
   return class MockSection {
+    _result: unknown
+    _done: boolean
     constructor() {
       this._result = resultShape || makeCompound('section_result')
       this._done = isDone
@@ -175,9 +177,9 @@ function makeOc({ hasSection = true, SectionClass = null } = {}) {
   return {
     BRepAlgoAPI_Section:   hasSection ? SClass : undefined,
     BRepAlgoAPI_Section_3: undefined,  // prefer plain overload in tests
-    gp_Pnt_3:  class { constructor(x, y, z) { this.x = x; this.y = y; this.z = z } },
-    gp_Dir_4:  class { constructor(x, y, z) { this.x = x; this.y = y; this.z = z } },
-    gp_Pln_2:  class { constructor(origin, axis) { this.origin = origin; this.axis = axis } },
+    gp_Pnt_3:  class { x: number; y: number; z: number; constructor(x: number, y: number, z: number) { this.x = x; this.y = y; this.z = z } },
+    gp_Dir_4:  class { x: number; y: number; z: number; constructor(x: number, y: number, z: number) { this.x = x; this.y = y; this.z = z } },
+    gp_Pln_2:  class { origin: unknown; axis: unknown; constructor(origin: unknown, axis: unknown) { this.origin = origin; this.axis = axis } },
     Message_ProgressRange_1: class { constructor() {} },
     _resultShape: resultShape,
   }
@@ -264,14 +266,14 @@ describe('opSection — dispatch and result', () => {
   })
 
   it('uses non-unit normal (normalises internally)', () => {
-    let capturedAxis = null
-    class MockDir { constructor(x, y, z) { capturedAxis = [x, y, z] } }
+    let capturedAxis: number[] | null = null
+    class MockDir { constructor(x: number, y: number, z: number) { capturedAxis = [x, y, z] } }
     const oc = makeOc()
-    oc.gp_Dir_4 = MockDir
+    oc.gp_Dir_4 = MockDir as unknown as typeof oc.gp_Dir_4
     const node = { target_solid_ref: 's', plane: { point: [0,0,0], normal: [0, 0, 3] } }
     opSection(oc, null, node, {}, [], { s: makeSolid() })
     // Normal [0,0,3] should be normalised to [0,0,1].
-    expect(capturedAxis[2]).toBeCloseTo(1, 5)
+    expect(capturedAxis![2]).toBeCloseTo(1, 5)
   })
 })
 

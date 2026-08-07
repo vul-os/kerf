@@ -10,11 +10,8 @@
 //   5. Primary path (all bindings present, all mocks succeed) — assert solid.
 
 import { describe, it, expect, vi } from 'vitest'
-// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
-// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
-// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))

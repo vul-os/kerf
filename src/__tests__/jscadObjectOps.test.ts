@@ -17,6 +17,12 @@ import {
   ensureSketchImport,
 } from '../lib/jscadObjectOps.js'
 
+// FeatureNode is a discriminated union over `op`; these assertions read op-specific fields
+// (target_id, sketch_path, diameter, ...). Widen where the node is pulled out of the doc and
+// leave the assertions themselves alone.
+const asAny = <T>(v: T) => v as T & Record<string, any>
+
+
 const SIMPLE = `export default function () {
   return [
     { id: 'base', geom: cuboid({ size: [10, 10, 10] }) },

@@ -19,6 +19,13 @@ import {
   normaliseMeanCurvature,
   buildCombGeometry,
 } from '../components/CurvatureCombOverlay.jsx'
+import type { CombPoint } from '../components/CurvatureCombOverlay.jsx'
+
+// FeatureNode is a discriminated union over `op`; these assertions read op-specific fields
+// (target_id, sketch_path, diameter, ...). Widen where the node is pulled out of the doc and
+// leave the assertions themselves alone.
+const asAny = <T>(v: T) => v as T & Record<string, any>
+
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const workerSrc = readFileSync(
@@ -214,7 +221,7 @@ describe('buildCombGeometry', () => {
   })
 
   it('produces 2 vertices per sample point', () => {
-    const pts = [
+    const pts: CombPoint[] = [
       { x: 0, y: 0, z: 0, nx: 0, ny: 0, nz: 1, mean: 0.5, maxAbs: 0.5 },
       { x: 1, y: 0, z: 0, nx: 0, ny: 1, nz: 0, mean: -0.5, maxAbs: 0.5 },
     ]
@@ -226,7 +233,7 @@ describe('buildCombGeometry', () => {
   })
 
   it('segment endpoint offset = maxAbs × scaleFactor × normal', () => {
-    const pts = [
+    const pts: CombPoint[] = [
       { x: 0, y: 0, z: 0, nx: 0, ny: 0, nz: 1, mean: 0.5, maxAbs: 2 },
     ]
     const geo = buildCombGeometry(pts, 5, 1)
@@ -237,7 +244,7 @@ describe('buildCombGeometry', () => {
   })
 
   it('colors are in [0,1] range', () => {
-    const pts = [
+    const pts: CombPoint[] = [
       { x: 0, y: 0, z: 0, nx: 0, ny: 0, nz: 1, mean: 1, maxAbs: 1 },
     ]
     const geo = buildCombGeometry(pts, 1, 1)
@@ -251,7 +258,7 @@ describe('buildCombGeometry', () => {
   })
 
   it('both segment vertices have the same color', () => {
-    const pts = [
+    const pts: CombPoint[] = [
       { x: 0, y: 0, z: 0, nx: 1, ny: 0, nz: 0, mean: 0.8, maxAbs: 0.8 },
     ]
     const geo = buildCombGeometry(pts, 1, 1)

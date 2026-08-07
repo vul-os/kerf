@@ -21,11 +21,8 @@
 // Plan ref: docs/plans/nurbs-phase-4-full.md § C1-T5 + task brief T5.
 
 import { describe, it, expect } from 'vitest'
-// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
-// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
-// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))

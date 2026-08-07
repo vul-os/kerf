@@ -14,11 +14,8 @@
  * Intentionally no DOM rendering — tests run on source text for speed.
  */
 import { describe, it, expect } from 'vitest'
-// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync, existsSync } from 'fs'
-// @ts-expect-error - no @types/node in this toolchain
 import { resolve, dirname } from 'path'
-// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))

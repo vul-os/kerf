@@ -38,7 +38,10 @@ import type { EquationsScope } from '../store/workspace.js'
 // evaluation so a user editing equations triggers a re-run via the standard
 // debounce pipeline (the workspace store touches the JSCAD source after the
 // equations file mutates).
-type EquationsResolver = () => Promise<EquationsScope> | EquationsScope | null | undefined
+// Only `values` is read (see resolveEquationsScope below), so a resolver need not produce a whole
+// EquationsScope — the errors/duplicates arrays are the store's concern, not this consumer's.
+type ResolvedEquations = Pick<EquationsScope, 'values'>
+type EquationsResolver = () => Promise<ResolvedEquations> | ResolvedEquations | null | undefined
 let equationsResolver: EquationsResolver | null = null
 export function setEquationsResolver(fn: EquationsResolver | null): void {
   equationsResolver = fn || null

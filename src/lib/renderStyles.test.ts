@@ -11,11 +11,8 @@ import { describe, it, expect, vi, beforeAll } from 'vitest'
 // array is T-500's — see docs/typescript-migration.md), so these Node
 // builtins (used only by this file's shader-fixture read) are untyped at
 // this boundary. Same pattern as src/lib/iesLoader.test.ts.
-// @ts-expect-error - no @types/node in this toolchain
 import * as fs from 'fs'
-// @ts-expect-error - no @types/node in this toolchain
 import * as path from 'path'
-// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
 
 // ── Three.js stub ─────────────────────────────────────────────────────────────

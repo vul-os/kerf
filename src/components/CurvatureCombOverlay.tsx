@@ -140,7 +140,12 @@ export function normaliseMeanCurvature(mean: number, maxAbsMean: number): number
 //
 // Returns null if the sample array is empty.
 // eslint-disable-next-line react-refresh/only-export-components -- pre-existing before this migration.
-export function buildCombGeometry(points: CurvaturePoint[] | null | undefined, scaleFactor: number, maxAbsMean: number): THREE.BufferGeometry | null {
+// Only the position, normal and curvature-magnitude fields are read — not the full
+// CurvaturePoint (u/v/k1/k2/normalDefined/...). Narrowed so callers and fixtures need only
+// supply what this actually uses.
+export type CombPoint = Pick<CurvaturePoint, 'x' | 'y' | 'z' | 'nx' | 'ny' | 'nz' | 'mean' | 'maxAbs'>
+
+export function buildCombGeometry(points: CombPoint[] | null | undefined, scaleFactor: number, maxAbsMean: number): THREE.BufferGeometry | null {
   if (!points || points.length === 0) return null
 
   const positions = new Float32Array(points.length * 6)  // 2 vertices × 3 floats

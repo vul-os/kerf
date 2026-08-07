@@ -22,6 +22,12 @@ import path from 'path'
 
 import { parseFeature, serializeFeature, newFeatureId } from '../lib/occtRunner.js'
 
+// FeatureNode is a discriminated union over `op`; these assertions read op-specific fields
+// (target_id, sketch_path, diameter, ...). Widen where the node is pulled out of the doc and
+// leave the assertions themselves alone.
+const asAny = <T>(v: T) => v as T & Record<string, any>
+
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // ── 1. parseSketchPoints (pure-JS re-implementation) ─────────────────────────
@@ -145,7 +151,7 @@ describe('parseSketchPoints', () => {
 describe('hole_pattern node round-trip', () => {
   const sampleNode = {
     id: 'hole_pattern-1',
-    op: 'hole_pattern',
+    op: 'hole_pattern' as const,
     target_id: 'pad-1',
     sketch_path: '/hole-grid.sketch',
     diameter: 3.0,
@@ -157,13 +163,13 @@ describe('hole_pattern node round-trip', () => {
       version: 1,
       name: 'Bracket',
       features: [
-        { id: 'pad-1', op: 'pad', sketch_path: '/base.sketch', height: 20 },
+        { id: 'pad-1', op: 'pad' as const, sketch_path: '/base.sketch', height: 20 },
         sampleNode,
       ],
     })
     const parsed = parseFeature(json)
     expect(parsed.features).toHaveLength(2)
-    const node = parsed.features[1]
+    const node = asAny(parsed.features[1])
     expect(node.op).toBe('hole_pattern')
     expect(node.target_id).toBe('pad-1')
     expect(node.sketch_path).toBe('/hole-grid.sketch')
@@ -187,14 +193,14 @@ describe('hole_pattern node round-trip', () => {
   it('node without target_id round-trips correctly', () => {
     const node = {
       id: 'hole_pattern-2',
-      op: 'hole_pattern',
+      op: 'hole_pattern' as const,
       sketch_path: '/pts.sketch',
       diameter: 5.0,
       depth: 10.0,
     }
     const json = JSON.stringify({ version: 1, name: 'T', features: [node] })
     const parsed = parseFeature(json)
-    expect(parsed.features[0].target_id).toBeUndefined()
+    expect(asAny(parsed.features[0]).target_id).toBeUndefined()
   })
 })
 

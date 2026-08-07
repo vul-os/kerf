@@ -14,6 +14,12 @@ import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import path from 'path'
 
+// FeatureNode is a discriminated union over `op`; these assertions read op-specific fields
+// (target_id, sketch_path, diameter, ...). Widen where the node is pulled out of the doc and
+// leave the assertions themselves alone.
+const asAny = <T>(v: T) => v as T & Record<string, any>
+
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const workerSrc = readFileSync(
@@ -41,7 +47,7 @@ const etfBody = workerSrc.slice(ETF_START)
 // Generic dispatch helper (same structure as jewelryDispatch.test.js).
 // ---------------------------------------------------------------------------
 
-function describeOp(opName, fnName, { nextFnName } = {}) {
+function describeOp(opName: string, fnName: string, { nextFnName }: { nextFnName?: string } = {}) {
   describe(`${opName} — T-25 jewelry op dispatch`, () => {
     it(`${fnName} function is defined in occtWorker.js`, () => {
       expect(workerSrc).toContain(`function ${fnName}(`)

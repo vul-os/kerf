@@ -132,7 +132,7 @@ describe('api.importFreecadProject — real endpoint', () => {
       status: 422,
       statusText: 'Unprocessable',
       text: async () => JSON.stringify({ error: 'bad fcstd' }),
-    }))
+    })) as unknown as typeof fetch
     await expect(
       api.importFreecadProject('proj-1', 'blob-1'),
     ).rejects.toThrow(/bad fcstd/)

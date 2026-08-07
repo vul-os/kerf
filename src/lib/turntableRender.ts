@@ -384,7 +384,6 @@ function dataUrlToBytes(dataUrl: string): Uint8Array {
   try {
     const binary = typeof atob !== 'undefined'
       ? atob(base64)
-      // @ts-expect-error - no @types/node in this toolchain (Buffer is a Node-only fallback for non-browser environments; see iesLoader.test.ts for the established pattern).
       : Buffer.from(base64, 'base64').toString('binary')
     const bytes = new Uint8Array(binary.length)
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)

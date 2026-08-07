@@ -391,7 +391,6 @@ describe('sketchSolver equations resolver registration', () => {
 describe('public planegcs.wasm asset presence', () => {
   it('public/planegcs.wasm exists and is non-empty', () => {
     const target = path.resolve(here, '../../public/planegcs.wasm')
-    // @ts-expect-error - no @types/node in this toolchain (the repo's node:fs
     // ambient shim only declares readFileSync)
     const stats = fs.statSync(target)
     expect(stats.isFile()).toBe(true)

@@ -25,6 +25,12 @@ import {
   setEquationsResolver,
 } from '../lib/jscadRunner.js'
 
+// runJscad returns an untagged {parts}|{error}|{stale} union (see src/types/workers.ts), so a
+// direct `res.error` / `res.parts` probe does not narrow. These assertions are about which key is
+// present, so widen at the declaration and leave the assertions untouched.
+const asAny = <T>(v: T) => v as T & Record<string, any>
+
+
 describe('DEFAULT_JSCAD seed', () => {
   it('is a non-empty string with the conventional default-export signature', () => {
     expect(typeof DEFAULT_JSCAD).toBe('string')
@@ -40,12 +46,12 @@ describe('DEFAULT_JSCAD seed', () => {
 
 describe('runJscad — empty input', () => {
   it('returns an empty parts array for empty source', async () => {
-    const res = await runJscad('')
+    const res = asAny(await runJscad(''))
     expect(res).toEqual({ parts: [] })
   })
 
   it('returns an empty parts array for whitespace-only source', async () => {
-    const res = await runJscad('   \n\t   ')
+    const res = asAny(await runJscad('   \n\t   '))
     expect(res).toEqual({ parts: [] })
   })
 })
@@ -53,7 +59,7 @@ describe('runJscad — empty input', () => {
 describe('runJscad — main-thread evaluation', () => {
   it('returns an empty parts array when the factory returns null', async () => {
     const code = `export default function () { return null }`
-    const res = await runJscad(code)
+    const res = asAny(await runJscad(code))
     expect(res.error).toBeUndefined()
     expect(res.parts).toEqual([])
   })
@@ -61,7 +67,7 @@ describe('runJscad — main-thread evaluation', () => {
   it('wraps a single returned object that already has a geom field', async () => {
     // normalizeParts(singleObjectWithGeom) → [{ id: out.id ?? 'part-0', geom }]
     const code = `export default function () { return { id: 'solo', geom: { polygons: [] } } }`
-    const res = await runJscad(code)
+    const res = asAny(await runJscad(code))
     expect(res.error).toBeUndefined()
     expect(res.parts).toHaveLength(1)
     expect(res.parts[0].id).toBe('solo')
@@ -70,7 +76,7 @@ describe('runJscad — main-thread evaluation', () => {
 
   it('mints sequential ids when the array entries lack them', async () => {
     const code = `export default function () { return [{ polygons: [] }, { polygons: [] }] }`
-    const res = await runJscad(code)
+    const res = asAny(await runJscad(code))
     expect(res.error).toBeUndefined()
     expect(res.parts).toHaveLength(2)
     expect(res.parts[0].id).toBe('part-0')
@@ -84,14 +90,14 @@ describe('runJscad — main-thread evaluation', () => {
         { id: 'b', geom: { polygons: [] } },
       ]
     }`
-    const res = await runJscad(code)
+    const res = asAny(await runJscad(code))
     expect(res.error).toBeUndefined()
     expect(res.parts.map((p) => p.id)).toEqual(['a', 'b'])
   })
 
   it('captures syntax errors as a string in the `error` field', async () => {
     // Unbalanced braces — `new Function` will throw at construction time.
-    const res = await runJscad('export default function ({{{ ')
+    const res = asAny(await runJscad('export default function ({{{ '))
     expect(res.parts).toBeUndefined()
     expect(typeof res.error).toBe('string')
     expect(res.error.length).toBeGreaterThan(0)
@@ -99,7 +105,7 @@ describe('runJscad — main-thread evaluation', () => {
 
   it('captures runtime errors thrown inside the user function', async () => {
     const code = `export default function () { throw new Error('kaboom') }`
-    const res = await runJscad(code)
+    const res = asAny(await runJscad(code))
     expect(res.error).toContain('kaboom')
   })
 
@@ -108,7 +114,7 @@ describe('runJscad — main-thread evaluation', () => {
     // shouldn't need them. Verify the source still evaluates.
     const code = `import * as foo from 'whatever'
 export default function () { return [] }`
-    const res = await runJscad(code)
+    const res = asAny(await runJscad(code))
     expect(res.error).toBeUndefined()
     expect(res.parts).toEqual([])
   })
@@ -164,7 +170,7 @@ describe('sketch import — missing path throws and propagates to partsError', (
     // No resolver → sketchResolver is null → file is null → should throw.
     setSketchResolver(null)
     const code = `import profile from '/missing.sketch'\nexport default function () { return [] }`
-    const res = await runJscad(code)
+    const res = asAny(await runJscad(code))
     expect(res.error).toBeDefined()
     expect(res.error).toContain('sketch not found')
     expect(res.error).toContain('/missing.sketch')
@@ -175,7 +181,7 @@ describe('sketch import — missing path throws and propagates to partsError', (
     setSketchResolver(async () => null)
     setSketchLister(async () => ['/parts/profile.sketch', '/parts/rail.sketch'])
     const code = `import profile from '/missing.sketch'\nexport default function () { return [] }`
-    const res = await runJscad(code)
+    const res = asAny(await runJscad(code))
     expect(res.error).toBeDefined()
     expect(res.error).toContain('sketch not found: /missing.sketch')
     expect(res.error).toContain('/parts/profile.sketch')
@@ -186,7 +192,7 @@ describe('sketch import — missing path throws and propagates to partsError', (
     setSketchResolver(async () => null)
     setSketchLister(async () => [])
     const code = `import profile from '/empty-project.sketch'\nexport default function () { return [] }`
-    const res = await runJscad(code)
+    const res = asAny(await runJscad(code))
     expect(res.error).toBeDefined()
     expect(res.error).toContain('sketch not found: /empty-project.sketch')
     expect(res.error).toContain('(no .sketch files in project)')
@@ -205,7 +211,7 @@ describe('sketch import — missing path throws and propagates to partsError', (
     setSketchResolver(async () => ({ content: minimalSketch }))
     setSketchLister(async () => ['/parts/outline.sketch'])
     const code = `import profile from '/parts/outline.sketch'\nexport default function () { return [] }`
-    const res = await runJscad(code)
+    const res = asAny(await runJscad(code))
     // No error — sketch resolved, JSCAD ran, returned empty parts array.
     expect(res.error).toBeUndefined()
     expect(res.parts).toEqual([])

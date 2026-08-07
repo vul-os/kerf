@@ -17,9 +17,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement } from 'react'
-// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
-// @ts-expect-error - no @types/node in this toolchain
 import { dirname } from 'path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -118,27 +116,21 @@ describe('ConflictBanner — conflict present', () => {
 
 describe('ConflictBanner — source contracts', () => {
   it('imports from the workspace store', () => {
-    // @ts-expect-error - no @types/node in this toolchain
     const { readFileSync } = require('fs')
-    // @ts-expect-error - no @types/node in this toolchain
     const { resolve } = require('path')
     const src = readFileSync(resolve(__dirname, '../ConflictBanner.tsx'), 'utf8')
     expect(src).toMatch(/from.*store\/workspace/)
   })
 
   it('calls loadFileForEditor on Reload click (via source)', () => {
-    // @ts-expect-error - no @types/node in this toolchain
     const { readFileSync } = require('fs')
-    // @ts-expect-error - no @types/node in this toolchain
     const { resolve } = require('path')
     const src = readFileSync(resolve(__dirname, '../ConflictBanner.tsx'), 'utf8')
     expect(src).toMatch(/loadFileForEditor/)
   })
 
   it('clears conflictFile via setState on Reload', () => {
-    // @ts-expect-error - no @types/node in this toolchain
     const { readFileSync } = require('fs')
-    // @ts-expect-error - no @types/node in this toolchain
     const { resolve } = require('path')
     const src = readFileSync(resolve(__dirname, '../ConflictBanner.tsx'), 'utf8')
     expect(src).toMatch(/setState.*conflictFile.*null|conflictFile.*null.*setState/s)

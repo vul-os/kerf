@@ -18,11 +18,8 @@
 // Pattern: mirrors featureBossWithDraft.test.js and sheetMetalFlange.test.js.
 
 import { describe, it, expect } from 'vitest'
-// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
-// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
-// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 
 import { parseFeature, serializeFeature } from '../lib/occtRunner.js'

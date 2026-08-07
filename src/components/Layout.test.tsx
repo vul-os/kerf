@@ -95,7 +95,6 @@ import { vi, beforeAll, afterAll } from 'vitest'
 // Stub react-router-dom
 vi.mock('react-router-dom', () => ({
   Link: ({ to, children, ...rest }) => {
-    // @ts-expect-error - no @types/node in this toolchain
     const React = require('react')
     return React.createElement('a', { href: to, ...rest }, children)
   },
@@ -104,7 +103,6 @@ vi.mock('react-router-dom', () => ({
 
 // Stub lucide-react icons
 vi.mock('lucide-react', () => {
-  // @ts-expect-error - no @types/node in this toolchain
   const React = require('react')
   const stub = (name) => (props) => React.createElement('span', { 'data-icon': name })
   return {

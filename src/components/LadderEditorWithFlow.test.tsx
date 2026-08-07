@@ -36,11 +36,8 @@ import { describe, it, expect } from 'vitest'
 // @types/node isn't part of this project's toolchain (tsconfig.json's `types` array is
 // T-500's — see docs/typescript-migration.md), so these Node builtins (used only for this
 // file's source-inspection assertions) are untyped at this boundary.
-// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
-// @ts-expect-error - no @types/node in this toolchain
 import { fileURLToPath } from 'url'
-// @ts-expect-error - no @types/node in this toolchain
 import path from 'path'
 
 // Pure-logic helpers we can test without a DOM.

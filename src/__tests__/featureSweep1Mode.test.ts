@@ -22,6 +22,12 @@ import path from 'path'
 
 import { parseFeature, serializeFeature, newFeatureId } from '../lib/occtRunner.js'
 
+// FeatureNode is a discriminated union over `op`; these assertions read op-specific fields
+// (target_id, sketch_path, diameter, ...). Widen where the node is pulled out of the doc and
+// leave the assertions themselves alone.
+const asAny = <T>(v: T) => v as T & Record<string, any>
+
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // ── 1. Node round-trip ────────────────────────────────────────────────────────
@@ -29,7 +35,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 describe('sweep1 node round-trip (mode field)', () => {
   const BASE = {
     id: 'sweep1-1',
-    op: 'sweep1',
+    op: 'sweep1' as const,
     profile_sketch_path: '/circle.sketch',
     path_sketch_path: '/helix.sketch',
     scale: 1.0,
@@ -42,7 +48,7 @@ describe('sweep1 node round-trip (mode field)', () => {
       const json = JSON.stringify({ version: 1, name: 'T', features: [node] })
       const parsed = parseFeature(json)
       expect(parsed.features).toHaveLength(1)
-      const out = parsed.features[0]
+      const out = asAny(parsed.features[0])
       expect(out.op).toBe('sweep1')
       expect(out.mode).toBe(mode)
       expect(out.profile_sketch_path).toBe('/circle.sketch')
@@ -51,7 +57,7 @@ describe('sweep1 node round-trip (mode field)', () => {
   }
 
   it('serializeFeature round-trips a corrected_frenet sweep1 node', () => {
-    const node = { ...BASE, mode: 'corrected_frenet' }
+    const node = { ...BASE, mode: 'corrected_frenet' as const }
     const tree = {
       version: 1,
       name: 'Ring',

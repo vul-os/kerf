@@ -574,7 +574,7 @@ function matchKey(src, i, end, name) {
 // identifier and uniquified against any existing identifiers used as
 // `import X from ...`. We deliberately don't rename existing imports — if
 // the user already imports a sketch under a wonky name, we use it as-is.
-export function ensureSketchImport(source, path, suggestedBinding) {
+export function ensureSketchImport(source, path, suggestedBinding?) {
   if (!source) source = ''
   // Look for a pre-existing `import X from '<path>'` (single OR double quotes).
   const re = /^[ \t]*import\s+([A-Za-z_$][\w$]*)\s+from\s+(['"])([^'"\n]+)\2;?[ \t]*$/gm

@@ -72,6 +72,9 @@
   --line: #93a0b3;
   --mono: 'SF Mono', 'JetBrains Mono', 'Menlo', 'Consolas', ui-monospace, monospace;
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  /* Shell width. Widened in one place at >=1600px rather than per-section, so the
+     auto-fill card grids can actually use a large display instead of leaving it empty. */
+  --shell: 1180px;
 }
 
 html { scroll-behavior: smooth; overflow-x: hidden; }
@@ -87,7 +90,7 @@ body {
 a { color: var(--text-2); text-decoration: none; transition: color .15s; }
 a:hover { color: var(--text); }
 .mono { font-family: var(--mono); }
-.container { max-width: 1180px; margin: 0 auto; padding: 0 1.5rem; }
+.container { max-width: var(--shell); margin: 0 auto; padding: 0 1.5rem; }
 .gold { color: var(--gold); }
 svg { display: block; }
 
@@ -100,7 +103,7 @@ svg { display: block; }
 /* ── Nav ── */
 .nav {
   position: fixed; top: 10px; left: 1rem; right: 1rem; z-index: 100;
-  max-width: 1180px; margin: 0 auto;
+  max-width: var(--shell); margin: 0 auto;
   background: rgba(10, 11, 13, 0.82);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--border); border-radius: 12px;
@@ -219,7 +222,7 @@ section.tight { padding: 3.25rem 0; }
 .is-scrollable + .scroll-hint { display: block; }
 
 /* ── Persona strip ── */
-.persona-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+.persona-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 1rem; }
 .persona-card { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); overflow: hidden; transition: border-color .15s, background .15s, transform .15s; }
 .persona-card:hover { border-color: var(--text-4); background: var(--elevated); transform: translateY(-2px); }
 .persona-illust { border-bottom: 1px solid var(--border-2); aspect-ratio: 16/10; }
@@ -230,7 +233,7 @@ section.tight { padding: 3.25rem 0; }
 .persona-body p { font-size: .8rem; color: var(--text-3); line-height: 1.55; }
 
 /* ── Domain spotlights ── */
-.spot-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.spot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(322px, 1fr)); gap: 1rem; }
 .spot-card { display: flex; border: 1px solid var(--border); border-radius: 13px; background: var(--surface); overflow: hidden; transition: border-color .15s, background .15s, transform .15s; }
 .spot-card:hover { border-color: var(--text-4); background: var(--elevated); transform: translateY(-2px); }
 .spot-illust { flex: none; width: 108px; border-right: 1px solid var(--border-2); display: flex; align-items: center; justify-content: center; padding: .55rem; }
@@ -261,7 +264,7 @@ section.tight { padding: 3.25rem 0; }
 .fact-card p { font-family: var(--mono); font-size: .8125rem; color: var(--text-3); line-height: 1.55; }
 
 /* ── Sketch to fab ── */
-.step-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+.step-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(214px, 1fr)); gap: 1rem; }
 .step-card { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 13px; background: var(--surface); overflow: hidden; transition: border-color .15s, transform .15s; }
 .step-card:hover { border-color: var(--text-4); transform: translateY(-2px); }
 .step-card .illus-box { border-bottom: 1px solid var(--border-2); aspect-ratio: 4/3; }
@@ -284,7 +287,7 @@ section.tight { padding: 3.25rem 0; }
 /* ── Capability grid ── */
 .group-label { font-family: var(--mono); font-size: .75rem; text-transform: uppercase; letter-spacing: .18em; color: var(--dim); margin: 1.75rem 0 .85rem; }
 .group-label:first-of-type { margin-top: 0; }
-.cap-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.cap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
 .cap-card { border: 1px solid var(--border); border-radius: 13px; background: var(--surface); overflow: hidden; transition: border-color .15s, background .15s, transform .15s; }
 .cap-card:hover { border-color: var(--text-4); background: var(--elevated); transform: translateY(-2px); }
 .cap-card .illus-box { border-bottom: 1px solid var(--border-2); aspect-ratio: 16/10; }
@@ -304,7 +307,7 @@ section.tight { padding: 3.25rem 0; }
 .rigor-card .body p { font-size: .86rem; color: var(--text-3); line-height: 1.65; }
 
 /* ── Kernel depth ── */
-.proof-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.proof-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
 .proof-card { border: 1px solid var(--border); border-radius: 14px; background: var(--surface); padding: 1.3rem 1.35rem; transition: border-color .15s, background .15s; }
 .proof-card:hover { border-color: var(--text-4); background: var(--elevated); }
 .proof-card .eyebrow { font-size: .75rem; letter-spacing: .1em; margin-bottom: .7rem; }
@@ -401,11 +404,11 @@ footer.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; }
 .footer-right { font-family: var(--mono); font-size: .8125rem; color: var(--dim); }
 
 /* ── Responsive ── */
-@media (max-width: 1080px) {
-  .persona-grid { grid-template-columns: repeat(2, 1fr); }
-  .spot-grid { grid-template-columns: repeat(2, 1fr); }
-  .cap-grid { grid-template-columns: repeat(2, 1fr); }
-  .step-grid { grid-template-columns: repeat(2, 1fr); }
+/* Large displays. The card grids above are auto-fill, so they already reflow at any width;
+   this is the one rule that lets a 1600px+ monitor show MORE columns rather than just wider
+   empty gutters either side of a 1180px column. */
+@media (min-width: 1600px) {
+  :root { --shell: 1400px; }
 }
 @media (max-width: 900px) {
   .hero-grid { grid-template-columns: 1fr; }
@@ -426,10 +429,6 @@ footer.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; }
 }
 @media (max-width: 680px) {
   .nav-links a.hide-sm { display: none; }
-  .persona-grid { grid-template-columns: 1fr; }
-  .spot-grid { grid-template-columns: 1fr; }
-  .cap-grid { grid-template-columns: 1fr; }
-  .step-grid { grid-template-columns: repeat(2, 1fr); }
   .dev-grid { grid-template-columns: 1fr; }
   .stat-panel ul { grid-template-columns: 1fr 1fr; }
   .hero { padding-top: 7.5rem; }
@@ -480,6 +479,7 @@ footer.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; }
   <div class="nav-links">
     <a href="#domains" class="hide-sm">domains</a>
     <a href="#capabilities" class="hide-sm">capabilities</a>
+    <a href="./compare.html">compare</a>
     <a href="#workshop" class="hide-sm">workshop</a>
     <a href="./docs.html">docs</a>
     <a href="https://github.com/vul-os/kerf" target="_blank" rel="noreferrer" class="gh">
@@ -1231,6 +1231,7 @@ docker compose up">copy</button></div>
       </div>
       <div class="footer-links">
         <a href="./docs.html">docs</a>
+        <a href="./compare.html">compare</a>
         <a href="https://github.com/vul-os/kerf" target="_blank" rel="noreferrer">github</a>
         <a href="https://github.com/vul-os/kerf/blob/main/ROADMAP.md" target="_blank" rel="noreferrer">roadmap</a>
         <a href="https://github.com/vul-os/kerf/issues" target="_blank" rel="noreferrer">issues</a>

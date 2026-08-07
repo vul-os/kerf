@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>Kerf vs Autodesk Eagle — capability comparison</title>
+<meta name="description" content="22 specific capabilities compared between Kerf and Autodesk Eagle, each with a documentation source.">
+<meta property="og:title" content="Kerf vs Autodesk Eagle — capability comparison">
+<meta property="og:description" content="22 specific capabilities compared between Kerf and Autodesk Eagle, each with a documentation source.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0b0d'/%3E%3Crect x='7' y='6' width='3.5' height='20' fill='%23ffd633'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg:#0a0b0d; --surface:#111318; --elevated:#16181f; --panel:#0f1115;
+  --border:#23262f; --border-2:#1a1d24;
+  --text:#f5f3ee; --text-2:#a6a9b4; --text-3:#8f94a3; --text-4:#3a3d47;
+  --dim:#868a97; --code-dim:#8d95a6;
+  --gold:#ffd633; --gold-2:#ffe566; --gold-dim:#cca82a;
+  --green:#7BB661; --cyan:#6bd4ff; --violet:#c8a2ff;
+  --mono:'SF Mono','JetBrains Mono','Menlo','Consolas',ui-monospace,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+}
+*,*::before,*::after { box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body { margin:0; background:var(--bg); color:var(--text); font-family:var(--sans); line-height:1.6; -webkit-font-smoothing:antialiased; overflow-x:hidden; }
+a { color:var(--text-2); text-decoration:none; }
+a:hover { color:var(--text); }
+:focus-visible { outline:2px solid var(--gold); outline-offset:2px; border-radius:3px; }
+
+/* Wider than the landing's 1180px: this page's job is a dense capability table, and on a
+   1440px+ display the extra room is the difference between a readable grid and a column. */
+.container { max-width:1320px; margin:0 auto; padding:0 1.5rem; }
+
+.nav { max-width:1320px; margin:0 auto; padding:1rem 1.5rem; display:flex; align-items:center; justify-content:space-between; }
+.nav-logo { display:flex; align-items:center; gap:.55rem; font-family:var(--mono); font-weight:700; font-size:.95rem; color:var(--text); }
+.nav-logo svg { width:22px; height:22px; }
+.nav-links { display:flex; align-items:center; gap:1.6rem; font-family:var(--mono); font-size:.85rem; }
+.nav-links a.active { color:var(--gold); }
+.nav-links .gh { display:flex; align-items:center; gap:.4rem; }
+.nav-links .gh svg { width:15px; height:15px; }
+.nav-cta { border:1px solid var(--gold-dim); color:var(--gold) !important; border-radius:7px; padding:.34rem .8rem; }
+.nav-cta:hover { background:rgba(255,214,51,.1); }
+.vulos-home img, .vulos-foot img { display:block; border-radius:5px; }
+
+section { padding:3.5rem 0; }
+.hero { padding:3rem 0 2.25rem; border-bottom:1px solid var(--border-2); }
+.eyebrow { font-family:var(--mono); font-size:.75rem; letter-spacing:.16em; text-transform:uppercase; color:var(--gold-dim); margin:0 0 .7rem; }
+h1 { font-size:clamp(1.9rem,4vw,2.9rem); line-height:1.12; letter-spacing:-.02em; margin:0 0 .9rem; }
+h2 { font-size:clamp(1.25rem,2.2vw,1.6rem); letter-spacing:-.01em; margin:0 0 1.1rem; }
+.lede { font-size:1.03rem; color:var(--text-3); max-width:46rem; margin:0; line-height:1.72; }
+
+/* Summary strip — auto-fit means it reflows on its own instead of needing a breakpoint each. */
+.stat-strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1px; background:var(--border-2); border:1px solid var(--border-2); border-radius:12px; overflow:hidden; margin-top:2rem; }
+.stat { background:var(--surface); padding:1.05rem 1.2rem; }
+.stat b { display:block; font-family:var(--mono); font-size:1.5rem; color:var(--gold); font-weight:700; letter-spacing:-.02em; }
+.stat span { font-size:.82rem; color:var(--text-3); }
+
+.cat { margin-bottom:2.75rem; }
+.cat-head { display:flex; align-items:baseline; gap:.75rem; margin-bottom:1.1rem; padding-bottom:.55rem; border-bottom:1px solid var(--border-2); }
+.cat-head h2 { margin:0; }
+.cat-head .count { font-family:var(--mono); font-size:.78rem; color:var(--dim); }
+
+.tool-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(310px,1fr)); gap:1rem; }
+.tool { display:flex; flex-direction:column; gap:.75rem; border:1px solid var(--border); border-radius:13px; background:var(--surface); padding:1.1rem 1.2rem; transition:border-color .15s, background .15s, transform .15s; }
+.tool:hover { border-color:var(--text-4); background:var(--elevated); transform:translateY(-2px); }
+.tool h3 { margin:0; font-size:1rem; color:var(--text); letter-spacing:-.01em; }
+.tool p { margin:0; font-size:.85rem; color:var(--text-3); line-height:1.6; }
+.tool .meta { display:flex; align-items:center; justify-content:space-between; gap:.75rem; font-family:var(--mono); font-size:.72rem; color:var(--dim); margin-top:auto; padding-top:.3rem; }
+
+/* Coverage bar — proportional, with a text equivalent beneath so it is not colour-only. */
+.bar { display:flex; height:6px; border-radius:999px; overflow:hidden; background:var(--border-2); }
+.bar i { display:block; height:100%; }
+.bar .yes { background:var(--green); }
+.bar .partial { background:var(--gold); }
+.bar .paid { background:var(--violet); }
+.bar .no { background:var(--text-4); }
+.bar-key { font-family:var(--mono); font-size:.72rem; color:var(--text-3); }
+
+/* Capability table. It scrolls inside its own box rather than pushing the page sideways. */
+.table-wrap { overflow-x:auto; border:1px solid var(--border-2); border-radius:12px; background:var(--surface); }
+table { border-collapse:collapse; width:100%; min-width:640px; font-size:.88rem; }
+thead th { position:sticky; top:0; background:var(--elevated); text-align:left; font-family:var(--mono); font-size:.74rem; letter-spacing:.09em; text-transform:uppercase; color:var(--text-3); font-weight:600; padding:.7rem .9rem; border-bottom:1px solid var(--border); }
+tbody td { padding:.72rem .9rem; border-bottom:1px solid var(--border-2); vertical-align:top; color:var(--text-2); }
+tbody tr:last-child td { border-bottom:0; }
+tbody tr:hover td { background:rgba(255,255,255,.015); }
+td.feat { color:var(--text); width:38%; }
+td.feat small { display:block; font-family:var(--mono); font-size:.7rem; color:var(--dim); margin-top:.2rem; }
+.chip { display:inline-block; font-family:var(--mono); font-size:.72rem; padding:.14rem .5rem; border-radius:999px; border:1px solid transparent; white-space:nowrap; }
+.chip.yes { color:var(--green); border-color:rgba(123,182,97,.4); background:rgba(123,182,97,.09); }
+.chip.partial { color:var(--gold); border-color:rgba(255,214,51,.35); background:rgba(255,214,51,.08); }
+.chip.paid { color:var(--violet); border-color:rgba(200,162,255,.35); background:rgba(200,162,255,.08); }
+.chip.no { color:var(--text-3); border-color:var(--border); }
+.chip.unknown { color:var(--dim); border-color:var(--border); }
+td .note { display:block; margin-top:.3rem; font-size:.8rem; color:var(--text-3); line-height:1.5; }
+td .src { font-family:var(--mono); font-size:.71rem; color:var(--code-dim); word-break:break-word; }
+td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
+
+.back { display:inline-flex; align-items:center; gap:.4rem; font-family:var(--mono); font-size:.8rem; color:var(--text-3); margin-bottom:1.1rem; }
+.legend { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin:1.4rem 0 0; padding:0; list-style:none; font-family:var(--mono); font-size:.75rem; color:var(--text-3); }
+
+.honest { margin-top:2.25rem; border:1px solid var(--border); border-left:2px solid var(--gold-dim); border-radius:10px; background:var(--panel); padding:1.05rem 1.2rem; }
+.honest p { margin:0; font-size:.86rem; color:var(--text-3); line-height:1.68; }
+
+.site-footer { border-top:1px solid var(--border-2); padding:2.25rem 0; margin-top:2rem; }
+.footer-inner { display:flex; flex-wrap:wrap; align-items:center; gap:1rem 2rem; font-family:var(--mono); font-size:.8rem; color:var(--dim); }
+.footer-left { display:flex; align-items:center; gap:.5rem; color:var(--text); font-weight:700; }
+.footer-left svg { width:20px; height:20px; }
+.footer-links { display:flex; flex-wrap:wrap; gap:1.2rem; }
+.vulos-foot { display:flex; align-items:center; gap:.45rem; }
+.footer-right { margin-left:auto; }
+
+@media (max-width:680px) {
+  .nav-links { gap:1rem; }
+  .nav-links a.hide-sm { display:none; }
+  .footer-right { margin-left:0; }
+  section { padding:2.5rem 0; }
+}
+@media (prefers-reduced-motion:reduce) {
+  html { scroll-behavior:auto; }
+  .tool { transition:none; }
+  .tool:hover { transform:none; }
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="../index.html" class="nav-logo"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0a0b0d"/><rect x="7" y="6" width="3.5" height="20" fill="#ffd633"/><polygon points="10.5,16 26,6 26,13" fill="#ffd633"/><polygon points="10.5,16 26,19 26,26" fill="#ffd633"/></svg> kerf</a>
+  <div class="nav-links">
+    <a href="../index.html#domains" class="hide-sm">domains</a>
+    <a href="../compare.html" class="active">compare</a>
+    <a href="../index.html#workshop" class="hide-sm">workshop</a>
+    <a href="../docs.html">docs</a>
+    <a href="https://github.com/vul-os/kerf" target="_blank" rel="noreferrer" class="gh"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span>github</span></a>
+    <a href="../index.html#install" class="nav-cta">install</a>
+    <a class="vulos-home" href="https://vulos.org" target="_blank" rel="noopener" title="Vulos — open, self-hostable software" aria-label="Vulos — open, self-hostable software"><img src="../assets/vulos-logo.png" alt="" width="22" height="22"></a>
+  </div>
+</nav>
+<main>
+
+<section class="hero">
+  <div class="container">
+    <a class="back" href="../compare.html">← all comparisons</a>
+    <p class="eyebrow">Electronics</p>
+    <h1>Kerf vs Autodesk Eagle</h1>
+    <p class="lede">Eagle democratised PCB design for a generation of makers — its successor lives inside Fusion, but Kerf gives you the same workflow without the subscription.</p>
+    <div class="stat-strip">
+      <div class="stat"><b>22/22</b><span>in Kerf today</span></div>
+      <div class="stat"><b>0/22</b><span>in Autodesk Eagle (included)</span></div>
+      <div class="stat"><b>11</b><span>behind a paid tier</span></div>
+      <div class="stat"><b>2026-05-24</b><span>last reviewed</span></div>
+    </div>
+  </div>
+</section>
+<section>
+  <div class="container">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Capability</th><th>Kerf</th><th>Autodesk Eagle</th></tr></thead>
+        <tbody>
+      <tr>
+        <td class="feat">Schematic capture (KiCad round-trip, ERC)<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-electronics/</code>
+        </td>
+        <td>
+          <span class="chip paid">paid tier</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">PCB layout (tscircuit, KiCad round-trip)<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-electronics/</code>
+        </td>
+        <td>
+          <span class="chip paid">paid tier</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">Interactive PCB editing (route/place)<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-electronics/</code>
+        </td>
+        <td>
+          <span class="chip paid">paid tier</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">Autoroute (FreeRouting)<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-electronics/src/kerf_electronics/freerouting/freerouting.py</code>
+        </td>
+        <td>
+          <span class="chip paid">paid tier</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">DRC / ERC<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-electronics/</code>
+        </td>
+        <td>
+          <span class="chip paid">paid tier</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">SPICE simulation<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-electronics/</code>
+        </td>
+        <td>
+          <span class="chip paid">paid tier</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">Signal integrity (Z0/crosstalk/eye/IBIS)<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-electronics/src/kerf_electronics/si</code>
+        </td>
+        <td>
+          <span class="chip no">no</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">EMC (radiated/shielding/limits)<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-electronics/src/kerf_electronics/emc</code>
+        </td>
+        <td>
+          <span class="chip no">no</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">PDN (DC IR-drop + AC sweep)<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-electronics/src/kerf_electronics/pdn</code>
+        </td>
+        <td>
+          <span class="chip no">no</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">PCB thermal<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-electronics/src/kerf_electronics/thermal_board.py</code>
+        </td>
+        <td>
+          <span class="chip partial">partial</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">Antenna / link budget<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-electronics/</code>
+        </td>
+        <td>
+          <span class="chip no">no</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">Battery/BMS, motor/gate/LED driver sizing<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-electronics/</code>
+        </td>
+        <td>
+          <span class="chip no">no</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">Gerber RS-274X output<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-electronics/</code>
+        </td>
+        <td>
+          <span class="chip paid">paid tier</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">IPC-2581 output<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-electronics/</code>
+        </td>
+        <td>
+          <span class="chip no">no</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">ODB++ output<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-electronics/</code>
+        </td>
+        <td>
+          <span class="chip no">no</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">ULP scripting<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-sdk/</code>
+        </td>
+        <td>
+          <span class="chip paid">paid tier</span>
+          
+          <a class="src" href="https://blogs.autodesk.com/eagle/eagle-tips-tricks/ultimate-guide-to-eagle-ulp-scripts/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">Component library<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-electronics/</code>
+        </td>
+        <td>
+          <span class="chip paid">paid tier</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">MCAD/ECAD integration<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-electronics/</code>
+        </td>
+        <td>
+          <span class="chip paid">paid tier</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">Silicon synthesis (Yosys) / STA / GDS<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-silicon/</code>
+        </td>
+        <td>
+          <span class="chip no">no</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">Silicon P&amp;R (OpenLane)<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-silicon/</code>
+        </td>
+        <td>
+          <span class="chip no">no</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">Analog PVT-corner simulation<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">packages/kerf-silicon/src/kerf_silicon/analog/pvt.py</code>
+        </td>
+        <td>
+          <span class="chip no">no</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr>
+      <tr>
+        <td class="feat">License model<small>D6</small></td>
+        <td>
+          <span class="chip yes">yes</span>
+          <code class="note">LICENSE</code>
+        </td>
+        <td>
+          <span class="chip paid">paid tier</span>
+          
+          <a class="src" href="https://www.autodesk.com/products/eagle" target="_blank" rel="noreferrer nofollow">source ↗</a>
+        </td>
+      </tr></tbody>
+      </table>
+    </div>
+    <ul class="legend">
+      <li><span class="chip yes">yes</span> shipped</li>
+      <li><span class="chip partial">partial</span> works with limits</li>
+      <li><span class="chip paid">paid tier</span> present, but behind an add-on or meter</li>
+      <li><span class="chip no">no</span> not available</li>
+    </ul>
+    <div class="honest">
+      <p><strong>Corrections welcome.</strong> These rows are read off published documentation on the date shown and go stale as products ship. If a row is wrong, <a href="https://github.com/vul-os/kerf/issues" target="_blank" rel="noreferrer">open an issue</a> — the source file is <code>public/compare/eagle.md</code> and every claim in it carries a link.</p>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-left"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0a0b0d"/><rect x="7" y="6" width="3.5" height="20" fill="#ffd633"/><polygon points="10.5,16 26,6 26,13" fill="#ffd633"/><polygon points="10.5,16 26,19 26,26" fill="#ffd633"/></svg> kerf</div>
+      <div class="footer-links">
+        <a href="../docs.html">docs</a>
+        <a href="../compare.html">compare</a>
+        <a href="https://github.com/vul-os/kerf" target="_blank" rel="noreferrer">github</a>
+        <a href="https://github.com/vul-os/kerf/blob/main/ROADMAP.md" target="_blank" rel="noreferrer">roadmap</a>
+      </div>
+      <a class="vulos-foot" href="https://vulos.org" target="_blank" rel="noopener"><img src="../assets/vulos-logo.png" alt="" width="18" height="18"><span>Part of <strong>Vulos</strong> — open, self-hostable software</span></a>
+      <div class="footer-right">made in south africa 🇿🇦</div>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

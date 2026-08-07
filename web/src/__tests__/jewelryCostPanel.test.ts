@@ -33,7 +33,7 @@ const apiSrc = readFileSync(
 const llmDocSrc = (() => {
   try {
     return readFileSync(
-      path.resolve(__dirname, '../../packages/kerf-chat/llm_docs/jewelry_metal_cost.md'), 'utf8',
+      path.resolve(__dirname, '../../../packages/kerf-chat/llm_docs/jewelry_metal_cost.md'), 'utf8',
     )
   } catch { return '' }
 })()
@@ -371,7 +371,7 @@ describe('LLM doc jewelry_metal_cost.md', () => {
 
 describe('Python plugin — tool module registration', () => {
   const pluginSrc = readFileSync(
-    path.resolve(__dirname, '../../packages/kerf-cad-core/src/kerf_cad_core/plugin.py'),
+    path.resolve(__dirname, '../../../packages/kerf-cad-core/src/kerf_cad_core/plugin.py'),
     'utf8',
   )
 

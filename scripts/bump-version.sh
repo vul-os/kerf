@@ -77,7 +77,7 @@ done
 
 # ── 4. package.json ───────────────────────────────────────────────────────────
 # Match the "version": "X.Y.Z" line specifically (first occurrence is enough).
-sedi "s/\"version\": \"${CURRENT}\"/\"version\": \"${NEW}\"/" package.json
+sedi "s/\"version\": \"${CURRENT}\"/\"version\": \"${NEW}\"/" web/package.json
 
 # ── 5. Commit ─────────────────────────────────────────────────────────────────
 FILES_TO_STAGE=(

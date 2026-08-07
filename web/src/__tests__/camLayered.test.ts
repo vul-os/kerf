@@ -34,7 +34,7 @@ const camViewSrc = readFileSync(
 const migrationSrc = (() => {
   const migDir = path.resolve(
     __dirname,
-    '../../packages/kerf-core/src/kerf_core/db/migrations',
+    '../../../packages/kerf-core/src/kerf_core/db/migrations',
   )
   try {
     let found = ''
@@ -192,7 +192,7 @@ describe('Migration 054 — cam_layered kind', () => {
 
 describe('Python plugin registration', () => {
   const pluginSrc = readFileSync(
-    path.resolve(__dirname, '../../packages/kerf-cad-core/src/kerf_cad_core/plugin.py'),
+    path.resolve(__dirname, '../../../packages/kerf-cad-core/src/kerf_cad_core/plugin.py'),
     'utf8',
   )
 
@@ -206,7 +206,7 @@ describe('Python plugin registration', () => {
 describe('LLM doc cam_layered.md', () => {
   const docPath = path.resolve(
     __dirname,
-    '../../packages/kerf-chat/llm_docs/cam_layered.md',
+    '../../../packages/kerf-chat/llm_docs/cam_layered.md',
   )
   const docSrc = (() => {
     try { return readFileSync(docPath, 'utf8') } catch { return '' }

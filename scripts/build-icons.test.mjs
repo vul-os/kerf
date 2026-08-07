@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const BRAND_LOGO = path.join(ROOT, 'brand', 'logo.svg')
-const PUBLIC_FAVICON = path.join(ROOT, 'public', 'favicon.svg')
+const PUBLIC_FAVICON = path.join(ROOT, 'web', 'public', 'favicon.svg')
 const GENERATOR = path.join(ROOT, 'scripts', 'build-icons.mjs')
 
 function readOrThrow(p, label) {

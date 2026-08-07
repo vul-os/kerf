@@ -379,7 +379,7 @@ describe('round_brilliant facet count convention', () => {
     // the OCCT op honours when producing the crown prism facets.
     try {
       const pySrc = readFileSync(
-        path.resolve(__dirname, '../../packages/kerf-cad-core/src/kerf_cad_core/jewelry/gemstones.py'),
+        path.resolve(__dirname, '../../../packages/kerf-cad-core/src/kerf_cad_core/jewelry/gemstones.py'),
         'utf8',
       )
       expect(pySrc).toContain('"facet_count": 57')

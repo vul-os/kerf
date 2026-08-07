@@ -682,7 +682,7 @@ describe('T-25 — Python gem_seat.py fields present in source', () => {
   try {
     pySrc = readFileSync(
       path.resolve(__dirname,
-        '../../packages/kerf-cad-core/src/kerf_cad_core/jewelry/gem_seat.py'),
+        '../../../packages/kerf-cad-core/src/kerf_cad_core/jewelry/gem_seat.py'),
       'utf8',
     )
   } catch { /* Python file not present in this environment */ }
@@ -737,7 +737,7 @@ describe('T-25 — Python chain.py fields present in source', () => {
   try {
     pySrc = readFileSync(
       path.resolve(__dirname,
-        '../../packages/kerf-cad-core/src/kerf_cad_core/jewelry/chain.py'),
+        '../../../packages/kerf-cad-core/src/kerf_cad_core/jewelry/chain.py'),
       'utf8',
     )
   } catch { /* Python file not present */ }

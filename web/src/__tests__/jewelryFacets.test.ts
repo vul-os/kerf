@@ -376,7 +376,7 @@ describe('jewelryFacets — Python gemstones.py facet spec', () => {
   it('gemstones.py specifies facet_count 57 for round_brilliant', () => {
     try {
       const pySrc = readFileSync(
-        path.resolve(__dirname, '../../packages/kerf-cad-core/src/kerf_cad_core/jewelry/gemstones.py'),
+        path.resolve(__dirname, '../../../packages/kerf-cad-core/src/kerf_cad_core/jewelry/gemstones.py'),
         'utf8',
       )
       expect(pySrc).toContain('"facet_count": 57')
@@ -390,7 +390,7 @@ describe('jewelryFacets — Python gemstones.py facet spec', () => {
   it('gemstones.py specifies facet_count 57 for princess', () => {
     try {
       const pySrc = readFileSync(
-        path.resolve(__dirname, '../../packages/kerf-cad-core/src/kerf_cad_core/jewelry/gemstones.py'),
+        path.resolve(__dirname, '../../../packages/kerf-cad-core/src/kerf_cad_core/jewelry/gemstones.py'),
         'utf8',
       )
       expect(pySrc).toContain('"facet_count": 57')
@@ -403,7 +403,7 @@ describe('jewelryFacets — Python gemstones.py facet spec', () => {
   it('gemstones.py specifies step_rows for emerald, asscher, baguette', () => {
     try {
       const pySrc = readFileSync(
-        path.resolve(__dirname, '../../packages/kerf-cad-core/src/kerf_cad_core/jewelry/gemstones.py'),
+        path.resolve(__dirname, '../../../packages/kerf-cad-core/src/kerf_cad_core/jewelry/gemstones.py'),
         'utf8',
       )
       expect(pySrc).toContain('"step_rows"')

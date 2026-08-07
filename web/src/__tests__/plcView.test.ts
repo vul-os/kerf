@@ -42,7 +42,7 @@ const plcViewSrc = readFileSync(
 const migrationSrc = (() => {
   const migDir = path.resolve(
     __dirname,
-    '../../packages/kerf-core/src/kerf_core/db/migrations',
+    '../../../packages/kerf-core/src/kerf_core/db/migrations',
   )
   try {
     let found = ''

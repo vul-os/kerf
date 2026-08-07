@@ -307,7 +307,7 @@ describe('Toolbar — panel toggle buttons', () => {
 describe('kerf-electronics plugin — si_ibis registration', () => {
   it('plugin.py contains si_ibis in tool_modules', () => {
     const pluginSrc = readFileSync(
-      resolve(root, '../packages/kerf-electronics/src/kerf_electronics/plugin.py'),
+      resolve(root, '../../packages/kerf-electronics/src/kerf_electronics/plugin.py'),
       'utf8'
     )
     expect(pluginSrc).toMatch(/kerf_electronics\.tools\.si_ibis/)

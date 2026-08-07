@@ -5920,7 +5920,7 @@ export default function FeatureView({
       const result = await runFeatures(tree, sketches)
       const ms = Math.round(performance.now() - t0)
       if (seq !== seqRef.current) return
-      if ('stale' in result && result.stale) return
+      if ('stale' in result) return
       if ('error' in result) {
         setEvalState({ loading: false, error: result.error, ms })
         if (result.partial) {
@@ -5995,7 +5995,7 @@ export default function FeatureView({
     void partId
     const id = newFeatureId('push_pull')
     // T5: dual-write face_name (persistent) + face_id (legacy fallback).
-    const node = { id, op: 'push_pull', face_id: faceId, distance }
+    const node: Record<string, unknown> = { id, op: 'push_pull', face_id: faceId, distance }
     if (faceName) node.face_name = faceName
     updateTree((arr) => [...arr, node])
     setSelectedId(id)
@@ -6005,7 +6005,7 @@ export default function FeatureView({
   // ---- Sketch-on-face: handle a one-shot face pick that creates a sketch ----
   // T5: onFacePicked now receives { id, name, partId } from FeatureRenderer
   // (name is the persistent face name, id is the integer id).
-  const onFacePicked = useCallback(async (pickArg, legacyPartId) => {
+  const onFacePicked = useCallback(async (pickArg: any, legacyPartId?: any) => {
     // Support both legacy (faceId, partId) and new ({ id, name, partId }) shapes.
     let faceId, faceName, partId
     if (pickArg && typeof pickArg === 'object' && 'id' in pickArg) {
@@ -6282,7 +6282,11 @@ export default function FeatureView({
           <FeatureRenderer
             meshes={meshes}
             selection={featureSelection}
-            pickMode={featurePickMode}
+            // FeatureRenderer only implements click behavior for face/edge/pushpull
+            // (FeatureRendererProps['pickMode']); FeatureView also drives one-shot
+            // and sketch-on-face modes that don't change viewport click handling,
+            // so passing them through as-is here preserves existing behavior.
+            pickMode={featurePickMode as 'face' | 'edge' | 'pushpull' | null}
             onSelectionChange={setFeatureSelection}
             onFacePick={onFacePicked}
             onPushPullCommit={onPushPullCommit}

@@ -271,11 +271,13 @@ export interface DrawingDoc {
   currentSheet: number
 }
 
-export type FeaturePickMode = 'face' | 'edge' | 'pushpull' | 'sketch_on_face' | 'one_shot_face' | 'one_shot_edge'
+export type FeaturePickMode =
+  | 'face' | 'edge' | 'pushpull' | 'sketch_on_face'
+  | 'one_shot_face' | 'one_shot_edge' | 'one_shot_axis' | 'one_shot_plane'
 export interface FeaturePickTarget {
   featureId: string
   fieldKey: string
-  accept: 'face' | 'edge' | 'edge_multi'
+  accept: 'face' | 'edge' | 'edge_multi' | 'face_multi'
 }
 
 /** currentCircuit — mirrors workers.ts's CircuitCompileResult success branch (circuitRunner.js splitCircuitJson()). */

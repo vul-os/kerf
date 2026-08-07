@@ -1,8 +1,19 @@
-# Kerf hosted stack (2026-06-01)
+# Kerf hosted stack — RETIRED 2026-08-07
 
-Canonical reference for the infrastructure running `kerf.sh`.
-Self-hosters run their own Postgres + the OSS binary — none of this applies
-to them; see `deployment/fly.md` for the cloud deploy runbook.
+> **This describes infrastructure that no longer exists.** Kerf is an installed
+> application: there is no hosted tier, no `kerf.sh` service and no cloud
+> edition. The Fly.io configuration this document referenced
+> (`fly.toml`, `fly.worker.toml`, `scripts/deploy-fly.sh`, `deployment/fly.md`)
+> has been deleted.
+>
+> **If you are deploying Kerf, read [`deployment/README.md`](../../deployment/README.md)** —
+> the same Docker image and env-var contract run on your own machine or your own
+> cloud.
+>
+> Kept as a historical record rather than deleted: the reasoning below for the
+> database, object-storage and worker choices still informs a self-hoster sizing
+> their own deployment, and the "Why NOT Koyeb" section documents an evaluation
+> worth not repeating. Read every provider-specific instruction as past tense.
 
 ---
 
@@ -38,7 +49,7 @@ EU users.
   request. `min_machines_running = 1` keeps one machine warm.
 - Secrets managed via `fly secrets set` — never stored in the database or
   committed to source control.
-- Deploy: `./scripts/deploy-fly.sh` (wraps `fly deploy --remote-only`).
+- Deploy: was `./scripts/deploy-fly.sh` (removed with the hosted tier).
 
 ### Object storage
 

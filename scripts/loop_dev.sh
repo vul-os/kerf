@@ -8,8 +8,8 @@
 # Steps (only with --yes):
 #   1. Read DATABASE_URL from .env.dev (without echoing it)
 #   2. DROP + recreate the dev Neon schema
-#   3. Deploy to Fly.io dev via  scripts/deploy-fly.sh --env dev  (runs migrations
-#      via the release_command defined in fly.toml).
+#   3. (Removed 2026-08-07.) There is no hosted tier to deploy to — Kerf is an
+#      installed application. Run migrations locally with `kerf-server --migrate`.
 #   4. Smoke: curl /healthz + one API smoke hit
 #   5. Report
 #

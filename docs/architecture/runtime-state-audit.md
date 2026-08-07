@@ -16,7 +16,8 @@ _Anchored at commit `ccb91c8` — 2026-05-19_
   is added or presence is exposed.
 
   > This audit was originally written against a Koyeb deployment; kerf's Koyeb
-  > migration was withdrawn 2026-06-01 and Fly.io is the permanent deploy target
+  > migration was withdrawn 2026-06-01; the Fly.io hosted tier was itself removed
+  > 2026-08-07 when Kerf became an installed-only application
   > (see `decisions.md`). The multi-instance safety analysis below applies to any
   > horizontally-scaled container deployment, including Fly.
 
@@ -54,7 +55,7 @@ _Anchored at commit `ccb91c8` — 2026-05-19_
 
 ## 1 — Multi-instance Safety
 
-### Fly.io service config (historical note: originally audited on Koyeb)
+### Service config — HISTORICAL (Fly.io hosted tier, removed 2026-08-07)
 
 Kerf runs on Fly.io with a single `web` app/machine by default (the Koyeb
 migration this section originally described was withdrawn 2026-06-01; see

@@ -23,8 +23,13 @@
 //   19. Module loads without throwing (dynamic import)
 
 import { describe, it, expect, vi, beforeAll } from 'vitest'
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
-import { resolve } from 'path'
+// @ts-expect-error - no @types/node in this toolchain
+import { resolve, dirname } from 'path'
+// @ts-expect-error - no @types/node in this toolchain
+import { fileURLToPath } from 'url'
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const root = resolve(__dirname, '../../..')
 
@@ -35,7 +40,7 @@ function src(relPath) {
 // ── Global fetch mock ──────────────────────────────────────────────────────────
 
 beforeAll(() => {
-  global.fetch = vi.fn().mockResolvedValue({
+  (globalThis as any).fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => ({
       instrument: 'oscilloscope',

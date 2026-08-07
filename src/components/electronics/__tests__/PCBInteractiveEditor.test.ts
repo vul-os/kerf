@@ -15,13 +15,18 @@
 //   8. PCBInteractiveEditor source references the route/push-shove API endpoints
 
 import { describe, it, expect, vi, beforeAll } from 'vitest'
+// @ts-expect-error - no @types/node in this toolchain
 import { readFileSync } from 'fs'
-import { resolve } from 'path'
+// @ts-expect-error - no @types/node in this toolchain
+import { resolve, dirname } from 'path'
+// @ts-expect-error - no @types/node in this toolchain
+import { fileURLToPath } from 'url'
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 // ── Global fetch mock (returns empty arrays / ok) ─────────────────────────────
 
 beforeAll(() => {
-  global.fetch = vi.fn().mockResolvedValue({
+  (globalThis as any).fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => ({ ok: true, violations: [], pads: [], traces: [], keepouts: [] }),
     text: async () => '{}',

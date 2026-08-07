@@ -7,7 +7,7 @@ From a fresh clone to a running Kerf server in about five minutes.
 | Tool | Minimum version |
 |------|-----------------|
 | Python | 3.11 |
-| Node.js | 22 |
+| Node.tsx | 22 |
 | npm | 10 (ships with Node 22) |
 
 > **No database to install.** kerf uses an embedded **SQLite** database by

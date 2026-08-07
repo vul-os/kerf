@@ -21,7 +21,7 @@ is via the `kerf-sdk` Python package (`pip install kerf-sdk`).
 
 **Status: shipped**
 
-Browser-side parser at `src/lib/openscadToJscad.js` with 18 vitest tests. Drag-drop `.scad` onto the file tree → creates `.jscad`.
+Browser-side parser at `src/lib/openscadToJscad.ts` with 18 vitest tests. Drag-drop `.scad` onto the file tree → creates `.jscad`.
 
 **How to import:**
 - Drag a `.scad` file onto the file tree

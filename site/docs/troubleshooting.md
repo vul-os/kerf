@@ -387,7 +387,7 @@ React Router does not restore scroll position on navigation by default.
 
 **Fix (already landed)**
 
-`src/components/ScrollToTop.jsx` is mounted once in `App.jsx`. It calls
+`src/components/ScrollToTop.tsx` is mounted once in `App.tsx`. It calls
 `window.scrollTo({ top: 0, left: 0, behavior: 'instant' })` on every
 `location.pathname` change. If the component is accidentally removed or its
 `useEffect` dependency array is changed, navigation will stop scrolling to top.
@@ -411,7 +411,7 @@ render. If the bundle is large or the device is slow, this gap is visible.
 `index.html` includes a pre-React-mount loader (commit `c8409bf`) that renders
 a lightweight spinner from raw HTML/CSS before the JS bundle loads. The spinner
 is removed automatically when React mounts. If the loader disappears before
-routing resolves, check that the `Suspense` boundary in `App.jsx` wraps all
+routing resolves, check that the `Suspense` boundary in `App.tsx` wraps all
 lazy routes — `<Suspense fallback={<RouteFallback />}>` is the Kerf-Loader-
 backed fallback used for route-level code splitting.
 

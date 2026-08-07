@@ -210,7 +210,7 @@ next to a feed you follow ("Notify me"). The toggle:
 A push arriving with no Workshop tab open runs a **best-effort background
 refresh** of just the feeds you've enabled Wake for (`public/sw.js`'s `push`
 handler, using an access token the open tab last handed it via Cache
-Storage — see `src/lib/wakeState.js`) and shows one quiet, silent,
+Storage — see `src/lib/wakeState.ts`) and shows one quiet, silent,
 coalesced notification; clicking it (or an already-open tab receiving the
 push) just re-triggers that same targeted refresh. None of this ever
 guesses at *what* changed — the push payload carries nothing to guess from

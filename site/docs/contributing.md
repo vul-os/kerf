@@ -124,7 +124,7 @@ behind by one test file silently corrupts every file collected after it. That
 single mistake accounted for the bulk of a 1563-failure full-suite run.
 
 Frontend has no automated test suite yet — assume manual smoke testing
-plus the OpenSCAD vitest suite (`vitest run src/lib/openscadToJscad.test.js`).
+plus the OpenSCAD vitest suite (`vitest run src/lib/openscadToJscad.test.ts`).
 
 ## Code style
 

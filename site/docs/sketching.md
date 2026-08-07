@@ -194,7 +194,7 @@ When the source 3D geometry changes, the projection updates automatically.
 
 ## Multi-loop holes
 
-A single sketch can contain multiple closed loops. When extruded via the `.feature` pipeline, nested loops automatically become pockets (boolean subtract). The `sketchGeom2.js` converter sorts loops by area — largest is the outer boundary; smaller loops contained within are treated as holes (CW orientation subtracted from the outer CCW region).
+A single sketch can contain multiple closed loops. When extruded via the `.feature` pipeline, nested loops automatically become pockets (boolean subtract). The `sketchGeom2.ts` converter sorts loops by area — largest is the outer boundary; smaller loops contained within are treated as holes (CW orientation subtracted from the outer CCW region).
 
 ```json
 {

@@ -275,7 +275,7 @@ Parameters:
 - `max_vias` — via budget to limit routing density
 - `layer_count` — number of copper layers (default inferred from the board)
 
-The pipeline: `circuitToSpice.js` emits CircuitJSON → DSN writer produces Specctra DSN → FreeRouter subprocess → SES parser → CircuitJSON with routes written back.
+The pipeline: `circuitToSpice.ts` emits CircuitJSON → DSN writer produces Specctra DSN → FreeRouter subprocess → SES parser → CircuitJSON with routes written back.
 
 ### Manual + autoroute coexistence
 

@@ -195,7 +195,7 @@ publishing node; it is not built, and this row is the record of that.
   therefore only replay ciphertexts the emitter really produced — it cannot mint
   new ones under the device's push key.
 
-`src/lib/__tests__/serviceWorkerWakeGate.test.js` drives the shipped
+`src/lib/__tests__/serviceWorkerWakeGate.test.ts` drives the shipped
 `public/sw.js` source (not a reimplementation) and asserts a replayed ping, a
 flood of distinct fresh nonces, an over-hour-budget series, a corrupt cache
 record and an unusable Cache Storage are all refused.

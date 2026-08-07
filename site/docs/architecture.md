@@ -217,7 +217,7 @@ Web Push wake path (kerf-local, adapted from substrate capability ⑥'s Wake,
 `dmtap/substrate/ROLES.md` §8) — a content-free "new revision" ping that lets
 a follower skip re-crawl polling. Both halves are implemented: the
 server-side subscription registry + send path, and the frontend
-(`public/sw.js`'s service worker + `src/lib/wake.js`'s `PushManager`
+(`public/sw.js`'s service worker + `src/lib/wake.ts`'s `PushManager`
 orchestration + the Workshop's "Notify me" toggle). It is **not** a
 conformant profile of ROLES.md §8.1 — kerf registers the subscription on the
 feed *author's* node rather than the subscriber's own, so §8.2's

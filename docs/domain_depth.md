@@ -70,9 +70,9 @@ Strongest domain. PlaneGCS sketcher + full OCCT feature set are wired in-browser
 | 2D drawings (views/dims/sections) | [x] (backend) + [~] (UI) | live B-rep HLR projection (projectFileWithHLR) + auto-dimension; no GD&T-placement UI |
 | GD&T on drawings / MBD / PMI | [~] | data model + auto-propose only; no UI |
 | Sheet metal | [~] | single flange + unfold + flat DXF + bend table (K-factor/BD/spring-back); no hem/relief/jog/multi-flange |
-| Configurations / family variants | [x] | engine + ConfigurationsPanel.jsx wired in Editor.jsx |
+| Configurations / family variants | [x] | engine + ConfigurationsPanel.tsx wired in Editor.tsx |
 | Direct edit (push-pull) | [~] | planar only; no move/delete-face |
-| Persistent face naming | [~] | **two disconnected systems** (Python DAG vs OCCT `faceNaming.js`) |
+| Persistent face naming | [~] | **two disconnected systems** (Python DAG vs OCCT `faceNaming.ts`) |
 | Model units system | [ ] | kernel is unitless |
 
 ## D2 — Structural / FEA  · engine ~70% · UI ~10%
@@ -98,7 +98,7 @@ Solid per-code calculators + real FEM via solver bridges. Almost no UI.
 | P-delta / 2nd-order | [ ] | θ checked, not amplified |
 | Section database | [~] (backend) | only ~12 sections vs 300+ |
 | Eurocode design (EC2/3/5/8) | [x] (backend) | full coverage: EC2 concrete + EC3 steel + EC5 timber + EC8 seismic |
-| Any structural UI panel | [~] | only `femDisplacement.js` displacement render |
+| Any structural UI panel | [~] | only `femDisplacement.ts` displacement render |
 
 ## D3 — Machine elements  · engine ~75% · UI ~0%
 
@@ -318,7 +318,7 @@ PLC + firmware + wiring genuinely usable; power/solar backend-only.
 ## Cross-cutting priorities (ranked feature-add backlog)
 
 **Tier 1 — surface existing engines in the UI (highest ROI, engines already built):**
-1. Fix `BIMView` null feed (Editor.jsx:1960) — Revit-class engine, viewer is one line from working.
+1. Fix `BIMView` null feed (Editor.tsx:1960) — Revit-class engine, viewer is one line from working.
 2. Wire viscous airfoil Cd into `aero_airfoil_polar` (engine exists, returns placeholder drag).
 3. Analysis panels for the deep backend engines: structural (per-code checks), machine elements, SI/EMC/PDN, power/solar, civil, dynamics — even simple form+result panels unlock huge latent value.
 4. Silicon flow viewer (synth/STA/GDS) — deep engine, zero UI.

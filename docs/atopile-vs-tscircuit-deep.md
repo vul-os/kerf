@@ -18,7 +18,7 @@ Both tools emerged from the same insight: schematic and PCB design tools are fun
 |--|---------|-----------|
 | First public release | 2023 | 2023 |
 | Primary language | atopile DSL (`.ato`) | TypeScript / TSX |
-| Runtime | Python compiler + KiCad backend | Node.js / browser / Deno |
+| Runtime | Python compiler + KiCad backend | Node.tsx / browser / Deno |
 | Licence | Apache 2.0 | MIT |
 | Community locus | [atopile.io](https://atopile.io) | [tscircuit.com](https://tscircuit.com) |
 | Kerf integration | Not integrated | Native (`.circuit.tsx`) |

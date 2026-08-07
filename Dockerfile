@@ -22,14 +22,14 @@
 # stage is discarded (only /app/dist is copied into the final image).
 FROM node:22-slim AS frontend
 WORKDIR /app
-COPY package.json package-lock.json* ./
+COPY web/package.json web/package-lock.json* ./
 # npm install (not ci): sharp/libvips pull platform-specific optional deps
 # (@emnapi/*) that a darwin-generated lockfile can't fully pin for the
 # linux/amd64 build image; install heals them while still honouring the lock.
 RUN npm install --no-audit --no-fund
-COPY vite.config.js index.html ./
-COPY src/ ./src/
-COPY public/ ./public/
+COPY web/vite.config.js web/index.html web/tsconfig.json ./
+COPY web/src/ ./src/
+COPY web/public/ ./public/
 COPY scripts/ ./scripts/
 # build-docs-manifest.mjs (run by `npm run build`) walks docs/ and
 # packages/*/llm_docs/*.md — without these the /docs manifest is empty.

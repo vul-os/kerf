@@ -449,7 +449,7 @@ describe('Toolbar — new panel toggle buttons', () => {
 describe('kerf-electronics plugin — new module registrations', () => {
   it('plugin.py registers pcb_3d_clearance module', () => {
     const pluginSrc = readFileSync(
-      resolve(root, '../packages/kerf-electronics/src/kerf_electronics/plugin.py'),
+      resolve(root, '../../packages/kerf-electronics/src/kerf_electronics/plugin.py'),
       'utf8'
     )
     expect(pluginSrc).toMatch(/kerf_electronics\.pcb_3d_clearance/)
@@ -457,7 +457,7 @@ describe('kerf-electronics plugin — new module registrations', () => {
 
   it('plugin.py registers idf_roundtrip module', () => {
     const pluginSrc = readFileSync(
-      resolve(root, '../packages/kerf-electronics/src/kerf_electronics/plugin.py'),
+      resolve(root, '../../packages/kerf-electronics/src/kerf_electronics/plugin.py'),
       'utf8'
     )
     expect(pluginSrc).toMatch(/kerf_electronics\.idf_roundtrip/)

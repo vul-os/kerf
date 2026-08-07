@@ -42,7 +42,8 @@ import sharp from 'sharp'
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
-const PUBLIC = path.join(ROOT, 'public')
+// Frontend static assets moved to web/public with the rest of the frontend.
+const PUBLIC = path.join(ROOT, 'web', 'public')
 const BRAND_LOGO = path.join(ROOT, 'brand', 'logo.svg')
 
 const COLORS = {

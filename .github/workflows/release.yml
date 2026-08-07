@@ -151,9 +151,11 @@ jobs:
           cache: npm
 
       - name: Install frontend dependencies
+        working-directory: web
         run: npm install --no-audit --no-fund  # npm install (not ci): lockfiles written on macOS drop platform-conditional optional deps (npm/cli#4828)
 
       - name: Build frontend
+        working-directory: web
         run: npm run build
         env:
           VITE_APP_VERSION: ${{ github.ref_name }}
@@ -167,7 +169,7 @@ jobs:
           mkdir -p "release/${STAGE}"
 
           # Pre-built frontend
-          cp -r dist "release/${STAGE}/dist"
+          cp -r web/dist "release/${STAGE}/dist"
 
           # Python plugin packages (source only, no kerf-sdk — it has its
           # own PyPI release cadence via sdk-v* tags) and repo metadata the
@@ -204,7 +206,7 @@ jobs:
           # second workflow used to rebuild it in a job of its own, which meant
           # two builds of the same commit and no guarantee the bytes matched.
           VERSION="${TAG#v}"
-          tar -czf "release-out/kerf-frontend-${VERSION}.tar.gz" -C dist .
+          tar -czf "release-out/kerf-frontend-${VERSION}.tar.gz" -C web/dist .
 
           # Verbatim, tag-stamped copy of install.sh. It is NOT pinned to the
           # tag: install.sh resolves the latest release at run time unless
@@ -368,6 +370,7 @@ jobs:
           echo "Python dependency manifest: ${sbom}"
 
       - name: Install npm dependencies
+        working-directory: web
         run: npm install --no-audit --no-fund  # npm install (not ci): lockfiles written on macOS drop platform-conditional optional deps (npm/cli#4828)
 
       - name: Generate npm SBOM (CycloneDX)

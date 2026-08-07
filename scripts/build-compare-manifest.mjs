@@ -20,9 +20,20 @@
 // copy. Works against an empty dir (writes empty items array, exit 0).
 
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { join, dirname } from 'node:path'
 
-const ROOT = process.cwd()
+// Paths resolve from this script's own location, not process.cwd(). The frontend moved from the
+// repo root into web/, so npm scripts now run with cwd=web and a cwd-relative ROOT silently
+// pointed at web/ — build-docs-manifest emitted an EMPTY manifest because web/docs does not
+// exist, and nothing failed loudly. sync-site-docs.mjs already did it this way.
+// KERF_ROOT lets the unit tests point the builder at a temp fixture dir; without it these
+// resolve from the script's own location so npm scripts running with cwd=web still find the
+// repo-root content they read.
+const ROOT = process.env.KERF_ROOT || join(dirname(fileURLToPath(import.meta.url)), '..')
+// Static assets the frontend serves now live under web/public.
+// Under KERF_ROOT (tests) public/ sits directly in the fixture; in the repo it is web/public.
+const PUBLIC = process.env.KERF_ROOT ? join(ROOT, 'public') : join(ROOT, 'web', 'public')
 
 // ---------------------------------------------------------------------------
 // YAML frontmatter parser — handles scalars + the `features:` nested list.
@@ -291,7 +302,7 @@ function normalizeFeature(f) {
 // Collect
 // ---------------------------------------------------------------------------
 
-const compareDir = join(ROOT, 'public', 'compare')
+const compareDir = join(PUBLIC, 'compare')
 const items = []
 
 if (existsSync(compareDir)) {
@@ -348,7 +359,7 @@ items.sort((a, b) => {
 
 const outputItems = items.map(({ order: _order, ...rest }) => rest)
 
-const outDir = join(ROOT, 'public')
+const outDir = PUBLIC
 mkdirSync(outDir, { recursive: true })
 const outPath = join(outDir, 'compare-manifest.json')
 

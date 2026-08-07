@@ -201,7 +201,7 @@ describe('LLM doc — feature_sheet_metal.md', () => {
   let docSrc = ''
   try {
     docSrc = readFileSync(
-      path.resolve(__dirname, '../../packages/kerf-chat/llm_docs/feature_sheet_metal.md'),
+      path.resolve(__dirname, '../../../packages/kerf-chat/llm_docs/feature_sheet_metal.md'),
       'utf8',
     )
   } catch {
@@ -245,7 +245,7 @@ describe('Python spec — sheet_metal.py', () => {
   let pySrc = ''
   try {
     pySrc = readFileSync(
-      path.resolve(__dirname, '../../packages/kerf-cad-core/src/kerf_cad_core/sheet_metal.py'),
+      path.resolve(__dirname, '../../../packages/kerf-cad-core/src/kerf_cad_core/sheet_metal.py'),
       'utf8',
     )
   } catch {
@@ -283,7 +283,7 @@ describe('Python spec — sheet_metal.py', () => {
   it('plugin.py registers kerf_cad_core.sheet_metal', () => {
     try {
       const pluginSrc = readFileSync(
-        path.resolve(__dirname, '../../packages/kerf-cad-core/src/kerf_cad_core/plugin.py'),
+        path.resolve(__dirname, '../../../packages/kerf-cad-core/src/kerf_cad_core/plugin.py'),
         'utf8',
       )
       expect(pluginSrc).toContain('"kerf_cad_core.sheet_metal"')

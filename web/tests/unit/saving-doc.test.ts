@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const DOC_PATH = path.resolve(__dirname, '../../docs/save-and-recovery.md')
+const DOC_PATH = path.resolve(__dirname, '../../../docs/save-and-recovery.md')
 
 describe('docs/save-and-recovery.md — file exists', () => {
   it('the doc file is present in the repo', () => {

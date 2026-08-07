@@ -43,7 +43,7 @@ function runScript(cwd) {
   const result = spawnSync('node', [SCRIPT], {
     cwd,
     encoding: 'utf8',
-    env: { ...process.env },
+    env: { ...process.env, KERF_ROOT: cwd },
   })
   return result
 }

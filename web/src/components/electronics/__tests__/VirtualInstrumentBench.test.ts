@@ -242,7 +242,7 @@ describe('VirtualInstrumentBench — result display', () => {
 describe('kerf-electronics plugin — virtual instrument registration', () => {
   it('plugin.py registers eda_virtual_instrument tool module', () => {
     const pluginSrc = readFileSync(
-      resolve(root, '../packages/kerf-electronics/src/kerf_electronics/plugin.py'),
+      resolve(root, '../../packages/kerf-electronics/src/kerf_electronics/plugin.py'),
       'utf8'
     )
     expect(pluginSrc).toMatch(/virtual_instruments\.tools/)
@@ -250,7 +250,7 @@ describe('kerf-electronics plugin — virtual instrument registration', () => {
 
   it('plugin.py registers eda_probe_nodes via same module', () => {
     const pluginSrc = readFileSync(
-      resolve(root, '../packages/kerf-electronics/src/kerf_electronics/plugin.py'),
+      resolve(root, '../../packages/kerf-electronics/src/kerf_electronics/plugin.py'),
       'utf8'
     )
     // The module registers both eda_virtual_instrument + eda_probe_nodes

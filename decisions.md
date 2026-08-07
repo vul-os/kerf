@@ -1196,3 +1196,36 @@ composites, fracture) self-register via the @register decorator and publish no
 TOOLS list; plugin.py unpacked `mod.TOOLS` unconditionally, so each raised
 AttributeError, was logged as a load failure, and skipped the `provides.append`
 lines after it. Now uses `getattr(mod, 'TOOLS', ())`.
+
+## 2026-08-07 — pygit2 fix verified; E2E 4/28 -> 8/28, remainder is frontend
+
+**Verified in CI.** Declaring `pygit2` cleared it: `plugin_register_failed` went
+from firing on every boot to **zero**, and the API came up. Response census for
+the run: **226 x 200, 4 x 201, 8 x 404** — versus the previous run's 218 x
+`/api/workspaces 404` alone. E2E moved **4 passed -> 8 passed** (24 -> 20 failed).
+
+The 8 remaining 404s are `/api/pub/workshop`, `/api/pub/follows`, a library-part
+GET and `/.well-known/dmtap-pub/wake-key` — the pub module, which is an opt-in
+extra (`pip install 'kerf[server,pub]'`), so those are expected absent rather
+than broken.
+
+**What the remaining 20 are.** They now share one signature, not the old
+`waitForURL` timeout: 15 of them fail at
+`expect(this.newFileDropdownButton).toBeVisible({ timeout: 20_000 })`, i.e. the
+FileTree "New" button never appears. The button and its accessible name are
+present in `FileTree.tsx` (`<span>New</span>`, matching
+`getByRole('button', {name: 'New', exact: true})`), so the likely cause is that
+the tree never renders — the editor does not reach a state with a loaded project
+— rather than a changed selector.
+
+**Why this was worth separating.** The old failure masked this one completely:
+every spec died at login-then-navigate, so nothing ever reached the editor. Only
+after the API came up did the real second fault become visible. Fixing the first
+did not "half fix" the suite — it revealed the next layer, which is a different
+problem in a different tier.
+
+**Not attempted this pass.** Diagnosing why the file tree does not render needs
+the app running against a live backend, which this environment cannot do (no
+postgres, kerf packages not importable). Guessing from Playwright output is what
+kept the pygit2 cause hidden; the next pass should install postgres and the
+`mech` persona locally rather than repeat that.

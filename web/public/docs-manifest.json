@@ -1,0 +1,74 @@
+{
+  "version": 2,
+  "generatedAt": "2026-08-07T15:33:24.743Z",
+  "groups": [
+    {
+      "id": "get-started",
+      "label": "Get started",
+      "items": []
+    },
+    {
+      "id": "domains",
+      "label": "Domains",
+      "items": [
+        {
+          "id": "architecture-bim",
+          "title": "Architecture / BIM",
+          "route": "/domains/architecture-bim",
+          "order": 0
+        },
+        {
+          "id": "automotive",
+          "title": "Automotive",
+          "route": "/domains/automotive",
+          "order": 1
+        },
+        {
+          "id": "electronics",
+          "title": "Electronics",
+          "route": "/domains/electronics",
+          "order": 2
+        },
+        {
+          "id": "jewelry",
+          "title": "Jewelry",
+          "route": "/domains/jewelry",
+          "order": 3
+        },
+        {
+          "id": "mechanical",
+          "title": "Mechanical",
+          "route": "/domains/mechanical",
+          "order": 4
+        }
+      ]
+    },
+    {
+      "id": "workflows",
+      "label": "Workflows",
+      "items": []
+    },
+    {
+      "id": "cloud",
+      "label": "Cloud features",
+      "items": []
+    },
+    {
+      "id": "reference",
+      "label": "Reference",
+      "items": []
+    },
+    {
+      "id": "develop",
+      "label": "Develop",
+      "items": []
+    },
+    {
+      "id": "whats-new",
+      "label": "What's new",
+      "items": []
+    }
+  ],
+  "entries": [],
+  "items": []
+}

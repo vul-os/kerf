@@ -1087,3 +1087,34 @@ vendor-shaped credential.
 email surface (strip), git panel UI (rewire onto local git + configured
 remotes), `docs/github-sync.md` (rewrite as "GitHub as an ordinary
 remote").
+
+## 2026-08-07 — Remove Fly.io, keep the self-hosting guides
+
+**Decision.** Deleted `fly.toml`, `fly.worker.toml`, `scripts/deploy-fly.sh` and
+`deployment/fly.md`. Kept `deployment/{aws,gcp,azure,digitalocean}.md`,
+`kubernetes.yaml`, `cloudrun.yaml` and the object-storage guides
+(`s3`, `gcs`, `spaces`, `tigris`, `azure-blob`).
+
+**Why the split.** The instruction was "delete fly and the old configs for cloud
+setup, this is now an installed application". Read literally that could mean
+deleting `deployment/` entirely, but the two groups are not the same thing:
+
+  * The Fly config described **our** hosted deployment — the thing that ran
+    `kerf.sh`. There is no hosted Kerf now, so it describes something that does
+    not exist and would rot.
+  * The other guides describe **the user's** deployment onto infrastructure they
+    already own. Self-hosting on your own GCP project is still an installed
+    application — it is the same Docker image and the same env-var contract, just
+    not on your laptop. Deleting them removes capability from users rather than
+    removing a stale claim about us.
+
+So the rule applied was: remove what asserts a hosted Kerf exists, keep what
+helps someone run their own.
+
+**Also changed.** `deployment/README.md` led with "Production runs on Fly.io.
+That's what powers kerf.sh" — replaced with a statement that Kerf is an installed
+application with no hosted tier and no cloud edition. Fly rows dropped from the
+provider-comparison and migration-command tables.
+
+**Left alone deliberately.** `docker-compose.yml` and the root `Dockerfile` — an
+installed application still ships as a container, and both are how you run it.

@@ -10,6 +10,7 @@
     "check:selftest": "node check-render.mjs --selftest"
   },
   "dependencies": {
+    "mermaid": "^11.16.1",
     "playwright": "^1.44.0"
   }
 }

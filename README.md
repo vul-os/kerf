@@ -93,10 +93,6 @@ File revisions (per-file undo history) + local git (commits, branches, GitHub sy
   <em>The 2D parametric sketcher — constrained geometry that feeds the OpenCascade B-rep feature tree via "New feature from sketch".</em>
 </p>
 
-<p align="center">
-  <img src="docs/screenshots/parity.png" alt="The feature-parity index: 57 tools surveyed across 1,397 sourced capability rows" width="100%">
-  <em>The <a href="https://vulos.org/projects/kerf/parity.html">feature-parity report</a> — 57 tools, 1,397 capability rows, every claim linked to the vendor's own documentation. It leads with the 16 rows Kerf does <strong>not</strong> cover.</em>
-</p>
 
 ## Quick start (standalone)
 
@@ -168,20 +164,40 @@ filesystem_root = "~/kerf-projects"
 Every Kerf install is a full node: the app, your project store, and an optional gateway for publishing to (and reading from) the Workshop. Nothing talks to the network unless you configure it.
 
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'fontFamily':'ui-monospace, SFMono-Regular, Menlo, monospace','primaryColor':'transparent','primaryBorderColor':'#14b8a6','primaryTextColor':'#8f969e','lineColor':'#8a8f98','nodeBorder':'#5f8f8a','edgeLabelBackground':'transparent','clusterBorder':'#3f8f86','clusterBkg':'transparent'}}}%%
+%%{init: {'theme':'base','themeVariables':{
+  'fontFamily':'ui-monospace, SFMono-Regular, Menlo, monospace',
+  'fontSize':'14px',
+  'primaryColor':'#fffbe6',
+  'primaryTextColor':'#1f2328',
+  'primaryBorderColor':'#b8860b',
+  'lineColor':'#57606a',
+  'tertiaryColor':'#f6f8fa',
+  'tertiaryTextColor':'#1f2328',
+  'tertiaryBorderColor':'#57606a',
+  'clusterBkg':'#f6f8fa',
+  'clusterBorder':'#8c959f',
+  'edgeLabelBackground':'#ffffff'
+}}}%%
 flowchart LR
-  subgraph Node["Your machine — one kerf node"]
-    App["kerf app<br/>sketch · model · simulate · CAM"]
-    Store[("your storage<br/>Postgres + files / S3")]
-    Pub["pub module<br/>publish · follow · pin · fetch"]
+  subgraph Node["🖥️  Your machine — one kerf node"]
+    direction TB
+    App["<b>kerf app</b><br/>sketch · model · simulate · CAM"]
+    Store[("<b>your storage</b><br/>Postgres + files / S3")]
+    Pub["<b>pub module</b><br/>publish · follow · pin · fetch"]
     App --> Store
     App --> Pub
   end
-  Pub -. "optional: publish your signed feed" .-> GW["a gateway<br/>(yours, or anyone's) — plain HTTPS"]
-  Feed["a workshop feed you follow<br/>(another node, signed)"] -. "optional: fetch + verify" .-> Pub
 
-  classDef optional stroke-dasharray: 4 4;
-  class GW,Feed optional;
+  GW["<b>a gateway</b><br/>yours, or anyone's<br/>plain HTTPS"]
+  Feed["<b>a workshop feed</b><br/>another node, signed"]
+
+  Pub -. "optional — publish your signed feed" .-> GW
+  Feed -. "optional — fetch + verify" .-> Pub
+
+  classDef core fill:#fffbe6,stroke:#b8860b,stroke-width:2px,color:#1f2328;
+  classDef outside fill:#ffffff,stroke:#8c959f,stroke-width:1.5px,stroke-dasharray:5 4,color:#1f2328;
+  class App,Store,Pub core;
+  class GW,Feed outside;
 ```
 
 - **One node type.** A homelab box running Kerf and a hosted always-on node run identical software — the only difference is uptime, not capability.

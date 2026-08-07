@@ -44,17 +44,23 @@ a:hover { color:var(--text); }
 .vulos-home img, .vulos-foot img { display:block; border-radius:5px; }
 
 section { padding:3.5rem 0; }
-.hero { padding:3rem 0 2.25rem; border-bottom:1px solid var(--border-2); }
+.hero { padding:3.25rem 0 2.5rem; border-bottom:1px solid var(--border-2); }
+/* Two columns. The copy is capped at 46rem for readability, so with the stats stacked
+   underneath the right half of the hero sat empty above ~1200px and the page read as one
+   narrow column. Stats now occupy that space. */
+.hero-grid { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr); gap:3.5rem; align-items:start; }
+@media (max-width:980px) { .hero-grid { grid-template-columns:1fr; gap:2rem; } }
 .eyebrow { font-family:var(--mono); font-size:.75rem; letter-spacing:.16em; text-transform:uppercase; color:var(--gold-dim); margin:0 0 .7rem; }
 h1 { font-size:clamp(1.9rem,4vw,2.9rem); line-height:1.12; letter-spacing:-.02em; margin:0 0 .9rem; }
 h2 { font-size:clamp(1.25rem,2.2vw,1.6rem); letter-spacing:-.01em; margin:0 0 1.1rem; }
 .lede { font-size:1.03rem; color:var(--text-3); max-width:46rem; margin:0; line-height:1.72; }
 
 /* Summary strip — auto-fit means it reflows on its own instead of needing a breakpoint each. */
-.stat-strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1px; background:var(--border-2); border:1px solid var(--border-2); border-radius:12px; overflow:hidden; margin-top:2rem; }
-.stat { background:var(--surface); padding:1.05rem 1.2rem; }
-.stat b { display:block; font-family:var(--mono); font-size:1.5rem; color:var(--gold); font-weight:700; letter-spacing:-.02em; }
-.stat span { font-size:.82rem; color:var(--text-3); }
+.stat-strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px; background:var(--border-2); border:1px solid var(--border-2); border-radius:14px; overflow:hidden; }
+.hero .stat-strip { grid-template-columns:1fr 1fr; }
+.stat { background:var(--surface); padding:1.15rem 1.25rem; }
+.stat b { display:block; font-family:var(--mono); font-size:1.65rem; color:var(--gold); font-weight:700; letter-spacing:-.02em; line-height:1.1; }
+.stat span { display:block; margin-top:.25rem; font-size:.8rem; color:var(--text-3); line-height:1.45; }
 
 .cat { margin-bottom:2.75rem; }
 .cat-head { display:flex; align-items:baseline; gap:.75rem; margin-bottom:1.1rem; padding-bottom:.55rem; border-bottom:1px solid var(--border-2); }
@@ -140,11 +146,13 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
 <main>
 
 <section class="hero">
-  <div class="container">
-    <p class="eyebrow">Feature parity</p>
-    <h1>Feature parity, line by line</h1>
-    <p class="lede">Every row is a specific capability, checked against the competitor's own documentation and against a named file in this repository. Each claim links to its source.</p>
-    <p class="lede" style="margin-top:.9rem"><strong style="color:var(--text-2)">Read this first:</strong> the rows are <em>Kerf's</em> capability list, so this measures how much of what Kerf does a given tool also does — not how much of that tool Kerf replaces. Every one of these products does things Kerf has no answer for at all, and those things are not rows here. Treat it as a coverage map, never as a score.</p>
+  <div class="container hero-grid">
+    <div>
+      <p class="eyebrow">Feature parity</p>
+      <h1>Feature parity, line by line</h1>
+      <p class="lede">Every row is a specific capability, checked against the competitor's own documentation and against a named file in this repository. Each claim links to its source.</p>
+      <p class="lede" style="margin-top:.9rem"><strong style="color:var(--text-2)">Read this first:</strong> the rows are <em>Kerf's</em> capability list, so this measures how much of what Kerf does a given tool also does — not how much of that tool Kerf replaces. Every one of these products does things Kerf has no answer for at all, and those things are not rows here. Treat it as a coverage map, never as a score.</p>
+    </div>
     <div class="stat-strip">
       <div class="stat"><b>57</b><span>tools surveyed</span></div>
       <div class="stat"><b>1,397</b><span>sourced capability rows</span></div>

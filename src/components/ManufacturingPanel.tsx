@@ -10,7 +10,7 @@
 //
 // Props: none — standalone panel
 
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import {
   Factory, CircuitBoard, Settings, Zap,
   Layers, Thermometer, Shield, Activity,
@@ -53,7 +53,8 @@ function fmt(v) {
 // Styles (dark mono palette)
 // ---------------------------------------------------------------------------
 
-const s = {
+// Typed so literals like flexDirection:'column' keep their CSSProperties meaning.
+const s: Record<string, CSSProperties> = {
   root: {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
     fontSize: 13,

@@ -273,7 +273,10 @@ function ThreadSwitcher({ threads, currentThreadId, onSelect, onCreate, onToggle
 // React tree — that's how we got `[object Object],[object Object],…` in the
 // rendered output. We do NOT use this for rendering; rendering passes the
 // real `children` so syntax-highlight spans survive.
-export function childrenToText(node: ReactNode): string {
+// `unknown`, not ReactNode: this is a defensive walker over whatever react-markdown hands a
+// custom renderer, which includes element-*like* objects ({type, props}) that are not real
+// ReactElements. Every branch below already guards with typeof/`in`.
+export function childrenToText(node: unknown): string {
   if (node == null || node === false) return ''
   if (typeof node === 'string' || typeof node === 'number') return String(node)
   if (Array.isArray(node)) return node.map(childrenToText).join('')

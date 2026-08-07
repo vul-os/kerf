@@ -20,6 +20,8 @@
 
 declare module 'node:fs' {
   export function readFileSync(path: string, encoding: string): string
+  // Needed by the extension-agnostic source probes (`existsSync(x.tsx) ? ... : x.jsx`).
+  export function existsSync(path: string): boolean
 }
 
 declare module 'node:url' {

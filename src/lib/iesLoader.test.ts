@@ -21,7 +21,8 @@ import { join } from 'path'
  
 declare global {
    
-  var process: { cwd(): string }
+  // env is read by sketcher.test.ts to point the planegcs loader at the wasm file.
+  var process: { cwd(): string; env: Record<string, string | undefined> }
 }
 
 // ── Synthetic IES fixture strings ─────────────────────────────────────────────

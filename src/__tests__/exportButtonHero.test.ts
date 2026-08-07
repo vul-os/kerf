@@ -7,9 +7,7 @@
 // internal open-state, so this pins the wiring contract at the source
 // level — same approach as the Python source-contract regressions.
 
-import { readFileSync } from 'node:fs'
-// @ts-expect-error - existsSync is not declared in this toolchain's narrow node:fs shim (src/cloud/__tests__/nodeTestShims.d.ts)
-import { existsSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { describe, it, expect } from 'vitest'

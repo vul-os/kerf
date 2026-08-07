@@ -31,11 +31,12 @@ vi.mock('@salusoft89/planegcs', () => {
 })
 
 import { solveSketch } from '../lib/sketchSolver.js'
+import type { SketchJSON } from '@/types'
 
-function emptySketch() {
+function emptySketch(): SketchJSON {
   return {
     version: 1, plane: { type: 'base', name: 'XY' },
-    entities: [{ id: 'origin', type: 'point', x: 0, y: 0 }],
+    entities: [{ id: 'origin', type: 'point' as const, x: 0, y: 0 }],
     constraints: [], visible_3d: [], solved: {}, metadata: {},
   }
 }
@@ -44,13 +45,13 @@ describe('GK-P38 — G2 curvature continuity constraint', () => {
   it('bezier_g2 does not crash the solver', async () => {
     const sketch = emptySketch()
     sketch.entities.push(
-      { id: 'a2', type: 'point', x: 7.0,  y: 4.0 },
-      { id: 'a3', type: 'point', x: 10.0, y: 0.0 },
-      { id: 'b1', type: 'point', x: 13.0, y: -4.0 },
-      { id: 'b2', type: 'point', x: 17.0, y: -4.0 },
+      { id: 'a2', type: 'point' as const, x: 7.0,  y: 4.0 },
+      { id: 'a3', type: 'point' as const, x: 10.0, y: 0.0 },
+      { id: 'b1', type: 'point' as const, x: 13.0, y: -4.0 },
+      { id: 'b2', type: 'point' as const, x: 17.0, y: -4.0 },
     )
     sketch.constraints.push({
-      id: 'g2_j', type: 'bezier_g2',
+      id: 'g2_j', type: 'bezier_g2' as const,
       p_minus2: 'a2', p_minus1: 'a2',
       p_junction: 'a3',
       p_plus1: 'b1', p_plus2: 'b2',
@@ -63,18 +64,18 @@ describe('GK-P38 — G2 curvature continuity constraint', () => {
   it('bezier_g2 removes 2 DOF from dofCount', async () => {
     const base = emptySketch()
     base.entities.push(
-      { id: 'pm2', type: 'point', x: 0,  y: 0 },
-      { id: 'pm1', type: 'point', x: 5,  y: 5 },
-      { id: 'pj',  type: 'point', x: 10, y: 0 },
-      { id: 'pp1', type: 'point', x: 15, y: -5 },
-      { id: 'pp2', type: 'point', x: 20, y: 0 },
+      { id: 'pm2', type: 'point' as const, x: 0,  y: 0 },
+      { id: 'pm1', type: 'point' as const, x: 5,  y: 5 },
+      { id: 'pj',  type: 'point' as const, x: 10, y: 0 },
+      { id: 'pp1', type: 'point' as const, x: 15, y: -5 },
+      { id: 'pp2', type: 'point' as const, x: 20, y: 0 },
     )
 
     const constrained = {
       ...base,
       entities: [...base.entities],
       constraints: [{
-        id: 'g2_j', type: 'bezier_g2',
+        id: 'g2_j', type: 'bezier_g2' as const,
         p_minus2: 'pm2', p_minus1: 'pm1',
         p_junction: 'pj',
         p_plus1: 'pp1', p_plus2: 'pp2',
@@ -90,19 +91,19 @@ describe('GK-P38 — G2 curvature continuity constraint', () => {
   it('symmetric Bezier segments with G2 solve without conflict', async () => {
     const sketch = emptySketch()
     sketch.entities.push(
-      { id: 'a0', type: 'point', x: 0,  y: 0 },
-      { id: 'a1', type: 'point', x: 3,  y: 4 },
-      { id: 'a2', type: 'point', x: 7,  y: 4 },
-      { id: 'a3', type: 'point', x: 10, y: 0 },
-      { id: 'b1', type: 'point', x: 13, y: -4 },
-      { id: 'b2', type: 'point', x: 17, y: -4 },
-      { id: 'b3', type: 'point', x: 20, y: 0 },
+      { id: 'a0', type: 'point' as const, x: 0,  y: 0 },
+      { id: 'a1', type: 'point' as const, x: 3,  y: 4 },
+      { id: 'a2', type: 'point' as const, x: 7,  y: 4 },
+      { id: 'a3', type: 'point' as const, x: 10, y: 0 },
+      { id: 'b1', type: 'point' as const, x: 13, y: -4 },
+      { id: 'b2', type: 'point' as const, x: 17, y: -4 },
+      { id: 'b3', type: 'point' as const, x: 20, y: 0 },
     )
     sketch.constraints.push(
-      { id: 'fix_a0', type: 'fixed', point: 'a0', x: 0, y: 0 },
-      { id: 'fix_b3', type: 'fixed', point: 'b3', x: 20, y: 0 },
+      { id: 'fix_a0', type: 'fixed' as const, point: 'a0', x: 0, y: 0 },
+      { id: 'fix_b3', type: 'fixed' as const, point: 'b3', x: 20, y: 0 },
       {
-        id: 'g2_j', type: 'bezier_g2',
+        id: 'g2_j', type: 'bezier_g2' as const,
         p_minus2: 'a2', p_minus1: 'a2',
         p_junction: 'a3',
         p_plus1: 'b1', p_plus2: 'b2',
@@ -117,18 +118,18 @@ describe('GK-P38 — G2 curvature continuity constraint', () => {
     const { make_gcs_wrapper } = await import('@salusoft89/planegcs')
     const sketch = emptySketch()
     sketch.entities.push(
-      { id: 'pm1', type: 'point', x: 5,  y: 5 },
-      { id: 'pj',  type: 'point', x: 10, y: 0 },
-      { id: 'pp1', type: 'point', x: 15, y: -5 },
+      { id: 'pm1', type: 'point' as const, x: 5,  y: 5 },
+      { id: 'pj',  type: 'point' as const, x: 10, y: 0 },
+      { id: 'pp1', type: 'point' as const, x: 15, y: -5 },
     )
     sketch.constraints.push({
-      id: 'g2', type: 'bezier_g2',
+      id: 'g2', type: 'bezier_g2' as const,
       p_minus2: 'pm1', p_minus1: 'pm1',
       p_junction: 'pj',
       p_plus1: 'pp1', p_plus2: 'pp1',
     })
     await solveSketch(sketch)
-    const wrapper = await make_gcs_wrapper.mock.results[make_gcs_wrapper.mock.results.length - 1].value
+    const wrapper = await (make_gcs_wrapper as unknown as { mock: { results: { value: any }[] } }).mock.results[(make_gcs_wrapper as unknown as { mock: { results: { value: any }[] } }).mock.results.length - 1].value
     const prims = wrapper.primitives
 
     // G1: collinearity

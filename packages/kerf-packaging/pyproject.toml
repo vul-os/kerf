@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerf-packaging"
-version = "0.1.3"
+version = "0.1.4"
 license = { text = "MIT" }
 classifiers = ["License :: OSI Approved :: MIT License"]
 description = "Packaging / dieline plugin for Kerf — folding carton + corrugated box"

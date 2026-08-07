@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerf-wiring"
-version = "0.1.3"
+version = "0.1.4"
 description = "Wiring / cable-harness diagram plugin for Kerf (.wiring → SVG via WireViz)"
 readme = "README.md"
 license = { text = "MIT" }

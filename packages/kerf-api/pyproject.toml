@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerf-api"
-version = "0.1.3"
+version = "0.1.4"
 description = "Kerf API plugin: REST surface for files, projects, workspaces"
 requires-python = ">=3.11"
 license = { text = "MIT" }

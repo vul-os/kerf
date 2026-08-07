@@ -1267,3 +1267,39 @@ discovering it the way pygit2 was discovered.
 **Kept as a report, not a gate.** Exit code is always 0: a legitimate new
 transitive can appear at any time, and a red build over `starlette` would train
 people to ignore it.
+
+## 2026-08-07 — Backend security pass
+
+**SQL injection: none.** Six sites build SQL with an f-string, all safe —
+`sqlite_backend.py` interpolates an integer savepoint depth, `migrations/runner.py`
+interpolates a module-level ledger table constant. No user input reaches a query
+string; everything else uses asyncpg parameter binding.
+
+**CORS: one real fix.** `kerf_core/app.py` had
+
+    allow_origins=[config.cors_origin, "http://localhost:5173"],
+    allow_credentials=True,
+
+with the Vite dev-server origin present unconditionally. Every deployment —
+including one reachable from a network — permanently accepted credentialed
+cross-origin requests from `http://localhost:5173`. Now appended only when
+`config.local_mode` is set. It is a dev convenience and does not belong in a
+hardened config: anything able to serve on that port on the user's machine could
+drive the authenticated API.
+
+**Route auth: 66 of 218 routes carry no auth dependency — NOT treated as 66 bugs.**
+A large share are public by design (`/refresh`, `/logout`, `/reset-password`,
+`/health`) and Kerf is local-first, so unauthenticated compute is plausibly
+intended when `LOCAL_MODE=true`. The ones worth a decision are the expensive
+compute endpoints — `/run-fem`, `/run-spice`, `/autoroute`, `/run-rf-study`,
+`/compute-pour-fill`, `/lint-plc` — which on a network-exposed instance are a
+denial-of-service surface: unauthenticated, unbounded CPU.
+
+I did not add auth to them. Doing so would change the product's behaviour for
+every local user, which is the majority case and the documented one, and the
+right answer is probably "require auth only when local_mode is false" rather than
+a blanket dependency. That is a product decision, and a wrong guess breaks the
+default install.
+
+**Not yet done:** path-traversal review of the file handlers, `npm audit`,
+`pip-audit`.

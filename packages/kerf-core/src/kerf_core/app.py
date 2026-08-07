@@ -123,9 +123,19 @@ def create_app(config: Config | None = None, config_path: str = "") -> FastAPI:
         lifespan=lifespan,
     )
 
+    # The Vite dev server origin is trusted ONLY in local mode. It used to be in this
+    # list unconditionally, alongside allow_credentials=True — so every deployment,
+    # including one reachable from a network, permanently accepted credentialed
+    # cross-origin requests from http://localhost:5173. That is a dev convenience, and
+    # it does not belong in a hardened config; anything able to serve on that port on
+    # the user's machine could drive the authenticated API.
+    _origins = [config.cors_origin]
+    if config.local_mode:
+        _origins.append("http://localhost:5173")
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[config.cors_origin, "http://localhost:5173"],
+        allow_origins=_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

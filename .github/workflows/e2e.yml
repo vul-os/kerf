@@ -90,16 +90,17 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: web/package-lock.json
 
       - name: Install root npm dependencies
+        working-directory: web
         run: npm ci
 
       - name: Install e2e npm dependencies
-        run: cd tests/e2e && npm ci
+        run: cd web/tests/e2e && npm ci
 
       - name: Install Playwright Chromium browser
-        run: cd tests/e2e && npx playwright install --with-deps chromium
+        run: cd web/tests/e2e && npx playwright install --with-deps chromium
 
       # -----------------------------------------------------------------------
       # Run tests
@@ -125,7 +126,7 @@ jobs:
           # index.html CSP (connect-src 'self') — every spec would then fail on
           # the sign-in page. The dev server proxies to the API instead; see
           # KERF_API_PROXY_TARGET in playwright.config.ts.
-        run: cd tests/e2e && npm test
+        run: cd web/tests/e2e && npm test
 
       # -----------------------------------------------------------------------
       # Artefacts (always uploaded so failures are debuggable)

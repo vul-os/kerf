@@ -107,7 +107,11 @@ async def register(app: FastAPI, ctx):
     # Wave 12E: material plasticity (J2 / Drucker-Prager / Mohr-Coulomb / Hill anisotropic)
     try:
         import kerf_fem.plasticity.plasticity_tools as _pl
-        for name, spec, handler in _pl.TOOLS:
+        # Self-registers via the @register decorator on import; only iterate TOOLS
+        # if the module actually publishes one. It does not, and the bare unpack
+        # raised AttributeError — which the except below logged as a load failure
+        # and which also skipped every provides.append that follows.
+        for name, spec, handler in getattr(_pl, 'TOOLS', ()):
             ctx.tools.register(name, spec, handler)
         provides.append("fem.plasticity-j2")
         provides.append("fem.plasticity-drucker-prager")
@@ -118,14 +122,22 @@ async def register(app: FastAPI, ctx):
     # Wave 12E: thermal-structural coupled + composite laminate (CLT) + failure criteria
     try:
         import kerf_fem.multiphysics.multiphysics_tools as _mp
-        for name, spec, handler in _mp.TOOLS:
+        # Self-registers via the @register decorator on import; only iterate TOOLS
+        # if the module actually publishes one. It does not, and the bare unpack
+        # raised AttributeError — which the except below logged as a load failure
+        # and which also skipped every provides.append that follows.
+        for name, spec, handler in getattr(_mp, 'TOOLS', ()):
             ctx.tools.register(name, spec, handler)
         provides.append("fem.thermo-elastic")
     except Exception as exc:
         logger.warning("kerf-fem: multiphysics tools failed to load: %s", exc)
     try:
         import kerf_fem.composites.composite_tools as _co
-        for name, spec, handler in _co.TOOLS:
+        # Self-registers via the @register decorator on import; only iterate TOOLS
+        # if the module actually publishes one. It does not, and the bare unpack
+        # raised AttributeError — which the except below logged as a load failure
+        # and which also skipped every provides.append that follows.
+        for name, spec, handler in getattr(_co, 'TOOLS', ()):
             ctx.tools.register(name, spec, handler)
         provides.append("fem.composite-clt")
         provides.append("fem.composite-failure")
@@ -144,7 +156,11 @@ async def register(app: FastAPI, ctx):
         logger.warning("kerf-fem: contact tools failed to load: %s", exc)
     try:
         import kerf_fem.fracture.fracture_tools as _ft
-        for name, spec, handler in _ft.TOOLS:
+        # Self-registers via the @register decorator on import; only iterate TOOLS
+        # if the module actually publishes one. It does not, and the bare unpack
+        # raised AttributeError — which the except below logged as a load failure
+        # and which also skipped every provides.append that follows.
+        for name, spec, handler in getattr(_ft, 'TOOLS', ()):
             ctx.tools.register(name, spec, handler)
         provides.append("fem.fracture-j-integral")
         provides.append("fem.fracture-stress-intensity")

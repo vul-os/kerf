@@ -5870,11 +5870,11 @@ export default function FeatureView({
     if (debounceRef.current) clearTimeout(debounceRef.current)
     const seq = ++seqRef.current
     debounceRef.current = setTimeout(async () => {
-      const referenced = new Set()
+      const referenced = new Set<string>()
       for (const node of tree) {
         if (node.sketch_path) referenced.add(node.sketch_path)
       }
-      const sketches = {}
+      const sketches: Record<string, string> = {}
       for (const path of referenced) {
         try {
           if (sketchCacheRef.current.has(path)) {
@@ -5920,8 +5920,8 @@ export default function FeatureView({
       const result = await runFeatures(tree, sketches)
       const ms = Math.round(performance.now() - t0)
       if (seq !== seqRef.current) return
-      if (result.stale) return
-      if (result.error) {
+      if ('stale' in result) return
+      if ('error' in result) {
         setEvalState({ loading: false, error: result.error, ms })
         if (result.partial) {
           const fallback = [{ id: 'partial', mesh: result.partial }]
@@ -5995,7 +5995,7 @@ export default function FeatureView({
     void partId
     const id = newFeatureId('push_pull')
     // T5: dual-write face_name (persistent) + face_id (legacy fallback).
-    const node = { id, op: 'push_pull', face_id: faceId, distance }
+    const node: Record<string, unknown> = { id, op: 'push_pull', face_id: faceId, distance }
     if (faceName) node.face_name = faceName
     updateTree((arr) => [...arr, node])
     setSelectedId(id)
@@ -6005,7 +6005,7 @@ export default function FeatureView({
   // ---- Sketch-on-face: handle a one-shot face pick that creates a sketch ----
   // T5: onFacePicked now receives { id, name, partId } from FeatureRenderer
   // (name is the persistent face name, id is the integer id).
-  const onFacePicked = useCallback(async (pickArg, legacyPartId) => {
+  const onFacePicked = useCallback(async (pickArg: any, legacyPartId?: any) => {
     // Support both legacy (faceId, partId) and new ({ id, name, partId }) shapes.
     let faceId, faceName, partId
     if (pickArg && typeof pickArg === 'object' && 'id' in pickArg) {
@@ -6282,7 +6282,11 @@ export default function FeatureView({
           <FeatureRenderer
             meshes={meshes}
             selection={featureSelection}
-            pickMode={featurePickMode}
+            // FeatureRenderer only implements click behavior for face/edge/pushpull
+            // (FeatureRendererProps['pickMode']); FeatureView also drives one-shot
+            // and sketch-on-face modes that don't change viewport click handling,
+            // so passing them through as-is here preserves existing behavior.
+            pickMode={featurePickMode as 'face' | 'edge' | 'pushpull' | null}
             onSelectionChange={setFeatureSelection}
             onFacePick={onFacePicked}
             onPushPullCommit={onPushPullCommit}
@@ -6538,11 +6542,11 @@ function FeatureTimelineChip({ node, kind, Icon, idx, isSel, rovingTabIndex = 0,
 //   Escape                  → close + return focus to trigger
 //   Enter/Space on item     → pick + close + return focus to trigger
 
-function AddFeaturePopover({ onPick }) {
+function AddFeaturePopover({ onPick }: { onPick: (op: string) => void }) {
   const [open, setOpen] = useState(false)
-  const wrapRef = useRef(null)
-  const triggerRef = useRef(null)
-  const menuRef = useRef(null)
+  const wrapRef = useRef<HTMLDivElement | null>(null)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
   useClickOutside(wrapRef, () => setOpen(false), open)
 
   // Flatten all valid ops across categories for sequential focus.
@@ -6562,16 +6566,16 @@ function AddFeaturePopover({ onPick }) {
   useEffect(() => {
     if (!open) return
     requestAnimationFrame(() => {
-      const first = menuRef.current?.querySelector('[role="menuitem"]')
+      const first = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')
       first?.focus()
     })
   }, [open])
 
-  function handleMenuKeyDown(e) {
-    const items = Array.from(menuRef.current?.querySelectorAll('[role="menuitem"]') ?? [])
+  function handleMenuKeyDown(e: any) {
+    const items = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])
     if (!items.length) return
     const focused = document.activeElement
-    const idx = items.indexOf(focused)
+    const idx = items.indexOf(focused as HTMLElement)
 
     if (e.key === 'Escape') {
       e.preventDefault()
@@ -6997,7 +7001,7 @@ function SketchPathListField({ value, onChange, sketchPaths }) {
 // variable-radius fillet. v1 keeps it simple: each picked edge gets a start
 // radius and an end radius (the worker fans these out into a 2-point param
 // table at .at=0 and .at=1). Richer per-vertex point editing is a follow-up.
-function EdgeRadiusListField({ value, onChange, pickArmed, onArmPick, selection }) {
+function EdgeRadiusListField({ value, onChange, pickArmed, onArmPick, selection }: { value: any; onChange: (v: any) => void; pickArmed: boolean; onArmPick: () => void; selection: any; setSelection?: any }) {
   const rows = Array.isArray(value) ? value : []
   // Sync any newly-picked edges into the rows with default radii.
   const pickedSet = selection?.edges instanceof Set ? selection.edges : new Set()
@@ -7080,7 +7084,7 @@ function EdgeRadiusListField({ value, onChange, pickArmed, onArmPick, selection 
   )
 }
 
-function EdgeIdsField({ value, onChange, pickArmed, onArmPick, selection, setSelection }) {
+function EdgeIdsField({ value, onChange, pickArmed, onArmPick, selection, setSelection }: { value: any; onChange: (v: any) => void; pickArmed: boolean; onArmPick: () => void; selection: any; setSelection: (v: any) => void }) {
   const ids = Array.isArray(value) ? value : []
   // Sync selection set to the displayed ids when the user is actively picking.
   // (FeatureView already pushes selection into the feature; this is the reverse
@@ -7115,7 +7119,7 @@ function EdgeIdsField({ value, onChange, pickArmed, onArmPick, selection, setSel
               onChange(next)
               // Also update the viewport selection so the highlight removes.
               const filteredEdges = new Set(
-                Array.from(selection?.edgeIds || []).filter((k) => Number(k.split('|')[1]) !== id)
+                Array.from<string>(selection?.edgeIds || []).filter((k) => Number(k.split('|')[1]) !== id)
               )
               setSelection({ faceIds: selection?.faceIds || new Set(), edgeIds: filteredEdges })
             }}
@@ -7132,7 +7136,7 @@ function EdgeIdsField({ value, onChange, pickArmed, onArmPick, selection, setSel
   )
 }
 
-function FaceIdsField({ value, onChange, pickArmed, onArmPick, selection, setSelection }) {
+function FaceIdsField({ value, onChange, pickArmed, onArmPick, selection, setSelection }: { value: any; onChange: (v: any) => void; pickArmed: boolean; onArmPick: () => void; selection: any; setSelection: (v: any) => void }) {
   const ids = Array.isArray(value) ? value : []
   return (
     <div className="space-y-1">
@@ -7160,7 +7164,7 @@ function FaceIdsField({ value, onChange, pickArmed, onArmPick, selection, setSel
               const next = ids.filter((x) => x !== id)
               onChange(next)
               const filteredFaces = new Set(
-                Array.from(selection?.faceIds || []).filter((k) => Number(k.split('|')[1]) !== id)
+                Array.from<string>(selection?.faceIds || []).filter((k) => Number(k.split('|')[1]) !== id)
               )
               setSelection({ edgeIds: selection?.edgeIds || new Set(), faceIds: filteredFaces })
             }}

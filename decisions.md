@@ -1157,3 +1157,42 @@ Both readings are bad and they need different fixes:
 I did not mass-rewrite the URLs to `vulos.org/projects/kerf`: which host serves
 installs and which host is canonical for SEO is a product decision, and guessing
 wrong would break installs or scatter canonical tags across two domains.
+
+## 2026-08-07 — E2E root cause: one undeclared dependency, not the migration
+
+**Finding.** 24 of 28 E2E specs had been timing out on `page.waitForURL` since
+before the TypeScript work. The cause was a single undeclared dependency.
+
+`kerf_api/routes_git_diff.py` imports `pygit2` at module top level, but `pygit2`
+was not in `packages/kerf-api/pyproject.toml`. In CI it is absent, the import
+raises inside `register()`, and the **entire kerf-api plugin fails to register**:
+
+    plugin_register_failed error="No module named 'pygit2'" plugin=kerf-api
+
+So every `/api/*` route 404s. The request census from one run makes the shape
+obvious — 218 × `GET /api/workspaces 404`, 48 × `GET /api/projects 404`,
+26 × `GET /api/bootstrap 404`, while `/auth/login` returned 200 and `/health`
+returned 200. Login genuinely succeeded; the app then had no API to load
+projects from, so it never navigated and every spec sat on `waitForURL`.
+
+**Why it read as a frontend fault for so long.** The visible symptom is a
+frontend timeout, the specs that fail are UI specs, and the failure survived a
+frontend restructure — all of which point away from a backend packaging bug.
+The tell was in the backend request log, not the Playwright output.
+
+**Fix.** Declared `pygit2>=1.14` in kerf-api's dependencies, alongside the
+`numpy` entry that carries a comment making exactly this argument ("declared so
+the kerf-api plugin can register on every persona"). Same class of omission.
+
+**Not done deliberately.** `_try_include` already guards the optional sub-routers
+and would have contained this, but `routes_git_diff` is reached through it and
+still took the plugin down, so the eager-import path is not fully understood. I
+declared the dependency rather than restructure the import, because the module
+genuinely needs pygit2 — making it lazily optional would trade a hard failure for
+a silently missing git-diff API.
+
+**Also fixed this pass.** Four kerf-fem modules (plasticity, multiphysics,
+composites, fracture) self-register via the @register decorator and publish no
+TOOLS list; plugin.py unpacked `mod.TOOLS` unconditionally, so each raised
+AttributeError, was logged as a load failure, and skipped the `provides.append`
+lines after it. Now uses `getattr(mod, 'TOOLS', ())`.

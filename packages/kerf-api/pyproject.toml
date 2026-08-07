@@ -20,6 +20,12 @@ dependencies = [
     # plugin can register on every persona regardless of which compute
     # plugins (kerf-cad-core etc.) are also installed.
     "numpy>=1.26",
+    # routes_git_diff.py imports pygit2 at module top level. Same reasoning as
+    # numpy above, and the omission was load-bearing: without it the import
+    # raised inside register(), the WHOLE kerf-api plugin failed to register, and
+    # every /api/* route 404'd — which is what stranded 24 of 28 E2E specs on
+    # page.waitForURL while /auth/* and /health answered 200.
+    "pygit2>=1.14",
 ]
 
 [project.optional-dependencies]

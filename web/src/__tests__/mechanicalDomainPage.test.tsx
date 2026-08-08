@@ -63,13 +63,13 @@ describe('mechanical.meta — META_DESCRIPTION', () => {
 
 describe('mechanical.meta — META_OG_IMAGE', () => {
   it('is the correct OG image URL', () => {
-    expect(META_OG_IMAGE).toBe('https://kerf.sh/og/mechanical.png')
+    expect(META_OG_IMAGE).toBe('https://vulos.org/projects/kerf/og/mechanical.png')
   })
 })
 
 describe('mechanical.meta — META_URL', () => {
   it('is the canonical page URL', () => {
-    expect(META_URL).toBe('https://kerf.sh/domains/mechanical')
+    expect(META_URL).toBe('https://vulos.org/projects/kerf/domains/mechanical')
   })
 })
 

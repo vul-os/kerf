@@ -215,12 +215,12 @@ describe('silicon.meta.js — structure', () => {
     expect(META_SRC).toMatch(/RTL to GDS-II/)
   })
 
-  it('has canonical URL pointing to kerf.sh/domains/silicon', () => {
-    expect(META_SRC).toMatch(/https:\/\/kerf\.sh\/domains\/silicon/)
+  it('has canonical URL pointing to vulos.org/projects/kerf/domains/silicon', () => {
+    expect(META_SRC).toMatch(/https:\/\/vulos\.org\/projects\/kerf\/domains\/silicon/)
   })
 
   it('has OG image URL for silicon.png', () => {
-    expect(META_SRC).toMatch(/https:\/\/kerf\.sh\/og\/silicon\.png/)
+    expect(META_SRC).toMatch(/https:\/\/vulos\.org\/projects\/kerf\/og\/silicon\.png/)
   })
 
   it('meta description is ≤ 160 characters', () => {

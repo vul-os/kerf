@@ -217,12 +217,12 @@ describe('automotive.meta.js — structure', () => {
     expect(META_SRC).toMatch(/export const meta/)
   })
 
-  it('has a canonical URL pointing to kerf.sh/domains/automotive', () => {
-    expect(META_SRC).toMatch(/https:\/\/kerf\.sh\/domains\/automotive/)
+  it('has a canonical URL pointing to vulos.org/projects/kerf/domains/automotive', () => {
+    expect(META_SRC).toMatch(/https:\/\/vulos\.org\/projects\/kerf\/domains\/automotive/)
   })
 
-  it('has an OG image URL pointing to kerf.sh/og/automotive.png', () => {
-    expect(META_SRC).toMatch(/https:\/\/kerf\.sh\/og\/automotive\.png/)
+  it('has an OG image URL pointing to vulos.org/projects/kerf/og/automotive.png', () => {
+    expect(META_SRC).toMatch(/https:\/\/vulos\.org\/projects\/kerf\/og\/automotive\.png/)
   })
 })
 

@@ -97,7 +97,7 @@ fails.
 
 The `--url` flag (or `KERF_API_URL`) selects the node. Every Kerf install
 runs byte-identical software, so your own self-hosted node and a public
-gateway such as `kerf.sh` (one gateway among equals, not a privileged hosted
+gateway such as `vulos.org/projects/kerf` (one gateway among equals, not a privileged hosted
 service) expose the same API surface.
 
 ## Exit codes
@@ -128,7 +128,7 @@ kerf sync abc-123 ./project \
   --token kerf_sk_mytoken
 
 # Use environment variables
-export KERF_API_URL=https://kerf.sh
+export KERF_API_URL=https://vulos.org/projects/kerf
 export KERF_API_TOKEN=kerf_sk_...
 kerf sync abc-123 ./project --watch
 ```

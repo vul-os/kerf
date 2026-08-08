@@ -12,8 +12,8 @@ export const meta = {
     title: 'PLC & industrial automation design — Kerf',
     description:
       'Ladder logic · FBD · Structured Text · I/O wiring · HMI layout · SCADA — full IEC 61131-3 PLC authoring in one chat-native workspace.',
-    image: 'https://kerf.sh/og/plc.png',
-    url: 'https://kerf.sh/domains/plc',
+    image: 'https://vulos.org/projects/kerf/og/plc.png',
+    url: 'https://vulos.org/projects/kerf/domains/plc',
     type: 'website',
   },
 }

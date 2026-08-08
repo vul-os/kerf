@@ -4,7 +4,7 @@
  * title      ≤60 chars
  * description ≤155 chars
  * JSON-LD     WebPage + ItemList
- * OG image    hosted at kerf.sh/og/electronics.png
+ * OG image    hosted at vulos.org/projects/kerf/og/electronics.png
  */
 
 export const meta = {
@@ -15,8 +15,8 @@ export const meta = {
     title: 'PCB design with chat-driven schematics — Kerf',
     description:
       'ERC · buses · diff pairs · autoroute · pour · SPICE sim · Gerbers — full KiCad-comprehensive electronics in one chat-native workspace.',
-    image: 'https://kerf.sh/og/electronics.png',
-    url: 'https://kerf.sh/domains/electronics',
+    image: 'https://vulos.org/projects/kerf/og/electronics.png',
+    url: 'https://vulos.org/projects/kerf/domains/electronics',
     type: 'website',
   },
 }

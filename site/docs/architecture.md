@@ -26,7 +26,7 @@ Browser (React + Three.js)  ←→  Python FastAPI server  ←→  Postgres
 
 There is no "cloud edition" versus "local edition" — Kerf is 100% MIT and
 every install (a laptop, a homelab box, or an always-on instance like
-`kerf.sh`) runs byte-identical software. A node's behavior is governed
+`vulos.org/projects/kerf`) runs byte-identical software. A node's behavior is governed
 entirely by config toggles (`publicly-reachable`, `relay-for-others`,
 `pin-storage`, `offer-compute`), never by a license gate or a proprietary
 package. See [node-architecture.md](./node-architecture.md) for the current
@@ -233,5 +233,5 @@ and `kerf_pub.wake`'s module docstring for the full list.
 - [llm-tools.md](./llm-tools.md) — full LLM tool reference
 - [tool-registry.md](./tool-registry.md) — AI workflow and extending the tool system
 - [render-pipeline.md](./render-pipeline.md) — Three.js + BVH + mesh caching
-- [cloud-operator.md](./cloud-operator.md) — running an always-on node like `kerf.sh`
+- [cloud-operator.md](./cloud-operator.md) — running an always-on node like `vulos.org/projects/kerf`
 - [plugins-development.md](./plugins-development.md) — writing a plugin

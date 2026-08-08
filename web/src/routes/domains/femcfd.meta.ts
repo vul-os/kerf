@@ -12,8 +12,8 @@ export const meta = {
     title: 'FEM & CFD simulation — Kerf',
     description:
       'Linear static · modal · thermal · CFD fluid flow — FEniCSx and OpenFOAM-backed simulation in one chat-native engineering workspace.',
-    image: 'https://kerf.sh/og/femcfd.png',
-    url: 'https://kerf.sh/domains/femcfd',
+    image: 'https://vulos.org/projects/kerf/og/femcfd.png',
+    url: 'https://vulos.org/projects/kerf/domains/femcfd',
     type: 'website',
   },
 }

@@ -20,7 +20,7 @@ anything on anyone else's behalf.
 
 ## One node type, four toggles
 
-Every Kerf install — a laptop, a homelab box, a rented VPS, kerf.sh itself —
+Every Kerf install — a laptop, a homelab box, a rented VPS, vulos.org/projects/kerf itself —
 runs the same byte-identical software. What makes a node "always-on" is
 purely configuration:
 
@@ -45,7 +45,7 @@ DMTAP-PUB objects to whoever asks — publishing, following, and fetching, as
 described in [distributed-workshop.md](./distributed-workshop.md). This is
 opt-in serving of the commons, not hosting a gallery: there is no account
 system, no curated catalog you moderate, and no special role your node has
-over any other node running the same toggles. kerf.sh's own node is "one
+over any other node running the same toggles. vulos.org/projects/kerf's own node is "one
 gateway among equals," not a privileged central server.
 
 ## Nothing to bill, nothing to operate for others

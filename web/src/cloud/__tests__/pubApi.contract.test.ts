@@ -50,10 +50,10 @@ describe('pub API client — matches the /api/pub contract', () => {
   })
 
   it('addFollow: POST /api/pub/follows {pub,label,gateway_url}', async () => {
-    await pub.addFollow({ pub: 'ed25519:abc', label: 'Kerf', gatewayUrl: 'https://kerf.sh' })
+    await pub.addFollow({ pub: 'ed25519:abc', label: 'Kerf', gatewayUrl: 'https://vulos.org/projects/kerf' })
     expect(calls[0].url).toBe('/api/pub/follows')
     expect(calls[0].method).toBe('POST')
-    expect(JSON.parse(calls[0].body as string)).toEqual({ pub: 'ed25519:abc', label: 'Kerf', gateway_url: 'https://kerf.sh' })
+    expect(JSON.parse(calls[0].body as string)).toEqual({ pub: 'ed25519:abc', label: 'Kerf', gateway_url: 'https://vulos.org/projects/kerf' })
   })
 
   it('removeFollow: DELETE /api/pub/follows/:pub', async () => {

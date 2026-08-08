@@ -43,7 +43,7 @@ The two layers are complementary and coexist. See [save-and-recovery.md](/docs/s
 
 ## Manual init (self-hosted)
 
-Every Kerf node — self-hosted or `kerf.sh` — runs byte-identical software and auto-initialises git unconditionally; there is no flag that turns the git layer on or off. If a project's repo failed to initialise (see above), call `POST /api/projects/:pid/git/init` to retry — the endpoint is idempotent.
+Every Kerf node — self-hosted or `vulos.org/projects/kerf` — runs byte-identical software and auto-initialises git unconditionally; there is no flag that turns the git layer on or off. If a project's repo failed to initialise (see above), call `POST /api/projects/:pid/git/init` to retry — the endpoint is idempotent.
 
 ---
 

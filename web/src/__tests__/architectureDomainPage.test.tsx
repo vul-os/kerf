@@ -35,8 +35,8 @@ describe('ARCH_META', () => {
     expect(ARCH_META.canonicalUrl).toContain('/domains/architecture')
   })
 
-  it('OG image URL points to kerf.sh/og/architecture.png', () => {
-    expect(ARCH_META.ogImage).toBe('https://kerf.sh/og/architecture.png')
+  it('OG image URL points to vulos.org/projects/kerf/og/architecture.png', () => {
+    expect(ARCH_META.ogImage).toBe('https://vulos.org/projects/kerf/og/architecture.png')
   })
 
   it('updatedDate matches expected format YYYY-MM-DD', () => {

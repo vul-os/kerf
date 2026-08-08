@@ -24,12 +24,16 @@ diagnostics so the editor can surface them cleanly.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import Depends, APIRouter
+
+from kerf_core.dependencies import require_auth_unless_local
 
 router = APIRouter()
 
 
-@router.post("/lint-plc")
+# Expensive solver work: free on a local node, token-gated on a shared one.
+# See require_auth_unless_local — the gate is the deployment shape, not the route.
+@router.post("/lint-plc", dependencies=[Depends(require_auth_unless_local)])
 async def lint_plc_route(req: dict) -> dict:
     """Lint IEC 61131-3 Structured Text source via MATIEC."""
     source = req.get("source", "")
@@ -64,7 +68,9 @@ async def lint_plc_route(req: dict) -> dict:
     return {"diagnostics": diagnostics, "warnings": warnings}
 
 
-@router.post("/lint-ld")
+# Expensive solver work: free on a local node, token-gated on a shared one.
+# See require_auth_unless_local — the gate is the deployment shape, not the route.
+@router.post("/lint-ld", dependencies=[Depends(require_auth_unless_local)])
 async def lint_ld_route(req: dict) -> dict:
     """
     Lint an IEC 61131-3 Ladder Diagram program (structural + MATIEC via LD→ST).

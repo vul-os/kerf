@@ -8,8 +8,8 @@ export const ARCH_META = {
   title: 'Architectural CAD with chat-driven design — Kerf',
   description:
     'Open-source chat-driven CAD for architecture. IFC Tier 2 import, DXF, drawings, structural sketcher, stairs, BOM. Honest about BIM depth vs Revit.',
-  canonicalUrl: 'https://kerf.sh/domains/architecture',
-  ogImage: 'https://kerf.sh/og/architecture.png',
+  canonicalUrl: 'https://vulos.org/projects/kerf/domains/architecture',
+  ogImage: 'https://vulos.org/projects/kerf/og/architecture.png',
   updatedDate: '2026-05-15',
 }
 
@@ -26,7 +26,7 @@ export function buildArchJsonLd() {
         url: ARCH_META.canonicalUrl,
         dateModified: ARCH_META.updatedDate,
         image: ARCH_META.ogImage,
-        isPartOf: { '@id': 'https://kerf.sh' },
+        isPartOf: { '@id': 'https://vulos.org/projects/kerf' },
       },
       {
         '@type': 'ItemList',

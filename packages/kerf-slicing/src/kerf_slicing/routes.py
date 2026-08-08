@@ -26,7 +26,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from kerf_core.dependencies import require_auth
+from kerf_core.dependencies import require_auth, require_auth_unless_local
 
 router = APIRouter()
 
@@ -77,7 +77,9 @@ def _assert_within_storage(path_str: str) -> Path:
     return resolved
 
 
-@router.post("/run-print-slice")
+# Expensive solver work: free on a local node, token-gated on a shared one.
+# See require_auth_unless_local — the gate is the deployment shape, not the route.
+@router.post("/run-print-slice", dependencies=[Depends(require_auth_unless_local)])
 async def run_print_slice_route(req: dict, _auth: dict = Depends(require_auth)) -> dict:
     """Slice an STL file to G-code via CuraEngine subprocess."""
     stl_path = req.get("stl_path", "")

@@ -350,7 +350,7 @@ describe('FollowsPanel', () => {
 
   it('lists each followed feed with a label/pub and a remove button', () => {
     const follows = [
-      { pub: 'ed25519:aaaa111122223333', label: 'Kerf default feed', gateway_url: 'https://kerf.sh' },
+      { pub: 'ed25519:aaaa111122223333', label: 'Kerf default feed', gateway_url: 'https://vulos.org/projects/kerf' },
       { pub: 'ed25519:bbbb444455556666', label: '', gateway_url: 'https://example.com' },
     ]
     const html = renderToStaticMarkup(

@@ -36,12 +36,12 @@ describe('makeCompareMeta', () => {
 
     it(`${slug}: canonical is correct URL`, () => {
       const meta = makeCompareMeta(slug)
-      expect(meta.canonical).toBe(`https://kerf.sh/compare/${slug}`)
+      expect(meta.canonical).toBe(`https://vulos.org/projects/kerf/compare/${slug}`)
     })
 
     it(`${slug}: OG image is correct URL`, () => {
       const meta = makeCompareMeta(slug)
-      expect(meta.ogImage).toBe(`https://kerf.sh/og/compare-${slug}.png`)
+      expect(meta.ogImage).toBe(`https://vulos.org/projects/kerf/og/compare-${slug}.png`)
     })
 
     it(`${slug}: jsonLd is valid JSON with @type WebPage`, () => {

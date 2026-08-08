@@ -177,7 +177,7 @@ export default function CompareByDomain() {
         '@type': 'WebPage',
         name: pageTitle,
         description: metaDescription,
-        url: `https://kerf.sh/compare/by-domain/${slug}`,
+        url: `https://vulos.org/projects/kerf/compare/by-domain/${slug}`,
       })
     : null
 

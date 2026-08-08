@@ -1303,3 +1303,36 @@ default install.
 
 **Not yet done:** path-traversal review of the file handlers, `npm audit`,
 `pip-audit`.
+
+## 2026-08-09 — kerf.sh retired in favour of vulos.org/projects/kerf; compute endpoints gated
+
+**kerf.sh.** The maintainer confirmed they own the domain — so this was never the
+supply-chain hazard the earlier entry flagged as a possibility, and it is now
+resolved the other way: they want `vulos.org/projects/kerf` used everywhere.
+148 references rewritten across 63 files (canonical URLs, OpenGraph images, the
+install one-liner, docs prose, the OpenAPI `servers` entries).
+
+Two things the blanket sweep got wrong, worth recording because both were caught
+only by tests:
+  * Assertions hold the URL as an **escaped regex** (`https:\/\/kerf\.sh`), which
+    the literal-text pass could not match. Six test files needed a second pass.
+  * `wake.test.ts` passes the value as an **origin**, compared via `URL().origin`.
+    `https://vulos.org/projects/kerf` is not a valid origin — it carries a path —
+    so the sweep silently broke the comparison. Those values are now
+    `https://vulos.org`. A find-and-replace over a URL is not safe when some
+    occurrences are origins and others are page addresses.
+
+**Compute endpoints.** Added `require_auth_unless_local` in
+`kerf_core/dependencies.py` and applied it to the seven expensive solver routes:
+`/run-fem`, `/run-spice`, `/autoroute`, `/run-rf-study`, `/compute-pour-fill`,
+`/lint-plc` + `/lint-ld`, `/run-print-slice`.
+
+The gate is the **deployment shape, not the route**: pass through when
+`config.local_mode` is set, require a real token otherwise. That keeps the
+documented single-user install working with no accounts, while closing
+unauthenticated unbounded CPU on a network-reachable node. It fails closed — if
+config is somehow unavailable it demands auth rather than assuming local.
+
+Deliberately NOT applied to routes touching another user's data; those want
+`require_auth` unconditionally, since "local" is not a safety argument there.
+No E2E spec exercises these endpoints, so the change cannot mask a suite result.

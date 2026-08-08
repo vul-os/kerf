@@ -1,7 +1,7 @@
 # Kerf hosted stack — RETIRED 2026-08-07
 
 > **This describes infrastructure that no longer exists.** Kerf is an installed
-> application: there is no hosted tier, no `kerf.sh` service and no cloud
+> application: there is no hosted tier, no `vulos.org/projects/kerf` service and no cloud
 > edition. The Fly.io configuration this document referenced
 > (`fly.toml`, `fly.worker.toml`, `scripts/deploy-fly.sh`, `deployment/fly.md`)
 > has been deleted.

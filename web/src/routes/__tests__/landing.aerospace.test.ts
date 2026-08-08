@@ -223,12 +223,12 @@ describe('aerospace.meta.js — structure', () => {
     expect(META_SRC).toMatch(/airframe|STEP|Mystran/)
   })
 
-  it('has canonical URL pointing to kerf.sh/domains/aerospace', () => {
-    expect(META_SRC).toMatch(/https:\/\/kerf\.sh\/domains\/aerospace/)
+  it('has canonical URL pointing to vulos.org/projects/kerf/domains/aerospace', () => {
+    expect(META_SRC).toMatch(/https:\/\/vulos\.org\/projects\/kerf\/domains\/aerospace/)
   })
 
   it('has OG image URL for aerospace.png', () => {
-    expect(META_SRC).toMatch(/https:\/\/kerf\.sh\/og\/aerospace\.png/)
+    expect(META_SRC).toMatch(/https:\/\/vulos\.org\/projects\/kerf\/og\/aerospace\.png/)
   })
 })
 

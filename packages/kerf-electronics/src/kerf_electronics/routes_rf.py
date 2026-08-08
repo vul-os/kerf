@@ -30,7 +30,7 @@ run it separately. The file is a faithful CSXCAD geometry + FDTD setup for a
 PCB microstrip or stripline route, ready for `openEMS --NrThreads=4 <file>`.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import Depends, APIRouter, HTTPException
 from pydantic import BaseModel, Field
 import base64
 import tempfile
@@ -597,7 +597,10 @@ def generate_smith_chart_svg(freq, s11_data, port_z0=50.0, freq_unit="GHz"):
     return svg_content
 
 
-@router.post("/run-rf-study", response_model=RFStudyResponse)
+# Expensive solver work: free on a local node, token-gated on a shared one.
+# See require_auth_unless_local — the gate is the deployment shape, not the route.
+@router.post("/run-rf-study", response_model=RFStudyResponse,
+             dependencies=[Depends(require_auth_unless_local)])
 async def run_rf_study(req: RFStudyRequest):
     """
     Run S-parameter analysis on a .rf-study file.

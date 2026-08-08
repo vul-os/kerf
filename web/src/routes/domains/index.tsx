@@ -82,8 +82,8 @@ export const DOMAINS_META = {
   title: 'CAD domains — jewelry to aerospace — Kerf',
   description:
     'One chat-driven, open-source CAD tool across 18 disciplines from jewelry to silicon, firmware and aerospace.',
-  canonicalUrl: 'https://kerf.sh/domains',
-  ogImage: 'https://kerf.sh/og/domains.png',
+  canonicalUrl: 'https://vulos.org/projects/kerf/domains',
+  ogImage: 'https://vulos.org/projects/kerf/og/domains.png',
 }
 
 /* -------------------------------------------------------------------------- */
@@ -347,8 +347,8 @@ export function buildDomainsJsonLd() {
         description: d.blurb,
         url:
           d.status === 'live'
-            ? `https://kerf.sh${d.to}`
-            : 'https://kerf.sh/roadmap',
+            ? `https://vulos.org/projects/kerf${d.to}`
+            : 'https://vulos.org/projects/kerf/roadmap',
       })),
     },
   }

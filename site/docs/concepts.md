@@ -145,7 +145,7 @@ The loop: **user chat → LLM queries docs → reads schema → tool call → ex
 
 Kerf is 100% MIT — there is no proprietary plugin package and no
 `cloud_enabled` license gate. Every install (a laptop, a homelab box, or a
-Vulos-hosted instance like `kerf.sh`) runs byte-identical software; what a
+Vulos-hosted instance like `vulos.org/projects/kerf`) runs byte-identical software; what a
 given node does is governed by config toggles, not by which build you
 installed:
 

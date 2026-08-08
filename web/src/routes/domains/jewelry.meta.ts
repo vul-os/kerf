@@ -4,15 +4,15 @@
  * title  ≤ 60 chars
  * description ≤ 155 chars
  * JSON-LD WebPage + ItemList
- * OG/Twitter: https://kerf.sh/og/jewelry.png (asset authored separately)
+ * OG/Twitter: https://vulos.org/projects/kerf/og/jewelry.png (asset authored separately)
  */
 
 export const JEWELRY_META = {
   title: 'Jewelry CAD with chat-driven design — Kerf',
   description:
     'Parametric rings, settings, gem seats, chains and findings — designed in conversation. 30 cuts, prong/bezel/pavé/halo, casting tables. MIT open-core.',
-  ogImage: 'https://kerf.sh/og/jewelry.png',
-  canonicalUrl: 'https://kerf.sh/domains/jewelry',
+  ogImage: 'https://vulos.org/projects/kerf/og/jewelry.png',
+  canonicalUrl: 'https://vulos.org/projects/kerf/domains/jewelry',
 }
 
 /**

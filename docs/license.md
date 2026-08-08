@@ -2,7 +2,7 @@
 
 Kerf is open-source software. You can read, modify, and redistribute the entire
 codebase — every byte of it, including the gateway code that runs a node like
-`kerf.sh` — under the MIT license.
+`vulos.org/projects/kerf` — under the MIT license.
 
 ## TL;DR
 
@@ -13,8 +13,8 @@ You can:
 - **Redistribute it.** Bundle Kerf into your own product, or run it as a
   service for your customers.
 - **Sell it.** You don't owe us a cut. Charge whatever you like.
-- **Run your own node.** The code that runs `kerf.sh` is in the same public
-  repo, under the same license — `kerf.sh` is just one gateway among equals,
+- **Run your own node.** The code that runs `vulos.org/projects/kerf` is in the same public
+  repo, under the same license — `vulos.org/projects/kerf` is just one gateway among equals,
   not a privileged central server. If you want to operate your own always-on
   Kerf node, you can (see [node-architecture.md](./node-architecture.md)).
 

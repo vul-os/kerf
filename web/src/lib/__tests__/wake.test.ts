@@ -107,7 +107,7 @@ function makeSupportedGlobals({ permission = 'default', registration }: { permis
         removeEventListener: vi.fn(),
       },
     },
-    window: { PushManager: function PushManager() {}, location: { origin: 'https://kerf.sh' } },
+    window: { PushManager: function PushManager() {}, location: { origin: 'https://vulos.org' } },
     Notification: { permission, requestPermission: vi.fn().mockResolvedValue('granted') },
     caches: { open: vi.fn() },
     __registration: reg,
@@ -175,22 +175,22 @@ describe('isWakeBrowserSupported', () => {
 
 describe('isWakeUsableForFollow', () => {
   it('is usable when gateway_url is empty/missing (this node, no explicit gateway)', () => {
-    expect(isWakeUsableForFollow({ pub: 'ed25519:aaaa' }, 'https://kerf.sh')).toBe(true)
-    expect(isWakeUsableForFollow({ pub: 'ed25519:aaaa', gateway_url: '' }, 'https://kerf.sh')).toBe(true)
-    expect(isWakeUsableForFollow({ pub: 'ed25519:aaaa', gateway_url: '   ' }, 'https://kerf.sh')).toBe(true)
+    expect(isWakeUsableForFollow({ pub: 'ed25519:aaaa' }, 'https://vulos.org')).toBe(true)
+    expect(isWakeUsableForFollow({ pub: 'ed25519:aaaa', gateway_url: '' }, 'https://vulos.org')).toBe(true)
+    expect(isWakeUsableForFollow({ pub: 'ed25519:aaaa', gateway_url: '   ' }, 'https://vulos.org')).toBe(true)
   })
 
   it('is usable when gateway_url resolves to the same origin', () => {
-    expect(isWakeUsableForFollow({ gateway_url: 'https://kerf.sh' }, 'https://kerf.sh')).toBe(true)
-    expect(isWakeUsableForFollow({ gateway_url: 'https://kerf.sh/some/path' }, 'https://kerf.sh')).toBe(true)
+    expect(isWakeUsableForFollow({ gateway_url: 'https://vulos.org' }, 'https://vulos.org')).toBe(true)
+    expect(isWakeUsableForFollow({ gateway_url: 'https://vulos.org/some/path' }, 'https://vulos.org')).toBe(true)
   })
 
   it('is NOT usable when gateway_url names a different node', () => {
-    expect(isWakeUsableForFollow({ gateway_url: 'https://other-node.example' }, 'https://kerf.sh')).toBe(false)
+    expect(isWakeUsableForFollow({ gateway_url: 'https://other-node.example' }, 'https://vulos.org')).toBe(false)
   })
 
   it('is NOT usable when gateway_url is malformed and origin is available', () => {
-    expect(isWakeUsableForFollow({ gateway_url: 'http://[invalid' }, 'https://kerf.sh')).toBe(false)
+    expect(isWakeUsableForFollow({ gateway_url: 'http://[invalid' }, 'https://vulos.org')).toBe(false)
   })
 
   it('is NOT usable when there is no origin to compare against', () => {
@@ -198,8 +198,8 @@ describe('isWakeUsableForFollow', () => {
   })
 
   it('falls back to window.location.origin when currentOrigin is not passed', () => {
-    withGlobals({ window: { location: { origin: 'https://kerf.sh' } } }, () => {
-      expect(isWakeUsableForFollow({ gateway_url: 'https://kerf.sh' })).toBe(true)
+    withGlobals({ window: { location: { origin: 'https://vulos.org' } } }, () => {
+      expect(isWakeUsableForFollow({ gateway_url: 'https://vulos.org' })).toBe(true)
       expect(isWakeUsableForFollow({ gateway_url: 'https://elsewhere.example' })).toBe(false)
     })
   })

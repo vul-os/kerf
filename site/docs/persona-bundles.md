@@ -88,7 +88,7 @@ What you get:
 **Plugins:** all packages, including `kerf-pub`
 
 Use for local development, monolith deploys, and a Vulos-hosted node like
-`kerf.sh`. All packages are MIT — there is no proprietary/cloud-only
+`vulos.org/projects/kerf`. All packages are MIT — there is no proprietary/cloud-only
 package, and no config flag gates them on or off. `kerf-pub` (the
 DMTAP-PUB gateway — Workshop publish/fetch/resolve/submit) mounts its
 endpoints unconditionally; whether a given node is reachable from outside

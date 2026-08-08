@@ -8,9 +8,9 @@ export const META_DESCRIPTION =
   'Ply layup, laminate schedules, curing cycles and CLT solver for aerospace ' +
   'and structural composites — chat-driven, MIT open-core.'
 
-export const META_OG_IMAGE = 'https://kerf.sh/og/composites.png'
+export const META_OG_IMAGE = 'https://vulos.org/projects/kerf/og/composites.png'
 
-export const META_URL = 'https://kerf.sh/domains/composites'
+export const META_URL = 'https://vulos.org/projects/kerf/domains/composites'
 
 export const FEATURES = [
   {
@@ -67,7 +67,7 @@ export const JSON_LD = {
       name: META_TITLE,
       description: META_DESCRIPTION,
       image: META_OG_IMAGE,
-      publisher: { '@type': 'Organization', name: 'Kerf', url: 'https://kerf.sh' },
+      publisher: { '@type': 'Organization', name: 'Kerf', url: 'https://vulos.org/projects/kerf' },
     },
     {
       '@type': 'ItemList',

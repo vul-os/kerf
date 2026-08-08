@@ -96,7 +96,7 @@ entry in `CHANGELOG.md`.
 Each tarball unpacks to `kerf-vX.Y.Z/` and its bundled `setup.sh` creates a
 venv, editable-installs the bundled packages, and writes a default
 `kerf.toml` — see `scripts/bundled-setup.sh` for the exact steps, or just run
-`curl -fsSL https://kerf.sh/install.sh | sh`, which does the download +
+`curl -fsSL https://vulos.org/projects/kerf/install.sh | sh`, which does the download +
 unpack + `setup.sh` run for you (see root `install.sh`).
 
 ### 3. `wheels` — Python wheels
@@ -156,7 +156,7 @@ new dated version section as part of the same commit `bump-version.sh` makes
 **Tarball (any OS):**
 
 ```sh
-curl -fsSL https://kerf.sh/install.sh | sh
+curl -fsSL https://vulos.org/projects/kerf/install.sh | sh
 ```
 
 `install.sh` downloads the tarball, fetches the release's `SHA256SUMS`, looks

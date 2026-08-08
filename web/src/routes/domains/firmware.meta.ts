@@ -11,9 +11,9 @@ export const META_DESCRIPTION =
   'Chat-driven embedded development: C/C++/Rust, static analysis, RTOS configuration, ' +
   'linker scripts, flash — .hex/.elf output, open toolchains.'
 
-export const META_OG_IMAGE = 'https://kerf.sh/og/firmware.png'
+export const META_OG_IMAGE = 'https://vulos.org/projects/kerf/og/firmware.png'
 
-export const META_URL = 'https://kerf.sh/domains/firmware'
+export const META_URL = 'https://vulos.org/projects/kerf/domains/firmware'
 
 export const TAGLINE = 'From bare metal to .hex in a conversation.'
 
@@ -100,7 +100,7 @@ export const JSON_LD = {
       publisher: {
         '@type': 'Organization',
         name: 'Kerf',
-        url: 'https://kerf.sh',
+        url: 'https://vulos.org/projects/kerf',
       },
     },
     {

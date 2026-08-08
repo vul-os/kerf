@@ -72,7 +72,7 @@ Walls, slabs, doors, windows, MEP families, schedules, and IFC round-trip; civil
 
 **37 engineering domains** — jewelry, mechanical, electronics, architecture, automotive, civil, composites, dental, optics, horology, piping, packaging, mold, woodworking, marine, silicon, firmware, aerospace, PLC, motion, FEM/CFD, textiles, and more — the most-used ones each with a dedicated workspace at [`/domains`](https://vulos.org/projects/kerf/#domains). Under the hood, 50+ Python plugins reach further still: apparel, energy, entertainment, LCA, microfluidics, PLM, wiring, landscape, HVAC, and more.
 
-Measured against the industry, not just described: a public [feature-comparison matrix](https://kerf.sh/compare) tracks 1,397 features across 57 CAD/BIM/EDA packages — SolidWorks, Revit, Altium, KiCad, Rhino, and more.
+Measured against the industry, not just described: a public [feature-comparison matrix](https://vulos.org/projects/kerf/compare) tracks 1,397 features across 57 CAD/BIM/EDA packages — SolidWorks, Revit, Altium, KiCad, Rhino, and more.
 
 ### Chat-driven editing
 
@@ -101,7 +101,7 @@ Kerf runs **by itself** — no account, no cloud, no external service required b
 ### Install (one-liner)
 
 ```sh
-curl -fsSL https://kerf.sh/install.sh | sh
+curl -fsSL https://vulos.org/projects/kerf/install.sh | sh
 ```
 
 Downloads the latest [GitHub release](https://github.com/vul-os/kerf/releases/latest), unpacks it, and sets up a Python venv with everything installed — no Docker, no `git clone` required. Every tag also ships `kerf-vX.Y.Z-{macos-arm64,macos-x64,linux-x64,src}.tar.gz` and a `SHA256SUMS` manifest if you'd rather download and verify a specific asset by hand. See [docs/releasing.md](./docs/releasing.md) for the full artifact matrix and what CI builds.

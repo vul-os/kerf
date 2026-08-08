@@ -563,7 +563,7 @@ function ComparisonTable() {
             rel="noreferrer"
             className="text-ink-400 hover:text-ink-200 underline underline-offset-2 transition-colors"
           >
-            kerf.sh
+            vulos.org/projects/kerf
           </a>{' '}
           if anything is out of date.
         </p>

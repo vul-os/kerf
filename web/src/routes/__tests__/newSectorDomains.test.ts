@@ -63,14 +63,14 @@ for (const { name, mod, slug } of ALL_METAS) {
   })
 
   describe(`${name}.meta — META_OG_IMAGE`, () => {
-    it('points to the correct kerf.sh OG image', () => {
-      expect(mod.META_OG_IMAGE).toBe(`https://kerf.sh/og/${slug}.png`)
+    it('points to the correct vulos.org/projects/kerf OG image', () => {
+      expect(mod.META_OG_IMAGE).toBe(`https://vulos.org/projects/kerf/og/${slug}.png`)
     })
   })
 
   describe(`${name}.meta — META_URL`, () => {
     it('is the canonical page URL', () => {
-      expect(mod.META_URL).toBe(`https://kerf.sh/domains/${slug}`)
+      expect(mod.META_URL).toBe(`https://vulos.org/projects/kerf/domains/${slug}`)
     })
   })
 

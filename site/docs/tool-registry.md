@@ -29,7 +29,7 @@ individual rows in the chat.
 The tool system is fully available on every install — Kerf is 100% MIT and
 there is no "cloud edition." Every one of the ~150 tools across the plugin
 packages is present when you install the matching persona, whether that's a
-laptop, a homelab box, or a Vulos-hosted instance like `kerf.sh`.
+laptop, a homelab box, or a Vulos-hosted instance like `vulos.org/projects/kerf`.
 
 You configure your own LLM API key on any install. Kerf has no billing
 anywhere, so there is no metering against credits — token usage is tracked

@@ -26,7 +26,7 @@ Returns:
 """
 import math
 
-from fastapi import APIRouter, HTTPException
+from fastapi import Depends, APIRouter, HTTPException
 
 try:
     from shapely.geometry import Polygon, LineString, Point, MultiPolygon
@@ -34,6 +34,8 @@ try:
     SHAPELY_AVAILABLE = True
 except ImportError:
     SHAPELY_AVAILABLE = False
+
+from kerf_core.dependencies import require_auth_unless_local
 
 router = APIRouter()
 
@@ -82,7 +84,9 @@ def _thermal_spokes(pad, spoke_count, gap, spoke_width):
     return spokes
 
 
-@router.post("/compute-pour-fill")
+# Expensive solver work: free on a local node, token-gated on a shared one.
+# See require_auth_unless_local — the gate is the deployment shape, not the route.
+@router.post("/compute-pour-fill", dependencies=[Depends(require_auth_unless_local)])
 async def compute_pour_fill(req: dict):
     pour = req.get("pour")
     board_state = req.get("board_state", {})

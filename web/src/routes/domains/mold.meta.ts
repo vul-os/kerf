@@ -8,9 +8,9 @@ export const META_DESCRIPTION =
   'Parametric mold base, core/cavity split, gate and runner design, ' +
   'cooling channels, and moldflow — chat-driven, MIT open-core.'
 
-export const META_OG_IMAGE = 'https://kerf.sh/og/mold.png'
+export const META_OG_IMAGE = 'https://vulos.org/projects/kerf/og/mold.png'
 
-export const META_URL = 'https://kerf.sh/domains/mold'
+export const META_URL = 'https://vulos.org/projects/kerf/domains/mold'
 
 export const FEATURES = [
   {
@@ -70,7 +70,7 @@ export const JSON_LD = {
       name: META_TITLE,
       description: META_DESCRIPTION,
       image: META_OG_IMAGE,
-      publisher: { '@type': 'Organization', name: 'Kerf', url: 'https://kerf.sh' },
+      publisher: { '@type': 'Organization', name: 'Kerf', url: 'https://vulos.org/projects/kerf' },
     },
     {
       '@type': 'ItemList',

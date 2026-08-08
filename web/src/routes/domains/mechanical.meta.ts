@@ -11,9 +11,9 @@ export const META_DESCRIPTION =
   'Full parametric mechanical CAD in the browser. Feature tree, OCCT boolean/fillet/draft, ' +
   'sheet metal, drawings, 5-axis CAM, STEP/IFC import — chat-driven.'
 
-export const META_OG_IMAGE = 'https://kerf.sh/og/mechanical.png'
+export const META_OG_IMAGE = 'https://vulos.org/projects/kerf/og/mechanical.png'
 
-export const META_URL = 'https://kerf.sh/domains/mechanical'
+export const META_URL = 'https://vulos.org/projects/kerf/domains/mechanical'
 
 // Feature list — one entry per capability card. Used by JSON-LD ItemList and
 // the capability grid section. Add new capabilities here; the grid renders
@@ -113,7 +113,7 @@ export const JSON_LD = {
       publisher: {
         '@type': 'Organization',
         name: 'Kerf',
-        url: 'https://kerf.sh',
+        url: 'https://vulos.org/projects/kerf',
       },
     },
     {

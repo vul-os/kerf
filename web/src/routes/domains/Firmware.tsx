@@ -202,7 +202,7 @@ function Hero() {
 
       <div className="relative mx-auto max-w-7xl px-6 pt-14 pb-16 sm:pt-16 lg:pt-20 lg:pb-20">
         <nav className="flex items-center gap-2 text-xs text-ink-500 font-mono mb-6">
-          <Link to="/" className="hover:text-ink-300 transition-colors">kerf.sh</Link>
+          <Link to="/" className="hover:text-ink-300 transition-colors">vulos.org/projects/kerf</Link>
           <ChevronRight size={12} />
           <Link to="/domains" className="hover:text-ink-300 transition-colors">domains</Link>
           <ChevronRight size={12} />

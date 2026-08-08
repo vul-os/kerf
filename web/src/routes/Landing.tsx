@@ -629,7 +629,7 @@ function RunLocallyChip() {
       </div>
       <p className="text-[10px] text-ink-500 pl-5">
         Python 3.11+ · Postgres · or{' '}
-        <code className="text-ink-400">curl kerf.sh/install.sh | sh</code>
+        <code className="text-ink-400">curl vulos.org/projects/kerf/install.sh | sh</code>
       </p>
     </div>
   )
@@ -1549,8 +1549,8 @@ const META_DESCRIPTION =
   'Mechanical + BIM + Civil + Electronics + Optics + Composites + Dental + ' +
   'Jewelry + Marine + Aerospace + 37 domains in one MIT open-core workspace. ' +
   'Chat-driven OCCT B-rep, CAM, FEA, PCB, IFC4, kerf-sdk. 1265 features tracked. Free local, hosted credits.'
-const META_OG_IMAGE = 'https://kerf.sh/og/landing.png'
-const META_URL = 'https://kerf.sh/'
+const META_OG_IMAGE = 'https://vulos.org/projects/kerf/og/landing.png'
+const META_URL = 'https://vulos.org/projects/kerf/'
 
 function LandingHead() {
   useEffect(() => {

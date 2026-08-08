@@ -7,7 +7,9 @@ import sys
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import Depends, APIRouter, HTTPException
+
+from kerf_core.dependencies import require_auth_unless_local
 
 router = APIRouter()
 
@@ -29,7 +31,9 @@ ENGINE_PENDING_WARNING = "Engine pending — FEniCSx (dolfinx) not yet installed
 _CALCULIX_PENDING_WARNING = "Engine pending — CalculiX (ccx) not installed or not in PATH."
 
 
-@router.post("/run-fem")
+# Expensive solver work: free on a local node, token-gated on a shared one.
+# See require_auth_unless_local — the gate is the deployment shape, not the route.
+@router.post("/run-fem", dependencies=[Depends(require_auth_unless_local)])
 async def run_fem(req: dict):
     step_b64 = req.get("step_b64")
     input_spec = req.get("input_spec", {})

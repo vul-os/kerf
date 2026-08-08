@@ -650,10 +650,10 @@ export function FollowsPanel({
             />
             <Input
               label="Gateway URL"
-              placeholder="https://kerf.sh"
+              placeholder="https://vulos.org/projects/kerf"
               value={gatewayUrl}
               onChange={(e) => setGatewayUrl(e.target.value)}
-              hint="Any gateway serving the DMTAP-PUB well-known routes works — kerf.sh is one gateway among equals."
+              hint="Any gateway serving the DMTAP-PUB well-known routes works — vulos.org/projects/kerf is one gateway among equals."
             />
             {addError && <p className="text-xs text-red-300">{addError}</p>}
             <Button type="submit" variant="primary" size="sm" disabled={adding}>

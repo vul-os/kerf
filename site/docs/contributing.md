@@ -64,7 +64,7 @@ pyproject.toml          Root meta-package: persona optional-dependency groups
 
 Kerf is 100% MIT. There is no proprietary tree, no dual license, and no
 "cloud edition" versus "local edition" — every install (a laptop, a homelab
-box, or a Vulos-hosted instance like `kerf.sh`) runs byte-identical
+box, or a Vulos-hosted instance like `vulos.org/projects/kerf`) runs byte-identical
 software. A node's behavior is governed entirely by config toggles
 (`publicly-reachable`, `relay-for-others`, `pin-storage`, `offer-compute`),
 never by which build you installed or a license gate. See

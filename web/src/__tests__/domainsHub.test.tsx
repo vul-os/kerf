@@ -50,12 +50,12 @@ describe('DOMAINS_META', () => {
     expect(DOMAINS_META.description.length).toBeLessThanOrEqual(155)
   })
 
-  it('canonicalUrl is exactly https://kerf.sh/domains', () => {
-    expect(DOMAINS_META.canonicalUrl).toBe('https://kerf.sh/domains')
+  it('canonicalUrl is exactly https://vulos.org/projects/kerf/domains', () => {
+    expect(DOMAINS_META.canonicalUrl).toBe('https://vulos.org/projects/kerf/domains')
   })
 
-  it('ogImage is an https kerf.sh URL', () => {
-    expect(DOMAINS_META.ogImage).toMatch(/^https:\/\/kerf\.sh\//)
+  it('ogImage is an https vulos.org/projects/kerf URL', () => {
+    expect(DOMAINS_META.ogImage).toMatch(/^https:\/\/vulos\.org\/projects\/kerf\//)
   })
 })
 
@@ -143,7 +143,7 @@ describe('buildDomainsJsonLd', () => {
       expect(item.position).toBe(i + 1)
       expect(item.name.length).toBeGreaterThan(0)
       expect(item.description.length).toBeGreaterThan(0)
-      expect(item.url).toMatch(/^https:\/\/kerf\.sh\//)
+      expect(item.url).toMatch(/^https:\/\/vulos\.org\/projects\/kerf\//)
     })
   })
 })

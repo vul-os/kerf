@@ -8,9 +8,9 @@ export const META_DESCRIPTION =
   'ISO 10628 P&ID symbols, isometric piping, stress analysis, and ' +
   'line-list export for process engineering — chat-driven, MIT open-core.'
 
-export const META_OG_IMAGE = 'https://kerf.sh/og/piping.png'
+export const META_OG_IMAGE = 'https://vulos.org/projects/kerf/og/piping.png'
 
-export const META_URL = 'https://kerf.sh/domains/piping'
+export const META_URL = 'https://vulos.org/projects/kerf/domains/piping'
 
 export const FEATURES = [
   {
@@ -69,7 +69,7 @@ export const JSON_LD = {
       name: META_TITLE,
       description: META_DESCRIPTION,
       image: META_OG_IMAGE,
-      publisher: { '@type': 'Organization', name: 'Kerf', url: 'https://kerf.sh' },
+      publisher: { '@type': 'Organization', name: 'Kerf', url: 'https://vulos.org/projects/kerf' },
     },
     {
       '@type': 'ItemList',

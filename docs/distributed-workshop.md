@@ -15,7 +15,7 @@ publisher-facing view, see [node-architecture.md](./node-architecture.md).
 ## A workshop is a set of feeds you follow
 
 There is no single "the Workshop" server. **A workshop is client-side
-state — the set of author feeds you've chosen to follow.** kerf.sh ships a
+state — the set of author feeds you've chosen to follow.** vulos.org/projects/kerf ships a
 default feed so a fresh install has something to browse, but it is an
 ordinary, removable feed like any other, not a hardcoded destination.
 
@@ -266,7 +266,7 @@ GET /.well-known/dmtap-pub/chunk/{h}
 
 A gateway serving this surface needs no CAD-specific code — it stores and
 serves opaque, signed, content-addressed objects; all artifact interpretation
-happens client-side. That's what lets kerf.sh's gateway be **one gateway
+happens client-side. That's what lets vulos.org/projects/kerf's gateway be **one gateway
 among equals**: it holds no special protocol role, and running your own is
 exactly as valid a way to publish or follow as using the default one. A
 native mesh transport is a later, additive phase on top of this, not a

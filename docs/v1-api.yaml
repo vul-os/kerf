@@ -10,7 +10,7 @@ info:
     Tokens obtained via POST /auth/login with email+password.
 
 servers:
-  - url: https://app.kerf.sh
+  - url: https://vulos.org/projects/kerf
     description: Production
   - url: http://localhost:8080
     description: Local

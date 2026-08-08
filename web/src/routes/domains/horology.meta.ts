@@ -8,9 +8,9 @@ export const META_DESCRIPTION =
   'Parametric escapement geometry, gear-train synthesis, ' +
   'mainspring curves, and watch-case design — chat-driven, MIT open-core.'
 
-export const META_OG_IMAGE = 'https://kerf.sh/og/horology.png'
+export const META_OG_IMAGE = 'https://vulos.org/projects/kerf/og/horology.png'
 
-export const META_URL = 'https://kerf.sh/domains/horology'
+export const META_URL = 'https://vulos.org/projects/kerf/domains/horology'
 
 export const FEATURES = [
   {
@@ -69,7 +69,7 @@ export const JSON_LD = {
       name: META_TITLE,
       description: META_DESCRIPTION,
       image: META_OG_IMAGE,
-      publisher: { '@type': 'Organization', name: 'Kerf', url: 'https://kerf.sh' },
+      publisher: { '@type': 'Organization', name: 'Kerf', url: 'https://vulos.org/projects/kerf' },
     },
     {
       '@type': 'ItemList',

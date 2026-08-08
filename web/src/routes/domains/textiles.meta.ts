@@ -12,8 +12,8 @@ export const meta = {
     title: 'Textile & apparel design — Kerf',
     description:
       'Pattern drafting · grading · seam allowances · fabric simulation · cut-file export — full textile and apparel design in one chat-native workspace.',
-    image: 'https://kerf.sh/og/textiles.png',
-    url: 'https://kerf.sh/domains/textiles',
+    image: 'https://vulos.org/projects/kerf/og/textiles.png',
+    url: 'https://vulos.org/projects/kerf/domains/textiles',
     type: 'website',
   },
 }

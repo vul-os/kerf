@@ -18,7 +18,7 @@ feeds you follow (`github.com/vul-os/dmtap`, §22 "Public Objects" + §23
 "CAD / Artifact Profile"). You publish from your own node by signing an
 announcement with your own identity key and appending it to your own feed;
 anyone who follows that feed sees the update. There is no account system:
-identity is a keypair, not a login. kerf.sh ships a default feed so a fresh
+identity is a keypair, not a login. vulos.org/projects/kerf ships a default feed so a fresh
 install has something to browse, but it is an ordinary, removable feed like
 any other — not a hardcoded destination, and not a requirement.
 

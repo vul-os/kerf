@@ -86,7 +86,7 @@ describe('DomainPage — T-H1 a11y', () => {
     META_TITLE: 'Test Domain',
     META_DESCRIPTION: 'desc',
     META_OG_IMAGE: '/img.png',
-    META_URL: 'https://kerf.sh/domains/test',
+    META_URL: 'https://vulos.org/projects/kerf/domains/test',
     FEATURES: [
       { id: 'f1', name: 'Feature One', description: 'Does stuff.' },
     ],

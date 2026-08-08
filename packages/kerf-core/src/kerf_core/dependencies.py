@@ -97,6 +97,34 @@ async def require_auth(
     return decode_jwt(token)
 
 
+async def require_auth_unless_local(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> dict | None:
+    """Auth for endpoints that are free to use on a local node but not on a shared one.
+
+    Kerf is local-first: on a single-user install there are no accounts, and demanding
+    a token for `/run-fem` would break the documented default. But the same endpoints on
+    a network-reachable node are unauthenticated, unbounded CPU — anyone who can reach
+    the port can queue solver work indefinitely.
+
+    So the rule is the deployment shape, not the endpoint: pass through when
+    `local_mode` is set, require a real token otherwise. Use this for expensive compute
+    routes; use `require_auth` for anything touching another user's data, which is not
+    safe to expose even locally.
+    """
+    config = getattr(request.app.state, "config", None)
+    # Fail closed: if config is somehow unavailable, demand auth rather than assume local.
+    if config is not None and getattr(config, "local_mode", False):
+        return None
+    if credentials is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    token = credentials.credentials
+    if token.startswith(API_TOKEN_PREFIX):
+        return await _resolve_api_token(request, token)
+    return decode_jwt(token)
+
+
 async def get_user_id(request: Request) -> str:
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):

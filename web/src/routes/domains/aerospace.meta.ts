@@ -11,9 +11,9 @@ export const META_DESCRIPTION =
   'Chat-driven aerospace CAD: parametric airframes, FEM, composites lay-up, ' +
   'CFD setup, GD&T per AS9100 — STEP and Mystran output.'
 
-export const META_OG_IMAGE = 'https://kerf.sh/og/aerospace.png'
+export const META_OG_IMAGE = 'https://vulos.org/projects/kerf/og/aerospace.png'
 
-export const META_URL = 'https://kerf.sh/domains/aerospace'
+export const META_URL = 'https://vulos.org/projects/kerf/domains/aerospace'
 
 export const TAGLINE = 'From airframe sketch to STEP and Mystran in a conversation.'
 
@@ -100,7 +100,7 @@ export const JSON_LD = {
       publisher: {
         '@type': 'Organization',
         name: 'Kerf',
-        url: 'https://kerf.sh',
+        url: 'https://vulos.org/projects/kerf',
       },
     },
     {

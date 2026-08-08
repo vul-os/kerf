@@ -38,8 +38,8 @@ describe('JEWELRY_META', () => {
     expect(JEWELRY_META.description.length).toBeLessThanOrEqual(155)
   })
 
-  it('ogImage references kerf.sh/og/jewelry.png', () => {
-    expect(JEWELRY_META.ogImage).toContain('kerf.sh/og/jewelry.png')
+  it('ogImage references vulos.org/projects/kerf/og/jewelry.png', () => {
+    expect(JEWELRY_META.ogImage).toContain('vulos.org/projects/kerf/og/jewelry.png')
   })
 
   it('canonicalUrl is a valid https URL', () => {

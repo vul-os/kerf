@@ -45,8 +45,8 @@ function setProp(prop, content) {
 const META = {
   title: 'Engineering tool panels — Kerf',
   description: 'Dedicated solver panels for optics, B-rep inspection, structural analysis, mold & electronics manufacturing, GD&T, FEM simulation and more.',
-  canonicalUrl: 'https://kerf.sh/tools',
-  ogImage: 'https://kerf.sh/og/tools.png',
+  canonicalUrl: 'https://vulos.org/projects/kerf/tools',
+  ogImage: 'https://vulos.org/projects/kerf/og/tools.png',
 }
 
 /* -------------------------------------------------------------------------- */

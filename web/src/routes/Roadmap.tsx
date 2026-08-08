@@ -25,8 +25,8 @@ const META_DESCRIPTION =
   'Live view of the Kerf engineering roadmap. North-star, P0–P3 priority ' +
   "triage, latest deltas. Renders ROADMAP.md from the repo as the single " +
   'source of truth.'
-const META_URL = 'https://kerf.sh/roadmap'
-const META_OG_IMAGE = 'https://kerf.sh/og/roadmap.png'
+const META_URL = 'https://vulos.org/projects/kerf/roadmap'
+const META_OG_IMAGE = 'https://vulos.org/projects/kerf/og/roadmap.png'
 
 /* ── SEO head injection (matches Landing / DomainPage pattern) ─────────── */
 

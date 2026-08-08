@@ -12,8 +12,8 @@ export const meta = {
     title: 'Motion simulation & kinematics — Kerf',
     description:
       'Rigid-body dynamics · kinematic chains · cam profiles · gear trains · robot trajectory — full motion simulation in one chat-native workspace.',
-    image: 'https://kerf.sh/og/motion.png',
-    url: 'https://kerf.sh/domains/motion',
+    image: 'https://vulos.org/projects/kerf/og/motion.png',
+    url: 'https://vulos.org/projects/kerf/domains/motion',
     type: 'website',
   },
 }

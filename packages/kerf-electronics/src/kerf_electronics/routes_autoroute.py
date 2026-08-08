@@ -16,16 +16,20 @@ import json
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import Depends, APIRouter, HTTPException
 
 from kerf_electronics.freerouting.dsn_writer import AutorouteParams, circuit_to_dsn
 from kerf_electronics.freerouting.freerouting import FreeRouter
 from kerf_electronics.freerouting.ses_reader import ses_to_routes
 
+from kerf_core.dependencies import require_auth_unless_local
+
 router = APIRouter()
 
 
-@router.post("/autoroute")
+# Expensive solver work: free on a local node, token-gated on a shared one.
+# See require_auth_unless_local — the gate is the deployment shape, not the route.
+@router.post("/autoroute", dependencies=[Depends(require_auth_unless_local)])
 async def autoroute(req: dict):
     circuit = req.get("circuit_json")
     if not circuit:

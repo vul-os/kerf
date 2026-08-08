@@ -28,8 +28,8 @@ describe('electronics.meta — meta object', () => {
     expect(meta.og).toBeDefined()
     expect(typeof meta.og.title).toBe('string')
     expect(typeof meta.og.description).toBe('string')
-    expect(meta.og.image).toMatch(/^https:\/\/kerf\.sh\/og\//)
-    expect(meta.og.url).toMatch(/^https:\/\/kerf\.sh\//)
+    expect(meta.og.image).toMatch(/^https:\/\/vulos\.org\/projects\/kerf\/og\//)
+    expect(meta.og.url).toMatch(/^https:\/\/vulos\.org\/projects\/kerf\//)
     expect(meta.og.type).toBe('website')
   })
 

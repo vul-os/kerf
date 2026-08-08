@@ -13,7 +13,7 @@
  *   </head>
  */
 
-const BASE = 'https://kerf.sh'
+const BASE = 'https://vulos.org/projects/kerf'
 
 /** Per-slug SEO data (title ≤60 chars, description ≤155 chars). */
 const PAGES = {

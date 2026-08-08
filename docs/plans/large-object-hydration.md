@@ -106,7 +106,7 @@ contexts. Neither is deprecated.
 | Flag | Default | Meaning |
 |---|---|---|
 | `--project <id>` | Inferred from `.kerf/project` or the repo remote URL | The Kerf project whose Tigris bucket holds the blobs. |
-| `--url <api-url>` | `$KERF_API_URL` or `https://kerf.sh` | Override the API endpoint. |
+| `--url <api-url>` | `$KERF_API_URL` or `https://vulos.org/projects/kerf` | Override the API endpoint. |
 | `--concurrency <n>` | `4` | Number of parallel blob fetches. |
 | `--dry-run` | off | Print what would be fetched without writing any bytes. |
 | `--force` | off | Re-fetch and overwrite files that appear already hydrated (size matches but force full replace). |
@@ -133,7 +133,7 @@ If no token is present the command exits with:
 
 ```
 error: no API token found. Set KERF_API_TOKEN or pass --token.
-To create a token: https://kerf.sh/w/<workspace>/settings#api-tokens
+To create a token: https://vulos.org/projects/kerf/w/<workspace>/settings#api-tokens
 ```
 
 ### Resolution flow
@@ -145,7 +145,7 @@ For each file path in scope:
    parse `oid` and `size`. Otherwise skip (already real bytes).
 2. **Resolve project**: if `--project` is not given, look for `.kerf/project`
    in the working tree root. Fall back to parsing the `origin` remote URL for a
-   known Kerf hostname pattern (`kerf.sh/<workspace>/<project-slug>`).
+   known Kerf hostname pattern (`vulos.org/projects/kerf/<workspace>/<project-slug>`).
    If no project can be inferred, exit with an error listing what was tried.
 3. **Check local cache**: look for `<oid>` in `$KERF_BLOB_CACHE_DIR`
    (default `~/.cache/kerf/blobs/`). If a file with the correct sha256

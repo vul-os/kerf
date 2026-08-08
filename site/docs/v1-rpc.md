@@ -20,7 +20,7 @@ thing that changes:
 |--------------|----------|
 | Local dev (default) | `http://localhost:8080` |
 | Self-hosted server | Your server's URL |
-| Public gateway (e.g. `kerf.sh`) | `https://kerf.sh` |
+| Public gateway (e.g. `vulos.org/projects/kerf`) | `https://vulos.org/projects/kerf` |
 
 There are no cloud-only methods — Kerf is 100% MIT and every node runs the
 same plugins. Workshop and git methods return a JSON-RPC error only if the

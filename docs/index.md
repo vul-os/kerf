@@ -25,7 +25,7 @@ Welcome to the Kerf docs. Use the sidebar to browse topics, or search with **Ctr
 
 ## Cloud
 - [Cloud features](cloud) — retired page; see node-architecture + distributed-workshop
-- [Cloud operator guide](cloud-operator) — running a Vulos-hosted node like `kerf.sh`
+- [Cloud operator guide](cloud-operator) — running a Vulos-hosted node like `vulos.org/projects/kerf`
 
 ## What's New
 - [Recent releases](whats-new) — shipped features this sprint

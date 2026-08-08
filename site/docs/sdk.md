@@ -2,7 +2,7 @@
 
 `kerf-sdk` is a Python package (on PyPI) for automating Kerf from your own
 machine. It talks to a running Kerf server over HTTP/JSON-RPC — the server can
-be your local install or the hosted cloud at kerf.sh.
+be your local install or the hosted cloud at vulos.org/projects/kerf.
 
 The SDK runs on your machine, not inside the server. You need a separate
 `pip install kerf-sdk` outside the server's virtualenv.
@@ -22,7 +22,7 @@ Generate an API token from your workspace settings
 
 ```sh
 export KERF_API_TOKEN=kerf_sk_...
-export KERF_API_URL=https://kerf.sh   # omit to use the default cloud URL
+export KERF_API_URL=https://vulos.org/projects/kerf   # omit to use the default cloud URL
 ```
 
 For a local server:
@@ -195,10 +195,10 @@ protocol is identical; see [v1-rpc.md](./v1-rpc.md) for the full spec.
 ## One node type
 
 The SDK works identically against any node — a local install, a self-hosted
-server, or a Vulos-hosted instance at `kerf.sh`. Kerf is 100% MIT with no
+server, or a Vulos-hosted instance at `vulos.org/projects/kerf`. Kerf is 100% MIT with no
 "cloud edition"; the only difference is the `KERF_API_URL`:
 
-- `kerf.sh`: `https://kerf.sh` (default when `KERF_API_URL` is unset)
+- `vulos.org/projects/kerf`: `https://vulos.org/projects/kerf` (default when `KERF_API_URL` is unset)
 - Local: `http://localhost:8080`
 - Self-hosted: your server's URL
 

@@ -223,12 +223,12 @@ describe('firmware.meta.js — structure', () => {
     expect(META_SRC).toMatch(/bare metal|\.hex/)
   })
 
-  it('has canonical URL pointing to kerf.sh/domains/firmware', () => {
-    expect(META_SRC).toMatch(/https:\/\/kerf\.sh\/domains\/firmware/)
+  it('has canonical URL pointing to vulos.org/projects/kerf/domains/firmware', () => {
+    expect(META_SRC).toMatch(/https:\/\/vulos\.org\/projects\/kerf\/domains\/firmware/)
   })
 
   it('has OG image URL for firmware.png', () => {
-    expect(META_SRC).toMatch(/https:\/\/kerf\.sh\/og\/firmware\.png/)
+    expect(META_SRC).toMatch(/https:\/\/vulos\.org\/projects\/kerf\/og\/firmware\.png/)
   })
 })
 

@@ -8,9 +8,9 @@ export const META_DESCRIPTION =
   'Hull-form design, hydrostatics, resistance prediction, structural scantlings, ' +
   'and outfitting for marine and naval projects — chat-driven, MIT open-core.'
 
-export const META_OG_IMAGE = 'https://kerf.sh/og/marine.png'
+export const META_OG_IMAGE = 'https://vulos.org/projects/kerf/og/marine.png'
 
-export const META_URL = 'https://kerf.sh/domains/marine'
+export const META_URL = 'https://vulos.org/projects/kerf/domains/marine'
 
 export const FEATURES = [
   {
@@ -70,7 +70,7 @@ export const JSON_LD = {
       name: META_TITLE,
       description: META_DESCRIPTION,
       image: META_OG_IMAGE,
-      publisher: { '@type': 'Organization', name: 'Kerf', url: 'https://kerf.sh' },
+      publisher: { '@type': 'Organization', name: 'Kerf', url: 'https://vulos.org/projects/kerf' },
     },
     {
       '@type': 'ItemList',

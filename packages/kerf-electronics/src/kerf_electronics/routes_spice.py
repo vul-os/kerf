@@ -29,14 +29,18 @@ import tempfile
 import os
 import re
 from pathlib import Path
-from fastapi import APIRouter, HTTPException
+from fastapi import Depends, APIRouter, HTTPException
+
+from kerf_core.dependencies import require_auth_unless_local
 
 router = APIRouter()
 
 Waveform = dict  # {name, kind, xUnit, yUnit, x: list[float], y: list[float]}
 
 
-@router.post("/run-spice")
+# Expensive solver work: free on a local node, token-gated on a shared one.
+# See require_auth_unless_local — the gate is the deployment shape, not the route.
+@router.post("/run-spice", dependencies=[Depends(require_auth_unless_local)])
 async def run_spice(req: dict):
     netlist = req.get("netlist", "")
     analysis = req.get("analysis", {})

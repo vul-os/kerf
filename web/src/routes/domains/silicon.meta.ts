@@ -11,9 +11,9 @@ export const META_DESCRIPTION =
   'Chat-driven IC and ASIC layout: RTL, PnR, DRC, LVS, parasitic extraction, ' +
   'timing closure — GDS-II out, open PDKs supported.'
 
-export const META_OG_IMAGE = 'https://kerf.sh/og/silicon.png'
+export const META_OG_IMAGE = 'https://vulos.org/projects/kerf/og/silicon.png'
 
-export const META_URL = 'https://kerf.sh/domains/silicon'
+export const META_URL = 'https://vulos.org/projects/kerf/domains/silicon'
 
 export const TAGLINE = 'From RTL to GDS-II in a conversation.'
 
@@ -106,7 +106,7 @@ export const JSON_LD = {
       publisher: {
         '@type': 'Organization',
         name: 'Kerf',
-        url: 'https://kerf.sh',
+        url: 'https://vulos.org/projects/kerf',
       },
     },
     {

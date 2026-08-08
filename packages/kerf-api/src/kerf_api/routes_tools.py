@@ -61,6 +61,36 @@ async def _resolve_project_role(
     return uuid.UUID(pid), role
 
 
+@router.get("/tools")
+async def list_tools(
+    request: Request,
+    payload: dict = Depends(require_auth),
+):
+    """Enumerate every registered LLM tool: name, description and input schema.
+
+    Exists so a terminal client can discover the surface before calling it —
+    `POST /tools/call` could already dispatch a tool, but there was no way to ask
+    what tools exist, which made the whole registry undiscoverable outside the UI.
+    The `kerf tools list` CLI command and the MCP server both read this.
+    """
+    registry = getattr(request.app.state, "tools", None)
+    if registry is None:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="tool registry not ready")
+
+    out = []
+    for spec in registry.all_specs():
+        # ToolSpec is a dataclass in kerf_core.plugin, but plugins may register a
+        # duck-typed spec from their own _compat shim — read defensively rather than
+        # assume one shape and 500 on the other.
+        out.append({
+            "name": getattr(spec, "name", None),
+            "description": getattr(spec, "description", "") or "",
+            "input_schema": getattr(spec, "parameters", None) or getattr(spec, "input_schema", None) or {},
+        })
+    out.sort(key=lambda t: t["name"] or "")
+    return {"tools": out, "count": len(out)}
+
+
 @router.post("/tools/call")
 async def call_tool(
     req: ToolCallRequest,

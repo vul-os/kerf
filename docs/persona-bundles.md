@@ -1,19 +1,30 @@
 # Persona bundles
 
-Kerf is a meta-package that installs a named **persona** — a curated subset of
-the 19 plugin packages under `packages/`. Installing a smaller persona means
-fewer Python dependencies, a smaller Docker image, and a lighter boot footprint.
-
-## Quick reference
+A **persona** is a named subset of the plugin packages under `packages/` —
+`kerf[mech]`, `kerf[electronics]`, and so on in the root `pyproject.toml`.
+Installing a smaller persona means fewer Python dependencies, a smaller
+Docker image, and a lighter boot footprint. Kerf itself is not on PyPI (see
+[local-install.md](./local-install.md#how-kerf-is-actually-distributed)), so
+picking a persona happens at build/install time, not via `pip install
+kerf[...]`:
 
 ```sh
-pip install "kerf[api-only]"      # lightest: REST gateway + LLM chat
-pip install "kerf[mech]"          # mechanical CAD + simulation
-pip install "kerf[electronics]"   # PCB + EDA + SPICE
-pip install "kerf[bim]"           # building information modelling
-pip install "kerf[full]"          # everything (dev / monolith)
-pip install "kerf[compute-only]"  # heavy compute workers only
+# From source (git clone) — one persona per run:
+./scripts/dev-install.sh api-only     # lightest: REST gateway + LLM chat
+./scripts/dev-install.sh mech         # mechanical CAD + simulation
+./scripts/dev-install.sh electronics  # PCB + EDA + SPICE
+./scripts/dev-install.sh bim          # building information modelling
+./scripts/dev-install.sh full         # everything (dev / monolith)
+./scripts/dev-install.sh compute-only # heavy compute workers only
+
+# Docker — persona picked at build time:
+docker build --build-arg KERF_PERSONA=mech -t kerf:mech .
 ```
+
+The `curl | sh` installer (`install.sh`) and the release tarballs it fetches
+currently ship only the `full` persona — a slimmer persona-scoped tarball is
+a TODO (see `docs/releasing.md`). If you need a smaller footprint today,
+install from source or build a scoped Docker image.
 
 ## api-only
 
@@ -111,17 +122,14 @@ queued and executed within this pod.
 
 ## Combining personas
 
-Personas are optional dependency groups in the root `pyproject.toml`. You can
-mix and match by installing multiple groups:
-
-```sh
-pip install -e ".[mech,electronics]"
-```
-
-The plugin loader discovers every installed package via
-`importlib.metadata.entry_points(group="kerf.plugins")` at boot, so any
-combination works. Capability tags reflect exactly which plugins loaded
-successfully.
+Personas are optional dependency groups in the root `pyproject.toml`, and the
+plugin loader discovers every installed package via
+`importlib.metadata.entry_points(group="kerf.plugins")` at boot — so any
+combination of installed plugin packages works at runtime. `./scripts/dev-install.sh`
+only takes one persona name per run, though, so from source the practical way
+to get more than one domain's plugins is either to install `full` (everything)
+or to run the script twice with different personas against the same
+environment (each run adds its packages; nothing gets removed).
 
 ## Runtime inspection
 

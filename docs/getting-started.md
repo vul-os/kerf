@@ -59,17 +59,37 @@ See [persona-bundles.md](./persona-bundles.md) for the full menu and what each p
 
 ## 3. Install Node dependencies
 
+The frontend lives in `web/` — run every `npm` command from there, not the
+repo root (there is no `package.json` at the repo root; `npm install` from
+`kerf/` fails with `ENOENT`).
+
 ```sh
+cd web
 npm install
 ```
 
+Stay in `web/` for the rest of this page.
+
 ## 4. Initialise configuration
 
+`npm run init` (and `npm run dev`, which runs it automatically) only mirrors
+a couple of WASM assets into `web/public/` — it does **not** currently write
+`kerf.toml` when run from `web/`, because the script's copy step is relative
+to the shell's working directory and the example file lives one level up.
+Write the config yourself, from the repo root:
+
 ```sh
-npm run init    # writes kerf.toml from kerf.example.toml (skip if it already exists)
+cp kerf.example.toml kerf.toml    # from the repo root, not web/
 ```
 
-Open `kerf.toml` and set at least one LLM API key:
+Then, from `web/`, run `npm run init` (or just start the dev server below —
+it runs on its own as a pre-step) to pick up the WASM assets:
+
+```sh
+npm run init
+```
+
+Open `kerf.toml` (repo root) and set at least one LLM API key:
 
 ```toml
 [llm.anthropic]
@@ -83,10 +103,12 @@ anything else.
 ## 5. Run database migrations
 
 ```sh
-kerf-server --migrate
-# or equivalently:
 npm run migrate
 ```
+
+(`kerf-server` itself has no `--migrate` flag — `npm run migrate`, run from
+`web/`, is a thin wrapper around `python3 -m kerf_core.db.migrations.runner`,
+which you can also call directly.)
 
 With no `DATABASE_URL` set this creates `~/.kerf/kerf.db` and applies the SQLite
 migration set (`packages/kerf-core/src/kerf_core/db/migrations_sqlite/`). If
@@ -108,12 +130,20 @@ Open <http://localhost:5173>.
 **Production / single-binary mode** (serves the pre-built SPA from `:8080`):
 
 ```sh
-npm run build      # compile the Vite SPA into dist/
-kerf-server        # serves dist/ + API on http://localhost:8080
+npm run build                              # compiles into web/dist/
+KERF_FRONTEND_DIST=web/dist kerf-server    # serves web/dist/ + API on :8080
 ```
 
+`kerf-server` only serves the SPA if `KERF_FRONTEND_DIST` points at a
+directory containing `index.html` — its built-in default (`/app/dist`) is
+the path used inside the Docker image, not a source checkout, so it must be
+set explicitly here. Run this from the repo root (not `web/`), since the
+path above is relative to your current directory.
+
 On first load `local_mode = true` auto-creates a singleton user and signs you
-in without a login screen.
+in without a login screen — you should land straight in the editor:
+
+![The Kerf editor after first launch](/screenshots/editor.png)
 
 ## Verifying the server is healthy
 
@@ -173,8 +203,9 @@ createdb kerf
 export DATABASE_URL=postgres://postgres:postgres@localhost:5432/kerf?sslmode=disable
 # (if your local role differs, e.g. `pc`: postgres://pc@localhost:5432/kerf?sslmode=disable)
 
-kerf-server --migrate   # applies the Postgres migration set
-kerf-server             # now serving on Postgres
+cd web             # npm commands run from here (see step 3)
+npm run migrate    # applies the Postgres migration set
+npm run dev        # now serving on Postgres
 ```
 
 Everything else — the API, the frontend, every plugin — is identical across the

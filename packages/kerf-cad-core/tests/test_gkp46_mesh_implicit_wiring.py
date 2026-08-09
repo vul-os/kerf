@@ -14,7 +14,7 @@ except ImportError:
     _HAS_MESH_TOOLS = False
 
 _WORKTREE = pathlib.Path(__file__).parents[3]
-_FEATURE_VIEW = _WORKTREE / "src" / "components" / "FeatureView.jsx"
+_FEATURE_VIEW = _WORKTREE / "web" / "src" / "components" / "FeatureView.tsx"
 
 
 def _fv() -> str:

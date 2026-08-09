@@ -41,7 +41,7 @@ def _registered(name: str) -> bool:
 # ---------------------------------------------------------------------------
 
 _WORKTREE = pathlib.Path(__file__).parents[3]
-_FEATURE_VIEW = _WORKTREE / "src" / "components" / "FeatureView.jsx"
+_FEATURE_VIEW = _WORKTREE / "web" / "src" / "components" / "FeatureView.tsx"
 
 
 def _feature_view_text() -> str:

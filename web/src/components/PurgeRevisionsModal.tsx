@@ -105,7 +105,7 @@ export default function PurgeRevisionsModal({
           <button
             type="button"
             onClick={handleCancel}
-            className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800"
+            className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             aria-label="Close dialog"
             data-testid="purge-modal-cancel-x"
           >
@@ -144,7 +144,7 @@ export default function PurgeRevisionsModal({
           <label className="flex items-start gap-3 cursor-pointer select-none group">
             <input
               type="checkbox"
-              className="mt-0.5 w-4 h-4 rounded border border-ink-600 bg-ink-800 accent-red-500 cursor-pointer"
+              className="mt-0.5 w-4 h-4 rounded border border-ink-600 bg-ink-800 accent-red-500 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/70"
               checked={confirmed}
               onChange={(e) => setConfirmed(e.target.checked)}
               data-testid="purge-modal-confirm-checkbox"

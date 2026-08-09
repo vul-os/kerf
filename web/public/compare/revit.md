@@ -411,7 +411,7 @@ features:
       paid: true
     kerf:
       status: "[~]"
-      evidence: "packages/kerf-cloud/src/kerf_cloud/"
+      evidence: "packages/kerf-core/src/kerf_core/storage/git_storer.py"
 
   - name: "Open-source / self-hosted deployment"
     domain: D13

@@ -97,9 +97,7 @@ aws secretsmanager create-secret \
     "DATABASE_URL": "postgres://kerf_app:CHANGE_ME@kerf-pg.xxx.af-south-1.rds.amazonaws.com:5432/kerf?sslmode=require",
     "JWT_SECRET": "'$(openssl rand -hex 32)'",
     "KERF_STORAGE_S3_BUCKET": "kerf-blobs-prod",
-    "LLM_ANTHROPIC_API_KEY": "sk-ant-...",
-    "CLOUD_PAYSTACK_SECRET_KEY": "sk_live_...",
-    "CLOUD_PAYSTACK_PUBLIC_KEY": "pk_live_..."
+    "LLM_ANTHROPIC_API_KEY": "sk-ant-..."
   }'
 ```
 

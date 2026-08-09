@@ -89,8 +89,6 @@ Manager, Secrets Manager, Key Vault, App Platform secrets).
 | `KERF_STORAGE_S3_ACCESS_KEY` | Omit when using ECS task role (AWS) |
 | `KERF_STORAGE_S3_SECRET_KEY` | Omit when using ECS task role (AWS) |
 | `LLM_ANTHROPIC_API_KEY` | Anthropic API key for AI features |
-| `CLOUD_PAYSTACK_SECRET_KEY` | Paystack billing (hosted deployments) |
-| `CLOUD_PAYSTACK_PUBLIC_KEY` | Paystack billing (hosted deployments) |
 | `KERF_LOCAL_MODE` | Set to `false` for hosted deployments |
 
 ## Migrations

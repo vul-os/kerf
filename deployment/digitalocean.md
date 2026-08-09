@@ -169,12 +169,6 @@ services:
       - key: LLM_ANTHROPIC_API_KEY
         value: REPLACE_ME
         type: SECRET
-      - key: CLOUD_PAYSTACK_SECRET_KEY
-        value: REPLACE_ME
-        type: SECRET
-      - key: CLOUD_PAYSTACK_PUBLIC_KEY
-        value: REPLACE_ME
-        type: SECRET
 
 workers:
   - name: worker

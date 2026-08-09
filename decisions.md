@@ -1550,3 +1550,69 @@ instead of renaming-in-place removes a cross-package edge rather than relocating
 kerf-api was already the plugin that reached into kerf-cloud's distributor module at
 import time, so absorbing it makes kerf-api the sole owner of something it effectively
 already owned.
+
+## 2026-08-09 15:11 SAST — pytest test-pollution triage: TWO separate bugs, not one
+
+**Context:** full-suite baseline `pytest packages/ -q --timeout=90 -p no:cacheprovider`
+from repo root currently measures 981 failed / 69463 passed / 510 skipped / 25 errors
+(~67 min), 946-ish of the failures concentrated in `kerf-cad-core`. Bisecting.
+
+**Bug A (confirmed, root-caused) — rootdir footgun drops the repo-root `conftest.py`.**
+pytest's rootdir search walks UP from the common ancestor of the given args looking for
+the nearest `pyproject.toml`/`pytest.ini`. Every `packages/kerf-<x>` directory has its
+own `pyproject.toml` with a `[tool.pytest.ini_options]` section (for its own
+`markers`/`testpaths`). So any invocation whose args are ALL under one package —
+e.g. `pytest packages/kerf-core/tests/`, or `pytest packages/kerf-cad-core/tests/…`,
+which is exactly what `make test-kernel` in docs/TESTING.md runs — resolves `rootdir` to
+that PACKAGE directory, not the repo root, and pytest never walks further up to find
+`/Users/pc/code/vulos/kerf/conftest.py`. Two things silently break as a result:
+  1. The repo-root conftest's `asyncio.get_event_loop` Python-3.13 compat shim never
+     installs, so any legacy `asyncio.get_event_loop().run_until_complete(...)` call
+     that runs after anything calls `asyncio.set_event_loop(None)` (pytest-asyncio 1.4's
+     per-test teardown does exactly this) raises
+     `RuntimeError: There is no current event loop in thread 'MainThread'` for the rest
+     of the process. Repro: `pytest packages/kerf-core/tests/test_access_control_auth_tokens.py
+     packages/kerf-core/tests/test_inprocess_workers.py` → 4 failed (both files are
+     `packages/kerf-core/tests/…`, so rootdir mis-resolves). Minimal repro: pair ANY
+     single trivial `@pytest.mark.asyncio async def test(): pass` file with
+     `test_inprocess_workers.py` — same 4 failures. Run `test_inprocess_workers.py`
+     alone (rootdir happens to still resolve to the package dir, but nothing upstream
+     called `set_event_loop`) → 4 passed.
+  2. `addopts = "--import-mode=importlib"` (set only in the ROOT pyproject.toml) is
+     silently replaced by pytest's default `prepend` import mode, because the
+     package-level `pyproject.toml`s don't repeat that addopts line. This changes how
+     `importlib.util.spec_from_file_location`-based test helpers interact with
+     `sys.modules` collisions.
+  Verified fix: force the correct config explicitly —
+  `pytest -c pyproject.toml --rootdir=/Users/pc/code/vulos/kerf packages/kerf-core/tests/`
+  — and the same command that showed 4 failed now shows 0.
+  **Not yet fixed in source** — candidates: add `addopts = "--import-mode=importlib"`
+  to every package's own `[tool.pytest.ini_options]` (cheap, but doesn't restore the
+  root conftest for scoped invocations), or make CI/Makefile targets that scope to one
+  package always pass `-c <repo-root>/pyproject.toml --rootdir=<repo-root>` explicitly.
+  This is the CI job's problem too — see Job 2 below, the new workflow must invoke
+  pytest in a way that keeps rootdir at the repo root.
+
+**Bug B (still being isolated) — real intra-`kerf-cad-core` sys.modules leak, independent
+of Bug A.** Forcing the correct rootdir/import-mode (`-c pyproject.toml --rootdir=…`)
+does NOT fully clear cad-core's failures. Reproduced with only the first 142
+alphabetically-sorted `kerf-cad-core` test files run together
+(`test_acoustics.py` … `test_curve_on_surface_robust.py`), correct rootdir forced:
+128 failed / 4 errors (vs. 3 failed / 4 errors — the known pre-existing bugs in
+`test_auto_lightweight.py` + `test_characteristic_curves.py` — when the same 142 files'
+neighborhood is narrowed correctly). `test_curve_on_surface_robust.py` alone: 7 passed.
+So something between file #1 and #141 (alphabetical) still poisons it even with Bug A's
+rootdir issue eliminated. `test_curve_degree_lower.py` + `test_curve_on_surface_robust.py`
+in isolation, correct rootdir: 29 passed (clean) — so that specific pairing, which looked
+like the smoking gun under Bug A's wrong import-mode, is NOT the real culprit once import
+mode is correct. Continuing to narrow within the 142-file window
+(`test_curve_lifting.py`, `test_curve_offset_2d.py` also fail alongside
+`test_curve_on_surface_robust.py` in that window — plausibly the same root class-identity
+mismatch as `test_auto_lightweight.py`/`test_gkp_degree_op.py`'s already-fixed
+`sys.modules["kerf_cad_core.geom.nurbs"]` stub pattern, documented in `docs/TESTING.md`
+root cause #1, but from a different offending file since those two already restore
+correctly). Next step: bisect the ~140-file window in halves with `-c
+pyproject.toml --rootdir=…` forced throughout, find the exact file, fix with a proper
+snapshot/restore (or better: assert in a `conftest.py` fixture that `sys.modules` keys
+present at test start still resolve to the same objects at test end) — no ordering
+hacks/xfail/skips.

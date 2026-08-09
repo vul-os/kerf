@@ -14,15 +14,47 @@
 // for a passing one.
 
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
+
 // `kicad-to-circuit-json` is a devDependency of the frontend (web/package.json),
 // not of this repo-root `scripts/` helper — the frontend restructure (moving
 // package.json + node_modules into web/) means the bare specifier below no
 // longer resolves via the normal node_modules walk-up from this file's
-// location. Import the installed package directly by its real path instead
-// of relying on a root-level node_modules that no longer exists.
-const { KicadToCircuitJsonConverter } = await import(
-  new URL("../web/node_modules/kicad-to-circuit-json/dist/index.js", import.meta.url)
+// location. Resolve it the way Node itself would, rooted at web/'s
+// package.json, instead of hardcoding the package's internal dist/ layout —
+// a hardcoded path breaks silently the moment that package's build output
+// moves. Falls back to the previous hardcoded path if resolution fails, so a
+// node_modules layout Node's resolver doesn't recognize doesn't hard-fail.
+const webPackageJson = new URL("../web/package.json", import.meta.url);
+const fallbackDistPath = new URL(
+  "../web/node_modules/kicad-to-circuit-json/dist/index.js",
+  import.meta.url,
 );
+
+let converterModuleUrl;
+try {
+  const resolved = createRequire(webPackageJson).resolve("kicad-to-circuit-json");
+  converterModuleUrl = pathToFileURL(resolved);
+} catch (err) {
+  console.error(
+    `kicad_oracle_convert: could not resolve 'kicad-to-circuit-json' from ` +
+      `${webPackageJson}: ${err.message}. Falling back to ${fallbackDistPath}.`,
+  );
+  converterModuleUrl = fallbackDistPath;
+}
+
+let converterModule;
+try {
+  converterModule = await import(converterModuleUrl);
+} catch (err) {
+  console.error(
+    `kicad_oracle_convert: could not load 'kicad-to-circuit-json' from ` +
+      `${converterModuleUrl}: ${err.message}. Is it installed? Run \`npm install\` in web/.`,
+  );
+  process.exit(2);
+}
+const { KicadToCircuitJsonConverter } = converterModule;
 
 const inputPath = process.argv[2];
 if (!inputPath) {

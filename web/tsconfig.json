@@ -50,7 +50,6 @@
     "packages",
     "tests/e2e",
     "site",
-    "landing",
     "public"
   ]
 }

@@ -18,7 +18,7 @@ function Tab({ active, onClick, children }: TabProps) {
     <button
       type="button"
       onClick={onClick}
-      className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+      className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/70 ${
         active
           ? 'border-kerf-300 text-kerf-200'
           : 'border-transparent text-ink-300 hover:text-ink-100'
@@ -105,7 +105,7 @@ function MembersTab({ projectId }: MembersTabProps) {
         <button
           type="submit"
           disabled={busy || !email.trim()}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-kerf-300 text-ink-950 text-sm font-medium hover:bg-kerf-200 disabled:opacity-40"
+          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-kerf-300 text-ink-950 text-sm font-medium hover:bg-kerf-200 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 focus-visible:ring-offset-1 focus-visible:ring-offset-ink-900"
         >
           {busy ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />}
           Invite
@@ -140,8 +140,9 @@ function MembersTab({ projectId }: MembersTabProps) {
               <button
                 type="button"
                 onClick={() => remove(m.user_id)}
-                className="p-1 rounded text-ink-400 hover:text-red-400 hover:bg-ink-700"
+                className="p-1 rounded text-ink-400 hover:text-red-400 hover:bg-ink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/70"
                 title="Remove"
+                aria-label={`Remove ${m.name || m.email}`}
               >
                 <Trash2 size={13} />
               </button>
@@ -248,7 +249,7 @@ function LinksTab({ projectId }: LinksTabProps) {
           type="button"
           onClick={create}
           disabled={busy}
-          className="ml-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-kerf-300 text-ink-950 text-sm font-medium hover:bg-kerf-200 disabled:opacity-40"
+          className="ml-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-kerf-300 text-ink-950 text-sm font-medium hover:bg-kerf-200 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 focus-visible:ring-offset-1 focus-visible:ring-offset-ink-900"
         >
           {busy ? <Loader2 size={13} className="animate-spin" /> : <LinkIcon size={13} />}
           Create link
@@ -278,8 +279,9 @@ function LinksTab({ projectId }: LinksTabProps) {
                 <button
                   type="button"
                   onClick={() => copy(l.id, token)}
-                  className="p-1 rounded text-ink-400 hover:text-kerf-300 hover:bg-ink-700"
+                  className="p-1 rounded text-ink-400 hover:text-kerf-300 hover:bg-ink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                   title="Copy link"
+                  aria-label="Copy share link"
                 >
                   {copiedId === l.id ? <Check size={13} className="text-kerf-300" /> : <Copy size={13} />}
                 </button>
@@ -288,8 +290,9 @@ function LinksTab({ projectId }: LinksTabProps) {
                 <button
                   type="button"
                   onClick={() => revoke(l.id)}
-                  className="p-1 rounded text-ink-400 hover:text-red-400 hover:bg-ink-700"
+                  className="p-1 rounded text-ink-400 hover:text-red-400 hover:bg-ink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/70"
                   title="Revoke"
+                  aria-label="Revoke share link"
                 >
                   <Trash2 size={13} />
                 </button>

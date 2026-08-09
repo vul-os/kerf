@@ -1,5 +1,5 @@
 """
-Tests for kerf_cloud.plm.bom150 — 150% BOM / effectivity.
+Tests for kerf_api.plm.bom150 — 150% BOM / effectivity.
 
 All tests are hermetic (no DB, no filesystem).
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import pytest
 
-from kerf_cloud.plm.bom150 import bom_150_percent
+from kerf_api.plm.bom150 import bom_150_percent
 
 
 # ---------------------------------------------------------------------------
@@ -165,7 +165,7 @@ class TestBom150Effectivity:
 
 class TestPlmBom150LlmTool:
     def test_tool_basic(self):
-        from kerf_cloud.plm.llm_tools import plm_bom_150_percent
+        from kerf_api.plm.llm_tools import plm_bom_150_percent
         p = _part("p1", "Part A")
         asm = _asm("a1", "Asm", [_comp("p1")])
         files_json = json.dumps([p, asm])
@@ -173,12 +173,12 @@ class TestPlmBom150LlmTool:
         assert len(result["parts"]) == 1
 
     def test_tool_bad_json(self):
-        from kerf_cloud.plm.llm_tools import plm_bom_150_percent
+        from kerf_api.plm.llm_tools import plm_bom_150_percent
         result = plm_bom_150_percent("not json")
         assert result["ok"] is False
         assert result["code"] == "PARSE_ERROR"
 
     def test_tool_defs_include_bom(self):
-        from kerf_cloud.plm.llm_tools import TOOL_DEFS
+        from kerf_api.plm.llm_tools import TOOL_DEFS
         names = {t["name"] for t in TOOL_DEFS}
         assert "plm_bom_150_percent" in names

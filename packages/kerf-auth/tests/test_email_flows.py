@@ -71,7 +71,7 @@ def _conn():
 # ---- _send_email is gone -------------------------------------------------
 
 def test_send_email_no_longer_exists():
-    """The lazily-importing kerf_cloud.email shim is fully removed, not a
+    """The old lazily-importing hosted-email shim is fully removed, not a
     soft-failing stub."""
     assert not hasattr(auth, "_send_email")
 

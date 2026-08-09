@@ -1,5 +1,5 @@
 """
-Tests for kerf_cloud.plm.eco — Engineering Change Order / ECR.
+Tests for kerf_api.plm.eco — Engineering Change Order / ECR.
 
 All tests are hermetic (no DB, no filesystem).
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import pytest
 
-from kerf_cloud.plm.eco import (
+from kerf_api.plm.eco import (
     ECO_STATUSES,
     CHANGE_TYPES,
     approve_eco,
@@ -269,7 +269,7 @@ class TestEcoFromContent:
 
 class TestPlmEcoLlmTools:
     def test_create_eco_tool(self):
-        from kerf_cloud.plm.llm_tools import plm_create_eco
+        from kerf_api.plm.llm_tools import plm_create_eco
         r = plm_create_eco(
             title="Material upgrade",
             description="Upgrade alloy",
@@ -280,14 +280,14 @@ class TestPlmEcoLlmTools:
         assert r["eco"]["title"] == "Material upgrade"
 
     def test_validate_eco_tool(self):
-        from kerf_cloud.plm.llm_tools import plm_validate_eco, plm_create_eco
+        from kerf_api.plm.llm_tools import plm_validate_eco, plm_create_eco
         cr = plm_create_eco("T", "d", "alice", json.dumps([_affected_part("p1")]))
         eco_json = json.dumps(cr["eco"])
         r = plm_validate_eco(eco_json)
         assert r["ok"] is True
 
     def test_compute_impact_tool(self):
-        from kerf_cloud.plm.llm_tools import plm_compute_eco_impact, plm_create_eco
+        from kerf_api.plm.llm_tools import plm_compute_eco_impact, plm_create_eco
         p1 = _part("p1", "Pin")
         asm = _asm("a1", "Axle", [_comp("p1")])
         cr = plm_create_eco("T", "d", "alice", json.dumps([_affected_part("p1")]))
@@ -296,7 +296,7 @@ class TestPlmEcoLlmTools:
         assert len(r["eco"]["impact_list"]) == 1
 
     def test_dispatch_unknown_tool(self):
-        from kerf_cloud.plm.llm_tools import dispatch
+        from kerf_api.plm.llm_tools import dispatch
         r = dispatch("no_such_tool", {})
         assert r["ok"] is False
         assert r["code"] == "NOT_FOUND"

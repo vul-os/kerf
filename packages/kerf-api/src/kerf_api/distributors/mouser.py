@@ -7,7 +7,7 @@ from typing import Optional
 
 import aiohttp
 
-from kerf_cloud.distributors.service import (
+from kerf_api.distributors.service import (
     PROVIDER_MOUSER,
     Credentials,
     DistributorNotFound,
@@ -118,4 +118,4 @@ class MouserService(Service):
         return 0.0
 
 
-from kerf_cloud.distributors.service import Credentials
+from kerf_api.distributors.service import Credentials

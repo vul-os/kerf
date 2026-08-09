@@ -45,12 +45,14 @@ import time
 from dataclasses import dataclass
 from typing import Iterable
 
-# pygit2 is only needed by the S3-backed git storer (cloud tier); it is declared
-# as a dependency of kerf-cloud, not kerf-core. Import it lazily so OSS / local
-# installs — which construct LocalStorage or S3Storage and never touch this
-# storer — can boot without the pygit2 wheel. `from __future__ import
-# annotations` keeps the `pygit2.Repository` return annotation a string, so the
-# module still imports cleanly when pygit2 is absent.
+# pygit2 is only needed by the S3-backed git storer; it is declared as a
+# dependency of kerf-api (which is what actually exercises this storer via
+# routes_git_diff.py / routes_git_local.py), not kerf-core. Import it lazily
+# so OSS / local installs — which construct LocalStorage or S3Storage and
+# never touch this storer — can boot without the pygit2 wheel. `from
+# __future__ import annotations` keeps the `pygit2.Repository` return
+# annotation a string, so the module still imports cleanly when pygit2 is
+# absent.
 try:
     import pygit2
 except ImportError:  # pragma: no cover — OSS install without cloud deps

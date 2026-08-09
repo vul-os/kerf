@@ -1,5 +1,5 @@
 """
-Tests for kerf_cloud.plm.sysml_trace — SysML-light requirements trace.
+Tests for kerf_api.plm.sysml_trace — SysML-light requirements trace.
 
 All tests are hermetic (no DB, no filesystem).
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import pytest
 
-from kerf_cloud.plm.sysml_trace import (
+from kerf_api.plm.sysml_trace import (
     LINK_TYPES,
     PRIORITIES,
     VERIFICATION_METHODS,
@@ -319,20 +319,20 @@ class TestSysmlFromContent:
 
 class TestPlmSysmlLlmTools:
     def test_create_sysml_doc_tool(self):
-        from kerf_cloud.plm.llm_tools import plm_create_sysml_doc
+        from kerf_api.plm.llm_tools import plm_create_sysml_doc
         r = plm_create_sysml_doc("Motor Controller")
         assert r["ok"] is True
         assert r["doc"]["title"] == "Motor Controller"
 
     def test_create_with_reqs_tool(self):
-        from kerf_cloud.plm.llm_tools import plm_create_sysml_doc
+        from kerf_api.plm.llm_tools import plm_create_sysml_doc
         reqs = [{"req_id": "R1", "text": "Shall spin at 3000 rpm", "priority": "shall"}]
         r = plm_create_sysml_doc("ESC", json.dumps(reqs))
         assert r["ok"] is True
         assert len(r["doc"]["requirements"]) == 1
 
     def test_add_trace_link_tool(self):
-        from kerf_cloud.plm.llm_tools import plm_create_sysml_doc, plm_add_trace_link
+        from kerf_api.plm.llm_tools import plm_create_sysml_doc, plm_add_trace_link
         cr = plm_create_sysml_doc(
             "Sys",
             json.dumps([{"req_id": "R1", "text": "text", "priority": "shall"}]),
@@ -342,7 +342,7 @@ class TestPlmSysmlLlmTools:
         assert len(r["doc"]["requirements"][0]["trace_links"]) == 1
 
     def test_add_verification_tool(self):
-        from kerf_cloud.plm.llm_tools import plm_create_sysml_doc, plm_add_verification
+        from kerf_api.plm.llm_tools import plm_create_sysml_doc, plm_add_verification
         cr = plm_create_sysml_doc(
             "Sys",
             json.dumps([{"req_id": "R1", "text": "text", "priority": "shall"}]),
@@ -352,7 +352,7 @@ class TestPlmSysmlLlmTools:
         assert len(r["doc"]["requirements"][0]["verification"]) == 1
 
     def test_trace_tool(self):
-        from kerf_cloud.plm.llm_tools import (
+        from kerf_api.plm.llm_tools import (
             plm_create_sysml_doc,
             plm_add_trace_link,
             plm_add_verification,
@@ -373,7 +373,7 @@ class TestPlmSysmlLlmTools:
         assert chain["coverage_status"] == "fully_verified"
 
     def test_tool_defs_complete(self):
-        from kerf_cloud.plm.llm_tools import TOOL_DEFS
+        from kerf_api.plm.llm_tools import TOOL_DEFS
         names = {t["name"] for t in TOOL_DEFS}
         expected = {
             "plm_bom_150_percent", "plm_where_used",

@@ -1,5 +1,5 @@
 """
-Tests for kerf_cloud.job_traveler — PO / Job Traveler / Inventory module.
+Tests for kerf_api.job_traveler — PO / Job Traveler / Inventory module.
 
 All tests use tmp_path for an isolated JSON store.
 """
@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from kerf_cloud.job_traveler import (
+from kerf_api.job_traveler import (
     STAGE_ORDER,
     advance_stage,
     allocation_check,

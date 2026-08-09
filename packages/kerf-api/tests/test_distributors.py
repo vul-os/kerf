@@ -1,4 +1,4 @@
-"""Smoke tests for the migrated kerf_cloud.distributors package.
+"""Smoke tests for the migrated kerf_api.distributors package.
 
 These are import-level and logic tests that require no DB or network.
 """
@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from kerf_cloud.distributors.service import (
+from kerf_api.distributors.service import (
     ALL_PROVIDERS,
     PROVIDER_DIGIKEY,
     PROVIDER_LCSC,
@@ -22,7 +22,7 @@ from kerf_cloud.distributors.service import (
     Service,
     validate_credentials,
 )
-from kerf_cloud.distributors.sync import is_stale
+from kerf_api.distributors.sync import is_stale
 
 
 # ---------------------------------------------------------------------------
@@ -120,7 +120,7 @@ def test_is_stale_invalid_json():
 
 @pytest.mark.asyncio
 async def test_mcmaster_lookup_raises():
-    from kerf_cloud.distributors.mcmaster import McMasterService
+    from kerf_api.distributors.mcmaster import McMasterService
 
     svc = McMasterService()
     with pytest.raises(DistributorNotSupported):
@@ -129,7 +129,7 @@ async def test_mcmaster_lookup_raises():
 
 @pytest.mark.asyncio
 async def test_mcmaster_search_raises():
-    from kerf_cloud.distributors.mcmaster import McMasterService
+    from kerf_api.distributors.mcmaster import McMasterService
 
     svc = McMasterService()
     with pytest.raises(DistributorNotSupported):

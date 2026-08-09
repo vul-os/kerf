@@ -1,4 +1,4 @@
-"""Hermetic tests for kerf_cloud.share_link.
+"""Hermetic tests for kerf_api.share_link.
 
 All tests use a temp directory so no real data/cloud/share/* files are written.
 """
@@ -24,7 +24,7 @@ def tmp_share_dir(tmp_path, monkeypatch):
 @pytest.fixture(autouse=True)
 def fresh_module(tmp_share_dir):
     import importlib
-    import kerf_cloud.share_link as m
+    import kerf_api.share_link as m
     importlib.reload(m)
     yield m
 

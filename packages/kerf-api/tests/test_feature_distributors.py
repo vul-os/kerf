@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from kerf_cloud.distributors.service import (
+from kerf_api.distributors.service import (
     PROVIDER_DIGIKEY,
     PROVIDER_LCSC,
     PROVIDER_MOUSER,
@@ -29,7 +29,7 @@ from kerf_cloud.distributors.service import (
     DistributorNotFound,
     DistributorPart,
 )
-from kerf_cloud.distributors.sync import STALE_PART_AGE, is_stale, refresh_part
+from kerf_api.distributors.sync import STALE_PART_AGE, is_stale, refresh_part
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -76,7 +76,7 @@ def _mock_fx(rate: float = 0.14, ok: bool = True):
 @pytest.mark.asyncio
 async def test_digikey_search_returns_parts():
     """T-56-1  DigiKey search: single result parsed correctly."""
-    from kerf_cloud.distributors.digikey import DigiKeyService
+    from kerf_api.distributors.digikey import DigiKeyService
 
     svc = DigiKeyService(Credentials(client_id="id", client_secret="sec"))
 
@@ -112,7 +112,7 @@ async def test_digikey_search_returns_parts():
 @pytest.mark.asyncio
 async def test_digikey_lookup_delegates_to_search():
     """T-56-2  DigiKey lookup() calls search() and returns first result."""
-    from kerf_cloud.distributors.digikey import DigiKeyService
+    from kerf_api.distributors.digikey import DigiKeyService
 
     svc = DigiKeyService(Credentials(client_id="id", client_secret="sec"))
 
@@ -127,7 +127,7 @@ async def test_digikey_lookup_delegates_to_search():
 @pytest.mark.asyncio
 async def test_digikey_lookup_empty_sku_raises():
     """T-56-3  DigiKey lookup() with empty SKU raises DistributorNotFound."""
-    from kerf_cloud.distributors.digikey import DigiKeyService
+    from kerf_api.distributors.digikey import DigiKeyService
 
     svc = DigiKeyService(Credentials(client_id="id", client_secret="sec"))
     with pytest.raises(DistributorNotFound):
@@ -137,7 +137,7 @@ async def test_digikey_lookup_empty_sku_raises():
 @pytest.mark.asyncio
 async def test_digikey_lookup_no_results_raises():
     """T-56-4  DigiKey lookup() with no search results raises DistributorNotFound."""
-    from kerf_cloud.distributors.digikey import DigiKeyService
+    from kerf_api.distributors.digikey import DigiKeyService
 
     svc = DigiKeyService(Credentials(client_id="id", client_secret="sec"))
     svc.search = AsyncMock(return_value=[])
@@ -149,7 +149,7 @@ async def test_digikey_lookup_no_results_raises():
 @pytest.mark.asyncio
 async def test_digikey_auth_error_propagates():
     """T-56-5  DigiKey raises DistributorAuthError on 401 token response."""
-    from kerf_cloud.distributors.digikey import DigiKeyService
+    from kerf_api.distributors.digikey import DigiKeyService
 
     svc = DigiKeyService(Credentials(client_id="id", client_secret="bad"))
 
@@ -175,7 +175,7 @@ async def test_digikey_auth_error_propagates():
 
 
 def _mouser_svc() -> object:
-    from kerf_cloud.distributors.mouser import MouserService
+    from kerf_api.distributors.mouser import MouserService
     return MouserService(Credentials(api_key="mouser-key-abc"))
 
 
@@ -245,7 +245,7 @@ async def test_mouser_lookup_not_found():
 @pytest.mark.asyncio
 async def test_mouser_price_parse_no_dollar():
     """T-56-10  Mouser price parser handles prices without $ prefix."""
-    from kerf_cloud.distributors.mouser import MouserService
+    from kerf_api.distributors.mouser import MouserService
     svc = MouserService(Credentials(api_key="k"))
     # "0.25 USD" style
     assert svc._parse_price([{"Price": "0.25 USD"}]) == pytest.approx(0.25)
@@ -259,7 +259,7 @@ async def test_mouser_price_parse_no_dollar():
 
 
 def _lcsc_svc(fx=None):
-    from kerf_cloud.distributors.lcsc import LCSCService
+    from kerf_api.distributors.lcsc import LCSCService
     return LCSCService(Credentials(api_key="lcsc-k"), fx=fx)
 
 

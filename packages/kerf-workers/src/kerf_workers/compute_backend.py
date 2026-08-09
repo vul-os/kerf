@@ -10,31 +10,32 @@ Concrete implementations
     are inserted into Postgres and drained by whichever :class:`BaseWorker`
     subclass handles that ``job_type``.
 
-Future proprietary extension point (DO NOT implement here)
-----------------------------------------------------------
+Future extension point (DO NOT implement here)
+-----------------------------------------------
 A GPU backend (e.g. ``RunPodGPUBackend`` or ``ModalGPUBackend``) that
-provisions on-demand GPU instances for rendering belongs in the
-**proprietary cloud/ tree**, NOT in this module.
-It should subclass :class:`ComputeBackend` and live at::
-
-    cloud/kerf_cloud/compute/runpod_gpu_backend.py   # or modal_gpu_backend.py
+provisions on-demand GPU instances for rendering does not belong in this
+module. There is no separate hosted/proprietary tier any more — every Kerf
+package is MIT and lives under ``packages/`` — so a GPU backend would ship
+as its own plugin package (e.g. ``packages/kerf-gpu``) subclassing
+:class:`ComputeBackend`, discovered the same way every other plugin is: via
+the ``kerf.plugins`` entry-point group. None exists today.
 
 The interface contract is intentionally minimal so the swap is transparent to
 callers.  Typical usage::
 
-    # MIT path (local / self-hosted):
+    # today (local / self-hosted):
     backend = LocalSubprocessBackend(pool=pool)
 
-    # Proprietary path (cloud/) — implementation TBD once GPU backend lands:
-    # from kerf_cloud.compute.runpod_gpu_backend import RunPodGPUBackend
+    # hypothetical future GPU plugin — implementation TBD once it lands:
+    # from kerf_gpu.runpod_gpu_backend import RunPodGPUBackend
     # backend = RunPodGPUBackend(api_key=..., region=...)
 
     job_id = await backend.submit("render", payload)
     status = await backend.poll(job_id)
 
-Open-core seam: nothing in this file may import the ``cloud`` package or any
-proprietary module.  The GPU backend integration point is documented
-here only as a docstring — no import, no reference at runtime.
+Nothing in this file may import a GPU-backend package — none is a declared
+dependency of kerf-workers, and the integration point above is documented
+here only as a docstring, no import, no reference at runtime.
 """
 
 from __future__ import annotations
@@ -118,8 +119,8 @@ class LocalSubprocessBackend(ComputeBackend):
     Extension point
     ~~~~~~~~~~~~~~~
     For GPU rendering (on-demand, scale-to-zero via RunPod or Modal),
-    replace this backend with a GPU backend from the proprietary
-    ``cloud/`` tree. The swap is transparent to callers because both
+    replace this backend with a GPU backend from a future plugin package
+    (none exists today). The swap is transparent to callers because both
     implement :class:`ComputeBackend`.
 
     Parameters

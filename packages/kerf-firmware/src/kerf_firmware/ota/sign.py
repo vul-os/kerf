@@ -129,8 +129,7 @@ def _load_crypto():
         pass
 
     raise ImportError(
-        "No ed25519 backend found.  Install 'cryptography' (already in "
-        "kerf-cloud deps) or 'PyNaCl'."
+        "No ed25519 backend found.  Install 'cryptography' or 'PyNaCl'."
     )
 
 

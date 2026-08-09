@@ -24,8 +24,8 @@ reuse the existing pygit2-based machinery instead of a literal `git add` +
 `git commit` subprocess pair:
   * ``commit`` reuses ``materialize_and_commit`` (already the single place
     that turns the live `files` table into a real git commit).
-  * ``status``'s ``dirty`` flag is computed the same way kerf-cloud's
-    (now-retired) hosted git status route did: diffing the live `files`
+  * ``status``'s ``dirty`` flag is computed the same way the old hosted
+    (now-retired) git status route did: diffing the live `files`
     table against the HEAD tree.
 Every other verb (``init``, ``log``, ``remotes``, ``push``, ``pull``) is a
 literal ``git -C <repo_dir> ...`` subprocess call, so push/pull pick up the
@@ -152,7 +152,7 @@ def _is_initialized(repo_dir: str) -> bool:
 
 async def _collect_live_file_map(conn, project_id: str) -> dict[str, bytes]:
     """Materialize project's current file tree (path -> bytes), mirroring the
-    now-retired kerf-cloud hosted-git status handler's `_collect_file_entries`.
+    now-retired hosted-git status handler's `_collect_file_entries`.
     """
     rows = await conn.fetch(
         "SELECT id, parent_id, name, kind, content, storage_key "
@@ -196,7 +196,7 @@ async def _collect_live_file_map(conn, project_id: str) -> dict[str, bytes]:
 def _head_tree_map(repo_dir: str) -> dict[str, bytes]:
     """Walk HEAD's tree via pygit2 (bare repo — no `git diff` working tree
     to compare against, so this mirrors the file-content comparison the
-    retired kerf-cloud git-status route used)."""
+    retired hosted git-status route used)."""
     import pygit2
 
     head_map: dict[str, bytes] = {}

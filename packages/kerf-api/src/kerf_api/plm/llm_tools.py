@@ -1,5 +1,5 @@
 """
-kerf_cloud.plm.llm_tools
+kerf_api.plm.llm_tools
 ========================
 
 LLM-callable tool definitions for PLM operations.
@@ -26,22 +26,22 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from kerf_cloud.plm.bom150 import bom_150_percent
-from kerf_cloud.plm.eco import (
+from kerf_api.plm.bom150 import bom_150_percent
+from kerf_api.plm.eco import (
     approve_eco,
     compute_impact,
     create_eco,
     eco_from_content,
     validate_eco,
 )
-from kerf_cloud.plm.sysml_trace import (
+from kerf_api.plm.sysml_trace import (
     add_trace_link,
     add_verification,
     create_sysml_doc,
     sysml_from_content,
     trace,
 )
-from kerf_cloud.plm.where_used import where_used
+from kerf_api.plm.where_used import where_used
 
 
 # ---------------------------------------------------------------------------

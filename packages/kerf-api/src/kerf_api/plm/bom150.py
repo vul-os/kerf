@@ -1,5 +1,5 @@
 """
-kerf_cloud.plm.bom150
+kerf_api.plm.bom150
 =====================
 
 150% BOM (Superset / Universal BOM).

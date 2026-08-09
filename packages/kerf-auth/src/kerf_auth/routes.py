@@ -447,7 +447,7 @@ async def logout(req: RefreshRequest, response: Response):
 async def github_login_start(request: Request):
     """Sign in with GitHub — login/signup entry point.
 
-    Separate from the kerf-cloud /auth/github/start repo-connect flow
+    Separate from the old hosted /auth/github/start repo-connect flow
     (scope=repo, requires an already-authenticated user). This route uses
     scope=read:user user:email and finds-or-creates the Kerf account.
     """

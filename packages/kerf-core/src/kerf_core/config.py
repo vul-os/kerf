@@ -116,8 +116,8 @@ class Settings(BaseSettings):
     # ---------------------------------------------------------------------------
     # Transactional email — pluggable provider + credentials.
     # email_provider: "smtp" (self-host default, zero-vendor) | "resend" | "ses".
-    #   New providers slot in via kerf_cloud.email.providers (add to
-    #   _VALID_PROVIDERS + a _send_<name>); no other code changes needed.
+    #   New providers slot in here (add to _VALID_PROVIDERS + a
+    #   _send_<name>); no other code changes needed.
     # Our hosted cloud runs Resend today (EMAIL_PROVIDER=resend in the deploy
     #   env); the planned migration to SES is a pure env flip — set
     #   EMAIL_PROVIDER=ses + the ses_* fields, no code change.

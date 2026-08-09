@@ -5,7 +5,7 @@ from typing import Optional
 
 import aiohttp
 
-from kerf_cloud.distributors.service import (
+from kerf_api.distributors.service import (
     PROVIDER_DIGIKEY,
     Credentials,
     DistributorAuthError,

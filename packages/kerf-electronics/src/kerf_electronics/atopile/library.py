@@ -237,10 +237,10 @@ class MockCatalogue(DistributorCatalogue):
 
 class LiveCatalogue(DistributorCatalogue):
     """
-    Delegates to the kerf-cloud distributor registry (LCSC / JLCPCB proxy).
+    Delegates to kerf-api's distributor registry (LCSC / JLCPCB proxy).
 
     Instantiated only when KERF_DISTRIBUTOR_LIVE=1.  Requires the
-    kerf_cloud package and a running distributor registry with LCSC
+    kerf_api package and a running distributor registry with LCSC
     credentials loaded.
     """
 
@@ -259,7 +259,7 @@ class LiveCatalogue(DistributorCatalogue):
         query = " ".join(terms)
 
         try:
-            from kerf_cloud.distributors.registry import get_registry
+            from kerf_api.distributors.registry import get_registry
             registry = get_registry()
             if registry is None:
                 raise RuntimeError("distributor registry not initialised")

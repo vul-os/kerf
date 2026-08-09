@@ -1,5 +1,5 @@
 """
-Tests for kerf_cloud.plm.where_used — assembly-graph inverse lookup.
+Tests for kerf_api.plm.where_used — assembly-graph inverse lookup.
 
 All tests are hermetic (no DB, no filesystem).
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import pytest
 
-from kerf_cloud.plm.where_used import where_used
+from kerf_api.plm.where_used import where_used
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +141,7 @@ class TestWhereUsedPath:
 
 class TestPlmWhereUsedLlmTool:
     def test_basic_dispatch(self):
-        from kerf_cloud.plm.llm_tools import plm_where_used
+        from kerf_api.plm.llm_tools import plm_where_used
         p = _part("p1", "Gear")
         asm = _asm("a1", "Gearbox", [_comp("p1")])
         files_json = json.dumps([p, asm])
@@ -149,12 +149,12 @@ class TestPlmWhereUsedLlmTool:
         assert len(result["usages"]) == 1
 
     def test_bad_json(self):
-        from kerf_cloud.plm.llm_tools import plm_where_used
+        from kerf_api.plm.llm_tools import plm_where_used
         result = plm_where_used("p1", "not json")
         assert result["ok"] is False
 
     def test_missing_part_id(self):
-        from kerf_cloud.plm.llm_tools import plm_where_used
+        from kerf_api.plm.llm_tools import plm_where_used
         result = plm_where_used("", json.dumps([]))
         assert result["ok"] is False
         assert result["code"] == "BAD_ARGS"

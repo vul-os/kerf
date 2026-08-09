@@ -122,8 +122,13 @@ test.describe('Mechanical persona (T-96)', () => {
     // A9 — "Sheet Metal" category label
     await expect(popoverMenu.getByText('Sheet Metal')).toBeVisible()
 
-    // A10 — "Hole pattern" menuitem is in the popover
-    const holePatternItem = popoverMenu.getByRole('menuitem', { name: /add hole pattern/i })
+    // A10 — "Hole pattern" menuitem is in the popover.
+    // Anchored exactly: the popover also has a "Hole Pattern (Sketch)" op
+    // (feature_hole_pattern_from_sketch, under Modify) whose accessible name
+    // is "Add Hole Pattern (Sketch)" — an unanchored /add hole pattern/i also
+    // matches that one, so getByRole resolves to 2 elements (strict-mode
+    // violation) instead of the plain sketch-based "hole_pattern" op we want.
+    const holePatternItem = popoverMenu.getByRole('menuitem', { name: /^add hole pattern$/i })
     await expect(holePatternItem).toBeVisible()
 
     // ── 5. Add Hole pattern feature ──────────────────────────────────────────

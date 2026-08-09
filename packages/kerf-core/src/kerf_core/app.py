@@ -306,6 +306,19 @@ async def _load_plugins(app: FastAPI, config: Config) -> None:
     sorted_names = topo_sort(list(register_fns.keys()), edges)
     sorted_names = [n for n in sorted_names if n in register_fns]
 
+    # Tolerating a failed plugin is right for an end user: a broken optional plugin should
+    # degrade that feature, not refuse to boot the whole application. It is wrong for CI,
+    # where the same tolerance hides real breakage — a missing import in routes_rf.py once
+    # took down every electronics route and LLM tool, and the suite stayed green because
+    # nothing an assertion could see had changed. Set KERF_STRICT_PLUGINS=true (the E2E and
+    # CI stacks do) to turn any registration failure into a hard boot failure.
+    strict_plugins = os.environ.get("KERF_STRICT_PLUGINS", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    failed: list[str] = []
+
     loaded: list[PluginManifest] = []
     for name in sorted_names:
         fn = register_fns[name]
@@ -330,8 +343,16 @@ async def _load_plugins(app: FastAPI, config: Config) -> None:
             )
         except Exception as exc:
             logger.error("plugin_register_failed", plugin=name, error=str(exc))
+            failed.append(f"{name}: {exc}")
+
+    if strict_plugins and failed:
+        raise RuntimeError(
+            "KERF_STRICT_PLUGINS is set and "
+            f"{len(failed)} plugin(s) failed to register: " + "; ".join(failed)
+        )
 
     app.state.loaded_plugins = loaded
+    app.state.failed_plugins = failed
     await workers.start_all()
 
 

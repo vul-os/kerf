@@ -98,6 +98,8 @@ export default defineConfig({
       // rejected against the default :5173 origin.
       command:
         'KERF_PORT=8081 KERF_LOCAL_MODE=true LOCAL_MODE=true ' +
+        // Any plugin that fails to register fails the boot — see the note in app.py.
+        'KERF_STRICT_PLUGINS=true ' +
         'CORS_ORIGIN=http://localhost:5174 ' +
         (process.env.DATABASE_URL
           ? `KERF_DATABASE_URL=${process.env.DATABASE_URL} ` +
@@ -134,6 +136,7 @@ export default defineConfig({
       // unconditional node capabilities in every mode.
       command:
         'KERF_PORT=8082 KERF_LOCAL_MODE=false LOCAL_MODE=false ' +
+        'KERF_STRICT_PLUGINS=true ' +
         'CORS_ORIGIN=http://localhost:5175 ' +
         (process.env.DATABASE_URL
           ? `KERF_DATABASE_URL=${process.env.DATABASE_URL} ` +

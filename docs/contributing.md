@@ -10,22 +10,26 @@ there is no proprietary/cloud plugin split (see the "Final form" ADR in
 git clone https://github.com/vul-os/kerf
 cd kerf
 
-# Postgres on the default port
-createdb kerf
+# Pick a persona — see docs/capabilities.md. Plain `pip install -e .[full]`
+# does NOT work (uv-workspace mapping that plain pip can't follow); use the
+# helper script instead:
+./scripts/dev-install.sh full
 
-# Pick a persona — see docs/capabilities.md
-pip install -e .[full]
+cp kerf.example.toml kerf.toml   # writes kerf.toml from the example
+# Edit kerf.toml: set at least one [llm.<provider>].api_key.
+# local_mode = true (single-user, no login screen) is already the default.
 
+cd web
 npm install
-npm run init               # writes kerf.toml from the example
-# Edit kerf.toml: set [auth].optional = true and one [llm.<provider>].api_key
-
-kerf-server --migrate      # apply migrations
+npm run migrate            # apply migrations — defaults to embedded SQLite,
+                           # no Postgres needed unless you opt into it
 npm run dev                # vite :5173 + kerf-server :8080
 ```
 
 Open <http://localhost:5173>. Hot reload runs on the frontend; the Python server
 restarts on file change via `uvicorn --reload` (handled by `npm run dev`).
+(All `npm` commands above run from `web/` — that's where `package.json`
+lives, not the repo root.)
 
 ## Repo layout
 
@@ -50,13 +54,14 @@ packages/                One package per plugin. All under MIT.
   kerf-sdk/                Python SDK (PyPI: kerf-sdk) for scripting
   kerf-pub/                DMTAP-PUB object model, feeds, publish/fetch/resolve/submit
 
-src/                    React + Vite frontend (MIT)
-  components/             shared UI
-  routes/                 page-level routes
-  lib/                    JSCAD runner, geom helpers, exporters, projection
-  store/                  Zustand stores
+web/                    React + Vite frontend (MIT) — package.json lives here
+  src/
+    components/           shared UI
+    routes/               page-level routes
+    lib/                  JSCAD runner, geom helpers, exporters, projection
+    store/                Zustand stores
 docs/                   Markdown docs (you're here)
-scripts/                npm helper scripts (init-config, etc.)
+scripts/                npm helper scripts (init-config, etc.) + dev-install.sh
 pyproject.toml          Root meta-package: persona optional-dependency groups
 ```
 
@@ -64,8 +69,10 @@ pyproject.toml          Root meta-package: persona optional-dependency groups
 
 Kerf is 100% MIT. There is no proprietary tree, no dual license, and no
 "cloud edition" versus "local edition" — every install (a laptop, a homelab
-box, or a Vulos-hosted instance like `vulos.org/projects/kerf`) runs byte-identical
-software. A node's behavior is governed entirely by config toggles
+box, or a shared team server) runs byte-identical software; there is no
+hosted tier to compare against (`vulos.org/projects/kerf` is the project's
+marketing site and docs, not a running instance). A node's behavior is
+governed entirely by config toggles
 (`publicly-reachable`, `relay-for-others`, `pin-storage`, `offer-compute`),
 never by which build you installed or a license gate. See
 [node-architecture.md](./node-architecture.md).
@@ -78,12 +85,12 @@ contributor flow — there is no separate license arrangement to negotiate.
 | Script                   | What it does                                                          |
 |--------------------------|-----------------------------------------------------------------------|
 | `npm run dev`            | Vite (:5173) + kerf-server (:8080), both with hot reload              |
-| `npm run init`           | Copy `kerf.example.toml` → `kerf.toml` (idempotent)                  |
+| `npm run init`           | Mirrors WASM assets into `web/public/`. Does **not** write `kerf.toml` when run from `web/` — copy it by hand (`cp kerf.example.toml kerf.toml` from the repo root) |
 | `npm run migrate`        | Apply pending migrations via `python3 -m kerf_core.db.migrations.runner` |
 | `npm run migrate:reset`  | Drop schema + re-apply all migrations from scratch                    |
-| `npm run build`          | Alias for `build:web` — compiles the Vite SPA into `dist/`            |
+| `npm run build`          | Alias for `build:web` — compiles the Vite SPA into `web/dist/`        |
 | `npm run build:web`      | Frontend bundle only (runs `build-docs-manifest.mjs` first)           |
-| `npm run start`          | Run `kerf-server` serving the pre-built `dist/` on `:8080`            |
+| `npm run start`          | Run `kerf-server` serving the pre-built `dist/` on `:8080` (set `KERF_FRONTEND_DIST=web/dist` first — its built-in default is the Docker image's path) |
 | `npm run lint`           | ESLint                                                                |
 | `npm run test`           | Vitest unit tests                                                     |
 | `npm run test:e2e`       | Playwright end-to-end tests                                           |
@@ -94,7 +101,9 @@ Single TOML file. Search order: `--config <path>` → `KERF_CONFIG` env →
 `./kerf.toml` → `~/.config/kerf/config.toml` → `/etc/kerf/config.toml`.
 Schema in `kerf.example.toml`. Notable knobs:
 
-- `[auth].optional = true` — single-user mode; no signup screen.
+- `[server].local_mode = true` (the default) — single-user mode; no login
+  screen. (`[auth].optional` is not a real setting — see the comment above
+  `[auth]` in `kerf.example.toml`; it was removed as a legacy flag.)
 - `[storage].backend = "local" | "s3" | "filesystem"` — pick where binary
   assets live.
 - `[llm.<provider>].api_key` — non-empty key activates that provider.
@@ -124,7 +133,7 @@ behind by one test file silently corrupts every file collected after it. That
 single mistake accounted for the bulk of a 1563-failure full-suite run.
 
 Frontend has no automated test suite yet — assume manual smoke testing
-plus the OpenSCAD vitest suite (`vitest run src/lib/openscadToJscad.test.ts`).
+plus the OpenSCAD vitest suite (from `web/`: `npm run test -- src/lib/openscadToJscad.test.ts`).
 
 ## Code style
 

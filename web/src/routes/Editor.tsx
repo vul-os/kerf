@@ -130,14 +130,14 @@ function Build3DModal({ op, sketchName, onConfirm, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 rounded border border-ink-700 text-ink-400 text-xs hover:bg-ink-800"
+            className="px-3 py-1.5 rounded border border-ink-700 text-ink-400 text-xs hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             Cancel
           </button>
           <button
             type="submit"
             form="build3d-form"
-            className="flex-1 py-1.5 rounded bg-kerf-300/15 border border-kerf-300/40 text-kerf-200 text-xs hover:bg-kerf-300/25"
+            className="flex-1 py-1.5 rounded bg-kerf-300/15 border border-kerf-300/40 text-kerf-200 text-xs hover:bg-kerf-300/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             Build 3D
           </button>
@@ -215,7 +215,7 @@ function Build3DDropdown({ sketch, sketchName, onBuild, disabled }) {
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-amber-300/10 border border-amber-300/25 text-amber-200 hover:bg-amber-300/20 text-xs"
+          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-amber-300/10 border border-amber-300/25 text-amber-200 hover:bg-amber-300/20 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/70"
           title="Build a 3D part from this sketch (extrude or revolve)"
         >
           <Box size={11} />
@@ -226,7 +226,7 @@ function Build3DDropdown({ sketch, sketchName, onBuild, disabled }) {
           <div className="absolute left-0 top-full mt-1 z-40 min-w-[160px] bg-ink-850 border border-ink-700 rounded-md shadow-lg py-1">
             <button
               type="button"
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-ink-100 hover:bg-ink-700 text-left"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-ink-100 hover:bg-ink-700 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/70"
               onClick={() => { setOpen(false); setModal('extrude_linear') }}
             >
               <ArrowRight size={12} className="text-amber-300" />
@@ -234,7 +234,7 @@ function Build3DDropdown({ sketch, sketchName, onBuild, disabled }) {
             </button>
             <button
               type="button"
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-ink-100 hover:bg-ink-700 text-left"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-ink-100 hover:bg-ink-700 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/70"
               onClick={() => { setOpen(false); setModal('extrude_rotate') }}
             >
               <RotateCw size={12} className="text-amber-300" />
@@ -310,6 +310,7 @@ function EditorUserMenu({ user }) {
         aria-expanded={open}
         aria-controls="editor-user-menu"
         title={user?.email || 'Account'}
+        aria-label={`Account menu${user?.email ? ` (${user.email})` : ''}`}
         className="w-7 h-7 rounded-full bg-ink-700 flex items-center justify-center text-[11px] text-ink-100 font-semibold flex-shrink-0 hover:bg-ink-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
       >
         {user?.avatar_url
@@ -1742,7 +1743,7 @@ export default function Editor() {
           <button
             type="button"
             onClick={() => navigate('/projects')}
-            className="flex-shrink-0 p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300"
+            className="flex-shrink-0 p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             title="Back to projects"
             aria-label="Back to projects"
           >
@@ -1754,7 +1755,7 @@ export default function Editor() {
             type="button"
             ref={treeOpenerRef}
             onClick={() => setTreeDrawerOpen(true)}
-            className="flex-shrink-0 lg:hidden p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300"
+            className="flex-shrink-0 lg:hidden p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             title="Open file tree"
             aria-label="Open file tree"
             aria-expanded={treeDrawerOpen}
@@ -1766,7 +1767,7 @@ export default function Editor() {
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="hidden sm:flex items-center hover:opacity-80 transition-opacity flex-shrink-0"
+            className="hidden sm:flex items-center hover:opacity-80 transition-opacity flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 rounded"
             title="Kerf home"
             aria-label="Kerf home"
           >
@@ -1791,7 +1792,7 @@ export default function Editor() {
             <button
               type="button"
               onClick={() => setEditingName(true)}
-              className="min-w-0 truncate max-w-[110px] sm:max-w-[180px] md:max-w-[280px] lg:max-w-none text-sm text-ink-200 hover:text-kerf-300 px-1 rounded text-left"
+              className="min-w-0 truncate max-w-[110px] sm:max-w-[180px] md:max-w-[280px] lg:max-w-none text-sm text-ink-200 hover:text-kerf-300 px-1 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               title="Click to rename"
             >
               {w.project?.name || 'Loading…'}
@@ -1823,7 +1824,7 @@ export default function Editor() {
           disabled={!w.currentFileId}
           title="Undo (Cmd+Z)"
           aria-label="Undo"
-          className="inline-flex p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent"
+          className="inline-flex p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Undo2 size={14} aria-hidden="true" />
         </button>
@@ -1833,7 +1834,7 @@ export default function Editor() {
           disabled={!w.currentFileId || (w.redoStack?.length ?? 0) === 0}
           title="Redo (Cmd+Shift+Z)"
           aria-label="Redo"
-          className="inline-flex p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent"
+          className="inline-flex p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Redo2 size={14} aria-hidden="true" />
         </button>

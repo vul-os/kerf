@@ -90,7 +90,7 @@ export class ProjectsPage {
     // Find the card that contains the h3 with the project name.
     const card = this.page
       .locator('.group')
-      .filter({ has: this.page.locator('h3', { hasText: projectName }) })
+      .filter({ has: this.page.locator('h2', { hasText: projectName }) })
       .first()
 
     const kebab = card.getByRole('button', { name: 'Project actions' })
@@ -107,7 +107,7 @@ export class ProjectsPage {
     // Exact match: a renamed project ("<name>-renamed") contains the
     // original name as a substring, so hasText would false-match.
     await expect(
-      this.page.getByRole('heading', { level: 3, name, exact: true }),
+      this.page.getByRole('heading', { level: 2, name, exact: true }),
     ).toBeVisible()
   }
 
@@ -116,7 +116,7 @@ export class ProjectsPage {
    */
   async expectProjectGone(name: string) {
     await expect(
-      this.page.getByRole('heading', { level: 3, name, exact: true }),
+      this.page.getByRole('heading', { level: 2, name, exact: true }),
     ).toHaveCount(0)
   }
 

@@ -1433,3 +1433,45 @@ moment of failure. The trace is already captured on disk from this run.
   backend: KERF_PORT=8091 KERF_LOCAL_MODE=true LOCAL_MODE=true DATABASE_URL=... -m kerf_core --port 8091
   frontend: cd web && KERF_API_PROXY_TARGET=http://localhost:8091 npx vite --port 5174
   spec: cd web/tests/e2e && DATABASE_URL=... PATH=.venv-e2e/bin:$PATH npx playwright test --project=local
+
+## E2E layer 2: the editor route was blank, not the button hidden
+
+**Symptom.** 20 local specs failed. The assertions said things like "New button not
+visible", but the failure screenshots showed an *empty page*. Those are different faults,
+and chasing the assertion text cost the most time here — the selector was correct all
+along.
+
+**Root cause.** `web/src/lib/panelRegistry.ts` collects its per-domain fragments with:
+
+```js
+import.meta.glob('./panels/*.ts', { eager: true })
+```
+
+`motion.test.ts` lived in `./panels`. An *eager* glob imports every match at module
+evaluation, so the registry pulled a vitest suite into the browser bundle; `suite()` then
+threw `Cannot read properties of undefined (reading 'config')` and React never mounted.
+`#root` was 0 characters on every route that touched the registry.
+
+It only started matching during the TypeScript migration. The glob was previously
+`./panels/*.js` and the suite was `motion.test.jsx` — no overlap. Renaming it to
+`.test.ts` silently enrolled it in the registry. This also broke plain `npm run dev`, so
+it was a product bug, not a test-only one.
+
+**Fix.** Moved the suite to `panels/__tests__/` (outside the non-recursive pattern) and
+added `'!./panels/*.test.ts'` / `'!./panels/*.spec.ts'` to the glob. Filtering the glob's
+*results* does not work — by then the import side-effect has already run. Result: editor
+route mounts (`#root` 46,080 chars, 0 page errors), and local E2E went 4 passed → 18
+passed / 6 failed.
+
+**Rule this suggests.** An eager `import.meta.glob` is an implicit import of anything
+matching the pattern, so the pattern is a security-and-correctness boundary, not a
+convenience. Any eager glob over a source directory should exclude test files explicitly.
+
+## Playwright artifacts were tracked because .gitignore was not re-anchored
+
+Moving the frontend into `web/` broke `tests/e2e/test-results/` in `.gitignore`: patterns
+containing a slash are anchored to the .gitignore's directory, so the rule stopped
+matching once the path gained a `web/` prefix. A run's traces, videos and screenshots got
+committed. Re-anchored the paths and untracked them. Worth remembering for any future
+directory move — path-anchored ignore rules fail silently and the first symptom is
+several MB of binary churn in a diff.

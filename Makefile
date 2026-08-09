@@ -18,22 +18,17 @@ test:
 # tests / ~75 min with 17 known failures, so it is not in the default gate.
 # The two --ignore'd files contain non-terminating tests (see docs/TESTING.md).
 #
-# --rootdir=. is load-bearing, not decoration: every packages/kerf-<x> has its
-# own pyproject.toml with a [tool.pytest.ini_options] section (markers/
-# testpaths), and pytest's rootdir search walks UP from the given args looking
-# for the nearest one. Args scoped entirely under packages/kerf-cad-core (as
-# these are) hit ITS pyproject.toml before ever reaching the repo root's —
-# silently dropping the repo-root conftest.py (asyncio.get_event_loop shim,
-# sys.path setup) AND falling back from --import-mode=importlib (set only in
-# the root pyproject.toml) to pytest's default prepend mode. The latter lets
-# two kerf-cad-core test files' importlib.util.spec_from_file_location
-# sys.modules stand-ins (test_auto_lightweight.py, test_gkp_degree_op.py,
-# test_curve_degree_lower.py) leak across files that never happens under
-# importlib mode — see docs/TESTING.md root cause #1 and decisions.md
-# (2026-08-09, "pytest test-pollution triage"). Forcing rootdir keeps this
-# target on the same config as a bare `pytest`/`make test`.
+# No --rootdir override needed here (an earlier version of this target forced
+# one — see git history if curious). packages/kerf-cad-core/pyproject.toml no
+# longer carries its own [tool.pytest.ini_options] table — see the comment
+# above [tool.pytest.ini_options] in the repo-root pyproject.toml — so this
+# scoped invocation, like every other pytest invocation anywhere in the repo,
+# resolves rootdir up to the repo root automatically and keeps the repo-root
+# conftest.py (asyncio.get_event_loop shim, sys.path setup) and
+# --import-mode=importlib. Full diagnosis in decisions.md, "pytest rootdir
+# footgun" (2026-08-09).
 test-kernel:
-	PYTHONHASHSEED=0 pytest --rootdir=. packages/kerf-cad-core/tests -n auto --timeout=300 \
+	PYTHONHASHSEED=0 pytest packages/kerf-cad-core/tests -n auto --timeout=300 \
 		--ignore=packages/kerf-cad-core/tests/test_curve_resample_uniform.py \
 		--ignore=packages/kerf-cad-core/tests/test_subd_limit_area_volume.py
 

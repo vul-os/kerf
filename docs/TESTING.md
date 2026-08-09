@@ -255,6 +255,45 @@ Not shared causes; real defects, each needing its own fix.
   `max_vonmises_stress_pa`) in `test_solid_fem_tools.py`. API drift: the solver
   no longer returns the shape its tests expect.
 
+### 5. pytest rootdir footgun — package-scoped invocations dropped the root conftest — FIXED 2026-08-09
+
+Every `packages/kerf-<x>/pyproject.toml` used to carry its own
+`[tool.pytest.ini_options]` table. pytest resolves `rootdir` (and its whole
+config) to the NEAREST `pyproject.toml` containing that table, walking up from
+the invocation's args — a `pyproject.toml` without the table doesn't count and
+the walk continues further up. So any invocation scoped entirely under one
+package — `pytest packages/kerf-core/tests/`, the old `make test-kernel`,
+this document's own "measured individually, `pytest packages/<pkg>/tests`"
+methodology above, an IDE test runner — resolved `rootdir` to that package,
+not the repo root, and silently never reached this file's `conftest.py`.
+Two consequences, both silent: (1) the repo-root conftest's
+`asyncio.get_event_loop` Python-3.13 compat shim never installed, so any
+later legacy `asyncio.get_event_loop().run_until_complete(...)` call (a
+narrower set than root cause #2 above — most call sites were rewritten to
+`asyncio.run()` directly and don't depend on this shim at all, but a few,
+e.g. `kerf-core/tests/test_inprocess_workers.py`, still do) raised
+`RuntimeError: There is no current event loop in thread 'MainThread'` for the
+rest of that pytest process; (2) `addopts = "--import-mode=importlib"` (set
+only in the root `pyproject.toml`) was silently replaced by pytest's default
+`prepend` import mode.
+
+**Fixed structurally, not by patching call sites:** every package's
+`[tool.pytest.ini_options]` table was deleted (see the comment above
+`[tool.pytest.ini_options]` in the repo-root `pyproject.toml`, and
+`decisions.md` "pytest rootdir footgun", 2026-08-09, for the full diagnosis,
+the options considered, and why deletion — not copying `addopts` into every
+package, and not forcing `-c`/`--rootdir` on specific call sites — was
+chosen). With no other `[tool.pytest.ini_options]` table anywhere in the
+tree, every pytest invocation, however scoped, resolves `rootdir` up to the
+repo root automatically. No call site — `make test-kernel`, this doc's
+per-package measurement commands, a plugin's own `README.md`, a future CI
+job, a developer typing `pytest packages/kerf-x/` by hand — needs an explicit
+flag to get this right; none of the numbers measured elsewhere in this
+document needed correcting because of this fix (root cause #2's rewrite to
+`asyncio.run()` meant those specific counts didn't depend on the shim), but
+any *future* package-scoped run of a test that does depend on it will now get
+the shim it needs.
+
 ### Not a root cause: the conda-forge scientific stack
 
 Worth stating plainly, because it was the initial hypothesis. **No failure

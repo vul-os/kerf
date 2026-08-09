@@ -1616,3 +1616,118 @@ pyproject.toml --rootdir=…` forced throughout, find the exact file, fix with a
 snapshot/restore (or better: assert in a `conftest.py` fixture that `sys.modules` keys
 present at test start still resolve to the same objects at test end) — no ordering
 hacks/xfail/skips.
+
+## 2026-08-09 15:41 SAST — Bug A fixed properly: deleted per-package `[tool.pytest.ini_options]` tables (option b)
+
+**Context:** continuing from the 15:11 SAST triage entry above. Bug A (rootdir
+footgun) was root-caused and reproduced there but explicitly left "not yet
+fixed in source." In between, a different pass (`527b0907`, "Makefile: fix
+Bug A — force --rootdir on test-kernel") landed a partial fix: added
+`--rootdir=.` to `make test-kernel` only. That is exactly option (d) from the
+brief — necessary for that one target, but insufficient, since it does
+nothing for a bare `pytest packages/kerf-x/tests/` typed by hand, a plugin's
+own README instructions (`kerf-worker/README.md` had `cd packages/kerf-worker
+&& pytest tests/`), a future CI job scoped to one package, or an IDE test
+runner. Nothing stops the next scoped invocation from hitting the same bug.
+
+**Decision:** picked option (b) — delete the `[tool.pytest.ini_options]`
+table from all 33 `packages/kerf-*/pyproject.toml` files, so the repo-root
+`pyproject.toml` is the ONLY file anywhere in the tree containing that table.
+
+**Why (b) over the alternatives in the brief:**
+- (a) copy `addopts`/etc. into every package — cheap, but explicitly
+  diagnosed as a half-fix: it does not restore the root `conftest.py` (the
+  asyncio shim, the `tools.*` namespace shim, the `sys.path` setup), so any
+  test file that still depends on the shim (e.g.
+  `kerf-core/tests/test_inprocess_workers.py`) keeps failing under a scoped
+  invocation regardless.
+- (c) a per-package `conftest.py` shim re-exporting root behavior — works but
+  is 33 files of duplicated indirection to maintain in lockstep with the real
+  one, and doesn't fix the `addopts`/import-mode half of the bug (that's an
+  ini option, not something a conftest can set).
+- (d) force `-c`/`--rootdir` on every call site — this is what `527b0907`
+  did for exactly one target. Proven insufficient by construction: it only
+  protects the call sites someone remembered to update, not a bare
+  `pytest packages/kerf-x/` a developer types by hand, which is the actual
+  footgun.
+- (b) removes the possibility of the bug existing at all: with no other
+  `[tool.pytest.ini_options]` table in the tree, pytest's rootdir search
+  cannot stop short of the repo root no matter how an invocation is scoped —
+  no call site, present or future, needs to know about this to be safe.
+
+**What each package's table actually provided, and where it went:**
+- `testpaths = ["tests"]` (all 33) — only affects a bare `pytest` with no
+  positional args run from inside the package directory. No documented
+  workflow anywhere in the repo (Makefile, scripts, READMEs, CONTRIBUTING.md,
+  docs/) does this — every real invocation passes an explicit path
+  (`pytest packages/kerf-x/tests/`, `pytest tests/` from within the package).
+  Dropped, no relocation needed.
+- `asyncio_mode = "auto"` (most packages) — root already sets this; once
+  rootdir resolves correctly it applies everywhere. Dropped.
+- `pythonpath = ["src"]` (kerf-core, kerf-silicon) — redundant with the root
+  conftest's `_add_plugin_src_paths()`, which already puts every
+  `packages/kerf-*/src` on `sys.path`. Dropped.
+- `addopts = "--import-mode=importlib"` (kerf-worker only — an earlier,
+  even-more-partial attempt at option (a) for just that one package) —
+  redundant with root's `addopts`. Dropped.
+- `markers = ["slow: ..."]` (kerf-cad-core only, 1 real usage in
+  `test_curve_degree_lower.py`... — actually in the kernel suite generally,
+  grepped 1 hit) — the only piece actually still needed somewhere. Relocated
+  to the root `pyproject.toml`'s `[tool.pytest.ini_options]`, with a comment
+  saying which package it's for. No `--strict-markers` anywhere in the repo,
+  so this was a warning-avoidance relocation, not a correctness fix, but did
+  it anyway per the brief ("relocate anything still needed").
+
+Left a comment block in every package's `pyproject.toml` (where the deleted
+table used to be) plus a longer one above `[tool.pytest.ini_options]` in the
+root `pyproject.toml`, explicitly telling future readers not to re-add a
+per-package table and why. Also reverted `527b0907`'s `--rootdir=.` on
+`make test-kernel` back to a bare invocation (now correct without it) and
+replaced its comment — leaving the stale flag in would have implied it was
+still load-bearing when the structural fix supersedes it.
+
+**Verification (all via `.venv-e2e/bin/python -m pytest`, Python 3.13.9):**
+- Baseline reproduced first, on the unmodified tree:
+  `pytest packages/kerf-core/tests/test_access_control_auth_tokens.py
+  packages/kerf-core/tests/test_inprocess_workers.py -q --timeout=90` →
+  **4 failed, 12 passed** (same `RuntimeError: There is no current event loop
+  in thread 'MainThread'` as documented above).
+- Same command, no `-c`/`--rootdir` flags, after deleting the per-package
+  ini tables → **16 passed, 0 failed.** `--collect-only` on the same args
+  shows `rootdir: /Users/pc/code/vulos/kerf`, `configfile: pyproject.toml`.
+- Kernel-tier scoped sample (`test_curve_degree_lower.py` +
+  `test_curve_on_surface_robust.py`, the exact pairing Bug B's investigation
+  used) → 29 passed, rootdir confirmed at repo root, no flags.
+- Domain-tier scoped sample, a whole package (`packages/kerf-mold/tests/`,
+  previously all-`get_event_loop` per root cause #2) → 1269 passed, matching
+  the already-fixed post-`asyncio.run()` count in docs/TESTING.md — confirms
+  scoped domain packages aren't newly broken by the config change.
+- Full default tier (`PYTHONHASHSEED=0 pytest -n auto`, bare invocation from
+  repo root, `pytest-xdist` was missing from `.venv-e2e` and installed for
+  this run): **5018 passed, 116 skipped, 2 failed** in 163s. Both failures
+  (`kerf-pub/tests/test_endpoints.py::test_plugin_registers_router_not_gated_by_cloud`,
+  `kerf-tess/tests/test_tess_plugin.py::test_plugin_register_mounts_route`)
+  are `AttributeError: '_IncludedRouter' object has no attribute 'path'` —
+  confirmed **pre-existing** by `git stash`-ing this fix and re-running the
+  identical two tests against the unmodified tree: same 2 failures, same
+  error. This is FastAPI/Starlette API drift unrelated to rootdir/asyncio,
+  out of scope for this task (not Bug A, not Bug B, not something the brief
+  asked for) — flagging here rather than silently absorbing it into "must be
+  my change." Not fixed.
+
+**Also fixed:** `packages/kerf-worker/README.md`'s `cd packages/kerf-worker
+&& pytest tests/` example needed no change — it already passes an explicit
+`tests/` arg, so once the per-package table was gone this now correctly
+walks up to the repo root on its own (verified: rootdir resolution doesn't
+depend on cwd, only on the args' resolved absolute paths and the ini-table
+search from there). No Makefile target or doc anywhere in the repo needed a
+flag added, because the fix is structural rather than call-site-by-call-site
+— that was the entire point of choosing (b). Added a new "root cause #5"
+section to `docs/TESTING.md` documenting the footgun and the fix, since that
+file is the canonical place this repo records pytest config gotchas.
+
+**Affected:** `pyproject.toml` (root, relocated `slow` marker + explanatory
+comment), all 33 `packages/kerf-*/pyproject.toml` (deleted
+`[tool.pytest.ini_options]`, left a pointer comment), `Makefile`
+(`test-kernel`: dropped now-redundant `--rootdir=.`, rewrote its comment),
+`docs/TESTING.md` (new root cause #5 section).

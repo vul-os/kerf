@@ -342,3 +342,40 @@ asyncio_mode = "auto"
 # modules need a focused hardening pass. Drop the corresponding --ignore line
 # once each module turns its suite green.
 addopts = "--import-mode=importlib"
+# `slow` is used by packages/kerf-cad-core/tests (deselect via `-m "not
+# slow"`). Registered HERE, not in kerf-cad-core's own pyproject.toml, because
+# this is the ONLY [tool.pytest.ini_options] table in the whole repo — see the
+# note below.
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+
+# ---------------------------------------------------------------------------
+# Why this is the ONLY [tool.pytest.ini_options] table in the repo
+# ---------------------------------------------------------------------------
+# Every packages/kerf-*/pyproject.toml used to carry its own small
+# [tool.pytest.ini_options] table (testpaths/asyncio_mode/markers/pythonpath).
+# That was a footgun: pytest resolves `rootdir` (and its whole config) to the
+# NEAREST pyproject.toml walking up from the invocation's args that contains
+# a [tool.pytest.ini_options] table — a pyproject.toml without that table is
+# skipped and the walk continues further up. So any single-package-scoped
+# invocation (`pytest packages/kerf-core/tests/`, `make test-kernel`, an IDE
+# test runner, a future CI job scoped to one package) silently stopped at the
+# package's own table and never reached this one, which meant:
+#   1. the repo-root conftest.py never loaded, so its Python-3.13
+#      asyncio.get_event_loop compat shim never installed, and any later
+#      legacy get_event_loop().run_until_complete(...) call raised
+#      "There is no current event loop in thread 'MainThread'" for the rest
+#      of that pytest process.
+#   2. addopts = "--import-mode=importlib" below was silently replaced by
+#      pytest's default `prepend` import mode.
+# Deleting the per-package tables (instead of e.g. copying addopts into each
+# one, or forcing -c/--rootdir on every call site) fixes this structurally:
+# with no other [tool.pytest.ini_options] table anywhere in the tree, EVERY
+# pytest invocation — however scoped, run by however careless a command —
+# resolves rootdir up to this file, no flags required. Full diagnosis, the
+# proven repro, and the alternatives considered are in decisions.md ("pytest
+# rootdir footgun", 2026-08-09). Do not add a new
+# [tool.pytest.ini_options] table to any packages/*/pyproject.toml — if a new
+# package needs a package-specific pytest option (e.g. a marker), add it here
+# with a comment noting which package it's for, the way `slow` is above.

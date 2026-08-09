@@ -34,6 +34,11 @@ pub = "kerf_pub.plugin:register"
 [tool.hatch.build.targets.wheel]
 packages = ["src/kerf_pub"]
 
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-testpaths = ["tests"]
+# Deliberately no [tool.pytest.ini_options] here. A per-package section
+# shadows the repo-root one: pytest resolves rootdir to the NEAREST
+# pyproject.toml containing that table, so any invocation scoped to this
+# package (e.g. `pytest packages/kerf-x/tests/`) would silently skip the
+# repo-root conftest.py (asyncio-loop shim, tools.* namespace shim) and its
+# addopts = "--import-mode=importlib". See decisions.md, "pytest rootdir
+# footgun" (2026-08-09), for the full diagnosis and proof. Config for every
+# package lives in the root pyproject.toml only — do not add one here.

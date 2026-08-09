@@ -63,13 +63,32 @@ if persona not in extras:
         f"usage: dev-install.sh [{'|'.join(sorted(extras))}]\n"
     )
     raise SystemExit(1)
-names = []
-for dep in extras[persona]:
-    name = re.split(r"[<>=!\[;\s]", dep.strip(), maxsplit=1)[0]
-    # Only workspace packages are installed editable from this checkout.
-    if name.startswith("kerf-") and name != "kerf-sdk":
-        names.append(name)
-print(" ".join(dict.fromkeys(names)))
+def bare(dep):
+    return re.split(r"[<>=!\[;\s]", dep.strip(), maxsplit=1)[0]
+
+# Every kerf-* directory in packages/ is installable from this checkout.
+root = __import__("pathlib").Path("packages")
+local = {d.name for d in root.iterdir() if d.is_dir() and d.name.startswith("kerf-")}
+
+# Close over workspace-local dependencies. A persona lists the plugins it wants,
+# but those plugins may depend on other workspace packages that no persona names
+# — kerf-horology depends on kerf-partsgen, which is a workspace member and is
+# not on PyPI. Without this closure pip tries to fetch it from the index and the
+# whole install dies with "No matching distribution found for kerf-partsgen".
+seen, queue, out = set(), [bare(d) for d in extras[persona]], []
+while queue:
+    name = queue.pop(0)
+    if name in seen or not name.startswith("kerf-") or name == "kerf-sdk":
+        continue
+    seen.add(name)
+    if name not in local:
+        continue
+    out.append(name)
+    sub = root / name / "pyproject.toml"
+    if sub.exists():
+        subdata = tomllib.load(open(sub, "rb"))
+        queue += [bare(d) for d in subdata.get("project", {}).get("dependencies", [])]
+print(" ".join(dict.fromkeys(out)))
 PYEOF
 )" || exit 1
 

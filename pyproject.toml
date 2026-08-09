@@ -104,6 +104,8 @@ full = [
     "kerf-1dsim",
     "kerf-aero",
     "kerf-apparel",
+    "kerf-costing",
+    "kerf-entertainment",
     "kerf-cfd",
     "kerf-civil",
     "kerf-composites",
@@ -177,6 +179,8 @@ members = [
     "packages/kerf-aero",
     "packages/kerf-api",
     "packages/kerf-apparel",
+    "packages/kerf-costing",
+    "packages/kerf-entertainment",
     "packages/kerf-auth",
     "packages/kerf-bim",
     "packages/kerf-cad-core",
@@ -235,6 +239,8 @@ kerf-1dsim = { workspace = true }
 kerf-aero = { workspace = true }
 kerf-api = { workspace = true }
 kerf-apparel = { workspace = true }
+kerf-costing = { workspace = true }
+kerf-entertainment = { workspace = true }
 kerf-auth = { workspace = true }
 kerf-bim = { workspace = true }
 kerf-cad-core = { workspace = true }

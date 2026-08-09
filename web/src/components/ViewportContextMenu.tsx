@@ -73,10 +73,10 @@ function MenuItem({ icon: Icon, label, hint, onClick, disabled, danger }: {
       role="menuitem"
       disabled={disabled}
       onClick={onClick}
-      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs disabled:opacity-40 disabled:cursor-not-allowed ${
+      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset ${
         danger
-          ? 'text-red-300 hover:bg-red-500/10'
-          : 'text-ink-200 hover:bg-ink-800 hover:text-kerf-300'
+          ? 'text-red-300 hover:bg-red-500/10 focus-visible:ring-red-400/60'
+          : 'text-ink-200 hover:bg-ink-800 hover:text-kerf-300 focus-visible:ring-kerf-300/60'
       }`}
     >
       {Icon && <Icon size={13} className="shrink-0 opacity-70" />}
@@ -109,7 +109,7 @@ function Submenu({ icon: Icon, label, hint, disabled, children }: {
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={disabled}
-        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-ink-200 hover:bg-ink-800 hover:text-kerf-300 disabled:opacity-40 disabled:cursor-not-allowed"
+        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-ink-200 hover:bg-ink-800 hover:text-kerf-300 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/60"
       >
         {Icon && <Icon size={13} className="shrink-0 opacity-70" />}
         <span className="flex-1 truncate">{label}</span>
@@ -291,7 +291,7 @@ export default function ViewportContextMenu({
             role="menuitemradio"
             aria-checked={currentOpacity === preset.value}
             onClick={() => dispatch({ opacity: preset.value === 1 ? null : preset.value })}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-ink-200 hover:bg-ink-800 hover:text-kerf-300"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-ink-200 hover:bg-ink-800 hover:text-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/60"
           >
             <span className="w-3 shrink-0">
               {currentOpacity === preset.value && <Check size={12} />}
@@ -333,7 +333,7 @@ export default function ViewportContextMenu({
               title={sw}
               aria-label={`Colour ${sw}`}
               onClick={() => dispatch({ color: sw })}
-              className={`h-4 w-4 rounded-sm border ${
+              className={`h-4 w-4 rounded-sm border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${
                 currentColor === sw ? 'border-kerf-300' : 'border-ink-700'
               }`}
               style={{ background: sw }}
@@ -391,7 +391,7 @@ export default function ViewportContextMenu({
                 roughness: m.roughness ?? null,
               })
             }
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-ink-200 hover:bg-ink-800 hover:text-kerf-300"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-ink-200 hover:bg-ink-800 hover:text-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/60"
           >
             <span className="w-3 shrink-0">
               {currentMaterial === m.name && <Check size={12} />}

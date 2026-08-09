@@ -91,6 +91,7 @@ export default function UnsavedRestoreBanner({ useWorkspace = _useWorkspace, cla
         <button
           onClick={handleRestore}
           data-testid="unsaved-restore-btn"
+          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           style={{
             padding: '4px 12px',
             background: 'var(--kerf-300, #4f8ef7)',
@@ -110,6 +111,7 @@ export default function UnsavedRestoreBanner({ useWorkspace = _useWorkspace, cla
         <button
           onClick={handleDiscard}
           data-testid="unsaved-discard-btn"
+          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           style={{
             padding: '4px 10px',
             background: 'none',

@@ -1,5 +1,19 @@
-version: "3.9"
-
+# Default stack: just `app`, talking to its own embedded SQLite file at
+# ~/.kerf/kerf.db (persisted in the kerf-home volume below). This matches
+# the zero-dependency default documented in README.md's "Quick start" — no
+# database server required, whether you install from source, via the
+# installer script, or via `docker compose up`.
+#
+# Postgres is a one-line opt-in for shared / multi-user installs, same as
+# it is from source (README: "Using Postgres instead"). Start it with the
+# `postgres` profile and point DATABASE_URL at it:
+#
+#   DATABASE_URL=postgres://postgres:postgres@postgres:5432/kerf docker compose --profile postgres up
+#
+# redis is unrelated to either database backend — nothing in this repo
+# currently reads REDIS_URL or imports a redis client, so it stays
+# unconditional here only as a placeholder for future job-queue work; it is
+# not part of the SQLite/Postgres decision this file is about.
 services:
   app:
     build:
@@ -13,7 +27,11 @@ services:
       - "${PORT:-8080}:8080"
     environment:
       - ENV=${ENV:-local}
-      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:postgres@postgres:5432/kerf}
+      # Unset (the default) -> kerf_core.db.config.default_database_url()
+      # points at embedded SQLite under ~/.kerf/kerf.db inside the
+      # container, matching the from-source default. Set DATABASE_URL (and
+      # run with --profile postgres, see above) to use Postgres instead.
+      - DATABASE_URL=${DATABASE_URL:-}
       - JWT_SECRET=${JWT_SECRET:-dev-secret}
       - PASSWORD_PEPPER=${PASSWORD_PEPPER:-dev-pepper}
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5173}
@@ -33,8 +51,10 @@ services:
       - LOCAL_MODE=${LOCAL_MODE:-true}
     volumes:
       - storage-data:/data/storage
+      # Persists the embedded SQLite db (and WAL files) across `compose down`
+      # the same way postgres-data persists the opt-in Postgres backend.
+      - kerf-home:/root/.kerf
     depends_on:
-      - postgres
       - redis
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
@@ -44,8 +64,12 @@ services:
       start_period: 10s
     stop_grace_period: 30s
 
+  # Opt-in only — `docker compose --profile postgres up`. A service gated by
+  # a profile is never auto-started as a dependency, so `app` intentionally
+  # does not `depends_on` this: the SQLite default must come up standalone.
   postgres:
     image: postgres:16-alpine
+    profiles: ["postgres"]
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -66,3 +90,4 @@ volumes:
   storage-data:
   postgres-data:
   redis-data:
+  kerf-home:

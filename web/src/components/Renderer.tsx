@@ -2491,17 +2491,21 @@ function Renderer({
           {leaderHtml.text}
         </div>
       )}
+      {/* Anchored bottom-LEFT (not centered) — a centered pill on the
+          full-width viewport track drifts under NavPrefsTab, which docks
+          bottom-right and dodges the chat drawer independently. Bottom-left
+          is unclaimed by any other floating control. */}
       {mode === 'object' && (displayedId ? (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-md bg-ink-900/80 border border-ink-700 text-xs font-mono text-kerf-300 backdrop-blur">
+        <div className="absolute bottom-3 left-3 px-3 py-1 rounded-md bg-ink-900/80 border border-ink-700 text-xs font-mono text-kerf-300 backdrop-blur">
           {displayedId}
         </div>
       ) : (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-md bg-ink-900/60 border border-ink-800 text-xs font-mono text-ink-400 backdrop-blur">
+        <div className="absolute bottom-3 left-3 px-3 py-1 rounded-md bg-ink-900/60 border border-ink-800 text-xs font-mono text-ink-400 backdrop-blur">
           click a part to reference it
         </div>
       ))}
       {mode !== 'object' && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-md bg-ink-900/80 border border-ink-700 text-[11px] font-mono text-kerf-300 backdrop-blur">
+        <div className="absolute bottom-3 left-3 px-3 py-1 rounded-md bg-ink-900/80 border border-ink-700 text-[11px] font-mono text-kerf-300 backdrop-blur">
           {mode} mode · click to pick · shift+click to add
         </div>
       )}

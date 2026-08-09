@@ -773,9 +773,9 @@ function ProjectCard({ project, currentUserId, onShare, onRename, onDelete }) {
                 <Box size={16} />
               </div>
               <div className="min-w-0">
-                <h3 className="font-display text-base font-semibold tracking-tight text-ink-100 truncate">
+                <h2 className="font-display text-base font-semibold tracking-tight text-ink-100 truncate">
                   {project.name}
-                </h3>
+                </h2>
                 <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-400 font-mono">
                   <VisibilityIcon visibility={project.visibility} />
                   <span>{project.visibility || 'private'}</span>
@@ -855,9 +855,9 @@ function EmptyState({ onCreate }) {
         <div className="mx-auto grid place-items-center w-14 h-14 rounded-2xl bg-kerf-300/15 border border-kerf-300/30 shadow-inner">
           <Sparkles size={24} className="text-kerf-300" />
         </div>
-        <h3 className="mt-5 font-display text-2xl font-semibold tracking-tight text-ink-100">
+        <h2 className="mt-5 font-display text-2xl font-semibold tracking-tight text-ink-100">
           Start your first project
-        </h3>
+        </h2>
         <p className="mt-1.5 text-sm text-ink-400 max-w-md mx-auto leading-relaxed">
           Mix any file kinds in one project — sketches, features, drawings,
           assemblies, circuits, library parts, plain JSCAD modules. Tag it

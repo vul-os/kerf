@@ -36,34 +36,31 @@ by kerf, and neither is required.
 
 ## Requirements
 
-- **Python 3.11+** (in a virtualenv)
-- **Postgres 14+** — Kerf uses Postgres even locally. No SQLite path exists.
-- **Node 20+** (only needed if you build the frontend from source)
+- **Python 3.11+**
+- **Nothing else to install for the database** — Kerf opens an embedded
+  SQLite file at `~/.kerf/kerf.db` the first time it runs, with no setup
+  step. Postgres 14+ is an optional scale backend for a team / always-on
+  install; see [local-install.md](./local-install.md#database-embedded-sqlite-by-default-postgres-optional).
+- **Node 22+** (only needed if you build the frontend from source — it lives
+  in `web/`, not the repo root)
 
 ---
 
 ## Install
 
-### From PyPI (recommended)
+Kerf is not published on PyPI (only the separate `kerf-sdk` scripting client
+is). The supported paths are the install script, Docker, or from source — see
+[local-install.md](./local-install.md#how-kerf-is-actually-distributed) for
+the full breakdown. From source:
 
 ```sh
-pip install kerf[mech]          # mechanical CAD stack
-# or
-pip install kerf[electronics]   # EDA stack
-# or
-pip install kerf[full]          # everything
+git clone https://github.com/vul-os/kerf
+cd kerf
+./scripts/dev-install.sh mech   # or another persona — plain `pip install -e .[mech]` does not work, see local-install.md
+cd web && npm install && npm run build  # build the frontend
 ```
 
 Persona options: `api-only`, `mech`, `electronics`, `bim`, `full`, `compute-only`.
-
-### From source
-
-```sh
-git clone https://github.com/kerf-design/kerf
-cd kerf
-pip install -e .[mech]       # or another persona
-npm install && npm run build  # build the frontend
-```
 
 ---
 
@@ -75,24 +72,31 @@ Copy the example config and edit it:
 cp kerf.example.toml kerf.toml
 ```
 
-Minimum config for a local single-user install:
+Minimum config for a local single-user install — this is already the
+default in `kerf.example.toml`, so for SQLite you don't need to add
+anything; shown here for clarity, and with Postgres opted into explicitly:
 
 ```toml
 [server]
-host = "127.0.0.1"
-port = 8080
-
-[database]
-url = "postgres://your_pg_user@localhost:5432/kerf?sslmode=disable"
+local_mode = true            # skip all auth — single-user; the default
 
 [auth]
-local_mode = true            # skip all auth — single-user
 jwt_secret = "change-me-random-string"
+
+[database]
+# Omit this entirely for the embedded SQLite default. Set it only to opt
+# into Postgres as a scale backend:
+url = "postgres://your_pg_user@localhost:5432/kerf?sslmode=disable"
 
 [storage]
 backend = "filesystem"
 filesystem_root = "~/kerf-projects"
 ```
+
+(`[server].port` exists in `kerf.example.toml` but nothing in `kerf_core`
+reads it for the actual bind address — the socket `kerf-server` listens on
+is always set via the `--host`/`--port` CLI flags or `KERF_HOST`/`KERF_PORT`
+env vars; see [getting-started.md#cli-flags](./getting-started.md#cli-flags).)
 
 With `local_mode = true`:
 - All authentication is bypassed. The login UI is hidden.
@@ -104,10 +108,22 @@ With `local_mode = true`:
 
 ## Database setup
 
+**SQLite (default) — nothing to do.** Leaving `[database].url` unset (or
+omitting `DATABASE_URL`) is enough; the file and schema are created on first
+run.
+
+**Postgres (opt-in scale backend):**
+
 ```sh
-createdb kerf                # create the database
-kerf-server --migrate        # apply all migrations
+createdb kerf                                            # create the database once
+python -m kerf_core.db.migrations.runner "$DATABASE_URL"  # apply all migrations
 ```
+
+`kerf-server` has no `--migrate` flag — this migration runner (also wrapped
+by `npm run migrate` when you have the frontend checked out; see
+[getting-started.md](./getting-started.md#5-run-database-migrations)) is the
+actual command, and it is idempotent — safe to re-run after every upgrade,
+against either backend.
 
 ---
 
@@ -120,10 +136,21 @@ kerf-server --config ./kerf.toml
 Or with env vars:
 
 ```sh
-KERF_DATABASE_URL="postgres://..." kerf-server
+DATABASE_URL="postgres://..." kerf-server --host 0.0.0.0 --port 8080
 ```
 
-The server binds to `host:port` as configured. The frontend SPA is served from the same port. Open `http://localhost:8080` in your browser.
+The bind address comes from `--host`/`--port` (or `KERF_HOST`/`KERF_PORT`),
+defaulting to `0.0.0.0:8080` — not from `kerf.toml` (see the config note
+above). To also serve the built frontend from the same port, set
+`KERF_FRONTEND_DIST` to the built `web/dist/` directory first (its built-in
+default, `/app/dist`, is the path used inside the Docker image, not a source
+checkout):
+
+```sh
+KERF_FRONTEND_DIST=web/dist kerf-server
+```
+
+Open `http://localhost:8080` in your browser.
 
 ---
 
@@ -134,19 +161,22 @@ There is no Kerf billing layer anywhere — every install uses provider API keys
 Set keys in `kerf.toml`:
 
 ```toml
-[llm]
-anthropic_api_key = "sk-ant-..."
-openai_api_key    = "sk-..."
+[llm.anthropic]
+api_key = "sk-ant-..."
+
+[llm.openai]
+api_key = "sk-..."
 ```
 
-Or via environment variables:
+Or leave them blank in `kerf.toml` and set `ANTHROPIC_API_KEY` /
+`OPENAI_API_KEY` / `MOONSHOT_API_KEY` / `GEMINI_API_KEY` as environment
+variables instead.
 
-```toml
-[llm]
-# leave blank — the server reads ANTHROPIC_API_KEY, OPENAI_API_KEY from env
-```
-
-With `local_mode = true` and `AUTH_OPTIONAL = true`, you can also let users paste their own keys through the settings panel (`prefer_byo` in the BYO model) — there is no billing behind this, it's simply which key is used for the request.
+Independently of the operator's configured key above, a signed-in user can
+save their own provider key via `POST /api/provider-keys`; when present, the
+server uses that user's key instead of the operator's for their requests
+(`_prefer_byo_provider` in `kerf_api/routes.py`) — a convenience preference,
+not a credit or billing bucket (Kerf has none).
 
 ---
 
@@ -158,8 +188,8 @@ The parts library works self-hosted. You populate it yourself.
 
 ```sh
 pip install -e packages/kerf-partsgen
-python -m kerf_partsgen.cli enumerate    # generate geometry into ./.parts-out/
-python -m kerf_partsgen.cli seed         # upsert into the Parts Library project
+kerf-partsgen enumerate    # deterministic, zero-token build into ./.parts-out/
+kerf-partsgen seed         # promote [x]-approved families into the Parts Library project
 ```
 
 ### Third-party libraries (KiCad, BOLTS, FreeCAD-library)
@@ -193,13 +223,15 @@ A persona is a named set of plugin packages. Select one at install time:
 ## Maintenance commands
 
 ```sh
-kerf-server --migrate                   # run pending migrations
-kerf-server revisions repack            # backfill gzip storage for file revisions
-kerf-server revisions repack --dry-run  # preview without writing
-kerf-server library-import --manifest samples/libraries/adafruit-sensors.yaml
+python -m kerf_core.db.migrations.runner "$DATABASE_URL"   # run pending migrations
 ```
 
----
+`kerf-server` itself takes no maintenance subcommands — see
+[getting-started.md#5-run-database-migrations](./getting-started.md#5-run-database-migrations)
+for the migration command, and
+[file-revisions.md#maintenance-self-hosted-operators](./file-revisions.md#maintenance-self-hosted-operators)
+for how revision-chain compaction works (automatic, server-mode only —
+nothing to run by hand).
 
 ---
 

@@ -100,22 +100,20 @@ File revisions are the undo stack. Cloud git is the snapshot/collaboration layer
 
 ## Maintenance (self-hosted operators)
 
-### Repack legacy rows
+### Revision-chain compaction
 
-Phase 4 migrated revision storage to gzip. Existing plaintext rows continue to read via the legacy `content` column. To backfill:
+Long-lived files accumulate a chain of diff rows against a `base` row. A
+background `compaction_worker` (`kerf_core.workers.compaction_worker`) polls
+for chains longer than a threshold, reconstructs the tip, writes a fresh
+gzip-compressed `base` row, and prunes the now-redundant diffs — every 5
+minutes by default, one chain per pass, idempotent (an already-short chain is
+skipped). There is no CLI to invoke this manually and nothing to schedule
+yourself.
 
-```sh
-# Dry run — reports rows that would be touched
-kerf-server revisions repack --dry-run
-
-# Compress all legacy rows (leaves content column populated as a safety net)
-kerf-server revisions repack
-
-# Compress and remove the legacy column once verified on a non-prod replica first
-kerf-server revisions repack --prune-legacy
-```
-
-The command is idempotent and processes rows in batches of 500 (tunable with `--batch=N`). It does not run on server boot — schedule it explicitly.
+This worker only runs when `[server].local_mode = false` (a shared / always-on
+node) — it raises at startup if instantiated in local mode. For a personal,
+single-user install this simply doesn't run: revision chains stay small (the
+default cap is 200 revisions per file, see below) and never need it.
 
 ### Retention limit
 

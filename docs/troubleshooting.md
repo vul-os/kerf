@@ -72,9 +72,11 @@ produces constraint violations.
 
 **Fix**
 
-Migrations are applied by `kerf-server --migrate` (or `npm run migrate`),
-which records applied migrations in a `schema_migrations` table and skips
-already-applied ones. Do not apply SQL files by hand.
+Migrations are applied by `npm run migrate` (run from `web/`) or directly via
+`python -m kerf_core.db.migrations.runner "$DATABASE_URL"` — `kerf-server`
+itself has no `--migrate` flag. Either way it records applied migrations in a
+`schema_migrations` table and skips already-applied ones. Do not apply SQL
+files by hand.
 
 If your DB is ahead of the migration runner (e.g., from a manual hot-fix),
 manually insert the skipped migration IDs:
@@ -144,22 +146,25 @@ Before the monorepo split (`refactor` branch), the entry point was defined in
 
 ```toml
 [project.scripts]
-kerf-server = "kerf_core.app:run"
+kerf-server = "kerf_core.__main__:main"
 ```
 
 Running `pip install -e .` against the old `backend/` path no longer installs
-this script.
+this script — and a bare `pip install -e .[full]` from the repo root doesn't
+either: the repo is a `uv` workspace, and `[tool.uv.sources]` (which maps
+`kerf-*` to `packages/*`) is only understood by `uv`, not plain pip (which
+tries PyPI, where these packages don't exist, and fails).
 
 **Fix**
 
-Re-install from the repo root:
+Use the workspace install helper instead, which installs every persona
+package editable in one `pip install` call:
 
 ```sh
-pip install -e .[full]
+./scripts/dev-install.sh full    # or your persona: mech, electronics, bim, api-only
 ```
 
-This installs `kerf-core` (and all other persona plugins) from `packages/` and
-registers the `kerf-server` entry point correctly. Verify:
+Verify:
 
 ```sh
 which kerf-server          # should point into your venv
@@ -233,22 +238,30 @@ FileNotFoundError: kerf.toml not found
 
 **Fix**
 
-Copy the example config:
+Copy the example config, from the repo root:
 
 ```sh
-npm run init
+cp kerf.example.toml kerf.toml
 ```
 
-This copies `kerf.example.toml` → `kerf.toml` idempotently. Then edit
-`kerf.toml` to set at least:
+(`npm run init` also exists, but only mirrors WASM assets when run from
+`web/` — its `kerf.toml` copy step is relative to the shell's cwd, so it
+silently does nothing for this file from there. See
+[getting-started.md#4-initialise-configuration](./getting-started.md#4-initialise-configuration).)
+
+Then edit `kerf.toml` to set at least:
 
 ```toml
-[auth]
-optional = true           # disables signup screen for local use
+[server]
+local_mode = true         # disables the login screen for local use — the default
 
 [llm.anthropic]
 api_key = "sk-ant-…"
 ```
+
+(`[auth].optional` is not a real setting — it was removed; see the comment
+above `[auth]` in `kerf.example.toml`. `[server].local_mode` is what actually
+gates the login screen.)
 
 Config search order: `--config <path>` → `KERF_CONFIG` env → `./kerf.toml` →
 `~/.config/kerf/config.toml` → `/etc/kerf/config.toml`.

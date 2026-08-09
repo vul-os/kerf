@@ -25,6 +25,10 @@ import { defineConfig } from '@playwright/test'
 export default defineConfig({
   testDir: './specs',
 
+  // Clears auth rate-limit buckets so the suite is re-runnable against a long-lived
+  // local database — see global-setup.ts. The limiter itself is untouched.
+  globalSetup: './global-setup.ts',
+
   // Run tests serially — all share one DB instance; parallel writes would
   // require isolated schemas per worker which is overkill for v1.
   fullyParallel: false,

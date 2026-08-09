@@ -22,7 +22,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerf"
-version = "0.1.4"
+version = "0.1.5"
 description = "Chat-driven CAD/EDA/BIM platform — meta package"
 readme = "README.md"
 requires-python = ">=3.11"

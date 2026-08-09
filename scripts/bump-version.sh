@@ -8,7 +8,7 @@
 #   VERSION                          (single source of truth)
 #   pyproject.toml                   (root meta-package)
 #   packages/kerf-*/pyproject.toml   (all plugins EXCEPT kerf-sdk)
-#   package.json                     (frontend / npm)
+#   web/package.json                 (frontend / npm)
 #
 # Then commits the bump with:
 #   chore: bump version to v<new-version>
@@ -83,7 +83,12 @@ sedi "s/\"version\": \"${CURRENT}\"/\"version\": \"${NEW}\"/" web/package.json
 FILES_TO_STAGE=(
   VERSION
   pyproject.toml
-  package.json
+  # web/package.json, not package.json — the frontend moved into web/ and this
+  # path was not updated, so `git add` failed with "pathspec did not match" and
+  # the script exited 128 AFTER already rewriting every version string. That
+  # left the tree bumped but uncommitted, which is how v0.1.4 once got tagged
+  # onto the wrong commit.
+  web/package.json
 )
 for f in packages/kerf-*/pyproject.toml; do
   [[ "$f" == packages/kerf-sdk/* ]] && continue

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerf-plm"
-version = "0.1.4"
+version = "0.1.5"
 license = { text = "MIT" }
 classifiers = ["License :: OSI Approved :: MIT License"]
 description = "PLM (Product Lifecycle Management) plugin for Kerf — configurator, effectivity BOM, ECR/ECO"

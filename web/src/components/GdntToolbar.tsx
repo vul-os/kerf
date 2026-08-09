@@ -113,7 +113,7 @@ export default function GdntToolbar({ tool = '', onTool }: Props) {
                 aria-pressed={active}
                 data-testid={`gdnt-tool-${id}`}
                 onClick={() => onTool?.(id)}
-                className={`w-8 h-7 rounded transition-colors flex items-center justify-center text-[13px] leading-none ${
+                className={`w-8 h-7 rounded transition-colors flex items-center justify-center text-[13px] leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${
                   active
                     ? 'bg-kerf-300 text-ink-950'
                     : 'bg-ink-900/60 text-ink-300 hover:text-kerf-300 hover:bg-ink-800 border border-ink-700/50'
@@ -244,8 +244,10 @@ export function FcfPlacementModal({ symbolCode, position, onCommit, onCancel }: 
             <button
               type="button"
               title="Diameter zone (cylindrical)"
+              aria-label="Diameter zone (cylindrical)"
+              aria-pressed={diameterZone}
               onClick={() => setDiameterZone((v) => !v)}
-              className={`w-6 h-6 rounded text-[11px] font-mono shrink-0 border ${
+              className={`w-6 h-6 rounded text-[11px] font-mono shrink-0 border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${
                 diameterZone
                   ? 'bg-kerf-300 text-ink-950 border-kerf-300'
                   : 'bg-ink-800 text-ink-400 border-ink-700 hover:text-kerf-300'
@@ -279,8 +281,9 @@ export function FcfPlacementModal({ symbolCode, position, onCommit, onCancel }: 
                 key={code}
                 type="button"
                 title={label}
+                aria-pressed={toleranceMod === code}
                 onClick={() => setToleranceMod(code)}
-                className={`h-5 px-1.5 rounded text-[10px] font-mono border transition-colors ${
+                className={`h-5 px-1.5 rounded text-[10px] font-mono border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${
                   toleranceMod === code
                     ? 'bg-kerf-300 text-ink-950 border-kerf-300'
                     : 'bg-ink-800 text-ink-400 border-ink-700 hover:text-kerf-300'
@@ -319,14 +322,14 @@ export function FcfPlacementModal({ symbolCode, position, onCommit, onCancel }: 
         <button
           type="button"
           onClick={handleCommit}
-          className="flex-1 h-7 rounded bg-kerf-300 text-ink-950 text-[11px] font-semibold hover:bg-kerf-200 transition-colors"
+          className="flex-1 h-7 rounded bg-kerf-300 text-ink-950 text-[11px] font-semibold hover:bg-kerf-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 focus-visible:ring-offset-1 focus-visible:ring-offset-ink-900"
         >
           Place FCF
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="h-7 px-3 rounded bg-ink-800 text-ink-400 text-[11px] hover:text-ink-200 border border-ink-700 transition-colors"
+          className="h-7 px-3 rounded bg-ink-800 text-ink-400 text-[11px] hover:text-ink-200 border border-ink-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           Cancel
         </button>

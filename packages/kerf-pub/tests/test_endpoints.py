@@ -95,7 +95,11 @@ async def test_plugin_registers_router_not_gated_by_cloud():
     app = FastAPI()
     manifest = await register(app, Ctx())
     assert manifest.name == "pub"
-    paths = {r.path for r in app.routes}
+    # FastAPI >=0.140 defers `include_router` into a lazy `_IncludedRouter`
+    # wrapper, so `app.routes` no longer yields flat objects with `.path`.
+    # `app.openapi()["paths"]` is the documented, stable way to see the
+    # effective mounted route table regardless of routing internals.
+    paths = set(app.openapi()["paths"].keys())
     assert "/.well-known/dmtap-pub/announce/{aid}" in paths
     # store wired even without a DB pool
     assert app.state.pub_store is not None

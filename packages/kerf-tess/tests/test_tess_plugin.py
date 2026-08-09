@@ -108,8 +108,11 @@ async def test_plugin_register_mounts_route():
     assert manifest.version == "0.1.0"
     assert "cad-core" in manifest.depends
 
-    # Route should be present
-    paths = [r.path for r in app.routes]
+    # Route should be present. FastAPI >=0.140 defers `include_router` into
+    # a lazy `_IncludedRouter` wrapper, so `app.routes` no longer yields flat
+    # objects with `.path`; `app.openapi()["paths"]` is the documented,
+    # stable way to see the effective mounted route table.
+    paths = list(app.openapi()["paths"].keys())
     assert "/run-tess" in paths
 
 

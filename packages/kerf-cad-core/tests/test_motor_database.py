@@ -100,7 +100,8 @@ def test_parse_rasp_total_impulse_within_5pct():
     m = motors[0]
     # Manual trapezoidal integration
     tc = m.thrust_curve
-    expected = float(np.trapz(tc[:, 1], tc[:, 0]))
+    _trapz = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
+    expected = float(_trapz(tc[:, 1], tc[:, 0]))
     np.testing.assert_allclose(m.total_impulse_n_s, expected, rtol=0.02,
                                err_msg="Total impulse should match trapezoidal integral")
 
@@ -113,7 +114,8 @@ def test_parse_rasp_impulse_equals_integral():
     motors = parse_rasp_eng_file(D12_ENG)
     m = motors[0]
     tc = m.thrust_curve
-    integral = float(np.trapz(tc[:, 1], tc[:, 0]))
+    _trapz = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
+    integral = float(_trapz(tc[:, 1], tc[:, 0]))
     np.testing.assert_allclose(m.total_impulse_n_s, integral, rtol=0.01,
                                err_msg="total_impulse should equal integral within 1%")
 

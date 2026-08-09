@@ -225,9 +225,13 @@ def parse_rasp_eng_file(content: str) -> list[RocketMotor]:
         burn_time_s = float(thrust_curve[-1, 0]) if len(thrust_curve) > 0 else 0.0
         max_thrust_n = float(np.max(thrust_curve[:, 1]))
 
-        # Integrate thrust curve using trapezoidal rule
+        # Integrate thrust curve using trapezoidal rule.
+        # np.trapz was removed in NumPy 2.0 in favour of np.trapezoid; same
+        # compat pattern used in kerf_cfd (cfd_advanced_v3_tools.py,
+        # marine/hydrodynamics.py).
         if len(thrust_curve) >= 2:
-            total_impulse = float(np.trapz(thrust_curve[:, 1], thrust_curve[:, 0]))
+            _trapz = np.trapezoid if hasattr(np, "trapezoid") else np.trapz
+            total_impulse = float(_trapz(thrust_curve[:, 1], thrust_curve[:, 0]))
         else:
             total_impulse = max_thrust_n * burn_time_s
 

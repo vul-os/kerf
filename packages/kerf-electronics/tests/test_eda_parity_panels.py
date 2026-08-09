@@ -235,38 +235,38 @@ class TestSISolver:
 class TestPanelSourceContracts:
     def _read(self, rel):
         import pathlib
-        root = pathlib.Path(__file__).parent.parent.parent.parent / "src"
+        root = pathlib.Path(__file__).parent.parent.parent.parent / "web" / "src"
         return (root / rel).read_text()
 
     def test_drc_erc_panel_exists(self):
-        src = self._read("components/electronics/DrcErcPanel.jsx")
+        src = self._read("components/electronics/DrcErcPanel.tsx")
         assert "DrcErcPanel" in src
         assert "run_pcb_drc" in src
         assert "run_erc" in src
         assert "data-testid=\"drc-erc-panel\"" in src
 
     def test_si_panel_exists(self):
-        src = self._read("components/electronics/SIPanel.jsx")
+        src = self._read("components/electronics/SIPanel.tsx")
         assert "SIPanel" in src
         assert "si_report" in src
         assert "si_ibis_parse" in src
         assert "data-testid=\"si-panel\"" in src
 
     def test_silicon_synth_panel_exists(self):
-        src = self._read("components/electronics/SiliconSynthPanel.jsx")
+        src = self._read("components/electronics/SiliconSynthPanel.tsx")
         assert "SiliconSynthPanel" in src
         assert "silicon_run_openlane" in src
         assert "pending" in src  # graceful degradation
         assert "data-testid=\"silicon-synth-panel\"" in src
 
     def test_pcb_editor_imports_panels(self):
-        src = self._read("components/electronics/PCBInteractiveEditor.jsx")
+        src = self._read("components/electronics/PCBInteractiveEditor.tsx")
         assert "DrcErcPanel" in src
         assert "SIPanel" in src
         assert "SiliconSynthPanel" in src
 
     def test_toolbar_has_panel_toggle_buttons(self):
-        src = self._read("components/electronics/pcb-editor/Toolbar.jsx")
+        src = self._read("components/electronics/pcb-editor/Toolbar.tsx")
         assert "btn-toggle-drc-panel" in src
         assert "btn-toggle-si-panel" in src
         assert "btn-toggle-silicon-panel" in src

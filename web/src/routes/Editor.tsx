@@ -1871,7 +1871,7 @@ export default function Editor() {
                   setThumbRefreshing(false)
                 }
               }}
-              className="hidden xl:inline-flex p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent"
+              className="hidden xl:inline-flex p-1.5 rounded hover:bg-ink-800 text-ink-300 hover:text-kerf-300 disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               {thumbRefreshing
                 ? <Loader2 size={14} className="animate-spin" aria-hidden="true" />
@@ -1899,7 +1899,7 @@ export default function Editor() {
           onClick={() => setShowShare(true)}
           disabled={!projectId}
           aria-label="Share project"
-          className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-kerf-300 text-ink-950 text-xs font-medium hover:bg-kerf-200 disabled:opacity-40"
+          className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-kerf-300 text-ink-950 text-xs font-medium hover:bg-kerf-200 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 focus-visible:ring-offset-1 focus-visible:ring-offset-ink-900"
         >
           <Share2 size={12} aria-hidden="true" />
           Share
@@ -1922,7 +1922,7 @@ export default function Editor() {
           title={rightDrawer.open && rightDrawer.tab === 'chat' ? 'Hide chat' : 'Open chat'}
           aria-label={rightDrawer.open && rightDrawer.tab === 'chat' ? 'Hide chat panel' : 'Open chat panel'}
           aria-expanded={rightDrawer.open && rightDrawer.tab === 'chat' || chatDrawerOpen}
-          className={`inline-flex p-1.5 rounded hover:bg-ink-800 ${rightDrawer.open && rightDrawer.tab === 'chat' ? 'text-kerf-300' : 'text-ink-300 hover:text-kerf-300'}`}
+          className={`inline-flex p-1.5 rounded hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${rightDrawer.open && rightDrawer.tab === 'chat' ? 'text-kerf-300' : 'text-ink-300 hover:text-kerf-300'}`}
         >
           {rightDrawer.open && rightDrawer.tab === 'chat'
             ? <PanelRightClose size={14} aria-hidden="true" />
@@ -1942,11 +1942,12 @@ export default function Editor() {
           <button
             type="button"
             role="menuitem"
-            onClick={() => { /* Export is handled inline — this entry surfaces it at < md. Future iteration: wire to ExportButton imperative API. */ }}
-            className="md:hidden w-full flex items-center gap-2 px-3 py-1.5 text-xs text-ink-100 hover:bg-ink-700 text-left"
+            disabled
+            title="Open the editor wider than 768px to export — not yet wired into this menu"
+            className="md:hidden w-full flex items-center gap-2 px-3 py-1.5 text-xs text-ink-500 text-left cursor-not-allowed opacity-60"
           >
-            <FileDown size={12} className="text-ink-400" aria-hidden="true" />
-            <span>Export</span>
+            <FileDown size={12} className="text-ink-500" aria-hidden="true" />
+            <span>Export (widen window)</span>
           </button>
           {/* Share — visible in overflow at < lg */}
           <button
@@ -1954,7 +1955,7 @@ export default function Editor() {
             role="menuitem"
             disabled={!projectId}
             onClick={() => setShowShare(true)}
-            className="lg:hidden w-full flex items-center gap-2 px-3 py-1.5 text-xs text-ink-100 hover:bg-ink-700 text-left disabled:opacity-40"
+            className="lg:hidden w-full flex items-center gap-2 px-3 py-1.5 text-xs text-ink-100 hover:bg-ink-700 text-left disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/70"
           >
             <Share2 size={12} className="text-ink-400" aria-hidden="true" />
             <span>Share</span>
@@ -1982,7 +1983,7 @@ export default function Editor() {
                   setThumbRefreshing(false)
                 }
               }}
-              className="xl:hidden w-full flex items-center gap-2 px-3 py-1.5 text-xs text-ink-100 hover:bg-ink-700 text-left disabled:opacity-40"
+              className="xl:hidden w-full flex items-center gap-2 px-3 py-1.5 text-xs text-ink-100 hover:bg-ink-700 text-left disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/70"
             >
               {thumbRefreshing
                 ? <Loader2 size={12} className="animate-spin text-ink-400" aria-hidden="true" />
@@ -2107,7 +2108,7 @@ export default function Editor() {
               <button
                 type="button"
                 onClick={() => setConfigsPanelOpen((v) => !v)}
-                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border text-[10px] ${
+                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border text-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${
                   configsPanelOpen
                     ? 'bg-kerf-300/10 border-kerf-300/60 text-kerf-300'
                     : 'bg-ink-900 border-ink-800 text-ink-300 hover:text-kerf-300 hover:border-kerf-300/40'
@@ -2124,7 +2125,7 @@ export default function Editor() {
               <button
                 type="button"
                 onClick={() => setConfigsPanelOpen(true)}
-                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-ink-500 hover:text-kerf-300"
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-ink-500 hover:text-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 title="Add per-file parameter overrides"
               >
                 <SlidersHorizontal size={10} />
@@ -2469,7 +2470,7 @@ export default function Editor() {
                 <button
                   type="button"
                   onClick={() => w.createFeatureFromSketch(w.currentFileId)}
-                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-xs"
+                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 >
                   <Plus size={11} />
                   <Box size={11} />

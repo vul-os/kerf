@@ -275,9 +275,9 @@ export function WorkshopCard({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-display text-base font-semibold tracking-tight text-ink-100 truncate">
+              <h2 className="font-display text-base font-semibold tracking-tight text-ink-100 truncate">
                 {meta.name || 'Untitled'}
-              </h3>
+              </h2>
               {superseded && (
                 <span className="px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider bg-ink-800 text-ink-400 border border-ink-700">
                   Superseded
@@ -427,9 +427,9 @@ export function BrowseEmptyState({ hasFollows, onGoToFeeds }: { hasFollows: bool
         <div className="mx-auto grid place-items-center w-12 h-12 rounded-xl bg-ink-800 border border-ink-700">
           <Users size={20} className="text-kerf-300" aria-hidden="true" />
         </div>
-        <h3 className="mt-4 font-display text-lg font-semibold tracking-tight">
+        <h2 className="mt-4 font-display text-lg font-semibold tracking-tight">
           A workshop is the set of feeds you follow
-        </h3>
+        </h2>
         <p className="mt-1 text-sm text-ink-400 max-w-sm mx-auto">
           There&apos;s no central Workshop server — follow a publisher&apos;s
           feed to add their parts, assemblies, and drawings to your browse
@@ -448,9 +448,9 @@ export function BrowseEmptyState({ hasFollows, onGoToFeeds }: { hasFollows: bool
       <div className="mx-auto grid place-items-center w-12 h-12 rounded-xl bg-ink-800 border border-ink-700">
         <Sparkles size={20} className="text-kerf-300" aria-hidden="true" />
       </div>
-      <h3 className="mt-4 font-display text-lg font-semibold tracking-tight">
+      <h2 className="mt-4 font-display text-lg font-semibold tracking-tight">
         Nothing published on your followed feeds yet
-      </h3>
+      </h2>
       <p className="mt-1 text-sm text-ink-400">
         Publish a project from the editor, or follow more feeds.
       </p>
@@ -568,9 +568,9 @@ export function FollowsPanel({
         {!loading && follows.length === 0 && !error && (
           <Card className="p-8 text-center" data-testid="follows-empty">
             <Users size={20} className="mx-auto text-kerf-300" aria-hidden="true" />
-            <h3 className="mt-3 font-display text-lg font-semibold tracking-tight">
+            <h2 className="mt-3 font-display text-lg font-semibold tracking-tight">
               A workshop is the set of feeds you follow
-            </h3>
+            </h2>
             <p className="mt-1 text-sm text-ink-400">
               Add a publisher&apos;s key and gateway to start browsing their feed.
               This is entirely local — it changes nothing on their end.
@@ -634,7 +634,7 @@ export function FollowsPanel({
 
       <div>
         <Card className="p-4">
-          <h3 className="text-sm font-semibold text-ink-100 mb-3">Add feed</h3>
+          <h2 className="text-sm font-semibold text-ink-100 mb-3">Add feed</h2>
           <form onSubmit={submit} className="flex flex-col gap-3">
             <Input
               label="Publisher key"

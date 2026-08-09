@@ -42,6 +42,26 @@ def _load(name: str, path: str):
     return mod
 
 
+# sys.modules is process-global and shared across the whole pytest session.
+# Loading nurbs.py / curve_degree_lower.py this way registers them under their
+# real dotted names (so curve_degree_lower's own `from kerf_cad_core.geom.nurbs
+# import ...` resolves against the copy we just loaded) — but leaving those
+# entries in place after this module finishes collecting would shadow the
+# real `kerf_cad_core.geom.nurbs` package for every test file collected
+# afterward: a curve built from the REAL NurbsCurve class then fails
+# `isinstance(curve, NurbsCurve)` against this file's stand-in class (two
+# distinct class objects from two separate execs of the same source), even
+# though both print as "NurbsCurve". This is the exact failure mode fixed in
+# test_auto_lightweight.py / test_gkp_degree_op.py — see docs/TESTING.md root
+# cause #1. Snapshot and restore every key we touch.
+_SNAPSHOT_KEYS = (
+    "kerf_cad_core",
+    "kerf_cad_core.geom",
+    "kerf_cad_core.geom.nurbs",
+    "kerf_cad_core.geom.curve_degree_lower",
+)
+_snapshot = {_k: sys.modules.get(_k) for _k in _SNAPSHOT_KEYS}
+
 # Load nurbs.py first (curve_degree_lower imports from it)
 _nurbs = _load(
     "kerf_cad_core.geom.nurbs",
@@ -58,6 +78,19 @@ NurbsCurve = _nurbs.NurbsCurve
 _elevate_curve_bspline = _nurbs._elevate_curve_bspline
 lower_curve_degree = _cdl.lower_curve_degree
 DegreeLowerResult = _cdl.DegreeLowerResult
+
+# Restore whatever was in sys.modules before this file patched it (nothing,
+# in the normal case) so later test files still see the real
+# `kerf_cad_core.geom` package rather than these transient stand-ins. The
+# aliases captured above (NurbsCurve, lower_curve_degree, ...) keep working —
+# they're direct references to the loaded module objects, independent of
+# what sys.modules points at afterward.
+for _k, _v in _snapshot.items():
+    if _v is None:
+        sys.modules.pop(_k, None)
+    else:
+        sys.modules[_k] = _v
+del _snapshot, _k, _v
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

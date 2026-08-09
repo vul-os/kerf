@@ -6,10 +6,31 @@ from typing import Optional
 
 import asyncpg
 
-from kerf_fem.worker import FEMWorker
 from kerf_workers.spice_worker import SPICEWorker
-from kerf_tess.worker import AutoTessWorker
-from kerf_cam.worker import CAMWorker
+
+# FEM, tessellation and CAM each live in their own persona package, and none of
+# them is a declared dependency of kerf-workers (which needs only asyncpg). A
+# plain top-level import therefore took the ENTIRE runner down with
+# ModuleNotFoundError on any install that omitted one of them — so a node with
+# no FEM solver also lost its SPICE, tessellation and CAM workers, and
+# kerf-core's own test suite could not import this module at all.
+#
+# Import each optionally and let _build_workers skip the ones that are absent;
+# a missing solver should disable its own worker, nothing more.
+try:
+    from kerf_fem.worker import FEMWorker
+except ModuleNotFoundError:
+    FEMWorker = None
+
+try:
+    from kerf_tess.worker import AutoTessWorker
+except ModuleNotFoundError:
+    AutoTessWorker = None
+
+try:
+    from kerf_cam.worker import CAMWorker
+except ModuleNotFoundError:
+    CAMWorker = None
 
 logger = logging.getLogger(__name__)
 
@@ -189,19 +210,26 @@ def _build_workers(
     """Construct the configured worker instances (no lifecycle)."""
     pyworker_url = os.getenv("PYWORKER_URL", "http://localhost:8090")
     workers: list = []
-    for _ in range(fem_count):
-        workers.append(FEMWorker(pool=pool, storage_getter=storage_getter,
-                                 pyworker_url=pyworker_url, timeout=fem_timeout))
-    for _ in range(sim_count):
-        workers.append(SPICEWorker(pool=pool, storage_getter=storage_getter,
-                                   pyworker_url=pyworker_url, timeout=sim_timeout))
+    # Each optional worker is skipped (with a warning) when its package is not
+    # installed, rather than taking the whole runner down — see the import block.
+    def _add(cls, name: str, count: int, timeout: int) -> None:
+        if count <= 0:
+            return
+        if cls is None:
+            logger.warning(
+                "%s worker requested (count=%d) but its package is not installed; skipping",
+                name, count,
+            )
+            return
+        for _ in range(count):
+            workers.append(cls(pool=pool, storage_getter=storage_getter,
+                               pyworker_url=pyworker_url, timeout=timeout))
+
+    _add(FEMWorker, "FEM", fem_count, fem_timeout)
+    _add(SPICEWorker, "SPICE", sim_count, sim_timeout)
     # tess_count and auto_tess_count both use AutoTessWorker.
-    for _ in range(tess_count + auto_tess_count):
-        workers.append(AutoTessWorker(pool=pool, storage_getter=storage_getter,
-                                      pyworker_url=pyworker_url, timeout=tess_timeout))
-    for _ in range(cam_count):
-        workers.append(CAMWorker(pool=pool, storage_getter=storage_getter,
-                                 pyworker_url=pyworker_url, timeout=cam_timeout))
+    _add(AutoTessWorker, "tessellation", tess_count + auto_tess_count, tess_timeout)
+    _add(CAMWorker, "CAM", cam_count, cam_timeout)
     # CompactionWorker: server-mode only; _maybe_compaction_worker gates it.
     workers.extend(_maybe_compaction_worker(pool, local_mode, compaction_count))
     # RateLimitGCWorker: prunes rate_limit_buckets rows older than 24h.

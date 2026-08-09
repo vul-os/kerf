@@ -120,7 +120,7 @@ export default function ExportButton({ onCaptureHero }: Props) {
         <button
           type="button"
           onClick={downloadOriginalStep}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-ink-700 bg-ink-850 text-ink-200 text-xs hover:border-ink-600 hover:text-kerf-300"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-ink-700 bg-ink-850 text-ink-200 text-xs hover:border-ink-600 hover:text-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/60"
           title="Download original .step file"
         >
           <FileDown size={12} />
@@ -137,7 +137,7 @@ export default function ExportButton({ onCaptureHero }: Props) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         disabled={visibleCount === 0}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-ink-700 bg-ink-850 text-ink-200 text-xs hover:border-ink-600 hover:text-kerf-300 disabled:opacity-40 disabled:hover:text-ink-200 disabled:hover:border-ink-700"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-ink-700 bg-ink-850 text-ink-200 text-xs hover:border-ink-600 hover:text-kerf-300 disabled:opacity-40 disabled:hover:text-ink-200 disabled:hover:border-ink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/60"
         title={visibleCount === 0 ? 'Nothing visible to export' : `Export ${visibleCount} visible part${visibleCount === 1 ? '' : 's'}`}
       >
         <FileDown size={12} />
@@ -157,7 +157,7 @@ export default function ExportButton({ onCaptureHero }: Props) {
                 key={f.id}
                 type="button"
                 onClick={() => doExport(f.id)}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] text-ink-100 hover:bg-ink-800 hover:text-kerf-300"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] text-ink-100 hover:bg-ink-800 hover:text-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/60"
               >
                 <span className="flex-1 truncate">{f.label}</span>
                 <span className="font-mono text-[10px] text-ink-500">.{f.ext}</span>
@@ -171,7 +171,7 @@ export default function ExportButton({ onCaptureHero }: Props) {
                 onClick={doCaptureHero}
                 disabled={heroBusy}
                 title="Render a 2048×2048 marketing shot (bloom + ACES tonemap, no UI chrome) and download a PNG"
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] text-ink-100 hover:bg-ink-800 hover:text-kerf-300 disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-ink-100"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] text-ink-100 hover:bg-ink-800 hover:text-kerf-300 disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/60"
               >
                 {heroBusy
                   ? <Loader2 size={12} className="animate-spin text-ink-400" />
@@ -196,8 +196,9 @@ function ErrorToast({ message, onDismiss }: { message: string; onDismiss: () => 
       <button
         type="button"
         onClick={onDismiss}
-        className="text-red-300 hover:text-red-100 flex-shrink-0 text-[14px] leading-none"
+        className="text-red-300 hover:text-red-100 flex-shrink-0 text-[14px] leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 rounded"
         title="Dismiss"
+        aria-label="Dismiss export error"
       >×</button>
     </div>
   )

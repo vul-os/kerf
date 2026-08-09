@@ -73,7 +73,15 @@ test.describe('Jewelry Configurator wizard (local mode)', () => {
 
     // 2. Step indicator marks "Piece type" as current.
     // StepIndicator uses aria-current="step" on the active step container.
-    const stepIndicatorText = page.getByText('Piece type', { exact: false }).first()
+    // It renders two <nav>s for the same steps — a vertical stepper for
+    // mobile (`md:hidden`) and a horizontal one for tablet/desktop
+    // (`hidden md:flex`) — so "Piece type" always matches twice. At the
+    // default desktop test viewport the mobile nav is display:none, so
+    // `.first()` (DOM order) picks the hidden copy; filter to the visible one.
+    const stepIndicatorText = page
+      .getByText('Piece type', { exact: false })
+      .and(page.locator(':visible'))
+      .first()
     await expect(stepIndicatorText).toBeVisible()
 
     // 3. Ring button present.
@@ -133,8 +141,11 @@ test.describe('Jewelry Configurator wizard (local mode)', () => {
       page.getByRole('heading', { name: /Gemstones/i }),
     ).toBeVisible({ timeout: 10_000 })
 
-    // Add a stone — click the "Add stone" button.
-    const addStoneBtn = page.getByRole('button', { name: /Add stone/i })
+    // Add a stone — click the "Add stone" button. Its accessible name is
+    // "Add gemstone" (its aria-label — same convention as JewelryCostPanel's
+    // add-stone control), which overrides the visible "Add stone" text node
+    // for accessible-name computation, so match on the aria-label.
+    const addStoneBtn = page.getByRole('button', { name: /Add gemstone/i })
     await expect(addStoneBtn).toBeVisible()
     await addStoneBtn.click()
 
@@ -142,8 +153,10 @@ test.describe('Jewelry Configurator wizard (local mode)', () => {
     const stone1Cut = page.getByRole('combobox', { name: /Stone 1 cut/i })
     await expect(stone1Cut).toBeVisible({ timeout: 5_000 })
 
-    // Fill in carat weight = 1.
-    const stone1Carat = page.getByRole('spinbutton', { name: /Stone 1 carat weight/i })
+    // Fill in carat weight = 1. The carat input's accessible name is
+    // "Stone 1 carat" (aria-label={`Stone ${i + 1} carat`}) — same short-form
+    // convention as the "Stone 1 cut" combobox above, not "carat weight".
+    const stone1Carat = page.getByRole('spinbutton', { name: /Stone 1 carat/i })
     await stone1Carat.fill('1')
   })
 
@@ -168,11 +181,13 @@ test.describe('Jewelry Configurator wizard (local mode)', () => {
     await expect(prongBtn).toBeVisible()
     await expect(prongBtn).toHaveAttribute('aria-pressed', 'true')
 
-    // Select ring size 6.
-    const size6 = page.getByRole('button', { name: /Ring size US 6\b/i })
-    await expect(size6).toBeVisible()
-    await size6.click()
-    await expect(size6).toHaveAttribute('aria-pressed', 'true')
+    // Select ring size 6. Ring size is a native <select> (16 sizes — a
+    // toggle-button grid would be unwieldy), not a pressable button like the
+    // piece/metal/finish/setting pickers.
+    const ringSizeSelect = page.getByLabel('Ring size (US)')
+    await expect(ringSizeSelect).toBeVisible()
+    await ringSizeSelect.selectOption('6')
+    await expect(ringSizeSelect).toHaveValue('6')
   })
 
   test('step 5 — review, cost estimate, and order confirmation', async ({ page }) => {
@@ -184,8 +199,8 @@ test.describe('Jewelry Configurator wizard (local mode)', () => {
     await page.getByRole('button', { name: /Platinum 950/i }).click()
     await page.getByRole('button', { name: /Continue to Gemstones|Next/i }).click()
     await page.getByRole('button', { name: /Continue to Setting|Next/i }).click()
-    const size6 = page.getByRole('button', { name: /Ring size US 6\b/i })
-    await size6.click()
+    // Ring size is a native <select>, not a pressable button — see step 4 test.
+    await page.getByLabel('Ring size (US)').selectOption('6')
     await page.getByRole('button', { name: /Continue to Review|Next/i }).click()
 
     // 9. Review step shows the configuration summary.

@@ -109,8 +109,19 @@ jobs:
       # ── Persona-specific image ──────────────────────────────────────────
       # Every persona gets a :<version>-<persona> tag.
       # The "full" persona additionally gets :<version> and :latest.
+      # DOCKER_BUILD_RECORD_UPLOAD: false — buildx otherwise auto-uploads a
+      # "<org>~<repo>~<random>.dockerbuild" workflow artifact per invocation
+      # (5 of them across this job: 4 personas + the "full" retag below).
+      # Nobody reads them; worse, `publish`'s `download-artifact` step used to
+      # match them via `pattern: "*"` and they are the artifacts that were
+      # failing with "Artifact download failed after 5 retries" — see the
+      # comment on that step for the run-log evidence. Turning off the
+      # upload at the source means there is nothing left for a future
+      # broad pattern to accidentally sweep in.
       - name: Build and push (${{ matrix.persona }})
         uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: .
           push: true
@@ -125,6 +136,8 @@ jobs:
       - name: Tag full persona as :version and :latest
         if: matrix.persona == 'full'
         uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: .
           push: true
@@ -415,12 +428,50 @@ jobs:
       # EVERY asset from every build job, merged into ONE directory. Nothing
       # else writes here, and nothing else is uploaded to the release — that is
       # what makes "published" and "covered by SHA256SUMS" the same set.
-      - name: Stage every published asset
+      #
+      # Named explicitly, NOT `pattern: "*"` + `merge-multiple: true`. That
+      # wildcard also matched the "<org>~<repo>~<random>.dockerbuild" build-record
+      # artifacts that docker/build-push-action auto-uploads (one per
+      # build-push-action invocation in the `docker` job — 5 of them: 4
+      # personas + the "full" retag). Run logs from the two most recent
+      # failures (31191723253, 31190796084) show every one of OUR artifacts
+      # (sbom, python-wheels, release-tarballs[-aux]) logging "Artifact
+      # download completed successfully" — including the single 177 MB
+      # release-tarballs in 31190796084, before the split — while the run
+      # then dies on "Unable to download and extract artifact: Artifact
+      # download failed after 5 retries" without ever logging a completion
+      # for any of the 5 `.dockerbuild` artifacts. Same pattern both times:
+      # our artifacts always finish; the unrelated auto-generated ones never
+      # do. Size was a red herring (see the `artifacts` job comment on the
+      # split — kept for the unrelated benefit of smaller individual
+      # downloads, not because it fixes this). The `docker` job now also
+      # sets DOCKER_BUILD_RECORD_UPLOAD: false so these artifacts stop being
+      # created at all; downloading by exact name here is the belt to that
+      # suspenders, so a future artifact this workflow doesn't own can never
+      # again be swept in by a broad pattern.
+      - name: Stage release tarballs
         uses: actions/download-artifact@v4
         with:
           path: release-out
-          pattern: "*"
-          merge-multiple: true
+          name: release-tarballs
+
+      - name: Stage source/frontend/installer tarballs
+        uses: actions/download-artifact@v4
+        with:
+          path: release-out
+          name: release-tarballs-aux
+
+      - name: Stage Python wheels
+        uses: actions/download-artifact@v4
+        with:
+          path: release-out
+          name: python-wheels
+
+      - name: Stage SBOMs
+        uses: actions/download-artifact@v4
+        with:
+          path: release-out
+          name: sbom
 
       # The set that MUST be there. The manifest below covers whatever is in
       # release-out/, which is necessary but not sufficient: a build job that

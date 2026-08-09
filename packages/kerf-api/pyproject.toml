@@ -26,6 +26,18 @@ dependencies = [
     # every /api/* route 404'd — which is what stranded 24 of 28 E2E specs on
     # page.waitForURL while /auth/* and /health answered 200.
     "pygit2>=1.14",
+    # kerf_api/tools/*.py import kerf_chat.tools.registry UNGUARDED (configurations,
+    # material, object_ops, revisions, scaffold, ...). Other packages wrap that import in
+    # try/except with a _compat fallback; these do not, so a missing kerf-chat raises
+    # inside register() and takes the WHOLE kerf-api plugin down — exactly what the
+    # undeclared pygit2 did. CI masks it because the `full` persona installs everything;
+    # a minimal install mounts 2 /api routes instead of ~200.
+    "kerf-chat>=0.1.0",
+    # routes.py imports kerf_tess at module level (line ~48), same as kerf_chat. The other
+    # sibling imports in this package are either lazy or behind _try_include, which is
+    # designed to swallow ImportError for optional sub-routers — those stay undeclared on
+    # purpose. These two are eager, so a missing one fails register() outright.
+    "kerf-tess>=0.1.0",
 ]
 
 [project.optional-dependencies]

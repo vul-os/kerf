@@ -59,7 +59,11 @@ for pkg in sorted(root.iterdir()):
                 mods = [(node.module.split('.')[0], node.lineno)]
             for mod, line in mods:
                 m = mod.lower()
-                if m in STDLIB or m.startswith('_') or m in localnames or m.startswith('kerf'): continue
+                if m in STDLIB or m.startswith('_'): continue
+                # Workspace packages ARE separately installable — an undeclared
+                # sibling breaks any persona that does not happen to include it.
+                # Only skip the package's own module.
+                if m == pkg.name.lower().replace('-', '_'): continue
                 canon = ALIAS.get(m, m)
                 if canon in declared_anywhere or m in declared_anywhere: continue
                 risky.setdefault((pkg.name, m), f"{f.relative_to(pkg)}:{line}")
@@ -67,3 +71,39 @@ for pkg in sorted(root.iterdir()):
 print(f"Unguarded top-level imports declared by NO package in the workspace: {len(risky)}\n")
 for (pkg, m), loc in sorted(risky.items()):
     print(f"  {pkg:<20} {m:<16} {loc}")
+
+# ── Second report: unguarded imports of a SIBLING workspace package that the importing
+# package does not declare. ────────────────────────────────────────────────────────────
+#
+# The first report asks "does anything provide this at all". That is the right question for
+# a third-party dep and it is how the pygit2 fault was found. It is the WRONG question for a
+# workspace sibling: kerf-chat is declared by the `full` persona, so it looks satisfied — but
+# pip installs per package, and kerf-api imported kerf_chat without declaring it. Under `full`
+# everything is present and CI passes; under a minimal persona the import raises inside
+# register() and the entire kerf-api plugin fails, mounting 2 /api routes instead of ~200.
+sib = {}
+for pkg in sorted(root.iterdir()):
+    pj, src = pkg / 'pyproject.toml', pkg / 'src'
+    if not pj.exists() or not src.exists(): continue
+    proj = tomllib.loads(pj.read_text()).get('project', {})
+    own = set()
+    for d in proj.get('dependencies', []) + [x for v in proj.get('optional-dependencies', {}).values() for x in v]:
+        own.add(re.split(r'[<>=!\[; ]', d.strip())[0].lower().replace('-', '_'))
+    selfname = pkg.name.lower().replace('-', '_')
+    for f in src.rglob('*.py'):
+        try: tree = ast.parse(f.read_text())
+        except Exception: continue
+        for node in tree.body:
+            mods = []
+            if isinstance(node, ast.Import):
+                mods = [(a.name.split('.')[0], node.lineno) for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                mods = [(node.module.split('.')[0], node.lineno)]
+            for mod, line in mods:
+                m = mod.lower()
+                if m == selfname or m not in localnames or m in own: continue
+                sib.setdefault((pkg.name, m), f"{f.relative_to(pkg)}:{line}")
+
+print(f"\nUnguarded imports of an UNDECLARED workspace sibling: {len(sib)}\n")
+for (pkg, m), loc in sorted(sib.items()):
+    print(f"  {pkg:<20} {m:<22} {loc}")

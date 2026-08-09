@@ -1336,3 +1336,70 @@ config is somehow unavailable it demands auth rather than assuming local.
 Deliberately NOT applied to routes touching another user's data; those want
 `require_auth` unconditionally, since "local" is not a safety argument there.
 No E2E spec exercises these endpoints, so the change cannot mask a suite result.
+
+## 2026-08-09 — Second instance of the undeclared-dependency class: kerf-api -> kerf-chat
+
+**Reproduced locally, not inferred.** Stood up postgres in docker, made a venv, installed
+only `kerf-core`, `kerf-auth`, `kerf-api` — a minimal persona — and booted the server:
+
+    /health        200
+    /api/config    404
+    plugin_register_failed error="No module named 'kerf_chat'" plugin=kerf-api
+
+`openapi.json` showed **2** `/api` routes instead of ~200. Five `kerf_api/tools/*.py` modules
+import `kerf_chat.tools.registry` **unguarded**, and kerf-chat was not in kerf-api's
+dependencies. Other packages wrap that same import in `try/except` with a `_compat` fallback;
+these do not.
+
+CI never caught it because the E2E job installs the `full` persona, where kerf-chat happens to
+be present. Any user installing a narrower persona gets an API with two routes.
+
+pygit2 confirmed that installing the local venv now pulls it automatically — that earlier fix
+is verified by a real install, not just by CI going green.
+
+**My sweep had a blind spot and I widened it.** `check-undeclared-imports.py` skipped every
+`kerf*` import as "workspace-local, therefore present". That is wrong: workspace packages are
+separately installable, so an undeclared sibling breaks any persona that does not include it.
+
+It also asked the wrong question for siblings. The original filter is "does ANY package declare
+this" — correct for a third-party dep, and how pygit2 was found. But kerf-chat IS declared by
+the `full` persona, so it looked satisfied while kerf-api itself never declared it. pip installs
+per package, so the question has to be "does THIS package declare what it imports".
+
+The script now emits two reports: third-party declared nowhere (still 3, all adjudicated), and
+**unguarded imports of an undeclared workspace sibling — 18**.
+
+**Only kerf-api is fixed.** The other 17 are recorded but not touched: each needs checking
+against the personas that actually ship it before adding a dependency edge, and a wrong edge can
+create a cycle. kerf-api was fixed because its breakage is reproduced and total.
+
+## 2026-08-09 — The undeclared-dependency chain, fully unwound against a real server
+
+**Result: a minimal persona now mounts 115 `/api` routes instead of 2, with zero
+`plugin_register_failed`.** `/api/config` returns 200.
+
+Three undeclared dependencies, each hidden behind the one before it. You cannot find
+these by reading — each only appears once the previous is fixed and the boot gets further:
+
+  1. `pygit2`    — found from CI logs, fixed, took E2E 4 -> 8 passed.
+  2. `kerf-chat` — found by booting a minimal venv locally. 2 routes.
+  3. `kerf-tess` — found by booting again after kerf-chat. Still 2 routes.
+
+All three are eager, module-level imports inside `kerf_api/routes.py`, which `register()`
+imports at startup, so any one missing fails the WHOLE kerf-api plugin.
+
+**Why only these three, when kerf-api imports ten siblings.** The other seven
+(`kerf_aero`, `kerf_cloud`, `kerf_composites`, `kerf_firmware`, `kerf_imports`,
+`kerf_mates`, `kerf_plc`, `kerf_silicon`) are either lazy or reached through
+`_try_include`, which swallows ImportError **by design** so an absent optional sub-router
+degrades instead of killing the plugin. Those stay undeclared deliberately — declaring them
+would force every persona to install every domain package. The distinction that matters is
+eager-vs-guarded, not workspace-vs-third-party.
+
+**Why CI never caught any of it.** The E2E job installs the `full` persona, where all three
+are incidentally present. Every narrower persona — which is what a real user installs —
+shipped an API with two routes. Green CI was not evidence of a working install.
+
+**Method note.** The local repro is the whole reason this closed. Postgres in docker, a venv
+with one package at a time, boot, read the error, install the next. Three rounds. Reading the
+code suggested ten candidates and could not rank them; the server ranked them instantly.

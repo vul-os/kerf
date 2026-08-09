@@ -59,11 +59,10 @@ Measured individually, `pytest packages/<pkg>/tests`, Python 3.13.9, macOS.
 
 | package | result |
 |---|---|
-| kerf-api | 689 passed, 30 skipped |
+| kerf-api | 897 passed, 30 skipped |
 | kerf-auth | 170 passed, 2 skipped |
 | kerf-chat | 178 passed |
 | kerf-cli | 156 passed |
-| kerf-cloud | 208 passed |
 | kerf-core | 345 passed, 18 skipped |
 | kerf-imports | 1292 passed, 20 skipped |
 | kerf-mates | 364 passed |
@@ -360,7 +359,7 @@ available):
 The split behind the tiers:
 
 * **Load-bearing** — the product genuinely depends on these: `kerf-core`,
-  `kerf-api`, `kerf-auth`, `kerf-cli`, `kerf-cloud`, `kerf-chat`, `kerf-pub`,
+  `kerf-api`, `kerf-auth`, `kerf-cli`, `kerf-chat`, `kerf-pub`,
   the SDKs, `kerf-imports`, `kerf-parts`/`kerf-partsgen`, `kerf-plm`,
   `kerf-worker`, `kerf-render`, `kerf-tess`/`kerf-topo`/`kerf-mates`,
   `kerf-rules`, and the `kerf-cad-core` geometry kernel.

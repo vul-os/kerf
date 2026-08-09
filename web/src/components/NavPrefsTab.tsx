@@ -99,7 +99,7 @@ export default function NavPrefsTab({ value, onChange }: Props) {
                   onChange?.(preset.id)
                   setOpen(false)
                 }}
-                className={`w-full border-b border-ink-800/60 px-3 py-2 text-left last:border-b-0 hover:bg-ink-800 ${
+                className={`w-full border-b border-ink-800/60 px-3 py-2 text-left last:border-b-0 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/70 ${
                   selected ? 'bg-kerf-300/10' : ''
                 }`}
               >
@@ -138,7 +138,7 @@ export default function NavPrefsTab({ value, onChange }: Props) {
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         title="Change navigation style"
-        className="ml-auto flex items-center gap-1.5 rounded-md border border-ink-700 bg-ink-900/90 px-2.5 py-1.5 text-[11px] text-ink-300 shadow-lg backdrop-blur hover:border-ink-600 hover:text-kerf-300"
+        className="ml-auto flex items-center gap-1.5 rounded-md border border-ink-700 bg-ink-900/90 px-2.5 py-1.5 text-[11px] text-ink-300 shadow-lg backdrop-blur hover:border-ink-600 hover:text-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         <Mouse size={13} className="opacity-70" />
         <span className="font-medium">{active.name}</span>

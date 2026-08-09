@@ -15,7 +15,7 @@ import { ApiError } from '../api.js'
 // ---- mocks ------------------------------------------------------------
 
 const wakeApiMock = { getKey: vi.fn(), subscribe: vi.fn(), unsubscribe: vi.fn() }
-vi.mock('../../cloud/api.js', () => ({ wake: wakeApiMock }))
+vi.mock('../pubApi.js', () => ({ wake: wakeApiMock }))
 
 const writeWakeStateMock = vi.fn()
 vi.mock('../wakeState.js', () => ({ writeWakeState: (...args) => writeWakeStateMock(...args) }))
@@ -42,7 +42,7 @@ const {
 // wake.js resolves its own API_URL the same way (import.meta.env.VITE_API_URL
 // || ''); mirror that here instead of hardcoding '' so this file doesn't
 // depend on whether a developer .env sets VITE_API_URL (see
-// src/cloud/__tests__/pubApi.contract.test.js's identical note).
+// src/lib/__tests__/pubApi.contract.test.js's identical note).
 const API_URL = import.meta.env.VITE_API_URL || ''
 
 // ---- helpers ------------------------------------------------------------

@@ -1,5 +1,6 @@
-// API helpers for the cloud-hosted-convenience surface (Workshop, Library,
-// hosted git, operator email admin). Kerf has no billing anywhere.
+// API helpers for the DMTAP-PUB / publishing surface (Workshop, Library,
+// local git, operator email admin). Kerf has no billing anywhere and no
+// hosted tier — every node runs the same software.
 //
 // Mirrors the patterns in src/lib/api.js: same fetch wrapper for bearer auth
 // and refresh-on-401, same ApiError shape. We intentionally re-import the
@@ -9,7 +10,7 @@
 // gains an exported request(), swap to that and delete the local copy.
 
 import { useAuth } from '../store/auth.js'
-import { ApiError } from '../lib/api.js'
+import { ApiError } from './api.js'
 import type { ApiUser } from '@/types'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -111,9 +112,9 @@ async function request<T = unknown>(path: string, options: RequestOptions = {}):
 //   POST/DELETE /api/pub/pin/:announce_id
 //   POST /api/pub/pin/:announce_id/hydrate
 
-// Local shapes for the /api/pub/* contract — this is src/cloud's own surface,
-// distinct from src/lib/api.js's endpoints (which src/types/api.ts covers),
-// so these are typed here rather than appended to the shared barrel.
+// Local shapes for the /api/pub/* contract — this is src/lib/pubApi's own
+// surface, distinct from src/lib/api.js's endpoints (which src/types/api.ts
+// covers), so these are typed here rather than appended to the shared barrel.
 export interface PubIdentity { pub: string | null }
 
 export interface PubFollow {

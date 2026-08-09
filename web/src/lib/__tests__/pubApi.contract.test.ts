@@ -1,13 +1,13 @@
-// pubApi.contract.test.js — verifies src/cloud/api.js's `pub` client hits
+// pubApi.contract.test.js — verifies src/lib/pubApi.js's `pub` client hits
 // the exact /api/pub/* contract this frontend wave was coded against
 // (backend built in parallel, per the wave-2 task brief). Pure fetch-mock
 // tests, no React needed.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { pub, wake } from '../api.js'
+import { pub, wake } from '../pubApi.js'
 
 // The fetch mock below only needs the {ok, status, json} shape `request()`
-// in ../api.ts actually reads, not the full Response interface — cast at
+// in ../pubApi.ts actually reads, not the full Response interface — cast at
 // the assignment rather than fleshing out every Response member for a
 // test-only stand-in.
 type CallRecord = { url: string; [key: string]: unknown }
@@ -139,7 +139,7 @@ describe('pub API client — matches the /api/pub contract', () => {
     // Cast: this test's whole point is asserting these properties are
     // *absent* from the real module namespace, so the un-narrowed cast
     // isn't hiding a real shape — it's what lets us ask the question at all.
-    const api = (await import('../api.js')) as unknown as Record<string, unknown>
+    const api = (await import('../pubApi.js')) as unknown as Record<string, unknown>
     expect(api.workshop).toBeUndefined()
     expect(api.githubOAuth).toBeUndefined()
   })

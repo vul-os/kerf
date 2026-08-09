@@ -96,7 +96,7 @@ File revisions (per-file undo history) + local git (commits, branches, GitHub sy
 
 ## Quick start (standalone)
 
-Kerf runs **by itself** — no account, no cloud, no external service required beyond a Postgres database.
+Kerf runs **by itself** — no account, no cloud, no external service, and no database server. State lives in an embedded SQLite file at `~/.kerf/kerf.db`. Postgres is a one-line opt-in for shared installs.
 
 ### Install (one-liner)
 
@@ -128,19 +128,33 @@ cd kerf
 npm install
 ```
 
-You'll need Python 3.11+, Node 22+, and Postgres 14+.
+You'll need Python 3.11+ and Node 22+. No database server — Kerf creates its own SQLite file on first run.
 
 > **Note:** a bare `pip install -e .[mech]` fails — the repo is a `uv` workspace, so the local `kerf-*` packages are wired up via `[tool.uv.sources]`, which only `uv` reads. `./scripts/dev-install.sh` works around that by installing every persona package editable in one `pip install` call.
 >
 > **`uv sync` currently doesn't work for *any* persona** (not just `mech`/`full`) — `kerf-cad-core`, `kerf-cam`, `kerf-fem`, and `kerf-topo` each declare a conda-forge-only extra (pythonOCC, FEniCSx/dolfinx), and uv resolves one lockfile for the whole workspace, so it always tries to satisfy those extras regardless of which `--extra` you pass. Even `uv sync --extra api-only` or a bare `uv sync` fails with "No solution found ... requirements are unsatisfiable." Use `./scripts/dev-install.sh` until that's untangled. Either way, the `mech`/`full` solver stack (pythonOCC, dolfinx) is conda-only; see [docs/local-install.md](./docs/local-install.md#solver-dependencies-dolfinx--pythonocc).
 
 ```sh
-export DATABASE_URL=postgres://<your-pg-user>@localhost:5432/kerf?sslmode=disable
-createdb kerf
 npm run init       # writes kerf.toml from kerf.example.toml — add at least one LLM API key
-npm run migrate    # applies every OSS migration
+npm run migrate    # applies every migration against ~/.kerf/kerf.db
 npm run dev        # vite :5173 + kerf-server :8080, both hot-reloading
 ```
+
+<details>
+<summary>Using Postgres instead (shared or multi-user installs)</summary>
+
+Set `DATABASE_URL` before migrating and Kerf uses Postgres instead — nothing else changes.
+
+```sh
+createdb kerf
+export DATABASE_URL=postgres://<your-pg-user>@localhost:5432/kerf?sslmode=disable
+npm run migrate
+```
+
+The same value can live in `kerf.toml` under `[database] url`. Both the plain
+`DATABASE_URL` and the `KERF_DATABASE_URL` form are read.
+
+</details>
 
 Open <http://localhost:5173>. With `local_mode = true` (the default), Kerf auto-creates a singleton user and signs you in — no login screen. Full walkthrough: [docs/getting-started.md](./docs/getting-started.md).
 
@@ -152,7 +166,9 @@ local_mode = true      # single-user, auto-login
 port = 8080
 
 [database]
-url = "postgres://postgres@localhost:5432/kerf?sslmode=disable"
+# Omit entirely for the default: embedded SQLite at ~/.kerf/kerf.db.
+# Set it only if you want Postgres:
+# url = "postgres://postgres@localhost:5432/kerf?sslmode=disable"
 
 [storage]
 backend = "filesystem"          # your project files as real files on disk
@@ -182,7 +198,7 @@ flowchart LR
   subgraph Node["🖥️  Your machine — one kerf node"]
     direction TB
     App["<b>kerf app</b><br/>sketch · model · simulate · CAM"]
-    Store[("<b>your storage</b><br/>Postgres + files / S3")]
+    Store[("<b>your storage</b><br/>SQLite or Postgres<br/>+ files / S3")]
     Pub["<b>pub module</b><br/>publish · follow · pin · fetch"]
     App --> Store
     App --> Pub
@@ -245,7 +261,7 @@ Full schema: [`kerf.example.toml`](./kerf.example.toml). Detailed reference: [do
 | [docs/getting-started.md](./docs/getting-started.md) | Clone to running server in about five minutes |
 | [docs/node-architecture.md](./docs/node-architecture.md) | Node model, the pub module, the zero-socket invariant, DMTAP-PUB pointer |
 | [docs/distributed-workshop.md](./docs/distributed-workshop.md) | Publish / follow / pin, availability states, irrevocability |
-| [docs/local-install.md](./docs/local-install.md) | Self-host install paths, persona bundles, Postgres setup |
+| [docs/local-install.md](./docs/local-install.md) | Self-host install paths, persona bundles, optional Postgres |
 | [docs/architecture.md](./docs/architecture.md) | API surface, data model, plugin system |
 | [docs/sketching.md](./docs/sketching.md) | Constraints, tools, the planegcs solver |
 | [docs/electronics.md](./docs/electronics.md) | tscircuit, PCB, SPICE, RF, autoroute |

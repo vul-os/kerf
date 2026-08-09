@@ -198,4 +198,4 @@ describe('cover URL resolution', () => {
 // shape. The Workshop is now a distributed DMTAP-PUB feed browser
 // (decisions.md 2026-07-17 "Final form" ADR) — publishing goes through
 // pub.publish({projectId, metadata}) instead; see
-// src/cloud/__tests__/PublishButton.test.jsx for its coverage.
+// src/components/pub/__tests__/PublishButton.test.jsx for its coverage.

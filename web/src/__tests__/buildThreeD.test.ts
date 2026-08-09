@@ -70,7 +70,7 @@ vi.mock('../lib/api.js', () => ({
   ApiError: class ApiError extends Error {},
 }))
 
-vi.mock('../cloud/api.js', () => ({ git: {} }))
+vi.mock('../lib/pubApi.js', () => ({ git: {} }))
 vi.mock('../lib/stepLoader.js', () => ({ loadStep: vi.fn() }))
 vi.mock('../lib/meshLoader.js', () => ({ loadMeshFromURL: vi.fn() }))
 vi.mock('../lib/assembly.js', () => ({

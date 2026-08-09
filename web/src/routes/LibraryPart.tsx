@@ -29,7 +29,7 @@ import Layout from '../components/Layout.jsx'
 import Card from '../components/Card.jsx'
 import Button from '../components/Button.jsx'
 import { ApiError } from '../lib/api.js'
-import { library } from '../cloud/api.js'
+import { library } from '../lib/pubApi.js'
 import { parsePart } from '../lib/part.js'
 
 function VerifiedBadge() {

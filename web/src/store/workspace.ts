@@ -903,7 +903,7 @@ const initial: WorkspaceData = {
   // one — see openGitPanel()/closeGitPanel() below. GitPanel.jsx (a core MIT
   // node capability as of decisions.md's 2026-07-17 "local git only; no
   // OAuth" addendum) owns its own local git state directly against
-  // src/cloud/api.js's `git` client and no longer reads/writes store state;
+  // src/lib/pubApi.js's `git` client and no longer reads/writes store state;
   // there is nothing else git-related in this store.
   gitOpen: false,
 

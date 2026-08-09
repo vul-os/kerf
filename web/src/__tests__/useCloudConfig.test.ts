@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 async function freshStore() {
   vi.resetModules()
-  const mod = await import('../cloud/useCloudConfig.js')
+  const mod = await import('../lib/useCloudConfig.js')
   return mod
 }
 

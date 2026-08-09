@@ -41,7 +41,7 @@
 
 import * as THREE from 'three'
 import { applyMatrixToGeom } from './geom3.js'
-import { library } from '../cloud/api.js'
+import { library } from './pubApi.js'
 import type {
   AssemblyDocument,
   AssemblyComponent,
@@ -922,7 +922,7 @@ function _emitDerivedCacheEvent(evt: DerivedCacheEvent): void {
   }
 }
 
-/** Result of a derived-artifact cache lookup — see `library.lookupDerivedArtifact` in `src/cloud/api.js`. */
+/** Result of a derived-artifact cache lookup — see `library.lookupDerivedArtifact` in `src/lib/pubApi.js`. */
 interface DerivedLookupResult {
   cached: boolean
   payload?: Uint8Array

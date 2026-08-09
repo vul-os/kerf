@@ -18,7 +18,7 @@
 // (isWakeUsableForFollow) rather than silently breaking whichever one was
 // registered second.
 
-import { wake as wakeApi, type PubFollow, type WakeSubscriptionInit } from '../cloud/api.js'
+import { wake as wakeApi, type PubFollow, type WakeSubscriptionInit } from './pubApi.js'
 import { useWake } from '../store/wake.js'
 import { useAuth } from '../store/auth.js'
 import { writeWakeState } from './wakeState.js'

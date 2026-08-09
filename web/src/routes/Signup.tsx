@@ -7,7 +7,7 @@ import Input from '../components/Input.jsx'
 import Card from '../components/Card.jsx'
 import { api, ApiError } from '../lib/api.js'
 import { useAuth } from '../store/auth.js'
-import { useCloudConfig } from '../cloud/useCloudConfig.js'
+import { useCloudConfig } from '../lib/useCloudConfig.js'
 
 function GitHubIcon() {
   return (

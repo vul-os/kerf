@@ -20,7 +20,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Loader2, Package, Search, Star, X } from 'lucide-react'
 import { ApiError } from '../lib/api.js'
 import { api } from '../lib/api.js'
-import { library } from '../cloud/api.js'
+import { library } from '../lib/pubApi.js'
 
 // api.listFiles()'s element type isn't exported by lib/api.ts (ApiFileWithMesh
 // is module-private); derive it structurally instead of redeclaring it.
@@ -198,7 +198,7 @@ export default function LibraryPicker({ onSelect, onClose, currentProjectId }: L
         if (cancelled) return
         // LibraryPartRow types `author` as a string, but the API actually
         // returns an object (see PickerRow comment above) — cast at this
-        // boundary rather than redeclaring the shared cloud/api.ts type.
+        // boundary rather than redeclaring the shared lib/pubApi.ts type.
         setGlobalRows((resp?.rows as unknown as PickerRow[]) || [])
         setGlobalErr(null)
       })

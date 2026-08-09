@@ -22,7 +22,7 @@ import {
 import Layout from '../components/Layout.jsx'
 import Card from '../components/Card.jsx'
 import { ApiError } from '../lib/api.js'
-import { library } from '../cloud/api.js'
+import { library } from '../lib/pubApi.js'
 import { useAuth } from '../store/auth.js'
 
 // Categories surfaced in the filter chip strip. Keep this list short —

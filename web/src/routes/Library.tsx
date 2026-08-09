@@ -61,7 +61,8 @@ function PartCard({ row, onSelect, selected }) {
         'group block text-left rounded-xl border overflow-hidden transition-colors ' +
         (selected
           ? 'border-kerf-300/60 bg-kerf-300/5'
-          : 'border-ink-800 bg-ink-900 hover:border-ink-700')
+          : 'border-ink-800 bg-ink-900 hover:border-ink-700') +
+        ' focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70'
       }
     >
       <div className="relative aspect-[4/3] bg-ink-800 overflow-hidden">
@@ -123,8 +124,9 @@ function DetailsPanel({ row, onClose }) {
         <button
           type="button"
           onClick={onClose}
-          className="text-ink-400 hover:text-ink-100 text-xs"
+          className="text-ink-400 hover:text-ink-100 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 rounded"
           title="Close"
+          aria-label="Close part details"
         >
           ×
         </button>
@@ -269,7 +271,7 @@ function SubmitPartModal({ open, onClose, onSubmitted }) {
           <button
             type="button"
             onClick={() => !busy && onClose?.()}
-            className="text-ink-400 hover:text-ink-100"
+            className="text-ink-400 hover:text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 rounded"
             aria-label="Close"
           >
             <X size={18} />
@@ -309,7 +311,7 @@ function SubmitPartModal({ open, onClose, onSubmitted }) {
             <button
               type="button"
               onClick={() => !busy && onClose?.()}
-              className="h-9 px-3 rounded-lg text-xs text-ink-300 hover:text-ink-100"
+              className="h-9 px-3 rounded-lg text-xs text-ink-300 hover:text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               disabled={busy}
             >
               Cancel
@@ -317,7 +319,7 @@ function SubmitPartModal({ open, onClose, onSubmitted }) {
             <button
               type="submit"
               disabled={busy}
-              className="h-9 px-4 rounded-lg text-xs font-medium bg-kerf-300 text-ink-950 hover:bg-kerf-200 disabled:opacity-60 inline-flex items-center gap-1.5"
+              className="h-9 px-4 rounded-lg text-xs font-medium bg-kerf-300 text-ink-950 hover:bg-kerf-200 disabled:opacity-60 inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 focus-visible:ring-offset-1 focus-visible:ring-offset-ink-900"
             >
               {busy ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
               Submit for review
@@ -496,7 +498,7 @@ export default function Library() {
             <button
               type="button"
               onClick={() => setSubmitOpen(true)}
-              className="h-8 px-3 rounded-full text-xs font-medium border border-kerf-300/40 text-kerf-300 hover:bg-kerf-300/10 inline-flex items-center gap-1.5"
+              className="h-8 px-3 rounded-full text-xs font-medium border border-kerf-300/40 text-kerf-300 hover:bg-kerf-300/10 inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               title="Submit a Part for review"
             >
               <Plus size={12} />
@@ -526,7 +528,7 @@ export default function Library() {
             type="button"
             onClick={() => setCategory(tab.id)}
             className={
-              'h-8 px-3 rounded-full text-xs font-medium transition-colors whitespace-nowrap border ' +
+              'h-8 px-3 rounded-full text-xs font-medium transition-colors whitespace-nowrap border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ' +
               (category === tab.id
                 ? 'bg-ink-100 text-ink-950 border-ink-100'
                 : 'text-ink-300 hover:text-ink-100 border-ink-800 hover:border-ink-700 bg-ink-900')

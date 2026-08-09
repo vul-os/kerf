@@ -60,6 +60,31 @@ sedi() {
   sed "$pattern" "$file" > "$tmp" && mv "$tmp" "$file"
 }
 
+# ── 0. Pre-flight ─────────────────────────────────────────────────────────────
+# Every path this script touches is checked BEFORE anything is rewritten.
+#
+# Why: the steps below rewrite version strings first and `git add` them last, so
+# a single wrong path used to fail at the very end with "pathspec did not match"
+# — exiting non-zero while leaving the whole tree bumped but uncommitted. That
+# is how v0.1.4 was tagged onto the wrong commit: the caller piped this script
+# through `tail`, which masked the non-zero exit, and the `&&` chain carried on.
+# The frontend restructure (package.json -> web/package.json) is exactly the
+# kind of move that reintroduces this, so fail loudly and early instead.
+_missing=()
+for _f in VERSION pyproject.toml web/package.json; do
+  [[ -e "$_f" ]] || _missing+=("$_f")
+done
+for _f in packages/kerf-*/pyproject.toml; do
+  [[ "$_f" == packages/kerf-sdk/* ]] && continue
+  [[ -e "$_f" ]] || _missing+=("$_f")
+done
+if (( ${#_missing[@]} )); then
+  echo "bump-version: refusing to run — these paths do not exist:" >&2
+  printf '  %s\n' "${_missing[@]}" >&2
+  echo "Nothing has been modified. Update this script's paths and re-run." >&2
+  exit 1
+fi
+
 # ── 1. VERSION file ───────────────────────────────────────────────────────────
 printf '%s\n' "$NEW" > VERSION
 

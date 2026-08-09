@@ -90,7 +90,8 @@ function LayerRow({ layer, isSolo, onToggle, onColorChange, onDragStart, onDragO
         type="button"
         onClick={handleEyeClick}
         title="Toggle visibility"
-        className="flex-shrink-0 p-0.5 rounded hover:bg-ink-700"
+        aria-label={layer.visible ? `Hide layer ${layer.name}` : `Show layer ${layer.name}`}
+        className="flex-shrink-0 p-0.5 rounded hover:bg-ink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         {layer.visible ? (
           <Eye size={12} className={isSolo ? 'text-kerf-300' : 'text-ink-300'} />
@@ -104,7 +105,8 @@ function LayerRow({ layer, isSolo, onToggle, onColorChange, onDragStart, onDragO
           type="button"
           onClick={() => setShowPicker((v) => !v)}
           title="Change layer color"
-          className="w-4 h-4 rounded-sm border border-ink-600 cursor-pointer"
+          aria-label={`Change color for layer ${layer.name}`}
+          className="w-4 h-4 rounded-sm border border-ink-600 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           style={{ backgroundColor: layer.color }}
         />
         {showPicker && (
@@ -238,7 +240,7 @@ export default function LayersPanel({ circuitJson, onLayerStackChange }: LayersP
         <button
           type="button"
           onClick={() => setCollapsed((v) => !v)}
-          className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-400 hover:text-ink-200"
+          className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-400 hover:text-ink-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 rounded"
         >
           {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
           <Layers size={12} />
@@ -248,7 +250,8 @@ export default function LayersPanel({ circuitJson, onLayerStackChange }: LayersP
           type="button"
           onClick={handleToggleAll}
           title={allVisible ? 'Hide all layers' : 'Show all layers'}
-          className="p-1 rounded hover:bg-ink-800 text-ink-500 hover:text-ink-300"
+          aria-label={allVisible ? 'Hide all layers' : 'Show all layers'}
+          className="p-1 rounded hover:bg-ink-800 text-ink-500 hover:text-ink-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {allVisible ? <Eye size={12} /> : <EyeOff size={12} />}
         </button>
@@ -263,7 +266,7 @@ export default function LayersPanel({ circuitJson, onLayerStackChange }: LayersP
                 type="button"
                 onClick={() => handleThemeChange(t)}
                 className={[
-                  'flex-1 px-1.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider border',
+                  'flex-1 px-1.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
                   theme === t
                     ? 'bg-kerf-300/20 text-kerf-300 border-kerf-300/40'
                     : 'text-ink-500 border-ink-800 hover:text-ink-300 hover:border-ink-700',

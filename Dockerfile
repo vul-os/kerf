@@ -30,11 +30,16 @@ RUN npm install --no-audit --no-fund
 COPY web/vite.config.js web/index.html web/tsconfig.json ./
 COPY web/src/ ./src/
 COPY web/public/ ./public/
-COPY scripts/ ./scripts/
+# These land at / rather than /app because the frontend's package.json now
+# lives in web/, so its build scripts reference ../scripts, ../docs and
+# ../packages. This stage flattens web/* into /app, which makes ".." resolve
+# to "/" — copying them under /app/ instead made `npm run build` die with
+# "Cannot find module '/scripts/build-docs-manifest.mjs'".
+COPY scripts/ /scripts/
 # build-docs-manifest.mjs (run by `npm run build`) walks docs/ and
 # packages/*/llm_docs/*.md — without these the /docs manifest is empty.
-COPY docs/ ./docs/
-COPY packages/ ./packages/
+COPY docs/ /docs/
+COPY packages/ /packages/
 COPY postcss.config.* tailwind.config.* eslint.config.* ./
 RUN npm run build
 

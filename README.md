@@ -19,7 +19,7 @@ Parametric sketching &amp; modeling across five geometry kernels · drawings · 
 
 [Website](https://vulos.org/projects/kerf/) · [Docs](https://vulos.org/projects/kerf/docs.html) · [Feature parity](https://vulos.org/projects/kerf/parity.html) · [Releases](https://github.com/vul-os/kerf/releases) · [Roadmap](./ROADMAP.md) · [Contributing](#contributing)
 
-<img src="public/screenshots/editor.png" alt="The Kerf editor: file tree, 3D viewport, and the LLM chat panel" width="900">
+<img src="web/public/screenshots/editor.png" alt="The Kerf editor: file tree, 3D viewport, and the LLM chat panel" width="900">
 
 </div>
 
@@ -89,7 +89,7 @@ File revisions (per-file undo history) + local git (commits, branches, GitHub sy
 ## Screenshots
 
 <p align="center">
-  <img src="public/screenshots/sketcher-features.png" alt="2D parametric sketch with constraints, ready to drive an OCCT feature timeline" width="100%">
+  <img src="web/public/screenshots/sketcher-features.png" alt="2D parametric sketch with constraints, ready to drive an OCCT feature timeline" width="100%">
   <em>The 2D parametric sketcher — constrained geometry that feeds the OpenCascade B-rep feature tree via "New feature from sketch".</em>
 </p>
 

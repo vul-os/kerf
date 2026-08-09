@@ -38,9 +38,17 @@ server = [
 pub = [
     "kerf-pub>=0.1.0",
 ]
+# [mcp] adds `kerf mcp` — an MCP (Model Context Protocol) server on stdio
+# that exposes the same tool registry as `kerf tools`. Kept optional so a
+# plain `pip install kerf-cli` stays a zero-dependency thin client; only
+# `kerf mcp` itself imports this package (lazily, at call time).
+mcp = [
+    "mcp>=1.2.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
+    "mcp>=1.2.0",
 ]
 
 [project.scripts]

@@ -34,8 +34,8 @@
       without a migration story
 - [ ] No new heavy runtime dep without strong motivation (optional
       extras are fine)
-- [ ] Anything proprietary lives under `kerf-billing/`, `kerf-cloud/`,
-      or `src/cloud/`
+- [ ] Anything proprietary lives under `kerf-billing/` (there is nothing
+      proprietary in the frontend — `src/` is 100% MIT, no `cloud/` split)
 
 ## Screenshots / output
 

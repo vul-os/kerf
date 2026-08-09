@@ -69,7 +69,7 @@ Drops every cached row for the file regardless of kind. Returns
 ## Frontend lookup
 
 `library.lookupDerivedArtifact({projectId, fileId, derivedKind})` in
-`src/cloud/api.js` wraps the lookup endpoint. On 501 it returns
+`src/lib/pubApi.js` wraps the lookup endpoint. On 501 it returns
 `{cached: false}`; on success it base64-decodes to `Uint8Array`.
 
 `loadExternalParts(ref)` in `src/lib/assembly.js` calls it before

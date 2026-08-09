@@ -15,7 +15,7 @@ import re
 from kerf_api.routes import STARTER_SEEDS, DEFAULT_STARTER, FILE_KINDS
 
 _PROJECT_TAGS_JS = (
-    pathlib.Path(__file__).resolve().parents[3] / "src/lib/projectTags.js"
+    pathlib.Path(__file__).resolve().parents[3] / "web/src/lib/projectTags.ts"
 )
 
 

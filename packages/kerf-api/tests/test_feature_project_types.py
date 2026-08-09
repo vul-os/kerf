@@ -24,7 +24,7 @@ from kerf_api.routes import STARTER_SEEDS, DEFAULT_STARTER, FILE_KINDS
 from kerf_chat.llm import tagKindHints, build_project_tags_addendum
 
 _PROJECT_TAGS_JS = (
-    pathlib.Path(__file__).resolve().parents[3] / "src/lib/projectTags.js"
+    pathlib.Path(__file__).resolve().parents[3] / "web/src/lib/projectTags.ts"
 )
 
 # ---------------------------------------------------------------------------
@@ -75,7 +75,7 @@ def _preset_ids() -> list[str]:
 
 def test_tag_presets_file_readable():
     """projectTags.js exists and has TAG_PRESETS."""
-    assert _PROJECT_TAGS_JS.exists(), "src/lib/projectTags.js not found"
+    assert _PROJECT_TAGS_JS.exists(), "web/src/lib/projectTags.ts not found"
     assert "TAG_PRESETS" in _js()
 
 

@@ -1209,6 +1209,127 @@ if _REGISTRY_AVAILABLE:
         return ok_payload({"ok": True, "limit_positions": results})
 
     # ------------------------------------------------------------------
+    # subd_evaluate_limit_curvature
+    # ------------------------------------------------------------------
+
+    _subd_evaluate_limit_curvature_spec = ToolSpec(
+        name="subd_evaluate_limit_curvature",
+        description=(
+            "Evaluate Stam-exact Catmull-Clark limit-surface curvature "
+            "(Gaussian K, mean H, principal kappa_1/kappa_2) at one or more "
+            "(face_id, u, v) points on a SubD mesh.  Pass the control-mesh "
+            "vertices and faces, and a list of query points.\n"
+            "\n"
+            "Returns:\n"
+            "  ok         : bool\n"
+            "  curvatures : list of {gaussian_K, mean_H, "
+            "principal_kappa_1, principal_kappa_2} (one per query point)\n"
+            "\n"
+            "Errors: {ok:false, reason} for invalid inputs.  Never raises."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "vertices": {
+                    "type": "array",
+                    "description": "Control-mesh vertices as [[x,y,z], ...].",
+                    "items": {"type": "array", "items": {"type": "number"}},
+                },
+                "faces": {
+                    "type": "array",
+                    "description": "Face vertex-index lists as [[i,j,k,l], ...].",
+                    "items": {"type": "array", "items": {"type": "integer"}},
+                },
+                "queries": {
+                    "type": "array",
+                    "description": "Points to evaluate: [{face_id, u, v}, ...].",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "face_id": {"type": "integer"},
+                            "u": {"type": "number"},
+                            "v": {"type": "number"},
+                        },
+                        "required": ["face_id", "u", "v"],
+                    },
+                },
+                "creases": {
+                    "type": "array",
+                    "description": "Optional list of crease entries {v1, v2, value}.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "v1": {"type": "integer"},
+                            "v2": {"type": "integer"},
+                            "value": {"type": "number"},
+                        },
+                        "required": ["v1", "v2", "value"],
+                    },
+                },
+            },
+            "required": ["vertices", "faces", "queries"],
+        },
+    )
+
+    @register(_subd_evaluate_limit_curvature_spec)
+    async def run_subd_evaluate_limit_curvature(ctx: "ProjectCtx", args: bytes) -> str:
+        # Lazy import: subd_limit_curvature imports SubDMesh from this module,
+        # so importing it at module scope here would be circular.
+        from kerf_cad_core.geom.subd_limit_curvature import evaluate_limit_curvature
+
+        try:
+            a = _json.loads(args)
+        except Exception as exc:
+            return err_payload(f"invalid args: {exc}", "BAD_ARGS")
+
+        raw_verts = a.get("vertices", [])
+        raw_faces = a.get("faces", [])
+        queries = a.get("queries", [])
+        raw_creases = a.get("creases", [])
+
+        if not raw_verts:
+            return err_payload("vertices is required", "BAD_ARGS")
+        if not raw_faces:
+            return err_payload("faces is required", "BAD_ARGS")
+        if not queries:
+            return err_payload("queries is required", "BAD_ARGS")
+
+        try:
+            mesh = SubDMesh(
+                vertices=[[float(x) for x in v] for v in raw_verts],
+                faces=[[int(i) for i in f] for f in raw_faces],
+            )
+        except Exception as exc:
+            return err_payload(f"invalid mesh: {exc}", "BAD_ARGS")
+
+        for crease_entry in raw_creases:
+            try:
+                mesh.set_crease(
+                    int(crease_entry["v1"]),
+                    int(crease_entry["v2"]),
+                    float(crease_entry["value"]),
+                )
+            except Exception:
+                pass
+
+        results = []
+        for q in queries:
+            try:
+                cv = evaluate_limit_curvature(
+                    mesh, int(q["face_id"]), float(q["u"]), float(q["v"])
+                )
+                results.append({
+                    "gaussian_K": cv.gaussian_K,
+                    "mean_H": cv.mean_H,
+                    "principal_kappa_1": cv.principal_kappa_1,
+                    "principal_kappa_2": cv.principal_kappa_2,
+                })
+            except Exception as exc:
+                results.append({"error": str(exc)})
+
+        return ok_payload({"ok": True, "curvatures": results})
+
+    # ------------------------------------------------------------------
     # subdivide_subd_mesh
     # ------------------------------------------------------------------
 

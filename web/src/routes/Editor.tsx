@@ -2814,7 +2814,7 @@ export default function Editor() {
                       setMatePickResult(null)
                       useWorkspace.getState().setMeasureMode('object')
                     }}
-                    className="text-amber-400 hover:text-amber-200 ml-1 text-[10px] underline"
+                    className="text-amber-400 hover:text-amber-200 ml-1 text-[10px] underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 rounded"
                   >
                     Cancel (Esc)
                   </button>
@@ -2943,7 +2943,7 @@ export default function Editor() {
                 type="button"
                 onClick={() => setTreeDrawerOpen(false)}
                 aria-label="Close file tree drawer"
-                className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800"
+                className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               >
                 <X size={14} />
               </button>
@@ -3024,7 +3024,7 @@ export default function Editor() {
                 type="button"
                 onClick={() => setChatDrawerOpen(false)}
                 aria-label="Close chat drawer"
-                className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800"
+                className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               >
                 <X size={14} />
               </button>
@@ -3069,7 +3069,7 @@ export default function Editor() {
               type="button"
               data-testid="right-drawer-tab-chat"
               onClick={() => setRightDrawerTab('chat')}
-              className={`flex items-center gap-1.5 px-4 h-10 text-[11px] uppercase tracking-wider font-medium border-b-2 transition-colors ${
+              className={`flex items-center gap-1.5 px-4 h-10 text-[11px] uppercase tracking-wider font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/70 ${
                 rightDrawer.tab === 'chat'
                   ? 'border-kerf-300 text-kerf-300'
                   : 'border-transparent text-ink-400 hover:text-ink-200'
@@ -3081,7 +3081,7 @@ export default function Editor() {
               type="button"
               data-testid="right-drawer-tab-activity"
               onClick={() => setRightDrawerTab('activity')}
-              className={`flex items-center gap-1.5 px-4 h-10 text-[11px] uppercase tracking-wider font-medium border-b-2 transition-colors ${
+              className={`flex items-center gap-1.5 px-4 h-10 text-[11px] uppercase tracking-wider font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/70 ${
                 rightDrawer.tab === 'activity'
                   ? 'border-kerf-300 text-kerf-300'
                   : 'border-transparent text-ink-400 hover:text-ink-200'
@@ -3095,7 +3095,7 @@ export default function Editor() {
               type="button"
               data-testid="right-drawer-tab-git"
               onClick={() => setRightDrawerTab('git')}
-              className={`flex items-center gap-1.5 px-4 h-10 text-[11px] uppercase tracking-wider font-medium border-b-2 transition-colors ${
+              className={`flex items-center gap-1.5 px-4 h-10 text-[11px] uppercase tracking-wider font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/70 ${
                 rightDrawer.tab === 'git'
                   ? 'border-kerf-300 text-kerf-300'
                   : 'border-transparent text-ink-400 hover:text-ink-200'
@@ -3107,7 +3107,7 @@ export default function Editor() {
               type="button"
               data-testid="right-drawer-tab-fea"
               onClick={() => setRightDrawerTab('fea')}
-              className={`flex items-center gap-1.5 px-4 h-10 text-[11px] uppercase tracking-wider font-medium border-b-2 transition-colors ${
+              className={`flex items-center gap-1.5 px-4 h-10 text-[11px] uppercase tracking-wider font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/70 ${
                 rightDrawer.tab === 'fea'
                   ? 'border-cyan-400 text-cyan-400'
                   : 'border-transparent text-ink-400 hover:text-ink-200'
@@ -3119,7 +3119,7 @@ export default function Editor() {
             <button
               type="button"
               onClick={() => closeRightDrawer()}
-              className="mr-2 p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800"
+              className="mr-2 p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               aria-label="Close panel"
             >
               <X size={14} />

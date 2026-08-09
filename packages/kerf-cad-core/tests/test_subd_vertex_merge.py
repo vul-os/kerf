@@ -57,7 +57,18 @@ from kerf_cad_core.subd.vertex_merge import (
     merge_vertices,
 )
 from kerf_cad_core.subd.edge_collapse import collapse_edge
-from kerf_cad_core.subd.edge_flip import _build_ordered_edges
+from kerf_cad_core.subd.cage_area import SubdCage
+
+
+def _as_subd_cage(mesh: SubDMesh) -> SubdCage:
+    """collapse_edge() takes a SubdCage (.vertices_xyz_mm/.faces), not the
+    SubDMesh (.vertices/.faces) merge_vertices() takes — two independently
+    evolved cage representations for the same concept. Convert so both
+    operate on the same underlying vertex/face data."""
+    return SubdCage(
+        vertices_xyz_mm=[tuple(v) for v in mesh.vertices],
+        faces=[list(f) for f in mesh.faces],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -154,16 +165,6 @@ def _two_non_adjacent_quads() -> SubDMesh:
     return SubDMesh(vertices=verts, faces=faces)
 
 
-def _edge_idx_for_vertices(cage: SubDMesh, va: int, vb: int) -> int:
-    """Return the edge index for the edge between va and vb."""
-    all_edges, _ = _build_ordered_edges(cage.faces)
-    key = (min(va, vb), max(va, vb))
-    for i, e in enumerate(all_edges):
-        if e == key:
-            return i
-    raise ValueError(f"Edge ({va}, {vb}) not found in cage")
-
-
 # ---------------------------------------------------------------------------
 # TestEdgeEquivalence
 # ---------------------------------------------------------------------------
@@ -176,20 +177,20 @@ class TestEdgeEquivalence:
         plane = _simple_plane_grid()
         # Edge (1, 4): adjacent pair sharing a face edge.
         v_a, v_b = 1, 4
-        eidx = _edge_idx_for_vertices(plane, v_a, v_b)
 
-        res_collapse = collapse_edge(plane, eidx)
+        # collapse_edge takes (cage, v_keep, v_remove) — SUBD-EDGE-COLLAPSE's
+        # dded0726 v_keep/v_remove API, not an edge index.
+        res_collapse = collapse_edge(_as_subd_cage(plane), v_a, v_b)
         res_merge = merge_vertices(plane, [v_a, v_b])
 
-        assert len(res_merge.new_cage_vertices) == len(res_collapse.new_cage_vertices)
+        assert len(res_merge.new_cage_vertices) == len(res_collapse.new_cage.vertices_xyz_mm)
 
     def test_faces_removed_same_as_edge_collapse(self):
         """merge_vertices([v_a, v_b]) removes the same number of faces as edge collapse."""
         plane = _simple_plane_grid()
         v_a, v_b = 1, 4
-        eidx = _edge_idx_for_vertices(plane, v_a, v_b)
 
-        res_collapse = collapse_edge(plane, eidx)
+        res_collapse = collapse_edge(_as_subd_cage(plane), v_a, v_b)
         res_merge = merge_vertices(plane, [v_a, v_b])
 
         assert res_merge.num_faces_removed == res_collapse.num_faces_removed

@@ -9,11 +9,6 @@
 # `postgres` profile and point DATABASE_URL at it:
 #
 #   DATABASE_URL=postgres://postgres:postgres@postgres:5432/kerf docker compose --profile postgres up
-#
-# redis is unrelated to either database backend — nothing in this repo
-# currently reads REDIS_URL or imports a redis client, so it stays
-# unconditional here only as a placeholder for future job-queue work; it is
-# not part of the SQLite/Postgres decision this file is about.
 services:
   app:
     build:
@@ -54,8 +49,6 @@ services:
       # Persists the embedded SQLite db (and WAL files) across `compose down`
       # the same way postgres-data persists the opt-in Postgres backend.
       - kerf-home:/root/.kerf
-    depends_on:
-      - redis
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
       interval: 30s
@@ -79,15 +72,7 @@ services:
     ports:
       - "5432:5432"
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-
 volumes:
   storage-data:
   postgres-data:
-  redis-data:
   kerf-home:

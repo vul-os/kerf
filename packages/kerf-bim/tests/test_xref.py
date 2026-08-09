@@ -274,7 +274,16 @@ def test_refresh_xref_status_not_stale(arch_spec):
 # 14. refresh_xref returns num_elements matching DATA lines in minimal IFC
 # ---------------------------------------------------------------------------
 
-def test_refresh_xref_element_count(ifc_file):
+def test_refresh_xref_element_count(ifc_file, monkeypatch):
+    # This module is documented (see the file docstring) to be hermetic and
+    # not require ifcopenshell — refresh_xref falls back to counting raw
+    # '#N=' DATA-section lines when ifcopenshell isn't importable. Force that
+    # path explicitly: when ifcopenshell IS installed (as it is in this
+    # venv), refresh_xref instead counts real IfcProduct instances, which
+    # for this minimal fixture (units + project header, no walls/proxies) is
+    # legitimately 0 — a different, non-comparable count, not a bug.
+    monkeypatch.setitem(sys.modules, "ifcopenshell", None)
+
     # Count DATA-section lines manually
     expected = _count_ifc_elements(ifc_file)
     assert expected > 0

@@ -169,13 +169,17 @@ class TestSIIBISToolRegistration:
 
     def test_si_ibis_tool_names(self):
         from kerf_electronics.tools import si_ibis
-        # si_ibis uses @register decorator so TOOLS is a list of decorated functions
-        # Each item is callable with a __name__ attribute
+        # si_ibis.TOOLS is a list of (name, ToolSpec, handler) triples —
+        # plugin.py does `for name, spec, handler in mod.TOOLS` (see the
+        # comment above the TOOLS export: a bare list of handlers used to
+        # break that unpack and silently skip the whole module at boot).
         for item in si_ibis.TOOLS:
-            assert callable(item), f"TOOLS item not callable: {item!r}"
-            assert hasattr(item, "__name__"), "Tool missing __name__"
+            name, spec, handler = item
+            assert isinstance(name, str), f"TOOLS entry name not a str: {item!r}"
+            assert callable(handler), f"TOOLS entry handler not callable: {item!r}"
+            assert hasattr(handler, "__name__"), "Tool handler missing __name__"
         # Verify expected function names
-        names = {fn.__name__ for fn in si_ibis.TOOLS}
+        names = {name for name, _spec, _handler in si_ibis.TOOLS}
         assert "si_ibis_parse" in names or any("ibis" in n for n in names), (
             f"Expected ibis tool names in {names}"
         )

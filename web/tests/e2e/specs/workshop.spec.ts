@@ -73,7 +73,16 @@ async function seedPublishedPart(req: APIRequestContext) {
       },
     },
   })
-  expect(pub.ok()).toBeTruthy()
+  // Surface the status and body on failure. `expect(pub.ok()).toBeTruthy()`
+  // alone reports "Received: false", which says nothing about WHY — this call
+  // failed in CI while passing locally and the assertion gave nothing to work
+  // from. A 404 means kerf-pub did not mount; a 500 means it mounted and threw.
+  if (!pub.ok()) {
+    throw new Error(
+      `POST /api/pub/publish failed: ${pub.status()} ${pub.statusText()}\n` +
+        `${await pub.text()}`,
+    )
+  }
 
   // The publishing identity is per-node (packages/kerf-pub/src/kerf_pub/identity.py
   // — one Ed25519 keypair on disk, not scoped to this user), so it already

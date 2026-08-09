@@ -354,6 +354,12 @@ addopts = "--import-mode=importlib"
 # note below.
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    # Postgres is OPTIONAL in Kerf — a default install runs on embedded SQLite
+    # at ~/.kerf/kerf.db. Tests that genuinely need Postgres carry this marker
+    # AND skip themselves unless DATABASE_URL is set, so the core gate never
+    # depends on a database server. Run them deliberately with:
+    #   DATABASE_URL=postgres://... pytest -m postgres
+    "postgres: requires a real Postgres instance (optional; not part of core testing)",
 ]
 
 # ---------------------------------------------------------------------------

@@ -62,10 +62,25 @@ _ROLES: Dict[str, str] = {
     _VIEWER_ID: "viewer",
 }
 
-_DB_URL: str = os.environ.get(
-    "DATABASE_URL",
-    "postgres://pc@localhost:5432/kerf?sslmode=disable",
-)
+def _require_postgres() -> str:
+    """Return DATABASE_URL, or skip this module.
+
+    Postgres is OPTIONAL in Kerf — a default install runs on embedded SQLite at
+    ~/.kerf/kerf.db — so these tests are not part of core testing. They used to
+    fall back to a hardcoded "postgres://pc@localhost:5432/kerf", a specific
+    developer's username, so on every other machine they ERRORed trying to reach
+    a database nobody has instead of skipping. Run them deliberately with
+    DATABASE_URL set (see the `postgres` marker in the root pyproject).
+    """
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        pytest.skip(
+            "requires DATABASE_URL (Postgres); optional, not part of core testing",
+            allow_module_level=True,
+        )
+    return url
+
+_DB_URL: str = _require_postgres()
 
 # Allowed kinds from routes.py
 _VALID_KINDS = ("jscad_mesh", "sketch_geom2", "circuit_board_3d")

@@ -352,7 +352,25 @@ for _entry in _PACKAGES_ROOT.iterdir():
     if _src.is_dir() and str(_src) not in sys.path:
         sys.path.insert(0, str(_src))
 
-_DB_URL = os.environ.get("DATABASE_URL", "postgres://pc@localhost:5432/kerf?sslmode=disable")
+def _require_postgres() -> str:
+    """Return DATABASE_URL, or skip this module.
+
+    Postgres is OPTIONAL in Kerf — a default install runs on embedded SQLite at
+    ~/.kerf/kerf.db — so these tests are not part of core testing. They used to
+    fall back to a hardcoded "postgres://pc@localhost:5432/kerf", a specific
+    developer's username, so on every other machine they ERRORed trying to reach
+    a database nobody has instead of skipping. Run them deliberately with
+    DATABASE_URL set (see the `postgres` marker in the root pyproject).
+    """
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        pytest.skip(
+            "requires DATABASE_URL (Postgres); optional, not part of core testing",
+            allow_module_level=True,
+        )
+    return url
+
+_DB_URL = _require_postgres()
 _JWT_SECRET = "dev-secret-change-in-production"
 _RUN_PREFIX = f"publocal-{secrets.token_hex(4)}"
 

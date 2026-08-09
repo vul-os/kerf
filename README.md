@@ -114,7 +114,7 @@ cd kerf
 docker compose up
 ```
 
-This builds the `full` persona image and starts Kerf alongside its own Postgres and Redis containers. Open <http://localhost:8080>.
+This builds the `full` persona image and starts Kerf against its own embedded SQLite database — no Postgres or Redis containers required. Open <http://localhost:8080>.
 
 ### From source
 

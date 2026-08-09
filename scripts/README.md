@@ -80,8 +80,7 @@ Tests run against an in-memory SQLite database — no real Postgres required. Th
 
 | Script | Purpose |
 |--------|---------|
-| `dev-cloud.sh` | Like `dev.sh` but in **CLOUD_MODE** (requires account signup at `/signup`) |
-| `deploy-fly.sh` | Deploy to Fly.io (production or dev environment) |
+| `dev-cloud.sh` | Like `dev.sh` but with `LOCAL_MODE=false` (requires account signup at `/signup`) |
 | `loop_local.sh` | Drop + recreate schema, migrate, seed, run full test suite |
 | `test_all.sh` | Run full test harness |
 | `bump-version.sh` | Bump the project version |

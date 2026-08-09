@@ -266,24 +266,27 @@ export default function SectionView({
         <button
           type="button"
           onClick={() => setZoom((z) => Math.min(50, z * 1.25))}
-          className="p-1 rounded hover:bg-ink-700 text-ink-300 hover:text-kerf-200"
+          className="p-1 rounded hover:bg-ink-700 text-ink-300 hover:text-kerf-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           title="Zoom in"
+          aria-label="Zoom in"
         >
           <ZoomIn size={14} />
         </button>
         <button
           type="button"
           onClick={() => setZoom((z) => Math.max(0.05, z * 0.8))}
-          className="p-1 rounded hover:bg-ink-700 text-ink-300 hover:text-kerf-200"
+          className="p-1 rounded hover:bg-ink-700 text-ink-300 hover:text-kerf-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           title="Zoom out"
+          aria-label="Zoom out"
         >
           <ZoomOut size={14} />
         </button>
         <button
           type="button"
           onClick={handleReset}
-          className="p-1 rounded hover:bg-ink-700 text-ink-300 hover:text-kerf-200"
+          className="p-1 rounded hover:bg-ink-700 text-ink-300 hover:text-kerf-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           title="Fit to view"
+          aria-label="Fit to view"
         >
           <Maximize2 size={14} />
         </button>
@@ -296,7 +299,7 @@ export default function SectionView({
         <button
           type="button"
           onClick={handleExportDxf}
-          className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-ink-300 hover:text-kerf-200 hover:bg-ink-700 border border-ink-700"
+          className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-ink-300 hover:text-kerf-200 hover:bg-ink-700 border border-ink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           title="Export DXF (coming in v0.3)"
         >
           <Download size={12} />

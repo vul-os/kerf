@@ -223,16 +223,15 @@ export default function RenderView({ content, fileName, onContentChange }: Rende
           </span>
         )}
         <div className="ml-auto relative">
-          <button type="button" onClick={() => setRunMsg('Run not wired yet — POST /api/projects/{pid}/files/{fid}/render/run is not implemented.')}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-kerf-300 text-ink-950 text-[11px] font-medium hover:bg-kerf-200">
+          <button
+            type="button"
+            disabled
+            title="Server-side render execution isn't wired up yet"
+            aria-label="Run render (not yet available)"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-kerf-300/40 text-ink-950/60 text-[11px] font-medium cursor-not-allowed"
+          >
             <Play size={11} /> Run
           </button>
-          {runMsg && (
-            <div className="absolute top-9 right-0 z-30 w-72 bg-ink-900 border border-amber-700/60 rounded-lg p-3 text-[11px] text-amber-300 shadow-2xl">
-              {runMsg}
-              <button type="button" onClick={() => setRunMsg(null)} className="ml-2 text-ink-500 hover:text-ink-200"><X size={11} /></button>
-            </div>
-          )}
         </div>
       </div>
 

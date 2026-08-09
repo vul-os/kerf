@@ -131,7 +131,7 @@ def run_ngspice(cir_path: str, raw_path: str, lst_path: str,
 
 def parse_raw_file(raw_path: str) -> list[Waveform]:
     waveforms = []
-    content = Path(raw_path).read_text()
+    content = Path(raw_path).read_text(encoding="utf-8")
     lines = content.splitlines()
 
     if not lines:

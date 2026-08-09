@@ -195,8 +195,8 @@ def generate(params: dict[str, Any] | None = None) -> "AnalogCell":
     if pdk != "sky130":
         raise ValueError(f"opamp_2stage: unsupported PDK '{pdk}'. Only 'sky130' is available.")
 
-    descriptor  = json.loads(_CELL_JSON.read_text())
-    lvs_ref     = json.loads(_LVS_JSON.read_text())
+    descriptor  = json.loads(_CELL_JSON.read_text(encoding="utf-8"))
+    lvs_ref     = json.loads(_LVS_JSON.read_text(encoding="utf-8"))
 
     return AnalogCell(
         name="opamp_2stage_sky130",

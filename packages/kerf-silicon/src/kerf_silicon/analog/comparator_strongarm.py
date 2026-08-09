@@ -156,8 +156,8 @@ def generate(params: dict[str, Any] | None = None) -> "AnalogCell":
             f"comparator_strongarm: unsupported PDK '{pdk}'. Only 'sky130' available."
         )
 
-    descriptor  = json.loads(_CELL_JSON.read_text())
-    lvs_ref     = json.loads(_LVS_JSON.read_text())
+    descriptor  = json.loads(_CELL_JSON.read_text(encoding="utf-8"))
+    lvs_ref     = json.loads(_LVS_JSON.read_text(encoding="utf-8"))
 
     return AnalogCell(
         name="comparator_strongarm_sky130",

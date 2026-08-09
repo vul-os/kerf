@@ -226,8 +226,8 @@ def generate(params: dict[str, Any] | None = None) -> "AnalogCell":
             f"bandgap_brokaw: unsupported PDK '{pdk}'. Only 'sky130' available."
         )
 
-    descriptor  = json.loads(_CELL_JSON.read_text())
-    lvs_ref     = json.loads(_LVS_JSON.read_text())
+    descriptor  = json.loads(_CELL_JSON.read_text(encoding="utf-8"))
+    lvs_ref     = json.loads(_LVS_JSON.read_text(encoding="utf-8"))
 
     return AnalogCell(
         name="bandgap_brokaw_sky130",

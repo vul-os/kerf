@@ -49,7 +49,7 @@ def load() -> Optional[WorkerConfig]:
     if not path.exists():
         return None
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         return WorkerConfig(**data)
     except Exception:
         return None

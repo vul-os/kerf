@@ -2191,7 +2191,7 @@ def parse_forces_dat(dat_path: str | Path) -> list[dict[str, Any]]:
     if not dat_path.exists():
         return records
 
-    for raw_line in dat_path.read_text().splitlines():
+    for raw_line in dat_path.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
@@ -2229,7 +2229,7 @@ def parse_scalar_dat(dat_path: str | Path) -> list[dict[str, Any]]:
     if not dat_path.exists():
         return records
 
-    for raw_line in dat_path.read_text().splitlines():
+    for raw_line in dat_path.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue

@@ -191,7 +191,14 @@ class TestEntryPointResolution:
         expected = tomllib.loads(pyproject.read_text())["project"]["version"]
 
         dist = meta.distribution("kerf-cli")
-        assert dist.metadata["Version"] == expected
+        installed = dist.metadata["Version"]
+        assert installed == expected, (
+            f"installed kerf-cli metadata says {installed}, pyproject.toml says "
+            f"{expected}. This usually means an editable install was built before a "
+            f"version bump and pip served it from its build cache — re-run:\n"
+            f"    pip install --no-cache-dir --force-reinstall --no-deps -e packages/kerf-cli\n"
+            f"If that does not fix it, the bump genuinely did not reach this package."
+        )
 
     def test_kerf_cli_server_extra_in_dist_requires(self):
         """Installed dist-info must advertise the server extra."""

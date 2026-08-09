@@ -117,9 +117,9 @@ def read_xyz(
             text = source
         # Check if it looks like a file path
         if len(text) < 4096 and "\n" not in text and Path(text).exists():
-            text = Path(text).read_text()
+            text = Path(text).read_text(encoding="utf-8")
     else:
-        text = Path(source).read_text()
+        text = Path(source).read_text(encoding="utf-8")
 
     lines = text.splitlines()
     rows = []
@@ -174,7 +174,7 @@ def read_ply_ascii(source: str | Path | bytes) -> np.ndarray:
     if isinstance(source, bytes):
         text = source.decode("utf-8", errors="replace")
     elif isinstance(source, Path):
-        text = source.read_text()
+        text = source.read_text(encoding="utf-8")
     else:
         text = str(source)
 

@@ -71,7 +71,7 @@ Usage
     import json, pathlib
     from kerf_plc.simulator.scan import Simulator
 
-    program = json.loads(pathlib.Path("program.json").read_text())
+    program = json.loads(pathlib.Path("program.json").read_text(encoding="utf-8"))
     sim = Simulator(program, tick_ms=1)
 
     outputs = sim.step({"start_btn": True})

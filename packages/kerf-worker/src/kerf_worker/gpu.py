@@ -216,7 +216,7 @@ def _probe_amd_sysfs() -> List[Dict[str, Any]]:
             continue
 
         try:
-            vendor = vendor_file.read_text().strip().lower()
+            vendor = vendor_file.read_text(encoding="utf-8").strip().lower()
         except OSError:
             continue
 
@@ -229,7 +229,7 @@ def _probe_amd_sysfs() -> List[Dict[str, Any]]:
         uevent = dev / "uevent"
         if uevent.exists():
             try:
-                for line in uevent.read_text().splitlines():
+                for line in uevent.read_text(encoding="utf-8").splitlines():
                     if line.startswith("PCI_ID="):
                         pci_id = line.split("=", 1)[1].strip()
                         name = f"AMD GPU ({pci_id})"
@@ -242,7 +242,7 @@ def _probe_amd_sysfs() -> List[Dict[str, Any]]:
         vram_file = dev / "mem_info_vram_total"
         if vram_file.exists():
             try:
-                vram_bytes = int(vram_file.read_text().strip())
+                vram_bytes = int(vram_file.read_text(encoding="utf-8").strip())
             except (ValueError, OSError):
                 pass
 

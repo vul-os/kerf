@@ -210,7 +210,7 @@ export default function DrawingToolbar({
                 aria-pressed={active}
                 data-testid={`drawing-tool-${id}`}
                 onClick={() => onTool?.(id)}
-                className={`rounded transition-colors flex items-center justify-center ${
+                className={`rounded transition-colors flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${
                   labelChar
                     ? 'w-7 h-6 text-[13px] leading-none'
                     : 'p-1.5'
@@ -232,8 +232,10 @@ export default function DrawingToolbar({
       <button
         type="button"
         title={snapEnabled ? 'Snap on (click to disable)' : 'Snap off (click to enable)'}
+        aria-label={snapEnabled ? 'Snap on (click to disable)' : 'Snap off (click to enable)'}
+        aria-pressed={snapEnabled}
         onClick={toggleSnap}
-        className={`p-1.5 rounded transition-colors ${
+        className={`p-1.5 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${
           snapEnabled
             ? 'bg-kerf-300 text-ink-950'
             : 'bg-ink-900/60 text-ink-300 hover:text-kerf-300 hover:bg-ink-800 border border-ink-700/50'
@@ -247,8 +249,9 @@ export default function DrawingToolbar({
           <button
             type="button"
             title="Add sheet"
+            aria-label="Add sheet"
             onClick={() => onAddSheet?.()}
-            className="p-1.5 rounded bg-ink-900/60 text-ink-300 hover:text-kerf-300 hover:bg-ink-800 border border-ink-700/50"
+            className="p-1.5 rounded bg-ink-900/60 text-ink-300 hover:text-kerf-300 hover:bg-ink-800 border border-ink-700/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Layers size={14} />
           </button>

@@ -69,14 +69,64 @@ async def register(app: FastAPI, ctx) -> PluginManifest:
 
     _register_tools(ctx)
 
+    # Distributor registry (Mouser/DigiKey/LCSC/McMaster sync) — a node
+    # feature (self-hosters supply their own distributor API credentials),
+    # folded in from the former kerf-cloud plugin. It needs a DB pool
+    # (distributor credentials live in the encrypted distributor_credentials
+    # table); with no pool it just stays dormant, same as a node with zero
+    # GitHub remotes configured still runs its git panel.
+    provides = ["api.rest", "files.crud", "projects.crud"]
+    if ctx.pool is not None:
+        await _init_distributor_registry(ctx)
+        provides.append("distributors")
+    else:
+        ctx.logger.info("kerf-api: no DB pool — distributor registry dormant")
+
     ctx.logger.info("kerf-api: registered /api routes and LLM tools")
 
     return PluginManifest(
         name="kerf-api",
         version="0.1.0",
-        provides=["api.rest", "files.crud", "projects.crud"],
+        provides=provides,
         depends=["kerf-auth"],
     )
+
+
+async def _init_distributor_registry(ctx) -> None:
+    """Create the distributor Registry, reload credentials from DB, wire it
+    into routes.py's module-level getter, and register the background sweep.
+
+    Folded in from the former kerf-cloud plugin's register(): distributor
+    sync was never actually a "cloud" feature — it runs on every node, gated
+    only by whether that node's operator has configured any distributor
+    credentials.
+    """
+    try:
+        from kerf_api.distributors.registry import Registry, set_registry
+        from kerf_api.distributors.sync import start_sweep
+        from kerf_api.routes import set_registry as routes_set_registry
+
+        # Pass fx=None initially; LCSC will skip CNY→USD conversion until
+        # an FX service is wired in later (non-blocking for other distributors).
+        reg = Registry(pool=ctx.pool, cfg=ctx.config, fx=None)
+        await reg.reload()
+
+        # Publish the registry so both the admin/distributor routes above
+        # (via kerf_api.distributors.registry.get_registry()) and the rest of
+        # routes.py (via routes.get_registry()) resolve the same object.
+        set_registry(reg)
+        routes_set_registry(reg)
+
+        # Register the sweep as a background worker so ctx.workers.start_all()
+        # picks it up at app startup.
+        async def _sweep_factory():
+            return start_sweep(ctx.pool, reg)
+
+        ctx.workers.register("distributors.sweep", _sweep_factory)
+
+        ctx.logger.info("kerf-api: distributor registry loaded", providers=reg.enabled_names())
+    except Exception as exc:  # never crash the whole plugin for distributor init failure
+        ctx.logger.warning("kerf-api: distributor registry init failed", error=str(exc))
 
 
 def _register_tools(ctx) -> None:

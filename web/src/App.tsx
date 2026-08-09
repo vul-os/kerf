@@ -100,12 +100,12 @@ const SchematicEditor = lazy(() => import('./routes/SchematicEditor.jsx'))
 // core MIT capability present unconditionally, like every other route
 // below; there is no "cloud edition" to gate anything behind. useCloudConfig
 // stays eager (we need it before any route renders) but is imported from
-// its own file so the rest of cloud/ doesn't end up in the initial chunk;
-// the route components themselves lazy-import their own modules and
-// become their own chunks.
-import { useCloudConfig } from './cloud/useCloudConfig.js'
+// its own file so the rest of routes/Workshop.jsx doesn't end up in the
+// initial chunk; the route components themselves lazy-import their own
+// modules and become their own chunks.
+import { useCloudConfig } from './lib/useCloudConfig.js'
 const Workshop = lazy(() =>
-  import('./cloud/Workshop.jsx').then((m) => ({ default: m.Workshop })),
+  import('./routes/Workshop.jsx').then((m) => ({ default: m.Workshop })),
 )
 
 import { useAuth } from './store/auth.js'

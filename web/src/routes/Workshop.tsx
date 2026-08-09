@@ -21,15 +21,15 @@ import {
 } from 'lucide-react'
 import Layout from '../components/Layout.jsx'
 import Card from '../components/Card.jsx'
-import { Button, Input, Modal } from './untypedUi.js'
+import { Button, Input, Modal } from '../components/pub/untypedUi.js'
 import { ApiError } from '../lib/api.js'
 import {
   disableWakeNotifications, enableWakeNotifications, getWakeKeyInfo,
   isWakeBrowserSupported, isWakeUsableForFollow, onWakeMessage, syncWakeStateOnChange,
 } from '../lib/wake.js'
 import { useWake } from '../store/wake.js'
-import { pub } from './api.js'
-import type { PubAvailability, PubBomResult, PubFollow, PubPinResult, PubWorkshopItem } from './api.js'
+import { pub } from '../lib/pubApi.js'
+import type { PubAvailability, PubBomResult, PubFollow, PubPinResult, PubWorkshopItem } from '../lib/pubApi.js'
 
 // Per-announce_id note surfaced under the availability badge after a pin
 // or hydrate-retry call — see the `pinNotes` state comment further down.

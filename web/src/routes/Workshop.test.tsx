@@ -2,7 +2,7 @@
 // (decisions.md 2026-07-17 "Final form" ADR; docs/distributed-workshop.md).
 //
 // This repo has no jsdom/@testing-library/react in its test toolchain (see
-// src/cloud/GitPanel.test.jsx's header comment) — component tests use
+// src/components/pub/GitPanel.test.jsx's header comment) — component tests use
 // react-dom/server's renderToStaticMarkup against small, prop-driven
 // sub-components, matching the pattern in src/__tests__/wave3UiWiring.test.jsx.
 //
@@ -29,11 +29,11 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import {
   AvailabilityBadge, WorkshopCard, BrowseEmptyState, FollowsPanel, BomTable, WakeToggle,
-} from '../Workshop.jsx'
-import type { PubWorkshopItem } from '../api.js'
+} from './Workshop.jsx'
+import type { PubWorkshopItem } from '../lib/pubApi.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const workshopSrc = readFileSync(join(__dirname, '../Workshop.tsx'), 'utf8')
+const workshopSrc = readFileSync(join(__dirname, './Workshop.tsx'), 'utf8')
 
 // ---------------------------------------------------------------------------
 // 1. AvailabilityBadge
@@ -570,7 +570,7 @@ describe('Workshop.jsx — retired account-based model is gone', () => {
   })
 
   it('drives the pub client, not the old workshop client', () => {
-    expect(workshopSrc).toContain("from './api.js'")
+    expect(workshopSrc).toContain("from '../lib/pubApi.js'")
     expect(workshopSrc).toContain('pub.listWorkshop')
     expect(workshopSrc).toContain('pub.listFollows')
   })

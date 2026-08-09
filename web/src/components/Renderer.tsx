@@ -2542,7 +2542,7 @@ function Renderer({
           type="button"
           onClick={() => setRenderMenuOpen((v) => !v)}
           title="Render options"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-ink-900/85 border border-ink-700 text-[11px] font-mono text-ink-300 hover:text-kerf-300 hover:border-kerf-300/50 backdrop-blur shadow-lg shadow-black/30"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-ink-900/85 border border-ink-700 text-[11px] font-mono text-ink-300 hover:text-kerf-300 hover:border-kerf-300/50 backdrop-blur shadow-lg shadow-black/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <SlidersHorizontal size={13} />
           Render
@@ -2574,7 +2574,8 @@ function Renderer({
                   key={it.label}
                   type="button"
                   onClick={it.set}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-ink-800"
+                  aria-pressed={it.on}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/70"
                 >
                   <span
                     className={`grid place-items-center w-4 h-4 rounded border flex-shrink-0 ${
@@ -2595,7 +2596,7 @@ function Renderer({
               <button
                 type="button"
                 onClick={() => { setRenderMenuOpen(false); setShowHeroPanel(true) }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-ink-800"
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/70"
               >
                 <span className="grid place-items-center w-4 h-4 rounded border border-kerf-300/60 flex-shrink-0 text-kerf-300">
                   ✦
@@ -2757,6 +2758,7 @@ function ClassAPanel({ loading, report, onClose }: { loading: boolean; report: C
           type="button"
           onClick={onClose}
           aria-label="Close Class-A panel"
+          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           style={{
             background: 'none',
             border: 'none',

@@ -114,7 +114,7 @@ export default function ShortcutsModal() {
         onClick={() => setOpen(true)}
         title="Keyboard shortcuts (?)"
         aria-label="Keyboard shortcuts"
-        className="fixed bottom-3 right-3 z-30 w-7 h-7 rounded-full bg-ink-900/90 border border-ink-700 text-ink-300 hover:text-kerf-300 hover:border-kerf-300/40 backdrop-blur flex items-center justify-center text-xs"
+        className="fixed bottom-3 right-3 z-30 w-7 h-7 rounded-full bg-ink-900/90 border border-ink-700 text-ink-300 hover:text-kerf-300 hover:border-kerf-300/40 backdrop-blur flex items-center justify-center text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         ?
       </button>

@@ -15,12 +15,18 @@ PLUGIN_DEPENDS = ["kerf-auth"]
 async def register(app, ctx) -> PluginManifest:
     app.include_router(router, prefix="/api")
     _register_tools(ctx)   # imports each tool module, wires spec+handler pairs
+    if ctx.pool is not None:
+        await _init_distributor_registry(ctx)   # see distributors.md
     return PluginManifest(
         name="kerf-api",
         provides=["api.rest", "files.crud", "projects.crud"],
         depends=["kerf-auth"],
     )
 ```
+
+`register()` also initializes the distributor registry (Mouser/DigiKey/LCSC/
+McMaster sync) and the plm/job_traveler/share_link modules folded in from
+the former kerf-cloud package — see [distributors.md](./distributors.md).
 
 Tool modules registered at startup:
 `file_ops`, `object_ops`, `scaffold`, `revisions`, `configurations`, `equations`, `validation`, `project_layers`, `material`

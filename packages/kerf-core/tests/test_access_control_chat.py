@@ -1,6 +1,6 @@
 """
-T-83 — RLS: chat_threads + chat_messages
-=========================================
+T-83 — Access control: chat_threads + chat_messages
+===================================================
 Hermetic tests for the application-level multi-tenant access control on the
 ``chat_threads`` and ``chat_messages`` tables.
 

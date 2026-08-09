@@ -1,6 +1,6 @@
 """
-T-84 — RLS: workspaces + workspace_members + workspace_invites
-==============================================================
+T-84 — Access control: workspaces + workspace_members + workspace_invites
+=========================================================================
 Hermetic tests for application-level multi-tenant access control on the
 ``workspaces``, ``workspace_members``, and ``workspace_invites`` tables.
 

@@ -1,6 +1,6 @@
 """
-T-91 — RLS: workshop_likes + workshop_readme + project_workshop_images (retired)
-================================================================================
+T-91 — Access control: workshop_likes + workshop_readme + project_workshop_images (retired)
+===========================================================================================
 Hermetic tests for the application-level multi-tenant access control on the
 three workshop-adjacent tables / fields.
 
@@ -575,7 +575,7 @@ def _retired_test_project_to_workshop_row_cover_from_storage_key():
 def test_list_public_projects_source_filters_visibility():
     """Static source check: list_public_projects must always emit visibility='public'.
 
-    This is the primary RLS gate that prevents private project readmes from
+    This is the primary access-control gate that prevents private project readmes from
     leaking through the workshop browse endpoint — the SQL WHERE clause must
     be present in the query construction code.
     """

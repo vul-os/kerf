@@ -1,6 +1,6 @@
 """
-T-87 — RLS: step_tessellation_jobs + cam_jobs + fem_jobs + sim_jobs
-====================================================================
+T-87 — Access control: step_tessellation_jobs + cam_jobs + fem_jobs + sim_jobs
+==============================================================================
 Hermetic tests for multi-tenant access control on the four worker job tables.
 
 The application enforces access via ``project_workspace_id(pid)`` +

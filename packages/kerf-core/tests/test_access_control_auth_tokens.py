@@ -1,6 +1,6 @@
 """
-T-85 — RLS: api_tokens + refresh_tokens
-=========================================
+T-85 — Access control: api_tokens + refresh_tokens
+==================================================
 Hermetic tests for application-level multi-tenant access control on the
 ``api_tokens`` and ``refresh_tokens`` tables.
 

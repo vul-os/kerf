@@ -451,34 +451,34 @@ authenticated session role. One task per protected table; ≥10 negative
 cases each (SELECT/INSERT/UPDATE/DELETE × {direct row, via join, via foreign-key
 escalation}).
 
-- [x] T-80 RLS: projects
+- [x] T-80 Access control: projects
   Scope: cross-tenant SELECT/UPDATE/DELETE on `projects`.
-  File: `packages/kerf-core/tests/test_rls_projects.py`
+  File: `packages/kerf-core/tests/test_access_control_projects.py`
   Success: 12 cases — user A sees only own workspace projects; cannot set `workspace_id` to B's.
 
-- [x] T-81 RLS: files
+- [x] T-81 Access control: files
   Scope: cross-tenant on `files`, including parent_id traversal.
-  File: `packages/kerf-core/tests/test_rls_files.py`
+  File: `packages/kerf-core/tests/test_access_control_files.py`
   Success: 12 cases — reparent to other workspace refused; storage_key leak via select refused.
 
-- [x] T-82 RLS: file_revisions (OSS undo)
+- [x] T-82 Access control: file_revisions (OSS undo)
   Scope: cross-tenant on `file_revisions` (mig 001 + 002 + 049).
-  File: `packages/kerf-core/tests/test_rls_file_revisions.py`
+  File: `packages/kerf-core/tests/test_access_control_file_revisions.py`
   Success: 12 cases — revision content of B's file not visible; restore-from-B refused.
 
-- [x] T-83 RLS: chat_threads + chat_messages
+- [x] T-83 Access control: chat_threads + chat_messages
   Scope: cross-tenant on `chat_threads`, `chat_messages`.
-  File: `packages/kerf-core/tests/test_rls_chat.py`
+  File: `packages/kerf-core/tests/test_access_control_chat.py`
   Success: 12 cases — thread of B not listable / readable; cannot post into B's thread; tool_call_id forging refused.
 
-- [x] T-84 RLS: workspaces + workspace_members + workspace_invites
+- [x] T-84 Access control: workspaces + workspace_members + workspace_invites
   Scope: cross-tenant on `workspaces` family.
-  File: `packages/kerf-core/tests/test_rls_workspaces.py`
+  File: `packages/kerf-core/tests/test_access_control_workspaces.py`
   Success: 15 cases — list/join/invite-leak refused; member elevation refused.
 
-- [x] T-85 RLS: api_tokens + refresh_tokens
+- [x] T-85 Access control: api_tokens + refresh_tokens
   Scope: cross-tenant on auth tokens.
-  File: `packages/kerf-core/tests/test_rls_auth_tokens.py`
+  File: `packages/kerf-core/tests/test_access_control_auth_tokens.py`
   Success: 12 cases — token rows of B not visible; cannot insert refresh_token for B.
 
 - [x] T-86 RLS: usage_events + cloud_user_balances + billing_buckets —
@@ -488,19 +488,19 @@ escalation}).
   File: `packages/kerf-core/tests/test_rls_billing.py`
   Success: 12 cases — B's spend invisible; cannot insert credit for self; cannot mutate B's balance.
 
-- [x] T-87 RLS: step_tessellation_jobs + cam_jobs + fem_jobs + sim_jobs
+- [x] T-87 Access control: step_tessellation_jobs + cam_jobs + fem_jobs + sim_jobs
   Scope: cross-tenant on worker job tables.
-  File: `packages/kerf-core/tests/test_rls_jobs.py`
+  File: `packages/kerf-core/tests/test_access_control_jobs.py`
   Success: 12 cases — cannot enqueue against B's project; cannot read B's job outputs; status leak via id-guess refused.
 
-- [x] T-88 RLS: distributor_credentials + user_provider_keys
+- [x] T-88 Access control: distributor_credentials + user_provider_keys
   Scope: BYO secrets must never leak across tenant.
-  File: `packages/kerf-core/tests/test_rls_secrets.py`
+  File: `packages/kerf-core/tests/test_access_control_secrets.py`
   Success: 12 cases — encrypted blob not retrievable; cannot mutate B's record; admin role explicitly required for ops paths.
 
-- [x] T-89 RLS: upload_sessions
+- [x] T-89 Access control: upload_sessions
   Scope: cross-tenant on `upload_sessions` (mig 008).
-  File: `packages/kerf-core/tests/test_rls_upload_sessions.py`
+  File: `packages/kerf-core/tests/test_access_control_upload_sessions.py`
   Success: 10 cases — session of B not readable; storage_key collision refused; cannot finalize B's session.
 
 - [x] T-90 RLS: cloud_github_tokens
@@ -508,14 +508,14 @@ escalation}).
   File: `packages/kerf-core/tests/test_rls_cloud_github_tokens.py`
   Success: 10 cases — installation token of B's not visible; cannot bind B's installation to A's project.
 
-- [x] T-91 RLS: project_workshop_images + workshop_likes + workshop_readme
+- [x] T-91 Access control: project_workshop_images + workshop_likes + workshop_readme
   Scope: workshop assets — public read OK, write tenant-scoped.
-  File: `packages/kerf-core/tests/test_rls_workshop.py`
+  File: `packages/kerf-core/tests/test_access_control_workshop.py`
   Success: 10 cases — public can read published; only owner can mutate / set primary / publish README.
 
-- [x] T-92 RLS: derived_artifacts
+- [x] T-92 Access control: derived_artifacts
   Scope: derived-artifact rows (mig 024) cross-tenant.
-  File: `packages/kerf-core/tests/test_rls_derived_artifacts.py`
+  File: `packages/kerf-core/tests/test_access_control_derived_artifacts.py`
   Success: 10 cases — artifact of B not readable; lineage column cannot be forged.
 
 - [x] T-93 RLS: model_prices admin-only

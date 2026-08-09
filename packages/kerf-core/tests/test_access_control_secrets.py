@@ -1,6 +1,6 @@
 """
-T-88 — RLS: distributor_credentials
-====================================
+T-88 — Access control: distributor_credentials
+==============================================
 Hermetic tests for the application-level access control on the
 ``distributor_credentials`` table — operator-managed API secrets; only users
 with ``account_role in ('admin','system')`` may list/read/write.

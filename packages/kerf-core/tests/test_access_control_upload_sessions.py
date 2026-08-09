@@ -1,6 +1,6 @@
 """
-T-89 — RLS: upload_sessions
-=============================
+T-89 — Access control: upload_sessions
+======================================
 Hermetic tests for the application-level multi-tenant access control on the
 ``upload_sessions`` table (folded into migration 0002 from 008_upload_sessions).
 

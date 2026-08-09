@@ -1,11 +1,11 @@
 """
-T-80 — RLS: projects
-=====================
+T-80 — Access control: projects
+===============================
 Hermetic tests for the application-level multi-tenant access control on the
 ``projects`` table.
 
-Postgres RLS is enforced via SQL joins to ``workspace_members`` in the
-application layer (routes.py).  All 12 cases exercise the core security
+Application-level access control is enforced via SQL joins to ``workspace_members``
+in the application layer (routes.py).  All 12 cases exercise the core security
 invariants using in-memory fake connections — no real database required.
 
 Invariants under test

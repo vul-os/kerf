@@ -1,6 +1,6 @@
 """
-T-92 — RLS: derived_artifacts
-==============================
+T-92 — Access control: derived_artifacts
+========================================
 Hermetic tests for the application-level multi-tenant access control on the
 ``derived_artifacts`` table.
 

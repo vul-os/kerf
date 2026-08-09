@@ -1,6 +1,6 @@
 """
-T-82 — RLS: file_revisions (OSS undo)
-======================================
+T-82 — Access control: file_revisions (OSS undo)
+================================================
 Hermetic tests for the application-level multi-tenant access control on the
 ``file_revisions`` table.
 

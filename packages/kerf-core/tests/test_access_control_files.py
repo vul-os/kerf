@@ -1,6 +1,6 @@
 """
-T-81 — RLS: files
-==================
+T-81 — Access control: files
+============================
 Hermetic tests for the application-level multi-tenant access control on the
 ``files`` table, including parent_id traversal and storage_key leak vectors.
 

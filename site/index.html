@@ -518,7 +518,7 @@ footer.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; }
           </a>
         </div>
         <div class="hero-chip-cmd">
-          <div class="row"><span class="p">$</span><span><span class="tok-cmd">pip</span> <span class="tok-sub">install</span> <span class="tok-punct">-e</span> <span class="tok-str">.[mech]</span></span></div>
+          <div class="row"><span class="p">$</span><span><span class="tok-cmd">pip</span> <span class="tok-sub">install</span> <span class="tok-flag">-e</span> <span class="tok-str">.[mech]</span></span></div>
           <div class="row"><span class="p">$</span><span><span class="tok-cmd">kerf-server</span> <span class="tok-flag">--migrate</span></span></div>
           <p class="note">Python 3.11+ · Postgres · or <code>curl vulos.org/projects/kerf/install.sh | sh</code></p>
         </div>
@@ -1206,15 +1206,15 @@ docker compose up">copy</button></div>
       <div class="dev-grid">
         <div class="dev-cell">
           <h4>frontend + backend (dev)</h4>
-          <pre><span class="tok-prompt">$ </span>pip install -e .[mech]
-<span class="tok-prompt">$ </span>npm install
-<span class="tok-prompt">$ </span>npm run dev  <span class="tok-cm"># :5173 + :8080</span></pre>
+          <pre><span class="tok-prompt">$ </span><span class="tok-cmd">pip</span> <span class="tok-sub">install</span> <span class="tok-flag">-e</span> <span class="tok-str">.[mech]</span>
+<span class="tok-prompt">$ </span><span class="tok-cmd">npm</span> <span class="tok-sub">install</span>
+<span class="tok-prompt">$ </span><span class="tok-cmd">npm</span> <span class="tok-sub">run</span> <span class="tok-str">dev</span>  <span class="tok-cm"># :5173 + :8080</span></pre>
         </div>
         <div class="dev-cell">
           <h4>tests</h4>
-          <pre><span class="tok-prompt">$ </span>pytest packages/ -n auto
-<span class="tok-prompt">$ </span>npm test
-<span class="tok-prompt">$ </span>npm run lint</pre>
+          <pre><span class="tok-prompt">$ </span><span class="tok-cmd">pytest</span> <span class="tok-str">packages/</span> <span class="tok-flag">-n</span> <span class="tok-str">auto</span>
+<span class="tok-prompt">$ </span><span class="tok-cmd">npm</span> <span class="tok-sub">test</span>
+<span class="tok-prompt">$ </span><span class="tok-cmd">npm</span> <span class="tok-sub">run</span> <span class="tok-str">lint</span></pre>
         </div>
       </div>
     </div>

@@ -1,0 +1,149 @@
+name: Backend pytest
+
+# Until this workflow existed, NO CI job anywhere ran pytest — see
+# decisions.md ("pytest test-pollution triage", 2026-08-09) for how that let
+# ~1000 failures sit unnoticed for days. Modeled on e2e.yml: same install
+# path (./scripts/dev-install.sh, which handles the uv-workspace / PyPI
+# problem — see that script's header — and this workflow uses its "full"
+# persona so as many packages as possible get real coverage).
+#
+# Scope: pip-installable packages only. dev-install.sh full deliberately does
+# NOT install pythonOCC (kerf-cad-core[occ]) or FEniCSx/dolfinx
+# (kerf-fem[fenicsx]) — both are conda-forge-only and cannot be pip-installed
+# on a plain runner; see dev-install.sh's own header comment. This is a
+# stated scoping decision, not a silent exclusion: kerf-cad-core and kerf-fem
+# both still run and are exercised here, just in the same "solver absent,
+# degrades gracefully" mode documented in docs/TESTING.md ("Not a root
+# cause: the conda-forge scientific stack") and dev-install.sh. Nothing in
+# packages/ is skipped because of this — every package's tests/ still runs,
+# it's specifically the OCC/FEniCSx *geometry-kernel-backed* code paths that
+# fall back rather than exercise a real solver.
+#
+# Tiers (see docs/TESTING.md for the full breakdown and known red causes):
+#   default tier  — load-bearing packages, expected GREEN. `make test`,
+#                   ~3 min. Runs on every PR AND every push to main, and is
+#                   the only tier that fails this workflow — a red default
+#                   tier is a real regression (docs/TESTING.md says so
+#                   explicitly), so it stays a hard gate.
+#   kernel tier   — kerf-cad-core, ~38.8k tests / ~75 min, 17 known failures.
+#                   `make test-kernel`.
+#   domain tier   — the 21 engineering-domain packages, ~10-30 min
+#                   (variance is a known unresolved BLAS-contention hang
+#                   class under xdist at full scale — see docs/TESTING.md
+#                   "Known traps"), currently RED (kerf-fem). `make
+#                   test-domains`.
+#
+# Full suite (all three tiers) runs ONLY on push to main — the combined wall
+# time is ~70-100 min depending on which tier you count how (decisions.md's
+# own baseline measurement, a single serial `pytest packages/` from the repo
+# root, took ~67 min; the Makefile's tiered/parallelised/hang-mitigated
+# targets used here run kernel and domain as two separate ~75 min / ~10-30
+# min jobs in PARALLEL rather than one serial pass, which is faster
+# wall-clock and gives each tier its own visible pass/fail check). PRs only
+# get the fast default-tier subset (~3 min) so review iteration isn't stuck
+# behind a 75-minute kernel-tier run on every push.
+#
+# The kernel and domain tiers are `continue-on-error: true` — they are
+# documented-red tiers (see docs/TESTING.md), and hard-failing this workflow
+# on every single push to main for known, pre-existing failures would make
+# the check exactly as ignorable as having no CI at all (the same "red
+# baseline trains people to stop looking" trap that .github/workflows/
+# typecheck.yml's own comment calls out for the JS lint ratchet). The point
+# of running them here is VISIBILITY — every push now has an actual recorded
+# pass/fail count for these tiers instead of nobody ever running them — not
+# turning main red for issues already tracked in docs/TESTING.md. Read the
+# job output/summary, not just the green/red icon, for these two jobs.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+env:
+  # Deliberately 3.13, not e2e.yml's 3.11: the rootdir/conftest fix this
+  # workflow exists to guard (decisions.md, "pytest rootdir footgun") and
+  # docs/TESTING.md's root cause #2 (asyncio.get_event_loop) are both
+  # Python-3.13-specific behaviour changes. Every number in docs/TESTING.md
+  # was measured on 3.13.9; pinning here keeps this workflow's results
+  # comparable to that document.
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  pytest-default:
+    name: pytest (default tier)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # Same reasoning as e2e.yml: plain `pip install -e .[full]` cannot
+      # resolve the kerf-* inter-package requirements (that redirect is a uv
+      # workspace feature, [tool.uv.sources], which plain pip doesn't read).
+      # "full" is used (not e.g. "mech") so this one install step covers
+      # every tier's packages without triggering three separate installs.
+      - name: Install Python dependencies (full persona)
+        run: |
+          pip install pytest pytest-asyncio pytest-xdist pytest-timeout
+          ./scripts/dev-install.sh full
+
+      - name: make test (default tier — hard gate)
+        run: make test
+
+  pytest-kernel:
+    name: pytest (kernel tier — kerf-cad-core)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python dependencies (full persona)
+        run: |
+          pip install pytest pytest-asyncio pytest-xdist pytest-timeout
+          ./scripts/dev-install.sh full
+
+      # Known-red tier (17 known failures across 2 files, see
+      # docs/TESTING.md) — continue-on-error so this doesn't turn main red
+      # for pre-existing, already-tracked issues. Results are still fully
+      # visible in this step's log.
+      - name: make test-kernel (informational — known pre-existing failures)
+        continue-on-error: true
+        run: make test-kernel
+
+  pytest-domains:
+    name: pytest (domain tier — 21 engineering domains)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python dependencies (full persona)
+        run: |
+          pip install pytest pytest-asyncio pytest-xdist pytest-timeout
+          ./scripts/dev-install.sh full
+
+      # Known-red tier (kerf-fem, see docs/TESTING.md) and a documented
+      # variable-duration hang class under xdist at full scale (docs/
+      # TESTING.md "Known traps" — the Makefile target already carries the
+      # three mitigations that bound it to ~10-30 min instead of never
+      # finishing). continue-on-error for the same reason as pytest-kernel.
+      - name: make test-domains (informational — known pre-existing failures)
+        continue-on-error: true
+        run: make test-domains

@@ -90,7 +90,7 @@ describe('AvailabilityBadge', () => {
 const baseItem: PubWorkshopItem = {
   announce_id: 'ann-1',
   pub: 'ed25519:abcdefghijklmnopqrstuvwxyz',
-  meta: { name: 'M3 Bracket', description: 'A bracket.', artifact_kind: 'part', license: 'CERN-OHL-S-2.0', units: 'mm', tags: ['bracket'] },
+  meta: { name: 'M3 Bracket', description: 'A bracket.', artifact_kind: 'part', license: 'CERN-OHL-S-2.0', units: { length_unit: 'mm' }, tags: ['bracket'] },
   ts: new Date().toISOString(),
   availability: { status: 'on-node' },
   pinned: false,

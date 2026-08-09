@@ -1,10 +1,26 @@
 /**
- * workshop.spec.ts — a public project with a Part appears in /workshop.
+ * workshop.spec.ts — a published Part appears in the Workshop browse list.
  *
- * Runs under the `cloud` Playwright project (LOCAL_MODE=false). The Workshop
- * index lists parts (kind='part') from projects with visibility='public'
- * (kerf_core.db.queries.library.list_public_parts). We seed that state via
- * the API, then assert the listing renders in the browser.
+ * Runs under the `cloud` Playwright project (LOCAL_MODE=false).
+ *
+ * Workshop is no longer a central, project-visibility-driven catalog — that
+ * role moved to /library (GET /api/library/parts -> list_public_parts, see
+ * library.spec.ts). Per decisions.md's 2026-07-17 "Final form" ADR and
+ * docs/distributed-workshop.md, Workshop is now client-side state: the set
+ * of author feeds ("follows") a node chooses to follow, crawled and rendered
+ * as a derived index (GET /api/pub/workshop, kerf_pub.router_local). There
+ * is no central Workshop server, so a merely-public project proves nothing
+ * about Workshop — it has to be announced over DMTAP-PUB (POST
+ * /api/pub/publish) and the node has to follow a feed that carries it.
+ *
+ * This test exercises that real flow: publish a Part from a project (signs
+ * and appends to THIS node's own DMTAP-PUB feed, kerf_pub.identity — the
+ * publishing identity is per-node, not per-user), then follow that same
+ * node's own feed (gateway_url left blank — PubClient.resolve() checks the
+ * local pub store before ever going over the network, so a self-follow
+ * resolves entirely from local state already written by publish, no live
+ * gateway required). GET /api/pub/workshop then derives a listing from that
+ * follow, and the seeded part must render in the browser.
  */
 
 import { test, expect, type APIRequestContext } from '@playwright/test'
@@ -12,7 +28,7 @@ import { test, expect, type APIRequestContext } from '@playwright/test'
 const uniq = () => `${Date.now()}-${Math.floor(Math.random() * 1e4)}`
 const PASSWORD = 'e2e-passw0rd!'
 
-async function seedPublicPart(req: APIRequestContext) {
+async function seedPublishedPart(req: APIRequestContext) {
   const email = `e2e-ws-${uniq()}@kerf.test`
   const reg = await req.post('/auth/register', {
     data: { email, password: PASSWORD, name: 'WS Author' },
@@ -39,20 +55,54 @@ async function seedPublicPart(req: APIRequestContext) {
   })
   expect(fr.ok()).toBeTruthy()
 
-  const up = await req.patch(`/api/projects/${project.id}`, {
+  // Announce the part over DMTAP-PUB — signs it under this node's own
+  // publishing identity and appends it to that identity's feed
+  // (kerf_pub.client.PubClient.publish). This is the actual act that makes
+  // something show up in Workshop; project visibility is unrelated to it.
+  const partName = `e2e-ws-part-${uniq()}`
+  const pub = await req.post('/api/pub/publish', {
     headers: auth,
-    data: { visibility: 'public' },
+    data: {
+      project_id: project.id,
+      metadata: {
+        name: partName,
+        description: 'A widget published for the Workshop e2e test.',
+        artifact_kind: 'part',
+        license: 'MIT',
+        units: { length_unit: 'mm' },
+      },
+    },
   })
-  expect(up.ok()).toBeTruthy()
+  expect(pub.ok()).toBeTruthy()
 
-  return { email, projectName, projectId: project.id }
+  // The publishing identity is per-node (packages/kerf-pub/src/kerf_pub/identity.py
+  // — one Ed25519 keypair on disk, not scoped to this user), so it already
+  // exists after the publish call above.
+  const idRes = await req.get('/api/pub/identity', { headers: auth })
+  expect(idRes.ok()).toBeTruthy()
+  const { pub: nodePub } = await idRes.json()
+  expect(typeof nodePub).toBe('string')
+  expect(nodePub.length).toBeGreaterThan(0)
+
+  // Follow that same identity's feed. gateway_url is left blank on purpose:
+  // PubClient.resolve() reads the local pub store before ever calling out
+  // to a gateway (kerf_pub.client.PubClient.resolve), and the feed head +
+  // announce this node just published are already in that same local store
+  // — so a self-follow resolves fully offline.
+  const followRes = await req.post('/api/pub/follows', {
+    headers: auth,
+    data: { pub: nodePub, label: 'This node', gateway_url: '' },
+  })
+  expect(followRes.ok()).toBeTruthy()
+
+  return { email, partName }
 }
 
 test.describe('Workshop (cloud mode)', () => {
-  test('public project with a Part appears in Workshop listing', async ({
+  test('published Part appears in Workshop after following the feed', async ({
     page,
   }) => {
-    const { email, projectName } = await seedPublicPart(page.request)
+    const { email, partName } = await seedPublishedPart(page.request)
 
     // Authenticate the browser as the author via the real /login UI.
     await page.goto('/login')
@@ -68,11 +118,15 @@ test.describe('Workshop (cloud mode)', () => {
     // resolves, the cloud-gated route isn't registered and the catch-all
     // ("*" → "/") bounces back to /projects.
     await page.getByRole('link', { name: 'Workshop', exact: true }).first().click()
+
+    // With a followed feed carrying a listing, Workshop renders past both
+    // empty states (BrowseEmptyState never mounts), so the page heading is
+    // once again the only element matching /workshop/i.
     await expect(
       page.getByRole('heading', { name: /workshop/i }),
     ).toBeVisible({ timeout: 15_000 })
     await expect(
-      page.getByText(projectName, { exact: false }).first(),
+      page.getByText(partName, { exact: false }).first(),
     ).toBeVisible({ timeout: 15_000 })
   })
 })

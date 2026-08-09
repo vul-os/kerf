@@ -312,9 +312,9 @@ export function WorkshopCard({
               {meta.license}
             </span>
           )}
-          {meta.units && (
+          {meta.units?.length_unit && (
             <span className="px-1.5 py-0.5 rounded bg-ink-800 text-ink-400 border border-ink-700">
-              {meta.units}
+              {meta.units.length_unit}
             </span>
           )}
         </div>

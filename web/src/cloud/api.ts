@@ -130,15 +130,22 @@ export interface PubAvailability {
   last_verified?: string
 }
 
+// Mirrors kerf_pub.router_local._resolve_follow_listings's `meta.units` shape
+// exactly (kerf-pub tests/test_router_local.py asserts
+// `{"length_unit": ..., "angle_unit": None, "mass_unit": None}` verbatim) —
+// the same struct PubPublishMetadata.units sends on the way in (§23.3.3).
+export interface PubMetaUnits {
+  length_unit?: string | null
+  angle_unit?: string | null
+  mass_unit?: string | null
+}
+
 export interface PubMeta {
   name?: string
   description?: string
   artifact_kind?: string
   license?: string
-  // Denormalized display string on a browsed workshop item (e.g. 'mm') —
-  // distinct from PubPublishMetadata.units, which the /publish endpoint
-  // requires as a { length_unit } struct (§23.3.3).
-  units?: string
+  units?: PubMetaUnits
   tags?: string[]
   deprecated?: boolean
   deprecated_reason?: string

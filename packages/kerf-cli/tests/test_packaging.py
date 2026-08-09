@@ -180,9 +180,19 @@ class TestEntryPointResolution:
         assert kerf_eps[0].value == "kerf_cli.main:main"
 
     def test_kerf_cli_dist_version(self):
+        # Compare the installed dist against pyproject.toml rather than a hard-coded
+        # literal. The point of this test is that the two agree — that the installed
+        # metadata is not stale — not that the version is any particular number. Pinning
+        # the literal made it fail on every release bump, which is noise, not signal.
         import importlib.metadata as meta
+        import tomllib
+        from pathlib import Path
+
+        pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+        expected = tomllib.loads(pyproject.read_text())["project"]["version"]
+
         dist = meta.distribution("kerf-cli")
-        assert dist.metadata["Version"] == "0.1.0"
+        assert dist.metadata["Version"] == expected
 
     def test_kerf_cli_server_extra_in_dist_requires(self):
         """Installed dist-info must advertise the server extra."""

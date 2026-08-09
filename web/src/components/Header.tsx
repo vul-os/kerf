@@ -82,7 +82,7 @@ export default function Header() {
             aria-label={menuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((v) => !v)}
-            className="grid place-items-center w-9 h-9 rounded-md text-ink-300 hover:text-ink-100 hover:bg-ink-800/80 transition-colors"
+            className="grid place-items-center w-9 h-9 rounded-md text-ink-300 hover:text-ink-100 hover:bg-ink-800/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
           >
             {menuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>

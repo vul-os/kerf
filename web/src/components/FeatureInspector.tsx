@@ -90,8 +90,9 @@ export default function FeatureInspector({
         <button
           type="button"
           onClick={onClose}
-          className="p-0.5 text-ink-400 hover:text-kerf-300"
+          className="p-0.5 text-ink-400 hover:text-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 rounded"
           title="Close (Esc)"
+          aria-label="Close inspector"
         >
           <X size={13} />
         </button>
@@ -129,8 +130,9 @@ export default function FeatureInspector({
             type="color"
             defaultValue={rgbToHex(intColorToRgb(part.color))}
             onChange={(e) => onRecolorPart?.(partId, hexToRgb(e.target.value))}
-            className="w-7 h-6 rounded bg-ink-800 border border-ink-700 cursor-pointer"
+            className="w-7 h-6 rounded bg-ink-800 border border-ink-700 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             title="Edit part color (mutates the source)"
+            aria-label="Edit part color"
           />
           <span className="text-[10px] text-ink-500 font-mono">applies to whole part</span>
         </div>
@@ -145,7 +147,7 @@ export default function FeatureInspector({
         <button
           type="button"
           onClick={() => onHidePart?.(partId)}
-          className="flex items-center gap-1 px-2 py-1 text-[11px] text-ink-300 hover:text-kerf-300 hover:bg-ink-800 rounded"
+          className="flex items-center gap-1 px-2 py-1 text-[11px] text-ink-300 hover:text-kerf-300 hover:bg-ink-800 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           title="Hide the parent part"
         >
           <EyeOff size={11} /> Hide part
@@ -153,7 +155,7 @@ export default function FeatureInspector({
         <button
           type="button"
           onClick={() => onReferenceInChat?.(partId, kind, featureId)}
-          className="flex items-center gap-1 px-2 py-1 text-[11px] text-ink-300 hover:text-kerf-300 hover:bg-ink-800 rounded"
+          className="flex items-center gap-1 px-2 py-1 text-[11px] text-ink-300 hover:text-kerf-300 hover:bg-ink-800 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           title="Add a reference chip to the next chat message"
         >
           <MessageSquare size={11} /> Reference in chat

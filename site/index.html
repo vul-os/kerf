@@ -397,7 +397,7 @@ pre.code { margin: 0; padding: 1.15rem 1.35rem; font-family: var(--mono); font-s
 .dev-head p { font-size: .85rem; color: var(--text-3); }
 .dev-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); }
 .dev-cell { padding: 1.5rem 1.75rem; background: var(--bg); }
-.dev-cell h4 { font-family: var(--mono); font-size: .75rem; color: var(--dim); text-transform: uppercase; letter-spacing: .1em; margin-bottom: .75rem; }
+.dev-cell h3 { font-family: var(--mono); font-size: .75rem; color: var(--dim); text-transform: uppercase; letter-spacing: .1em; margin-bottom: .75rem; }
 .dev-cell pre { margin: 0; font-family: var(--mono); font-size: .8rem; color: var(--text-2); line-height: 1.95; overflow-x: auto; }
 
 
@@ -1213,13 +1213,13 @@ docker compose up">copy</button></div>
       </div>
       <div class="dev-grid">
         <div class="dev-cell">
-          <h4>frontend + backend (dev)</h4>
+          <h3>frontend + backend (dev)</h3>
           <pre><span class="tok-prompt">$ </span><span class="tok-cmd">pip</span> <span class="tok-sub">install</span> <span class="tok-flag">-e</span> <span class="tok-str">.[mech]</span>
 <span class="tok-prompt">$ </span><span class="tok-cmd">npm</span> <span class="tok-sub">install</span>
 <span class="tok-prompt">$ </span><span class="tok-cmd">npm</span> <span class="tok-sub">run</span> <span class="tok-str">dev</span>  <span class="tok-cm"># :5173 + :8080</span></pre>
         </div>
         <div class="dev-cell">
-          <h4>tests</h4>
+          <h3>tests</h3>
           <pre><span class="tok-prompt">$ </span><span class="tok-cmd">pytest</span> <span class="tok-str">packages/</span> <span class="tok-flag">-n</span> <span class="tok-str">auto</span>
 <span class="tok-prompt">$ </span><span class="tok-cmd">npm</span> <span class="tok-sub">test</span>
 <span class="tok-prompt">$ </span><span class="tok-cmd">npm</span> <span class="tok-sub">run</span> <span class="tok-str">lint</span></pre>

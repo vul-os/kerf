@@ -77,8 +77,6 @@ def client():
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
-    from kerf_core.dependencies import require_auth
-
     # Re-inject stub so previous test modules can't strip it
     _inject_cura_stub()
     sys.modules.pop("kerf_slicing.routes", None)
@@ -87,8 +85,10 @@ def client():
     app = FastAPI()
     app.include_router(router)
 
-    # Override auth: inject a fake authenticated user for all tests
-    app.dependency_overrides[require_auth] = lambda: {"sub": "test-user"}
+    # /run-print-slice is gated by require_auth_unless_local, not require_auth
+    # (see ed1c885a) — simulate a local, single-user install so the route is
+    # free to call without a bearer token, matching the documented default.
+    app.state.config = types.SimpleNamespace(local_mode=True)
 
     # Patch storage root to the system temp dir so tmp_path files are allowed
     import kerf_slicing.routes as _routes
@@ -145,12 +145,11 @@ class TestRunPrintSliceRoute:
 
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
-        from kerf_core.dependencies import require_auth
         from kerf_slicing.routes import router
 
         app = FastAPI()
         app.include_router(router)
-        app.dependency_overrides[require_auth] = lambda: {"sub": "test-user"}
+        app.state.config = types.SimpleNamespace(local_mode=True)
 
         import kerf_slicing.routes as _routes
         _routes._get_storage_root = lambda: Path(tempfile.gettempdir()).resolve()

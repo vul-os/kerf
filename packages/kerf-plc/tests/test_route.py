@@ -5,6 +5,7 @@ Uses FastAPI TestClient; does not require MATIEC or a real database.
 """
 from __future__ import annotations
 
+import types
 import unittest.mock as mock
 
 import pytest
@@ -22,6 +23,10 @@ def client():
 
     app = FastAPI()
     app.include_router(router)
+    # /lint-plc is gated by require_auth_unless_local (see ed1c885a) —
+    # simulate a local, single-user install so the route is free without a
+    # token, matching the documented default.
+    app.state.config = types.SimpleNamespace(local_mode=True)
     return TestClient(app)
 
 

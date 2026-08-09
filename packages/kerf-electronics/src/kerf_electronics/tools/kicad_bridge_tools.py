@@ -15,6 +15,36 @@ from typing import Any
 from kerf_electronics._compat import ToolSpec, err_payload, ok_payload, register
 
 
+def _require_local_mode() -> str | None:
+    """Return an error message if this process is not running local-mode, else None.
+
+    elec_export_kicad / elec_import_kicad_pcb read and write arbitrary
+    filesystem paths on the machine running the Kerf server — that is the
+    point of the KiCad round-trip (the user opens the exported project in a
+    desktop copy of KiCad Pcbnew running on that same machine). There is no
+    project/workspace containment: `output_dir` and `pcb_path` go straight to
+    os.makedirs()/open() with no root to stay under.
+
+    That is safe on the documented single-user local install (the "machine
+    running the server" and "the user's own machine" are the same one) but
+    is an arbitrary-file-read/write primitive for any authenticated caller on
+    a shared/hosted deployment — reachable via POST /api/tools/call, which
+    dispatches tools without requiring a project_id (kerf_api/routes_tools.py
+    treats an omitted project_id as a stateless call with role="owner").
+    Gate on the same local_mode signal require_auth_unless_local uses for the
+    other local-only-by-nature compute routes.
+    """
+    from kerf_core.config import get_settings
+
+    if get_settings().local_mode:
+        return None
+    return (
+        "KiCad round-trip export/import touches the local filesystem of the "
+        "machine running the Kerf server and is only available on a local "
+        "install (local_mode=true), not a shared/hosted deployment."
+    )
+
+
 # ─── elec_export_kicad ───────────────────────────────────────────────────────
 
 elec_export_kicad_spec = ToolSpec(
@@ -63,6 +93,10 @@ elec_export_kicad_spec = ToolSpec(
 
 @register(elec_export_kicad_spec)
 async def run_elec_export_kicad(ctx: Any, args: bytes) -> str:
+    denied = _require_local_mode()
+    if denied:
+        return err_payload(denied, "LOCAL_MODE_REQUIRED")
+
     try:
         a = json.loads(args)
     except Exception as e:
@@ -139,6 +173,10 @@ elec_import_kicad_pcb_spec = ToolSpec(
 
 @register(elec_import_kicad_pcb_spec)
 async def run_elec_import_kicad_pcb(ctx: Any, args: bytes) -> str:
+    denied = _require_local_mode()
+    if denied:
+        return err_payload(denied, "LOCAL_MODE_REQUIRED")
+
     try:
         a = json.loads(args)
     except Exception as e:

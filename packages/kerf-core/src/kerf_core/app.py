@@ -201,7 +201,7 @@ def _mount_frontend(app: FastAPI) -> None:
     Docker builds embed dist/ at /app/dist).
     """
     dist_dir = os.environ.get("KERF_FRONTEND_DIST", "/app/dist")
-    dist_path = Path(dist_dir)
+    dist_path = Path(dist_dir).resolve()
     if not dist_path.is_dir() or not (dist_path / "index.html").exists():
         return
 
@@ -217,9 +217,22 @@ def _mount_frontend(app: FastAPI) -> None:
         # (the post-OAuth landing page) which must get the SPA shell.
         if full_path.startswith(("api/", "v1/", "health", "healthz")):
             return JSONResponse({"detail": "Not Found"}, status_code=404)
-        target = dist_path / full_path
-        if full_path and target.is_file():
-            return FileResponse(target)
+
+        # Path traversal guard (CWE-22): full_path is attacker-controlled —
+        # Starlette's {path:path} converter does not strip "../" segments,
+        # so "GET /../../etc/passwd" reaches here with full_path exactly
+        # that string. Resolve and require the result stay inside dist_path
+        # before ever touching the filesystem; anything that escapes (or an
+        # absolute path swallowing dist_path via `/`) falls through to the
+        # SPA shell instead of leaking an arbitrary file.
+        if full_path:
+            candidate = (dist_path / full_path).resolve()
+            try:
+                candidate.relative_to(dist_path)
+            except ValueError:
+                candidate = None
+            if candidate is not None and candidate.is_file():
+                return FileResponse(candidate)
         return FileResponse(dist_path / "index.html")
 
 

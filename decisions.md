@@ -1506,3 +1506,22 @@ dependency-bug costume, not a reachable break.
       maintains it without weighing down the shipped install.
 Neither was done here — it needs a decision about the file's purpose, not just its import
 declaration, and that's the maintainer's call.
+
+## `kerf-cloud` is a legacy name, not cloud infrastructure — left in place
+
+Checked whether `packages/kerf-cloud` was leftover hosting code that the "remove cloud"
+work missed. It is not. It contains product features that run entirely on a local
+install:
+
+- `plm/` — BOM-150, ECO, SysML trace, where-used
+- `job_traveler.py`, `share_link.py`, `distributors/`, `scheduler/`
+
+It is in the `full` persona and `kerf-cli` depends on it. Deleting it would delete real
+functionality, so it stays.
+
+The name is nonetheless wrong now that there is no hosted tier — it dates from when the
+cloud/local split existed, and it invites exactly the mistaken deletion this note exists
+to prevent. Renaming a workspace package touches the persona lists, the entry-point
+group, `uv` sources, the wheel build and every import site, so it is not something to do
+in the run-up to a release. Flagged for a deliberate follow-up rather than done quietly
+here; `kerf-plm` would be the accurate name.

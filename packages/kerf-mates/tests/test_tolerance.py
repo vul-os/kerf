@@ -1,6 +1,4 @@
 import math
-import sys
-sys.path.insert(0, '/Users/pc/code/exo/kerf/backend-python')
 
 from kerf_mates.tolerance import (
     worst_case, rss, monte_carlo, compute_histogram,

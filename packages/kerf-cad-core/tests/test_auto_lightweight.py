@@ -75,6 +75,20 @@ sys.modules.setdefault("kerf_cad_core", _kcc_pkg)
 
 _lw_mod = _load("geom/auto_lightweight.py", "kerf_cad_core.geom.auto_lightweight")
 
+# Pin auto_lightweight's lazy `_nurbs_module()`/`_brep_module()` helpers to
+# the exact _nurbs_mod/_brep_mod objects loaded above. Left unpinned, those
+# helpers do `from kerf_cad_core.geom import nurbs as _n` at *call* time —
+# i.e. after the sys.modules restore below has put the real package back (or
+# removed the stub) — so they'd resolve to a DIFFERENT NurbsCurve/NurbsSurface
+# class than the one used to build this file's fixtures, and every
+# isinstance() check inside auto_lightweight.py would silently fail. Same
+# class-identity hazard as the sys.modules leak documented in
+# docs/TESTING.md root cause #1/#5 — fixed here the same way: never let two
+# loads of "the same" module produce two live class objects that the test
+# expects to compare equal.
+_lw_mod._nurbs_module = lambda: _nurbs_mod
+_lw_mod._brep_module = lambda: _brep_mod
+
 # Undo the sys.modules patching now that the module objects we need are
 # captured directly (see aliases below) — restore whatever was there before
 # (nothing, in the normal case) so later test files still see the real

@@ -506,8 +506,9 @@ class TestRunJewelryMetalCost:
     def test_plugin_registers_module(self):
         """plugin._TOOL_MODULES includes jewelry tool."""
         import importlib.util
-        spec_path = (
-            "/Users/pc/code/exo/kerf/packages/kerf-cad-core/src/kerf_cad_core/plugin.py"
+        import os
+        spec_path = os.path.join(
+            os.path.dirname(__file__), "..", "src", "kerf_cad_core", "plugin.py"
         )
         spec = importlib.util.spec_from_file_location("plugin_check", spec_path)
         mod = importlib.util.module_from_spec(spec)

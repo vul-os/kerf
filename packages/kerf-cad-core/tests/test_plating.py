@@ -624,8 +624,9 @@ class TestRunJewelryPlating:
 
 class TestPluginRegistration:
     def test_plugin_tool_modules_includes_plating(self):
-        spec_path = (
-            "/Users/pc/code/exo/kerf/packages/kerf-cad-core/src/kerf_cad_core/plugin.py"
+        import os
+        spec_path = os.path.join(
+            os.path.dirname(__file__), "..", "src", "kerf_cad_core", "plugin.py"
         )
         spec = importlib.util.spec_from_file_location("plugin_check_plating", spec_path)
         mod = importlib.util.module_from_spec(spec)

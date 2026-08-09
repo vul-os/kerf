@@ -305,8 +305,6 @@ class TestCorridorVolumeVsAnalyticPrism:
 
     def _cut_area_analytic(self) -> float:
         """Analytic cut area for the test fixture using shoelace formula."""
-        import sys
-        sys.path.insert(0, '/Users/pc/code/exo/kerf/.claude/worktrees/agent-a913022592f14f3a2/packages/kerf-civil/src')
         # Build a single cross-section and return its cut area
         tin = _flat_tin(z=100.0)
         c = _make_straight_corridor(

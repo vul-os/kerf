@@ -203,7 +203,7 @@ export default function KeybindHelp({ bindings = [], onClose, title = 'Viewport 
           {onClose && (
             <button
               onClick={onClose}
-              className="text-ink-400 hover:text-ink-100 transition-colors rounded p-0.5"
+              className="text-ink-400 hover:text-ink-100 transition-colors rounded p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               aria-label="Close shortcuts panel"
               type="button"
             >

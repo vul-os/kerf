@@ -4775,6 +4775,7 @@ def continuity_audit(
     tol: float = 1e-4,
     include_gauss_bonnet: bool = False,
     include_chord_deviation: bool = False,
+    include_curvature_metrics: bool = False,
 ) -> dict:
     """Walk every shared edge of a Body and classify G0/G1/G2/G3 continuity.
 
@@ -4810,6 +4811,11 @@ def continuity_audit(
             yield (identical poles + knots + basis; the ``DN`` worker path is
             gated behind the binding probe in ``src/lib/occtBridge.js``).
         ``summary`` : dict with counts per grade and total shared-edge count.
+        ``curvature_metrics`` : (only when ``include_curvature_metrics=True``)
+            dict ``{ok, per_face: {face_id: isophote_density_metric(...)}}``
+            — Pottmann-Wallner isophote-density curvature indicator
+            (``geom.curvature_metrics.isophote_density_metric``) computed for
+            every ``NurbsSurface`` face, alongside the edge-continuity grades.
         ``ok`` : bool -- False only if the Body has no faces or the traversal
             raised an unexpected exception.
         ``reason`` : str -- empty on success.
@@ -5130,6 +5136,27 @@ def continuity_audit(
         # Optional: per-face chord-deviation metrics
         if include_chord_deviation:
             result["chord_deviation"] = chord_deviation_per_face(body)
+
+        # Optional: per-face isophote-density curvature metrics
+        if include_curvature_metrics:
+            try:
+                from kerf_cad_core.geom.curvature_metrics import (
+                    isophote_density_metric,
+                )
+
+                per_face_curvature: dict = {}
+                for face in body.all_faces():
+                    surf = getattr(face, "surface", None)
+                    if not isinstance(surf, NurbsSurface):
+                        continue
+                    face_id = getattr(face, "id", id(face))
+                    per_face_curvature[face_id] = isophote_density_metric(surf)
+                result["curvature_metrics"] = {
+                    "ok": True,
+                    "per_face": per_face_curvature,
+                }
+            except Exception as exc:
+                result["curvature_metrics"] = {"ok": False, "reason": str(exc), "per_face": {}}
 
         return result
 

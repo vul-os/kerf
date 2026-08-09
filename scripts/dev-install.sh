@@ -43,28 +43,40 @@ PIP="${PIP:-pip}"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
-# Package sets mirror the [project.optional-dependencies] personas in the root
-# pyproject.toml. Keep in sync when a persona's plugin list changes.
-core="kerf-core kerf-auth kerf-api kerf-chat"
+# The package set is DERIVED from the root pyproject.toml's
+# [project.optional-dependencies] rather than duplicated here.
+#
+# It used to be a hardcoded list per persona with a comment saying "keep in
+# sync when a persona's plugin list changes". It drifted badly: `full` was
+# missing 36 of its packages (kerf-pub among them, so CI installed no
+# /api/pub/* surface at all and the Workshop e2e spec 404'd), while listing two
+# — kerf-billing and kerf-pricing — that no persona contains. A list that must
+# be hand-synced with another list eventually is not.
+pkgs="$(python3 - "$persona" <<'PYEOF'
+import re, sys, tomllib
+persona = sys.argv[1]
+data = tomllib.load(open("pyproject.toml", "rb"))
+extras = data["project"].get("optional-dependencies", {})
+if persona not in extras:
+    sys.stderr.write(
+        f"error: unknown persona {persona!r}\n"
+        f"usage: dev-install.sh [{'|'.join(sorted(extras))}]\n"
+    )
+    raise SystemExit(1)
+names = []
+for dep in extras[persona]:
+    name = re.split(r"[<>=!\[;\s]", dep.strip(), maxsplit=1)[0]
+    # Only workspace packages are installed editable from this checkout.
+    if name.startswith("kerf-") and name != "kerf-sdk":
+        names.append(name)
+print(" ".join(dict.fromkeys(names)))
+PYEOF
+)" || exit 1
 
-case "$persona" in
-  api-only)
-    pkgs="$core kerf-v1" ;;
-  mech)
-    pkgs="$core kerf-cad-core kerf-tess kerf-fem kerf-cam kerf-topo kerf-mates" ;;
-  electronics)
-    pkgs="$core kerf-electronics" ;;
-  bim)
-    pkgs="$core kerf-bim" ;;
-  full)
-    pkgs="$core kerf-v1 kerf-billing kerf-pricing \
-          kerf-cad-core kerf-tess kerf-fem kerf-cam kerf-topo kerf-mates \
-          kerf-electronics kerf-bim kerf-imports kerf-render kerf-workers" ;;
-  *)
-    echo "error: unknown persona '$persona'" >&2
-    echo "usage: $0 [api-only|mech|electronics|bim|full]" >&2
-    exit 1 ;;
-esac
+if [[ -z "$pkgs" ]]; then
+  echo "error: persona '$persona' resolved to no kerf-* packages" >&2
+  exit 1
+fi
 
 # Extras to pull in alongside a package. Only PyPI-installable ones belong here
 # — the conda-forge-only solvers (pythonOCC, dolfinx) are deliberately absent,

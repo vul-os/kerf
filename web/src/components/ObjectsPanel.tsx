@@ -174,7 +174,7 @@ export default function ObjectsPanel({
             <button
               type="button"
               onClick={onShowAll}
-              className="text-[10px] text-kerf-300 hover:text-kerf-200"
+              className="text-[10px] text-kerf-300 hover:text-kerf-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 rounded"
               title="Show all"
             >
               show all
@@ -190,8 +190,9 @@ export default function ObjectsPanel({
           <button
             type="button"
             onClick={() => setExportError(null)}
-            className="text-red-300 hover:text-red-100 flex-shrink-0"
+            className="text-red-300 hover:text-red-100 flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 rounded"
             title="Dismiss"
+            aria-label="Dismiss export error"
           >
             <Check size={11} />
           </button>
@@ -203,8 +204,9 @@ export default function ObjectsPanel({
           <button
             type="button"
             onClick={() => setOpError(null)}
-            className="text-amber-300 hover:text-amber-100 flex-shrink-0"
+            className="text-amber-300 hover:text-amber-100 flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 rounded"
             title="Dismiss"
+            aria-label="Dismiss warning"
           >
             <Check size={11} />
           </button>
@@ -249,7 +251,8 @@ export default function ObjectsPanel({
                 }}
                 disabled={isStepFile}
                 title={isStepFile ? 'STEP files are read-only' : 'Edit color'}
-                className={`w-3 h-3 rounded-sm border border-ink-700 flex-shrink-0 ${
+                aria-label={isStepFile ? 'STEP files are read-only' : `Edit color for ${p.id}`}
+                className={`w-3 h-3 rounded-sm border border-ink-700 flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${
                   isStepFile ? 'cursor-not-allowed' : 'cursor-pointer hover:border-kerf-300'
                 }`}
                 style={{ backgroundColor: swatchHex }}
@@ -272,8 +275,9 @@ export default function ObjectsPanel({
                   e.stopPropagation()
                   onToggleVisibility?.(p.id)
                 }}
-                className="text-ink-300 hover:text-kerf-300 flex-shrink-0 p-0.5"
+                className="text-ink-300 hover:text-kerf-300 flex-shrink-0 p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 rounded"
                 title={isHidden ? 'Show' : 'Hide'}
+                aria-label={isHidden ? `Show ${p.id}` : `Hide ${p.id}`}
               >
                 {isHidden
                   ? <EyeOff size={12} />
@@ -287,8 +291,9 @@ export default function ObjectsPanel({
                     e.stopPropagation()
                     onIsolate?.(p.id)
                   }}
-                  className="text-ink-400 hover:text-kerf-300 flex-shrink-0 p-0.5"
+                  className="text-ink-400 hover:text-kerf-300 flex-shrink-0 p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 rounded"
                   title="Isolate (hide others)"
+                  aria-label={`Isolate ${p.id} (hide others)`}
                 >
                   <Focus size={11} />
                 </button>
@@ -302,8 +307,9 @@ export default function ObjectsPanel({
                     setOpenKebab(openKebab === p.id ? null : p.id)
                     setOpenRowExport(null)
                   }}
-                  className="text-ink-400 hover:text-kerf-300 p-0.5"
+                  className="text-ink-400 hover:text-kerf-300 p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 rounded"
                   title="More"
+                  aria-label={`More actions for ${p.id}`}
                 >
                   <MoreVertical size={11} />
                 </button>
@@ -374,7 +380,7 @@ export default function ObjectsPanel({
                                 setOpenKebab(null)
                                 setOpenRowExport(null)
                               }}
-                              className="w-full text-left px-2.5 py-1 hover:bg-ink-800 hover:text-kerf-300 flex items-center gap-2"
+                              className="w-full text-left px-2.5 py-1 hover:bg-ink-800 hover:text-kerf-300 flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/70"
                             >
                               <span className="flex-1 truncate">{f.label}</span>
                               <span className="text-ink-500 font-mono text-[10px]">.{f.ext}</span>
@@ -400,7 +406,7 @@ function KebabItem({ children, onClick }: { children: ReactNode; onClick: () => 
     <button
       type="button"
       onClick={onClick}
-      className="w-full text-left px-2.5 py-1 hover:bg-ink-800 hover:text-kerf-300 flex items-center gap-2"
+      className="w-full text-left px-2.5 py-1 hover:bg-ink-800 hover:text-kerf-300 flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/70"
     >
       {children}
     </button>

@@ -1403,3 +1403,35 @@ shipped an API with two routes. Green CI was not evidence of a working install.
 **Method note.** The local repro is the whole reason this closed. Postgres in docker, a venv
 with one package at a time, boot, read the error, install the next. Three rounds. Reading the
 code suggested ten candidates and could not rank them; the server ranked them instantly.
+
+## 2026-08-09 — sqlalchemy commit reverted: kerf_core/db/models/models.py is vestigial
+
+**Context:** security-audit pass over `packages/*/src` found `kerf_core/db/models/models.py`
+importing `sqlalchemy` at module top level, unguarded, and no `pyproject.toml` in the workspace
+declares it — the same shape as the pygit2 / kerf-chat / kerf-tess class the checker exists to
+catch. Committed a one-line fix declaring `sqlalchemy>=2.0.0` in kerf-core's dependencies
+(commit b818e1df).
+
+**Decision:** reverted (commit b7a6fdd2). Confirmed by grep that nothing under `packages/*/src`
+imports `kerf_core.db.models` or `kerf_core.db.models.models` — not `kerf_core/db/__init__.py`,
+not any plugin `register()`, not any route module. The project's actual persistence layer is
+hand-rolled asyncpg queries under `kerf_core/db/queries/*.py` plus a migration runner; this
+SQLAlchemy `Base`/`declarative_base()` model file (416 lines: User, Workspace, Project, File,
+ShareLink, ...) has no caller anywhere in the tree.
+
+**Why this differs from pygit2/kerf-chat/kerf-tess.** Those three were reachable: eager imports
+inside `register()` or `routes.py`, executed on every boot, verified by a real minimal-persona
+server that mounted 2 routes instead of ~115 until each was declared. This one is not reachable
+by any code path — declaring the dependency adds real install weight (SQLAlchemy + its own
+transitive deps) for a module nothing executes. That is a style/hygiene fix wearing a
+dependency-bug costume, not a reachable break.
+
+**Left open, not fixed:** the module itself. Two legitimate options for a future pass:
+  (a) delete `kerf_core/db/models/` entirely if it is confirmed superseded by the
+      `db/queries/*.py` + migrations approach and nothing external (e.g. an alembic
+      autogenerate step, or a script outside `packages/`) depends on it, or
+  (b) keep it as an intentional schema-as-documentation artifact and declare sqlalchemy as a
+      `dev`/optional extra (not a hard runtime dependency) so it stays importable for whoever
+      maintains it without weighing down the shipped install.
+Neither was done here — it needs a decision about the file's purpose, not just its import
+declaration, and that's the maintainer's call.

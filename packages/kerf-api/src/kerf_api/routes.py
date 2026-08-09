@@ -5670,7 +5670,19 @@ async def serve_project_thumbnail(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no thumbnail available")
 
     storage = get_storage_required()
-    body, content_type = await storage.get(key)
+    try:
+        body, content_type = await storage.get(key)
+    except FileNotFoundError:
+        # The row carries a thumbnail_storage_key but the object is gone from
+        # storage — a capture that failed midway, a pruned storage root, or a
+        # database restored without its files. That is a missing thumbnail, not
+        # a server fault: it raised FileNotFoundError to the client as a 500 on
+        # EVERY project in that state, filling logs with tracebacks for an
+        # entirely expected condition. Mirrors serve_project_blob, which already
+        # documents "404 when the object is not in storage".
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="no thumbnail available"
+        ) from None
     return StreamingResponse(body, media_type=content_type or "image/jpeg")
 
 

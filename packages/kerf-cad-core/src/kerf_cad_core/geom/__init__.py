@@ -465,6 +465,26 @@ from kerf_cad_core.geom.subd_authoring import subd_edge_split
 # GK-107: bevel weight per edge (graded crease 0..1)
 from kerf_cad_core.geom.subd_authoring import subd_set_bevel_weight
 # GK-108: Loop subdivision scheme (triangle mesh)
+#
+# NOTE: `kerf_cad_core.geom.loop_subdivide` is both a submodule (its own
+# distinct `loop_subdivide()` implementation, used directly by
+# modified_butterfly.py and test_subd_schemes.py) and, here, a re-exported
+# FUNCTION name from subd_authoring.py. Python sets `geom.loop_subdivide` to
+# the submodule object as a side effect the first time anything imports it
+# (`import kerf_cad_core.geom.loop_subdivide` / `from ...loop_subdivide
+# import X`) — but only the *first* time; once cached in sys.modules, later
+# imports of that submodule elsewhere are no-ops for this attribute. Import
+# it here, first, so this package is always the one whose "first import"
+# wins that race, then bind the function name below so it's the value that
+# actually sticks. Without this, whichever of modified_butterfly.py /
+# test_subd_schemes.py happens to import the submodule first (test order
+# dependent) silently turns `kerf_cad_core.geom.loop_subdivide` from a
+# callable back into a module for the rest of the process. Same footgun as
+# `geom.parting_line` above; there the fix was pure reordering because
+# geom/__init__.py already imported that submodule for other names, but
+# geom/__init__.py never otherwise touches geom/loop_subdivide.py, so the
+# explicit import here is required too.
+import kerf_cad_core.geom.loop_subdivide as _loop_subdivide_submodule  # noqa: F401
 from kerf_cad_core.geom.subd_authoring import loop_subdivide
 # GK-P SubD boundary→curve snap
 from kerf_cad_core.geom.subd_boundary_replace import (
@@ -578,17 +598,28 @@ from kerf_cad_core.geom.threads import (
     coil_spring,
 )
 
-# GK-118: parting line generation
 # GK-119: cavity / core mould split
-from kerf_cad_core.geom.mold import parting_line, undercut_faces, mold_split
+from kerf_cad_core.geom.mold import undercut_faces, mold_split
 
 # GK-P: parting-line extraction + undercut detection (Ahn-Cho-Kim 2002)
+#
+# NOTE: `kerf_cad_core.geom.parting_line` is both a submodule (this import)
+# and, historically (GK-118), a function name (`mold.parting_line`). Importing
+# the submodule here implicitly binds `geom.parting_line` to the module object
+# as a side effect (Python always sets the parent package's attribute when a
+# dotted submodule is imported) — so the GK-118 function import below MUST
+# come after this block, or the module clobbers the callable and
+# `from kerf_cad_core.geom import parting_line` silently returns a module
+# instead of the function every caller and test actually wants.
 from kerf_cad_core.geom.parting_line import (
     PartingLineResult,
     extract_parting_line,
     detect_undercuts,
     optimal_pull_direction,
 )
+
+# GK-118: parting line generation (function — see NOTE above on import order)
+from kerf_cad_core.geom.mold import parting_line
 # GK-P Wave 4T: mold parting-surface construction (Yu-Fan 2003 §6)
 from kerf_cad_core.geom.mold_parting_surface import (
     construct_parting_surface,

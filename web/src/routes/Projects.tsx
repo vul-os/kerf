@@ -108,7 +108,7 @@ function TagsField({ tags, onChange }) {
                   e.stopPropagation()
                   remove(t)
                 }}
-                className="ml-0.5 grid place-items-center w-3.5 h-3.5 rounded-sm hover:bg-ink-700/60"
+                className="ml-0.5 grid place-items-center w-3.5 h-3.5 rounded-sm hover:bg-ink-700/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               >
                 <X size={9} />
               </button>
@@ -137,8 +137,9 @@ function TagsField({ tags, onChange }) {
               disabled={disabled}
               onClick={() => add(p.id)}
               title={disabled ? 'Already added' : `Add ${p.label}`}
+              aria-label={disabled ? `${p.label} already added` : `Add ${p.label}`}
               className={clsx(
-                'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono uppercase tracking-wider border transition-colors',
+                'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono uppercase tracking-wider border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
                 disabled
                   ? 'opacity-40 cursor-not-allowed border-ink-800 text-ink-500'
                   : `${p.badgeBg} hover:brightness-125`,
@@ -202,7 +203,7 @@ function DomainGrid({ presets, selected, onSelect }) {
             aria-pressed={active}
             title={p.blurb}
             className={clsx(
-              'flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-colors min-h-[76px]',
+              'flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-colors min-h-[76px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
               active
                 ? 'border-kerf-300/60 bg-kerf-300/10 ring-1 ring-kerf-300/40'
                 : 'border-ink-800 bg-ink-950/30 hover:border-ink-600 hover:bg-ink-800/40',
@@ -342,7 +343,7 @@ function NewProjectModalBody({ onClose, onCreated, workspaceId }) {
           <button
             type="button"
             onClick={() => setShowMore((v) => !v)}
-            className="inline-flex items-center gap-1 text-[12px] text-ink-300 hover:text-ink-100 transition-colors"
+            className="inline-flex items-center gap-1 text-[12px] text-ink-300 hover:text-ink-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 rounded"
             aria-expanded={showMore}
           >
             <ChevronDown
@@ -591,7 +592,7 @@ function KebabMenu({ project, isOwner, onShare, onRename, onDelete }) {
           e.stopPropagation()
           setOpen((v) => !v)
         }}
-        className="p-1.5 rounded-md text-ink-400 hover:text-ink-100 hover:bg-ink-800/80 transition-colors"
+        className="p-1.5 rounded-md text-ink-400 hover:text-ink-100 hover:bg-ink-800/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         aria-label="Project actions"
       >
         <MoreHorizontal size={16} />
@@ -609,7 +610,7 @@ function KebabMenu({ project, isOwner, onShare, onRename, onDelete }) {
               setOpen(false)
               onShare(project)
             }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80"
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/70"
           >
             <Share2 size={13} className="text-ink-300" />
             Share
@@ -622,7 +623,7 @@ function KebabMenu({ project, isOwner, onShare, onRename, onDelete }) {
                 setOpen(false)
                 onRename(project)
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/70"
             >
               <Pencil size={13} className="text-ink-300" />
               Rename
@@ -638,7 +639,7 @@ function KebabMenu({ project, isOwner, onShare, onRename, onDelete }) {
                   setOpen(false)
                   onDelete(project)
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-300 hover:bg-red-500/10"
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-300 hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-red-400/70"
               >
                 <Trash2 size={13} />
                 Delete

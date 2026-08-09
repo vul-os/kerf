@@ -11,6 +11,8 @@ kerf sync        Two-way folder mirror between a local directory and a cloud
                  project (T-127).
 kerf export      Materialise a project as a plain file tree on disk (T-322).
 kerf import      Re-create a project from a materialised export directory (T-322).
+kerf tools       List, inspect, and invoke Kerf's registered LLM tools.
+kerf mcp         Run an MCP server over stdio exposing the same tools.
 """
 
 from __future__ import annotations
@@ -82,6 +84,20 @@ def _cmd_export(args: argparse.Namespace) -> int:
 def _cmd_import(args: argparse.Namespace) -> int:
     from kerf_cli.import_ import cmd_import  # noqa: PLC0415
     return cmd_import(args)
+
+
+# ---------------------------------------------------------------------------
+# mcp
+# ---------------------------------------------------------------------------
+
+def _cmd_mcp(args: argparse.Namespace) -> int:
+    from kerf_cli.mcp_server import run_mcp_server  # noqa: PLC0415
+
+    return run_mcp_server(
+        api_url=args.url or None,
+        api_token=args.token or None,
+        project_id=args.project or None,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -217,7 +233,57 @@ def _build_parser() -> argparse.ArgumentParser:
     from kerf_cli.admin import add_admin_parser  # noqa: PLC0415
     add_admin_parser(sub)
 
+    # ---- tools ----
+    from kerf_cli.tools import add_tools_parser  # noqa: PLC0415
+    add_tools_parser(sub)
+
+    # ---- mcp ----
+    _add_mcp_parser(sub)
+
     return parser
+
+
+def _add_mcp_parser(
+    sub: argparse._SubParsersAction,  # type: ignore[type-arg]
+) -> None:
+    """Register the ``mcp`` sub-parser."""
+    p = sub.add_parser(
+        "mcp",
+        help="Run an MCP server over stdio exposing Kerf's LLM tools",
+        description=(
+            "Start a Model Context Protocol (MCP) server on stdio that exposes\n"
+            "every tool from GET /api/tools as an MCP tool, routing tool calls\n"
+            "through POST /api/tools/call.  Intended to be launched by an MCP\n"
+            "client (Claude Desktop, etc.) as a subprocess -- see docs/mcp.md\n"
+            "for the exact client configuration.\n\n"
+            "Requires the optional `mcp` dependency: pip install 'kerf-cli[mcp]'.\n\n"
+            "KERF_API_URL / KERF_API_TOKEN or `kerf login` credentials are used\n"
+            "for authentication."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument(
+        "--url",
+        default="",
+        metavar="URL",
+        help="Override the API endpoint (default: $KERF_API_URL or https://app.kerf.io).",
+    )
+    p.add_argument(
+        "--token",
+        default="",
+        metavar="TOKEN",
+        help="API token (kerf_sk_…).  $KERF_API_TOKEN is preferred.",
+    )
+    p.add_argument(
+        "--project",
+        default="",
+        metavar="ID",
+        help=(
+            "Default Kerf project UUID sent with every tool call.  A call can\n"
+            "override it by including its own `project_id` argument."
+        ),
+    )
+    p.set_defaults(func=_cmd_mcp)
 
 
 def _add_hydrate_parser(

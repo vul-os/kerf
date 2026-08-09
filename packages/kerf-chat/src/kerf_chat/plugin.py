@@ -36,15 +36,14 @@ def _register_tools(ctx) -> None:
 
 
 async def register(app: FastAPI, ctx) -> PluginManifest:
-    # llm.py uses module-level get_settings() and acts as a singleton.
-    # It exposes an APIRouter at module import time.
-    from kerf_chat import llm as _llm
-    router = getattr(_llm, "router", None)
-    if router is not None:
-        app.include_router(router, prefix="/api", tags=["chat"])
-        ctx.logger.info("kerf-chat: registered chat router")
-    else:
-        ctx.logger.warning("kerf-chat: no router exported from llm.py")
+    # No router to mount. Chat's HTTP surface (/projects/{pid}/threads and
+    # friends) lives in kerf_api/routes.py, which imports kerf_chat.llm's
+    # functions directly rather than including a router from here.
+    #
+    # This used to `getattr(llm, "router", None)` and log
+    # "kerf-chat: no router exported from llm.py" on every single boot — a
+    # warning about a router that has never existed in any commit. The
+    # scaffold anticipated one; the design went the other way.
 
     # Register built-in LLM tools.
     _register_tools(ctx)

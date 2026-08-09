@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import entries from './motion.js'
+import entries from '../motion.js'
 
 describe('motion panel registry fragment', () => {
   it('default export is an array', () => {

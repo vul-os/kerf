@@ -44,10 +44,17 @@ export interface RegistryFile {
 }
 
 // Eagerly import the (tiny) fragment modules; the panels they reference stay lazy.
-const _fragments = import.meta.glob('./panels/*.ts', { eager: true }) as Record<
-  string,
-  { default?: PanelEntry[] }
->
+//
+// The negative patterns are load-bearing, not tidiness. A colocated `motion.test.ts` used to sit
+// in ./panels, and an EAGER glob imports on match — so the registry evaluated a vitest suite in
+// the browser, `suite()` threw "Cannot read properties of undefined (reading 'config')", and the
+// whole editor route rendered blank. Filtering the results afterwards is too late; the import
+// side-effect has already run. The suite has since moved to ./panels/__tests__ (out of this
+// non-recursive pattern), and these exclusions keep the next colocated test from doing it again.
+const _fragments = import.meta.glob(
+  ['./panels/*.ts', '!./panels/*.test.ts', '!./panels/*.spec.ts'],
+  { eager: true },
+) as Record<string, { default?: PanelEntry[] }>
 
 const ENTRIES: PanelEntry[] = []
 for (const mod of Object.values(_fragments)) {

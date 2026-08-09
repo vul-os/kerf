@@ -54,11 +54,11 @@ export default defineConfig({
   },
 
   // Two project profiles against two server stacks:
-  //   local — LOCAL_MODE singleton auto-login (:5174 → :8081)
-  //   cloud — LOCAL_MODE=false, real signup/login + Workshop/Library (:5175 → :8082)
-  // Specs that need the public auth surface run under `cloud`; everything
-  // else under `local`. "cloud" here just means "server mode" — Workshop
-  // and Library are core MIT node capabilities present in both projects.
+  //   local        — LOCAL_MODE singleton auto-login (:5174 → :8081)
+  //   server-mode  — LOCAL_MODE=false, real signup/login + Workshop/Library (:5175 → :8082)
+  // Specs that need the public auth surface run under `server-mode`; everything
+  // else under `local`. Workshop and Library are core MIT node capabilities
+  // present in both projects.
   projects: [
     {
       name: 'local',
@@ -70,7 +70,7 @@ export default defineConfig({
       use: { baseURL: 'http://localhost:5174' },
     },
     {
-      name: 'cloud',
+      name: 'server-mode',
       testMatch: [
         '**/signup.spec.ts',
         '**/library.spec.ts',
@@ -135,7 +135,7 @@ export default defineConfig({
       stderr: 'pipe',
     },
     {
-      // Cloud backend on :8082 — LOCAL_MODE=false, no local auto-login, so
+      // server-mode backend on :8082 — LOCAL_MODE=false, no local auto-login, so
       // the real /signup + /login surface exists. Workshop/Library are
       // unconditional node capabilities in every mode.
       command:
@@ -154,7 +154,7 @@ export default defineConfig({
       stderr: 'pipe',
     },
     {
-      // Cloud frontend: Vite on :5175 (proxies /api + /auth to :8082)
+      // server-mode frontend: Vite on :5175 (proxies /api + /auth to :8082)
       // Same-origin proxy rather than VITE_API_URL — see the :5174 note above.
       command:
         'KERF_API_PROXY_TARGET=http://localhost:8082 ' +

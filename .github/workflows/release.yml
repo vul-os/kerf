@@ -238,11 +238,14 @@ jobs:
           [ -s "release-out/kerf-install-${TAG}.sh" ] || { echo "::error::missing install.sh copy"; exit 1; }
           ls -la release-out
 
-      # Split across two artifacts rather than one. The combined set is ~177 MB — dist is 98 MB,
-      # 63 MB of which is the OpenCascade wasm, and it lands in all three platform tarballs plus
-      # the standalone frontend tarball. A single artifact that size failed `download-artifact`
-      # with "failed after 5 retries" on two consecutive v0.1.4 runs while every other artifact in
-      # the same job downloaded fine. Publishing globs `release-out/*`, so how many artifacts the
+      # Split across two artifacts rather than one. NOTE: the original justification for this
+      # split — that a ~177 MB artifact was too large for `download-artifact` — was WRONG, and the
+      # run logs disprove it: the unsplit 177 MB artifact downloaded fine on every run. The actual
+      # cause of "Artifact download failed after 5 retries" was `pattern: "*"` in the publish job
+      # matching buildx's auto-uploaded `.dockerbuild` artifacts (see the comment on that step).
+      #
+      # The split is kept because it is harmless and smaller artifacts are marginally quicker, not
+      # because it fixes anything. Publishing globs `release-out/*`, so how many artifacts the
       # bytes arrive in does not change what gets released.
       - name: Upload platform tarballs as workflow artifact
         uses: actions/upload-artifact@v4

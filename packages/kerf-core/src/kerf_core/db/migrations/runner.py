@@ -74,7 +74,11 @@ async def run_sqlite_migrations(database_url: str):
             name = migration_file.name
             if name in applied:
                 continue
-            sql = migration_file.read_text()
+            # encoding="utf-8" is required, not cosmetic: read_text() defaults to the
+            # platform locale encoding, which is cp1252 on Windows. Migration
+            # files contain non-ASCII bytes, so the runner crashed before applying
+            # a single migration on every Windows install.
+            sql = migration_file.read_text(encoding="utf-8")
             # executescript runs the DDL (autocommit); the DDL is IF-NOT-EXISTS
             # idempotent so a re-run after a partial failure is safe.
             await conn.executescript(sql)
@@ -114,7 +118,11 @@ async def run_migrations(database_url: str):
             name = migration_file.name
             if name in applied:
                 continue
-            sql = migration_file.read_text()
+            # encoding="utf-8" is required, not cosmetic: read_text() defaults to the
+            # platform locale encoding, which is cp1252 on Windows. Migration
+            # files contain non-ASCII bytes, so the runner crashed before applying
+            # a single migration on every Windows install.
+            sql = migration_file.read_text(encoding="utf-8")
             # Strip SQL line comments + whitespace to check whether the file
             # actually contains any statement to execute. T-307's fold
             # produced "tombstone" files (0003, 0007, 0009) that are

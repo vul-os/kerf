@@ -479,11 +479,12 @@ export function WakeToggle({ enabled, disabledReason, busy, onToggle }: {
       data-testid="wake-toggle"
       data-wake-enabled={enabled ? 'true' : 'false'}
       aria-pressed={enabled}
+      aria-label={title}
       title={title}
       disabled={disabled}
       onClick={onToggle}
       className={
-        'p-1.5 rounded shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ' +
+        'p-1.5 rounded shrink-0 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ' +
         (enabled
           ? 'text-kerf-300 hover:bg-kerf-300/10'
           : 'text-ink-400 hover:bg-ink-800 hover:text-ink-200')
@@ -613,8 +614,9 @@ export function FollowsPanel({
                         type="button"
                         onClick={() => remove(f.pub)}
                         disabled={removing === f.pub}
-                        className="p-1.5 rounded text-red-300 hover:bg-red-500/10 disabled:opacity-40 shrink-0"
+                        className="p-1.5 rounded text-red-300 hover:bg-red-500/10 disabled:opacity-40 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/70"
                         title={`Unfollow ${f.label || truncatePub(f.pub)}`}
+                        aria-label={`Unfollow ${f.label || truncatePub(f.pub)}`}
                       >
                         {removing === f.pub
                           ? <Loader2 size={14} className="animate-spin" />
@@ -910,7 +912,7 @@ export function Workshop() {
             type="button"
             onClick={() => setTab('browse')}
             className={
-              'h-8 px-3 rounded-md text-xs font-medium transition-colors ' +
+              'h-8 px-3 rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ' +
               (tab === 'browse'
                 ? 'bg-kerf-300 text-ink-950'
                 : 'text-ink-200 hover:text-ink-100 hover:bg-ink-800')
@@ -923,7 +925,7 @@ export function Workshop() {
             data-testid="workshop-tab-feeds"
             onClick={() => setTab('feeds')}
             className={
-              'h-8 px-3 rounded-md text-xs font-medium transition-colors ' +
+              'h-8 px-3 rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ' +
               (tab === 'feeds'
                 ? 'bg-kerf-300 text-ink-950'
                 : 'text-ink-200 hover:text-ink-100 hover:bg-ink-800')

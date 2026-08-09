@@ -38,6 +38,8 @@ import os
 import math
 import xml.etree.ElementTree as _ET
 from dataclasses import dataclass, field
+
+from kerf_core.dependencies import require_auth_unless_local
 from typing import List, Optional
 
 router = APIRouter()

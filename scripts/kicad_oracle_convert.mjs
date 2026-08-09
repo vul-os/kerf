@@ -14,7 +14,15 @@
 // for a passing one.
 
 import { readFileSync } from "node:fs";
-import { KicadToCircuitJsonConverter } from "kicad-to-circuit-json";
+// `kicad-to-circuit-json` is a devDependency of the frontend (web/package.json),
+// not of this repo-root `scripts/` helper — the frontend restructure (moving
+// package.json + node_modules into web/) means the bare specifier below no
+// longer resolves via the normal node_modules walk-up from this file's
+// location. Import the installed package directly by its real path instead
+// of relying on a root-level node_modules that no longer exists.
+const { KicadToCircuitJsonConverter } = await import(
+  new URL("../web/node_modules/kicad-to-circuit-json/dist/index.js", import.meta.url)
+);
 
 const inputPath = process.argv[2];
 if (!inputPath) {

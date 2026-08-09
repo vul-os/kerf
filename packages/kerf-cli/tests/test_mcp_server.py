@@ -47,6 +47,20 @@ def _run(coro):
 # tool_entry_to_mcp_tool
 # ---------------------------------------------------------------------------
 
+
+def _input_schema(tool):
+    """Read a Tool's input schema across mcp versions.
+
+    mcp renamed this field from ``inputSchema`` to ``input_schema`` (keeping
+    ``inputSchema`` as a serialization alias). Construction by alias still
+    works, so mcp_server.py is unaffected — but ATTRIBUTE access is not, and
+    reading ``tool.inputSchema`` raises AttributeError on current mcp. These
+    tests only run where mcp is installed, so the break showed up in CI while
+    passing locally, where the package is absent and they skip.
+    """
+    return getattr(tool, "input_schema", None) or getattr(tool, "inputSchema")
+
+
 class TestToolEntryConversion:
     def test_maps_name_description_schema(self):
         from kerf_cli.mcp_server import tool_entry_to_mcp_tool
@@ -54,7 +68,7 @@ class TestToolEntryConversion:
         t = tool_entry_to_mcp_tool(_SAMPLE_PAYLOAD["tools"][0])
         assert t.name == "create_file"
         assert t.description == "Create a new file."
-        assert t.inputSchema == _SAMPLE_PAYLOAD["tools"][0]["input_schema"]
+        assert _input_schema(t) == _SAMPLE_PAYLOAD["tools"][0]["input_schema"]
 
     def test_defaults_missing_description_and_schema(self):
         from kerf_cli.mcp_server import tool_entry_to_mcp_tool
@@ -62,7 +76,7 @@ class TestToolEntryConversion:
         t = tool_entry_to_mcp_tool(_SAMPLE_PAYLOAD["tools"][1])
         assert t.name == "no_schema_tool"
         assert t.description == ""
-        assert t.inputSchema == {"type": "object", "properties": {}}
+        assert _input_schema(t) == {"type": "object", "properties": {}}
 
 
 # ---------------------------------------------------------------------------

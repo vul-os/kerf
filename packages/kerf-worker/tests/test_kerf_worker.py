@@ -286,7 +286,14 @@ class TestRevoke:
 class TestGPUProbe:
     def test_nvidia_smi_parsed(self):
         fake_output = "NVIDIA GeForce RTX 4090, 24576 MiB\nNVIDIA GeForce RTX 3080, 10240 MiB\n"
-        with patch("subprocess.run") as mock_run:
+        # probe() queries several sources; on Linux it also runs probe_amd_rocm(),
+        # whose rocm-smi call hits this same blanket subprocess.run mock and parses
+        # the NVIDIA fixture a second time — yielding 3 GPUs instead of 2. That made
+        # this test pass on macOS and fail on Linux CI. Pin the platform and stub the
+        # AMD path so this exercises nvidia-smi parsing only, as its name says.
+        with patch("subprocess.run") as mock_run, \
+             patch.object(gpu_mod.platform, "system", return_value="Linux"), \
+             patch.object(gpu_mod, "probe_amd_rocm", return_value=[]):
             mock_run.return_value = MagicMock(
                 returncode=0, stdout=fake_output, stderr=""
             )

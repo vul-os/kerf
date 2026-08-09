@@ -75,8 +75,8 @@ venv/
 env/
 
 # Playwright e2e generated artifacts
-tests/e2e/test-results/
-tests/e2e/playwright-report/
+web/tests/e2e/test-results/
+web/tests/e2e/playwright-report/
 /test-results/
 /playwright-report/
 

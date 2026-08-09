@@ -309,8 +309,9 @@ function Node({ file, depth, byParent, expanded, toggle, currentFileId, onSelect
             {isFolder && (
               <button
                 type="button"
-                className="opacity-0 group-hover:opacity-100 text-ink-400 hover:text-kerf-300 p-0.5 rounded hover:bg-ink-700"
+                className="opacity-0 group-hover:opacity-100 text-ink-400 hover:text-kerf-300 p-0.5 rounded hover:bg-ink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 title="New file in folder"
+                aria-label="New file in folder"
                 onClick={(e) => {
                   e.stopPropagation()
                   if (!isOpen) toggle(file.id)
@@ -322,8 +323,9 @@ function Node({ file, depth, byParent, expanded, toggle, currentFileId, onSelect
             )}
             <button
               type="button"
-              className="opacity-0 group-hover:opacity-100 text-ink-400 hover:text-red-400 p-0.5 rounded hover:bg-ink-700"
+              className="opacity-0 group-hover:opacity-100 text-ink-400 hover:text-red-400 p-0.5 rounded hover:bg-ink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/50"
               title={isFolder ? 'Delete folder (and contents)' : 'Delete file'}
+              aria-label={isFolder ? 'Delete folder (and contents)' : 'Delete file'}
               onClick={(e) => {
                 e.stopPropagation()
                 onDelete?.(file.id)
@@ -381,7 +383,7 @@ function MenuItem({ icon: Icon, label, action }: { icon: LucideIcon; label: stri
     <button
       type="button"
       onClick={action}
-      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-ink-100 hover:bg-ink-700 text-left"
+      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-ink-100 hover:bg-ink-700 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/70"
     >
       <Icon size={12} className="text-ink-300" />
       {label}
@@ -417,16 +419,18 @@ function UploadProgressStrip({ onRetry }: { onRetry?: () => void }) {
           <>
             <button
               type="button"
-              className="p-0.5 rounded hover:bg-ink-700 text-ink-300 hover:text-kerf-300"
+              className="p-0.5 rounded hover:bg-ink-700 text-ink-300 hover:text-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               title="Retry"
+              aria-label="Retry upload"
               onClick={() => onRetry?.()}
             >
               <RefreshCw size={11} />
             </button>
             <button
               type="button"
-              className="p-0.5 rounded hover:bg-ink-700 text-ink-300 hover:text-red-400"
+              className="p-0.5 rounded hover:bg-ink-700 text-ink-300 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/50"
               title="Dismiss"
+              aria-label="Dismiss upload error"
               onClick={() => dismiss()}
             >
               <X size={11} />
@@ -435,8 +439,9 @@ function UploadProgressStrip({ onRetry }: { onRetry?: () => void }) {
         ) : (
           <button
             type="button"
-            className="p-0.5 rounded hover:bg-ink-700 text-ink-300 hover:text-red-400"
+            className="p-0.5 rounded hover:bg-ink-700 text-ink-300 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/50"
             title="Cancel upload"
+            aria-label="Cancel upload"
             onClick={() => cancelUpload()}
           >
             <X size={11} />
@@ -512,7 +517,7 @@ function CreateCard({ icon: Icon, label, hint, color = 'text-ink-200', onClick }
       type="button"
       onClick={onClick}
       title={hint ? `${label} — ${hint}` : label}
-      className="flex flex-col items-start gap-1 rounded-xl border border-ink-800 bg-ink-950/30 p-3 text-left transition-colors hover:border-ink-600 hover:bg-ink-800/40 min-h-[72px]"
+      className="flex flex-col items-start gap-1 rounded-xl border border-ink-800 bg-ink-950/30 p-3 text-left transition-colors hover:border-ink-600 hover:bg-ink-800/40 min-h-[72px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
     >
       <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-ink-100">
         <Icon size={14} className={color} />
@@ -563,7 +568,7 @@ function CreateMenu({ onCreate, openImportPicker, openKicadPicker, openFreecadPi
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-ink-200 hover:text-kerf-300 hover:bg-ink-800 border border-ink-700 hover:border-ink-600"
+        className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-ink-200 hover:text-kerf-300 hover:bg-ink-800 border border-ink-700 hover:border-ink-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         title="Create a new file or folder, or import CAD"
       >
         <Plus size={12} />
@@ -587,7 +592,7 @@ function CreateMenu({ onCreate, openImportPicker, openKicadPicker, openFreecadPi
               <button
                 type="button"
                 onClick={close}
-                className="text-ink-400 hover:text-ink-100 transition-colors"
+                className="text-ink-400 hover:text-ink-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 rounded"
                 aria-label="Close"
               >
                 <X size={16} />
@@ -869,7 +874,7 @@ export default function FileTree({ files, currentFileId, onSelect, onCreate, onR
         <div className="flex items-center gap-2 px-3 py-1.5 bg-red-950/40 border-b border-red-700/50 text-[11px] text-red-200">
           <AlertCircle size={12} className="shrink-0" />
           <span className="flex-1 truncate">{kicadError}</span>
-          <button type="button" onClick={() => setKicadError(null)} className="hover:text-red-100"><X size={11} /></button>
+          <button type="button" onClick={() => setKicadError(null)} className="hover:text-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/50 rounded" aria-label="Dismiss KiCad import error"><X size={11} /></button>
         </div>
       )}
       <UploadProgressStrip onRetry={retryLastImport} />
@@ -924,7 +929,7 @@ export default function FileTree({ files, currentFileId, onSelect, onCreate, onR
             No files yet.<br />
             <button
               type="button"
-              className="mt-2 text-kerf-300 hover:underline"
+              className="mt-2 text-kerf-300 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 rounded"
               onClick={() => onCreate?.(null, 'file')}
             >
               Create one

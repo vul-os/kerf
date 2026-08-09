@@ -33,6 +33,11 @@ dependencies = [
     # undeclared pygit2 did. CI masks it because the `full` persona installs everything;
     # a minimal install mounts 2 /api routes instead of ~200.
     "kerf-chat>=0.1.0",
+    # routes.py imports kerf_tess at module level (line ~48), same as kerf_chat. The other
+    # sibling imports in this package are either lazy or behind _try_include, which is
+    # designed to swallow ImportError for optional sub-routers — those stay undeclared on
+    # purpose. These two are eager, so a missing one fails register() outright.
+    "kerf-tess>=0.1.0",
 ]
 
 [project.optional-dependencies]

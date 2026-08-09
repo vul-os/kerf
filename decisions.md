@@ -1372,3 +1372,34 @@ The script now emits two reports: third-party declared nowhere (still 3, all adj
 **Only kerf-api is fixed.** The other 17 are recorded but not touched: each needs checking
 against the personas that actually ship it before adding a dependency edge, and a wrong edge can
 create a cycle. kerf-api was fixed because its breakage is reproduced and total.
+
+## 2026-08-09 — The undeclared-dependency chain, fully unwound against a real server
+
+**Result: a minimal persona now mounts 115 `/api` routes instead of 2, with zero
+`plugin_register_failed`.** `/api/config` returns 200.
+
+Three undeclared dependencies, each hidden behind the one before it. You cannot find
+these by reading — each only appears once the previous is fixed and the boot gets further:
+
+  1. `pygit2`    — found from CI logs, fixed, took E2E 4 -> 8 passed.
+  2. `kerf-chat` — found by booting a minimal venv locally. 2 routes.
+  3. `kerf-tess` — found by booting again after kerf-chat. Still 2 routes.
+
+All three are eager, module-level imports inside `kerf_api/routes.py`, which `register()`
+imports at startup, so any one missing fails the WHOLE kerf-api plugin.
+
+**Why only these three, when kerf-api imports ten siblings.** The other seven
+(`kerf_aero`, `kerf_cloud`, `kerf_composites`, `kerf_firmware`, `kerf_imports`,
+`kerf_mates`, `kerf_plc`, `kerf_silicon`) are either lazy or reached through
+`_try_include`, which swallows ImportError **by design** so an absent optional sub-router
+degrades instead of killing the plugin. Those stay undeclared deliberately — declaring them
+would force every persona to install every domain package. The distinction that matters is
+eager-vs-guarded, not workspace-vs-third-party.
+
+**Why CI never caught any of it.** The E2E job installs the `full` persona, where all three
+are incidentally present. Every narrower persona — which is what a real user installs —
+shipped an API with two routes. Green CI was not evidence of a working install.
+
+**Method note.** The local repro is the whole reason this closed. Postgres in docker, a venv
+with one package at a time, boot, read the error, install the next. Three rounds. Reading the
+code suggested ten candidates and could not rank them; the server ranked them instantly.

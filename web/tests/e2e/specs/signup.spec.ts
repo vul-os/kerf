@@ -1,7 +1,7 @@
 /**
- * signup.spec.ts — sign-up + sign-in flow (cloud project).
+ * signup.spec.ts — sign-up + sign-in flow (server-mode project).
  *
- * Runs under the Playwright `cloud` project, which boots a kerf-server
+ * Runs under the Playwright `server-mode` project, which boots a kerf-server
  * with LOCAL_MODE=false (no local singleton auto-login) so the real /signup and
  * /login pages exist. Register returns tokens immediately (no email
  * verification gate), then the app navigates to /projects.
@@ -23,7 +23,7 @@ async function expectProjectsPage(page: Page) {
   ).toBeVisible({ timeout: 20_000 })
 }
 
-test.describe('Signup / signin (cloud mode)', () => {
+test.describe('Signup / signin (server mode)', () => {
   test('fill signup form and redirect to /projects', async ({ page }) => {
     const email = uniqueEmail('signup')
     await page.goto('/signup')
@@ -39,7 +39,7 @@ test.describe('Signup / signin (cloud mode)', () => {
   test('login with existing credentials and redirect to /projects', async ({
     page,
   }) => {
-    // Seed a user via the API (proxied through Vite → cloud backend).
+    // Seed a user via the API (proxied through Vite → server-mode backend).
     const email = uniqueEmail('login')
     const res = await page.request.post('/auth/register', {
       data: { email, password: PASSWORD, name: 'E2E Login' },

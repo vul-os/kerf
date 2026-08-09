@@ -7,8 +7,8 @@
  * brute-force control and is deliberately NOT made configurable — a "disable rate limiting"
  * env var is exactly the kind of knob that ends up set in production.
  *
- * But the cloud specs register a fresh user per test, so the fourth consecutive local run
- * inside an hour starts getting 429s and the cloud project fails wholesale, with symptoms
+ * But the server-mode specs register a fresh user per test, so the fourth consecutive local run
+ * inside an hour starts getting 429s and the server-mode project fails wholesale, with symptoms
  * that look nothing like rate limiting: instant sub-200ms failures on tests that never
  * mention auth. CI never hit this because its database is new every run; a developer
  * re-running the suite locally hits it immediately.

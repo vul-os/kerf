@@ -1,7 +1,7 @@
 /**
  * workshop.spec.ts — a published Part appears in the Workshop browse list.
  *
- * Runs under the `cloud` Playwright project (LOCAL_MODE=false).
+ * Runs under the `server-mode` Playwright project (LOCAL_MODE=false).
  *
  * Workshop is no longer a central, project-visibility-driven catalog — that
  * role moved to /library (GET /api/library/parts -> list_public_parts, see
@@ -98,7 +98,7 @@ async function seedPublishedPart(req: APIRequestContext) {
   return { email, partName }
 }
 
-test.describe('Workshop (cloud mode)', () => {
+test.describe('Workshop (server mode)', () => {
   test('published Part appears in Workshop after following the feed', async ({
     page,
   }) => {
@@ -114,9 +114,9 @@ test.describe('Workshop (cloud mode)', () => {
     ).toBeVisible({ timeout: 20_000 })
 
     // Navigate to Workshop via the in-app link (client-side route) — a hard
-    // page.goto('/workshop') races useNodeConfig: until /api/config
-    // resolves, the cloud-gated route isn't registered and the catch-all
-    // ("*" → "/") bounces back to /projects.
+    // page.goto('/workshop') races App.tsx's bootstrap gate: until
+    // /api/config resolves, App renders null (see the `bootstrapping` guard),
+    // so a fresh navigation can land on a blank frame instead of Workshop.
     await page.getByRole('link', { name: 'Workshop', exact: true }).first().click()
 
     // With a followed feed carrying a listing, Workshop renders past both

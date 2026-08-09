@@ -3,7 +3,7 @@
 // unconditionally on every node (see decisions.md's 2026-07-17
 // "local git only; no OAuth" addendum).
 //
-// Drives the local git API directly (src/cloud/api.js `git`): init if not
+// Drives the local git API directly (src/lib/pubApi.js `git`): init if not
 // initialized, status/branch/dirty, commit with a message, a flat commit
 // log, a remotes manager (add/remove name+URL — any git remote, no OAuth),
 // and push/pull with remote + branch pickers. There is no branch
@@ -22,10 +22,10 @@ import {
   Link2, Loader2, RefreshCw, X,
 } from 'lucide-react'
 import { Button } from './untypedUi.js'
-import PurgeRevisionsModal from '../components/PurgeRevisionsModal.jsx'
-import { api, ApiError } from '../lib/api.js'
-import { git } from './api.js'
-import type { GitCommitEntry, GitRemote, GitStatus } from './api.js'
+import PurgeRevisionsModal from '../PurgeRevisionsModal.jsx'
+import { api, ApiError } from '../../lib/api.js'
+import { git } from '../../lib/pubApi.js'
+import type { GitCommitEntry, GitRemote, GitStatus } from '../../lib/pubApi.js'
 import RemotesManager from './RemotesManager.jsx'
 import type { RevisionsSize } from '@/types'
 

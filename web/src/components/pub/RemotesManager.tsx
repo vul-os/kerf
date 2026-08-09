@@ -11,9 +11,9 @@ import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { AlertCircle, Link2, Loader2, Plus, Trash2, X } from 'lucide-react'
 import { Button, Input } from './untypedUi.js'
-import { ApiError } from '../lib/api.js'
-import { git } from './api.js'
-import type { GitRemote } from './api.js'
+import { ApiError } from '../../lib/api.js'
+import { git } from '../../lib/pubApi.js'
+import type { GitRemote } from '../../lib/pubApi.js'
 
 export default function RemotesManager({ projectId, onClose, onChanged }: {
   projectId: string

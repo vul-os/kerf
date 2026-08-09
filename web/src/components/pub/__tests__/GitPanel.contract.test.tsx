@@ -2,11 +2,11 @@
 // (decisions.md 2026-07-17 "local git only; no OAuth" addendum).
 //
 // GitPanel.jsx and RemotesManager.jsx now drive GET/POST /api/git/:project_id/*
-// directly (src/cloud/api.js `git`) instead of the retired hosted-git +
+// directly (src/lib/pubApi.js `git`) instead of the retired hosted-git +
 // GitHub-OAuth product. Component tests render the exported, prop-driven
 // sub-components via react-dom/server's renderToStaticMarkup — this repo's
 // toolchain has no jsdom/@testing-library/react (see the header comment on
-// the pre-existing src/cloud/GitPanel.test.jsx). Source-text assertions
+// the pre-existing src/components/pub/GitPanel.test.jsx). Source-text assertions
 // cover the "no OAuth" requirement directly, since that's an absence of a
 // code path rather than something with a renderable state.
 //
@@ -30,7 +30,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { ErrorBanner, TransferPanel, CommitLog, EmptyState } from '../GitPanel.jsx'
 import RemotesManager from '../RemotesManager.jsx'
-import { git } from '../api.js'
+import { git } from '../../../lib/pubApi.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const gitPanelSrc = readFileSync(join(__dirname, '../GitPanel.tsx'), 'utf8')

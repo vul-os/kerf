@@ -1,6 +1,7 @@
 // untypedUi.ts — typed re-exports for the handful of src/components/*.jsx UI
-// primitives this slice (src/cloud) consumes but does not own (T-508 covers
-// src/store, src/stores, src/cloud, src/illustrations — not src/components).
+// primitives this slice (src/components/pub) consumes but does not own
+// (T-508 covers src/store, src/stores, src/components/pub, src/illustrations
+// — not src/components proper).
 //
 // Each of these is plain, unannotated JS. TypeScript still infers a prop
 // type for them from the destructuring in their function signature, but
@@ -15,9 +16,9 @@
 // artifact of un-migrated JS. Casting once, here, to a generic component
 // type documents the boundary in one place instead.
 import type { ComponentType } from 'react'
-import ButtonImpl from '../components/Button.jsx'
-import InputImpl, { Textarea as TextareaImpl } from '../components/Input.jsx'
-import ModalImpl from '../components/Modal.jsx'
+import ButtonImpl from '../Button.jsx'
+import InputImpl, { Textarea as TextareaImpl } from '../Input.jsx'
+import ModalImpl from '../Modal.jsx'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- boundary: see header comment; src/components is not this slice's to type.
 type LooseComponent = ComponentType<Record<string, any>>

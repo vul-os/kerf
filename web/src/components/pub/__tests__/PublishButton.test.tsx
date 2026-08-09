@@ -5,7 +5,7 @@
 //
 // Component tests render the step sub-components directly via
 // react-dom/server's renderToStaticMarkup (no jsdom/@testing-library/react
-// in this repo's toolchain — see src/cloud/GitPanel.test.jsx), which lets us
+// in this repo's toolchain — see src/components/pub/GitPanel.test.jsx), which lets us
 // assert on a given step's markup without driving PublishModal's internal
 // async orchestration (identity check + publish call).
 //

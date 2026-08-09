@@ -51,7 +51,7 @@ import { useWorkspace, loadFilePartsForProject, unpackJscadResult } from '../sto
 import type { RenderablePart } from '../store/workspace.js'
 import { useWorkspaces } from '../store/workspaces.js'
 import { useAuth } from '../store/auth.js'
-import { GitPanel, PublishButton } from '../cloud/index.js'
+import { GitPanel, PublishButton } from '../components/pub/index.js'
 import { runJscad, cancelJscad } from '../lib/jscadRunner.js'
 import { getTopologyLazy } from '../lib/topology.js'
 import { meshCache } from '../lib/meshCache.js'

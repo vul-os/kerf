@@ -51,7 +51,7 @@ describe('formatBytes', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // RevisionStorageBadge — minimal inline replica of the badge JSX from
 // GitPanel so we can assert on the data-testid and text without importing the
-// full panel (which drags in zustand, the cloud API client, and lucide icons).
+// full panel (which drags in zustand, the pub API client, and lucide icons).
 // ─────────────────────────────────────────────────────────────────────────────
 
 function RevisionStorageBadge({ revSize }) {

@@ -24,9 +24,9 @@ import {
   AlertCircle, Check, Copy, Globe, KeyRound, Loader2, Plus, ShieldAlert, Trash2,
 } from 'lucide-react'
 import { Button, Input, Modal, Textarea } from './untypedUi.js'
-import { ApiError } from '../lib/api.js'
-import { pub } from './api.js'
-import type { PubAssemblyCandidate, PubPublishChild, PubPublishResult } from './api.js'
+import { ApiError } from '../../lib/api.js'
+import { pub } from '../../lib/pubApi.js'
+import type { PubAssemblyCandidate, PubPublishChild, PubPublishResult } from '../../lib/pubApi.js'
 import type { ApiProject } from '@/types'
 
 // A child row's `quantity` starts as the number 1 but the quantity <Input>

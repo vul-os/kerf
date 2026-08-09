@@ -71,7 +71,7 @@ async def register(app: FastAPI, ctx) -> PluginManifest:
 
     # Distributor registry (Mouser/DigiKey/LCSC/McMaster sync) — a node
     # feature (self-hosters supply their own distributor API credentials),
-    # folded in from the former kerf-cloud plugin. It needs a DB pool
+    # folded in from the former cloud-tier plugin package. It needs a DB pool
     # (distributor credentials live in the encrypted distributor_credentials
     # table); with no pool it just stays dormant, same as a node with zero
     # GitHub remotes configured still runs its git panel.
@@ -96,10 +96,10 @@ async def _init_distributor_registry(ctx) -> None:
     """Create the distributor Registry, reload credentials from DB, wire it
     into routes.py's module-level getter, and register the background sweep.
 
-    Folded in from the former kerf-cloud plugin's register(): distributor
-    sync was never actually a "cloud" feature — it runs on every node, gated
-    only by whether that node's operator has configured any distributor
-    credentials.
+    Folded in from the former cloud-tier plugin package's register():
+    distributor sync was never actually a "cloud" feature — it runs on every
+    node, gated only by whether that node's operator has configured any
+    distributor credentials.
     """
     try:
         from kerf_api.distributors.registry import Registry, set_registry

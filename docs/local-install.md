@@ -83,12 +83,13 @@ have lighter runtime footprints.
 | `mech` | Mechanical CAD, FEM, CAM, topology optimisation | pythonOCC, FEniCSx, OpenCAMlib |
 | `electronics` | PCB, schematics, SPICE, RF | ngspice, scikit-rf |
 | `bim` | Building modelling, IFC export | IfcOpenShell |
-| `full` | All of the above, plus distributor sync & production-ops extras (`kerf-cloud`: job traveler, share links, PLM) | everything |
+| `full` | Every domain plugin on top of the personas above | everything |
 | `compute-only` | Heavy workers behind an internal load balancer; no auth or REST | all compute deps |
 
-(`kerf-cloud` is an ordinary MIT plugin that runs locally like every other
-plugin — the name refers to what it does, not to a hosted service. There is
-no separate cloud product.)
+Distributor sync and the production-ops extras (job traveler, share links,
+PLM: 150% BOM / ECO / SysML trace / where-used) live in `kerf-api` itself,
+so they ship with every persona above, not just `full` — there is no
+separate "cloud" plugin gating them and no hosted service behind them.
 
 Full breakdown: [persona-bundles.md](./persona-bundles.md).
 

@@ -1525,3 +1525,28 @@ to prevent. Renaming a workspace package touches the persona lists, the entry-po
 group, `uv` sources, the wheel build and every import site, so it is not something to do
 in the run-up to a release. Flagged for a deliberate follow-up rather than done quietly
 here; `kerf-plm` would be the accurate name.
+
+## 2026-08-09 13:12 SAST — `kerf-cloud` folded into `kerf-api`, package deleted
+
+**Context:** the deliberate follow-up flagged above. `packages/kerf-cloud` held real
+LOCAL features under a name and a cross-package split left over from the retired
+hosted/proprietary tier. `kerf_api/routes.py` already imported `kerf_cloud.distributors`
+directly, so the separation was already leaking, not protecting anything.
+
+**Decision:** moved every kerf-cloud submodule into `kerf_api` verbatim — `plm/`,
+`distributors/`, `job_traveler.py`, `share_link.py`, `scheduler/` — rewrote their
+internal imports, folded kerf-cloud's `register()` (distributor Registry + background
+sweep worker) into `kerf_api.plugin.register()`, moved its tests into
+`packages/kerf-api/tests/`, merged its one non-duplicate runtime dep (`aiohttp`) into
+`kerf-api/pyproject.toml`, and deleted `packages/kerf-cloud` along with every
+`kerf-cloud`/`kerf_cloud` reference in the root `pyproject.toml` (persona lists,
+workspace members, `[tool.uv.sources]`, pytest testpaths), `packages/kerf-cli`
+(`[server]` extra + its packaging test), and `scripts/{dev-install,test_all}.sh`.
+
+**Why:** `kerf-plm` (suggested above) was rejected as the new name — `packages/kerf-plm`
+already exists as an unrelated, independent PLM package (configurator/effectivity-BOM/
+ECR workspace member), so reusing that name would collide. Folding into `kerf-api`
+instead of renaming-in-place removes a cross-package edge rather than relocating it:
+kerf-api was already the plugin that reached into kerf-cloud's distributor module at
+import time, so absorbing it makes kerf-api the sole owner of something it effectively
+already owned.

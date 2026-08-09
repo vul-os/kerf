@@ -59,7 +59,6 @@ export PYTHONPATH="$PYPATH"
 if PYTHONHASHSEED=0 PYTHONPATH="$PYPATH" python3 -m pytest \
       packages/ \
       -n "${PYTEST_WORKERS:-auto}" \
-      --ignore=packages/kerf-cloud \
       --ignore=packages/kerf-billing \
       --tb=short -q 2>&1; then
   _pass "pytest (bulk, parallel)"
@@ -67,20 +66,26 @@ else
   _fail "pytest (bulk, parallel)"
 fi
 
-# 1b. DB-integration packages (cloud + billing) — run SERIALLY (no -n). These
-# assert on shared real-Postgres state (GC sweeps, billing debits) and cannot
-# run concurrently against one database without per-worker DB isolation; they
-# pass deterministically single-process. Set SKIP_DB_TESTS=1 to skip when no
+# 1b. DB-integration packages (billing) — run SERIALLY (no -n). These assert
+# on shared real-Postgres state (billing debits) and cannot run concurrently
+# against one database without per-worker DB isolation; they pass
+# deterministically single-process. Set SKIP_DB_TESTS=1 to skip when no
 # Postgres is available (DATABASE_URL).
+#
+# The distributor-sync / PLM / job-traveler / share-link tests used to run
+# here too, back when they lived in a separate cloud-tier plugin package
+# that needed the same serial-DB treatment for GC sweeps. That package
+# folded into kerf-api and its tests are hermetic (no DB, no network — see
+# packages/kerf-api/tests/test_distributors.py etc.), so they now run in
+# the parallel bulk pass above instead.
 if [[ "${SKIP_DB_TESTS:-0}" == "1" ]]; then
-  echo "  [skip] cloud + billing (SKIP_DB_TESTS=1)"
+  echo "  [skip] billing (SKIP_DB_TESTS=1)"
 elif PYTHONHASHSEED=0 PYTHONPATH="$PYPATH" python3 -m pytest \
-      packages/kerf-cloud/tests/ \
       packages/kerf-billing/tests/ \
       --tb=short -q 2>&1; then
-  _pass "pytest (cloud + billing, serial / DB)"
+  _pass "pytest (billing, serial / DB)"
 else
-  _fail "pytest (cloud + billing, serial / DB)"
+  _fail "pytest (billing, serial / DB)"
 fi
 
 # ── 2. Frontend vitest ────────────────────────────────────────────────────────

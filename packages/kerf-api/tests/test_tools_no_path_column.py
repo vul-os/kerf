@@ -27,7 +27,10 @@ _ROOT = pathlib.Path(__file__).resolve().parents[3]
 _TOOL_DIRS = [
     _ROOT / "packages/kerf-api/src/kerf_api/tools",
     _ROOT / "packages/kerf-chat/src/kerf_chat/tools",
-    _ROOT / "packages/kerf-cloud/src/kerf_cloud",
+    # The former cloud-tier plugin package folded into kerf-api; these are
+    # the two dirs from it that touch the `files` table directly.
+    _ROOT / "packages/kerf-api/src/kerf_api/distributors",
+    _ROOT / "packages/kerf-api/src/kerf_api/plm",
 ]
 
 # Lines like:    SELECT ... FROM files ... WHERE ... path = $...

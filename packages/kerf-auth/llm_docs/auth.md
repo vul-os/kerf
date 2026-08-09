@@ -28,7 +28,7 @@ async def register(app, ctx) -> PluginManifest:
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/auth/register` | Create account (email + password). Returns `AuthResponse`. Also fires a welcome email via `kerf_cloud.email` (silent fail). |
+| POST | `/auth/register` | Create account (email + password). Returns `AuthResponse`. Auto-verified immediately — no welcome/verification email is sent. |
 | POST | `/auth/login` | Verify password (bcrypt + pepper). Returns `AuthResponse`. |
 | POST | `/auth/refresh` | Exchange a refresh token for a new access token. |
 | POST | `/auth/logout` | Revoke the current refresh token (cookie or body). |
@@ -113,7 +113,9 @@ GitHub OAuth routes are always mounted; they 503 until `cloud_github_client_id`/
 5. Upsert Kerf user, store encrypted GitHub token in `cloud_github_tokens`
 6. Issue Kerf JWT + refresh token, redirect to frontend
 
-The encrypted token enables the GitHub App repo-connect flow (handled by `kerf-cloud`).
+The GitHub App repo-connect flow that used to consume this encrypted token
+was retired along with the rest of hosted git; the token is stored but
+nothing currently reads it back out.
 
 ---
 

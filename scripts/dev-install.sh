@@ -57,7 +57,7 @@ case "$persona" in
   bim)
     pkgs="$core kerf-bim" ;;
   full)
-    pkgs="$core kerf-v1 kerf-billing kerf-cloud kerf-pricing \
+    pkgs="$core kerf-v1 kerf-billing kerf-pricing \
           kerf-cad-core kerf-tess kerf-fem kerf-cam kerf-topo kerf-mates \
           kerf-electronics kerf-bim kerf-imports kerf-render kerf-workers" ;;
   *)

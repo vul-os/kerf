@@ -44,11 +44,12 @@ singleton user account, so you don't see a login screen.
 packages/
 ├── kerf-core/         FastAPI app factory, plugin loader, DB, storage
 ├── kerf-auth/         JWT + API tokens + sessions
-├── kerf-api/          Core REST surface + ~50 LLM tools
+├── kerf-api/          Core REST surface + ~50 LLM tools; also PLM, distributor
+│                       sync, job traveler, share links (folded in from the
+│                       retired kerf-cloud package)
 ├── kerf-chat/         LLM agent loop + tool dispatch
 ├── kerf-v1/           /v1/rpc JSON-RPC for the kerf-sdk
 ├── kerf-pub/          DMTAP-PUB Workshop: publish / fetch / resolve / submit
-├── kerf-cloud/        PLM, distributor sync, job-traveller, share links (MIT; legacy name)
 ├── kerf-cad-core/     pythonOCC: sketch, BREP, surfacing, .feature ops
 ├── kerf-tess/         STEP → GLB tessellation worker
 ├── kerf-fem/          FEM (FEniCSx + CalculiX)
@@ -64,17 +65,25 @@ packages/
 └── kerf-sdk/          Python SDK (PyPI: kerf-sdk)
 
 src/
-├── components/        React components + illustrations
+├── components/        React components + illustrations (components/pub/ holds
+│                       the Git panel + publish button — DMTAP-PUB/git UI)
 ├── routes/            Landing, Editor, Projects, Library, Workshop, Docs
 ├── lib/               runners (JSCAD / OCCT / sketch / equations), API client
-├── store/             Zustand stores
-└── cloud/             Git panel, Workshop publish/browse UI (MIT; legacy name)
+│                       (pubApi.ts covers Workshop/git/library endpoints)
+└── store/             Zustand stores
 ```
 
-> **Legacy names.** `kerf-cloud` and `src/cloud/` predate the move to a single
-> MIT build and no longer hold anything "cloud-only" or proprietary — the
-> billing (`kerf-billing`) and pricing (`kerf-pricing`) packages and
-> `LICENSE-CLOUD` were removed. Everything in the tree is MIT.
+> **Legacy names.** The billing (`kerf-billing`) and pricing (`kerf-pricing`)
+> packages and `LICENSE-CLOUD` were removed when the project moved to a
+> single MIT build. `kerf-cloud` outlived that move as a naming leftover —
+> it held ordinary local features (PLM, distributor sync, job traveler,
+> share links) behind a "cloud" name and a package boundary that no longer
+> meant anything, so it was folded into `kerf-api` and deleted. The
+> frontend's own `src/cloud/` was retired the same way: it held ordinary
+> local UI (Git panel, Workshop publish/browse) with no proprietary split
+> left to justify a "cloud" name, so it was folded into `components/`,
+> `routes/`, and `lib/` alongside everything else. Everything in the tree
+> is MIT.
 
 ## How to add a new feature
 

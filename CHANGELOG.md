@@ -167,6 +167,17 @@ The authoritative source for what's shipped vs. in-flight is
 
 ### Changed
 
+- **`packages/kerf-cloud` folded into `kerf-api`; the package is gone.** It
+  was a naming leftover from the retired hosted/proprietary split, but it
+  held real local-only features — distributor sync (Mouser/DigiKey/LCSC/
+  McMaster), PLM (150% BOM, ECO, SysML trace, where-used), job traveler,
+  and share links. `kerf_api/routes.py` already imported
+  `kerf_cloud.distributors` directly, so the two packages were never
+  cleanly separated. Everything moved into `kerf_api` as submodules
+  (`plm/`, `distributors/`, `job_traveler.py`, `share_link.py`,
+  `scheduler/`), its plugin `register()` folded into `kerf_api.plugin`, and
+  its tests moved into `packages/kerf-api/tests/`. No functionality was
+  removed — only the vestigial package boundary.
 - **`site/docs/` is a generated, gated subset instead of a hand-copied partial
   mirror.** The static site carries a curated 58-page subset of the docs, but
   its markdown was copied by hand and nothing diffed it: 30 of the 58 files had

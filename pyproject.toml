@@ -90,7 +90,6 @@ full = [
     "kerf-chat",
     "kerf-v1",
     "kerf-pub",
-    "kerf-cloud",
     "kerf-cad-core",
     "kerf-tess",
     "kerf-fem",
@@ -186,7 +185,6 @@ members = [
     "packages/kerf-chat",
     "packages/kerf-civil",
     "packages/kerf-cli",
-    "packages/kerf-cloud",
     "packages/kerf-composites",
     "packages/kerf-core",
     "packages/kerf-dental",
@@ -245,7 +243,6 @@ kerf-cfd = { workspace = true }
 kerf-chat = { workspace = true }
 kerf-civil = { workspace = true }
 kerf-cli = { workspace = true }
-kerf-cloud = { workspace = true }
 kerf-composites = { workspace = true }
 kerf-core = { workspace = true }
 kerf-dental = { workspace = true }
@@ -321,7 +318,6 @@ testpaths = [
     "packages/kerf-auth/tests",
     "packages/kerf-api/tests",
     "packages/kerf-chat/tests",
-    "packages/kerf-cloud/tests",
     "packages/kerf-pub/tests",
     "packages/kerf-sdk/tests",
     "packages/kerf-imports/tests",

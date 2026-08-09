@@ -17,8 +17,9 @@ dependencies = [
     "kerf-core>=0.1.0",
     "kerf-auth>=0.1.0",
     # distributors/*.py (registry.py, service.py, digikey.py, lcsc.py, mouser.py)
-    # import aiohttp at module top level — folded in from kerf-cloud's own
-    # pyproject.toml when the distributor sync feature moved into kerf-api.
+    # import aiohttp at module top level — folded in from the former
+    # cloud-tier plugin's own dependency list when distributor sync moved
+    # into kerf-api.
     # _init_distributor_registry() in plugin.py wraps the import in try/except
     # so a missing aiohttp only disables distributor sync rather than taking
     # the whole plugin down, but the feature is silently dead without it.

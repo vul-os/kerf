@@ -167,7 +167,6 @@ function LightRow({ light, onChange, onRemove }: { light: RenderLight; onChange:
 
 export default function RenderView({ content, fileName, onContentChange }: RenderViewProps) {
   const [doc, setDoc] = useState<RenderDoc | null>(null)
-  const [runMsg, setRunMsg] = useState<string | null>(null)
   const [orbitOpen, setOrbitOpen] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 

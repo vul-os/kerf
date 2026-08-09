@@ -1403,3 +1403,33 @@ shipped an API with two routes. Green CI was not evidence of a working install.
 **Method note.** The local repro is the whole reason this closed. Postgres in docker, a venv
 with one package at a time, boot, read the error, install the next. Three rounds. Reading the
 code suggested ten candidates and could not rank them; the server ranked them instantly.
+
+## 2026-08-09 — E2E layer 2: narrowed, not yet solved
+
+**What the local repro established.**
+  * Backend is healthy: 115 `/api` routes, 0 `plugin_register_failed`, `/api/config` 200.
+  * Vite dev server serves 200 and the app MOUNTS against it — `#root` renders 8,478 chars
+    with **zero** console errors and zero page errors.
+  * Yet the failing spec's screenshot is a **completely blank page**.
+
+**So the assertion has been misleading me.** The reported failure is
+`expect(newFileDropdownButton).toBeVisible()`, which reads as "one button is missing". The
+screenshot shows nothing rendered at all. Those are different faults, and chasing the button
+selector — which is correct in FileTree.tsx — was never going to find it.
+
+**What that rules out.** Not the selector, not the backend, not the plugin chain, not the app's
+ability to boot, and not a console/page error at load. 8,478 chars is roughly a login-sized
+render rather than the ~303K a full editor produces, so the app is very likely sitting on an
+earlier route than the spec believes.
+
+**Next step, stated so it is not re-derived.** Drive the spec's own flow — create project,
+navigate to the editor — with the trace viewer
+(`npx playwright show-trace test-results/.../trace.zip`), and read the URL and DOM at the
+moment of failure. The trace is already captured on disk from this run.
+
+**Local repro, for reuse.**
+  docker: `kerf-e2e-db`, port 5433, db kerf_e2e, postgres/postgres
+  venv: `.venv-e2e` — kerf-core, kerf-auth, kerf-api, kerf-chat, kerf-cad-core, kerf-tess
+  backend: KERF_PORT=8091 KERF_LOCAL_MODE=true LOCAL_MODE=true DATABASE_URL=... -m kerf_core --port 8091
+  frontend: cd web && KERF_API_PROXY_TARGET=http://localhost:8091 npx vite --port 5174
+  spec: cd web/tests/e2e && DATABASE_URL=... PATH=.venv-e2e/bin:$PATH npx playwright test --project=local

@@ -27,8 +27,8 @@ vi.mock('../store/auth.js', () => ({
   useAuth: () => () => {},
 }))
 
-vi.mock('../lib/useCloudConfig.js', () => ({
-  useCloudConfig: () => ({ googleEnabled: false, githubEnabled: false }),
+vi.mock('../lib/useNodeConfig.js', () => ({
+  useNodeConfig: () => ({ googleEnabled: false, githubEnabled: false }),
 }))
 
 vi.mock('../lib/api.js', () => ({

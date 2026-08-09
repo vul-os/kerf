@@ -7,7 +7,7 @@ import Input from '../components/Input.jsx'
 import Card from '../components/Card.jsx'
 import { api, ApiError } from '../lib/api.js'
 import { useAuth } from '../store/auth.js'
-import { useCloudConfig } from '../lib/useCloudConfig.js'
+import { useNodeConfig } from '../lib/useNodeConfig.js'
 
 function GitHubIcon() {
   return (
@@ -43,7 +43,7 @@ function GoogleIcon() {
 export default function Signup() {
   const navigate = useNavigate()
   const setSession = useAuth((s) => s.setSession)
-  const { googleEnabled, githubEnabled } = useCloudConfig()
+  const { googleEnabled, githubEnabled } = useNodeConfig()
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')

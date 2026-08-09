@@ -114,7 +114,7 @@ test.describe('Workshop (cloud mode)', () => {
     ).toBeVisible({ timeout: 20_000 })
 
     // Navigate to Workshop via the in-app link (client-side route) — a hard
-    // page.goto('/workshop') races useCloudConfig: until /api/config
+    // page.goto('/workshop') races useNodeConfig: until /api/config
     // resolves, the cloud-gated route isn't registered and the catch-all
     // ("*" → "/") bounces back to /projects.
     await page.getByRole('link', { name: 'Workshop', exact: true }).first().click()

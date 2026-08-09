@@ -7,7 +7,7 @@ import Input from '../components/Input.jsx'
 import Card from '../components/Card.jsx'
 import { api, ApiError } from '../lib/api.js'
 import { useAuth } from '../store/auth.js'
-import { useCloudConfig } from '../lib/useCloudConfig.js'
+import { useNodeConfig } from '../lib/useNodeConfig.js'
 
 const ERROR_LABELS = {
   missing_tokens: 'Sign-in did not return tokens. Please try again.',
@@ -54,7 +54,7 @@ export default function Login() {
   const location = useLocation()
   const [params] = useSearchParams()
   const setSession = useAuth((s) => s.setSession)
-  const { googleEnabled, githubEnabled } = useCloudConfig()
+  const { googleEnabled, githubEnabled } = useNodeConfig()
 
   const sessionExpired = location.state?.sessionExpired === true
 

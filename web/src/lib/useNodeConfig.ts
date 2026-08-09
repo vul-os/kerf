@@ -102,7 +102,7 @@ const useStore = create<CloudConfigStore>((set, get) => ({
       .catch((err: unknown) => {
         // Treat network/unreachable as "OSS defaults". Surface in console
         // so devs notice misconfigured proxies.
-        console.warn('[useCloudConfig] /api/config failed:', err)
+        console.warn('[useNodeConfig] /api/config failed:', err)
         set({ ...DEFAULTS, ready: true, _inflight: null })
       })
     set({ _inflight: p })
@@ -110,7 +110,7 @@ const useStore = create<CloudConfigStore>((set, get) => ({
   },
 }))
 
-export function useCloudConfig(): CloudConfigValues {
+export function useNodeConfig(): CloudConfigValues {
   const state = useStore()
   useEffect(() => {
     if (!state.ready && !state._inflight) state.fetch()

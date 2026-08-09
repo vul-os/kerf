@@ -1,4 +1,4 @@
-// useCloudConfig.test.js — verifies the /api/config consumer surfaces
+// useNodeConfig.test.js — verifies the /api/config consumer surfaces
 // OAuth availability fields (googleEnabled, githubEnabled, githubClientId)
 // from the runtime response, and that secrets are never present.
 //
@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 async function freshStore() {
   vi.resetModules()
-  const mod = await import('../lib/useCloudConfig.js')
+  const mod = await import('../lib/useNodeConfig.js')
   return mod
 }
 

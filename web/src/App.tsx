@@ -98,12 +98,12 @@ const SchematicEditor = lazy(() => import('./routes/SchematicEditor.jsx'))
 
 // Node-capability surface — Workshop (distributed DMTAP-PUB feeds) is a
 // core MIT capability present unconditionally, like every other route
-// below; there is no "cloud edition" to gate anything behind. useCloudConfig
+// below; there is no "cloud edition" to gate anything behind. useNodeConfig
 // stays eager (we need it before any route renders) but is imported from
 // its own file so the rest of routes/Workshop.jsx doesn't end up in the
 // initial chunk; the route components themselves lazy-import their own
 // modules and become their own chunks.
-import { useCloudConfig } from './lib/useCloudConfig.js'
+import { useNodeConfig } from './lib/useNodeConfig.js'
 const Workshop = lazy(() =>
   import('./routes/Workshop.jsx').then((m) => ({ default: m.Workshop })),
 )
@@ -112,7 +112,7 @@ import { useAuth } from './store/auth.js'
 import { api } from './lib/api.js'
 
 export default function App() {
-  const { localMode, ready: cloudConfigReady } = useCloudConfig()
+  const { localMode, ready: cloudConfigReady } = useNodeConfig()
   const tryBootstrap = useAuth((s) => s.tryBootstrap)
   const tryBootstrapLocal = useAuth((s) => s.tryBootstrapLocal)
   const setSession = useAuth((s) => s.setSession)

@@ -63,7 +63,7 @@ test.describe('Library browse + open (cloud mode)', () => {
     ).toBeVisible({ timeout: 20_000 })
 
     // Navigate to Library via the in-app link (client-side route — a hard
-    // page.goto races useCloudConfig and the catch-all bounces it away).
+    // page.goto races useNodeConfig and the catch-all bounces it away).
     await page.getByRole('link', { name: 'Library', exact: true }).first().click()
     await expect(
       page.getByRole('heading', { name: 'Library', exact: true }).first(),

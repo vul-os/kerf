@@ -522,33 +522,36 @@ function Step4Setting({ state, onChange }) {
         Choose how stones will be set, and the piece size.
       </p>
 
-      {(state.stones || []).length > 0 && (
-        <div className="mb-5">
-          <p className="block text-xs font-mono uppercase tracking-wider text-ink-400 mb-2">
-            Setting style
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-            {SETTING_STYLES.map((s) => (
-              <button
-                key={s.key}
-                type="button"
-                onClick={() => onChange({ settingStyle: s.key })}
-                aria-pressed={state.settingStyle === s.key}
-                aria-label={`${s.label}, $${s.fee} per stone`}
-                className={`min-h-[44px] px-3 py-2.5 rounded-xl border text-xs font-medium transition-all text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950
-                  ${state.settingStyle === s.key
-                    ? 'border-kerf-300 bg-kerf-300/10 text-kerf-300'
-                    : 'border-ink-700 bg-ink-900/40 text-ink-300 hover:border-ink-500'}`}
-              >
-                {s.label}
-                <span className="block text-[10px] font-mono text-ink-500 mt-0.5">
-                  ${s.fee}/stone
-                </span>
-              </button>
-            ))}
-          </div>
+      {/* Setting style always has a default ('prong') carried in state and shown
+          unconditionally on the review step, so the picker itself must not be
+          gated on stones being present — stones are optional (validateStep
+          step 2 always passes) and a piece can be ordered "plain" and have
+          its setting style revisited later. */}
+      <div className="mb-5">
+        <p className="block text-xs font-mono uppercase tracking-wider text-ink-400 mb-2">
+          Setting style
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+          {SETTING_STYLES.map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => onChange({ settingStyle: s.key })}
+              aria-pressed={state.settingStyle === s.key}
+              aria-label={`${s.label}, $${s.fee} per stone`}
+              className={`min-h-[44px] px-3 py-2.5 rounded-xl border text-xs font-medium transition-all text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950
+                ${state.settingStyle === s.key
+                  ? 'border-kerf-300 bg-kerf-300/10 text-kerf-300'
+                  : 'border-ink-700 bg-ink-900/40 text-ink-300 hover:border-ink-500'}`}
+            >
+              {s.label}
+              <span className="block text-[10px] font-mono text-ink-500 mt-0.5">
+                ${s.fee}/stone
+              </span>
+            </button>
+          ))}
         </div>
-      )}
+      </div>
 
       {state.pieceType === 'ring' && (
         <div className="mb-5">

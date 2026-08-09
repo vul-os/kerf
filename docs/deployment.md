@@ -5,31 +5,35 @@ endpoint.
 
 ## Single-binary deploy
 
-`npm run build` compiles the Vite SPA into `dist/`. The `kerf-server` CLI then
+`npm run build` (run from `web/` — that's where `package.json` lives, not the
+repo root) compiles the Vite SPA into `web/dist/`. The `kerf-server` CLI then
 serves the static files alongside the FastAPI backend on a single port:
 
 ```sh
-# Build the SPA
-npm run build         # → dist/
+# Build the SPA (run from web/ — see getting-started.md)
+cd web && npm run build   # → web/dist/
+cd ..
 
-# Run migrations (safe to re-run)
-kerf-server --migrate
+# Run migrations (safe to re-run; kerf-server itself has no --migrate flag)
+python -m kerf_core.db.migrations.runner "$DATABASE_URL"
 
-# Start (serves dist/ + /api/* + /v1/rpc on :8080)
-kerf-server --host 0.0.0.0 --port 8080
+# Start (serves web/dist/ + /api/* + /v1/rpc on :8080)
+KERF_FRONTEND_DIST=web/dist kerf-server --host 0.0.0.0 --port 8080
 ```
 
 Equivalent via Python:
 
 ```sh
-python -m kerf_core --host 0.0.0.0 --port 8080
+KERF_FRONTEND_DIST=web/dist python -m kerf_core --host 0.0.0.0 --port 8080
 # or:
-uvicorn kerf_core.app:create_app --factory --host 0.0.0.0 --port 8080
+KERF_FRONTEND_DIST=web/dist uvicorn kerf_core.app:create_app --factory --host 0.0.0.0 --port 8080
 ```
 
-The frontend dist directory is resolved via the `KERF_FRONTEND_DIST` env var
-(default: `./dist`). If it is absent the server boots as an API-only service
-(no SPA served).
+The frontend dist directory is resolved via the `KERF_FRONTEND_DIST` env var.
+Its built-in default is `/app/dist` — the path the Docker image copies the
+built SPA to (see below) — which does not exist on a bare source checkout, so
+set it explicitly there. If the resolved directory is absent the server boots
+as an API-only service (no SPA served).
 
 ## Docker
 
@@ -64,16 +68,19 @@ docker run -p 8080:8080 \
 ```
 
 The container `CMD` runs `kerf-server --host 0.0.0.0 --port 8080`. Migrations
-must be run separately before the first start:
+must be run separately before the first start (`kerf-server` has no
+`--migrate` flag; the image's Python environment has the migration runner
+module instead):
 
 ```sh
 docker run --rm \
   -e DATABASE_URL=postgres://... \
   kerf \
-  kerf-server --migrate
+  python -m kerf_core.db.migrations.runner
 ```
 
-Or add `--migrate` to your entrypoint / init container in production.
+Or run that same command from an init container in production (see the
+Kubernetes example under [Migrations on boot](#migrations-on-boot) below).
 
 ## Docker Compose (local dev stack)
 
@@ -146,10 +153,12 @@ curl http://localhost:8080/health/capabilities | python3 -m json.tool
 
 ## Migrations on boot
 
-Run `kerf-server --migrate` before the first start (or after any upgrade) to
-apply pending SQL migrations from
-`packages/kerf-core/src/kerf_core/db/migrations/`. Migrations are
+Run `python -m kerf_core.db.migrations.runner` before the first start (or
+after any upgrade) to apply pending SQL migrations from
+`packages/kerf-core/src/kerf_core/db/migrations/` (or `migrations_sqlite/`
+if `DATABASE_URL` is unset or a `sqlite://` DSN). Migrations are
 sequential and safe to re-run — already-applied migrations are skipped.
+`kerf-server` itself takes no `--migrate` flag.
 
 For Kubernetes / Cloud Run deploys, use an init container:
 
@@ -157,7 +166,7 @@ For Kubernetes / Cloud Run deploys, use an init container:
 initContainers:
   - name: migrate
     image: kerf:full
-    command: ["kerf-server", "--migrate"]
+    command: ["python", "-m", "kerf_core.db.migrations.runner"]
     env:
       - name: DATABASE_URL
         valueFrom:
@@ -173,7 +182,7 @@ initContainers:
 - [ ] Set `[server].cors_origin` to your frontend domain
 - [ ] Configure `[storage].backend = "s3"` with credentials
 - [ ] Set at least one `[llm.<provider>].api_key`
-- [ ] Run `kerf-server --migrate` before first start
+- [ ] Run `python -m kerf_core.db.migrations.runner` before first start
 - [ ] Confirm `/healthz` and `/health/capabilities` are reachable
 
 ## Node capabilities (config toggles, not license gates)

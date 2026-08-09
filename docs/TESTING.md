@@ -23,6 +23,14 @@ A bare `pytest` runs the default tier (it is the `testpaths` set in
 one.** The other tiers are explicitly labelled and must not be used as a gate
 until the issues below are fixed.
 
+`.github/workflows/pytest.yml` gates on `make test` (the default tier) on
+every PR and every push to main. It also runs `make test-kernel` and `make
+test-domains` on push to main, but non-blocking (`continue-on-error`) —
+they're known-red tiers, and a hard gate on pre-existing failures just
+trains people to ignore the check, exactly the failure mode this document
+exists to prevent. Read those two jobs' output for the actual numbers rather
+than their pass/fail icon.
+
 ## The numbers
 
 ### Where the "1563 failures" went

@@ -87,10 +87,24 @@ jobs:
       # workspace feature, [tool.uv.sources], which plain pip doesn't read).
       # "full" is used (not e.g. "mech") so this one install step covers
       # every tier's packages without triggering three separate installs.
-      - name: Install Python dependencies (full persona)
+      #
+      # dev-install.sh full is NOT sufficient on its own for running the test
+      # suite — verified locally (see decisions.md, "CI pytest workflow"):
+      # it only installs the "full" PERSONA's package list (~16 of 57), so
+      # e.g. kerf-cli, kerf-worker, kerf-sdk, kerf-textiles, kerf-aero are
+      # never actually pip-installed (their modules still import via the
+      # root conftest's sys.path insertion, but entry-point-metadata tests
+      # and their own runtime deps don't work), and it never installs any
+      # package's `[dev]` extra (test-only deps like moto/respx/steputils).
+      # ci-install-test-deps.sh closes both gaps — see its header comment
+      # for the full reasoning. It is additive: run dev-install.sh first so
+      # the "full" persona's own deps resolve via its normal, already-proven
+      # path, then layer in every package's test-only deps on top.
+      - name: Install Python dependencies (full persona + test deps)
         run: |
           pip install pytest pytest-asyncio pytest-xdist pytest-timeout
           ./scripts/dev-install.sh full
+          ./scripts/ci-install-test-deps.sh
 
       - name: make test (default tier — hard gate)
         run: make test
@@ -108,12 +122,16 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install Python dependencies (full persona)
+      # See the pytest-default job's install step for why both scripts are
+      # needed (dev-install.sh alone misses [dev] test-only extras — e.g.
+      # kerf-cad-core's `steputils`).
+      - name: Install Python dependencies (full persona + test deps)
         run: |
           pip install pytest pytest-asyncio pytest-xdist pytest-timeout
           ./scripts/dev-install.sh full
+          ./scripts/ci-install-test-deps.sh
 
-      # Known-red tier (17 known failures across 2 files, see
+      # Known-red tier (28 known failures / 8 errors as of 2026-08-09, see
       # docs/TESTING.md) — continue-on-error so this doesn't turn main red
       # for pre-existing, already-tracked issues. Results are still fully
       # visible in this step's log.
@@ -134,10 +152,13 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install Python dependencies (full persona)
+      # See the pytest-default job's install step for why both scripts are
+      # needed (dev-install.sh alone misses [dev] test-only extras).
+      - name: Install Python dependencies (full persona + test deps)
         run: |
           pip install pytest pytest-asyncio pytest-xdist pytest-timeout
           ./scripts/dev-install.sh full
+          ./scripts/ci-install-test-deps.sh
 
       # Known-red tier (kerf-fem, see docs/TESTING.md) and a documented
       # variable-duration hang class under xdist at full scale (docs/

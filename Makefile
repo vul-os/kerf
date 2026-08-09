@@ -6,11 +6,13 @@
 # ---------------------------------------------------------------------------
 
 # DEFAULT TIER — load-bearing product packages. Expected GREEN; a failure here
-# is a real regression. ~5.0k tests, ~3 min. NOTE: no GitHub Actions workflow
-# runs this (or ruff/eslint/vitest) today — .github/workflows/ only runs the
-# Playwright e2e suite and the release-guards/SDK-publish jobs. Run this
-# yourself before every merge until a CI job calls it; do not read "no CI
-# failure" as "this tier is green".
+# is a real regression. ~5.0k tests, ~3 min. Gated in CI by
+# .github/workflows/pytest.yml's `pytest-default` job, on every PR and every
+# push to main (that workflow also runs the kernel + domain tiers, but only
+# on push to main and only as non-blocking/informational — see its own
+# comments). Before that workflow existed, NOTHING in .github/workflows/ ran
+# pytest at all — see decisions.md, "pytest test-pollution triage"
+# (2026-08-09), for how that let ~1000 failures go unnoticed for days.
 test:
 	PYTHONHASHSEED=0 pytest -n auto
 

@@ -11,8 +11,6 @@ description = "CFD plugin for Kerf — OpenFOAM bridge + turbulence models"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi",
-    "asyncpg",
-    "aiohttp",
 ]
 
 [project.optional-dependencies]

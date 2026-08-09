@@ -11,8 +11,6 @@ description = "Civil engineering plugin for Kerf — horizontal/vertical alignme
 requires-python = ">=3.11"
 dependencies = [
     "fastapi",
-    "asyncpg",
-    "aiohttp",
     "numpy>=1.26",
     "scipy>=1.11",
 ]

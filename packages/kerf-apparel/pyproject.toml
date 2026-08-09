@@ -11,7 +11,6 @@ description = "Apparel / pattern-making plugin for Kerf — 2D flat patterns, se
 requires-python = ">=3.11"
 dependencies = [
     "fastapi",
-    "pydantic",
 ]
 
 [project.entry-points."kerf.plugins"]

@@ -11,7 +11,6 @@ license = { text = "MIT" }
 classifiers = ["License :: OSI Approved :: MIT License"]
 dependencies = [
     "fastapi>=0.111.0",
-    "asyncpg>=0.29.0",
     "kerf-core>=0.1.0",
     "kerf-api>=0.1.0",
     "kerf-auth>=0.1.0",

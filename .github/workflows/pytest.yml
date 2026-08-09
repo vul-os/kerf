@@ -73,6 +73,25 @@ jobs:
   pytest-default:
     name: pytest (default tier)
     runs-on: ubuntu-latest
+
+    # kerf-api's route tests talk to a real database (git diff/local, export
+    # spine, and friends). Without one they do not skip — they ERROR with
+    # "Connect call failed ... 5432", 82 of them, which failed this gate while
+    # 4951 tests passed. e2e.yml already runs Postgres this way; mirror it.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: kerf_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -107,6 +126,8 @@ jobs:
           ./scripts/ci-install-test-deps.sh
 
       - name: make test (default tier — hard gate)
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/kerf_test
         run: make test
 
   pytest-kernel:

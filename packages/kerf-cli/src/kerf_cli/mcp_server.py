@@ -29,8 +29,6 @@ import json
 import sys
 from typing import Any, Callable, Optional
 
-from kerf_cli.tools_client import ToolsAPIError, call_tool, fetch_tools
-
 
 def _require_mcp_package() -> None:
     try:
@@ -67,6 +65,8 @@ def list_mcp_tools(api_url: str, token: str) -> list:
     list (an MCP `tools/list` failure would otherwise kill the session;
     an empty tool set at least keeps the connection alive and visible).
     """
+    from kerf_cli.tools_client import ToolsAPIError, fetch_tools  # noqa: PLC0415
+
     try:
         payload = fetch_tools(api_url, token)
     except ToolsAPIError as exc:
@@ -90,6 +90,8 @@ def build_call_tool_handler(
 
     async def _handler(name: str, arguments: dict) -> list:
         import mcp.types as types  # noqa: PLC0415
+
+        from kerf_cli.tools_client import call_tool  # noqa: PLC0415
 
         call_args = dict(arguments or {})
         project_id = call_args.pop("project_id", None) or default_project_id

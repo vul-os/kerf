@@ -39,7 +39,9 @@ export default function MeasureToolbar({
             type="button"
             onClick={() => onMode?.(id)}
             title={label}
-            className={`p-1.5 rounded transition-colors ${
+            aria-label={label}
+            aria-pressed={active}
+            className={`p-1.5 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${
               active
                 ? 'bg-kerf-300 text-ink-950'
                 : 'bg-ink-900/60 text-ink-300 hover:text-kerf-300 hover:bg-ink-800 border border-ink-700/50'
@@ -55,7 +57,8 @@ export default function MeasureToolbar({
         onClick={onClear}
         disabled={selectionCount === 0}
         title="Clear selection (Esc)"
-        className={`p-1.5 rounded ${
+        aria-label="Clear selection"
+        className={`p-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${
           selectionCount > 0
             ? 'text-kerf-300 hover:bg-ink-800'
             : 'text-ink-600 cursor-not-allowed'

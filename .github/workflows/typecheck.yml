@@ -55,7 +55,6 @@ jobs:
           # The lockfile lives in web/, not the repo root — setup-node
           # defaults to the root and fails the whole job without this.
           cache-dependency-path: web/package-lock.json
-          cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
         run: npm ci

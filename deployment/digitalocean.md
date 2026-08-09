@@ -143,7 +143,7 @@ services:
       period_seconds: 30
     envs:
       - key: ENV
-        value: cloud
+        value: main
       - key: PORT
         value: "8080"
       - key: STORAGE_BACKEND

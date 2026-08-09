@@ -30,7 +30,7 @@ spec:
             - containerPort: 8080
           env:
             - name: ENV
-              value: "cloud"
+              value: "main"
             - name: PORT
               value: "8080"
             - name: DATABASE_URL

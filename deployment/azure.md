@@ -234,7 +234,7 @@ az containerapp create \
   --cpu 2 \
   --memory 4Gi \
   --env-vars \
-    ENV=cloud \
+    ENV=main \
     PORT=8080 \
     STORAGE_BACKEND=s3 \
   --secrets \

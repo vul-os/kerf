@@ -163,7 +163,7 @@ Save the following as `task-definition.json`, replacing placeholders:
       "image": "<ACCOUNT>.dkr.ecr.af-south-1.amazonaws.com/kerf:latest",
       "portMappings": [{"containerPort": 8080, "protocol": "tcp"}],
       "environment": [
-        {"name": "ENV", "value": "cloud"},
+        {"name": "ENV", "value": "main"},
         {"name": "PORT", "value": "8080"},
         {"name": "STORAGE_BACKEND", "value": "s3"},
         {"name": "KERF_STORAGE_S3_REGION", "value": "af-south-1"}
@@ -264,7 +264,7 @@ aws apprunner create-service \
       "ImageConfiguration": {
         "Port": "8080",
         "RuntimeEnvironmentVariables": {
-          "ENV": "cloud",
+          "ENV": "main",
           "STORAGE_BACKEND": "s3",
           "KERF_STORAGE_S3_REGION": "af-south-1"
         },

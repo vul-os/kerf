@@ -145,7 +145,7 @@ gcloud run deploy kerf \
   --platform=managed \
   --service-account="${SA}" \
   --add-cloudsql-instances="${PROJECT_ID}:africa-south1:kerf-pg" \
-  --set-env-vars="ENV=cloud,PORT=8080,STORAGE_BACKEND=s3" \
+  --set-env-vars="ENV=main,PORT=8080,STORAGE_BACKEND=s3" \
   --set-env-vars="KERF_STORAGE_S3_REGION=africa-south1" \
   --set-env-vars="KERF_STORAGE_S3_ENDPOINT=https://storage.googleapis.com" \
   --set-secrets="DATABASE_URL=kerf-database-url:latest" \

@@ -89,6 +89,14 @@ body {
 }
 a { color: var(--text-2); text-decoration: none; transition: color .15s; }
 a:hover { color: var(--text); }
+/* One visible keyboard-focus ring for every link and button, layered on top
+   of (never replacing) each element's own hover/active styling. Excludes
+   .vulos-home/.vulos-foot: that chrome is shared byte-identical across the
+   whole Vulos suite and already carries its own focus affordance below. */
+a:not(.vulos-home, .vulos-foot):focus-visible, button:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
 .mono { font-family: var(--mono); }
 .container { max-width: var(--shell); margin: 0 auto; padding: 0 1.5rem; }
 .gold { color: var(--gold); }

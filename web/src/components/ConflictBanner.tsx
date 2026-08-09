@@ -71,6 +71,7 @@ export default function ConflictBanner({ useWorkspace = _useWorkspace, className
       <button
         onClick={handleReload}
         data-testid="conflict-banner-reload"
+        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/70"
         style={{
           padding: '4px 12px',
           background: 'var(--conflict-banner-accent, #e05252)',
@@ -90,6 +91,7 @@ export default function ConflictBanner({ useWorkspace = _useWorkspace, className
         onClick={handleDismiss}
         aria-label="Dismiss conflict banner"
         data-testid="conflict-banner-dismiss"
+        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/70"
         style={{
           background: 'none',
           border: 'none',

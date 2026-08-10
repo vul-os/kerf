@@ -498,6 +498,7 @@ export default function GmatTrajectoryViewer({
         {onLoadMission && (
           <button
             onClick={onLoadMission}
+            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             style={{
               background: '#1a3a6a',
               border: '1px solid #2a5a9a',
@@ -533,6 +534,7 @@ export default function GmatTrajectoryViewer({
         {/* Play / Pause */}
         <button
           onClick={() => setPlaying(p => !p)}
+          className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           style={{
             background: playing ? '#2a1a4a' : '#1a3a2a',
             border: `1px solid ${playing ? '#6a40a0' : '#2a6a3a'}`,
@@ -591,6 +593,7 @@ export default function GmatTrajectoryViewer({
                   setFrameIdx(bestIdx)
                   setPlaying(false)
                 }}
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 style={{
                   background: 'transparent',
                   border: '1px solid #1a2a4a',

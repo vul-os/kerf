@@ -190,6 +190,41 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
 
 .back { display:inline-flex; align-items:center; gap:.4rem; font-family:var(--mono); font-size:.8rem; color:var(--text-3); margin-bottom:1.1rem; }
 .legend { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin:1.4rem 0 0; padding:0; list-style:none; font-family:var(--mono); font-size:.75rem; color:var(--text-3); }
+.legend li { display:inline-flex; align-items:center; }
+.dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:.4rem; }
+.dot.yes { background:var(--green); }
+.dot.partial { background:var(--gold); }
+.dot.paid { background:var(--violet); }
+.dot.no { background:var(--text-4); }
+
+/* Browse controls — search + category pills over the tool grid. Vanilla JS below hides/shows
+   .tool cards and their parent .cat[data-filterable] section; no framework, no page reload. */
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.browse-head { margin-bottom:1.5rem; }
+.controls { display:flex; flex-wrap:wrap; align-items:center; gap:.9rem 1.1rem; margin:.9rem 0 1rem; }
+.search-wrap { position:relative; flex:1 1 17rem; max-width:22rem; }
+.search-wrap svg { position:absolute; left:.75rem; top:50%; transform:translateY(-50%); width:14px; height:14px; color:var(--text-3); pointer-events:none; }
+.search-input { width:100%; box-sizing:border-box; background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:.55rem .8rem .55rem 2.15rem; font-size:.85rem; font-family:var(--sans); color:var(--text); appearance:none; }
+.search-input::placeholder { color:var(--text-4); }
+.search-input:focus-visible { outline:2px solid var(--gold); outline-offset:1px; }
+.search-input::-webkit-search-cancel-button { display:none; }
+.search-clear { position:absolute; right:.5rem; top:50%; transform:translateY(-50%); width:22px; height:22px; display:grid; place-items:center; background:none; border:0; color:var(--text-3); font-size:1rem; line-height:1; cursor:pointer; border-radius:6px; }
+.search-clear:hover { color:var(--text); background:var(--elevated); }
+.pills { display:flex; flex-wrap:wrap; gap:.45rem; }
+.pill { font-family:var(--mono); font-size:.72rem; border:1px solid var(--border); background:var(--panel); color:var(--text-3); border-radius:999px; padding:.32rem .8rem; cursor:pointer; transition:border-color .15s,color .15s,background .15s; }
+.pill:hover { border-color:var(--text-4); color:var(--text-2); }
+.pill.active { border-color:var(--gold-dim); color:var(--gold); background:rgba(255,214,51,.08); }
+.pill-count { color:var(--text-4); }
+.pill.active .pill-count { color:var(--gold-dim); }
+.results-count { font-family:var(--mono); font-size:.78rem; color:var(--text-3); margin:0 0 1.5rem; }
+.no-results { color:var(--text-3); font-size:.9rem; padding:1.5rem 0; }
+
+/* Sticky first column — the feature/tool name stays pinned while a narrow viewport scrolls the
+   table sideways, mirroring the old React CategoryMatrix's sticky Kerf column. */
+.table-wrap table th:first-child, .table-wrap table td:first-child { position:sticky; left:0; z-index:2; }
+.table-wrap thead th:first-child { z-index:3; background:var(--elevated); box-shadow:1px 0 0 var(--border); }
+.table-wrap tbody td:first-child { background:var(--surface); box-shadow:1px 0 0 var(--border-2); }
+.table-wrap tbody tr:hover td:first-child { background:var(--border-2); }
 
 .honest { margin-top:2.25rem; border:1px solid var(--border); border-left:2px solid var(--gold-dim); border-radius:10px; background:var(--panel); padding:1.05rem 1.2rem; }
 .honest p { margin:0; font-size:.86rem; color:var(--text-3); line-height:1.68; }
@@ -285,13 +320,21 @@ for (const it of items) {
 const kerfNo = shortfalls.filter((s) => s.status === 'no').length
 const kerfPartial = shortfalls.filter((s) => s.status !== 'no').length
 
-const catSections = [...byCat.entries()]
-  .sort((a, b) => b[1].length - a[1].length)
+// Sorted once, shared by the category pills and the section list below so the pill order and the
+// section order can never drift apart.
+const sortedCats = [...byCat.entries()].sort((a, b) => b[1].length - a[1].length)
+
+const pillsHtml = sortedCats.map(([label, list]) => `
+      <button type="button" class="pill" data-pill="${esc(label)}" role="tab" aria-selected="false">${esc(label)} <span class="pill-count">${list.length}</span></button>`).join('')
+
+const catSections = sortedCats
   .map(([label, list]) => {
     const cards = list.map((it) => {
       const { kerf, comp, total } = coverage(it)
+      // Single lowercased haystack for the search box — competitor name, slug and tagline.
+      const search = esc(`${it.competitor} ${it.slug} ${it.hero_tagline || ''}`.toLowerCase())
       return `
-        <a class="tool" href="./parity/${esc(it.slug)}.html">
+        <a class="tool" href="./parity/${esc(it.slug)}.html" data-cat="${esc(label)}" data-search="${search}">
           <h3>Kerf vs ${esc(it.competitor)}</h3>
           <p>${esc(it.hero_tagline || '')}</p>
           ${bar(kerf, total)}
@@ -300,7 +343,7 @@ const catSections = [...byCat.entries()]
         </a>`
     }).join('')
     return `
-      <div class="cat">
+      <div class="cat" data-filterable="true">
         <div class="cat-head"><h2>${esc(label)}</h2><span class="count">${list.length} tool${list.length === 1 ? '' : 's'}</span></div>
         <div class="tool-grid">${cards}</div>
       </div>`
@@ -340,13 +383,103 @@ const indexBody = `
         </table>
       </div>
     </div>
+    <div class="browse-head">
+      <div class="cat-head"><h2>Browse all ${items.length} comparisons</h2></div>
+      <div class="controls">
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <label class="sr-only" for="tool-search">Search comparisons</label>
+          <input type="search" id="tool-search" class="search-input" placeholder="Search tools… (e.g. FreeCAD, KiCad, BIM)" autocomplete="off">
+          <button type="button" id="tool-search-clear" class="search-clear" aria-label="Clear search" hidden>&#215;</button>
+        </div>
+        <div class="pills" role="tablist" aria-label="Filter by discipline">
+          <button type="button" class="pill active" data-pill="" role="tab" aria-selected="true">All</button>${pillsHtml}
+        </div>
+      </div>
+      <p id="tool-results-count" class="results-count" aria-live="polite"></p>
+      <ul class="legend" aria-label="Coverage bar legend" style="margin:0 0 1.4rem">
+        <li><i class="dot yes"></i>Kerf: yes</li>
+        <li><i class="dot partial"></i>Kerf: partial</li>
+        <li><i class="dot no"></i>Kerf: no</li>
+      </ul>
+    </div>
+    <p id="tool-no-results" class="no-results" hidden>No comparisons match your search. <button type="button" id="tool-no-results-reset" class="search-clear" style="position:static;display:inline;color:var(--gold);text-decoration:underline;">Clear filters</button></p>
     ${catSections}
     <div class="honest">
       <p><strong>How to read this.</strong> A competitor row marked <em>paid tier</em> means the tool does have the capability, but behind an extension, add-on or metered service — a different answer to “can I do this today” than “included”, so it is counted separately rather than folded into either. Kerf has no tiers, so its rows are only yes, partial or no.</p>
       <p style="margin-top:.8rem"><strong>What this page is not.</strong> It is not a verdict, and the totals are not scores. The rows were written from Kerf's feature set, which is why Kerf is a yes on ${((totalRows - shortfalls.length) / totalRows * 100).toFixed(1)}% of them — that number says something about how the list was built, not about the products. A tool scoring low here may be far better than Kerf at the work you actually do. If you are choosing between them, read the rows in your discipline and ignore the counts.</p>
     </div>
   </div>
-</section>`
+</section>
+<script>
+(function () {
+  var input = document.getElementById('tool-search');
+  var clearBtn = document.getElementById('tool-search-clear');
+  var resetLink = document.getElementById('tool-no-results-reset');
+  var pills = Array.prototype.slice.call(document.querySelectorAll('.pill'));
+  var cats = Array.prototype.slice.call(document.querySelectorAll('.cat[data-filterable]'));
+  var resultsEl = document.getElementById('tool-results-count');
+  var noResultsEl = document.getElementById('tool-no-results');
+  var activeCat = null;
+  if (!input) return;
+
+  function setActivePill() {
+    pills.forEach(function (p) {
+      var isAll = p.getAttribute('data-pill') === '';
+      var active = isAll ? activeCat === null : p.getAttribute('data-pill') === activeCat;
+      p.classList.toggle('active', active);
+      p.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+  }
+
+  function applyFilter() {
+    var q = input.value.trim().toLowerCase();
+    var totalCards = 0, visibleCards = 0;
+    cats.forEach(function (cat) {
+      var cards = Array.prototype.slice.call(cat.querySelectorAll('.tool'));
+      var visible = 0;
+      cards.forEach(function (card) {
+        totalCards += 1;
+        var matchesCat = !activeCat || card.getAttribute('data-cat') === activeCat;
+        var matchesQuery = !q || (card.getAttribute('data-search') || '').indexOf(q) !== -1;
+        var show = matchesCat && matchesQuery;
+        card.style.display = show ? '' : 'none';
+        if (show) { visible += 1; visibleCards += 1; }
+      });
+      cat.style.display = visible > 0 ? '' : 'none';
+    });
+    clearBtn.hidden = q.length === 0;
+    noResultsEl.hidden = visibleCards !== 0;
+    var parts = ['Showing ' + visibleCards + ' of ' + totalCards + ' comparisons'];
+    if (q) parts.push('matching "' + input.value.trim() + '"');
+    if (activeCat) parts.push('in ' + activeCat);
+    resultsEl.textContent = parts.join(' ');
+  }
+
+  input.addEventListener('input', applyFilter);
+  clearBtn.addEventListener('click', function () {
+    input.value = '';
+    input.focus();
+    applyFilter();
+  });
+  if (resetLink) resetLink.addEventListener('click', function () {
+    input.value = '';
+    activeCat = null;
+    setActivePill();
+    applyFilter();
+  });
+  pills.forEach(function (pill) {
+    pill.addEventListener('click', function () {
+      var val = pill.getAttribute('data-pill');
+      activeCat = val === '' ? null : (activeCat === val ? null : val);
+      setActivePill();
+      applyFilter();
+    });
+  });
+
+  applyFilter();
+})();
+</script>`
 
 mkdirSync(join(ROOT, 'site', 'parity'), { recursive: true })
 writeFileSync(

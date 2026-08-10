@@ -302,7 +302,7 @@ function EngPasteInput({ onParse }: EngPasteInputProps) {
         rows={5}
       />
       <button
-        className="od-btn od-btn-batch"
+        className="od-btn od-btn-batch focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         onClick={() => text.trim() && onParse?.(text)}
         disabled={!text.trim()}
       >
@@ -354,7 +354,7 @@ function FilterBar({ onFilter }: FilterBarProps) {
         type="number"
         min={0}
       />
-      <button className="od-btn od-btn-batch" onClick={apply}>Filter</button>
+      <button className="od-btn od-btn-batch focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={apply}>Filter</button>
     </div>
   )
 }
@@ -401,7 +401,7 @@ export default function MotorSelectPanel({
         <span className="od-title">Motor Database</span>
         <span className="od-subtitle">Thrustcurve / RASP .eng</span>
         <button
-          className="od-btn od-btn-demo"
+          className="od-btn od-btn-demo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           style={{ marginLeft: 'auto', fontSize: 10 }}
           onClick={() => setShowDemo(d => !d)}
         >
@@ -415,7 +415,7 @@ export default function MotorSelectPanel({
       {/* Eng paste toggle */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
         <button
-          className="od-btn od-btn-demo"
+          className="od-btn od-btn-demo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={() => setShowEng(e => !e)}
         >
           {showEng ? 'Hide .eng input' : 'Parse .eng file'}

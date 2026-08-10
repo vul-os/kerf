@@ -327,7 +327,7 @@ export default function OrbitDeterminationPanel({
       <div className="od-actions">
         {showBatch && onRunBatch && (
           <button
-            className="od-btn od-btn-batch"
+            className="od-btn od-btn-batch focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={onRunBatch}
             disabled={loading}
           >
@@ -336,7 +336,7 @@ export default function OrbitDeterminationPanel({
         )}
         {showEkf && onRunEkf && (
           <button
-            className="od-btn od-btn-ekf"
+            className="od-btn od-btn-ekf focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={onRunEkf}
             disabled={loading}
           >
@@ -344,7 +344,7 @@ export default function OrbitDeterminationPanel({
           </button>
         )}
         <button
-          className="od-btn od-btn-demo"
+          className="od-btn od-btn-demo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={() => setShowDemo(d => !d)}
         >
           {showDemo ? 'Hide Demo' : 'Demo'}

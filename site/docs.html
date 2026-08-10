@@ -393,6 +393,16 @@ body.drawer-open { overflow: hidden; }
   .vulos-foot { display: inline-flex; align-items: center; gap: 9px; font-size: 13.5px; line-height: 1.45; text-decoration: none; color: inherit; opacity: .85; transition: opacity .15s ease; }
   .vulos-foot:hover { opacity: 1; text-decoration: none; }
   .vulos-foot img { display: block; width: 18px; height: 18px; border-radius: 5px; flex: 0 0 auto; }
+
+  /* Dark-ground correction for the mark above. vulos-logo.png is flat #2E383A
+     on transparency — ink drawn for paper — so composited on this surface it
+     measures about 1.3:1 and reads as a smudge, not as a dimmed logo. The
+     artwork carries its whole shape in the alpha channel, so brightness(0)
+     invert(1) recolours it to the surface's foreground with the glyph intact,
+     and the opacity holds it at the same secondary weight the light theme
+     gives it. Styling only: the chrome markup stays byte-identical suite-wide. */
+  :root:not([data-theme="light"]) .vulos-home img,
+  :root:not([data-theme="light"]) .vulos-foot img { filter: brightness(0) invert(1); opacity: .66; }
 </style>
 <script src="./assets/vendor/marked.umd.js"></script>
 <script src="./assets/vendor/highlight.min.js"></script>

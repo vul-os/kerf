@@ -173,7 +173,7 @@ export default function RPDDenturePanel({ content }: Props) {
                 key={a}
                 type="button"
                 onClick={() => { setArch(a); setSelectedFdi([]); setResult(null) }}
-                className={`flex-1 py-1.5 rounded text-xs font-medium border transition-colors ${
+                className={`flex-1 py-1.5 rounded text-xs font-medium border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${
                   arch === a
                     ? 'bg-rose-500/20 border-rose-400/60 text-rose-200'
                     : 'bg-ink-800 border-ink-700 text-ink-300 hover:bg-ink-700'
@@ -192,7 +192,7 @@ export default function RPDDenturePanel({ content }: Props) {
                 key={t}
                 type="button"
                 onClick={() => { setType(t); setResult(null) }}
-                className={`flex-1 py-1.5 rounded text-xs font-medium border transition-colors ${
+                className={`flex-1 py-1.5 rounded text-xs font-medium border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${
                   type === t
                     ? 'bg-rose-500/20 border-rose-400/60 text-rose-200'
                     : 'bg-ink-800 border-ink-700 text-ink-300 hover:bg-ink-700'
@@ -225,7 +225,7 @@ export default function RPDDenturePanel({ content }: Props) {
               key={fdi}
               type="button"
               onClick={() => toggleTooth(fdi)}
-              className={`py-1 rounded text-[10px] font-mono border transition-colors ${
+              className={`py-1 rounded text-[10px] font-mono border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${
                 selectedFdi.includes(fdi)
                   ? 'bg-rose-500/25 border-rose-400/60 text-rose-200'
                   : 'bg-ink-800 border-ink-700 text-ink-500 hover:bg-ink-700'
@@ -247,7 +247,7 @@ export default function RPDDenturePanel({ content }: Props) {
                 key={c}
                 type="button"
                 onClick={() => setClaspType(c)}
-                className={`flex-1 py-1.5 rounded text-[10px] font-medium border transition-colors ${
+                className={`flex-1 py-1.5 rounded text-[10px] font-medium border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${
                   claspType === c
                     ? 'bg-rose-500/20 border-rose-400/60 text-rose-200'
                     : 'bg-ink-800 border-ink-700 text-ink-400 hover:bg-ink-700'
@@ -266,7 +266,7 @@ export default function RPDDenturePanel({ content }: Props) {
         type="button"
         onClick={handleRun}
         disabled={running || selectedFdi.length === 0}
-        className="flex items-center justify-center gap-2 px-4 py-2 rounded bg-rose-500/20 border border-rose-400/50 text-rose-200 text-xs font-medium hover:bg-rose-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        className="flex items-center justify-center gap-2 px-4 py-2 rounded bg-rose-500/20 border border-rose-400/50 text-rose-200 text-xs font-medium hover:bg-rose-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         {running ? (
           <>

@@ -1832,10 +1832,13 @@ Cause: two agents were working in the same worktree at once. One ran a broad `gi
 and swept up the other's in-flight changes. Nothing was lost and nothing is broken —
 `check-render` is clean — but the history misdescribes what happened.
 
-Not rewritten, deliberately. The commit is unpushed, so an amend or split would be safe
-in isolation; it was not safe at the time, because three agents were actively committing
-into this tree and rewriting under them would have caused precisely the confusion being
-fixed. A misleading message is a smaller problem than a corrupted working tree.
+Not rewritten, and now permanently so. At the time it was unpushed, so an amend or split
+would have been safe in isolation — but not safe in practice, because three agents were
+actively committing into this tree and rewriting under them would have caused precisely
+the confusion being fixed. It has since been pushed to `main` with a dozen commits on top,
+which closes the question: rewriting it now would rewrite published history for a
+cosmetic gain. The record here is the fix. A misleading message is a smaller problem than
+a corrupted working tree, and a much smaller one than a rewritten `main`.
 
 **The rule this establishes:** agents doing independent work get
 `isolation: "worktree"`, or are instructed to `git add <explicit paths>` and never
@@ -1875,3 +1878,42 @@ after `821b566b`:
 **Verdict:** before this fire's changes, today's page was behind the old one specifically on interaction (no search/filter/expand-collapse/pinning) and information density (no domain grouping, no mobile-specific layout), but ahead on honesty/fairness framing and roughly even on visual polish, with a coverage-bar improvement on cards. This fire ported the interaction/grouping wins (search, category pills, per-domain `<details>` sections with matched-count, sticky column pinning on the feature column) into `scripts/build-parity-site.mjs` as vanilla JS/CSS — see the commit(s) immediately following this entry for what shipped and its Playwright verification. Pricing was not reintroduced (per explicit instruction), and the fairness framing block was left untouched.
 
 **Affected:** `decisions.md` (this entry — the answer itself, so a 5th agent doesn't redo this research), `scripts/build-parity-site.mjs`, `site/parity.html`, `site/parity/*.html`.
+
+## 2026-08-10 SAST — Why `src/store` is not in the strict allow-list yet (and what unblocks it)
+
+**Context:** `web/tsconfig.strict.json` is a hard-zero gate — `npm run typecheck:strict`
+fails CI on a single error — over an explicit allow-list of already-tightened
+directories. A sweep to add `src/store/**/*.ts` to that list was attempted and is
+deliberately **not** landed.
+
+**Measured, not guessed.** Adding the one include line takes the gate from 0 errors to
+**526**, across 25 files:
+
+| where | errors | note |
+|---|---|---|
+| `src/lib/**` | 431 | not in the allow-list at all — pulled in *transitively* |
+| `src/store/**` | 95 | the directory actually being added |
+
+The 431 are the trap. TypeScript typechecks whatever the included files import, so
+adding `src/store` silently drags all of `src/lib` under `strict` +
+`noUncheckedIndexedAccess` without `src/lib` ever appearing in the include list. The
+worst offenders are the geometry kernels — `sketchIntersect.ts` (91), `sketchGeom2.ts`
+(81), `subd.ts` (57), `equations.ts` (35) — where the errors are mostly
+`noUncheckedIndexedAccess` on hot array indexing, i.e. the changes are invasive and
+touch numerical code, not annotations.
+
+**So the ordering is fixed:** `src/lib` must be tightened *before* `src/store` can join,
+not after. The header comment in `tsconfig.strict.json` claims T-521 "adds src/lib" — it
+did not; `src/lib` has never been in the include list. That comment is aspirational, not
+a description of the file.
+
+**What did land** (`ec906e0a`): every `err?.message` / `err?.status` / `err.aborted`
+read in `src/store/workspace.ts` now goes through the `src/store/errorUtils.ts`
+duck-typing helpers, so `useUnknownInCatchVariables` is already satisfied there. That is
+the portion of the work that is useful without the gate change and safe without it. The
+remaining 95 in-directory errors are almost all `TS7006` implicit-any parameters on the
+module-level helpers near the bottom of `workspace.ts` — bounded, mechanical, and
+worth doing, but pointless to finish while the 431 transitive ones block the include.
+
+**Affected:** `web/src/store/workspace.ts`, `web/src/store/errorUtils.ts`,
+`web/tsconfig.strict.json` (deliberately unchanged), `decisions.md` (this entry).

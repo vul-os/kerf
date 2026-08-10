@@ -290,7 +290,7 @@ function Section({ title, icon: Icon, children, defaultOpen = true }: SectionPro
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div style={{ borderBottom: '1px solid #1a1d24', paddingBottom: open ? 10 : 0, marginBottom: 2 }}>
-      <button
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         type="button"
         data-testid={`section-${title.toLowerCase().replace(/\s+/g, '-')}`}
         onClick={() => setOpen((o) => !o)}
@@ -555,7 +555,7 @@ export default function AnimationTimelinePanel({
           <Section title="Playback" icon={Play}>
             {/* Transport buttons */}
             <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-              <button
+              <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 type="button"
                 data-testid="btn-skip-back"
                 onClick={() => { scrub(0); setPlaying(false) }}
@@ -564,7 +564,7 @@ export default function AnimationTimelinePanel({
               >
                 <SkipBack size={12} />
               </button>
-              <button
+              <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 type="button"
                 data-testid="btn-play-pause"
                 onClick={() => {
@@ -577,7 +577,7 @@ export default function AnimationTimelinePanel({
                 {playing ? <Pause size={12} /> : <Play size={12} />}
                 <span style={{ fontSize: 10, marginLeft: 4 }}>{playing ? 'Pause' : 'Play'}</span>
               </button>
-              <button
+              <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 type="button"
                 data-testid="btn-skip-forward"
                 onClick={() => { scrub(clip.duration); setPlaying(false) }}
@@ -671,7 +671,7 @@ export default function AnimationTimelinePanel({
               <span style={{ fontSize: 10, color: '#8a909e', display: 'block', marginBottom: 3 }}>Interpolation</span>
               <div style={{ display: 'flex', gap: 3 }}>
                 {(['step', 'linear', 'bezier'] as const).map((interp) => (
-                  <button
+                  <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                     key={interp}
                     type="button"
                     data-testid={`interp-${interp}`}
@@ -692,7 +692,7 @@ export default function AnimationTimelinePanel({
                 ))}
               </div>
             </div>
-            <button
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               type="button"
               data-testid="btn-add-keyframe"
               onClick={addKeyframe}
@@ -735,7 +735,7 @@ export default function AnimationTimelinePanel({
               <span style={{ fontSize: 10, color: '#8a909e', display: 'block', marginBottom: 3 }}>Algorithm</span>
               <div style={{ display: 'flex', gap: 4 }}>
                 {['ccd', 'fabrik'].map((alg) => (
-                  <button
+                  <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                     key={alg}
                     type="button"
                     data-testid={`ik-algo-${alg}`}
@@ -780,7 +780,7 @@ export default function AnimationTimelinePanel({
                 ))}
               </div>
             </div>
-            <button
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               type="button"
               data-testid="btn-solve-ik"
               onClick={solveIK}
@@ -868,7 +868,7 @@ export default function AnimationTimelinePanel({
                         {fmtV(kf.value)}
                       </span>
                       <span style={{ fontSize: 9, color: '#5a6275' }}>{kf.interpolation || 'linear'}</span>
-                      <button
+                      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                         type="button"
                         data-testid={`remove-kf-${ch}-${ki}`}
                         onClick={() => removeKeyframe(ch, kf.t)}

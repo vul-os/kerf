@@ -236,7 +236,7 @@ export default function PCBThermalPanel({ onClose }: PCBThermalPanelProps) {
         <button
           data-testid="pcb-thermal-close"
           onClick={onClose}
-          className="ml-auto p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors"
+          className="ml-auto p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <X size={14} />
         </button>
@@ -297,7 +297,7 @@ export default function PCBThermalPanel({ onClose }: PCBThermalPanelProps) {
               data-testid="thermal-run-btn"
               onClick={runMap}
               disabled={loading}
-              className="w-full py-2 rounded-lg bg-orange-700 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-medium flex items-center justify-center gap-2 transition-colors"
+              className="w-full py-2 rounded-lg bg-orange-700 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-medium flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               {loading ? <RefreshCw size={12} className="animate-spin" /> : <Thermometer size={12} />}
               Run Thermal Map
@@ -365,7 +365,7 @@ export default function PCBThermalPanel({ onClose }: PCBThermalPanelProps) {
               data-testid="thermal-recommend-btn"
               onClick={runRecommend}
               disabled={loading}
-              className="w-full py-2 rounded-lg bg-orange-700 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-medium flex items-center justify-center gap-2 transition-colors"
+              className="w-full py-2 rounded-lg bg-orange-700 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-medium flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               {loading ? <RefreshCw size={12} className="animate-spin" /> : <Zap size={12} />}
               Get Recommendations

@@ -190,7 +190,7 @@ function RunBtn({ onClick, running, label = 'Run' }: {
   label?: string
 }) {
   return (
-    <button
+    <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       onClick={onClick}
       disabled={running}
       style={{ ...s.button, background: '#1e40af', marginTop: 6, ...(running ? s.buttonDisabled : {}) }}
@@ -917,7 +917,7 @@ export default function StructuralPanel() {
 
       <div style={s.tabs}>
         {TABS.map(t => (
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             key={t.id}
             onClick={() => setTab(t.id)}
             style={{ ...s.tab, ...(tab === t.id ? s.tabActive : {}) }}

@@ -385,7 +385,7 @@ export default function CircuitEditor({ viewRef }: CircuitEditorProps = {}) {
                 active
                   ? 'text-kerf-300 bg-ink-850'
                   : 'text-ink-400 hover:text-ink-200 hover:bg-ink-850/60'
-              }`}
+              } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
             >
               <Icon size={12} />
               {t.label}

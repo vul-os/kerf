@@ -461,7 +461,7 @@ export default function PlcHmiTester({ program = '', onProgramLoad, className = 
             onClick={() => handleLoadFixture(name)}
             disabled={loadingFixture === name}
             data-testid={`load-fixture-${name}`}
-            className="px-2 py-0.5 rounded text-xs bg-ink-800 hover:bg-ink-700 text-ink-300 border border-ink-700 disabled:opacity-50 transition-colors"
+            className="px-2 py-0.5 rounded text-xs bg-ink-800 hover:bg-ink-700 text-ink-300 border border-ink-700 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             {loadingFixture === name ? '…' : name}
           </button>
@@ -488,7 +488,7 @@ export default function PlcHmiTester({ program = '', onProgramLoad, className = 
           type="button"
           onClick={() => runStep(1)}
           disabled={!program?.trim() || playing}
-          className="px-3 py-1 rounded text-xs font-medium bg-ink-700 hover:bg-ink-600 text-ink-200 disabled:opacity-40 transition-colors"
+          className="px-3 py-1 rounded text-xs font-medium bg-ink-700 hover:bg-ink-600 text-ink-200 disabled:opacity-40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           aria-label="Step simulation one tick"
         >
           ⏭ Step
@@ -502,7 +502,7 @@ export default function PlcHmiTester({ program = '', onProgramLoad, className = 
             setStatusMsg('')
             setErrorMsg('')
           }}
-          className="px-3 py-1 rounded text-xs font-medium bg-ink-800 hover:bg-ink-700 text-ink-400 transition-colors"
+          className="px-3 py-1 rounded text-xs font-medium bg-ink-800 hover:bg-ink-700 text-ink-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           aria-label="Reset simulation state"
         >
           ↺ Reset

@@ -107,7 +107,7 @@ function AttrRow({ row, onChange, onDelete }: {
       </select>
       <button
         onClick={onDelete}
-        className="rounded p-1 text-gray-400 hover:text-red-500 focus:outline-none focus:ring-1 focus:ring-red-400"
+        className="rounded p-1 text-gray-400 hover:text-red-500 focus:outline-none focus:ring-1 focus:ring-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         aria-label="Remove attribute"
         title="Remove"
       >
@@ -169,7 +169,7 @@ function RuleRow({ rule, onChange, onDelete }: {
       <td className="px-2 py-1.5 text-center">
         <button
           onClick={onDelete}
-          className="rounded p-1 text-gray-400 hover:text-red-500 focus:outline-none focus:ring-1 focus:ring-red-400"
+          className="rounded p-1 text-gray-400 hover:text-red-500 focus:outline-none focus:ring-1 focus:ring-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           aria-label="Remove rule"
           title="Remove rule"
         >
@@ -423,7 +423,7 @@ export default function ConfiguratorPanel({ parentPn: initialPn = '', className 
           </label>
           <button
             onClick={handleAddAttr}
-            className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 focus:outline-none focus:ring-1 focus:ring-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             aria-label="Add attribute"
           >
             <Plus size={12} /> Add
@@ -455,7 +455,7 @@ export default function ConfiguratorPanel({ parentPn: initialPn = '', className 
           </label>
           <button
             onClick={handleAddRule}
-            className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 focus:outline-none focus:ring-1 focus:ring-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             aria-label="Add variant rule"
           >
             <Plus size={12} /> Add rule
@@ -507,7 +507,7 @@ export default function ConfiguratorPanel({ parentPn: initialPn = '', className 
         <button
           onClick={handleResolve}
           disabled={loading}
-          className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+          className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           aria-label="Resolve variant BOM"
         >
           {loading

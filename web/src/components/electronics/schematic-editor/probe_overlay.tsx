@@ -186,7 +186,7 @@ export default function ProbeOverlay({ waveforms = [], height = 200, onClose }: 
         {onClose && (
           <button
             onClick={onClose}
-            className="ml-auto text-gray-600 hover:text-gray-300 text-xs transition-colors"
+            className="ml-auto text-gray-600 hover:text-gray-300 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             aria-label="Close simulation results"
           >
             ✕

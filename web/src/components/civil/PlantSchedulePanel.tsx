@@ -180,7 +180,7 @@ export default function PlantSchedulePanel({
         </span>
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            className="text-xs px-2 py-1 rounded border border-slate-600 hover:border-slate-400 text-slate-300 disabled:opacity-50 transition-colors"
+            className="text-xs px-2 py-1 rounded border border-slate-600 hover:border-slate-400 text-slate-300 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={handleFilterPlants}
             disabled={loading}
             data-testid="plant-filter-btn"
@@ -197,7 +197,7 @@ export default function PlantSchedulePanel({
               data-testid="plant-lookup-input"
             />
             <button
-              className="text-xs px-2 py-1 rounded bg-kerf-700 hover:bg-kerf-600 text-white disabled:opacity-50 transition-colors"
+              className="text-xs px-2 py-1 rounded bg-kerf-700 hover:bg-kerf-600 text-white disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               onClick={handleLookup}
               disabled={loading || !lookupName.trim()}
               data-testid="plant-lookup-btn"

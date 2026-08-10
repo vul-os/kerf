@@ -326,7 +326,7 @@ function FourBarTab() {
           <input style={s.input} value={tolMm}
                  onChange={e => setTolMm(e.target.value)} data-testid="fourbar-tol" />
         </div>
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           style={{ ...s.button, background: loading ? '#374151' : '#1d4ed8',
                    ...(loading ? s.buttonDisabled : {}) }}
           onClick={run} disabled={loading}
@@ -450,7 +450,7 @@ function CamTab() {
             <option value="false">Fall</option>
           </select>
         </div>
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           style={{ ...s.button, background: loading ? '#374151' : '#1d4ed8',
                    ...(loading ? s.buttonDisabled : {}) }}
           onClick={run} disabled={loading}
@@ -559,7 +559,7 @@ function GearTab() {
             <option value="2">2 stages</option>
           </select>
         </div>
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           style={{ ...s.button, background: loading ? '#374151' : '#1d4ed8',
                    ...(loading ? s.buttonDisabled : {}) }}
           onClick={run} disabled={loading}
@@ -654,7 +654,7 @@ export default function MechanismSynthesisPanel({ content }: MechanismSynthesisP
       {/* Tab bar */}
       <div style={s.tabs} role="tablist">
         {TABS.map(tab => (
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             key={tab.id}
             role="tab"
             aria-selected={activeTab === tab.id}

@@ -103,14 +103,14 @@ export default function WorksharingPanel({ content, projectId, fileId, callTool 
       </div>
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={() => run('bim_worksharing_status', {}, 'status')}
           disabled={!!busy}
           style={btn}
         >
           <RefreshCw size={13} /> Refresh status
         </button>
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={() => run('bim_worksharing_sync', {}, 'sync')}
           disabled={!!busy}
           style={{ ...btn, background: '#1d4ed8', color: '#fff', borderColor: '#1d4ed8' }}
@@ -171,11 +171,11 @@ export default function WorksharingPanel({ content, projectId, fileId, callTool 
                 </span>
               </div>
               {borrowed ? (
-                <button onClick={() => run('bim_worksharing_release', { element_id: id }, `rel-${id}`)} disabled={!!busy} style={btn}>
+                <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={() => run('bim_worksharing_release', { element_id: id }, `rel-${id}`)} disabled={!!busy} style={btn}>
                   <Unlock size={12} /> Release
                 </button>
               ) : (
-                <button onClick={() => run('bim_worksharing_borrow', { element_id: id }, `bor-${id}`)} disabled={!!busy} style={btn}>
+                <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={() => run('bim_worksharing_borrow', { element_id: id }, `bor-${id}`)} disabled={!!busy} style={btn}>
                   <Lock size={12} /> Borrow
                 </button>
               )}

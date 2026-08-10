@@ -236,7 +236,7 @@ export default function IrrigationPanel({
         </span>
         <div className="flex items-center gap-2">
           <button
-            className="text-xs px-2 py-1 rounded border border-slate-600 hover:border-slate-400 text-slate-300 disabled:opacity-50 transition-colors"
+            className="text-xs px-2 py-1 rounded border border-slate-600 hover:border-slate-400 text-slate-300 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={handleLayout}
             disabled={loading}
             data-testid="irrigation-layout-btn"
@@ -244,7 +244,7 @@ export default function IrrigationPanel({
             {loading && activeAction === 'layout' ? 'Computing…' : 'Place heads'}
           </button>
           <button
-            className="text-xs px-2 py-1 rounded bg-kerf-700 hover:bg-kerf-600 text-white disabled:opacity-50 transition-colors"
+            className="text-xs px-2 py-1 rounded bg-kerf-700 hover:bg-kerf-600 text-white disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={handleFlowDemand}
             disabled={loading || !positions}
             data-testid="irrigation-flow-btn"

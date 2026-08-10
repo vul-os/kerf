@@ -115,7 +115,7 @@ function OrbitPopover({ render, onApply, onClose }: { render: RenderDoc; onApply
     <div className="absolute top-8 right-0 z-30 w-60 bg-ink-900 border border-ink-800 rounded-lg shadow-2xl p-3 text-xs">
       <div className="flex items-center justify-between mb-2">
         <span className="text-ink-300 font-medium text-[11px]">Set from orbit</span>
-        <button type="button" onClick={onClose} className="text-ink-500 hover:text-ink-200"><X size={12} /></button>
+        <button type="button" onClick={onClose} className="text-ink-500 hover:text-ink-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><X size={12} /></button>
       </div>
       <div className="space-y-2">
         {([['Distance (mm)', dist, setDist, 100, 20000, 100], ['Azimuth (°)', az, setAz, 0, 360, 1], ['Elevation (°)', el, setEl, -89, 89, 1]] as Array<[string, number, (v: number) => void, number, number, number]>).map(([lbl, v, setter, mn, mx, st]) => (
@@ -128,7 +128,7 @@ function OrbitPopover({ render, onApply, onClose }: { render: RenderDoc; onApply
         ))}
       </div>
       <button type="button" onClick={apply}
-        className="mt-3 w-full px-2 py-1.5 rounded bg-kerf-300 text-ink-950 text-[11px] font-medium hover:bg-kerf-200">
+        className="mt-3 w-full px-2 py-1.5 rounded bg-kerf-300 text-ink-950 text-[11px] font-medium hover:bg-kerf-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
         Apply
       </button>
     </div>
@@ -150,7 +150,7 @@ function LightRow({ light, onChange, onRemove }: { light: RenderLight; onChange:
         <span className="text-[10px] text-ink-500 truncate flex-1 font-mono">{light.id || ''}</span>
         <input type="color" value={light.color || '#ffffff'} onChange={(e) => set('color')(e.target.value)}
           className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent" title="Light color" />
-        <button type="button" onClick={onRemove} className="text-ink-600 hover:text-red-400"><X size={12} /></button>
+        <button type="button" onClick={onRemove} className="text-ink-600 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><X size={12} /></button>
       </div>
       {useDir
         ? <XYZRow label="Direction" value={light.direction} onChange={set('direction')} />
@@ -227,7 +227,7 @@ export default function RenderView({ content, fileName, onContentChange }: Rende
             disabled
             title="Server-side render execution isn't wired up yet"
             aria-label="Run render (not yet available)"
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-kerf-300/40 text-ink-950/60 text-[11px] font-medium cursor-not-allowed"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-kerf-300/40 text-ink-950/60 text-[11px] font-medium cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Play size={11} /> Run
           </button>
@@ -259,7 +259,7 @@ export default function RenderView({ content, fileName, onContentChange }: Rende
               </div>
               <div className="relative inline-block">
                 <button type="button" onClick={() => setOrbitOpen((v) => !v)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-ink-800 bg-ink-900 text-ink-300 hover:text-kerf-300 hover:border-kerf-300/40 text-[11px]">
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-ink-800 bg-ink-900 text-ink-300 hover:text-kerf-300 hover:border-kerf-300/40 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
                   <Camera size={11} /> Set from orbit…
                 </button>
                 {orbitOpen && <OrbitPopover render={doc} onApply={(next) => { emit(next); setOrbitOpen(false) }} onClose={() => setOrbitOpen(false)} />}
@@ -273,7 +273,7 @@ export default function RenderView({ content, fileName, onContentChange }: Rende
               <Heading icon={Sun}>Lights</Heading>
               <button type="button"
                 onClick={() => emit(addLight(doc, { id: `light_${Date.now().toString(36)}`, kind: 'sun', direction: [-1, -1, -2], intensity: 3, color: '#ffffff' }) as RenderDoc)}
-                className="text-[10px] px-2 py-0.5 rounded border border-ink-800 bg-ink-900 text-ink-400 hover:text-kerf-300 hover:border-kerf-300/40">
+                className="text-[10px] px-2 py-0.5 rounded border border-ink-800 bg-ink-900 text-ink-400 hover:text-kerf-300 hover:border-kerf-300/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
                 + Add
               </button>
             </div>

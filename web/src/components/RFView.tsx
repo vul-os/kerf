@@ -234,7 +234,7 @@ export default function RFView({ rfResult, fileId, onRunStudy, viewRef }: RFView
         <button
           type="button"
           onClick={onRunStudy}
-          className="px-3 py-1.5 text-[11px] font-medium rounded bg-kerf-300 text-ink-950 hover:bg-kerf-200 transition-colors"
+          className="px-3 py-1.5 text-[11px] font-medium rounded bg-kerf-300 text-ink-950 hover:bg-kerf-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           Run RF Study
         </button>

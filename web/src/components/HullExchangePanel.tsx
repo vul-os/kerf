@@ -243,7 +243,7 @@ function ExportResult({ result, format }: { result: HullExchangeResult | null | 
         <span className="text-[10px] text-gray-500 ml-2">{sizeLabel}</span>
         <button
           onClick={handleDownload}
-          className="ml-auto flex items-center gap-1 rounded border border-gray-600 bg-gray-800 hover:bg-gray-700 px-2 py-1 text-xs text-gray-200 transition-colors"
+          className="ml-auto flex items-center gap-1 rounded border border-gray-600 bg-gray-800 hover:bg-gray-700 px-2 py-1 text-xs text-gray-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Download size={11} />
           Download .{fmt?.ext}
@@ -362,7 +362,7 @@ export default function HullExchangePanel({ hullForm: hullFormProp, content }: H
       <button
         onClick={handleExport}
         disabled={loading || !hasHullForm}
-        className="flex items-center justify-center gap-2 rounded-lg bg-green-800 hover:bg-green-700 disabled:opacity-40 px-4 py-2 text-sm font-medium text-white transition-colors"
+        className="flex items-center justify-center gap-2 rounded-lg bg-green-800 hover:bg-green-700 disabled:opacity-40 px-4 py-2 text-sm font-medium text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         {loading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
         {loading ? 'Exporting…' : `Export as ${format.toUpperCase()}`}

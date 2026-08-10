@@ -415,7 +415,7 @@ export default function HyperelasticSolverPanel({ projectId, fileId }: Props) {
       )}
 
       {/* Run button */}
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, background: '#065f46', ...(running ? s.buttonDisabled : {}) }}>
         {running
           ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Solving NR…</>

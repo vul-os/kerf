@@ -104,7 +104,7 @@ function SurfaceRow({ surf, index, onChange, onRemove }: SurfaceRowProps) {
       </td>
       <td className="px-2 py-1">
         <button
-          className="text-red-400 hover:text-red-300 text-xs"
+          className="text-red-400 hover:text-red-300 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={() => onRemove(index)}
         >
           ×
@@ -222,7 +222,7 @@ export default function SequentialTracePanel({ onCallTool }: Props) {
           </tbody>
         </table>
         <button
-          className="mt-1 text-xs text-blue-400 hover:text-blue-300"
+          className="mt-1 text-xs text-blue-400 hover:text-blue-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={handleAddSurface}
         >
           + Add surface
@@ -261,7 +261,7 @@ export default function SequentialTracePanel({ onCallTool }: Props) {
       </div>
 
       <button
-        className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white text-xs font-semibold px-4 py-2 rounded"
+        className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white text-xs font-semibold px-4 py-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         onClick={handleTrace}
         disabled={loading || surfaces.length === 0}
       >

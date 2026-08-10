@@ -204,14 +204,14 @@ function SaveAsRow({ sourceName, onConfirm, onCancel }: SaveAsRowProps) {
       <button
         onClick={() => onConfirm(name)}
         disabled={!name.trim()}
-        className="px-3 py-1 bg-kerf-600 hover:bg-kerf-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs rounded transition-colors"
+        className="px-3 py-1 bg-kerf-600 hover:bg-kerf-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         data-testid="save-as-confirm"
       >
         Save
       </button>
       <button
         onClick={onCancel}
-        className="px-2 py-1 text-ink-400 hover:text-ink-200 text-xs rounded transition-colors"
+        className="px-2 py-1 text-ink-400 hover:text-ink-200 text-xs rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         data-testid="save-as-cancel"
       >
         Cancel
@@ -285,7 +285,7 @@ export default function MaterialPbrEditor({ material, onSave, onClose, className
         {typeof onClose === 'function' && (
           <button
             onClick={onClose}
-            className="text-ink-500 hover:text-ink-200 text-xs transition-colors"
+            className="text-ink-500 hover:text-ink-200 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             aria-label="Close PBR editor"
             data-testid="pbr-close"
           >
@@ -348,7 +348,7 @@ export default function MaterialPbrEditor({ material, onSave, onClose, className
             ) : (
               <button
                 onClick={() => setShowSaveAs(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-ink-800 hover:bg-ink-700 border border-ink-700 rounded text-xs text-ink-200 transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 bg-ink-800 hover:bg-ink-700 border border-ink-700 rounded text-xs text-ink-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 data-testid="save-as-button"
               >
                 <Save size={12} />

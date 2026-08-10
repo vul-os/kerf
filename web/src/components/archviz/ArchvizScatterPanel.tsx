@@ -195,7 +195,7 @@ interface AssetChipProps {
 function AssetChip({ asset, selected, onToggle }: AssetChipProps) {
   const color = CATEGORY_COLORS[asset.category] ?? '#888'
   return (
-    <button
+    <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       onClick={() => onToggle(asset.id)}
       title={`${asset.label}\nBBox: ${asset.bbox?.join(' × ')} m`}
       style={{
@@ -434,7 +434,7 @@ export default function ArchvizScatterPanel({ callTool }: Props) {
 
       {/* Asset Palette ─────────────────────────────────────────────────── */}
       <div style={sectionStyle}>
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={toggleAssetPalette}
           style={{
             display: 'flex', alignItems: 'center', gap: 6, width: '100%',
@@ -511,7 +511,7 @@ export default function ArchvizScatterPanel({ callTool }: Props) {
         {/* Method toggle */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
           {(['poisson', 'grid'] as const).map((m) => (
-            <button
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               key={m}
               onClick={() => setMethod(m)}
               style={{
@@ -584,7 +584,7 @@ export default function ArchvizScatterPanel({ callTool }: Props) {
               textAlign: 'right',
             }}
           />
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={randomiseSeed}
             title="Random seed"
             style={{
@@ -598,7 +598,7 @@ export default function ArchvizScatterPanel({ callTool }: Props) {
       </div>
 
       {/* Run button */}
-      <button
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         onClick={runScatter}
         disabled={running}
         style={{

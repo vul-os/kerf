@@ -311,7 +311,7 @@ export default function TINView({
           TIN Surface
         </span>
         <button
-          className="text-xs px-3 py-1 rounded bg-kerf-700 hover:bg-kerf-600 text-white disabled:opacity-50 transition-colors"
+          className="text-xs px-3 py-1 rounded bg-kerf-700 hover:bg-kerf-600 text-white disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={handleRunAnalysis}
           disabled={loading || isEmpty}
           data-testid="tin-run-btn"

@@ -6520,7 +6520,7 @@ function FeatureTimelineChip({ node, kind, Icon, idx, isSel, rovingTabIndex = 0,
             role="menuitem"
             type="button"
             onClick={() => { setDotMenuOpen(false); onDelete() }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-300 hover:bg-red-900/25 focus-visible:outline-none focus-visible:bg-red-900/25"
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-300 hover:bg-red-900/25 focus-visible:outline-none focus-visible:bg-red-900/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Trash2 size={11} aria-hidden="true" />
             Delete feature
@@ -7147,7 +7147,7 @@ function FaceIdsField({ value, onChange, pickArmed, onArmPick, selection, setSel
           className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] border
             ${pickArmed
               ? 'bg-kerf-300/15 border-kerf-300/50 text-kerf-200'
-              : 'bg-ink-800 border-ink-700 text-ink-300 hover:border-ink-500'}`}
+              : 'bg-ink-800 border-ink-700 text-ink-300 hover:border-ink-500'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
           title={pickArmed ? 'Stop picking faces' : 'Click in the viewport to pick faces'}
         >
           <Crosshair size={11} />

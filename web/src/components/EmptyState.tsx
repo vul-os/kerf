@@ -23,7 +23,7 @@
  *     when it replaces a live region that had content.
  *   - The icon is `aria-hidden` since the title + description carry the full
  *     meaning.
- *   - The action button is a standard <button> or <a> with focusable tab stop.
+ *   - The action button is a standard <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"> or <a> with focusable tab stop.
  *
  * Examples
  * ────────

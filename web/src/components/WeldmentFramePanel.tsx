@@ -209,7 +209,7 @@ function ProfileLookupMode({ onToast }: ModeProps) {
 
       <button type="button" onClick={run} disabled={loading}
         data-testid="weldment-profile-run"
-        className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded bg-kerf-300/10 hover:bg-kerf-300/20 text-[11px] text-kerf-300 disabled:opacity-40">
+        className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded bg-kerf-300/10 hover:bg-kerf-300/20 text-[11px] text-kerf-300 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
         {loading ? <Loader2 size={12} className="animate-spin" /> : <Frame size={12} />}
         Look Up Profile
       </button>
@@ -300,7 +300,7 @@ function FrameMode({ onToast }: ModeProps) {
 
       <button type="button" onClick={run} disabled={loading || !skeletonStatus.ok}
         data-testid="weldment-frame-run"
-        className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded bg-kerf-300/10 hover:bg-kerf-300/20 text-[11px] text-kerf-300 disabled:opacity-40">
+        className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded bg-kerf-300/10 hover:bg-kerf-300/20 text-[11px] text-kerf-300 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
         {loading ? <Loader2 size={12} className="animate-spin" /> : <Frame size={12} />}
         Generate Frame
       </button>
@@ -378,7 +378,7 @@ export default function WeldmentFramePanel({ onToast, content }: WeldmentFramePa
     <div className="border-t border-ink-800 flex-shrink-0" data-testid="weldment-frame-panel">
       <div className="flex items-center px-3 py-1.5 gap-2">
         <button type="button" onClick={() => setOpen((v) => !v)}
-          className="flex items-center gap-1.5 text-[11px] text-ink-400 hover:text-kerf-300 flex-1 min-w-0"
+          className="flex items-center gap-1.5 text-[11px] text-ink-400 hover:text-kerf-300 flex-1 min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           aria-expanded={open}
           aria-controls="weldment-panel-body"
           data-testid="weldment-panel-toggle">
@@ -399,7 +399,7 @@ export default function WeldmentFramePanel({ onToast, content }: WeldmentFramePa
                   mode === k
                     ? 'bg-kerf-300/20 text-kerf-300'
                     : 'bg-ink-800 text-ink-400 hover:bg-ink-700'
-                }`}>
+                } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}>
                 {label}
               </button>
             ))}

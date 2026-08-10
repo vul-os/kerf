@@ -261,7 +261,7 @@ function PipeInspector({ pipe, flow, onClose }: PipeInspectorProps) {
         <span className="text-slate-100 font-semibold">{pipe.id}</span>
         <button
           onClick={onClose}
-          className="text-slate-500 hover:text-slate-300 ml-2"
+          className="text-slate-500 hover:text-slate-300 ml-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           aria-label="Close inspector"
         >
           ✕
@@ -423,7 +423,7 @@ export default function PipeNetworkView({
             </span>
           )}
           <button
-            className="text-xs px-3 py-1 rounded bg-kerf-700 hover:bg-kerf-600 text-white disabled:opacity-50 transition-colors"
+            className="text-xs px-3 py-1 rounded bg-kerf-700 hover:bg-kerf-600 text-white disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={handleSolve}
             disabled={loading || isEmpty}
             data-testid="pipe-solve-btn"

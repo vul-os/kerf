@@ -224,7 +224,7 @@ function AddTopicModal({ onAdd, onClose }: AddTopicModalProps) {
       <div className="w-full max-w-lg rounded-xl border border-ink-700 bg-ink-900 p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-ink-100">New BCF Topic</h2>
-          <button type="button" onClick={onClose} className="rounded p-1 text-ink-400 hover:bg-ink-800 hover:text-ink-200">
+          <button type="button" onClick={onClose} className="rounded p-1 text-ink-400 hover:bg-ink-800 hover:text-ink-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
             <X size={15} />
           </button>
         </div>
@@ -294,11 +294,11 @@ function AddTopicModal({ onAdd, onClose }: AddTopicModalProps) {
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" onClick={onClose}
-              className="rounded px-3 py-1.5 text-xs text-ink-400 hover:bg-ink-800 hover:text-ink-200">
+              className="rounded px-3 py-1.5 text-xs text-ink-400 hover:bg-ink-800 hover:text-ink-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
               Cancel
             </button>
             <button type="submit" disabled={!isValid}
-              className="rounded bg-kerf-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-kerf-500 disabled:cursor-not-allowed disabled:opacity-50">
+              className="rounded bg-kerf-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-kerf-500 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
               Create Topic
             </button>
           </div>
@@ -430,7 +430,7 @@ function DetailPanel({ topic, comments, viewpoints, onStatusChange, onAddComment
             type="button"
             onClick={submitComment}
             disabled={!commentText.trim()}
-            className="rounded bg-kerf-700 px-3 py-2 text-xs text-white hover:bg-kerf-600 disabled:opacity-40"
+            className="rounded bg-kerf-700 px-3 py-2 text-xs text-white hover:bg-kerf-600 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             Send
           </button>
@@ -590,7 +590,7 @@ export default function BCFIssueManager({ projectId, className = '' }: Props) {
         <button
           type="button"
           onClick={() => setShowAdd(true)}
-          className="flex items-center gap-1.5 rounded bg-kerf-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-kerf-600"
+          className="flex items-center gap-1.5 rounded bg-kerf-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-kerf-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Plus size={13} />
           Add Topic
@@ -599,7 +599,7 @@ export default function BCFIssueManager({ projectId, className = '' }: Props) {
           type="button"
           onClick={handleExport}
           disabled={topics.length === 0}
-          className="flex items-center gap-1.5 rounded border border-ink-700 bg-ink-800 px-3 py-1.5 text-xs text-ink-300 hover:bg-ink-700 hover:text-ink-100 disabled:opacity-40"
+          className="flex items-center gap-1.5 rounded border border-ink-700 bg-ink-800 px-3 py-1.5 text-xs text-ink-300 hover:bg-ink-700 hover:text-ink-100 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Download size={13} />
           Export BCF
@@ -607,7 +607,7 @@ export default function BCFIssueManager({ projectId, className = '' }: Props) {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="flex items-center gap-1.5 rounded border border-ink-700 bg-ink-800 px-3 py-1.5 text-xs text-ink-300 hover:bg-ink-700 hover:text-ink-100"
+          className="flex items-center gap-1.5 rounded border border-ink-700 bg-ink-800 px-3 py-1.5 text-xs text-ink-300 hover:bg-ink-700 hover:text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Upload size={13} />
           Import BCF
@@ -639,7 +639,7 @@ export default function BCFIssueManager({ projectId, className = '' }: Props) {
         </div>
         {hasFilters && (
           <button type="button" onClick={clearFilters}
-            className="ml-auto flex items-center gap-1 text-[11px] text-ink-500 hover:text-ink-300">
+            className="ml-auto flex items-center gap-1 text-[11px] text-ink-500 hover:text-ink-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
             <X size={11} /> Clear
           </button>
         )}
@@ -649,7 +649,7 @@ export default function BCFIssueManager({ projectId, className = '' }: Props) {
         <div className="border-b border-red-800 bg-red-950/40 px-4 py-2 text-xs text-red-300 flex items-center gap-2">
           <AlertTriangle size={12} />
           {importError}
-          <button type="button" onClick={() => setImportError('')} className="ml-auto">
+          <button type="button" onClick={() => setImportError('')} className="ml-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
             <X size={12} />
           </button>
         </div>

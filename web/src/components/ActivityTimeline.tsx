@@ -308,7 +308,7 @@ export default function ActivityTimeline({ projectId, open, onClose }: ActivityT
           type="button"
           onClick={() => useWorkspace.getState().loadActivity(false)}
           disabled={loading}
-          className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800 disabled:opacity-40"
+          className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           title="Refresh"
         >
           <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
@@ -361,7 +361,7 @@ export default function ActivityTimeline({ projectId, open, onClose }: ActivityT
             type="button"
             onClick={() => useWorkspace.getState().loadActivity(true)}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-1.5 h-7 rounded-md bg-ink-800 hover:bg-ink-700 text-[11px] text-ink-200 disabled:opacity-40"
+            className="w-full flex items-center justify-center gap-1.5 h-7 rounded-md bg-ink-800 hover:bg-ink-700 text-[11px] text-ink-200 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             {loading ? (
               <Loader2 size={11} className="animate-spin" />

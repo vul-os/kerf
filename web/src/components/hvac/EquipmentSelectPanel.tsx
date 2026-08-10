@@ -209,7 +209,7 @@ export function EquipmentCard({ eq, selected, onSelect }: {
         selected
           ? 'bg-kerf-300/10 border-kerf-300/60'
           : 'bg-ink-900 border-ink-800 hover:border-ink-600'
-      }`}
+      } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
     >
       <div className="flex items-start justify-between gap-2 mb-1">
         <div>
@@ -376,7 +376,7 @@ export default function EquipmentSelectPanel() {
                     category === c.key
                       ? 'bg-kerf-300/15 border-kerf-300/50 text-kerf-200'
                       : 'bg-ink-900 border-ink-700 text-ink-400 hover:border-ink-500'
-                  }`}
+                  } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
                 >
                   {c.label}
                 </button>

@@ -269,7 +269,7 @@ interface RunBtnProps {
 
 function RunBtn({ onClick, running, disabled, label = 'Run' }: RunBtnProps) {
   return (
-    <button onClick={onClick} disabled={running || disabled}
+    <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={onClick} disabled={running || disabled}
       style={{ ...s.btn, ...(running || disabled ? s.btnDis : {}) }}>
       {running
         ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Computing…</>
@@ -847,7 +847,7 @@ export default function DrawingSheetPanel() {
 
       <div style={s.tabs}>
         {TABS.map(({ id, label, Icon }) => (
-          <button key={id} onClick={() => setTab(id)}
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" key={id} onClick={() => setTab(id)}
             style={{ ...s.tab, ...(tab === id ? s.tabActive : {}) }}>
             <Icon size={11} style={{ marginRight: 4 }} />{label}
           </button>

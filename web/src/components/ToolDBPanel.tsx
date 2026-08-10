@@ -251,7 +251,7 @@ function ToolForm({ initial, onSubmit, onClose }) {
       <div style={{ background: '#111827', border: '1px solid #374151', borderRadius: 10, padding: 24, width: 420, maxHeight: '90vh', overflowY: 'auto', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 13, color: '#e5e7eb' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <span style={{ fontWeight: 700, fontSize: 14 }}>{initial ? 'Edit Tool' : 'Add Tool'}</span>
-          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: 2 }}>
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" type="button" onClick={onClose} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: 2 }}>
             <X size={16} />
           </button>
         </div>
@@ -306,10 +306,10 @@ function ToolForm({ initial, onSubmit, onClose }) {
           </div>
 
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-            <button type="button" onClick={onClose} style={{ padding: '6px 14px', background: '#1f2937', border: '1px solid #374151', borderRadius: 5, color: '#9ca3af', fontSize: 12, cursor: 'pointer' }}>
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" type="button" onClick={onClose} style={{ padding: '6px 14px', background: '#1f2937', border: '1px solid #374151', borderRadius: 5, color: '#9ca3af', fontSize: 12, cursor: 'pointer' }}>
               Cancel
             </button>
-            <button type="submit" style={{ padding: '6px 14px', background: '#4c1d95', border: 'none', borderRadius: 5, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" type="submit" style={{ padding: '6px 14px', background: '#4c1d95', border: 'none', borderRadius: 5, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
               {initial ? 'Save' : 'Add Tool'}
             </button>
           </div>
@@ -358,7 +358,7 @@ function ToolCard({ tool, onEdit, onDelete }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: '#c4b5fd', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{tool.id}</span>
           <div style={{ display: 'flex', gap: 4 }}>
-            <button
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               type="button"
               onClick={() => onEdit(tool)}
               title="Edit tool"
@@ -366,7 +366,7 @@ function ToolCard({ tool, onEdit, onDelete }) {
             >
               <Pencil size={12} />
             </button>
-            <button
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               type="button"
               onClick={() => onDelete(tool.id)}
               title="Delete tool"
@@ -475,7 +475,7 @@ export default function ToolDBPanel({ tools = [], onAddTool, onDeleteTool, readO
           <span style={{ fontWeight: 600, fontSize: 13, color: '#f3f4f6' }}>Tool Library</span>
         </div>
         {!readOnly && (
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             type="button"
             onClick={handleAdd}
             style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', background: '#4c1d95', border: 'none', borderRadius: 5, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}

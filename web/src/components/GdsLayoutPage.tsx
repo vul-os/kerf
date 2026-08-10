@@ -144,7 +144,7 @@ export default function GdsLayoutPage({ pdk = 'sky130', className = '' }: Props)
           <p className="font-medium">Failed to parse GDS file</p>
           <p className="text-sm mt-1">{error}</p>
           <button
-            className="mt-3 text-sm underline hover:no-underline"
+            className="mt-3 text-sm underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={() => { setError(null); setFileName(null) }}
           >
             Try another file
@@ -164,7 +164,7 @@ export default function GdsLayoutPage({ pdk = 'sky130', className = '' }: Props)
               {layout.cells?.length ?? 0} cell{layout.cells?.length !== 1 ? 's' : ''} · top: <code>{layout.topCell}</code>
             </span>
             <button
-              className="ml-auto text-xs text-gray-400 hover:text-gray-700"
+              className="ml-auto text-xs text-gray-400 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               onClick={() => { setLayout(null); setFileName(null); setError(null) }}
               aria-label="Load a different GDS file"
             >

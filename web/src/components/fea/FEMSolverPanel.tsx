@@ -220,7 +220,7 @@ function NonlinearStaticCard({ projectId, fileId }: FemPanelProps) {
           <span style={{ color: '#9ca3af', fontSize: 11, marginLeft: 4 }}>(Riks / snap-through)</span>
         </div>
       </div>
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, background: '#7c2d12', ...(running ? s.buttonDisabled : {}) }}>
         {running ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Running…</> : <><Play size={13} /> Run NL Static</>}
       </button>
@@ -305,7 +305,7 @@ function NonlinearBarCard({ projectId, fileId }: FemPanelProps) {
           disabled={running} rows={2}
           style={{ ...s.input, flex: 'none', width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }} />
       </div>
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, background: '#7c2d12', ...(running ? s.buttonDisabled : {}) }}>
         {running ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Running…</> : <><Play size={13} /> Run NL Bar</>}
       </button>
@@ -409,7 +409,7 @@ function ExplicitDynamicsCard({ projectId, fileId }: FemPanelProps) {
           <input type="number" value={loadMag} onChange={e => setLoadMag(e.target.value)} style={s.input} disabled={running} />
         </div>
       </div>
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, background: '#7f1d1d', ...(running ? s.buttonDisabled : {}) }}>
         {running ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Running…</> : <><Play size={13} /> Run Explicit</>}
       </button>
@@ -510,7 +510,7 @@ function ThermalCard({ projectId, fileId }: FemPanelProps) {
           </div>
         )}
       </div>
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, background: '#78350f', ...(running ? s.buttonDisabled : {}) }}>
         {running ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Running…</> : <><Play size={13} /> Run Thermal</>}
       </button>
@@ -626,7 +626,7 @@ function AcousticsCard({ projectId, fileId }: FemPanelProps) {
           <input type="number" value={fMax} onChange={e => setFMax(e.target.value)} style={{ ...s.input, flex: '0 0 70px' }} disabled={running} />
         </div>
       </div>
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, background: '#3730a3', ...(running ? s.buttonDisabled : {}) }}>
         {running ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Running…</> : <><Play size={13} /> Run Acoustics</>}
       </button>
@@ -706,7 +706,7 @@ function ElectrostaticsCard({ projectId, fileId }: FemPanelProps) {
           <input type="number" value={v1} onChange={e => setV1(e.target.value)} style={s.input} disabled={running} />
         </div>
       </div>
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, background: '#713f12', ...(running ? s.buttonDisabled : {}) }}>
         {running ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Running…</> : <><Play size={13} /> Run Electrostatics</>}
       </button>
@@ -767,7 +767,7 @@ function MagnetostaticsCard({ projectId, fileId }: FemPanelProps) {
           <input type="text" value={jCurr} onChange={e => setJCurr(e.target.value)} style={s.input} disabled={running} />
         </div>
       </div>
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, background: '#4c1d95', ...(running ? s.buttonDisabled : {}) }}>
         {running ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Running…</> : <><Play size={13} /> Run Magnetostatics</>}
       </button>
@@ -849,7 +849,7 @@ function EMHighFreqCard({ projectId, fileId }: FemPanelProps) {
           <input type="number" value={nFreqs} min="2" max="500" onChange={e => setNFreqs(e.target.value)} style={s.input} disabled={running} />
         </div>
       </div>
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, background: '#164e63', ...(running ? s.buttonDisabled : {}) }}>
         {running ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Running…</> : <><Play size={13} /> Run EM HF</>}
       </button>
@@ -932,7 +932,7 @@ function CFDNavierStokesCard({ projectId, fileId }: FemPanelProps) {
           <input type="number" value={nIter} min="10" onChange={e => setNIter(e.target.value)} style={s.input} disabled={running} />
         </div>
       </div>
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, background: '#065f46', ...(running ? s.buttonDisabled : {}) }}>
         {running ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Running…</> : <><Play size={13} /> Run N-S</>}
       </button>
@@ -1001,7 +1001,7 @@ function CFDPotentialCard({ projectId, fileId }: FemPanelProps) {
           <input type="number" value={nPts} min="10" max="500" onChange={e => setNPts(e.target.value)} style={s.input} disabled={running} />
         </div>
       </div>
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, background: '#134e4a', ...(running ? s.buttonDisabled : {}) }}>
         {running ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Running…</> : <><Play size={13} /> Run Potential Flow</>}
       </button>
@@ -1120,7 +1120,7 @@ function PlateStaticCard({ projectId, fileId }: FemPanelProps) {
           <input type="text" value={q} onChange={e => setQ(e.target.value)} style={s.input} disabled={running} />
         </div>
       </div>
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, background: '#4c1d95', ...(running ? s.buttonDisabled : {}) }}>
         {running ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Running…</> : <><Play size={13} /> Run Plate</>}
       </button>
@@ -1200,7 +1200,7 @@ function UncertaintyCard({ projectId, fileId }: FemPanelProps) {
           <input type="text" value={fSigma} onChange={e => setFSigma(e.target.value)} style={s.input} disabled={running} />
         </div>
       </div>
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, background: '#701a75', ...(running ? s.buttonDisabled : {}) }}>
         {running ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Running…</> : <><Play size={13} /> Run Uncertainty</>}
       </button>
@@ -1292,7 +1292,7 @@ function TrussPlasticCard({ projectId, fileId }: FemPanelProps) {
           Topology: 3-node 2-bar arch — nodes at (0,0), (0.5,0.5), (1,0)
         </div>
       </div>
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, background: '#7c2d12', ...(running ? s.buttonDisabled : {}) }}>
         {running ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Running…</> : <><Play size={13} /> Run Truss</>}
       </button>
@@ -1352,7 +1352,7 @@ export default function FEMSolverPanel({ projectId, fileId }: Props) {
         {SECTIONS.map(sec => {
           const active = activeSection === sec.id
           return (
-            <button
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               key={sec.id}
               role="tab"
               aria-selected={active}

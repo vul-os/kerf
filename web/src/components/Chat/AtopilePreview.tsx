@@ -191,7 +191,7 @@ export default function AtopilePreview({ source, projectId }: Props) {
         <button
           type="button"
           onClick={() => setSourceExpanded((v) => !v)}
-          className="flex items-center gap-1.5 w-full px-3 py-1.5 text-[11px] text-ink-500 hover:text-ink-300 hover:bg-ink-900/40 transition-colors text-left"
+          className="flex items-center gap-1.5 w-full px-3 py-1.5 text-[11px] text-ink-500 hover:text-ink-300 hover:bg-ink-900/40 transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {sourceExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
           {sourceExpanded ? 'Hide' : 'Show'} source

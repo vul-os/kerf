@@ -573,7 +573,7 @@ export default function LadderView({
               mode === 'diagram'
                 ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
                 : 'text-ink-500 hover:text-ink-300'
-            }`}
+            } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
           >
             <List size={10} /> Diagram
           </button>
@@ -583,7 +583,7 @@ export default function LadderView({
               mode === 'source'
                 ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
                 : 'text-ink-500 hover:text-ink-300'
-            }`}
+            } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
           >
             <Code2 size={10} /> JSON
           </button>

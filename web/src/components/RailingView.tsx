@@ -255,7 +255,7 @@ export default function RailingView({ content, onContentChange }: RailingViewPro
             <input className={iCls} defaultValue={`${pt.x}, ${pt.y}, ${pt.z}`}
               onBlur={(e) => updatePoint(idx, e.target.value)} />
             <button type="button" onClick={() => commit({ ...railing, path: path.filter((_, i) => i !== idx) })}
-              className="p-0.5 text-ink-500 hover:text-red-400 flex-shrink-0"><Trash2 size={12} /></button>
+              className="p-0.5 text-ink-500 hover:text-red-400 flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Trash2 size={12} /></button>
           </div>
         ))}
       </Section>

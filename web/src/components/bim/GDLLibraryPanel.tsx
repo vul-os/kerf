@@ -228,7 +228,7 @@ export default function GDLLibraryPanel({ content }: { content?: string; onToast
     <div className="flex flex-col border border-ink-200 dark:border-ink-700 rounded-lg bg-white dark:bg-ink-900 overflow-hidden">
       {/* Header */}
       <button
-        className="flex items-center justify-between px-4 py-3 text-sm font-semibold text-ink-800 dark:text-ink-100 hover:bg-ink-50 dark:hover:bg-ink-800"
+        className="flex items-center justify-between px-4 py-3 text-sm font-semibold text-ink-800 dark:text-ink-100 hover:bg-ink-50 dark:hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         onClick={() => setExpanded(x => !x)}
       >
         <div className="flex items-center gap-2">
@@ -247,7 +247,7 @@ export default function GDLLibraryPanel({ content }: { content?: string; onToast
               <button key={id} onClick={() => setActiveTab(id)}
                 className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors ${
                   activeTab === id ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-ink-500 hover:text-ink-700 dark:hover:text-ink-300'
-                }`}>
+                } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}>
                 {label}
               </button>
             ))}
@@ -262,7 +262,7 @@ export default function GDLLibraryPanel({ content }: { content?: string; onToast
                   <button key={s} onClick={() => setFilter(s)}
                     className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
                       filter === s ? 'bg-indigo-600 text-white' : 'bg-ink-100 text-ink-600 hover:bg-ink-200 dark:bg-ink-700 dark:text-ink-300'
-                    }`}>
+                    } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}>
                     {s}
                   </button>
                 ))}
@@ -276,7 +276,7 @@ export default function GDLLibraryPanel({ content }: { content?: string; onToast
                     <button key={obj.id} onClick={() => selectObject(obj.id)}
                       className={`rounded-lg border p-3 text-left transition-all hover:shadow-sm ${
                         selectedId === obj.id ? 'border-indigo-400 dark:border-indigo-500' : 'border-ink-200 dark:border-ink-700'
-                      } ${obj.bg}`}>
+                      } ${obj.bg} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}>
                       <div className="flex items-center gap-2 mb-1">
                         <Icon className={`h-4 w-4 ${obj.color}`} />
                         <span className="text-xs font-semibold text-ink-800 dark:text-ink-100">{obj.name}</span>
@@ -330,12 +330,12 @@ export default function GDLLibraryPanel({ content }: { content?: string; onToast
                   {/* Action buttons */}
                   <div className="flex gap-2">
                     <button onClick={evaluate}
-                      className="flex-1 flex items-center justify-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700">
+                      className="flex-1 flex items-center justify-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
                       <Zap className="h-3.5 w-3.5" />
                       Evaluate
                     </button>
                     <button onClick={() => setShowScript(x => !x)}
-                      className="flex items-center gap-1.5 rounded-md border border-ink-300 px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-ink-50 dark:border-ink-600 dark:text-ink-300 dark:hover:bg-ink-800">
+                      className="flex items-center gap-1.5 rounded-md border border-ink-300 px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-ink-50 dark:border-ink-600 dark:text-ink-300 dark:hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
                       <Code2 className="h-3.5 w-3.5" />
                       {showScript ? 'Hide' : 'Script'}
                     </button>

@@ -202,7 +202,7 @@ export default function FatiguePanel({ projectId, fileId }: Props) {
       <div style={s.section}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={s.sectionTitle}>S-N Curve (Wöhler) — {mat.label}</div>
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={() => setShowHaigh(h => !h)}
             style={{
               marginLeft: 'auto', fontSize: 10, background: 'none', border: '1px solid #374151',
@@ -271,7 +271,7 @@ export default function FatiguePanel({ projectId, fileId }: Props) {
         </div>
       </div>
 
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, background: '#9d174d', ...(running ? s.buttonDisabled : {}) }}>
         {running
           ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Running…</>

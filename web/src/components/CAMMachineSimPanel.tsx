@@ -274,7 +274,7 @@ export default function CAMMachineSimPanel({
         <span style={styles.dimVal}>{toolpathPoints?.length ?? 0}</span>
       </div>
 
-      <button
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         type="button"
         onClick={handleRun}
         disabled={running}

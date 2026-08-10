@@ -333,7 +333,7 @@ function FlatPatternTool() {
         <input type="checkbox" checked={exportDxf} onChange={e => setExportDxf(e.target.checked)} />
         Export DXF
       </label>
-      <button style={s.button} onClick={run} disabled={loading}>
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" style={s.button} onClick={run} disabled={loading}>
         {loading ? <Loader2 size={13} /> : <Play size={13} />}
         Compute Flat Pattern
       </button>
@@ -448,7 +448,7 @@ function CornerReliefTool() {
 
       <div style={s.reliefDiagram}>{RELIEF_DIAGRAMS[reliefType]}</div>
 
-      <button style={s.button} onClick={run} disabled={loading}>
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" style={s.button} onClick={run} disabled={loading}>
         {loading ? <Loader2 size={13} /> : <Play size={13} />}
         Compute Corner Relief
       </button>
@@ -553,7 +553,7 @@ function MultiFlangeCalc() {
         <div style={s.label}>flanges (JSON)</div>
         <textarea style={s.textarea} value={flanges} onChange={e => setFlanges(e.target.value)} />
       </div>
-      <button style={s.button} onClick={run} disabled={loading}>
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" style={s.button} onClick={run} disabled={loading}>
         {loading ? <Loader2 size={13} /> : <Play size={13} />}
         Compute
       </button>
@@ -605,7 +605,7 @@ export default function SheetMetalPanel({ content }: SheetMetalPanelProps = {}) 
 
       <div style={s.tabs}>
         {TABS.map(t => (
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             key={t}
             style={{ ...s.tab, ...(tab === t ? s.tabActive : {}) }}
             onClick={() => setTab(t)}

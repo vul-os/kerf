@@ -492,7 +492,7 @@ export default function LaminateStackup({ initialPlies, onResult }: Props) {
           <span style={styles.badge(balanced)}>
             {balanced ? 'Bal ✓' : 'Unbal'}
           </span>
-          <button style={styles.addBtn} onClick={addPly} type="button">
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" style={styles.addBtn} onClick={addPly} type="button">
             + Ply
           </button>
         </div>
@@ -575,7 +575,7 @@ export default function LaminateStackup({ initialPlies, onResult }: Props) {
                   {fmtNum(ply.E2, 1)}
                 </td>
                 <td style={{ ...styles.td, width: 24 }}>
-                  <button
+                  <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                     style={styles.removeBtn}
                     onClick={(e) => { e.stopPropagation(); removePly(i) }}
                     type="button"
@@ -612,7 +612,7 @@ export default function LaminateStackup({ initialPlies, onResult }: Props) {
       <div style={styles.resultPanel}>
         <div style={styles.resultLabel}>
           <span>CLT Stiffness</span>
-          <button style={styles.runBtn} onClick={runCLT} type="button" disabled={loading}>
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" style={styles.runBtn} onClick={runCLT} type="button" disabled={loading}>
             {loading ? '⟳ Running…' : '▶ Run Analysis'}
           </button>
           {error && (

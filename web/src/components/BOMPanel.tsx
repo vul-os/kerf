@@ -76,7 +76,7 @@ export default function BOMPanel({ projectId, onClose }: BOMPanelProps) {
             type="button"
             onClick={() => loadBOM(projectId)}
             disabled={loading}
-            className="text-[11px] text-ink-400 hover:text-kerf-300 disabled:opacity-50"
+            className="text-[11px] text-ink-400 hover:text-kerf-300 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             Refresh
           </button>
@@ -84,7 +84,7 @@ export default function BOMPanel({ projectId, onClose }: BOMPanelProps) {
             type="button"
             onClick={() => downloadCSV(rows, computedTotal, projectId)}
             disabled={loading || rows.length === 0}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-kerf-300 text-ink-950 text-[11px] font-medium hover:bg-kerf-200 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-kerf-300 text-ink-950 text-[11px] font-medium hover:bg-kerf-200 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Download size={11} />
             Export CSV
@@ -93,7 +93,7 @@ export default function BOMPanel({ projectId, onClose }: BOMPanelProps) {
             <button
               type="button"
               onClick={onClose}
-              className="text-[11px] text-ink-400 hover:text-ink-100"
+              className="text-[11px] text-ink-400 hover:text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               Close
             </button>
@@ -163,7 +163,7 @@ function WarningStrip({ warnings }: { warnings: string[] }) {
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="text-[10px] text-amber-300/80 hover:text-amber-200"
+            className="text-[10px] text-amber-300/80 hover:text-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             {expanded ? 'Less' : `+${warnings.length - 3} more`}
           </button>
@@ -209,7 +209,7 @@ function ErrorState({ error, onRetry }: { error: string; onRetry: () => void }) 
         <button
           type="button"
           onClick={onRetry}
-          className="px-2.5 py-1 rounded-md bg-kerf-300 text-ink-950 text-[11px] font-medium hover:bg-kerf-200"
+          className="px-2.5 py-1 rounded-md bg-kerf-300 text-ink-950 text-[11px] font-medium hover:bg-kerf-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           Retry
         </button>

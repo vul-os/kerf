@@ -191,7 +191,7 @@ export default function FirmwareProjectPanel({
           onClick={handleBuild}
           disabled={anyLoading}
           data-testid="btn-build"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border border-ink-600 bg-ink-800 text-ink-100 hover:bg-ink-700 hover:border-kerf-400 hover:text-kerf-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border border-ink-600 bg-ink-800 text-ink-100 hover:bg-ink-700 hover:border-kerf-400 hover:text-kerf-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {buildStatus === 'loading'
             ? <Loader2 size={12} className="animate-spin flex-shrink-0" />
@@ -208,7 +208,7 @@ export default function FirmwareProjectPanel({
           disabled={anyLoading || !IS_LOCAL_CLI}
           data-testid="btn-flash"
           title={IS_LOCAL_CLI ? 'Flash firmware to connected board' : 'Requires local Kerf CLI'}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border border-ink-600 bg-ink-800 text-ink-100 hover:bg-ink-700 hover:border-kerf-400 hover:text-kerf-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border border-ink-600 bg-ink-800 text-ink-100 hover:bg-ink-700 hover:border-kerf-400 hover:text-kerf-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {uploadStatus === 'loading'
             ? <Loader2 size={12} className="animate-spin flex-shrink-0" />
@@ -229,7 +229,7 @@ export default function FirmwareProjectPanel({
             showMonitor && IS_LOCAL_CLI
               ? 'border-green-600/70 bg-green-900/30 text-green-300'
               : 'border-ink-600 bg-ink-800 text-ink-100 hover:bg-ink-700 hover:border-green-600 hover:text-green-300'
-          }`}
+          } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
         >
           <Activity size={12} className="flex-shrink-0" />
           Monitor
@@ -239,7 +239,7 @@ export default function FirmwareProjectPanel({
         <button
           type="button"
           onClick={() => setShowBuildOutput((v) => !v)}
-          className="flex items-center gap-1 text-[10px] text-ink-500 hover:text-ink-300 transition-colors ml-auto"
+          className="flex items-center gap-1 text-[10px] text-ink-500 hover:text-ink-300 transition-colors ml-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {showBuildOutput ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
           Build log

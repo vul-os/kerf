@@ -610,7 +610,7 @@ export default function AssemblyEditor({
               <button
                 type="button"
                 onClick={startInsert}
-                className="text-kerf-300 hover:underline"
+                className="text-kerf-300 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               >
                 Add your first component
               </button>
@@ -700,7 +700,7 @@ export default function AssemblyEditor({
         <button
           type="button"
           onClick={() => setShowJson((v) => !v)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-ink-400 hover:text-kerf-300"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-ink-400 hover:text-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {showJson ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
           JSON
@@ -852,9 +852,9 @@ function InsertObjectsModal({ modal, eligibleFiles, allFiles, onPickFile, onCanc
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[10px] uppercase tracking-wider text-ink-500">Objects</span>
                 <div className="flex items-center gap-2 text-[10px]">
-                  <button type="button" onClick={selectAll} className="text-ink-400 hover:text-kerf-300">all</button>
+                  <button type="button" onClick={selectAll} className="text-ink-400 hover:text-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">all</button>
                   <span className="text-ink-700">·</span>
-                  <button type="button" onClick={selectNone} className="text-ink-400 hover:text-kerf-300">none</button>
+                  <button type="button" onClick={selectNone} className="text-ink-400 hover:text-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">none</button>
                 </div>
               </div>
               <ul role="list" className="space-y-0.5">
@@ -895,7 +895,7 @@ function InsertObjectsModal({ modal, eligibleFiles, allFiles, onPickFile, onCanc
           <button
             type="button"
             onClick={onCancel}
-            className="px-3 py-1.5 rounded-md text-xs text-ink-300 hover:bg-ink-800"
+            className="px-3 py-1.5 rounded-md text-xs text-ink-300 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             Cancel
           </button>
@@ -903,7 +903,7 @@ function InsertObjectsModal({ modal, eligibleFiles, allFiles, onPickFile, onCanc
             type="button"
             onClick={() => onConfirm(orderedSelection, rigid)}
             disabled={loading || orderedSelection.length === 0}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-kerf-300 text-ink-950 text-xs font-medium hover:bg-kerf-200 disabled:opacity-40"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-kerf-300 text-ink-950 text-xs font-medium hover:bg-kerf-200 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Check size={12} />
             Insert {orderedSelection.length || ''}
@@ -1011,7 +1011,7 @@ function ComponentRow({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setEditingName(true) }}
-            className="text-[11px] font-mono text-ink-100 hover:text-kerf-300 truncate"
+            className="text-[11px] font-mono text-ink-100 hover:text-kerf-300 truncate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             title={row.object_id && !isWildcard
               ? `${sourceLabel} / ${row.object_id}`
               : sourceLabel}
@@ -1156,7 +1156,7 @@ function ComponentRow({
             <button
               type="button"
               onClick={() => onPatch({ color: null })}
-              className="text-[10px] text-ink-400 hover:text-kerf-300"
+              className="text-[10px] text-ink-400 hover:text-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               Clear override
             </button>
@@ -1248,7 +1248,7 @@ function ExternalRefChips({ externalRef, onRecordSeen }: ExternalRefChipsProps) 
               onRecordSeen(liveUpdatedAt)
             }
           }}
-          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-950/40 border border-amber-900/60 text-amber-300 text-[10px] font-mono hover:bg-amber-900/40"
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-950/40 border border-amber-900/60 text-amber-300 text-[10px] font-mono hover:bg-amber-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           title={`Source advanced since you last viewed it (${lastSeen} → ${liveUpdatedAt}). Click to acknowledge.`}
         >
           <AlertTriangle size={9} />

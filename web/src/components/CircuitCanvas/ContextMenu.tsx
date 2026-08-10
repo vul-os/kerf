@@ -98,7 +98,7 @@ export default function ContextMenu({ x, y, traceId, circuitJson, onPatch, onClo
       <button
         role="menuitem"
         onClick={handleDelete}
-        className="w-full text-left px-3 py-1.5 hover:bg-zinc-700 text-red-400 hover:text-red-300 transition-colors"
+        className="w-full text-left px-3 py-1.5 hover:bg-zinc-700 text-red-400 hover:text-red-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         Delete wire
       </button>
@@ -106,7 +106,7 @@ export default function ContextMenu({ x, y, traceId, circuitJson, onPatch, onClo
       <button
         role="menuitem"
         onClick={handleReroute}
-        className="w-full text-left px-3 py-1.5 hover:bg-zinc-700 transition-colors"
+        className="w-full text-left px-3 py-1.5 hover:bg-zinc-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         Re-route
       </button>
@@ -114,7 +114,7 @@ export default function ContextMenu({ x, y, traceId, circuitJson, onPatch, onClo
       <button
         role="menuitem"
         onClick={handlePin}
-        className="w-full text-left px-3 py-1.5 hover:bg-zinc-700 transition-colors"
+        className="w-full text-left px-3 py-1.5 hover:bg-zinc-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         Pin to grid
       </button>
@@ -123,7 +123,7 @@ export default function ContextMenu({ x, y, traceId, circuitJson, onPatch, onClo
         role="menuitem"
         onClick={handleConvertToBus}
         disabled
-        className="w-full text-left px-3 py-1.5 text-zinc-500 cursor-not-allowed"
+        className="w-full text-left px-3 py-1.5 text-zinc-500 cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         title="Coming soon"
       >
         Convert to bus

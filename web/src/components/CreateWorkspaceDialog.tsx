@@ -156,7 +156,7 @@ export default function CreateWorkspaceDialog({ open, onClose, onCreated }: Crea
           <button
             type="button"
             onClick={onClose}
-            className="text-ink-400 hover:text-ink-100 transition-colors"
+            className="text-ink-400 hover:text-ink-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             aria-label="Close"
           >
             <X size={16} />
@@ -218,7 +218,7 @@ export default function CreateWorkspaceDialog({ open, onClose, onCreated }: Crea
                   type="button"
                   onClick={clearAvatar}
                   disabled={submitting}
-                  className="self-start inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-ink-300 hover:text-ink-100 hover:bg-ink-800 transition-colors"
+                  className="self-start inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-ink-300 hover:text-ink-100 hover:bg-ink-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 >
                   <X size={11} />
                   Remove
@@ -274,7 +274,7 @@ export default function CreateWorkspaceDialog({ open, onClose, onCreated }: Crea
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="px-3 py-1.5 rounded-md text-sm text-ink-300 hover:bg-ink-800 transition-colors disabled:opacity-40"
+              className="px-3 py-1.5 rounded-md text-sm text-ink-300 hover:bg-ink-800 transition-colors disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               {warning ? 'Close' : 'Cancel'}
             </button>
@@ -282,7 +282,7 @@ export default function CreateWorkspaceDialog({ open, onClose, onCreated }: Crea
               <button
                 type="submit"
                 disabled={submitting || !name.trim() || !slugValid}
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md bg-kerf-300 text-ink-950 text-sm font-semibold hover:bg-kerf-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md bg-kerf-300 text-ink-950 text-sm font-semibold hover:bg-kerf-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               >
                 {submitting && <Loader2 size={13} className="animate-spin" />}
                 {submitting ? 'Creating…' : 'Create workspace'}

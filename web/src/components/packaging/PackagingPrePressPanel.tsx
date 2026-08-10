@@ -424,7 +424,7 @@ export default function PackagingPrePressPanel({ className = '' }: Props) {
                 activeTab === t.id
                   ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
+              } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
               aria-selected={activeTab === t.id}
               role="tab"
             >
@@ -448,7 +448,7 @@ export default function PackagingPrePressPanel({ className = '' }: Props) {
               <button
                 onClick={handleCheck}
                 disabled={loading}
-                className="flex w-fit items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+                className="flex w-fit items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 aria-label="Run pre-press check"
               >
                 {loading ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle size={14} />}
@@ -469,7 +469,7 @@ export default function PackagingPrePressPanel({ className = '' }: Props) {
               <button
                 onClick={handleGenMarks}
                 disabled={loading}
-                className="flex w-fit items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+                className="flex w-fit items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 aria-label="Generate registration marks"
               >
                 {loading ? <RefreshCw size={14} className="animate-spin" /> : null}
@@ -516,7 +516,7 @@ export default function PackagingPrePressPanel({ className = '' }: Props) {
               <button
                 onClick={handleExport}
                 disabled={loading}
-                className="flex w-fit items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+                className="flex w-fit items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 aria-label="Generate PDF/X-1a export"
               >
                 {loading

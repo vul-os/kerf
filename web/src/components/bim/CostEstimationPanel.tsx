@@ -212,7 +212,7 @@ export default function CostEstimationPanel({ content, onToast }: {
     <div className="flex flex-col border border-ink-200 dark:border-ink-700 rounded-lg bg-white dark:bg-ink-900 overflow-hidden">
       {/* Header */}
       <button
-        className="flex items-center justify-between px-4 py-3 text-sm font-semibold text-ink-800 dark:text-ink-100 hover:bg-ink-50 dark:hover:bg-ink-800"
+        className="flex items-center justify-between px-4 py-3 text-sm font-semibold text-ink-800 dark:text-ink-100 hover:bg-ink-50 dark:hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         onClick={() => setExpanded(x => !x)}
       >
         <div className="flex items-center gap-2">
@@ -240,7 +240,7 @@ export default function CostEstimationPanel({ content, onToast }: {
           <button
             onClick={compute}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-1.5 rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-1.5 rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             {loading ? <span className="animate-spin">⟳</span> : <BarChart3 className="h-3.5 w-3.5" />}
             Compute Cost Estimate
@@ -256,7 +256,7 @@ export default function CostEstimationPanel({ content, onToast }: {
                   activeTab === id
                     ? 'border-green-500 text-green-600 dark:text-green-400'
                     : 'border-transparent text-ink-500 hover:text-ink-700 dark:hover:text-ink-300'
-                }`}
+                } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
               >
                 {label}
               </button>
@@ -306,7 +306,7 @@ export default function CostEstimationPanel({ content, onToast }: {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-ink-600 dark:text-ink-300 uppercase tracking-wider">BIM Elements</span>
-                <button onClick={addElement} className="flex items-center gap-1 rounded px-2 py-1 text-xs text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20">
+                <button onClick={addElement} className="flex items-center gap-1 rounded px-2 py-1 text-xs text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
                   <Plus className="h-3 w-3" /> Add
                 </button>
               </div>
@@ -320,7 +320,7 @@ export default function CostEstimationPanel({ content, onToast }: {
                         className="rounded border border-ink-200 dark:border-ink-600 bg-transparent px-1 py-0.5 text-xs">
                         {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
-                      <button onClick={() => removeElement(idx)} className="text-red-400 hover:text-red-600"><Trash2 className="h-3 w-3" /></button>
+                      <button onClick={() => removeElement(idx)} className="text-red-400 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Trash2 className="h-3 w-3" /></button>
                     </div>
                     <div className="grid grid-cols-3 gap-1.5">
                       {(['width', 'height', 'area'] as (keyof CostElement)[]).map(f => (

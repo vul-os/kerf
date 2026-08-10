@@ -289,7 +289,7 @@ function JointRow({ joint, index, onChange, onRemove }: JointRowProps) {
         <button
           type="button"
           onClick={() => onRemove(index)}
-          className="text-ink-600 hover:text-red-400 transition-colors"
+          className="text-ink-600 hover:text-red-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           aria-label={`Remove joint ${index + 1}`}
         >
           <Trash2 size={11} />
@@ -750,7 +750,7 @@ export default function AssemblyMotionStudioPanel({
             <button
               type="button"
               onClick={rewind}
-              className="text-ink-500 hover:text-kerf-300 transition-colors"
+              className="text-ink-500 hover:text-kerf-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               aria-label="Rewind to start"
             >
               <SkipBack size={11} />
@@ -758,7 +758,7 @@ export default function AssemblyMotionStudioPanel({
             <button
               type="button"
               onClick={stepBack}
-              className="text-ink-500 hover:text-kerf-300 transition-colors"
+              className="text-ink-500 hover:text-kerf-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               aria-label="Step back one frame"
               data-testid="step-back-btn"
             >
@@ -768,7 +768,7 @@ export default function AssemblyMotionStudioPanel({
               <button
                 type="button"
                 onClick={stopPlayback}
-                className="text-amber-400 hover:text-amber-300 transition-colors"
+                className="text-amber-400 hover:text-amber-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 aria-label="Pause"
                 data-testid="pause-btn"
               >
@@ -778,7 +778,7 @@ export default function AssemblyMotionStudioPanel({
               <button
                 type="button"
                 onClick={startPlayback}
-                className="text-kerf-400 hover:text-kerf-300 transition-colors"
+                className="text-kerf-400 hover:text-kerf-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 aria-label="Play"
                 data-testid="play-btn"
               >
@@ -788,7 +788,7 @@ export default function AssemblyMotionStudioPanel({
             <button
               type="button"
               onClick={stepForward}
-              className="text-ink-500 hover:text-kerf-300 transition-colors"
+              className="text-ink-500 hover:text-kerf-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               aria-label="Step forward one frame"
               data-testid="step-fwd-btn"
             >
@@ -797,7 +797,7 @@ export default function AssemblyMotionStudioPanel({
             <button
               type="button"
               onClick={() => { stopPlayback(); setTimeline(null) }}
-              className="ml-auto text-[10px] text-ink-600 hover:text-red-400 transition-colors"
+              className="ml-auto text-[10px] text-ink-600 hover:text-red-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               aria-label="Clear simulation results"
             >
               <Square size={10} />
@@ -822,7 +822,7 @@ export default function AssemblyMotionStudioPanel({
               activeTab === tab
                 ? 'text-kerf-300 border-b border-kerf-400'
                 : 'text-ink-500 hover:text-ink-300'
-            }`}
+            } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
             data-testid={`tab-${tab}`}
           >
             {tab}
@@ -843,7 +843,7 @@ export default function AssemblyMotionStudioPanel({
               <button
                 type="button"
                 onClick={addJoint}
-                className="flex items-center gap-1 text-[10px] text-kerf-400 hover:text-kerf-300 transition-colors"
+                className="flex items-center gap-1 text-[10px] text-kerf-400 hover:text-kerf-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 data-testid="studio-add-joint-btn"
               >
                 <Plus size={10} /> Add joint
@@ -909,7 +909,7 @@ export default function AssemblyMotionStudioPanel({
             type="button"
             onClick={handleRun}
             disabled={running}
-            className="flex items-center justify-center gap-1.5 rounded bg-kerf-600 hover:bg-kerf-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-[11px] font-medium py-1.5 px-3 transition-colors"
+            className="flex items-center justify-center gap-1.5 rounded bg-kerf-600 hover:bg-kerf-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-[11px] font-medium py-1.5 px-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             data-testid="studio-run-btn"
           >
             {running
@@ -1022,7 +1022,7 @@ export default function AssemblyMotionStudioPanel({
                 type="button"
                 onClick={handleFeaExport}
                 disabled={feaBusy}
-                className="flex items-center gap-1.5 rounded bg-ink-800 hover:bg-ink-700 disabled:opacity-50 disabled:cursor-not-allowed text-ink-100 text-[11px] font-medium py-1 px-2.5 transition-colors"
+                className="flex items-center gap-1.5 rounded bg-ink-800 hover:bg-ink-700 disabled:opacity-50 disabled:cursor-not-allowed text-ink-100 text-[11px] font-medium py-1 px-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 data-testid="fea-export-btn"
               >
                 {feaBusy

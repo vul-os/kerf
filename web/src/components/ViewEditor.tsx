@@ -209,7 +209,7 @@ export default function ViewEditor({ content, fileName, onContentChange }: ViewE
                 <button
                   type="button"
                   onClick={clearCropBox}
-                  className="text-[10px] text-ink-400 hover:text-kerf-300"
+                  className="text-[10px] text-ink-400 hover:text-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 >
                   Clear
                 </button>
@@ -217,7 +217,7 @@ export default function ViewEditor({ content, fileName, onContentChange }: ViewE
                 <button
                   type="button"
                   onClick={() => patch({ crop_box: { min: [0, 0, 0], max: [1000, 1000, 3000] } })}
-                  className="text-[10px] text-kerf-300 hover:text-kerf-200"
+                  className="text-[10px] text-kerf-300 hover:text-kerf-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 >
                   Enable
                 </button>
@@ -260,7 +260,7 @@ export default function ViewEditor({ content, fileName, onContentChange }: ViewE
               type="button"
               onClick={addFilterExpr}
               disabled={!filterDraft.trim() || !!filterErr}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-[11px] disabled:opacity-40"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-[11px] disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               <Plus size={11} /> Add
             </button>
@@ -276,7 +276,7 @@ export default function ViewEditor({ content, fileName, onContentChange }: ViewE
                   <button
                     type="button"
                     onClick={() => removeFilter(idx)}
-                    className="p-1 rounded hover:bg-red-900/30 text-ink-500 hover:text-red-300"
+                    className="p-1 rounded hover:bg-red-900/30 text-ink-500 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                     title="Remove filter"
                   >
                     <Trash2 size={11} />
@@ -294,7 +294,7 @@ export default function ViewEditor({ content, fileName, onContentChange }: ViewE
             <button
               type="button"
               onClick={handleAddAnnotation}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-[11px]"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               <Plus size={11} /> Add
             </button>
@@ -310,7 +310,7 @@ export default function ViewEditor({ content, fileName, onContentChange }: ViewE
                   <button
                     type="button"
                     onClick={() => handleRemoveAnnotation(a.id)}
-                    className="p-1 rounded hover:bg-red-900/30 text-ink-500 hover:text-red-300"
+                    className="p-1 rounded hover:bg-red-900/30 text-ink-500 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                     title="Remove annotation"
                   >
                     <Trash2 size={11} />

@@ -111,7 +111,7 @@ function Section({ title, action, children }: { title: string; action?: ReactNod
   )
 }
 const AddBtn = ({ onClick }: { onClick: () => void }) => (
-  <button type="button" onClick={onClick} className="inline-flex items-center gap-1 text-[11px] text-kerf-300 hover:text-kerf-200"><Plus size={12} />Add</button>
+  <button type="button" onClick={onClick} className="inline-flex items-center gap-1 text-[11px] text-kerf-300 hover:text-kerf-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Plus size={12} />Add</button>
 )
 const Empty = ({ children }: { children: ReactNode }) => <p className="text-[11px] text-ink-600 italic py-1">{children}</p>
 
@@ -206,7 +206,7 @@ export default function MEPView({ content, fileName, onContentChange }: MEPViewP
                       {seg.kind === 'elbow' && <input className={iCls} type="number" value={seg.elbow_radius_mm ?? ''} onChange={(e) => patchSeg(seg.id, { elbow_radius_mm: parseFloat(e.target.value) || undefined })} />}
                     </td>
                     <td className="px-2 py-1">
-                      <button type="button" onClick={() => commit({ ...route, segments: route.segments.filter((s) => s.id !== seg.id) })} className="p-0.5 text-ink-500 hover:text-red-400"><Trash2 size={12} /></button>
+                      <button type="button" onClick={() => commit({ ...route, segments: route.segments.filter((s) => s.id !== seg.id) })} className="p-0.5 text-ink-500 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Trash2 size={12} /></button>
                     </td>
                   </tr>
                 ))}
@@ -225,7 +225,7 @@ export default function MEPView({ content, fileName, onContentChange }: MEPViewP
             </select>
             <span className="text-ink-500">@</span>
             <div className="w-40"><CoordCell value={f.position} onChange={(v) => commit({ ...route, fittings: route.fittings.map((x) => x.id === f.id ? { ...x, position: v } : x) })} /></div>
-            <button type="button" onClick={() => commit({ ...route, fittings: route.fittings.filter((x) => x.id !== f.id) })} className="p-0.5 text-ink-500 hover:text-red-400 ml-auto"><Trash2 size={12} /></button>
+            <button type="button" onClick={() => commit({ ...route, fittings: route.fittings.filter((x) => x.id !== f.id) })} className="p-0.5 text-ink-500 hover:text-red-400 ml-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Trash2 size={12} /></button>
           </div>
         ))}
       </Section>
@@ -241,7 +241,7 @@ export default function MEPView({ content, fileName, onContentChange }: MEPViewP
             <span className="text-ink-500">@</span>
             <div className="w-40"><CoordCell value={ep.position} onChange={(v) => patchEp(ep.id, { position: v })} /></div>
             <span className="text-ink-600 font-mono text-[10px] ml-1">{ep.id}</span>
-            <button type="button" onClick={() => commit({ ...route, endpoints: route.endpoints.filter((e) => e.id !== ep.id) })} className="p-0.5 text-ink-500 hover:text-red-400 ml-auto"><Trash2 size={12} /></button>
+            <button type="button" onClick={() => commit({ ...route, endpoints: route.endpoints.filter((e) => e.id !== ep.id) })} className="p-0.5 text-ink-500 hover:text-red-400 ml-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Trash2 size={12} /></button>
           </div>
         ))}
       </Section>
@@ -275,7 +275,7 @@ export default function MEPView({ content, fileName, onContentChange }: MEPViewP
             {route.endpoints.map((ep) => <option key={ep.id} value={ep.id}>{ep.id} ({ep.kind})</option>)}
           </select>
           <button type="button" onClick={runAutoRoute}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-[11px]">
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
             <Zap size={11} />Auto-route
           </button>
         </div>

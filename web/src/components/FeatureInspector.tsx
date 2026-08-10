@@ -169,7 +169,7 @@ export default function FeatureInspector({
               vertex ? vertex.position : undefined
             copyText(`${partId}#${featureId} ${fmtVec(point)}`)
           }}
-          className="flex items-center gap-1 px-2 py-1 text-[11px] text-ink-300 hover:text-kerf-300 hover:bg-ink-800 rounded ml-auto"
+          className="flex items-center gap-1 px-2 py-1 text-[11px] text-ink-300 hover:text-kerf-300 hover:bg-ink-800 rounded ml-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           title="Copy coords to clipboard"
         >
           <Copy size={11} />

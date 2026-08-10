@@ -523,7 +523,7 @@ function ComponentPairsTab({ projectId }: TabProps) {
       </div>
 
       <div style={p.btnRow}>
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={run}
           disabled={running || (!bodyAJson && !bodyBJson)}
           style={p.runBtn(running || (!bodyAJson && !bodyBJson))}
@@ -533,7 +533,7 @@ function ComponentPairsTab({ projectId }: TabProps) {
             : <><Play size={11} /> Check Interference</>}
         </button>
         {(result || error) && (
-          <button onClick={() => { setResult(null); setError(null) }} style={p.clearBtn}>
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={() => { setResult(null); setError(null) }} style={p.clearBtn}>
             <RotateCcw size={10} /> Reset
           </button>
         )}
@@ -639,7 +639,7 @@ function WholeSweepTab({ projectId }: TabProps) {
       </div>
       <div style={p.fieldRow}>
         <label style={p.label}>Exclude fasteners</label>
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           type="button"
           onClick={() => setExcludeFasteners((v) => !v)}
           style={p.toggle(excludeFasteners)}
@@ -653,7 +653,7 @@ function WholeSweepTab({ projectId }: TabProps) {
       </div>
 
       <div style={p.btnRow}>
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={run}
           disabled={running}
           style={p.runBtn(running)}
@@ -663,7 +663,7 @@ function WholeSweepTab({ projectId }: TabProps) {
             : <><Play size={11} /> Run Assembly Sweep</>}
         </button>
         {(result || error) && (
-          <button onClick={() => { setResult(null); setError(null) }} style={p.clearBtn}>
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={() => { setResult(null); setError(null) }} style={p.clearBtn}>
             <RotateCcw size={10} /> Reset
           </button>
         )}
@@ -774,7 +774,7 @@ function ClearanceTab({ projectId }: TabProps) {
       </div>
 
       <div style={p.btnRow}>
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={run}
           disabled={running || (!bodyAJson && !bodyBJson)}
           style={p.runBtn(running || (!bodyAJson && !bodyBJson))}
@@ -784,7 +784,7 @@ function ClearanceTab({ projectId }: TabProps) {
             : <><Ruler size={11} /> Measure Clearance</>}
         </button>
         {(result || error) && (
-          <button onClick={() => { setResult(null); setError(null) }} style={p.clearBtn}>
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={() => { setResult(null); setError(null) }} style={p.clearBtn}>
             <RotateCcw size={10} /> Reset
           </button>
         )}
@@ -1012,7 +1012,7 @@ function MotionClashTab({ projectId }: TabProps) {
       </div>
 
       <div style={p.btnRow}>
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={run}
           disabled={running || (!bodyAJson && !bodyBJson)}
           style={p.runBtn(running || (!bodyAJson && !bodyBJson))}
@@ -1023,12 +1023,12 @@ function MotionClashTab({ projectId }: TabProps) {
             : <><Play size={11} /> Sweep Motion</>}
         </button>
         {running && (
-          <button onClick={cancel} style={{ ...p.clearBtn, color: '#ef4444', borderColor: '#7f1d1d' }}>
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={cancel} style={{ ...p.clearBtn, color: '#ef4444', borderColor: '#7f1d1d' }}>
             <X size={10} /> Cancel
           </button>
         )}
         {!running && frames.length > 0 && (
-          <button onClick={() => setFrames([])} style={p.clearBtn}>
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={() => setFrames([])} style={p.clearBtn}>
             <RotateCcw size={10} /> Reset
           </button>
         )}
@@ -1179,7 +1179,7 @@ export default function AssemblyClashPanel({ projectId }: Props) {
       {/* Tab bar */}
       <div style={p.tabBar}>
         {TABS.map((t) => (
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             key={t.id}
             onClick={() => setActiveTab(t.id)}
             style={p.tab(activeTab === t.id)}

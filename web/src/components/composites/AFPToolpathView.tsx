@@ -571,7 +571,7 @@ export default function AFPToolpathView(_props: Props) {
           {error && <span style={{ fontSize: 9, color: '#f87171' }}>{error}</span>}
           {/* Export CNC dropdown */}
           <div style={styles.exportWrap}>
-            <button
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               style={styles.exportBtn}
               type="button"
               disabled={exporting}
@@ -582,7 +582,7 @@ export default function AFPToolpathView(_props: Props) {
             </button>
             {exportMenuOpen && (
               <div style={styles.exportMenu}>
-                <button
+                <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                   style={styles.exportMenuItem}
                   type="button"
                   onClick={() => exportCNC('gcode')}
@@ -591,7 +591,7 @@ export default function AFPToolpathView(_props: Props) {
                 >
                   G-code (.gcode)
                 </button>
-                <button
+                <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                   style={styles.exportMenuItem}
                   type="button"
                   onClick={() => exportCNC('apt')}
@@ -603,7 +603,7 @@ export default function AFPToolpathView(_props: Props) {
               </div>
             )}
           </div>
-          <button style={styles.runBtn} onClick={runPathplan} type="button" disabled={loading}>
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" style={styles.runBtn} onClick={runPathplan} type="button" disabled={loading}>
             {loading ? '⟳ Running…' : '▶ Plan Paths'}
           </button>
         </div>

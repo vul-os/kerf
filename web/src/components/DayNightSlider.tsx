@@ -186,7 +186,7 @@ export default function DayNightSlider({
           onClick={handlePlayPause}
           aria-label={playing ? 'Pause' : 'Play'}
           data-testid="play-pause-btn"
-          className="flex items-center justify-center w-8 h-8 rounded-lg bg-ink-700 hover:bg-ink-600 active:bg-ink-800 text-ink-100 transition-colors"
+          className="flex items-center justify-center w-8 h-8 rounded-lg bg-ink-700 hover:bg-ink-600 active:bg-ink-800 text-ink-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {playing ? (
             /* Pause icon */

@@ -156,7 +156,7 @@ interface RunBtnProps {
 
 function RunBtn({ onClick, running, label = 'Run' }: RunBtnProps) {
   return (
-    <button onClick={onClick} disabled={running}
+    <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={onClick} disabled={running}
       style={{ ...s.button, background: '#1e40af', marginTop: 6, ...(running ? s.buttonDisabled : {}) }}>
       {running
         ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Computing…</>
@@ -689,7 +689,7 @@ export default function SeismicRSAPanel({ content }: Props = {}) {
 
       <div style={s.tabs}>
         {TABS.map(t => (
-          <button key={t.id} style={{ ...s.tab, ...(tab === t.id ? s.tabActive : {}) }} onClick={() => setTab(t.id)}>
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" key={t.id} style={{ ...s.tab, ...(tab === t.id ? s.tabActive : {}) }} onClick={() => setTab(t.id)}>
             {t.icon && <t.icon size={10} style={{ marginRight: 3 }} />}
             {t.label}
           </button>

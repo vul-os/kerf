@@ -461,7 +461,7 @@ export function LCAResultsPanel({ result, lifecycle, multi, uncertainty, classNa
             <button
               type="button"
               onClick={() => setShowMaterials(v => !v)}
-              className="flex items-center gap-1.5 text-[10px] text-ink-400 uppercase tracking-wide hover:text-ink-200 transition-colors"
+              className="flex items-center gap-1.5 text-[10px] text-ink-400 uppercase tracking-wide hover:text-ink-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               {showMaterials ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
               Material breakdown
@@ -481,7 +481,7 @@ export function LCAResultsPanel({ result, lifecycle, multi, uncertainty, classNa
             <button
               type="button"
               onClick={() => setShowWarnings(v => !v)}
-              className="flex items-center gap-1.5 text-[10px] text-amber-400 hover:text-amber-300 transition-colors"
+              className="flex items-center gap-1.5 text-[10px] text-amber-400 hover:text-amber-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               <Info size={11} />
               {warnings.length} warning{warnings.length !== 1 ? 's' : ''}

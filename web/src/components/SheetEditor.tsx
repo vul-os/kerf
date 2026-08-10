@@ -247,7 +247,7 @@ export default function SheetEditor({ content, fileName, onContentChange }: Shee
             <button
               type="button"
               onClick={handleAddViewport}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-[11px]"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               <Plus size={11} /> Add viewport
             </button>
@@ -274,7 +274,7 @@ export default function SheetEditor({ content, fileName, onContentChange }: Shee
                     <button
                       type="button"
                       onClick={() => handleRemoveViewport(vp.id)}
-                      className="p-1 rounded hover:bg-red-900/30 text-ink-500 hover:text-red-300"
+                      className="p-1 rounded hover:bg-red-900/30 text-ink-500 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                       title="Remove viewport"
                     >
                       <Trash2 size={11} />

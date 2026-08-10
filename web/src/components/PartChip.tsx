@@ -16,7 +16,7 @@ export default function PartChip({ partId, fileName, onRemove }: Props) {
         <button
           type="button"
           onClick={onRemove}
-          className="ml-0.5 text-ink-300 hover:text-kerf-200 flex-shrink-0"
+          className="ml-0.5 text-ink-300 hover:text-kerf-200 flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           title="Remove"
         >
           <X size={10} />

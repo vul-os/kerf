@@ -128,7 +128,7 @@ export default function EquationsEditor() {
               setDoc(parseEquations(currentFileContent || ''))
               try { refreshEquationsCache?.() } catch { /* tolerate */ }
             }}
-            className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-ink-900/60 border border-ink-700 text-ink-300 hover:bg-ink-800 text-xs"
+            className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-ink-900/60 border border-ink-700 text-ink-300 hover:bg-ink-800 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             title="Re-parse and re-evaluate"
           >
             <RefreshCw size={11} />
@@ -236,7 +236,7 @@ export default function EquationsEditor() {
                     <button
                       type="button"
                       onClick={() => removeRow(i)}
-                      className="p-1 rounded hover:bg-red-950/40 text-ink-500 hover:text-red-400"
+                      className="p-1 rounded hover:bg-red-950/40 text-ink-500 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                       title="Delete row"
                     >
                       <Trash2 size={12} />
@@ -250,7 +250,7 @@ export default function EquationsEditor() {
                 <button
                   type="button"
                   onClick={addRow}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-xs"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 >
                   <Plus size={11} />
                   Add row

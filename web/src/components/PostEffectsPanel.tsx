@@ -254,7 +254,7 @@ export default function PostEffectsPanel({ settings: settingsProp, onChange, onC
             type="button"
             aria-label="Close post-effects panel"
             onClick={onClose}
-            className="text-ink-500 hover:text-ink-200 transition-colors text-[14px] leading-none"
+            className="text-ink-500 hover:text-ink-200 transition-colors text-[14px] leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             ✕
           </button>

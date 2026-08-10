@@ -896,12 +896,12 @@ export default function PCBView({ circuitJson, highlightRefdes = null, onSelectR
                   setPendingPourVertices(null)
                   setActiveTool(null)
                 }}
-                className="flex-1 py-1 bg-kerf-300 text-ink-950 text-[11px] font-semibold rounded hover:bg-kerf-400"
+                className="flex-1 py-1 bg-kerf-300 text-ink-950 text-[11px] font-semibold rounded hover:bg-kerf-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               >Add Pour</button>
               <button
                 type="button"
                 onClick={() => { setShowPourDialog(false); setPendingPourVertices(null) }}
-                className="flex-1 py-1 bg-ink-800 text-ink-300 text-[11px] rounded hover:bg-ink-700"
+                className="flex-1 py-1 bg-ink-800 text-ink-300 text-[11px] rounded hover:bg-ink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               >Cancel</button>
             </div>
           </div>

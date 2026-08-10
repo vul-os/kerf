@@ -176,7 +176,7 @@ export default function ScheduleEditor({ content, fileName, onContentChange }: S
             <button
               type="button"
               onClick={addFilter}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-[11px]"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               <Plus size={11} /> Add filter
             </button>
@@ -210,7 +210,7 @@ export default function ScheduleEditor({ content, fileName, onContentChange }: S
                   <button
                     type="button"
                     onClick={() => removeFilter(idx)}
-                    className="p-1 rounded hover:bg-red-900/30 text-ink-500 hover:text-red-300"
+                    className="p-1 rounded hover:bg-red-900/30 text-ink-500 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                     title="Remove filter"
                   >
                     <Trash2 size={11} />
@@ -228,7 +228,7 @@ export default function ScheduleEditor({ content, fileName, onContentChange }: S
             <button
               type="button"
               onClick={addColumn}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-[11px]"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               <Plus size={11} /> Add column
             </button>
@@ -261,7 +261,7 @@ export default function ScheduleEditor({ content, fileName, onContentChange }: S
                   <button
                     type="button"
                     onClick={() => removeColumn(idx)}
-                    className="p-1 rounded hover:bg-red-900/30 text-ink-500 hover:text-red-300"
+                    className="p-1 rounded hover:bg-red-900/30 text-ink-500 hover:text-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                     title="Remove column"
                   >
                     <Trash2 size={11} />
@@ -279,7 +279,7 @@ export default function ScheduleEditor({ content, fileName, onContentChange }: S
             <button
               type="button"
               onClick={handleRun}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-kerf-300 text-ink-950 text-[11px] font-medium hover:bg-kerf-200"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded bg-kerf-300 text-ink-950 text-[11px] font-medium hover:bg-kerf-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               <Play size={11} /> Run
             </button>

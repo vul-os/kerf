@@ -295,7 +295,7 @@ export default function FEMView({ file, projectId, geometry, viewRef }: FEMViewP
           />
         </div>
 
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={handleRun}
           disabled={running || !fid || !pid}
           style={{ ...styles.button, ...(running ? styles.buttonDisabled : {}) }}

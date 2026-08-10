@@ -410,7 +410,7 @@ export default function HullFormPanel({ onHullReady, initialParams, content }: H
       {/* Advanced */}
       <button
         onClick={() => setShowAdvanced(v => !v)}
-        className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 w-fit"
+        className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 w-fit focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         {showAdvanced ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         Advanced options
@@ -441,7 +441,7 @@ export default function HullFormPanel({ onHullReady, initialParams, content }: H
       <button
         onClick={handleGenerate}
         disabled={loading}
-        className="flex items-center justify-center gap-2 rounded-lg bg-cyan-700 hover:bg-cyan-600 disabled:opacity-50 px-4 py-2 text-sm font-medium text-white transition-colors"
+        className="flex items-center justify-center gap-2 rounded-lg bg-cyan-700 hover:bg-cyan-600 disabled:opacity-50 px-4 py-2 text-sm font-medium text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         {loading ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
         {loading ? 'Generating…' : 'Generate Hull Form'}

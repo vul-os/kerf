@@ -740,7 +740,7 @@ export default function EnergyReportPanel({ projectId, onClose, embedded = false
         {simState === 'idle' && (
           <button
             onClick={runSim}
-            className="w-full flex items-center justify-center gap-2 bg-kerf-600 hover:bg-kerf-500 text-white rounded-lg py-2.5 text-sm font-medium transition-colors"
+            className="w-full flex items-center justify-center gap-2 bg-kerf-600 hover:bg-kerf-500 text-white rounded-lg py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Play size={15} />
             Run 8760-Hour Simulation
@@ -804,7 +804,7 @@ export default function EnergyReportPanel({ projectId, onClose, embedded = false
 
             <button
               onClick={() => setTab('report')}
-              className="w-full text-center text-[12px] text-kerf-400 hover:text-kerf-300 underline underline-offset-2"
+              className="w-full text-center text-[12px] text-kerf-400 hover:text-kerf-300 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               View full compliance report →
             </button>
@@ -814,7 +814,7 @@ export default function EnergyReportPanel({ projectId, onClose, embedded = false
         {(simState === 'done' || simState === 'error') && (
           <button
             onClick={runSim}
-            className="w-full flex items-center justify-center gap-2 border border-ink-700 hover:border-ink-600 text-ink-300 hover:text-ink-200 rounded-lg py-2 text-[12px] transition-colors"
+            className="w-full flex items-center justify-center gap-2 border border-ink-700 hover:border-ink-600 text-ink-300 hover:text-ink-200 rounded-lg py-2 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Play size={12} />
             Re-run simulation
@@ -831,7 +831,7 @@ export default function EnergyReportPanel({ projectId, onClose, embedded = false
           <BarChart3 size={32} className="mx-auto mb-3 opacity-30" />
           Run the 8760-hour simulation first to see the compliance report.
           <br />
-          <button onClick={() => setTab('sim')} className="mt-2 text-kerf-400 underline underline-offset-2">
+          <button onClick={() => setTab('sim')} className="mt-2 text-kerf-400 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
             Go to Annual Sim →
           </button>
         </div>
@@ -925,7 +925,7 @@ export default function EnergyReportPanel({ projectId, onClose, embedded = false
             ))}
           </div>
           {report.recommendations?.length > 3 && (
-            <button onClick={() => setTab('export')} className="mt-2 text-[11px] text-kerf-400 underline underline-offset-2">
+            <button onClick={() => setTab('export')} className="mt-2 text-[11px] text-kerf-400 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
               See all {report.recommendations.length} recommendations →
             </button>
           )}
@@ -941,7 +941,7 @@ export default function EnergyReportPanel({ projectId, onClose, embedded = false
           <div className="text-center py-8 text-ink-500 text-[12px]">
             Run the simulation to generate the report before exporting.
             <br />
-            <button onClick={() => setTab('sim')} className="mt-2 text-kerf-400 underline underline-offset-2">
+            <button onClick={() => setTab('sim')} className="mt-2 text-kerf-400 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
               Go to Annual Sim →
             </button>
           </div>
@@ -949,7 +949,7 @@ export default function EnergyReportPanel({ projectId, onClose, embedded = false
           <>
             <button
               onClick={exportText}
-              className="w-full flex items-center justify-center gap-2 bg-kerf-600 hover:bg-kerf-500 text-white rounded-lg py-2.5 text-sm font-medium transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-kerf-600 hover:bg-kerf-500 text-white rounded-lg py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               <FileDown size={15} />
               Download Report (.txt)
@@ -971,7 +971,7 @@ export default function EnergyReportPanel({ projectId, onClose, embedded = false
             <div className="rounded bg-amber-900/20 border border-amber-800/30 overflow-hidden">
               <button
                 onClick={() => setCaveatsOpen((v) => !v)}
-                className="w-full flex items-center justify-between px-3 py-2 text-[11px] text-amber-400 hover:bg-amber-900/10"
+                className="w-full flex items-center justify-between px-3 py-2 text-[11px] text-amber-400 hover:bg-amber-900/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               >
                 <div className="flex items-center gap-1.5">
                   <AlertCircle size={12} />
@@ -1018,7 +1018,7 @@ export default function EnergyReportPanel({ projectId, onClose, embedded = false
             </span>
           </div>
           {onClose && (
-            <button onClick={onClose} className="text-ink-500 hover:text-ink-300 text-[18px] leading-none">&times;</button>
+            <button onClick={onClose} className="text-ink-500 hover:text-ink-300 text-[18px] leading-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">&times;</button>
           )}
         </div>
       )}
@@ -1033,7 +1033,7 @@ export default function EnergyReportPanel({ projectId, onClose, embedded = false
               tab === id
                 ? 'border-kerf-500 text-kerf-300'
                 : 'border-transparent text-ink-500 hover:text-ink-300'
-            }`}
+            } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
           >
             <Icon size={11} />
             {label}

@@ -281,7 +281,7 @@ export default function LandscapeView({
         </span>
         <div className="flex items-center gap-2">
           <button
-            className="text-xs px-2 py-1 rounded border border-slate-600 hover:border-slate-400 text-slate-300 disabled:opacity-50 transition-colors"
+            className="text-xs px-2 py-1 rounded border border-slate-600 hover:border-slate-400 text-slate-300 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={handlePlants}
             disabled={loading || plants.length === 0}
             data-testid="landscape-plants-btn"
@@ -289,7 +289,7 @@ export default function LandscapeView({
             {loading && activeAction === 'plants' ? 'Running…' : 'Spec plants'}
           </button>
           <button
-            className="text-xs px-2 py-1 rounded bg-kerf-700 hover:bg-kerf-600 text-white disabled:opacity-50 transition-colors"
+            className="text-xs px-2 py-1 rounded bg-kerf-700 hover:bg-kerf-600 text-white disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={handleIrrigationSchedule}
             disabled={loading || zones.length === 0}
             data-testid="landscape-irrigation-btn"

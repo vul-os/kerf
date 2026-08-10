@@ -232,7 +232,7 @@ function SIReportTab() {
         data-testid="si-run-btn"
         onClick={run}
         disabled={loading}
-        className="px-3 py-1.5 rounded-md bg-indigo-700 hover:bg-indigo-600 text-white text-xs font-medium transition-colors disabled:opacity-40 self-start"
+        className="px-3 py-1.5 rounded-md bg-indigo-700 hover:bg-indigo-600 text-white text-xs font-medium transition-colors disabled:opacity-40 self-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         {loading ? 'Running…' : 'Analyse'}
       </button>
@@ -365,7 +365,7 @@ function IBISEyeTab() {
         data-testid="ibis-run-btn"
         onClick={run}
         disabled={loading}
-        className="px-3 py-1.5 rounded-md bg-purple-700 hover:bg-purple-600 text-white text-xs font-medium transition-colors disabled:opacity-40 self-start"
+        className="px-3 py-1.5 rounded-md bg-purple-700 hover:bg-purple-600 text-white text-xs font-medium transition-colors disabled:opacity-40 self-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         {loading ? 'Simulating…' : 'Simulate Channel'}
       </button>
@@ -414,7 +414,7 @@ export default function SIPanel({ onClose }: SIPanelProps) {
         <button
           data-testid="si-panel-close"
           onClick={onClose}
-          className="ml-auto p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors"
+          className="ml-auto p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <X size={12} />
         </button>

@@ -192,7 +192,7 @@ function MappingRow({ mapping, onChange, onDelete }: MappingRowProps) {
       <td className="px-2 py-1.5 text-center">
         <button
           onClick={onDelete}
-          className="rounded p-1 text-gray-400 hover:text-red-500 focus:outline-none focus:ring-1 focus:ring-red-400"
+          className="rounded p-1 text-gray-400 hover:text-red-500 focus:outline-none focus:ring-1 focus:ring-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           aria-label="Remove mapping"
           title="Remove"
         >
@@ -230,7 +230,7 @@ function ValidationPanel({ errors, onDismiss }: ValidationPanelProps) {
         </div>
         <button
           onClick={onDismiss}
-          className="text-xs underline opacity-70 hover:opacity-100"
+          className="text-xs underline opacity-70 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           dismiss
         </button>
@@ -375,7 +375,7 @@ export default function COBiePanel({ ifcData = null, onExport, className = '', r
                 selectedTemplate === t.value
                   ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300'
                   : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-500'
-              } disabled:cursor-not-allowed disabled:opacity-50`}
+              } disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
               aria-pressed={selectedTemplate === t.value}
             >
               {t.label}
@@ -396,7 +396,7 @@ export default function COBiePanel({ ifcData = null, onExport, className = '', r
           {!readOnly && (
             <button
               onClick={handleAddMapping}
-              className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 focus:outline-none focus:ring-1 focus:ring-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               aria-label="Add mapping row"
             >
               <Plus size={12} /> Add row
@@ -463,7 +463,7 @@ export default function COBiePanel({ ifcData = null, onExport, className = '', r
         <button
           onClick={handleValidate}
           disabled={validating || readOnly}
-          className="flex items-center gap-1.5 rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+          className="flex items-center gap-1.5 rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:cursor-not-allowed disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           aria-label="Validate COBie deliverable"
         >
           <ShieldCheck size={13} />
@@ -473,7 +473,7 @@ export default function COBiePanel({ ifcData = null, onExport, className = '', r
         <button
           onClick={() => handleExport('xlsx')}
           disabled={exporting || readOnly}
-          className="flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+          className="flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           aria-label="Export COBie as Excel"
         >
           <Download size={13} />
@@ -483,7 +483,7 @@ export default function COBiePanel({ ifcData = null, onExport, className = '', r
         <button
           onClick={() => handleExport('xml')}
           disabled={exporting || readOnly}
-          className="flex items-center gap-1.5 rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+          className="flex items-center gap-1.5 rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:cursor-not-allowed disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           aria-label="Export COBie as XML"
         >
           <FileText size={13} />

@@ -285,7 +285,7 @@ function AutoChainModal({ projectId, onChain, onClose }: AutoChainModalProps) {
           <span className="text-xs font-semibold uppercase tracking-wider text-ink-300">
             Auto-build chain from assembly
           </span>
-          <button type="button" onClick={onClose} className="text-ink-500 hover:text-ink-200">
+          <button type="button" onClick={onClose} className="text-ink-500 hover:text-ink-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
             <X size={14} />
           </button>
         </div>
@@ -353,7 +353,7 @@ function AutoChainModal({ projectId, onChain, onClose }: AutoChainModalProps) {
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 rounded text-[11px] font-medium text-ink-400 hover:text-ink-200 hover:bg-ink-800"
+            className="px-3 py-1.5 rounded text-[11px] font-medium text-ink-400 hover:text-ink-200 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             Cancel
           </button>
@@ -361,7 +361,7 @@ function AutoChainModal({ projectId, onChain, onClose }: AutoChainModalProps) {
             type="button"
             onClick={handleBuild}
             disabled={loading}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-kerf-300 text-ink-950 text-[11px] font-medium hover:bg-kerf-200 disabled:opacity-50"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-kerf-300 text-ink-950 text-[11px] font-medium hover:bg-kerf-200 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             {loading ? <><Loader2 size={11} className="animate-spin" /> Building…</> : 'Build chain'}
           </button>
@@ -476,7 +476,7 @@ export default function ToleranceView({ content, fileName, projectId, fileId }: 
             type="button"
             onClick={() => setShowAutoChain(true)}
             disabled={!projectId}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded border border-ink-700 text-ink-300 text-[11px] font-medium hover:bg-ink-800 hover:text-ink-100 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded border border-ink-700 text-ink-300 text-[11px] font-medium hover:bg-ink-800 hover:text-ink-100 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             title="Auto-build chain from assembly mate graph"
           >
             <GitBranch size={11} />
@@ -486,7 +486,7 @@ export default function ToleranceView({ content, fileName, projectId, fileId }: 
             type="button"
             onClick={handleRunMonteCarlo}
             disabled={running || displayDims.length === 0}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded bg-kerf-300 text-ink-950 text-[11px] font-medium hover:bg-kerf-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-kerf-300"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded bg-kerf-300 text-ink-950 text-[11px] font-medium hover:bg-kerf-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             {running ? (
               <>

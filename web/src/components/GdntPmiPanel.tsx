@@ -116,7 +116,7 @@ function Section({ title, children, defaultOpen = true }: { title: string; child
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 w-full px-3 py-2 bg-ink-900/60 hover:bg-ink-800/60 text-left"
+        className="flex items-center gap-2 w-full px-3 py-2 bg-ink-900/60 hover:bg-ink-800/60 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         aria-expanded={open}
       >
         <Shield size={11} className="text-kerf-400 shrink-0" />
@@ -159,7 +159,7 @@ function FcfListEntry({ ann, selected, onDelete }: { ann: FcfAnnotation; selecte
         aria-label="Delete FCF"
         title="Delete"
         onClick={() => onDelete?.(ann.id)}
-        className="shrink-0 text-ink-600 hover:text-red-400 transition-colors"
+        className="shrink-0 text-ink-600 hover:text-red-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         <Trash2 size={11} />
       </button>
@@ -194,7 +194,7 @@ function DatumListEntry({ ann, selected, onDelete }: { ann: DatumAnnotation; sel
         aria-label={`Delete datum ${label}`}
         title="Delete"
         onClick={() => onDelete?.(ann.id)}
-        className="shrink-0 text-ink-600 hover:text-red-400 transition-colors"
+        className="shrink-0 text-ink-600 hover:text-red-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         <Trash2 size={11} />
       </button>
@@ -248,7 +248,7 @@ function QuickValidatePanel() {
         type="button"
         onClick={handleValidate}
         disabled={loading}
-        className="flex items-center justify-center gap-1.5 w-full bg-kerf-700 hover:bg-kerf-600 disabled:bg-ink-800 disabled:text-ink-600 text-white text-[11px] rounded py-1.5 transition-colors"
+        className="flex items-center justify-center gap-1.5 w-full bg-kerf-700 hover:bg-kerf-600 disabled:bg-ink-800 disabled:text-ink-600 text-white text-[11px] rounded py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         {loading ? <Loader2 size={11} className="animate-spin" /> : <Play size={11} />}
         {loading ? 'Validating…' : 'gdt_validate_frame'}
@@ -403,7 +403,7 @@ export default function GdntPmiPanel({
             <button
               type="button"
               onClick={onAutoCallout}
-              className="flex items-center justify-center gap-1.5 w-full bg-ink-800 hover:bg-ink-700 text-ink-200 text-[11px] border border-ink-700 rounded py-1.5 transition-colors"
+              className="flex items-center justify-center gap-1.5 w-full bg-ink-800 hover:bg-ink-700 text-ink-200 text-[11px] border border-ink-700 rounded py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               data-testid="pmi-auto-callout-btn"
             >
               <Play size={11} />

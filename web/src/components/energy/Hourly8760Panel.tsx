@@ -360,7 +360,7 @@ export default function Hourly8760Panel({ projectId: _projectId }: { projectId?:
         <button
           onClick={run}
           disabled={loading}
-          className="w-full h-8 bg-kerf-600 hover:bg-kerf-500 disabled:opacity-50 text-white text-xs font-medium rounded flex items-center justify-center gap-1.5 mt-2"
+          className="w-full h-8 bg-kerf-600 hover:bg-kerf-500 disabled:opacity-50 text-white text-xs font-medium rounded flex items-center justify-center gap-1.5 mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Play size={11} />
           {loading ? 'Simulating 8760 hours…' : 'Run 8760-Hour Simulation'}

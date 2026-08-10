@@ -161,7 +161,7 @@ function GalleryItem({ job, onDownloadPng, onDownloadExr }: {
               type="button"
               aria-label="Download PNG"
               onClick={() => onDownloadPng(job)}
-              className="px-2 py-0.5 rounded bg-ink-700 text-ink-300 border border-ink-600 hover:text-kerf-300 hover:border-kerf-300/50 text-[9px]"
+              className="px-2 py-0.5 rounded bg-ink-700 text-ink-300 border border-ink-600 hover:text-kerf-300 hover:border-kerf-300/50 text-[9px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               PNG
             </button>
@@ -171,7 +171,7 @@ function GalleryItem({ job, onDownloadPng, onDownloadExr }: {
               type="button"
               aria-label="Download EXR"
               onClick={() => onDownloadExr(job)}
-              className="px-2 py-0.5 rounded bg-ink-700 text-ink-300 border border-ink-600 hover:text-kerf-300 hover:border-kerf-300/50 text-[9px]"
+              className="px-2 py-0.5 rounded bg-ink-700 text-ink-300 border border-ink-600 hover:text-kerf-300 hover:border-kerf-300/50 text-[9px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               EXR
             </button>
@@ -457,7 +457,7 @@ export default function HeroRenderPanel({ onClose, projectId, rendererRef }: Her
             type="button"
             aria-label="Close Hero Render panel"
             onClick={onClose}
-            className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800 transition-colors"
+            className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             ✕
           </button>
@@ -610,7 +610,7 @@ export default function HeroRenderPanel({ onClose, projectId, rendererRef }: Her
                     type="button"
                     aria-label="Download PNG"
                     onClick={() => handleDownloadPng()}
-                    className="flex-1 py-2 rounded text-[11px] font-mono border bg-ink-800 text-ink-200 border-ink-600 hover:text-kerf-300 hover:border-kerf-300/50 transition-colors"
+                    className="flex-1 py-2 rounded text-[11px] font-mono border bg-ink-800 text-ink-200 border-ink-600 hover:text-kerf-300 hover:border-kerf-300/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                   >
                     Download PNG
                   </button>
@@ -620,7 +620,7 @@ export default function HeroRenderPanel({ onClose, projectId, rendererRef }: Her
                     type="button"
                     aria-label="Download EXR"
                     onClick={() => handleDownloadExr()}
-                    className="flex-1 py-2 rounded text-[11px] font-mono border bg-ink-800 text-ink-200 border-ink-600 hover:text-kerf-300 hover:border-kerf-300/50 transition-colors"
+                    className="flex-1 py-2 rounded text-[11px] font-mono border bg-ink-800 text-ink-200 border-ink-600 hover:text-kerf-300 hover:border-kerf-300/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                   >
                     Download EXR
                   </button>

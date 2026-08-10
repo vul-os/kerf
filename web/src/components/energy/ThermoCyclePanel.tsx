@@ -121,7 +121,7 @@ function RunButton({ loading, label, onClick }: { loading: boolean; label: strin
     <button
       onClick={onClick}
       disabled={loading}
-      className="w-full h-8 bg-kerf-600 hover:bg-kerf-500 disabled:opacity-50 text-white text-xs font-medium rounded flex items-center justify-center gap-1.5 mt-3"
+      className="w-full h-8 bg-kerf-600 hover:bg-kerf-500 disabled:opacity-50 text-white text-xs font-medium rounded flex items-center justify-center gap-1.5 mt-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
     >
       <Play size={11} />
       {loading ? 'Computing…' : label}
@@ -586,7 +586,7 @@ export default function ThermoCyclePanel({ projectId: _projectId }: { projectId?
               cycle === c.id
                 ? 'border-kerf-400 text-kerf-300'
                 : 'border-transparent text-ink-500 hover:text-ink-300'
-            }`}
+            } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
           >
             {c.label}
           </button>

@@ -405,7 +405,7 @@ export default function MarkupPanel() {
                   activeShape === id
                     ? 'bg-blue-600 text-white'
                     : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-100'
-                }`}
+                } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
               >
                 <Icon size={14} />
               </button>
@@ -424,7 +424,7 @@ export default function MarkupPanel() {
                 style={{ background: hex }}
                 className={`w-6 h-6 rounded-full transition-transform ${
                   activeColor === hex ? 'ring-2 ring-white scale-110' : 'hover:scale-105'
-                }`}
+                } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
               />
             ))}
           </div>
@@ -460,7 +460,7 @@ export default function MarkupPanel() {
             </p>
             <button
               onClick={addLayer}
-              className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+              className="p-1 rounded text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               title="Add layer"
             >
               <Plus size={12} />
@@ -485,7 +485,7 @@ export default function MarkupPanel() {
                 <span className="text-xs text-zinc-500">{l.annotations.length}</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(l.name) }}
-                  className="text-zinc-500 hover:text-zinc-200 transition-colors"
+                  className="text-zinc-500 hover:text-zinc-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 >
                   {l.visible ? <Eye size={12} /> : <EyeOff size={12} />}
                 </button>
@@ -498,13 +498,13 @@ export default function MarkupPanel() {
         <div className="p-3 border-t border-zinc-800 space-y-1">
           <button
             onClick={exportSvg}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Download size={12} /> SVG overlay
           </button>
           <button
             onClick={exportSummary}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <FileText size={12} /> Summary CSV
           </button>
@@ -530,13 +530,13 @@ export default function MarkupPanel() {
               <div className="flex gap-2">
                 <button
                   onClick={confirmText}
-                  className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+                  className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium py-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 >
                   Place
                 </button>
                 <button
                   onClick={() => { setPendingTextPt(null); setTextInput('') }}
-                  className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-sm py-2 rounded-lg transition-colors"
+                  className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 text-sm py-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 >
                   Cancel
                 </button>
@@ -619,7 +619,7 @@ export default function MarkupPanel() {
               <span>·</span>
               <button
                 onClick={deleteSelected}
-                className="flex items-center gap-1 text-red-400 hover:text-red-300 transition-colors"
+                className="flex items-center gap-1 text-red-400 hover:text-red-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               >
                 <Trash2 size={12} /> Delete selected
               </button>
@@ -649,21 +649,21 @@ export default function MarkupPanel() {
         <div className="flex items-center gap-1 px-3 py-1.5 border-b border-zinc-800 text-xs text-zinc-500 select-none">
           <button
             onClick={() => toggleSort('author')}
-            className="flex items-center gap-0.5 hover:text-zinc-300 transition-colors"
+            className="flex items-center gap-0.5 hover:text-zinc-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             Author <SortIcon field="author" sortField={sortField} sortDir={sortDir} />
           </button>
           <span className="mx-1">·</span>
           <button
             onClick={() => toggleSort('created_at_iso')}
-            className="flex items-center gap-0.5 hover:text-zinc-300 transition-colors"
+            className="flex items-center gap-0.5 hover:text-zinc-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             Date <SortIcon field="created_at_iso" sortField={sortField} sortDir={sortDir} />
           </button>
           <span className="mx-1">·</span>
           <button
             onClick={() => toggleSort('shape')}
-            className="flex items-center gap-0.5 hover:text-zinc-300 transition-colors"
+            className="flex items-center gap-0.5 hover:text-zinc-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             Shape <SortIcon field="shape" sortField={sortField} sortDir={sortDir} />
           </button>

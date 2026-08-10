@@ -379,7 +379,7 @@ export default function SpiceRunPanel({
                 analysisId === a.id
                   ? 'border-kerf-300 text-kerf-300 bg-ink-800/60'
                   : 'border-transparent text-ink-400 hover:text-ink-200 hover:border-ink-600'
-              }`}
+              } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
             >
               {a.label}
             </button>
@@ -410,7 +410,7 @@ export default function SpiceRunPanel({
             data-testid="run-simulation-btn"
             onClick={handleRun}
             disabled={running}
-            className="flex items-center gap-2 px-4 py-1.5 rounded bg-kerf-300/15 border border-kerf-300/40 text-kerf-200 text-xs font-medium hover:bg-kerf-300/25 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-1.5 rounded bg-kerf-300/15 border border-kerf-300/40 text-kerf-200 text-xs font-medium hover:bg-kerf-300/25 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             {running ? (
               <>
@@ -427,7 +427,7 @@ export default function SpiceRunPanel({
           <button
             type="button"
             onClick={handleLoadTemplate}
-            className="px-3 py-1.5 rounded border border-ink-700 text-ink-400 text-xs hover:bg-ink-800 hover:text-ink-100"
+            className="px-3 py-1.5 rounded border border-ink-700 text-ink-400 text-xs hover:bg-ink-800 hover:text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             title={`Load a sample ${analysis.label} netlist`}
           >
             Load template

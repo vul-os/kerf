@@ -140,7 +140,7 @@ function SvgCanvas({ svgParsed, label }: { svgParsed: ParsedSvg | null; label: s
         type="button"
         onClick={reset}
         title="Reset view"
-        className="absolute top-2 right-2 z-10 flex items-center gap-1 px-1.5 py-1 rounded border border-ink-700 bg-ink-900/80 text-ink-400 hover:text-ink-100 hover:bg-ink-800 text-[10px] transition-colors"
+        className="absolute top-2 right-2 z-10 flex items-center gap-1 px-1.5 py-1 rounded border border-ink-700 bg-ink-900/80 text-ink-400 hover:text-ink-100 hover:bg-ink-800 text-[10px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         <RotateCcw size={11} />
       </button>
@@ -259,7 +259,7 @@ export default function CircuitJsonPreview({ circuitJson, projectId }: Props) {
             onClick={handleOpenInEditor}
             disabled={saving}
             title="Save as a project file and open in the circuit editor"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 mr-1 rounded border border-ink-700 bg-ink-800 hover:bg-ink-700 text-[11px] text-ink-300 hover:text-ink-100 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 mr-1 rounded border border-ink-700 bg-ink-800 hover:bg-ink-700 text-[11px] text-ink-300 hover:text-ink-100 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             {saving ? (
               <Loader2 size={11} className="animate-spin" />

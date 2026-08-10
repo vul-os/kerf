@@ -215,7 +215,7 @@ function CheckCard({ result }) {
       borderRadius: 8, marginBottom: 12, overflow: 'hidden',
     }}>
       {/* Header */}
-      <button
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         onClick={() => setOpen(o => !o)}
         style={{
           width: '100%', padding: '10px 14px',
@@ -550,7 +550,7 @@ export default function ScantlingCheckPanel({ result: propResult, loading: propL
             background: '#111827', border: '1px solid #1f2937',
             borderRadius: 8, marginBottom: 14, overflow: 'hidden',
           }}>
-            <button
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               onClick={() => setIsoOpen(o => !o)}
               style={{
                 width: '100%', padding: '10px 14px',
@@ -587,7 +587,7 @@ export default function ScantlingCheckPanel({ result: propResult, loading: propL
             background: '#111827', border: '1px solid #1f2937',
             borderRadius: 8, marginBottom: 16, overflow: 'hidden',
           }}>
-            <button
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               onClick={() => setAbsOpen(o => !o)}
               style={{
                 width: '100%', padding: '10px 14px',
@@ -610,7 +610,7 @@ export default function ScantlingCheckPanel({ result: propResult, loading: propL
           </div>
 
           {/* Run button */}
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={handleRun}
             disabled={loading}
             style={{

@@ -106,7 +106,7 @@ export default function ClashPanel({ projectId, assemblyFileId, onHighlight, onT
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="flex items-center gap-1.5 text-[11px] text-ink-400 hover:text-kerf-300 flex-1 min-w-0"
+          className="flex items-center gap-1.5 text-[11px] text-ink-400 hover:text-kerf-300 flex-1 min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           aria-expanded={open}
           aria-controls="clash-panel-body"
           data-testid="clash-panel-toggle"
@@ -208,7 +208,7 @@ export default function ClashPanel({ projectId, assemblyFileId, onHighlight, onT
                           <button
                             type="button"
                             onClick={() => jumpTo(clash.a)}
-                            className="text-[10px] text-kerf-300 hover:underline mr-2 focus-visible:outline-none"
+                            className="text-[10px] text-kerf-300 hover:underline mr-2 focus-visible:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                             title={`Highlight ${clash.a} in viewport`}
                             data-testid="clash-jump-btn"
                           >

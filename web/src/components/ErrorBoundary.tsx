@@ -32,7 +32,7 @@
  *
  *   // Custom fallback:
  *   <ErrorBoundary fallback={(err, reset) => (
- *     <div>Oops: {err.message} <button onClick={reset}>Retry</button></div>
+ *     <div>Oops: {err.message} <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={reset}>Retry</button></div>
  *   )}>
  *     <DataTable />
  *   </ErrorBoundary>

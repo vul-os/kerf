@@ -78,7 +78,7 @@ export default function XRefManagerPanel({ content, projectId, fileId, callTool 
         External models linked as read-only overlays · reload + nested resolution
       </div>
 
-      <button
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         onClick={() => run('bim_xref_reload', {}, 'reload')}
         disabled={!!busy}
         style={{ ...btn, marginBottom: '12px' }}
@@ -119,7 +119,7 @@ export default function XRefManagerPanel({ content, projectId, fileId, callTool 
                 {x.nested ? ` · ${(Array.isArray(x.nested) ? x.nested.length : x.nested)} nested` : ''}
                 {' · read-only'}
               </div>
-              <button
+              <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 onClick={() => run('bim_xref_reload', { xref_id: id }, `rl-${id}`)}
                 disabled={!!busy}
                 style={{ ...btn, marginTop: '6px' }}

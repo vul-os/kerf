@@ -222,7 +222,7 @@ function PhaseTagger({ onTag }: { onTag: (entry: ElementPhase) => void }) {
         <button
           onClick={handleApply}
           disabled={!elementId.trim()}
-          className="self-end rounded bg-accent-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-500 disabled:cursor-not-allowed disabled:opacity-40"
+          className="self-end rounded bg-accent-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-500 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           Tag element
         </button>
@@ -295,7 +295,7 @@ function FilterSelector({ activeFilter, onFilterChange }: { activeFilter: PhaseF
             mode === 'preset'
               ? 'bg-accent-600 text-white'
               : 'border border-ink-300 text-ink-600 hover:bg-ink-50 dark:border-ink-600 dark:text-ink-300 dark:hover:bg-ink-700'
-          }`}
+          } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
         >
           Preset
         </button>
@@ -305,7 +305,7 @@ function FilterSelector({ activeFilter, onFilterChange }: { activeFilter: PhaseF
             mode === 'custom'
               ? 'bg-accent-600 text-white'
               : 'border border-ink-300 text-ink-600 hover:bg-ink-50 dark:border-ink-600 dark:text-ink-300 dark:hover:bg-ink-700'
-          }`}
+          } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
         >
           Custom
         </button>
@@ -496,7 +496,7 @@ function ElementList({ elementPhases, onRemove }: { elementPhases: ElementPhase[
             {onRemove && (
               <button
                 onClick={() => onRemove(ep.element_id)}
-                className="ml-1 text-ink-400 hover:text-red-500"
+                className="ml-1 text-ink-400 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 aria-label={`Remove ${ep.element_id}`}
               >
                 ×
@@ -655,7 +655,7 @@ export default function BIMPhasePanel({
         <button
           onClick={handleApplyFilter}
           disabled={applying || elementPhases.length === 0}
-          className="w-full rounded bg-accent-600 px-3 py-2 text-sm font-medium text-white hover:bg-accent-500 disabled:cursor-not-allowed disabled:opacity-40"
+          className="w-full rounded bg-accent-600 px-3 py-2 text-sm font-medium text-white hover:bg-accent-500 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {applying ? 'Applying…' : `Apply "${activeFilter.name}"`}
         </button>

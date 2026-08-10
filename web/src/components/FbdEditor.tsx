@@ -546,7 +546,7 @@ export default function FbdEditor({ value, onChange }: Props) {
           Blocks
         </div>
         {BLOCK_TYPES.map((type) => (
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             key={type}
             data-block-type={type}
             onClick={() => handlePaletteClick(type)}

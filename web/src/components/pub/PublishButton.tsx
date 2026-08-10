@@ -138,7 +138,7 @@ export function IdentityCreatedStep({ pubKey, onContinue }: { pubKey: string; on
         <button
           type="button"
           onClick={onCopy}
-          className="p-1.5 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800 shrink-0"
+          className="p-1.5 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           title="Copy to clipboard"
         >
           {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
@@ -370,7 +370,7 @@ export function ChildrenStep({
               <button
                 type="button"
                 onClick={() => removeRow(i)}
-                className="p-1.5 rounded text-red-300 hover:bg-red-500/10 shrink-0"
+                className="p-1.5 rounded text-red-300 hover:bg-red-500/10 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 title="Remove child"
                 data-testid="remove-child-row"
               >

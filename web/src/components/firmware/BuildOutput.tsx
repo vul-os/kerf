@@ -63,7 +63,7 @@ export default function BuildOutput({
             autoScroll
               ? 'text-kerf-300 bg-kerf-300/10'
               : 'text-ink-500 hover:text-ink-300'
-          }`}
+          } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
         >
           <ChevronsDown size={12} />
         </button>
@@ -72,7 +72,7 @@ export default function BuildOutput({
             type="button"
             title="Clear output"
             onClick={onClear}
-            className="p-0.5 rounded text-ink-500 hover:text-ink-300 transition-colors"
+            className="p-0.5 rounded text-ink-500 hover:text-ink-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <X size={12} />
           </button>

@@ -223,7 +223,7 @@ function Legend({ signals, visible, onToggle }: LegendProps) {
               isVisible
                 ? 'border-ink-600 text-ink-100 hover:border-kerf-300/50'
                 : 'border-ink-800 text-ink-600 opacity-50 hover:opacity-80'
-            }`}
+            } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
           >
             <span style={{ color }} className="text-lg leading-none select-none">—</span>
             <span>{sig.name}</span>

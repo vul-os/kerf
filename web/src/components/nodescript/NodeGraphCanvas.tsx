@@ -410,7 +410,7 @@ export default function NodeGraphCanvas({
             { label: graph.nodes.get(ctxMenu.nodeId)?.disabled ? 'Enable' : 'Disable', action: handleCtxDisable, color: '#b8bfcc' },
             { label: 'Delete', action: handleCtxDelete, color: '#ef4444' },
           ].map(({ label, action, color }) => (
-            <button
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               key={label}
               type="button"
               onClick={action}

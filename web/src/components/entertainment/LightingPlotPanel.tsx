@@ -273,7 +273,7 @@ interface TabProps {
 
 function Tab({ label, active, onClick }: TabProps) {
   return (
-    <button
+    <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       onClick={onClick}
       style={{
         padding: '6px 14px', borderRadius: '6px 6px 0 0', border: 'none', cursor: 'pointer',
@@ -369,7 +369,7 @@ export default function LightingPlotPanel({
           {fixtures.length || patch_sheet.length} fixtures
         </span>
         <div style={{ flex: 1 }} />
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={handleCheck}
           disabled={checking}
           style={{

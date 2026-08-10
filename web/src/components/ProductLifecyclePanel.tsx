@@ -314,7 +314,7 @@ function ToolCard({ name, icon: Icon, color, desc, fields, buildArgs }: ToolCard
         </div>
       )}
 
-      <button onClick={run} disabled={running}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={run} disabled={running}
         style={{ ...s.runBtn, ...(running ? s.runBtnDisabled : {}) }}>
         {running
           ? <><Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> Running…</>
@@ -1060,7 +1060,7 @@ export default function ProductLifecyclePanel() {
       {/* Top tabs */}
       <div style={s.tabs}>
         {tabs.map((t) => (
-          <button key={t.id}
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" key={t.id}
             style={{ ...s.tab, ...(tab === t.id ? s.tabActive : {}) }}
             onClick={() => setTab(t.id)}>
             <t.icon size={13} />

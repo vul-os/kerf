@@ -296,7 +296,7 @@ function JointRow({ joint, index, components, onChange, onRemove }: JointRowProp
         <button
           type="button"
           onClick={() => onRemove(index)}
-          className="text-ink-600 hover:text-red-400 transition-colors"
+          className="text-ink-600 hover:text-red-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           aria-label={`Remove joint ${index + 1}`}
         >
           <Trash2 size={11} />
@@ -571,7 +571,7 @@ export default function AssemblyMotionPanel({
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="flex flex-1 items-center gap-1.5 text-[11px] text-ink-400 hover:text-kerf-300 transition-colors"
+          className="flex flex-1 items-center gap-1.5 text-[11px] text-ink-400 hover:text-kerf-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           aria-expanded={open}
           aria-controls="motion-panel-body"
         >
@@ -598,7 +598,7 @@ export default function AssemblyMotionPanel({
               <button
                 type="button"
                 onClick={addJoint}
-                className="flex items-center gap-1 text-[10px] text-kerf-400 hover:text-kerf-300 transition-colors"
+                className="flex items-center gap-1 text-[10px] text-kerf-400 hover:text-kerf-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 data-testid="add-joint-btn"
               >
                 <Plus size={10} />
@@ -665,7 +665,7 @@ export default function AssemblyMotionPanel({
             type="button"
             onClick={handleRun}
             disabled={running}
-            className="flex items-center justify-center gap-1.5 rounded bg-kerf-600 hover:bg-kerf-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-[11px] font-medium py-1.5 px-3 transition-colors"
+            className="flex items-center justify-center gap-1.5 rounded bg-kerf-600 hover:bg-kerf-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-[11px] font-medium py-1.5 px-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             data-testid="motion-run-btn"
           >
             {running
@@ -697,7 +697,7 @@ export default function AssemblyMotionPanel({
                   <button
                     type="button"
                     onClick={stopPlayback}
-                    className="flex items-center gap-1 text-[10px] text-amber-400 hover:text-amber-300 transition-colors"
+                    className="flex items-center gap-1 text-[10px] text-amber-400 hover:text-amber-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                   >
                     <Square size={10} />Stop
                   </button>
@@ -705,7 +705,7 @@ export default function AssemblyMotionPanel({
                   <button
                     type="button"
                     onClick={startPlayback}
-                    className="flex items-center gap-1 text-[10px] text-kerf-400 hover:text-kerf-300 transition-colors"
+                    className="flex items-center gap-1 text-[10px] text-kerf-400 hover:text-kerf-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                   >
                     <Play size={10} />Play
                   </button>

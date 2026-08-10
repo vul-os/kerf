@@ -155,11 +155,11 @@ function LayersPanel({ layers, visible, palette, onToggle, onToggleAll }: Layers
     >
       <div style={{ padding: '8px 10px', borderBottom: '1px solid #2d3348', display: 'flex', gap: 6, alignItems: 'center' }}>
         <span style={{ color: '#aab4cc', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', flex: 1 }}>LAYERS</span>
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={() => onToggleAll(true)}
           style={{ fontSize: 10, color: '#4fd1c5', background: 'none', border: 'none', cursor: 'pointer', padding: '1px 4px' }}
         >all</button>
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={() => onToggleAll(false)}
           style={{ fontSize: 10, color: '#4fd1c5', background: 'none', border: 'none', cursor: 'pointer', padding: '1px 4px' }}
         >none</button>
@@ -225,7 +225,7 @@ function Toolbar({ onFit, showLayers, onToggleLayers }: ToolbarProps) {
       padding: '0 8px',
       flexShrink: 0,
     }}>
-      <button
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         onClick={onFit}
         title="Fit to window (F)"
         style={btnStyle}
@@ -233,7 +233,7 @@ function Toolbar({ onFit, showLayers, onToggleLayers }: ToolbarProps) {
         Fit
       </button>
       <div style={{ width: 1, height: 20, background: '#2d3348', margin: '0 4px' }} />
-      <button
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         onClick={onToggleLayers}
         title="Toggle layers panel"
         style={{ ...btnStyle, background: showLayers ? '#2d3a5a' : 'transparent' }}

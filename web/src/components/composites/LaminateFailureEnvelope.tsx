@@ -473,7 +473,7 @@ export default function LaminateFailureEnvelope({ plies: propPlies, onResult }: 
             </div>
           )}
 
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             style={styles.runBtn}
             onClick={runEnvelope}
             type="button"

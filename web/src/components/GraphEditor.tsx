@@ -311,7 +311,7 @@ function ParamField({ paramKey, value, onUpdate }: ParamFieldProps) {
         <button
           type="button"
           onClick={() => onUpdate(paramKey, '')}
-          className="text-ink-500 hover:text-red-400"
+          className="text-ink-500 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           title="Disconnect"
         >
           <X size={11} />
@@ -406,14 +406,14 @@ function InspectorPanel({ node, results, onParamUpdate, onDelete, onClose }: Ins
             type="button"
             onClick={() => onDelete(node.id)}
             title="Delete node"
-            className="p-1 rounded text-ink-500 hover:text-red-400 hover:bg-ink-800"
+            className="p-1 rounded text-ink-500 hover:text-red-400 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Trash2 size={12} />
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded text-ink-500 hover:text-ink-100 hover:bg-ink-800"
+            className="p-1 rounded text-ink-500 hover:text-ink-100 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <X size={12} />
           </button>
@@ -695,7 +695,7 @@ export default function GraphEditor({ content, fileName, onContentChange }: Prop
             type="button"
             data-testid="add-node-btn"
             onClick={() => setAddDropdownOpen((v) => !v)}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded bg-ink-800 border border-ink-700 text-xs text-ink-200 hover:text-kerf-300 hover:border-kerf-300/40"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded bg-ink-800 border border-ink-700 text-xs text-ink-200 hover:text-kerf-300 hover:border-kerf-300/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Plus size={11} />
             Add Node
@@ -709,7 +709,7 @@ export default function GraphEditor({ content, fileName, onContentChange }: Prop
                   key={op}
                   type="button"
                   onClick={() => handleAddNode(op)}
-                  className="w-full text-left px-3 py-1 text-xs text-ink-200 hover:bg-ink-800 hover:text-kerf-300 font-mono"
+                  className="w-full text-left px-3 py-1 text-xs text-ink-200 hover:bg-ink-800 hover:text-kerf-300 font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 >
                   {op}
                 </button>
@@ -720,7 +720,7 @@ export default function GraphEditor({ content, fileName, onContentChange }: Prop
                   key={op}
                   type="button"
                   onClick={() => handleAddNode(op)}
-                  className="w-full text-left px-3 py-1 text-xs text-ink-200 hover:bg-ink-800 hover:text-purple-300 font-mono"
+                  className="w-full text-left px-3 py-1 text-xs text-ink-200 hover:bg-ink-800 hover:text-purple-300 font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 >
                   {op}
                 </button>
@@ -733,7 +733,7 @@ export default function GraphEditor({ content, fileName, onContentChange }: Prop
           type="button"
           data-testid="run-btn"
           onClick={handleRun}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-xs"
+          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Play size={11} />
           Run
@@ -753,7 +753,7 @@ export default function GraphEditor({ content, fileName, onContentChange }: Prop
           <button
             type="button"
             onClick={() => setShowRunPanel(false)}
-            className="text-ink-500 hover:text-ink-100"
+            className="text-ink-500 hover:text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <X size={12} />
           </button>

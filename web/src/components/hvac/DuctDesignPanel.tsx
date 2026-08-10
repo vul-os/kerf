@@ -281,7 +281,7 @@ function SegmentRow({ seg, idx, onChange, onRemove, result }: {
   return (
     <div className="border border-ink-800 rounded-md overflow-hidden">
       <div className="flex items-center gap-2 px-2 py-1.5 bg-ink-900">
-        <button type="button" onClick={() => setExpanded(v => !v)} className="text-ink-500 hover:text-ink-200">
+        <button type="button" onClick={() => setExpanded(v => !v)} className="text-ink-500 hover:text-ink-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
           {expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
         </button>
         <span className="text-[10px] font-medium text-ink-300 flex-1">Segment {idx + 1}</span>
@@ -294,7 +294,7 @@ function SegmentRow({ seg, idx, onChange, onRemove, result }: {
             {result.total_pa} Pa
           </span>
         )}
-        <button type="button" onClick={onRemove} className="text-ink-600 hover:text-red-400">
+        <button type="button" onClick={onRemove} className="text-ink-600 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
           <Trash2 size={11} />
         </button>
       </div>
@@ -504,7 +504,7 @@ export default function DuctDesignPanel() {
       <button
         type="button"
         onClick={addSegment}
-        className="flex items-center gap-1.5 self-start px-2 py-1 rounded border border-ink-700 text-ink-400 hover:text-ink-200 hover:border-ink-600 text-[11px]"
+        className="flex items-center gap-1.5 self-start px-2 py-1 rounded border border-ink-700 text-ink-400 hover:text-ink-200 hover:border-ink-600 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         <Plus size={11} />
         Add segment
@@ -514,7 +514,7 @@ export default function DuctDesignPanel() {
         type="button"
         onClick={calculate}
         disabled={loading || segments.length === 0}
-        className="flex items-center justify-center gap-2 w-full py-2 rounded-md bg-kerf-300/15 border border-kerf-300/40 text-kerf-200 hover:bg-kerf-300/25 disabled:opacity-50 text-xs font-medium"
+        className="flex items-center justify-center gap-2 w-full py-2 rounded-md bg-kerf-300/15 border border-kerf-300/40 text-kerf-200 hover:bg-kerf-300/25 disabled:opacity-50 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         {loading ? <Loader2 size={12} className="animate-spin" /> : <Calculator size={12} />}
         {loading ? 'Sizing ducts…' : 'Size all segments'}

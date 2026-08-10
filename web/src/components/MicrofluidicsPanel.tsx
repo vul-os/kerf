@@ -222,7 +222,7 @@ function RunButton({ loading, onClick, children }: { loading: boolean; onClick: 
       type="button"
       onClick={onClick}
       disabled={loading}
-      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/80 hover:bg-blue-600 disabled:opacity-50 text-white text-[11px] rounded font-medium transition-colors"
+      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/80 hover:bg-blue-600 disabled:opacity-50 text-white text-[11px] rounded font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
     >
       {loading ? <Loader2 size={12} className="animate-spin" /> : <Calculator size={12} />}
       {children}
@@ -530,12 +530,10 @@ export default function MicrofluidicsPanel({ className = '', content }: Microflu
             key={id}
             type="button"
             onClick={() => setActiveTab(id)}
-            className={`
-              flex items-center gap-1.5 px-3 py-1.5 text-[11px] transition-colors
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] transition-colors
               ${activeTab === id
                 ? 'text-blue-300 border-b-2 border-blue-400 bg-blue-950/20'
-                : 'text-ink-500 hover:text-ink-300'}
-            `}
+                : 'text-ink-500 hover:text-ink-300'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
           >
             <Icon size={11} />
             {label}

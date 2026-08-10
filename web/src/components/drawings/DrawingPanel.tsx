@@ -262,7 +262,7 @@ interface RunBtnProps {
 
 function RunBtn({ onClick, running, disabled, label = 'Run' }: RunBtnProps) {
   return (
-    <button
+    <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       onClick={onClick}
       disabled={running || disabled}
       style={{
@@ -972,7 +972,7 @@ function TabAnnotations() {
         <NumRow label="X position (mm)" value={note.x} onChange={v => setNote(p => ({ ...p, x: v }))} />
         <NumRow label="Y position (mm)" value={note.y} onChange={v => setNote(p => ({ ...p, y: v }))} />
         <NumRow label="Font size (mm)" value={note.font_size} onChange={v => setNote(p => ({ ...p, font_size: v }))} />
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={addNote}
           style={{ ...s.button, background: '#1e40af', marginTop: 6 }}
         >
@@ -1003,7 +1003,7 @@ function TabAnnotations() {
         <NumRow label="X position (mm)" value={balloon.x} onChange={v => setBalloon(p => ({ ...p, x: v }))} />
         <NumRow label="Y position (mm)" value={balloon.y} onChange={v => setBalloon(p => ({ ...p, y: v }))} />
         <NumRow label="Radius (mm)" value={balloon.radius} onChange={v => setBalloon(p => ({ ...p, radius: v }))} />
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={addBalloon}
           style={{ ...s.button, background: '#064e3b', marginTop: 6 }}
         >
@@ -1030,13 +1030,13 @@ function TabAnnotations() {
             <div dangerouslySetInnerHTML={{ __html: annotSvg }} />
           </div>
           <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-            <button
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               onClick={() => setNoteItems([])}
               style={{ ...s.button, background: '#374151', fontSize: 11, padding: '3px 8px' }}
             >
               Clear notes
             </button>
-            <button
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               onClick={() => setBalloonItems([])}
               style={{ ...s.button, background: '#374151', fontSize: 11, padding: '3px 8px' }}
             >
@@ -1419,7 +1419,7 @@ function TabExport() {
           <div style={s.resultBox}>
             <ResultTable data={pdfR} skip={['pdf_base64', 'pdf', 'svg']} />
             {pdfR.pdf_base64 && (
-              <button
+              <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 onClick={() => {
                   const a = document.createElement('a')
                   a.href = 'data:application/pdf;base64,' + pdfR.pdf_base64
@@ -1581,7 +1581,7 @@ export default function DrawingPanel() {
       {/* Tab bar */}
       <div style={s.tabs}>
         {TABS.map(t => (
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             key={t.id}
             onClick={() => setActiveTab(t.id)}
             style={{

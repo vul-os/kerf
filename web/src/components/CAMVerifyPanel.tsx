@@ -259,7 +259,7 @@ export default function CAMVerifyPanel({
         <span style={styles.dimVal}>{resolutionMm}mm/cell</span>
       </div>
 
-      <button
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         type="button"
         onClick={handleRun}
         disabled={running}

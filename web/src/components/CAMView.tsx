@@ -340,7 +340,7 @@ export default function CAMView({ file, projectId, viewRef }) {
         {st && st !== 'not_found' && <StatusBadge status={st} />}
         {/* T7: sidebar tab switcher */}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             type="button"
             onClick={() => setActiveTab('job')}
             title="CAM Job"
@@ -350,7 +350,7 @@ export default function CAMView({ file, projectId, viewRef }) {
           >
             <Settings size={11} />
           </button>
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             type="button"
             onClick={() => setActiveTab('tools')}
             title="Tool Library"
@@ -393,7 +393,7 @@ export default function CAMView({ file, projectId, viewRef }) {
           <div style={{ ...styles.sectionTitle, marginBottom: 6 }}>Axis Mode</div>
           <div data-testid="axis-mode-switch" style={{ display: 'flex', gap: 4 }}>
             {Object.entries(AXIS_MODES).map(([key, label]) => (
-              <button
+              <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 key={key}
                 type="button"
                 data-mode={key}
@@ -736,7 +736,7 @@ export default function CAMView({ file, projectId, viewRef }) {
           </div>
         )}
 
-        <button type="button" onClick={handleGenerate} disabled={running || !fid || !pid} style={{ ...styles.button, ...(running ? styles.buttonDisabled : {}) }}>
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" type="button" onClick={handleGenerate} disabled={running || !fid || !pid} style={{ ...styles.button, ...(running ? styles.buttonDisabled : {}) }}>
           {running
             ? <><Loader2 size={13} style={styles.spin} /> Generating…</>
             : <><Settings size={13} /> Generate Toolpath</>}
@@ -781,7 +781,7 @@ export default function CAMView({ file, projectId, viewRef }) {
 
           {canDownload && (
             <>
-              <button
+              <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 type="button"
                 onClick={handleDownload}
                 style={{ ...styles.button, background: '#1e3a5f', marginTop: 6 }}
@@ -1070,7 +1070,7 @@ export function LayeredCAMView({ file, projectId, parsedContent, viewRef }) {
           {/* Layer scrubber */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <button
+              <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 type="button"
                 onClick={() => setLayerIdx((i) => Math.max(0, i - 1))}
                 disabled={layerIdx === 0}
@@ -1087,7 +1087,7 @@ export function LayeredCAMView({ file, projectId, parsedContent, viewRef }) {
                 onChange={(e) => setLayerIdx(Number(e.target.value))}
                 style={{ flex: 1, accentColor: '#2dd4bf' }}
               />
-              <button
+              <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 type="button"
                 onClick={() => setLayerIdx((i) => Math.min(layers.length - 1, i + 1))}
                 disabled={layerIdx === layers.length - 1}
@@ -1104,7 +1104,7 @@ export function LayeredCAMView({ file, projectId, parsedContent, viewRef }) {
                   {axis}={zMm.toFixed(3)} mm
                 </span>
               )}
-              <button type="button" onClick={handleReset} style={{ fontSize: 10, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>reset view</button>
+              <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" type="button" onClick={handleReset} style={{ fontSize: 10, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>reset view</button>
             </div>
           </div>
 
@@ -1166,7 +1166,7 @@ export function LayeredCAMView({ file, projectId, parsedContent, viewRef }) {
 
           {/* Generate G-code */}
           <div style={styles.section}>
-            <button
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               type="button"
               onClick={handleGenerateGcode}
               disabled={gcodeRunning || !file?.id || !projectId}
@@ -1188,7 +1188,7 @@ export function LayeredCAMView({ file, projectId, parsedContent, viewRef }) {
                   <CheckCircle size={12} />
                   <span style={{ marginLeft: 6 }}>G-code ready — {gcodeResult.line_count ?? '?'} lines</span>
                 </div>
-                <button type="button" onClick={handleDownloadGcode} style={{ ...styles.button, background: '#1e3a5f' }}>
+                <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" type="button" onClick={handleDownloadGcode} style={{ ...styles.button, background: '#1e3a5f' }}>
                   <Download size={13} /> Download .nc
                 </button>
                 {gcodeResult?.gcode_b64 && (

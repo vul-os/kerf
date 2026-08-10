@@ -92,7 +92,7 @@ export default function RemotesManager({ projectId, onClose, onChanged }: {
         <button
           type="button"
           onClick={onClose}
-          className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800"
+          className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           title="Back to Git panel"
         >
           <X size={14} />
@@ -139,7 +139,7 @@ export default function RemotesManager({ projectId, onClose, onChanged }: {
                   type="button"
                   onClick={() => onRemove(r.name)}
                   disabled={removing === r.name}
-                  className="p-1 rounded text-red-300 hover:bg-red-500/10 disabled:opacity-40"
+                  className="p-1 rounded text-red-300 hover:bg-red-500/10 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                   title={`Remove ${r.name}`}
                 >
                   {removing === r.name

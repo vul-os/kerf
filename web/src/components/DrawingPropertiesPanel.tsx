@@ -626,7 +626,7 @@ function AddViewForm({ files, projectId, drawing, onCancel, onAdd, onAddStandard
               })
               onAddStandardViews(specs)
             }}
-            className="px-2 py-0.5 rounded bg-ink-800 text-ink-100 text-[11px] hover:bg-ink-700 hover:text-kerf-300"
+            className="px-2 py-0.5 rounded bg-ink-800 text-ink-100 text-[11px] hover:bg-ink-700 hover:text-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             3-view (Front / Top / Right)
           </button>
@@ -642,7 +642,7 @@ function AddViewForm({ files, projectId, drawing, onCancel, onAdd, onAddStandard
               })
               onAddStandardViews(specs)
             }}
-            className="px-2 py-0.5 rounded bg-ink-800 text-ink-100 text-[11px] hover:bg-ink-700 hover:text-kerf-300"
+            className="px-2 py-0.5 rounded bg-ink-800 text-ink-100 text-[11px] hover:bg-ink-700 hover:text-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             6-view (+ Left / Back / Bottom)
           </button>

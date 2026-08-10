@@ -156,7 +156,7 @@ export default function InlineBOMPanel({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="flex-1 flex items-center gap-2 px-3 py-2 text-left"
+          className="flex-1 flex items-center gap-2 px-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           title={expanded ? 'Collapse BOM' : 'Expand BOM'}
         >
           {expanded ? <ChevronDown size={11} className="text-ink-400" /> : <ChevronRight size={11} className="text-ink-400" />}
@@ -172,7 +172,7 @@ export default function InlineBOMPanel({
           <button
             type="button"
             onClick={() => { if (projectId) loadBOM(projectId) }}
-            className="inline-flex items-center gap-1 mr-3 px-1.5 py-0.5 rounded text-[10px] text-ink-400 hover:text-kerf-300"
+            className="inline-flex items-center gap-1 mr-3 px-1.5 py-0.5 rounded text-[10px] text-ink-400 hover:text-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             title="Refresh BOM"
           >
             <RefreshCw size={10} className={loading ? 'animate-spin' : ''} />

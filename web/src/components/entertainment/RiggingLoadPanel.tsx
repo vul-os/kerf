@@ -333,7 +333,7 @@ export default function RiggingLoadPanel({
       {trusses.length > 1 && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
           {trusses.map((t, i) => (
-            <button
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               key={i}
               onClick={() => setSelectedTruss(i)}
               style={{

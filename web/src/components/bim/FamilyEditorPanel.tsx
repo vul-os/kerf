@@ -1049,7 +1049,7 @@ export default function FamilyEditorPanel({ className = '', onClose }: Props) {
           {onClose && (
             <button
               onClick={onClose}
-              className="p-1 rounded hover:bg-ink-100 dark:hover:bg-ink-800 text-ink-400 hover:text-ink-600 dark:hover:text-ink-200"
+              className="p-1 rounded hover:bg-ink-100 dark:hover:bg-ink-800 text-ink-400 hover:text-ink-600 dark:hover:text-ink-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               aria-label="Close family editor"
             >
               ×

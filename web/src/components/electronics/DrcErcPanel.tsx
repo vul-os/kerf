@@ -70,7 +70,7 @@ function SeverityIcon({ severity, size = 14 }: { severity?: string; size?: numbe
 function ViolationRow({ v, onClick }: { v: DrcViolation; onClick?: (v: DrcViolation) => void }) {
   return (
     <button
-      className="w-full text-left flex items-start gap-2 px-2 py-1.5 hover:bg-white/5 rounded transition-colors"
+      className="w-full text-left flex items-start gap-2 px-2 py-1.5 hover:bg-white/5 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       onClick={() => onClick && onClick(v)}
       title={v.message}
     >
@@ -96,7 +96,7 @@ function ErcRow({ item, onClick }: { item: ErcItem; onClick?: (item: ErcItem) =>
   const severity = item.severity === 'error' ? 'error' : 'warning'
   return (
     <button
-      className="w-full text-left flex items-start gap-2 px-2 py-1.5 hover:bg-white/5 rounded transition-colors"
+      className="w-full text-left flex items-start gap-2 px-2 py-1.5 hover:bg-white/5 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       onClick={() => onClick && onClick(item)}
     >
       <SeverityIcon severity={severity} />
@@ -254,14 +254,14 @@ export default function DrcErcPanel({ circuitJson, onClose, onMarkerClick }: Drc
             onClick={runChecks}
             disabled={loading}
             title="Re-run checks"
-            className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors disabled:opacity-40"
+            className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
           </button>
           <button
             data-testid="drc-erc-close"
             onClick={onClose}
-            className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors"
+            className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <X size={12} />
           </button>

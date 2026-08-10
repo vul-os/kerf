@@ -204,7 +204,7 @@ export default function LightingSimPanel({ onCallTool }: Props) {
               <div className="flex justify-between items-center">
                 <span className="text-xs font-semibold text-gray-200">{src.source_id}</span>
                 <button
-                  className="text-red-400 hover:text-red-300 text-xs"
+                  className="text-red-400 hover:text-red-300 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                   onClick={() => setSources((prev) => prev.filter((_, i) => i !== idx))}
                 >
                   Remove
@@ -247,7 +247,7 @@ export default function LightingSimPanel({ onCallTool }: Props) {
             </div>
           ))}
           <button
-            className="text-xs text-amber-400 hover:text-amber-300"
+            className="text-xs text-amber-400 hover:text-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={() =>
               setSources((prev) => [
                 ...prev,
@@ -321,7 +321,7 @@ export default function LightingSimPanel({ onCallTool }: Props) {
                   </td>
                   <td className="px-1 py-1">
                     <button
-                      className="text-red-400 text-xs"
+                      className="text-red-400 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                       onClick={() => setSurfaces((prev) => prev.filter((_, i) => i !== idx))}
                     >
                       ×
@@ -333,7 +333,7 @@ export default function LightingSimPanel({ onCallTool }: Props) {
           </table>
         </div>
         <button
-          className="mt-1 text-xs text-amber-400 hover:text-amber-300"
+          className="mt-1 text-xs text-amber-400 hover:text-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={() =>
             setSurfaces((prev) => [
               ...prev,
@@ -362,7 +362,7 @@ export default function LightingSimPanel({ onCallTool }: Props) {
           />
         </div>
         <button
-          className="bg-amber-600 hover:bg-amber-500 disabled:bg-gray-700 text-white text-xs font-semibold px-4 py-2 rounded"
+          className="bg-amber-600 hover:bg-amber-500 disabled:bg-gray-700 text-white text-xs font-semibold px-4 py-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={handleRun}
           disabled={loading || sources.length === 0 || surfaces.length === 0}
         >

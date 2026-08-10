@@ -364,7 +364,7 @@ function Toolbar({ tool, onToolChange, canUndo, canRedo, onUndo, onRedo, onSimul
         onClick={onUndo}
         disabled={!canUndo}
         data-testid="btn-undo"
-        className="px-2 py-1 text-xs rounded bg-white/5 text-gray-400 disabled:opacity-30 hover:bg-white/10 hover:text-white transition-colors"
+        className="px-2 py-1 text-xs rounded bg-white/5 text-gray-400 disabled:opacity-30 hover:bg-white/10 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         title="Undo (Ctrl+Z)"
       >
         ↩ Undo
@@ -373,7 +373,7 @@ function Toolbar({ tool, onToolChange, canUndo, canRedo, onUndo, onRedo, onSimul
         onClick={onRedo}
         disabled={!canRedo}
         data-testid="btn-redo"
-        className="px-2 py-1 text-xs rounded bg-white/5 text-gray-400 disabled:opacity-30 hover:bg-white/10 hover:text-white transition-colors"
+        className="px-2 py-1 text-xs rounded bg-white/5 text-gray-400 disabled:opacity-30 hover:bg-white/10 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         title="Redo (Ctrl+Shift+Z)"
       >
         ↪ Redo
@@ -381,7 +381,7 @@ function Toolbar({ tool, onToolChange, canUndo, canRedo, onUndo, onRedo, onSimul
 
       <button
         onClick={onClear}
-        className="px-2 py-1 text-xs rounded bg-white/5 text-gray-500 hover:bg-red-900/30 hover:text-red-400 transition-colors"
+        className="px-2 py-1 text-xs rounded bg-white/5 text-gray-500 hover:bg-red-900/30 hover:text-red-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         title="Clear schematic"
       >
         Clear

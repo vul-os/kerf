@@ -75,7 +75,7 @@ export default function NodePalette({ onAddNode, collapsed, onToggleCollapse }: 
             Node Library
           </span>
         )}
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           type="button"
           onClick={onToggleCollapse}
           title={collapsed ? 'Expand palette' : 'Collapse palette'}
@@ -131,7 +131,7 @@ export default function NodePalette({ onAddNode, collapsed, onToggleCollapse }: 
               return (
                 <div key={cat}>
                   {/* Category header */}
-                  <button
+                  <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                     type="button"
                     onClick={() => toggleCat(cat)}
                     style={{
@@ -164,7 +164,7 @@ export default function NodePalette({ onAddNode, collapsed, onToggleCollapse }: 
 
                   {/* Nodes */}
                   {open && nodes.map((def) => (
-                    <button
+                    <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                       key={def.id}
                       type="button"
                       title={def.description}

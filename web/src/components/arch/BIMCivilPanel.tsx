@@ -195,7 +195,7 @@ function RunBtn({ onClick, running, label = 'Run' }: {
   label?: string
 }) {
   return (
-    <button
+    <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       onClick={onClick}
       disabled={running}
       style={{ ...s.button, background: '#1e40af', marginTop: 6, ...(running ? s.buttonDisabled : {}) }}
@@ -1505,7 +1505,7 @@ export default function BIMCivilPanel() {
 
       <div style={s.tabs}>
         {TABS.map(({ id, label, Icon }) => (
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             key={id}
             onClick={() => setTab(id)}
             style={{ ...s.tab, ...(tab === id ? s.tabActive : {}) }}

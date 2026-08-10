@@ -398,7 +398,7 @@ export default function DaylightingPanel({ projectId }: Props) {
       <button
         onClick={run}
         disabled={loading || gridNx * gridNy > 1000}
-        className="flex items-center gap-2 rounded-lg bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 px-4 py-2 text-sm font-semibold text-white transition-colors"
+        className="flex items-center gap-2 rounded-lg bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 px-4 py-2 text-sm font-semibold text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         <Play size={14} />
         {loading ? 'Simulating…' : 'Run Daylighting Simulation'}

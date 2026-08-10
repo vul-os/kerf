@@ -62,7 +62,7 @@ export default function FEAView({ file, projectId }: Props) {
         {TABS.map(tab => {
           const active = activeTab === tab.id
           return (
-            <button
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               key={tab.id}
               role="tab"
               aria-selected={active}

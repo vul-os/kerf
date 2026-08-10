@@ -192,7 +192,7 @@ function UnverifiedBanner({ user }) {
             type="button"
             onClick={resend}
             disabled={state === 'sending'}
-            className="font-medium text-amber-100 hover:text-white underline underline-offset-2 disabled:opacity-50"
+            className="font-medium text-amber-100 hover:text-white underline underline-offset-2 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             {state === 'sending' ? 'Sending…' : 'Resend email'}
           </button>

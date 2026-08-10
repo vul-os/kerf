@@ -326,7 +326,7 @@ function ToolCard({ name, icon: Icon, color, desc, fields, buildArgs, projectId 
         </div>
       )}
 
-      <button
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         onClick={run}
         disabled={running}
         style={{ ...s.runBtn, ...(running ? s.runBtnDisabled : {}) }}

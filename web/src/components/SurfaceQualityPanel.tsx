@@ -252,7 +252,7 @@ export default function SurfaceQualityPanel({ surfA, surfB, sharedEdge }: Props)
         <div style={s.cardTitle}>
           <Activity size={16} /> Continuity report
         </div>
-        <button style={s.btn} onClick={analyze} disabled={busy}>
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" style={s.btn} onClick={analyze} disabled={busy}>
           {busy ? <Loader2 size={14} className="spin" /> : <Play size={14} />}
           {busy ? 'Analyzing…' : 'Analyze join'}
         </button>

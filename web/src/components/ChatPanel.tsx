@@ -100,7 +100,7 @@ function ModelPicker({ models, selectedId, onSelect, disabled }: ModelPickerProp
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Model: ${current?.label || 'pick model'}`}
-        className="group inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-ink-700 bg-ink-900/80 text-[11px] font-mono text-ink-200 hover:bg-ink-800 hover:border-ink-600 disabled:opacity-50 transition-colors"
+        className="group inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-ink-700 bg-ink-900/80 text-[11px] font-mono text-ink-200 hover:bg-ink-800 hover:border-ink-600 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         title="Pick model"
       >
         <Sparkles size={11} className="text-kerf-300" />
@@ -187,7 +187,7 @@ function ThreadSwitcher({ threads, currentThreadId, onSelect, onCreate, onToggle
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="flex-1 flex items-center gap-2 px-3 py-2 text-left hover:bg-ink-800 transition-colors min-w-0"
+          className="flex-1 flex items-center gap-2 px-3 py-2 text-left hover:bg-ink-800 transition-colors min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           title="Switch thread"
         >
           <MessageSquare size={13} className="text-ink-400 flex-shrink-0" />
@@ -203,7 +203,7 @@ function ThreadSwitcher({ threads, currentThreadId, onSelect, onCreate, onToggle
         <button
           type="button"
           onClick={() => { onCreate(); setOpen(false) }}
-          className="px-3 border-l border-ink-800 text-ink-300 hover:bg-ink-800 hover:text-kerf-300 transition-colors"
+          className="px-3 border-l border-ink-800 text-ink-300 hover:bg-ink-800 hover:text-kerf-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           title="New thread"
         >
           <MessageSquarePlus size={14} />
@@ -236,7 +236,7 @@ function ThreadSwitcher({ threads, currentThreadId, onSelect, onCreate, onToggle
                   onClick={(e) => { e.stopPropagation(); onToggleStar(t.id) }}
                   className={`flex-shrink-0 p-1 rounded hover:bg-ink-700 ${
                     t.is_starred ? 'text-kerf-300' : 'text-ink-500 opacity-0 group-hover:opacity-100 hover:text-kerf-300'
-                  }`}
+                  } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
                   title={t.is_starred ? 'Unstar' : 'Star'}
                 >
                   <Star size={11} fill={t.is_starred ? 'currentColor' : 'none'} />
@@ -244,7 +244,7 @@ function ThreadSwitcher({ threads, currentThreadId, onSelect, onCreate, onToggle
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); if (confirm('Delete this thread?')) onDelete(t.id) }}
-                  className="flex-shrink-0 p-1 rounded text-ink-500 opacity-0 group-hover:opacity-100 hover:bg-ink-700 hover:text-red-400"
+                  className="flex-shrink-0 p-1 rounded text-ink-500 opacity-0 group-hover:opacity-100 hover:bg-ink-700 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                   title="Delete thread"
                 >
                   <Trash2 size={11} />
@@ -255,7 +255,7 @@ function ThreadSwitcher({ threads, currentThreadId, onSelect, onCreate, onToggle
           <button
             type="button"
             onClick={() => { onCreate(); setOpen(false) }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-ink-300 hover:bg-ink-800 hover:text-kerf-300 border-t border-ink-800"
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-ink-300 hover:bg-ink-800 hover:text-kerf-300 border-t border-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Plus size={12} /> New thread
           </button>
@@ -626,7 +626,7 @@ function ToolCallChip({ call }: { call: ToolCallInfo }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-ink-800/60 transition-colors"
+        className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-ink-800/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         {open
           ? <ChevronDown size={12} className="text-ink-500 flex-shrink-0" />
@@ -920,7 +920,7 @@ function MessageBlock({ message, modelLookup, isLatestAssistant, onRetry }: Mess
                 type="button"
                 data-testid="chat-message-retry"
                 onClick={onRetry}
-                className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-500/20 border border-red-500/30 text-red-200 hover:bg-red-500/30 transition-colors text-[10px] font-medium"
+                className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-500/20 border border-red-500/30 text-red-200 hover:bg-red-500/30 transition-colors text-[10px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               >
                 Retry
               </button>
@@ -1058,7 +1058,7 @@ const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(function ChatI
               type="button"
               onClick={submit}
               disabled={!canSend}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-kerf-300 text-ink-950 text-xs font-semibold hover:bg-kerf-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-kerf-300 text-ink-950 text-xs font-semibold hover:bg-kerf-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               title="Send (Enter)"
             >
               <Send size={12} />
@@ -1265,7 +1265,7 @@ const ChatPanel = forwardRef<HTMLTextAreaElement, ChatPanelProps>(function ChatP
                   type="button"
                   data-testid="cancel-stream-btn"
                   onClick={onCancelStream}
-                  className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded border border-ink-700 bg-ink-800 text-ink-300 hover:bg-ink-700 hover:text-ink-100 transition-colors text-[10px]"
+                  className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded border border-ink-700 bg-ink-800 text-ink-300 hover:bg-ink-700 hover:text-ink-100 transition-colors text-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                   title="Stop generating"
                 >
                   <Square size={9} />
@@ -1293,7 +1293,7 @@ const ChatPanel = forwardRef<HTMLTextAreaElement, ChatPanelProps>(function ChatP
             data-testid="chat-send-error-dismiss"
             onClick={() => setSendError(null)}
             aria-label="Dismiss error"
-            className="shrink-0 p-0.5 rounded hover:bg-red-500/20 text-red-400 hover:text-red-200 transition-colors"
+            className="shrink-0 p-0.5 rounded hover:bg-red-500/20 text-red-400 hover:text-red-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <X size={11} />
           </button>

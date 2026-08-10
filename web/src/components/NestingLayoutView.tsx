@@ -290,7 +290,7 @@ export default function NestingLayoutView({ parsedContent, sheetW: propSheetW, s
           {/* Sheet selector */}
           {sheetsUsed > 1 && (
             <div style={styles.sheetNav}>
-              <button
+              <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 type="button"
                 onClick={() => setSheetIdx((i) => Math.max(0, i - 1))}
                 disabled={clampedIdx === 0}
@@ -303,7 +303,7 @@ export default function NestingLayoutView({ parsedContent, sheetW: propSheetW, s
               <span style={styles.sheetLabel}>
                 Sheet {clampedIdx + 1} / {sheetsUsed}
               </span>
-              <button
+              <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 type="button"
                 onClick={() => setSheetIdx((i) => Math.min(sheetsUsed - 1, i + 1))}
                 disabled={clampedIdx >= sheetsUsed - 1}
@@ -313,7 +313,7 @@ export default function NestingLayoutView({ parsedContent, sheetW: propSheetW, s
               >
                 <ChevronRight size={14} />
               </button>
-              <button
+              <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 type="button"
                 onClick={handleResetView}
                 style={styles.resetBtn}
@@ -326,7 +326,7 @@ export default function NestingLayoutView({ parsedContent, sheetW: propSheetW, s
 
           {sheetsUsed <= 1 && (
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button type="button" onClick={handleResetView} style={styles.resetBtn}>reset view</button>
+              <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" type="button" onClick={handleResetView} style={styles.resetBtn}>reset view</button>
             </div>
           )}
 

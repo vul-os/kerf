@@ -143,7 +143,7 @@ export default function Toolbar({
             data-testid="btn-toggle-drc-panel"
             onClick={onToggleDrcPanel}
             title="DRC / ERC results panel"
-            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <ShieldAlert size={13} />
             <span className="hidden sm:inline">DRC/ERC</span>
@@ -154,7 +154,7 @@ export default function Toolbar({
             data-testid="btn-toggle-si-panel"
             onClick={onToggleSIPanel}
             title="Signal Integrity panel (Z0 / crosstalk / IBIS eye)"
-            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Activity size={13} />
             <span className="hidden sm:inline">SI</span>
@@ -165,7 +165,7 @@ export default function Toolbar({
             data-testid="btn-toggle-silicon-panel"
             onClick={onToggleSiliconPanel}
             title="Silicon synthesis / P&R (Yosys + OpenLane)"
-            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Cpu size={13} />
             <span className="hidden sm:inline">Synth</span>
@@ -176,7 +176,7 @@ export default function Toolbar({
             data-testid="btn-toggle-multiboard-panel"
             onClick={onToggleMultiBoardPanel}
             title="Multi-board workspace (Altium MB3D)"
-            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Box size={13} />
             <span className="hidden sm:inline">MB3D</span>
@@ -187,7 +187,7 @@ export default function Toolbar({
             data-testid="btn-toggle-pcb3d-panel"
             onClick={onTogglePCB3DPanel}
             title="3D PCB editor — STEP import + clearance DRC"
-            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Layers3 size={13} />
             <span className="hidden sm:inline">3D</span>
@@ -198,7 +198,7 @@ export default function Toolbar({
             data-testid="btn-toggle-emc-panel"
             onClick={onToggleEMCPanel}
             title="EMC pre-compliance (radiated / shielding / FCC + CISPR limits)"
-            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Zap size={13} />
             <span className="hidden sm:inline">EMC</span>
@@ -209,7 +209,7 @@ export default function Toolbar({
             data-testid="btn-toggle-thermal-panel"
             onClick={onTogglePCBThermalPanel}
             title="PCB thermal analysis — 2D FD hotspot map + via recommendations"
-            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Thermometer size={13} />
             <span className="hidden sm:inline">Thermal</span>
@@ -226,7 +226,7 @@ export default function Toolbar({
           onClick={onUndo}
           disabled={!canUndo}
           title="Undo (Ctrl-Z)"
-          className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+          className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Undo2 size={13} />
         </button>
@@ -235,7 +235,7 @@ export default function Toolbar({
           onClick={onRedo}
           disabled={!canRedo}
           title="Redo (Ctrl-Shift-Z)"
-          className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+          className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Redo2 size={13} />
         </button>

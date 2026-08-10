@@ -66,7 +66,7 @@ export function ErrorBanner({ message, onDismiss }: { message: string | null; on
       <AlertCircle size={12} className="mt-0.5 shrink-0" />
       <span className="flex-1 break-words">{message}</span>
       {onDismiss && (
-        <button type="button" onClick={onDismiss} className="text-red-200 hover:text-white">
+        <button type="button" onClick={onDismiss} className="text-red-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
           <X size={11} />
         </button>
       )}
@@ -343,7 +343,7 @@ export function GitPanel({ projectId, onClose: _onClose }: { projectId: string; 
             type="button"
             onClick={() => refreshStatus()}
             disabled={loading}
-            className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800 disabled:opacity-40"
+            className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             title="Refresh"
           >
             <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
@@ -352,7 +352,7 @@ export function GitPanel({ projectId, onClose: _onClose }: { projectId: string; 
             <button
               type="button"
               onClick={() => setShowRemotes(true)}
-              className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800"
+              className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               title="Manage remotes"
             >
               <Link2 size={13} />
@@ -396,7 +396,7 @@ export function GitPanel({ projectId, onClose: _onClose }: { projectId: string; 
             type="button"
             data-testid="open-purge-modal"
             onClick={() => setShowPurge(true)}
-            className="text-[10px] text-kerf-300/70 hover:text-kerf-300 underline underline-offset-2 shrink-0 ml-2"
+            className="text-[10px] text-kerf-300/70 hover:text-kerf-300 underline underline-offset-2 shrink-0 ml-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             Manage…
           </button>
@@ -488,7 +488,7 @@ export function GitPanel({ projectId, onClose: _onClose }: { projectId: string; 
               <button
                 type="button"
                 onClick={() => setShowRemotes(true)}
-                className="ml-1 text-[10px] text-kerf-300/70 hover:text-kerf-300 underline underline-offset-2"
+                className="ml-1 text-[10px] text-kerf-300/70 hover:text-kerf-300 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               >
                 Add a remote…
               </button>

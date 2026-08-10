@@ -352,7 +352,7 @@ function SolidStaticCard({ projectId, fileId }: FemPanelProps) {
           disabled={running} rows={2}
           style={{ ...s.input, flex: 'none', width: '100%', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }} />
       </div>
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, background: '#0369a1', ...(running ? s.buttonDisabled : {}) }}>
         {running
           ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Solving…</>
@@ -535,7 +535,7 @@ function ModalBeamCard({ projectId, fileId }: FemPanelProps) {
           </div>
         </>)}
       </div>
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, background: '#4c1d95', ...(running ? s.buttonDisabled : {}) }}>
         {running
           ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Eigensolve…</>
@@ -747,7 +747,7 @@ function BeamStaticCard({ projectId, fileId }: FemPanelProps) {
           </div>
         </>)}
       </div>
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, background: '#065f46', ...(running ? s.buttonDisabled : {}) }}>
         {running
           ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Solving…</>
@@ -823,7 +823,7 @@ export default function SolidFEMPanel({ projectId, fileId }: Props) {
         {SOLID_SECTIONS.map(sec => {
           const isActive = active === sec.id
           return (
-            <button
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               key={sec.id}
               role="tab"
               aria-selected={isActive}

@@ -556,7 +556,7 @@ export default function FiberOrientationContour({ plies: propPlies }: Props) {
                 </select>
               </div>
 
-              <button style={styles.runBtn} onClick={runDrape} type="button" disabled={loading}>
+              <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" style={styles.runBtn} onClick={runDrape} type="button" disabled={loading}>
                 {loading ? '⟳ Running…' : '▶ Run Drape'}
               </button>
 

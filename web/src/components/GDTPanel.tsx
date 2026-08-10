@@ -438,7 +438,7 @@ function ToolInspector({ tool, params, onParamChange, onRun, running, result }: 
         <button
           onClick={onRun}
           disabled={running}
-          className="flex items-center justify-center gap-2 w-full bg-kerf-600 hover:bg-kerf-500 disabled:bg-ink-800 disabled:text-ink-600 text-white text-[12px] font-medium rounded-md py-2 transition-colors"
+          className="flex items-center justify-center gap-2 w-full bg-kerf-600 hover:bg-kerf-500 disabled:bg-ink-800 disabled:text-ink-600 text-white text-[12px] font-medium rounded-md py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {running ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
           {running ? 'Running…' : `Run ${tool.id}`}
@@ -506,7 +506,7 @@ function CollapsibleSection({ title, icon: Icon, iconClass = 'text-kerf-400', ch
     <div className="border border-ink-800 rounded-lg overflow-hidden">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 w-full px-3 py-2 bg-ink-900/60 hover:bg-ink-800/60 text-left"
+        className="flex items-center gap-2 w-full px-3 py-2 bg-ink-900/60 hover:bg-ink-800/60 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         {Icon && <Icon size={12} className={iconClass} />}
         <span className="text-[11px] font-semibold text-ink-200 flex-1">{title}</span>
@@ -719,7 +719,7 @@ function DrawingAnnotationPanel({ mbdMode, onResult }: { mbdMode: boolean; onRes
           <button
             onClick={handleApplyDatum}
             disabled={applyDatumLoading}
-            className="flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ink-800 disabled:text-ink-600 text-white text-[11px] rounded py-1.5 transition-colors"
+            className="flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 disabled:bg-ink-800 disabled:text-ink-600 text-white text-[11px] rounded py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             {applyDatumLoading ? <Loader2 size={11} className="animate-spin" /> : <Play size={11} />}
             {applyDatumLoading ? 'Applying…' : 'gdt_apply_datum'}
@@ -842,7 +842,7 @@ function DrawingAnnotationPanel({ mbdMode, onResult }: { mbdMode: boolean; onRes
           <button
             onClick={handleApplyTolerance}
             disabled={applyTolLoading}
-            className="flex items-center justify-center gap-2 w-full bg-amber-700 hover:bg-amber-600 disabled:bg-ink-800 disabled:text-ink-600 text-white text-[11px] rounded py-1.5 transition-colors"
+            className="flex items-center justify-center gap-2 w-full bg-amber-700 hover:bg-amber-600 disabled:bg-ink-800 disabled:text-ink-600 text-white text-[11px] rounded py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             {applyTolLoading ? <Loader2 size={11} className="animate-spin" /> : <Play size={11} />}
             {applyTolLoading ? 'Applying…' : 'gdt_apply_tolerance'}
@@ -864,7 +864,7 @@ function DrawingAnnotationPanel({ mbdMode, onResult }: { mbdMode: boolean; onRes
           <button
             onClick={handleValidateFrame}
             disabled={validateLoading}
-            className="flex items-center justify-center gap-2 w-full bg-blue-700 hover:bg-blue-600 disabled:bg-ink-800 disabled:text-ink-600 text-white text-[11px] rounded py-1.5 transition-colors"
+            className="flex items-center justify-center gap-2 w-full bg-blue-700 hover:bg-blue-600 disabled:bg-ink-800 disabled:text-ink-600 text-white text-[11px] rounded py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             {validateLoading ? <Loader2 size={11} className="animate-spin" /> : <Play size={11} />}
             {validateLoading ? 'Validating…' : 'gdt_validate_frame'}
@@ -978,7 +978,7 @@ function ToleranceStackupPanel({ onResult }: { onResult?: (r: ToolResult) => voi
               </select>
               <button
                 onClick={() => removeLink(idx)}
-                className="text-red-500 hover:text-red-400"
+                className="text-red-500 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 title="Remove link"
               >
                 <Trash2 size={11} />
@@ -1007,7 +1007,7 @@ function ToleranceStackupPanel({ onResult }: { onResult?: (r: ToolResult) => voi
 
         <button
           onClick={addLink}
-          className="flex items-center gap-1.5 text-[11px] text-kerf-400 hover:text-kerf-300 w-full py-1 border border-dashed border-ink-700 hover:border-kerf-600 rounded-md justify-center transition-colors"
+          className="flex items-center gap-1.5 text-[11px] text-kerf-400 hover:text-kerf-300 w-full py-1 border border-dashed border-ink-700 hover:border-kerf-600 rounded-md justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <PlusCircle size={12} />Add link
         </button>
@@ -1042,7 +1042,7 @@ function ToleranceStackupPanel({ onResult }: { onResult?: (r: ToolResult) => voi
         <button
           onClick={() => runStackup('worst_case')}
           disabled={loading}
-          className="flex-1 flex items-center justify-center gap-1.5 bg-kerf-700 hover:bg-kerf-600 disabled:bg-ink-800 disabled:text-ink-600 text-white text-[11px] rounded py-1.5 transition-colors"
+          className="flex-1 flex items-center justify-center gap-1.5 bg-kerf-700 hover:bg-kerf-600 disabled:bg-ink-800 disabled:text-ink-600 text-white text-[11px] rounded py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {loading ? <Loader2 size={11} className="animate-spin" /> : <BarChart2 size={11} />}
           Worst Case
@@ -1050,7 +1050,7 @@ function ToleranceStackupPanel({ onResult }: { onResult?: (r: ToolResult) => voi
         <button
           onClick={() => runStackup('rss')}
           disabled={loading}
-          className="flex-1 flex items-center justify-center gap-1.5 bg-blue-700 hover:bg-blue-600 disabled:bg-ink-800 disabled:text-ink-600 text-white text-[11px] rounded py-1.5 transition-colors"
+          className="flex-1 flex items-center justify-center gap-1.5 bg-blue-700 hover:bg-blue-600 disabled:bg-ink-800 disabled:text-ink-600 text-white text-[11px] rounded py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {loading ? <Loader2 size={11} className="animate-spin" /> : <BarChart2 size={11} />}
           RSS (3σ)

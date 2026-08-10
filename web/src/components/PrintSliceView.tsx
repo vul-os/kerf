@@ -237,7 +237,7 @@ function ToggleField({ label, value, onChange }: ToggleFieldProps) {
         role="switch"
         aria-checked={value}
         onClick={() => onChange(!value)}
-        className={`relative inline-flex h-4 w-7 flex-shrink-0 rounded-full border transition-colors focus:outline-none ${value ? 'bg-orange-400 border-orange-300' : 'bg-ink-700 border-ink-600'}`}
+        className={`relative inline-flex h-4 w-7 flex-shrink-0 rounded-full border transition-colors focus:outline-none ${value ? 'bg-orange-400 border-orange-300' : 'bg-ink-700 border-ink-600'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
       >
         <span
           className={`inline-block h-3 w-3 rounded-full bg-white shadow transform transition-transform mt-0.5 ${value ? 'translate-x-3.5' : 'translate-x-0.5'}`}
@@ -421,7 +421,7 @@ const PrintSliceView = forwardRef<PrintSliceViewHandle, PrintSliceViewProps>(fun
           type="button"
           onClick={handleSlice}
           disabled={slicing}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded bg-orange-400/15 border border-orange-400/40 text-orange-300 hover:bg-orange-400/25 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded bg-orange-400/15 border border-orange-400/40 text-orange-300 hover:bg-orange-400/25 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {slicing
             ? <><Loader2 size={14} className="animate-spin" /> Slicing…</>
@@ -478,7 +478,7 @@ const PrintSliceView = forwardRef<PrintSliceViewHandle, PrintSliceViewProps>(fun
               <button
                 type="button"
                 onClick={() => setShowGcode((v) => !v)}
-                className="flex items-center gap-1 text-xs text-ink-400 hover:text-ink-200 transition-colors mb-1"
+                className="flex items-center gap-1 text-xs text-ink-400 hover:text-ink-200 transition-colors mb-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               >
                 {showGcode ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                 G-code preview (first 50 lines)

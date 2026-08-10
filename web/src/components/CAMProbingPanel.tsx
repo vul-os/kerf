@@ -460,7 +460,7 @@ export default function CAMProbingPanel({ projectId, fileId }: CAMProbingPanelPr
       </div>
 
       {/* Generate button */}
-      <button
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         onClick={generate}
         disabled={loading}
         style={{
@@ -519,7 +519,7 @@ export default function CAMProbingPanel({ projectId, fileId }: CAMProbingPanelPr
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
               <Label>G-code Preview</Label>
-              <button
+              <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 onClick={downloadGcode}
                 style={{
                   background: '#1f2937', color: '#9ca3af', border: '1px solid #374151',

@@ -367,13 +367,13 @@ export default function DryUtilityNetworkPanel({
                 tab === t
                   ? 'bg-slate-700 text-slate-100'
                   : 'text-slate-500 hover:text-slate-300'
-              }`}
+              } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
             >
               {t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ))}
           <button
-            className="text-xs px-3 py-1 rounded bg-kerf-700 hover:bg-kerf-600 text-white disabled:opacity-50 transition-colors"
+            className="text-xs px-3 py-1 rounded bg-kerf-700 hover:bg-kerf-600 text-white disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={handleCheckClearances}
             disabled={loading || isEmpty}
             data-testid="clearance-check-btn"
@@ -471,7 +471,7 @@ export default function DryUtilityNetworkPanel({
                 </span>
                 <button
                   onClick={() => setSelectedLink(null)}
-                  className="text-slate-500 hover:text-slate-300 ml-2"
+                  className="text-slate-500 hover:text-slate-300 ml-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                   aria-label="Close inspector"
                 >
                   ✕

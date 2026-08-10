@@ -385,7 +385,7 @@ function StairCodeCheckCard() {
       <button
         type="button"
         onClick={handleRun}
-        className="w-full px-3 py-1.5 rounded bg-kerf-300/15 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/25 text-[11px] font-medium"
+        className="w-full px-3 py-1.5 rounded bg-kerf-300/15 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/25 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         Run Code Check
       </button>
@@ -441,7 +441,7 @@ function StairCodeCheckCard() {
           <button
             type="button"
             onClick={handleGenerateSticker}
-            className="inline-flex items-center gap-1.5 text-[11px] text-kerf-300 hover:text-kerf-200"
+            className="inline-flex items-center gap-1.5 text-[11px] text-kerf-300 hover:text-kerf-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <FileText size={11} />Generate Code Summary Sticker (.txt)
           </button>
@@ -623,7 +623,7 @@ export default function StairView({ content, fileName: _fileName, onContentChang
               </div>
             </div>
             <button type="button" onClick={() => commit({ ...stair, flights: stair.flights.filter((f) => f.id !== fl.id) })}
-              className="p-0.5 text-ink-500 hover:text-red-400 flex-shrink-0"><Trash2 size={12} /></button>
+              className="p-0.5 text-ink-500 hover:text-red-400 flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Trash2 size={12} /></button>
           </div>
         ))}
       </Section>
@@ -656,7 +656,7 @@ export default function StairView({ content, fileName: _fileName, onContentChang
               </div>
             </div>
             <button type="button" onClick={() => commit({ ...stair, landings: stair.landings.filter((l) => l.id !== ld.id) })}
-              className="p-0.5 text-ink-500 hover:text-red-400 flex-shrink-0"><Trash2 size={12} /></button>
+              className="p-0.5 text-ink-500 hover:text-red-400 flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Trash2 size={12} /></button>
           </div>
         ))}
       </Section>

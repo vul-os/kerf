@@ -393,24 +393,24 @@ export default function ConstraintManagerPanel({ circuitJson: circuitJsonProp, o
           {hasPending && (
             <>
               <button onClick={discardEdits}
-                      className="px-2 py-0.5 text-[10px] rounded border border-gray-600 text-gray-400 hover:text-gray-200">
+                      className="px-2 py-0.5 text-[10px] rounded border border-gray-600 text-gray-400 hover:text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
                 Discard
               </button>
               <button onClick={commitEdits} disabled={loading}
                       className="flex items-center gap-1 px-2.5 py-0.5 bg-blue-700/40 hover:bg-blue-700/60
-                                 border border-blue-500/50 rounded text-blue-300 text-[10px] transition-colors">
+                                 border border-blue-500/50 rounded text-blue-300 text-[10px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
                 <Save size={10} /> Apply
               </button>
             </>
           )}
           <button onClick={() => loadTable()}
-                  className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-gray-300"
+                  className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                   title="Refresh">
             <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
           </button>
           {onClose && (
             <button onClick={onClose}
-                    className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-gray-300">
+                    className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
               <X size={13} />
             </button>
           )}
@@ -530,7 +530,7 @@ export default function ConstraintManagerPanel({ circuitJson: circuitJsonProp, o
           onClick={addRow}
           disabled={!addName.trim() || loading}
           className="px-2.5 py-1 bg-blue-800/40 hover:bg-blue-800/60
-                     border border-blue-600/40 rounded text-blue-300 text-[11px] transition-colors disabled:opacity-40">
+                     border border-blue-600/40 rounded text-blue-300 text-[11px] transition-colors disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
           Add
         </button>
         <span className="text-[10px] text-gray-600 ml-1">Click any cell to edit</span>

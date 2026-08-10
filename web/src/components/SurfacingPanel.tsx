@@ -332,7 +332,7 @@ function GordonNetworkTool() {
           <input style={s.input} value={gridN} onChange={e => setGridN(e.target.value)} />
         </div>
       </div>
-      <button style={s.button} onClick={run} disabled={loading}>
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" style={s.button} onClick={run} disabled={loading}>
         {loading ? <Loader2 size={13} /> : <Play size={13} />}
         Compute Gordon Surface
       </button>
@@ -418,7 +418,7 @@ function SkinningLoftTool() {
           Ruled (linear)
         </label>
       </div>
-      <button style={s.button} onClick={run} disabled={loading}>
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" style={s.button} onClick={run} disabled={loading}>
         {loading ? <Loader2 size={13} /> : <Play size={13} />}
         Loft Profiles
       </button>
@@ -507,7 +507,7 @@ function LoftWithGuidesTool() {
           onChange={e => setDegreeU(e.target.value)}
         />
       </div>
-      <button style={s.button} onClick={run} disabled={loading}>
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" style={s.button} onClick={run} disabled={loading}>
         {loading ? <Loader2 size={13} /> : <Play size={13} />}
         Loft with Guides
       </button>
@@ -569,7 +569,7 @@ export default function SurfacingPanel({ content }: SurfacingPanelProps = {}) {
 
       <div style={s.tabs}>
         {TABS.map(t => (
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             key={t}
             style={{ ...s.tab, ...(tab === t ? s.tabActive : {}) }}
             onClick={() => setTab(t)}

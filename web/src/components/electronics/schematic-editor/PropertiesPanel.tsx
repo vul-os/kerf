@@ -113,7 +113,7 @@ export default function PropertiesPanel({ selected, devices, onUpdateProps, onUp
         </div>
         <button
           onClick={() => onDelete?.(selected.id, 'wire')}
-          className="w-full px-3 py-1.5 text-xs rounded bg-red-900/30 text-red-400 border border-red-700/40 hover:bg-red-800/40 transition-colors"
+          className="w-full px-3 py-1.5 text-xs rounded bg-red-900/30 text-red-400 border border-red-700/40 hover:bg-red-800/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           Delete Wire
         </button>
@@ -173,7 +173,7 @@ export default function PropertiesPanel({ selected, devices, onUpdateProps, onUp
       <div className="mt-auto">
         <button
           onClick={() => onDelete?.(dev.id, 'part')}
-          className="w-full px-3 py-1.5 text-xs rounded bg-red-900/30 text-red-400 border border-red-700/40 hover:bg-red-800/40 transition-colors"
+          className="w-full px-3 py-1.5 text-xs rounded bg-red-900/30 text-red-400 border border-red-700/40 hover:bg-red-800/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           Delete Component
         </button>

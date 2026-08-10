@@ -186,7 +186,7 @@ function RunButton({ loading, onClick, children }: { loading: boolean; onClick: 
       type="button"
       onClick={onClick}
       disabled={loading}
-      className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-700/70 hover:bg-amber-700 disabled:opacity-50 text-white text-[11px] rounded font-medium transition-colors"
+      className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-700/70 hover:bg-amber-700 disabled:opacity-50 text-white text-[11px] rounded font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
     >
       {loading ? <Loader2 size={12} className="animate-spin" /> : <Calculator size={12} />}
       {children}
@@ -334,7 +334,7 @@ function GearTrainTab() {
             className={`px-2 py-0.5 rounded text-[10px] border transition-colors
               ${parseFloat(form.freq_hz) === hz
                 ? 'border-amber-500/60 text-amber-300 bg-amber-950/30'
-                : 'border-ink-700 text-ink-500 hover:text-ink-300'}`}
+                : 'border-ink-700 text-ink-500 hover:text-ink-300'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
           >
             {label}
           </button>
@@ -590,12 +590,10 @@ export default function HorologyPanel({ className = '', content }: HorologyPanel
             key={id}
             type="button"
             onClick={() => setActiveTab(id)}
-            className={`
-              flex items-center gap-1.5 px-3 py-1.5 text-[11px] transition-colors
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] transition-colors
               ${activeTab === id
                 ? 'text-amber-300 border-b-2 border-amber-400 bg-amber-950/20'
-                : 'text-ink-500 hover:text-ink-300'}
-            `}
+                : 'text-ink-500 hover:text-ink-300'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
           >
             <Icon size={11} />
             {label}

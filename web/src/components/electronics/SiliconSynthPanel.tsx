@@ -158,7 +158,7 @@ export default function SiliconSynthPanel({ onClose }: SiliconSynthPanelProps) {
         <button
           data-testid="silicon-synth-close"
           onClick={onClose}
-          className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors ml-auto"
+          className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors ml-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <X size={12} />
         </button>
@@ -225,7 +225,7 @@ export default function SiliconSynthPanel({ onClose }: SiliconSynthPanelProps) {
           data-testid="synth-run-btn"
           onClick={run}
           disabled={status === 'running'}
-          className="px-3 py-1.5 rounded-md bg-purple-800 hover:bg-purple-700 text-white text-xs font-medium transition-colors disabled:opacity-40 self-start"
+          className="px-3 py-1.5 rounded-md bg-purple-800 hover:bg-purple-700 text-white text-xs font-medium transition-colors disabled:opacity-40 self-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {status === 'running' ? 'Running flow…' : 'Run Synthesis + P&R'}
         </button>

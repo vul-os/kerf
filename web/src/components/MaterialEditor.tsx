@@ -172,7 +172,7 @@ export default function MaterialEditor() {
             <button
               type="button"
               onClick={() => setPbrOpen((v) => !v)}
-              className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-ink-500 font-medium hover:text-ink-300 transition-colors"
+              className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-ink-500 font-medium hover:text-ink-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               aria-expanded={pbrOpen}
               data-testid="pbr-panel-toggle"
             >

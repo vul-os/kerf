@@ -882,7 +882,7 @@ export default function PointCloudPanel({
       {/* AI dispatch button */}
       {onDispatch && (
         <div style={{ padding: '6px 12px', background: '#131f2b', borderTop: '1px solid #1e3040', display: 'flex', gap: 8 }}>
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={() => onDispatch({
               tool: 'pointcloud_import',
               params: { format: 'xyz', data: '', voxel_cell_size: 0.1, max_return_pts: 5000 }
@@ -894,7 +894,7 @@ export default function PointCloudPanel({
           >
             Import scan…
           </button>
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={() => onDispatch({
               tool: 'pointcloud_detect_pipes',
               params: { points: points ?? [], threshold_m: 0.02, min_inliers: 20, max_pipes: 20 }

@@ -2,7 +2,7 @@
 //
 // Visible only at widths where the inline button row has had to elide
 // lower-priority actions (i.e. < xl in the current breakpoint mapping). The
-// caller passes `children` — those are the same action <button>s that
+// caller passes `children` — those are the same action <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">s that
 // appear inline, each with their own breakpoint-conditional visibility
 // class (`inline-flex md:hidden` / `inline-flex lg:hidden` / etc.). When
 // the popup mounts, only the ones not visible inline at the current width

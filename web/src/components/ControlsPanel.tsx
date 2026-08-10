@@ -567,7 +567,7 @@ export default function ControlsPanel({
       {/* Tab bar */}
       <div style={{ display: 'flex', borderBottom: '1px solid #2a2a3a', marginBottom: 8 }}>
         {tabs.map((tab) => (
-          <button key={tab.id} style={tabStyle(tab.id)} onClick={() => setActiveTab(tab.id)}>
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" key={tab.id} style={tabStyle(tab.id)} onClick={() => setActiveTab(tab.id)}>
             {tab.label}
           </button>
         ))}

@@ -228,7 +228,7 @@ export default function CameraLensPicker({
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         title="Camera projection and lens settings"
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-ink-900/85 border border-ink-700 text-[11px] font-mono text-ink-300 hover:text-kerf-300 hover:border-kerf-300/50 backdrop-blur shadow-lg shadow-black/30 transition-colors"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-ink-900/85 border border-ink-700 text-[11px] font-mono text-ink-300 hover:text-kerf-300 hover:border-kerf-300/50 backdrop-blur shadow-lg shadow-black/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         <Camera size={13} aria-hidden="true" />
         {label}

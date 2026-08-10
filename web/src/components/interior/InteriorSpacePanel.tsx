@@ -210,7 +210,7 @@ export default function InteriorSpacePanel({
         </span>
         <div className="flex items-center gap-2">
           <button
-            className="text-xs px-2 py-1 rounded border border-slate-600 hover:border-slate-400 text-slate-300 disabled:opacity-50 transition-colors"
+            className="text-xs px-2 py-1 rounded border border-slate-600 hover:border-slate-400 text-slate-300 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={handleAudit}
             disabled={loading}
             data-testid="interior-audit-btn"

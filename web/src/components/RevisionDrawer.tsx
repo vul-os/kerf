@@ -143,14 +143,14 @@ function ConfirmRestoreStrip({ onConfirm, onCancel }: { onConfirm: () => void; o
         <button
           type="button"
           onClick={onConfirm}
-          className="inline-flex items-center gap-1 px-2 h-6 rounded text-[10px] uppercase tracking-wider font-medium bg-kerf-300 text-ink-950 hover:bg-kerf-200"
+          className="inline-flex items-center gap-1 px-2 h-6 rounded text-[10px] uppercase tracking-wider font-medium bg-kerf-300 text-ink-950 hover:bg-kerf-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Check size={10} /> Restore
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="inline-flex items-center gap-1 px-2 h-6 rounded text-[10px] uppercase tracking-wider text-ink-300 hover:text-ink-100 hover:bg-ink-800 border border-ink-800"
+          className="inline-flex items-center gap-1 px-2 h-6 rounded text-[10px] uppercase tracking-wider text-ink-300 hover:text-ink-100 hover:bg-ink-800 border border-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           Cancel
         </button>
@@ -331,7 +331,7 @@ function RevisionRow({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onRequestRestore() }}
-                className="inline-flex items-center gap-1 px-1.5 h-5 rounded border border-ink-800 text-[10px] uppercase tracking-wider text-ink-300 hover:text-kerf-300 hover:border-kerf-300/40 hover:bg-kerf-300/[0.04]"
+                className="inline-flex items-center gap-1 px-1.5 h-5 rounded border border-ink-800 text-[10px] uppercase tracking-wider text-ink-300 hover:text-kerf-300 hover:border-kerf-300/40 hover:bg-kerf-300/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 title="Restore this version"
               >
                 <RotateCcw size={9} />
@@ -343,7 +343,7 @@ function RevisionRow({
                 type="button"
                 onClick={handleToggleFullContent}
                 disabled={loadingContent}
-                className="inline-flex items-center gap-1 px-1.5 h-5 rounded border border-ink-800 text-[10px] uppercase tracking-wider text-ink-500 hover:text-ink-200 hover:border-ink-700 disabled:opacity-40"
+                className="inline-flex items-center gap-1 px-1.5 h-5 rounded border border-ink-800 text-[10px] uppercase tracking-wider text-ink-500 hover:text-ink-200 hover:border-ink-700 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 title={showFull ? 'Hide full content' : 'Show full content'}
               >
                 {loadingContent
@@ -562,7 +562,7 @@ export default function RevisionDrawer({ revisions, loading, onRestore, onClose 
               if (currentFileId) useWorkspace.getState().loadRevisions(currentFileId)
             }}
             disabled={loading || !currentFileId}
-            className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800 disabled:opacity-40"
+            className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             title="Refresh"
           >
             <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
@@ -570,7 +570,7 @@ export default function RevisionDrawer({ revisions, loading, onRestore, onClose 
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800"
+            className="p-1 rounded text-ink-400 hover:text-ink-100 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             aria-label="Close history"
           >
             <X size={14} />
@@ -599,7 +599,7 @@ export default function RevisionDrawer({ revisions, loading, onRestore, onClose 
                 activeKinds.size === 0
                   ? 'border-kerf-300/40 bg-kerf-300/10 text-kerf-300'
                   : 'border-ink-800 text-ink-500 hover:text-ink-200 hover:border-ink-700'
-              }`}
+              } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
             >
               All
             </button>

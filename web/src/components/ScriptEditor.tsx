@@ -88,7 +88,7 @@ export default function ScriptEditor({ content, fileName, file, onChange }: Scri
           onClick={() => setShowInfo((v) => !v)}
           aria-expanded={showInfo}
           title={showInfo ? 'Hide how scripts run' : 'How scripts run (Kerf SDK)'}
-          className="ml-auto inline-flex items-center gap-1 text-[10px] text-ink-400 hover:text-kerf-300 border border-ink-700 hover:border-ink-600 rounded px-1.5 py-0.5 transition-colors shrink-0"
+          className="ml-auto inline-flex items-center gap-1 text-[10px] text-ink-400 hover:text-kerf-300 border border-ink-700 hover:border-ink-600 rounded px-1.5 py-0.5 transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Info size={11} />
           {showInfo ? 'Hide' : 'How it runs'}

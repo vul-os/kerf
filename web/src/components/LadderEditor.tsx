@@ -479,7 +479,7 @@ export default function LadderEditor({ value = [], onChange, programName = 'Main
                 selectedPalette?.type === item.type && selectedPalette?.kind === item.kind
                   ? 'bg-cyan-500/20 border-cyan-500/60 text-cyan-300'
                   : 'bg-[#21262d] border-[#30363d] text-[#c9d1d9] hover:bg-[#30363d] hover:border-[#58a6ff]/40'
-              }`}
+              } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
               onClick={() =>
                 setSelectedPalette(
                   selectedPalette?.type === item.type && selectedPalette?.kind === item.kind
@@ -508,7 +508,7 @@ export default function LadderEditor({ value = [], onChange, programName = 'Main
                 selectedPalette?.type === item.type && selectedPalette?.kind === item.kind
                   ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
                   : 'bg-[#21262d] border-[#30363d] text-[#c9d1d9] hover:bg-[#30363d] hover:border-[#f78c6c]/40'
-              }`}
+              } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
               onClick={() =>
                 setSelectedPalette(
                   selectedPalette?.type === item.type && selectedPalette?.kind === item.kind
@@ -690,7 +690,7 @@ export default function LadderEditor({ value = [], onChange, programName = 'Main
         />
 
         <button
-          className="flex items-center gap-1.5 text-[11px] px-3 py-1 rounded border border-[#30363d] bg-[#21262d] text-[#c9d1d9] hover:border-lime-500/50 hover:text-lime-300 transition-colors"
+          className="flex items-center gap-1.5 text-[11px] px-3 py-1 rounded border border-[#30363d] bg-[#21262d] text-[#c9d1d9] hover:border-lime-500/50 hover:text-lime-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={addRung}
           data-testid="add-rung-btn"
         >
@@ -700,7 +700,7 @@ export default function LadderEditor({ value = [], onChange, programName = 'Main
 
         {/* PLCopen Import */}
         <button
-          className="flex items-center gap-1.5 text-[11px] px-3 py-1 rounded border border-[#30363d] bg-[#21262d] text-[#c9d1d9] hover:border-blue-500/50 hover:text-blue-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center gap-1.5 text-[11px] px-3 py-1 rounded border border-[#30363d] bg-[#21262d] text-[#c9d1d9] hover:border-blue-500/50 hover:text-blue-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={handleImportClick}
           disabled={ioStatus === 'importing' || ioStatus === 'exporting'}
           data-testid="plcopen-import-btn"
@@ -711,7 +711,7 @@ export default function LadderEditor({ value = [], onChange, programName = 'Main
 
         {/* PLCopen Export */}
         <button
-          className="flex items-center gap-1.5 text-[11px] px-3 py-1 rounded border border-[#30363d] bg-[#21262d] text-[#c9d1d9] hover:border-emerald-500/50 hover:text-emerald-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center gap-1.5 text-[11px] px-3 py-1 rounded border border-[#30363d] bg-[#21262d] text-[#c9d1d9] hover:border-emerald-500/50 hover:text-emerald-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={handleExport}
           disabled={ioStatus === 'importing' || ioStatus === 'exporting' || rungs.length === 0}
           data-testid="plcopen-export-btn"

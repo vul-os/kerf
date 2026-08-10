@@ -154,7 +154,7 @@ export default function MultiBoardPanel({ onClose }: MultiBoardPanelProps) {
         <button
           data-testid="multi-board-close"
           onClick={onClose}
-          className="ml-auto p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors"
+          className="ml-auto p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <X size={14} />
         </button>
@@ -212,7 +212,7 @@ export default function MultiBoardPanel({ onClose }: MultiBoardPanelProps) {
               data-testid="mb3d-validate-btn"
               onClick={runValidate}
               disabled={loading}
-              className="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium flex items-center justify-center gap-2 transition-colors"
+              className="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               {loading ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
               Validate Workspace
@@ -261,7 +261,7 @@ export default function MultiBoardPanel({ onClose }: MultiBoardPanelProps) {
               data-testid="mb3d-netmap-btn"
               onClick={runNetMap}
               disabled={loading}
-              className="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium flex items-center justify-center gap-2 transition-colors"
+              className="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               {loading ? <RefreshCw size={12} className="animate-spin" /> : <Network size={12} />}
               Compute Net Map
@@ -302,7 +302,7 @@ export default function MultiBoardPanel({ onClose }: MultiBoardPanelProps) {
               data-testid="mb3d-step-btn"
               onClick={runExportStep}
               disabled={loading}
-              className="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium flex items-center justify-center gap-2 transition-colors"
+              className="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               {loading ? <RefreshCw size={12} className="animate-spin" /> : <Download size={12} />}
               Export STEP Assembly

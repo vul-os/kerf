@@ -250,7 +250,7 @@ function LMTDPanel() {
       <button
         onClick={run}
         disabled={loading}
-        className="w-full h-8 bg-kerf-600 hover:bg-kerf-500 disabled:opacity-50 text-white text-xs font-medium rounded flex items-center justify-center gap-1.5 mt-2"
+        className="w-full h-8 bg-kerf-600 hover:bg-kerf-500 disabled:opacity-50 text-white text-xs font-medium rounded flex items-center justify-center gap-1.5 mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         <Play size={11} />
         {loading ? 'Computing…' : 'Compute LMTD'}
@@ -380,7 +380,7 @@ function ENTUPanel() {
       <button
         onClick={run}
         disabled={loading}
-        className="w-full h-8 bg-kerf-600 hover:bg-kerf-500 disabled:opacity-50 text-white text-xs font-medium rounded flex items-center justify-center gap-1.5 mt-2"
+        className="w-full h-8 bg-kerf-600 hover:bg-kerf-500 disabled:opacity-50 text-white text-xs font-medium rounded flex items-center justify-center gap-1.5 mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         <Play size={11} />
         {loading ? 'Computing…' : 'Compute ε-NTU'}
@@ -589,7 +589,7 @@ function BellDelawarePanel() {
       <button
         type="button"
         onClick={() => setAdvancedOpen((v) => !v)}
-        className="flex items-center gap-1 text-[10px] text-ink-500 hover:text-ink-300 mt-2"
+        className="flex items-center gap-1 text-[10px] text-ink-500 hover:text-ink-300 mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         {advancedOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
         Fluid properties + baffles
@@ -626,7 +626,7 @@ function BellDelawarePanel() {
       <button
         onClick={run}
         disabled={loading}
-        className="w-full h-8 bg-kerf-600 hover:bg-kerf-500 disabled:opacity-50 text-white text-xs font-medium rounded flex items-center justify-center gap-1.5 mt-3"
+        className="w-full h-8 bg-kerf-600 hover:bg-kerf-500 disabled:opacity-50 text-white text-xs font-medium rounded flex items-center justify-center gap-1.5 mt-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         <Play size={11} />
         {loading ? 'Computing…' : 'Run Bell-Delaware Design'}
@@ -700,7 +700,7 @@ export default function HeatExchangerPanel({ projectId: _projectId }: { projectI
               method === m.id
                 ? 'border-kerf-400 text-kerf-300'
                 : 'border-transparent text-ink-500 hover:text-ink-300'
-            }`}
+            } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
           >
             {m.label}
           </button>

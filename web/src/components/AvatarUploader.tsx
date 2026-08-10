@@ -120,7 +120,7 @@ export default function AvatarUploader({ user, onClose, onUpdated }: Props) {
           <button
             type="button"
             onClick={() => !busy && onClose?.()}
-            className="rounded-md p-1 text-ink-400 hover:text-ink-100 hover:bg-ink-800/80 disabled:opacity-50"
+            className="rounded-md p-1 text-ink-400 hover:text-ink-100 hover:bg-ink-800/80 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             disabled={busy}
             aria-label="Close"
           >
@@ -182,7 +182,7 @@ export default function AvatarUploader({ user, onClose, onUpdated }: Props) {
                   type="button"
                   onClick={handleRemove}
                   disabled={busy}
-                  className="inline-flex items-center gap-1.5 text-xs text-ink-400 hover:text-red-300 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 text-xs text-ink-400 hover:text-red-300 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 >
                   <Trash2 size={13} />
                   Remove
@@ -194,7 +194,7 @@ export default function AvatarUploader({ user, onClose, onUpdated }: Props) {
                 type="button"
                 onClick={() => !busy && onClose?.()}
                 disabled={busy}
-                className="px-3 h-8 rounded-md text-sm text-ink-300 hover:bg-ink-800/80 disabled:opacity-50"
+                className="px-3 h-8 rounded-md text-sm text-ink-300 hover:bg-ink-800/80 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               >
                 Cancel
               </button>

@@ -155,7 +155,7 @@ export default function LinearStaticPanel({ projectId, fileId }: Props) {
       <div style={s.section}>
         <div style={{ ...s.sectionTitle, justifyContent: 'space-between' }}>
           <span>Boundary Conditions</span>
-          <button onClick={addBC} disabled={running}
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={addBC} disabled={running}
             style={{ background: 'none', border: 'none', color: '#22d3ee', cursor: 'pointer', padding: 0 }}
             title="Add BC" aria-label="Add boundary condition">
             <Plus size={13} />
@@ -171,7 +171,7 @@ export default function LinearStaticPanel({ projectId, fileId }: Props) {
             <input type="number" value={bc.face_tag} min="0"
               onChange={e => setBcs(bcs.map((b, j) => j === i ? { ...b, face_tag: e.target.value } : b))}
               style={{ ...s.input, flex: '0 0 50px' }} disabled={running} />
-            <button onClick={() => removeBC(i)} disabled={running || bcs.length <= 1}
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={() => removeBC(i)} disabled={running || bcs.length <= 1}
               style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: 0 }}
               aria-label="Remove boundary condition">
               <Trash2 size={12} />
@@ -184,7 +184,7 @@ export default function LinearStaticPanel({ projectId, fileId }: Props) {
       <div style={s.section}>
         <div style={{ ...s.sectionTitle, justifyContent: 'space-between' }}>
           <span>Loads</span>
-          <button onClick={addLoad} disabled={running}
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={addLoad} disabled={running}
             style={{ background: 'none', border: 'none', color: '#22d3ee', cursor: 'pointer', padding: 0 }}
             title="Add load" aria-label="Add load">
             <Plus size={13} />
@@ -204,7 +204,7 @@ export default function LinearStaticPanel({ projectId, fileId }: Props) {
             <input type="number" value={l.value}
               onChange={e => setLoads(loads.map((x, j) => j === i ? { ...x, value: e.target.value } : x))}
               style={{ ...s.input, flex: '0 0 80px' }} disabled={running} />
-            <button onClick={() => removeLoad(i)} disabled={running || loads.length <= 1}
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={() => removeLoad(i)} disabled={running || loads.length <= 1}
               style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: 0 }}
               aria-label="Remove load">
               <Trash2 size={12} />
@@ -213,7 +213,7 @@ export default function LinearStaticPanel({ projectId, fileId }: Props) {
         ))}
       </div>
 
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, ...(running ? s.buttonDisabled : {}) }}>
         {running
           ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Running…</>

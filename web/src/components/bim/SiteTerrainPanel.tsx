@@ -268,7 +268,7 @@ export default function SiteTerrainPanel({ content, projectId: _projectId, onToa
     <div className="flex flex-col border border-ink-200 dark:border-ink-700 rounded-lg bg-white dark:bg-ink-900 overflow-hidden">
       {/* Header */}
       <button
-        className="flex items-center justify-between px-4 py-3 text-sm font-semibold text-ink-800 dark:text-ink-100 hover:bg-ink-50 dark:hover:bg-ink-800"
+        className="flex items-center justify-between px-4 py-3 text-sm font-semibold text-ink-800 dark:text-ink-100 hover:bg-ink-50 dark:hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         onClick={() => setExpanded(x => !x)}
       >
         <div className="flex items-center gap-2">
@@ -299,7 +299,7 @@ export default function SiteTerrainPanel({ content, projectId: _projectId, onToa
               <button key={id} onClick={() => setActiveTab(id)}
                 className={`px-2.5 py-1.5 text-xs font-medium border-b-2 transition-colors ${
                   activeTab === id ? 'border-teal-500 text-teal-600 dark:text-teal-400' : 'border-transparent text-ink-500 hover:text-ink-700 dark:hover:text-ink-300'
-                }`}>
+                } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}>
                 {label}
               </button>
             ))}
@@ -400,7 +400,7 @@ export default function SiteTerrainPanel({ content, projectId: _projectId, onToa
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-ink-600 dark:text-ink-300 uppercase tracking-wider">Survey Points ({points.length})</span>
-                <button onClick={addPoint} className="flex items-center gap-1 rounded px-2 py-1 text-xs text-teal-600 hover:bg-teal-50 dark:text-teal-400 dark:hover:bg-teal-900/20">
+                <button onClick={addPoint} className="flex items-center gap-1 rounded px-2 py-1 text-xs text-teal-600 hover:bg-teal-50 dark:text-teal-400 dark:hover:bg-teal-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
                   <Plus className="h-3 w-3" /> Add
                 </button>
               </div>
@@ -416,7 +416,7 @@ export default function SiteTerrainPanel({ content, projectId: _projectId, onToa
                           className="w-14 rounded border border-ink-200 dark:border-ink-600 bg-transparent px-1 py-0.5 text-xs" />
                       </div>
                     ))}
-                    <button onClick={() => removePoint(idx)} className="text-red-400 hover:text-red-600 ml-auto">
+                    <button onClick={() => removePoint(idx)} className="text-red-400 hover:text-red-600 ml-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
                       <Trash2 className="h-3 w-3" />
                     </button>
                   </div>

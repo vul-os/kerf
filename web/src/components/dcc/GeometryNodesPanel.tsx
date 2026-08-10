@@ -102,7 +102,7 @@ function Section({ title, icon: Icon, children, defaultOpen = true }: SectionPro
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div style={{ borderBottom: '1px solid #1a1d24', paddingBottom: open ? 10 : 0, marginBottom: 2 }}>
-      <button
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         type="button"
         data-testid={`section-${title.toLowerCase().replace(/\s+/g, '-')}`}
         onClick={() => setOpen((o) => !o)}
@@ -308,7 +308,7 @@ export default function GeometryNodesPanel({
         </span>
 
         {/* Evaluate button */}
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           type="button"
           data-testid="btn-evaluate-graph"
           onClick={evaluateGraph}

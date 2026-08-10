@@ -158,7 +158,7 @@ function ZoneEditor({ zone, onChange, onRemove, idx }: {
         <div className="flex items-center gap-2">
           <button
             onClick={e => { e.stopPropagation(); onRemove() }}
-            className="text-gray-400 hover:text-red-500 transition-colors"
+            className="text-gray-400 hover:text-red-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Trash2 size={13} />
           </button>
@@ -398,7 +398,7 @@ export default function BuildingEnergyExportPanel({ projectId }: { projectId: st
             <button
               onClick={applyClimateDefaults}
               title="Apply ASHRAE 90.1-2022 prescriptive U-values for this climate zone"
-              className="rounded border border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 text-xs text-blue-600 dark:text-blue-300 hover:bg-blue-100 transition-colors"
+              className="rounded border border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 text-xs text-blue-600 dark:text-blue-300 hover:bg-blue-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               Apply defaults
             </button>
@@ -427,7 +427,7 @@ export default function BuildingEnergyExportPanel({ projectId }: { projectId: st
           </span>
           <button
             onClick={addZone}
-            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Plus size={12} />Add Zone
           </button>
@@ -447,7 +447,7 @@ export default function BuildingEnergyExportPanel({ projectId }: { projectId: st
       <button
         onClick={run}
         disabled={loading || zones.length === 0}
-        className="flex items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-2 text-sm font-semibold text-white transition-colors"
+        className="flex items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-2 text-sm font-semibold text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         <Play size={14} />
         {loading ? 'Exporting…' : `Export ${fmt === 'gbxml' ? 'gbXML' : 'EnergyPlus IDF'}`}
@@ -481,7 +481,7 @@ export default function BuildingEnergyExportPanel({ projectId }: { projectId: st
               </div>
               <button
                 onClick={downloadResult}
-                className="flex items-center gap-1.5 rounded-lg border border-green-300 dark:border-green-600 bg-white dark:bg-green-900/30 px-3 py-1.5 text-sm text-green-700 dark:text-green-300 hover:bg-green-50 transition-colors"
+                className="flex items-center gap-1.5 rounded-lg border border-green-300 dark:border-green-600 bg-white dark:bg-green-900/30 px-3 py-1.5 text-sm text-green-700 dark:text-green-300 hover:bg-green-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               >
                 <Download size={14} />
                 Download

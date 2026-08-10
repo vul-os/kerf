@@ -545,13 +545,13 @@ export default function PCBInteractiveEditor() {
         <div className="px-3 py-1.5 bg-[#1e293b] border-t border-white/5 text-xs text-gray-400 flex items-center gap-3">
           <span>Selected: <code className="text-indigo-300">{selectedId}</code></span>
           <button
-            className="ml-auto text-red-400 hover:text-red-300 transition-colors"
+            className="ml-auto text-red-400 hover:text-red-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={() => { handleDeleteObject(selectedId, 'trace'); }}
           >
             Delete
           </button>
           <button
-            className="text-gray-500 hover:text-white transition-colors"
+            className="text-gray-500 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={() => setSelectedId(null)}
           >
             Deselect
@@ -693,7 +693,7 @@ export default function PCBInteractiveEditor() {
             data-testid="tune-run-btn"
             onClick={handleTuneDiffPair}
             disabled={tuneLoading}
-            className="px-3 py-1.5 rounded-md bg-teal-700 hover:bg-teal-600 text-white font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            className="px-3 py-1.5 rounded-md bg-teal-700 hover:bg-teal-600 text-white font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             {tuneLoading ? 'Tuning…' : 'Tune Pair'}
           </button>

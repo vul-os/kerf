@@ -98,7 +98,7 @@ function PartRow({ row, onSelect }: { row: PickerRow; onSelect: (row: PickerRow)
     <button
       type="button"
       onClick={() => onSelect(row)}
-      className="w-full text-left px-3 py-2 rounded-md border border-ink-800 bg-ink-900 hover:border-kerf-300/40 hover:bg-ink-850 transition-colors flex items-center gap-3"
+      className="w-full text-left px-3 py-2 rounded-md border border-ink-800 bg-ink-900 hover:border-kerf-300/40 hover:bg-ink-850 transition-colors flex items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
     >
       <div className="w-12 h-12 rounded bg-ink-800 overflow-hidden flex-shrink-0 grid place-items-center">
         {row.primary_photo_url ? (
@@ -259,7 +259,7 @@ export default function LibraryPicker({ onSelect, onClose, currentProjectId }: L
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded hover:bg-ink-800 text-ink-300 hover:text-ink-100"
+            className="p-1 rounded hover:bg-ink-800 text-ink-300 hover:text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             title="Close"
           >
             <X size={16} />
@@ -371,7 +371,7 @@ export default function LibraryPicker({ onSelect, onClose, currentProjectId }: L
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 rounded-md text-xs text-ink-300 hover:bg-ink-800"
+            className="px-3 py-1.5 rounded-md text-xs text-ink-300 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             Cancel
           </button>

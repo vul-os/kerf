@@ -76,7 +76,7 @@ export function FreeCADImportProgress({ filename, status, progress = 0, error, o
             type="button"
             aria-label="Dismiss"
             onClick={onDismiss}
-            className="p-0.5 rounded hover:bg-ink-700 text-current opacity-60 hover:opacity-100"
+            className="p-0.5 rounded hover:bg-ink-700 text-current opacity-60 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <X size={11} />
           </button>
@@ -233,7 +233,7 @@ export function FreeCADImportDialog({ projectId, open, onClose, onImported }) {
             aria-label="Close"
             onClick={onClose}
             disabled={isRunning}
-            className="text-ink-400 hover:text-ink-100 transition-colors disabled:opacity-40"
+            className="text-ink-400 hover:text-ink-100 transition-colors disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <X size={16} />
           </button>
@@ -307,7 +307,7 @@ export function FreeCADImportDialog({ projectId, open, onClose, onImported }) {
             type="button"
             onClick={onClose}
             disabled={isRunning}
-            className="px-3 py-1.5 text-sm rounded-lg border border-ink-700 text-ink-200 hover:bg-ink-800 disabled:opacity-40 transition-colors"
+            className="px-3 py-1.5 text-sm rounded-lg border border-ink-700 text-ink-200 hover:bg-ink-800 disabled:opacity-40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             {importState?.status === 'done' ? 'Done' : 'Cancel'}
           </button>

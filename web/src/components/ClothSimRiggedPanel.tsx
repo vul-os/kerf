@@ -227,7 +227,7 @@ function FrameScrubber({ frameIdx, totalFrames, onChange }: FrameScrubberProps) 
     <div className="flex items-center gap-2" data-testid="frame-scrubber">
       <button
         onClick={() => onChange(Math.max(0, frameIdx - 1))}
-        className="p-0.5 rounded text-ink-400 hover:text-ink-200 disabled:opacity-30"
+        className="p-0.5 rounded text-ink-400 hover:text-ink-200 disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         disabled={frameIdx === 0}
         aria-label="Previous frame"
       >
@@ -247,7 +247,7 @@ function FrameScrubber({ frameIdx, totalFrames, onChange }: FrameScrubberProps) 
 
       <button
         onClick={() => onChange(Math.min(totalFrames - 1, frameIdx + 1))}
-        className="p-0.5 rounded text-ink-400 hover:text-ink-200 disabled:opacity-30"
+        className="p-0.5 rounded text-ink-400 hover:text-ink-200 disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         disabled={frameIdx === totalFrames - 1}
         aria-label="Next frame"
       >

@@ -334,7 +334,7 @@ function EmptyState({ onDrape }: { onDrape?: (() => void) | null }) {
         <button
           onClick={onDrape}
           className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700
-            text-white text-sm font-medium rounded-lg transition-colors"
+            text-white text-sm font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Play className="w-4 h-4" />
           Arrange &amp; Drape
@@ -353,7 +353,7 @@ function ErrorState({ error, onDrape }: { error?: string; onDrape?: (() => void)
         <button
           onClick={onDrape}
           className="inline-flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300
-            dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Play className="w-3.5 h-3.5" />
           Retry
@@ -420,7 +420,7 @@ export default function GarmentAutoArrangePanel({ result, onDrape, className = '
           <button
             onClick={onDrape}
             className="ml-auto inline-flex items-center gap-1 px-3 py-1 bg-blue-600
-              hover:bg-blue-700 text-white text-xs font-medium rounded-md transition-colors"
+              hover:bg-blue-700 text-white text-xs font-medium rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Play className="w-3 h-3" />
             Drape

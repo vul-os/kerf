@@ -353,7 +353,7 @@ export default function ICPackagePanel({ onClose }: ICPackagePanelProps) {
         <div className="ml-auto flex gap-1">
           {onClose && (
             <button onClick={onClose}
-                    className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-gray-300">
+                    className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
               <X size={13} />
             </button>
           )}
@@ -369,7 +369,7 @@ export default function ICPackagePanel({ onClose }: ICPackagePanelProps) {
                   className={`px-2.5 py-1 text-[11px] rounded-t transition-colors
                     ${tab === id
                       ? 'bg-amber-900/30 text-amber-300 border-b-2 border-amber-400'
-                      : 'text-gray-500 hover:text-gray-300'}`}>
+                      : 'text-gray-500 hover:text-gray-300'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}>
             {label}
           </button>
         ))}
@@ -438,7 +438,7 @@ export default function ICPackagePanel({ onClose }: ICPackagePanelProps) {
               onClick={runDrc}
               disabled={loading}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-700/30 hover:bg-amber-700/50
-                         border border-amber-600/40 rounded text-amber-300 text-[11px] transition-colors disabled:opacity-50">
+                         border border-amber-600/40 rounded text-amber-300 text-[11px] transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
               {loading ? <RefreshCw size={11} className="animate-spin" /> : <Layers size={11} />}
               Run DRC
             </button>
@@ -533,7 +533,7 @@ export default function ICPackagePanel({ onClose }: ICPackagePanelProps) {
               onClick={createPkg}
               disabled={loading || !formName.trim()}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-700/30 hover:bg-amber-700/50
-                         border border-amber-600/40 rounded text-amber-300 text-[11px] transition-colors disabled:opacity-50">
+                         border border-amber-600/40 rounded text-amber-300 text-[11px] transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
               {loading ? <RefreshCw size={11} className="animate-spin" /> : <Cpu size={11} />}
               Create Package
             </button>

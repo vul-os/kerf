@@ -321,7 +321,7 @@ function OscopeTab({ waveforms }: { waveforms?: unknown[] }) {
           data-testid="vi-oscope-run"
           onClick={run}
           disabled={busy}
-          className="self-end px-3 py-1.5 rounded bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black text-xs font-semibold"
+          className="self-end px-3 py-1.5 rounded bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {busy ? 'Measuring…' : 'Measure'}
         </button>
@@ -429,7 +429,7 @@ function MultimeterTab({ waveforms }: { waveforms?: unknown[] }) {
           data-testid="vi-mm-read"
           onClick={run}
           disabled={busy}
-          className="self-end px-3 py-1.5 rounded bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white text-xs font-semibold"
+          className="self-end px-3 py-1.5 rounded bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {busy ? 'Reading…' : 'Read'}
         </button>
@@ -528,7 +528,7 @@ function FunctionGenTab() {
           data-testid="vi-fgen-generate"
           onClick={generate}
           disabled={busy}
-          className="self-end px-3 py-1.5 rounded bg-purple-500 hover:bg-purple-400 disabled:opacity-50 text-white text-xs font-semibold"
+          className="self-end px-3 py-1.5 rounded bg-purple-500 hover:bg-purple-400 disabled:opacity-50 text-white text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {busy ? 'Generating…' : 'Generate'}
         </button>
@@ -627,7 +627,7 @@ function ProbesTab({ waveforms }: { waveforms?: unknown[] }) {
           data-testid="vi-probes-run"
           onClick={run}
           disabled={busy}
-          className="self-end px-3 py-1.5 rounded bg-teal-500 hover:bg-teal-400 disabled:opacity-50 text-black text-xs font-semibold"
+          className="self-end px-3 py-1.5 rounded bg-teal-500 hover:bg-teal-400 disabled:opacity-50 text-black text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {busy ? 'Probing…' : 'Probe'}
         </button>
@@ -734,7 +734,7 @@ export default function VirtualInstrumentBench({ onClose, waveforms, content }: 
           <button
             data-testid="vi-bench-close"
             onClick={onClose}
-            className="ml-2 p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors"
+            className="ml-2 p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             title="Close"
             aria-label="Close virtual instrument bench"
           >
@@ -754,7 +754,7 @@ export default function VirtualInstrumentBench({ onClose, waveforms, content }: 
               tab === key
                 ? 'border-amber-400 text-amber-300'
                 : 'border-transparent text-gray-500 hover:text-gray-300'
-            }`}
+            } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
             aria-selected={tab === key}
           >
             <Icon size={11} />

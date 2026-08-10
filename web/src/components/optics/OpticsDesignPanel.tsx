@@ -250,7 +250,7 @@ interface RunBtnProps {
 
 function RunBtn({ onClick, running, disabled }: RunBtnProps) {
   return (
-    <button
+    <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       onClick={onClick}
       disabled={running || disabled}
       style={{ ...s.button, background: '#1e40af', marginTop: 6, ...(running || disabled ? s.buttonDisabled : {}) }}
@@ -1458,7 +1458,7 @@ export default function OpticsDesignPanel() {
 
       <div style={s.tabs}>
         {TABS.map(t => (
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             key={t.id}
             style={{ ...s.tab, ...(activeTab === t.id ? s.tabActive : {}) }}
             onClick={() => setActiveTab(t.id)}

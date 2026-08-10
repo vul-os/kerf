@@ -235,7 +235,7 @@ function EnrollModal({ onClose, onEnrolled }: EnrollModalProps) {
           <button
             type="button"
             aria-label="Close"
-            className="p-1 rounded-lg text-ink-400 hover:text-ink-100 hover:bg-ink-800"
+            className="p-1 rounded-lg text-ink-400 hover:text-ink-100 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             onClick={onClose}
           >
             <X size={16} />
@@ -260,7 +260,7 @@ function EnrollModal({ onClose, onEnrolled }: EnrollModalProps) {
                 <button
                   type="button"
                   aria-label="Copy token"
-                  className="absolute right-2 top-2 text-ink-400 hover:text-ink-100"
+                  className="absolute right-2 top-2 text-ink-400 hover:text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                   onClick={copyToken}
                 >
                   {copied ? <CheckCircle2 size={14} className="text-emerald-400" /> : <Copy size={14} />}

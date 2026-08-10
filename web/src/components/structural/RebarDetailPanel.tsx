@@ -425,7 +425,7 @@ export default function RebarDetailPanel() {
       {/* Tabs */}
       <div style={s.tabs}>
         {TABS.map(t => (
-          <button key={t.id} style={{ ...s.tab, ...(tab === t.id ? s.tabActive : {}) }}
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" key={t.id} style={{ ...s.tab, ...(tab === t.id ? s.tabActive : {}) }}
             onClick={() => setTab(t.id)}>{t.label}</button>
         ))}
       </div>
@@ -447,7 +447,7 @@ export default function RebarDetailPanel() {
           {inputRow('Stirrup Spacing (mm)', 'stirrup_spacing_mm')}
         </div>
         <div style={{ marginTop: 8 }}>
-          <button style={{ ...s.button, opacity: loading ? 0.6 : 1 }} onClick={runAll} disabled={loading}>
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" style={{ ...s.button, opacity: loading ? 0.6 : 1 }} onClick={runAll} disabled={loading}>
             {loading ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
             {loading ? 'Computing...' : 'Detail + Schedule + Drawing'}
           </button>
@@ -532,7 +532,7 @@ export default function RebarDetailPanel() {
             <div>
               <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
                 {drawing.sheets.map((sh, i) => (
-                  <button key={i}
+                  <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" key={i}
                     style={{ ...s.tab, ...(sheetIdx === i ? s.tabActive : {}) }}
                     onClick={() => setSheetIdx(i)}>
                     Sheet {sh.sheet_number}: {sh.title}

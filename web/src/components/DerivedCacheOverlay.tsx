@@ -138,7 +138,7 @@ export default function DerivedCacheOverlay({ position = 'bottom-right', default
             </div>
             <button
               onClick={() => setOpen(false)}
-              className="text-white/40 hover:text-white transition-colors"
+              className="text-white/40 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               aria-label="Close"
             >
               <X size={12} />

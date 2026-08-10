@@ -281,7 +281,7 @@ export default function GradingPlanView({
           Grading Plan
         </span>
         <button
-          className="text-xs px-3 py-1 rounded bg-kerf-700 hover:bg-kerf-600 text-white disabled:opacity-50 transition-colors"
+          className="text-xs px-3 py-1 rounded bg-kerf-700 hover:bg-kerf-600 text-white disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           onClick={handleVolumes}
           disabled={loading || isEmpty}
           data-testid="grading-volume-btn"

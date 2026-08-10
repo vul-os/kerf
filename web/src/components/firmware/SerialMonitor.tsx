@@ -134,7 +134,7 @@ export default function SerialMonitor({ fwConfig = null, projectId: _projectId =
           onClick={() => setAutoScroll((v) => !v)}
           className={`p-0.5 rounded transition-colors ${
             autoScroll ? 'text-kerf-300 bg-kerf-300/10' : 'text-ink-500 hover:text-ink-300'
-          }`}
+          } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
         >
           <ChevronsDown size={12} />
         </button>
@@ -144,7 +144,7 @@ export default function SerialMonitor({ fwConfig = null, projectId: _projectId =
           type="button"
           title="Clear"
           onClick={handleClear}
-          className="p-0.5 rounded text-ink-500 hover:text-ink-300 transition-colors"
+          className="p-0.5 rounded text-ink-500 hover:text-ink-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Trash2 size={12} />
         </button>
@@ -158,7 +158,7 @@ export default function SerialMonitor({ fwConfig = null, projectId: _projectId =
             streaming
               ? 'bg-red-900/40 border-red-700/60 text-red-300 hover:bg-red-900/60'
               : 'bg-green-900/30 border-green-700/50 text-green-300 hover:bg-green-900/50'
-          }`}
+          } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
         >
           {streaming ? <Square size={10} /> : <Play size={10} />}
           {streaming ? 'Stop' : 'Stream'}
@@ -204,7 +204,7 @@ export default function SerialMonitor({ fwConfig = null, projectId: _projectId =
         <button
           type="submit"
           disabled={!txLine.trim()}
-          className="flex items-center gap-1 px-2 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 disabled:opacity-40 text-[10px]"
+          className="flex items-center gap-1 px-2 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 disabled:opacity-40 text-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Send size={10} />
           Send

@@ -190,7 +190,7 @@ function BOMRow({ row, editable, override, onChangeOverride, onOpen, compact }: 
             <button
               type="button"
               onClick={onOpen}
-              className="text-left text-ink-100 hover:text-kerf-300 truncate"
+              className="text-left text-ink-100 hover:text-kerf-300 truncate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               title={note ? `${row.path || part.name}\n\nNote: ${note}` : (row.path || part.name)}
             >
               {part.name || <span className="italic text-ink-500">unnamed</span>}

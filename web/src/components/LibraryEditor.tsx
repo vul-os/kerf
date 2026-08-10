@@ -493,7 +493,7 @@ function ModelPreview({ part, onReplaceModel }: ModelPreviewProps) {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-kerf-300 text-ink-950 text-xs font-medium hover:bg-kerf-200"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-kerf-300 text-ink-950 text-xs font-medium hover:bg-kerf-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Upload size={12} />
             Attach model
@@ -536,7 +536,7 @@ function ModelPreview({ part, onReplaceModel }: ModelPreviewProps) {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-ink-900/90 backdrop-blur border border-ink-800 text-[10px] text-ink-300 hover:text-kerf-300 hover:border-kerf-300/40"
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-ink-900/90 backdrop-blur border border-ink-800 text-[10px] text-ink-300 hover:text-kerf-300 hover:border-kerf-300/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Upload size={10} />
           Replace
@@ -645,7 +645,7 @@ function PhotosPanel({ projectId, fileId, photos, onChange }: PhotosPanelProps) 
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={busy}
-          className="inline-flex items-center gap-1 text-[10px] text-ink-400 hover:text-kerf-300 disabled:opacity-50"
+          className="inline-flex items-center gap-1 text-[10px] text-ink-400 hover:text-kerf-300 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Plus size={10} />
           Add
@@ -723,7 +723,7 @@ function PhotoTile({ photo, onEnlarge, onSetPrimary, onRemove, disabled }: Photo
         <button
           type="button"
           onClick={onEnlarge}
-          className="block w-full h-full"
+          className="block w-full h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <img
             src={src}
@@ -758,7 +758,7 @@ function PhotoTile({ photo, onEnlarge, onSetPrimary, onRemove, disabled }: Photo
             <button
               type="button"
               onClick={() => { setMenuOpen(false); onSetPrimary() }}
-              className="w-full text-left px-2.5 py-1 text-[11px] text-ink-200 hover:bg-ink-800 hover:text-kerf-300 inline-flex items-center gap-1.5"
+              className="w-full text-left px-2.5 py-1 text-[11px] text-ink-200 hover:bg-ink-800 hover:text-kerf-300 inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               <Star size={10} />
               Set primary
@@ -767,7 +767,7 @@ function PhotoTile({ photo, onEnlarge, onSetPrimary, onRemove, disabled }: Photo
           <button
             type="button"
             onClick={() => { setMenuOpen(false); onRemove() }}
-            className="w-full text-left px-2.5 py-1 text-[11px] text-ink-200 hover:bg-ink-800 hover:text-red-300 inline-flex items-center gap-1.5"
+            className="w-full text-left px-2.5 py-1 text-[11px] text-ink-200 hover:bg-ink-800 hover:text-red-300 inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Trash2 size={10} />
             Remove
@@ -917,7 +917,7 @@ function DistributorsPanel({ distributors, onChange, projectId, fileId, onRefres
               onClick={handleRefresh}
               disabled={refreshing}
               title="Refresh prices and stock from configured distributor APIs"
-              className="inline-flex items-center gap-1 text-[10px] text-ink-400 hover:text-kerf-300 disabled:opacity-50"
+              className="inline-flex items-center gap-1 text-[10px] text-ink-400 hover:text-kerf-300 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               {refreshing ? (
                 <Loader2 size={10} className="animate-spin" />
@@ -930,7 +930,7 @@ function DistributorsPanel({ distributors, onChange, projectId, fileId, onRefres
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="inline-flex items-center gap-1 text-[10px] text-ink-400 hover:text-kerf-300"
+            className="inline-flex items-center gap-1 text-[10px] text-ink-400 hover:text-kerf-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Plus size={10} />
             Add
@@ -994,7 +994,7 @@ function DistributorRow({ row, onChange, onRemove }: DistributorRowProps) {
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="flex-1 min-w-0 text-left"
+          className="flex-1 min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] text-ink-100 font-medium truncate">{row.name || 'unnamed'}</span>
@@ -1143,7 +1143,7 @@ function DistributorEditor({ initial, onSave, onCancel }: DistributorEditorProps
         <button
           type="button"
           onClick={onCancel}
-          className="px-2 py-0.5 text-[10px] text-ink-400 hover:text-ink-200"
+          className="px-2 py-0.5 text-[10px] text-ink-400 hover:text-ink-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           Cancel
         </button>
@@ -1156,7 +1156,7 @@ function DistributorEditor({ initial, onSave, onCancel }: DistributorEditorProps
             price_usd: draft.price_usd,
           })}
           disabled={!valid}
-          className="px-2 py-0.5 text-[10px] rounded bg-kerf-300 text-ink-950 font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-kerf-200"
+          className="px-2 py-0.5 text-[10px] rounded bg-kerf-300 text-ink-950 font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-kerf-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           Save
         </button>

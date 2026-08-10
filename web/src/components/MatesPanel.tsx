@@ -181,7 +181,7 @@ export default function MatesPanel({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-ink-800/40 transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-ink-800/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         {open ? <ChevronDown size={12} className="text-ink-400 shrink-0" /> : <ChevronRight size={12} className="text-ink-400 shrink-0" />}
         <Link2 size={12} className="text-kerf-300 shrink-0" />
@@ -209,7 +209,7 @@ export default function MatesPanel({
               <button
                 type="button"
                 onClick={() => handleDelete(m.id)}
-                className="text-ink-600 hover:text-red-400 transition-colors shrink-0"
+                className="text-ink-600 hover:text-red-400 transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 title="Delete mate"
               >
                 <Trash2 size={11} />
@@ -282,7 +282,7 @@ export default function MatesPanel({
                 <button
                   type="button"
                   onClick={() => { setAdding(false); setForm(EMPTY_FORM); onPickCancel?.() }}
-                  className="px-2 py-0.5 rounded text-[11px] text-ink-400 hover:text-ink-200"
+                  className="px-2 py-0.5 rounded text-[11px] text-ink-400 hover:text-ink-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 >
                   Cancel
                 </button>
@@ -290,7 +290,7 @@ export default function MatesPanel({
                   type="button"
                   onClick={handleAdd}
                   disabled={!form.a_component_id || !form.a_feature_id || !form.b_component_id || !form.b_feature_id}
-                  className="px-2 py-0.5 rounded text-[11px] bg-kerf-300 text-ink-950 font-medium hover:bg-kerf-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-2 py-0.5 rounded text-[11px] bg-kerf-300 text-ink-950 font-medium hover:bg-kerf-200 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 >
                   Add
                 </button>
@@ -300,7 +300,7 @@ export default function MatesPanel({
             <button
               type="button"
               onClick={() => setAdding(true)}
-              className="flex items-center gap-1 text-[11px] text-ink-400 hover:text-kerf-300 transition-colors py-0.5"
+              className="flex items-center gap-1 text-[11px] text-ink-400 hover:text-kerf-300 transition-colors py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               <Plus size={11} />
               Add mate
@@ -312,7 +312,7 @@ export default function MatesPanel({
               type="button"
               onClick={triggerSolve}
               disabled={solving}
-              className="flex items-center gap-1 text-[10px] text-ink-400 hover:text-kerf-300 transition-colors py-0.5 disabled:opacity-50"
+              className="flex items-center gap-1 text-[10px] text-ink-400 hover:text-kerf-300 transition-colors py-0.5 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               {solving ? <Loader2 size={10} className="animate-spin" /> : <Link2 size={10} />}
               {solving ? 'Solving…' : 'Solve assembly'}
@@ -370,7 +370,7 @@ function RefRow({ label, prefix, form, setForm, isPicking, onRequestPick }: RefR
             <button
               type="button"
               onClick={onRequestPick}
-              className={`flex items-center gap-1 text-[10px] py-0.5 transition-colors ${filled ? 'text-ink-500 hover:text-kerf-300' : 'text-ink-400 hover:text-kerf-300'}`}
+              className={`flex items-center gap-1 text-[10px] py-0.5 transition-colors ${filled ? 'text-ink-500 hover:text-kerf-300' : 'text-ink-400 hover:text-kerf-300'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
             >
               <Crosshair size={10} className="shrink-0" />
               {filled ? 'Re-pick from viewport' : 'Pick from viewport'}

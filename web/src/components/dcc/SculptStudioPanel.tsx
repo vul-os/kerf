@@ -200,7 +200,7 @@ function Section({ title, icon: Icon, children, defaultOpen = true }: SectionPro
         marginBottom: 2,
       }}
     >
-      <button
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         type="button"
         data-testid={`section-${title.toLowerCase().replace(/\s+/g, '-')}`}
         onClick={() => setOpen((o) => !o)}
@@ -498,7 +498,7 @@ export default function SculptStudioPanel({
             style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, marginBottom: 8 }}
           >
             {BRUSH_KINDS.map((b) => (
-              <button
+              <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 key={b.id}
                 type="button"
                 data-testid={`brush-${b.id}`}
@@ -521,7 +521,7 @@ export default function SculptStudioPanel({
               </button>
             ))}
             {/* Taubin smooth — extra brush kind wired client-side */}
-            <button
+            <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               type="button"
               data-testid="brush-taubin"
               title="Taubin smooth (λ-μ double-pass anti-shrinkage)"
@@ -567,7 +567,7 @@ export default function SculptStudioPanel({
             <span style={{ fontSize: 11, color: '#8a909e', display: 'block', marginBottom: 4 }}>Falloff</span>
             <div style={{ display: 'flex', gap: 4 }}>
               {FALLOFF_OPTIONS.map((f) => (
-                <button
+                <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                   key={f}
                   type="button"
                   data-testid={`falloff-${f}`}
@@ -622,7 +622,7 @@ export default function SculptStudioPanel({
           </div>
 
           {/* Apply brush button */}
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             type="button"
             data-testid="btn-apply-brush"
             onClick={activeBrush === TAUBIN_ID ? applyTaubin : applyBrush}
@@ -659,7 +659,7 @@ export default function SculptStudioPanel({
             step={32}
             onChange={setRemeshRes}
           />
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             type="button"
             data-testid="btn-remesh"
             onClick={doRemesh}
@@ -707,7 +707,7 @@ export default function SculptStudioPanel({
             step={0.01}
             onChange={setPolyOpacity}
           />
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             type="button"
             data-testid="btn-polypaint-stroke"
             onClick={doPolyPaintStroke}

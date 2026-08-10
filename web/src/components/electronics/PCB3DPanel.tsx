@@ -162,7 +162,7 @@ export default function PCB3DPanel({ circuitJson, onClose }: PCB3DPanelProps) {
         <button
           data-testid="pcb-3d-close"
           onClick={onClose}
-          className="ml-auto p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors"
+          className="ml-auto p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <X size={14} />
         </button>
@@ -217,7 +217,7 @@ export default function PCB3DPanel({ circuitJson, onClose }: PCB3DPanelProps) {
               data-testid="pcb3d-clearance-btn"
               onClick={runClearanceCheck}
               disabled={loading}
-              className="w-full py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-medium flex items-center justify-center gap-2 transition-colors"
+              className="w-full py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-medium flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               {loading ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
               Run 3D Clearance DRC
@@ -258,7 +258,7 @@ export default function PCB3DPanel({ circuitJson, onClose }: PCB3DPanelProps) {
               data-testid="pcb3d-step-import-btn"
               onClick={runStepImport}
               disabled={loading || !stepText.trim()}
-              className="w-full py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-medium flex items-center justify-center gap-2 transition-colors"
+              className="w-full py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-medium flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               {loading ? <RefreshCw size={12} className="animate-spin" /> : <Upload size={12} />}
               Extract Body Dimensions
@@ -294,7 +294,7 @@ export default function PCB3DPanel({ circuitJson, onClose }: PCB3DPanelProps) {
               data-testid="pcb3d-idf-roundtrip-btn"
               onClick={runIdfRoundtrip}
               disabled={loading}
-              className="w-full py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-medium flex items-center justify-center gap-2 transition-colors"
+              className="w-full py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-xs font-medium flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               {loading ? <RefreshCw size={12} className="animate-spin" /> : <Download size={12} />}
               Validate IDF Round-Trip

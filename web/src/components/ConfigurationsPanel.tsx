@@ -96,7 +96,7 @@ export default function ConfigurationsPanel({
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded hover:bg-ink-800 text-ink-400 hover:text-ink-100"
+            className="p-1 rounded hover:bg-ink-800 text-ink-400 hover:text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             title="Close"
           >
             <X size={14} />
@@ -131,7 +131,7 @@ export default function ConfigurationsPanel({
         <button
           type="button"
           onClick={addConfig}
-          className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-[11px]"
+          className="w-full inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Plus size={11} />
           Add configuration
@@ -181,7 +181,7 @@ function ConfigRow({ cfg, isDefault, onSetDefault, onRemove, onUpdate }: ConfigR
           title={isDefault ? 'Default configuration' : 'Make default'}
           className={`p-1 rounded ${isDefault
             ? 'text-amber-300 bg-amber-300/10'
-            : 'text-ink-500 hover:text-amber-300'}`}
+            : 'text-ink-500 hover:text-amber-300'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
         >
           <Star size={11} className={isDefault ? 'fill-current' : ''} />
         </button>
@@ -199,7 +199,7 @@ function ConfigRow({ cfg, isDefault, onSetDefault, onRemove, onUpdate }: ConfigR
           type="button"
           onClick={onRemove}
           title="Remove configuration"
-          className="p-1 rounded text-ink-500 hover:text-red-300 hover:bg-red-300/10"
+          className="p-1 rounded text-ink-500 hover:text-red-300 hover:bg-red-300/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <X size={11} />
         </button>

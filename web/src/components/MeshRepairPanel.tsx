@@ -327,7 +327,7 @@ function MeshRepairTool() {
           <input style={s.input} value={maxHoleEdges} onChange={e => setMaxHoleEdges(e.target.value)} />
         </div>
       </div>
-      <button style={s.button} onClick={run} disabled={loading}>
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" style={s.button} onClick={run} disabled={loading}>
         {loading ? <Loader2 size={13} /> : <Play size={13} />}
         Repair Mesh
       </button>
@@ -398,7 +398,7 @@ function DiagnosticsTool() {
         <div style={s.label}>mesh (JSON {'{vertices, faces}'})</div>
         <textarea style={s.textarea} value={mesh} onChange={e => setMesh(e.target.value)} />
       </div>
-      <button style={s.button} onClick={run} disabled={loading}>
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" style={s.button} onClick={run} disabled={loading}>
         {loading ? <Loader2 size={13} /> : <Play size={13} />}
         Run Diagnostics
       </button>
@@ -506,7 +506,7 @@ function ShrinkWrapTool() {
           <input style={s.input} value={snapTol} onChange={e => setSnapTol(e.target.value)} />
         </div>
       </div>
-      <button style={s.button} onClick={run} disabled={loading}>
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" style={s.button} onClick={run} disabled={loading}>
         {loading ? <Loader2 size={13} /> : <Play size={13} />}
         Shrinkwrap
       </button>
@@ -588,7 +588,7 @@ function BooleanTool() {
           <option value="subtract">Subtract (A − B)</option>
         </select>
       </div>
-      <button style={s.button} onClick={run} disabled={loading}>
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" style={s.button} onClick={run} disabled={loading}>
         {loading ? <Loader2 size={13} /> : <Play size={13} />}
         Run Boolean
       </button>
@@ -632,7 +632,7 @@ export default function MeshRepairPanel({ content }: MeshRepairPanelProps = {}) 
 
       <div style={s.tabs}>
         {TABS.map(t => (
-          <button
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             key={t}
             style={{ ...s.tab, ...(tab === t ? s.tabActive : {}) }}
             onClick={() => setTab(t)}

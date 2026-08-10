@@ -325,7 +325,7 @@ export function CurvatureCombPanel({
         >
           Curvature Combs
         </h2>
-        <button
+        <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           type="button"
           onClick={onToggle}
           aria-pressed={enabled}

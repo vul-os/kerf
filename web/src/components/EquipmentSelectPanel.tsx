@@ -276,7 +276,7 @@ export default function EquipmentSelectPanel({ onSelect }: EquipmentSelectPanelP
           type="button"
           onClick={search}
           disabled={loading}
-          className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-[11px] disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-[11px] disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Search size={12} />
           {loading ? 'Searching…' : 'Search AHRI Catalogue'}

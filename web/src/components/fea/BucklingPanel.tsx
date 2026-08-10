@@ -147,7 +147,7 @@ export default function BucklingPanel({ projectId, fileId }: Props) {
         </div>
       </div>
 
-      <button onClick={handleRun} disabled={running || !projectId || !fileId}
+      <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" onClick={handleRun} disabled={running || !projectId || !fileId}
         style={{ ...s.button, background: '#92400e', ...(running ? s.buttonDisabled : {}) }}>
         {running
           ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Running…</>

@@ -174,7 +174,7 @@ export default function FootprintLibrary({ onSelect, onClose }: Props) {
           <button
             type="button"
             onClick={onClose}
-            className="text-ink-400 hover:text-ink-100 transition-colors"
+            className="text-ink-400 hover:text-ink-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             aria-label="Close"
           >
             <X size={14} />
@@ -289,7 +289,7 @@ export default function FootprintLibrary({ onSelect, onClose }: Props) {
           <button
             type="button"
             onClick={handlePlace}
-            className="mt-1 w-full py-1.5 bg-kerf-300 hover:bg-kerf-200 text-ink-900 text-[12px] font-semibold rounded transition-colors"
+            className="mt-1 w-full py-1.5 bg-kerf-300 hover:bg-kerf-200 text-ink-900 text-[12px] font-semibold rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             Place {selectedName}
           </button>

@@ -92,7 +92,7 @@ function ErrorBanner({ message, onDismiss }: { message: string | null; onDismiss
       <AlertTriangle size={12} className="mt-0.5 shrink-0" />
       <span className="flex-1 break-words">{message}</span>
       {onDismiss && (
-        <button onClick={onDismiss} className="text-red-300 hover:text-white ml-1">
+        <button onClick={onDismiss} className="text-red-300 hover:text-white ml-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
           <X size={10} />
         </button>
       )}
@@ -283,7 +283,7 @@ export default function FirmwareDebugPanel({
           <button
             onClick={attach}
             disabled={loading}
-            className="rounded px-2 py-1 text-[10px] font-medium text-ink-300 hover:text-ink-100 hover:bg-ink-800 disabled:opacity-40"
+            className="rounded px-2 py-1 text-[10px] font-medium text-ink-300 hover:text-ink-100 hover:bg-ink-800 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             title="Attach to target"
           >
             Attach
@@ -291,7 +291,7 @@ export default function FirmwareDebugPanel({
           <button
             onClick={refresh}
             disabled={loading}
-            className="rounded p-1 text-ink-400 hover:text-ink-100 hover:bg-ink-800 disabled:opacity-40"
+            className="rounded p-1 text-ink-400 hover:text-ink-100 hover:bg-ink-800 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             title="Refresh snapshot"
           >
             <RefreshCw size={12} />
@@ -299,7 +299,7 @@ export default function FirmwareDebugPanel({
           {onClose && (
             <button
               onClick={onClose}
-              className="rounded p-1 text-ink-400 hover:text-ink-100 hover:bg-ink-800"
+              className="rounded p-1 text-ink-400 hover:text-ink-100 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
               title="Close"
             >
               <X size={12} />

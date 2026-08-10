@@ -171,7 +171,7 @@ export default function WorkspaceSwitcher() {
               type="button"
               role="menuitem"
               onClick={() => { setOpen(false); setCreateOpen(true) }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-200 hover:bg-ink-800/60 hover:text-kerf-300 transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-200 hover:bg-ink-800/60 hover:text-kerf-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               <span className="grid place-items-center w-5 h-5 rounded-md bg-ink-800 text-ink-400">
                 <Plus size={12} />
@@ -185,7 +185,7 @@ export default function WorkspaceSwitcher() {
                   type="button"
                   role="menuitem"
                   onClick={() => { setOpen(false); navigate(`/w/${current.slug}/members`) }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-300 hover:bg-ink-800/60 transition-colors"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-300 hover:bg-ink-800/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 >
                   <span className="grid place-items-center w-5 h-5 text-ink-400">
                     <Users size={13} />
@@ -196,7 +196,7 @@ export default function WorkspaceSwitcher() {
                   type="button"
                   role="menuitem"
                   onClick={() => { setOpen(false); navigate(`/w/${current.slug}/settings`) }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-300 hover:bg-ink-800/60 transition-colors"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-300 hover:bg-ink-800/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 >
                   <span className="grid place-items-center w-5 h-5 text-ink-400">
                     <Settings size={13} />

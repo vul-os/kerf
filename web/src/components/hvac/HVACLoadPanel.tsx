@@ -239,7 +239,7 @@ function Section({ icon: Icon, title, children, defaultOpen = true }: {
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center gap-2 px-3 py-2 bg-ink-900 hover:bg-ink-800 text-xs font-medium text-ink-200"
+        className="w-full flex items-center gap-2 px-3 py-2 bg-ink-900 hover:bg-ink-800 text-xs font-medium text-ink-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         <Icon size={12} className="text-kerf-300 flex-shrink-0" />
         <span className="flex-1 text-left">{title}</span>
@@ -442,7 +442,7 @@ export default function HVACLoadPanel() {
         type="button"
         onClick={calculate}
         disabled={loading}
-        className="flex items-center justify-center gap-2 w-full py-2 rounded-md bg-kerf-300/15 border border-kerf-300/40 text-kerf-200 hover:bg-kerf-300/25 disabled:opacity-50 text-xs font-medium"
+        className="flex items-center justify-center gap-2 w-full py-2 rounded-md bg-kerf-300/15 border border-kerf-300/40 text-kerf-200 hover:bg-kerf-300/25 disabled:opacity-50 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         {loading ? <Loader2 size={12} className="animate-spin" /> : <BarChart2 size={12} />}
         {loading ? 'Calculating…' : 'Calculate loads'}

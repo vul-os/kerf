@@ -247,7 +247,7 @@ export default function ParametricFamilyEditorPanel({ content, onToast: _onToast
     <div className="flex flex-col border border-ink-200 dark:border-ink-700 rounded-lg bg-white dark:bg-ink-900 overflow-hidden">
       {/* Header */}
       <button
-        className="flex items-center justify-between px-4 py-3 text-sm font-semibold text-ink-800 dark:text-ink-100 hover:bg-ink-50 dark:hover:bg-ink-800"
+        className="flex items-center justify-between px-4 py-3 text-sm font-semibold text-ink-800 dark:text-ink-100 hover:bg-ink-50 dark:hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         onClick={() => setExpanded(x => !x)}
       >
         <div className="flex items-center gap-2">
@@ -285,12 +285,12 @@ export default function ParametricFamilyEditorPanel({ content, onToast: _onToast
           {/* Action buttons */}
           <div className="flex gap-2">
             <button onClick={instantiate}
-              className="flex-1 flex items-center justify-center gap-1.5 rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700">
+              className="flex-1 flex items-center justify-center gap-1.5 rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
               <Zap className="h-3.5 w-3.5" />
               Instantiate
             </button>
             <button onClick={validate}
-              className="flex items-center gap-1.5 rounded-md border border-ink-300 px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-ink-50 dark:border-ink-600 dark:text-ink-300 dark:hover:bg-ink-800">
+              className="flex items-center gap-1.5 rounded-md border border-ink-300 px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-ink-50 dark:border-ink-600 dark:text-ink-300 dark:hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
               <CheckCircle2 className="h-3.5 w-3.5" />
               Validate
             </button>
@@ -311,7 +311,7 @@ export default function ParametricFamilyEditorPanel({ content, onToast: _onToast
               <button key={id} onClick={() => setActiveTab(id)}
                 className={`px-2.5 py-1.5 text-xs font-medium border-b-2 transition-colors ${
                   activeTab === id ? 'border-purple-500 text-purple-600 dark:text-purple-400' : 'border-transparent text-ink-500 hover:text-ink-700 dark:hover:text-ink-300'
-                }`}>
+                } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}>
                 {label}
               </button>
             ))}
@@ -322,7 +322,7 @@ export default function ParametricFamilyEditorPanel({ content, onToast: _onToast
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-ink-600 dark:text-ink-300 uppercase tracking-wider">Parameters</span>
-                <button onClick={addParam} className="flex items-center gap-1 rounded px-2 py-1 text-xs text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20">
+                <button onClick={addParam} className="flex items-center gap-1 rounded px-2 py-1 text-xs text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
                   <Plus className="h-3 w-3" /> Add
                 </button>
               </div>
@@ -336,7 +336,7 @@ export default function ParametricFamilyEditorPanel({ content, onToast: _onToast
                         className="rounded border border-ink-200 dark:border-ink-600 bg-transparent px-1 py-0.5 text-xs">
                         {PARAM_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
-                      <button onClick={() => removeParam(idx)} className="text-red-400 hover:text-red-600"><Trash2 className="h-3 w-3" /></button>
+                      <button onClick={() => removeParam(idx)} className="text-red-400 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Trash2 className="h-3 w-3" /></button>
                     </div>
                     <div className="grid grid-cols-3 gap-1.5">
                       <div><label className="text-ink-400">Default</label>

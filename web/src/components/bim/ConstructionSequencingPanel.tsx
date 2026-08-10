@@ -173,7 +173,7 @@ function TaskEditor({ tasks, onChange }: TaskEditorProps) {
         <span className="text-xs font-semibold text-ink-600 dark:text-ink-300 uppercase tracking-wider">Tasks</span>
         <button
           onClick={addTask}
-          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
+          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           <Plus className="h-3 w-3" /> Add
         </button>
@@ -196,7 +196,7 @@ function TaskEditor({ tasks, onChange }: TaskEditorProps) {
               >
                 {IFC_TASK_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
-              <button onClick={() => removeTask(idx)} className="text-red-400 hover:text-red-600"><Trash2 className="h-3 w-3" /></button>
+              <button onClick={() => removeTask(idx)} className="text-red-400 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Trash2 className="h-3 w-3" /></button>
             </div>
             <div className="grid grid-cols-2 gap-1.5">
               <div>
@@ -304,7 +304,7 @@ export default function ConstructionSequencingPanel({ content, projectId: _proje
     <div className="flex flex-col border border-ink-200 dark:border-ink-700 rounded-lg bg-white dark:bg-ink-900 overflow-hidden">
       {/* Header */}
       <button
-        className="flex items-center justify-between px-4 py-3 text-sm font-semibold text-ink-800 dark:text-ink-100 hover:bg-ink-50 dark:hover:bg-ink-800"
+        className="flex items-center justify-between px-4 py-3 text-sm font-semibold text-ink-800 dark:text-ink-100 hover:bg-ink-50 dark:hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         onClick={() => setExpanded(x => !x)}
       >
         <div className="flex items-center gap-2">
@@ -341,14 +341,14 @@ export default function ConstructionSequencingPanel({ content, projectId: _proje
             <button
               onClick={buildTimeline}
               disabled={loading}
-              className="flex-1 flex items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="flex-1 flex items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               {loading ? <span className="animate-spin">⟳</span> : <Zap className="h-3.5 w-3.5" />}
               Build Timeline
             </button>
             <button
               onClick={validateSchedule}
-              className="flex items-center gap-1.5 rounded-md border border-ink-300 px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-ink-50 dark:border-ink-600 dark:text-ink-300 dark:hover:bg-ink-800"
+              className="flex items-center gap-1.5 rounded-md border border-ink-300 px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-ink-50 dark:border-ink-600 dark:text-ink-300 dark:hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               <ClipboardList className="h-3.5 w-3.5" />
               Validate
@@ -376,7 +376,7 @@ export default function ConstructionSequencingPanel({ content, projectId: _proje
                   activeTab === id
                     ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                     : 'border-transparent text-ink-500 hover:text-ink-700 dark:hover:text-ink-300'
-                }`}
+                } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70`}
               >
                 {label}
               </button>

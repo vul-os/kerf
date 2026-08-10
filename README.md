@@ -345,11 +345,8 @@ which is why they were chosen where GPL alternatives were not — but if you red
 
 <div align="center">
 
-<a href="https://vulos.org" title="Vulos — open, self-hostable software"><img src="docs/assets/vulos-logo.png" height="30" alt="Vulos"></a>
+<a href="https://vulos.org" title="Vulos — open by design"><img src="docs/assets/vulos-logo.png" height="30" alt="Vulos"></a>
 
-**Part of [Vulos](https://vulos.org)** — open, self-hostable software.<br>
-Kerf runs standalone, or as an app hosted by Vulos.
-
-<sub>Built in Durban 🇿🇦 by a small team. Engineered for engineers everywhere.</sub>
+**[Vulos](https://vulos.org)** — open by design
 
 </div>

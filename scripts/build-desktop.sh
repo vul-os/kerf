@@ -77,7 +77,12 @@ if [ ! -d "$venv_dir" ]; then
   if [ "${DESKTOP_VENV_SYSTEM_SITE_PACKAGES:-0}" = "1" ]; then
     venv_extra_args+=(--system-site-packages)
   fi
-  "$python_bin" -m venv "${venv_extra_args[@]}" "$venv_dir"
+  # "${arr[@]}" on an EMPTY array trips `set -u` on bash 3.2, which is what
+  # macOS (and the macos-latest runner) ships — the v0.1.7 desktop legs all
+  # died here with "venv_extra_args[@]: unbound variable". The ${arr[@]+...}
+  # form expands to nothing when the array is empty instead of erroring, and
+  # is portable back to bash 3.
+  "$python_bin" -m venv ${venv_extra_args[@]+"${venv_extra_args[@]}"} "$venv_dir"
 fi
 
 # POSIX venvs (macOS, Linux) put executables in bin/; venvs created by a
@@ -124,7 +129,7 @@ esac
   -e packages/kerf-topo \
   -e packages/kerf-mates \
   -e "packages/kerf-desktop[build]" \
-  "${extra_pip_args[@]}"
+  ${extra_pip_args[@]+"${extra_pip_args[@]}"}
 
 echo "==> [3/3] running PyInstaller"
 ( cd packages/kerf-desktop && "$venv_pyinstaller" --noconfirm kerf-desktop.spec )

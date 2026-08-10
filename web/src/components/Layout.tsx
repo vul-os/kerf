@@ -5,6 +5,7 @@ import clsx from 'clsx'
 import { LogoWordmark } from './Logo.jsx'
 import WorkspaceSwitcher from './WorkspaceSwitcher.jsx'
 import { useAuth } from '../store/auth.js'
+import { useNodeConfig } from '../lib/useNodeConfig.js'
 import { useWorkspaces } from '../store/workspaces.js'
 import { api } from '../lib/api.js'
 
@@ -156,6 +157,13 @@ function UserMenu({ user, onLogout, currentWorkspaceSlug }) {
 
 function UnverifiedBanner({ user }) {
   const [state, setState] = useState('idle') // idle | sending | sent | error
+  const { localMode } = useNodeConfig()
+  // Never shown on a local install. local_mode auto-mints a singleton user
+  // with no real email address and no way to receive mail, so asking that
+  // user to "verify your email to secure your account" is meaningless — there
+  // is no account to secure and nothing to send. It is a leftover from when
+  // Kerf had hosted accounts.
+  if (localMode) return null
   // Soft gate: only nudge; never block. Hidden once verified or for
   // OAuth accounts (which arrive verified / have no password to reset).
   if (!user || user.email_verified !== false) return null

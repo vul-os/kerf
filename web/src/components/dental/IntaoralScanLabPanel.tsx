@@ -238,7 +238,7 @@ export default function IntraoralScanLabPanel({ content }: Props) {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={loading === 'scan'}
-            className="px-3 py-1.5 rounded bg-cyan-500/15 border border-cyan-400/40 text-cyan-200 text-xs hover:bg-cyan-500/25 disabled:opacity-50"
+            className="px-3 py-1.5 rounded bg-cyan-500/15 border border-cyan-400/40 text-cyan-200 text-xs hover:bg-cyan-500/25 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             {loading === 'scan' ? (
               <span className="flex items-center gap-1">
@@ -301,7 +301,7 @@ export default function IntraoralScanLabPanel({ content }: Props) {
             type="button"
             onClick={() => labFileRef.current?.click()}
             disabled={loading === 'lab'}
-            className="px-3 py-1.5 rounded bg-emerald-500/15 border border-emerald-400/40 text-emerald-200 text-xs hover:bg-emerald-500/25 disabled:opacity-50"
+            className="px-3 py-1.5 rounded bg-emerald-500/15 border border-emerald-400/40 text-emerald-200 text-xs hover:bg-emerald-500/25 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             {loading === 'lab' ? (
               <span className="flex items-center gap-1">

@@ -13,6 +13,7 @@ stamped, so genuinely-new migrations still run while old ones don't
 re-execute. Real (non-duplicate) errors still abort the deploy.
 """
 import asyncio
+import hashlib
 import os
 import sys
 from pathlib import Path
@@ -64,15 +65,37 @@ async def run_sqlite_migrations(database_url: str):
             "filename text PRIMARY KEY, "
             "applied_at text NOT NULL DEFAULT CURRENT_TIMESTAMP)"
         )
-        cur = await conn.execute(f"SELECT filename FROM {_LEDGER}")
-        applied = {r[0] for r in await cur.fetchall()}
+        # content_sha is what makes FOLDING safe. This repo consolidates schema
+        # changes back into the numbered files rather than accumulating a new
+        # one per change ("folded from 017_user_preferences.sql", passim). With
+        # a filename-only ledger that silently breaks every existing database:
+        # 0001 is already stamped, so anything folded into it is never applied.
+        # Re-running is safe by construction — every statement in these files is
+        # CREATE ... IF NOT EXISTS — so the ledger tracks content instead, and a
+        # file whose text changed is applied again.
+        # SQLite has no ADD COLUMN IF NOT EXISTS; the second run raises
+        # "duplicate column name", which is the success case here.
+        try:
+            await conn.execute(f"ALTER TABLE {_LEDGER} ADD COLUMN content_sha text")
+        except Exception:
+            pass
+        cur = await conn.execute(f"SELECT filename, content_sha FROM {_LEDGER}")
+        applied = {r[0]: r[1] for r in await cur.fetchall()}
         await cur.close()
 
         migrations_dir = Path(__file__).parent.parent / "migrations_sqlite"
         ran = 0
         for migration_file in sorted(migrations_dir.glob("*.sql")):
             name = migration_file.name
-            if name in applied:
+            digest = hashlib.sha256(migration_file.read_bytes()).hexdigest()
+            # A NULL content_sha is a row stamped before this column existed,
+            # so its content is unknown — re-apply and stamp it. That costs one
+            # no-op pass per file on an existing database (every statement is
+            # CREATE ... IF NOT EXISTS) and is what lets anything already folded
+            # in reach installs that were migrated before this change. Treating
+            # NULL as up-to-date would be quieter and would silently withhold
+            # exactly those tables.
+            if name in applied and applied[name] == digest:
                 continue
             # encoding="utf-8" is required, not cosmetic: read_text() defaults to the
             # platform locale encoding, which is cp1252 on Windows. Migration
@@ -83,9 +106,9 @@ async def run_sqlite_migrations(database_url: str):
             # idempotent so a re-run after a partial failure is safe.
             await conn.executescript(sql)
             await conn.execute(
-                f"INSERT INTO {_LEDGER} (filename) VALUES (?) "
-                "ON CONFLICT DO NOTHING",
-                (name,),
+                f"INSERT INTO {_LEDGER} (filename, content_sha) VALUES (?, ?) "
+                "ON CONFLICT (filename) DO UPDATE SET content_sha = excluded.content_sha",
+                (name, digest),
             )
             print(f"  ✓ {name}")
             ran += 1

@@ -102,6 +102,47 @@ td .note { display:block; margin-top:.3rem; font-size:.8rem; color:var(--text-3)
 td .src { font-family:var(--mono); font-size:.71rem; color:var(--code-dim); word-break:break-word; }
 td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
 
+/* Column pinning — the feature name stays put while Kerf / competitor columns scroll under it,
+   so a capability is never off-screen while you're reading its verdict. Needs an opaque
+   background per row state or the scrolling columns show through. */
+td.feat, th.feat { position:sticky; left:0; z-index:1; background:var(--surface); }
+thead th.feat { z-index:2; background:var(--elevated); }
+tbody tr:hover td.feat { background:#15171d; }
+
+/* Search + category filter (index page only). Vanilla JS, no framework — filters .tool cards by
+   name/slug/tagline and by category, matching the old React landing's search box + pill row. */
+.filter-bar { display:flex; flex-wrap:wrap; align-items:center; gap:.75rem 1rem; margin:1.6rem 0 .25rem; }
+.search-wrap { position:relative; flex:1 1 260px; max-width:22rem; }
+.search-wrap svg { position:absolute; left:.8rem; top:50%; transform:translateY(-50%); width:14px; height:14px; color:var(--text-3); pointer-events:none; }
+#parity-search { width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:9px; padding:.55rem .9rem .55rem 2.1rem; font-size:.86rem; font-family:var(--sans); }
+#parity-search::placeholder { color:var(--text-4); }
+#parity-search:focus { border-color:var(--gold-dim); outline:none; }
+.pills { display:flex; flex-wrap:wrap; gap:.45rem; }
+.pill { font-family:var(--mono); font-size:.74rem; color:var(--text-3); background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:.36rem .8rem; cursor:pointer; transition:border-color .15s,color .15s,background .15s; }
+.pill:hover { color:var(--text); border-color:var(--text-4); }
+.pill.active { color:var(--gold); border-color:var(--gold-dim); background:rgba(255,214,51,.08); }
+.filter-status { font-family:var(--mono); font-size:.78rem; color:var(--dim); margin:.9rem 0 0; min-height:1.2em; }
+.filter-status button { font:inherit; color:var(--gold-dim); background:none; border:0; padding:0; cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
+.filter-status button:hover { color:var(--gold); }
+.tool[hidden], .cat[hidden] { display:none; }
+.no-matches { display:none; font-size:.85rem; color:var(--text-3); padding:1.5rem 0; }
+.no-matches.show { display:block; }
+.scroll-mt { scroll-margin-top:20px; }
+
+/* Per-domain expand/collapse on a tool's detail page — matches the old React matrix's D1–D14
+   <details> sections instead of one long flat table. */
+.domain { border:1px solid var(--border-2); border-radius:12px; background:var(--surface); overflow:hidden; margin-bottom:.85rem; }
+.domain:last-child { margin-bottom:0; }
+.domain > summary { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.85rem 1.1rem; cursor:pointer; list-style:none; font-family:var(--mono); }
+.domain > summary::-webkit-details-marker { display:none; }
+.domain > summary:hover { background:var(--elevated); }
+.domain-title { display:flex; align-items:baseline; gap:.6rem; font-family:var(--sans); font-size:.92rem; color:var(--text); }
+.domain-title .code { font-family:var(--mono); font-size:.72rem; color:var(--text-3); }
+.domain-meta { display:flex; align-items:center; gap:.75rem; font-size:.75rem; color:var(--text-3); flex-shrink:0; }
+.domain-caret { display:inline-block; color:var(--text-3); transition:transform .15s; }
+.domain[open] > summary .domain-caret { transform:rotate(90deg); }
+.domain .table-wrap { border:0; border-top:1px solid var(--border-2); border-radius:0; }
+
 .back { display:inline-flex; align-items:center; gap:.4rem; font-family:var(--mono); font-size:.8rem; color:var(--text-3); margin-bottom:1.1rem; }
 .legend { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin:1.4rem 0 0; padding:0; list-style:none; font-family:var(--mono); font-size:.75rem; color:var(--text-3); }
 
@@ -121,6 +162,15 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
   .nav-links a.hide-sm { display:none; }
   .footer-right { margin-left:0; }
   section { padding:2.5rem 0; }
+}
+/* Same fix as site/index.html's own nav (commit fa8b6fe5): below ~430px the nav row still has
+   more unshrinkable content than the bar can give it — here worse than index.html's, because
+   this page keeps its own "parity" link visible (un-hidden, it's the active-page marker) instead
+   of hiding it like index.html does. Drop the github WORD and tighten the gap the same way. */
+@media (max-width:430px) {
+  .nav-links { gap:.6rem; }
+  .nav-links .gh { gap:0; }
+  .nav-links .gh span { display:none; }
 }
 @media (prefers-reduced-motion:reduce) {
   html { scroll-behavior:auto; }
@@ -168,7 +218,7 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
       <p class="lede" style="margin:0 0 1.1rem">These are every row across all 57 reports where Kerf is not a straight yes. It is a short list because of how the rows were chosen, not because the gaps are small — see the note above.</p>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Capability</th><th>Kerf</th><th>Surfaced comparing against</th></tr></thead>
+          <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>Surfaced comparing against</th></tr></thead>
           <tbody>
             <tr>
               <td class="feat">Robot Structural Analysis integration</td>
@@ -253,137 +303,160 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
         </table>
       </div>
     </div>
+    <div class="honest">
+      <p><strong>How to read this.</strong> A competitor row marked <em>paid tier</em> means the tool does have the capability, but behind an extension, add-on or metered service — a different answer to “can I do this today” than “included”, so it is counted separately rather than folded into either. Kerf has no tiers, so its rows are only yes, partial or no.</p>
+      <p style="margin-top:.8rem"><strong>What this page is not.</strong> It is not a verdict, and the totals are not scores. The rows were written from Kerf's feature set, which is why Kerf is a yes on 98.9% of them — that number says something about how the list was built, not about the products. A tool scoring low here may be far better than Kerf at the work you actually do. If you are choosing between them, read the rows in your discipline and ignore the counts.</p>
+    </div>
+  </div>
+</section>
+<section id="by-tool" class="scroll-mt">
+  <div class="container">
+    <div class="cat-head" style="border-bottom:0; margin-bottom:.5rem; padding-bottom:0"><h2>Browse by tool</h2></div>
+    <p class="lede" style="margin:0">Search or filter by discipline — every card still opens the same full, sourced capability table.</p>
     
-      <div class="cat">
+<div class="filter-bar">
+  <div class="search-wrap">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input id="parity-search" type="search" placeholder="Search tools… (e.g. FreeCAD, SPICE, BIM)" aria-label="Search comparisons">
+  </div>
+  <div class="pills" role="group" aria-label="Filter by category">
+    <button type="button" class="pill active" data-cat="">All</button>
+    <button type="button" class="pill" data-cat="cad-mechanical">Mechanical</button><button type="button" class="pill" data-cat="cad-sim">Simulation</button><button type="button" class="pill" data-cat="cad-electronic">Electronics</button><button type="button" class="pill" data-cat="bim">BIM &amp; AEC</button><button type="button" class="pill" data-cat="cad-silicon">Silicon &amp; EDA</button><button type="button" class="pill" data-cat="dcc">DCC &amp; rendering</button><button type="button" class="pill" data-cat="hvac-energy">HVAC &amp; energy</button><button type="button" class="pill" data-cat="jewelry-nurbs">Jewellery &amp; NURBS</button><button type="button" class="pill" data-cat="cad-architecture">Architecture</button><button type="button" class="pill" data-cat="drafting">Drafting</button><button type="button" class="pill" data-cat="cad-electronics">Electronics</button><button type="button" class="pill" data-cat="cad-firmware">Firmware</button>
+  </div>
+</div>
+<p class="filter-status" id="parity-filter-status" role="status"></p>
+    <div class="no-matches" id="parity-no-matches">No comparisons match your search.</div>
+    
+      <div class="cat" data-cat="cad-mechanical">
         <div class="cat-head"><h2>Mechanical</h2><span class="count">19 tools</span></div>
         <div class="tool-grid">
-        <a class="tool" href="./parity/3shape.html">
+        <a class="tool" href="./parity/3shape.html" data-cat="cad-mechanical" data-q="3shape dental system 3shape the dental lab cad platform — versus an open-core cad with dicom ingest, surgical guide generation, and multi-domain engineering.">
           <h3>Kerf vs 3Shape Dental System</h3>
           <p>The dental lab CAD platform — versus an open-core CAD with DICOM ingest, surgical guide generation, and multi-domain engineering.</p>
           <div class="bar" role="img" aria-label="10 of 10 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">9 of these 10 are included in 3Shape Dental System</span>
           <span class="meta"><span>10 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/fusion.html">
+        <a class="tool" href="./parity/fusion.html" data-cat="cad-mechanical" data-q="autodesk fusion 360 fusion cloud-connected multi-discipline cad — two tools, two philosophies.">
           <h3>Kerf vs Autodesk Fusion 360</h3>
           <p>Cloud-connected multi-discipline CAD — two tools, two philosophies.</p>
           <div class="bar" role="img" aria-label="81 of 81 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">19 of these 81 are included in Autodesk Fusion 360, 15 behind a paid tier</span>
           <span class="meta"><span>81 capabilities</span><span>reviewed 2026-05-19</span></span>
         </a>
-        <a class="tool" href="./parity/inventor.html">
+        <a class="tool" href="./parity/inventor.html" data-cat="cad-mechanical" data-q="autodesk inventor inventor 30 years of industrial mfg depth — compared honestly against mit open-core.">
           <h3>Kerf vs Autodesk Inventor</h3>
           <p>30 years of industrial MFG depth — compared honestly against MIT open-core.</p>
           <div class="bar" role="img" aria-label="68 of 68 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">29 of these 68 are included in Autodesk Inventor, 5 behind a paid tier</span>
           <span class="meta"><span>68 capabilities</span><span>reviewed 2026-05-19</span></span>
         </a>
-        <a class="tool" href="./parity/aveva-e3d.html">
+        <a class="tool" href="./parity/aveva-e3d.html" data-cat="cad-mechanical" data-q="aveva e3d design aveva-e3d the enterprise piping and plant design platform — versus an open-core cad with p&amp;id, isometric generation, and piping stress in one workspace.">
           <h3>Kerf vs AVEVA E3D Design</h3>
           <p>The enterprise piping and plant design platform — versus an open-core CAD with P&amp;ID, isometric generation, and piping stress in one workspace.</p>
           <div class="bar" role="img" aria-label="10 of 11 supported"><i class="yes" style="width:90.91%"></i><i class="partial" style="width:9.09%"></i></div>
           <span class="bar-key">9 of these 11 are included in AVEVA E3D Design</span>
           <span class="meta"><span>11 capabilities</span><span>reviewed 2026-06-05</span></span>
         </a>
-        <a class="tool" href="./parity/maxsurf.html">
+        <a class="tool" href="./parity/maxsurf.html" data-cat="cad-mechanical" data-q="bentley maxsurf maxsurf integrated naval architecture hull design and stability platform — versus an open-core cad with hydrostatics, seakeeping, and resistance prediction.">
           <h3>Kerf vs Bentley Maxsurf</h3>
           <p>Integrated naval architecture hull design and stability platform — versus an open-core CAD with hydrostatics, seakeeping, and resistance prediction.</p>
           <div class="bar" role="img" aria-label="11 of 11 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">10 of these 11 are included in Bentley Maxsurf</span>
           <span class="meta"><span>11 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/cimatron.html">
+        <a class="tool" href="./parity/cimatron.html" data-cat="cad-mechanical" data-q="cimatron cimatron integrated mold cad/cam from quote to shop floor — versus an open-core alternative that adds moldflow fill simulation and multi-domain engineering.">
           <h3>Kerf vs Cimatron</h3>
           <p>Integrated mold CAD/CAM from quote to shop floor — versus an open-core alternative that adds Moldflow fill simulation and multi-domain engineering.</p>
           <div class="bar" role="img" aria-label="11 of 11 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">10 of these 11 are included in Cimatron</span>
           <span class="meta"><span>11 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/clo3d.html">
+        <a class="tool" href="./parity/clo3d.html" data-cat="cad-mechanical" data-q="clo virtual fashion clo3d clo3d 3d garment simulation for fashion studios — versus an open-core cad that adds grading, cut-room automation, and engineering precision.">
           <h3>Kerf vs CLO Virtual Fashion CLO3D</h3>
           <p>3D garment simulation for fashion studios — versus an open-core CAD that adds grading, cut-room automation, and engineering precision.</p>
           <div class="bar" role="img" aria-label="12 of 12 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">8 of these 12 are included in CLO Virtual Fashion CLO3D</span>
           <span class="meta"><span>12 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/catia.html">
+        <a class="tool" href="./parity/catia.html" data-cat="cad-mechanical" data-q="dassault catia catia catia built the a380 — kerf builds the next generation of engineers who work without seat fees.">
           <h3>Kerf vs Dassault CATIA</h3>
           <p>CATIA built the A380 — Kerf builds the next generation of engineers who work without seat fees.</p>
           <div class="bar" role="img" aria-label="60 of 60 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">16 of these 60 are included in Dassault CATIA, 18 behind a paid tier</span>
           <span class="meta"><span>60 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/artioscad.html">
+        <a class="tool" href="./parity/artioscad.html" data-cat="cad-mechanical" data-q="esko artioscad artioscad the packaging industry's gold standard structural cad — versus an open-core alternative that adds structural performance and chat-native design.">
           <h3>Kerf vs Esko ArtiosCAD</h3>
           <p>The packaging industry's gold standard structural CAD — versus an open-core alternative that adds structural performance and chat-native design.</p>
           <div class="bar" role="img" aria-label="10 of 10 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">7 of these 10 are included in Esko ArtiosCAD</span>
           <span class="meta"><span>10 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/esprit.html">
+        <a class="tool" href="./parity/esprit.html" data-cat="cad-mechanical" data-q="esprit (hexagon) esprit production cam with factory-certified posts — compared honestly against mit open-core.">
           <h3>Kerf vs ESPRIT (Hexagon)</h3>
           <p>Production CAM with factory-certified posts — compared honestly against MIT open-core.</p>
           <div class="bar" role="img" aria-label="9 of 10 supported"><i class="yes" style="width:90.00%"></i><i class="partial" style="width:10.00%"></i></div>
           <span class="bar-key">9 of these 10 are included in ESPRIT (Hexagon)</span>
           <span class="meta"><span>10 capabilities</span><span>reviewed 2026-06-05</span></span>
         </a>
-        <a class="tool" href="./parity/freecad.html">
+        <a class="tool" href="./parity/freecad.html" data-cat="cad-mechanical" data-q="freecad freecad open-source parametric b-rep modeller — lgpl vs mit, desktop vs cloud.">
           <h3>Kerf vs FreeCAD</h3>
           <p>Open-source parametric B-rep modeller — LGPL vs MIT, desktop vs cloud.</p>
           <div class="bar" role="img" aria-label="61 of 61 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">14 of these 61 are included in FreeCAD</span>
           <span class="meta"><span>61 capabilities</span><span>reviewed 2026-05-19</span></span>
         </a>
-        <a class="tool" href="./parity/mastercam.html">
+        <a class="tool" href="./parity/mastercam.html" data-cat="cad-mechanical" data-q="mastercam mastercam the most-used cam on the shop floor — compared honestly against mit open-core.">
           <h3>Kerf vs Mastercam</h3>
           <p>The most-used CAM on the shop floor — compared honestly against MIT open-core.</p>
           <div class="bar" role="img" aria-label="13 of 13 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">11 of these 13 are included in Mastercam</span>
           <span class="meta"><span>13 capabilities</span><span>reviewed 2026-06-05</span></span>
         </a>
-        <a class="tool" href="./parity/mozaik.html">
+        <a class="tool" href="./parity/mozaik.html" data-cat="cad-mechanical" data-q="mozaik software mozaik cnc-driven cabinet shop software — versus an open-core cad with grain matching, joinery, and multi-domain engineering in one workspace.">
           <h3>Kerf vs Mozaik Software</h3>
           <p>CNC-driven cabinet shop software — versus an open-core CAD with grain matching, joinery, and multi-domain engineering in one workspace.</p>
           <div class="bar" role="img" aria-label="10 of 10 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">8 of these 10 are included in Mozaik Software</span>
           <span class="meta"><span>10 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/onshape.html">
+        <a class="tool" href="./parity/onshape.html" data-cat="cad-mechanical" data-q="onshape onshape browser-native real-time-collab cad — closest peer in cloud shape.">
           <h3>Kerf vs Onshape</h3>
           <p>Browser-native real-time-collab CAD — closest peer in cloud shape.</p>
           <div class="bar" role="img" aria-label="57 of 57 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">10 of these 57 are included in Onshape, 5 behind a paid tier</span>
           <span class="meta"><span>57 capabilities</span><span>reviewed 2026-05-19</span></span>
         </a>
-        <a class="tool" href="./parity/creo.html">
+        <a class="tool" href="./parity/creo.html" data-cat="cad-mechanical" data-q="ptc creo creo creo invented the parametric feature tree — kerf brings that same discipline to teams who can't afford the subscription.">
           <h3>Kerf vs PTC Creo</h3>
           <p>Creo invented the parametric feature tree — Kerf brings that same discipline to teams who can't afford the subscription.</p>
           <div class="bar" role="img" aria-label="58 of 58 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">19 of these 58 are included in PTC Creo, 16 behind a paid tier</span>
           <span class="meta"><span>58 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/shapr3d.html">
+        <a class="tool" href="./parity/shapr3d.html" data-cat="cad-mechanical" data-q="shapr3d shapr3d direct + history-based modeling on ipad/desktop — compared honestly against mit open-core.">
           <h3>Kerf vs Shapr3D</h3>
           <p>Direct + history-based modeling on iPad/desktop — compared honestly against MIT open-core.</p>
           <div class="bar" role="img" aria-label="10 of 11 supported"><i class="yes" style="width:90.91%"></i><i class="no" style="width:9.09%"></i></div>
           <span class="bar-key">10 of these 11 are included in Shapr3D</span>
           <span class="meta"><span>11 capabilities</span><span>reviewed 2026-06-05</span></span>
         </a>
-        <a class="tool" href="./parity/fibersim.html">
+        <a class="tool" href="./parity/fibersim.html" data-cat="cad-mechanical" data-q="siemens fibersim fibersim the composites ply design and manufacturing tool — versus an open-core cad with clt, failure analysis, afp/atl output, and multi-domain engineering.">
           <h3>Kerf vs Siemens Fibersim</h3>
           <p>The composites ply design and manufacturing tool — versus an open-core CAD with CLT, failure analysis, AFP/ATL output, and multi-domain engineering.</p>
           <div class="bar" role="img" aria-label="11 of 11 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">7 of these 11 are included in Siemens Fibersim</span>
           <span class="meta"><span>11 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/nx.html">
+        <a class="tool" href="./parity/nx.html" data-cat="cad-mechanical" data-q="siemens nx nx nx defined advanced surfacing for a generation — kerf makes that power accessible without a six-figure licence.">
           <h3>Kerf vs Siemens NX</h3>
           <p>NX defined advanced surfacing for a generation — Kerf makes that power accessible without a six-figure licence.</p>
           <div class="bar" role="img" aria-label="54 of 54 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">54 of these 54 are included in Siemens NX</span>
           <span class="meta"><span>54 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/solidworks.html">
+        <a class="tool" href="./parity/solidworks.html" data-cat="cad-mechanical" data-q="solidworks solidworks 30 years of parasolid-kernel polish — compared honestly against mit open-core.">
           <h3>Kerf vs SOLIDWORKS</h3>
           <p>30 years of Parasolid-kernel polish — compared honestly against MIT open-core.</p>
           <div class="bar" role="img" aria-label="59 of 59 supported"><i class="yes" style="width:100.00%"></i></div>
@@ -391,66 +464,66 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
           <span class="meta"><span>59 capabilities</span><span>reviewed 2026-05-19</span></span>
         </a></div>
       </div>
-      <div class="cat">
+      <div class="cat" data-cat="cad-sim">
         <div class="cat-head"><h2>Simulation</h2><span class="count">9 tools</span></div>
         <div class="tool-grid">
-        <a class="tool" href="./parity/ansys-mechanical.html">
+        <a class="tool" href="./parity/ansys-mechanical.html" data-cat="cad-sim" data-q="ansys mechanical ansys-mechanical the structural-fea gold standard — compared honestly against mit open-core.">
           <h3>Kerf vs Ansys Mechanical</h3>
           <p>The structural-FEA gold standard — compared honestly against MIT open-core.</p>
           <div class="bar" role="img" aria-label="18 of 18 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">16 of these 18 are included in Ansys Mechanical</span>
           <span class="meta"><span>18 capabilities</span><span>reviewed 2026-06-05</span></span>
         </a>
-        <a class="tool" href="./parity/zemax.html">
+        <a class="tool" href="./parity/zemax.html" data-cat="cad-sim" data-q="ansys zemax opticstudio zemax the gold standard for optical design and tolerancing — versus an open-core cad with ray tracing, gaussian beam propagation, physical-optics propagation, and acoustics.">
           <h3>Kerf vs Ansys Zemax OpticStudio</h3>
           <p>The gold standard for optical design and tolerancing — versus an open-core CAD with ray tracing, Gaussian beam propagation, physical-optics propagation, and acoustics.</p>
           <div class="bar" role="img" aria-label="11 of 11 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">9 of these 11 are included in Ansys Zemax OpticStudio</span>
           <span class="meta"><span>11 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/calculix.html">
+        <a class="tool" href="./parity/calculix.html" data-cat="cad-sim" data-q="calculix calculix calculix runs the fem — kerf wraps it so structural analysis is as easy as describing the load case.">
           <h3>Kerf vs CalculiX</h3>
           <p>CalculiX runs the FEM — Kerf wraps it so structural analysis is as easy as describing the load case.</p>
           <div class="bar" role="img" aria-label="23 of 23 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">5 of these 23 are included in CalculiX</span>
           <span class="meta"><span>23 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/comsol.html">
+        <a class="tool" href="./parity/comsol.html" data-cat="cad-sim" data-q="comsol multiphysics comsol general-purpose multiphysics simulation — compared honestly against mit open-core.">
           <h3>Kerf vs COMSOL Multiphysics</h3>
           <p>General-purpose multiphysics simulation — compared honestly against MIT open-core.</p>
           <div class="bar" role="img" aria-label="9 of 10 supported"><i class="yes" style="width:90.00%"></i><i class="partial" style="width:10.00%"></i></div>
           <span class="bar-key">9 of these 10 are included in COMSOL Multiphysics</span>
           <span class="meta"><span>10 capabilities</span><span>reviewed 2026-06-05</span></span>
         </a>
-        <a class="tool" href="./parity/adams.html">
+        <a class="tool" href="./parity/adams.html" data-cat="cad-sim" data-q="msc adams (hexagon) adams the industry-standard multibody dynamics solver — versus an open-core cad with rigid/flexible mbd, kinematics, and controls co-simulation.">
           <h3>Kerf vs MSC Adams (Hexagon)</h3>
           <p>The industry-standard multibody dynamics solver — versus an open-core CAD with rigid/flexible MBD, kinematics, and controls co-simulation.</p>
           <div class="bar" role="img" aria-label="12 of 12 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">9 of these 12 are included in MSC Adams (Hexagon)</span>
           <span class="meta"><span>12 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/gmat.html">
+        <a class="tool" href="./parity/gmat.html" data-cat="cad-sim" data-q="nasa gmat gmat gmat plans the mission — kerf designs the spacecraft hardware that executes it.">
           <h3>Kerf vs NASA GMAT</h3>
           <p>GMAT plans the mission — Kerf designs the spacecraft hardware that executes it.</p>
           <div class="bar" role="img" aria-label="18 of 18 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">17 of these 18 are included in NASA GMAT</span>
           <span class="meta"><span>18 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/openfoam.html">
+        <a class="tool" href="./parity/openfoam.html" data-cat="cad-sim" data-q="openfoam openfoam openfoam solves the navier-stokes equations — kerf wraps it so you describe the flow problem in plain language.">
           <h3>Kerf vs OpenFOAM</h3>
           <p>OpenFOAM solves the Navier-Stokes equations — Kerf wraps it so you describe the flow problem in plain language.</p>
           <div class="bar" role="img" aria-label="24 of 25 supported"><i class="yes" style="width:96.00%"></i><i class="partial" style="width:4.00%"></i></div>
           <span class="bar-key">16 of these 25 are included in OpenFOAM</span>
           <span class="meta"><span>25 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/openrocket.html">
+        <a class="tool" href="./parity/openrocket.html" data-cat="cad-sim" data-q="openrocket openrocket openrocket simulates the flight — kerf designs the airframe and electronics that make it fly.">
           <h3>Kerf vs OpenRocket</h3>
           <p>OpenRocket simulates the flight — Kerf designs the airframe and electronics that make it fly.</p>
           <div class="bar" role="img" aria-label="17 of 17 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">9 of these 17 are included in OpenRocket</span>
           <span class="meta"><span>17 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/star-ccm.html">
+        <a class="tool" href="./parity/star-ccm.html" data-cat="cad-sim" data-q="simcenter star-ccm+ star-ccm comprehensive cfd &amp; multiphysics — compared honestly against mit open-core.">
           <h3>Kerf vs Simcenter STAR-CCM+</h3>
           <p>Comprehensive CFD &amp; multiphysics — compared honestly against MIT open-core.</p>
           <div class="bar" role="img" aria-label="11 of 12 supported"><i class="yes" style="width:91.67%"></i><i class="no" style="width:8.33%"></i></div>
@@ -458,45 +531,45 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
           <span class="meta"><span>12 capabilities</span><span>reviewed 2026-06-05</span></span>
         </a></div>
       </div>
-      <div class="cat">
+      <div class="cat" data-cat="cad-electronic">
         <div class="cat-head"><h2>Electronics</h2><span class="count">6 tools</span></div>
         <div class="tool-grid">
-        <a class="tool" href="./parity/altium.html">
+        <a class="tool" href="./parity/altium.html" data-cat="cad-electronic" data-q="altium designer altium industrial-grade pcb design — situs router vs mit open-core eda.">
           <h3>Kerf vs Altium Designer</h3>
           <p>Industrial-grade PCB design — Situs router vs MIT open-core EDA.</p>
           <div class="bar" role="img" aria-label="38 of 38 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">36 of these 38 are included in Altium Designer</span>
           <span class="meta"><span>38 capabilities</span><span>reviewed 2026-05-19</span></span>
         </a>
-        <a class="tool" href="./parity/eagle.html">
+        <a class="tool" href="./parity/eagle.html" data-cat="cad-electronic" data-q="autodesk eagle eagle eagle democratised pcb design for a generation of makers — its successor lives inside fusion, but kerf gives you the same workflow without the subscription.">
           <h3>Kerf vs Autodesk Eagle</h3>
           <p>Eagle democratised PCB design for a generation of makers — its successor lives inside Fusion, but Kerf gives you the same workflow without the subscription.</p>
           <div class="bar" role="img" aria-label="22 of 22 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">0 of these 22 are included in Autodesk Eagle, 11 behind a paid tier</span>
           <span class="meta"><span>22 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/allegro.html">
+        <a class="tool" href="./parity/allegro.html" data-cat="cad-electronic" data-q="cadence allegro x allegro high-end constraint-driven pcb design — compared honestly against mit open-core eda.">
           <h3>Kerf vs Cadence Allegro X</h3>
           <p>High-end constraint-driven PCB design — compared honestly against MIT open-core EDA.</p>
           <div class="bar" role="img" aria-label="13 of 13 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">12 of these 13 are included in Cadence Allegro X</span>
           <span class="meta"><span>13 capabilities</span><span>reviewed 2026-06-05</span></span>
         </a>
-        <a class="tool" href="./parity/easyeda.html">
+        <a class="tool" href="./parity/easyeda.html" data-cat="cad-electronic" data-q="easyeda easyeda easyeda lowered the jlcpcb barrier to zero — kerf raises the ceiling with in-box pre-compliance simulation.">
           <h3>Kerf vs EasyEDA</h3>
           <p>EasyEDA lowered the JLCPCB barrier to zero — Kerf raises the ceiling with in-box pre-compliance simulation.</p>
           <div class="bar" role="img" aria-label="22 of 22 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">8 of these 22 are included in EasyEDA, 3 behind a paid tier</span>
           <span class="meta"><span>22 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/kicad.html">
+        <a class="tool" href="./parity/kicad.html" data-cat="cad-electronic" data-q="kicad kicad open-source eda suite — gpl vs mit, deep vs integrated.">
           <h3>Kerf vs KiCad</h3>
           <p>Open-source EDA suite — GPL vs MIT, deep vs integrated.</p>
           <div class="bar" role="img" aria-label="33 of 33 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">16 of these 33 are included in KiCad</span>
           <span class="meta"><span>33 capabilities</span><span>reviewed 2026-05-19</span></span>
         </a>
-        <a class="tool" href="./parity/multisim.html">
+        <a class="tool" href="./parity/multisim.html" data-cat="cad-electronic" data-q="ni multisim multisim industry-standard spice circuit simulation — compared honestly against mit open-core eda.">
           <h3>Kerf vs NI Multisim</h3>
           <p>Industry-standard SPICE circuit simulation — compared honestly against MIT open-core EDA.</p>
           <div class="bar" role="img" aria-label="10 of 10 supported"><i class="yes" style="width:100.00%"></i></div>
@@ -504,38 +577,38 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
           <span class="meta"><span>10 capabilities</span><span>reviewed 2026-06-05</span></span>
         </a></div>
       </div>
-      <div class="cat">
+      <div class="cat" data-cat="bim">
         <div class="cat-head"><h2>BIM &amp; AEC</h2><span class="count">5 tools</span></div>
         <div class="tool-grid">
-        <a class="tool" href="./parity/revit.html">
+        <a class="tool" href="./parity/revit.html" data-cat="bim" data-q="autodesk revit revit industry-standard bim for aec — compared honestly against mit open-core.">
           <h3>Kerf vs Autodesk Revit</h3>
           <p>Industry-standard BIM for AEC — compared honestly against MIT open-core.</p>
           <div class="bar" role="img" aria-label="39 of 41 supported"><i class="yes" style="width:95.12%"></i><i class="partial" style="width:2.44%"></i><i class="no" style="width:2.44%"></i></div>
           <span class="bar-key">35 of these 41 are included in Autodesk Revit</span>
           <span class="meta"><span>41 capabilities</span><span>reviewed 2026-05-19</span></span>
         </a>
-        <a class="tool" href="./parity/openroads.html">
+        <a class="tool" href="./parity/openroads.html" data-cat="bim" data-q="bentley openroads designer openroads civil infrastructure &amp; roadway design — compared honestly against mit open-core.">
           <h3>Kerf vs Bentley OpenRoads Designer</h3>
           <p>Civil infrastructure &amp; roadway design — compared honestly against MIT open-core.</p>
           <div class="bar" role="img" aria-label="11 of 11 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">10 of these 11 are included in Bentley OpenRoads Designer</span>
           <span class="meta"><span>11 capabilities</span><span>reviewed 2026-06-05</span></span>
         </a>
-        <a class="tool" href="./parity/civil3d.html">
+        <a class="tool" href="./parity/civil3d.html" data-cat="bim" data-q="civil 3d civil3d civil infrastructure design — corridor/pipe depth vs mit open-core analysis modules.">
           <h3>Kerf vs Civil 3D</h3>
           <p>Civil infrastructure design — corridor/pipe depth vs MIT open-core analysis modules.</p>
           <div class="bar" role="img" aria-label="28 of 28 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">12 of these 28 are included in Civil 3D</span>
           <span class="meta"><span>28 capabilities</span><span>reviewed 2026-05-19</span></span>
         </a>
-        <a class="tool" href="./parity/archicad.html">
+        <a class="tool" href="./parity/archicad.html" data-cat="bim" data-q="graphisoft archicad archicad archicad pioneered bim — kerf brings engineering-grade precision to teams building beyond the building.">
           <h3>Kerf vs Graphisoft ArchiCAD</h3>
           <p>ArchiCAD pioneered BIM — Kerf brings engineering-grade precision to teams building beyond the building.</p>
           <div class="bar" role="img" aria-label="28 of 28 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">16 of these 28 are included in Graphisoft ArchiCAD, 3 behind a paid tier</span>
           <span class="meta"><span>28 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/tekla.html">
+        <a class="tool" href="./parity/tekla.html" data-cat="bim" data-q="tekla structures tekla the structural steel &amp; concrete detailing standard — compared honestly against mit open-core.">
           <h3>Kerf vs Tekla Structures</h3>
           <p>The structural steel &amp; concrete detailing standard — compared honestly against MIT open-core.</p>
           <div class="bar" role="img" aria-label="12 of 12 supported"><i class="yes" style="width:100.00%"></i></div>
@@ -543,38 +616,38 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
           <span class="meta"><span>12 capabilities</span><span>reviewed 2026-06-05</span></span>
         </a></div>
       </div>
-      <div class="cat">
+      <div class="cat" data-cat="cad-silicon">
         <div class="cat-head"><h2>Silicon &amp; EDA</h2><span class="count">5 tools</span></div>
         <div class="tool-grid">
-        <a class="tool" href="./parity/cadence-spectre.html">
+        <a class="tool" href="./parity/cadence-spectre.html" data-cat="cad-silicon" data-q="cadence spectre cadence-spectre spectre is the industry-standard commercial spice for tapeout — kerf targets open pdk workflows and chat-driven exploration.">
           <h3>Kerf vs Cadence Spectre</h3>
           <p>Spectre is the industry-standard commercial SPICE for tapeout — Kerf targets open PDK workflows and chat-driven exploration.</p>
           <div class="bar" role="img" aria-label="6 of 8 supported"><i class="yes" style="width:75.00%"></i><i class="partial" style="width:12.50%"></i><i class="no" style="width:12.50%"></i></div>
           <span class="bar-key">6 of these 8 are included in Cadence Spectre</span>
           <span class="meta"><span>8 capabilities</span><span>reviewed 2026-05-29</span></span>
         </a>
-        <a class="tool" href="./parity/ltspice.html">
+        <a class="tool" href="./parity/ltspice.html" data-cat="cad-silicon" data-q="ltspice ltspice ltspice is the free spice standard for analog designers — kerf wraps it in a cloud-native, chat-driven workflow.">
           <h3>Kerf vs LTspice</h3>
           <p>LTspice is the free SPICE standard for analog designers — Kerf wraps it in a cloud-native, chat-driven workflow.</p>
           <div class="bar" role="img" aria-label="10 of 11 supported"><i class="yes" style="width:90.91%"></i><i class="partial" style="width:9.09%"></i></div>
           <span class="bar-key">7 of these 11 are included in LTspice</span>
           <span class="meta"><span>11 capabilities</span><span>reviewed 2026-05-29</span></span>
         </a>
-        <a class="tool" href="./parity/ngspice.html">
+        <a class="tool" href="./parity/ngspice.html" data-cat="cad-silicon" data-q="ngspice ngspice ngspice is the open-source spice engine kerf uses under the hood — kerf adds the workflow layer on top.">
           <h3>Kerf vs NGSpice</h3>
           <p>NGSpice is the open-source SPICE engine Kerf uses under the hood — Kerf adds the workflow layer on top.</p>
           <div class="bar" role="img" aria-label="8 of 8 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">3 of these 8 are included in NGSpice</span>
           <span class="meta"><span>8 capabilities</span><span>reviewed 2026-05-29</span></span>
         </a>
-        <a class="tool" href="./parity/openroad.html">
+        <a class="tool" href="./parity/openroad.html" data-cat="cad-silicon" data-q="openroad openroad openroad automates rtl-to-gds-ii — kerf wraps it so you describe intent and the tool figures out the rest.">
           <h3>Kerf vs OpenROAD</h3>
           <p>OpenROAD automates RTL-to-GDS-II — Kerf wraps it so you describe intent and the tool figures out the rest.</p>
           <div class="bar" role="img" aria-label="19 of 19 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">15 of these 19 are included in OpenROAD</span>
           <span class="meta"><span>19 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/hspice.html">
+        <a class="tool" href="./parity/hspice.html" data-cat="cad-silicon" data-q="synopsys hspice hspice hspice is the gold-standard sign-off spice — kerf targets open-pdk workflows without a six-figure eda budget.">
           <h3>Kerf vs Synopsys HSPICE</h3>
           <p>HSPICE is the gold-standard sign-off SPICE — Kerf targets open-PDK workflows without a six-figure EDA budget.</p>
           <div class="bar" role="img" aria-label="7 of 8 supported"><i class="yes" style="width:87.50%"></i><i class="no" style="width:12.50%"></i></div>
@@ -582,31 +655,31 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
           <span class="meta"><span>8 capabilities</span><span>reviewed 2026-05-29</span></span>
         </a></div>
       </div>
-      <div class="cat">
+      <div class="cat" data-cat="dcc">
         <div class="cat-head"><h2>DCC &amp; rendering</h2><span class="count">4 tools</span></div>
         <div class="tool-grid">
-        <a class="tool" href="./parity/max3ds.html">
+        <a class="tool" href="./parity/max3ds.html" data-cat="dcc" data-q="autodesk 3ds max max3ds archviz &amp; game-art dcc — a different category from b-rep cad.">
           <h3>Kerf vs Autodesk 3ds Max</h3>
           <p>Archviz &amp; game-art DCC — a different category from B-rep CAD.</p>
           <div class="bar" role="img" aria-label="28 of 28 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">5 of these 28 are included in Autodesk 3ds Max</span>
           <span class="meta"><span>28 capabilities</span><span>reviewed 2026-05-19</span></span>
         </a>
-        <a class="tool" href="./parity/blender.html">
+        <a class="tool" href="./parity/blender.html" data-cat="dcc" data-q="blender blender world-class mesh / dcc tool — a different category from b-rep cad.">
           <h3>Kerf vs Blender</h3>
           <p>World-class mesh / DCC tool — a different category from B-rep CAD.</p>
           <div class="bar" role="img" aria-label="52 of 52 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">4 of these 52 are included in Blender</span>
           <span class="meta"><span>52 capabilities</span><span>reviewed 2026-05-19</span></span>
         </a>
-        <a class="tool" href="./parity/marvelous-designer.html">
+        <a class="tool" href="./parity/marvelous-designer.html" data-cat="dcc" data-q="marvelous designer marvelous-designer the industry-standard 3d cloth simulation tool — compared honestly against mit open-core.">
           <h3>Kerf vs Marvelous Designer</h3>
           <p>The industry-standard 3D cloth simulation tool — compared honestly against MIT open-core.</p>
           <div class="bar" role="img" aria-label="8 of 10 supported"><i class="yes" style="width:80.00%"></i><i class="partial" style="width:20.00%"></i></div>
           <span class="bar-key">9 of these 10 are included in Marvelous Designer</span>
           <span class="meta"><span>10 capabilities</span><span>reviewed 2026-06-05</span></span>
         </a>
-        <a class="tool" href="./parity/zbrush.html">
+        <a class="tool" href="./parity/zbrush.html" data-cat="dcc" data-q="maxon zbrush zbrush zbrush sculpts the organic world in polygons — kerf models the engineered world in exact b-rep.">
           <h3>Kerf vs Maxon ZBrush</h3>
           <p>ZBrush sculpts the organic world in polygons — Kerf models the engineered world in exact B-rep.</p>
           <div class="bar" role="img" aria-label="20 of 20 supported"><i class="yes" style="width:100.00%"></i></div>
@@ -614,24 +687,24 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
           <span class="meta"><span>20 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a></div>
       </div>
-      <div class="cat">
+      <div class="cat" data-cat="hvac-energy">
         <div class="cat-head"><h2>HVAC &amp; energy</h2><span class="count">3 tools</span></div>
         <div class="tool-grid">
-        <a class="tool" href="./parity/carrier-hap.html">
+        <a class="tool" href="./parity/carrier-hap.html" data-cat="hvac-energy" data-q="carrier hap (hourly analysis program) carrier-hap building energy analysis and hvac system design — carrier hap vs mit open-core.">
           <h3>Kerf vs Carrier HAP (Hourly Analysis Program)</h3>
           <p>Building energy analysis and HVAC system design — Carrier HAP vs MIT open-core.</p>
           <div class="bar" role="img" aria-label="8 of 8 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">6 of these 8 are included in Carrier HAP (Hourly Analysis Program)</span>
           <span class="meta"><span>8 capabilities</span><span>reviewed 2026-05-29</span></span>
         </a>
-        <a class="tool" href="./parity/ies-ve.html">
+        <a class="tool" href="./parity/ies-ve.html" data-cat="hvac-energy" data-q="ies ve (virtual environment) ies-ve integrated building performance simulation — ies ve vs mit open-core.">
           <h3>Kerf vs IES VE (Virtual Environment)</h3>
           <p>Integrated building performance simulation — IES VE vs MIT open-core.</p>
           <div class="bar" role="img" aria-label="8 of 8 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">7 of these 8 are included in IES VE (Virtual Environment)</span>
           <span class="meta"><span>8 capabilities</span><span>reviewed 2026-05-29</span></span>
         </a>
-        <a class="tool" href="./parity/trace-3d.html">
+        <a class="tool" href="./parity/trace-3d.html" data-cat="hvac-energy" data-q="trane trace 3d plus trace-3d commercial building energy analysis and hvac design — trace 3d plus vs mit open-core.">
           <h3>Kerf vs Trane TRACE 3D Plus</h3>
           <p>Commercial building energy analysis and HVAC design — TRACE 3D Plus vs MIT open-core.</p>
           <div class="bar" role="img" aria-label="7 of 7 supported"><i class="yes" style="width:100.00%"></i></div>
@@ -639,17 +712,17 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
           <span class="meta"><span>7 capabilities</span><span>reviewed 2026-05-29</span></span>
         </a></div>
       </div>
-      <div class="cat">
+      <div class="cat" data-cat="jewelry-nurbs">
         <div class="cat-head"><h2>Jewellery &amp; NURBS</h2><span class="count">2 tools</span></div>
         <div class="tool-grid">
-        <a class="tool" href="./parity/matrixgold.html">
+        <a class="tool" href="./parity/matrixgold.html" data-cat="jewelry-nurbs" data-q="matrixgold matrixgold industry-standard jewelry cad — grasshopper-based goldsmith depth vs mit open-core.">
           <h3>Kerf vs MatrixGold</h3>
           <p>Industry-standard jewelry CAD — Grasshopper-based goldsmith depth vs MIT open-core.</p>
           <div class="bar" role="img" aria-label="28 of 29 supported"><i class="yes" style="width:96.55%"></i><i class="no" style="width:3.45%"></i></div>
           <span class="bar-key">0 of these 29 are included in MatrixGold, 18 behind a paid tier</span>
           <span class="meta"><span>29 capabilities</span><span>reviewed 2026-05-19</span></span>
         </a>
-        <a class="tool" href="./parity/rhino.html">
+        <a class="tool" href="./parity/rhino.html" data-cat="jewelry-nurbs" data-q="rhino rhino nurbs &amp; jewelry cad — class-leading kernel vs mit open-core.">
           <h3>Kerf vs Rhino</h3>
           <p>NURBS &amp; jewelry CAD — class-leading kernel vs MIT open-core.</p>
           <div class="bar" role="img" aria-label="44 of 45 supported"><i class="yes" style="width:97.78%"></i><i class="partial" style="width:2.22%"></i></div>
@@ -657,17 +730,17 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
           <span class="meta"><span>45 capabilities</span><span>reviewed 2026-05-19</span></span>
         </a></div>
       </div>
-      <div class="cat">
+      <div class="cat" data-cat="cad-architecture">
         <div class="cat-head"><h2>Architecture</h2><span class="count">2 tools</span></div>
         <div class="tool-grid">
-        <a class="tool" href="./parity/sketchup.html">
+        <a class="tool" href="./parity/sketchup.html" data-cat="cad-architecture" data-q="trimble sketchup sketchup sketchup made 3d intuitive for architects — kerf brings engineering precision to the same audience.">
           <h3>Kerf vs Trimble SketchUp</h3>
           <p>SketchUp made 3D intuitive for architects — Kerf brings engineering precision to the same audience.</p>
           <div class="bar" role="img" aria-label="25 of 25 supported"><i class="yes" style="width:100.00%"></i></div>
           <span class="bar-key">0 of these 25 are included in Trimble SketchUp</span>
           <span class="meta"><span>25 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a>
-        <a class="tool" href="./parity/vectorworks.html">
+        <a class="tool" href="./parity/vectorworks.html" data-cat="cad-architecture" data-q="vectorworks vectorworks vectorworks spans architecture, landscape, and entertainment — kerf spans mechanical, electronics, and fabrication.">
           <h3>Kerf vs Vectorworks</h3>
           <p>Vectorworks spans architecture, landscape, and entertainment — Kerf spans mechanical, electronics, and fabrication.</p>
           <div class="bar" role="img" aria-label="30 of 30 supported"><i class="yes" style="width:100.00%"></i></div>
@@ -675,10 +748,10 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
           <span class="meta"><span>30 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a></div>
       </div>
-      <div class="cat">
+      <div class="cat" data-cat="drafting">
         <div class="cat-head"><h2>Drafting</h2><span class="count">1 tool</span></div>
         <div class="tool-grid">
-        <a class="tool" href="./parity/autocad.html">
+        <a class="tool" href="./parity/autocad.html" data-cat="drafting" data-q="autocad autocad industry-standard 2d drafting + .dwg ecosystem — different primary jobs.">
           <h3>Kerf vs AutoCAD</h3>
           <p>Industry-standard 2D drafting + .dwg ecosystem — different primary jobs.</p>
           <div class="bar" role="img" aria-label="41 of 41 supported"><i class="yes" style="width:100.00%"></i></div>
@@ -686,10 +759,10 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
           <span class="meta"><span>41 capabilities</span><span>reviewed 2026-05-19</span></span>
         </a></div>
       </div>
-      <div class="cat">
+      <div class="cat" data-cat="cad-firmware">
         <div class="cat-head"><h2>Firmware</h2><span class="count">1 tool</span></div>
         <div class="tool-grid">
-        <a class="tool" href="./parity/openplc.html">
+        <a class="tool" href="./parity/openplc.html" data-cat="cad-firmware" data-q="openplc openplc openplc brings iec 61131-3 logic to open hardware — kerf connects the logic to the pcb that runs it.">
           <h3>Kerf vs OpenPLC</h3>
           <p>OpenPLC brings IEC 61131-3 logic to open hardware — Kerf connects the logic to the PCB that runs it.</p>
           <div class="bar" role="img" aria-label="18 of 18 supported"><i class="yes" style="width:100.00%"></i></div>
@@ -697,12 +770,60 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
           <span class="meta"><span>18 capabilities</span><span>reviewed 2026-05-24</span></span>
         </a></div>
       </div>
-    <div class="honest">
-      <p><strong>How to read this.</strong> A competitor row marked <em>paid tier</em> means the tool does have the capability, but behind an extension, add-on or metered service — a different answer to “can I do this today” than “included”, so it is counted separately rather than folded into either. Kerf has no tiers, so its rows are only yes, partial or no.</p>
-      <p style="margin-top:.8rem"><strong>What this page is not.</strong> It is not a verdict, and the totals are not scores. The rows were written from Kerf's feature set, which is why Kerf is a yes on 98.9% of them — that number says something about how the list was built, not about the products. A tool scoring low here may be far better than Kerf at the work you actually do. If you are choosing between them, read the rows in your discipline and ignore the counts.</p>
-    </div>
   </div>
 </section>
+<script>
+(function () {
+  var search = document.getElementById('parity-search')
+  var pills = Array.prototype.slice.call(document.querySelectorAll('.pill'))
+  var cats = Array.prototype.slice.call(document.querySelectorAll('.cat[data-cat]'))
+  var status = document.getElementById('parity-filter-status')
+  var noMatches = document.getElementById('parity-no-matches')
+  var activeCat = ''
+
+  function apply() {
+    var q = search.value.trim().toLowerCase()
+    var shown = 0
+    cats.forEach(function (cat) {
+      var catMatches = !activeCat || cat.getAttribute('data-cat') === activeCat
+      var anyVisible = false
+      Array.prototype.slice.call(cat.querySelectorAll('.tool')).forEach(function (tool) {
+        var visible = catMatches && (!q || tool.getAttribute('data-q').indexOf(q) !== -1)
+        tool.hidden = !visible
+        if (visible) { anyVisible = true; shown++ }
+      })
+      cat.hidden = !anyVisible
+    })
+    noMatches.classList.toggle('show', shown === 0)
+    var filtering = q.length > 0 || activeCat !== ''
+    if (!filtering) {
+      status.innerHTML = ''
+    } else {
+      var label = activeCat ? (pills.filter(function (p) { return p.getAttribute('data-cat') === activeCat })[0] || {}).textContent : ''
+      var bits = [shown === 0 ? 'No results' : (shown + ' comparison' + (shown === 1 ? '' : 's'))]
+      if (q) bits.push('for "' + search.value.trim() + '"')
+      if (label) bits.push('in ' + label)
+      status.innerHTML = bits.join(' ') + ' — <button type="button" id="parity-clear">clear</button>'
+      var clear = document.getElementById('parity-clear')
+      if (clear) clear.addEventListener('click', function () {
+        search.value = ''
+        activeCat = ''
+        pills.forEach(function (p) { p.classList.toggle('active', p.getAttribute('data-cat') === '') })
+        apply()
+      })
+    }
+  }
+
+  search.addEventListener('input', apply)
+  pills.forEach(function (pill) {
+    pill.addEventListener('click', function () {
+      activeCat = pill.getAttribute('data-cat')
+      pills.forEach(function (p) { p.classList.toggle('active', p === pill) })
+      apply()
+    })
+  })
+})()
+</script>
 </main>
 
 <footer class="site-footer">

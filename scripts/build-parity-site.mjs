@@ -24,7 +24,8 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const manifest = JSON.parse(readFileSync(join(ROOT, 'public', 'compare-manifest.json'), 'utf8'))
+// The frontend moved to web/ (commit 290d3318); the manifest now lives at web/public/, not public/.
+const manifest = JSON.parse(readFileSync(join(ROOT, 'web', 'public', 'compare-manifest.json'), 'utf8'))
 
 const esc = (s) =>
   String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -54,6 +55,25 @@ const CATEGORY_LABELS = {
   'drafting': 'Drafting',
   'hvac-energy': 'HVAC & energy',
   'jewelry-nurbs': 'Jewellery & NURBS',
+}
+
+// Same D1–D14 domain codes the old React CompareFeatureMatrix grouped rows under. Kept here so a
+// per-tool page can present rows as named, collapsible sections instead of one long flat table.
+const DOMAIN_TITLES = {
+  D1: 'Geometry & core CAD',
+  D2: 'Structural / FEA',
+  D3: 'Machine elements',
+  D4: 'Thermal / fluid / HVAC',
+  D5: 'Aero / marine / space',
+  D6: 'Electronics / EDA / silicon',
+  D7: 'Manufacturing / CAM',
+  D8: 'Civil / infrastructure / geo',
+  D9: 'Dynamics / motion / controls',
+  D10: 'Electrical / energy / PLC',
+  D11: 'Tolerancing / metrology / QA',
+  D12: 'Optics / acoustics',
+  D13: 'Verticals',
+  D14: 'Cost / materials / LCA',
 }
 
 // ── shared chrome ────────────────────────────────────────────────────────────
@@ -187,6 +207,47 @@ td .note { display:block; margin-top:.3rem; font-size:.8rem; color:var(--text-3)
 td .src { font-family:var(--mono); font-size:.71rem; color:var(--code-dim); word-break:break-word; }
 td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
 
+/* Column pinning — the feature name stays put while Kerf / competitor columns scroll under it,
+   so a capability is never off-screen while you're reading its verdict. Needs an opaque
+   background per row state or the scrolling columns show through. */
+td.feat, th.feat { position:sticky; left:0; z-index:1; background:var(--surface); }
+thead th.feat { z-index:2; background:var(--elevated); }
+tbody tr:hover td.feat { background:#15171d; }
+
+/* Search + category filter (index page only). Vanilla JS, no framework — filters .tool cards by
+   name/slug/tagline and by category, matching the old React landing's search box + pill row. */
+.filter-bar { display:flex; flex-wrap:wrap; align-items:center; gap:.75rem 1rem; margin:1.6rem 0 .25rem; }
+.search-wrap { position:relative; flex:1 1 260px; max-width:22rem; }
+.search-wrap svg { position:absolute; left:.8rem; top:50%; transform:translateY(-50%); width:14px; height:14px; color:var(--text-3); pointer-events:none; }
+#parity-search { width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:9px; padding:.55rem .9rem .55rem 2.1rem; font-size:.86rem; font-family:var(--sans); }
+#parity-search::placeholder { color:var(--text-4); }
+#parity-search:focus { border-color:var(--gold-dim); outline:none; }
+.pills { display:flex; flex-wrap:wrap; gap:.45rem; }
+.pill { font-family:var(--mono); font-size:.74rem; color:var(--text-3); background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:.36rem .8rem; cursor:pointer; transition:border-color .15s,color .15s,background .15s; }
+.pill:hover { color:var(--text); border-color:var(--text-4); }
+.pill.active { color:var(--gold); border-color:var(--gold-dim); background:rgba(255,214,51,.08); }
+.filter-status { font-family:var(--mono); font-size:.78rem; color:var(--dim); margin:.9rem 0 0; min-height:1.2em; }
+.filter-status button { font:inherit; color:var(--gold-dim); background:none; border:0; padding:0; cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
+.filter-status button:hover { color:var(--gold); }
+.tool[hidden], .cat[hidden] { display:none; }
+.no-matches { display:none; font-size:.85rem; color:var(--text-3); padding:1.5rem 0; }
+.no-matches.show { display:block; }
+.scroll-mt { scroll-margin-top:20px; }
+
+/* Per-domain expand/collapse on a tool's detail page — matches the old React matrix's D1–D14
+   <details> sections instead of one long flat table. */
+.domain { border:1px solid var(--border-2); border-radius:12px; background:var(--surface); overflow:hidden; margin-bottom:.85rem; }
+.domain:last-child { margin-bottom:0; }
+.domain > summary { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.85rem 1.1rem; cursor:pointer; list-style:none; font-family:var(--mono); }
+.domain > summary::-webkit-details-marker { display:none; }
+.domain > summary:hover { background:var(--elevated); }
+.domain-title { display:flex; align-items:baseline; gap:.6rem; font-family:var(--sans); font-size:.92rem; color:var(--text); }
+.domain-title .code { font-family:var(--mono); font-size:.72rem; color:var(--text-3); }
+.domain-meta { display:flex; align-items:center; gap:.75rem; font-size:.75rem; color:var(--text-3); flex-shrink:0; }
+.domain-caret { display:inline-block; color:var(--text-3); transition:transform .15s; }
+.domain[open] > summary .domain-caret { transform:rotate(90deg); }
+.domain .table-wrap { border:0; border-top:1px solid var(--border-2); border-radius:0; }
+
 .back { display:inline-flex; align-items:center; gap:.4rem; font-family:var(--mono); font-size:.8rem; color:var(--text-3); margin-bottom:1.1rem; }
 .legend { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin:1.4rem 0 0; padding:0; list-style:none; font-family:var(--mono); font-size:.75rem; color:var(--text-3); }
 
@@ -206,6 +267,15 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
   .nav-links a.hide-sm { display:none; }
   .footer-right { margin-left:0; }
   section { padding:2.5rem 0; }
+}
+/* Same fix as site/index.html's own nav (commit fa8b6fe5): below ~430px the nav row still has
+   more unshrinkable content than the bar can give it — here worse than index.html's, because
+   this page keeps its own "parity" link visible (un-hidden, it's the active-page marker) instead
+   of hiding it like index.html does. Drop the github WORD and tighten the gap the same way. */
+@media (max-width:430px) {
+  .nav-links { gap:.6rem; }
+  .nav-links .gh { gap:0; }
+  .nav-links .gh span { display:none; }
 }
 @media (prefers-reduced-motion:reduce) {
   html { scroll-behavior:auto; }
@@ -272,6 +342,17 @@ for (const it of items) {
 }
 const totalRows = items.reduce((n, it) => n + it.features.length, 0)
 
+// Category filter pills — one per distinct category id, sorted the same way the section headers
+// below are (largest group first), so the pill order matches the page order it filters.
+const catIds = new Map() // category id -> { label, count }
+for (const it of items) {
+  const label = CATEGORY_LABELS[it.category] || it.category
+  const cur = catIds.get(it.category) || { label, count: 0 }
+  cur.count += 1
+  catIds.set(it.category, cur)
+}
+const pillList = [...catIds.entries()].sort((a, b) => b[1].count - a[1].count)
+
 // Kerf's own gaps. Surfaced deliberately: with the rows drawn from Kerf's capability list it
 // scores "yes" on 98.9% of them, so a page that does not lead with the exceptions is marketing.
 const shortfalls = []
@@ -287,10 +368,14 @@ const kerfPartial = shortfalls.filter((s) => s.status !== 'no').length
 const catSections = [...byCat.entries()]
   .sort((a, b) => b[1].length - a[1].length)
   .map(([label, list]) => {
+    const catId = list[0]?.category ?? ''
     const cards = list.map((it) => {
       const { kerf, comp, total } = coverage(it)
+      // Search haystack: competitor name + slug + tagline, lowercased once at build time so the
+      // filter script does a plain substring test with no runtime normalisation.
+      const q = esc(`${it.competitor} ${it.slug} ${it.hero_tagline || ''}`.toLowerCase())
       return `
-        <a class="tool" href="./parity/${esc(it.slug)}.html">
+        <a class="tool" href="./parity/${esc(it.slug)}.html" data-cat="${esc(catId)}" data-q="${q}">
           <h3>Kerf vs ${esc(it.competitor)}</h3>
           <p>${esc(it.hero_tagline || '')}</p>
           ${bar(kerf, total)}
@@ -299,11 +384,84 @@ const catSections = [...byCat.entries()]
         </a>`
     }).join('')
     return `
-      <div class="cat">
+      <div class="cat" data-cat="${esc(catId)}">
         <div class="cat-head"><h2>${esc(label)}</h2><span class="count">${list.length} tool${list.length === 1 ? '' : 's'}</span></div>
         <div class="tool-grid">${cards}</div>
       </div>`
   }).join('')
+
+const searchIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>'
+
+const filterBar = `
+<div class="filter-bar">
+  <div class="search-wrap">
+    ${searchIcon}
+    <input id="parity-search" type="search" placeholder="Search tools… (e.g. FreeCAD, SPICE, BIM)" aria-label="Search comparisons">
+  </div>
+  <div class="pills" role="group" aria-label="Filter by category">
+    <button type="button" class="pill active" data-cat="">All</button>
+    ${pillList.map(([id, meta]) => `<button type="button" class="pill" data-cat="${esc(id)}">${esc(meta.label)}</button>`).join('')}
+  </div>
+</div>
+<p class="filter-status" id="parity-filter-status" role="status"></p>`
+
+// Vanilla JS — this is a static site with no framework, so search + category filtering (the old
+// React landing's two headline interactions) has to be plain DOM manipulation. It only touches
+// the "by tool" card grid below; the "Read this first" intro and "Where Kerf falls short" table
+// are unaffected by any filter state.
+const filterScript = `
+<script>
+(function () {
+  var search = document.getElementById('parity-search')
+  var pills = Array.prototype.slice.call(document.querySelectorAll('.pill'))
+  var cats = Array.prototype.slice.call(document.querySelectorAll('.cat[data-cat]'))
+  var status = document.getElementById('parity-filter-status')
+  var noMatches = document.getElementById('parity-no-matches')
+  var activeCat = ''
+
+  function apply() {
+    var q = search.value.trim().toLowerCase()
+    var shown = 0
+    cats.forEach(function (cat) {
+      var catMatches = !activeCat || cat.getAttribute('data-cat') === activeCat
+      var anyVisible = false
+      Array.prototype.slice.call(cat.querySelectorAll('.tool')).forEach(function (tool) {
+        var visible = catMatches && (!q || tool.getAttribute('data-q').indexOf(q) !== -1)
+        tool.hidden = !visible
+        if (visible) { anyVisible = true; shown++ }
+      })
+      cat.hidden = !anyVisible
+    })
+    noMatches.classList.toggle('show', shown === 0)
+    var filtering = q.length > 0 || activeCat !== ''
+    if (!filtering) {
+      status.innerHTML = ''
+    } else {
+      var label = activeCat ? (pills.filter(function (p) { return p.getAttribute('data-cat') === activeCat })[0] || {}).textContent : ''
+      var bits = [shown === 0 ? 'No results' : (shown + ' comparison' + (shown === 1 ? '' : 's'))]
+      if (q) bits.push('for "' + search.value.trim() + '"')
+      if (label) bits.push('in ' + label)
+      status.innerHTML = bits.join(' ') + ' — <button type="button" id="parity-clear">clear</button>'
+      var clear = document.getElementById('parity-clear')
+      if (clear) clear.addEventListener('click', function () {
+        search.value = ''
+        activeCat = ''
+        pills.forEach(function (p) { p.classList.toggle('active', p.getAttribute('data-cat') === '') })
+        apply()
+      })
+    }
+  }
+
+  search.addEventListener('input', apply)
+  pills.forEach(function (pill) {
+    pill.addEventListener('click', function () {
+      activeCat = pill.getAttribute('data-cat')
+      pills.forEach(function (p) { p.classList.toggle('active', p === pill) })
+      apply()
+    })
+  })
+})()
+</script>`
 
 const indexBody = `
 <section class="hero">
@@ -329,7 +487,7 @@ const indexBody = `
       <p class="lede" style="margin:0 0 1.1rem">These are every row across all ${items.length} reports where Kerf is not a straight yes. It is a short list because of how the rows were chosen, not because the gaps are small — see the note above.</p>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Capability</th><th>Kerf</th><th>Surfaced comparing against</th></tr></thead>
+          <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>Surfaced comparing against</th></tr></thead>
           <tbody>${shortfalls.map((g) => `
             <tr>
               <td class="feat">${esc(g.name)}</td>
@@ -339,13 +497,21 @@ const indexBody = `
         </table>
       </div>
     </div>
-    ${catSections}
     <div class="honest">
       <p><strong>How to read this.</strong> A competitor row marked <em>paid tier</em> means the tool does have the capability, but behind an extension, add-on or metered service — a different answer to “can I do this today” than “included”, so it is counted separately rather than folded into either. Kerf has no tiers, so its rows are only yes, partial or no.</p>
       <p style="margin-top:.8rem"><strong>What this page is not.</strong> It is not a verdict, and the totals are not scores. The rows were written from Kerf's feature set, which is why Kerf is a yes on ${((totalRows - shortfalls.length) / totalRows * 100).toFixed(1)}% of them — that number says something about how the list was built, not about the products. A tool scoring low here may be far better than Kerf at the work you actually do. If you are choosing between them, read the rows in your discipline and ignore the counts.</p>
     </div>
   </div>
-</section>`
+</section>
+<section id="by-tool" class="scroll-mt">
+  <div class="container">
+    <div class="cat-head" style="border-bottom:0; margin-bottom:.5rem; padding-bottom:0"><h2>Browse by tool</h2></div>
+    <p class="lede" style="margin:0">Search or filter by discipline — every card still opens the same full, sourced capability table.</p>
+    ${filterBar}
+    <div class="no-matches" id="parity-no-matches">No comparisons match your search.</div>
+    ${catSections}
+  </div>
+</section>${filterScript}`
 
 mkdirSync(join(ROOT, 'site', 'parity'), { recursive: true })
 writeFileSync(
@@ -370,26 +536,56 @@ for (const it of items) {
     byDomain.get(d).push(f)
   }
 
-  const rows = [...byDomain.entries()].map(([domain, feats]) => feats.map((f) => {
-    const kc = classify(f.kerf?.status)
-    const cc = classify(f.competitor?.status)
-    // Keep the competitor's own prose after the leading token — it is the substance of the claim.
-    const compProse = String(f.competitor?.status ?? '').replace(/^\S+\s*[—-]?\s*/, '').trim()
-    const src = f.competitor?.source
+  // Domain rows in D1..D14 order (falling back to encounter order for any unrecognised code),
+  // each its own collapsible <details> section with a "N of M matched" count — matching the old
+  // React CompareFeatureMatrix's per-CAD layout instead of one long flat table.
+  const domainKeys = [...byDomain.keys()].sort((a, b) => {
+    const ai = Object.keys(DOMAIN_TITLES).indexOf(a)
+    const bi = Object.keys(DOMAIN_TITLES).indexOf(b)
+    if (ai === -1 && bi === -1) return a.localeCompare(b)
+    if (ai === -1) return 1
+    if (bi === -1) return -1
+    return ai - bi
+  })
+
+  const domainSections = domainKeys.map((domain) => {
+    const feats = byDomain.get(domain)
+    const matched = feats.filter((f) => classify(f.kerf?.status) === 'yes' && classify(f.competitor?.status) === 'yes').length
+    const rows = feats.map((f) => {
+      const kc = classify(f.kerf?.status)
+      const cc = classify(f.competitor?.status)
+      // Keep the competitor's own prose after the leading token — it is the substance of the claim.
+      const compProse = String(f.competitor?.status ?? '').replace(/^\S+\s*[—-]?\s*/, '').trim()
+      const src = f.competitor?.source
+      return `
+        <tr>
+          <td class="feat">${esc(f.name)}</td>
+          <td>
+            <span class="chip ${kc}">${kc}</span>
+            ${f.kerf?.evidence ? `<code class="note">${esc(f.kerf.evidence)}</code>` : ''}
+          </td>
+          <td>
+            <span class="chip ${cc}">${cc === 'paid' ? 'paid tier' : cc}</span>
+            ${compProse ? `<span class="note">${esc(compProse)}</span>` : ''}
+            ${src ? `<a class="src" href="${esc(src)}" target="_blank" rel="noreferrer nofollow">source ↗</a>` : ''}
+          </td>
+        </tr>`
+    }).join('')
+    const title = DOMAIN_TITLES[domain] || domain
     return `
-      <tr>
-        <td class="feat">${esc(f.name)}<small>${esc(domain)}</small></td>
-        <td>
-          <span class="chip ${kc}">${kc}</span>
-          ${f.kerf?.evidence ? `<code class="note">${esc(f.kerf.evidence)}</code>` : ''}
-        </td>
-        <td>
-          <span class="chip ${cc}">${cc === 'paid' ? 'paid tier' : cc}</span>
-          ${compProse ? `<span class="note">${esc(compProse)}</span>` : ''}
-          ${src ? `<a class="src" href="${esc(src)}" target="_blank" rel="noreferrer nofollow">source ↗</a>` : ''}
-        </td>
-      </tr>`
-  }).join('')).join('')
+      <details class="domain">
+        <summary>
+          <span class="domain-title"><span class="code">${esc(domain)}</span> ${esc(title)}</span>
+          <span class="domain-meta"><span>${matched} of ${feats.length} matched</span><span class="domain-caret" aria-hidden="true">›</span></span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>${esc(it.competitor)}</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </details>`
+  }).join('')
 
   const body = `
 <section class="hero">
@@ -408,12 +604,8 @@ for (const it of items) {
 </section>
 <section>
   <div class="container">
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Capability</th><th>Kerf</th><th>${esc(it.competitor)}</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
+    <p class="lede" style="margin:0 0 1.1rem">Grouped by discipline (D1–D14), same as Kerf's own capability list. Click a section to expand it.</p>
+    ${domainSections}
     <ul class="legend">
       <li><span class="chip yes">yes</span> shipped</li>
       <li><span class="chip partial">partial</span> works with limits</li>

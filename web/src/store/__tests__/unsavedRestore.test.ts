@@ -14,6 +14,7 @@ import {
   _resetForTest,
   _setIDBFactory,
 } from '../../lib/localStash.js'
+import { errStatus, errMessage } from '../errorUtils.js'
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -118,7 +119,7 @@ describe('restoreUnsavedEntries logic', () => {
 
     const remaining = await listUnflushed(WS)
     expect(remaining).toHaveLength(1)
-    expect(remaining[0].path).toBe('file-fail')
+    expect(remaining[0]?.path).toBe('file-fail')
   })
 
   it('409 conflict leaves the entry with a "Server has newer version" hint', async () => {
@@ -143,16 +144,16 @@ describe('restoreUnsavedEntries logic', () => {
         await markFlushed(WS, entry.path)
         results.push({ path: entry.path, ok: true })
       } catch (err) {
-        const hint = err?.status === 409
+        const hint = errStatus(err) === 409
           ? 'Server has newer version — reload to merge'
-          : (err?.message || 'Failed to restore')
+          : (errMessage(err) || 'Failed to restore')
         results.push({ path: entry.path, ok: false, error: hint })
       }
     }
 
     expect(results).toHaveLength(1)
-    expect(results[0].ok).toBe(false)
-    expect(results[0].error).toBe('Server has newer version — reload to merge')
+    expect(results[0]?.ok).toBe(false)
+    expect(results[0]?.error).toBe('Server has newer version — reload to merge')
 
     // Entry still unflushed.
     const remaining = await listUnflushed(WS)

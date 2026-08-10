@@ -195,7 +195,7 @@ export default function ImplantPlanningPanel({ content }: Props) {
             type="button"
             onClick={handleDrillSeq}
             disabled={loading === 'drill'}
-            className="text-[10px] px-2 py-1 rounded bg-teal-500/15 border border-teal-400/30 text-teal-300 hover:bg-teal-500/25 disabled:opacity-50"
+            className="text-[10px] px-2 py-1 rounded bg-teal-500/15 border border-teal-400/30 text-teal-300 hover:bg-teal-500/25 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             {loading === 'drill' ? (
               <span className="flex items-center gap-1">
@@ -237,7 +237,7 @@ export default function ImplantPlanningPanel({ content }: Props) {
           type="button"
           onClick={handleSpacingCheck}
           disabled={loading === 'spacing'}
-          className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2 rounded bg-teal-500/20 border border-teal-400/50 text-teal-200 text-xs font-medium hover:bg-teal-500/30 disabled:opacity-50 transition-colors"
+          className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2 rounded bg-teal-500/20 border border-teal-400/50 text-teal-200 text-xs font-medium hover:bg-teal-500/30 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {loading === 'spacing' ? (
             <>

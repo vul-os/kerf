@@ -102,43 +102,49 @@ td .note { display:block; margin-top:.3rem; font-size:.8rem; color:var(--text-3)
 td .src { font-family:var(--mono); font-size:.71rem; color:var(--code-dim); word-break:break-word; }
 td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
 
+/* Column pinning — the feature name stays put while Kerf / competitor columns scroll under it,
+   so a capability is never off-screen while you're reading its verdict. Needs an opaque
+   background per row state or the scrolling columns show through. */
+td.feat, th.feat { position:sticky; left:0; z-index:1; background:var(--surface); }
+thead th.feat { z-index:2; background:var(--elevated); }
+tbody tr:hover td.feat { background:#15171d; }
+
+/* Search + category filter (index page only). Vanilla JS, no framework — filters .tool cards by
+   name/slug/tagline and by category, matching the old React landing's search box + pill row. */
+.filter-bar { display:flex; flex-wrap:wrap; align-items:center; gap:.75rem 1rem; margin:1.6rem 0 .25rem; }
+.search-wrap { position:relative; flex:1 1 260px; max-width:22rem; }
+.search-wrap svg { position:absolute; left:.8rem; top:50%; transform:translateY(-50%); width:14px; height:14px; color:var(--text-3); pointer-events:none; }
+#parity-search { width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:9px; padding:.55rem .9rem .55rem 2.1rem; font-size:.86rem; font-family:var(--sans); }
+#parity-search::placeholder { color:var(--text-4); }
+#parity-search:focus { border-color:var(--gold-dim); outline:none; }
+.pills { display:flex; flex-wrap:wrap; gap:.45rem; }
+.pill { font-family:var(--mono); font-size:.74rem; color:var(--text-3); background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:.36rem .8rem; cursor:pointer; transition:border-color .15s,color .15s,background .15s; }
+.pill:hover { color:var(--text); border-color:var(--text-4); }
+.pill.active { color:var(--gold); border-color:var(--gold-dim); background:rgba(255,214,51,.08); }
+.filter-status { font-family:var(--mono); font-size:.78rem; color:var(--dim); margin:.9rem 0 0; min-height:1.2em; }
+.filter-status button { font:inherit; color:var(--gold-dim); background:none; border:0; padding:0; cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
+.filter-status button:hover { color:var(--gold); }
+.tool[hidden], .cat[hidden] { display:none; }
+.no-matches { display:none; font-size:.85rem; color:var(--text-3); padding:1.5rem 0; }
+.no-matches.show { display:block; }
+.scroll-mt { scroll-margin-top:20px; }
+
+/* Per-domain expand/collapse on a tool's detail page — matches the old React matrix's D1–D14
+   <details> sections instead of one long flat table. */
+.domain { border:1px solid var(--border-2); border-radius:12px; background:var(--surface); overflow:hidden; margin-bottom:.85rem; }
+.domain:last-child { margin-bottom:0; }
+.domain > summary { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.85rem 1.1rem; cursor:pointer; list-style:none; font-family:var(--mono); }
+.domain > summary::-webkit-details-marker { display:none; }
+.domain > summary:hover { background:var(--elevated); }
+.domain-title { display:flex; align-items:baseline; gap:.6rem; font-family:var(--sans); font-size:.92rem; color:var(--text); }
+.domain-title .code { font-family:var(--mono); font-size:.72rem; color:var(--text-3); }
+.domain-meta { display:flex; align-items:center; gap:.75rem; font-size:.75rem; color:var(--text-3); flex-shrink:0; }
+.domain-caret { display:inline-block; color:var(--text-3); transition:transform .15s; }
+.domain[open] > summary .domain-caret { transform:rotate(90deg); }
+.domain .table-wrap { border:0; border-top:1px solid var(--border-2); border-radius:0; }
+
 .back { display:inline-flex; align-items:center; gap:.4rem; font-family:var(--mono); font-size:.8rem; color:var(--text-3); margin-bottom:1.1rem; }
 .legend { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin:1.4rem 0 0; padding:0; list-style:none; font-family:var(--mono); font-size:.75rem; color:var(--text-3); }
-.legend li { display:inline-flex; align-items:center; }
-.dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:.4rem; }
-.dot.yes { background:var(--green); }
-.dot.partial { background:var(--gold); }
-.dot.paid { background:var(--violet); }
-.dot.no { background:var(--text-4); }
-
-/* Browse controls — search + category pills over the tool grid. Vanilla JS below hides/shows
-   .tool cards and their parent .cat[data-filterable] section; no framework, no page reload. */
-.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
-.browse-head { margin-bottom:1.5rem; }
-.controls { display:flex; flex-wrap:wrap; align-items:center; gap:.9rem 1.1rem; margin:.9rem 0 1rem; }
-.search-wrap { position:relative; flex:1 1 17rem; max-width:22rem; }
-.search-wrap svg { position:absolute; left:.75rem; top:50%; transform:translateY(-50%); width:14px; height:14px; color:var(--text-3); pointer-events:none; }
-.search-input { width:100%; box-sizing:border-box; background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:.55rem .8rem .55rem 2.15rem; font-size:.85rem; font-family:var(--sans); color:var(--text); appearance:none; }
-.search-input::placeholder { color:var(--text-4); }
-.search-input:focus-visible { outline:2px solid var(--gold); outline-offset:1px; }
-.search-input::-webkit-search-cancel-button { display:none; }
-.search-clear { position:absolute; right:.5rem; top:50%; transform:translateY(-50%); width:22px; height:22px; display:grid; place-items:center; background:none; border:0; color:var(--text-3); font-size:1rem; line-height:1; cursor:pointer; border-radius:6px; }
-.search-clear:hover { color:var(--text); background:var(--elevated); }
-.pills { display:flex; flex-wrap:wrap; gap:.45rem; }
-.pill { font-family:var(--mono); font-size:.72rem; border:1px solid var(--border); background:var(--panel); color:var(--text-3); border-radius:999px; padding:.32rem .8rem; cursor:pointer; transition:border-color .15s,color .15s,background .15s; }
-.pill:hover { border-color:var(--text-4); color:var(--text-2); }
-.pill.active { border-color:var(--gold-dim); color:var(--gold); background:rgba(255,214,51,.08); }
-.pill-count { color:var(--text-4); }
-.pill.active .pill-count { color:var(--gold-dim); }
-.results-count { font-family:var(--mono); font-size:.78rem; color:var(--text-3); margin:0 0 1.5rem; }
-.no-results { color:var(--text-3); font-size:.9rem; padding:1.5rem 0; }
-
-/* Sticky first column — the feature/tool name stays pinned while a narrow viewport scrolls the
-   table sideways, mirroring the old React CategoryMatrix's sticky Kerf column. */
-.table-wrap table th:first-child, .table-wrap table td:first-child { position:sticky; left:0; z-index:2; }
-.table-wrap thead th:first-child { z-index:3; background:var(--elevated); box-shadow:1px 0 0 var(--border); }
-.table-wrap tbody td:first-child { background:var(--surface); box-shadow:1px 0 0 var(--border-2); }
-.table-wrap tbody tr:hover td:first-child { background:var(--border-2); }
 
 .honest { margin-top:2.25rem; border:1px solid var(--border); border-left:2px solid var(--gold-dim); border-radius:10px; background:var(--panel); padding:1.05rem 1.2rem; }
 .honest p { margin:0; font-size:.86rem; color:var(--text-3); line-height:1.68; }
@@ -156,6 +162,15 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
   .nav-links a.hide-sm { display:none; }
   .footer-right { margin-left:0; }
   section { padding:2.5rem 0; }
+}
+/* Same fix as site/index.html's own nav (commit fa8b6fe5): below ~430px the nav row still has
+   more unshrinkable content than the bar can give it — here worse than index.html's, because
+   this page keeps its own "parity" link visible (un-hidden, it's the active-page marker) instead
+   of hiding it like index.html does. Drop the github WORD and tighten the gap the same way. */
+@media (max-width:430px) {
+  .nav-links { gap:.6rem; }
+  .nav-links .gh { gap:0; }
+  .nav-links .gh span { display:none; }
 }
 @media (prefers-reduced-motion:reduce) {
   html { scroll-behavior:auto; }
@@ -196,636 +211,800 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
 </section>
 <section>
   <div class="container">
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Capability</th><th>Kerf</th><th>Blender</th></tr></thead>
-        <tbody>
-      <tr>
-        <td class="feat">Constraint sketcher (geo + dim)<small>D1</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Pad / pocket / revolve<small>D1</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/modifiers/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Loft<small>D1</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/feature_loft.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/skin.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">B-rep booleans (general NURBS)<small>D1</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/booleans.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">NURBS surfacing (blend/network/patch)<small>D1</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/curves/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Assemblies — mates<small>D1</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/assembly/mates.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/scene_layout/object/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">2D drawings (views/dims/sections)<small>D1</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/render/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">GD&amp;T on drawings / MBD / PMI<small>D1</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Sheet metal<small>D1</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/construction_verbs_tools.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">STEP / IGES B-rep interop<small>D1</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/files/import_export/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Configurations / family variants<small>D1</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/family/</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">FE — solid (tet/hex)<small>D2</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-fem/src/kerf_fem/calculix_bridge.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/physics/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">AISC 360-22 steel (members)<small>D2</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-structural/src/kerf_structural/steel_beam.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/physics/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">ACI 318-19 concrete<small>D2</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-structural/src/kerf_structural/rc_beam.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/physics/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Fatigue (S-N, ε-N, rainflow)<small>D2</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-fem/src/kerf_fem/fatigue_fem.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/physics/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Spur/helical gear rating (AGMA 2001-D04)<small>D3</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Bearings — ISO 281 L10<small>D3</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/bearings/select.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">CFD<small>D4</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cfd/src/kerf_cfd/openfoam_bridge.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/physics/fluid/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">HVAC duct sizing (SMACNA)<small>D4</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-hvac/src/kerf_hvac/duct.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/physics/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Heat exchangers (LMTD + ε-NTU + Bell-Delaware)<small>D4</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-hvac/src/kerf_hvac/sizing.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/physics/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Airfoil inviscid CL (panel)<small>D5</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-aero/src/kerf_aero/panel_2d.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/physics/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Orbital (Kepler, J2/J3, Hohmann)<small>D5</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-aero/src/kerf_aero</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/physics/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Schematic capture (KiCad round-trip, ERC)<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">PCB layout (tscircuit, KiCad round-trip)<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/fab</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">SPICE<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/spice/</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Signal integrity (Z0/crosstalk/eye/IBIS)<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/si/ibis_channel.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">3-axis CAM (profile/contour/pocket/face)<small>D7</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">src/components/CAMView.jsx</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">G-code post (Fanuc/GRBL/LinuxCNC/Mach3)<small>D7</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cam/src/kerf_cam/posts/fanuc_3x.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">FDM slicing (Cura)<small>D7</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">src/components/PrintSliceView.jsx</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/files/import_export/stl.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Moldflow / fill sim<small>D7</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/procsim/moldflow.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Nesting (skyline + true-shape NFP)<small>D7</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/nesting/nfp.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Horizontal+vertical alignment (clothoid, SSD)<small>D8</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-civil/src/kerf_civil/horizontal_alignment.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Geotech (bearing/settlement/slope/pile/liquefaction)<small>D8</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/geotech/liquefaction.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Planar MBD (Lagrange/DAE, Baumgarte)<small>D9</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/mbd/solver.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/physics/rigid_body/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Controls — classical (Routh/Bode/RL/PID tune)<small>D9</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/controls/pid_tuning.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Controls — state-space / LQR / Kalman<small>D9</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/controls/statespace.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">PLC IEC 61131-3 (ST/Ladder/FB/motion)<small>D10</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">src/components/PLCView.jsx</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Solar PV (system + partial shading)<small>D10</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/solarpv/shading.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Tolerance stackup — 1D (WC/RSS/MC)<small>D11</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/tolstack</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Process capability (Cpk/Ppk)<small>D11</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/spc/charts.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Path-traced renderer (Cycles/EEVEE)<small>D12</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-render/src/kerf_render/pathtracer.py</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://www.blender.org/features/rendering/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Paraxial ABCD ray transfer<small>D12</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-optics/src/kerf_optics/ray_transfer.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/render/cycles/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Acoustics (ISO 9613, RT60, weighting, mass-law TL)<small>D12</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/acoustics/wave.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/physics/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Sculpting + dyntopo + multires<small>D13</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/subd_tools.py</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://www.blender.org/features/sculpt-paint/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Animation / rigging<small>D13</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">src/components</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://www.blender.org/features/animation/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Geometry Nodes (visual node DAG)<small>D13</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/geometry_nodes/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Textiles (weave/knit/drape/cut-room)<small>D13</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-textiles/src/kerf_textiles/</code>
-        </td>
-        <td>
-          <span class="chip partial">partial</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/physics/cloth/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Jewelry (configurator)<small>D13</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/jewelry/</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">BIM (walls/slabs/framing/stairs/IFC4)<small>D13</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-bim/src/kerf_bim</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Should-cost (6 processes, Boothroyd-Dewhurst)<small>D14</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/costing</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Material selection (Ashby)<small>D14</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-cad-core/src/kerf_cad_core/matsel/multi_objective.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.blender.org/manual/en/latest/render/materials/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">LCA (full ISO 14040/44 4 phases)<small>D14</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-lca/src/kerf_lca/phases.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr></tbody>
-      </table>
-    </div>
+    <p class="lede" style="margin:0 0 1.1rem">Grouped by discipline (D1–D14), same as Kerf's own capability list. Click a section to expand it.</p>
+    
+      <details class="domain">
+        <summary>
+          <span class="domain-title"><span class="code">D1</span> Geometry &amp; core CAD</span>
+          <span class="domain-meta"><span>0 of 11 matched</span><span class="domain-caret" aria-hidden="true">›</span></span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>Blender</th></tr></thead>
+            <tbody>
+        <tr>
+          <td class="feat">Constraint sketcher (geo + dim)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Pad / pocket / revolve</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/modifiers/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Loft</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/feature_loft.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/skin.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">B-rep booleans (general NURBS)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/modifiers/generate/booleans.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">NURBS surfacing (blend/network/patch)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/geom/network_srf.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/curves/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Assemblies — mates</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/assembly/mates.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/scene_layout/object/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">2D drawings (views/dims/sections)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/geom/make2d.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/render/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">GD&amp;T on drawings / MBD / PMI</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Sheet metal</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/construction_verbs_tools.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">STEP / IGES B-rep interop</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/files/import_export/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Configurations / family variants</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/family/</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr></tbody>
+          </table>
+        </div>
+      </details>
+      <details class="domain">
+        <summary>
+          <span class="domain-title"><span class="code">D2</span> Structural / FEA</span>
+          <span class="domain-meta"><span>0 of 4 matched</span><span class="domain-caret" aria-hidden="true">›</span></span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>Blender</th></tr></thead>
+            <tbody>
+        <tr>
+          <td class="feat">FE — solid (tet/hex)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-fem/src/kerf_fem/calculix_bridge.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/physics/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">AISC 360-22 steel (members)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-structural/src/kerf_structural/steel_beam.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/physics/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">ACI 318-19 concrete</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-structural/src/kerf_structural/rc_beam.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/physics/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Fatigue (S-N, ε-N, rainflow)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-fem/src/kerf_fem/fatigue_fem.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/physics/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr></tbody>
+          </table>
+        </div>
+      </details>
+      <details class="domain">
+        <summary>
+          <span class="domain-title"><span class="code">D3</span> Machine elements</span>
+          <span class="domain-meta"><span>0 of 2 matched</span><span class="domain-caret" aria-hidden="true">›</span></span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>Blender</th></tr></thead>
+            <tbody>
+        <tr>
+          <td class="feat">Spur/helical gear rating (AGMA 2001-D04)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Bearings — ISO 281 L10</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/bearings/select.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr></tbody>
+          </table>
+        </div>
+      </details>
+      <details class="domain">
+        <summary>
+          <span class="domain-title"><span class="code">D4</span> Thermal / fluid / HVAC</span>
+          <span class="domain-meta"><span>0 of 3 matched</span><span class="domain-caret" aria-hidden="true">›</span></span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>Blender</th></tr></thead>
+            <tbody>
+        <tr>
+          <td class="feat">CFD</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cfd/src/kerf_cfd/openfoam_bridge.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/physics/fluid/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">HVAC duct sizing (SMACNA)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-hvac/src/kerf_hvac/duct.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/physics/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Heat exchangers (LMTD + ε-NTU + Bell-Delaware)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-hvac/src/kerf_hvac/sizing.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/physics/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr></tbody>
+          </table>
+        </div>
+      </details>
+      <details class="domain">
+        <summary>
+          <span class="domain-title"><span class="code">D5</span> Aero / marine / space</span>
+          <span class="domain-meta"><span>0 of 2 matched</span><span class="domain-caret" aria-hidden="true">›</span></span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>Blender</th></tr></thead>
+            <tbody>
+        <tr>
+          <td class="feat">Airfoil inviscid CL (panel)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-aero/src/kerf_aero/panel_2d.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/physics/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Orbital (Kepler, J2/J3, Hohmann)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-aero/src/kerf_aero</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/physics/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr></tbody>
+          </table>
+        </div>
+      </details>
+      <details class="domain">
+        <summary>
+          <span class="domain-title"><span class="code">D6</span> Electronics / EDA / silicon</span>
+          <span class="domain-meta"><span>0 of 4 matched</span><span class="domain-caret" aria-hidden="true">›</span></span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>Blender</th></tr></thead>
+            <tbody>
+        <tr>
+          <td class="feat">Schematic capture (KiCad round-trip, ERC)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">PCB layout (tscircuit, KiCad round-trip)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/fab</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">SPICE</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/spice/</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Signal integrity (Z0/crosstalk/eye/IBIS)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/si/ibis_channel.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr></tbody>
+          </table>
+        </div>
+      </details>
+      <details class="domain">
+        <summary>
+          <span class="domain-title"><span class="code">D7</span> Manufacturing / CAM</span>
+          <span class="domain-meta"><span>0 of 5 matched</span><span class="domain-caret" aria-hidden="true">›</span></span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>Blender</th></tr></thead>
+            <tbody>
+        <tr>
+          <td class="feat">3-axis CAM (profile/contour/pocket/face)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">src/components/CAMView.jsx</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">G-code post (Fanuc/GRBL/LinuxCNC/Mach3)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cam/src/kerf_cam/posts/fanuc_3x.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">FDM slicing (Cura)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">src/components/PrintSliceView.jsx</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/files/import_export/stl.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Moldflow / fill sim</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/procsim/moldflow.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Nesting (skyline + true-shape NFP)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/nesting/nfp.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr></tbody>
+          </table>
+        </div>
+      </details>
+      <details class="domain">
+        <summary>
+          <span class="domain-title"><span class="code">D8</span> Civil / infrastructure / geo</span>
+          <span class="domain-meta"><span>0 of 2 matched</span><span class="domain-caret" aria-hidden="true">›</span></span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>Blender</th></tr></thead>
+            <tbody>
+        <tr>
+          <td class="feat">Horizontal+vertical alignment (clothoid, SSD)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-civil/src/kerf_civil/horizontal_alignment.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Geotech (bearing/settlement/slope/pile/liquefaction)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/geotech/liquefaction.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr></tbody>
+          </table>
+        </div>
+      </details>
+      <details class="domain">
+        <summary>
+          <span class="domain-title"><span class="code">D9</span> Dynamics / motion / controls</span>
+          <span class="domain-meta"><span>0 of 3 matched</span><span class="domain-caret" aria-hidden="true">›</span></span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>Blender</th></tr></thead>
+            <tbody>
+        <tr>
+          <td class="feat">Planar MBD (Lagrange/DAE, Baumgarte)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/mbd/solver.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/physics/rigid_body/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Controls — classical (Routh/Bode/RL/PID tune)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/controls/pid_tuning.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Controls — state-space / LQR / Kalman</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/controls/statespace.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr></tbody>
+          </table>
+        </div>
+      </details>
+      <details class="domain">
+        <summary>
+          <span class="domain-title"><span class="code">D10</span> Electrical / energy / PLC</span>
+          <span class="domain-meta"><span>0 of 2 matched</span><span class="domain-caret" aria-hidden="true">›</span></span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>Blender</th></tr></thead>
+            <tbody>
+        <tr>
+          <td class="feat">PLC IEC 61131-3 (ST/Ladder/FB/motion)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">src/components/PLCView.jsx</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Solar PV (system + partial shading)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/solarpv/shading.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr></tbody>
+          </table>
+        </div>
+      </details>
+      <details class="domain">
+        <summary>
+          <span class="domain-title"><span class="code">D11</span> Tolerancing / metrology / QA</span>
+          <span class="domain-meta"><span>0 of 2 matched</span><span class="domain-caret" aria-hidden="true">›</span></span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>Blender</th></tr></thead>
+            <tbody>
+        <tr>
+          <td class="feat">Tolerance stackup — 1D (WC/RSS/MC)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/tolstack</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Process capability (Cpk/Ppk)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/spc/charts.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr></tbody>
+          </table>
+        </div>
+      </details>
+      <details class="domain">
+        <summary>
+          <span class="domain-title"><span class="code">D12</span> Optics / acoustics</span>
+          <span class="domain-meta"><span>1 of 3 matched</span><span class="domain-caret" aria-hidden="true">›</span></span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>Blender</th></tr></thead>
+            <tbody>
+        <tr>
+          <td class="feat">Path-traced renderer (Cycles/EEVEE)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-render/src/kerf_render/pathtracer.py</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://www.blender.org/features/rendering/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Paraxial ABCD ray transfer</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-optics/src/kerf_optics/ray_transfer.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/render/cycles/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Acoustics (ISO 9613, RT60, weighting, mass-law TL)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/acoustics/wave.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/physics/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr></tbody>
+          </table>
+        </div>
+      </details>
+      <details class="domain">
+        <summary>
+          <span class="domain-title"><span class="code">D13</span> Verticals</span>
+          <span class="domain-meta"><span>3 of 6 matched</span><span class="domain-caret" aria-hidden="true">›</span></span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>Blender</th></tr></thead>
+            <tbody>
+        <tr>
+          <td class="feat">Sculpting + dyntopo + multires</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/subd_tools.py</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://www.blender.org/features/sculpt-paint/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Animation / rigging</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">src/components</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://www.blender.org/features/animation/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Geometry Nodes (visual node DAG)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/modeling/geometry_nodes/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Textiles (weave/knit/drape/cut-room)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-textiles/src/kerf_textiles/</code>
+          </td>
+          <td>
+            <span class="chip partial">partial</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/physics/cloth/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Jewelry (configurator)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/jewelry/</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">BIM (walls/slabs/framing/stairs/IFC4)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-bim/src/kerf_bim</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr></tbody>
+          </table>
+        </div>
+      </details>
+      <details class="domain">
+        <summary>
+          <span class="domain-title"><span class="code">D14</span> Cost / materials / LCA</span>
+          <span class="domain-meta"><span>0 of 3 matched</span><span class="domain-caret" aria-hidden="true">›</span></span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>Blender</th></tr></thead>
+            <tbody>
+        <tr>
+          <td class="feat">Should-cost (6 processes, Boothroyd-Dewhurst)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/costing</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Material selection (Ashby)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-cad-core/src/kerf_cad_core/matsel/multi_objective.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.blender.org/manual/en/latest/render/materials/index.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">LCA (full ISO 14040/44 4 phases)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-lca/src/kerf_lca/phases.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://www.blender.org/features/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr></tbody>
+          </table>
+        </div>
+      </details>
     <ul class="legend">
       <li><span class="chip yes">yes</span> shipped</li>
       <li><span class="chip partial">partial</span> works with limits</li>

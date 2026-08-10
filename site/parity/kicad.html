@@ -102,43 +102,49 @@ td .note { display:block; margin-top:.3rem; font-size:.8rem; color:var(--text-3)
 td .src { font-family:var(--mono); font-size:.71rem; color:var(--code-dim); word-break:break-word; }
 td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
 
+/* Column pinning — the feature name stays put while Kerf / competitor columns scroll under it,
+   so a capability is never off-screen while you're reading its verdict. Needs an opaque
+   background per row state or the scrolling columns show through. */
+td.feat, th.feat { position:sticky; left:0; z-index:1; background:var(--surface); }
+thead th.feat { z-index:2; background:var(--elevated); }
+tbody tr:hover td.feat { background:#15171d; }
+
+/* Search + category filter (index page only). Vanilla JS, no framework — filters .tool cards by
+   name/slug/tagline and by category, matching the old React landing's search box + pill row. */
+.filter-bar { display:flex; flex-wrap:wrap; align-items:center; gap:.75rem 1rem; margin:1.6rem 0 .25rem; }
+.search-wrap { position:relative; flex:1 1 260px; max-width:22rem; }
+.search-wrap svg { position:absolute; left:.8rem; top:50%; transform:translateY(-50%); width:14px; height:14px; color:var(--text-3); pointer-events:none; }
+#parity-search { width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text); border-radius:9px; padding:.55rem .9rem .55rem 2.1rem; font-size:.86rem; font-family:var(--sans); }
+#parity-search::placeholder { color:var(--text-4); }
+#parity-search:focus { border-color:var(--gold-dim); outline:none; }
+.pills { display:flex; flex-wrap:wrap; gap:.45rem; }
+.pill { font-family:var(--mono); font-size:.74rem; color:var(--text-3); background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:.36rem .8rem; cursor:pointer; transition:border-color .15s,color .15s,background .15s; }
+.pill:hover { color:var(--text); border-color:var(--text-4); }
+.pill.active { color:var(--gold); border-color:var(--gold-dim); background:rgba(255,214,51,.08); }
+.filter-status { font-family:var(--mono); font-size:.78rem; color:var(--dim); margin:.9rem 0 0; min-height:1.2em; }
+.filter-status button { font:inherit; color:var(--gold-dim); background:none; border:0; padding:0; cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
+.filter-status button:hover { color:var(--gold); }
+.tool[hidden], .cat[hidden] { display:none; }
+.no-matches { display:none; font-size:.85rem; color:var(--text-3); padding:1.5rem 0; }
+.no-matches.show { display:block; }
+.scroll-mt { scroll-margin-top:20px; }
+
+/* Per-domain expand/collapse on a tool's detail page — matches the old React matrix's D1–D14
+   <details> sections instead of one long flat table. */
+.domain { border:1px solid var(--border-2); border-radius:12px; background:var(--surface); overflow:hidden; margin-bottom:.85rem; }
+.domain:last-child { margin-bottom:0; }
+.domain > summary { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.85rem 1.1rem; cursor:pointer; list-style:none; font-family:var(--mono); }
+.domain > summary::-webkit-details-marker { display:none; }
+.domain > summary:hover { background:var(--elevated); }
+.domain-title { display:flex; align-items:baseline; gap:.6rem; font-family:var(--sans); font-size:.92rem; color:var(--text); }
+.domain-title .code { font-family:var(--mono); font-size:.72rem; color:var(--text-3); }
+.domain-meta { display:flex; align-items:center; gap:.75rem; font-size:.75rem; color:var(--text-3); flex-shrink:0; }
+.domain-caret { display:inline-block; color:var(--text-3); transition:transform .15s; }
+.domain[open] > summary .domain-caret { transform:rotate(90deg); }
+.domain .table-wrap { border:0; border-top:1px solid var(--border-2); border-radius:0; }
+
 .back { display:inline-flex; align-items:center; gap:.4rem; font-family:var(--mono); font-size:.8rem; color:var(--text-3); margin-bottom:1.1rem; }
 .legend { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin:1.4rem 0 0; padding:0; list-style:none; font-family:var(--mono); font-size:.75rem; color:var(--text-3); }
-.legend li { display:inline-flex; align-items:center; }
-.dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:.4rem; }
-.dot.yes { background:var(--green); }
-.dot.partial { background:var(--gold); }
-.dot.paid { background:var(--violet); }
-.dot.no { background:var(--text-4); }
-
-/* Browse controls — search + category pills over the tool grid. Vanilla JS below hides/shows
-   .tool cards and their parent .cat[data-filterable] section; no framework, no page reload. */
-.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
-.browse-head { margin-bottom:1.5rem; }
-.controls { display:flex; flex-wrap:wrap; align-items:center; gap:.9rem 1.1rem; margin:.9rem 0 1rem; }
-.search-wrap { position:relative; flex:1 1 17rem; max-width:22rem; }
-.search-wrap svg { position:absolute; left:.75rem; top:50%; transform:translateY(-50%); width:14px; height:14px; color:var(--text-3); pointer-events:none; }
-.search-input { width:100%; box-sizing:border-box; background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:.55rem .8rem .55rem 2.15rem; font-size:.85rem; font-family:var(--sans); color:var(--text); appearance:none; }
-.search-input::placeholder { color:var(--text-4); }
-.search-input:focus-visible { outline:2px solid var(--gold); outline-offset:1px; }
-.search-input::-webkit-search-cancel-button { display:none; }
-.search-clear { position:absolute; right:.5rem; top:50%; transform:translateY(-50%); width:22px; height:22px; display:grid; place-items:center; background:none; border:0; color:var(--text-3); font-size:1rem; line-height:1; cursor:pointer; border-radius:6px; }
-.search-clear:hover { color:var(--text); background:var(--elevated); }
-.pills { display:flex; flex-wrap:wrap; gap:.45rem; }
-.pill { font-family:var(--mono); font-size:.72rem; border:1px solid var(--border); background:var(--panel); color:var(--text-3); border-radius:999px; padding:.32rem .8rem; cursor:pointer; transition:border-color .15s,color .15s,background .15s; }
-.pill:hover { border-color:var(--text-4); color:var(--text-2); }
-.pill.active { border-color:var(--gold-dim); color:var(--gold); background:rgba(255,214,51,.08); }
-.pill-count { color:var(--text-4); }
-.pill.active .pill-count { color:var(--gold-dim); }
-.results-count { font-family:var(--mono); font-size:.78rem; color:var(--text-3); margin:0 0 1.5rem; }
-.no-results { color:var(--text-3); font-size:.9rem; padding:1.5rem 0; }
-
-/* Sticky first column — the feature/tool name stays pinned while a narrow viewport scrolls the
-   table sideways, mirroring the old React CategoryMatrix's sticky Kerf column. */
-.table-wrap table th:first-child, .table-wrap table td:first-child { position:sticky; left:0; z-index:2; }
-.table-wrap thead th:first-child { z-index:3; background:var(--elevated); box-shadow:1px 0 0 var(--border); }
-.table-wrap tbody td:first-child { background:var(--surface); box-shadow:1px 0 0 var(--border-2); }
-.table-wrap tbody tr:hover td:first-child { background:var(--border-2); }
 
 .honest { margin-top:2.25rem; border:1px solid var(--border); border-left:2px solid var(--gold-dim); border-radius:10px; background:var(--panel); padding:1.05rem 1.2rem; }
 .honest p { margin:0; font-size:.86rem; color:var(--text-3); line-height:1.68; }
@@ -156,6 +162,15 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
   .nav-links a.hide-sm { display:none; }
   .footer-right { margin-left:0; }
   section { padding:2.5rem 0; }
+}
+/* Same fix as site/index.html's own nav (commit fa8b6fe5): below ~430px the nav row still has
+   more unshrinkable content than the bar can give it — here worse than index.html's, because
+   this page keeps its own "parity" link visible (un-hidden, it's the active-page marker) instead
+   of hiding it like index.html does. Drop the github WORD and tighten the gap the same way. */
+@media (max-width:430px) {
+  .nav-links { gap:.6rem; }
+  .nav-links .gh { gap:0; }
+  .nav-links .gh span { display:none; }
 }
 @media (prefers-reduced-motion:reduce) {
   html { scroll-behavior:auto; }
@@ -196,408 +211,452 @@ td code { font-family:var(--mono); font-size:.74rem; color:var(--code-dim); }
 </section>
 <section>
   <div class="container">
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Capability</th><th>Kerf</th><th>KiCad</th></tr></thead>
-        <tbody>
-      <tr>
-        <td class="feat">Schematic capture (KiCad round-trip, ERC)<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/schematic/capture.py</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/eeschema/eeschema.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">PCB layout (tscircuit, KiCad round-trip)<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/kicad_io.py</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/pcbnew/pcbnew.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Interactive PCB editing (route/place)<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/routing/push_shove.py</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/pcbnew/pcbnew.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Push-and-shove router<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/routing/push_shove.py</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/pcbnew/pcbnew.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Autoroute (FreeRouting)<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/freerouting/freerouting.py</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://www.kicad.org/discover/pcb-design/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Differential pairs / length tuning<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/tools/diffpair.py</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/pcbnew/pcbnew.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">DRC / ERC<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/drc.py</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://docs.kicad.org/10.0/en/pcbnew/pcbnew.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">SPICE simulation<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/routes_spice.py</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Signal integrity (Z0/crosstalk/eye/IBIS)<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/si_eye_wizard.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://forum.kicad.info/t/signal-integrity-with-pcbnew-layouts/8652" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">EMC (radiated/shielding/limits)<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/emc_wizard.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://forum.kicad.info/t/signal-integrity-with-pcbnew-layouts/8652" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">PDN (DC IR-drop + AC sweep)<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/pdn/ac_impedance.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://forum.kicad.info/t/open-source-power-analysis-tool/21652" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">PCB thermal<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/thermal_board.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/pcbnew/pcbnew.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Stackup / impedance calculator<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/stackup/impedance.py</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/pcb_calculator/pcb_calculator.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Gerber / Excellon export<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/fab/gerber.py</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/pcbnew/pcbnew.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">IPC-2581 export<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/fab/ipc2581.py</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://www.kicad.org/blog/2026/03/Version-10.0.0-Released/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">ODB++ export<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/fab/odbpp/writer.py</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://www.kicad.org/blog/2026/03/Version-10.0.0-Released/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">3D PCB viewer (STEP export)<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/fab/board_step.py</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/getting_started_in_kicad/getting_started_in_kicad.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">ECAD importers (Allegro / PADS / gEDA / Eagle)<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/kicad_io.py</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://www.kicad.org/blog/2026/02/Three-New-Importers-in-KiCad-10-Allegro-PADS-and-gEDA/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Component / symbol library<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/atopile/library.py</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/kicad/kicad.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Design variants<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/tools/variants.py</code>
-        </td>
-        <td>
-          <span class="chip yes">yes</span>
-          
-          <a class="src" href="https://www.kicad.org/blog/2026/03/Version-10.0.0-Released/" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Panelisation<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/tools/panelize.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/pcbnew/pcbnew.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Monte-Carlo SPICE corner analysis<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/sim_corner.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Analog PVT-corner sim<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-silicon/src/kerf_silicon/analog/pvt.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Silicon synth (Yosys) / STA / GDS / DRC / LVS<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-silicon/src/kerf_silicon/bridges/yosys_bridge.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Antenna / link budget<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/antenna/element.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Battery/BMS, motor/gate/LED driver sizing<small>D6</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/charger/bms.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Wiring/harness (WireViz + 3D router)<small>D10</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/harness3d/router.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">PLC IEC 61131-3 (ST/Ladder/FB/motion)<small>D10</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/routes_spice.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Solar PV (system + partial shading)<small>D10</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/routes_spice.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Constraint sketcher (geo + dim)<small>D1</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/fab/board_step.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Assemblies — mates<small>D1</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/fab/board_step.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Should-cost (6 processes, Boothroyd-Dewhurst)<small>D14</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/tools/bom_cost.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr>
-      <tr>
-        <td class="feat">Material selection (Ashby)<small>D14</small></td>
-        <td>
-          <span class="chip yes">yes</span>
-          <code class="note">packages/kerf-electronics/src/kerf_electronics/tools/bom_cost.py</code>
-        </td>
-        <td>
-          <span class="chip no">no</span>
-          
-          <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
-        </td>
-      </tr></tbody>
-      </table>
-    </div>
+    <p class="lede" style="margin:0 0 1.1rem">Grouped by discipline (D1–D14), same as Kerf's own capability list. Click a section to expand it.</p>
+    
+      <details class="domain">
+        <summary>
+          <span class="domain-title"><span class="code">D1</span> Geometry &amp; core CAD</span>
+          <span class="domain-meta"><span>0 of 2 matched</span><span class="domain-caret" aria-hidden="true">›</span></span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>KiCad</th></tr></thead>
+            <tbody>
+        <tr>
+          <td class="feat">Constraint sketcher (geo + dim)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/fab/board_step.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Assemblies — mates</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/fab/board_step.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr></tbody>
+          </table>
+        </div>
+      </details>
+      <details class="domain">
+        <summary>
+          <span class="domain-title"><span class="code">D6</span> Electronics / EDA / silicon</span>
+          <span class="domain-meta"><span>16 of 26 matched</span><span class="domain-caret" aria-hidden="true">›</span></span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>KiCad</th></tr></thead>
+            <tbody>
+        <tr>
+          <td class="feat">Schematic capture (KiCad round-trip, ERC)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/schematic/capture.py</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/eeschema/eeschema.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">PCB layout (tscircuit, KiCad round-trip)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/kicad_io.py</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/pcbnew/pcbnew.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Interactive PCB editing (route/place)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/routing/push_shove.py</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/pcbnew/pcbnew.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Push-and-shove router</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/routing/push_shove.py</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/pcbnew/pcbnew.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Autoroute (FreeRouting)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/freerouting/freerouting.py</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://www.kicad.org/discover/pcb-design/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Differential pairs / length tuning</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/tools/diffpair.py</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/pcbnew/pcbnew.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">DRC / ERC</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/drc.py</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://docs.kicad.org/10.0/en/pcbnew/pcbnew.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">SPICE simulation</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/routes_spice.py</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Signal integrity (Z0/crosstalk/eye/IBIS)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/si_eye_wizard.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://forum.kicad.info/t/signal-integrity-with-pcbnew-layouts/8652" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">EMC (radiated/shielding/limits)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/emc_wizard.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://forum.kicad.info/t/signal-integrity-with-pcbnew-layouts/8652" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">PDN (DC IR-drop + AC sweep)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/pdn/ac_impedance.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://forum.kicad.info/t/open-source-power-analysis-tool/21652" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">PCB thermal</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/thermal_board.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/pcbnew/pcbnew.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Stackup / impedance calculator</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/stackup/impedance.py</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/pcb_calculator/pcb_calculator.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Gerber / Excellon export</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/fab/gerber.py</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/pcbnew/pcbnew.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">IPC-2581 export</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/fab/ipc2581.py</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://www.kicad.org/blog/2026/03/Version-10.0.0-Released/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">ODB++ export</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/fab/odbpp/writer.py</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://www.kicad.org/blog/2026/03/Version-10.0.0-Released/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">3D PCB viewer (STEP export)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/fab/board_step.py</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/getting_started_in_kicad/getting_started_in_kicad.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">ECAD importers (Allegro / PADS / gEDA / Eagle)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/kicad_io.py</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://www.kicad.org/blog/2026/02/Three-New-Importers-in-KiCad-10-Allegro-PADS-and-gEDA/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Component / symbol library</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/atopile/library.py</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/kicad/kicad.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Design variants</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/tools/variants.py</code>
+          </td>
+          <td>
+            <span class="chip yes">yes</span>
+            
+            <a class="src" href="https://www.kicad.org/blog/2026/03/Version-10.0.0-Released/" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Panelisation</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/tools/panelize.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/pcbnew/pcbnew.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Monte-Carlo SPICE corner analysis</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/sim_corner.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Analog PVT-corner sim</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-silicon/src/kerf_silicon/analog/pvt.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Silicon synth (Yosys) / STA / GDS / DRC / LVS</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-silicon/src/kerf_silicon/bridges/yosys_bridge.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Antenna / link budget</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/antenna/element.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Battery/BMS, motor/gate/LED driver sizing</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/charger/bms.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr></tbody>
+          </table>
+        </div>
+      </details>
+      <details class="domain">
+        <summary>
+          <span class="domain-title"><span class="code">D10</span> Electrical / energy / PLC</span>
+          <span class="domain-meta"><span>0 of 3 matched</span><span class="domain-caret" aria-hidden="true">›</span></span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>KiCad</th></tr></thead>
+            <tbody>
+        <tr>
+          <td class="feat">Wiring/harness (WireViz + 3D router)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/harness3d/router.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">PLC IEC 61131-3 (ST/Ladder/FB/motion)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/routes_spice.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Solar PV (system + partial shading)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/routes_spice.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr></tbody>
+          </table>
+        </div>
+      </details>
+      <details class="domain">
+        <summary>
+          <span class="domain-title"><span class="code">D14</span> Cost / materials / LCA</span>
+          <span class="domain-meta"><span>0 of 2 matched</span><span class="domain-caret" aria-hidden="true">›</span></span>
+        </summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="feat">Capability</th><th>Kerf</th><th>KiCad</th></tr></thead>
+            <tbody>
+        <tr>
+          <td class="feat">Should-cost (6 processes, Boothroyd-Dewhurst)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/tools/bom_cost.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="feat">Material selection (Ashby)</td>
+          <td>
+            <span class="chip yes">yes</span>
+            <code class="note">packages/kerf-electronics/src/kerf_electronics/tools/bom_cost.py</code>
+          </td>
+          <td>
+            <span class="chip no">no</span>
+            
+            <a class="src" href="https://docs.kicad.org/8.0/en/introduction/introduction.html" target="_blank" rel="noreferrer nofollow">source ↗</a>
+          </td>
+        </tr></tbody>
+          </table>
+        </div>
+      </details>
     <ul class="legend">
       <li><span class="chip yes">yes</span> shipped</li>
       <li><span class="chip partial">partial</span> works with limits</li>

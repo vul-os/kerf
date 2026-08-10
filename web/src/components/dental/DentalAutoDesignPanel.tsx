@@ -334,6 +334,7 @@ export default function DentalAutoDesignPanel(_props: Props) {
       <button
         onClick={handleAutoDesign}
         disabled={running}
+        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         style={{
           width: '100%', padding: '10px 0', borderRadius: 8, border: 'none',
           background: running ? '#374151' : '#2563eb', color: '#fff',

@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from pydantic import BaseModel
 from urllib.parse import urlencode, urlparse
 
+from kerf_core.db.errors import is_unique_violation
 from kerf_core.config import get_settings
 from kerf_core.db.connection import get_pool_required
 from kerf_core.db.queries import users as users_queries
@@ -234,7 +235,9 @@ async def register(
 
         try:
             user = await users_queries.create_user(conn, email, req.name, password_hash)
-        except asyncpg.UniqueViolationError:
+        except Exception as exc:
+            if not is_unique_violation(exc):
+                raise
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="email already registered")
 
         display_name = req.name
@@ -830,7 +833,12 @@ async def bootstrap_local(response: Response):
             try:
                 user = await users_queries.create_user(conn, email, name, None, None)
                 user = dict(user)
-            except asyncpg.UniqueViolationError:
+            except Exception as exc:
+                # Two requests can bootstrap the singleton at once (a second
+                # tab, or two e2e workers). Losing that race is fine — read
+                # back the row the winner wrote.
+                if not is_unique_violation(exc):
+                    raise
                 user = await users_queries.get_user_by_email(conn, email)
 
         if not user:

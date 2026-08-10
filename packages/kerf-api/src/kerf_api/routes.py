@@ -24,6 +24,7 @@ from fastapi.responses import StreamingResponse, RedirectResponse
 from pydantic import BaseModel
 from urllib.parse import urlencode
 
+from kerf_core.db.errors import is_unique_violation
 from kerf_core.config import get_settings
 from kerf_core.db.connection import get_pool_required
 from kerf_core.db.queries import users as users_queries
@@ -762,7 +763,9 @@ async def create_workspace(req: CreateWorkspaceRequest, payload: dict = Depends(
         async with conn.transaction():
             try:
                 workspace = await workspaces_queries.create_workspace(conn, slug, name, user_id)
-            except asyncpg.UniqueViolationError:
+            except Exception as exc:
+                if not is_unique_violation(exc):
+                    raise
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="slug already in use")
 
             await workspaces_queries.add_workspace_member(conn, workspace["id"], user_id, "owner")

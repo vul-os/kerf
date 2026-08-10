@@ -303,3 +303,50 @@ class TestSqliteCorePath:
             got = await conn.fetchrow("SELECT 1 FROM users WHERE email=$1", "t@x.io")
             assert got is None
 
+
+
+class TestUniqueViolationPredicate:
+    """`is_unique_violation` must recognise BOTH drivers.
+
+    The regression: route handlers caught `asyncpg.UniqueViolationError`, which
+    never arrives on the embedded backend, so a duplicate answered 500 instead
+    of 409 — and /auth/bootstrap-local's lost-race recovery never fired, which
+    surfaced as "Your session expired" on a fresh local install.
+    """
+
+    def test_recognises_sqlite_unique_violation(self):
+        import sqlite3
+
+        from kerf_core.db.errors import is_unique_violation
+
+        conn = sqlite3.connect(":memory:")
+        conn.execute("CREATE TABLE u (email text UNIQUE)")
+        conn.execute("INSERT INTO u VALUES ('a@b.c')")
+        try:
+            conn.execute("INSERT INTO u VALUES ('a@b.c')")
+            raise AssertionError("expected an IntegrityError")
+        except sqlite3.IntegrityError as exc:
+            assert is_unique_violation(exc), exc
+
+    def test_recognises_asyncpg_unique_violation(self):
+        import asyncpg
+
+        from kerf_core.db.errors import is_unique_violation
+
+        assert is_unique_violation(asyncpg.UniqueViolationError("duplicate key"))
+
+    def test_other_integrity_errors_are_not_unique_violations(self):
+        """NOT NULL / FK failures share IntegrityError and must keep propagating."""
+        import sqlite3
+
+        from kerf_core.db.errors import is_unique_violation
+
+        conn = sqlite3.connect(":memory:")
+        conn.execute("CREATE TABLE u (email text NOT NULL)")
+        try:
+            conn.execute("INSERT INTO u VALUES (NULL)")
+            raise AssertionError("expected an IntegrityError")
+        except sqlite3.IntegrityError as exc:
+            assert not is_unique_violation(exc), exc
+
+        assert not is_unique_violation(ValueError("nope"))

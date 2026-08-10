@@ -317,11 +317,27 @@ jobs:
           echo "Built ${count} wheel(s):"
           ls -lh release-wheels/
 
+      # Bundle the wheels into ONE archive rather than attaching ~40 loose
+      # .whl files to the release. A release page listing forty wheels buries
+      # the four downloads a human actually wants (the platform tarballs), and
+      # nobody installs Kerf by picking wheels off a web page one at a time.
+      # The bundle stays in release-out/, so SHA256SUMS and the provenance
+      # attestation still cover every wheel byte.
+      - name: Bundle wheels into a single archive
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          tar czf "release-wheels-bundle/kerf-wheels-${VERSION}.tar.gz" -C release-wheels .             2>/dev/null || {
+              mkdir -p release-wheels-bundle
+              tar czf "release-wheels-bundle/kerf-wheels-${VERSION}.tar.gz" -C release-wheels .
+            }
+          ls -lh release-wheels-bundle/
+
       - name: Upload wheels as workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: python-wheels
-          path: release-wheels/*.whl
+          path: release-wheels-bundle/*.tar.gz
           retention-days: 1
           if-no-files-found: error
 

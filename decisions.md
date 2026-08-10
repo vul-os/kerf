@@ -2035,3 +2035,70 @@ cores, so treat these as a ratio not an absolute):** 28 tests, Vite dev + SQLite
 `web/tests/e2e/global-setup.ts`, nine files under `web/tests/e2e/specs/`, `.gitignore`,
 `decisions.md` (this entry).
 
+## 2026-08-11 SAST — What the first CI runs on SQLite found (four more defects, and why bim was never flaky)
+
+Running the E2E suite on the embedded backend for the first time turned up three more
+Postgres-only defects and one wrong assumption in my own test wiring. Recording them together
+because the pattern matters more than any one of them.
+
+**4. Every file save 500'd.** `PATCH /api/projects/{id}/files/{id}` — the autosave route, about as
+core as this app gets — computed its idempotency window as
+`created_at >= now() - ($2 * interval '1 second')`. Interval literals are Postgres-only, so the
+embedded backend answered `near "'1 second'": syntax error`, thirteen times in one CI run. Same
+literal in the rate-limit GC worker and the tessellation stuck-job recovery. All three now floor
+the cutoff in Python and bind it, which also removed an f-string that was interpolating a
+constant into SQL text.
+
+This is also the honest explanation for two "flaky" specs: `bim` waits for a successful PATCH
+before it renders, and `sketch` reloads and expects its file to have persisted. Neither was
+flaky. Both were sitting on a broken save.
+
+**5. `FOR UPDATE OF <alias>` was mistranslated — the worst kind of bug, because the construct
+*was* handled.** The dialect layer stripped `FOR UPDATE` and `SKIP LOCKED` but left the `OF j`
+between them, producing `SELECT … FROM jobs j  OF j` — which SQLite rejects with
+`near "OF": syntax error`. That spelling is what every job-claim query uses (kerf-cam, kerf-fem,
+kerf-tess, and kerf-workers' `job_mixin` and `base`), so no worker could claim a job on a default
+install. The rule now consumes the optional `OF` clause and `NOWAIT`, and the test asserts the
+*translated SQL parses* rather than merely that the keywords are gone — an assertion on absence
+would have passed against the broken output.
+
+**6. `except asyncpg.UniqueViolationError` never fires on SQLite.** Three handlers caught that
+class by name to turn a duplicate into a 409, or to absorb a lost insert race. The embedded
+driver raises `sqlite3.IntegrityError`, so none of them ran: a duplicate signup email and a
+duplicate workspace slug answered 500 instead of 409, and `POST /auth/bootstrap-local`'s
+lost-race recovery — two requests bootstrapping the local singleton user at once — became a 500
+that the UI rendered as **"Your session expired — sign in again" on a fresh local install**.
+That one matters most: local mode is what the desktop binary runs.
+
+New `kerf_core/db/errors.py` provides `is_unique_violation(exc)`, recognising both drivers.
+SQLite reuses `IntegrityError` for NOT NULL, CHECK and foreign-key failures, so it matches on the
+message tag and lets the others keep propagating — with a test for exactly that.
+
+**Two things wrong in the suite's own wiring, both mine:**
+
+**Playwright starts `webServer` BEFORE `globalSetup`.** I had put the migrations in the
+globalSetup hook, so both servers booted against an empty database file and logged
+`no such table: distributor_credentials` while initialising, then worked anyway because the query
+layer opens connections per request. Only boot-time initialisation was the casualty — the quiet
+kind. The CI log makes the ordering unambiguous: `Application startup complete` at 21:35:51 and
+21:35:55, `databases ready` at 21:35:57. Preparation now happens at config module scope, which
+runs before Playwright starts anything, guarded by `TEST_WORKER_INDEX` so the per-worker config
+reload does not clear the rate-limit buckets mid-run.
+
+**There was no per-test timeout, and that is why bim looked flaky for weeks.** The config set
+`actionTimeout: 30_000` and specs asked for 20-30s on individual assertions, but never set
+`timeout`, so each test ran under Playwright's 30s default — meaning a single step was permitted
+to consume the entire test. `bim` takes ~29-33s end to end (create project, load editor, type
+into Monaco, await autosave, boot web-ifc's WASM, render), so it passed or failed on machine
+noise rather than on anything in the code. It passed at 28.8s in one CI run and failed at 30s in
+the next with no relevant change in between. The per-test budget is now 120s; every individual
+step is still bounded, so a genuine hang still fails — just at 120s instead of masquerading as a
+flake at 30s.
+
+**Affected:** `packages/kerf-api/src/kerf_api/routes.py`,
+`packages/kerf-auth/src/kerf_auth/routes.py`,
+`packages/kerf-core/src/kerf_core/db/{dialect.py,errors.py}`,
+`packages/kerf-core/src/kerf_core/workers/rate_limit_gc_worker.py`,
+`packages/kerf-tess/src/kerf_tess/worker.py`,
+`packages/kerf-core/tests/test_sqlite_backend.py`,
+`web/tests/e2e/{playwright.config.ts,global-setup.ts}`, `decisions.md` (this entry).

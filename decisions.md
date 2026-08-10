@@ -1731,3 +1731,92 @@ comment), all 33 `packages/kerf-*/pyproject.toml` (deleted
 `[tool.pytest.ini_options]`, left a pointer comment), `Makefile`
 (`test-kernel`: dropped now-redundant `--rootdir=.`, rewrote its comment),
 `docs/TESTING.md` (new root cause #5 section).
+
+## 2026-08-10 02:50 SAST — kerf.toml went from documented-but-ignored to actually parsed
+
+**Context:** `kerf.toml` is documented everywhere (README, CONTRIBUTING.md,
+docs/, and a full `kerf.example.toml` ships in the repo) as THE way to
+configure Kerf. `Settings.load(config_path)` in
+`packages/kerf-core/src/kerf_core/config.py` accepted `config_path` and
+threw it away — its own docstring admitted TOML support didn't exist yet.
+`kerf-server --config kerf.toml` silently discarded every value a user put
+in the file; only `.env` and real env vars ever took effect. Separately,
+even the `port` field of `Settings` was never wired to what uvicorn
+actually bound to — `__main__.py`'s `--port`/`KERF_PORT` handling bypassed
+`Settings` entirely.
+
+**Decision — path resolution** (highest wins): explicit `config_path`
+(`--config` flag / `create_app(config_path=...)`) > `KERF_CONFIG` env var
+> `./kerf.toml` > `~/.kerf/kerf.toml` > no file (defaults only). An
+explicit `config_path` now force-sets `KERF_CONFIG` (was `setdefault`
+before — silently lost to a stale env var) so it truly outranks it.
+
+**Decision — value precedence** (highest wins): real process env vars >
+the `.env` file > `kerf.toml` > built-in field default. Chose env-over-TOML
+deliberately, not TOML-over-env: 12-factor apps expect `docker run -e
+PORT=...`-style overrides to win regardless of what's baked into a config
+file, and every existing Kerf deployment already relies on env vars/.env
+taking effect. Implemented via `Settings.settings_customise_sources()`,
+inserting a custom `_KerfTomlSettingsSource` between pydantic-settings'
+built-in `dotenv_settings` and `file_secret_settings` sources — earlier
+tuple entries win, so this lands exactly where intended without touching
+how env/.env already work.
+
+**Decision — missing vs. malformed:** a kerf.toml that doesn't resolve to
+any existing file falls through to defaults silently (most installs never
+create one). A file that exists but fails to parse — bad TOML syntax, or
+an `auth.access_ttl`/`auth.refresh_ttl` that isn't a `"15m"`/`"720h"`-style
+duration — raises `RuntimeError` naming the file path immediately, rather
+than booting on silently-wrong defaults. Chose loud-for-malformed because
+a typo'd key silently doing nothing is exactly the failure mode this whole
+task exists to close.
+
+**Mapped every section `kerf.example.toml` documents:** `[server]`
+(port/env/cors_origin/local_mode), `[database]` (url), `[auth]`
+(jwt_secret/access_ttl/refresh_ttl/password_pepper + `[auth.google]`),
+`[storage]` (backend/local_path/filesystem_root/cdn_base_url +
+`[storage.s3]`), `[llm]` (default_model + `[llm.anthropic/openai/
+moonshot/gemini]`.api_key), `[usage]` (enabled), `[limits]`
+(max_threads_per_project/file_revisions_max/step_max_bytes/
+upload_chunk_size/upload_session_ttl_hours/step_tessellate_workers/
+step_tessellate_timeout_sec), `[system_user]` (email/name/password).
+
+**Not mapped, and why:** `[limits].step_tessellate_node_bin` and
+`step_tessellate_script` are documented (commented-out) in
+`kerf.example.toml` but have no `Settings` field anywhere in the
+codebase — no code path reads them under any name today. Left unmapped
+rather than inventing a field with unclear ownership; a TOML file that
+sets them is accepted (pydantic's `extra='ignore'`) but has no effect,
+same as before this change. `cdn_s3_*` fields on `Settings` (a second,
+separate CDN bucket) have no `[storage]` counterpart in
+`kerf.example.toml` either — left as env-only, since the example file
+never advertised a TOML shape for them.
+
+**Also fixed the `port` dead end:** `Settings.port` existed but nothing
+consumed it — `__main__.py` computed uvicorn's bind port from
+`--port`/`KERF_PORT` alone, so even after TOML parsing worked, a
+`[server].port` in kerf.toml still wouldn't change what the server bound
+to. `--port` now defaults to `None` (was `int(...)` with a baked-in
+default) so `main()` can tell "not given" apart from "given" and fall
+through: `--port` > `KERF_PORT` env > `Settings.load(args.config).port`
+(itself env > toml > default) > `8080`. `--port`/`KERF_PORT` behavior is
+unchanged; only the previously-silent kerf.toml case is new.
+
+**Verification:** `tomllib` is stdlib (Python 3.11+, already required by
+`pyproject.toml`) — no `tomli` dependency added, consistent with why it
+was previously removed from kerf-core. 20 new hermetic tests added in
+`packages/kerf-core/tests/test_config_toml.py` (precedence at each stage,
+every section, missing file, malformed syntax, malformed duration, path
+resolution at all four levels, and a regression guard that the shipped
+`kerf.example.toml` itself always parses) — all pass. Full
+`packages/kerf-core/tests` suite: 357 passed, 18 skipped, 8 pre-existing
+failures in `test_access_control_derived_artifacts.py` (confirmed via
+`git stash` unrelated to this change — same 8 failures on unmodified
+main). End-to-end: booted `kerf-server --config <tmp toml>` with
+`KERF_STRICT_PLUGINS=true` and a `[server].port` override; server bound
+the TOML port; `plugin_register_failed=0` in the strict-plugin boot log.
+
+**Affected:** `packages/kerf-core/src/kerf_core/config.py` (TOML source +
+precedence wiring), `packages/kerf-core/src/kerf_core/__main__.py` (port
+fallthrough), `packages/kerf-core/tests/test_config_toml.py` (new, 20
+tests), `decisions.md` (this entry).

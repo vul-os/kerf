@@ -195,7 +195,7 @@ function CalcBtn({ onClick, loading, disabled, label = 'Calculate' }: {
   return (
     <button type="button" onClick={onClick}
       disabled={loading || disabled}
-      className="flex items-center justify-center gap-2 w-full py-2 rounded-md bg-kerf-300/15 border border-kerf-300/40 text-kerf-200 hover:bg-kerf-300/25 disabled:opacity-50 text-xs font-medium">
+      className="flex items-center justify-center gap-2 w-full py-2 rounded-md bg-kerf-300/15 border border-kerf-300/40 text-kerf-200 hover:bg-kerf-300/25 disabled:opacity-50 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
       {loading ? <Loader2 size={12} className="animate-spin" /> : <Calculator size={12} />}
       {loading ? 'Calculating…' : label}
     </button>
@@ -340,7 +340,7 @@ function PressureDropTab({ token }: TabProps) {
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-medium text-ink-400">Pipe segments</span>
           <button type="button" onClick={() => setSegments(p => [...p, DEFAULT_SEGMENT()])}
-            className="flex items-center gap-1 text-[10px] text-kerf-300 hover:text-kerf-200">
+            className="flex items-center gap-1 text-[10px] text-kerf-300 hover:text-kerf-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
             <Plus size={10} /> Add
           </button>
         </div>
@@ -359,7 +359,8 @@ function PressureDropTab({ token }: TabProps) {
               <NumInput value={seg.roughness} onChange={v => setSegments(p => p.map(s => s.id === seg.id ? {...s, roughness: v} : s))} />
             </label>
             <button type="button" onClick={() => setSegments(p => p.filter(s => s.id !== seg.id))}
-              className="text-ink-600 hover:text-red-400 self-center mt-3">
+              className="text-ink-600 hover:text-red-400 self-center mt-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
+              aria-label="Remove pipe segment">
               <Trash2 size={11} />
             </button>
           </div>
@@ -370,7 +371,7 @@ function PressureDropTab({ token }: TabProps) {
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-medium text-ink-400">Fittings (Crane TP-410)</span>
           <button type="button" onClick={() => setFittings(p => [...p, DEFAULT_FITTING()])}
-            className="flex items-center gap-1 text-[10px] text-kerf-300 hover:text-kerf-200">
+            className="flex items-center gap-1 text-[10px] text-kerf-300 hover:text-kerf-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
             <Plus size={10} /> Add
           </button>
         </div>
@@ -392,7 +393,8 @@ function PressureDropTab({ token }: TabProps) {
                 <NumInput value={fit.qty} onChange={v => setFittings(p => p.map(f => f.id === fit.id ? {...f, qty: v} : f))} min="1" />
               </label>
               <button type="button" onClick={() => setFittings(p => p.filter(f => f.id !== fit.id))}
-                className="text-ink-600 hover:text-red-400 mb-1">
+                className="text-ink-600 hover:text-red-400 mb-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
+                aria-label="Remove fitting">
                 <Trash2 size={11} />
               </button>
             </div>
@@ -851,7 +853,7 @@ export default function PipingDesignPanel({ content: _content }: { content?: str
             key={id}
             type="button"
             onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-1 px-2.5 py-2 text-[10px] font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-1 px-2.5 py-2 text-[10px] font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${
               activeTab === id
                 ? 'border-kerf-300 text-kerf-200'
                 : 'border-transparent text-ink-500 hover:text-ink-300'

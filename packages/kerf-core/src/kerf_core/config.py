@@ -1,15 +1,228 @@
 import base64
 import os
+import re
+import tomllib
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import Field, model_validator
+from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings.sources import PydanticBaseSettingsSource
 
 from kerf_core.db.config import default_database_url
 
 _REPO_ROOT_ENV = str(Path(__file__).resolve().parent.parent / ".env")
+
+
+# =============================================================================
+# kerf.toml support
+#
+# tomllib is stdlib (Python 3.11+, which this project already requires — see
+# pyproject.toml's requires-python), so no tomli dependency is added.
+# =============================================================================
+
+# Duration strings as used by kerf.example.toml's [auth] section, e.g.
+# "15m", "720h". Deliberately simple (one number + one unit) — matches what
+# the example file documents; not a general ISO-8601/Go-duration parser.
+_DURATION_RE = re.compile(r"^\s*(\d+)\s*(s|m|h|d|w)\s*$")
+_DURATION_UNIT_SECONDS = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
+
+
+def _resolve_toml_path() -> Optional[Path]:
+    """Pick the kerf.toml path to load, or None if none applies.
+
+    Resolution order (highest wins):
+      1. KERF_CONFIG env var — set unconditionally by Settings.load() when
+         an explicit config_path is passed, so an explicit --config always
+         beats a pre-existing KERF_CONFIG in the environment.
+      2. ./kerf.toml (current working directory)
+      3. ~/.kerf/kerf.toml
+
+    Candidates 2 and 3 are implicit defaults, not user directives, so they
+    are only used if the file actually exists there. Candidate 1 is a user
+    directive (explicit path or KERF_CONFIG) — if it doesn't exist, that is
+    handled as a missing file (fall through to defaults silently), not an
+    error; see _KerfTomlSettingsSource.__call__.
+    """
+    explicit = os.environ.get("KERF_CONFIG", "")
+    if explicit:
+        return Path(explicit).expanduser()
+    cwd_candidate = Path("kerf.toml")
+    if cwd_candidate.is_file():
+        return cwd_candidate
+    home_candidate = Path.home() / ".kerf" / "kerf.toml"
+    if home_candidate.is_file():
+        return home_candidate
+    return None
+
+
+def _parse_duration_seconds(value: str, toml_path: Path, key: str) -> int:
+    """Parse a "15m" / "720h" style duration string into whole seconds.
+
+    Raises RuntimeError (not ValueError) so it reads the same as the
+    TOMLDecodeError path below: a malformed kerf.toml value fails loudly,
+    with the file path and the offending key, instead of booting on a
+    silently-wrong default.
+    """
+    match = _DURATION_RE.match(str(value))
+    if not match:
+        raise RuntimeError(
+            f"Malformed kerf.toml at {toml_path}: {key} = {value!r} is not a "
+            "duration like '15m' or '720h' (supported suffixes: s, m, h, d, w)"
+        )
+    amount, unit = match.groups()
+    return int(amount) * _DURATION_UNIT_SECONDS[unit]
+
+
+def _flatten_kerf_toml(data: dict, toml_path: Path) -> dict[str, Any]:
+    """Map the [section] structure documented in kerf.example.toml onto
+    Settings' flat field names.
+
+    Only keys kerf.example.toml actually documents are mapped here. A
+    couple of keys it documents (step_tessellate_node_bin,
+    step_tessellate_script) have no corresponding Settings field anywhere
+    in the codebase — they are deliberately left unmapped rather than
+    inventing a field for them; see decisions.md.
+    """
+    out: dict[str, Any] = {}
+
+    server = data.get("server", {})
+    if "port" in server:
+        # Settings.port is typed str; tolerate a bare TOML integer
+        # (port = 8080) as well as the documented quoted form.
+        out["port"] = str(server["port"])
+    if "env" in server:
+        out["env"] = server["env"]
+    if "cors_origin" in server:
+        out["cors_origin"] = server["cors_origin"]
+    if "local_mode" in server:
+        out["local_mode"] = server["local_mode"]
+
+    database = data.get("database", {})
+    if "url" in database:
+        out["database_url"] = database["url"]
+
+    auth = data.get("auth", {})
+    if "jwt_secret" in auth:
+        out["jwt_secret"] = auth["jwt_secret"]
+    if "access_ttl" in auth:
+        out["jwt_access_ttl_minutes"] = (
+            _parse_duration_seconds(auth["access_ttl"], toml_path, "auth.access_ttl") // 60
+        )
+    if "refresh_ttl" in auth:
+        out["jwt_refresh_ttl_days"] = (
+            _parse_duration_seconds(auth["refresh_ttl"], toml_path, "auth.refresh_ttl") // 86400
+        )
+    if "password_pepper" in auth:
+        out["password_pepper"] = auth["password_pepper"]
+    google = auth.get("google", {})
+    if "client_id" in google:
+        out["google_client_id"] = google["client_id"]
+    if "client_secret" in google:
+        out["google_client_secret"] = google["client_secret"]
+    if "redirect_url" in google:
+        out["google_redirect_url"] = google["redirect_url"]
+
+    storage = data.get("storage", {})
+    if "backend" in storage:
+        out["storage_backend"] = storage["backend"]
+    if "local_path" in storage:
+        out["local_storage_path"] = storage["local_path"]
+    if "filesystem_root" in storage:
+        out["filesystem_root"] = storage["filesystem_root"]
+    if "cdn_base_url" in storage:
+        out["cdn_base_url"] = storage["cdn_base_url"]
+    s3 = storage.get("s3", {})
+    if "bucket" in s3:
+        out["s3_bucket"] = s3["bucket"]
+    if "region" in s3:
+        out["s3_region"] = s3["region"]
+    if "access_key_id" in s3:
+        out["s3_access_key_id"] = s3["access_key_id"]
+    if "secret_access_key" in s3:
+        out["s3_secret_access_key"] = s3["secret_access_key"]
+    if "endpoint" in s3:
+        out["s3_endpoint"] = s3["endpoint"]
+    if "public_url_base" in s3:
+        out["s3_public_url_base"] = s3["public_url_base"]
+
+    llm = data.get("llm", {})
+    if "default_model" in llm:
+        out["default_model"] = llm["default_model"]
+    for provider, field_name in (
+        ("anthropic", "anthropic_api_key"),
+        ("openai", "openai_api_key"),
+        ("moonshot", "moonshot_api_key"),
+        ("gemini", "gemini_api_key"),
+    ):
+        section = llm.get(provider, {})
+        if "api_key" in section:
+            out[field_name] = section["api_key"]
+
+    usage = data.get("usage", {})
+    if "enabled" in usage:
+        out["usage_enabled"] = usage["enabled"]
+
+    limits = data.get("limits", {})
+    for key in (
+        "max_threads_per_project",
+        "file_revisions_max",
+        "step_max_bytes",
+        "upload_chunk_size",
+        "upload_session_ttl_hours",
+        "step_tessellate_workers",
+        "step_tessellate_timeout_sec",
+    ):
+        if key in limits:
+            out[key] = limits[key]
+
+    system_user = data.get("system_user", {})
+    if "email" in system_user:
+        out["system_user_email"] = system_user["email"]
+    if "name" in system_user:
+        out["system_user_name"] = system_user["name"]
+    if "password" in system_user:
+        out["system_user_password"] = system_user["password"]
+
+    return out
+
+
+class _KerfTomlSettingsSource(PydanticBaseSettingsSource):
+    """pydantic-settings source that loads kerf.toml, if one resolves.
+
+    This class only knows how to FIND and PARSE the file. Where it ranks
+    relative to env vars / .env / defaults is decided entirely by its
+    position in the tuple Settings.settings_customise_sources() returns —
+    see that method for the actual precedence decision and rationale.
+    """
+
+    def get_field_value(self, field: FieldInfo, field_name: str) -> tuple[Any, str, bool]:
+        # Unused: __call__ is overridden below to return one fully-built
+        # dict in a single pass, because TOML keys are renamed and nested
+        # (e.g. [auth.google].client_id -> google_client_id) rather than a
+        # 1:1 field-name lookup this method could answer per-field.
+        return None, field_name, False
+
+    def __call__(self) -> dict[str, Any]:
+        path = _resolve_toml_path()
+        if path is None or not path.is_file():
+            # No kerf.toml resolves anywhere — fall through to defaults
+            # (or whatever env vars/.env already provide) silently. Most
+            # installs never create a kerf.toml at all.
+            return {}
+        try:
+            with path.open("rb") as fh:
+                data = tomllib.load(fh)
+        except tomllib.TOMLDecodeError as exc:
+            # The file exists but doesn't parse: almost certainly a typo,
+            # not an absent config. Fail loudly with the path so it's
+            # obvious which file is broken, rather than silently booting
+            # on defaults and leaving the user to wonder why their
+            # settings never took effect.
+            raise RuntimeError(f"Malformed kerf.toml at {path}: {exc}") from exc
+        return _flatten_kerf_toml(data, path)
 
 
 class Settings(BaseSettings):
@@ -193,15 +406,66 @@ class Settings(BaseSettings):
         return self
 
     @classmethod
-    def load(cls, config_path: str = "") -> "Settings":
-        """Load a Settings instance.
+    def settings_customise_sources(
+        cls,
+        settings_cls,
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    ):
+        """Wire kerf.toml into the source chain, deliberately below env/.env.
 
-        ``config_path`` is currently unused (we read environment variables and
-        the .env file); accepted for API compatibility with future TOML
-        support and for use by ``kerf_core.app.create_app(config_path=...)``.
+        pydantic-settings gives earlier tuple entries higher priority. We
+        insert the TOML source between dotenv_settings and
+        file_secret_settings, producing (highest to lowest):
+
+          init kwargs (tests) > env vars > .env file > kerf.toml > defaults
+
+        Env vars and .env sit ABOVE kerf.toml on purpose: 12-factor
+        deployments expect `docker run -e PORT=...`-style overrides to win
+        no matter what's baked into a config file, and every existing Kerf
+        deployment already relies on that. kerf.toml sits ABOVE the
+        built-in field defaults so that writing a value there actually
+        changes behaviour — closing the gap this class used to have, where
+        config_path was accepted and silently discarded. See decisions.md
+        for the record of this choice.
+        """
+        return (
+            init_settings,
+            env_settings,
+            dotenv_settings,
+            _KerfTomlSettingsSource(settings_cls),
+            file_secret_settings,
+        )
+
+    @classmethod
+    def load(cls, config_path: str = "") -> "Settings":
+        """Load a Settings instance, applying kerf.toml if one resolves.
+
+        Path resolution for *which file* to read (highest wins):
+          1. ``config_path`` — explicit --config flag, or
+             create_app(config_path=...). Forces KERF_CONFIG so it wins
+             over any KERF_CONFIG already set in the environment.
+          2. KERF_CONFIG environment variable
+          3. ./kerf.toml (current working directory)
+          4. ~/.kerf/kerf.toml
+          5. none — Settings falls back to env vars / .env / defaults only.
+
+        Precedence for the *value* of any individual setting (highest
+        wins), enforced by settings_customise_sources() above:
+          1. real process environment variables
+          2. the .env file (model_config's env_file)
+          3. kerf.toml, resolved per the path rules above
+          4. the field default declared on Settings
+
+        A missing kerf.toml is not an error (most installs never create
+        one). A *present but malformed* kerf.toml raises immediately —
+        RuntimeError with the file path and the parser error — rather than
+        silently booting on defaults.
         """
         if config_path:
-            os.environ.setdefault("KERF_CONFIG", config_path)
+            os.environ["KERF_CONFIG"] = config_path
         return cls()
 
 

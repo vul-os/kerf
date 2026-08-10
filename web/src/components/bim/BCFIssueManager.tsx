@@ -224,7 +224,7 @@ function AddTopicModal({ onAdd, onClose }: AddTopicModalProps) {
       <div className="w-full max-w-lg rounded-xl border border-ink-700 bg-ink-900 p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-ink-100">New BCF Topic</h2>
-          <button type="button" onClick={onClose} className="rounded p-1 text-ink-400 hover:bg-ink-800 hover:text-ink-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
+          <button type="button" onClick={onClose} aria-label="Close new BCF topic dialog" className="rounded p-1 text-ink-400 hover:bg-ink-800 hover:text-ink-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
             <X size={15} />
           </button>
         </div>
@@ -649,7 +649,7 @@ export default function BCFIssueManager({ projectId, className = '' }: Props) {
         <div className="border-b border-red-800 bg-red-950/40 px-4 py-2 text-xs text-red-300 flex items-center gap-2">
           <AlertTriangle size={12} />
           {importError}
-          <button type="button" onClick={() => setImportError('')} className="ml-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
+          <button type="button" onClick={() => setImportError('')} aria-label="Dismiss import error" className="ml-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
             <X size={12} />
           </button>
         </div>

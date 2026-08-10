@@ -261,6 +261,7 @@ export default function DrcErcPanel({ circuitJson, onClose, onMarkerClick }: Drc
           <button
             data-testid="drc-erc-close"
             onClick={onClose}
+            aria-label="Close DRC/ERC panel"
             className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <X size={12} />

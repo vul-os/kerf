@@ -413,6 +413,7 @@ export default function SIPanel({ onClose }: SIPanelProps) {
         </span>
         <button
           data-testid="si-panel-close"
+          aria-label="Close signal integrity panel"
           onClick={onClose}
           className="ml-auto p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >

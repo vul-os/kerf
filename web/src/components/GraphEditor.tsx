@@ -413,6 +413,7 @@ function InspectorPanel({ node, results, onParamUpdate, onDelete, onClose }: Ins
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close node inspector"
             className="p-1 rounded text-ink-500 hover:text-ink-100 hover:bg-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <X size={12} />
@@ -753,6 +754,7 @@ export default function GraphEditor({ content, fileName, onContentChange }: Prop
           <button
             type="button"
             onClick={() => setShowRunPanel(false)}
+            aria-label="Close run panel"
             className="text-ink-500 hover:text-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <X size={12} />

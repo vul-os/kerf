@@ -285,7 +285,7 @@ function AutoChainModal({ projectId, onChain, onClose }: AutoChainModalProps) {
           <span className="text-xs font-semibold uppercase tracking-wider text-ink-300">
             Auto-build chain from assembly
           </span>
-          <button type="button" onClick={onClose} className="text-ink-500 hover:text-ink-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
+          <button type="button" onClick={onClose} aria-label="Close auto-build chain dialog" className="text-ink-500 hover:text-ink-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
             <X size={14} />
           </button>
         </div>

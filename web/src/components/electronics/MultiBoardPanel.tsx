@@ -153,6 +153,7 @@ export default function MultiBoardPanel({ onClose }: MultiBoardPanelProps) {
         <span className="text-sm font-semibold text-white">Multi-Board Workspace (MB3D)</span>
         <button
           data-testid="multi-board-close"
+          aria-label="Close multi-board workspace"
           onClick={onClose}
           className="ml-auto p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >

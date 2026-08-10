@@ -623,6 +623,7 @@ export default function StairView({ content, fileName: _fileName, onContentChang
               </div>
             </div>
             <button type="button" onClick={() => commit({ ...stair, flights: stair.flights.filter((f) => f.id !== fl.id) })}
+              aria-label={`Delete flight ${idx + 1}`}
               className="p-0.5 text-ink-500 hover:text-red-400 flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Trash2 size={12} /></button>
           </div>
         ))}
@@ -656,6 +657,7 @@ export default function StairView({ content, fileName: _fileName, onContentChang
               </div>
             </div>
             <button type="button" onClick={() => commit({ ...stair, landings: stair.landings.filter((l) => l.id !== ld.id) })}
+              aria-label={`Delete landing ${ld.id}`}
               className="p-0.5 text-ink-500 hover:text-red-400 flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Trash2 size={12} /></button>
           </div>
         ))}

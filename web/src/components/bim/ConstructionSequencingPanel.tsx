@@ -196,7 +196,7 @@ function TaskEditor({ tasks, onChange }: TaskEditorProps) {
               >
                 {IFC_TASK_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
-              <button onClick={() => removeTask(idx)} className="text-red-400 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Trash2 className="h-3 w-3" /></button>
+              <button onClick={() => removeTask(idx)} aria-label={`Remove task ${idx + 1}`} className="text-red-400 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Trash2 className="h-3 w-3" /></button>
             </div>
             <div className="grid grid-cols-2 gap-1.5">
               <div>

@@ -352,7 +352,7 @@ export default function ICPackagePanel({ onClose }: ICPackagePanelProps) {
         </span>
         <div className="ml-auto flex gap-1">
           {onClose && (
-            <button onClick={onClose}
+            <button onClick={onClose} aria-label="Close IC package panel"
                     className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
               <X size={13} />
             </button>

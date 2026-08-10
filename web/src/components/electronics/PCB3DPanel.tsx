@@ -161,6 +161,7 @@ export default function PCB3DPanel({ circuitJson, onClose }: PCB3DPanelProps) {
         <span className="text-sm font-semibold text-white">3D PCB Editor</span>
         <button
           data-testid="pcb-3d-close"
+          aria-label="Close 3D PCB editor"
           onClick={onClose}
           className="ml-auto p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >

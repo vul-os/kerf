@@ -235,6 +235,7 @@ export default function PCBThermalPanel({ onClose }: PCBThermalPanelProps) {
         <span className="text-sm font-semibold text-white">PCB Thermal Analysis</span>
         <button
           data-testid="pcb-thermal-close"
+          aria-label="Close PCB thermal analysis"
           onClick={onClose}
           className="ml-auto p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >

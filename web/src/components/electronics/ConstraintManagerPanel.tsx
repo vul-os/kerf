@@ -409,7 +409,7 @@ export default function ConstraintManagerPanel({ circuitJson: circuitJsonProp, o
             <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
           </button>
           {onClose && (
-            <button onClick={onClose}
+            <button onClick={onClose} aria-label="Close constraint manager"
                     className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
               <X size={13} />
             </button>

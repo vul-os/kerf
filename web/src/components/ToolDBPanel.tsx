@@ -251,7 +251,7 @@ function ToolForm({ initial, onSubmit, onClose }) {
       <div style={{ background: '#111827', border: '1px solid #374151', borderRadius: 10, padding: 24, width: 420, maxHeight: '90vh', overflowY: 'auto', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 13, color: '#e5e7eb' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <span style={{ fontWeight: 700, fontSize: 14 }}>{initial ? 'Edit Tool' : 'Add Tool'}</span>
-          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" type="button" onClick={onClose} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: 2 }}>
+          <button className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" type="button" onClick={onClose} aria-label="Close tool editor" style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: 2 }}>
             <X size={16} />
           </button>
         </div>

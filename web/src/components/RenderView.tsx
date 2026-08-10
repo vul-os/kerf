@@ -115,7 +115,7 @@ function OrbitPopover({ render, onApply, onClose }: { render: RenderDoc; onApply
     <div className="absolute top-8 right-0 z-30 w-60 bg-ink-900 border border-ink-800 rounded-lg shadow-2xl p-3 text-xs">
       <div className="flex items-center justify-between mb-2">
         <span className="text-ink-300 font-medium text-[11px]">Set from orbit</span>
-        <button type="button" onClick={onClose} className="text-ink-500 hover:text-ink-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><X size={12} /></button>
+        <button type="button" onClick={onClose} aria-label="Close set-from-orbit panel" className="text-ink-500 hover:text-ink-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><X size={12} /></button>
       </div>
       <div className="space-y-2">
         {([['Distance (mm)', dist, setDist, 100, 20000, 100], ['Azimuth (°)', az, setAz, 0, 360, 1], ['Elevation (°)', el, setEl, -89, 89, 1]] as Array<[string, number, (v: number) => void, number, number, number]>).map(([lbl, v, setter, mn, mx, st]) => (
@@ -150,7 +150,7 @@ function LightRow({ light, onChange, onRemove }: { light: RenderLight; onChange:
         <span className="text-[10px] text-ink-500 truncate flex-1 font-mono">{light.id || ''}</span>
         <input type="color" value={light.color || '#ffffff'} onChange={(e) => set('color')(e.target.value)}
           className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent" title="Light color" />
-        <button type="button" onClick={onRemove} className="text-ink-600 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><X size={12} /></button>
+        <button type="button" onClick={onRemove} aria-label={`Remove ${light.kind} light`} className="text-ink-600 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><X size={12} /></button>
       </div>
       {useDir
         ? <XYZRow label="Direction" value={light.direction} onChange={set('direction')} />

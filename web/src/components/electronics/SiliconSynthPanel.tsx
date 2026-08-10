@@ -157,6 +157,7 @@ export default function SiliconSynthPanel({ onClose }: SiliconSynthPanelProps) {
         {status && <div className="ml-auto mr-2"><StatusBadge status={status} /></div>}
         <button
           data-testid="silicon-synth-close"
+          aria-label="Close silicon synthesis panel"
           onClick={onClose}
           className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors ml-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >

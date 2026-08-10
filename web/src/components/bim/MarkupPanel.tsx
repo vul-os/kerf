@@ -485,6 +485,7 @@ export default function MarkupPanel() {
                 <span className="text-xs text-zinc-500">{l.annotations.length}</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(l.name) }}
+                  aria-label={`${l.visible ? 'Hide' : 'Show'} layer ${l.name}`}
                   className="text-zinc-500 hover:text-zinc-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
                 >
                   {l.visible ? <Eye size={12} /> : <EyeOff size={12} />}

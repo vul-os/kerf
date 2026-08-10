@@ -281,7 +281,7 @@ function SegmentRow({ seg, idx, onChange, onRemove, result }: {
   return (
     <div className="border border-ink-800 rounded-md overflow-hidden">
       <div className="flex items-center gap-2 px-2 py-1.5 bg-ink-900">
-        <button type="button" onClick={() => setExpanded(v => !v)} className="text-ink-500 hover:text-ink-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
+        <button type="button" onClick={() => setExpanded(v => !v)} aria-label={`${expanded ? 'Collapse' : 'Expand'} segment ${idx + 1}`} className="text-ink-500 hover:text-ink-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
           {expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
         </button>
         <span className="text-[10px] font-medium text-ink-300 flex-1">Segment {idx + 1}</span>
@@ -294,7 +294,7 @@ function SegmentRow({ seg, idx, onChange, onRemove, result }: {
             {result.total_pa} Pa
           </span>
         )}
-        <button type="button" onClick={onRemove} className="text-ink-600 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
+        <button type="button" onClick={onRemove} aria-label={`Remove segment ${idx + 1}`} className="text-ink-600 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
           <Trash2 size={11} />
         </button>
       </div>

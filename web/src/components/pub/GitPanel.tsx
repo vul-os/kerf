@@ -66,7 +66,7 @@ export function ErrorBanner({ message, onDismiss }: { message: string | null; on
       <AlertCircle size={12} className="mt-0.5 shrink-0" />
       <span className="flex-1 break-words">{message}</span>
       {onDismiss && (
-        <button type="button" onClick={onDismiss} className="text-red-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
+        <button type="button" onClick={onDismiss} aria-label="Dismiss error" className="text-red-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
           <X size={11} />
         </button>
       )}

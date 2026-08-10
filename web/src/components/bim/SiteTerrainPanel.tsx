@@ -416,7 +416,7 @@ export default function SiteTerrainPanel({ content, projectId: _projectId, onToa
                           className="w-14 rounded border border-ink-200 dark:border-ink-600 bg-transparent px-1 py-0.5 text-xs" />
                       </div>
                     ))}
-                    <button onClick={() => removePoint(idx)} className="text-red-400 hover:text-red-600 ml-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
+                    <button onClick={() => removePoint(idx)} aria-label={`Remove survey point ${idx + 1}`} className="text-red-400 hover:text-red-600 ml-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
                       <Trash2 className="h-3 w-3" />
                     </button>
                   </div>

@@ -160,6 +160,7 @@ export default function EMCPanel({ onClose }: EMCPanelProps) {
         <span className="text-sm font-semibold text-white">EMC Pre-Compliance</span>
         <button
           data-testid="emc-close"
+          aria-label="Close EMC pre-compliance panel"
           onClick={onClose}
           className="ml-auto p-1 rounded hover:bg-white/10 text-gray-500 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >

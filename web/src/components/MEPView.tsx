@@ -206,7 +206,7 @@ export default function MEPView({ content, fileName, onContentChange }: MEPViewP
                       {seg.kind === 'elbow' && <input className={iCls} type="number" value={seg.elbow_radius_mm ?? ''} onChange={(e) => patchSeg(seg.id, { elbow_radius_mm: parseFloat(e.target.value) || undefined })} />}
                     </td>
                     <td className="px-2 py-1">
-                      <button type="button" onClick={() => commit({ ...route, segments: route.segments.filter((s) => s.id !== seg.id) })} className="p-0.5 text-ink-500 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Trash2 size={12} /></button>
+                      <button type="button" onClick={() => commit({ ...route, segments: route.segments.filter((s) => s.id !== seg.id) })} aria-label={`Delete segment ${seg.id}`} className="p-0.5 text-ink-500 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Trash2 size={12} /></button>
                     </td>
                   </tr>
                 ))}
@@ -225,7 +225,7 @@ export default function MEPView({ content, fileName, onContentChange }: MEPViewP
             </select>
             <span className="text-ink-500">@</span>
             <div className="w-40"><CoordCell value={f.position} onChange={(v) => commit({ ...route, fittings: route.fittings.map((x) => x.id === f.id ? { ...x, position: v } : x) })} /></div>
-            <button type="button" onClick={() => commit({ ...route, fittings: route.fittings.filter((x) => x.id !== f.id) })} className="p-0.5 text-ink-500 hover:text-red-400 ml-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Trash2 size={12} /></button>
+            <button type="button" onClick={() => commit({ ...route, fittings: route.fittings.filter((x) => x.id !== f.id) })} aria-label={`Delete ${f.kind} fitting`} className="p-0.5 text-ink-500 hover:text-red-400 ml-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Trash2 size={12} /></button>
           </div>
         ))}
       </Section>
@@ -241,7 +241,7 @@ export default function MEPView({ content, fileName, onContentChange }: MEPViewP
             <span className="text-ink-500">@</span>
             <div className="w-40"><CoordCell value={ep.position} onChange={(v) => patchEp(ep.id, { position: v })} /></div>
             <span className="text-ink-600 font-mono text-[10px] ml-1">{ep.id}</span>
-            <button type="button" onClick={() => commit({ ...route, endpoints: route.endpoints.filter((e) => e.id !== ep.id) })} className="p-0.5 text-ink-500 hover:text-red-400 ml-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Trash2 size={12} /></button>
+            <button type="button" onClick={() => commit({ ...route, endpoints: route.endpoints.filter((e) => e.id !== ep.id) })} aria-label={`Delete ${ep.kind} endpoint ${ep.id}`} className="p-0.5 text-ink-500 hover:text-red-400 ml-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"><Trash2 size={12} /></button>
           </div>
         ))}
       </Section>

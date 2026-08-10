@@ -92,7 +92,7 @@ function ErrorBanner({ message, onDismiss }: { message: string | null; onDismiss
       <AlertTriangle size={12} className="mt-0.5 shrink-0" />
       <span className="flex-1 break-words">{message}</span>
       {onDismiss && (
-        <button onClick={onDismiss} className="text-red-300 hover:text-white ml-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
+        <button onClick={onDismiss} aria-label="Dismiss error" className="text-red-300 hover:text-white ml-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
           <X size={10} />
         </button>
       )}

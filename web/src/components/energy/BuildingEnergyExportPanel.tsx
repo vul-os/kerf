@@ -158,6 +158,7 @@ function ZoneEditor({ zone, onChange, onRemove, idx }: {
         <div className="flex items-center gap-2">
           <button
             onClick={e => { e.stopPropagation(); onRemove() }}
+            aria-label={`Remove ${zone.name || `zone ${idx}`}`}
             className="text-gray-400 hover:text-red-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Trash2 size={13} />

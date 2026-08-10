@@ -152,7 +152,7 @@ export default function CrownBridgePanel({ content }: Props) {
               key={p.fdi}
               type="button"
               onClick={() => { setToothPreset(p); setResult(null) }}
-              className={`py-1.5 px-1 rounded text-xs font-medium border transition-colors ${
+              className={`py-1.5 px-1 rounded text-xs font-medium border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${
                 toothPreset.fdi === p.fdi
                   ? 'bg-violet-500/20 border-violet-400/60 text-violet-200'
                   : 'bg-ink-800 border-ink-700 text-ink-300 hover:bg-ink-700'
@@ -278,7 +278,7 @@ export default function CrownBridgePanel({ content }: Props) {
         type="button"
         onClick={handleRun}
         disabled={running}
-        className="flex items-center justify-center gap-2 px-4 py-2 rounded bg-violet-500/20 border border-violet-400/50 text-violet-200 text-xs font-medium hover:bg-violet-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        className="flex items-center justify-center gap-2 px-4 py-2 rounded bg-violet-500/20 border border-violet-400/50 text-violet-200 text-xs font-medium hover:bg-violet-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         {running ? (
           <>

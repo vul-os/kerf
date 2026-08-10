@@ -1917,3 +1917,51 @@ worth doing, but pointless to finish while the 431 transitive ones block the inc
 
 **Affected:** `web/src/store/workspace.ts`, `web/src/store/errorUtils.ts`,
 `web/tsconfig.strict.json` (deliberately unchanged), `decisions.md` (this entry).
+
+## 2026-08-10 SAST — Postgres-only SQL on the default backend: two 500s the whole test suite could not see
+
+**Context:** Postgres is optional; the default install opens an embedded SQLite file. Every
+automated suite, however, runs against Postgres — the E2E workflow starts a `postgres:16`
+service container, and the Python tests either use Postgres or fake the database entirely.
+So the *default* install path had no automated coverage at all, and two Postgres-only
+statements shipped in it.
+
+**1. The rate limiter — `enforce()` in `kerf_core/rate_limit.py`.** It derived its window in SQL:
+
+```
+to_timestamp(floor(extract(epoch from now()) / $2) * $2)
+```
+
+SQLite cannot parse that (`near "from": syntax error`). The limiter is a FastAPI dependency of
+every auth route, so on a default install with `LOCAL_MODE` off, `POST /auth/register` and
+`/auth/login` answered **500** — nobody could create an account. Reproduced directly, not inferred.
+
+Fixed by flooring the boundary in Python (the same floor the `Retry-After` header already
+computed) and binding it as a parameter. What remains — `INSERT … ON CONFLICT … DO UPDATE …
+RETURNING` — both backends support. Verified against a real Postgres that the row still lands on
+the identical second boundary, so existing buckets and multi-machine sharing are unchanged.
+
+**Why the tests passed anyway, which is the more important half:** `test_rate_limit.py` ran
+against a `FakePool` whose `fetchrow` read `args[1]` as a number and ignored the SQL string
+completely. Eight tests asserted rich behaviour — sliding windows, atomic increments, 429 shape
+— against a statement no database ever saw. *A fake that accepts any SQL cannot catch a dialect
+error.* The fake is gone; the tests now run against a real SQLite database opened through kerf's
+own adapter (stdlib — no service container, still hermetic), plus a round-trip test that asserts
+the UPSERT parses, writes exactly one row, and increments it.
+
+**2. The CAM tool DB.** Three "latest revision per tool file" queries used `DISTINCT ON`, which
+SQLite rejects (`near "ON": syntax error`), 500ing `list_tools` and both LLM tool-DB handlers.
+Rewritten with `ROW_NUMBER() OVER (PARTITION BY f.id ORDER BY fr.created_at DESC)` — portable,
+and plainer than `DISTINCT ON`'s reliance on a matching `ORDER BY`. Verified on both backends
+against a seeded old/new revision pair.
+
+**The rule this establishes:** the default backend needs default coverage. A grep for
+Postgres-only constructs (`extract(epoch`, `to_timestamp(`, `date_trunc(`, `DISTINCT ON`,
+`generate_series`, `array_agg`, `::regclass`) across `packages/*/src` is now clean, but a grep is
+a snapshot — the durable fix is that the E2E suite runs on SQLite, so the zero-dependency path
+is exercised on every push.
+
+**Affected:** `packages/kerf-core/src/kerf_core/rate_limit.py`,
+`packages/kerf-core/tests/test_rate_limit.py`, `packages/kerf-cam/src/kerf_cam/tool_db.py`,
+`packages/kerf-cam/src/kerf_cam/tools/tool_db.py`, `decisions.md` (this entry).
+

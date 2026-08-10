@@ -47,7 +47,7 @@ The sector work only matters if you **own your work, are not locked in, and can 
 
 ## Active program — G1…G4 (opened 2026-08-05)
 
-Four goals, sequenced by *start* order, not completion order. G1 must land its foundation before anything else forks; after that all four run concurrently against disjoint file sets. Task detail lives in [`tasks.md`](./tasks.md) under the ranges named below.
+Four goals, sequenced by *start* order, not completion order. G1 must land its foundation before anything else forks; after that all four run concurrently against disjoint file sets. Task detail is tracked in GitHub issues.
 
 A single theme connects G2, G3 and G4: **Kerf reads far more formats than it writes.** KiCad round-trip preserves only refs/nets/footprint names; FreeCAD import is deep but one-way; the STEP writer is AP214 while the reader handles AP242. Every goal below is, in part, closing a writer gap.
 
@@ -82,7 +82,7 @@ So Kerf has **at least three incompatible in-repo pour conventions**, not one co
 
 **Licensing constraint (decided 2026-08-05):** the analysis recommended `kiutils` as the parser backbone. It is **GPLv3**, and Kerf is 100% MIT. Decision: **stay MIT-clean.** No GPL dependency enters the interop path.
 
-**Parser strategy (decided 2026-08-06):** the constraint turned out to be far cheaper than feared — **MIT-licensed KiCad parsers were already installed** as transitive tscircuit dependencies (`kicadts`, effectively an MIT `kiutils`; and `kicad-to-circuit-json`, which converts straight to Circuit JSON). Both carry `MIT License, Copyright (c) 2025 tscircuit Inc.`; their `package.json` `license` field is merely absent, which is why a metadata scan missed them. They are TypeScript, however, and Kerf's ~20 electronics consumers are Python, with no Node at runtime (`pip install kerf` would regress otherwise). So: **the parser stays in Python**, `sexpdata` (BSD-2) replaces the hand-rolled lexer, `kicadts` serves as a reference blueprint rather than a dependency, and `kicad-to-circuit-json` becomes a **CI conformance oracle** — an independent implementation to diff against, which is the answer to our fixtures being hand-authored. Full rationale in `tasks.md` under the G2 decision block.
+**Parser strategy (decided 2026-08-06):** the constraint turned out to be far cheaper than feared — **MIT-licensed KiCad parsers were already installed** as transitive tscircuit dependencies (`kicadts`, effectively an MIT `kiutils`; and `kicad-to-circuit-json`, which converts straight to Circuit JSON). Both carry `MIT License, Copyright (c) 2025 tscircuit Inc.`; their `package.json` `license` field is merely absent, which is why a metadata scan missed them. They are TypeScript, however, and Kerf's ~20 electronics consumers are Python, with no Node at runtime (`pip install kerf` would regress otherwise). So: **the parser stays in Python**, `sexpdata` (BSD-2) replaces the hand-rolled lexer, `kicadts` serves as a reference blueprint rather than a dependency, and `kicad-to-circuit-json` becomes a **CI conformance oracle** — an independent implementation to diff against, which is the answer to our fixtures being hand-authored. Full rationale is recorded in `decisions.md`.
 
 That distinction set G2's first job: **measure the true gap before designing around it.** An earlier draft of this section blamed Circuit JSON's expressiveness for the pour gap; that was wrong, and the same caution applies to the other suspected gaps (custom pad primitives, teardrops, rule areas, net-class DRC semantics, hierarchical sheet instances, stackup, 3D model links). T-525 quantifies which of those are genuinely IR limits and which are merely adapter limits — the answer changes how much new IR is warranted versus how much is a better reader/writer over what already exists.
 
@@ -418,7 +418,7 @@ This list is only AI-redundant *authoring/UX interaction paradigms* — not skip
 
 ## How to contribute
 
-Pick a task from [`tasks.md`](./tasks.md) (sized for a single isolated agent run), or open an issue proposing a new long-tail sector line. The roadmap states *why* and *in what order*; `tasks.md` is the *how*. Keep them in sync: when a priority moves here, move the corresponding tasks there.
+Pick an open issue, or open one proposing a new long-tail sector line. This roadmap states *why* and *in what order*; the issue tracker carries the *how*.
 
 ---
 

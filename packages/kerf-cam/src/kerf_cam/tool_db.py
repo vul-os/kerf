@@ -351,13 +351,19 @@ async def list_tools(pool, project_id: str) -> list[Tool]:
     """List all .tool files in a project (best-effort; malformed files skipped)."""
     rows = await pool.fetch(
         """
-        SELECT DISTINCT ON (f.id) f.id, fr.content
-        FROM files f
-        LEFT JOIN file_revisions fr ON fr.file_id = f.id
-        WHERE f.project_id = $1
-          AND f.kind = 'tool'
-          AND f.deleted_at IS NULL
-        ORDER BY f.id, fr.created_at DESC
+        SELECT id, content FROM (
+            SELECT f.id AS id, fr.content AS content,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY f.id ORDER BY fr.created_at DESC
+                   ) AS rn
+            FROM files f
+            LEFT JOIN file_revisions fr ON fr.file_id = f.id
+            WHERE f.project_id = $1
+              AND f.kind = 'tool'
+              AND f.deleted_at IS NULL
+        ) AS latest
+        WHERE rn = 1
+        ORDER BY id
         """,
         project_id,
     )

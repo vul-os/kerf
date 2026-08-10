@@ -178,13 +178,19 @@ async def run_update_tool(ctx: ProjectCtx, args: bytes) -> str:
     # Search all tool files for the matching id.
     rows = await ctx.pool.fetch(
         """
-        SELECT DISTINCT ON (f.id) f.id AS file_id, fr.content
-        FROM files f
-        LEFT JOIN file_revisions fr ON fr.file_id = f.id
-        WHERE f.project_id = $1
-          AND f.kind = 'tool'
-          AND f.deleted_at IS NULL
-        ORDER BY f.id, fr.created_at DESC
+        SELECT file_id, content FROM (
+            SELECT f.id AS file_id, fr.content AS content,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY f.id ORDER BY fr.created_at DESC
+                   ) AS rn
+            FROM files f
+            LEFT JOIN file_revisions fr ON fr.file_id = f.id
+            WHERE f.project_id = $1
+              AND f.kind = 'tool'
+              AND f.deleted_at IS NULL
+        ) AS latest
+        WHERE rn = 1
+        ORDER BY file_id
         """,
         ctx.project_id,
     )
@@ -278,13 +284,19 @@ async def run_delete_tool(ctx: ProjectCtx, args: bytes) -> str:
 
     rows = await ctx.pool.fetch(
         """
-        SELECT DISTINCT ON (f.id) f.id AS file_id, fr.content
-        FROM files f
-        LEFT JOIN file_revisions fr ON fr.file_id = f.id
-        WHERE f.project_id = $1
-          AND f.kind = 'tool'
-          AND f.deleted_at IS NULL
-        ORDER BY f.id, fr.created_at DESC
+        SELECT file_id, content FROM (
+            SELECT f.id AS file_id, fr.content AS content,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY f.id ORDER BY fr.created_at DESC
+                   ) AS rn
+            FROM files f
+            LEFT JOIN file_revisions fr ON fr.file_id = f.id
+            WHERE f.project_id = $1
+              AND f.kind = 'tool'
+              AND f.deleted_at IS NULL
+        ) AS latest
+        WHERE rn = 1
+        ORDER BY file_id
         """,
         ctx.project_id,
     )

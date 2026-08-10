@@ -24,7 +24,8 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const manifest = JSON.parse(readFileSync(join(ROOT, 'public', 'compare-manifest.json'), 'utf8'))
+// The frontend moved to web/ (commit 290d3318); the manifest now lives at web/public/, not public/.
+const manifest = JSON.parse(readFileSync(join(ROOT, 'web', 'public', 'compare-manifest.json'), 'utf8'))
 
 const esc = (s) =>
   String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')

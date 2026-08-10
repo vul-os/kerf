@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerf-structural"
-version = "0.1.6"
+version = "0.1.7"
 license = { text = "MIT" }
 classifiers = ["License :: OSI Approved :: MIT License"]
 description = "Structural RC / steel + rebar design plugin for Kerf"

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerf-desktop"
-version = "0.1.6"
+version = "0.1.7"
 description = "Kerf desktop — one-process, one-binary native app (FastAPI in a background thread + a native OS webview, frozen with PyInstaller). No sidecar."
 readme = "README.md"
 requires-python = ">=3.11"

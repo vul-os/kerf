@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerf-entertainment"
-version = "0.1.6"
+version = "0.1.7"
 license = { text = "MIT" }
 classifiers = ["License :: OSI Approved :: MIT License"]
 description = "Theatrical / entertainment design: lighting plot + DMX patch + rigging load analysis"

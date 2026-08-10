@@ -471,8 +471,9 @@ function ElementRow({ elem, onChange, onRemove }: {
         </select>
         <button
           onClick={onRemove}
-          className="p-1 text-gray-400 hover:text-red-500"
+          className="p-1 text-gray-400 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           title="Remove element"
+          aria-label="Remove element"
         >
           <Trash2 size={14} />
         </button>
@@ -677,7 +678,7 @@ export default function PlantCoordinationPanel() {
         <button
           onClick={runCheck}
           disabled={loading || elements.length === 0}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {loading
             ? <><Loader2 size={14} className="animate-spin" /> Running…</>
@@ -728,7 +729,7 @@ export default function PlantCoordinationPanel() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-1 px-3 py-2 text-xs border-b-2 transition-colors ${
+                className={`flex items-center gap-1 px-3 py-2 text-xs border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${
                   activeTab === tab.id
                     ? 'border-blue-600 text-blue-600 font-medium'
                     : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -794,7 +795,7 @@ export default function PlantCoordinationPanel() {
           </h3>
           <button
             onClick={addElement}
-            className="flex items-center gap-1 px-2 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-50"
+            className="flex items-center gap-1 px-2 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Plus size={12} /> Add element
           </button>

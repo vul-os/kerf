@@ -401,7 +401,7 @@ export default function PipingRoute3DPanel() {
           </label>
           <button
             onClick={addObstacle}
-            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             <Plus size={12} /> Add obstacle
           </button>
@@ -440,7 +440,7 @@ export default function PipingRoute3DPanel() {
               title="Clearance (m)"
             />
             <span className="text-gray-400 text-xs">m clr</span>
-            <button onClick={() => removeObstacle(obs.id)} className="text-red-400 hover:text-red-600">
+            <button onClick={() => removeObstacle(obs.id)} className="text-red-400 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" aria-label="Remove obstacle">
               <Trash2 size={12} />
             </button>
           </div>
@@ -451,7 +451,7 @@ export default function PipingRoute3DPanel() {
         onClick={handleRoute}
         disabled={loading}
         className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50
-                   text-white text-sm px-4 py-2 rounded"
+                   text-white text-sm px-4 py-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         {loading ? <Loader2 size={14} className="animate-spin" /> : <GitBranch size={14} />}
         Route pipe

@@ -142,3 +142,30 @@ def _install_tools_shim() -> None:
 
 
 _install_tools_shim()
+
+
+# ---------------------------------------------------------------------------
+# Keep a developer's kerf.toml out of the test session
+# ---------------------------------------------------------------------------
+# Settings.load() resolves ./kerf.toml when no explicit path is given, which is
+# the documented UX. It also means that running pytest from a checkout that has
+# a local kerf.toml silently applies that developer's config to every test —
+# the repo's own gitignored kerf.toml sets `jwt_secret = "dev-only-change-me-in-prod"`,
+# which made eight access-control tests fail with 401 "invalid token" against
+# tokens they had just minted.
+#
+# Point KERF_CONFIG at a path that does not exist for the duration of the
+# session. Settings treats a missing file as "no config" and falls through to
+# defaults, so tests get the same baseline on every machine. Tests that WANT a
+# TOML pass an explicit path to Settings.load(), which still wins.
+import os as _os
+
+# Set BEFORE any test module imports. A session fixture is too late: kerf_core's
+# get_settings() is @lru_cache'd and the FastAPI app is built at import time, so
+# by the time a fixture body runs the config has already been read.
+#
+# Env beats kerf.toml (Settings.settings_customise_sources), so pinning here
+# makes tests immune to a developer's local file. This is the one that bit: the
+# repo's gitignored kerf.toml sets a different jwt_secret, so tokens the tests
+# minted were rejected with 401 "invalid token" in eight access-control tests.
+_os.environ.setdefault("JWT_SECRET", "dev-secret-change-in-production")

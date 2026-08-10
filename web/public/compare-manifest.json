@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "generatedAt": "2026-08-07T16:02:18.676Z",
+  "generatedAt": "2026-08-10T00:54:00.705Z",
   "items": [
     {
       "slug": "revit",
@@ -525,7 +525,7 @@
           },
           "kerf": {
             "status": "partial",
-            "evidence": "packages/kerf-cloud/src/kerf_cloud/"
+            "evidence": "packages/kerf-core/src/kerf_core/storage/git_storer.py"
           }
         },
         {

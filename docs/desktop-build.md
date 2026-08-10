@@ -116,12 +116,25 @@ curl -s http://127.0.0.1:<port>/health   # port is logged to stdout on boot
 the terminal even though the day-to-day experience is "double-click, a
 window opens.")
 
+## CI builds (release workflow)
+
+`.github/workflows/release.yml`'s `desktop` job builds the binary on all
+three platforms natively (no cross-compilation) — `macos-latest`,
+`windows-latest`, `ubuntu-latest` — via this same `scripts/build-desktop.sh`
+and spec, and attaches the results to the GitHub Release as:
+
+- `kerf-desktop-<tag>-macos-arm64`
+- `kerf-desktop-<tag>-windows-x64.exe`
+- `kerf-desktop-<tag>-linux-x64`
+
+Linux needs system WebKitGTK + PyGObject build deps that the job installs
+before building (see that job's comments); Windows uses WebView2, already
+present on the runner image. All three land in `release-out/` like every
+other release asset, so they're covered by `SHA256SUMS` and the sigstore
+build-provenance attestation same as everything else.
+
 ## Known limits beyond the OCCT/FEM exclusion
 
-- The binary is built for the machine's own OS/arch (this repo's build was
-  verified on macOS/arm64). Cross-compiling a Windows or Linux binary from
-  macOS is not set up — build on each target OS, or wire up CI matrix
-  builds later.
 - `console=True` in the spec means the binary currently opens (or is
   attached to) a terminal/console alongside the webview window. Flipping to
   `console=False` for a quieter release build is a follow-up, not done here

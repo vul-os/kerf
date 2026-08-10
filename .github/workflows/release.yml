@@ -22,7 +22,14 @@
 #   3. `wheels`    — Python wheels for packages/kerf-* (except kerf-sdk,
 #                    which has its own PyPI cadence on sdk-v* tags).
 #   4. `sbom`      — CycloneDX SBOMs for the Python and npm dependency trees.
-#   5. `publish`   — stages EVERY asset from 2–4 into one directory, writes
+#   5. `desktop`   — matrix build (macOS/Windows/Linux) of the one-file
+#                    kerf-desktop binary via scripts/build-desktop.sh and
+#                    packages/kerf-desktop/kerf-desktop.spec. Ships the LEAN
+#                    persona: OCCT B-rep (pythonOCC) and real FEM
+#                    (FEniCSx/dolfinx) are conda-forge-only and cannot be
+#                    frozen by PyInstaller, so they are NOT in these
+#                    binaries — see docs/desktop-build.md.
+#   6. `publish`   — stages EVERY asset from 2–5 into one directory, writes
 #                    SHA256SUMS over that directory, verifies it with the same
 #                    scripts/verify.sh a user runs, attaches a sigstore build
 #                    provenance attestation, and creates ONE GitHub Release
@@ -432,11 +439,113 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  # ── Desktop binaries (macOS / Windows / Linux) ───────────────────────────
+  # One-file kerf-desktop binary per OS, via scripts/build-desktop.sh and
+  # packages/kerf-desktop/kerf-desktop.spec (unchanged from the existing,
+  # macOS-verified local build path — this job just runs it on three
+  # runners). Ships the LEAN persona only: pythonOCC (OCCT B-rep) and
+  # FEniCSx/dolfinx (real FEM) are conda-forge-only, so PyInstaller cannot
+  # freeze them — those stay out of every binary here. `pip install
+  # kerf[mech]` into a conda env remains the path for OCCT/FEM. See
+  # docs/desktop-build.md.
+  desktop:
+    name: Build desktop binary (${{ matrix.asset_suffix }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            asset_suffix: macos-arm64
+            artifact_name: desktop-macos-arm64
+          - runner: windows-latest
+            asset_suffix: windows-x64.exe
+            artifact_name: desktop-windows-x64
+          - runner: ubuntu-latest
+            asset_suffix: linux-x64
+            artifact_name: desktop-linux-x64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          # The lockfile lives in web/, not the repo root — setup-node
+          # defaults to the root and fails the whole job without this.
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm install --no-audit --no-fund  # npm install (not ci): lockfiles written on macOS drop platform-conditional optional deps (npm/cli#4828)
+
+      # pywebview has no bundled Chromium: on Linux it renders through
+      # WebKitGTK via WebKit2GTK + PyGObject bindings, neither of which
+      # ships with the ubuntu-latest image. libwebkit2gtk-4.1-dev /
+      # gir1.2-webkit2-4.1 are the WebKitGTK runtime + typelib (ubuntu-24.04
+      # dropped the older 4.0 packages); the rest are dev headers that
+      # scripts/build-desktop.sh needs to `pip install pygobject pycairo`
+      # into the build venv (see that script's comment on why it does this
+      # itself rather than relying on apt's python3-gi, which is bound to
+      # the system interpreter, not the venv actions/setup-python creates).
+      - name: Install WebKitGTK (Linux runtime deps for pywebview)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev gir1.2-webkit2-4.1 \
+            libgirepository1.0-dev libcairo2-dev pkg-config gcc python3-dev
+
+      # Windows uses WebView2, which ships with the windows-latest image —
+      # nothing to install for it. macOS uses WebKit via pywebview's Cocoa
+      # backend, also part of the OS — nothing to install there either.
+      - name: Build desktop binary
+        shell: bash
+        env:
+          # actions/setup-python puts `python3` on PATH on macOS/Linux, but
+          # only `python` on Windows.
+          PYTHON: ${{ runner.os == 'Windows' && 'python' || 'python3' }}
+        run: ./scripts/build-desktop.sh
+
+      - name: Stage desktop binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          mkdir -p release-out
+
+          src="packages/kerf-desktop/dist/kerf-desktop"
+          [ -f "${src}.exe" ] && src="${src}.exe"
+          if [ ! -f "$src" ]; then
+            echo "::error::built binary not found at $src"
+            exit 1
+          fi
+
+          dest="release-out/kerf-desktop-${TAG}-${{ matrix.asset_suffix }}"
+          cp "$src" "$dest"
+          chmod +x "$dest" || true
+          ls -la release-out
+
+      - name: Upload desktop binary as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: release-out/kerf-desktop-*
+          retention-days: 1
+          if-no-files-found: error
+
   # ── Create the GitHub Release ────────────────────────────────────────────
   publish:
     name: Publish GitHub Release (checksummed + attested)
     runs-on: ubuntu-latest
-    needs: [docker, artifacts, wheels, sbom]
+    needs: [docker, artifacts, wheels, sbom, desktop]
     permissions:
       contents: write       # create the Release and upload assets
       packages: write       # inherited default kept explicit
@@ -494,6 +603,23 @@ jobs:
           path: release-out
           name: sbom
 
+      # The `desktop` matrix job uploads three separately-named artifacts
+      # (desktop-macos-arm64, desktop-windows-x64, desktop-linux-x64) because
+      # upload-artifact requires a unique name per invocation within a run —
+      # matrix jobs can't all upload under one shared name. `pattern` +
+      # `merge-multiple` is the intended way to fan them back into one
+      # directory. This is NOT the banned `pattern: "*"` from the comment on
+      # "Stage release tarballs" above: it is scoped to names this workflow
+      # itself defines (the `desktop` job's `matrix.artifact_name`), so it
+      # cannot match docker/build-push-action's auto-uploaded
+      # "*.dockerbuild" artifacts or any other job's artifact name.
+      - name: Stage desktop binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: release-out
+          pattern: desktop-*
+          merge-multiple: true
+
       # The set that MUST be there. The manifest below covers whatever is in
       # release-out/, which is necessary but not sufficient: a build job that
       # produced nothing would yield a smaller release with a perfectly
@@ -530,6 +656,14 @@ jobs:
             || missing+=("a Python dependency manifest")
           [ "$(find release-out -maxdepth 1 \( -name "kerf-npm-sbom-${VERSION}.json" -o -name "kerf-npm-deps-${VERSION}.json" \) | wc -l | tr -d ' ')" -gt 0 ] \
             || missing+=("an npm dependency manifest")
+
+          # Desktop binaries, one per OS — see the `desktop` job. `-s`
+          # (non-empty), not just `-f`: a PyInstaller run that "succeeded"
+          # but produced a truncated/zero-byte binary must not pass this
+          # gate.
+          for suffix in macos-arm64 "windows-x64.exe" linux-x64; do
+            [ -s "release-out/kerf-desktop-${TAG}-${suffix}" ] || missing+=("kerf-desktop-${TAG}-${suffix}")
+          done
 
           if [ "${#missing[@]}" -gt 0 ]; then
             echo "::error::release-out/ is missing expected asset(s):"
@@ -655,6 +789,29 @@ jobs:
             echo "| macOS (Intel) | \`kerf-${TAG}-macos-x64.tar.gz\` |"
             echo "| Linux (x64) | \`kerf-${TAG}-linux-x64.tar.gz\` |"
             echo "| Source | \`kerf-${TAG}-src.tar.gz\` |"
+            echo ""
+            echo "## Desktop app"
+            echo ""
+            echo "A one-file native desktop binary — FastAPI plus a native OS window"
+            echo "(WebView2 on Windows, WebKit on macOS/Linux), no Python install, no"
+            echo "Docker, nothing to \`pip install\`. Just download and run."
+            echo ""
+            echo "| Platform | Asset |"
+            echo "|----------|-------|"
+            echo "| macOS (Apple Silicon) | \`kerf-desktop-${TAG}-macos-arm64\` |"
+            echo "| Windows (x64) | \`kerf-desktop-${TAG}-windows-x64.exe\` |"
+            echo "| Linux (x64) | \`kerf-desktop-${TAG}-linux-x64\` |"
+            echo ""
+            echo "**These binaries ship a LEAN persona.** OCCT B-rep modelling"
+            echo "(pythonOCC — STEP/IGES import-export, real B-rep booleans,"
+            echo "fillets/chamfers on B-rep solids) and real FEM (FEniCSx/dolfinx"
+            echo "solves) are NOT included: both are distributed conda-forge-only,"
+            echo "so neither can be \`pip install\`-ed or frozen by PyInstaller. For"
+            echo "those, use \`pip install kerf[mech]\` (or the Docker image) in a"
+            echo "conda environment that also has \`pythonocc-core\` and"
+            echo "\`fenics-dolfinx\` installed — see docs/desktop-build.md and"
+            echo "docs/local-install.md for the full breakdown of what each"
+            echo "distribution channel does and doesn't include."
             echo ""
             echo "Every asset is covered by \`SHA256SUMS\` in this release, and"
             echo "carries a sigstore build-provenance attestation. Verify before"

@@ -38,6 +38,7 @@ import { meshCache } from '../lib/meshCache.js'
 import { subdToBufferGeometry, meshDocToBufferGeometry } from '../lib/subdToBufferGeometry.js'
 import { markFlushed as l1MarkFlushed, listUnflushed as l1ListUnflushed } from '../lib/localStash.js'
 import { markDirty as schedulerMarkDirty } from '../lib/autosaveScheduler.js'
+import { errMessage, errStatus, errAborted, errName } from './errorUtils.js'
 import type {
   ApiProject, ApiFile, ApiThread, FileKind, FileRevision, ActivityEvent, BOMRow,
 } from '@/types'
@@ -1260,7 +1261,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       if (main) await get().selectFile(main.id)
       if (threads[0]) await get().selectThread(threads[0].id)
     } catch (err) {
-      set({ loadingProject: false, loadError: err?.message || String(err) })
+      set({ loadingProject: false, loadError: errMessage(err) || String(err) })
     }
   },
 
@@ -1427,7 +1428,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
           }
         } catch (err) {
           if (get().currentFileId === fileId) {
-            set({ loadingParts: false, partsError: err?.message || 'Failed to load subd' })
+            set({ loadingParts: false, partsError: errMessage(err) || 'Failed to load subd' })
           }
         }
         return
@@ -1455,7 +1456,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
           }
         } catch (err) {
           if (get().currentFileId === fileId) {
-            set({ loadingParts: false, partsError: err?.message || 'Failed to load mesh' })
+            set({ loadingParts: false, partsError: errMessage(err) || 'Failed to load mesh' })
           }
         }
         return
@@ -1475,7 +1476,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
           }
         } catch (err) {
           if (get().currentFileId === fileId) {
-            set({ loadingParts: false, partsError: err?.message || 'Assembly load failed', parts: [] })
+            set({ loadingParts: false, partsError: errMessage(err) || 'Assembly load failed', parts: [] })
           }
         }
         return
@@ -1521,7 +1522,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
           if (get().currentFileId === fileId) {
             set({
               loadingParts: false,
-              partsError: err?.message || 'Failed to load STEP',
+              partsError: errMessage(err) || 'Failed to load STEP',
               parts: [],
             })
           }
@@ -1583,11 +1584,11 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
         }
       } catch (err) {
         if (get().currentFileId === fileId) {
-          set({ partsError: err?.message || String(err), loadingParts: false })
+          set({ partsError: errMessage(err) || String(err), loadingParts: false })
         }
       }
     } catch (err) {
-      set({ loadingParts: false, loadError: err?.message || String(err) })
+      set({ loadingParts: false, loadError: errMessage(err) || String(err) })
     }
   },
 
@@ -1611,7 +1612,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
     try {
       res = await runCircuit(source || '')
     } catch (err) {
-      set({ circuitLoading: false, circuitError: err?.message || String(err) })
+      set({ circuitLoading: false, circuitError: errMessage(err) || String(err) })
       return
     }
     if (res?.stale) {
@@ -1666,7 +1667,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       }
     } catch (err) {
       if (get().currentFileId === currentFileId) {
-        set({ partsError: err?.message || 'Assembly resolve failed' })
+        set({ partsError: errMessage(err) || 'Assembly resolve failed' })
       }
     }
   },
@@ -1729,10 +1730,10 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       }
     } catch (err) {
       // 409 = version conflict: someone else edited this file.
-      if (err?.status === 409) {
+      if (errStatus(err) === 409) {
         let detail: { current_version?: number; current_content_preview?: string } = {}
         try {
-          const parsed = JSON.parse(err.message)
+          const parsed = JSON.parse(errMessage(err) ?? '')
           detail = parsed.detail || parsed
         } catch { /* message is not JSON — detail stays empty */ }
         set({
@@ -1745,7 +1746,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
         })
         return
       }
-      set({ saving: false, loadError: err?.message || String(err) })
+      set({ saving: false, loadError: errMessage(err) || String(err) })
     }
   },
 
@@ -1781,7 +1782,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       set((s) => ({ files: [...s.files, { ...created, content: undefined }] }))
       return created
     } catch (err) {
-      set({ toast: err?.message || 'Failed to create sketch on face' })
+      set({ toast: errMessage(err) || 'Failed to create sketch on face' })
       return null
     }
   },
@@ -1834,7 +1835,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       if (kind !== 'folder') await get().selectFile(created.id)
       return created
     } catch (err) {
-      set({ loadError: err?.message || String(err) })
+      set({ loadError: errMessage(err) || String(err) })
     }
   },
 
@@ -1870,7 +1871,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       set((s) => ({ files: [...s.files, { ...created, content: undefined }] }))
       await get().selectFile(created.id)
     } catch (err) {
-      set({ toast: 'Could not create feature: ' + (err?.message || String(err)) })
+      set({ toast: 'Could not create feature: ' + (errMessage(err) || String(err)) })
     }
   },
 
@@ -1937,7 +1938,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       await get().selectFile(created.id)
       return created
     } catch (err) {
-      set({ toast: 'Could not create JSCAD: ' + (err?.message || String(err)) })
+      set({ toast: 'Could not create JSCAD: ' + (errMessage(err) || String(err)) })
       return null
     }
   },
@@ -2033,15 +2034,15 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
         return created
       } catch (err) {
         // Aborted uploads are user-initiated; clear silently.
-        if (err && err.aborted) {
+        if (errAborted(err)) {
           set({ uploadProgress: null })
           return null
         }
         set((s) => ({
           uploadProgress: s.uploadProgress
-            ? { ...s.uploadProgress, status: 'error', error: err?.message || String(err) }
+            ? { ...s.uploadProgress, status: 'error', error: errMessage(err) || String(err) }
             : null,
-          loadError: err?.message || String(err),
+          loadError: errMessage(err) || String(err),
         }))
         return null
       }
@@ -2052,7 +2053,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       await get().selectFile(created.id)
       return created
     } catch (err) {
-      set({ loadError: err?.message || String(err) })
+      set({ loadError: errMessage(err) || String(err) })
       return null
     }
   },
@@ -2089,7 +2090,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
         currentFile: s.currentFile?.id === id ? { ...s.currentFile, name: updated.name } : s.currentFile,
       }))
     } catch (err) {
-      set({ loadError: err?.message || String(err) })
+      set({ loadError: errMessage(err) || String(err) })
     }
   },
 
@@ -2120,7 +2121,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
         if (f) await get().selectFile(f.id)
       }
     } catch (err) {
-      set({ loadError: err?.message || String(err) })
+      set({ loadError: errMessage(err) || String(err) })
     }
   },
 
@@ -2131,7 +2132,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       const updated = await api.updateProject(projectId, { name })
       set({ project: updated })
     } catch (err) {
-      set({ loadError: err?.message || String(err) })
+      set({ loadError: errMessage(err) || String(err) })
     }
   },
 
@@ -2413,7 +2414,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       const messages = await api.listMessages(projectId, threadId)
       set({ messages: messages || [], loadingMessages: false })
     } catch (err) {
-      set({ loadingMessages: false, loadError: err?.message || String(err) })
+      set({ loadingMessages: false, loadError: errMessage(err) || String(err) })
     }
   },
 
@@ -2426,7 +2427,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       await get().selectThread(t.id)
       return t
     } catch (err) {
-      set({ loadError: err?.message || String(err) })
+      set({ loadError: errMessage(err) || String(err) })
     }
   },
 
@@ -2465,7 +2466,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
         await get().selectThread(remaining[0]?.id ?? null)
       }
     } catch (err) {
-      set({ loadError: err?.message || String(err) })
+      set({ loadError: errMessage(err) || String(err) })
     }
   },
 
@@ -2551,7 +2552,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       set((s) => ({
         sending: false,
         messages: s.messages.map((m) => m.id === optimistic.id
-          ? { ...m, _error: err?.message || 'Failed to send' }
+          ? { ...m, _error: errMessage(err) || 'Failed to send' }
           : m),
       }))
     }
@@ -2707,7 +2708,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
         }
       }
     } catch (err) {
-      if (err?.name === 'AbortError' || ctrl.signal.aborted) {
+      if (errName(err) === 'AbortError' || ctrl.signal.aborted) {
         // User cancelled — preserve partial state
         updateAssistant(() => ({ _streaming: false }))
         set({ sending: false, streamAbortController: null })
@@ -2715,7 +2716,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       }
 
       // Network error or 4xx/5xx — fall back to blocking sendMessage
-      const statusCode = err?.status ?? 0
+      const statusCode = errStatus(err) ?? 0
       if (statusCode === 404 || statusCode >= 500) {
         // Remove the placeholder and delegate to the blocking path
         set((s) => ({
@@ -2732,7 +2733,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
 
       updateAssistant(() => ({
         _streaming: false,
-        _error: err?.message || 'Failed to stream',
+        _error: errMessage(err) || 'Failed to stream',
       }))
       set({ sending: false, streamAbortController: null })
     }
@@ -2807,9 +2808,9 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
           return { path: entry.path, ok: true }
         } catch (err) {
           // 409 = OCC conflict — server has newer version.
-          const hint = err?.status === 409
+          const hint = errStatus(err) === 409
             ? 'Server has newer version — reload to merge'
-            : (err?.message || 'Failed to restore')
+            : (errMessage(err) || 'Failed to restore')
           return { path: entry.path, ok: false, error: hint }
         }
       }),
@@ -2909,7 +2910,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       // If a new view's source isn't in our source-parts cache yet, resolve it.
       await get().resolveDrawingSources()
     } catch (err) {
-      set({ saving: false, toast: err?.message || 'Failed to save drawing' })
+      set({ saving: false, toast: errMessage(err) || 'Failed to save drawing' })
     }
   },
 
@@ -3287,7 +3288,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       const sketchPath = fileAbsPath(get().files, currentFileId)
       await get()._reEvalJscadForSketch(sketchPath)
     } catch (err) {
-      set({ saving: false, toast: err?.message || 'Failed to save sketch' })
+      set({ saving: false, toast: errMessage(err) || 'Failed to save sketch' })
     }
   },
 
@@ -3367,7 +3368,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
         set({ parts, partsError: null, loadingParts: false })
       } catch (err) {
         if (get().currentFileId === currentFileId) {
-          set({ loadingParts: false, partsError: err?.message || 'Assembly resolve failed' })
+          set({ loadingParts: false, partsError: errMessage(err) || 'Assembly resolve failed' })
         }
       }
     }
@@ -3398,7 +3399,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
         files: s.files.map((f) => f.id === updated.id ? { ...f, ...updated, content: undefined } : f),
       }))
     } catch (err) {
-      set({ saving: false, toast: err?.message || 'Failed to save feature' })
+      set({ saving: false, toast: errMessage(err) || 'Failed to save feature' })
     }
   },
 
@@ -3515,9 +3516,9 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
     } catch (err) {
       set((s) => ({
         uploadProgress: s.uploadProgress
-          ? { ...s.uploadProgress, status: 'error', error: err?.message || String(err) }
+          ? { ...s.uploadProgress, status: 'error', error: errMessage(err) || String(err) }
           : null,
-        toast: err?.message || 'Failed to upload model',
+        toast: errMessage(err) || 'Failed to upload model',
       }))
     }
   },
@@ -3675,7 +3676,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
           total: null,
           warnings: [],
           loading: false,
-          error: err?.message || 'Failed to load BOM',
+          error: errMessage(err) || 'Failed to load BOM',
         },
       })
     }
@@ -3720,7 +3721,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
         set({ revisions: revisions || [], loadingRevisions: false })
       }
     } catch (err) {
-      set({ loadingRevisions: false, toast: err?.message || 'Failed to load history' })
+      set({ loadingRevisions: false, toast: errMessage(err) || 'Failed to load history' })
     }
   },
 
@@ -3741,7 +3742,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       const _rd = get().rightDrawer
       if (get().revisionDrawerOpen || (_rd.open && _rd.tab === 'history')) await get().loadRevisions(currentFileId)
     } catch (err) {
-      set({ toast: err?.message || 'Restore failed' })
+      set({ toast: errMessage(err) || 'Restore failed' })
     }
   },
 
@@ -3772,7 +3773,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
         redoStack: [...s.redoStack, { fileId: currentFileId, revisionId: current.id }],
       }))
     } catch (err) {
-      set({ toast: err?.message || 'Undo failed' })
+      set({ toast: errMessage(err) || 'Undo failed' })
     }
   },
 
@@ -3791,7 +3792,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       const _rdRedo = get().rightDrawer
       if (get().revisionDrawerOpen || (_rdRedo.open && _rdRedo.tab === 'history')) await get().loadRevisions(currentFileId)
     } catch (err) {
-      set({ toast: err?.message || 'Redo failed' })
+      set({ toast: errMessage(err) || 'Redo failed' })
     }
   },
 
@@ -3874,7 +3875,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
     } catch (err) {
       set({
         activityLoading: false,
-        activityError: err instanceof ApiError ? err.message : (err?.message || 'Could not load activity.'),
+        activityError: err instanceof ApiError ? err.message : (errMessage(err) || 'Could not load activity.'),
       })
     }
   },
@@ -4274,7 +4275,7 @@ async function applyAppearanceEdit(set, get, nextSource) {
       files: s.files.map((f) => (f.id === updated.id ? { ...f, ...updated, content: undefined } : f)),
     }))
   } catch (err) {
-    set({ saving: false, toast: err?.message || 'Failed to save appearance' })
+    set({ saving: false, toast: errMessage(err) || 'Failed to save appearance' })
   }
 }
 
@@ -4298,6 +4299,6 @@ async function applySourceEdit(set, get, nextSource) {
       files: s.files.map((f) => f.id === updated.id ? { ...f, ...updated, content: undefined } : f),
     }))
   } catch (err) {
-    set({ saving: false, toast: err?.message || 'Failed to save edit' })
+    set({ saving: false, toast: errMessage(err) || 'Failed to save edit' })
   }
 }

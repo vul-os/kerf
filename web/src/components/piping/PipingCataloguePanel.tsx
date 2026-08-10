@@ -313,7 +313,7 @@ export default function PipingCataloguePanel() {
           onClick={handleLookup}
           disabled={loading}
           className="mt-4 flex items-center gap-2 bg-blue-600 hover:bg-blue-700
-                     disabled:opacity-50 text-white text-sm px-4 py-2 rounded"
+                     disabled:opacity-50 text-white text-sm px-4 py-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {loading ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
           Look up
@@ -338,7 +338,7 @@ export default function PipingCataloguePanel() {
             <button
               onClick={handleAddToBOM}
               className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800
-                         border border-green-200 hover:border-green-400 rounded px-2 py-1"
+                         border border-green-200 hover:border-green-400 rounded px-2 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             >
               <Plus size={12} /> Add to BOM
             </button>
@@ -371,7 +371,7 @@ export default function PipingCataloguePanel() {
             <h4 className="font-medium text-sm text-gray-700 flex items-center gap-1">
               <Package size={14} /> Fitting BOM
             </h4>
-            <button onClick={clearBOM} className="text-xs text-red-500 hover:text-red-700">
+            <button onClick={clearBOM} className="text-xs text-red-500 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
               Clear all
             </button>
           </div>
@@ -399,7 +399,7 @@ export default function PipingCataloguePanel() {
                   </td>
                   <td className="px-2 py-1 border border-gray-200 text-gray-500 text-xs">{row.standard}</td>
                   <td className="px-2 py-1 border border-gray-200">
-                    <button onClick={() => removeLine(i)} className="text-red-400 hover:text-red-600">
+                    <button onClick={() => removeLine(i)} className="text-red-400 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70" aria-label={`Remove ${row.item || 'component'} from BOM`}>
                       <Trash2 size={10} />
                     </button>
                   </td>

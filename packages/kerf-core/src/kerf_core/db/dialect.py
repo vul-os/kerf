@@ -215,6 +215,72 @@ def parse_array_column(name: str, value: Any) -> Any:
     return value
 
 
+# Postgres ``timestamptz`` columns.  asyncpg returns these as timezone-aware
+# ``datetime``s; SQLite stores them as ISO-ish text (the generator maps
+# ``timestamptz`` -> ``text``), so without this the SAME row field is a
+# ``datetime`` on one backend and a ``str`` on the other — and every
+# ``row["created_at"].isoformat()`` in the query layer becomes an
+# AttributeError on the embedded backend.  That shipped: POST
+# /api/projects/{id}/thumbnail 500'd with "'str' object has no attribute
+# 'isoformat'".  Converting here, at the single row-construction boundary,
+# fixes every present and future call site at once rather than sprinkling
+# isinstance() guards through the routes.
+#
+# The set is exhaustive as of this writing, derived mechanically from the
+# Postgres migrations (every ``<name> timestamptz`` declaration).  A column
+# added later and not listed here simply stays a string — the same
+# conservative failure mode ARRAY_COLUMNS has.
+TIMESTAMP_COLUMNS = frozenset({
+    "avatar_updated_at",
+    "completed_at",
+    "cover_generated_at",
+    "created_at",
+    "deleted_at",
+    "expires_at",
+    "finished_at",
+    "last_accessed_at",
+    "last_message_at",
+    "last_seen_at",
+    "last_unref_at",
+    "last_used_at",
+    "picked_up_at",
+    "readme_generated_at",
+    "recorded_at",
+    "revoked_at",
+    "started_at",
+    "thumbnail_updated_at",
+    "updated_at",
+    "used_at",
+    "window_start",
+})
+
+
+def parse_timestamp_column(name: str, value: Any) -> Any:
+    """Parse a known timestamptz result column's text into an aware datetime.
+
+    Handles both spellings SQLite ends up holding: ``CURRENT_TIMESTAMP``
+    writes ``'YYYY-MM-DD HH:MM:SS'``, and :func:`adapt_param` writes
+    ``'YYYY-MM-DD HH:MM:SS[.ffffff]'`` — both UTC, both accepted by
+    ``fromisoformat`` on 3.11+. Naive results are stamped UTC so they compare
+    and serialise exactly like asyncpg's.
+
+    Anything that does not parse is returned untouched: a malformed or
+    unexpected value must not take down the read path.
+    """
+    if name not in TIMESTAMP_COLUMNS or not isinstance(value, str):
+        return value
+    text = value.strip()
+    if not text:
+        return value
+    try:
+        parsed = _dt.datetime.fromisoformat(text)
+    except ValueError:
+        return value
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=_dt.timezone.utc)
+    return parsed
+
+
 def _json_default(v: Any) -> Any:
     if isinstance(v, uuid.UUID):
         return str(v)

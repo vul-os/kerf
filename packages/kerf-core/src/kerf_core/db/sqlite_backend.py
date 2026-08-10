@@ -36,6 +36,7 @@ import aiosqlite
 
 from .dialect import (
     parse_array_column,
+    parse_timestamp_column,
     sqlite_path_from_url,
     translate_query,
     translate_sql,
@@ -57,7 +58,10 @@ def _row_to_record(cursor_description, row) -> Record:
     return Record(
         (
             cursor_description[i][0],
-            parse_array_column(cursor_description[i][0], row[i]),
+            parse_timestamp_column(
+                cursor_description[i][0],
+                parse_array_column(cursor_description[i][0], row[i]),
+            ),
         )
         for i in range(len(row))
     )

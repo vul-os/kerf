@@ -100,6 +100,29 @@ class TestDialect:
         # non-array column names pass through untouched (jsonb stays a str)
         assert dialect.parse_array_column("part_refs", '[1,2]') == '[1,2]'
 
+    def test_timestamp_column_parse(self):
+        utc = datetime.timezone.utc
+
+        # CURRENT_TIMESTAMP's spelling — no fractional part, no offset.
+        assert dialect.parse_timestamp_column("created_at", "2026-01-02 03:04:05") == \
+            datetime.datetime(2026, 1, 2, 3, 4, 5, tzinfo=utc)
+        # adapt_param's spelling — microseconds.
+        assert dialect.parse_timestamp_column("updated_at", "2026-01-02 03:04:05.123456") == \
+            datetime.datetime(2026, 1, 2, 3, 4, 5, 123456, tzinfo=utc)
+        # An explicit offset is respected rather than overwritten.
+        assert dialect.parse_timestamp_column("expires_at", "2026-01-02T03:04:05+02:00") == \
+            datetime.datetime(2026, 1, 2, 3, 4, 5,
+                              tzinfo=datetime.timezone(datetime.timedelta(hours=2)))
+
+        # Pass-throughs: unknown column, null, already-parsed, and unparseable
+        # text must never raise — a bad value must not take down a read.
+        assert dialect.parse_timestamp_column("name", "2026-01-02 03:04:05") == "2026-01-02 03:04:05"
+        assert dialect.parse_timestamp_column("created_at", None) is None
+        assert dialect.parse_timestamp_column("created_at", "") == ""
+        assert dialect.parse_timestamp_column("created_at", "not a timestamp") == "not a timestamp"
+        already = datetime.datetime(2026, 1, 2, tzinfo=utc)
+        assert dialect.parse_timestamp_column("created_at", already) is already
+
 
 # ── core-path integration on a real SQLite database ─────────────────────────────
 
@@ -137,6 +160,25 @@ class TestSqliteCorePath:
         for t in ("users", "workspaces", "projects", "files", "file_revisions",
                   "refresh_tokens", "pub_chunks", "pub_follows"):
             assert t in names, f"missing table {t}"
+
+    async def test_timestamps_read_back_as_datetimes(self, sqlite_pool):
+        """A timestamptz column must be a datetime on BOTH backends.
+
+        The regression this guards: SQLite stores these as text, so
+        ``row["created_at"].isoformat()`` — which the query layer does in a
+        dozen places — raised AttributeError and 500'd the route. Asserting
+        on the pure function is not enough; the conversion has to survive the
+        real cursor -> Record path.
+        """
+        async with sqlite_pool.acquire() as conn:
+            u = await conn.fetchrow(
+                "INSERT INTO users (email) VALUES ($1) RETURNING *", "ts@x.io")
+            created = u["created_at"]
+            assert isinstance(created, datetime.datetime), \
+                f"created_at came back as {type(created).__name__}: {created!r}"
+            assert created.tzinfo is not None, "must be timezone-aware, like asyncpg's"
+            # The call site that shipped broken.
+            assert created.isoformat()
 
     async def test_uuid_default_is_v4(self, sqlite_pool):
         async with sqlite_pool.acquire() as conn:

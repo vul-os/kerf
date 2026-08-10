@@ -17,6 +17,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { api } from '../lib/api.js'
+import { errMessage } from './errorUtils.js'
 
 // Defaults consumed by the rest of the app when a key is not set. The
 // backend never auto-fills these; the consumer falls back to DEFAULTS so a
@@ -83,7 +84,7 @@ export const useUserPrefs = create<UserPrefsState>()(
           set({ prefs: data || {}, loaded: true, loading: false })
           applyPrefsToDOM(data || {})
         } catch (err) {
-          set({ loading: false, error: err?.message || 'failed to load preferences' })
+          set({ loading: false, error: errMessage(err) || 'failed to load preferences' })
         }
       },
 
@@ -115,7 +116,7 @@ export const useUserPrefs = create<UserPrefsState>()(
           set({ prefs: stored || {}, saving: false })
           applyPrefsToDOM(stored || {})
         } catch (err) {
-          set({ saving: false, error: err?.message || 'failed to save preferences' })
+          set({ saving: false, error: errMessage(err) || 'failed to save preferences' })
           throw err
         }
       },

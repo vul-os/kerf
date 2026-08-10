@@ -327,10 +327,8 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
-          tar czf "release-wheels-bundle/kerf-wheels-${VERSION}.tar.gz" -C release-wheels .             2>/dev/null || {
-              mkdir -p release-wheels-bundle
-              tar czf "release-wheels-bundle/kerf-wheels-${VERSION}.tar.gz" -C release-wheels .
-            }
+          mkdir -p release-wheels-bundle
+          tar czf "release-wheels-bundle/kerf-wheels-${VERSION}.tar.gz" -C release-wheels .
           ls -lh release-wheels-bundle/
 
       - name: Upload wheels as workflow artifact

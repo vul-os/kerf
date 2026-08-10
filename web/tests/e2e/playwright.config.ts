@@ -50,6 +50,8 @@ import path from 'node:path'
 
 import { defineConfig } from '@playwright/test'
 
+import { prepareDatabases } from './global-setup'
+
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..')
 const DIST = path.join(REPO_ROOT, 'web', 'dist')
 
@@ -72,6 +74,21 @@ export const LOCAL_DB =
   process.env.DATABASE_URL || `sqlite://${path.join(DB_DIR, 'e2e-local.db')}`
 export const SERVER_DB =
   process.env.DATABASE_URL || `sqlite://${path.join(DB_DIR, 'e2e-server.db')}`
+
+// Here, at module scope, NOT in a `globalSetup` hook: Playwright starts the
+// webServer processes before globalSetup runs, so a hook would migrate a
+// database the servers had already opened. They booted against an empty file
+// and logged `no such table: distributor_credentials` while initialising, then
+// worked anyway because the query layer opens connections per request — the
+// kind of quiet, boot-time-only breakage worth being deliberate about.
+//
+// Guarded to the main process: Playwright re-evaluates this config in every
+// worker, and re-running the prepare there would clear the auth rate-limit
+// buckets in the middle of a run — quietly resetting a limit the server-mode
+// specs are exercising. TEST_WORKER_INDEX is set only in workers.
+if (process.env.TEST_WORKER_INDEX === undefined) {
+  prepareDatabases(DB_DIR, [LOCAL_DB, SERVER_DB])
+}
 
 /** One kerf-server, serving the API and the built SPA from a single origin. */
 function kerfServer(port: number, localMode: boolean, db: string) {
@@ -101,8 +118,8 @@ function kerfServer(port: number, localMode: boolean, db: string) {
 export default defineConfig({
   testDir: './specs',
 
-  // Creates + migrates the SQLite databases and clears auth rate-limit buckets.
-  globalSetup: './global-setup.ts',
+  // No globalSetup: database preparation happens at module scope above,
+  // because that hook runs after the webServers have already started.
 
   // Spec FILES run in parallel; tests within a file stay serial, because
   // several build on state an earlier test in the same file created. Files are
@@ -116,6 +133,19 @@ export default defineConfig({
   workers: process.env.CI ? 2 : undefined,
 
   retries: 0,
+
+  // Per-test budget. Playwright's default is 30s — which was never consistent
+  // with this suite's own step budgets: `actionTimeout` below is 30s, and
+  // individual assertions ask for 20-30s, so ONE step was permitted to consume
+  // the entire test. The heavy specs do several such steps in a row (create a
+  // project, load the editor, type into Monaco, wait for autosave, boot a WASM
+  // worker, render), and they legitimately total more than 30s.
+  //
+  // This is what made bim.spec look flaky for weeks: it takes ~29-33s end to
+  // end, so it passed or failed on machine noise rather than on anything in the
+  // code. Raising the total does not hide slowness — every individual step is
+  // still bounded, and a genuine hang still fails, just at 120s instead of 30s.
+  timeout: 120_000,
 
   reporter: [
     ['list'],

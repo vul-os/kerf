@@ -1,6 +1,17 @@
 /**
  * global-setup.ts — prepare the databases the suite runs against.
  *
+ * NOT registered as Playwright's `globalSetup`, deliberately. Playwright starts
+ * the `webServer` processes BEFORE the globalSetup hook runs, so a hook here
+ * migrates a database the servers have already opened: they booted against an
+ * empty file and logged `no such table: distributor_credentials` while
+ * initialising, then worked anyway because the query layer opens connections
+ * per request. Only boot-time initialisation was the casualty, which is exactly
+ * the kind of thing that fails quietly.
+ *
+ * So playwright.config.ts calls `prepareDatabases()` at module scope instead,
+ * which runs before Playwright starts anything at all.
+ *
  * Two jobs:
  *
  * 1. CREATE AND MIGRATE. On the embedded SQLite backend (the default — see
@@ -27,8 +38,6 @@
 
 import { spawnSync } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
-
-import { DB_DIR, LOCAL_DB, SERVER_DB } from './playwright.config'
 
 const PY = `
 import asyncio, sys
@@ -64,10 +73,14 @@ asyncio.run(main())
 print("e2e: databases ready, rate-limit buckets cleared")
 `
 
-export default function globalSetup(): void {
-  mkdirSync(DB_DIR, { recursive: true })
+/**
+ * Migrate the suite's databases and clear rate-limit buckets. Synchronous on
+ * purpose: it is called from config module scope, where nothing can await.
+ */
+export function prepareDatabases(dbDir: string, urls: string[]): void {
+  mkdirSync(dbDir, { recursive: true })
 
-  const res = spawnSync('python', ['-c', PY, LOCAL_DB, SERVER_DB], {
+  const res = spawnSync('python', ['-c', PY, ...urls], {
     encoding: 'utf8',
     env: process.env,
     timeout: 120_000,
@@ -75,10 +88,11 @@ export default function globalSetup(): void {
 
   const out = [res.stdout, res.stderr].filter(Boolean).join('').trim()
   if (res.status !== 0) {
-    // Do not limp on: every spec would fail on a missing table and the real
-    // cause would be buried 28 failures deep.
+    // Do not limp on: the servers would boot against an empty database, every
+    // spec would fail on a missing table, and the real cause would be buried 28
+    // failures deep.
     throw new Error(
-      `e2e global setup could not prepare the database (exit ${res.status}).\n` +
+      `e2e setup could not prepare the database (exit ${res.status}).\n` +
         `Is kerf-core importable by the \`python\` on PATH? (./scripts/dev-install.sh full)\n\n` +
         out,
     )

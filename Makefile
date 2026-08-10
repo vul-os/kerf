@@ -1,4 +1,4 @@
-.PHONY: release test test-kernel test-domains test-all
+.PHONY: release test test-kernel test-domains test-all desktop
 
 # ---------------------------------------------------------------------------
 # Test tiers. See docs/TESTING.md for what each tier covers, the measured
@@ -73,6 +73,12 @@ test-all:
 		--max-worker-restart=2 \
 		--deselect=packages/kerf-aero/tests/test_panel_2d_viscous.py::TestNACA0012Viscous
 
+
+# Build the one-file Kerf desktop binary: frontend build + PyInstaller.
+# See scripts/build-desktop.sh and docs/desktop-build.md — including what
+# the binary does NOT include (OCCT B-rep, real FEM: both conda-only).
+desktop:
+	./scripts/build-desktop.sh
 
 # Cut a release: verify a clean tree, bump every version string in lockstep,
 # commit, tag, and push. Pushing the tag fires .github/workflows/release.yml

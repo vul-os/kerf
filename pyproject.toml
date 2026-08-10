@@ -192,6 +192,7 @@ members = [
     "packages/kerf-composites",
     "packages/kerf-core",
     "packages/kerf-dental",
+    "packages/kerf-desktop",
     "packages/kerf-electronics",
     "packages/kerf-energy",
     "packages/kerf-fem",
@@ -252,6 +253,7 @@ kerf-cli = { workspace = true }
 kerf-composites = { workspace = true }
 kerf-core = { workspace = true }
 kerf-dental = { workspace = true }
+kerf-desktop = { workspace = true }
 kerf-electronics = { workspace = true }
 kerf-energy = { workspace = true }
 kerf-fem = { workspace = true }

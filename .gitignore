@@ -73,6 +73,12 @@ __pycache__/
 .venv/
 venv/
 env/
+.venv-desktop-build/
+
+# PyInstaller build output for the desktop binary (scripts/build-desktop.sh /
+# make desktop). The spec's own build/ and dist/ dirs, both regenerated.
+packages/kerf-desktop/build/
+packages/kerf-desktop/dist/
 
 # Playwright e2e generated artifacts
 web/tests/e2e/test-results/

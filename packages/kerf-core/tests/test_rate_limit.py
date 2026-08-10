@@ -1,7 +1,16 @@
-"""Hermetic tests for kerf_core.rate_limit.enforce.
+"""Tests for kerf_core.rate_limit.enforce, against a REAL database.
 
-Tests use a FakePool / FakeConn that simulates rate_limit_buckets
-in-memory. No Postgres required.
+These used to run against a FakePool that pattern-matched the arguments and
+never looked at the SQL. Every assertion below passed while the actual
+statement was unparseable on the embedded backend: ``enforce`` built its
+window with ``to_timestamp(floor(extract(epoch from now()) / $2) * $2)``,
+which is Postgres-only, so on a default (SQLite) install every rate-limited
+route — /auth/register, /auth/login — answered 500. A fake that accepts any
+SQL cannot catch a dialect error, so the fake is gone: these run against a
+real SQLite database opened through kerf's own adapter
+(``create_sqlite_pool``), which applies the same dialect translation
+production does. No Postgres, no network, no service container — the
+embedded backend is stdlib.
 
 Covers:
   - First request under limit returns immediately, count=1.
@@ -9,92 +18,56 @@ Covers:
   - The 429 includes a Retry-After header.
   - The 429 body has the expected JSON shape.
   - Concurrent calls from the same key serialise correctly (no
-    over-allowance — UPSERT is atomic).
+    over-allowance — the UPSERT is atomic).
   - Sliding window: a request 61 s later starts a new window (count
     resets).
+  - The statement actually executes on the embedded backend (implied by
+    every test above, and asserted directly in the round-trip test).
 """
 from __future__ import annotations
 
 import asyncio
-import math
-import time
-from typing import Any
 from unittest.mock import patch
 
 import pytest
 from fastapi import HTTPException
 
+from kerf_core.db.sqlite_backend import create_sqlite_pool
 
-# ---------------------------------------------------------------------------
-# Fake pool that simulates rate_limit_buckets atomically in-process
-# ---------------------------------------------------------------------------
-
-class FakeBucketsStore:
-    """Shared in-memory store for rate_limit_buckets rows."""
-
-    def __init__(self):
-        # {(bucket_key, window_start_epoch): count}
-        self._buckets: dict[tuple[str, float], int] = {}
-
-    def upsert(self, key: str, window_start_epoch: float) -> int:
-        k = (key, window_start_epoch)
-        self._buckets[k] = self._buckets.get(k, 0) + 1
-        return self._buckets[k]
-
-    def clear(self):
-        self._buckets.clear()
+# Mirrors migrations_sqlite/0001_core_identity.sql. Kept here rather than
+# running the whole migration set so a limiter test stays a limiter test.
+_DDL = """
+create table if not exists rate_limit_buckets (
+    bucket_key   text not null,
+    window_start text not null,
+    count        integer not null default 0,
+    primary key (bucket_key, window_start)
+)
+"""
 
 
-class FakeConn:
-    def __init__(self, store: FakeBucketsStore, now_epoch: float, window_seconds: float):
-        self._store = store
-        self._now = now_epoch
-        self._w = window_seconds
+@pytest.fixture
+async def pool(tmp_path):
+    """A real SQLite pool with the rate_limit_buckets table created.
 
-    async def fetchrow(self, query: str, *args) -> dict:
-        # args: (bucket_key, window_seconds_as_float)
-        key = args[0]
-        w = float(args[1])
-        window_start = math.floor(self._now / w) * w
-        count = self._store.upsert(key, window_start)
-        return {"count": count}
+    A file (not :memory:) so the pool's several connections all see the same
+    rows — which is what makes the concurrency test meaningful.
+    """
+    p = await create_sqlite_pool(f"sqlite://{tmp_path / 'rl.db'}", max_size=4)
+    await p.execute(_DDL)
+    yield p
+    await p.close()
 
 
-class FakeConnCtx:
-    def __init__(self, store, now_epoch, window_seconds):
-        self._store = store
-        self._now = now_epoch
-        self._w = window_seconds
-
-    async def __aenter__(self):
-        return FakeConn(self._store, self._now, self._w)
-
-    async def __aexit__(self, *_):
-        pass
-
-
-class FakePool:
-    def __init__(self, store: FakeBucketsStore, now_epoch: float = None):
-        self._store = store
-        self._now = now_epoch if now_epoch is not None else time.time()
-        self._window_seconds: float = 60.0
-
-    def acquire(self):
-        return FakeConnCtx(self._store, self._now, self._window_seconds)
-
-    def set_now(self, t: float):
-        self._now = t
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-async def _enforce(pool, key, max_per_window, window_seconds=60):
-    """Thin wrapper so tests don't need to patch time.time."""
+async def _enforce(pool, key, max_per_window, window_seconds=60, *, now=None):
+    """Call enforce, optionally pinning the clock it derives its window from."""
     from kerf_core.rate_limit import enforce
-    pool._window_seconds = float(window_seconds)
-    await enforce(pool, key, max_per_window, window_seconds)
+
+    if now is None:
+        await enforce(pool, key, max_per_window, window_seconds)
+        return
+    with patch("kerf_core.rate_limit.time.time", return_value=now):
+        await enforce(pool, key, max_per_window, window_seconds)
 
 
 # ---------------------------------------------------------------------------
@@ -102,26 +75,42 @@ async def _enforce(pool, key, max_per_window, window_seconds=60):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_first_request_does_not_raise():
-    store = FakeBucketsStore()
-    pool = FakePool(store)
-    # Should not raise
+async def test_first_request_does_not_raise(pool):
     await _enforce(pool, "test:user1", max_per_window=10, window_seconds=60)
 
 
 @pytest.mark.asyncio
-async def test_requests_under_limit_succeed():
-    store = FakeBucketsStore()
-    pool = FakePool(store)
-    for _ in range(10):
-        await _enforce(pool, "test:user2", max_per_window=10, window_seconds=60)
-    # 10th request must pass
+async def test_statement_round_trips_on_the_embedded_backend(pool):
+    """The regression test proper: the UPSERT parses, runs, and counts.
+
+    A dialect error here is exactly the failure that shipped — it surfaced as
+    sqlite3.OperationalError: near "from": syntax error, five frames below an
+    HTTP 500.
+    """
+    for expected in (1, 2, 3):
+        await _enforce(pool, "test:roundtrip", max_per_window=10, window_seconds=60)
+        row = await pool.fetchrow(
+            "SELECT count FROM rate_limit_buckets WHERE bucket_key = $1",
+            "test:roundtrip",
+        )
+        assert row is not None, "no bucket row was written"
+        assert row["count"] == expected
+
+    rows = await pool.fetch(
+        "SELECT bucket_key FROM rate_limit_buckets WHERE bucket_key = $1",
+        "test:roundtrip",
+    )
+    assert len(rows) == 1, "each call must UPSERT one row, not insert a new one"
 
 
 @pytest.mark.asyncio
-async def test_11th_request_raises_429():
-    store = FakeBucketsStore()
-    pool = FakePool(store)
+async def test_requests_under_limit_succeed(pool):
+    for _ in range(10):
+        await _enforce(pool, "test:user2", max_per_window=10, window_seconds=60)
+
+
+@pytest.mark.asyncio
+async def test_11th_request_raises_429(pool):
     for _ in range(10):
         await _enforce(pool, "test:user3", max_per_window=10, window_seconds=60)
 
@@ -132,9 +121,7 @@ async def test_11th_request_raises_429():
 
 
 @pytest.mark.asyncio
-async def test_429_has_retry_after_header():
-    store = FakeBucketsStore()
-    pool = FakePool(store)
+async def test_429_has_retry_after_header(pool):
     for _ in range(10):
         await _enforce(pool, "test:user4", max_per_window=10, window_seconds=60)
 
@@ -149,9 +136,7 @@ async def test_429_has_retry_after_header():
 
 
 @pytest.mark.asyncio
-async def test_429_body_has_json_shape():
-    store = FakeBucketsStore()
-    pool = FakePool(store)
+async def test_429_body_has_json_shape(pool):
     for _ in range(10):
         await _enforce(pool, "test:user5", max_per_window=10, window_seconds=60)
 
@@ -168,11 +153,8 @@ async def test_429_body_has_json_shape():
 
 
 @pytest.mark.asyncio
-async def test_different_keys_are_independent():
+async def test_different_keys_are_independent(pool):
     """Two different keys do not interfere with each other."""
-    store = FakeBucketsStore()
-    pool = FakePool(store)
-
     for _ in range(10):
         await _enforce(pool, "test:user_a", max_per_window=10, window_seconds=60)
 
@@ -181,44 +163,43 @@ async def test_different_keys_are_independent():
 
 
 @pytest.mark.asyncio
-async def test_sliding_window_new_window_resets_count():
+async def test_sliding_window_new_window_resets_count(pool):
     """A request 61 s later lands in a new window; count starts at 1."""
-    store = FakeBucketsStore()
-    base_time = 1_700_000_000.0  # arbitrary fixed epoch
-    pool = FakePool(store, now_epoch=base_time)
+    base_time = 1_700_000_000.0  # arbitrary fixed epoch, already window-aligned
 
     for _ in range(10):
-        await _enforce(pool, "test:slide", max_per_window=10, window_seconds=60)
+        await _enforce(pool, "test:slide", max_per_window=10, window_seconds=60, now=base_time)
 
-    # 11th in same window → 429
+    # 11th in the same window → 429
     with pytest.raises(HTTPException) as exc_info:
-        await _enforce(pool, "test:slide", max_per_window=10, window_seconds=60)
+        await _enforce(pool, "test:slide", max_per_window=10, window_seconds=60, now=base_time)
     assert exc_info.value.status_code == 429
 
-    # Move time forward by 61 seconds → new window
-    pool.set_now(base_time + 61)
+    # 61 s later → a different window_start, so a different row
+    await _enforce(pool, "test:slide", max_per_window=10, window_seconds=60, now=base_time + 61)
 
-    # Should succeed again (new window, count=1)
-    await _enforce(pool, "test:slide", max_per_window=10, window_seconds=60)
+    rows = await pool.fetch(
+        "SELECT count FROM rate_limit_buckets WHERE bucket_key = $1 ORDER BY window_start",
+        "test:slide",
+    )
+    assert [r["count"] for r in rows] == [11, 1], (
+        "expected two window rows — the old one at its final count and a fresh one at 1"
+    )
 
 
 @pytest.mark.asyncio
-async def test_concurrent_calls_no_over_allowance():
-    """Concurrent calls for the same key serialise atomically via UPSERT.
+async def test_concurrent_calls_no_over_allowance(pool):
+    """Concurrent calls for one key must not over-allow.
 
-    Because FakeBucketsStore.upsert() is synchronous (no await), there is
-    no interleaving — this verifies the arithmetic is correct for N
-    concurrent coroutines.
+    Against the real database this is a genuine concurrency test: the pool
+    hands each coroutine its own connection, and correctness rests on the
+    UPSERT being atomic rather than on the test's own bookkeeping.
     """
-    store = FakeBucketsStore()
-    pool = FakePool(store)
-
     limit = 5
     calls = 10
+    results: list[str] = []
 
-    results = []
-
-    async def attempt(i):
+    async def attempt(_i):
         try:
             await _enforce(pool, "test:concurrent", max_per_window=limit, window_seconds=60)
             results.append("ok")
@@ -230,10 +211,5 @@ async def test_concurrent_calls_no_over_allowance():
 
     await asyncio.gather(*[attempt(i) for i in range(calls)])
 
-    ok_count = results.count("ok")
-    rejected_count = results.count("429")
-
-    assert ok_count == limit, f"Expected exactly {limit} successes, got {ok_count}"
-    assert rejected_count == calls - limit, (
-        f"Expected {calls - limit} rejections, got {rejected_count}"
-    )
+    assert results.count("ok") == limit, f"expected exactly {limit} allowed, got {results}"
+    assert results.count("429") == calls - limit

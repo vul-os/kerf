@@ -50,7 +50,7 @@ function reset() {
     currentThreadId: 't-1',
     currentFileId: null,
     pendingPartRefs: [],
-    threads: [{ id: 't-1', title: 'x', last_message_at: null }],
+    threads: [{ id: 't-1', title: 'x', last_message_at: undefined }],
     messages: [],
     sending: false,
   })
@@ -79,9 +79,12 @@ describe('sendMessage error handling', () => {
     const { messages } = useWorkspace.getState()
     // The optimistic message stays in the list so the user sees what they typed.
     expect(messages).toHaveLength(1)
-    expect(messages[0].role).toBe('user')
-    expect(messages[0].content).toBe('hello there')
-    expect(messages[0]._error).toMatch(/timed out/i)
+    const first = messages[0]
+    expect(first).toBeTruthy()
+    if (!first) throw new Error('unreachable — asserted above')
+    expect(first.role).toBe('user')
+    expect(first.content).toBe('hello there')
+    expect(first._error).toMatch(/timed out/i)
   })
 
   it('keeps the optimistic message visible (does not silently drop it)', async () => {
@@ -97,6 +100,8 @@ describe('sendMessage error handling', () => {
     vi.mocked(api.sendMessage).mockRejectedValueOnce({} as never)  // no .message
     await useWorkspace.getState().sendMessage('hi', {})
     const m = useWorkspace.getState().messages[0]
+    expect(m).toBeTruthy()
+    if (!m) throw new Error('unreachable — asserted above')
     expect(m._error).toBe('Failed to send')
   })
 })

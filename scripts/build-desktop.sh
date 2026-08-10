@@ -91,17 +91,22 @@ fi
 if [ -x "$venv_dir/bin/pip" ]; then
   venv_bin="$venv_dir/bin"
   venv_pip="$venv_bin/pip"
+  venv_python="$venv_bin/python"
   venv_pyinstaller="$venv_bin/pyinstaller"
 elif [ -x "$venv_dir/Scripts/pip.exe" ]; then
   venv_bin="$venv_dir/Scripts"
   venv_pip="$venv_bin/pip.exe"
+  venv_python="$venv_bin/python.exe"
   venv_pyinstaller="$venv_bin/pyinstaller.exe"
 else
   echo "error: no pip found under $venv_dir/bin or $venv_dir/Scripts — venv creation failed?" >&2
   exit 1
 fi
 
-"$venv_pip" install --upgrade pip -q
+# `python -m pip`, not the pip executable: on Windows pip.exe cannot overwrite
+# itself while running, and pip refuses with "To modify pip, please run the
+# following command" — which failed the windows-x64 leg on v0.1.7.
+"$venv_python" -m pip install --upgrade pip -q
 
 # pywebview's GTK/WebKitGTK backend (the only backend on Linux — there is no
 # bundled Chromium) needs PyGObject + pycairo at import time. Neither is a
@@ -114,7 +119,12 @@ fi
 # shipping a binary whose window never opens.
 extra_pip_args=()
 case "$(uname -s)" in
-  Linux*) extra_pip_args+=(pygobject pycairo) ;;
+  # PyGObject 3.52 dropped girepository-1.0 and now requires girepository-2.0,
+  # which the runner's libgirepository1.0-dev does NOT provide — the linux-x64
+  # leg died with "Dependency 'girepository-2.0' is required but not found".
+  # Pin below that break rather than chase apt package names that differ per
+  # Ubuntu release.
+  Linux*) extra_pip_args+=("pygobject<3.52" pycairo) ;;
 esac
 
 "$venv_pip" install -q \

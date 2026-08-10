@@ -18,7 +18,7 @@ const CIRCUIT_TYPE_RE = /^(source_|pcb_|schematic_)/
  * @param {string | unknown} jsonString - Raw JSON string OR already-parsed value.
  * @returns {boolean}
  */
-export function detectCircuitJson(jsonString) {
+export function detectCircuitJson(jsonString: unknown): boolean {
   let value
   if (typeof jsonString === 'string') {
     try {
@@ -58,7 +58,7 @@ export function detectCircuitJson(jsonString) {
  * @param {string | unknown} jsonString
  * @returns {Array | null}
  */
-export function normaliseCircuitJson(jsonString) {
+export function normaliseCircuitJson(jsonString: unknown): Array<Record<string, unknown>> | null {
   if (!detectCircuitJson(jsonString)) return null
 
   let value

@@ -1898,6 +1898,12 @@ deliberately **not** landed.
 | `src/lib/**` | 431 | not in the allow-list at all — pulled in *transitively* |
 | `src/store/**` | 95 | the directory actually being added |
 
+> **Correction (2026-08-11).** That 431 is only the part of `src/lib` that `src/store`
+> happens to import. Including the whole directory is **5,194** errors — 4,379 in `src/lib`
+> itself across 260 files, plus 815 in components dragged in transitively. I quoted 431 as
+> though it were the size of the job; it is about a twelfth of it. See the entry at the end
+> of this file for the actual shape and what is now in the gate.
+
 The 431 are the trap. TypeScript typechecks whatever the included files import, so
 adding `src/store` silently drags all of `src/lib` under `strict` +
 `noUncheckedIndexedAccess` without `src/lib` ever appearing in the include list. The
@@ -2151,4 +2157,48 @@ delete, threads, messages, workspace members, `/api/me`) found **no** 5xx on SQL
 `packages/kerf-core/src/kerf_core/db/{dialect.py,queries/workspaces.py}`,
 `packages/kerf-api/tests/test_route_sweep_sqlite.py`,
 `packages/kerf-core/tests/test_sqlite_backend.py`, `decisions.md` (this entry).
+
+## 2026-08-11 SAST — src/lib into the strict gate: the real scale, and 41 files in
+
+**I under-reported this by a factor of twelve.** I had measured "431 errors in src/lib" — but
+that was only the subset `src/store` happens to import. Including the whole directory:
+
+| where | files | errors |
+|---|---|---|
+| `src/lib/**` itself | 260 | 4,379 |
+| components/store pulled in transitively | 79 | 815 |
+| **total** | **339** | **5,194** |
+
+By error code: 1,968 `TS7006` (implicit-any parameter), 1,627 `TS18048`/`TS2532` (the
+`noUncheckedIndexedAccess` class), 555 `TS2345`/`TS2322` (genuine type mismatches), rest a tail.
+So it is *not* mostly non-null assertions in geometry kernels, as I had assumed — the largest
+class is missing parameter annotations, which is ordinary work rather than risky work.
+
+**The gate is now per-file, not per-directory.** `src/lib` cannot join as a glob at any point
+before the last file is clean, so `tsconfig.strict.json` lists files individually. The constraint
+that matters: **a file can only be listed once its entire import closure is clean**, because tsc
+checks whatever an included file imports — a dirty dependency fails the gate exactly as loudly as
+a dirty entry. That is why the first attempt at this (add the 37 files a regex-based import
+walker called clean) still produced 1,364 errors; the real closures came from
+`tsc --listFilesOnly`, which cut 37 to 22.
+
+**In the gate now: 41 files, 0 errors**, both configs, full suite green (12,993 tests), build
+clean. 22 were already clean and just needed listing; 19 were fixed here. The fixes were
+ordinary: real parameter types (`slug: string`, `url: unknown`, `(e: MediaQueryListEvent)`),
+return types that match the JSDoc that was already there, and `!` only where the line above
+*proves* non-emptiness — `filtered[0]!.id` sits under `if (filtered.length === 0) throw`. One
+was a latent bug rather than a typing nit: `sseClient` called `res.body.getReader()` with no null
+check, so a 200 with an empty body threw "Cannot read properties of null" several frames from the
+cause; it now says what happened.
+
+**The blocker worth knowing about: `three` ships no types at 0.160**, and `@types/three` is not
+installed — so every `import * as THREE from 'three'` is a `TS7016` implicit-any, and every
+three-touching file in `src/lib` is unreachable for the gate. Installing `@types/three@0.160`
+is the right fix and I tried it: it introduces **140 errors in the root, non-strict config**,
+which is currently at zero and gated by CI. So it is its own piece of work — real, scoped, and
+not something to land halfway — and it is reverted for now. Nothing else in `src/lib` gets into
+the gate cheaply until it is done.
+
+**Affected:** `web/tsconfig.strict.json`, 19 files under `web/src/lib/`, `decisions.md` (this
+entry, and a correction to the "431" figure in the entry above).
 

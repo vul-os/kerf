@@ -148,8 +148,9 @@ export function createFocusTrap(container: HTMLElement, options: FocusTrapOption
       return
     }
 
-    const first = tabbable[0]
-    const last = tabbable[tabbable.length - 1]
+    // tabbable is non-empty — the branch above returns when it is.
+    const first = tabbable[0]!
+    const last = tabbable[tabbable.length - 1]!
     const focused = document.activeElement
 
     if (e.shiftKey) {

@@ -58,7 +58,7 @@ const SAFE_URL_RE = /^(https?:|mailto:|#|\/|\.\/|\.\.\/)/i
  * Returns the original URL if it starts with a safe scheme, otherwise ''.
  * Pure function — no DOM access — so it is testable in Node / Vitest.
  */
-export function sanitizeMarkdownUrl(url) {
+export function sanitizeMarkdownUrl(url: unknown): string {
   if (!url || typeof url !== 'string') return ''
   const trimmed = url.trim()
   if (!trimmed) return ''
@@ -73,6 +73,6 @@ export function sanitizeMarkdownUrl(url) {
  * Adapter for react-markdown's `urlTransform` prop (v10+).
  * Replaces the previous `transformLinkUri` / `transformImageUri` props.
  */
-export function urlTransformer(url) {
+export function urlTransformer(url: unknown): string {
   return sanitizeMarkdownUrl(url)
 }

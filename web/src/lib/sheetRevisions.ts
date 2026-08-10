@@ -48,7 +48,7 @@ function _nextLetter(existing: string): string {
   const chars = existing.toUpperCase().split("");
 
   for (let i = chars.length - 1; i >= 0; i--) {
-    const code = chars[i].charCodeAt(0);
+    const code = chars[i]!.charCodeAt(0);
     if (code < MAX_CHAR) {
       chars[i] = String.fromCharCode(code + 1);
       return chars.join("");
@@ -78,7 +78,7 @@ function nextRevisionLetter(sheet: RevisionSheet): string {
   const revs = (sheet.revisions || []).map(r => r.letter).filter(Boolean);
   if (revs.length === 0) return "A";
   revs.sort();
-  return _nextLetter(revs[revs.length - 1]);
+  return _nextLetter(revs[revs.length - 1]!);
 }
 
 /**

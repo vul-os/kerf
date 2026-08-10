@@ -88,7 +88,7 @@ export function removeLayer(canvas: Canvas, layer_id: string): Canvas {
   if (filtered.length === canvas.layers.length) return canvas // not found — no-op
   if (filtered.length === 0) throw new Error('cannot remove the last layer')
   let active = canvas.active_layer
-  if (active === layer_id) active = filtered[0].id
+  if (active === layer_id) active = filtered[0]!.id
   return { ...canvas, layers: filtered, active_layer: active }
 }
 

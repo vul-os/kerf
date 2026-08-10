@@ -34,7 +34,7 @@ export const BREAKPOINTS = [
  * @param {number} width  — typically window.innerWidth
  * @returns {'sm'|'md'|'lg'|'xl'|'2xl'|null}
  */
-export function getBreakpointForWidth(width) {
+export function getBreakpointForWidth(width: number) {
   for (const bp of BREAKPOINTS) {
     if (width >= bp.minWidth) return bp.name
   }

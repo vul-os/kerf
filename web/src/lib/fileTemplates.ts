@@ -278,6 +278,6 @@ library (untitled) {
  * @param {string} kind  — file kind (e.g. 'hdl_vhdl', 'spice_netlist', …)
  * @returns {string}
  */
-export function getTemplate(kind) {
-  return FILE_TEMPLATES[kind] ?? ''
+export function getTemplate(kind: string): string {
+  return (FILE_TEMPLATES as Record<string, string>)[kind] ?? ''
 }

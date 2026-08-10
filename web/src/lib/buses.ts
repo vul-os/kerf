@@ -116,7 +116,9 @@ export function expandBus(spec: unknown): string[] {
     return hasBrackets ? [] : [spec]
   }
 
-  const [, prefix, rawA, rawB] = sliceMatch
+  // All three groups are non-optional in the pattern, so a successful match
+  // always populates them.
+  const [, prefix, rawA, rawB] = sliceMatch as unknown as [string, string, string, string]
   const a = parseInt(rawA, 10)
   const b = parseInt(rawB, 10)
 

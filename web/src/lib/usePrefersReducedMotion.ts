@@ -44,7 +44,7 @@ export default function usePrefersReducedMotion() {
       return
     }
     const mql = window.matchMedia(QUERY)
-    const handler = (e) => setReduced(e.matches)
+    const handler = (e: MediaQueryListEvent) => setReduced(e.matches)
 
     // Modern API — addEventListener is preferred over addListener (deprecated).
     if (typeof mql.addEventListener === 'function') {

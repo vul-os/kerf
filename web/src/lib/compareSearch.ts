@@ -136,7 +136,7 @@ export const COMPARE_CATEGORIES = [
  * @param {string|null} category - category id to filter by, or null for all
  * @returns {Array<{slug: string, competitor: string, category: string, hero_tagline: string}>}
  */
-export function compareSearch(query, category = null) {
+export function compareSearch(query: string | null | undefined, category: string | null = null) {
   const q = (query ?? '').trim().toLowerCase()
 
   let items = COMPARE_MANIFEST
@@ -165,7 +165,7 @@ export function compareSearch(query, category = null) {
  * @param {Array} items
  * @returns {Array<{category: string, label: string, items: Array}>}
  */
-export function groupByCategory(items) {
+export function groupByCategory(items: Array<{ category?: string }>) {
   const map = new Map()
   for (const cat of COMPARE_CATEGORIES) {
     map.set(cat.id, { category: cat.id, label: cat.label, items: [] })

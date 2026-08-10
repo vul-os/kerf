@@ -47,7 +47,7 @@ const SIGNAL_RE = /(?:^\s*signal\b|~)/m
  * @param {unknown} source
  * @returns {boolean}
  */
-export function detectAtopile(source) {
+export function detectAtopile(source: unknown): boolean {
   if (typeof source !== 'string' || source.length === 0) return false
 
   // Strip a leading ` ```ato` / ` ```atopile` fence and trailing ` ``` ` so
@@ -70,7 +70,7 @@ export function detectAtopile(source) {
  * @param {unknown} source
  * @returns {string | null}
  */
-export function extractAtopileSource(source) {
+export function extractAtopileSource(source: unknown): string | null {
   if (typeof source !== 'string' || source.length === 0) return null
   return _stripFence(source)
 }
@@ -83,7 +83,7 @@ export function extractAtopileSource(source) {
 const FENCE_OPEN_RE = /^```(?:ato(?:pile)?)\s*\n?/i
 const FENCE_CLOSE_RE = /\n?```\s*$/
 
-function _stripFence(text) {
+function _stripFence(text: string): string {
   const trimmed = text.trim()
   if (FENCE_OPEN_RE.test(trimmed)) {
     const withoutOpen = trimmed.replace(FENCE_OPEN_RE, '')

@@ -52,7 +52,7 @@ export class DirtyTimer {
    *
    * @param {string} workspaceId
    */
-  markCommit(workspaceId) {
+  markCommit(workspaceId: string) {
     this._lastCommitAt.set(workspaceId, Date.now())
     this._warned.delete(workspaceId)
     if (this._intervalId === null) {
@@ -68,7 +68,7 @@ export class DirtyTimer {
    * @param {number} [lastCommitAt]  Epoch ms of the last known deliberate commit.
    *                                 Defaults to now (optimistically clean).
    */
-  watchWorkspace(workspaceId, lastCommitAt = Date.now()) {
+  watchWorkspace(workspaceId: string, lastCommitAt: number = Date.now()) {
     if (!this._lastCommitAt.has(workspaceId)) {
       this._lastCommitAt.set(workspaceId, lastCommitAt)
     }
@@ -81,7 +81,7 @@ export class DirtyTimer {
    * Stop tracking a workspace (e.g. on unmount).
    * @param {string} workspaceId
    */
-  unwatchWorkspace(workspaceId) {
+  unwatchWorkspace(workspaceId: string) {
     this._lastCommitAt.delete(workspaceId)
     this._warned.delete(workspaceId)
     if (this._lastCommitAt.size === 0) {

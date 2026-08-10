@@ -94,6 +94,9 @@ export async function* streamSse(
     throw new Error(`SSE request failed: ${res.status} ${detail}`)
   }
 
+  // A 200 with no body is legal HTTP and would otherwise throw an opaque
+  // "Cannot read properties of null" several frames from here.
+  if (!res.body) throw new Error('SSE request returned no body')
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''

@@ -110,7 +110,7 @@ export async function stepSim({ program, inputs = {}, tick_count = 1, session_id
       outputs: {},
       trace: [],
       last_state: {},
-      errors: [err?.message ?? 'Network error'],
+      errors: [(err as { message?: string } | null | undefined)?.message ?? 'Network error'],
     }
   }
 }
@@ -157,7 +157,7 @@ export async function loadFixture(name: string): Promise<LoadFixtureResult> {
       program: '',
       inputs: [],
       description: '',
-      errors: [err?.message ?? 'Network error'],
+      errors: [(err as { message?: string } | null | undefined)?.message ?? 'Network error'],
     }
   }
 }

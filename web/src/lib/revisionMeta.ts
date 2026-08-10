@@ -56,14 +56,14 @@ const FALLBACK = {
   avatarFg: 'text-ink-200',
 }
 
-export function sourceMeta(source) {
-  return META[source] || { ...FALLBACK, label: source ? String(source) : 'Edit' }
+export function sourceMeta(source: string | null | undefined) {
+  return (META as Record<string, typeof FALLBACK>)[source ?? ''] || { ...FALLBACK, label: source ? String(source) : 'Edit' }
 }
 
 // Returns a JSX-ready shape mirroring the legacy `sourceTag` API used by the
 // pre-redesign drawer. New code should prefer `sourceMeta()` directly so it
 // can compose the icon component as a React element.
-export function sourceTag(source) {
+export function sourceTag(source: string | null | undefined) {
   const m = sourceMeta(source)
   return { label: m.label, icon: m.icon, className: m.accent }
 }

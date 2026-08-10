@@ -168,7 +168,8 @@ export const defaultLayerColor = {
  * Returns null when the layer is not in the palette (caller should fall back to
  * defaultLayerColor).
  */
-export function getPaletteColor(palette: Record<string, { layerNum?: number; datatype?: number; fill?: string; stroke?: string }>, layerIdOrObj) {
+export function getPaletteColor(palette: Record<string, { layerNum?: number; datatype?: number; fill?: string; stroke?: string }>, layerIdOrObj: string | { layerNum?: number; datatype?: number } | null | undefined,
+) {
   if (typeof layerIdOrObj === 'string') {
     const entry = palette[layerIdOrObj]
     return entry ? { fill: entry.fill, stroke: entry.stroke } : null

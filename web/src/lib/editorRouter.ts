@@ -4,9 +4,10 @@
 // Map extension → component-name string.
 // Callers import routeByExtension and switch on the returned string to
 // lazy-load the correct editor.
-export function routeByExtension(filename) {
+export function routeByExtension(filename: unknown): string {
   if (!filename || typeof filename !== 'string') return 'MonacoEditor'
-  const base = filename.split('/').pop()
+  // split() always yields at least one element, so pop() cannot be undefined here.
+  const base = filename.split('/').pop()!
   const dot = base.lastIndexOf('.')
   if (dot === -1) return 'MonacoEditor'
   const ext = base.slice(dot).toLowerCase()

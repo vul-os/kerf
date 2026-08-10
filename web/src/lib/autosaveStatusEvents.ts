@@ -12,7 +12,7 @@
 //   autosaveStatusEvents.removeEventListener('saved', handler)
 
 class AutosaveStatusBus extends EventTarget {
-  emit(type, detail) {
+  emit(type: string, detail?: unknown) {
     this.dispatchEvent(new CustomEvent(type, { detail }))
   }
 }

@@ -90,6 +90,6 @@ export const HDRI_PRESETS = [
  *             source: string, intensity: number, description: string,
  *             thumbnail_url: string | null } | undefined}
  */
-export function getPresetBySlug(slug) {
+export function getPresetBySlug(slug: string) {
   return HDRI_PRESETS.find((p) => p.slug === slug)
 }

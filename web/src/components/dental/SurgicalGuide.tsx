@@ -310,7 +310,7 @@ function ImplantPoseRow({ index, implant, onChange, onRemove }: {
         <button
           type="button"
           onClick={() => onRemove(index)}
-          className="text-ink-500 hover:text-red-400 text-[10px]"
+          className="text-ink-500 hover:text-red-400 text-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           aria-label={`Remove implant ${index + 1}`}
         >
           Remove
@@ -507,7 +507,7 @@ export default function SurgicalGuide(_props: Props) {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="px-3 py-1.5 rounded bg-sky-500/15 border border-sky-400/40 text-sky-200 text-xs hover:bg-sky-500/25"
+            className="px-3 py-1.5 rounded bg-sky-500/15 border border-sky-400/40 text-sky-200 text-xs hover:bg-sky-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             Import
           </button>
@@ -551,7 +551,7 @@ export default function SurgicalGuide(_props: Props) {
           <button
             type="button"
             onClick={addImplant}
-            className="text-[10px] px-2 py-1 rounded bg-sky-500/15 border border-sky-400/30 text-sky-300 hover:bg-sky-500/25"
+            className="text-[10px] px-2 py-1 rounded bg-sky-500/15 border border-sky-400/30 text-sky-300 hover:bg-sky-500/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
           >
             + Add implant
           </button>
@@ -578,7 +578,7 @@ export default function SurgicalGuide(_props: Props) {
           type="button"
           onClick={handleRun}
           disabled={running || implants.length === 0}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded bg-sky-500/20 border border-sky-400/50 text-sky-200 text-xs font-medium hover:bg-sky-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded bg-sky-500/20 border border-sky-400/50 text-sky-200 text-xs font-medium hover:bg-sky-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {running ? (
             <>
@@ -595,7 +595,7 @@ export default function SurgicalGuide(_props: Props) {
             type="button"
             onClick={handleExportStl}
             data-testid="export-stl-button"
-            className="px-3 py-2 rounded bg-emerald-500/20 border border-emerald-400/50 text-emerald-200 text-xs font-medium hover:bg-emerald-500/30 transition-colors whitespace-nowrap"
+            className="px-3 py-2 rounded bg-emerald-500/20 border border-emerald-400/50 text-emerald-200 text-xs font-medium hover:bg-emerald-500/30 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
             aria-label="Export surgical guide as STL"
           >
             Export STL

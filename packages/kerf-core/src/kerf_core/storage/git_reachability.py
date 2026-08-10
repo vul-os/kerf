@@ -35,7 +35,25 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-import pygit2
+# Guarded: pygit2 is an optional dependency (the frozen desktop build excludes
+# it because its vendored libcrypto collides with Python's libssl). An
+# unguarded import here failed the WHOLE kerf-api plugin at registration —
+# every /api route 404'd with {"detail":"Not Found"} from the SPA fallback,
+# which is the same failure mode that took electronics down earlier. Callers
+# that actually need git use _require_pygit2().
+try:
+    import pygit2
+except ImportError:  # pragma: no cover — install without the git extras
+    pygit2 = None
+
+
+def _require_pygit2():
+    if pygit2 is None:
+        raise RuntimeError(
+            "pygit2 is required for git-backed storage but is not installed. "
+            "Install it with: pip install pygit2"
+        )
+    return pygit2
 
 from kerf_core.storage.lfs_pointer import LfsPointerError
 from kerf_core.storage.lfs_pointer import parse as parse_lfs_pointer

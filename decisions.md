@@ -1959,11 +1959,15 @@ Rewritten with `ROW_NUMBER() OVER (PARTITION BY f.id ORDER BY fr.created_at DESC
 and plainer than `DISTINCT ON`'s reliance on a matching `ORDER BY`. Verified on both backends
 against a seeded old/new revision pair.
 
-**The rule this establishes:** the default backend needs default coverage. A grep for
-Postgres-only constructs (`extract(epoch`, `to_timestamp(`, `date_trunc(`, `DISTINCT ON`,
-`generate_series`, `array_agg`, `::regclass`) across `packages/*/src` is now clean, but a grep is
-a snapshot — the durable fix is that the E2E suite runs on SQLite, so the zero-dependency path
-is exercised on every push.
+**The rule this establishes:** the default backend needs default coverage, and a grep is not
+coverage. After fixing these two I ran exactly that grep — `extract(epoch`, `to_timestamp(`,
+`date_trunc(`, `DISTINCT ON`, `generate_series`, `array_agg`, `::regclass` — and called it clean.
+The very next CI run found two more: `interval '1 second'` in the file-autosave route (a 500 on
+*every save*), and `FOR UPDATE OF <alias>` mistranslated into a dangling `OF j` (every worker's
+job-claim query). The first was clean only because my pattern list happened to omit `interval '`;
+the second no grep would have caught, because the construct *is* handled — just incorrectly.
+The durable fix is not a better pattern list. It is that the E2E suite now runs on SQLite, so
+the zero-dependency path is exercised on every push.
 
 **Affected:** `packages/kerf-core/src/kerf_core/rate_limit.py`,
 `packages/kerf-core/tests/test_rate_limit.py`, `packages/kerf-cam/src/kerf_cam/tool_db.py`,

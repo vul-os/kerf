@@ -1,9 +1,18 @@
 name: E2E tests
 
-# Runs on every PR and on pushes to the two long-lived branches.
-# The job spins up a fresh Postgres service container, installs all deps,
-# boots kerf-server on :8081 with KERF_LOCAL_MODE=true (no sign-in needed),
-# and runs the Playwright suite against a Vite dev server on :5174.
+# Runs on every PR and on pushes to main.
+#
+# No service containers. The suite runs against kerf-server on the embedded
+# SQLite backend, serving the built frontend itself — the same shape as a
+# default `pip install` and as the desktop binary. Postgres is optional in
+# Kerf, so testing on it exclusively (which this job used to do) left the
+# default install with no coverage at all; the move turned up three
+# Postgres-only defects that 500'd on SQLite. See decisions.md and
+# web/tests/e2e/playwright.config.ts.
+#
+# playwright.config.ts owns the rest: it boots two kerf-servers (:8081 local
+# mode, :8082 server mode), and global-setup.ts creates and migrates their
+# database files. There is nothing here to keep in sync with them.
 
 on:
   pull_request:
@@ -14,34 +23,12 @@ on:
 env:
   PYTHON_VERSION: "3.11"
   NODE_VERSION: "22"
-  # Vite port used by the frontend during tests (separate from dev :5173)
-  E2E_VITE_PORT: "5174"
-  # Backend port (separate from dev :8080)
-  E2E_API_PORT: "8081"
-  # DB name for this job
-  E2E_DB: kerf_e2e
 
 jobs:
   playwright:
     name: Playwright E2E
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: ${{ env.E2E_DB }}
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        # Wait until Postgres is ready before the job steps start.
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
 
     steps:
       - uses: actions/checkout@v4
@@ -66,23 +53,6 @@ jobs:
         run: ./scripts/dev-install.sh full
 
       # -----------------------------------------------------------------------
-      # Database migrations
-      # -----------------------------------------------------------------------
-      # The runner reads sys.argv[1] or $DATABASE_URL — NOT $KERF_DATABASE_URL
-      # (kerf_core.config.Settings has no env prefix). Passing only the KERF_*
-      # name would leave it with no DSN.
-      - name: Run DB migrations
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/${{ env.E2E_DB }}
-          KERF_DATABASE_URL: postgres://postgres:postgres@localhost:5432/${{ env.E2E_DB }}
-          PGHOST: localhost
-          PGPORT: 5432
-          PGUSER: postgres
-          PGPASSWORD: postgres
-        run: |
-          python -m kerf_core.db.migrations.runner
-
-      # -----------------------------------------------------------------------
       # Node / frontend
       # -----------------------------------------------------------------------
       - name: Set up Node ${{ env.NODE_VERSION }}
@@ -94,9 +64,17 @@ jobs:
           # defaults to the root and fails the whole job without this.
           cache-dependency-path: web/package-lock.json
 
-      - name: Install root npm dependencies
+      - name: Install frontend dependencies
         working-directory: web
         run: npm ci
+
+      # The suite serves this build from kerf-server, so it must exist before
+      # Playwright starts. Its own config fails fast with this instruction if
+      # it is missing, but building here keeps a vite failure in its own step
+      # rather than buried in the test log.
+      - name: Build frontend
+        working-directory: web
+        run: npm run build
 
       - name: Install e2e npm dependencies
         run: cd web/tests/e2e && npm ci
@@ -107,38 +85,27 @@ jobs:
       # -----------------------------------------------------------------------
       # Run tests
       # -----------------------------------------------------------------------
+      # DELIBERATELY NOT SET: DATABASE_URL. Leaving it unset is what selects the
+      # embedded SQLite backend, which is the point of this job. Setting it to a
+      # postgres:// DSN runs the identical suite against Postgres.
       - name: Run Playwright E2E tests
         env:
           CI: "true"
-          KERF_LOCAL_MODE: "true"
-          LOCAL_MODE: "true"
-          # playwright.config.ts forwards $DATABASE_URL into the kerf-server it
-          # boots; without the unprefixed name the server would fall back to its
-          # default DSN and never see the migrated e2e database.
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/${{ env.E2E_DB }}
-          KERF_DATABASE_URL: postgres://postgres:postgres@localhost:5432/${{ env.E2E_DB }}
-          # Tell the playwright.config.ts webServer commands which ports to use.
-          # The playwright.config.ts picks these up directly via the hardcoded
-          # port values (:8081 / :5174); we also export them here for clarity.
-          E2E_BASE_URL: http://localhost:${{ env.E2E_VITE_PORT }}
-          E2E_API_URL: http://localhost:${{ env.E2E_API_PORT }}
-          # DELIBERATELY NOT SET: VITE_API_URL. Vite exposes any VITE_-prefixed
-          # var from the environment to the client bundle, so setting it here
-          # would make the browser call the API cross-origin and trip the
-          # index.html CSP (connect-src 'self') — every spec would then fail on
-          # the sign-in page. The dev server proxies to the API instead; see
-          # KERF_API_PROXY_TARGET in playwright.config.ts.
         run: cd web/tests/e2e && npm test
 
       # -----------------------------------------------------------------------
       # Artefacts (always uploaded so failures are debuggable)
       # -----------------------------------------------------------------------
+      # These paths are relative to the workspace root, and the suite lives in
+      # web/. They were missing that prefix, so every failing run logged "No
+      # files were found with the provided path" and uploaded nothing — which
+      # is why the last few red runs had no screenshots or traces to look at.
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: tests/e2e/playwright-report/
+          path: web/tests/e2e/playwright-report/
           retention-days: 7
 
       - name: Upload failure artefacts (screenshots + videos + traces)
@@ -146,5 +113,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-failures
-          path: tests/e2e/test-results/
+          path: web/tests/e2e/test-results/
           retention-days: 7

@@ -92,7 +92,7 @@ async function leftDrag(page: Page, mods: string[] = []) {
 async function projectWithCube(page: Page) {
   const pp = new ProjectsPage(page)
   await pp.goto()
-  await page.waitForURL(/\/projects$/, { timeout: 20_000 })
+  await pp.waitForList()
   await pp.createProject(`e2e-nav-${uid()}`)
   await page.waitForURL(/\/projects\//, { timeout: 20_000 })
   registerProject(projectIdFromUrl(page))

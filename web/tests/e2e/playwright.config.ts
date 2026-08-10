@@ -1,38 +1,119 @@
 /**
  * Playwright configuration for Kerf end-to-end tests.
  *
- * LOCAL MODE
- * ----------
- * The backend reads KERF_LOCAL_MODE=true and calls /auth/bootstrap-local on
- * startup, auto-minting a singleton user so tests never need a sign-in form.
- * The webServer stanza below wires this up automatically when you run
- * `npm test` from this directory.
+ * WHAT THIS RUNS AGAINST
+ * ----------------------
+ * kerf-server, serving the BUILT frontend itself (KERF_FRONTEND_DIST ->
+ * web/dist) — the same code path the desktop binary and the Docker image use.
+ * There is no Vite dev server and no proxy: the browser talks to one origin,
+ * which is what the app does in the field.
  *
- * DEV USAGE (reuse an already-running server):
- *   VITE_API_URL=http://localhost:8080 npm run dev   # terminal 1
- *   npm test                                         # terminal 2 — reuseExistingServer=true skips boot
+ * That replaced two Vite dev servers. Every test opens a fresh browser
+ * context, so each page load re-fetched the un-bundled module graph from the
+ * dev server; serving the build removes that per-test cost.
  *
- * CI (fresh server each run):
- *   DATABASE_URL=postgres://... KERF_LOCAL_MODE=true npm test
+ * It also deletes a class of configuration hazard. The dev-server setup needed
+ * a hand-maintained proxy list (/compile-ifc, /run-fem, /run-cam, …) because
+ * plugin routes mount at the root, and anything missing from that list was
+ * silently answered with index.html — which had already broken BIM/FEM/CAM/
+ * topo/tess once. Serving from the API means there is no list to keep in sync,
+ * and no VITE_API_URL/CSP interaction to get wrong.
  *
- * Port layout (separate from the dev port so dev + test can coexist):
- *   :8081  — kerf-server (FastAPI)
- *   :5174  — Vite dev server (proxies /api + /auth to :8081)
+ * Because it serves a build, `npm run build` in web/ must have run first. The
+ * check below says so plainly rather than letting 28 specs time out on a blank
+ * page.
+ *
+ * DATABASE — embedded SQLite, not Postgres
+ * ----------------------------------------
+ * Postgres is optional in Kerf; the default install opens an embedded SQLite
+ * file. Running E2E on SQLite makes this suite the coverage for the path most
+ * users are actually on. That is not theoretical: moving it turned up three
+ * Postgres-only defects that 500'd on a default install — the auth rate
+ * limiter, the CAM tool DB, and every timestamptz column read back as text.
+ * See decisions.md.
+ *
+ * Each project gets its own database file, so local mode's singleton user and
+ * server mode's registered users never share a users table. global-setup.ts
+ * creates and migrates them, so `npm test` needs no setup at all: no service
+ * container, no DATABASE_URL, no migrate step.
+ *
+ * Set DATABASE_URL to a postgres:// DSN to run the same suite against Postgres
+ * instead (both projects then share it, as they did before).
+ *
+ * Port layout (separate from dev :5173/:8080 so dev and test coexist):
+ *   :8081  — kerf-server, local mode (auto-login singleton) + web/dist
+ *   :8082  — kerf-server, server mode (real signup/login) + web/dist
  */
 
+import { existsSync } from 'node:fs'
+import path from 'node:path'
+
 import { defineConfig } from '@playwright/test'
+
+const REPO_ROOT = path.resolve(__dirname, '..', '..', '..')
+const DIST = path.join(REPO_ROOT, 'web', 'dist')
+
+if (!existsSync(path.join(DIST, 'index.html'))) {
+  throw new Error(
+    `web/dist/index.html not found at ${DIST}.\n` +
+      `The e2e suite serves the BUILT frontend from kerf-server, so build it first:\n` +
+      `    cd web && npm run build\n`,
+  )
+}
+
+/** Where global-setup.ts puts the SQLite files. Gitignored. */
+export const DB_DIR = path.join(__dirname, '.tmp')
+
+/**
+ * One DSN per project unless DATABASE_URL pins an external database, in which
+ * case both share it (the historic Postgres behaviour).
+ */
+export const LOCAL_DB =
+  process.env.DATABASE_URL || `sqlite://${path.join(DB_DIR, 'e2e-local.db')}`
+export const SERVER_DB =
+  process.env.DATABASE_URL || `sqlite://${path.join(DB_DIR, 'e2e-server.db')}`
+
+/** One kerf-server, serving the API and the built SPA from a single origin. */
+function kerfServer(port: number, localMode: boolean, db: string) {
+  return {
+    // kerf_core.config.Settings has NO env prefix, so it reads the unprefixed
+    // names (LOCAL_MODE / DATABASE_URL / PORT). The KERF_* duplicates are kept
+    // for deploy paths that consume those instead — setting only
+    // KERF_DATABASE_URL would leave the server on its default DSN.
+    command:
+      `KERF_PORT=${port} ` +
+      `KERF_LOCAL_MODE=${localMode} LOCAL_MODE=${localMode} ` +
+      // Any plugin that fails to register fails the boot — see the note in app.py.
+      `KERF_STRICT_PLUGINS=true ` +
+      `KERF_FRONTEND_DIST=${DIST} ` +
+      `KERF_DATABASE_URL=${db} DATABASE_URL=${db} ` +
+      `python -m kerf_core --port ${port}`,
+    url: `http://localhost:${port}/health`,
+    // Plugin registration walks every installed kerf-* package; on a cold CI
+    // runner that is slower than a warm laptop.
+    timeout: 120_000,
+    reuseExistingServer: !process.env.CI,
+    stdout: 'pipe' as const,
+    stderr: 'pipe' as const,
+  }
+}
 
 export default defineConfig({
   testDir: './specs',
 
-  // Clears auth rate-limit buckets so the suite is re-runnable against a long-lived
-  // local database — see global-setup.ts. The limiter itself is untouched.
+  // Creates + migrates the SQLite databases and clears auth rate-limit buckets.
   globalSetup: './global-setup.ts',
 
-  // Run tests serially — all share one DB instance; parallel writes would
-  // require isolated schemas per worker which is overkill for v1.
+  // Spec FILES run in parallel; tests within a file stay serial, because
+  // several build on state an earlier test in the same file created. Files are
+  // safe to overlap: each names its fixtures with a uid and asserts on exact
+  // names, so concurrent files never observe each other's rows.
   fullyParallel: false,
-  workers: 1,
+  // Two, not more: the heavy specs render three.js through headless Chromium's
+  // software rasteriser, so workers compete for the same CPU rather than
+  // overlapping I/O. On a 4-vCPU runner, more workers buys nothing and starts
+  // costing timeouts in exactly the WebGL specs this suite is here to protect.
+  workers: process.env.CI ? 2 : undefined,
 
   retries: 0,
 
@@ -42,20 +123,19 @@ export default defineConfig({
   ],
 
   use: {
-    baseURL: process.env.E2E_BASE_URL || 'http://localhost:5174',
     headless: true,
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     trace: 'retain-on-failure',
 
-    // Give slow WASM workers (OCCT, JSCAD) time to finish
+    // Give slow WASM workers (web-ifc, JSCAD, planegcs) time to finish.
     actionTimeout: 30_000,
     navigationTimeout: 30_000,
   },
 
   // Two project profiles against two server stacks:
-  //   local        — LOCAL_MODE singleton auto-login (:5174 → :8081)
-  //   server-mode  — LOCAL_MODE=false, real signup/login + Workshop/Library (:5175 → :8082)
+  //   local        — LOCAL_MODE singleton auto-login (:8081)
+  //   server-mode  — LOCAL_MODE=false, real signup/login + Workshop/Library (:8082)
   // Specs that need the public auth surface run under `server-mode`; everything
   // else under `local`. Workshop and Library are core MIT node capabilities
   // present in both projects.
@@ -67,7 +147,7 @@ export default defineConfig({
         '**/library.spec.ts',
         '**/workshop.spec.ts',
       ],
-      use: { baseURL: 'http://localhost:5174' },
+      use: { baseURL: process.env.E2E_BASE_URL || 'http://localhost:8081' },
     },
     {
       name: 'server-mode',
@@ -76,95 +156,12 @@ export default defineConfig({
         '**/library.spec.ts',
         '**/workshop.spec.ts',
       ],
-      use: { baseURL: 'http://localhost:5175' },
+      use: { baseURL: process.env.E2E_SERVER_BASE_URL || 'http://localhost:8082' },
     },
   ],
 
-  // webServer boots a throwaway Vite dev server + kerf-server. If you
-  // already have servers running on these ports (local dev) Playwright will
-  // reuse them instead of starting new ones (reuseExistingServer=true when
-  // not in CI).
-  //
-  // Adjust the python command if your environment uses `python3` or a
-  // virtualenv — `python -m kerf_core` is what `pip install -e .[full]`
-  // makes available.
   webServer: [
-    {
-      // Backend: kerf-server on :8081
-      // NOTE: kerf_core.config.Settings has no env prefix, so it reads the
-      // UNPREFIXED names (LOCAL_MODE / DATABASE_URL / CORS_ORIGIN). The
-      // KERF_* duplicates are kept for any deploy path that consumes them —
-      // setting only KERF_DATABASE_URL would leave the server on its default
-      // DSN.
-      // CORS_ORIGIN is belt-and-braces: the browser now reaches the API
-      // same-origin through the Vite proxy (see KERF_API_PROXY_TARGET below),
-      // so preflight shouldn't arise, but a direct call would otherwise be
-      // rejected against the default :5173 origin.
-      command:
-        'KERF_PORT=8081 KERF_LOCAL_MODE=true LOCAL_MODE=true ' +
-        // Any plugin that fails to register fails the boot — see the note in app.py.
-        'KERF_STRICT_PLUGINS=true ' +
-        'CORS_ORIGIN=http://localhost:5174 ' +
-        (process.env.DATABASE_URL
-          ? `KERF_DATABASE_URL=${process.env.DATABASE_URL} ` +
-            `DATABASE_URL=${process.env.DATABASE_URL} `
-          : '') +
-        'python -m kerf_core --port 8081',
-      url: 'http://localhost:8081/health',
-      timeout: 60_000,
-      reuseExistingServer: !process.env.CI,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    },
-    {
-      // Frontend: Vite on :5174 (proxies /api + /auth to :8081)
-      //
-      // KERF_API_PROXY_TARGET, not VITE_API_URL: VITE_-prefixed vars are inlined
-      // into the client bundle, so the browser would call http://localhost:8081
-      // cross-origin and every fetch would be blocked by the index.html CSP
-      // (connect-src 'self'), stranding all local specs on /login. Going through
-      // the Vite proxy keeps requests same-origin.
-      command:
-        'KERF_API_PROXY_TARGET=http://localhost:8081 ' +
-        'npx vite --port 5174 --host localhost',
-      cwd: '../..',
-      url: 'http://localhost:5174',
-      timeout: 60_000,
-      reuseExistingServer: !process.env.CI,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    },
-    {
-      // server-mode backend on :8082 — LOCAL_MODE=false, no local auto-login, so
-      // the real /signup + /login surface exists. Workshop/Library are
-      // unconditional node capabilities in every mode.
-      command:
-        'KERF_PORT=8082 KERF_LOCAL_MODE=false LOCAL_MODE=false ' +
-        'KERF_STRICT_PLUGINS=true ' +
-        'CORS_ORIGIN=http://localhost:5175 ' +
-        (process.env.DATABASE_URL
-          ? `KERF_DATABASE_URL=${process.env.DATABASE_URL} ` +
-            `DATABASE_URL=${process.env.DATABASE_URL} `
-          : '') +
-        'python -m kerf_core --port 8082',
-      url: 'http://localhost:8082/health',
-      timeout: 60_000,
-      reuseExistingServer: !process.env.CI,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    },
-    {
-      // server-mode frontend: Vite on :5175 (proxies /api + /auth to :8082)
-      // Same-origin proxy rather than VITE_API_URL — see the :5174 note above.
-      command:
-        'KERF_API_PROXY_TARGET=http://localhost:8082 ' +
-        'npx vite --port 5175 --host localhost',
-      cwd: '../..',
-      url: 'http://localhost:5175',
-      timeout: 60_000,
-      reuseExistingServer: !process.env.CI,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    },
+    kerfServer(8081, true, LOCAL_DB),
+    kerfServer(8082, false, SERVER_DB),
   ],
 })

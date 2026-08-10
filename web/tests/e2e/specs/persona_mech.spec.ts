@@ -50,7 +50,7 @@ test.describe('Mechanical persona (T-96)', () => {
     // ── 1. Create a new project ──────────────────────────────────────────────
     const pp = new ProjectsPage(page)
     await pp.goto()
-    await page.waitForURL(/\/projects$/, { timeout: 20_000 })
+    await pp.waitForList()
 
     // A1 — projects heading
     await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible({ timeout: 20_000 })

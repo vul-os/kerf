@@ -83,6 +83,8 @@ packages/kerf-desktop/dist/
 # Playwright e2e generated artifacts
 web/tests/e2e/test-results/
 web/tests/e2e/playwright-report/
+# SQLite databases the e2e suite creates and migrates for itself
+web/tests/e2e/.tmp/
 /test-results/
 /playwright-report/
 

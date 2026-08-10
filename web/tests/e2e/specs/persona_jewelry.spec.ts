@@ -303,7 +303,7 @@ test.describe('Jewelry persona — project editor (local mode)', () => {
     const pp = new ProjectsPage(page)
     const projectName = `e2e-jewelry-stl-${uid()}`
     await pp.goto()
-    await page.waitForURL(/\/projects$/, { timeout: 20_000 })
+    await pp.waitForList()
     await pp.createProject(projectName)
     await page.waitForURL(/\/projects\//, { timeout: 20_000 })
 

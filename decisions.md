@@ -1434,6 +1434,10 @@ moment of failure. The trace is already captured on disk from this run.
   frontend: cd web && KERF_API_PROXY_TARGET=http://localhost:8091 npx vite --port 5174
   spec: cd web/tests/e2e && DATABASE_URL=... PATH=.venv-e2e/bin:$PATH npx playwright test --project=local
 
+  (Superseded — kept because the analysis above depends on it. The suite no longer uses
+  Postgres or a Vite dev server; see "2026-08-10 SAST — E2E off Postgres and off Vite"
+  below. The repro is now: `cd web && npm run build`, then `cd web/tests/e2e && npm test`.)
+
 ## E2E layer 2: the editor route was blank, not the button hidden
 
 **Symptom.** 20 local specs failed. The assertions said things like "New button not
@@ -1964,4 +1968,66 @@ is exercised on every push.
 **Affected:** `packages/kerf-core/src/kerf_core/rate_limit.py`,
 `packages/kerf-core/tests/test_rate_limit.py`, `packages/kerf-cam/src/kerf_cam/tool_db.py`,
 `packages/kerf-cam/src/kerf_cam/tools/tool_db.py`, `decisions.md` (this entry).
+
+## 2026-08-10 SAST — E2E off Postgres and off Vite: 12.9 min to 3.2 min, and three bugs it immediately found
+
+**Symptom:** "Playwright E2E (push) Failing after 11m", again. One test failed —
+`bim.spec.ts`, "BIM canvas never rendered any geometry" — and the run took 11m36s.
+
+**What the 11 minutes actually were.** Step timings from the failing run: dependency install
+99s, migrations 1s, npm 18s, browser install 26s, **tests 516s**. So the install was never the
+problem; the test phase was. And the per-test times had a tell — `bim` 28.8s, `drawing` 28.3s,
+`feature` 28.5s, `nav-presets` 28.4s, `sketch` 28.2s, while the jewelry-wizard tests ran in
+~1s each. A uniform ~28s is not work, it is overhead: every one of those specs opens the editor
+route (some twice, across a reload), and every Playwright test gets a fresh browser context, so
+each page load re-fetched the un-bundled module graph from the Vite dev server. `bim` failed
+because that overhead ate its entire 30s budget, not because BIM is broken — the same test had
+passed at 28.8s in the run immediately before.
+
+**Three changes, in order of how much they mattered:**
+
+**1. Serve the built frontend from kerf-server, delete both Vite dev servers.** `kerf_core.app`
+already serves a build from `KERF_FRONTEND_DIST` — that is how the Docker image and the desktop
+binary work. Pointing the suite at that means one origin, a bundled payload, and the production
+serving path under test. It also deletes a standing hazard: the dev-server setup needed a
+hand-maintained proxy list (`/compile-ifc`, `/run-fem`, `/run-cam`, …) because plugin routes
+mount at the root, and anything missing from it was silently answered with `index.html` — which
+had already broken BIM/FEM/CAM/topo/tess once. There is now no list to keep in sync, and no
+`VITE_API_URL`/CSP interaction to get wrong. Cost: `npm run build` must run first, and the
+config throws with that instruction rather than letting 28 specs time out on a blank page.
+
+**2. Run on embedded SQLite; drop the Postgres service container.** Postgres is optional in
+Kerf, but every suite tested on it exclusively, so the *default* install path had no automated
+coverage. Moving E2E onto SQLite found three real defects on the first run — the auth rate
+limiter, the CAM tool DB, and every `timestamptz` column reading back as `str` — each a 500 on a
+default install, each documented in the entry above. That is the argument for this change; the
+container being one less moving part is a bonus. `global-setup.ts` now creates and migrates the
+database files itself, so `npm test` works from a clean checkout with no service, no
+`DATABASE_URL` and no migrate step. Setting `DATABASE_URL` to a `postgres://` DSN still runs the
+identical suite against Postgres.
+
+**3. Two workers instead of one.** Spec *files* now run in parallel; tests within a file stay
+serial because several build on state an earlier test created. Two, not four: the heavy specs
+render three.js through headless Chromium's software rasteriser, so workers contend for CPU
+rather than overlapping I/O, and on a 4-vCPU runner more workers would buy nothing while costing
+timeouts in exactly the WebGL specs this suite exists to protect.
+
+**Measured, same machine, same load (a badly oversubscribed laptop — load average 29 on 8
+cores, so treat these as a ratio not an absolute):** 28 tests, Vite dev + SQLite + serial:
+**12.9 min**. Same 28 tests, build served from kerf-server + SQLite + parallel: **3.2 min**.
+
+**Two more things that were quietly broken:**
+
+- **The failure artefacts were never uploaded.** Both `upload-artifact` steps pointed at
+  `tests/e2e/…` when the suite lives at `web/tests/e2e/…`, so every red run logged "No files were
+  found with the provided path" and attached nothing. That is why the recent failures had no
+  screenshot or trace to look at.
+- **`page.waitForURL(/\/projects$/)` in nine specs.** `ProjectsPage` already documents why that
+  is wrong and provides `waitForList()` — a client-side redirect is a pushState navigation, so
+  waiting on a URL "until load" can hang, and under load that is exactly what three specs did.
+  All nine now use the page object's UI-signal wait.
+
+**Affected:** `.github/workflows/e2e.yml`, `web/tests/e2e/playwright.config.ts`,
+`web/tests/e2e/global-setup.ts`, nine files under `web/tests/e2e/specs/`, `.gitignore`,
+`decisions.md` (this entry).
 

@@ -24,7 +24,7 @@ test.describe('Drawing creation (TechDraw)', () => {
     const pp = new ProjectsPage(page)
     const projectName = `e2e-drawing-${uid()}`
     await pp.goto()
-    await page.waitForURL(/\/projects$/, { timeout: 20_000 })
+    await pp.waitForList()
     await pp.createProject(projectName)
     await page.waitForURL(/\/projects\//, { timeout: 20_000 })
 

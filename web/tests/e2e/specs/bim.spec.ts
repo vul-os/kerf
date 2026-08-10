@@ -150,7 +150,7 @@ test.describe('BIM editor (local mode)', () => {
     // 1. Create a project — lands us in the editor.
     const pp = new ProjectsPage(page)
     await pp.goto()
-    await page.waitForURL(/\/projects$/, { timeout: 20_000 })
+    await pp.waitForList()
     await pp.createProject(`e2e-bim-${uid()}`)
     await page.waitForURL(/\/projects\//, { timeout: 20_000 })
 

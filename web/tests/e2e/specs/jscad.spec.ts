@@ -47,7 +47,7 @@ test.describe('JSCAD editor (local mode)', () => {
     const pp = new ProjectsPage(page)
     const projectName = `e2e-jscad-${uid()}`
     await pp.goto()
-    await page.waitForURL(/\/projects$/, { timeout: 20_000 })
+    await pp.waitForList()
     await pp.createProject(projectName)
     await page.waitForURL(/\/projects\//, { timeout: 20_000 })
 

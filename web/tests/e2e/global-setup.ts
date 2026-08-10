@@ -1,56 +1,87 @@
 /**
- * global-setup.ts — clear auth rate-limit buckets before a run.
+ * global-setup.ts — prepare the databases the suite runs against.
  *
- * WHY
- * ---
- * /auth/register is rate limited to 5 per hour per IP (kerf_auth/routes.py). That is a real
- * brute-force control and is deliberately NOT made configurable — a "disable rate limiting"
- * env var is exactly the kind of knob that ends up set in production.
+ * Two jobs:
  *
- * But the server-mode specs register a fresh user per test, so the fourth consecutive local run
- * inside an hour starts getting 429s and the server-mode project fails wholesale, with symptoms
- * that look nothing like rate limiting: instant sub-200ms failures on tests that never
- * mention auth. CI never hit this because its database is new every run; a developer
- * re-running the suite locally hits it immediately.
+ * 1. CREATE AND MIGRATE. On the embedded SQLite backend (the default — see
+ *    playwright.config.ts) the database is a file this suite owns, so it makes
+ *    one here. That is what lets `npm test` work from a clean checkout with no
+ *    service container, no DATABASE_URL and no separate migrate step. When
+ *    DATABASE_URL names Postgres, migrating is the caller's job and only the
+ *    bucket clear below runs.
  *
- * Clearing the bucket table here keeps the limiter fully intact in the application and
- * makes the suite repeatable against a long-lived local database.
+ * 2. CLEAR AUTH RATE-LIMIT BUCKETS. /auth/register is limited to 5 per hour per
+ *    IP (kerf_auth/routes.py). That is a real brute-force control and is
+ *    deliberately NOT made configurable — a "disable rate limiting" env var is
+ *    exactly the kind of knob that ends up set in production. But the
+ *    server-mode specs register a fresh user per test, so re-running the suite
+ *    inside an hour starts getting 429s, with symptoms that look nothing like
+ *    rate limiting: instant sub-200ms failures on tests that never mention
+ *    auth. Clearing the bucket table here leaves the limiter fully intact in
+ *    the application and makes the suite repeatable.
  *
- * Best-effort by design: if DATABASE_URL is unset (embedded SQLite) or python cannot be
- * reached, the run continues — this must never be the reason a suite fails to start.
+ *    This used to run for Postgres only, so it quietly did nothing once the
+ *    suite moved to SQLite — which is exactly when it began to matter, because
+ *    a SQLite file survives between runs while a CI Postgres container does not.
  */
 
 import { spawnSync } from 'node:child_process'
+import { mkdirSync } from 'node:fs'
+
+import { DB_DIR, LOCAL_DB, SERVER_DB } from './playwright.config'
 
 const PY = `
-import os, sys
-url = os.environ.get("DATABASE_URL", "")
-if not url.startswith(("postgres://", "postgresql://")):
-    sys.exit(0)
-try:
-    # asyncpg, not psycopg — it is what kerf-core already depends on, so it is present
-    # wherever the server can run and this needs no extra install in CI or locally.
-    import asyncio, asyncpg
+import asyncio, sys
 
-    async def clear() -> None:
+urls = [u for u in sys.argv[1:] if u]
+
+async def prepare(url: str) -> None:
+    from kerf_core.db.dialect import is_sqlite_url
+    if is_sqlite_url(url):
+        from kerf_core.db.migrations.runner import run_sqlite_migrations
+        from kerf_core.db.sqlite_backend import create_sqlite_pool
+        await run_sqlite_migrations(url)
+        pool = await create_sqlite_pool(url, max_size=1)
+        try:
+            await pool.execute("DELETE FROM rate_limit_buckets")
+        finally:
+            await pool.close()
+    else:
+        # asyncpg, not psycopg — it is what kerf-core already depends on, so it
+        # is present wherever the server can run and needs no extra install.
+        import asyncpg
         conn = await asyncpg.connect(url.replace("postgres://", "postgresql://"), timeout=5)
         try:
             await conn.execute("DELETE FROM rate_limit_buckets")
         finally:
             await conn.close()
 
-    asyncio.run(clear())
-    print("e2e: cleared rate_limit_buckets")
-except Exception as exc:
-    print(f"e2e: could not clear rate limits ({exc}) - continuing")
+async def main() -> None:
+    for url in dict.fromkeys(urls):   # de-dupe: one shared DSN is one prepare
+        await prepare(url)
+
+asyncio.run(main())
+print("e2e: databases ready, rate-limit buckets cleared")
 `
 
 export default function globalSetup(): void {
-  const res = spawnSync('python', ['-c', PY], {
+  mkdirSync(DB_DIR, { recursive: true })
+
+  const res = spawnSync('python', ['-c', PY, LOCAL_DB, SERVER_DB], {
     encoding: 'utf8',
     env: process.env,
-    timeout: 20_000,
+    timeout: 120_000,
   })
-  const out = (res.stdout || '').trim()
+
+  const out = [res.stdout, res.stderr].filter(Boolean).join('').trim()
+  if (res.status !== 0) {
+    // Do not limp on: every spec would fail on a missing table and the real
+    // cause would be buried 28 failures deep.
+    throw new Error(
+      `e2e global setup could not prepare the database (exit ${res.status}).\n` +
+        `Is kerf-core importable by the \`python\` on PATH? (./scripts/dev-install.sh full)\n\n` +
+        out,
+    )
+  }
   if (out) console.log(out)
 }

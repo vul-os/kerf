@@ -38,7 +38,6 @@ import { meshCache } from '../lib/meshCache.js'
 import { subdToBufferGeometry, meshDocToBufferGeometry } from '../lib/subdToBufferGeometry.js'
 import { markFlushed as l1MarkFlushed, listUnflushed as l1ListUnflushed } from '../lib/localStash.js'
 import { markDirty as schedulerMarkDirty } from '../lib/autosaveScheduler.js'
-import type { BufferGeometry } from 'three'
 import type {
   ApiProject, ApiFile, ApiThread, FileKind, FileRevision, ActivityEvent, BOMRow,
 } from '@/types'
@@ -141,6 +140,19 @@ export interface PartRef {
   feature_kind?: string
   feature_id?: string
 }
+
+/**
+ * Opaque stand-in for three.js's `BufferGeometry`. This repo has no `@types/three`
+ * (three ships no bundled types either) — `import type { BufferGeometry } from 'three'`
+ * fails with TS7016 under strict. Installing `@types/three` was tried and reverted: it
+ * surfaces ~130 latent errors across src/components/src/lib (out of this slice's scope,
+ * and src/components is mid-a11y-sweep by another agent). workspace.ts only ever stores
+ * and passes these values through (subdToBufferGeometry/meshDocToBufferGeometry produce
+ * them; consumers elsewhere call real three.js methods on them) — never calls a
+ * BufferGeometry method itself — so an opaque object type is honest here, not a mask for
+ * unchecked `.foo` access the way a bare `any` would be.
+ */
+type BufferGeometry = object
 
 /** parts / drawingSourceParts entries: JSCAD parts (Geom3-backed) or STEP/mesh/subd-loaded parts (BufferGeometry-backed, three.js — no @types/three in this repo, so the geom field there is a boundary this slice doesn't own). */
 // Includes the assembly shapes because `parts` genuinely holds them when an .assembly file is

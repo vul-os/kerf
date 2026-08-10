@@ -516,8 +516,16 @@ jobs:
 
           # `find | wc -l`, not a glob: an unmatched glob under `set -u` is a
           # literal string, which `[ -f ]` then reports as merely absent.
-          [ "$(find release-out -maxdepth 1 -name '*.whl' | wc -l | tr -d ' ')" -gt 0 ] \
-            || missing+=("at least one Python wheel (*.whl)")
+          # Wheels ship as one bundle rather than ~40 loose .whl files (see the
+          # "Bundle wheels" step). Assert the bundle exists AND is non-empty —
+          # a zero-wheel tarball would otherwise satisfy a bare existence check
+          # and quietly ship a release with no wheels in it.
+          _wheel_bundle="release-out/kerf-wheels-${VERSION}.tar.gz"
+          if [ ! -s "$_wheel_bundle" ]; then
+            missing+=("kerf-wheels-${VERSION}.tar.gz")
+          elif [ "$(tar tzf "$_wheel_bundle" | grep -c '\.whl$')" -eq 0 ]; then
+            missing+=("at least one Python wheel inside kerf-wheels-${VERSION}.tar.gz")
+          fi
           [ "$(find release-out -maxdepth 1 \( -name "kerf-python-sbom-${VERSION}.json" -o -name "kerf-python-deps-${VERSION}.txt" \) | wc -l | tr -d ' ')" -gt 0 ] \
             || missing+=("a Python dependency manifest")
           [ "$(find release-out -maxdepth 1 \( -name "kerf-npm-sbom-${VERSION}.json" -o -name "kerf-npm-deps-${VERSION}.json" \) | wc -l | tr -d ' ')" -gt 0 ] \

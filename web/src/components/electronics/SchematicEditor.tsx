@@ -346,7 +346,7 @@ function Toolbar({ tool, onToolChange, canUndo, canRedo, onUndo, onRedo, onSimul
             onClick={() => onToolChange(t.id)}
             title={`${t.label} (${t.key})`}
             className={[
-              'px-2.5 py-1 text-xs rounded font-mono transition-colors',
+              'px-2.5 py-1 text-xs rounded font-mono transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
               tool === t.id
                 ? 'bg-indigo-600 text-white'
                 : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white',
@@ -395,7 +395,7 @@ function Toolbar({ tool, onToolChange, canUndo, canRedo, onUndo, onRedo, onSimul
         disabled={simRunning}
         data-testid="btn-run-simulation"
         className={[
-          'px-4 py-1.5 text-xs rounded font-semibold transition-colors',
+          'px-4 py-1.5 text-xs rounded font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
           simRunning
             ? 'bg-indigo-800 text-indigo-300 cursor-not-allowed'
             : 'bg-indigo-600 hover:bg-indigo-500 text-white',

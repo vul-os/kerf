@@ -122,7 +122,7 @@ export default function ShadowSettings({ settings, lights = [], onChange }: Prop
               aria-label={`Shadow type ${TYPE_LABELS[type]}`}
               onClick={() => patch({ type })}
               className={[
-                'px-2.5 py-1 rounded text-[11px] font-mono border transition-colors',
+                'px-2.5 py-1 rounded text-[11px] font-mono border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
                 doc.type === type
                   ? 'bg-kerf-300 text-ink-950 border-kerf-300'
                   : 'bg-ink-900/80 text-ink-300 border-ink-700 hover:text-kerf-300 hover:border-kerf-300/50',
@@ -148,7 +148,7 @@ export default function ShadowSettings({ settings, lights = [], onChange }: Prop
               aria-label={`Shadow map size ${size}`}
               onClick={() => patch({ map_size: size })}
               className={[
-                'px-2.5 py-1 rounded text-[11px] font-mono border transition-colors',
+                'px-2.5 py-1 rounded text-[11px] font-mono border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
                 doc.map_size === size
                   ? 'bg-kerf-300 text-ink-950 border-kerf-300'
                   : 'bg-ink-900/80 text-ink-300 border-ink-700 hover:text-kerf-300 hover:border-kerf-300/50',

@@ -84,7 +84,7 @@ export default function StudioLightingPicker({ value, onChange, className = '' }
               title={meta.description}
               onClick={() => onChange(name)}
               className={
-                'flex flex-col gap-0.5 rounded-md border px-2.5 py-2 text-left transition-colors ' +
+                'flex flex-col gap-0.5 rounded-md border px-2.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ' +
                 (active
                   ? 'border-kerf-300/60 bg-kerf-300/10 text-ink-100'
                   : 'border-ink-800 bg-ink-900 text-ink-300 hover:border-ink-700 hover:text-ink-100')

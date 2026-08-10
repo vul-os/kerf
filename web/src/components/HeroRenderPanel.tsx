@@ -92,7 +92,7 @@ function PresetButton({ preset, active, onClick }: {
       aria-label={`${preset.label} quality — ${preset.samples.toLocaleString()} samples`}
       onClick={() => onClick(preset.id)}
       className={[
-        'flex flex-col items-center gap-0.5 px-3 py-2 rounded text-[11px] font-mono border transition-colors',
+        'flex flex-col items-center gap-0.5 px-3 py-2 rounded text-[11px] font-mono border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
         active
           ? 'bg-kerf-300 text-ink-950 border-kerf-300'
           : 'bg-ink-900/80 text-ink-300 border-ink-700 hover:text-kerf-300 hover:border-kerf-300/50 backdrop-blur',
@@ -473,7 +473,7 @@ export default function HeroRenderPanel({ onClose, projectId, rendererRef }: Her
               aria-selected={tab === t}
               onClick={() => setTab(t)}
               className={[
-                'flex-1 py-2 text-[11px] font-mono capitalize transition-colors',
+                'flex-1 py-2 text-[11px] font-mono capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
                 tab === t
                   ? 'text-kerf-300 border-b-2 border-kerf-300 -mb-px'
                   : 'text-ink-400 hover:text-ink-200',
@@ -542,7 +542,7 @@ export default function HeroRenderPanel({ onClose, projectId, rendererRef }: Her
               disabled={busy}
               onClick={handleSubmit}
               className={[
-                'w-full py-2 rounded text-[12px] font-mono font-semibold border transition-colors',
+                'w-full py-2 rounded text-[12px] font-mono font-semibold border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
                 busy
                   ? 'bg-ink-800 text-ink-500 border-ink-700 cursor-wait'
                   : 'bg-kerf-300 text-ink-950 border-kerf-300 hover:bg-kerf-400',

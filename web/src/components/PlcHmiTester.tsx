@@ -176,7 +176,7 @@ function ToggleInput({ name, value, onChange }: { name: string; value: boolean; 
         type="button"
         onClick={() => onChange(name, !value)}
         className={[
-          'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
+          'relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
           value
             ? 'bg-kerf-500'
             : 'bg-ink-700 border border-ink-600',
@@ -219,7 +219,7 @@ function MomentaryInput({ name, onChange }: { name: string; onChange: InputChang
         onTouchStart={handleDown}
         onTouchEnd={handleUp}
         className={[
-          'px-2 py-0.5 rounded text-xs font-mono transition-colors select-none',
+          'px-2 py-0.5 rounded text-xs font-mono transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
           pressed
             ? 'bg-kerf-500 text-white'
             : 'bg-ink-700 text-ink-300 hover:bg-ink-600',
@@ -475,7 +475,7 @@ export default function PlcHmiTester({ program = '', onProgramLoad, className = 
           onClick={() => setPlaying(p => !p)}
           disabled={!program?.trim()}
           className={[
-            'px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-40',
+            'px-3 py-1 rounded text-xs font-medium transition-colors disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
             playing
               ? 'bg-amber-600 hover:bg-amber-500 text-white'
               : 'bg-kerf-600 hover:bg-kerf-500 text-white',

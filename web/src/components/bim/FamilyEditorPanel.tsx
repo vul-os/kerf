@@ -300,7 +300,7 @@ function TabBar({ activeTab, onTabChange }: { activeTab: string; onTabChange: (i
           key={id}
           onClick={() => onTabChange(id)}
           className={[
-            'flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors',
+            'flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
             activeTab === id
               ? 'border-accent-500 text-accent-600 dark:text-accent-400'
               : 'border-transparent text-ink-500 hover:text-ink-700 dark:text-ink-400 dark:hover:text-ink-200',
@@ -374,7 +374,7 @@ function BrowseTab({ onSelect, selectedFamily }: BrowseTabProps) {
               key={cat}
               onClick={() => setFilterCat(cat)}
               className={[
-                'px-2.5 py-1 rounded-md text-[10px] font-medium whitespace-nowrap capitalize transition-colors',
+                'px-2.5 py-1 rounded-md text-[10px] font-medium whitespace-nowrap capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
                 filterCat === cat
                   ? 'bg-accent-500 text-white'
                   : 'bg-ink-100 dark:bg-ink-800 text-ink-600 dark:text-ink-300 hover:bg-ink-200 dark:hover:bg-ink-700',
@@ -398,7 +398,7 @@ function BrowseTab({ onSelect, selectedFamily }: BrowseTabProps) {
                 key={family.module}
                 onClick={() => onSelect(family)}
                 className={[
-                  'text-left p-3.5 rounded-lg border transition-all cursor-pointer',
+                  'text-left p-3.5 rounded-lg border transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
                   isSelected
                     ? 'border-accent-400 bg-accent-50 dark:bg-accent-900/20 shadow-sm'
                     : 'border-ink-200 dark:border-ink-700 bg-white dark:bg-ink-900 hover:border-ink-300 dark:hover:border-ink-600 hover:shadow-sm',
@@ -464,7 +464,7 @@ function ParamRow({ param, value, onChange }: ParamRowProps) {
           aria-checked={Boolean(value)}
           onClick={() => onChange(param.name, !value)}
           className={[
-            'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
+            'relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
             value ? 'bg-accent-500' : 'bg-ink-300 dark:bg-ink-600',
           ].join(' ')}
         >
@@ -898,7 +898,7 @@ function InstantiateTab({ family, paramValues, resolvedNs }: InstantiateTabProps
         onClick={handleInstantiate}
         disabled={status === 'running'}
         className={[
-          'flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-medium transition-colors',
+          'flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
           status === 'running'
             ? 'bg-ink-200 dark:bg-ink-700 text-ink-500 dark:text-ink-400 cursor-not-allowed'
             : 'bg-accent-500 hover:bg-accent-600 text-white',

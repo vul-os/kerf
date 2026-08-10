@@ -78,7 +78,7 @@ function ProjectionOption({ kind, active, onSelect }: ProjectionOptionProps) {
       role="menuitem"
       onClick={() => onSelect(kind)}
       className={[
-        'w-full text-left px-3 py-2 flex flex-col gap-0.5 transition-colors',
+        'w-full text-left px-3 py-2 flex flex-col gap-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
         active
           ? 'bg-kerf-900/60 text-kerf-200'
           : 'text-ink-300 hover:bg-ink-800 hover:text-ink-100',
@@ -126,7 +126,7 @@ function FocalLengthRow({ focalMm, sensor, onFocalMm }: FocalLengthRowProps) {
             type="button"
             onClick={() => typeof onFocalMm === 'function' && onFocalMm(f)}
             className={[
-              'px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors',
+              'px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
               focalMm === f
                 ? 'bg-kerf-700 text-kerf-100'
                 : 'bg-ink-800 text-ink-400 hover:bg-ink-700 hover:text-ink-200',

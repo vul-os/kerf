@@ -239,7 +239,7 @@ export default function BinarySideBySide({ file, projectId, againstSha, onResolv
               disabled={resolving}
               onClick={() => handlePick('yours')}
               className={[
-                'text-xs px-2.5 py-1 rounded border transition-colors',
+                'text-xs px-2.5 py-1 rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
                 resolving
                   ? 'border-zinc-700 text-zinc-600 cursor-not-allowed'
                   : 'border-zinc-600 text-zinc-300 hover:border-amber-500 hover:text-amber-400',
@@ -251,7 +251,7 @@ export default function BinarySideBySide({ file, projectId, againstSha, onResolv
               disabled={resolving}
               onClick={() => handlePick('theirs')}
               className={[
-                'text-xs px-2.5 py-1 rounded border transition-colors',
+                'text-xs px-2.5 py-1 rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
                 resolving
                   ? 'border-zinc-700 text-zinc-600 cursor-not-allowed'
                   : 'border-zinc-600 text-zinc-300 hover:border-emerald-500 hover:text-emerald-400',

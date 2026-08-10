@@ -239,7 +239,7 @@ export default function CircuitJsonPreview({ circuitJson, projectId }: Props) {
             type="button"
             onClick={() => setTab(id)}
             className={[
-              'flex items-center gap-1.5 px-3 py-2 text-[11px] font-medium border-b-2 transition-colors',
+              'flex items-center gap-1.5 px-3 py-2 text-[11px] font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
               tab === id
                 ? 'border-kerf-400 text-kerf-300'
                 : 'border-transparent text-ink-400 hover:text-ink-200',

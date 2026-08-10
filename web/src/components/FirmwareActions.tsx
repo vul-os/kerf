@@ -98,7 +98,7 @@ function ActionButton({ icon: Icon, label, onClick, disabled, status }: ActionBu
       onClick={onClick}
       disabled={disabled || isLoading}
       className={[
-        'flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium',
+        'flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
         'border transition-colors select-none',
         isLoading || disabled
           ? 'opacity-50 cursor-not-allowed border-ink-700 bg-ink-800 text-ink-400'

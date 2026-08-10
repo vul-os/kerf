@@ -214,7 +214,7 @@ export default function DerivedCacheOverlay({ position = 'bottom-right', default
       <button
         onClick={() => setOpen((v) => !v)}
         className={[
-          'flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold',
+          'flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
           'border shadow-lg transition-all',
           total === 0
             ? 'bg-zinc-800/90 border-white/10 text-white/50'

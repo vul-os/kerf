@@ -302,7 +302,7 @@ function ChildRefKindToggle({ value, onChange }: { value: 'track' | 'pin'; onCha
         data-testid="child-refkind-track"
         onClick={() => onChange('track')}
         className={
-          'h-7 px-2.5 rounded text-xs font-medium transition-colors ' +
+          'h-7 px-2.5 rounded text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ' +
           (value === 'track' ? 'bg-kerf-300 text-ink-950' : 'text-ink-300 hover:text-ink-100')
         }
       >
@@ -313,7 +313,7 @@ function ChildRefKindToggle({ value, onChange }: { value: 'track' | 'pin'; onCha
         data-testid="child-refkind-pin"
         onClick={() => onChange('pin')}
         className={
-          'h-7 px-2.5 rounded text-xs font-medium transition-colors ' +
+          'h-7 px-2.5 rounded text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ' +
           (value === 'pin' ? 'bg-kerf-300 text-ink-950' : 'text-ink-300 hover:text-ink-100')
         }
       >

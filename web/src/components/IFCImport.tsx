@@ -363,7 +363,7 @@ export function IFCImportButton({ projectId, onImported, className = '' }) {
         title="Import IFC4 file (.ifc) from Revit, ArchiCAD, or any IFC-compliant tool"
         onClick={() => setOpen(true)}
         className={[
-          'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium',
+          'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
           'border-ink-700 text-ink-200 hover:border-ink-600 hover:bg-ink-800/60 transition-colors',
           className,
         ].join(' ')}

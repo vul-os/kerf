@@ -475,7 +475,7 @@ function ToolCard({ tool, selected, onClick }: { tool: GdtTool; selected: boolea
     <button
       onClick={onClick}
       className={[
-        'flex items-start gap-2 px-3 py-2.5 rounded-lg border text-left transition-colors w-full',
+        'flex items-start gap-2 px-3 py-2.5 rounded-lg border text-left transition-colors w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
         selected
           ? 'border-kerf-500 bg-kerf-950/40 text-ink-100'
           : 'border-ink-800 hover:border-ink-600 bg-ink-950/60 hover:bg-ink-900/60 text-ink-300',
@@ -1207,7 +1207,7 @@ export default function GDTPanel() {
           onClick={() => setMbdMode((v) => !v)}
           title={mbdMode ? 'MBD mode — click to use drawing sheet' : 'Drawing sheet mode — click for MBD'}
           className={[
-            'flex items-center gap-1.5 px-2 py-1 rounded-md border text-[10px] font-medium transition-colors',
+            'flex items-center gap-1.5 px-2 py-1 rounded-md border text-[10px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
             mbdMode
               ? 'border-blue-600 bg-blue-950/40 text-blue-300'
               : 'border-ink-700 bg-ink-900/60 text-ink-500 hover:border-ink-500',
@@ -1231,7 +1231,7 @@ export default function GDTPanel() {
                   key={tab.id}
                   onClick={() => setLeftTab(tab.id)}
                   className={[
-                    'flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-medium transition-colors border-b-2',
+                    'flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-medium transition-colors border-b-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
                     leftTab === tab.id
                       ? 'border-kerf-400 text-kerf-300 bg-kerf-950/20'
                       : 'border-transparent text-ink-500 hover:text-ink-300',

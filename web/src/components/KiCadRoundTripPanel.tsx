@@ -280,7 +280,7 @@ export default function KiCadRoundTripPanel({ circuitJson, onImportResult }: KiC
             onClick={handleExport}
             disabled={exportStatus === STEP_RUNNING}
             className={[
-              'flex items-center justify-center gap-1.5 rounded px-3 py-1.5 text-[11px] font-medium',
+              'flex items-center justify-center gap-1.5 rounded px-3 py-1.5 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
               'focus:outline-none focus:ring-2 focus:ring-kerf-300 min-h-[2rem]',
               exportStatus === STEP_RUNNING
                 ? 'bg-ink-700 text-ink-500 cursor-not-allowed'
@@ -334,7 +334,7 @@ export default function KiCadRoundTripPanel({ circuitJson, onImportResult }: KiC
             onClick={handleImport}
             disabled={importStatus === STEP_RUNNING}
             className={[
-              'flex items-center justify-center gap-1.5 rounded px-3 py-1.5 text-[11px] font-medium',
+              'flex items-center justify-center gap-1.5 rounded px-3 py-1.5 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
               'focus:outline-none focus:ring-2 focus:ring-kerf-300 min-h-[2rem]',
               importStatus === STEP_RUNNING
                 ? 'bg-ink-700 text-ink-500 cursor-not-allowed'

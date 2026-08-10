@@ -170,7 +170,7 @@ export default function AtopileEditor({
             key={id}
             onClick={() => setActiveTab(id)}
             className={[
-              'flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-t transition-colors',
+              'flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-t transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
               activeTab === id
                 ? 'text-white border-b-2 border-blue-500'
                 : 'text-ink-400 hover:text-ink-200',

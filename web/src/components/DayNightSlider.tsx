@@ -245,7 +245,7 @@ export default function DayNightSlider({
             onClick={() => handleSpeedChange(value)}
             data-testid={`speed-btn-${value}`}
             className={[
-              'px-2 py-0.5 rounded text-xs font-mono transition-colors',
+              'px-2 py-0.5 rounded text-xs font-mono transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
               speed === value
                 ? 'bg-kerf-300 text-ink-950 font-semibold'
                 : 'bg-ink-700 text-ink-300 hover:bg-ink-600',

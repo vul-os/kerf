@@ -144,7 +144,7 @@ export default function WorkspaceSwitcher() {
                   role="menuitem"
                   onClick={() => onPick(ws.slug)}
                   className={clsx(
-                    'w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors',
+                    'w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
                     active ? 'bg-ink-800/60' : 'hover:bg-ink-800/60',
                   )}
                 >

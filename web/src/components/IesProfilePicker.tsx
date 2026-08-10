@@ -51,7 +51,7 @@ function CategoryTab({ id, label, active, onClick }: CategoryTabProps) {
       type="button"
       onClick={() => onClick(id)}
       className={
-        'h-7 px-2.5 rounded-full text-[11px] font-medium transition-colors whitespace-nowrap border ' +
+        'h-7 px-2.5 rounded-full text-[11px] font-medium transition-colors whitespace-nowrap border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ' +
         (active
           ? 'bg-ink-100 text-ink-950 border-ink-100'
           : 'text-ink-300 hover:text-ink-100 border-ink-800 hover:border-ink-700 bg-ink-900')
@@ -85,7 +85,7 @@ function PresetRow({ preset, selected, onSelect }: PresetRowProps) {
       onClick={() => onSelect(preset)}
       aria-pressed={selected}
       className={
-        'w-full text-left px-3 py-2 rounded-md border transition-colors flex items-start gap-3 ' +
+        'w-full text-left px-3 py-2 rounded-md border transition-colors flex items-start gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ' +
         (selected
           ? 'border-kerf-300/60 bg-kerf-300/10 ring-1 ring-kerf-300/20'
           : 'border-ink-800 bg-ink-900 hover:border-kerf-300/40 hover:bg-ink-850')

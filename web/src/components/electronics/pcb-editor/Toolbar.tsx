@@ -70,7 +70,7 @@ export default function Toolbar({
             onClick={() => onToolChange(id)}
             title={label}
             className={[
-              'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors',
+              'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
               tool === id
                 ? 'bg-indigo-600 text-white shadow'
                 : 'text-gray-400 hover:text-white hover:bg-white/10',
@@ -95,7 +95,7 @@ export default function Toolbar({
               onClick={() => onLayerChange(id)}
               title={label}
               className={[
-                'px-2 py-1 rounded-md text-xs font-medium transition-colors',
+                'px-2 py-1 rounded-md text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
                 layer === id
                   ? 'text-white shadow'
                   : 'text-gray-400 hover:text-white hover:bg-white/10',

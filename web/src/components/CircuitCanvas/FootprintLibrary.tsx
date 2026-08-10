@@ -104,7 +104,7 @@ function FootprintCard({ name, isSelected, onClick }: FootprintCardProps) {
       type="button"
       onClick={() => onClick(name)}
       className={[
-        'flex flex-col items-start gap-0.5 p-2 rounded border text-left w-full',
+        'flex flex-col items-start gap-0.5 p-2 rounded border text-left w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
         'transition-colors cursor-pointer',
         isSelected
           ? 'bg-kerf-300/20 border-kerf-300 text-ink-100'
@@ -205,7 +205,7 @@ export default function FootprintLibrary({ onSelect, onClose }: Props) {
             type="button"
             onClick={() => setActiveGroup(g)}
             className={[
-              'text-[10px] px-2 py-0.5 rounded transition-colors',
+              'text-[10px] px-2 py-0.5 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
               activeGroup === g
                 ? 'bg-kerf-300/20 text-kerf-300 border border-kerf-300/40'
                 : 'text-ink-400 hover:text-ink-200',

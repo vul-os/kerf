@@ -62,7 +62,7 @@ function Pill({ id, label, active, onSelect }: PillProps) {
       data-category={id ?? 'all'}
       onClick={() => onSelect(active ? null : id)}
       className={[
-        'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium font-mono',
+        'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
         'border transition-colors focus-visible:outline focus-visible:outline-2',
         'focus-visible:outline-kerf-300 focus-visible:outline-offset-2',
         active

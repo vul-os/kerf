@@ -286,7 +286,7 @@ export default function LibraryPicker({ onSelect, onClose, currentProjectId }: L
                 type="button"
                 onClick={() => setCategory(opt.id)}
                 className={
-                  'h-7 px-2.5 rounded-full text-[11px] font-medium transition-colors whitespace-nowrap border ' +
+                  'h-7 px-2.5 rounded-full text-[11px] font-medium transition-colors whitespace-nowrap border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ' +
                   (category === opt.id
                     ? 'bg-ink-100 text-ink-950 border-ink-100'
                     : 'text-ink-300 hover:text-ink-100 border-ink-800 hover:border-ink-700 bg-ink-900')

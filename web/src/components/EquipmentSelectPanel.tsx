@@ -112,7 +112,7 @@ function ModelCard({ model, onSelect, selected }: ModelCardProps) {
       type="button"
       onClick={() => onSelect(model)}
       className={[
-        'w-full text-left rounded border px-3 py-2.5 transition-colors',
+        'w-full text-left rounded border px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
         isSelected
           ? 'border-kerf-400/60 bg-kerf-400/10'
           : 'border-ink-700/60 hover:border-ink-600 hover:bg-ink-900/60',

@@ -110,7 +110,7 @@ function SourceChip({ kind, active, onToggle, count }: {
     <button
       type="button"
       onClick={() => onToggle(kind)}
-      className={`inline-flex items-center gap-1 px-1.5 h-5 rounded text-[10px] uppercase tracking-wider border transition-colors ${
+      className={`inline-flex items-center gap-1 px-1.5 h-5 rounded text-[10px] uppercase tracking-wider border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${
         on
           ? `${meta.pillBg} ${meta.accent}`
           : 'border-ink-800 text-ink-500 hover:text-ink-200 hover:border-ink-700'

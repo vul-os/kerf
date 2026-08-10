@@ -47,8 +47,8 @@ function uid() { return Math.random().toString(36).slice(2, 9) }
 
 const iCls = 'w-full bg-ink-950 border border-ink-700 rounded px-2 py-0.5 text-[12px] text-ink-200 focus:outline-none focus:border-kerf-300/60'
 const sCls = 'bg-ink-950 border border-ink-700 rounded px-1.5 py-0.5 text-[11px] text-ink-200 focus:outline-none focus:border-kerf-300/60'
-const btnCls = 'inline-flex items-center gap-1 text-[11px] text-kerf-300 hover:text-kerf-200'
-const buildBtnCls = 'px-2.5 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-[11px]'
+const btnCls = 'inline-flex items-center gap-1 text-[11px] text-kerf-300 hover:text-kerf-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70'
+const buildBtnCls = 'px-2.5 py-1 rounded bg-kerf-300/10 border border-kerf-300/30 text-kerf-200 hover:bg-kerf-300/20 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70'
 
 function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (

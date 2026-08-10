@@ -279,7 +279,7 @@ export default function DrcErcPanel({ circuitJson, onClose, onMarkerClick }: Drc
             data-testid={`drc-erc-tab-${key}`}
             onClick={() => setTab(key)}
             className={[
-              'px-4 py-1.5 text-xs font-medium transition-colors border-b-2',
+              'px-4 py-1.5 text-xs font-medium transition-colors border-b-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
               tab === key
                 ? 'border-indigo-500 text-indigo-300'
                 : 'border-transparent text-gray-500 hover:text-gray-300',

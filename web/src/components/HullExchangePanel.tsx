@@ -192,7 +192,7 @@ function FormatCard({ fmt, selected, onSelect }: { fmt: FormatDef; selected: boo
   return (
     <button
       onClick={() => onSelect(fmt.id)}
-      className={`flex flex-col gap-1 rounded-lg border p-3 text-left transition-colors w-full ${
+      className={`flex flex-col gap-1 rounded-lg border p-3 text-left transition-colors w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 ${
         selected
           ? `${fmt.borderColor} ${fmt.bgColor}`
           : 'border-gray-800 bg-gray-900 hover:border-gray-600'

@@ -176,7 +176,7 @@ export default function PCB3DPanel({ circuitJson, onClose }: PCB3DPanelProps) {
             data-testid={`pcb3d-tab-${id}`}
             onClick={() => setTab(id)}
             className={[
-              'px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors',
+              'px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
               tab === id ? 'bg-violet-600 text-white' : 'text-gray-400 hover:text-white hover:bg-white/10',
             ].join(' ')}
           >

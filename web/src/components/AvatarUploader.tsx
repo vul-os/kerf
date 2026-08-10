@@ -157,7 +157,7 @@ export default function AvatarUploader({ user, onClose, onUpdated }: Props) {
               onClick={() => fileInputRef.current?.click()}
               disabled={busy}
               className={clsx(
-                'w-full flex items-center justify-center gap-2 rounded-lg',
+                'w-full flex items-center justify-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
                 'border border-dashed border-ink-700 bg-ink-950/40',
                 'px-3 py-3 text-sm text-ink-200',
                 'hover:border-kerf-300/60 hover:bg-ink-900 hover:text-ink-100',
@@ -203,7 +203,7 @@ export default function AvatarUploader({ user, onClose, onUpdated }: Props) {
                 onClick={handleUpload}
                 disabled={busy || !picked}
                 className={clsx(
-                  'inline-flex items-center gap-1.5 px-3 h-8 rounded-md text-sm font-medium',
+                  'inline-flex items-center gap-1.5 px-3 h-8 rounded-md text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70',
                   'bg-kerf-300 text-ink-950 hover:bg-kerf-200',
                   'disabled:bg-ink-700 disabled:text-ink-400 disabled:cursor-not-allowed',
                 )}

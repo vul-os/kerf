@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { api } from '../lib/api.js'
 import type { ApiWorkspace } from '@/types'
+import { errMessage } from './errorUtils.js'
 
 const CURRENT_KEY = 'kerf:currentWorkspaceSlug'
 
@@ -50,8 +51,9 @@ export const useWorkspaces = create<WorkspacesState>()((set, get) => ({
         const arr = Array.isArray(list) ? list : (list?.workspaces || [])
         set({ workspaces: arr, loading: false, loaded: true, error: null })
         const cur = get().currentSlug
-        if (arr.length > 0 && (!cur || !arr.some((w) => w.slug === cur))) {
-          get().setCurrent(arr[0].slug)
+        const first = arr[0]
+        if (first && (!cur || !arr.some((w) => w.slug === cur))) {
+          get().setCurrent(first.slug)
         }
         return arr
       } catch (err) {
@@ -65,7 +67,7 @@ export const useWorkspaces = create<WorkspacesState>()((set, get) => ({
     // later trigger (route change / opening the New Project dialog) can
     // retry. The server also resolves the default workspace on create,
     // so the user is never hard-blocked even while this is failing.
-    set({ loading: false, loaded: false, error: lastErr?.message || String(lastErr) })
+    set({ loading: false, loaded: false, error: errMessage(lastErr) || String(lastErr) })
     return []
   },
 

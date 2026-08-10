@@ -159,7 +159,7 @@ function Section({ title, icon: Icon, defaultOpen = true, children }: {
     <div className="border border-zinc-700 rounded-lg overflow-hidden mb-3">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-2 px-4 py-2 bg-zinc-800 text-sm font-medium text-zinc-200 hover:bg-zinc-750 transition-colors"
+        className="w-full flex items-center gap-2 px-4 py-2 bg-zinc-800 text-sm font-medium text-zinc-200 hover:bg-zinc-750 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         {Icon && <Icon size={14} className="text-zinc-400" />}
@@ -562,13 +562,14 @@ export default function AirsideSystemPanel() {
                   className="bg-zinc-700 border border-zinc-600 rounded px-2 py-1 text-xs text-zinc-200 font-mono focus:outline-none focus:border-blue-500" />
               </label>
               <button onClick={() => removeZone(i)}
-                className="self-end flex items-center justify-center h-7 w-7 rounded bg-red-900/30 hover:bg-red-900/60 text-red-400 transition-colors">
+                className="self-end flex items-center justify-center h-7 w-7 rounded bg-red-900/30 hover:bg-red-900/60 text-red-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
+                aria-label={`Remove zone ${z.name || i + 1}`}>
                 <Trash2 size={12} />
               </button>
             </div>
           ))}
           <button onClick={addZone}
-            className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors mt-1">
+            className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors mt-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70">
             <Plus size={13} /> Add Zone
           </button>
         </div>
@@ -594,7 +595,7 @@ export default function AirsideSystemPanel() {
       <button
         onClick={run}
         disabled={loading}
-        className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+        className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
       >
         {loading ? <Loader2 size={15} className="animate-spin" /> : <Zap size={15} />}
         {loading ? 'Simulating…' : 'Run AHU Simulation'}

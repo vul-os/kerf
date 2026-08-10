@@ -13,7 +13,7 @@ import uuid
 import io
 import zipfile
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
 
 import asyncpg
@@ -2209,15 +2209,22 @@ async def update_file(pid: str, fid: str, req: UpdateFileRequest, payload: dict 
         bump_version = req.content is not None
         if req.content is not None:
             new_sha = compute_content_sha(req.content)
+            # The cutoff is computed here rather than as `now() - ($2 *
+            # interval '1 second')`: interval literals are Postgres-only, and
+            # that expression 500'd EVERY file save on the embedded backend
+            # with `near "'1 second'": syntax error`.
+            idempotency_cutoff = datetime.now(timezone.utc) - timedelta(
+                seconds=_IDEMPOTENCY_WINDOW_SECS
+            )
             recent = await conn.fetchrow(
                 """
                 SELECT content_sha256 FROM file_revisions
                 WHERE file_id = $1
-                  AND created_at >= now() - ($2 * interval '1 second')
+                  AND created_at >= $2
                 ORDER BY created_at DESC
                 LIMIT 1
                 """,
-                fid, _IDEMPOTENCY_WINDOW_SECS,
+                fid, idempotency_cutoff,
             )
             if recent and recent["content_sha256"] is not None:
                 # content_sha256 may be stored as bytes/memoryview or hex text

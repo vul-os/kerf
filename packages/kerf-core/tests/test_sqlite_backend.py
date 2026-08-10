@@ -80,6 +80,31 @@ class TestDialect:
         assert "FOR UPDATE" not in out
         assert "SKIP LOCKED" not in out
 
+    def test_translate_for_update_of_alias(self):
+        """``FOR UPDATE OF <alias>`` — the spelling every job worker uses.
+
+        The regression this guards: only the FOR UPDATE and SKIP LOCKED halves
+        were stripped, leaving a dangling ``OF j`` that SQLite rejects with
+        `near "OF": syntax error` — so every worker's claim query failed on the
+        embedded backend.
+        """
+        import sqlite3
+        conn = sqlite3.connect(":memory:")
+        conn.execute("CREATE TABLE jobs (id text, status text)")
+
+        for query in (
+            "SELECT id FROM jobs j WHERE j.status='queued' FOR UPDATE OF j SKIP LOCKED",
+            "SELECT id FROM jobs j WHERE j.status='queued' FOR UPDATE OF j, k SKIP LOCKED",
+            "SELECT id FROM jobs j FOR UPDATE OF j",
+            "SELECT id FROM jobs FOR UPDATE NOWAIT",
+        ):
+            out = translate_sql(query)
+            assert " OF " not in out.upper(), out
+            assert "FOR UPDATE" not in out.upper(), out
+            assert "SKIP LOCKED" not in out.upper(), out
+            # The real check: what's left must actually parse.
+            conn.execute(out)
+
     def test_translate_ilike(self):
         assert "LIKE" in translate_sql("SELECT 1 WHERE a ILIKE $1")
         assert "ILIKE" not in translate_sql("SELECT 1 WHERE a ILIKE $1")

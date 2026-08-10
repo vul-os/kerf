@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from typing import Any
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -67,10 +68,14 @@ class RateLimitGCWorker:
 
         Returns the number of rows deleted.
         """
+        # Cutoff computed here, not as `now() - interval '24 hours'`:
+        # interval literals are Postgres-only and raise a syntax error on the
+        # embedded backend.
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
         async with pool.acquire() as conn:
             result = await conn.execute(
-                "DELETE FROM rate_limit_buckets "
-                "WHERE window_start < now() - interval '24 hours'"
+                "DELETE FROM rate_limit_buckets WHERE window_start < $1",
+                cutoff,
             )
         # asyncpg returns a command tag like "DELETE N"
         try:

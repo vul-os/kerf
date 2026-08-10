@@ -100,9 +100,17 @@ _RE_CAST = re.compile(r"::\s*[A-Za-z_][A-Za-z0-9_]*(\s*\[\s*\])?")
 _RE_GEN_UUID = re.compile(r"gen_random_uuid\s*\(\s*\)", re.IGNORECASE)
 _RE_NOW = re.compile(r"\bnow\s*\(\s*\)", re.IGNORECASE)
 _RE_CURRENT_TS = re.compile(r"\bcurrent_timestamp\b", re.IGNORECASE)
+# The optional ``OF <alias>[, <alias>…]`` clause must be part of the match, not
+# left behind. Every job-claim query in the workers is spelled ``FOR UPDATE OF j
+# SKIP LOCKED``, and stripping only the FOR UPDATE and SKIP LOCKED halves left a
+# dangling ``OF j`` — valid-looking SQL that SQLite rejects with
+# `near "OF": syntax error`, breaking every worker's claim on the embedded
+# backend.
+_FOR_UPDATE_TARGETS = r"(?:\s+OF\s+[A-Za-z_][\w.]*(?:\s*,\s*[A-Za-z_][\w.]*)*)?"
 _RE_FOR_UPDATE_SKIP = re.compile(
-    r"\bFOR\s+UPDATE\s+SKIP\s+LOCKED\b", re.IGNORECASE)
-_RE_FOR_UPDATE = re.compile(r"\bFOR\s+UPDATE\b", re.IGNORECASE)
+    r"\bFOR\s+UPDATE" + _FOR_UPDATE_TARGETS + r"\s+SKIP\s+LOCKED\b", re.IGNORECASE)
+_RE_FOR_UPDATE = re.compile(
+    r"\bFOR\s+UPDATE" + _FOR_UPDATE_TARGETS + r"(?:\s+NOWAIT)?\b", re.IGNORECASE)
 _RE_SKIP_LOCKED = re.compile(r"\bSKIP\s+LOCKED\b", re.IGNORECASE)
 _RE_ILIKE = re.compile(r"\bILIKE\b", re.IGNORECASE)
 _RE_PARAM = re.compile(r"\$(\d+)")

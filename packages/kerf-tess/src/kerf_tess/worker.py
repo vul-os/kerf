@@ -28,6 +28,7 @@ import asyncpg
 
 from kerf_tess.base import BaseWorker
 from kerf_tess.specs import TessInputSpec
+from datetime import datetime, timedelta, timezone
 
 
 logger = logging.getLogger(__name__)
@@ -172,14 +173,22 @@ class AutoTessWorker(BaseWorker):
 
     async def _recover_stuck_jobs(self) -> None:
         try:
+            # Cutoff computed here, not as `now() - interval '<n> seconds'`:
+            # interval literals are Postgres-only and raise a syntax error on
+            # the embedded backend. Binding it also drops the f-string, so the
+            # constant is no longer interpolated into SQL text.
+            cutoff = datetime.now(timezone.utc) - timedelta(
+                seconds=_STUCK_RUNNING_RECOVERY_SECONDS
+            )
             await self.pool.execute(
-                f"""
+                """
                 UPDATE step_tessellation_jobs
                 SET status = 'queued', started_at = NULL
                 WHERE status = 'running'
                   AND started_at IS NOT NULL
-                  AND started_at < now() - interval '{int(_STUCK_RUNNING_RECOVERY_SECONDS)} seconds'
+                  AND started_at < $1
                 """,
+                cutoff,
             )
         except Exception:
             logger.exception("auto_tess: stuck-job recovery failed")

@@ -105,6 +105,15 @@ def _run_server(server) -> None:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
+    # Fail the boot if any plugin fails to register, rather than opening a
+    # window onto a dead API. This shipped broken once: excluding pygit2 from
+    # the frozen build made kerf-api's registration raise, so every /api route
+    # vanished and the SPA fallback answered {"detail": "Not Found"} — while
+    # the launcher reported a clean start and cheerfully opened the window.
+    # A desktop user cannot read plugin logs; a hard failure with a real error
+    # is far kinder than a UI where nothing works.
+    os.environ.setdefault("KERF_STRICT_PLUGINS", "true")
+
     dist = _resolve_frontend_dist()
     if dist is not None:
         os.environ["KERF_FRONTEND_DIST"] = str(dist)

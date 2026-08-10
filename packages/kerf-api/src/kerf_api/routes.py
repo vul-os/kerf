@@ -1075,20 +1075,45 @@ async def list_projects(request: Request, payload: dict = Depends(require_auth))
         if tag:
             tags_arg = tag
 
-        rows = await conn.fetch(
-            """
-            SELECT p.id, p.workspace_id, p.name, p.description, p.visibility, p.tags,
-                   p.thumbnail_storage_key, p.thumbnail_updated_at,
-                   p.created_at, p.updated_at, m.role
-            FROM projects p
-            JOIN workspace_members m ON m.workspace_id = p.workspace_id
-            WHERE m.user_id = $1
-              AND ($2::uuid IS NULL OR p.workspace_id = $2)
-              AND ($3::text[] IS NULL OR p.tags @> $3::text[])
-            ORDER BY p.updated_at DESC
-            """,
-            user_id, ws_id if ws_id else None, tags_arg,
-        )
+        # Portable across both backends. The previous version used three
+        # Postgres-only constructs — $2::uuid, $3::text[] and the @> array
+        # containment operator — so on SQLite (the zero-dependency DEFAULT)
+        # this endpoint died with
+        #   sqlite3.OperationalError: unrecognized token: "@"
+        # and listing projects 500'd on every default install.
+        #
+        # Build the workspace predicate conditionally instead of relying on a
+        # cast, and apply the tag filter in Python: the tag list is small, it
+        # is already being deserialised per row below, and there is no portable
+        # SQL spelling of array containment.
+        _sql = [
+            "SELECT p.id, p.workspace_id, p.name, p.description, p.visibility, p.tags,",
+            "       p.thumbnail_storage_key, p.thumbnail_updated_at,",
+            "       p.created_at, p.updated_at, m.role",
+            "FROM projects p",
+            "JOIN workspace_members m ON m.workspace_id = p.workspace_id",
+            "WHERE m.user_id = $1",
+        ]
+        _args: list = [user_id]
+        if ws_id:
+            _args.append(ws_id)
+            _sql.append(f"  AND p.workspace_id = ${len(_args)}")
+        _sql.append("ORDER BY p.updated_at DESC")
+        rows = await conn.fetch("\n".join(_sql), *_args)
+
+        if tags_arg:
+            _want = set(tags_arg)
+
+            def _has_all_tags(row) -> bool:
+                raw = dict(row).get("tags") or []
+                if isinstance(raw, str):
+                    try:
+                        raw = json.loads(raw)
+                    except (ValueError, TypeError):
+                        raw = [t for t in raw.split(",") if t]
+                return _want.issubset(set(raw or []))
+
+            rows = [r for r in rows if _has_all_tags(r)]
 
         out = []
         for row in rows:

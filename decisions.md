@@ -2102,3 +2102,53 @@ flake at 30s.
 `packages/kerf-tess/src/kerf_tess/worker.py`,
 `packages/kerf-core/tests/test_sqlite_backend.py`,
 `web/tests/e2e/{playwright.config.ts,global-setup.ts}`, `decisions.md` (this entry).
+
+## 2026-08-11 SAST — Sweeping the read surface: five more 500s, two of them not SQLite's fault
+
+With the e2e suite green on the embedded backend, I swept the rest of the read surface the same
+way rather than trusting another grep: boot a SQLite-backed server, seed a real
+user/workspace/project/file/thread, enumerate `/openapi.json`, call every GET whose path params
+the fixtures can fill, and chase each 5xx. 53 routes, 10 5xx — five of them correct 503s (OAuth
+and web-push genuinely unconfigured on a bare node), five real:
+
+| route | cause |
+|---|---|
+| `/projects/{pid}/files/{fid}/revisions` | `limit` referenced twice, never declared — `UnboundLocalError` |
+| `/projects/{pid}/members` | `user_to_response()` on `workspace_members` rows, which have no `id` |
+| `/projects/{pid}/activity` | `LEFT(cm.content, 240)` — no such function on SQLite |
+| `/projects/{pid}/revisions/size` | `pg_column_size()` |
+| `/projects/{pid}/export` | `to_char(created_at at time zone 'utc', …)` |
+
+**The first two were broken on Postgres too, and always had been.** `list_revisions` could never
+have returned a response on any backend. `list_members` would have raised `KeyError` on any
+backend, and even if it hadn't, it dropped `role` — the one field a member list exists for — and
+labelled the *membership* date as the user's `created_at`. It now returns exactly the shape the
+client's `ProjectMember` type declares.
+
+That is the finding worth keeping: *a schema-driven sweep catches endpoints nobody thought to
+test*, because nobody writes a test for the endpoint they forgot existed. Both of these had zero
+coverage and would have kept it under any amount of careful per-feature test writing.
+
+The three dialect gaps were fixed in `db/dialect.py` so every call site benefits: `LEFT`/`RIGHT`
+-> `substr` (non-greedy — all three call sites nest it inside `COALESCE`, and a greedy match eats
+the closing paren; `LEFT JOIN` is asserted untouched), `AT TIME ZONE 'utc'` dropped (everything
+stored is already UTC), and `pg_column_size`/`octet_length` -> `length` (approximate for
+multi-byte text, and the route used to 500). The export route now formats its timestamp in
+Python instead, which both backends reach identically now that timestamptz columns come back as
+aware datetimes.
+
+**Made permanent:** `packages/kerf-api/tests/test_route_sweep_sqlite.py` does the sweep as a
+hermetic test in the default tier — temp SQLite file, seeded fixtures, walk the app's own
+OpenAPI, fail on any 5xx. Verified it *catches* rather than merely passes: removing the `LEFT`
+translation makes it fail naming `/activity` and `/revisions`. Its limits are in its docstring
+rather than implied — kerf-api and kerf-auth only (~38 routes; mounting the plugin routers would
+drag in optional native deps), and GET only.
+
+A separate by-hand pass over the write surface (project rename/tag, file create/patch/rename/
+delete, threads, messages, workspace members, `/api/me`) found **no** 5xx on SQLite.
+
+**Affected:** `packages/kerf-api/src/kerf_api/routes.py`,
+`packages/kerf-core/src/kerf_core/db/{dialect.py,queries/workspaces.py}`,
+`packages/kerf-api/tests/test_route_sweep_sqlite.py`,
+`packages/kerf-core/tests/test_sqlite_backend.py`, `decisions.md` (this entry).
+

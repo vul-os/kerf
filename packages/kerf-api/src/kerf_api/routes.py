@@ -4489,6 +4489,12 @@ async def get_revisions_size(pid: str, payload: dict = Depends(require_auth)):
     Byte estimates use ``pg_column_size(content_gz)`` for the gzip column and
     ``octet_length(content)`` for the text column (both NULL-safe via COALESCE).
     Results are ordered descending by bytes (largest file first).
+
+    On the embedded SQLite backend both become ``length()`` (see
+    db/dialect.py), which is exact for the BLOB column and counts characters
+    rather than bytes for the text one — so a multi-byte source file reads
+    slightly small there. These are a storage breakdown, not an accounting
+    figure, and the alternative was the 500 this route used to return.
     """
     user_id = payload.get("sub")
 

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerf-piping"
-version = "0.1.5"
+version = "0.1.6"
 license = { text = "MIT" }
 classifiers = ["License :: OSI Approved :: MIT License"]
 description = "P&ID / piping plant design plugin for Kerf — ISA 5.1 symbols, isometric routing, DXF export"

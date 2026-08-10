@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerf-topo"
-version = "0.1.5"
+version = "0.1.6"
 license = { text = "MIT" }
 classifiers = ["License :: OSI Approved :: MIT License"]
 description = "Topology-optimization plugin for Kerf"

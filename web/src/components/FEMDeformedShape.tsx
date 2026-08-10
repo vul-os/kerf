@@ -99,7 +99,9 @@ export default function DeformedShapeOverlay({
       euler.y += (e.clientX - lastX) * 0.01
       euler.x += (e.clientY - lastY) * 0.01
       lastX = e.clientX; lastY = e.clientY
-      scene.rotation.setFromEuler(euler)
+      // Euler.copy, not setFromEuler — the latter is Quaternion's method and
+      // does not exist on Euler, so this threw TypeError on every drag frame.
+      scene.rotation.copy(euler)
     }
     canvas.addEventListener('mousedown', onMouseDown)
     window.addEventListener('mouseup', onMouseUp)

@@ -875,7 +875,7 @@ function Renderer({
     pmrem.compileEquirectangularShader()
     let envTexture = null
     try {
-      envTexture = pmrem.fromScene(new RoomEnvironment(0.5), 0.04).texture
+      envTexture = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
       scene.environment = envTexture
     } catch (e) {
       // Some headless GL contexts can't run the PMREM shader; PBR materials
@@ -2311,7 +2311,7 @@ function Renderer({
       if (!url) {
         // Revert: rebuild from RoomEnvironment if we previously swapped out.
         try {
-          const tex = s.pmrem.fromScene(new RoomEnvironment(0.5), 0.04).texture
+          const tex = s.pmrem.fromScene(new RoomEnvironment(), 0.04).texture
           // Dispose the old environment to release the GPU texture.
           s.envTexture?.dispose?.()
           s.envTexture = tex

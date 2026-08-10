@@ -63,7 +63,12 @@ export function applyMatrixToGeom(
   } else {
     bg = geom3ToBufferGeometry(geom as Geom3)
   }
-  if (matrix4 && !matrix4.isIdentity?.()) {
+  // No isIdentity() on THREE.Matrix4 — the optional call always evaluated to
+  // undefined, so this branch was taken unconditionally. Applying an identity
+  // matrix is a numeric no-op, so the guard was only ever an optimisation;
+  // dropping the phantom call keeps the behaviour and stops it reading as a
+  // check that fires.
+  if (matrix4) {
     bg.applyMatrix4(matrix4)
     // applyMatrix4 transforms positions and normals, but a non-uniform scale
     // can leave normals non-unit. Recompute if there's clearly a scale that

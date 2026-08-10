@@ -171,7 +171,7 @@ const FeatureRenderer = forwardRef<FeatureRendererHandle, FeatureRendererProps>(
     // their envMapIntensity stays 0; only the PBR jewelry overrides set it > 0.
     const pmrem = new THREE.PMREMGenerator(renderer)
     pmrem.compileEquirectangularShader()
-    const studioEnv = pmrem.fromScene(new RoomEnvironment(0.5)).texture
+    const studioEnv = pmrem.fromScene(new RoomEnvironment()).texture
     scene.environment = studioEnv
     pmrem.dispose()
 
@@ -566,6 +566,9 @@ const FeatureRenderer = forwardRef<FeatureRendererHandle, FeatureRendererProps>(
           color: jewelryParams.color,
           transmission: jewelryParams.transmission,
           ior: jewelryParams.ior,
+          // Inert on three r160 — `dispersion` landed in r166. Kept so the gem
+          // params stay complete and it starts working on upgrade, but gems do
+          // NOT currently render dispersion however this is set.
           dispersion: jewelryParams.dispersion ?? 0,
           roughness: jewelryParams.roughness,
           thickness: jewelryParams.thickness,

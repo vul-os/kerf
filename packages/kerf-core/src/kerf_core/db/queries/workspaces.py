@@ -98,7 +98,9 @@ async def list_workspace_members(
 ) -> List[Dict[str, Any]]:
     rows = await conn.fetch(
         """
-        SELECT wm.*, u.email, u.name, u.avatar_url
+        SELECT wm.workspace_id, wm.user_id, wm.role,
+               wm.created_at AS joined_at,
+               u.email, u.name, u.avatar_url
         FROM workspace_members wm
         JOIN users u ON wm.user_id = u.id
         WHERE wm.workspace_id = $1

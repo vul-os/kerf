@@ -113,6 +113,34 @@ _RE_FOR_UPDATE = re.compile(
     r"\bFOR\s+UPDATE" + _FOR_UPDATE_TARGETS + r"(?:\s+NOWAIT)?\b", re.IGNORECASE)
 _RE_SKIP_LOCKED = re.compile(r"\bSKIP\s+LOCKED\b", re.IGNORECASE)
 _RE_ILIKE = re.compile(r"\bILIKE\b", re.IGNORECASE)
+
+# LEFT(expr, n) / RIGHT(expr, n) -> substr(). SQLite has no LEFT/RIGHT, so the
+# content-preview queries (activity feed, revision list, the revisions LLM
+# tool) died with `no such function: LEFT`. The expression argument may itself
+# contain parentheses — COALESCE(x, LEFT(y, 200)) — so match balanced-ish by
+# taking everything up to the LAST comma before the closing paren of this call,
+# via a non-greedy body plus an integer length.
+_RE_LEFT = re.compile(
+    r"\bLEFT\s*\(\s*(.+?)\s*,\s*(\d+)\s*\)", re.IGNORECASE | re.DOTALL)
+_RE_RIGHT = re.compile(
+    r"\bRIGHT\s*\(\s*(.+?)\s*,\s*(\d+)\s*\)", re.IGNORECASE | re.DOTALL)
+
+# `<ts> AT TIME ZONE 'utc'` — Postgres-only. Every timestamp kerf stores is
+# already UTC (see adapt_param), so on SQLite the conversion is the identity
+# and the clause can simply be dropped.
+_RE_AT_TIME_ZONE = re.compile(
+    r"\s+AT\s+TIME\s+ZONE\s+'[^']*'", re.IGNORECASE)
+
+# Byte-size functions. `pg_column_size` has no SQLite equivalent, and
+# `octet_length` only arrived in SQLite 3.43 (newer than some bundled builds),
+# so both become `length()`. For BLOBs that is exactly bytes; for TEXT it
+# counts characters, so a multi-byte string reads slightly small. The only
+# caller is the revision-size *estimate* endpoint, which is a storage
+# breakdown rather than an accounting figure — and it answered 500 on this
+# backend before, which is worse than approximate.
+_RE_PG_COLUMN_SIZE = re.compile(r"\bpg_column_size\s*\(", re.IGNORECASE)
+_RE_OCTET_LENGTH = re.compile(r"\boctet_length\s*\(", re.IGNORECASE)
+
 _RE_PARAM = re.compile(r"\$(\d+)")
 
 
@@ -135,6 +163,11 @@ def translate_sql(sql: str) -> str:
     sql = _RE_FOR_UPDATE.sub("", sql)
     sql = _RE_SKIP_LOCKED.sub("", sql)
     sql = _RE_ILIKE.sub("LIKE", sql)
+    sql = _RE_LEFT.sub(r"substr(\1, 1, \2)", sql)
+    sql = _RE_RIGHT.sub(r"substr(\1, -\2)", sql)
+    sql = _RE_AT_TIME_ZONE.sub("", sql)
+    sql = _RE_PG_COLUMN_SIZE.sub("length(", sql)
+    sql = _RE_OCTET_LENGTH.sub("length(", sql)
     return sql
 
 

@@ -4263,7 +4263,20 @@ async def list_members(pid: str, request: Request, payload: dict = Depends(requi
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
 
         members = await workspaces_queries.list_workspace_members(conn, ws_id)
-        return [user_to_response(m) for m in members]
+        # Not user_to_response(): workspace_members has no `id` column (its key
+        # is (workspace_id, user_id)), so that raised KeyError -> 500 on every
+        # backend, and it dropped `role` — the one field a member list is for.
+        # This shape is what the client's ProjectMember type declares.
+        return [
+            {
+                "user_id": str(m["user_id"]),
+                "email": m["email"],
+                "name": m["name"] or "",
+                "avatar_url": m.get("avatar_url") or "",
+                "role": m["role"],
+            }
+            for m in members
+        ]
 
 
 @router.post("/projects/{pid}/members")
@@ -4325,7 +4338,15 @@ async def remove_member(pid: str, uid: str, request: Request, payload: dict = De
 
 
 @router.get("/projects/{pid}/files/{fid}/revisions")
-async def list_revisions(pid: str, fid: str, request: Request, payload: dict = Depends(require_auth)):
+async def list_revisions(
+    pid: str,
+    fid: str,
+    request: Request,
+    # Was referenced twice in the body and never declared, so this endpoint
+    # raised UnboundLocalError -> 500 on EVERY backend, not just SQLite.
+    limit: int = Query(default=50, ge=1, le=200),
+    payload: dict = Depends(require_auth),
+):
     user_id = payload.get("sub")
 
     pool = await get_pool_required()
@@ -4337,9 +4358,6 @@ async def list_revisions(pid: str, fid: str, request: Request, payload: dict = D
         role = await get_user_workspace_role(conn, ws_id, user_id)
         if not role:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
-
-        if limit > 200:
-            limit = 200
 
         rows = await conn.fetch(
             """
@@ -5331,8 +5349,7 @@ async def export_project(
         row = await conn.fetchrow(
             """
             select name, description, coalesce(tags, '{}') as tags,
-                   to_char(created_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at,
-                   thumbnail_storage_key
+                   created_at, thumbnail_storage_key
             from projects where id = $1
             """,
             uuid.UUID(pid),
@@ -5343,7 +5360,18 @@ async def export_project(
         name = row["name"]
         description = row["description"]
         tags = list(row["tags"]) if row["tags"] else []
-        created_at = row["created_at"]
+        # Formatted here rather than with to_char(... at time zone 'utc', ...),
+        # which is Postgres-only and 500'd this route on the embedded backend.
+        # Both backends now hand back an aware datetime (see
+        # db/dialect.parse_timestamp_column), so one strftime covers both and
+        # the exact export format stays pinned by this line rather than by a
+        # format string buried in SQL.
+        raw_created = row["created_at"]
+        created_at = (
+            raw_created.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            if hasattr(raw_created, "astimezone")
+            else str(raw_created)
+        )
         thumb_key = row["thumbnail_storage_key"]
 
         file_rows = await conn.fetch(

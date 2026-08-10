@@ -109,6 +109,52 @@ class TestDialect:
         assert "LIKE" in translate_sql("SELECT 1 WHERE a ILIKE $1")
         assert "ILIKE" not in translate_sql("SELECT 1 WHERE a ILIKE $1")
 
+    def test_translate_left_right(self):
+        """LEFT/RIGHT -> substr, including nested inside COALESCE.
+
+        The content-preview queries (activity feed, revision list, the
+        revisions LLM tool) all spell it `COALESCE(fr.content_preview,
+        LEFT(fr.content, 200))` and died with `no such function: LEFT`. The
+        nesting is the interesting part: a greedy match would swallow the
+        closing paren of the COALESCE.
+        """
+        import sqlite3
+        conn = sqlite3.connect(":memory:")
+        conn.execute("CREATE TABLE fr (content text, content_preview text)")
+        conn.execute("INSERT INTO fr VALUES ('abcdefghij', NULL)")
+
+        cases = [
+            ("SELECT LEFT(content, 4) FROM fr", "abcd"),
+            ("SELECT COALESCE(content_preview, LEFT(content, 3)) FROM fr", "abc"),
+            ("SELECT RIGHT(content, 3) FROM fr", "hij"),
+        ]
+        for query, expected in cases:
+            out = translate_sql(query)
+            assert "LEFT(" not in out.upper() or "JOIN" in out.upper(), out
+            assert conn.execute(out).fetchone()[0] == expected, out
+
+    def test_translate_left_join_is_untouched(self):
+        """LEFT JOIN must not be mistaken for the LEFT() string function."""
+        out = translate_sql("SELECT 1 FROM a LEFT JOIN b ON b.id = a.id")
+        assert "LEFT JOIN" in out
+
+    def test_translate_at_time_zone_and_size_functions(self):
+        import sqlite3
+        conn = sqlite3.connect(":memory:")
+        conn.execute("CREATE TABLE t (created_at text, content text, content_gz blob)")
+        conn.execute("INSERT INTO t VALUES ('2026-01-02 03:04:05', 'abcd', x'0102')")
+
+        # AT TIME ZONE 'utc' is the identity here — everything is stored UTC.
+        out = translate_sql("SELECT created_at at time zone 'utc' FROM t")
+        assert "TIME ZONE" not in out.upper()
+        assert conn.execute(out).fetchone()[0] == "2026-01-02 03:04:05"
+
+        # pg_column_size / octet_length -> length()
+        out = translate_sql(
+            "SELECT COALESCE(pg_column_size(content_gz),0) + COALESCE(octet_length(content),0) FROM t")
+        assert "pg_column_size" not in out and "octet_length" not in out
+        assert conn.execute(out).fetchone()[0] == 2 + 4
+
     def test_adapt_param_types(self):
         u = uuid.uuid4()
         assert adapt_param(u) == str(u)

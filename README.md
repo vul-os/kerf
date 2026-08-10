@@ -291,7 +291,7 @@ npm run dev         # vite :5173 + kerf-server :8080, hot-reload
 npm run build        # production build (Vite SPA)
 npm run lint         # ESLint
 npm test             # vitest (frontend)
-npm run test:e2e     # Playwright end-to-end
+npm run test:e2e     # Playwright end-to-end (run `npm run build` first — it serves web/dist)
 
 # Backend — run from repo root so the root conftest loads
 make test                                        # default tier — expected GREEN (~3 min)

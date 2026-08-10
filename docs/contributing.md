@@ -93,7 +93,7 @@ contributor flow — there is no separate license arrangement to negotiate.
 | `npm run start`          | Run `kerf-server` serving the pre-built `dist/` on `:8080` (set `KERF_FRONTEND_DIST=web/dist` first — its built-in default is the Docker image's path) |
 | `npm run lint`           | ESLint                                                                |
 | `npm run test`           | Vitest unit tests                                                     |
-| `npm run test:e2e`       | Playwright end-to-end tests                                           |
+| `npm run test:e2e`       | Playwright end-to-end tests. Run `npm run build` first — the suite serves `web/dist` from `kerf-server` (one origin, no Vite) and boots on embedded SQLite, so it needs no Postgres and no migrate step. Set `DATABASE_URL` to a `postgres://` DSN to run the same suite against Postgres. |
 
 ## Config
 

@@ -1820,3 +1820,25 @@ the TOML port; `plugin_register_failed=0` in the strict-plugin boot log.
 precedence wiring), `packages/kerf-core/src/kerf_core/__main__.py` (port
 fallthrough), `packages/kerf-core/tests/test_config_toml.py` (new, 20
 tests), `decisions.md` (this entry).
+
+## A commit that says one thing and contains another (be813448)
+
+`be813448` is titled "a11y: focus-visible rings on aerospace panel buttons" and does
+contain that — three aerospace panels. It also contains the entire parity-page
+regeneration: `scripts/build-parity-site.mjs` plus 57 detail pages, 62 files and ~2,300
+lines in total.
+
+Cause: two agents were working in the same worktree at once. One ran a broad `git add`
+and swept up the other's in-flight changes. Nothing was lost and nothing is broken —
+`check-render` is clean — but the history misdescribes what happened.
+
+Not rewritten, deliberately. The commit is unpushed, so an amend or split would be safe
+in isolation; it was not safe at the time, because three agents were actively committing
+into this tree and rewriting under them would have caused precisely the confusion being
+fixed. A misleading message is a smaller problem than a corrupted working tree.
+
+**The rule this establishes:** agents doing independent work get
+`isolation: "worktree"`, or are instructed to `git add <explicit paths>` and never
+`git add -A`. A shared worktree with concurrent agents has now produced two incidents —
+this one, and an earlier case where one agent's uncommitted edits were committed by
+another under an unrelated message.

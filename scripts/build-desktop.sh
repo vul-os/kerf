@@ -58,7 +58,13 @@ venv_dir="${DESKTOP_VENV:-$repo_root/.venv-desktop-build}"
 python_bin="${PYTHON:-python3}"
 
 echo "==> [1/3] building frontend (web/dist)"
-( cd web && npm run build )
+if [ "${KERF_SKIP_FRONTEND_BUILD:-}" = "1" ]; then
+  # CI builds the frontend in a dedicated step so a vite failure shows up in
+  # the run log instead of being buried in this subshell.
+  echo "    (skipped: KERF_SKIP_FRONTEND_BUILD=1 — web/dist built by the caller)"
+else
+  ( cd web && npm run build )
+fi
 
 if [ ! -f web/dist/index.html ]; then
   echo "error: web/dist/index.html missing after 'npm run build'" >&2

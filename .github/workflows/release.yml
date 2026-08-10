@@ -506,12 +506,26 @@ jobs:
       # Windows uses WebView2, which ships with the windows-latest image —
       # nothing to install for it. macOS uses WebKit via pywebview's Cocoa
       # backend, also part of the OS — nothing to install there either.
+      # Built as its own step, NOT inside build-desktop.sh. When all three
+      # desktop legs failed on v0.1.7, `vite build` exited 1 with no visible
+      # error because its output was buried in the script's subshell — the run
+      # log ended on a routine warning then "exit code 1", which is
+      # undiagnosable. A dedicated step surfaces the real failure.
+      - name: Build frontend (web/dist)
+        working-directory: web
+        env:
+          VITE_APP_VERSION: ${{ github.ref_name }}
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: npm run build
+
       - name: Build desktop binary
         shell: bash
         env:
           # actions/setup-python puts `python3` on PATH on macOS/Linux, but
           # only `python` on Windows.
           PYTHON: ${{ runner.os == 'Windows' && 'python' || 'python3' }}
+          # web/dist was built by the step above; do not rebuild it.
+          KERF_SKIP_FRONTEND_BUILD: "1"
         run: ./scripts/build-desktop.sh
 
       - name: Stage desktop binary

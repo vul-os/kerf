@@ -98,13 +98,26 @@ File revisions (per-file undo history) + local git (commits, branches, GitHub sy
 
 Kerf runs **by itself** — no account, no cloud, no external service, and no database server. State lives in an embedded SQLite file at `~/.kerf/kerf.db`. Postgres is a one-line opt-in for shared installs.
 
-### Install (one-liner)
+### Install
+
+Download the build for your platform from the [latest release](https://github.com/vul-os/kerf/releases/latest):
+
+| Platform | Asset |
+|---|---|
+| macOS (Apple Silicon) | `kerf-vX.Y.Z-macos-arm64.tar.gz` |
+| macOS (Intel) | `kerf-vX.Y.Z-macos-x64.tar.gz` |
+| Linux (x64) | `kerf-vX.Y.Z-linux-x64.tar.gz` |
+| Source | `kerf-vX.Y.Z-src.tar.gz` |
+
+Unpack it and run `./install.sh` from inside the tarball — it sets up a Python venv with everything installed. No Docker, no `git clone`.
+
+Every release ships a `SHA256SUMS` manifest covering all assets plus a sigstore build-provenance attestation. To verify before running:
 
 ```sh
-curl -fsSL https://vulos.org/projects/kerf/install.sh | sh
+bash verify.sh --tag vX.Y.Z --attest kerf-vX.Y.Z-linux-x64.tar.gz
 ```
 
-Downloads the latest [GitHub release](https://github.com/vul-os/kerf/releases/latest), unpacks it, and sets up a Python venv with everything installed — no Docker, no `git clone` required. Every tag also ships `kerf-vX.Y.Z-{macos-arm64,macos-x64,linux-x64,src}.tar.gz` and a `SHA256SUMS` manifest if you'd rather download and verify a specific asset by hand. See [docs/releasing.md](./docs/releasing.md) for the full artifact matrix and what CI builds.
+See [docs/releasing.md](./docs/releasing.md) for the full artifact matrix.
 
 ### Docker
 

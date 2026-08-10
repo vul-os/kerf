@@ -528,7 +528,7 @@ footer.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; }
         <div class="hero-chip-cmd">
           <div class="row"><span class="p">$</span><span><span class="tok-cmd">pip</span> <span class="tok-sub">install</span> <span class="tok-flag">-e</span> <span class="tok-str">.[mech]</span></span></div>
           <div class="row"><span class="p">$</span><span><span class="tok-cmd">kerf-server</span> <span class="tok-flag">--migrate</span></span></div>
-          <p class="note">Python 3.11+ · Postgres · or <code>curl -fsSL https://raw.githubusercontent.com/vul-os/kerf/main/install.sh | sh</code></p>
+          <p class="note">Python 3.11+ · no database server (embedded SQLite) · or <a href="https://github.com/vul-os/kerf/releases/latest">download a release</a></p>
         </div>
         <ul class="hero-foot">
           <li>1265 features tracked</li>
@@ -1174,8 +1174,10 @@ footer.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; }
     </div>
     <div class="install-cols">
       <div class="code-box wide">
-        <div class="code-head"><span class="title">one-liner</span><button data-copy="curl -fsSL https://raw.githubusercontent.com/vul-os/kerf/main/install.sh | sh">copy</button></div>
-        <pre class="code"><span class="tok-prompt">$ </span><span class="tok-cmd">curl</span> <span class="tok-flag">-fsSL</span> <span class="tok-str">https://raw.githubusercontent.com/vul-os/kerf/main/install.sh</span> <span class="tok-punct">|</span> <span class="tok-cmd">sh</span></pre>
+        <div class="code-head"><span class="title">download a release</span><button data-copy="tar xzf kerf-vX.Y.Z-macos-arm64.tar.gz &amp;&amp; cd kerf-vX.Y.Z &amp;&amp; ./install.sh">copy</button></div>
+        <pre class="code"><span class="tok-cm"># grab your platform's tarball from the releases page</span>
+<span class="tok-prompt">$ </span><span class="tok-cmd">tar</span> <span class="tok-flag">xzf</span> <span class="tok-str">kerf-vX.Y.Z-macos-arm64.tar.gz</span>
+<span class="tok-prompt">$ </span><span class="tok-cmd">cd</span> <span class="tok-str">kerf-vX.Y.Z</span> <span class="tok-punct">&amp;&amp;</span> <span class="tok-cmd">./install.sh</span></pre>
       </div>
       <div class="code-box">
         <div class="code-head"><span class="title">from source</span><button data-copy="git clone https://github.com/vul-os/kerf

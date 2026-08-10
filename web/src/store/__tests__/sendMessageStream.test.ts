@@ -7,13 +7,14 @@
  *  - Falls back to sendMessage on 404 from stream endpoint
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { StreamMessageEvent } from '../../lib/api.js'
 
 // ---------------------------------------------------------------------------
 // Mock the API client
 // ---------------------------------------------------------------------------
 
 // We need to return an async iterable from api.streamMessage
-function makeAsyncIterable(items) {
+function makeAsyncIterable(items: StreamMessageEvent[]) {
   return {
     [Symbol.asyncIterator]() {
       let i = 0
@@ -64,7 +65,7 @@ function reset(overrides = {}) {
     currentThreadId: 't-1',
     currentFileId: null,
     pendingPartRefs: [],
-    threads: [{ id: 't-1', title: 'x', last_message_at: null }],
+    threads: [{ id: 't-1', title: 'x', last_message_at: undefined }],
     messages: [],
     sending: false,
     streamAbortController: null,
@@ -115,6 +116,7 @@ describe('sendMessageStreaming — store state transitions', () => {
     const { messages } = useWorkspace.getState()
     const placeholder = messages.find((m) => m._streaming)
     expect(placeholder).toBeTruthy()
+    if (!placeholder) throw new Error('unreachable — asserted above')
     expect(placeholder.role).toBe('assistant')
     await promise
   })
@@ -131,6 +133,7 @@ describe('sendMessageStreaming — store state transitions', () => {
     const { messages } = useWorkspace.getState()
     const assistantMsg = messages.find((m) => m.role === 'assistant')
     expect(assistantMsg).toBeTruthy()
+    if (!assistantMsg) throw new Error('unreachable — asserted above')
     expect(assistantMsg.content).toBe('Hello world')
     expect(assistantMsg._streaming).toBe(false)
   })
@@ -147,9 +150,12 @@ describe('sendMessageStreaming — store state transitions', () => {
 
     const { messages } = useWorkspace.getState()
     const assistantMsg = messages.find((m) => m.role === 'assistant')
+    expect(assistantMsg).toBeTruthy()
+    if (!assistantMsg) throw new Error('unreachable — asserted above')
     expect(assistantMsg._toolChips).toBeDefined()
-    const chip = assistantMsg._toolChips.find((c) => c.tool_use_id === 'tu_1')
+    const chip = assistantMsg._toolChips?.find((c) => c.tool_use_id === 'tu_1')
     expect(chip).toBeTruthy()
+    if (!chip) throw new Error('unreachable — asserted above')
     expect(chip.name).toBe('read_file')
     expect(chip.status).toBe('done')
     expect(chip.content_preview).toBe('file content')
@@ -169,6 +175,7 @@ describe('sendMessageStreaming — store state transitions', () => {
           async next() {
             if (i >= events.length) return { value: undefined, done: true }
             const item = events[i++]
+            if (!item) return { value: undefined, done: true }
             // After the last event we can check state on next iteration
             if (item.event === 'tool_executing') {
               // Emit this event and then end
@@ -193,7 +200,11 @@ describe('sendMessageStreaming — store state transitions', () => {
 
     const { messages } = useWorkspace.getState()
     const assistantMsg = messages.find((m) => m.role === 'assistant')
-    const chip = assistantMsg._toolChips.find((c) => c.tool_use_id === 'tu_2')
+    expect(assistantMsg).toBeTruthy()
+    if (!assistantMsg) throw new Error('unreachable — asserted above')
+    const chip = assistantMsg._toolChips?.find((c) => c.tool_use_id === 'tu_2')
+    expect(chip).toBeTruthy()
+    if (!chip) throw new Error('unreachable — asserted above')
     expect(chip.status).toBe('done')  // ended as done after tool_result
   })
 
@@ -209,7 +220,11 @@ describe('sendMessageStreaming — store state transitions', () => {
 
     const { messages } = useWorkspace.getState()
     const assistantMsg = messages.find((m) => m.role === 'assistant')
-    const chip = assistantMsg._toolChips.find((c) => c.tool_use_id === 'tu_err')
+    expect(assistantMsg).toBeTruthy()
+    if (!assistantMsg) throw new Error('unreachable — asserted above')
+    const chip = assistantMsg._toolChips?.find((c) => c.tool_use_id === 'tu_err')
+    expect(chip).toBeTruthy()
+    if (!chip) throw new Error('unreachable — asserted above')
     expect(chip.status).toBe('error')
   })
 
@@ -224,6 +239,8 @@ describe('sendMessageStreaming — store state transitions', () => {
     const { messages, sending } = useWorkspace.getState()
     expect(sending).toBe(false)
     const assistantMsg = messages.find((m) => m.role === 'assistant')
+    expect(assistantMsg).toBeTruthy()
+    if (!assistantMsg) throw new Error('unreachable — asserted above')
     expect(assistantMsg._streaming).toBe(false)
   })
 
@@ -237,6 +254,8 @@ describe('sendMessageStreaming — store state transitions', () => {
     const { messages, sending } = useWorkspace.getState()
     expect(sending).toBe(false)
     const assistantMsg = messages.find((m) => m.role === 'assistant')
+    expect(assistantMsg).toBeTruthy()
+    if (!assistantMsg) throw new Error('unreachable — asserted above')
     expect(assistantMsg._error).toBe('provider failed')
     expect(assistantMsg._streaming).toBe(false)
   })
@@ -273,6 +292,7 @@ describe('sendMessageStreaming — store state transitions', () => {
     // Partial text should be preserved
     const assistantMsg = messages.find((m) => m.role === 'assistant')
     expect(assistantMsg).toBeTruthy()
+    if (!assistantMsg) throw new Error('unreachable — asserted above')
     expect(assistantMsg._streaming).toBe(false)
     // Content accumulated before abort should be present
     expect(assistantMsg.content).toBe('partial ')

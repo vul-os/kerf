@@ -109,7 +109,7 @@ function ImplantCard({ implant, selected, onSelect, onPlace, placing }: {
           type="button"
           onClick={(e) => { e.stopPropagation(); onPlace(implant) }}
           disabled={placing}
-          className="flex-shrink-0 px-2 py-1 rounded bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 hover:bg-cyan-500/30 disabled:opacity-50 whitespace-nowrap"
+          className="flex-shrink-0 px-2 py-1 rounded bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 hover:bg-cyan-500/30 disabled:opacity-50 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
         >
           {placing ? (
             <span className="flex items-center gap-1">

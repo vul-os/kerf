@@ -124,7 +124,9 @@ describe('revisionDisplayPreview', () => {
   })
 
   it('returns empty string when both content_preview and content are absent', () => {
-    const rev = { id: '1' }
+    // A row with neither field — the signature's properties are optional, so
+    // this needs to be widened rather than matched.
+    const rev = { id: '1' } as { content_preview?: string; content?: string }
     expect(revisionDisplayPreview(rev)).toBe('')
   })
 

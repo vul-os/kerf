@@ -17,11 +17,10 @@ export const PREVIEW_MAX = 120
  * - Truncates to ``maxLen`` characters and appends an ellipsis.
  * - Returns an empty string when the input is null / undefined / empty.
  *
- * @param {string|null|undefined} preview  Raw content_preview from the API.
- * @param {number} [maxLen]                Truncation limit (default PREVIEW_MAX).
- * @returns {string}
+ * @param preview  Raw content_preview from the API.
+ * @param maxLen   Truncation limit (default PREVIEW_MAX).
  */
-export function formatPreview(preview, maxLen = PREVIEW_MAX) {
+export function formatPreview(preview: string | null | undefined, maxLen = PREVIEW_MAX): string {
   if (!preview) return ''
   const flat = preview.replace(/\s+/g, ' ').trim()
   if (flat.length <= maxLen) return flat
@@ -35,10 +34,9 @@ export function formatPreview(preview, maxLen = PREVIEW_MAX) {
  * for the expanded "full content" panel where formatting matters.
  *
  * @param {string|null|undefined} content  Full file content.
- * @param {number} [maxLen]                Truncation limit (default 4096).
- * @returns {string}
+ * @param maxLen   Truncation limit (default 4096).
  */
-export function truncateContent(content, maxLen = 4096) {
+export function truncateContent(content: string | null | undefined, maxLen = 4096): string {
   if (!content) return ''
   if (content.length <= maxLen) return content
   return content.slice(0, maxLen) + '…'
@@ -53,10 +51,11 @@ export function truncateContent(content, maxLen = 4096) {
  *      the full content was included (legacy / local mode).
  *   3. Empty string.
  *
- * @param {object} rev  Revision row from the API.
- * @returns {string}
+ * @param rev  Revision row from the API.
  */
-export function revisionDisplayPreview(rev) {
+export function revisionDisplayPreview(
+  rev: { content_preview?: string | null; content?: string | null } | null | undefined,
+): string {
   if (!rev) return ''
   const raw = rev.content_preview || (rev.content ? rev.content.slice(0, 200) : '')
   return formatPreview(raw)

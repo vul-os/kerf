@@ -333,7 +333,9 @@ async function exportWebm(frames: string[], opts: ExportFramesOptions = {}): Pro
           setTimeout(drawNext, interval)
         }
         img.onerror = () => { idx++; setTimeout(drawNext, interval) }
-        img.src = frames[idx]
+        const frame = frames[idx]
+        if (frame === undefined) return
+        img.src = frame
       }
       drawNext()
     }
@@ -366,6 +368,7 @@ async function exportPngZip(frames: string[], _opts: ExportFramesOptions = {}): 
     const pad = String(i).padStart(4, '0')
     const name = `frame${pad}.png`
     const dataUrl = frames[i]
+    if (dataUrl === undefined) continue
     const bytes = dataUrlToBytes(dataUrl)
     files[name] = bytes
   }

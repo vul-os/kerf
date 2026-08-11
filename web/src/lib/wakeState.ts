@@ -16,7 +16,14 @@
 export const WAKE_CACHE_NAME = 'kerf-wake-state-v1'
 export const WAKE_STATE_URL = '/__kerf-wake-state'
 
-export async function writeWakeState({ apiUrl, accessToken, pubs }) {
+export interface WakeState {
+  apiUrl?: string | null
+  accessToken?: string | null
+  /** Opaque pub descriptors handed straight back to the service worker. */
+  pubs?: unknown[] | null
+}
+
+export async function writeWakeState({ apiUrl, accessToken, pubs }: WakeState) {
   if (typeof caches === 'undefined') return
   try {
     const cache = await caches.open(WAKE_CACHE_NAME)

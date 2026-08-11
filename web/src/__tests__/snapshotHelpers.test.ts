@@ -24,7 +24,11 @@ function makeFakeContext() {
   }
 }
 
-function makeFakeCanvas({ width = 100, height = 100, blobType = 'image/jpeg' } = {}) {
+// snapshotCanvas reads width/height/getContext/toBlob and nothing else, so the
+// fake carries those four and the cast lives here rather than at every call.
+function makeFakeCanvas(
+  { width = 100, height = 100, blobType = 'image/jpeg' } = {},
+): HTMLCanvasElement {
   return {
     width,
     height,
@@ -33,7 +37,7 @@ function makeFakeCanvas({ width = 100, height = 100, blobType = 'image/jpeg' } =
       // Mimic the spec: pass a Blob with the requested type, async.
       setTimeout(() => cb({ size: 42, type: type || blobType }), 0)
     }),
-  }
+  } as unknown as HTMLCanvasElement
 }
 
 function installDom({
@@ -135,7 +139,7 @@ describe('snapshotCanvas', () => {
         height: 512,
         getContext: vi.fn(() => null),
         toBlob: vi.fn(),
-      }),
+      } as unknown as HTMLCanvasElement),
     })
     const src = makeFakeCanvas({ width: 800, height: 600 })
     expect(await snapshotCanvas(src)).toBeNull()
@@ -147,7 +151,7 @@ describe('snapshotCanvas', () => {
     ;(src as any)._ctx = null
     const offCanvas = makeFakeCanvas({ width: 512, height: 512 })
     const offCtx = makeFakeContext()
-    offCanvas.getContext = vi.fn(() => offCtx)
+    offCanvas.getContext = vi.fn(() => offCtx) as unknown as HTMLCanvasElement['getContext']
     uninstallDom()
     installDom({ createCanvas: () => offCanvas })
     await snapshotCanvas(src, { size: 512 })
@@ -168,7 +172,9 @@ describe('snapshotSvg', () => {
   beforeEach(() => installDom())
   afterEach(() => uninstallDom())
 
-  function makeFakeSvg({ width, height, viewBox, attrs = {} }: any = {}) {
+  // Likewise: snapshotSvg only calls getAttribute/setAttribute/cloneNode and
+  // getBoundingClientRect.
+  function makeFakeSvg({ width, height, viewBox, attrs = {} }: any = {}): SVGElement {
     const attrMap: any = {}
     if (width != null) attrMap.width = String(width)
     if (height != null) attrMap.height = String(height)
@@ -179,7 +185,7 @@ describe('snapshotSvg', () => {
       setAttribute: (k, v) => { attrMap[k] = v },
       cloneNode: () => makeFakeSvg({ width, height, viewBox, attrs: { ...attrMap, __xml: '<svg/>' } }),
       getBoundingClientRect: () => ({ width: width || 0, height: height || 0 }),
-    }
+    } as unknown as SVGElement
   }
 
   it('returns a JPEG blob from an SVG with explicit width/height', async () => {
@@ -214,6 +220,7 @@ describe('snapshotSvg', () => {
   })
 
   it('rejects a non-svg-shaped object (no cloneNode)', async () => {
-    expect(await snapshotSvg({})).toBeNull()
+    // Deliberately not an SVGElement — that is the case under test.
+    expect(await snapshotSvg({} as unknown as SVGElement)).toBeNull()
   })
 })

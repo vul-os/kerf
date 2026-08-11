@@ -17,14 +17,23 @@
 // needs to force a synchronous re-render of the WebGL scene before
 // reading pixels; the helpers here are for everything else.
 
+export interface SnapshotOptions {
+  /** Edge length of the output square, in pixels. */
+  size?: number
+  /** JPEG quality, 0..1. */
+  quality?: number
+}
+
 /**
  * Capture a center-cropped square JPEG from a canvas element.
  *
- * @param {HTMLCanvasElement|null|undefined} canvas
- * @param {{ size?: number, quality?: number }} [opts]
- * @returns {Promise<Blob|null>}
+ * @param canvas  The source canvas; null/undefined yields null.
+ * @param opts    Output square size and JPEG quality.
  */
-export async function snapshotCanvas(canvas, { size = 512, quality = 0.7 } = {}) {
+export async function snapshotCanvas(
+  canvas: HTMLCanvasElement | null | undefined,
+  { size = 512, quality = 0.7 }: SnapshotOptions = {},
+): Promise<Blob | null> {
   if (!canvas) return null
   const sw = canvas.width
   const sh = canvas.height
@@ -74,15 +83,18 @@ export async function snapshotCanvas(canvas, { size = 512, quality = 0.7 } = {})
  *   * `<foreignObject>` content cannot be rasterized via this path in
  *     most browsers; we silently fall back to null on Image.onerror.
  *
- * @param {SVGElement|null|undefined} svgEl
- * @param {{ size?: number, quality?: number }} [opts]
- * @returns {Promise<Blob|null>}
+ * @param svgEl  The source SVG; null/undefined yields null.
+ * @param opts   Output square size and JPEG quality.
  */
-export async function snapshotSvg(svgEl, { size = 512, quality = 0.7 } = {}) {
+export async function snapshotSvg(
+  svgEl: SVGElement | null | undefined,
+  { size = 512, quality = 0.7 }: SnapshotOptions = {},
+): Promise<Blob | null> {
   if (!svgEl) return null
   if (typeof svgEl.cloneNode !== 'function') return null
 
-  const clone = svgEl.cloneNode(true)
+  // cloneNode returns Node; the clone of an SVGElement is one.
+  const clone = svgEl.cloneNode(true) as SVGElement
   if (!clone.getAttribute('xmlns')) {
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
   }
@@ -90,15 +102,15 @@ export async function snapshotSvg(svgEl, { size = 512, quality = 0.7 } = {}) {
   // Derive a width/height from the SVG so the rasterizer has something
   // to work with. Order: explicit width/height attrs → viewBox → bounding
   // box on the live element. If none exist, bail.
-  let w = parseFloat(clone.getAttribute('width')) || 0
-  let h = parseFloat(clone.getAttribute('height')) || 0
+  let w = parseFloat(clone.getAttribute('width') ?? '') || 0
+  let h = parseFloat(clone.getAttribute('height') ?? '') || 0
   if (!w || !h) {
     const vb = clone.getAttribute('viewBox')
     if (vb) {
       const parts = vb.trim().split(/[\s,]+/).map(Number)
       if (parts.length === 4 && parts.every((n) => Number.isFinite(n))) {
-        w = parts[2]
-        h = parts[3]
+        w = parts[2] as number
+        h = parts[3] as number
       }
     }
   }
@@ -171,7 +183,7 @@ export async function snapshotSvg(svgEl, { size = 512, quality = 0.7 } = {}) {
     return null
   }
 
-  const blob = await new Promise((resolve) => {
+  const blob = await new Promise<Blob | null>((resolve) => {
     try {
       off.toBlob((b) => resolve(b || null), 'image/jpeg', quality)
     } catch {

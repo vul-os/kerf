@@ -27,6 +27,16 @@
     // an included file imports, so a dirty dependency fails the gate just as
     // loudly as a dirty entry. These were already clean; the rest follow as
     // they are fixed. When the list covers src/lib it collapses back to a glob.
+    "src/lib/wakeState.ts",
+    "src/lib/turntableRender.ts",
+    "src/lib/snapshotHelpers.ts",
+    "src/lib/revisionPreview.ts",
+    "src/lib/heroRender.ts",
+    "src/lib/zebraMaterial.ts",
+    "src/lib/usageFormat.ts",
+    "src/lib/threeNarrow.ts",
+    "src/lib/renderStyles.ts",
+    "src/lib/postEffects.ts",
     "src/lib/a11y/ariaIds.ts",
     "src/lib/a11y/focusTrap.ts",
     "src/lib/a11y/keyboardShortcuts.ts",

@@ -85,7 +85,14 @@ async def _migrate_and_seed() -> dict[str, str]:
                 "VALUES ($1, 'Hidden Part', 'part', '{}') RETURNING *",
                 private["id"],
             )
+            await conn.execute(
+                "INSERT INTO workspace_members (workspace_id, user_id, role) "
+                "VALUES ($1, $2, 'owner')",
+                ws["id"], user["id"],
+            )
         return {
+            "user_id": str(user["id"]),
+            "project_id": str(public["id"]),
             "workspace_slug": ws["slug"],
             "project_name": public["name"],
             "part_name": part["name"],
@@ -120,6 +127,17 @@ def client() -> Generator[TestClient, None, None]:
     app.include_router(api_router, prefix="/api")
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
+
+
+def _auth_headers() -> dict[str, str]:
+    import jwt
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(tz=timezone.utc)
+    token = jwt.encode(
+        {"sub": _IDS["user_id"], "exp": now + timedelta(hours=1), "iat": now},
+        "dev-secret-change-in-production", algorithm="HS256",
+    )
+    return {"Authorization": f"Bearer {token}"}
 
 
 def _listed_slug(client: TestClient) -> str:
@@ -181,3 +199,26 @@ def test_malformed_slugs_404_rather_than_matching_something_else(client, slug):
 
 def test_an_unknown_uuid_still_404s(client: TestClient):
     assert client.get(f"/api/library/parts/{uuid.uuid4()}").status_code == 404
+
+
+# ── project membership ──────────────────────────────────────────────────────
+# Not library-related, but it shares this module's SQLite fixture and the bug
+# was found by the same sweep.
+
+def test_updating_a_member_who_is_not_a_user_404s(client: TestClient):
+    """workspace_members.user_id is a foreign key.
+
+    A uid naming no user reached the INSERT and came back as a 500 — a client's
+    stale or mistyped id reported as a server fault. Found by the route sweep
+    once its fixtures grew a second kind of id.
+    """
+    import uuid as _uuid
+
+    resp = client.patch(
+        f"/api/projects/{_IDS['project_id']}/members/{_uuid.uuid4()}",
+        headers=_auth_headers(),
+        json={"role": "member"},
+    )
+
+    assert resp.status_code == 404, resp.text
+    assert resp.status_code != 500

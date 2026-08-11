@@ -4639,6 +4639,13 @@ async def update_member(pid: str, uid: str, req: ChangeRoleRequest, payload: dic
         if not role or role not in ("owner", "admin"):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="owner or admin required")
 
+        # workspace_members.user_id is a foreign key, so a uid that names no
+        # user reached the INSERT and came back as a 500 — a client's stale or
+        # mistyped id reported as a server fault. Check first and answer 404.
+        target = await conn.fetchrow("SELECT id FROM users WHERE id = $1", uid)
+        if not target:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
+
         member = await workspaces_queries.add_workspace_member(conn, ws_id, uid, req.role)
         return member
 

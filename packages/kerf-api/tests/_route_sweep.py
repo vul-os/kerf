@@ -109,8 +109,22 @@ async def seed(pool) -> dict[str, str]:
             "VALUES ($1, $2, $3) RETURNING *",
             user["id"], ws["id"], "{}",
         )
+        # A real resumable-upload session. Without one, {uid} filled with the
+        # *user* id — so the four /uploads/{uid} routes were "swept" while
+        # 404ing on a row that could never exist, which is coverage in name
+        # only. received_chunks is int[] on Postgres and JSON text on SQLite,
+        # so it is bound rather than inlined (same reason as tags above).
+        upload = await conn.fetchrow(
+            "INSERT INTO upload_sessions "
+            "(project_id, user_id, filename, size, mime, sha256, storage_key, "
+            " total_chunks, received_chunks) "
+            "VALUES ($1, $2, 'sweep.bin', 1024, 'application/octet-stream', "
+            "        $3, $4, 1, $5) RETURNING *",
+            proj["id"], user["id"], "0" * 64,
+            f"uploads/{uuid.uuid4().hex}/sweep.bin", [],
+        )
     return {
-        "user_id": str(user["id"]), "uid": str(user["id"]),
+        "user_id": str(user["id"]),
         "workspace_id": str(ws["id"]), "wid": str(ws["id"]),
         "slug": ws["slug"],
         "project_id": str(proj["id"]), "pid": str(proj["id"]),
@@ -131,6 +145,15 @@ async def seed(pool) -> dict[str, str]:
         # /admin/distributors/{name} — any name reaches the handler; the
         # 403/404 that follows is a fine answer, a 500 is not.
         "name": "sweep-distributor",
+        # Reached via PARAM_BY_PATH — {uid} means this under /uploads and a
+        # user id under /members.
+        "upload_session_id": str(upload["id"]),
+        # First chunk index. The route validates the range before touching
+        # storage, so 0 is enough to reach the handler.
+        "n": "0",
+        # Content-addressed object key. No such blob exists, which is the
+        # point — a miss must be a 404, not a 500.
+        "oid": "0" * 64,
     }
 
 
@@ -143,13 +166,32 @@ def auth_headers(user_id: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+# Params whose meaning depends on the route. {uid} is the honest example: it
+# is a *user* id under /members and an *upload session* id under /uploads, and
+# filling one with the other is not a harmless miss — it sends a well-formed
+# request for a row that cannot exist, which reads as coverage while testing
+# nothing. Keyed on a path fragment so a new route under the same prefix picks
+# up the right fixture automatically.
+PARAM_BY_PATH = {
+    ("uid", "/uploads/"): "upload_session_id",
+    ("uid", "/members/"): "user_id",
+}
+
+
+def _fixture_key(param: str, path: str) -> str:
+    for (name, fragment), key in PARAM_BY_PATH.items():
+        if name == param and fragment in path:
+            return key
+    return param
+
+
 def fill(path: str, ids: dict[str, str]) -> str | None:
     """Substitute {param} placeholders from the fixtures, or None."""
     out = path
     while "{" in out:
         start = out.index("{")
         end = out.index("}", start)
-        name = out[start + 1:end]
+        name = _fixture_key(out[start + 1:end], path)
         if name not in ids:
             return None
         out = out[:start] + ids[name] + out[end + 1:]

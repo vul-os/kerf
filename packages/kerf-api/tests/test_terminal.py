@@ -268,6 +268,42 @@ def test_reattaching_replays_the_scrollback(client):
 
 
 @_POSIX_ONLY
+def test_a_reattached_session_can_still_be_typed_into(client):
+    """Replaying the scrollback is half of re-attaching. The other half is that
+    the new socket still drives the shell.
+
+    The existing reattach test only asserted the replay, and the replay is sent
+    straight from the ring buffer — it arrives whether or not the live PTY is
+    still wired to anything. So a reattached terminal could show its history,
+    report itself connected, and be deaf, which is exactly what the browser
+    suite kept catching.
+    """
+    with client.websocket_connect("/api/terminal/session") as ws:
+        session_id = json.loads(ws.receive_text())["id"]
+        ws.send_bytes(b"echo first-command\n")
+        for _ in range(80):
+            if b"first-command" in (ws.receive().get("bytes") or b""):
+                break
+
+    with client.websocket_connect(f"/api/terminal/session?session={session_id}") as ws2:
+        assert json.loads(ws2.receive_text())["reattached"] is True
+        ws2.receive()  # the replayed scrollback
+
+        ws2.send_bytes(b"echo second-command\n")
+        seen = b""
+        for _ in range(80):
+            chunk = ws2.receive().get("bytes")
+            if chunk:
+                seen += chunk
+                if seen.count(b"second-command") >= 2:  # echo, then output
+                    break
+        assert b"second-command" in seen, (
+            "the reattached socket reached no shell — input went nowhere, or "
+            "the PTY's output is no longer routed to this connection"
+        )
+
+
+@_POSIX_ONLY
 def test_an_unknown_session_id_starts_a_fresh_one(client):
     """Rather than erroring: a stale id in a reloaded tab is ordinary."""
     with client.websocket_connect("/api/terminal/session?session=does-not-exist") as ws:

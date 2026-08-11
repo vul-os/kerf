@@ -231,6 +231,15 @@ class _Session:
     sockets: set[WebSocket] = field(default_factory=set)
     closed: bool = False
     _reaper: Optional[asyncio.TimerHandle] = None
+    # One reader per SESSION, not per connection. asyncio allows exactly one
+    # callback per file descriptor — a second add_reader() on the same fd
+    # replaces the first — so a reader task per socket meant re-attaching
+    # silently unhooked the previous one, and whichever task's `finally` ran
+    # next called remove_reader() and unhooked the live one too. The terminal
+    # then reported itself connected, replayed its scrollback (which is sent
+    # straight from the ring buffer and needs no reader), and delivered nothing
+    # further in either direction.
+    _reader: Optional["asyncio.Task[None]"] = None
 
 
 _sessions: dict[str, _Session] = {}
@@ -272,11 +281,19 @@ def _resize(session: _Session, cols: int, rows: int) -> None:
         pass
 
 
+def _stop_reader(session: _Session) -> None:
+    reader = session._reader
+    session._reader = None
+    if reader is not None and not reader.done():
+        reader.cancel()
+
+
 def _close(session: _Session) -> None:
     if session.closed:
         return
     session.closed = True
     _sessions.pop(session.id, None)
+    _stop_reader(session)
     try:
         os.kill(session.pid, signal.SIGHUP)
     except Exception:
@@ -353,7 +370,11 @@ async def terminal_session(websocket: WebSocket) -> None:
             await websocket.send_bytes(snapshot)
         _resize(session, cols, rows)
 
-    reader = asyncio.create_task(_pump_pty_to_socket(session))
+    # Started once, by whichever connection got here first, and owned by the
+    # session for the rest of its life.
+    if session._reader is None or session._reader.done():
+        session._reader = asyncio.create_task(_pump_pty_to_session(session))
+
     try:
         await _pump_socket_to_pty(websocket, session)
     except WebSocketDisconnect:
@@ -365,7 +386,7 @@ async def terminal_session(websocket: WebSocket) -> None:
             loop = asyncio.get_running_loop()
             session._reaper = loop.call_later(_ORPHAN_TTL_SECONDS, _close, session)
         if session.closed:
-            reader.cancel()
+            _stop_reader(session)
 
 
 def _int_param(websocket: WebSocket, name: str, default: int) -> int:
@@ -412,8 +433,13 @@ def _clamp(value: Any, default: int) -> int:
         return default
 
 
-async def _pump_pty_to_socket(session: _Session) -> None:
-    """PTY -> every attached browser, plus the scrollback ring."""
+async def _pump_pty_to_session(session: _Session) -> None:
+    """PTY -> every attached browser, plus the scrollback ring.
+
+    One of these per session. Sockets come and go underneath it; the loop reads
+    `session.sockets` fresh each time, so a re-attach needs no new reader and
+    an orphaned session keeps buffering into its scrollback.
+    """
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue[bytes] = asyncio.Queue()
 

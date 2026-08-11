@@ -59,24 +59,24 @@ function nextFrame() {
  * @param {object}   opts
  * @param {object}   opts.rendererRef  React ref to the live Renderer
  * @param {number}   [opts.samples=256]
- * @param {number}   [opts.width]      defaults to the canvas width
- * @param {number}   [opts.height]     defaults to the canvas height
  * @param {(pct:number)=>void} [opts.onProgress]  0..100
+ *
+ * The output is the canvas's own size. `width`/`height` options used to be
+ * accepted here and documented as overrides; nothing read them, so asking for
+ * a 4K hero shot silently produced a viewport-sized one. Removed rather than
+ * implemented: rendering at a size the viewport is not is a feature with a
+ * control attached to it, not a parameter.
  * @param {AbortSignal} [opts.signal]
  * @returns {Promise<Blob>} image/png
  */
 export async function renderBrowserPT({
   rendererRef,
   samples = 256,
-  width,
-  height,
   onProgress,
   signal,
 }: {
   rendererRef?: unknown
   samples?: number
-  width?: number
-  height?: number
   onProgress?: (pct: number) => void
   signal?: AbortSignal
 } = {}) {
@@ -120,8 +120,18 @@ export async function renderBrowserPT({
 
   try {
     // setScene also bakes the environment (PMREM/HDRI) the live scene carries.
-    await tracer.setSceneAsync?.(scene, camera) ??
+    //
+    // This was `await tracer.setSceneAsync?.(...) ?? tracer.setScene?.(...)`,
+    // which reads as "the async one, or the sync one" and is not. `await X ?? Y`
+    // parses as `(await X) ?? Y`, and setSceneAsync is a void async method — it
+    // resolves to undefined — so the ?? fired every time and the scene was set
+    // twice, the second time synchronously and without waiting for the first to
+    // finish baking.
+    if (tracer.setSceneAsync) {
+      await tracer.setSceneAsync(scene, camera)
+    } else {
       tracer.setScene?.(scene, camera)
+    }
 
     let done = 0
     while (done < totalSamples) {

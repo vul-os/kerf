@@ -140,10 +140,10 @@ function GemPickerTab() {
   const [showProportions, setShowProportions] = useState(false)
 
   const selectedGem = GEM_CATALOG.find(g => g.name === gemName) ?? GEM_CATALOG[0]
-  const density = selectedGem ? (
-    // GEM_CATALOG entries don't carry density; import from GEM_DENSITIES
-    METAL_DENSITY[gemName] ?? null
-  ) : null
+  // A `density` was computed here as METAL_DENSITY[gemName] — a metal table
+  // indexed by a gem name, so always undefined — and then never used. The
+  // conversions below get gem density right: they pass gemName to
+  // caratFromMm/mmFromCarat, which look it up in GEM_DENSITIES.
 
   // Compute results
   const results = useMemo(() => {

@@ -405,7 +405,16 @@ export default function ClothSimRiggedPanel({ result = null, content, className 
         </span>
         <span className="text-ink-700">·</span>
         <span className="text-ink-500">
-          {n_frames} frames · {cloth_rows}×{cloth_cols} cloth grid
+          {/* n_sampled_frames and n_cloth_particles were pulled out of the
+              result and never shown. The sampled count is the one that matters
+              when reading the frame slider — "240 frames" next to a timeline
+              with 24 stops reads as a broken timeline until you know the
+              solver subsampled. */}
+          {n_sampled_frames != null && n_sampled_frames !== n_frames
+            ? `${n_sampled_frames} of ${n_frames} frames`
+            : `${n_frames} frames`}
+          {' · '}{cloth_rows}×{cloth_cols} cloth grid
+          {n_cloth_particles != null && ` · ${n_cloth_particles} particles`}
         </span>
       </div>
 

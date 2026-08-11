@@ -351,6 +351,7 @@ export default function RoomCfdPanel({
   const hasSect   = section_temperature_C?.length > 0
   const hasComfort= occupant_comfort?.length > 0
   const hasRoom   = room_dims_m?.length === 3
+  const hasSpacing = grid_spacing_m?.length === 3
 
   // Residual badge
   const resid = mass_continuity_residual
@@ -385,14 +386,24 @@ export default function RoomCfdPanel({
         <p style={{ margin: '4px 0 0', fontSize: 10, color: '#6b7280' }}>
           SIMPLE RANS · Mixing-length turbulence · Boussinesq buoyancy
           {hasGrid && ` · Grid ${grid_dims[0]}×${grid_dims[1]}×${grid_dims[2]}`}
+          {hasSpacing && ` @ ${grid_spacing_m.map(v => v.toFixed(3)).join('×')} m`}
           {hasRoom && ` · Room ${room_dims_m.map(v => v.toFixed(1)).join('×')} m`}
         </p>
       </div>
 
-      {/* Summary cards */}
+      {/* Summary cards.
+
+          Min/max temperature and mean speed were destructured from the result
+          and then never rendered — the solver computed them, this component's
+          own header comment documented them, and the panel showed a mean
+          temperature with no spread and a peak speed with nothing to compare
+          it to. For a ventilation study the spread is the answer: a room can
+          sit at a perfect mean and still be 6 °C colder by the window. */}
       <div style={{ ...SECTION, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
         <SummaryCard label="Mean Temp" value={fmt(T_mean_C, 3)} unit="°C" />
+        <SummaryCard label="Temp Range" value={`${fmt(T_min_C, 1)} – ${fmt(T_max_C, 1)}`} unit="°C" />
         <SummaryCard label="Max Speed" value={fmt(velocity_max_m_s, 3)} unit="m/s" />
+        <SummaryCard label="Mean Speed" value={fmt(velocity_mean_m_s, 3)} unit="m/s" />
         <SummaryCard
           label="Continuity Residual"
           value={fmt(resid, 2)}

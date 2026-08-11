@@ -458,7 +458,10 @@ export default function CfdPostProcessPanel({
   fieldStats = null,
   n_cells = null,
 }: CfdPostProcessPanelProps) {
-  const hasAny = filter || filterResult || exportPath || exportMeta
+  // fieldStats counts: it used to be accepted, documented and typed, and then
+  // dropped on the floor — a caller that passed only field statistics got
+  // "No post-processing results" over the top of results it had just computed.
+  const hasAny = filter || filterResult || exportPath || exportMeta || fieldStats
 
   return (
     <div style={{
@@ -502,6 +505,10 @@ export default function CfdPostProcessPanel({
       {filterResult && filter && (
         <FilterResultPanel filter={filter} result={filterResult} />
       )}
+
+      {/* Rendered with the same block the per-filter results use, rather than
+          a second presentation of the same min/max/mean/rms shape. */}
+      {fieldStats && <StatsBlock stats={fieldStats} title="Field statistics" />}
 
       <ExportCard exportPath={exportPath} exportMeta={exportMeta} />
     </div>

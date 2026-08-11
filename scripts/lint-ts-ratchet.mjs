@@ -34,7 +34,7 @@ import { execFileSync } from 'node:child_process'
 // Measured 2026-08-07 at 662, down from 1184 when the TS-only variant read 73.
 // Lowered to 610, then 540, as the chrome/panel/test slices landed.
 // This number may only ever go DOWN.
-const BASELINE = 366
+const BASELINE = 363
 
 const args = [
   'eslint',

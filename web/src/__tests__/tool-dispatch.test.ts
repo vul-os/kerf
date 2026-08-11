@@ -37,22 +37,12 @@ const SRC = resolve(__dirname, '..')
  * Do not add to this list. Remove from it.
  */
 const KNOWN_BROKEN = new Set([
-  'components/electronics/ConstraintManagerPanel.tsx',
   'components/electronics/DrcErcPanel.tsx',
-  'components/electronics/EMCPanel.tsx',
-  'components/electronics/ICPackagePanel.tsx',
-  'components/electronics/MultiBoardPanel.tsx',
-  'components/electronics/PCB3DPanel.tsx',
   'components/electronics/PCBInteractiveEditor.tsx',
-  'components/electronics/PCBThermalPanel.tsx',
   'components/electronics/SIPanel.tsx',
   'components/electronics/SiliconSynthPanel.tsx',
   'components/electronics/VirtualInstrumentBench.tsx',
-  'components/packaging/PackagingMaterialYieldPanel.tsx',
   'components/packaging/PackagingPrePressPanel.tsx',
-  'components/plm/ConfiguratorPanel.tsx',
-  'components/plm/QuoteToDeliveryPanel.tsx',
-  'components/plm/SysMLTracePanel.tsx',
   'routes/GmatViewer.tsx',
   'routes/NodeScript.tsx',
 ])

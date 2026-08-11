@@ -9,12 +9,13 @@
  *         → PRODUCTION ↔ QC_HOLD → SHIPPED → DELIVERED → INVOICED
  *
  * Tool used:
- *   POST /api/llm-tools/plm_quote_to_delivery
+ *   plm_quote_to_delivery, via POST /api/tools/call
  *     operation: 'transition' | 'status_report' | 'on_time_rate'
  */
 
 import { useState, useCallback } from 'react'
 import { ArrowRight, RefreshCw, CheckCircle, AlertTriangle, Clock, TrendingUp } from 'lucide-react'
+import { api } from '../../lib/api.js'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -246,13 +247,9 @@ export default function QuoteToDeliveryPanel({ className = '' }: { className?: s
     }
 
     try {
-      const res = await fetch('/api/llm-tools/plm_quote_to_delivery', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
+      const data = await api.callTool<Record<string, any>>(
+        'plm_quote_to_delivery', payload as unknown as Record<string, unknown>,
+      )
       if (data.ok === false) throw new Error(data.error || 'Unknown error')
       const updated = data.job ?? data
       setJob(updated)
@@ -281,13 +278,9 @@ export default function QuoteToDeliveryPanel({ className = '' }: { className?: s
     setError(null)
 
     try {
-      const res = await fetch('/api/llm-tools/plm_quote_to_delivery', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operation: 'status_report', jobs: [job] }),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
+      const data = await api.callTool<Record<string, any>>(
+        'plm_quote_to_delivery', { operation: 'status_report', jobs: [job] },
+      )
       setLastReport(data)
     } catch {
       // Demo fallback

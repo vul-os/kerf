@@ -8,7 +8,7 @@
  *   - Material cost (total + per part)
  *
  * Tool:
- *   POST /api/llm-tools/packaging_material_yield
+ *   packaging_material_yield, via POST /api/tools/call
  *
  * References: PMMI / FBA Cost of Converting Handbook (2019) §7;
  *             FBA Corrugated Containers Design Manual §7.
@@ -16,6 +16,7 @@
 
 import { useState, useCallback } from 'react'
 import { Calculator, RefreshCw, AlertTriangle } from 'lucide-react'
+import { api } from '../../lib/api.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -183,13 +184,9 @@ export default function PackagingMaterialYieldPanel({ className = '' }: Props) {
     }
 
     try {
-      const res = await fetch('/api/llm-tools/packaging_material_yield', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
+      const data = await api.callTool<YieldResult & { error?: string }>(
+        'packaging_material_yield', payload as unknown as Record<string, unknown>,
+      )
       if (data.error) throw new Error(data.error)
       setResult(data)
     } catch {

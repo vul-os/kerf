@@ -19,6 +19,7 @@
 import { useCallback, useState } from 'react'
 import { Layers3, AlertTriangle, CheckCircle2, X, RefreshCw, Upload, Download } from 'lucide-react'
 import type { CircuitJson } from '../../types'
+import { api } from '../../lib/api.js'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -77,12 +78,10 @@ const DEMO_CIRCUIT_JSON = [
 
 async function apiPost<T>(endpoint: string, body: Record<string, unknown>): Promise<T | ApiError> {
   try {
-    const r = await fetch(`/api/llm-tools/${endpoint}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    return r.ok ? r.json() : { ok: false, error: `HTTP ${r.status}` }
+    // api.callTool, not a raw fetch: /api/llm-tools/<tool> has never been a
+    // route (404), and /api/tools/call is behind require_auth so an unheadered
+    // fetch gets a 401. api.callTool has the URL, the `args` key and the token.
+    return await api.callTool(endpoint, body as Record<string, unknown>)
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Request failed' }
   }

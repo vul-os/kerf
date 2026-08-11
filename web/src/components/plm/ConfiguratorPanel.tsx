@@ -5,7 +5,7 @@
  * user configure a product variant (region / color / market_segment / options)
  * and see which BOM entries are active for that variant.
  *
- * Tool spec (POST /api/llm-tools/plm_resolve_variant_bom):
+ * Tool spec (plm_resolve_variant_bom, via POST /api/tools/call):
  *   {
  *     base_bom:       [[part_number, qty], ...],
  *     variant_rules:  [{part_number, variant_attribute_key,
@@ -18,6 +18,7 @@
 
 import { useState, useCallback } from 'react'
 import { Plus, Trash2, Layers, RefreshCw, CheckCircle, XCircle } from 'lucide-react'
+import { api } from '../../lib/api.js'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -324,13 +325,9 @@ export default function ConfiguratorPanel({ parentPn: initialPn = '', className 
     }
 
     try {
-      const res = await fetch('/api/llm-tools/plm_resolve_variant_bom', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
+      const data = await api.callTool<Record<string, any>>(
+        'plm_resolve_variant_bom', payload as unknown as Record<string, unknown>,
+      )
       // Backend returns {ok, resolved_bom: [{part_number, qty, included, reason}]}
       const resolved = data.resolved_bom ?? data.result?.resolved_bom ?? []
       if (resolved.length === 0 && data.ok !== true) {

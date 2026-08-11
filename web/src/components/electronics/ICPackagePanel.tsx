@@ -14,6 +14,7 @@
 
 import { useCallback, useState } from 'react'
 import { Cpu, AlertTriangle, CheckCircle2, X, RefreshCw, Layers } from 'lucide-react'
+import { api } from '../../lib/api.js'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 // IC package / substrate domain shape — bespoke to this panel's backend tools,
@@ -146,12 +147,10 @@ const DEMO_PACKAGE: ICPackage = {
 
 async function apiPost<T extends ApiResult>(endpoint: string, body: unknown): Promise<T> {
   try {
-    const r = await fetch(`/api/llm-tools/${endpoint}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    return r.ok ? ((await r.json()) as T) : ({ error: `HTTP ${r.status}` } as T)
+    // api.callTool, not a raw fetch: /api/llm-tools/<tool> has never been a
+    // route (404), and /api/tools/call is behind require_auth so an unheadered
+    // fetch gets a 401. api.callTool has the URL, the `args` key and the token.
+    return (await api.callTool(endpoint, body as Record<string, unknown>)) as T
   } catch (e) {
     return { error: (e as Error).message } as T
   }

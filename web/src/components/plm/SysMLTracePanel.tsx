@@ -14,6 +14,7 @@
 import { useState, useCallback, useRef, useMemo } from 'react'
 import type { JSX } from 'react'
 import { Download, RefreshCw, GitBranch, Table2, FileCode } from 'lucide-react'
+import { api } from '../../lib/api.js'
 
 // ---------------------------------------------------------------------------
 // Demo seed data
@@ -418,19 +419,13 @@ function XMIExportTab({ requirements, designElements, testCases }: {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/llm-tools/sysml_export_xmi', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requirements,
-          design_elements: designElements,
-          test_cases:      testCases,
-          path:            'traceability.xmi',
-          sysml_version:   version,
-        }),
+      const data = await api.callTool<Record<string, any>>('sysml_export_xmi', {
+        requirements,
+        design_elements: designElements,
+        test_cases:      testCases,
+        path:            'traceability.xmi',
+        sysml_version:   version,
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
       // If backend returns XMI text inline, use it; otherwise show metadata
       const text = data.xmi_text ?? data.result?.xmi_text ?? JSON.stringify(data, null, 2)
       setXmiText(text)
@@ -576,21 +571,15 @@ export default function SysMLTracePanel({ className = '' }: { className?: string
     setComputing(true)
     setError(null)
     try {
-      const res = await fetch('/api/llm-tools/sysml_trace_coverage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requirements: requirements.map(({ id, text, parent_id, satisfied_by, verified_by }) => ({
-            id, text, parent_id, satisfied_by, verified_by,
-          })),
-          design_elements: designEls.map(({ id, kind, name, properties, allocated_to }) => ({
-            id, kind, name, properties, allocated_to,
-          })),
-          test_cases: testCases.map(({ id, name, verifies }) => ({ id, name, verifies })),
-        }),
+      const data = await api.callTool<CoverageReport>('sysml_trace_coverage', {
+        requirements: requirements.map(({ id, text, parent_id, satisfied_by, verified_by }) => ({
+          id, text, parent_id, satisfied_by, verified_by,
+        })),
+        design_elements: designEls.map(({ id, kind, name, properties, allocated_to }) => ({
+          id, kind, name, properties, allocated_to,
+        })),
+        test_cases: testCases.map(({ id, name, verifies }) => ({ id, name, verifies })),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
       setReport(data)
     } catch {
       // Offline / demo mode: compute coverage client-side

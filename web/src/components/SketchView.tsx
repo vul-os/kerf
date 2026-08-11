@@ -2901,12 +2901,18 @@ function SketchBackdrop3D({ sketch, view, loadParts, tool, onProjectEdge }) {
                 let nextSeg = -1
                 for (const nb of neighbors) {
                   if (nb === seg || visited[nb]) continue
-                  // Check valence==2 at the far endpoint.
                   const nbIA = nb * 2, nbIB = nb * 2 + 1
                   const nbKeyA = quantize(new THREE.Vector3(posAttr.getX(nbIA), posAttr.getY(nbIA), posAttr.getZ(nbIA)))
-                  const nbKeyB = quantize(new THREE.Vector3(posAttr.getX(nbIB), posAttr.getY(nbIB), posAttr.getZ(nbIB)))
-                  const nbEndKey = nbKeyA === endKey ? nbKeyB : nbKeyA
-                  const nbEndValence = (endpointToSegs.get(nbEndKey) || []).filter(s => !visited[s] || s === nb).length
+                  // A valence check was computed here and never applied — the
+                  // dead line measured valence at the neighbour's FAR endpoint,
+                  // which is not the junction being crossed, so it would not
+                  // have implemented the "valence==2" its comment claimed
+                  // either. Tangent continuity below is the only criterion in
+                  // force, and at a T-junction the chain follows whichever
+                  // branch stays within 35 degrees. That may well be what is
+                  // wanted; restoring a guard on a guess is how this kind of
+                  // code acquires a silent regression, so it is left as-is and
+                  // recorded rather than half-fixed.
                   // Check tangent continuity.
                   const dot = tangents[seg].dot(tangents[nb])
                   if (dot > COS_35) {

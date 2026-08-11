@@ -2396,7 +2396,6 @@ function AnnotationGlyph({ ann, selected, onSelect, onDragStart, onHandleDown })
 // Symbol glyph — surface_finish, weld, gdt. Renders SVG primitives produced
 // by `symbolGlyph(kind, params)` translated to the symbol's anchor.
 function SymbolGlyph({ sym, selected, onSelect }) {
-  const stroke = selected ? ANN_SELECTED_STROKE : '#0c1118'
   const g = symbolGlyph(sym.kind, sym.params || {})
   const tx = sym.position?.x ?? 0
   const ty = sym.position?.y ?? 0

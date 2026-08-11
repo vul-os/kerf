@@ -1,8 +1,16 @@
 # API reference
 
-All routes are mounted under `/api` by `kerf-core`. The router is defined in
-`packages/kerf-api/src/kerf_api/routes.py`; auth routes live in
-`packages/kerf-auth/src/kerf_auth/routes.py`.
+Most routes are mounted under `/api` by `kerf-core`; the main router is
+`packages/kerf-api/src/kerf_api/routes.py`.
+
+Not all of them. Plugins mount their own routers, and several do so at the app
+root — `/auth/…` (kerf-auth), `/v1/rpc` (kerf-v1, see
+[v1-rpc.md](./v1-rpc.md)), `/.well-known/dmtap-pub/…` (kerf-pub), and a
+scattering of compute endpoints from the domain plugins: `/run-cam`,
+`/run-5axis`, `/compile-ifc`, `/import-kicad`, `/run-wireviz`,
+`/run-quad-remesh`, `/textiles/…`, `/atopile/compile`. Grep for
+`include_router` if you need the current list — this one is illustrative, not
+exhaustive.
 
 ## Authentication
 
@@ -48,14 +56,23 @@ The whole of sign-in. Three routes, no accounts.
 | POST | `/api/setup/password` | none | Claim an unconfigured node. Succeeds exactly once (409 after). **403 on a non-loopback bind** — claiming a node a stranger can reach is a race with that stranger, so the operator uses `kerf admin set-password` instead. Rate limited: 10/hour per IP. |
 | POST | `/api/setup/signin` | none | Exchange the password for a session. Rate limited: 10/minute per IP. An unclaimed node and a wrong password return the identical 401, because which of the two it is tells an attacker whether the node is still claimable. |
 
-## Auth endpoints (`/api/auth/…`)
+## Auth endpoints (`/auth/…`)
 
-What is left once sign-in moved: token lifecycle only.
+What is left once sign-in moved: token lifecycle only. Note the prefix — these
+two are mounted at `/auth`, not under `/api`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/auth/refresh` | refresh token | Issue a new access token from a valid refresh token. |
-| POST | `/api/auth/logout` | any | Revoke the current refresh token. |
+| POST | `/auth/refresh` | refresh token | Issue a new access token from a valid refresh token. |
+| POST | `/auth/logout` | any | Revoke the current refresh token. |
+
+Long-lived API tokens for the SDK are managed under `/api`:
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/api-tokens` | required | List this user's API tokens. |
+| POST | `/api/api-tokens` | required | Mint a token. The secret is returned once. |
+| DELETE | `/api/api-tokens/{token_id}` | required | Revoke a token. |
 
 `register`, `login`, `forgot-password`, `reset-password`, `bootstrap-local`,
 and the Google and GitHub OAuth routes are gone. So are the pages that drove
@@ -69,7 +86,7 @@ them: there is no `/login` and no `/signup`.
 |--------|------|------|-------------|
 | GET | `/api/config` | none | Public feature flags: `local_mode`. No secrets returned. |
 | GET | `/api/bootstrap` | none | Local-mode only. Returns persisted `refresh_token` from `~/.config/kerf/state.json`. |
-| GET | `/api/models` | none | Available LLM models (`claude-sonnet-4`, `claude-opus-4`, …). |
+| GET | `/api/models` | none | Available LLM models, filtered to the providers that have a key configured — so adding an OpenAI key makes `gpt-4o` appear without a code change. |
 
 ---
 
@@ -113,13 +130,14 @@ Roles: `owner` > `admin` > `member`.
 | GET | `/api/workspaces/{slug}` | required | member |
 | PATCH | `/api/workspaces/{slug}` | required | admin |
 | DELETE | `/api/workspaces/{slug}` | required | owner |
-| POST | `/api/workspaces/accept` | required | — (invite token) |
 | GET | `/api/workspaces/avatar/{id}` | none | — |
 | POST | `/api/workspaces/{slug}/avatar` | required | admin |
 | DELETE | `/api/workspaces/{slug}/avatar` | required | admin |
-| POST | `/api/workspaces/{slug}/members` | required | admin |
-| PATCH | `/api/workspaces/{slug}/members/{member_id}` | required | admin |
-| DELETE | `/api/workspaces/{slug}/members/{member_id}` | required | admin |
+
+There is no membership API. A node has one owner, so the invite-accept and
+add/change/remove-member routes that used to sit here went with the hosted
+account system; `member_count` below is a count of a table nothing writes
+except workspace creation.
 
 **Workspace object**
 
@@ -348,19 +366,20 @@ request. Viewer role cannot post messages.
 
 ---
 
-## Members
+## Sharing a project
 
-Local project collaboration. Publishing or sharing a project *outside* your
-box is not done with hosted share links — it goes through the decentralised,
-key-signed **Workshop** (DMTAP-PUB); see the Workshop section below and
-[distributed-workshop.md](./distributed-workshop.md).
+There is no per-project membership API. Two mechanisms remain:
 
 | Method | Path | Notes |
 |--------|------|-------|
-| GET | `/api/projects/{pid}/members` | List members |
-| POST | `/api/projects/{pid}/members` | Add member |
-| PATCH | `/api/projects/{pid}/members/{uid}` | Change member role |
-| DELETE | `/api/projects/{pid}/members/{uid}` | Remove member |
+| POST | `/api/projects/{pid}/share/links` | Mint a share link for one project |
+| GET | `/api/projects/{pid}/share/links` | List this project's share links |
+| DELETE | `/api/projects/{pid}/share/links/{lid}` | Revoke one |
+| GET | `/api/share/{token}` | Resolve a share link — no auth, the token is the credential |
+| POST | `/api/share/{token}/accept` | Redeem a share link |
+
+Publishing a project *outside* your box is a different thing entirely: it goes
+through the decentralised, key-signed **Workshop** (DMTAP-PUB) below.
 
 ---
 
@@ -377,20 +396,49 @@ key-signed **Workshop** (DMTAP-PUB); see the Workshop section below and
 
 Decentralised, key-signed publishing and following, backed by DMTAP-PUB
 (see [distributed-workshop.md](./distributed-workshop.md)) — not a hosted
-catalog or gallery. No license or config flag gates it — every node mounts
-these endpoints; whether anything is actually published or fetched depends
-on the node's own toggles and the user's explicit publish/follow actions.
+catalog or gallery. No license or config flag gates it — a node that has the
+plugin installed mounts every one of these endpoints; whether anything is
+actually published or fetched depends on the node's own toggles and the user's
+explicit publish/follow actions.
 
-| Method | Path | Auth |
-|--------|------|------|
-| GET | `/api/workshop/` | optional |
-| GET | `/api/workshop/parts` | optional |
-| GET | `/api/workshop/{slug}` | optional |
-| POST | `/api/workshop/publish` | required |
-| POST | `/api/workshop/regenerate-readme` | required |
-| DELETE | `/api/workshop/{slug}` | required |
-| POST | `/api/workshop/{slug}/like` | required |
-| POST | `/api/workshop/{slug}/fork` | required |
+The local half — what *this* node's owner does — is mounted under `/api/pub`.
+All of it requires auth: it acts as you, with your key.
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | `/api/pub/identity` | This node's publishing keypair, if one exists |
+| POST | `/api/pub/identity` | Create the keypair |
+| GET | `/api/pub/follows` | Feeds this node follows |
+| POST | `/api/pub/follows` | Follow a feed |
+| DELETE | `/api/pub/follows/{pub}` | Unfollow |
+| POST | `/api/pub/follows/{pub}/refresh` | Pull new announcements from one feed |
+| GET | `/api/pub/workshop` | The merged view across followed feeds — what the Workshop page renders |
+| POST | `/api/pub/publish` | Sign an announcement for a project and append it to your feed |
+| GET | `/api/pub/bom/{announce_id}` | BOM for a published announcement |
+| GET | `/api/pub/assembly-candidates/{project_id}` | Published parts that could fill this assembly |
+| POST | `/api/pub/pin/{announce_id}` | Pin an announcement so this node keeps hosting it |
+| POST | `/api/pub/pin/{announce_id}/hydrate` | Fetch a pinned announcement's blobs |
+| DELETE | `/api/pub/pin/{announce_id}` | Unpin |
+
+Publishing does not change a project's `visibility` column — that is a separate,
+local access-control setting changed with `PATCH /api/projects/{pid}`.
+
+The other half is the gateway that *other* nodes read, mounted at the protocol's
+well-known prefix and unauthenticated by design:
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | `/.well-known/dmtap-pub/wake-key` | This node's public key |
+| GET | `/.well-known/dmtap-pub/feed/{pub}/head` | Head of a feed |
+| GET | `/.well-known/dmtap-pub/feed/{pub}/range` | A range of feed entries |
+| POST | `/.well-known/dmtap-pub/feed/{pub}/subscribe` | Subscribe to push updates |
+| DELETE | `/.well-known/dmtap-pub/feed/{pub}/subscribe` | Unsubscribe |
+| GET | `/.well-known/dmtap-pub/announce/{aid}` | One announcement |
+| GET | `/.well-known/dmtap-pub/manifest/{mid}` | An artifact manifest |
+| GET | `/.well-known/dmtap-pub/chunk/{h}` | One content-addressed chunk |
+
+These endpoints exist only when `kerf-pub` is installed — it is an optional
+extra (`pip install kerf-cli[server,pub]`), and the server runs fine without it.
 
 ---
 

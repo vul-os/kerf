@@ -1,36 +1,49 @@
 # Configuration
 
 Kerf is configured via a TOML file (`kerf.toml`) with environment-variable
-overrides. A starter file is emitted by `npm run init` (source installs) or
-by `kerf-server --init`.
+overrides. There is a starter at `kerf.example.toml` in the repo root — copy it
+yourself. (`npm run init` is meant to do this, but it resolves
+`kerf.example.toml` relative to the working directory and npm runs it from
+`web/`, so it finds nothing and silently does nothing.)
 
 Full example: `kerf.example.toml` in the repo root.
 
 ## Config file search order
 
-The server picks the first file found, in priority order:
+Nothing is required — most installs never create a `kerf.toml` at all, and a
+missing one is not an error. When one is wanted, the server takes the first of:
 
-1. `--config <path>` CLI flag
+1. `--config <path>` CLI flag (`kerf serve` and `kerf-server` both set
+   `KERF_CONFIG` from it, so it beats anything already in the environment)
 2. `KERF_CONFIG` environment variable
 3. `./kerf.toml` (current working directory)
-4. `~/.config/kerf/config.toml` (per-user)
-5. `/etc/kerf/config.toml` (system-wide)
+4. `~/.kerf/kerf.toml` (per-user)
+
+A file that is present but does not parse raises immediately, naming the path —
+it is never silently skipped in favour of defaults.
 
 ## Environment variable overrides
 
-Any config value can be overridden at runtime with an environment variable. The
-convention is `KERF_` prefix + the TOML path in uppercase with dots/brackets
-replaced by underscores. Key specific overrides:
+Config values are overridable at runtime with environment variables. **The
+variable name is the flat setting name in uppercase, without a `KERF_`
+prefix** — `LOCAL_MODE`, not `KERF_LOCAL_MODE`. The handful of `KERF_`-prefixed
+variables below are read separately, by the entry point rather than by the
+config loader.
 
-| Env var | Equivalent TOML key | Notes |
-|---------|---------------------|-------|
-| `KERF_CONFIG` | _(path to config file)_ | |
-| `KERF_HOST` | `[server].host` | CLI `--host` also accepted |
-| `KERF_PORT` | `[server].port` | CLI `--port` also accepted |
-| `KERF_LOCAL_MODE` | `[server].local_mode` | `true` or `false` |
+| Env var | Affects | Notes |
+|---------|---------|-------|
+| `KERF_CONFIG` | _(path to config file)_ | See search order above |
+| `KERF_HOST` | the bind address | Entry-point only; there is no `[server].host` TOML key. CLI `--host` also accepted |
+| `KERF_PORT` | the bind port | Entry-point only. Resolution: `--port` > `KERF_PORT` > `[server].port` > 8080 |
+| `LOCAL_MODE` | `[server].local_mode` | `true` or `false` |
+| `PORT` | `[server].port` | What `Settings.port` itself reads |
 | `DATABASE_URL` | `[database].url` | Standard 12-factor convention |
 | `ANTHROPIC_API_KEY` | `[llm.anthropic].api_key` | |
 | `OPENAI_API_KEY` | `[llm.openai].api_key` | |
+
+Environment variables and `.env` sit **above** `kerf.toml`, which sits above the
+built-in defaults — so a `docker run -e …` override wins over anything baked
+into a config file.
 
 ## [server]
 
@@ -47,7 +60,7 @@ local_mode = true
 | `port` | `"8080"` | HTTP port. Override with `KERF_PORT` or `--port`. |
 | `env` | `"local"` | Informational label; controls some log verbosity. |
 | `cors_origin` | `"http://localhost:5173"` | Single allowed CORS origin. In production set to your frontend URL. |
-| `local_mode` | `true` | When `true`: no login screen, a singleton user is auto-bootstrapped. Set `false` for multi-user deploys. Override with `KERF_LOCAL_MODE`. |
+| `local_mode` | `true` | Skips the marketing landing and opens straight into your projects; also lets the expensive compute endpoints run without a token. **Not an auth switch** — sign-in goes through the node password either way. Override with `LOCAL_MODE`. |
 
 ## [database]
 
@@ -119,7 +132,10 @@ cdn_base_url = ""
 | `"local"` | Opaque blob store under `local_path`. Default. Auth-protected `/api/blobs/{key}` serves bytes. |
 | `"s3"` | AWS S3, Cloudflare R2, or MinIO. Blob downloads are presigned 302 redirects. Set `[storage.s3]` credentials. |
 | `"filesystem"` | Projects mirror to `filesystem_root` as real folders. Files are editable with any tool. |
-| `"git"` | Per-project git mirror in S3 — an ordinary node capability. Requires `[storage.s3]`. |
+
+Those three are the whole set — any other value raises at startup. Per-project
+git repos are not a `backend` choice: they are an ordinary node capability that
+works under whichever of the three is configured.
 
 `cdn_base_url` — when set, `Storage.PublicURL` returns a CDN URL instead of
 routing through the backend. Recommended for production S3 deployments with
@@ -165,24 +181,37 @@ gateway by naming it with a provider prefix (`openrouter/meta/llama-4`).
 
 ```toml
 [rate_limits]
-"auth:register" = 50     # default 5 per hour
-"auth:login" = 100       # default 10 per minute
-"auth:forgot_password" = 0   # 0 disables the limiter for this bucket
+"setup:signin" = 60      # default 10 per minute
+"api:export" = 100       # default 20 per hour
+"api:blobs" = 0          # 0 disables the limiter for this bucket
 ```
 
 Each key is a rate-limiter bucket name; the value replaces the limit that
 bucket declares in code, and `0` disables it entirely. Keys are free text, so a
-limiter added later is tunable without a config change.
+limiter added later is tunable without a config change — and an unrecognised
+key is simply never consulted.
 
-**The auth limiters key on IP for unauthenticated requests, and that matters
-more than the numbers suggest.** `auth:register` defaults to 5 per hour, which
-is per-IP — a team behind one office NAT hits it on the sixth person to sign
-up. If you are onboarding a group, raise it first.
+The buckets that exist today:
+
+| Bucket | Default | Guards |
+|--------|---------|--------|
+| `setup:claim` | 10 / hour | Claiming an unconfigured node |
+| `setup:signin` | 10 / minute | Exchanging the password for a session |
+| `api:messages` | 30 / minute | Posting a chat message (runs the agent loop) |
+| `api:messages_stream` | 30 / minute | The streaming variant |
+| `api:export` | 20 / hour | Whole-project export |
+| `api:blobs` | 120 / minute | Blob fetches |
+| `api:photos` | 60 / minute | Photo upload on a file |
+
+**The `setup:*` limiters key on IP, because the requests they guard are
+unauthenticated by definition.** That is what you want for a node on a network
+— they are the only thing standing between a stranger and password guesses —
+and it is worth leaving alone.
 
 Also settable as an environment variable, as JSON:
 
 ```
-RATE_LIMIT_OVERRIDES='{"auth:register": 50}'
+RATE_LIMIT_OVERRIDES='{"api:export": 100}'
 ```
 
 ## [limits]
@@ -202,8 +231,12 @@ step_tessellate_timeout_sec = 300
 |-----|---------|-------|
 | `file_revisions_max` | `200` | Per-file undo history cap. Each edit appends one row; oldest beyond this cap are pruned on next write. |
 | `step_max_bytes` | `200 MB` | Maximum STEP upload size. |
-| `upload_chunk_size` | `5 MB` | Chunk size for resumable uploads. Must match what the frontend sends. |
-| `step_tessellate_workers` | `2` | Workers for server-side STEP → GLB tessellation. Set `-1` to disable. |
+| `upload_chunk_size` | `5 MB` | Chunk size for resumable uploads. The server returns it in the initiate response, so the browser follows whatever is set here. |
+| `upload_session_ttl_hours` | `24` | How long an unfinished chunked upload stays resumable. |
+
+`max_threads_per_project`, `step_tessellate_workers` and
+`step_tessellate_timeout_sec` are accepted by the loader but read by nothing —
+setting them changes no behaviour today.
 
 ## [system_user]
 
@@ -214,13 +247,18 @@ name = "Kerf System"
 password = ""
 ```
 
-When `password` is non-empty, the server ensures this user exists in the
-database on boot, mints a long-lived refresh token, and writes it to
-`~/.config/kerf/state.json`. The frontend reads `/api/bootstrap` on first
-load and silently signs in. This is the mechanism behind the
-single-user local-install UX.
+`email` and `name` set the identity of the singleton user (default:
+`local@kerf.local` / "Local"). The row is created lazily, the first time
+someone signs in through `POST /api/setup/signin` — not on boot.
 
-Leave `password` blank for multi-user deploys — bootstrap becomes a no-op.
+`password` is inert: nothing reads it. The node's password is set on first
+load through the setup screen, or from the machine with
+`kerf admin set-password`. See [api-reference.md](./api-reference.md#authentication).
+
+`GET /api/bootstrap` still reads a refresh token from
+`~/.config/kerf/state.json` (or `$KERF_STATE_PATH`) when `local_mode` is on, but
+no code writes that file any more — it returns `{"has_state": false}` unless
+you put one there yourself.
 
 ## Node config (retired: `[cloud]` / Paystack / GitHub OAuth)
 

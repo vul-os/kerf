@@ -6799,19 +6799,37 @@ async def library_list_parts(
     return result
 
 
-@router.get("/library/parts/{slug}")
+@router.get("/library/parts/{slug:path}")
 async def library_get_part(slug: str):
-    """GET /api/library/parts/:slug — single part detail (slug = file_id or path)."""
-    # Slug may be a UUID file_id or a path like workspace/project/filename.
-    # We try UUID first; path-based lookup is a future enhancement.
+    """GET /api/library/parts/:slug — single part detail.
+
+    ``slug`` is either a file_id UUID or the human-readable
+    ``<workspace_slug>/<project_name>/<file_name>`` that every catalogue row
+    advertises. It has to be ``{slug:path}``: the readable form has two
+    slashes in it, so against a single-segment ``{slug}`` the request did not
+    match this route at all and 404'd before reaching the handler — and the
+    handler then rejected anything that was not a UUID anyway, with a comment
+    calling path lookup a future enhancement. Between the two, every click
+    from the Library catalogue into a part landed on a 404.
+    """
+    pool = await get_pool_required()
+
     try:
         file_id = uuid.UUID(slug)
     except ValueError:
-        raise HTTPException(status_code=404, detail="Part not found")
+        file_id = None
 
-    pool = await get_pool_required()
     async with pool.acquire() as conn:
-        part = await library_queries.get_public_part(conn, file_id)
+        if file_id is not None:
+            part = await library_queries.get_public_part(conn, file_id)
+        else:
+            # Exactly three segments; a name containing a slash is not
+            # addressable this way and falls through to the 404 below rather
+            # than matching some other part by accident.
+            parts = slug.split("/")
+            if len(parts) != 3 or not all(parts):
+                raise HTTPException(status_code=404, detail="Part not found")
+            part = await library_queries.get_public_part_by_slug(conn, *parts)
 
     if not part:
         raise HTTPException(status_code=404, detail="Part not found")

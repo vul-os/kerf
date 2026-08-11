@@ -121,8 +121,16 @@ async def get_public_part(
         """,
         file_id,
     )
-    if not row:
-        return None
+    return _shape_part_detail(row) if row else None
+
+
+def _shape_part_detail(row) -> Dict[str, Any]:
+    """Turn a part-detail row into the response body.
+
+    Shared by both lookups so a part fetched by slug and the same part fetched
+    by file_id are byte-identical — including the ``slug`` field, which is what
+    the caller will use for the canonical URL.
+    """
     d = dict(row)
     d["file_id"] = str(d["file_id"])
     d["project_id"] = str(d["project_id"])
@@ -145,6 +153,57 @@ async def get_public_part(
     d["distributors"] = content_obj.get("distributors", [])
     d["source_project_slug"] = f"{ws_slug}/{proj_name}" if ws_slug and proj_name else None
     return d
+
+
+_PART_DETAIL_SELECT = """
+        SELECT
+            f.id            AS file_id,
+            f.project_id,
+            f.name,
+            f.content,
+            w.slug          AS workspace_slug,
+            p.name          AS project_name,
+            u.name          AS author,
+            u.is_verified_publisher,
+            f.updated_at
+        FROM files f
+        JOIN projects p ON p.id = f.project_id
+        JOIN workspaces w ON w.id = p.workspace_id
+        JOIN users u ON u.id = w.created_by
+"""
+
+
+async def get_public_part_by_slug(
+    conn: asyncpg.Connection,
+    workspace_slug: str,
+    project_name: str,
+    file_name: str,
+) -> Optional[Dict[str, Any]]:
+    """Fetch a single part detail by its human-readable slug.
+
+    The catalogue has always advertised parts as
+    ``<workspace_slug>/<project_name>/<file_name>`` — that is what
+    :func:`list_public_parts` puts in every row's ``slug`` and what the
+    frontend navigates to. Nothing could resolve it: the detail route parsed
+    the slug as a UUID and 404'd on anything else, with a comment calling
+    path lookup "a future enhancement". So every click from the catalogue
+    into a part landed on a 404.
+
+    Matching is on the same three columns the slug is built from, so a part is
+    reachable by exactly the identifier it was listed under.
+    """
+    row = await conn.fetchrow(
+        _PART_DETAIL_SELECT + """
+        WHERE w.slug = $1
+          AND p.name = $2
+          AND f.name = $3
+          AND f.kind = 'part'
+          AND f.deleted_at IS NULL
+          AND p.visibility = 'public'
+        """,
+        workspace_slug, project_name, file_name,
+    )
+    return _shape_part_detail(row) if row else None
 
 
 async def create_library_submission(

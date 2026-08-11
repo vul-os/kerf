@@ -14,6 +14,29 @@ The authoritative source for what's shipped vs. in-flight is
 
 ---
 
+## [0.1.9] - 2026-08-11
+
+### Fixed
+
+- **The published npm SBOM declared that Kerf's frontend has no
+  dependencies.** The SBOM job's "install npm dependencies" step carries
+  `working-directory: web`; the step that generates the SBOM did not, so both
+  tools ran from a repo root that has no `package.json` — the frontend moved
+  to `web/` and this step never followed it. `cyclonedx-npm` failed,
+  `npm ls --json` succeeded with the literal `{}`, and the fallback's
+  `[ -s "$file" ]` guard passed because two bytes is not empty. v0.1.8 shipped
+  that file as `kerf-npm-deps-0.1.8.json`.
+
+  A supply-chain artifact that confidently lists nothing is worse than no
+  artifact, because it is the kind of file that gets trusted rather than read.
+  Both halves are fixed: the step runs in `web/`, and each branch now checks
+  the *content* it produced — a CycloneDX SBOM with zero components and an
+  `npm ls` fallback with zero dependencies both fail the job rather than
+  publish. Verified against the real tree: from the repo root `npm ls --json`
+  is `{}`; from `web/` it is 54 direct dependencies.
+
+---
+
 ## [0.1.8] - 2026-08-11
 
 ### Added

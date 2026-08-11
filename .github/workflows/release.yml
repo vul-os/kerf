@@ -414,21 +414,38 @@ jobs:
         working-directory: web
         run: npm install --no-audit --no-fund  # npm install (not ci): lockfiles written on macOS drop platform-conditional optional deps (npm/cli#4828)
 
+      # working-directory matters and its absence is not visible in the output:
+      # the frontend moved to web/ and this step did not follow it, so both
+      # tools ran from a repo root with no package.json. cyclonedx-npm failed,
+      # `npm ls --json` succeeded with the literal `{}`, and the `-s` guard
+      # below passed because two bytes is not empty. v0.1.8 shipped an npm SBOM
+      # declaring that Kerf's frontend has no dependencies.
       - name: Generate npm SBOM (CycloneDX)
         shell: bash
+        working-directory: web
         run: |
           set -uo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
+          OUT="${GITHUB_WORKSPACE}/release-sbom"
+          mkdir -p "$OUT"
 
           if npx --yes @cyclonedx/cyclonedx-npm \
-               --output-file "release-sbom/kerf-npm-sbom-${VERSION}.json" \
+               --output-file "${OUT}/kerf-npm-sbom-${VERSION}.json" \
                --output-format JSON; then
-            echo "npm SBOM: release-sbom/kerf-npm-sbom-${VERSION}.json"
+            sbom="${OUT}/kerf-npm-sbom-${VERSION}.json"
+            components=$(node -e "process.stdout.write(String((require('$sbom').components||[]).length))")
+            [ "$components" -gt 0 ] \
+              || { echo "::error::CycloneDX SBOM lists ${components} components — refusing to publish an empty SBOM"; exit 1; }
+            echo "npm SBOM: ${sbom} (${components} components)"
           else
             echo "::warning::cyclonedx-npm failed — publishing 'npm ls' output instead, which is NOT a CycloneDX SBOM."
-            npm ls --json > "release-sbom/kerf-npm-deps-${VERSION}.json" || true
-            [ -s "release-sbom/kerf-npm-deps-${VERSION}.json" ] \
-              || { echo "::error::neither a CycloneDX SBOM nor an npm ls fallback could be produced"; exit 1; }
+            npm ls --json > "${OUT}/kerf-npm-deps-${VERSION}.json" || true
+            # Content, not size. `npm ls` outside a package prints `{}`, which
+            # is a passing -s check and a worthless artifact.
+            deps=$(node -e "process.stdout.write(String(Object.keys((require('${OUT}/kerf-npm-deps-${VERSION}.json').dependencies)||{}).length))" 2>/dev/null || echo 0)
+            [ "$deps" -gt 0 ] \
+              || { echo "::error::npm dependency manifest lists ${deps} dependencies — neither a CycloneDX SBOM nor a usable fallback could be produced"; exit 1; }
+            echo "npm dependency manifest: ${deps} direct dependencies"
           fi
 
       - name: Upload SBOMs as workflow artifact

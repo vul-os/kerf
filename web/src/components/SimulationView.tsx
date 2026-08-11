@@ -167,7 +167,6 @@ interface SimulationViewProps {
 
 export default function SimulationView({ content, fileName }: SimulationViewProps) {
   const w = useWorkspace()
-  const { accessToken } = useAuth()
   const parsed = parseSimulation(content || '')
   const [running, setRunning] = useState(false)
   const [jobStatus, setJobStatus] = useState<JobStatus | null>(null)

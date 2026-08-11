@@ -18,7 +18,9 @@ import { Plus, Trash2, Pencil, Wrench, X } from 'lucide-react'
 // ---------------------------------------------------------------------------
 
 function ToolProfileSvg({ tool }) {
-  const { type, diameter_mm, ball_radius_mm, corner_radius_mm, flute_length_mm, overall_length_mm } = tool
+  // overall_length_mm is not read: the thumbnail fills a fixed 60px box
+  // rather than drawing to scale in the length axis.
+  const { type, diameter_mm, ball_radius_mm, corner_radius_mm, flute_length_mm } = tool
   const w = 40
   const h = 60
   const cx = w / 2

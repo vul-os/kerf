@@ -292,7 +292,6 @@ function checkFloatingNet(portList, traceList) {
     portById.set(id, p)
   }
 
-  const touched = touchedPortIds(traceList)
   for (const t of traceList) {
     const ids = t.connected_source_port_ids ?? t.port_ids ?? []
     if (ids.length === 0) continue

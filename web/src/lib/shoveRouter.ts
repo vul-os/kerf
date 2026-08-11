@@ -99,17 +99,6 @@ function _intersectPoint(a, b, c, d) {
   return null
 }
 
-function _splitTraceAtPoint(trace, point, tol = 0.01) {
-  const pts = trace.points
-  for (let i = 0; i < pts.length - 1; i++) {
-    const a = pts[i], b = pts[i + 1]
-    const ip = _intersectPoint(a, b, point, point)
-    if (!ip) continue
-    const newPts = [...pts.slice(0, i + 1), { x: ip.x, y: ip.y }, ...pts.slice(i + 1)]
-    return { trace, idx: i, point: { x: ip.x, y: ip.y }, newPts }
-  }
-  return null
-}
 
 function _traceSegments(trace) {
   const pts = trace.points
@@ -142,13 +131,11 @@ function _doShove(circuit_json, layer, newSeg, clearance_mm, depth, maxDepth, sh
   }
 
   const board = circuit_json.pcb_board || circuit_json.board || {}
-  const newTrace = newSeg.trace
 
-  for (const trace of board.pcb_trace || []) {
-    if (trace.layer !== layer) continue
-    if (trace.net_id === newTrace.net_id && _isTJunction(newTrace, trace)) continue
-  }
-
+  // A loop with the same two guards and an empty body sat here: it walked
+  // every trace on the board, decided which ones to skip, and then did nothing
+  // with either answer. The filter below is the same test written as the
+  // filter it always was.
   const existingTraces = (board.pcb_trace || []).filter(t => {
     if (t.layer !== layer) return false
     if (t.net_id === newSeg.trace.net_id && _isTJunction(newSeg.trace, t)) return false
@@ -213,8 +200,6 @@ export function routeWithShove(circuit_json, layer, new_trace_points, clearance_
   }
 
   const circuit = JSON.parse(JSON.stringify(circuit_json))
-  const board = circuit.pcb_board || circuit.board || {}
-  const traces = board.pcb_trace || []
 
   const newTrace = {
     id: `new_${Date.now()}`,

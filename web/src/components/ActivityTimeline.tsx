@@ -262,10 +262,9 @@ function EventRow({ ev, onSelectFile, onSelectThread }: EventRowProps) {
 export interface ActivityTimelineProps {
   projectId?: string | null
   open: boolean
-  onClose: () => void
 }
 
-export default function ActivityTimeline({ projectId, open, onClose }: ActivityTimelineProps) {
+export default function ActivityTimeline({ projectId, open }: ActivityTimelineProps) {
   const events = useWorkspace((s) => s.activityEvents)
   const loading = useWorkspace((s) => s.activityLoading)
   const error = useWorkspace((s) => s.activityError)

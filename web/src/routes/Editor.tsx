@@ -805,16 +805,11 @@ function isCostReportFile(file) {
 // the activity tab is active. All data comes from the workspace store.
 // ---------------------------------------------------------------------------
 function ActivityTimelineBody({ projectId }) {
-  // Render the full ActivityTimeline but pass `open={true}` so it always shows
-  // its content. The onClose callback routes to the unified drawer close action.
-  const closeRightDrawer = useWorkspace((s) => s.closeRightDrawer)
-  return (
-    <ActivityTimeline
-      projectId={projectId}
-      open={true}
-      onClose={closeRightDrawer}
-    />
-  )
+  // `open` stays true because this IS the drawer's content — the drawer above
+  // decides whether to render it at all. No onClose: the component stopped
+  // rendering its own chrome when it became a body, and the unified drawer
+  // owns the close button, so the callback passed here was never called.
+  return <ActivityTimeline projectId={projectId} open={true} />
 }
 
 // ---------------------------------------------------------------------------

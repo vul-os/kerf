@@ -165,6 +165,10 @@ def _flatten_kerf_toml(data: dict, toml_path: Path) -> dict[str, Any]:
     if "enabled" in usage:
         out["usage_enabled"] = usage["enabled"]
 
+    terminal = data.get("terminal", {})
+    if "enabled" in terminal:
+        out["terminal_enabled"] = bool(terminal["enabled"])
+
     # [rate_limits] — one entry per rate_limit() key_prefix, e.g.
     #   [rate_limits]
     #   "auth:register" = 50
@@ -280,6 +284,12 @@ class Settings(BaseSettings):
     cdn_s3_endpoint: str = ""
 
     usage_enabled: bool = False
+    # A terminal is a shell with the server process's full authority — the
+    # filesystem as that user, the environment, and kerf.toml with its secrets.
+    # On a loopback bind that grants nothing the user did not have, so it is
+    # allowed there without this flag. On any other bind it is refused unless
+    # the operator sets this, having read what it means.
+    terminal_enabled: bool = False
     # Per-bucket rate-limit overrides, keyed on rate_limit()'s key_prefix.
     # Empty means every limiter uses the number declared at its call site.
     rate_limit_overrides: dict[str, int] = Field(default_factory=dict)

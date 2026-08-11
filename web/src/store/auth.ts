@@ -21,6 +21,7 @@ export interface AuthState {
   isAuthed: () => boolean
   tryBootstrap: () => Promise<void>
   tryBootstrapLocal: () => Promise<boolean>
+  signInWithNodePassword: (password: string) => Promise<boolean>
 }
 
 // Single source of truth for tokens + current user. Persisted to localStorage so
@@ -101,6 +102,31 @@ export const useAuth = create<AuthState>()(
       // it there would just be a noisy no-op.
       //
       // Returns true on success (session populated), false otherwise.
+      // signInWithNodePassword exchanges the node's single password for a
+      // session. It replaces tryBootstrapLocal's credential-free mint: that
+      // endpoint hands a full session to anything that can reach the port,
+      // which "bound to loopback" does not make safe — a hostile page can
+      // point a browser at loopback.
+      signInWithNodePassword: async (password: string) => {
+        const res = await fetch(`${API_URL}/api/setup/signin`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          credentials: 'omit',
+          body: JSON.stringify({ password }),
+        })
+        if (!res.ok) {
+          const detail = await res.json().catch(() => ({}))
+          throw new Error(detail?.detail || 'Incorrect password.')
+        }
+        const data = await res.json()
+        set({
+          accessToken: data.access_token || null,
+          refreshToken: data.refresh_token || null,
+          user: data.user || null,
+        })
+        return !!(data && data.access_token)
+      },
+
       tryBootstrapLocal: async () => {
         const s = get()
         if (s.accessToken) return true

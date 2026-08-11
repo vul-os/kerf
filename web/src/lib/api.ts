@@ -324,6 +324,19 @@ export const api = {
     request<void>('/api/me/password', { method: 'POST', body: { current_password, new_password } }),
   deleteMe: () => request<void>('/api/me?confirm=DELETE', { method: 'DELETE' }),
 
+  // ---- First run: one password per node ----
+  // Unauthenticated by necessity — this is what the app asks before it knows
+  // whether there is anything to authenticate against.
+  setupState: () =>
+    request<{ configured: boolean; can_configure_here: boolean; reason: string }>(
+      '/api/setup/state', { auth: false }),
+  // Claims an unconfigured node. Succeeds exactly once; changing the password
+  // afterwards is `kerf admin set-password` on the machine itself.
+  claimNode: (password: string) =>
+    request<{ configured: boolean }>('/api/setup/password', {
+      method: 'POST', body: { password }, auth: false,
+    }),
+
   // ---- Settings: LLM provider keys + usage ----
   // Keys live per-user in the database rather than in config, so they can be
   // changed from the UI without editing a file and restarting. The server

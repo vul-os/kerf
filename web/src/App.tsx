@@ -1,5 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
+import Setup from './routes/Setup.jsx'
+import type { SetupState as SetupStateShape } from './routes/Setup.jsx'
 
 // ── eager (lightweight, shell-critical) ───────────────────────────────────
 // ProtectedRoute is a tiny wrapper used to gate the /projects, /editor, etc.
@@ -122,6 +124,7 @@ export default function App() {
   const refreshToken = useAuth((s) => s.refreshToken)
   const accessToken = useAuth((s) => s.accessToken)
   const [bootstrapping, setBootstrapping] = useState(true)
+  const [setupState, setSetupState] = useState<SetupStateShape | null>(null)
 
   // On mount: wait for /api/config (so we know local_mode), then hit
   // /api/bootstrap. If the backend has a state.json (the brew/curl-install
@@ -148,13 +151,22 @@ export default function App() {
             setSession({ accessToken: null, refreshToken: null, user: null })
           }
         }
-        // Local-mode auto-account: if we still don't have a session
-        // and the cloud config says local_mode is on, mint one. The
-        // endpoint 404s on cloud builds so this is OSS-only by design.
+        // Local mode used to mint a session here with no credential at all —
+        // /auth/bootstrap-local signs in anything that can reach the port.
+        // Now the node has one password, so if we still have no session we
+        // ask the server whether it has been claimed and show the matching
+        // screen instead of silently letting the caller in.
         if (!cancelled && localMode) {
           const { accessToken: at2 } = useAuth.getState()
           if (!at2) {
-            await tryBootstrapLocal()
+            try {
+              const state = await api.setupState()
+              if (!cancelled) setSetupState(state)
+            } catch {
+              // A node too old to know about /api/setup falls back to the
+              // previous behaviour rather than becoming unusable.
+              await tryBootstrapLocal()
+            }
           }
         }
       } finally {
@@ -173,6 +185,13 @@ export default function App() {
   // round trip) so the blank frame is imperceptible in practice.
   if (bootstrapping && !accessToken && !refreshToken) {
     return null
+  }
+
+  // No session and the node has something to say about why: set a password,
+  // enter one, or go and set it on the machine. Rendered before the router so
+  // no route can be reached around it.
+  if (!accessToken && setupState) {
+    return <Setup state={setupState} onReady={() => setSetupState(null)} />
   }
 
   // In local mode the marketing landing + login/signup pages don't apply —

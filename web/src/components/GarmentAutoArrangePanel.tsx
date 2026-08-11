@@ -186,6 +186,12 @@ function TensionGrid({ tension, rows, cols }: { tension: number[]; rows: number;
 
 /** Avatar schematic SVG (front-view body silhouette, top=crown, bottom=floor) */
 function AvatarSchematic({ panels, avatarHeightCm = 168 }: { panels: GarmentPanel[]; avatarHeightCm?: number }) {
+  // avatarHeightCm does not scale the drawing and should not: the landmarks
+  // below are proportions of body height (crown 1.00, shoulder 0.82, hip 0.54,
+  // …), so the silhouette is the same shape at any height and the SVG is a
+  // fixed-size schematic. The caller passes a real height though, and it was
+  // accepted and then ignored entirely — so it goes into the accessible name,
+  // which was the generic "Avatar schematic" and now says which avatar.
   const SVG_W = 200
   const SVG_H = 320
   const PAD = 16
@@ -231,7 +237,12 @@ function AvatarSchematic({ panels, avatarHeightCm = 168 }: { panels: GarmentPane
   ).join(' ')
 
   return (
-    <svg width={SVG_W} height={SVG_H} className="block mx-auto" aria-label="Avatar schematic">
+    <svg
+      width={SVG_W}
+      height={SVG_H}
+      className="block mx-auto"
+      aria-label={`Avatar schematic, ${Math.round(avatarHeightCm)} cm tall`}
+    >
       {/* Body fill */}
       <path
         d={leftPath + ' ' + rightPath.replace('M', 'L') + ' Z'}

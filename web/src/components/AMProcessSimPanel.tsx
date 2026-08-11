@@ -383,6 +383,18 @@ function ThermoMechSection({ data: d }: { data: AMResultData }) {
               : '—'}
             color="#7c3aed"
           />
+          {/* melt_pool_width_mm was extracted alongside depth and reached, and
+              then never rendered — the only one of the three with no card.
+              Mirrors the depth card above; melt pool geometry is a width and a
+              depth, and reporting one without the other is half the answer. */}
+          <StatCard
+            icon={<Activity size={14} />}
+            label="Avg Melt Width"
+            value={meltWidths.length > 0
+              ? `${(meltWidths.reduce((a,b) => a+b, 0) / meltWidths.length).toFixed(3)} mm`
+              : '—'}
+            color="#7c3aed"
+          />
           <StatCard
             icon={<Zap size={14} />}
             label="Energy Input"

@@ -28,13 +28,23 @@ So the terminal is gated on the **listen address**, not on a role:
 
 | Bind | Terminal |
 |------|----------|
-| `127.0.0.1` / `::1` (default, and always in the desktop app) | available |
+| `127.0.0.1` / `::1` (always, in the desktop app) | available |
 | anything else | refused, unless you opt in below |
+
+Note that `kerf serve` and `python -m kerf_core` both default to `--host
+0.0.0.0`, so a plain `kerf serve` on a machine with a network is in the second
+row, not the first. Pass `--host 127.0.0.1` (or set `KERF_HOST`) if you meant
+loopback — which you probably did, if you are the only person using it.
 
 ```toml
 [terminal]
 enabled = true   # only on a bind you have thought about
 ```
+
+If Kerf is running under something that is not one of its own entry points —
+embedded in another app, or started by a process manager calling uvicorn
+directly — nothing has told it what it is bound to, and it assumes the worst
+and refuses. Set `KERF_HOST` to say otherwise.
 
 The app asks the server whether a terminal is possible before offering one, so
 a node where the answer is no never shows a control that would fail.

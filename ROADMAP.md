@@ -254,7 +254,7 @@ Key additions from the wave-7 push:
 
 Prior to the current saturation push, the following major capabilities landed:
 
-> **Superseded (historical record).** The cloud/billing/pricing/OAuth items below reflect the architecture *at that date*. They were retired by the 2026-07-17 "Decentralized node model" ADR further down this file: billing and the cloud tier are gone, Kerf is 100% MIT with no accounts, and sign-in via Google OAuth was removed. This block is kept as history, not as a description of the current build.
+> **Superseded (historical record).** The cloud/billing/pricing/OAuth items below reflect the architecture *at that date*. They were retired by the 2026-07-17 "Decentralized node model" ADR further down this file: billing and the cloud tier are gone, Kerf is 100% MIT with no accounts, and sign-in via Google OAuth was removed. The "auth-optional local mode" below went too: `POST /auth/bootstrap-local` handed a full session to anything that could reach the port, and a node now has one password set on first load. This block is kept as history, not as a description of the current build.
 
 **Core platform**
 - Auth + projects + files + chat (CRUD) — Postgres, JWT, Google OAuth.

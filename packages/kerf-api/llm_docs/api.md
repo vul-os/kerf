@@ -207,4 +207,4 @@ Standard error codes: `BAD_ARGS`, `NOT_FOUND`, `PERMISSION_DENIED`, `CONFLICT`, 
 
 ## Auth gates
 
-All `/api/projects/{id}/*` endpoints verify that the calling user is the project owner or an invited project member. The `require_auth` dependency (from `kerf_core.dependencies`) handles JWT / opaque API token validation. Public endpoints (library search, workshop feed, project pages with `visibility='public'`) use `optional_auth`.
+All `/api/projects/{id}/*` endpoints verify that the calling user owns the project — which, on a node with one user, is the same as being signed in. (The check reads `workspace_members`, a table that is now always one row per workspace.) The `require_auth` dependency (from `kerf_core.dependencies`) handles JWT / opaque API token validation. Public endpoints (library search, workshop feed, project pages with `visibility='public'`) use `optional_auth`.

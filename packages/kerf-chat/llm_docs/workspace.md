@@ -1,17 +1,23 @@
-# Workspaces and members
+# Workspaces
 
-A **workspace** is the multi-member container above projects: every
-project belongs to exactly one workspace, and every collaborator
-joins through `workspace_members`. Workspaces also own the billing
-attachment (cloud only — see `email.md` and the cloud billing
-module). Created in migration
-`1746577400000_workspaces.sql` which folded `project_members` into
+A **workspace** is the container above projects: every project
+belongs to exactly one. Created in migration
+`1746577400000_workspaces.sql`, which folded `project_members` into
 `workspace_members` and replaced `projects.owner_id` with
 `projects.workspace_id`.
 
-If the user asks "who has access to this project" or "where do I
-invite someone", the answer is always the **workspace**, never the
-project — there's no per-project ACL anymore.
+**There is nobody to share one with.** Kerf is one node, one
+password, one user — that user owns every workspace on the node.
+Members, invites and roles are removed: the routes are gone, the
+Members page is gone, and the flow behind them never worked (adding
+someone looked their account up by email, found none because none
+can be created, and wrote nothing).
+
+So if the user asks "how do I invite someone to this workspace",
+the answer is that you cannot, and it is not a missing feature —
+sharing happens between *nodes*, by publishing a project or handing
+out a share link, not by adding people to yours. A workspace is a
+folder, not a team.
 
 ## `workspaces` table
 
@@ -28,8 +34,8 @@ workspaces (
 ```
 
 The `slug` is the user-visible identifier. All workspace-scoped
-routes are keyed off it: `/w/<slug>/projects`,
-`/w/<slug>/settings`, `/w/<slug>/members`. The slug must be unique
+routes are keyed off it: `/w/<slug>/projects` and
+`/w/<slug>/settings`. The slug must be unique
 across the install. Renaming the slug breaks bookmarks — the
 Settings panel disables it after creation.
 
@@ -45,32 +51,23 @@ workspace_members (
 )
 ```
 
-Three roles:
-
-| Role     | Can do                                                                |
-|----------|-----------------------------------------------------------------------|
-| `owner`  | Everything `admin` can + delete the workspace + change billing        |
-| `admin`  | Everything `member` can + invite/remove members + edit workspace meta |
-| `member` | Read/write all projects in the workspace                              |
-
-There's always at least one `owner` (the `created_by` user is
-seeded as owner on workspace create). Demoting the last owner is
-rejected by the API.
+**Vestigial.** The CHECK still admits `owner`/`admin`/`member`,
+and in practice every row is the node's single user as `owner`:
+they are seeded on workspace create and there is no route left that
+adds, removes or re-roles anyone. `get_user_workspace_role` still
+reads the table, so it stays.
 
 ## `workspace_invites` table
 
-Out-of-band invites for users who don't yet have an account. Each
-row carries an email, a target role, and a one-shot token. When the
-invitee accepts, a `workspace_members` row is created and the
-invite is deleted. There's no doc tool for invites — it's a
-backend-only flow driven by the Members panel.
+**Dead.** Nothing writes to it and the endpoint that read it is
+removed. The table survives because these migrations do not drop
+tables. Never suggest it.
 
 ## Routes
 
 ```
 /w/:workspaceSlug/projects   — project list (Projects.jsx)
 /w/:workspaceSlug/settings   — workspace meta + avatar (WorkspaceSettings.jsx)
-/w/:workspaceSlug/members    — invite / remove / change role (WorkspaceMembers.jsx)
 ```
 
 Inside a project the URL is
@@ -88,14 +85,14 @@ GET    /api/workspaces/:slug                      — fetch one
 PATCH  /api/workspaces/:slug                      — { name?, slug? }
 DELETE /api/workspaces/:slug                      — owner-only
 POST   /api/workspaces/:slug/avatar               — multipart upload
-POST   /api/workspaces/:slug/members              — { email, role } → invite
-DELETE /api/workspaces/:slug/members/:userId      — remove
-PATCH  /api/workspaces/:slug/members/:userId      — { role } → promote/demote
 ```
 
-The `lib/api.js` wrappers (`listWorkspaces`,
-`inviteWorkspaceMember`, `changeWorkspaceMemberRole`, …) are the
-canonical client surface.
+The member routes that used to sit under this list — invite,
+remove, promote/demote, and the `/api/workspaces/accept` that
+consumed an invite — are all removed and return 404.
+
+The `lib/api.js` wrappers (`listWorkspaces`, `createWorkspace`, …)
+are the canonical client surface.
 
 ## Stores — a confusing pair
 
@@ -138,23 +135,6 @@ storage is whatever Postgres + your disk allow.
 
 ## Examples
 
-### "Invite jane@example.com to my acme workspace as admin"
-
-```
-POST /api/workspaces/acme/members
-{ "email": "jane@example.com", "role": "admin" }
-```
-
-Or via the JS wrapper:
-
-```js
-api.inviteWorkspaceMember('acme', 'jane@example.com', 'admin')
-```
-
-If Jane already has an account, she's added directly to
-`workspace_members`. Otherwise a `workspace_invites` row is
-created and an invite email is sent (cloud only).
-
 ### "Which workspace does project X belong to?"
 
 ```js
@@ -165,15 +145,6 @@ proj.workspace_slug   // → 'acme'
 Or directly from the database side: the `projects.workspace_id`
 column is the source of truth.
 
-### "Demote a user from admin to member"
-
-```
-PATCH /api/workspaces/acme/members/<userId>
-{ "role": "member" }
-```
-
-The API rejects demoting the last owner.
-
 ## Known limits
 
 - **No transfer-project tool.** Moving a project between workspaces
@@ -181,8 +152,5 @@ The API rejects demoting the last owner.
 - **Slug is final after creation.** The Settings panel disables
   slug editing once the workspace exists; rename = create new +
   manual move.
-- **OSS = single workspace recommended.** The OSS build supports
-  multiple workspaces, but the install model assumes one shop /
-  one team. Billing attachment is a no-op on OSS.
-- **Invite emails are cloud-only.** OSS installs accept invites via
-  copy-paste of the invite link from the Members panel.
+- **Multiple workspaces are folders, not teams.** A node supports
+  as many as you like; they are all owned by the same single user.

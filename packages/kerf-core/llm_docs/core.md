@@ -158,7 +158,9 @@ The `push_from_local` flow:
 Migrations live in `kerf_core/db/migrations/` as numbered SQL files (`001_init.sql` … `033_*`). The runner applies them in order at startup, tracking applied migrations in a `schema_migrations` table.
 
 Key tables introduced by core migrations:
-- `users`, `workspaces`, `workspace_members`, `projects`, `project_members`
+- `node_credential` (the node's one password), `users` (one row),
+  `workspaces`, `workspace_members` (vestigial — one row per workspace),
+  `projects`
 - `files`, `file_revisions` (soft-delete + gzip-compressed diffs)
 - `api_tokens`, `refresh_tokens`
 - `usage_events`, `upload_sessions`, `derived_artifacts`

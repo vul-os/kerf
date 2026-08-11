@@ -1,6 +1,14 @@
 # kerf-auth — authentication flows, routes, token lifecycle
 
-`kerf-auth` provides all authentication surfaces for Kerf: email/password registration and login, Google OAuth, GitHub OAuth (cloud-only), JWT access tokens, opaque refresh tokens, and long-lived opaque API tokens.
+`kerf-auth` provides Kerf's token lifecycle: JWT access tokens, opaque refresh
+tokens, and long-lived opaque API tokens.
+
+**Sign-in does not live here any more.** Kerf is one node, one password: it is
+set on first load and exchanged for a session through `/api/setup/*` (see
+`kerf-api`). Registration, login, password reset, email verification and OAuth
+— Google and GitHub alike — are gone, along with the accounts they served.
+Recovery is `kerf admin set-password` on the machine, because a self-hosted
+node has no mail transport.
 
 It registers as the first plugin in the dependency chain (`depends=[]`). All other API-bearing plugins declare `depends=["kerf-auth"]` and therefore load after it.
 
@@ -24,19 +32,24 @@ async def register(app, ctx) -> PluginManifest:
 
 ## Routes
 
-### `/auth/*` — session management
+### `/api/setup/*` — the whole of sign-in (in kerf-api)
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/auth/register` | Create account (email + password). Returns `AuthResponse`. Auto-verified immediately — no welcome/verification email is sent. |
-| POST | `/auth/login` | Verify password (bcrypt + pepper). Returns `AuthResponse`. |
+| GET | `/api/setup/state` | Has this node been claimed, and may it be claimed from here? |
+| POST | `/api/setup/password` | Claim an unconfigured node. Once only (409 after). 403 on a non-loopback bind — use `kerf admin set-password`. |
+| POST | `/api/setup/signin` | Exchange the node password for a session. Returns `AuthResponse`. |
+
+### `/auth/*` — token lifecycle only
+
+| Method | Path | Description |
+|---|---|---|
 | POST | `/auth/refresh` | Exchange a refresh token for a new access token. |
 | POST | `/auth/logout` | Revoke the current refresh token (cookie or body). |
-| GET | `/auth/me` | Return the authenticated user + default workspace. |
-| GET | `/auth/google` | Redirect to Google OAuth consent screen. |
-| GET | `/auth/google/callback` | Exchange Google code for user. Auto-creates account on first sign-in. |
-| GET | `/auth/github/login` | Redirect to GitHub OAuth (requires `cloud_github_client_id`/`cloud_github_client_secret` to be configured — a node feature, any self-hoster can supply their own app). |
-| GET | `/auth/github/callback` | Exchange GitHub code. Saves encrypted GitHub token to DB. |
+
+`/auth/register`, `/auth/login`, `/auth/forgot-password`, `/auth/reset-password`,
+`/auth/bootstrap-local` and the Google and GitHub OAuth routes have been
+removed. They return 404. Do not suggest them.
 
 ### `/api/api-tokens` — long-lived API tokens
 
@@ -92,7 +105,12 @@ async def my_route(user_id: str = Depends(require_auth)):
 
 ## Password hashing
 
-Passwords are hashed with **bcrypt** plus a server-side pepper (`PASSWORD_PEPPER`). The pepper prevents rainbow-table attacks if the bcrypt hashes leak without the server config.
+The node password is hashed with **bcrypt** plus a server-side pepper
+(`PASSWORD_PEPPER`), in `kerf_core.node_credential`. The pepper prevents
+rainbow-table attacks if the bcrypt hashes leak without the server config. An
+unconfigured node is compared against a dummy hash so that "no password set"
+and "wrong password" take the same time — otherwise a stopwatch tells an
+attacker whether the node is still claimable.
 
 ```python
 def hash_password(password: str) -> str:
@@ -102,20 +120,12 @@ def hash_password(password: str) -> str:
 
 ---
 
-## GitHub OAuth flow
+## GitHub is a git remote, not an identity provider
 
-GitHub OAuth routes are always mounted; they 503 until `cloud_github_client_id`/`cloud_github_client_secret` are configured — any self-hoster can supply their own GitHub OAuth app, the same way they'd supply their own Postgres. The flow:
-
-1. `GET /auth/github/login` — redirect to `github.com/login/oauth/authorize`
-2. User authorises → GitHub redirects to `/auth/github/callback?code=…`
-3. Exchange code for a GitHub access token (POST to `github.com/login/oauth/access_token`)
-4. Fetch the user's GitHub email via the GitHub API
-5. Upsert Kerf user, store encrypted GitHub token in `cloud_github_tokens`
-6. Issue Kerf JWT + refresh token, redirect to frontend
-
-The GitHub App repo-connect flow that used to consume this encrypted token
-was retired along with the rest of hosted git; the token is stored but
-nothing currently reads it back out.
+The GitHub OAuth sign-in flow that used to be documented here is removed, along
+with Google's. GitHub is used as an ordinary git remote — you authenticate with
+a personal access token or an SSH key, exactly as you would with the git CLI.
+Kerf brokers no OAuth and holds no GitHub-issued token on your behalf.
 
 ---
 

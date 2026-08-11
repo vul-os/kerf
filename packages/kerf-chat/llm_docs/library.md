@@ -13,20 +13,22 @@ This page exists so the assistant can walk a user through:
   contract;
 - *"how do I submit a Part to the kerf-system catalog?"* — the
   manufacturer-PR submission flow;
-- *"what does that 'Verified' badge mean?"* — `is_verified_publisher`.
+- *"what does that 'Verified' badge mean?"* — it does not exist any
+  more; see below.
 
 ## The catalog endpoint
 
 ```http
-GET /api/library/parts?search=...&category=...&verified_only=true
+GET /api/library/parts?search=...&category=...
 ```
 
-Returns a paginated list of public Parts. Filters:
+Returns a paginated list of public Parts, most recently updated
+first. Filters:
 
 - `search` — substring match on Part `name`, `manufacturer`, `mpn`.
 - `category` — exact match (`resistor`, `capacitor`, …).
-- `verified_only=true` — restrict to Parts whose author has the
-  `is_verified_publisher` flag.
+
+There was a third, `verified_only=true`. It is gone — see below.
 
 `GET /api/library/parts/{slug}` returns a single Part by its
 project's listing slug, with the full Part JSON in the `content`
@@ -47,20 +49,20 @@ Setting just one of these is the most common confusion — see
 `part.md` for how to flip the Part-side flag, and project settings
 for the project-side flag.
 
-## Verified publishers
+## There are no verified publishers
 
-`users.is_verified_publisher` is a boolean flag set by an admin.
-Verified publishers get:
+`users.is_verified_publisher`, the "Verified" badge, and the
+`?verified_only=true` filter are all removed.
 
-- A "Verified" badge on their Library and Workshop listings.
-- The `?verified_only=true` filter pin on `/library`.
-- Their authored BOM rows render with an "Author" tag in the BOM
-  panel.
+The flag could only be set by an admin route gated on an account
+role nothing in Kerf ever wrote, so no node could set it and the
+filter returned an empty catalog on every install. It was also the
+wrong shape: a node vouching for its own parts is not a signal.
 
-The flag is set out of band — admins flip it via the admin UI; the
-LLM has no tool for it. If the user asks "how do I become a
-verified publisher", point them at the admin contact path; don't
-promise verification.
+If a user asks how to become a verified publisher, say there is no
+such status rather than pointing them anywhere. Judge a Part on its
+metadata — a real MPN, distributor SKUs and URLs, a datasheet link
+— which is what `curation.md` covers.
 
 ### The `kerf-system` seed account
 

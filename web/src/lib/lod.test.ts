@@ -13,7 +13,6 @@
  *   - selectLOD: 'full' when large angular size + below count threshold
  */
 
-import type * as THREE from 'three'
 import { describe, it, expect, vi } from 'vitest'
 
 // ---------------------------------------------------------------------------

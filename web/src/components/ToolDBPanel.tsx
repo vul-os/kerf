@@ -404,8 +404,10 @@ function ToolCard({ tool, onEdit, onDelete }) {
 // ---------------------------------------------------------------------------
 
 export function ToolPicker({ tools = [], value, onChange, disabled }) {
-  const [hoverTool, setHoverTool] = useState(null)
-
+  // A hoverTool state was declared here and never read. It cannot work as
+  // written: this is a native <select>, and a browser gives you no per-option
+  // hover event to hang a preview off. The leftover is from a custom dropdown;
+  // the `title` on the select is what carries the tool detail now.
   const selected = tools.find((t) => t.id === value)
 
   return (

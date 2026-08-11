@@ -94,6 +94,21 @@ async def seed(pool) -> dict[str, str]:
             "INSERT INTO chat_threads (project_id, title) VALUES ($1, 'Sweep') RETURNING *",
             proj["id"],
         )
+        # Rows that exist only to make more of the route surface reachable.
+        # Without them the share, membership, submission and BYO-key routes
+        # are skipped for unfillable path params — which is how a route goes
+        # years without ever being called by a test.
+        share = await conn.fetchrow(
+            "INSERT INTO share_links (project_id, token, role, created_by) "
+            "VALUES ($1, $2, 'viewer', $3) RETURNING *",
+            proj["id"], f"sweep-{uuid.uuid4().hex}", user["id"],
+        )
+        submission = await conn.fetchrow(
+            "INSERT INTO library_part_submissions "
+            "(submitter_user_id, target_workspace_id, payload) "
+            "VALUES ($1, $2, $3) RETURNING *",
+            user["id"], ws["id"], "{}",
+        )
     return {
         "user_id": str(user["id"]), "uid": str(user["id"]),
         "workspace_id": str(ws["id"]), "wid": str(ws["id"]),
@@ -102,6 +117,20 @@ async def seed(pool) -> dict[str, str]:
         "file_id": str(f["id"]), "fid": str(f["id"]),
         "revision_id": str(rev["id"]), "rid": str(rev["id"]),
         "thread_id": str(thread["id"]), "tid": str(thread["id"]),
+        "token": share["token"],
+        "lid": str(share["id"]),
+        "submission_id": str(submission["id"]),
+        # The caller is the workspace's own owner, so member routes address a
+        # real membership row rather than a stranger.
+        "member_id": str(user["id"]),
+        # A provider the BYO-key routes actually support.
+        "provider": "anthropic",
+        # /workspaces/avatar/{id} is the only bare {id} in the surface, and it
+        # is a workspace. Check that before adding another.
+        "id": str(ws["id"]),
+        # /admin/distributors/{name} — any name reaches the handler; the
+        # 403/404 that follows is a fine answer, a 500 is not.
+        "name": "sweep-distributor",
     }
 
 

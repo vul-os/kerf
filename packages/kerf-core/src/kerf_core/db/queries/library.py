@@ -220,7 +220,13 @@ async def create_library_submission(
         """,
         submitter_user_id,
         target_workspace_id,
-        payload,
+        # Serialised here, not passed as a dict. `payload` is jsonb, and
+        # asyncpg does not encode a dict for it — it raises DataError
+        # "expected str, got dict", so every submission 500'd on Postgres. It
+        # worked on SQLite only because that backend's adapt_param serialises
+        # dicts on the way through, which is the kind of asymmetry that hides
+        # a bug on whichever backend the tests do not run against.
+        json.dumps(payload if payload is not None else {}),
     )
     return dict(row)
 

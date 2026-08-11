@@ -15,6 +15,7 @@ Endpoints under test:
 from __future__ import annotations
 
 import sys
+import json
 import uuid
 import pathlib
 from contextlib import asynccontextmanager
@@ -308,8 +309,14 @@ class TestSubmitPart:
         })
         assert len(conn.inserted) == 1
         stored = conn.inserted[0]["payload"]
-        # payload is passed as a dict; it may be stored as-is
-        assert stored == payload or stored == str(payload)
+        # The column is jsonb, so the bound value has to be a JSON string.
+        # This used to accept `stored == payload or stored == str(payload)` —
+        # a dict, or its Python repr — and neither is valid jsonb. asyncpg
+        # rejects the dict outright (DataError: expected str, got dict), so
+        # every submission 500'd on Postgres while passing here, because the
+        # assertion was loose enough to admit the broken value.
+        assert isinstance(stored, str), f"payload must be serialised, got {type(stored)}"
+        assert json.loads(stored) == payload
 
     def test_submit_missing_workspace_404(self):
         """Scenario 4: non-existent target workspace → 404."""

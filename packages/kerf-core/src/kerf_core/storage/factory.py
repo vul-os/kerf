@@ -1,4 +1,5 @@
 from .base import Storage, PutResult
+from .filesystem import FilesystemStorage
 from .git_storer import (
     ProjectRepoLocation,
     project_git_prefix,
@@ -23,6 +24,7 @@ def create_storage(
     cdn_s3_secret_access_key: str = "",
     cdn_s3_endpoint: str = "",
     local_storage_path: str = "./.kerf-storage",
+    filesystem_root: str = "~/kerf-projects",
 ) -> Storage:
     backend = backend or ("s3" if s3_bucket else "local")
 
@@ -44,7 +46,10 @@ def create_storage(
             public_endpoint=cdn_s3_endpoint,
         )
 
-    if backend in ("local", "filesystem"):
+    if backend == "filesystem":
+        return FilesystemStorage(root=filesystem_root, cdn_url=cdn_base_url)
+
+    if backend == "local":
         return LocalStorage(root=local_storage_path, cdn_url=cdn_base_url)
 
     raise ValueError(f"Unknown storage backend: {backend} (expected local|s3|filesystem)")
@@ -54,6 +59,7 @@ __all__ = [
     "Storage",
     "PutResult",
     "LocalStorage",
+    "FilesystemStorage",
     "S3Storage",
     "create_storage",
     "ProjectRepoLocation",

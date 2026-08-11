@@ -106,7 +106,52 @@ Authentication is *not* bypassed, in either mode. It used to be — local mode
 handed out a session to anything that could reach the port — and that is what
 the password set on first load replaced. See
 [api-reference.md#authentication](./api-reference.md#authentication).
-- The `filesystem` storage backend writes each project as a directory under `filesystem_root`, so your JSCAD / STEP files are real files you can open, grep, and git from outside the app.
+
+---
+
+## The `filesystem` storage backend
+
+Turn it on in `kerf.toml`:
+
+```toml
+[storage]
+backend = "filesystem"
+filesystem_root = "~/kerf-projects"   # the default
+```
+
+Every object the server stores then lands under `filesystem_root` as a tree
+you can `cd` into — one directory per project, files under the names they
+were uploaded with, so your JSCAD / STEP files are real files you can open,
+grep, and `git init` on from outside the app:
+
+```
+~/kerf-projects/
+  projects/<project-id>/
+    assets/bracket-3f2a91c40b7e.step   # your upload; the short suffix keeps
+    assets/bracket-8b44c1de2f90.step   # two "bracket.step" uploads apart
+    renders/front.png
+    thumbnail.jpg
+  .kerf/objects/…                      # content-addressed blobs — hex names,
+  .kerf/uploads/…                      # nothing to read; in-flight chunks
+```
+
+Project directories are named by project id, not by title: a title can change
+or collide, the id is what the rest of the system uses.
+
+What it is **not**:
+
+- **Not a sync engine.** The tree is written, never read back for changes.
+  Edit `bracket-3f2a91c40b7e.step` with your own tools and the app keeps
+  serving whatever is on disk — but the app never notices the edit, and it
+  produces no revision. Renaming or moving files there hides them from the
+  app entirely.
+- **Not the index.** The database still holds projects, files, revision
+  history and who owns what; this tree holds bytes. Copying it to another
+  machine without the database gives you files, not an install.
+- **Not `"local"` with a nicer name.** `backend = "local"` writes the same
+  objects flat under `local_path` named by their raw storage key. Switching
+  backends does not migrate existing objects — point a fresh install at
+  `filesystem`, or move the bytes yourself.
 
 ---
 

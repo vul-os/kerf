@@ -58,6 +58,10 @@ def _wire_storage(config):
         cdn_s3_secret_access_key=config.cdn_s3_secret_access_key,
         cdn_s3_endpoint=config.cdn_s3_endpoint,
         local_storage_path=config.local_storage_path,
+        # Without this the filesystem backend always used create_storage's own
+        # default, so [storage].filesystem_root was parsed, stored on Settings,
+        # unit-tested — and then silently ignored by the one call that matters.
+        filesystem_root=config.filesystem_root,
     )
 
 

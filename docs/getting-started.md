@@ -175,7 +175,7 @@ The full schema is in `kerf.example.toml`. The most useful knobs for local dev:
 | `[server].port` | `8080` | HTTP port |
 | `[database].url` | _(unset → embedded `~/.kerf/kerf.db`)_ | Set to `postgres://…` for scale mode; override via `DATABASE_URL` env var |
 | `[llm.anthropic].api_key` | _(empty)_ | Set this to activate the default model |
-| `[storage].backend` | `"local"` | `"local"` / `"s3"` / `"filesystem"` |
+| `[storage].backend` | `"local"` | `"local"` — objects under `[storage].local_path`, named by their storage key. `"filesystem"` — the same objects under `[storage].filesystem_root` (default `~/kerf-projects`) as a readable tree: one directory per project, files under the names they were uploaded with. It writes that tree, it does not read it back — the database still holds the index and revisions. `"s3"` — any S3-compatible endpoint. |
 | `[limits].file_revisions_max` | `200` | Per-file undo history cap |
 
 Config is read from the first file found in this order:

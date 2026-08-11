@@ -5,6 +5,22 @@ on:
   pull_request:
 
 jobs:
+  # site/docs/ is a copy of docs/, curated by site/docs.html's slug list and
+  # written by scripts/sync-site-docs.mjs. Nothing regenerates it on the way to
+  # production, so an edit to docs/ that forgets the sync leaves the public site
+  # serving the old text — which is how the site came to document
+  # POST /api/auth/login, a route that had been deleted, to anyone reading it.
+  site-docs-in-sync:
+    name: site/docs matches docs/
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check for drift
+        run: node scripts/sync-site-docs.mjs --check
+
   # The landing page and docs are rendered in a real browser at eight viewports
   # in both colour schemes. None of what this catches survives a diff: a
   # stretched screenshot, an off-theme capture, body copy under 12px, an element

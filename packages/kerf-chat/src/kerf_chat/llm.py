@@ -378,397 +378,389 @@ class Registry:
         return provider, info["id"]
 
 
-def _anthropic_sdk_supports_cache_control() -> bool:
-    """Return True when the installed anthropic SDK exposes cache_control on ToolParam."""
-    try:
-        import anthropic.types as _t
-        return "cache_control" in getattr(_t.ToolParam, "__annotations__", {})
-    except Exception:
-        return False
+# ════════════════════════════════════════════════════════════════════════════
+# Providers
+# ════════════════════════════════════════════════════════════════════════════
+#
+# One implementation, LiteLLM, for every provider. This replaced four
+# hand-written providers (Anthropic, OpenAI, Moonshot, Gemini) that each spoke
+# their vendor's SDK directly — roughly 850 lines of message translation,
+# streaming-event decoding and per-vendor quirk handling, four times over, with
+# four separate places for a bug to live.
+#
+# LiteLLM speaks the OpenAI wire shape to every vendor, so there is now one
+# translation to write and one streaming decoder to maintain. The provider
+# classes below survive as names only: they pick a prefix and a default
+# endpoint, and everything else is shared.
+#
+# What the fold fixed on its way through:
+#
+#   * The system prompt reached Anthropic and Gemini and was silently dropped
+#     for OpenAI and Moonshot. OpenAIProvider.complete built its message list
+#     from req.messages alone and never looked at req.system, so picking GPT-4o
+#     or Kimi ran the model with no CAD instructions at all. One translation
+#     means one place that can forget.
+#   * Anthropic needed tool_choice as an object where OpenAI needs a string,
+#     and needed temperature omitted rather than null. LiteLLM normalises both,
+#     and drop_params handles the models (o3-mini and friends) that reject
+#     parameters the others require.
+#
+# What had to be carried across deliberately:
+#
+#   * Anthropic prompt caching. cache_control breakpoints go on the system
+#     block and the last tool definition; LiteLLM passes them through to the
+#     Anthropic API unchanged. Feature-detecting the installed SDK is gone —
+#     the SDK is no longer in the request path.
+#   * Gemini 3's thought_signature. It must be echoed back on the assistant
+#     turn or the next request is rejected outright with HTTP 400
+#     "Function call is missing a thought_signature in functionCall parts".
+#     LiteLLM reads it from a tool call's provider_specific_fields, which is
+#     exactly what ToolCall.provider_metadata carries, so the round-trip is a
+#     rename rather than a re-implementation.
+
+_CACHE_CONTROL = {"type": "ephemeral"}
+
+# Providers whose API supports Anthropic-style prompt-cache breakpoints.
+_PROMPT_CACHE_PROVIDERS = frozenset({"anthropic"})
+
+# OpenAI's finish_reason vocabulary mapped onto the one the routes read.
+# Both spellings are already in use there ("stop" from the OpenAI path,
+# "tool_use" from the Anthropic path), so this keeps every existing branch
+# working rather than forcing a rewrite of the callers.
+_STOP_REASONS = {
+    "tool_calls": "tool_use",
+    "length": "max_tokens",
+    "function_call": "tool_use",
+}
 
 
-class AnthropicProvider(Provider):
-    def __init__(self, api_key: str, prompt_cache: bool = True, base_url: str = ""):
+def _tool_call_metadata(raw: Any) -> dict[str, Any]:
+    """Pull provider-specific fields off a LiteLLM tool call.
+
+    Today this carries Gemini 3's thought_signature and nothing else, but it is
+    deliberately opaque: anything a provider hangs here is round-tripped
+    verbatim rather than enumerated, so a new vendor quirk needs no schema
+    change.
+    """
+    for holder in (raw, getattr(raw, "function", None)):
+        fields = getattr(holder, "provider_specific_fields", None)
+        if isinstance(fields, dict) and fields:
+            return dict(fields)
+    return {}
+
+
+class LiteLLMProvider(Provider):
+    """Every model Kerf can reach, through one client.
+
+    ``provider`` is the LiteLLM route prefix ("anthropic", "openai", …) and is
+    also what :meth:`name` reports, so the registry, the BYO-key swap and the
+    usage rows all keep keying on the same string they always did.
+    """
+
+    #: Endpoint used when the caller supplies no base_url. Empty means "let
+    #: LiteLLM pick", which is right for every vendor that publishes one.
+    _DEFAULT_BASE_URL = ""
+
+    def __init__(
+        self,
+        provider: str,
+        api_key: str,
+        base_url: str = "",
+        prompt_cache: bool = True,
+    ):
+        self.provider = provider
         self.api_key = api_key
-        self.prompt_cache = prompt_cache
         # Endpoint override for a gateway or an OpenAI-compatible clone.
-        # Empty means the SDK's default. Saved per user in
-        # user_provider_keys.base_url and set from Settings.
-        self.base_url = base_url
+        # Saved per user in user_provider_keys.base_url and set from Settings.
+        self.base_url = base_url or self._DEFAULT_BASE_URL
+        self.prompt_cache = prompt_cache
 
     def name(self) -> str:
-        return "anthropic"
+        return self.provider
 
-    def complete(self, req: CompleteRequest) -> CompleteResponse:
-        import anthropic
-        import httpx
+    # ── request building ────────────────────────────────────────────────────
 
-        client = anthropic.Anthropic(
-            api_key=self.api_key,
-            http_client=httpx.Client(timeout=120.0),
-            **({"base_url": self.base_url} if self.base_url else {}),
-        )
+    def _model_id(self, model: str) -> str:
+        """Prefix a catalogue id for LiteLLM's router.
 
-        max_tokens = req.max_tokens if req.max_tokens > 0 else 4096
+        CATALOG stores bare vendor ids ("claude-opus-4-7"); LiteLLM needs
+        "anthropic/claude-opus-4-7" to know where to send it. An id that is
+        already prefixed is left alone, so a user pointing base_url at a
+        gateway can name a model the catalogue has never heard of.
+        """
+        return model if "/" in model else f"{self.provider}/{model}"
 
-        # Determine whether to inject cache_control breakpoints.
-        # We only do this when:
-        #   1. prompt_cache is enabled on this provider instance, AND
-        #   2. the installed SDK actually supports cache_control (feature-detect).
-        use_cache = self.prompt_cache and _anthropic_sdk_supports_cache_control()
+    def _use_cache(self) -> bool:
+        return self.prompt_cache and self.provider in _PROMPT_CACHE_PROVIDERS
 
-        # ── System block ─────────────────────────────────────────────────────
-        # When caching is on, wrap the system string in a single-element list
-        # of TextBlockParam with cache_control attached so Anthropic caches the
-        # entire system-prompt prefix.  The plain-string form is used otherwise
-        # for full backward compatibility.
-        if use_cache and req.system:
-            system_param: Any = [
-                {
-                    "type": "text",
-                    "text": req.system,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ]
-        else:
-            system_param: Any = req.system
+    def _system_message(self, system: str) -> list[dict[str, Any]]:
+        if not system:
+            return []
+        if not self._use_cache():
+            return [{"role": "system", "content": system}]
+        # A cache_control breakpoint has to sit on a content *block*, not on a
+        # bare string, so the system prompt becomes a one-element block list.
+        # Everything up to and including this block becomes cacheable, which
+        # for Kerf is the ~7KB CAD system prompt sent on every single turn.
+        return [{
+            "role": "system",
+            "content": [{
+                "type": "text",
+                "text": system,
+                "cache_control": _CACHE_CONTROL,
+            }],
+        }]
 
-        # ── Tools block ──────────────────────────────────────────────────────
-        tools = None
-        if req.tools:
-            tools = [
-                {
+    def _tools(self, tools: list[ToolSpec]) -> list[dict[str, Any]] | None:
+        if not tools:
+            return None
+        out = [
+            {
+                "type": "function",
+                "function": {
                     "name": t.name,
                     "description": t.description,
-                    "input_schema": t.input_schema or {"type": "object", "properties": {}},
-                }
-                for t in req.tools
-            ]
-            # Attach cache_control only to the *last* tool entry.  Anthropic
-            # treats this as a breakpoint: everything up to and including this
-            # entry is eligible for the KV cache.
-            if use_cache and tools:
-                tools[-1] = dict(tools[-1], cache_control={"type": "ephemeral"})
+                    "parameters": t.input_schema or {"type": "object", "properties": {}},
+                },
+            }
+            for t in tools
+        ]
+        if self._use_cache():
+            # One breakpoint, on the last tool: Anthropic caches the prefix up
+            # to and including it, which covers the whole 14-tool block.
+            out[-1] = {**out[-1], "cache_control": _CACHE_CONTROL}
+        return out
 
-        tool_choice = None
-        if tools:
-            # Anthropic requires tool_choice to be an OBJECT, not the bare
-            # strings "auto"/"none" — passing "auto" yields HTTP 400
-            # "tool_choice: Input should be an object" (every opus chat
-            # turn failed with this).
-            if req.tool_choice in ("", "auto"):
-                tool_choice = {"type": "auto"}
-            elif req.tool_choice == "none":
-                tool_choice = {"type": "none"}
-            else:
-                tool_choice = {"type": "tool", "name": req.tool_choice}
-
-        messages = []
-        i = 0
-        while i < len(req.messages):
-            m = req.messages[i]
-            if m.role == "tool":
-                tool_blocks = []
-                while i < len(req.messages) and req.messages[i].role == "tool":
-                    tm = req.messages[i]
-                    block: dict[str, Any] = {
-                        "type": "tool_result",
-                        "tool_use_id": tm.tool_call_id,
-                        "content": tm.content,
-                    }
-                    if tm.is_error:
-                        block["is_error"] = True
-                    tool_blocks.append(block)
-                    i += 1
-                messages.append({"role": "user", "content": tool_blocks})
-                continue
-
+    def _messages(self, req: CompleteRequest) -> list[dict[str, Any]]:
+        messages = self._system_message(req.system)
+        for m in req.messages:
+            content = m.content
+            if m.is_error and m.role == "tool":
+                # Anthropic's tool_result block has an is_error flag and the
+                # hand-written provider set it; LiteLLM's OpenAI-shaped tool
+                # message has nowhere to put it (its Anthropic transformation
+                # leaves is_error commented out), so the signal moves into the
+                # content, where every provider sees it. That is a wider net
+                # than before: the flag only ever reached Anthropic, and a
+                # failed tool looked like a successful one to OpenAI, Moonshot
+                # and Gemini. The payload itself is left intact after the
+                # marker so a model that parses it still can.
+                content = f"[tool error] {content}"
+            msg: dict[str, Any] = {"role": m.role, "content": content}
             if m.tool_calls:
-                content_blocks = []
-                if m.content.strip():
-                    content_blocks.append({"type": "text", "text": m.content})
-                for tc in m.tool_calls:
-                    content_blocks.append({
-                        "type": "tool_use",
+                msg["tool_calls"] = [
+                    {
                         "id": tc.id,
-                        "name": tc.name,
-                        "input": json.loads(tc.arguments_json) if tc.arguments_json.strip() else {},
-                    })
-                messages.append({"role": m.role, "content": content_blocks})
-            else:
-                messages.append({"role": m.role, "content": m.content})
-            i += 1
+                        "type": "function",
+                        "function": {
+                            "name": tc.name,
+                            "arguments": tc.arguments_json,
+                        },
+                        # Gemini 3 rejects the next request outright if this
+                        # does not come back, so it rides on the echo.
+                        **(
+                            {"provider_specific_fields": tc.provider_metadata}
+                            if tc.provider_metadata else {}
+                        ),
+                    }
+                    for tc in m.tool_calls
+                ]
+            if m.tool_call_id:
+                msg["tool_call_id"] = m.tool_call_id
+            messages.append(msg)
+        return messages
 
-        # Only send temperature when explicitly set (>0). Passing
-        # temperature=None serializes to JSON null, which Anthropic now
-        # rejects with 400 "temperature: Input should be a valid number"
-        # — that broke chat for every model.
-        _kw = dict(
-            model=req.model,
-            system=system_param,
-            max_tokens=max_tokens,
-            messages=messages,
-        )
-        # Same defensive omission for tools/tool_choice. The auto-title and
-        # readme-gen paths call provider.complete() with NO tools — sending
-        # tool_choice=None would serialize as JSON null and Anthropic now
-        # rejects that with 400 "tool_choice: Input should be an object",
-        # which broke auto-title every first message and surfaced to users
-        # as "temporary server-side issue preventing file reads and writes".
-        if tools:
-            _kw["tools"] = tools
-        if tool_choice is not None:
-            _kw["tool_choice"] = tool_choice
+    def _kwargs(self, req: CompleteRequest) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {
+            "model": self._model_id(req.model),
+            "messages": self._messages(req),
+            "api_key": self.api_key,
+            "timeout": 120.0,
+            # Reasoning models reject parameters the chat models require
+            # (o3-mini and temperature, most visibly). Dropping the unsupported
+            # ones is better than maintaining a per-model allow-list that goes
+            # stale every time a vendor ships.
+            "drop_params": True,
+        }
+        if self.base_url:
+            kwargs["base_url"] = self.base_url
+        if req.max_tokens > 0:
+            kwargs["max_tokens"] = req.max_tokens
+        # Omit temperature rather than sending 0/null: some models reject an
+        # explicit null, and some reject the parameter at any value.
         if req.temperature > 0:
-            _kw["temperature"] = req.temperature
-        response = client.messages.create(**_kw)
+            kwargs["temperature"] = req.temperature
 
-        text_parts = []
-        tool_calls = []
-        for block in response.content:
-            if block.type == "text":
-                text_parts.append(block.text)
-            elif block.type == "tool_use":
-                tool_calls.append(ToolCall(
-                    id=block.id,
-                    name=block.name,
-                    arguments_json=json.dumps(block.input),
-                ))
+        tools = self._tools(req.tools)
+        if tools:
+            kwargs["tools"] = tools
+            if req.tool_choice and req.tool_choice not in ("auto", "none"):
+                # A bare name means "call this specific tool".
+                kwargs["tool_choice"] = {
+                    "type": "function",
+                    "function": {"name": req.tool_choice},
+                }
+            elif req.tool_choice:
+                kwargs["tool_choice"] = req.tool_choice
+        return kwargs
 
-        stop_reason = response.stop_reason or "stop"
-        if stop_reason == "tool_use":
-            stop_reason = "tool_use"
-        elif stop_reason == "max_tokens":
-            stop_reason = "length"
+    # ── completion ──────────────────────────────────────────────────────────
+
+    def complete(self, req: CompleteRequest) -> CompleteResponse:
+        import litellm
+
+        response = litellm.completion(**self._kwargs(req))
+
+        choice = response.choices[0]
+        message = choice.message
+
+        tool_calls = [
+            ToolCall(
+                id=tc.id,
+                name=tc.function.name,
+                arguments_json=tc.function.arguments or "{}",
+                provider_metadata=_tool_call_metadata(tc),
+            )
+            for tc in (message.tool_calls or [])
+        ]
+
+        finish = choice.finish_reason or "stop"
+        usage = getattr(response, "usage", None)
 
         return CompleteResponse(
-            content="".join(text_parts),
+            content=message.content or "",
             tool_calls=tool_calls,
-            stop_reason=stop_reason,
-            model_used=req.model,
-            input_tokens=response.usage.input_tokens,
-            output_tokens=response.usage.output_tokens,
+            stop_reason=_STOP_REASONS.get(finish, finish),
+            model_used=getattr(response, "model", "") or req.model,
+            input_tokens=getattr(usage, "prompt_tokens", 0) or 0,
+            output_tokens=getattr(usage, "completion_tokens", 0) or 0,
         )
 
-    async def stream(self, req: CompleteRequest) -> AsyncIterator[StreamEvent]:  # type: ignore[override]
-        """Stream one LLM turn via Anthropic's messages.stream() context manager.
+    # ── streaming ───────────────────────────────────────────────────────────
 
-        Yields Kerf-native StreamEvent objects:
+    async def stream(self, req: CompleteRequest) -> AsyncIterator[StreamEvent]:
+        """Yield Kerf-native StreamEvents for one LLM turn.
+
+        Event vocabulary, unchanged from the hand-written providers because the
+        SSE route and the frontend both decode it:
+
           assistant_text_delta  — incremental text
           tool_use_start        — a new tool call block started
           tool_use_input_delta  — partial JSON input for a tool call
           tool_use_complete     — tool call input fully assembled
-          assistant_done        — final stop/token event
+          assistant_done        — final stop reason + token counts
+
+        The OpenAI streaming shape identifies tool calls by an integer index
+        rather than by block boundaries, and sends the id and name once (on the
+        first fragment) with the arguments dribbling in afterwards. So calls are
+        accumulated per index and completed at end of stream — there is no
+        per-block stop event to hang tool_use_complete off.
         """
-        import anthropic
-        import httpx
+        import json as _json
+        import litellm
 
-        client = anthropic.Anthropic(
-            api_key=self.api_key,
-            http_client=httpx.Client(timeout=120.0),
-            **({"base_url": self.base_url} if self.base_url else {}),
-        )
+        kwargs = self._kwargs(req)
+        kwargs["stream"] = True
+        # Streaming responses omit usage unless asked. Without this every turn
+        # records zero tokens, which is what the usage panel reads.
+        kwargs["stream_options"] = {"include_usage": True}
 
-        max_tokens = req.max_tokens if req.max_tokens > 0 else 4096
-        use_cache = self.prompt_cache and _anthropic_sdk_supports_cache_control()
-
-        # ── System block ────────────────────────────────────────────────────
-        if use_cache and req.system:
-            system_param: Any = [
-                {
-                    "type": "text",
-                    "text": req.system,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ]
-        else:
-            system_param: Any = req.system
-
-        # ── Tools block ─────────────────────────────────────────────────────
-        tools = None
-        if req.tools:
-            tools = [
-                {
-                    "name": t.name,
-                    "description": t.description,
-                    "input_schema": t.input_schema or {"type": "object", "properties": {}},
-                }
-                for t in req.tools
-            ]
-            if use_cache and tools:
-                tools[-1] = dict(tools[-1], cache_control={"type": "ephemeral"})
-
-        tool_choice = None
-        if tools:
-            if req.tool_choice in ("", "auto"):
-                tool_choice = {"type": "auto"}
-            elif req.tool_choice == "none":
-                tool_choice = {"type": "none"}
-            else:
-                tool_choice = {"type": "tool", "name": req.tool_choice}
-
-        # ── Build messages ───────────────────────────────────────────────────
-        messages: list[dict] = []
-        i = 0
-        while i < len(req.messages):
-            m = req.messages[i]
-            if m.role == "tool":
-                tool_blocks = []
-                while i < len(req.messages) and req.messages[i].role == "tool":
-                    tm = req.messages[i]
-                    block: dict[str, Any] = {
-                        "type": "tool_result",
-                        "tool_use_id": tm.tool_call_id,
-                        "content": tm.content,
-                    }
-                    if tm.is_error:
-                        block["is_error"] = True
-                    tool_blocks.append(block)
-                    i += 1
-                messages.append({"role": "user", "content": tool_blocks})
-                continue
-
-            if m.tool_calls:
-                content_blocks = []
-                if m.content.strip():
-                    content_blocks.append({"type": "text", "text": m.content})
-                for tc in m.tool_calls:
-                    content_blocks.append({
-                        "type": "tool_use",
-                        "id": tc.id,
-                        "name": tc.name,
-                        "input": json.loads(tc.arguments_json) if tc.arguments_json.strip() else {},
-                    })
-                messages.append({"role": m.role, "content": content_blocks})
-            else:
-                messages.append({"role": m.role, "content": m.content})
-            i += 1
-
-        _kw: dict[str, Any] = dict(
-            model=req.model,
-            system=system_param,
-            max_tokens=max_tokens,
-            messages=messages,
-        )
-        if tools:
-            _kw["tools"] = tools
-        if tool_choice is not None:
-            _kw["tool_choice"] = tool_choice
-        if req.temperature > 0:
-            _kw["temperature"] = req.temperature
-
-        # ── State tracking for tool-use blocks ──────────────────────────────
-        # We accumulate per-block state so we can emit complete events.
-        current_block_type: str | None = None
-        current_tool_id: str | None = None
-        current_tool_name: str | None = None
-        current_tool_input_parts: list[str] = []
-
+        # index -> {id, name, parts[], metadata}
+        pending: dict[int, dict[str, Any]] = {}
+        stop_reason = "end_turn"
         input_tokens = 0
         output_tokens = 0
+        model_used = req.model
 
-        with client.messages.stream(**_kw) as stream:
-            for event in stream:
-                etype = type(event).__name__
+        response = await litellm.acompletion(**kwargs)
+        async for chunk in response:
+            usage = getattr(chunk, "usage", None)
+            if usage is not None:
+                input_tokens = getattr(usage, "prompt_tokens", 0) or input_tokens
+                output_tokens = getattr(usage, "completion_tokens", 0) or output_tokens
+            model_used = getattr(chunk, "model", "") or model_used
 
-                # The Anthropic SDK (≥ 0.39) emits events with the literal
-                # class names `RawMessageStartEvent`, `RawContentBlockStartEvent`,
-                # `RawContentBlockDeltaEvent`, `ParsedContentBlockStopEvent`,
-                # `RawMessageDeltaEvent`, `ParsedMessageStopEvent`, etc. The
-                # previous match (against un-prefixed names) silently fell
-                # through for EVERY event, so this method yielded nothing
-                # and the route saw stop_reason=tool_use with zero tool calls
-                # captured — surface symptom: "blank chat head" with no
-                # tools executed (see scripts/e2e_chat_probe.py output).
-                # Also tolerate both the higher-level helper events (TextEvent,
-                # InputJsonEvent) emitted alongside the raw deltas, and the
-                # un-prefixed legacy names in case an older SDK is in use.
+            choices = getattr(chunk, "choices", None)
+            if not choices:
+                # The usage-only final chunk carries no choices.
+                continue
+            choice = choices[0]
 
-                if etype in ("RawMessageStartEvent", "MessageStartEvent"):
-                    # Capture input tokens from message_start usage
-                    if hasattr(event, "message") and hasattr(event.message, "usage"):
-                        input_tokens = getattr(event.message.usage, "input_tokens", 0) or 0
+            if getattr(choice, "finish_reason", None):
+                stop_reason = _STOP_REASONS.get(choice.finish_reason, choice.finish_reason)
 
-                elif etype in ("RawContentBlockStartEvent", "ContentBlockStartEvent"):
-                    block = event.content_block
-                    if block.type == "text":
-                        current_block_type = "text"
-                        current_tool_id = None
-                        current_tool_name = None
-                        current_tool_input_parts = []
-                    elif block.type == "tool_use":
-                        current_block_type = "tool_use"
-                        current_tool_id = block.id
-                        current_tool_name = block.name
-                        current_tool_input_parts = []
-                        yield StreamEvent(
-                            type="tool_use_start",
-                            data={"tool_use_id": block.id, "name": block.name},
-                        )
+            delta = getattr(choice, "delta", None)
+            if delta is None:
+                continue
 
-                elif etype in ("RawContentBlockDeltaEvent", "ContentBlockDeltaEvent"):
-                    delta = event.delta
-                    dtype = getattr(delta, "type", None)
-                    if current_block_type == "text" and dtype == "text_delta":
-                        yield StreamEvent(
-                            type="assistant_text_delta",
-                            data={"text": delta.text},
-                        )
-                    elif current_block_type == "tool_use" and dtype == "input_json_delta":
-                        current_tool_input_parts.append(delta.partial_json)
+            text = getattr(delta, "content", None)
+            if text:
+                yield StreamEvent(type="assistant_text_delta", data={"text": text})
+
+            for tc in (getattr(delta, "tool_calls", None) or []):
+                index = getattr(tc, "index", 0) or 0
+                entry = pending.get(index)
+                if entry is None:
+                    entry = {"id": "", "name": "", "parts": [], "metadata": {}}
+                    pending[index] = entry
+
+                if getattr(tc, "id", None):
+                    entry["id"] = tc.id
+                fn = getattr(tc, "function", None)
+                if fn is not None and getattr(fn, "name", None):
+                    entry["name"] = fn.name
+                entry["metadata"].update(_tool_call_metadata(tc))
+
+                # Announce the call as soon as both halves of its identity are
+                # known — the UI renders the tool name before any arguments
+                # arrive, and a fragment can carry the id and the name apart.
+                if entry["id"] and entry["name"] and not entry.get("announced"):
+                    entry["announced"] = True
+                    yield StreamEvent(
+                        type="tool_use_start",
+                        data={"tool_use_id": entry["id"], "name": entry["name"]},
+                    )
+
+                fragment = getattr(fn, "arguments", None) if fn is not None else None
+                if fragment:
+                    entry["parts"].append(fragment)
+                    if entry.get("announced"):
                         yield StreamEvent(
                             type="tool_use_input_delta",
                             data={
-                                "tool_use_id": current_tool_id,
-                                "partial_json": delta.partial_json,
+                                "tool_use_id": entry["id"],
+                                "partial_json": fragment,
                             },
                         )
 
-                elif etype in (
-                    "RawContentBlockStopEvent",
-                    "ContentBlockStopEvent",
-                    "ParsedContentBlockStopEvent",
-                ):
-                    if current_block_type == "tool_use" and current_tool_id is not None:
-                        assembled = "".join(current_tool_input_parts)
-                        try:
-                            parsed_input = json.loads(assembled) if assembled.strip() else {}
-                        except json.JSONDecodeError:
-                            parsed_input = {}
-                        yield StreamEvent(
-                            type="tool_use_complete",
-                            data={
-                                "tool_use_id": current_tool_id,
-                                "name": current_tool_name,
-                                "input": parsed_input,
-                            },
-                        )
-                    current_block_type = None
-
-                elif etype in ("RawMessageDeltaEvent", "MessageDeltaEvent"):
-                    if hasattr(event, "usage"):
-                        output_tokens = getattr(event.usage, "output_tokens", 0) or 0
-
-                elif etype in (
-                    "RawMessageStopEvent",
-                    "MessageStopEvent",
-                    "ParsedMessageStopEvent",
-                ):
-                    pass  # handled via get_final_message below
-
-                # `TextEvent` / `InputJsonEvent` / etc. are higher-level
-                # helpers emitted alongside the Raw events — we already
-                # forwarded the Raw delta above, so skip them silently.
-
-            # Retrieve final stop_reason + token counts from the accumulated message.
+        for index in sorted(pending):
+            entry = pending[index]
+            if not entry["id"] and not entry["name"]:
+                continue
+            if not entry.get("announced"):
+                # An id or a name never arrived. Emit the start anyway so the
+                # completion below is not orphaned in the UI.
+                yield StreamEvent(
+                    type="tool_use_start",
+                    data={"tool_use_id": entry["id"], "name": entry["name"]},
+                )
+            assembled = "".join(entry["parts"])
             try:
-                final_msg = stream.get_final_message()
-                stop_reason = final_msg.stop_reason or "end_turn"
-                if hasattr(final_msg, "usage"):
-                    input_tokens = getattr(final_msg.usage, "input_tokens", input_tokens)
-                    output_tokens = getattr(final_msg.usage, "output_tokens", output_tokens)
-            except Exception:
-                stop_reason = "end_turn"
+                parsed = _json.loads(assembled) if assembled.strip() else {}
+            except _json.JSONDecodeError:
+                # A truncated stream leaves half an object. Empty input is a
+                # tool call the executor can reject cleanly; a raise here would
+                # take down the whole turn.
+                parsed = {}
+            yield StreamEvent(
+                type="tool_use_complete",
+                data={
+                    "tool_use_id": entry["id"],
+                    "name": entry["name"],
+                    "input": parsed,
+                    "provider_metadata": entry["metadata"],
+                },
+            )
 
         yield StreamEvent(
             type="assistant_done",
@@ -776,512 +768,34 @@ class AnthropicProvider(Provider):
                 "stop_reason": stop_reason,
                 "input_tokens": input_tokens,
                 "output_tokens": output_tokens,
-                "model": req.model,
+                "model": model_used,
             },
         )
 
 
-class OpenAIProvider(Provider):
+# ── The four named providers ────────────────────────────────────────────────
+# Kept as classes rather than collapsed into Registry lookups because
+# _prefer_byo_provider constructs them by name, and isinstance checks on them
+# are how the tests assert a user's own key was swapped in.
+
+class AnthropicProvider(LiteLLMProvider):
+    def __init__(self, api_key: str, prompt_cache: bool = True, base_url: str = ""):
+        super().__init__("anthropic", api_key, base_url=base_url, prompt_cache=prompt_cache)
+
+
+class OpenAIProvider(LiteLLMProvider):
     def __init__(self, api_key: str, base_url: str = ""):
-        self.api_key = api_key
-        # Endpoint override for a gateway or an OpenAI-compatible clone.
-        # Empty means the SDK's default. Saved per user in
-        # user_provider_keys.base_url and set from Settings.
-        self.base_url = base_url
-
-    def name(self) -> str:
-        return "openai"
-
-    def complete(self, req: CompleteRequest) -> CompleteResponse:
-        from openai import OpenAI
-        import httpx
-
-        client = OpenAI(
-            api_key=self.api_key,
-            http_client=httpx.Client(timeout=120.0),
-            **({"base_url": self.base_url} if self.base_url else {}),
-        )
-
-        tools = None
-        if req.tools:
-            tools = [
-                {"type": "function", "function": {
-                    "name": t.name,
-                    "description": t.description,
-                    "parameters": t.input_schema or {"type": "object", "properties": {}},
-                }}
-                for t in req.tools
-            ]
-
-        messages = []
-        for m in req.messages:
-            msg = {"role": m.role, "content": m.content}
-            if m.tool_calls:
-                msg["tool_calls"] = [
-                    {
-                        "id": tc.id,
-                        "function": {"name": tc.name, "arguments": tc.arguments_json},
-                        "type": "function",
-                    }
-                    for tc in m.tool_calls
-                ]
-            if m.tool_call_id:
-                msg["tool_call_id"] = m.tool_call_id
-            messages.append(msg)
-
-        extra_body = {}
-        if tools:
-            extra_body["tools"] = tools
-            if req.tool_choice and req.tool_choice != "auto":
-                extra_body["tool_choice"] = req.tool_choice
-        # Omit temperature unless set (None → null is rejected by some
-        # providers; see the Anthropic note above).
-        if req.temperature > 0:
-            extra_body["temperature"] = req.temperature
-
-        response = client.chat.completions.create(
-            model=req.model,
-            messages=messages,
-            max_tokens=req.max_tokens if req.max_tokens > 0 else None,
-            **extra_body,
-        )
-
-        choice = response.choices[0]
-        text_parts = []
-        tool_calls = []
-
-        if choice.message.content:
-            text_parts.append(choice.message.content)
-
-        if choice.message.tool_calls:
-            for tc in choice.message.tool_calls:
-                tool_calls.append(ToolCall(
-                    id=tc.id,
-                    name=tc.function.name,
-                    arguments_json=tc.function.arguments,
-                ))
-
-        stop_reason = choice.finish_reason or "stop"
-
-        return CompleteResponse(
-            content="".join(text_parts),
-            tool_calls=tool_calls,
-            stop_reason=stop_reason,
-            model_used=response.model,
-            input_tokens=response.usage.prompt_tokens,
-            output_tokens=response.usage.completion_tokens,
-        )
+        super().__init__("openai", api_key, base_url=base_url)
 
 
-class MoonshotProvider(Provider):
+class MoonshotProvider(LiteLLMProvider):
+    # Moonshot publishes no default LiteLLM picks up for the .cn endpoint.
     _DEFAULT_BASE_URL = "https://api.moonshot.cn/v1"
 
     def __init__(self, api_key: str, base_url: str = ""):
-        self.api_key = api_key
-        # Endpoint override for a gateway or an OpenAI-compatible clone.
-        # Empty means the SDK's default. Saved per user in
-        # user_provider_keys.base_url and set from Settings.
-        self.base_url = base_url or self._DEFAULT_BASE_URL
-
-    def name(self) -> str:
-        return "moonshot"
-
-    def complete(self, req: CompleteRequest) -> CompleteResponse:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=self.api_key, base_url=self.base_url)
-
-        messages = []
-        for m in req.messages:
-            msg = {"role": m.role, "content": m.content}
-            if m.tool_calls:
-                msg["tool_calls"] = [
-                    {
-                        "id": tc.id,
-                        "function": {"name": tc.name, "arguments": tc.arguments_json},
-                        "type": "function",
-                    }
-                    for tc in m.tool_calls
-                ]
-            if m.tool_call_id:
-                msg["tool_call_id"] = m.tool_call_id
-            messages.append(msg)
-
-        tools = None
-        if req.tools:
-            tools = [
-                {"type": "function", "function": {
-                    "name": t.name,
-                    "description": t.description,
-                    "parameters": t.input_schema or {"type": "object", "properties": {}},
-                }}
-                for t in req.tools
-            ]
-
-        extra_body = {}
-        if tools:
-            extra_body["tools"] = tools
-        # Omit temperature unless set (None → null is rejected by some
-        # providers; see the Anthropic note above).
-        if req.temperature > 0:
-            extra_body["temperature"] = req.temperature
-
-        response = client.chat.completions.create(
-            model=req.model,
-            messages=messages,
-            max_tokens=req.max_tokens if req.max_tokens > 0 else None,
-            **extra_body,
-        )
-
-        choice = response.choices[0]
-        text_parts = []
-        tool_calls = []
-
-        if choice.message.content:
-            text_parts.append(choice.message.content)
-
-        if choice.message.tool_calls:
-            for tc in choice.message.tool_calls:
-                tool_calls.append(ToolCall(
-                    id=tc.id,
-                    name=tc.function.name,
-                    arguments_json=tc.function.arguments,
-                ))
-
-        return CompleteResponse(
-            content="".join(text_parts),
-            tool_calls=tool_calls,
-            stop_reason=choice.finish_reason or "stop",
-            model_used=response.model,
-            input_tokens=response.usage.prompt_tokens,
-            output_tokens=response.usage.completion_tokens,
-        )
+        super().__init__("moonshot", api_key, base_url=base_url)
 
 
-class GeminiProvider(Provider):
-    """Google Gemini via the modern `google-genai` SDK.
-
-    Migrated 2026-05-19 from the deprecated `google-generativeai`
-    package. The old SDK printed a FutureWarning on every import and
-    used different APIs (GenerativeModel constructor + module-level
-    `configure`); the new SDK is client-shaped:
-
-        client = genai.Client(api_key=...)
-        client.models.generate_content(model=..., contents=...,
-            config=types.GenerateContentConfig(...))
-
-    Message format:
-      - `contents` is a list of `types.Content` objects
-      - each Content has role ∈ {"user", "model"} + a list of Parts
-      - a Part is `types.Part.from_text(text)` for text, or
-        `types.Part(function_call=...)` for assistant tool calls, or
-        `types.Part(function_response=...)` for tool results
-
-    Tools:
-      - `types.Tool(function_declarations=[...FunctionDeclaration...])`
-    """
-
+class GeminiProvider(LiteLLMProvider):
     def __init__(self, api_key: str, base_url: str = ""):
-        self.api_key = api_key
-        # Endpoint override for a gateway or a Vertex-style proxy. Empty means
-        # the SDK's default. Saved per user in user_provider_keys.base_url and
-        # set from Settings. google-genai takes this via HttpOptions rather
-        # than a constructor kwarg, hence _client() below.
-        self.base_url = base_url
-
-    def name(self) -> str:
-        return "gemini"
-
-    def _client(self):
-        """Build a genai client, honouring a configured base_url."""
-        from google import genai
-        if not self.base_url:
-            return genai.Client(api_key=self.api_key)
-        from google.genai import types as genai_types
-        return genai.Client(
-            api_key=self.api_key,
-            http_options=genai_types.HttpOptions(base_url=self.base_url),
-        )
-
-    # ── Shared request-building helpers ─────────────────────────────────
-
-    def _build_request_args(self, req: CompleteRequest):
-        """Translate a Kerf CompleteRequest into the kwargs the genai
-        Client expects. Returns (contents, config) where `config` is a
-        `types.GenerateContentConfig` instance (or None) and `contents`
-        is a list of `types.Content` objects.
-
-        Pulled out of complete() / stream() so both share the same wire
-        contract — the previous bifurcation was where Gemini regressions
-        landed.
-        """
-        from google import genai
-        from google.genai import types
-
-        contents = []
-        for m in req.messages:
-            if m.role == "user":
-                contents.append(types.Content(
-                    role="user",
-                    parts=[types.Part.from_text(text=m.content)],
-                ))
-            elif m.role == "assistant":
-                parts = []
-                if m.content.strip():
-                    parts.append(types.Part.from_text(text=m.content))
-                for tc in m.tool_calls:
-                    args = json.loads(tc.arguments_json) if tc.arguments_json.strip() else {}
-                    part_kwargs: dict[str, Any] = {
-                        "function_call": types.FunctionCall(name=tc.name, args=args),
-                    }
-                    # Echo Gemini's thought_signature back on the Part —
-                    # required by Gemini 3 (see _parse_response_parts).
-                    sig_b64 = (tc.provider_metadata or {}).get("thought_signature")
-                    if sig_b64:
-                        import base64
-                        try:
-                            part_kwargs["thought_signature"] = base64.b64decode(sig_b64)
-                        except Exception:
-                            pass
-                    parts.append(types.Part(**part_kwargs))
-                contents.append(types.Content(role="model", parts=parts))
-            elif m.role == "tool":
-                # In the genai SDK, function_response parts go in a user-
-                # role Content turn. tool_call_id maps to the original
-                # function name (Gemini doesn't track call ids the way
-                # Anthropic does, so we use the name; the upstream
-                # routing layer correlates by order).
-                contents.append(types.Content(
-                    role="user",
-                    parts=[types.Part(
-                        function_response=types.FunctionResponse(
-                            name=m.tool_call_id or "unknown",
-                            response={"result": m.content},
-                        ),
-                    )],
-                ))
-
-        # Tool catalog → FunctionDeclaration list inside one Tool.
-        tool_objs = None
-        if req.tools:
-            decls = [
-                types.FunctionDeclaration(
-                    name=t.name,
-                    description=t.description,
-                    parameters=t.input_schema or {"type": "object", "properties": {}},
-                )
-                for t in req.tools
-            ]
-            tool_objs = [types.Tool(function_declarations=decls)]
-
-        config_kwargs: dict[str, Any] = {}
-        if req.system:
-            config_kwargs["system_instruction"] = req.system
-        if tool_objs is not None:
-            config_kwargs["tools"] = tool_objs
-        if req.max_tokens > 0:
-            config_kwargs["max_output_tokens"] = req.max_tokens
-        if req.temperature > 0:
-            config_kwargs["temperature"] = req.temperature
-
-        config = (
-            types.GenerateContentConfig(**config_kwargs)
-            if config_kwargs else None
-        )
-        return contents, config
-
-    @staticmethod
-    def _parse_response_parts(candidate) -> tuple[list[str], list[ToolCall]]:
-        """Extract text + function_calls from a single genai response
-        candidate. Skips empty parts so we never emit empty deltas.
-
-        For each function_call part we capture `thought_signature`
-        (Gemini 3's opaque thinking-context token) into
-        `tool_call.provider_metadata['thought_signature']` — base64-
-        encoded so it survives JSON persistence. When we echo the
-        assistant turn back in `_build_request_args`, the signature
-        rides along; without it Gemini 3 rejects the request.
-        """
-        import base64
-        text_parts: list[str] = []
-        tool_calls: list[ToolCall] = []
-        if not getattr(candidate, "content", None):
-            return text_parts, tool_calls
-        for part in candidate.content.parts or []:
-            text = getattr(part, "text", None)
-            fc = getattr(part, "function_call", None)
-            if text:
-                text_parts.append(text)
-            if fc and fc.name:
-                args = dict(fc.args) if fc.args else {}
-                meta: dict[str, Any] = {}
-                sig = getattr(part, "thought_signature", None)
-                if sig:
-                    # `thought_signature` is bytes. Base64 it so the
-                    # value JSON-serialises cleanly into chat_messages.tool_calls.
-                    meta["thought_signature"] = base64.b64encode(sig).decode("ascii")
-                tool_calls.append(ToolCall(
-                    id=f"call_{hash((fc.name, str(args))) % 1000000}",
-                    name=fc.name,
-                    arguments_json=json.dumps(args),
-                    provider_metadata=meta,
-                ))
-        return text_parts, tool_calls
-
-    # ── Non-streaming path ──────────────────────────────────────────────
-
-    def complete(self, req: CompleteRequest) -> CompleteResponse:
-        from google import genai
-        client = self._client()
-
-        contents, config = self._build_request_args(req)
-
-        response = client.models.generate_content(
-            model=req.model,
-            contents=contents,
-            config=config,
-        )
-
-        text_parts: list[str] = []
-        tool_calls: list[ToolCall] = []
-        for candidate in (response.candidates or []):
-            tp, tcs = self._parse_response_parts(candidate)
-            text_parts.extend(tp)
-            tool_calls.extend(tcs)
-
-        # finish_reason: 1 = STOP, 2 = MAX_TOKENS, 3 = SAFETY, 5 = OTHER, etc.
-        finish = None
-        if response.candidates:
-            finish = getattr(response.candidates[0], "finish_reason", None)
-        stop_reason = "tool_use" if tool_calls else "stop"
-        if finish and str(finish).endswith("MAX_TOKENS"):
-            stop_reason = "length"
-
-        usage = getattr(response, "usage_metadata", None)
-        input_tokens = getattr(usage, "prompt_token_count", 0) if usage else 0
-        output_tokens = getattr(usage, "candidates_token_count", 0) if usage else 0
-
-        return CompleteResponse(
-            content="".join(text_parts),
-            tool_calls=tool_calls,
-            stop_reason=stop_reason,
-            model_used=req.model,
-            input_tokens=input_tokens or 0,
-            output_tokens=output_tokens or 0,
-        )
-
-    # ── Streaming path ──────────────────────────────────────────────────
-
-    async def stream(self, req: CompleteRequest) -> AsyncIterator[StreamEvent]:  # type: ignore[override]
-        """True streaming via genai's generate_content_stream. Emits the
-        same Kerf-native StreamEvent shape as AnthropicProvider.stream():
-        assistant_text_delta / tool_use_start / tool_use_complete /
-        assistant_done."""
-        from google import genai
-        client = self._client()
-
-        contents, config = self._build_request_args(req)
-
-        # Accumulators that survive across chunks.
-        emitted_tool_starts: set[str] = set()
-        last_input_tokens = 0
-        last_output_tokens = 0
-        last_finish = None
-
-        # genai's stream iterator is sync — call it on a worker thread
-        # and pump chunks into an async queue to keep the FastAPI event
-        # loop responsive.
-        import asyncio
-        import queue as _queue
-        chunk_q: asyncio.Queue = asyncio.Queue()
-        loop = asyncio.get_event_loop()
-        _SENTINEL = object()
-
-        def _pump():
-            try:
-                for chunk in client.models.generate_content_stream(
-                    model=req.model,
-                    contents=contents,
-                    config=config,
-                ):
-                    asyncio.run_coroutine_threadsafe(chunk_q.put(chunk), loop)
-            except Exception as e:  # surface to the consumer
-                asyncio.run_coroutine_threadsafe(chunk_q.put(e), loop)
-            finally:
-                asyncio.run_coroutine_threadsafe(chunk_q.put(_SENTINEL), loop)
-
-        import threading
-        t = threading.Thread(target=_pump, daemon=True)
-        t.start()
-
-        while True:
-            chunk = await chunk_q.get()
-            if chunk is _SENTINEL:
-                break
-            if isinstance(chunk, Exception):
-                raise chunk
-
-            # Token usage rolls forward.
-            usage = getattr(chunk, "usage_metadata", None)
-            if usage:
-                last_input_tokens = getattr(usage, "prompt_token_count", last_input_tokens) or last_input_tokens
-                last_output_tokens = getattr(usage, "candidates_token_count", last_output_tokens) or last_output_tokens
-
-            for candidate in (chunk.candidates or []):
-                last_finish = getattr(candidate, "finish_reason", last_finish)
-                if not getattr(candidate, "content", None):
-                    continue
-                for part in candidate.content.parts or []:
-                    text = getattr(part, "text", None)
-                    fc = getattr(part, "function_call", None)
-                    if text:
-                        yield StreamEvent(
-                            type="assistant_text_delta",
-                            data={"text": text},
-                        )
-                    if fc and fc.name:
-                        # genai streams tool calls atomically — start +
-                        # complete in one chunk. Emit both so the
-                        # frontend's chip flow renders the same way as
-                        # the Anthropic path.
-                        args = dict(fc.args) if fc.args else {}
-                        tid_key = f"call_{hash((fc.name, str(args))) % 1000000}"
-                        if tid_key not in emitted_tool_starts:
-                            emitted_tool_starts.add(tid_key)
-                            yield StreamEvent(
-                                type="tool_use_start",
-                                data={"tool_use_id": tid_key, "name": fc.name},
-                            )
-                        # Carry Gemini 3's thought_signature on the
-                        # tool_use_complete event so the route's
-                        # pending_tools assembly picks it up into the
-                        # ToolCall.provider_metadata — required for
-                        # subsequent-turn echo (otherwise Gemini 3 400s).
-                        import base64
-                        provider_metadata: dict[str, Any] = {}
-                        sig = getattr(part, "thought_signature", None)
-                        if sig:
-                            provider_metadata["thought_signature"] = base64.b64encode(sig).decode("ascii")
-                        yield StreamEvent(
-                            type="tool_use_complete",
-                            data={
-                                "tool_use_id": tid_key,
-                                "name": fc.name,
-                                "input": args,
-                                "provider_metadata": provider_metadata,
-                            },
-                        )
-
-        stop_reason = (
-            "tool_use" if emitted_tool_starts
-            else ("length" if last_finish and str(last_finish).endswith("MAX_TOKENS") else "stop")
-        )
-        yield StreamEvent(
-            type="assistant_done",
-            data={
-                "stop_reason": stop_reason,
-                "input_tokens": last_input_tokens or 0,
-                "output_tokens": last_output_tokens or 0,
-                "model": req.model,
-            },
-        )
+        super().__init__("gemini", api_key, base_url=base_url)

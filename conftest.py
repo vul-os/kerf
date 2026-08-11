@@ -169,3 +169,47 @@ import os as _os
 # repo's gitignored kerf.toml sets a different jwt_secret, so tokens the tests
 # minted were rejected with 401 "invalid token" in eight access-control tests.
 _os.environ.setdefault("JWT_SECRET", "dev-secret-change-in-production")
+
+
+# ---------------------------------------------------------------------------
+# No test may reach a model provider
+# ---------------------------------------------------------------------------
+# This is not a hypothetical. The provider tests used to mock each vendor's own
+# SDK (`anthropic.Anthropic`, `openai.OpenAI`, `google.genai.Client`). When the
+# four hand-written providers were folded into one LiteLLM implementation, every
+# one of those mocks stopped intercepting anything — the SDK was no longer in
+# the request path — and the suite started making real HTTPS calls to
+# api.anthropic.com on a developer machine that happened to have a key in its
+# environment. It surfaced as a hang, then as a 401 from a real provider.
+#
+# So the boundary is pinned here rather than left to each test's discretion:
+# litellm.completion / litellm.acompletion raise unless a test has replaced them
+# deliberately. A test that wants a fake response patches the same names, whose
+# patch wins for its duration; anything else gets a message naming the fix.
+import pytest as _pytest
+
+
+@_pytest.fixture(autouse=True, scope="session")
+def _no_live_llm_calls():
+    try:
+        import litellm as _litellm
+    except ImportError:  # litellm absent (a slim install) — nothing to guard
+        yield
+        return
+
+    def _blocked(*args, **kwargs):
+        raise RuntimeError(
+            "A test tried to call a real model provider. Patch "
+            "'litellm.completion' / 'litellm.acompletion' (that is where every "
+            "Kerf provider goes now — not the vendor SDKs)."
+        )
+
+    real_completion = _litellm.completion
+    real_acompletion = _litellm.acompletion
+    _litellm.completion = _blocked
+    _litellm.acompletion = _blocked
+    try:
+        yield
+    finally:
+        _litellm.completion = real_completion
+        _litellm.acompletion = real_acompletion

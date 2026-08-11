@@ -8,7 +8,15 @@ Fix contract:
 1. executor.execute wraps exceptions → err_payload JSON.
 2. routes._insert_tool_message stores is_error=True for error payloads.
 3. The Message passed to provider.complete carries is_error=True.
-4. AnthropicProvider.complete forwards is_error into the tool_result block.
+4. The provider marks the tool message so the model cannot read a failure as
+   a success.
+
+Point 4 changed shape when the four hand-written providers were folded into
+LiteLLM. Anthropic's tool_result block has an is_error flag and the old
+provider set it; LiteLLM's OpenAI-shaped tool message has nowhere to put one,
+so the marker now lives in the content. That is strictly more coverage than
+before — the flag only ever reached Anthropic, so a failed tool looked exactly
+like a successful one to OpenAI, Moonshot and Gemini.
 """
 from __future__ import annotations
 
@@ -66,101 +74,80 @@ def test_ok_payload_does_not_trigger_is_error():
     assert not is_err
 
 
-# ── LLM transport: is_error forwarded into tool_result block ─────────────────
+# ── LLM transport: the model must be able to tell a failure from a success ───
 
-def test_anthropic_provider_forwards_is_error_in_tool_result():
-    """AnthropicProvider.complete must set is_error=True on error tool blocks."""
-    from kerf_chat.llm import AnthropicProvider, CompleteRequest, Message, ToolCall
+def _tool_message_for(is_error: bool) -> dict:
+    """Build one turn through a provider and return the tool message it sends."""
+    from unittest.mock import patch
+    from types import SimpleNamespace
 
-    captured_kwargs: dict = {}
-
-    class _FakeMsg:
-        content = []
-        stop_reason = "end_turn"
-        usage = type("U", (), {"input_tokens": 0, "output_tokens": 0})()
-
-    class _FakeClient:
-        class messages:
-            @staticmethod
-            def create(**kwargs):
-                captured_kwargs.update(kwargs)
-                return _FakeMsg()
-
-    import unittest.mock as mock
-    provider = AnthropicProvider(api_key="test", prompt_cache=False)
-
-    tool_msg = Message(
-        role="tool",
-        content='{"error": "write failed", "code": "ERROR"}',
-        tool_call_id="call_abc",
-        is_error=True,
-    )
-
-    req = CompleteRequest(
-        model="claude-sonnet-4-6",
-        system="",
-        messages=[tool_msg],
-        max_tokens=64,
-    )
-
-    with mock.patch("anthropic.Anthropic", return_value=_FakeClient()):
-        provider.complete(req)
-
-    msgs = captured_kwargs.get("messages", [])
-    assert msgs, "messages must be present"
-    # Tool messages are grouped into a single user turn with content blocks
-    user_turn = msgs[0]
-    assert user_turn["role"] == "user"
-    blocks = user_turn["content"]
-    assert len(blocks) == 1
-    block = blocks[0]
-    assert block["type"] == "tool_result"
-    assert block.get("is_error") is True, (
-        "is_error must be forwarded into the Anthropic tool_result block"
-    )
-
-
-def test_anthropic_provider_does_not_set_is_error_on_success():
-    """Successful tool results must NOT have is_error in the tool_result block."""
     from kerf_chat.llm import AnthropicProvider, CompleteRequest, Message
 
-    captured_kwargs: dict = {}
+    seen = {}
 
-    class _FakeMsg:
-        content = []
-        stop_reason = "end_turn"
-        usage = type("U", (), {"input_tokens": 0, "output_tokens": 0})()
-
-    class _FakeClient:
-        class messages:
-            @staticmethod
-            def create(**kwargs):
-                captured_kwargs.update(kwargs)
-                return _FakeMsg()
-
-    import unittest.mock as mock
-    provider = AnthropicProvider(api_key="test", prompt_cache=False)
-
-    tool_msg = Message(
-        role="tool",
-        content='[{"id": "box"}]',
-        tool_call_id="call_xyz",
-        is_error=False,
-    )
+    def fake_completion(**kwargs):
+        seen.update(kwargs)
+        return SimpleNamespace(
+            choices=[SimpleNamespace(
+                message=SimpleNamespace(content="ok", tool_calls=[]),
+                finish_reason="stop",
+            )],
+            model="m",
+            usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1),
+        )
 
     req = CompleteRequest(
-        model="claude-sonnet-4-6",
-        system="",
-        messages=[tool_msg],
-        max_tokens=64,
+        model="claude-opus-4-7",
+        messages=[Message(
+            role="tool",
+            content=json.dumps({"error": "disk full", "code": "ERROR"}),
+            tool_call_id="tu_1",
+            is_error=is_error,
+        )],
     )
+    with patch("litellm.completion", fake_completion):
+        AnthropicProvider("k").complete(req)
+    return seen["messages"][-1]
 
-    with mock.patch("anthropic.Anthropic", return_value=_FakeClient()):
-        provider.complete(req)
 
-    msgs = captured_kwargs.get("messages", [])
-    blocks = msgs[0]["content"]
-    block = blocks[0]
-    assert "is_error" not in block, (
-        "Successful tool results must not carry is_error"
-    )
+def test_provider_marks_an_errored_tool_result():
+    msg = _tool_message_for(is_error=True)
+
+    assert msg["content"].startswith("[tool error] ")
+    # The payload survives the marker, so a model that parses it still can.
+    assert json.loads(msg["content"].removeprefix("[tool error] "))["code"] == "ERROR"
+
+
+def test_provider_leaves_a_successful_tool_result_alone():
+    msg = _tool_message_for(is_error=False)
+
+    assert "[tool error]" not in msg["content"]
+    assert json.loads(msg["content"])["error"] == "disk full"
+
+
+def test_the_marker_applies_to_every_provider_not_just_anthropic():
+    """The old is_error flag was Anthropic-only; three providers never saw it."""
+    from unittest.mock import patch
+    from types import SimpleNamespace
+
+    from kerf_chat.llm import CompleteRequest, GeminiProvider, Message, MoonshotProvider, OpenAIProvider
+
+    for cls in (OpenAIProvider, MoonshotProvider, GeminiProvider):
+        seen = {}
+
+        def fake_completion(**kwargs):
+            seen.update(kwargs)
+            return SimpleNamespace(
+                choices=[SimpleNamespace(
+                    message=SimpleNamespace(content="", tool_calls=[]), finish_reason="stop")],
+                model="m", usage=SimpleNamespace(prompt_tokens=0, completion_tokens=0),
+            )
+
+        req = CompleteRequest(
+            model="m",
+            messages=[Message(role="tool", content="boom", tool_call_id="t", is_error=True)],
+        )
+        with patch("litellm.completion", fake_completion):
+            cls("k").complete(req)
+
+        assert seen["messages"][-1]["content"].startswith("[tool error] "), cls.__name__

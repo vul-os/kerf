@@ -41,7 +41,11 @@ import { execFileSync } from 'node:child_process'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const SITE_DOCS_HTML = join(ROOT, 'site', 'docs.html')
 const SITE_DOCS_DIR = join(ROOT, 'site', 'docs')
-const MANIFEST = join(ROOT, 'public', 'docs-manifest.json')
+// web/public, not public: the frontend moved out of the repo root and this
+// path did not follow it, so every run since died on ENOENT before syncing a
+// single file. Nothing in CI calls this script, so it failed unobserved —
+// build-docs-manifest.mjs already resolves the same directory this way.
+const MANIFEST = join(ROOT, 'web', 'public', 'docs-manifest.json')
 
 export function navSlugs(html) {
   // Strip HTML comments first: the nav carries a maintenance note that spells

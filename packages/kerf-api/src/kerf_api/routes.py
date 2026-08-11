@@ -862,11 +862,15 @@ def _friendly_llm_error(provider_name: str, err: Exception) -> str:
         return "The model took too long to respond. Try again or pick a faster model."
     if "deprecated" in msg:
         return "The selected model rejected one of the request parameters. Try picking a different model — this usually means the catalog needs updating."
-    # ModuleNotFoundError on a provider SDK dependency — most common cause
-    # is a missing pip entry. Surface this concretely so the next E2E
-    # probe doesn't have to SSH into the box to find it.
+    # ModuleNotFoundError reaching here means litellm itself is missing — every
+    # provider goes through it now, so this is no longer a per-vendor SDK gap
+    # but a broken install. Name the package so the fix is one pip command
+    # rather than an SSH session.
     if "modulenotfounderror" in type(err).__name__.lower() or "no module named" in msg:
-        return f"The {provider_name} provider's SDK is not installed on the server (missing pip dependency)."
+        return (
+            "The server is missing the 'litellm' package, which every model "
+            "provider needs. Reinstall the kerf-chat dependencies."
+        )
     # Last-resort: include the exception class name + a short fragment of
     # the message so operators can grep logs. Don't leak internal stack
     # frames — just a labelled tail.

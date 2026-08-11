@@ -149,6 +149,18 @@ key set for the LLM agent loop to function. `default_model` is used when the
 user does not specify a model. Override individual providers via their
 respective env vars (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, etc.).
 
+**You do not have to edit this file.** Every key here can also be set per user
+from **Settings** in the app, where it is encrypted before storage and can be
+changed without a restart. The keys configured here are the fallback for users
+who have not set their own — which is what you want for a headless or
+multi-user deployment, and unnecessary for a single-user install.
+
+Settings also offers a **base URL** per provider. Point it at a LiteLLM proxy,
+an OpenAI-compatible endpoint, or any gateway; leave it blank for the
+provider's own API. Requests go through [LiteLLM](https://docs.litellm.ai/),
+so a model the built-in catalogue does not list can still be reached through a
+gateway by naming it with a provider prefix (`openrouter/meta/llama-4`).
+
 ## [limits]
 
 ```toml

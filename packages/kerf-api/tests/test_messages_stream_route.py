@@ -4,7 +4,9 @@ test_messages_stream_route.py
 Tests for the streaming endpoint + SSE wire format.
 
 Strategy:
-  - Tests for AnthropicProvider.stream() live in kerf-chat/tests/test_anthropic_stream.py.
+  - Provider-level stream() decoding lives in
+    kerf-chat/tests/test_litellm_provider.py — one implementation now serves
+    every provider, so there is one place for it.
   - This file covers:
       * SSE frame parsing helpers
       * _sse_frame wire format (inline, no routes import needed)
@@ -302,30 +304,65 @@ class TestEventGeneratorOrdering:
 # Provider stream() NotImplementedError for non-Anthropic providers
 # ---------------------------------------------------------------------------
 
-class TestProviderStreamNotImplemented:
-    def _run(self, coro):
-        return asyncio.run(coro)
+class TestEveryProviderStreams:
+    """Streaming used to be Anthropic-only.
 
-    def test_openai_stream_raises_not_implemented(self):
-        _oi = types.ModuleType("openai")
-        class _OAI:
-            def __init__(self, **kw): pass
-        _oi.OpenAI = _OAI
-        sys.modules["openai"] = _oi
+    Each hand-written provider implemented stream() separately and only
+    Anthropic ever did; the other three inherited the base class's
+    NotImplementedError, so choosing GPT-4o or Kimi silently fell back to a
+    blocking request. Folding all four onto LiteLLM made streaming a property
+    of the one shared implementation, so this asserts the capability rather
+    than the old limitation.
+    """
 
-        from kerf_chat.llm import OpenAIProvider, CompleteRequest, Message
+    def _events(self, provider):
+        from types import SimpleNamespace
+        from unittest.mock import patch
 
-        provider = OpenAIProvider("key")
-        req = CompleteRequest(model="gpt-4o", messages=[Message(role="user", content="hi")])
+        from kerf_chat.llm import CompleteRequest, Message
 
-        async def _run():
-            raised = False
-            try:
-                async for _ in provider.stream(req):
-                    pass
-            except NotImplementedError:
-                raised = True
-            assert raised
+        class _Stream:
+            def __aiter__(self):
+                async def gen():
+                    yield SimpleNamespace(
+                        choices=[SimpleNamespace(
+                            delta=SimpleNamespace(content="hi", tool_calls=None),
+                            finish_reason=None)],
+                        usage=None, model="m")
+                    yield SimpleNamespace(
+                        choices=[SimpleNamespace(
+                            delta=SimpleNamespace(content=None, tool_calls=None),
+                            finish_reason="stop")],
+                        usage=SimpleNamespace(prompt_tokens=3, completion_tokens=1),
+                        model="m")
+                return gen()
 
-        self._run(_run())
-        sys.modules.pop("openai", None)
+        async def fake_acompletion(**kwargs):
+            return _Stream()
+
+        req = CompleteRequest(model="m", messages=[Message(role="user", content="hi")])
+
+        async def _collect():
+            with patch("litellm.acompletion", fake_acompletion):
+                return [ev async for ev in provider.stream(req)]
+
+        return asyncio.run(_collect())
+
+    @pytest.mark.parametrize("name", ["anthropic", "openai", "moonshot", "gemini"])
+    def test_provider_streams_text_and_closes(self, name):
+        from kerf_chat.llm import (
+            AnthropicProvider, GeminiProvider, MoonshotProvider, OpenAIProvider,
+        )
+
+        provider = {
+            "anthropic": AnthropicProvider,
+            "openai": OpenAIProvider,
+            "moonshot": MoonshotProvider,
+            "gemini": GeminiProvider,
+        }[name]("key")
+
+        events = self._events(provider)
+
+        assert [e.type for e in events] == ["assistant_text_delta", "assistant_done"]
+        assert events[0].data["text"] == "hi"
+        assert events[-1].data["input_tokens"] == 3

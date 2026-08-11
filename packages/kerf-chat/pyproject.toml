@@ -12,14 +12,15 @@ classifiers = ["License :: OSI Approved :: MIT License"]
 dependencies = [
     "fastapi>=0.111.0",
     "httpx>=0.27.0",
-    "anthropic>=0.25.0",
-    "openai>=1.30.0",
-    # `google-genai` is Google's new official SDK (the old
-    # `google-generativeai` is deprecated and prints a FutureWarning on
-    # every import). Without this dep, every chat call against a
-    # gemini-* model 500s with `ModuleNotFoundError`. The frontend
-    # surfaced that as the generic "The model returned an error" toast.
-    "google-genai>=1.0.0",
+    # One client for every provider. This replaced direct dependencies on
+    # anthropic, openai and google-genai, and with them three separate
+    # opportunities for a chat call to 500 with ModuleNotFoundError because a
+    # vendor SDK was missing from a deploy — which the frontend could only
+    # report as the generic "The model returned an error" toast.
+    #
+    # Adding a provider is now a catalogue entry, not a dependency, an SDK to
+    # learn and a fourth copy of the message translation.
+    "litellm>=1.96.0",
     "kerf-core>=0.1.0",
     "kerf-api>=0.1.0",
 ]

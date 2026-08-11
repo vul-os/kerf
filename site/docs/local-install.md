@@ -1,55 +1,47 @@
 # Local install
 
 How to self-host Kerf on your own machine or a private server. Kerf is fully
-open-source (MIT) for the core; no account or network access is required.
+open-source (MIT); no account, sign-up, or network access is required — the
+config toggles that make a node single-user vs. multi-user are covered under
+[Single-user vs multi-user](#single-user-vs-multi-user) below.
 
-## Install paths
+## How Kerf is actually distributed
 
-Kerf ships on PyPI. There is no Homebrew formula — pip/pipx is the one supported install path.
+Kerf is **not** on PyPI (only the standalone [`kerf-sdk`](./sdk.md) client
+package is — that's for scripting against a running Kerf server, not for
+installing Kerf itself). `pip install kerf` will not find anything. There are
+three real install paths:
 
-### Recommended — pipx (isolated venv, always on PATH)
-
-```sh
-pipx install kerf
-```
-
-`pipx` installs Kerf into its own isolated virtualenv and puts the `kerf` command on your PATH, keeping it separate from any other Python environment.
-
-### Alternative — pip inside a virtualenv
+### 1. The install script (recommended for most people)
 
 ```sh
-python -m venv .venv && source .venv/bin/activate
-pip install kerf
+curl -fsSL https://vulos.org/projects/kerf/install.sh | sh
 ```
 
-### Self-host (server + database)
+Downloads the latest tagged release tarball from GitHub Releases, verifies
+its checksum, unpacks it under `~/.local/share/kerf/<version>/`, and runs the
+bundled `setup.sh`: creates a Python venv, editable-installs the bundled
+`packages/kerf-*` plugins, and writes a starter `kerf.toml`. No Docker, no
+`git clone`, no PyPI. Requires `bash`, `curl`, `tar`, and Python 3.11+.
+`KERF_VERSION=vX.Y.Z sh` pins a specific release instead of the latest.
 
-To run the full server stack, install the `[server]` extra:
+Release tarballs today ship the **`full`** persona only (every plugin) — a
+persona-scoped tarball is a TODO; see [persona-bundles.md](./persona-bundles.md#quick-reference)
+for how to get a smaller install today (from source or Docker).
+
+### 2. Docker
 
 ```sh
-pip install 'kerf[server]'
+git clone https://github.com/vul-os/kerf
+cd kerf
+docker compose up
 ```
 
-`kerf serve` requires PostgreSQL. Set `DATABASE_URL` before starting.
-If you don't have Postgres yet, spin one up with Docker:
+Builds the `full` persona image and starts Kerf alongside its own Postgres
+and Redis containers (see [deployment.md](./deployment.md) for the image
+matrix and `--build-arg KERF_PERSONA=...` to build a smaller persona).
 
-```sh
-docker run -d --name kerf-postgres -e POSTGRES_PASSWORD=kerf -p 5432:5432 postgres:16
-export DATABASE_URL=postgres://postgres:kerf@localhost:5432/kerf
-```
-
-If `DATABASE_URL` is missing or unreachable, `kerf serve` fails immediately with a clear error and prints the above one-liner.
-
-### Persona installs (explicit plugin set)
-
-```sh
-pip install "kerf[mech]"          # mechanical CAD
-pip install "kerf[electronics]"   # EDA / PCB
-pip install "kerf[bim]"           # building information modelling
-pip install "kerf[full]"          # everything
-```
-
-### From source
+### 3. From source (for development, or an unsupported platform)
 
 ```sh
 git clone https://github.com/vul-os/kerf
@@ -58,7 +50,7 @@ cd kerf
 # installs the persona's workspace packages editable, with plain pip:
 ./scripts/dev-install.sh mech    # choose your persona
 
-npm install
+cd web && npm install
 ```
 
 > A bare `pip install -e .[mech]` does **not** work: the repo is a `uv`
@@ -128,12 +120,18 @@ Notes:
 - conda-forge splits gmsh: the Python binding is `python-gmsh`, separate from the
   `gmsh` app package.
 - `scipy` is needed by several `kerf-cad-core` geometry tools.
-- `pygit2` is only required if you use the cloud S3-backed git storer; it is
-  harmless to include and keeps `[full]` happy.
+- `pygit2` is only required if you use the S3-backed git storer (per-project
+  bare repos on top of S3-compatible storage); it is harmless to include and
+  keeps `[full]` happy.
 
-## Postgres setup
+## Database: embedded SQLite by default, Postgres optional
 
-Kerf requires Postgres 14 or newer.
+Kerf needs **no database setup for a local install** — with `DATABASE_URL`
+unset it opens an embedded SQLite file at `~/.kerf/kerf.db` (WAL mode,
+auto-created) the first time it runs. Postgres 14+ is an opt-in **scale
+backend** for a team / always-on / multi-node deployment — see
+[getting-started.md#scale-mode-postgres](./getting-started.md#scale-mode-postgres)
+for what it adds. To switch, set `DATABASE_URL` before running migrations:
 
 ```sh
 # macOS (Homebrew)
@@ -163,14 +161,20 @@ export DATABASE_URL=postgres://myuser:mypass@localhost:5432/kerf?sslmode=disable
 
 ## First-run setup
 
-```sh
-# Create and initialise the database
-createdb kerf
-kerf-server --migrate   # runs all migrations; safe to re-run
+From a source checkout (see [getting-started.md](./getting-started.md) for
+the full walkthrough):
 
-# Start the server (serves on http://localhost:8080)
-kerf-server
+```sh
+cp kerf.example.toml kerf.toml   # from the repo root
+cd web
+npm run migrate    # applies migrations against $DATABASE_URL, or SQLite if unset
+npm run dev         # serves the editor at http://localhost:5173
 ```
+
+From an `install.sh` or Docker install, migrations run via
+`python -m kerf_core.db.migrations.runner` (`install.sh`'s bundled `setup.sh`
+prints the exact venv path to use) — `kerf-server` itself has no `--migrate`
+flag. See [deployment.md](./deployment.md#migrations-on-boot).
 
 On first load with `local_mode = true` (the default), the server auto-creates
 a system user and signs you in without a login screen.
@@ -182,11 +186,12 @@ a system user and signs you in without a login screen.
 | `[server].local_mode = true` (default) | No login screen. A singleton user is bootstrapped automatically. Ideal for a personal workstation install. |
 | `[server].local_mode = false` | Login required. Local users are provisioned on the box for a shared team install. No central account system or public sign-up is involved. |
 
-A shared multi-user node (a team box, or a Vulos-hosted instance like
-`vulos.org/projects/kerf`) sets `[server].local_mode = false` explicitly — there is no
+A shared multi-user node (a team box, or any install you run for more than
+just yourself) sets `[server].local_mode = false` explicitly — there is no
 separate proprietary package or license gate involved. Kerf is 100% MIT and
 every install runs the same software; the config toggle is the only thing
-that changes.
+that changes. (`vulos.org/projects/kerf` is the project's marketing site and
+docs — not a running, multi-tenant Kerf instance; there is no hosted tier.)
 
 ## Config layering
 
@@ -198,9 +203,12 @@ Kerf reads configuration from the first file found, in priority order:
 4. `~/.config/kerf/config.toml`
 5. `/etc/kerf/config.toml`
 
-The server emits a starter `kerf.toml` on `npm run init` (source installs) or
-on `kerf-server --init`. Full schema: `kerf.example.toml` in the repo root, or
-[configuration.md](./configuration.md).
+A starter `kerf.toml` is copied from `kerf.example.toml` for you by the
+`install.sh` / Docker `setup.sh` path; on a source checkout, copy it yourself
+(`cp kerf.example.toml kerf.toml` — see
+[getting-started.md](./getting-started.md#4-initialise-configuration) for why
+`npm run init` doesn't do this on its own today). Full schema:
+`kerf.example.toml` in the repo root, or [configuration.md](./configuration.md).
 
 ## Environment variables
 
@@ -213,7 +221,7 @@ mapping follows the TOML path with underscores and a `KERF_` prefix:
 | `KERF_HOST` | `[server].host` |
 | `KERF_PORT` | `[server].port` |
 | `DATABASE_URL` | `[database].url` |
-| `KERF_LOCAL_MODE` | `[server].local_mode` |
+| `LOCAL_MODE` | `[server].local_mode` (no `KERF_` prefix) |
 | `ANTHROPIC_API_KEY` | `[llm.anthropic].api_key` |
 | `OPENAI_API_KEY` | `[llm.openai].api_key` |
 
@@ -233,23 +241,41 @@ its own repos over standard git HTTP/SSH if you configure it to.
 
 ## Upgrading
 
-Migrations are safe to re-run. Always run `--migrate` after pulling a new
-version:
+Migrations are safe to re-run — always run them after upgrading.
+
+**Install-script install:** re-run the one-liner; it re-downloads the latest
+release and re-runs `setup.sh` (reuses the existing venv, updates packages,
+leaves an existing `kerf.toml` alone):
+
+```sh
+curl -fsSL https://vulos.org/projects/kerf/install.sh | sh
+```
+
+**From source:**
 
 ```sh
 git pull
 ./scripts/dev-install.sh mech    # uv sync doesn't currently work, see above
-kerf-server --migrate
-kerf-server
+cd web && npm run migrate
 ```
 
 ## Uninstall
 
+**Install-script install** — everything lives under one version directory:
+
 ```sh
-pip uninstall kerf kerf-core kerf-api kerf-chat  # etc.
-dropdb kerf                                       # drops the database
-rm -rf ~/.config/kerf                             # config + auth state
-rm -rf ./.kerf-storage                            # local blob store (if used)
+rm -rf ~/.local/share/kerf/<version>   # or ~/.local/share/kerf/current (symlink)
+dropdb kerf                             # only if you switched to Postgres
+```
+
+**From-source / editable install:**
+
+```sh
+pip uninstall kerf-core kerf-api kerf-chat kerf-auth  # + any other kerf-* you installed
+dropdb kerf                                             # only if you switched to Postgres
+rm -rf ~/.config/kerf                                   # config + auth state, if used
+rm -rf ./.kerf-storage                                  # local blob store, if used
+rm -f kerf.toml                                          # repo-root config
 ```
 
 ## Project git CLI

@@ -1,117 +1,159 @@
-# Distributor APIs (Library Phase 2)
+# Distributor sync + production-ops extras
 
-Live pricing and stock for `.part` files come from real distributor
-APIs (DigiKey, Mouser, LCSC). The distributor metadata lives inside
-the Part JSON's `distributors` array; the kerf server refreshes it
-periodically and on-demand. The LLM never calls a distributor API
-directly — read the existing `distributors[*].price_usd` and
-`distributors[*].stock` fields and trust them.
+These live in `kerf-api` — they were a separate `kerf-cloud` package until
+the name outlived the hosted tier it referred to; there was never a "cloud
+edition" gating them. The distributor registry needs a DB pool (distributor
+credentials live in the encrypted `distributor_credentials` table); when no
+pool is available `kerf_api.plugin.register()` just skips it and the rest of
+kerf-api's routes/tools still mount normally.
 
-## How prices get populated
+Per the 2026-07-17 decentralization ADRs, hosted git serving, GitHub/GitLab
+OAuth sync, transactional email, and the centralized Workshop were all
+retired from the old kerf-cloud package before it folded into kerf-api:
 
-There are two paths:
+- Hosted git → `packages/kerf-api`'s local git API (`routes_git_local.py`),
+  a thin subprocess-git wrapper over each project's own repo — no server-held
+  OAuth tokens, no S3-backed "system of record" repo.
+- Centralized Workshop → `packages/kerf-pub`'s DMTAP-PUB feeds
+  (`router_local.py`), a federated protocol rather than a hosted service.
+- Transactional email → retired outright (no accounts to email; see
+  `decisions.md`'s "Addendum: local git only; no OAuth; accounts shrink to
+  the box" ADR).
 
-1. **Manual.** A user (or you, on their behalf via instructions to
-   them) calls `POST /api/projects/:pid/files/:fid/distributors/refresh`.
-   The server walks the Part's `distributors` array, looks each entry
-   up against the matching distributor service, and rewrites the
-   Part. The endpoint returns the updated Part JSON.
-2. **Automatic.** Every 6 hours, a boot-time goroutine sweeps every
-   Part whose `distributors[*].fetched_at` is older than 24 hours
-   and refreshes them through the same code path. The sweep respects
-   per-distributor rate limits.
+---
 
-Both paths require the operator to have configured an API credential
-for that distributor — see "When a distributor is missing" below.
+## Plugin registration
 
-## What's in a distributor entry
+`kerf_api.plugin.register()` mounts `/api/*` routes and LLM tools as usual,
+then initializes the distributor registry inline:
 
-```json
-{
-  "name": "digikey",
-  "sku": "311-10.0KCRCT-ND",
-  "url": "https://www.digikey.com/.../RC0805FR-0710KL",
-  "price_usd": 0.014,
-  "stock": 5000,
-  "fetched_at": "2026-05-01T12:00:00Z"
-}
+```python
+# kerf_api/plugin.py
+async def register(app, ctx) -> PluginManifest:
+    ...
+    provides = ["api.rest", "files.crud", "projects.crud"]
+    if ctx.pool is not None:
+        await _init_distributor_registry(ctx)   # needs a DB pool
+        provides.append("distributors")
+    return PluginManifest(name="kerf-api", provides=provides, ...)
 ```
 
-- `name` is the canonical lowercase distributor key. Supported
-  live-priced names: `digikey`, `mouser`, `lcsc`.
-- `sku` is what the distributor calls the part. Required for `Lookup`;
-  if missing, the sync falls back to a free-text Search using the
-  Part's `manufacturer + name` or `mpn`.
-- `url` is the human-facing product page. Always populated (either
-  user-supplied or filled in by the refresh).
-- `price_usd` and `stock` are populated by the refresh. May be missing
-  on a brand-new entry until the next sweep.
-- `fetched_at` is RFC3339 UTC. The "stale" cutoff is 24 hours.
+Distributor endpoints live in `kerf-api`'s `routes.py`
+(`/api/admin/distributors`,
+`/api/projects/{pid}/files/{fid}/distributors/refresh`), which lazily
+imports `kerf_api.distributors.service` / `kerf_api.distributors.sync`.
 
-## Supported distributors
+---
 
-| Name        | API support           | Pricing currency  | Notes                                    |
-| ----------- | --------------------- | ----------------- | ---------------------------------------- |
-| `digikey`   | Yes (OAuth2 + REST)   | USD               | Lookup by SKU; falls back to keyword.    |
-| `mouser`    | Yes (REST + key)      | USD               | Locale-bound; configure US for USD.      |
-| `lcsc`      | Yes (REST)            | CNY → USD via FX  | USD conversion needs the cloud FX cache. |
-| `mcmaster`  | URL-only              | n/a               | No public API; store the catalog URL.    |
+## Distributor integrations (`kerf_api.distributors`)
 
-`mcmaster` distributors render in the BOM panel as a clickable link
-but never get a `price_usd` or `stock` value — McMaster doesn't
-publish a pricing API. For mech parts that need a paper-trail, write
-the `mcmaster.com/<sku>` URL into `distributors[0].url` and leave
-`price_usd` empty. Don't fabricate prices.
+A **node feature**, not a hosted-only one: self-hosters supply their own
+distributor API credentials. Proxies part searches/refreshes to
+electronics/hardware distributors. Credentials are AES-GCM encrypted at rest
+in the `distributor_credentials` DB table.
 
-## When a distributor is missing
+Enabled distributors: DigiKey, Mouser, LCSC, McMaster-Carr. The registry
+loads at startup via `Registry.reload()` and is refreshed on a background
+sweep.
 
-If you ask the user to refresh prices but no rows come back populated,
-the most likely cause is the operator hasn't configured credentials for
-that distributor. The admin UI is at `/admin/distributors`. Tell the
-user something like:
-
-> The DigiKey lookup returned nothing because no DigiKey API
-> credentials are configured. Open `/admin/distributors` (admin only)
-> and add a DigiKey OAuth client_id + client_secret, then try the
-> refresh again.
-
-Don't claim you can configure it for them — the credential entry is
-out of band of the LLM tool surface for security reasons.
-
-## Errors you might see
-
-The refresh endpoint returns HTTP 502 for distributor-side failures
-(rate limits, expired tokens, malformed responses). The error body
-includes a short reason. If a refresh is hitting a steady 502, the
-admin's stored credentials likely need re-entering — JWT secret
-rotations invalidate stored credentials by design.
-
-## What you should NOT do
-
-- Don't write `price_usd` or `stock` values yourself. They're managed
-  by the refresh subsystem; manual edits will be overwritten on the
-  next sweep.
-- Don't invent SKUs. If the user gives you a manufacturer + MPN,
-  search DigiKey or Mouser through the web (out of band) and write
-  the SKU + URL into the entry; the refresh will populate price/stock
-  on the next pass.
-- Don't try to mirror a distributor's full catalog into the project.
-  The library is intentionally per-design — Parts are added when
-  they're referenced by an Assembly, not pre-filled.
-
-## Manual refresh request shape
-
-```http
-POST /api/projects/<pid>/files/<fid>/distributors/refresh
-
-200 OK
-{
-  "updated": 2,
-  "content": "{\n  \"version\": 1,\n  \"name\": \"...\",\n  \"distributors\": [...]\n}"
-}
+```python
+# kerf_api/plugin.py  (_init_distributor_registry)
+reg = Registry(pool, cfg, fx=None)
+await reg.reload()
+ctx.workers.register("distributors.sweep", sweep_factory)
 ```
 
-The `updated` count is the number of `distributors[*]` entries whose
-`fetched_at` was rewritten. `0` is a valid (stable) result —
-distributors that were already fresh, or whose service isn't
-configured, simply pass through unchanged.
+The sweep worker periodically calls `reload()` to pick up new credentials
+without a restart.
+
+---
+
+## Share links (`kerf_api.share_link`)
+
+Share links let designers share a design revision with a customer for review
+and approval. They do not require the customer to have a Kerf account.
+
+```python
+token = create_share(project_id, revision_id, ttl_days=30,
+                     allow_comments=True, allow_approve=True)
+info  = resolve_share(token)   # None if invalid/expired/revoked
+ok    = add_comment(token, customer_name, body)
+ok    = record_approval(token, customer_name, signature)
+ok    = revoke_share(token)
+```
+
+Tokens are `<16-char-urlsafe>.<8-char-HMAC>` — the HMAC check digit prevents
+enumeration attacks. Records are stored as JSON files under
+`data/cloud/share/` (overridable via `KERF_SHARE_DIR`). No DB dependency.
+
+The module also attempts to register `share.create`, `share.resolve`,
+`share.add_comment`, `share.record_approval`, `share.revoke` as LLM tools
+via `kerf_core.plugin.register`, but that symbol does not currently exist —
+the `try/except (ImportError, AttributeError)` around it swallows the
+failure, so this registration has never actually fired. Pre-existing
+behavior, carried over unchanged from the old kerf-cloud package; not
+something this move introduced or fixed.
+
+---
+
+## Job Traveler (`kerf_api.job_traveler`)
+
+A production-ops layer for tracking a design from order through manufacture
+to delivery. Suited to jewelry workshops and small-batch manufacturing. No
+DB dependency — persisted as JSON files under `data/cloud/jobs/`.
+
+### Data model
+
+- **PurchaseOrder** — customer + line items (part_ref, qty, unit_price,
+  lead_time); status: `draft → issued → received → closed`
+- **JobTraveler** — links a PO + project/revision; tracks progress through
+  `STAGE_ORDER = ["design", "cast", "clean", "set", "polish", "qc"]`
+- **InventoryItem** — on_hand, allocated, reorder_point per SKU
+
+### Key operations
+
+```python
+create_po(customer, items)           → {ok, po}
+issue_po(po_id)                      → {ok, po}
+receive_po(po_id, received_items)    → {ok, po, inventory_updates}
+start_traveler(po, project, revision, due_date) → {ok, traveler}
+advance_stage(traveler_id, stage, assignee)     → {ok, traveler, next_stage}
+close_traveler(traveler_id, qc_pass=True)       → {ok, traveler}
+allocation_check(items)              → {ok, checks, shortfalls}
+inventory_pick_list(bom)             → {ok, can_fill, needs_order, summary}
+```
+
+`job_create_po` / `job_inventory_pick_list` are defined as `kerf_chat.tools`
+specs in this module, but the module itself is never imported by
+`kerf_api.plugin`'s tool-registration list (nor was it imported by
+kerf-cloud's plugin before the move), so the `@_register(...)` decorators
+never run and these tools are not actually reachable today. Same caveat as
+share_link's tool registration above — pre-existing, not a regression.
+
+---
+
+## PLM (`kerf_api.plm`)
+
+Unrelated to the hosting/decentralization split — a production-lifecycle
+layer (150% BOM, ECO, SysML trace, where-used). `kerf_api.plm.llm_tools`
+defines its own `TOOL_DEFS`/`dispatch()` pair, separate from the
+`kerf_chat.tools.registry` mechanism `kerf_api.tools.*` and `job_traveler.py`
+use; nothing currently imports `kerf_api.plm` at boot, so — like the tool
+registrations above — it is reachable by direct import (as its test suite
+does) but not wired into the running server's tool surface.
+
+**Pruned 2026-07-19 (while still in kerf-cloud):** the unwired CRDT collab
+seed (`collab` — `YDoc`/`YMap`/`YArray`/`PresenceChannel`, pure-Python, no
+network transport, never mounted on any router) was removed. Real-time
+multi-author sync for kerf is planned via the shared substrate Sync spec
+(`dmtap/substrate/SYNC.md`) with proper bindings, not a per-product
+hand-rolled engine — see `docs/architecture.md` future-work.
+
+---
+
+## Security notes
+
+- Share link records are HMAC-signed; brute-force enumeration requires 2^64
+  guesses
+- Distributor credentials are AES-GCM encrypted at rest
+- These docs deliberately omit vendor-specific service names

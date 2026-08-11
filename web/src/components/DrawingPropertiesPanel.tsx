@@ -135,9 +135,23 @@ export default function DrawingPropertiesPanel({
   const selectedAnnotation = annotations.find((a) => a.id === selectedAnnotationId) || null
   const selectedSymbol = symbols.find((y) => y.id === selectedAnnotationId) || null
   const selectedDimension = dimensions.find((d) => d.id === selectedDimensionId) || null
-  const selectedView = views.find((v) => v.id === selectedAnnotationId) || null
-  const selectedCenterline = centerlines.find((c) => c.id === selectedAnnotationId) || null
-  const selectedBreak = breaks.find((b) => b.id === selectedAnnotationId) || null
+  // Views, centerlines and breaks were looked up here the same way, and then
+  // dropped: dimensions, annotations and symbols each get a rendered editor
+  // below, those three never did. So selecting one of them in the drawing
+  // shows an empty properties panel while the panel has already found the
+  // object it would need.
+  //
+  // The lookups are gone rather than left computing values nobody reads. What
+  // is missing is three editor blocks, and inventing their fields and update
+  // handlers from the shape of the data would be guessing at a product
+  // decision — the gap is recorded here instead, next to the code that would
+  // implement it.
+  //
+  // onAddSheet and onRemoveSheet are the same story from the other side: the
+  // component accepts both and wires neither, so a parent supplying them gets
+  // no sheet controls. They are left in the props rather than removed, because
+  // deleting a handler a caller already passes is the more disruptive of the
+  // two wrong answers.
 
   const [open, setOpen] = useState(true)
   const [adding, setAdding] = useState(false)

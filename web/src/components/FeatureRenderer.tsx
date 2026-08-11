@@ -909,15 +909,17 @@ function handlePushPullDrag(s, ev) {
   // Update the ghost extrusion preview directly in Three.js (no worker needed
   // for the visual; the worker runs only on commit).
   paintGhost(s, drag)
-  // Debounced preview RPC (not currently consumed by occtWorker, but the hook
-  // is wired so we can plug it in once we have a "preview-only" fast path).
-  if (drag.debounceTimer) clearTimeout(drag.debounceTimer)
-  drag.debounceTimer = setTimeout(() => {
-    s.onPushPullPreviewRef // ref check
-  }, 100)
-  if (s.onPushPullPreviewRef) {
-    // No-op; preview hook is the prop ref captured by mount-effect closures.
-  }
+  // A debounced preview RPC was scaffolded here for a "preview-only" fast path
+  // that occtWorker still does not have. It scheduled a 100ms timer whose body
+  // was the bare expression `s.onPushPullPreviewRef`, which evaluates a
+  // property and discards it — so every pointermove of a push-pull drag
+  // cleared and re-armed a timer that, when it fired, did nothing.
+  //
+  // Removed rather than left as scaffolding: the ghost preview above is what
+  // the user sees, and s.onPushPullPreviewRef is still on the state object for
+  // whoever wires the RPC up. drag.debounceTimer stays in the drag shape and
+  // is still cleared on drag end, so re-introducing a real timer here needs no
+  // other change.
   // Show distance in the corner.
   const ev2 = new CustomEvent('kerf:pushpull-update', { detail: { distance } })
   window.dispatchEvent(ev2)

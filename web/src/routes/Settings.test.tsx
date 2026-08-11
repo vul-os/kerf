@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ReactElement } from 'react'
-import { ProviderRow, UsageChart } from './Settings.jsx'
+import { KindBreakdown, ProviderRow, UsageChart } from './Settings.jsx'
 import {
   formatTokens,
   formatUsd,
@@ -183,5 +183,52 @@ describe('usage chart', () => {
     )
     expect(html).toMatch(/role="img"/)
     expect(html).toMatch(/aria-label="Daily token use over the last 30 days"/)
+  })
+})
+
+describe('usage by kind', () => {
+  const report = (by_kind: UsageReport['by_kind']): UsageReport => ({
+    days: 30,
+    project_id: null,
+    totals: { events: 1, input_tokens: 0, output_tokens: 0, bytes_delta: 0, usd_cost: 0 },
+    by_model: [],
+    by_kind,
+    daily: [],
+    recent: [],
+  })
+
+  it('renders nothing when there is no usage', () => {
+    expect(render(<KindBreakdown report={report([])} />)).toBe('')
+  })
+
+  it('shows storage as bytes and chat as tokens', () => {
+    // The two kinds are not comparable — reporting a file upload in "tokens"
+    // is what the by-model table alone would have implied.
+    const html = render(<KindBreakdown report={report([
+      { kind: 'storage', events: 2, input_tokens: 0, output_tokens: 0, bytes_delta: 2048, usd_cost: 0 },
+      { kind: 'token', events: 3, input_tokens: 900, output_tokens: 100, bytes_delta: 0, usd_cost: 0.05 },
+    ])} />)
+
+    expect(html).toContain('2.0 KB')
+    expect(html).toContain('1.0k tokens')
+    expect(html).toContain('$0.05')
+  })
+
+  it('names the kinds in the user’s terms, and passes unknown ones through', () => {
+    const html = render(<KindBreakdown report={report([
+      { kind: 'gpu', events: 1, input_tokens: 0, output_tokens: 0, bytes_delta: 0, usd_cost: 0 },
+      { kind: 'something_new', events: 1, input_tokens: 0, output_tokens: 0, bytes_delta: 0, usd_cost: 0 },
+    ])} />)
+
+    expect(html).toContain('Compute')
+    expect(html).toContain('something_new')
+  })
+
+  it('pluralises the event count', () => {
+    const one = render(<KindBreakdown report={report([
+      { kind: 'gpu', events: 1, input_tokens: 0, output_tokens: 0, bytes_delta: 0, usd_cost: 0 },
+    ])} />)
+    expect(one).toContain('1 event')
+    expect(one).not.toContain('1 events')
   })
 })

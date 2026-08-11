@@ -177,6 +177,44 @@ export function ProviderRow({ provider, saved, operatorConfigured, onSaved }: Pr
   )
 }
 
+const KIND_LABELS: Record<string, string> = {
+  token: 'Chat',
+  operator_token: 'Chat (server key)',
+  storage: 'Files',
+  gpu: 'Compute',
+  egress: 'Downloads',
+}
+
+/**
+ * Where the usage went, by kind.
+ *
+ * The by-model table below answers "which model", but not every recorded event
+ * has one — file uploads and GPU renders are usage too, and on a self-hosted
+ * node they are usually the larger number. Rendering only the token rows made
+ * the totals above look wrong, because they include everything.
+ */
+export function KindBreakdown({ report }: { report: UsageReport }) {
+  if (report.by_kind.length === 0) return null
+  return (
+    <div className="mt-5 flex flex-wrap gap-2">
+      {report.by_kind.map((k) => (
+        <div key={k.kind} className="flex-1 min-w-[150px] rounded-lg border border-ink-800 bg-ink-950 px-3 py-2">
+          <p className="text-[11px] text-ink-300">{KIND_LABELS[k.kind] || k.kind}</p>
+          <p className="text-sm text-ink-100 tabular-nums">
+            {k.kind === 'storage'
+              ? formatBytes(k.bytes_delta)
+              : `${formatTokens(k.input_tokens + k.output_tokens)} tokens`}
+          </p>
+          <p className="text-[11px] text-ink-500 tabular-nums">
+            {k.events} {k.events === 1 ? 'event' : 'events'}
+            {k.usd_cost > 0 && ` · ${formatUsd(k.usd_cost)}`}
+          </p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function StatTile({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="rounded-lg border border-ink-800 bg-ink-950 px-3 py-2.5">
@@ -343,6 +381,8 @@ export default function Settings() {
               </div>
 
               <UsageChart report={usage} />
+
+              <KindBreakdown report={usage} />
 
               {usage.by_model.length > 0 && (
                 <div className="mt-6 overflow-x-auto">

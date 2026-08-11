@@ -6,11 +6,13 @@
  * about three things: where to connect, that control and data live on different
  * frame types, and that a refusal is not something to retry.
  */
-import { describe, it, expect } from 'vitest'
+import { afterEach, beforeEach, describe, it, expect } from 'vitest'
 import {
   isRefusal,
   parseControl,
+  recallSession,
   reconnectDelay,
+  rememberSession,
   resizeMessage,
   sessionUrl,
 } from './terminalSocket.js'
@@ -107,5 +109,58 @@ describe('reconnect backoff', () => {
   it('is jittered, so tabs waking together do not arrive together', () => {
     const samples = new Set(Array.from({ length: 20 }, () => reconnectDelay(4)))
     expect(samples.size).toBeGreaterThan(1)
+  })
+})
+
+describe('remembering the session', () => {
+  // A stub rather than jsdom: everything else in this file is deliberately
+  // testable without a DOM, and one storage-shaped object is cheaper than an
+  // environment.
+  let store: Map<string, string>
+
+  beforeEach(() => {
+    store = new Map()
+    Object.defineProperty(globalThis, 'sessionStorage', {
+      configurable: true,
+      value: {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => void store.set(k, v),
+        removeItem: (k: string) => void store.delete(k),
+      },
+    })
+  })
+
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, 'sessionStorage')
+  })
+
+  it('survives the panel being unmounted and mounted again', () => {
+    // The panel unmounts whenever the user looks at another tab in the same
+    // drawer. Holding the id in a component ref meant the shell kept running
+    // server-side while the browser could no longer reach it, and the user got
+    // a fresh prompt with none of their state.
+    rememberSession('abc123')
+    expect(recallSession()).toBe('abc123')
+  })
+
+  it('reports nothing when there is nothing to remember', () => {
+    expect(recallSession()).toBeNull()
+  })
+
+  it('can be cleared', () => {
+    rememberSession('abc123')
+    rememberSession(null)
+    expect(recallSession()).toBeNull()
+  })
+
+  it('does not throw when storage is unavailable', () => {
+    // Private-mode Safari and some embedded webviews throw on any access, and
+    // so does any non-browser context this module gets imported into.
+    Object.defineProperty(globalThis, 'sessionStorage', {
+      configurable: true,
+      get() { throw new Error('denied') },
+    })
+    expect(() => rememberSession('abc123')).not.toThrow()
+    expect(recallSession()).toBeNull()
   })
 })

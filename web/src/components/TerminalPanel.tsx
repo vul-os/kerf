@@ -7,7 +7,9 @@ import { api } from '../lib/api.js'
 import {
   isRefusal,
   parseControl,
+  recallSession,
   reconnectDelay,
+  rememberSession,
   resizeMessage,
   sessionUrl,
   type TerminalCapability,
@@ -31,7 +33,9 @@ export default function TerminalPanel() {
   const mountRef = useRef<HTMLDivElement | null>(null)
   const termRef = useRef<Terminal | null>(null)
   const socketRef = useRef<WebSocket | null>(null)
-  const sessionRef = useRef<string | null>(null)
+  // Seeded from storage, not null: this panel unmounts every time the user
+  // looks at another tab, and a ref that starts empty re-attaches to nothing.
+  const sessionRef = useRef<string | null>(recallSession())
   const attemptRef = useRef(0)
   const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const closedByUs = useRef(false)
@@ -105,6 +109,7 @@ export default function TerminalPanel() {
           const hello = parseControl(event.data)
           if (hello) {
             sessionRef.current = hello.id
+            rememberSession(hello.id)
             // A fresh session starts on a clean screen; a re-attached one is
             // about to be replayed its scrollback, so clearing first avoids
             // showing the same output twice.

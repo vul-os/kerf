@@ -89,3 +89,40 @@ export function reconnectDelay(attempt: number): number {
   // together.
   return Math.round(base * (0.7 + Math.random() * 0.6))
 }
+
+/**
+ * Where the current session id is remembered between mountings of the panel.
+ *
+ * The component held it in a ref, which dies with the component: switching to
+ * the Chat tab and back — the ordinary way to get a bigger 3D viewport — closed
+ * the socket, dropped the id, and re-attached to nothing. The old shell was
+ * still running, unreachable, until the server reaped it an hour later, and the
+ * user got a fresh prompt with none of their state.
+ *
+ * sessionStorage rather than a module variable so a page reload finds it too,
+ * and per-tab rather than shared so two tabs get two shells instead of fighting
+ * over one set of keystrokes.
+ */
+const SESSION_KEY = 'kerf.terminal.session'
+
+export function rememberSession(id: string | null): void {
+  try {
+    // globalThis, not window: this module is deliberately DOM-free so its
+    // protocol can be tested without one, and the try/catch is load-bearing
+    // anyway — private-mode Safari and some embedded webviews throw on any
+    // storage access. A terminal that forgets its session still works; one
+    // that throws does not.
+    if (id) globalThis.sessionStorage.setItem(SESSION_KEY, id)
+    else globalThis.sessionStorage.removeItem(SESSION_KEY)
+  } catch {
+    // Nothing to do: the next mount starts a fresh shell.
+  }
+}
+
+export function recallSession(): string | null {
+  try {
+    return globalThis.sessionStorage.getItem(SESSION_KEY) || null
+  } catch {
+    return null
+  }
+}

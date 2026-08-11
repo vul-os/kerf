@@ -115,7 +115,7 @@ export default function SectorTour() {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Button as={Link} to="/signup" size="lg">
+            <Button as={Link} to="/docs/getting-started" size="lg">
               Start for free <ArrowRight className="size-4" />
             </Button>
             <Button as={Link} to="/docs" variant="outline" size="lg">
@@ -147,7 +147,7 @@ export default function SectorTour() {
                 Every sector uses the same LLM-first workflow. No GUI required.
               </p>
             </div>
-            <Button as={Link} to="/signup" size="lg">
+            <Button as={Link} to="/docs/getting-started" size="lg">
               Get started free <ArrowRight className="size-4" />
             </Button>
           </div>

@@ -5,7 +5,6 @@ import clsx from 'clsx'
 import { LogoWordmark } from './Logo.jsx'
 import WorkspaceSwitcher from './WorkspaceSwitcher.jsx'
 import { useAuth } from '../store/auth.js'
-import { useNodeConfig } from '../lib/useNodeConfig.js'
 import { useWorkspaces } from '../store/workspaces.js'
 import { api } from '../lib/api.js'
 
@@ -164,53 +163,6 @@ function UserMenu({ user, onLogout, currentWorkspaceSlug }) {
   )
 }
 
-function UnverifiedBanner({ user }) {
-  const [state, setState] = useState('idle') // idle | sending | sent | error
-  const { localMode } = useNodeConfig()
-  // Never shown on a local install. local_mode auto-mints a singleton user
-  // with no real email address and no way to receive mail, so asking that
-  // user to "verify your email to secure your account" is meaningless — there
-  // is no account to secure and nothing to send. It is a leftover from when
-  // Kerf had hosted accounts.
-  if (localMode) return null
-  // Soft gate: only nudge; never block. Hidden once verified or for
-  // OAuth accounts (which arrive verified / have no password to reset).
-  if (!user || user.email_verified !== false) return null
-
-  const resend = async () => {
-    if (state === 'sending') return
-    setState('sending')
-    try {
-      await api.requestVerification()
-      setState('sent')
-    } catch {
-      setState('error')
-    }
-  }
-
-  return (
-    <div className="bg-amber-500/10 border-b border-amber-500/25 text-amber-200/90">
-      <div className="mx-auto max-w-7xl px-6 py-2 flex items-center gap-3 text-xs">
-        <span className="flex-1">
-          Please verify your email to secure your account.
-          {state === 'sent' && ' Verification email sent — check your inbox.'}
-          {state === 'error' && ' Could not resend just now — try again shortly.'}
-        </span>
-        {state !== 'sent' && (
-          <button
-            type="button"
-            onClick={resend}
-            disabled={state === 'sending'}
-            className="font-medium text-amber-100 hover:text-white underline underline-offset-2 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
-          >
-            {state === 'sending' ? 'Sending…' : 'Resend email'}
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
 export default function Layout({ children, wide = false, padded = true }) {
   const navigate = useNavigate()
   const user = useAuth((s) => s.user)
@@ -241,7 +193,9 @@ export default function Layout({ children, wide = false, padded = true }) {
       // ignore network errors; we already cleared local state
     }
     logout()
-    navigate('/login', { replace: true })
+    // No /login page: App renders the node's sign-in screen whenever there
+    // is no session, so the root is the way back to it.
+    navigate('/', { replace: true })
   }
 
   const fallbackUser = user || {
@@ -321,7 +275,6 @@ export default function Layout({ children, wide = false, padded = true }) {
         </div>
       </header>
 
-      <UnverifiedBanner user={user} />
 
       <main
         className={clsx(

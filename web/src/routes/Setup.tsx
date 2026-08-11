@@ -170,7 +170,17 @@ export function SetupClaim({ onClaimed }: { onClaimed: () => void }) {
 }
 
 /** The node is claimed; ask for the password. */
-export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
+export function SignIn({
+  onSignedIn,
+  // Set when ProtectedRoute bounced someone whose session ran out. Passed in
+  // rather than read from the router here, so this stays a component that can
+  // be rendered on its own — and "why am I being asked for this again" is a
+  // worse question than a one-line answer.
+  sessionExpired = false,
+}: {
+  onSignedIn: () => void
+  sessionExpired?: boolean
+}) {
   const signInWithNodePassword = useAuth((s) => s.signInWithNodePassword)
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -200,6 +210,11 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
 
       <form className="flex flex-col gap-4" onSubmit={submit}>
         {error && <Problem message={error} />}
+        {!error && sessionExpired && (
+          <p role="status" aria-live="polite" className="text-[12px] text-ink-400 leading-relaxed">
+            Your session expired. Enter this node&apos;s password to carry on.
+          </p>
+        )}
 
         <Input
           label="Password"
@@ -229,11 +244,13 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
 export default function Setup({
   state,
   onReady,
+  sessionExpired = false,
 }: {
   state: SetupState
   onReady: () => void
+  sessionExpired?: boolean
 }) {
-  if (state.configured) return <SignIn onSignedIn={onReady} />
+  if (state.configured) return <SignIn onSignedIn={onReady} sessionExpired={sessionExpired} />
   if (!state.can_configure_here) return <SetupBlocked reason={state.reason} />
   return <SetupClaim onClaimed={onReady} />
 }

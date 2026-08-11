@@ -199,6 +199,73 @@ def test_an_unclaimed_node_answers_signin_exactly_like_a_wrong_password(client):
     assert unclaimed.json()["detail"] == wrong.json()["detail"]
 
 
+# ── brute force ─────────────────────────────────────────────────────────────
+#
+# One password guarding a whole node makes brute force the obvious attack, and
+# this is the only password endpoint left — /auth/login and its lockout tests
+# went with the accounts. What those tests asserted has to hold here instead.
+
+def test_signin_is_rate_limited():
+    """A limiter is declared on sign-in, per-IP, in minutes rather than hours.
+
+    Asserted on the route's dependencies rather than by making 11 requests: the
+    limiter is backed by the database, and a test that exercises it end to end
+    is really a test of the limiter, which kerf-core already covers.
+    """
+    import kerf_api.routes_setup as setup_routes
+
+    dep = _rate_limit_args(setup_routes.router, "/setup/signin")
+    assert dep is not None, "sign-in must be rate limited"
+    max_per_window, window_seconds, key_prefix = dep
+    assert key_prefix == "setup:signin"
+    # A slow limit: the owner types their password a handful of times, an
+    # attacker needs thousands of guesses.
+    assert max_per_window <= 20
+    assert window_seconds <= 300
+
+
+def test_claiming_is_rate_limited_separately():
+    """Distinct buckets, so a burst of claim attempts cannot lock the owner out
+    of signing in, or vice versa."""
+    import kerf_api.routes_setup as setup_routes
+
+    claim = _rate_limit_args(setup_routes.router, "/setup/password")
+    signin = _rate_limit_args(setup_routes.router, "/setup/signin")
+    assert claim is not None and signin is not None
+    assert claim[2] != signin[2]
+
+
+def _rate_limit_args(router, path):
+    """The (max_per_window, window_seconds, key_prefix) of the rate limiter on
+    *path*, or None if it has none.
+
+    rate_limit() returns a closure, so the numbers live in its cell contents
+    rather than anywhere nameable.
+    """
+    for route in router.routes:
+        if getattr(route, "path", None) != path:
+            continue
+        for dependency in getattr(route, "dependencies", []) or []:
+            call = getattr(dependency, "dependency", None)
+            closure = getattr(call, "__closure__", None) or ()
+            values = [c.cell_contents for c in closure]
+            ints = [v for v in values if isinstance(v, int) and not isinstance(v, bool)]
+            strs = [v for v in values if isinstance(v, str)]
+            if len(ints) >= 2 and strs:
+                return ints[0], ints[1], strs[0]
+        # Dependencies declared as parameter defaults rather than in the
+        # decorator live on the dependant tree instead.
+        for dep in getattr(getattr(route, "dependant", None), "dependencies", []) or []:
+            call = getattr(dep, "call", None)
+            closure = getattr(call, "__closure__", None) or ()
+            values = [c.cell_contents for c in closure]
+            ints = [v for v in values if isinstance(v, int) and not isinstance(v, bool)]
+            strs = [v for v in values if isinstance(v, str)]
+            if len(ints) >= 2 and strs:
+                return ints[0], ints[1], strs[0]
+    return None
+
+
 # ── the generated password ──────────────────────────────────────────────────
 
 def test_a_suggested_password_is_long_and_unique():

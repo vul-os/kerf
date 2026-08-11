@@ -1,37 +1,32 @@
 /**
  * auth.setup.ts — claim the node and save a signed-in browser state.
  *
- * Kerf used to sign anyone in who could reach the port: in local mode the app
- * called /auth/bootstrap-local on load and got a full session with no
- * credential. Every spec relied on that, and none of them mentioned auth.
+ * Kerf used to sign anyone in who could reach the port: the app called
+ * /auth/bootstrap-local on load and got a full session with no credential.
+ * Every spec relied on that, and none of them mentioned auth.
  *
  * There is a password now, set on first load, so the suite has to set one too.
  * Doing it here rather than in each spec keeps the change to one file: this
- * runs first (the other projects declare it as a dependency), claims the node,
- * signs in, and writes the browser state that every other project reuses.
+ * runs first (the stack projects declare it as a dependency), claims the node,
+ * signs in, and writes the browser state they reuse.
  *
- * Claiming is idempotent from the suite's point of view — a 409 means a
+ * It runs once per stack — local and server-mode are two databases and two
+ * claims — and the state files are named after the stack.
+ *
+ * Claiming is idempotent from the suite's point of view: a 409 means a
  * previous run already claimed this database, and the password is the same
  * either way, so signing in still works.
  */
 import { test as setup, expect } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
+import { E2E_NODE_PASSWORD, storageStatePath } from '../node-credential'
 
-/** Not a secret: these nodes are ephemeral, loopback-only and rebuilt per run. */
-export const E2E_NODE_PASSWORD = 'e2e-node-passw0rd'
-
-export function storageStatePath(project: string): string {
-  // Beside the suite, not the cwd: playwright may be invoked from either the
-  // repo root or tests/e2e, and a state file that lands in a different place
-  // each time is a state file the projects cannot find.
-  return path.join(__dirname, '..', '.auth', `${project}.json`)
-}
-
-setup('claim the node and sign in', async ({ page, request, baseURL }) => {
-  // Both stacks share this file; the local project is the one that consumes
-  // it, and the server-mode project keeps its own per-spec signups.
-  const target = storageStatePath('local')
+setup('claim the node and sign in', async ({ page, request, baseURL }, testInfo) => {
+  // One state file per stack: they are two databases, so two claims and two
+  // sessions. The project is named `setup-<stack>`, and the stack projects
+  // read back the matching file.
+  const target = storageStatePath(testInfo.project.name.replace(/^setup-/, ''))
   fs.mkdirSync(path.dirname(target), { recursive: true })
 
   const claim = await request.post(`${baseURL}/api/setup/password`, {
@@ -70,7 +65,7 @@ setup('claim the node and sign in', async ({ page, request, baseURL }) => {
   // this ever fails, every other spec would fail one assertion later and much
   // less legibly.
   await expect(page.getByRole('heading', { name: 'Unlock this Kerf' })).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible({ timeout: 30_000 })
 
   await page.context().storageState({ path: target })
 })

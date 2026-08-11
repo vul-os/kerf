@@ -204,7 +204,7 @@ function Hero({ headline, paragraph, tags, accentColor, comingSoon, slug, heroIl
             </p>
 
             <div className="mt-6 flex flex-wrap items-center gap-3">
-              <Button as={Link} to="/signup" variant="primary" size="lg">
+              <Button as={Link} to="/docs/getting-started" variant="primary" size="lg">
                 Start free
                 <ArrowRight size={16} />
               </Button>
@@ -516,12 +516,12 @@ function CTAStrip({ domainName }: { domainName?: string }) {
                 Start your first {domainName} project.
               </h2>
               <p className="mt-2 text-ink-300 max-w-xl">
-                Sign up free — no credit card required. Or clone the MIT repo
+                Install Kerf — no credit card required. Or clone the MIT repo
                 and self-host with your own Postgres and LLM key.
               </p>
             </div>
             <div className="flex flex-wrap gap-3 shrink-0">
-              <Button as={Link} to="/signup" variant="primary" size="lg">
+              <Button as={Link} to="/docs/getting-started" variant="primary" size="lg">
                 Start for free
                 <ArrowRight size={16} />
               </Button>

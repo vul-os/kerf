@@ -141,7 +141,7 @@ function Hero() {
           </p>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
-            <Button as={Link} to="/signup" variant="primary" size="lg">
+            <Button as={Link} to="/docs/getting-started" variant="primary" size="lg">
               Start designing free
               <ArrowRight size={16} />
             </Button>
@@ -816,12 +816,12 @@ function CTAStrip() {
                 Route your first board.
               </h2>
               <p className="mt-2 text-ink-300 max-w-xl">
-                Sign up free and ship a PCB in your next session — or clone the
+                Install Kerf and ship a PCB in your next session — or clone the
                 repo and self-host. Both paths are first-class.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button as={Link} to="/signup" variant="primary" size="lg">
+              <Button as={Link} to="/docs/getting-started" variant="primary" size="lg">
                 Try it free
                 <ArrowRight size={16} />
               </Button>

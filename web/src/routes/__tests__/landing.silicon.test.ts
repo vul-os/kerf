@@ -83,8 +83,10 @@ describe('Silicon page — hero', () => {
     expect(PAGE_SRC).toMatch(/TAGLINE|From RTL to GDS-II/)
   })
 
-  it('links to /signup CTA', () => {
-    expect(PAGE_SRC).toMatch(/\/signup/)
+  it('links somewhere a visitor can act on', () => {
+    // Was /signup. There is nothing to sign up for — Kerf is installed, not
+    // subscribed to — so the CTA points at the install instructions.
+    expect(PAGE_SRC).toMatch(/\/docs\/getting-started/)
   })
 
   it('links to /docs/silicon', () => {

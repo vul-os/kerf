@@ -542,7 +542,7 @@ function CTAStrip() {
           </p>
         </div>
         <div className="flex flex-wrap gap-3 shrink-0">
-          <Button as={Link} to="/signup" variant="primary" size="md">
+          <Button as={Link} to="/docs/getting-started" variant="primary" size="md">
             Try Kerf free
             <ArrowRight size={14} />
           </Button>

@@ -52,16 +52,19 @@ curl -X POST http://localhost:8080/v1/rpc \
   -d '{"jsonrpc":"2.0","method":"files.list","params":{"project_id":"<uuid>"},"id":1}'
 ```
 
-### Session token (email + password)
+### Session token (the node password)
 
 If you need a session token programmatically (e.g. in tests):
 
 ```sh
-curl -X POST http://localhost:8080/auth/login \
+curl -X POST http://localhost:8080/api/setup/signin \
   -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"secret"}'
+  -d '{"password":"your-node-password"}'
 # → {"access_token":"eyJ…","refresh_token":"…","user":{…}}
 ```
+
+This is rate limited to 10 attempts a minute per IP — it is the only password
+the node has, so it is the obvious thing to guess at.
 
 Pass the `access_token` as the Bearer value. API tokens are preferred for
 automation — session tokens expire.

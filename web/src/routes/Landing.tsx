@@ -493,8 +493,8 @@ function Hero() {
                   <ArrowRight size={16} />
                 </Button>
               ) : (
-                <Button as={Link} to="/signup" variant="primary" size="lg">
-                  Sign up free
+                <Button as={Link} to="/docs/getting-started" variant="primary" size="lg">
+                  Install Kerf
                   <ArrowRight size={16} />
                 </Button>
               )}
@@ -1320,8 +1320,8 @@ function LocalVsHosted() {
             label="Hosted"
             sub="we run it for you"
             highlighted
-            ctaText="Sign up free"
-            ctaTo="/signup"
+            ctaText="Install Kerf"
+            ctaTo="/docs/getting-started"
             extra="Metered LLM tokens + storage"
             features={SHARED_FEATURES}
             extras={['Daily backups', 'GitHub OAuth + branch sync']}
@@ -1418,7 +1418,7 @@ function CTAStrip() {
                 Open Kerf in your browser.
               </h2>
               <p className="mt-2 text-ink-300 max-w-xl">
-                Sign up free and ship a model in the next ten minutes — or clone
+                Install Kerf and ship a model in the next ten minutes — or clone
                 the repo and self-host. Both paths are first-class.
               </p>
             </div>
@@ -1429,8 +1429,8 @@ function CTAStrip() {
                   <ArrowRight size={16} />
                 </Button>
               ) : (
-                <Button as={Link} to="/signup" variant="primary" size="lg">
-                  Sign up free
+                <Button as={Link} to="/docs/getting-started" variant="primary" size="lg">
+                  Install Kerf
                   <ArrowRight size={16} />
                 </Button>
               )}

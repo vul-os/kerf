@@ -99,9 +99,13 @@ is always set via the `--host`/`--port` CLI flags or `KERF_HOST`/`KERF_PORT`
 env vars; see [getting-started.md#cli-flags](./getting-started.md#cli-flags).)
 
 With `local_mode = true`:
-- All authentication is bypassed. The login UI is hidden.
-- `POST /auth/bootstrap-local` issues a session for the configured local user.
-- All requests resolve to that user.
+- All requests resolve to the node's single owner.
+- The marketing landing is skipped: opening the app takes you to your projects.
+
+Authentication is *not* bypassed, in either mode. It used to be — local mode
+handed out a session to anything that could reach the port — and that is what
+the password set on first load replaced. See
+[api-reference.md#authentication](./api-reference.md#authentication).
 - The `filesystem` storage backend writes each project as a directory under `filesystem_root`, so your JSCAD / STEP files are real files you can open, grep, and git from outside the app.
 
 ---

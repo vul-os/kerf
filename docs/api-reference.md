@@ -6,13 +6,23 @@ All routes are mounted under `/api` by `kerf-core`. The router is defined in
 
 ## Authentication
 
-A Kerf install is **single-owner on your own box** — there is no central
-account system, no sign-up service, and no Google/OAuth login. The owner
-authenticates locally; in `local_mode` the single owner is auto-bootstrapped
-with no login screen at all.
+A Kerf install is **one node, one password**. There is no central account
+system, no sign-up service, and no Google/OAuth login. You set the password on
+first load — the browser shows a "Set a password" screen — and exchange it for
+a session.
 
-The owner's local session uses two token types carried in standard HTTP
-cookies:
+It used to be that `local_mode` (the default, and the only mode a desktop
+install has ever used) handed out a full session from `/auth/bootstrap-local`
+with **no credential whatsoever**: anything that could reach the port was
+signed in. "Bound to loopback" is not on its own a credential, because a
+hostile page can point a browser at loopback — DNS rebinding is the usual
+route. That endpoint is gone.
+
+Recovery is `kerf admin set-password`, not a reset email: a self-hosted node
+has no mail transport, and pretending otherwise is how `/auth/forgot-password`
+ended up returning 501.
+
+The session uses two token types:
 
 | Cookie | Type | TTL |
 |--------|------|-----|
@@ -24,24 +34,32 @@ workspace and carried in the `Authorization: Bearer <token>` header.
 
 Every endpoint that requires auth is guarded by `require_auth` from
 `kerf_core.dependencies`. Endpoints that accept anonymous access for public
-projects use `optional_auth`. Role enforcement (`owner` / `admin` / `member` /
-`viewer`) happens inside each handler via `get_user_workspace_role`.
+projects use `optional_auth`.
 
 ---
 
-## Auth endpoints (`/api/auth/…`)
+## Setup endpoints (`/api/setup/…`)
 
-These are all **local** to your own install. There is no central sign-up
-service and no Google/OAuth login — those were retired when accounts shrank
-to the box.
+The whole of sign-in. Three routes, no accounts.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/auth/register` | none | Create the local owner account on a fresh install (not a central sign-up service). Returns `access_token` + `refresh_token` cookies and the created user + workspace. |
-| POST | `/api/auth/login` | none | Local owner login. Same cookie response. |
-| POST | `/api/auth/refresh` | refresh cookie | Issue new access token from a valid refresh token. |
+| GET | `/api/setup/state` | none | Has this node been claimed, and may it be claimed from here? What the first-run screen branches on. Reveals nothing else. |
+| POST | `/api/setup/password` | none | Claim an unconfigured node. Succeeds exactly once (409 after). **403 on a non-loopback bind** — claiming a node a stranger can reach is a race with that stranger, so the operator uses `kerf admin set-password` instead. Rate limited: 10/hour per IP. |
+| POST | `/api/setup/signin` | none | Exchange the password for a session. Rate limited: 10/minute per IP. An unclaimed node and a wrong password return the identical 401, because which of the two it is tells an attacker whether the node is still claimable. |
+
+## Auth endpoints (`/api/auth/…`)
+
+What is left once sign-in moved: token lifecycle only.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/auth/refresh` | refresh token | Issue a new access token from a valid refresh token. |
 | POST | `/api/auth/logout` | any | Revoke the current refresh token. |
-| POST | `/api/auth/bootstrap-local` | none | Local-mode auto-login (only when `local_mode=true`). |
+
+`register`, `login`, `forgot-password`, `reset-password`, `bootstrap-local`,
+and the Google and GitHub OAuth routes are gone. So are the pages that drove
+them: there is no `/login` and no `/signup`.
 
 ---
 

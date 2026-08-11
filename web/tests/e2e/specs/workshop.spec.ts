@@ -24,17 +24,20 @@
  */
 
 import { test, expect, type APIRequestContext } from '@playwright/test'
+import { E2E_NODE_PASSWORD } from '../node-credential'
 
 const uniq = () => `${Date.now()}-${Math.floor(Math.random() * 1e4)}`
-const PASSWORD = 'e2e-passw0rd!'
 
 async function seedPublishedPart(req: APIRequestContext) {
-  const email = `e2e-ws-${uniq()}@kerf.test`
-  const reg = await req.post('/auth/register', {
-    data: { email, password: PASSWORD, name: 'WS Author' },
+  // Seeding used to register a throwaway account. There are no accounts: a
+  // node has one password, and the setup project has already claimed this one.
+  // That suits this spec — the publishing identity was always per-node rather
+  // than per-user, so the author here was never really the account anyway.
+  const session = await req.post('/api/setup/signin', {
+    data: { password: E2E_NODE_PASSWORD },
   })
-  expect(reg.status()).toBe(201)
-  const { access_token, default_workspace } = await reg.json()
+  expect(session.ok()).toBeTruthy()
+  const { access_token, default_workspace } = await session.json()
   const auth = { Authorization: `Bearer ${access_token}` }
 
   const projectName = `e2e-ws-proj-${uniq()}`
@@ -104,20 +107,18 @@ async function seedPublishedPart(req: APIRequestContext) {
   })
   expect(followRes.ok()).toBeTruthy()
 
-  return { email, partName }
+  return { partName }
 }
 
 test.describe('Workshop (server mode)', () => {
   test('published Part appears in Workshop after following the feed', async ({
     page,
   }) => {
-    const { email, partName } = await seedPublishedPart(page.request)
+    const { partName } = await seedPublishedPart(page.request)
 
-    // Authenticate the browser as the author via the real /login UI.
-    await page.goto('/login')
-    await page.getByLabel('Email').fill(email)
-    await page.getByLabel('Password').fill(PASSWORD)
-    await page.getByRole('button', { name: 'Sign in' }).click()
+    // Already signed in: the setup project claimed this node and saved the
+    // session, so there is no sign-in step to drive here.
+    await page.goto('/projects')
     await expect(
       page.getByRole('heading', { name: 'Projects' }),
     ).toBeVisible({ timeout: 20_000 })

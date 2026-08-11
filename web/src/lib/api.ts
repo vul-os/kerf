@@ -3,7 +3,6 @@ import { toast } from '../components/ToastBus.jsx'
 import { streamSse } from './sseClient.js'
 import type {
   ApiUser,
-  AuthSession,
   ApiWorkspace,
   WorkspaceMember,
   ApiProject,
@@ -305,16 +304,9 @@ interface SendMessageBody {
 
 export const api = {
   // ---- Auth ----
-  register: (email: string, password: string, name: string) =>
-    request<AuthSession>('/auth/register', { method: 'POST', body: { email, password, name }, auth: false }),
-  login: (email: string, password: string) =>
-    request<AuthSession>('/auth/login', { method: 'POST', body: { email, password }, auth: false }),
-  forgotPassword: (email: string) =>
-    request<void>('/auth/forgot-password', { method: 'POST', body: { email }, auth: false }),
-  resetPassword: (token: string, password: string) =>
-    request<AuthSession>('/auth/reset-password', { method: 'POST', body: { token, password }, auth: false }),
-  requestVerification: () =>
-    request<void>('/auth/request-verification', { method: 'POST', body: {} }),
+  // register / login / forgotPassword / resetPassword / requestVerification
+  // are gone with the accounts they served. A node has one password, set on
+  // first load: see setupState and signInWithNodePassword.
   refresh: () => refreshAccessToken(),
   me: () => request<ApiUser>('/api/me'),
   updateMe: (patch: Partial<ApiUser>) => request<ApiUser>('/api/me', { method: 'PATCH', body: patch }),

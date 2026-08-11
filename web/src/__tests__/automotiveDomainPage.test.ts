@@ -64,8 +64,10 @@ describe('Automotive page — hero', () => {
     expect(PAGE_SRC).toMatch(/automotive/)
   })
 
-  it('links to /signup CTA', () => {
-    expect(PAGE_SRC).toMatch(/\/signup/)
+  it('links somewhere a visitor can act on', () => {
+    // Was /signup. There is nothing to sign up for — Kerf is installed, not
+    // subscribed to — so the CTA points at the install instructions.
+    expect(PAGE_SRC).toMatch(/\/docs\/getting-started/)
   })
 
   it('links to /docs/automotive', () => {

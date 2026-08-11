@@ -17,7 +17,7 @@ from kerf_core.db.queries import users as users_queries
 from kerf_core.db.queries import workspaces as workspaces_queries
 from kerf_core.db.queries import refresh_tokens as rt_queries
 from kerf_core.db.queries import api_tokens as api_tokens_queries
-from kerf_core.dependencies import require_auth, rate_limit
+from kerf_core.dependencies import require_auth
 
 router = APIRouter()
 api_tokens_router = APIRouter()
@@ -206,197 +206,6 @@ def workspace_to_response(ws: dict) -> WorkspaceResponse:
     )
 
 
-@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-async def register(
-    req: RegisterRequest,
-    response: Response,
-    request: Request,
-    _rl: None = Depends(rate_limit(max_per_window=5, window_seconds=3600, key_prefix="auth:register")),
-):
-    pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        email = req.email.strip().lower()
-        if not email or not req.password:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="email and password are required")
-        if len(req.password) < 8:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="password must be at least 8 characters")
-
-        password_hash = hash_password(req.password)
-
-        try:
-            user = await users_queries.create_user(conn, email, req.name, password_hash)
-        except Exception as exc:
-            if not is_unique_violation(exc):
-                raise
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="email already registered")
-
-        display_name = req.name
-        if not display_name:
-            at_idx = email.find("@")
-            if at_idx > 0:
-                display_name = email[:at_idx]
-            else:
-                display_name = "My"
-        await create_personal_workspace(conn, str(user["id"]), display_name)
-
-        access_token, refresh_token = await issue_tokens(conn, str(user["id"]))
-        default_ws, _ = await get_default_workspace(conn, str(user["id"]))
-
-        # Kerf sends no transactional email (decisions.md 2026-07-17
-        # "accounts shrink to the box"), so there is no inbox to click a
-        # verification link from. The account is fully usable immediately;
-        # mark it verified at creation rather than leaving an unclearable
-        # "unverified" banner with no way to ever clear it.
-        await conn.execute(
-            "UPDATE users SET email_verified = true WHERE id = $1",
-            user["id"],
-        )
-        user = dict(user)
-        user["email_verified"] = True
-
-        response.status_code = status.HTTP_201_CREATED
-        return AuthResponse(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            user=user_to_response(user),
-            default_workspace=workspace_to_response(default_ws) if default_ws else None,
-        )
-
-
-@router.post("/login", response_model=AuthResponse)
-async def login(
-    req: LoginRequest,
-    request: Request,
-    _rl: None = Depends(rate_limit(max_per_window=10, window_seconds=60, key_prefix="auth:login")),
-):
-    pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        email = req.email.strip().lower()
-        user = await users_queries.get_user_by_email(conn, email)
-        if not user:
-            # Dummy bcrypt check so the response time is indistinguishable
-            # from the wrong-password path, preventing user-enumeration via
-            # timing.  Always raises 401 afterwards.
-            check_password(_DUMMY_HASH, req.password)
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
-
-        if not user["password_hash"] or not check_password(user["password_hash"], req.password):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
-
-        access_token, refresh_token = await issue_tokens(conn, str(user["id"]))
-
-        default_ws, ws_exists = await get_default_workspace(conn, str(user["id"]))
-        if not ws_exists:
-            display = user["name"].strip()
-            if not display:
-                at_idx = email.find("@")
-                if at_idx > 0:
-                    display = email[:at_idx]
-                else:
-                    display = "My"
-            default_ws = await create_personal_workspace(conn, str(user["id"]), display)
-
-        return AuthResponse(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            user=user_to_response(user),
-            default_workspace=workspace_to_response(default_ws) if default_ws else None,
-        )
-
-
-async def admin_generate_password_reset_link(
-    conn: asyncpg.Connection, email: str,
-) -> Optional[str]:
-    """Operator-only password-reset link generation — no email involved.
-
-    Kerf sends no transactional email (decisions.md 2026-07-17 "accounts
-    shrink to the box"), so self-service /forgot-password can no longer
-    deliver a reset link to anyone. This is the local-account-recovery
-    replacement: a node operator with DATABASE_URL runs
-    ``kerf admin reset-password <email>`` (kerf-cli, calls this function)
-    and relays the returned one-time link to the account owner out of
-    band (chat, SMS, in person — whatever channel the operator trusts).
-
-    Reuses the same single-use, sha256-hashed, 30-minute-TTL token
-    machinery as the old email flow; only the delivery mechanism changed.
-    Returns ``None`` when there is no password-auth account for *email*.
-    """
-    user = await users_queries.get_user_by_email(conn, email.strip().lower())
-    if not user or not user.get("password_hash"):
-        return None
-    token = await _create_email_token(conn, str(user["id"]), "reset", RESET_TOKEN_TTL)
-    return f"{_app_url()}/reset-password?token={token}"
-
-
-@router.post("/forgot-password")
-async def forgot_password(
-    req: ForgotPasswordRequest,
-    request: Request,
-    _rl: None = Depends(rate_limit(max_per_window=5, window_seconds=3600, key_prefix="auth:forgot_password")),
-):
-    """Kerf sends no transactional email — self-service reset is not
-    possible. Always responds the same way regardless of whether *email*
-    is registered (no account enumeration), pointing at the local-account
-    recovery path instead of silently doing nothing."""
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail=(
-            "Kerf has no email to send a reset link to. Ask your node "
-            "operator to run `kerf admin reset-password <email>` and share "
-            "the printed one-time link with you directly."
-        ),
-    )
-
-
-@router.post("/reset-password", response_model=AuthResponse)
-async def reset_password(req: ResetPasswordRequest, response: Response):
-    if not req.token or len(req.password) < 8:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="token and a password of at least 8 characters are required",
-        )
-    pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            """
-            SELECT id, user_id FROM email_tokens
-            WHERE token_hash = $1 AND kind = 'reset'
-              AND used_at IS NULL AND expires_at > now()
-            """,
-            hash_token(req.token),
-        )
-        if not row:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="invalid or expired reset link",
-            )
-        new_hash = hash_password(req.password)
-        async with conn.transaction():
-            await conn.execute(
-                "UPDATE users SET password_hash = $1 WHERE id = $2",
-                new_hash, row["user_id"],
-            )
-            await conn.execute(
-                "UPDATE email_tokens SET used_at = now() WHERE id = $1",
-                row["id"],
-            )
-            # Security: a password reset invalidates all existing sessions.
-            await conn.execute(
-                "UPDATE refresh_tokens SET revoked_at = now() "
-                "WHERE user_id = $1 AND revoked_at IS NULL",
-                row["user_id"],
-            )
-        user = await users_queries.get_user(conn, row["user_id"])
-        access_token, refresh_token = await issue_tokens(conn, str(user["id"]))
-        default_ws, _ = await get_default_workspace(conn, str(user["id"]))
-    return AuthResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        user=user_to_response(user),
-        default_workspace=workspace_to_response(default_ws) if default_ws else None,
-    )
-
-
 @router.post("/refresh", response_model=AuthResponse)
 async def refresh(req: RefreshRequest):
     if not req.refresh_token:
@@ -436,11 +245,20 @@ async def logout(req: RefreshRequest, response: Response):
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/bootstrap-local", response_model=AuthResponse)
-async def bootstrap_local(response: Response):
-    if not settings.local_mode:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
+async def issue_node_session() -> AuthResponse:
+    """Mint a session for this node's single owner.
 
+    Replaces the `/auth/bootstrap-local` route, which did the same thing over
+    HTTP with **no credential at all**: anything that could reach the port was
+    signed in, which on a machine where a hostile page can point the browser at
+    loopback (DNS rebinding is the usual route) is not a credential. The
+    password set on first load is, so this is now reachable only through
+    `POST /api/setup/signin`, behind that check.
+
+    Not gated on `local_mode`. The old route was, because it was the *local*
+    way in and accounts were the other way; there is one way in now, and it is
+    the same on a laptop and on a box in a rack.
+    """
     email = settings.system_user_email.strip().lower() if settings.system_user_email else "local@kerf.local"
     name = settings.system_user_name.strip() if settings.system_user_name else "Local"
 

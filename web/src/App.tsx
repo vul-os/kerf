@@ -1,5 +1,5 @@
 import { useEffect, useState, lazy, Suspense } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Setup from './routes/Setup.jsx'
 import type { SetupState as SetupStateShape } from './routes/Setup.jsx'
 
@@ -27,10 +27,6 @@ const Automotive = lazy(() => import('./routes/domains/Automotive.jsx'))
 const Roadmap = lazy(() => import('./routes/Roadmap.jsx'))
 const DocsHome = lazy(() => import('./routes/Docs/index.jsx'))
 const DocsArticle = lazy(() => import('./routes/Docs/Article.jsx'))
-const Login = lazy(() => import('./routes/Login.jsx'))
-const Signup = lazy(() => import('./routes/Signup.jsx'))
-const ForgotPassword = lazy(() => import('./routes/ForgotPassword.jsx'))
-const ResetPassword = lazy(() => import('./routes/ResetPassword.jsx'))
 const Projects = lazy(() => import('./routes/Projects.jsx'))
 const Editor = lazy(() => import('./routes/Editor.jsx'))
 const Library = lazy(() => import('./routes/Library.jsx'))
@@ -118,19 +114,17 @@ import { api } from './lib/api.js'
 export default function App() {
   const { localMode, ready: cloudConfigReady } = useNodeConfig()
   const tryBootstrap = useAuth((s) => s.tryBootstrap)
-  const tryBootstrapLocal = useAuth((s) => s.tryBootstrapLocal)
   const setSession = useAuth((s) => s.setSession)
   const refreshToken = useAuth((s) => s.refreshToken)
   const accessToken = useAuth((s) => s.accessToken)
+  const location = useLocation()
   const [bootstrapping, setBootstrapping] = useState(true)
   const [setupState, setSetupState] = useState<SetupStateShape | null>(null)
 
-  // On mount: wait for /api/config (so we know local_mode), then hit
-  // /api/bootstrap. If the backend has a state.json (the brew/curl-install
-  // path) the store is seeded with a refresh token, exchange it for an
-  // access token. Otherwise, when local_mode is on we POST to
-  // /auth/bootstrap-local to auto-create a singleton account so the user
-  // never sees /login.
+  // On mount: wait for /api/config, then hit /api/bootstrap. If the backend
+  // has a state.json (the brew/curl-install path) the store is seeded with a
+  // refresh token, so exchange it for an access token. Otherwise ask the node
+  // whether it has a password yet, and show the matching first-run screen.
   useEffect(() => {
     if (!cloudConfigReady) return
     let cancelled = false
@@ -144,28 +138,24 @@ export default function App() {
             await api.refresh()
             // refresh() leaves accessToken/user populated on success.
           } catch {
-            // If the refresh failed (e.g. token expired/revoked), drop
-            // the dead refresh token so the user lands on /login (or
-            // we re-bootstrap below in local mode).
+            // If the refresh failed (e.g. token expired/revoked), drop the
+            // dead refresh token so the sign-in screen comes up below.
             setSession({ accessToken: null, refreshToken: null, user: null })
           }
         }
-        // Local mode used to mint a session here with no credential at all —
-        // /auth/bootstrap-local signs in anything that can reach the port.
-        // Now the node has one password, so if we still have no session we
-        // ask the server whether it has been claimed and show the matching
-        // screen instead of silently letting the caller in.
-        if (!cancelled && localMode) {
+        // This used to mint a session here with no credential at all, in local
+        // mode, via /auth/bootstrap-local: anything that could reach the port
+        // was signed in. The node has one password now, so with no session we
+        // ask whether it has been claimed and show the matching screen.
+        //
+        // Not gated on local_mode any more. The gate existed because accounts
+        // were the other way in; there is one way in, and asking a server-mode
+        // node the same question gets the same answer.
+        if (!cancelled) {
           const { accessToken: at2 } = useAuth.getState()
           if (!at2) {
-            try {
-              const state = await api.setupState()
-              if (!cancelled) setSetupState(state)
-            } catch {
-              // A node too old to know about /api/setup falls back to the
-              // previous behaviour rather than becoming unusable.
-              await tryBootstrapLocal()
-            }
+            const state = await api.setupState()
+            if (!cancelled) setSetupState(state)
           }
         }
       } finally {
@@ -176,7 +166,21 @@ export default function App() {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cloudConfigReady, localMode])
+  }, [cloudConfigReady])
+
+  // Losing the session — signing out, or a refresh token that expired while
+  // the tab was open — has to bring the sign-in screen back. The effect above
+  // runs once on boot, so without this a sign-out left the app rendering its
+  // routes with no session, which is how a signed-out tab ended up showing the
+  // marketing landing instead of the door.
+  useEffect(() => {
+    if (!cloudConfigReady || accessToken || setupState) return
+    let cancelled = false
+    api.setupState()
+      .then((state) => { if (!cancelled) setSetupState(state) })
+      .catch(() => { /* leave the router to it; nothing better to show */ })
+    return () => { cancelled = true }
+  }, [cloudConfigReady, accessToken, setupState])
 
   // While the bootstrap probe is in flight we deliberately render nothing —
   // showing /login for a frame before silently logging the user in is the
@@ -190,13 +194,22 @@ export default function App() {
   // enter one, or go and set it on the machine. Rendered before the router so
   // no route can be reached around it.
   if (!accessToken && setupState) {
-    return <Setup state={setupState} onReady={() => setSetupState(null)} />
+    return (
+      <Setup
+        state={setupState}
+        onReady={() => setSetupState(null)}
+        sessionExpired={!!(location.state as { sessionExpired?: boolean } | null)?.sessionExpired}
+      />
+    )
   }
 
-  // In local mode the marketing landing + login/signup pages don't apply —
-  // there's exactly one user, the auto-bootstrap above has already minted
-  // their session, send them straight to /projects. Cloud builds keep the
-  // existing public surface (Landing, Login, Signup, Docs).
+  // In local mode the marketing landing doesn't apply — this is the app the
+  // owner installed, not a page selling it — so send them straight to
+  // /projects. A server-mode node keeps the public surface (Landing, Docs).
+  //
+  // /login and /signup used to be here too. There is nobody to sign up: a node
+  // has one password, set on first load, and the screen for that is rendered
+  // above, before the router, so no route can be reached around it.
   const localShortcut = localMode && accessToken
   return (
     <>
@@ -208,16 +221,6 @@ export default function App() {
         path="/"
         element={localShortcut ? <Navigate to="/projects" replace /> : <Landing />}
       />
-      <Route
-        path="/login"
-        element={localShortcut ? <Navigate to="/projects" replace /> : <Login />}
-      />
-      <Route
-        path="/signup"
-        element={localShortcut ? <Navigate to="/projects" replace /> : <Signup />}
-      />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/roadmap" element={<Roadmap />} />
       <Route path="/tools" element={<Tools />} />
       <Route path="/inspect" element={<GeometryInspect />} />

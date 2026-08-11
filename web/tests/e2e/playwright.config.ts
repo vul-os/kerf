@@ -42,7 +42,7 @@
  *
  * Port layout (separate from dev :5173/:8080 so dev and test coexist):
  *   :8081  — kerf-server, local mode (auto-login singleton) + web/dist
- *   :8082  — kerf-server, server mode (real signup/login) + web/dist
+ *   :8082  — kerf-server, server mode (LOCAL_MODE=false) + web/dist
  */
 
 import { existsSync } from 'node:fs'
@@ -51,13 +51,15 @@ import path from 'node:path'
 import { defineConfig } from '@playwright/test'
 
 import { prepareDatabases } from './global-setup'
+import { storageStatePath } from './node-credential'
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..')
 const DIST = path.join(REPO_ROOT, 'web', 'dist')
 
 // Where auth.setup.ts writes the signed-in browser state the other projects
 // reuse. Under tests/e2e so a stale one is obvious and easy to delete.
-const LOCAL_AUTH_STATE = path.join(__dirname, '.auth', 'local.json')
+const LOCAL_AUTH_STATE = storageStatePath('local')
+const SERVER_AUTH_STATE = storageStatePath('server-mode')
 
 if (!existsSync(path.join(DIST, 'index.html'))) {
   throw new Error(
@@ -181,18 +183,15 @@ export default defineConfig({
 
   // Two project profiles against two server stacks:
   //   local        — LOCAL_MODE singleton auto-login (:8081)
-  //   server-mode  — LOCAL_MODE=false, real signup/login + Workshop/Library (:8082)
+  //   server-mode  — LOCAL_MODE=false, Workshop/Library (:8082)
   // Specs that need the public auth surface run under `server-mode`; everything
   // else under `local`. Workshop and Library are core MIT node capabilities
   // present in both projects.
   projects: [
-    // A local node now has a password, set on first load, so the suite sets
-    // one too: this runs first and writes a signed-in storageState the `local`
-    // project reuses. Without it every local spec lands on the setup screen
-    // instead of the app.
-    //
-    // The server-mode stack needs nothing here — it has accounts, and its
-    // specs sign up for their own.
+    // A node has a password, set on first load, so the suite sets one too.
+    // These run first and write the signed-in storageState the stack projects
+    // reuse; without them every spec lands on the setup screen instead of the
+    // app. One per stack, because they are two separate databases.
     {
       name: 'setup-local',
       testMatch: /auth\.setup\.ts/,
@@ -204,7 +203,6 @@ export default defineConfig({
       name: 'local',
       dependencies: ['setup-local'],
       testIgnore: [
-        '**/signup.spec.ts',
         '**/library.spec.ts',
         '**/workshop.spec.ts',
         '**/auth.setup.ts',
@@ -215,13 +213,23 @@ export default defineConfig({
       },
     },
     {
+      name: 'setup-server-mode',
+      testMatch: /auth\.setup\.ts/,
+      use: {
+        baseURL: process.env.E2E_SERVER_BASE_URL || 'http://localhost:8082',
+      },
+    },
+    {
       name: 'server-mode',
+      dependencies: ['setup-server-mode'],
       testMatch: [
-        '**/signup.spec.ts',
         '**/library.spec.ts',
         '**/workshop.spec.ts',
       ],
-      use: { baseURL: process.env.E2E_SERVER_BASE_URL || 'http://localhost:8082' },
+      use: {
+        baseURL: process.env.E2E_SERVER_BASE_URL || 'http://localhost:8082',
+        storageState: SERVER_AUTH_STATE,
+      },
     },
   ],
 

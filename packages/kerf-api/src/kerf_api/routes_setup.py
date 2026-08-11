@@ -107,11 +107,10 @@ async def sign_in(
     # exists; when users collapse into publishing profiles this returns a
     # node-scoped token instead. Deliberately imported here so this module
     # does not depend on kerf-auth at import time.
-    from kerf_auth.routes import bootstrap_local  # noqa: PLC0415
-    from fastapi import Response
+    from kerf_auth.routes import issue_node_session  # noqa: PLC0415
 
-    # bootstrap_local returns an AuthResponse model, not a dict. Annotating
-    # this route `-> dict` made FastAPI validate the response against dict and
-    # 500 on every correct password — the return type here has to stay wide
-    # enough for whatever the session machinery hands back.
-    return await bootstrap_local(Response())
+    # It returns an AuthResponse model, not a dict. Annotating this route
+    # `-> dict` made FastAPI validate the response against dict and 500 on
+    # every correct password — the return type has to stay wide enough for
+    # whatever the session machinery hands back.
+    return await issue_node_session()

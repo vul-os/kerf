@@ -28,12 +28,9 @@ import asyncio
 import hashlib
 import os
 import pathlib
-import secrets
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Optional
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -499,53 +496,6 @@ class TestInputValidation:
             f"Invalid slug should be 400, got {r.status_code}: {r.text}"
         )
 
-    def test_reset_password_too_short_is_400(self):
-        """POST /auth/reset-password with password < 8 chars → 400 (no DB hit)."""
-        from fastapi.testclient import TestClient
-        import kerf_auth.routes as auth_routes
-        from fastapi import FastAPI
-
-        app = FastAPI()
-        app.include_router(auth_routes.router, prefix="/auth")
-        client = TestClient(app, raise_server_exceptions=False)
-        r = client.post(
-            "/auth/reset-password",
-            json={"token": "sometoken", "password": "short"},
-        )
-        assert r.status_code == 400, (
-            f"Short password in reset should be 400, got {r.status_code}: {r.text}"
-        )
-
-    def test_reset_password_empty_token_is_400(self):
-        """POST /auth/reset-password with empty token → 400."""
-        from fastapi.testclient import TestClient
-        import kerf_auth.routes as auth_routes
-        from fastapi import FastAPI
-
-        app = FastAPI()
-        app.include_router(auth_routes.router, prefix="/auth")
-        client = TestClient(app, raise_server_exceptions=False)
-        r = client.post(
-            "/auth/reset-password",
-            json={"token": "", "password": "longenoughpw"},
-        )
-        assert r.status_code == 400, (
-            f"Empty token in reset should be 400, got {r.status_code}: {r.text}"
-        )
-
-    def test_register_weak_password_is_400(self, scenario):
-        """POST /auth/register with < 8 char password → 400."""
-        from fastapi.testclient import TestClient
-
-        with TestClient(_make_app()) as client:
-            r = client.post(
-                "/auth/register",
-                json={"email": _uuid_email("weak"), "password": "abc", "name": "Weak"},
-            )
-        assert r.status_code == 400, (
-            f"Weak password should be 400, got {r.status_code}: {r.text}"
-        )
-
 
 # ===========================================================================
 # (c-ext) No secret / PII leakage in responses
@@ -601,151 +551,59 @@ class TestNoPIILeakage:
 #     second use (real DB)
 # ===========================================================================
 
-def _insert_email_token_sync(
-    user_id: str,
-    kind: str,
-    *,
-    raw: Optional[str] = None,
-    expire_in: timedelta = timedelta(hours=1),
-    already_used: bool = False,
-) -> str:
-    """Insert an email_token row; return the raw (pre-hash) token."""
-    import asyncpg
-
-    raw = raw or secrets.token_urlsafe(32)
-    token_hash = _hash_token(raw)
-    expires_at = datetime.now(timezone.utc) + expire_in
-    used_at = datetime.now(timezone.utc) if already_used else None
-
-    async def _run():
-        pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=2)
-        try:
-            async with pool.acquire() as conn:
-                await conn.execute(
-                    "INSERT INTO email_tokens (user_id, kind, token_hash, expires_at, used_at) "
-                    "VALUES ($1, $2, $3, $4, $5)",
-                    uuid.UUID(user_id), kind, token_hash, expires_at, used_at,
-                )
-        finally:
-            await pool.close()
-
-    asyncio.run(_run())
-    return raw
-
-
-class TestTokenSingleUse:
-
-    def test_reset_token_second_use_rejected(self, scenario):
-        """After a reset token is consumed once, a second POST → 400."""
-        from fastapi.testclient import TestClient
-
-        raw = _insert_email_token_sync(scenario["uid_a"], "reset")
-
-        with TestClient(_make_app()) as client:
-            # First use — should succeed (200)
-            r1 = client.post(
-                "/auth/reset-password",
-                json={"token": raw, "password": "ValidPassword1!"},
-            )
-            assert r1.status_code == 200, (
-                f"First reset should succeed (200), got {r1.status_code}: {r1.text}"
-            )
-            # Second use — token consumed (used_at IS NOT NULL) → must be 400
-            r2 = client.post(
-                "/auth/reset-password",
-                json={"token": raw, "password": "AnotherPassword2@"},
-            )
-        assert r2.status_code == 400, (
-            f"TOKEN SINGLE-USE FAILURE: second reset returned {r2.status_code} "
-            f"instead of 400 — the app accepted the same reset token twice. "
-            f"REAL VULNERABILITY."
-        )
-
-    def test_pre_consumed_reset_token_rejected(self, scenario):
-        """A token row with used_at already set is immediately rejected."""
-        from fastapi.testclient import TestClient
-
-        raw = _insert_email_token_sync(scenario["uid_a"], "reset", already_used=True)
-
-        with TestClient(_make_app()) as client:
-            r = client.post(
-                "/auth/reset-password",
-                json={"token": raw, "password": "ValidPassword1!"},
-            )
-        assert r.status_code == 400, (
-            f"Pre-consumed reset token should be 400, got {r.status_code}: {r.text}"
-        )
-
-    # test_verify_token_second_use_redirects_invalid removed 2026-07-18:
-    # /auth/verify-email no longer exists. Kerf sends no email, so new
-    # accounts are auto-verified at registration instead of via an emailed
-    # token — see kerf_auth.routes.register() and decisions.md 2026-07-18
-    # "accounts shrink to the box". Single-use-token coverage for the
-    # 'reset' kind (the only email_tokens kind still issued) remains above.
-
-
 # ===========================================================================
-# (e) Token expiry — expired token rejected
+# (e-ext) There is no credential-free way in
 # ===========================================================================
 
-class TestTokenExpiry:
+class TestNoCredentialFreeSignIn:
+    """`/auth/bootstrap-local` used to hand out a full session to anything that
+    could reach the port, gated only on local_mode — which is the default. The
+    node password replaced it, and what matters now is that the old door is
+    actually gone rather than merely discouraged."""
 
-    def test_expired_reset_token_is_400(self, scenario):
-        """POST /auth/reset-password with expired token → 400."""
-        from fastapi.testclient import TestClient
-
-        raw = _insert_email_token_sync(
-            scenario["uid_a"], "reset",
-            expire_in=timedelta(hours=-2),  # already expired
-        )
-
-        with TestClient(_make_app()) as client:
-            r = client.post(
-                "/auth/reset-password",
-                json={"token": raw, "password": "ValidPassword1!"},
-            )
-        assert r.status_code == 400, (
-            f"Expired reset token should be 400, got {r.status_code}: {r.text}"
-        )
-
-    # test_expired_verify_token_redirects_invalid removed 2026-07-18:
-    # /auth/verify-email no longer exists — see the note in
-    # TestTokenSingleUse above.
-
-
-# ===========================================================================
-# (e-ext) Bootstrap-local blocked in cloud mode (no DB needed)
-# ===========================================================================
-
-class TestBootstrapLocalCloudGuard:
-
-    def test_bootstrap_local_blocked_when_cloud_mode(self):
-        """POST /auth/bootstrap-local must return 404 when local_mode=False."""
+    def test_bootstrap_local_is_not_routed(self):
         import kerf_auth.routes as auth_routes
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
-        fake_settings = MagicMock()
-        fake_settings.local_mode = False
-
         app = FastAPI()
         app.include_router(auth_routes.router, prefix="/auth")
 
-        with patch.object(auth_routes, "settings", fake_settings):
-            client = TestClient(app, raise_server_exceptions=False)
-            r = client.post("/auth/bootstrap-local")
+        client = TestClient(app, raise_server_exceptions=False)
+        r = client.post("/auth/bootstrap-local")
 
         assert r.status_code == 404, (
-            f"bootstrap-local should be 404 in cloud mode, got {r.status_code}: {r.text}"
+            f"bootstrap-local must not be routed at all, got {r.status_code}: {r.text}"
         )
 
-    def test_bootstrap_local_cloud_guard_exists_in_source(self):
-        """Source contract: bootstrap-local route checks local_mode."""
+    def test_no_route_issues_a_session_without_a_credential(self):
+        """Every path that mints tokens has to check something first. This
+        walks the router rather than naming routes, so a future one that
+        forgets is caught here instead of by whoever finds it."""
         import kerf_auth.routes as auth_routes
+
+        UNAUTHENTICATED_BY_DESIGN = {
+            "/refresh",    # the refresh token is itself the credential
+            "/logout",     # revoking a token you hold
+        }
         src = pathlib.Path(auth_routes.__file__).read_text()
-        assert "if not settings.local_mode:" in src, (
-            "Missing cloud guard in bootstrap-local: 'if not settings.local_mode:' not found"
-        )
-        assert "HTTP_404_NOT_FOUND" in src, (
-            "bootstrap-local must raise 404 when cloud guard triggers"
-        )
+
+        for route in auth_routes.router.routes:
+            path = getattr(route, "path", "")
+            if path in UNAUTHENTICATED_BY_DESIGN:
+                continue
+            name = getattr(route, "name", "")
+            start = src.find(f"async def {name}(")
+            assert start != -1, f"could not locate {name} in source"
+            body = src[start:start + 3000]
+            if "issue_tokens(" not in body:
+                continue
+            assert (
+                "verify_password" in body
+                or "check_password" in body
+                or "password_hash" in body
+            ), (
+                f"{path} issues a session but checks no credential. If that is "
+                f"deliberate, say why here — the last route that did it signed "
+                f"in anything that could reach the port."
+            )

@@ -56,26 +56,24 @@ export default function Header() {
 
         {/* Desktop right side */}
         <nav className="hidden md:flex items-center gap-2 shrink-0" aria-label="Account">
+          {/* There is no sign-in page: a node has one password, set on first
+              load, and that screen renders before the router. What a visitor
+              without a session needs is not an account — it is the install. */}
           {authed ? (
             <Button as={Link} to="/projects" variant="primary" size="sm">
               Open Kerf
             </Button>
           ) : (
-            <>
-              <Button as={Link} to="/login" variant="ghost" size="sm">
-                Sign in
-              </Button>
-              <Button as={Link} to="/signup" variant="primary" size="sm">
-                Sign up
-              </Button>
-            </>
+            <Button as={Link} to="/docs/getting-started" variant="primary" size="sm">
+              Install Kerf
+            </Button>
           )}
         </nav>
 
         {/* Mobile right side */}
         <div className="flex md:hidden items-center gap-2">
-          <Button as={Link} to={authed ? '/projects' : '/signup'} variant="primary" size="sm">
-            {authed ? 'Open Kerf' : 'Sign up'}
+          <Button as={Link} to={authed ? '/projects' : '/docs/getting-started'} variant="primary" size="sm">
+            {authed ? 'Open Kerf' : 'Install Kerf'}
           </Button>
           <button
             type="button"
@@ -104,11 +102,11 @@ export default function Header() {
               </Link>
             ))}
             <Link
-              to={authed ? '/projects' : '/login'}
+              to={authed ? '/projects' : '/docs/getting-started'}
               onClick={() => setMenuOpen(false)}
               className="py-2.5 text-sm text-ink-400 hover:text-ink-100 transition-colors"
             >
-              {authed ? 'Open Kerf' : 'Sign in'}
+              {authed ? 'Open Kerf' : 'Install Kerf'}
             </Link>
           </nav>
         </div>

@@ -6,10 +6,7 @@ Strategy: Kerf's primary CSRF defence layers are:
   1. FastAPI CORSMiddleware configured with an explicit allow_origins list
      (not '*') and allow_credentials=True — browsers will refuse
      cross-origin credentialed requests rejected here.
-  2. OAuth state cookies carry httponly=True and samesite='lax',
-     preventing JavaScript from reading them and limiting cross-site
-     submission.
-  3. Auth endpoints authenticate via Bearer JWT / API token, not cookies,
+  2. Auth endpoints authenticate via Bearer JWT / API token, not cookies,
      so a forged cross-origin POST cannot carry a valid credential even if
      CORS is bypassed.
 
@@ -21,9 +18,7 @@ These tests are hermetic (no Postgres required). They cover:
   Case  5 — sub-domain of allowed origin → not an exact match
   Case  6 — OPTIONS preflight for cross-origin → not allowed by CORS
   Case  7 — OPTIONS preflight for same-origin → allowed by CORS
-  Case  8 — GitHub OAuth state cookie has samesite=lax + httponly
-  Case  9 — Google OAuth state cookie has samesite=lax + httponly
-  Case 10 — state-mutating route (/forgot-password) requires no cookie
+  Case  8 — state-mutating route (/logout) requires no cookie
              but same-origin Origin header is accepted; cross-origin blocked
 """
 from __future__ import annotations
@@ -45,8 +40,7 @@ ALLOWED_ORIGIN = "http://localhost:5173"
 def _stub_rate_limit(monkeypatch):
     """Prevent rate_limit from hitting the DB pool in all tests here.
 
-    The /forgot-password route now has a rate_limit dependency (R17).
-    Stub enforce so tests remain hermetic.
+    Stub enforce so tests remain hermetic whichever route is probed.
     """
     import kerf_core.rate_limit as _rl_module
     monkeypatch.setattr(_rl_module, "enforce", AsyncMock(return_value=None))
@@ -101,17 +95,18 @@ def _conn_ok():
 def test_same_origin_post_not_blocked_by_cors():
     """A POST from the allowed origin must reach the handler (not be CORS-blocked).
 
-    /forgot-password always returns 501 (Kerf sends no email) regardless of
-    whether the email exists, so this is safe to exercise without a real DB.
+    /logout with an empty refresh token returns 204 without touching the
+    database, so it is safe to exercise here. It used to be /forgot-password,
+    which is gone with the accounts it reset.
     """
     client = TestClient(_build_app(), raise_server_exceptions=False)
     r = client.post(
-        "/auth/forgot-password",
-        json={"email": "nobody@test.invalid"},
+        "/auth/logout",
+        json={"refresh_token": ""},
         headers={"Origin": ALLOWED_ORIGIN},
     )
-    # Not 403 (CORS-blocked); the handler ran and returned its 501.
-    assert r.status_code == 501
+    # Not 403 (CORS-blocked); the handler ran and returned its 204.
+    assert r.status_code == 204
 
 
 # ---------------------------------------------------------------------------
@@ -130,8 +125,8 @@ def test_cross_origin_post_response_has_no_acao():
          patch.object(auth.users_queries, "get_user_by_email", AsyncMock(return_value=None)):
         client = TestClient(_build_app(), raise_server_exceptions=False)
         r = client.post(
-            "/auth/forgot-password",
-            json={"email": "evil@test.invalid"},
+            "/auth/logout",
+            json={"refresh_token": ""},
             headers={"Origin": CROSS_ORIGIN},
         )
     acao = r.headers.get("access-control-allow-origin", "")
@@ -152,7 +147,7 @@ def test_cross_origin_options_preflight_returns_no_acao():
     """
     client = TestClient(_build_app(), raise_server_exceptions=False)
     r = client.options(
-        "/auth/forgot-password",
+        "/auth/logout",
         headers={
             "Origin": CROSS_ORIGIN,
             "Access-Control-Request-Method": "POST",
@@ -175,8 +170,8 @@ def test_null_origin_post_is_not_granted_cors():
          patch.object(auth.users_queries, "get_user_by_email", AsyncMock(return_value=None)):
         client = TestClient(_build_app(), raise_server_exceptions=False)
         r = client.post(
-            "/auth/forgot-password",
-            json={"email": "null@test.invalid"},
+            "/auth/logout",
+            json={"refresh_token": ""},
             headers={"Origin": NULL_ORIGIN},
         )
     acao = r.headers.get("access-control-allow-origin", "")
@@ -196,8 +191,8 @@ def test_subdomain_origin_not_granted_cors():
          patch.object(auth.users_queries, "get_user_by_email", AsyncMock(return_value=None)):
         client = TestClient(_build_app(), raise_server_exceptions=False)
         r = client.post(
-            "/auth/forgot-password",
-            json={"email": "sub@test.invalid"},
+            "/auth/logout",
+            json={"refresh_token": ""},
             headers={"Origin": SUBDOMAIN_ORIGIN},
         )
     acao = r.headers.get("access-control-allow-origin", "")
@@ -216,7 +211,7 @@ def test_cross_origin_preflight_has_no_allow_methods():
     """
     client = TestClient(_build_app(), raise_server_exceptions=False)
     r = client.options(
-        "/auth/forgot-password",
+        "/auth/logout",
         headers={
             "Origin": CROSS_ORIGIN,
             "Access-Control-Request-Method": "POST",
@@ -235,7 +230,7 @@ def test_same_origin_preflight_returns_acao():
     """A preflight from the allowed origin must receive the ACAO header."""
     client = TestClient(_build_app(), raise_server_exceptions=False)
     r = client.options(
-        "/auth/forgot-password",
+        "/auth/logout",
         headers={
             "Origin": ALLOWED_ORIGIN,
             "Access-Control-Request-Method": "POST",
@@ -253,7 +248,7 @@ def test_same_origin_preflight_returns_acao():
 # ---------------------------------------------------------------------------
 
 def test_state_mutating_route_same_origin_allowed_cross_origin_blocked():
-    """/forgot-password is state-mutating (triggers DB writes / email).
+    """/logout is state-mutating (it revokes a refresh token).
 
     Same-origin Origin header: ACAO is set in the response.
     Cross-origin Origin header: no ACAO (browser-side enforcement).
@@ -266,8 +261,8 @@ def test_state_mutating_route_same_origin_allowed_cross_origin_blocked():
 
         # Same-origin: ACAO must echo the allowed origin.
         r_good = client.post(
-            "/auth/forgot-password",
-            json={"email": "good@test.invalid"},
+            "/auth/logout",
+            json={"refresh_token": ""},
             headers={"Origin": ALLOWED_ORIGIN},
         )
         acao_good = r_good.headers.get("access-control-allow-origin", "")
@@ -277,8 +272,8 @@ def test_state_mutating_route_same_origin_allowed_cross_origin_blocked():
 
         # Cross-origin: ACAO must NOT echo the attacker origin.
         r_bad = client.post(
-            "/auth/forgot-password",
-            json={"email": "bad@test.invalid"},
+            "/auth/logout",
+            json={"refresh_token": ""},
             headers={"Origin": CROSS_ORIGIN},
         )
         acao_bad = r_bad.headers.get("access-control-allow-origin", "")

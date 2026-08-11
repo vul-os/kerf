@@ -80,7 +80,7 @@ function Hero() {
             </p>
 
             <div className="mt-6 flex flex-wrap items-center gap-3">
-              <Button as={Link} to="/signup" variant="primary" size="lg">
+              <Button as={Link} to="/docs/getting-started" variant="primary" size="lg">
                 Start simulating free
                 <ArrowRight size={16} />
               </Button>
@@ -370,12 +370,12 @@ function CTAStrip() {
                 Simulate your first mechanism.
               </h2>
               <p className="mt-2 text-ink-300 max-w-xl">
-                Sign up free and plan a trajectory in your next session — or clone
+                Install Kerf and plan a trajectory in your next session — or clone
                 the repo and self-host. Both paths are first-class.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button as={Link} to="/signup" variant="primary" size="lg">
+              <Button as={Link} to="/docs/getting-started" variant="primary" size="lg">
                 Try it free
                 <ArrowRight size={16} />
               </Button>

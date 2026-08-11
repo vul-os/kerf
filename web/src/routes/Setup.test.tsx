@@ -108,6 +108,18 @@ describe('signing in', () => {
     const html = render(<SignIn onSignedIn={noop} />)
     expect(html).toMatch(/autoComplete="current-password"|autocomplete="current-password"/)
   })
+
+  it('says so when the session ran out, rather than just reappearing', () => {
+    // ProtectedRoute bounces an expired session here. Without a word about
+    // why, the screen reads as the node having forgotten the password.
+    const html = render(<SignIn onSignedIn={noop} sessionExpired />)
+    expect(html).toMatch(/session expired/i)
+  })
+
+  it('says nothing about it on an ordinary sign-in', () => {
+    const html = render(<SignIn onSignedIn={noop} />)
+    expect(html).not.toMatch(/session expired/i)
+  })
 })
 
 describe('the blocked screen', () => {

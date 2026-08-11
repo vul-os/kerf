@@ -388,7 +388,7 @@ function Hero() {
           </div>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
-            <Button as={Link} to="/signup" variant="primary" size="lg">
+            <Button as={Link} to="/docs/getting-started" variant="primary" size="lg">
               Try it free
               <ArrowRight size={16} />
             </Button>
@@ -812,13 +812,13 @@ function CTAStrip() {
                 Start with what&apos;s here.
               </h2>
               <p className="mt-2 text-ink-300 max-w-xl">
-                IFC import, DXF, drawings, and BOM are live today. Sign up free
+                IFC import, DXF, drawings, and BOM are live today. Install Kerf
                 and import a real IFC in the next five minutes — or clone the
                 repo and self-host.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button as={Link} to="/signup" variant="primary" size="lg">
+              <Button as={Link} to="/docs/getting-started" variant="primary" size="lg">
                 Try it free
                 <ArrowRight size={16} />
               </Button>

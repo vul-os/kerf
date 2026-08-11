@@ -87,16 +87,6 @@ describe('ApiError', () => {
 })
 
 describe('URL builders + request shape', () => {
-  it('login posts JSON to /auth/login with no auth header', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(jsonRes({ access_token: 't', user: { id: 'u1' } }))
-    await api.login('alice@example.com', 'secret')
-    expect(fetch).toHaveBeenCalledTimes(1)
-    const [url, init] = vi.mocked(fetch).mock.calls[0] as [string, any]
-    expect(url).toBe(`${API_URL}/auth/login`)
-    expect(init.method).toBe('POST')
-    expect(init.headers.authorization).toBeUndefined()
-    expect(JSON.parse(init.body)).toEqual({ email: 'alice@example.com', password: 'secret' })
-  })
 
   it('me sends a Bearer token from the auth store', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonRes({ id: 'u1' }))

@@ -298,7 +298,9 @@ function EditorUserMenu({ user }) {
     setOpen(false)
     try { await api.logout() } catch { /* tolerate network error */ }
     logout()
-    navigate('/login', { replace: true })
+    // No /login page — App renders the node's sign-in screen at any route
+    // once the session is gone.
+    navigate('/', { replace: true })
   }
 
   const initial = ((user?.name || user?.email || '?').slice(0, 1) || '?').toUpperCase()

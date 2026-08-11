@@ -6,20 +6,25 @@
  * kind='part' from projects with visibility='public' — no verified-publisher
  * requirement for the default (non-verified-only) listing. We seed that
  * state via the API, then browse + open the part in the browser.
+ *
+ * "server mode" now means only LOCAL_MODE=false — the way in is the node
+ * password either way.
  */
 
 import { test, expect, type APIRequestContext } from '@playwright/test'
+import { E2E_NODE_PASSWORD } from '../node-credential'
 
 const uniq = () => `${Date.now()}-${Math.floor(Math.random() * 1e4)}`
-const PASSWORD = 'e2e-passw0rd!'
 
 async function seedLibraryPart(req: APIRequestContext) {
-  const email = `e2e-lib-${uniq()}@kerf.test`
-  const reg = await req.post('/auth/register', {
-    data: { email, password: PASSWORD, name: 'Lib Author' },
+  // Seeding used to register a throwaway account. There are no accounts: a
+  // node has one password, and the setup project has already claimed this one,
+  // so signing in with it is how anything gets a token here.
+  const session = await req.post('/api/setup/signin', {
+    data: { password: E2E_NODE_PASSWORD },
   })
-  expect(reg.status()).toBe(201)
-  const { access_token, default_workspace } = await reg.json()
+  expect(session.ok()).toBeTruthy()
+  const { access_token, default_workspace } = await session.json()
   const auth = { Authorization: `Bearer ${access_token}` }
 
   const pr = await req.post('/api/projects', {
@@ -46,18 +51,16 @@ async function seedLibraryPart(req: APIRequestContext) {
   })
   expect(up.ok()).toBeTruthy()
 
-  return { email, partName }
+  return { partName }
 }
 
 test.describe('Library browse + open (server mode)', () => {
   test('open Library Part from the catalog', async ({ page }) => {
-    const { email, partName } = await seedLibraryPart(page.request)
+    const { partName } = await seedLibraryPart(page.request)
 
-    // Authenticate via the real /login UI.
-    await page.goto('/login')
-    await page.getByLabel('Email').fill(email)
-    await page.getByLabel('Password').fill(PASSWORD)
-    await page.getByRole('button', { name: 'Sign in' }).click()
+    // Already signed in: the setup project claimed this node and saved the
+    // session, so there is no sign-in step to drive here.
+    await page.goto('/projects')
     await expect(
       page.getByRole('heading', { name: 'Projects' }),
     ).toBeVisible({ timeout: 20_000 })

@@ -65,7 +65,13 @@ class TestR13SaveProviderKey:
              patch("kerf_core.utils.encrypt.encrypt_secret", return_value=b"encrypted-blob"):
             result = _run(save_provider_key(req, payload=self._payload(user_id)))
 
-        assert result == {"provider": "anthropic", "saved": True}
+        assert result["provider"] == "anthropic"
+        assert result["saved"] is True
+        # The save echoes back what Settings will render, so the UI can show
+        # the new state without a second round-trip — masked, never the key.
+        assert result["masked_key"].startswith("••••")
+        assert "sk-ant-valid-key" not in str(result)
+        assert result["base_url"] is None  # none sent -> provider default
         conn.execute.assert_awaited_once()
         call_args = conn.execute.call_args
         assert "user_provider_keys" in call_args[0][0]

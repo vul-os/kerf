@@ -57,6 +57,10 @@ _RE_NOW_INTERVAL = re.compile(
     r"now\s*\(\s*\)\s*([+-])\s*interval\s*'([^']+)'", re.IGNORECASE)
 _RE_NOW = re.compile(r"\bnow\s*\(\s*\)", re.IGNORECASE)
 _RE_CAST = re.compile(r"::\s*[A-Za-z_][A-Za-z0-9_]*(\s*\[\s*\])?")
+# SQLite has no ADD COLUMN IF NOT EXISTS. Drop the qualifier here; the runner
+# skips the statement instead when the column already exists.
+_RE_ADD_COLUMN_INE = re.compile(
+    r"\badd\s+column\s+if\s+not\s+exists\b", re.IGNORECASE)
 _RE_ARRAY = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\[\s*\]")
 
 # type-token replacements (word-boundary, case-insensitive)
@@ -87,6 +91,8 @@ def translate_ddl(sql: str) -> str:
         line = _RE_NOW_INTERVAL.sub(
             lambda m: f"(datetime('now','{m.group(1)}{m.group(2)}'))", line)
         line = _RE_NOW.sub("CURRENT_TIMESTAMP", line)
+        if not line.lstrip().startswith("--"):
+            line = _RE_ADD_COLUMN_INE.sub("add column", line)
         # Array types -> text (stored as a JSON array).  A Postgres empty-array
         # default `'{}'` must become a JSON empty array `'[]'` so it round-trips
         # through json.loads on read.  Do this before erasing the `[]` marker.

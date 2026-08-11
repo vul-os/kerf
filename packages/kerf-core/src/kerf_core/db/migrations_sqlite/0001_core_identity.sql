@@ -281,33 +281,6 @@ create index if not exists dental_cases_project_id_idx
 create index if not exists dental_cases_treatment_idx
     on dental_cases(treatment);
 
--- ════════════ folded: user_llm_credentials ════════════
--- Per-user LLM API keys, editable from Settings at runtime.
---
--- These used to exist only as process config (env vars or kerf.toml), so
--- changing one meant editing a file and restarting. Most people install the
--- app and never open a config file, so the UI is the primary way to set them
--- and the DB is the source of truth; env/TOML remains the fallback for
--- headless deploys.
---
--- `provider` is free text, not a CHECK: with a gateway in front, the set of
--- reachable providers is whatever it supports, and needing a schema migration
--- when a new model vendor appears is exactly the friction this table removes.
---
--- api_key_ciphertext is a Fernet token, never plaintext. base_url is for
--- gateway/OpenAI-compatible endpoints; NULL means the provider default.
-create table if not exists user_llm_credentials (
-    user_id            text not null references users(id) on delete cascade,
-    provider           text not null,
-    api_key_ciphertext text not null,
-    base_url           text,
-    created_at         text not null default CURRENT_TIMESTAMP,
-    updated_at         text not null default CURRENT_TIMESTAMP,
-    primary key (user_id, provider)
-);
-create index if not exists user_llm_credentials_user_idx
-    on user_llm_credentials(user_id);
-
 -- ════════════ rate_limit_buckets (T-310) ════════════
 -- Sliding-window counter keyed on caller (user_id or IP) + endpoint name.
 -- Each window_start is a window_seconds-rounded text; INSERT ... ON

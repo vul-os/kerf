@@ -365,6 +365,23 @@ _BYO_SUPPORTED_PROVIDERS = frozenset({"anthropic", "openai", "moonshot", "gemini
 class SaveProviderKeyRequest(BaseModel):
     provider: str
     api_key: str
+    # Gateway / OpenAI-compatible endpoint override. Empty string clears it
+    # back to the provider default, which is why this is not Optional[str] with
+    # a None default — "" and "not sent" have to mean different things.
+    base_url: str = ""
+
+
+def _mask_api_key(plaintext: str) -> str:
+    """Render a key as enough to recognise and not enough to use.
+
+    Read routes must never return a stored key, but "you have a key saved"
+    alone is not enough for someone with several accounts to tell which one is
+    in the box. Last four characters only, and never for a key so short that
+    four characters is most of it.
+    """
+    if len(plaintext) <= 8:
+        return "••••"
+    return "••••" + plaintext[-4:]
 
 
 async def _validate_provider_key(provider: str, api_key: str) -> None:
@@ -469,21 +486,256 @@ async def save_provider_key(
     # Encrypt and upsert.
     from kerf_core.utils.encrypt import encrypt_secret
     encrypted = encrypt_secret(api_key.encode(), "byo-provider-key")
+    base_url = req.base_url.strip() or None
 
     pool = await get_pool_required()
     async with pool.acquire() as conn:
         await conn.execute(
             """
-            INSERT INTO user_provider_keys (user_id, provider, encrypted_key)
-            VALUES ($1, $2, $3)
+            INSERT INTO user_provider_keys (user_id, provider, encrypted_key, base_url)
+            VALUES ($1, $2, $3, $4)
             ON CONFLICT (user_id, provider)
             DO UPDATE SET encrypted_key = EXCLUDED.encrypted_key,
+                          base_url      = EXCLUDED.base_url,
                           created_at    = now()
             """,
-            user_id, provider, encrypted,
+            user_id, provider, encrypted, base_url,
         )
 
-    return {"provider": provider, "saved": True}
+    return {
+        "provider": provider,
+        "saved": True,
+        "masked_key": _mask_api_key(api_key),
+        "base_url": base_url,
+    }
+
+
+@router.get("/provider-keys")
+async def list_provider_keys(payload: dict = Depends(require_auth)):
+    """GET /api/provider-keys — which providers this user has a key saved for.
+
+    Settings needs to render "Anthropic: ••••a91f, configured" without ever
+    receiving the key. The ciphertext is decrypted server-side purely to
+    compute the mask; the plaintext never leaves this function.
+
+    A row whose ciphertext will not decrypt is reported with
+    ``readable: false`` rather than dropped or 500'd. That state is reachable
+    without anything being corrupt: the encryption key is derived from
+    ``jwt_secret``, so rotating it — which operators are told to do — orphans
+    every saved key. Showing the row is what lets the UI say "saved under a
+    previous server secret, re-enter it" instead of silently forgetting.
+    """
+    user_id = payload.get("sub")
+    pool = await get_pool_required()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT provider, encrypted_key, base_url, created_at
+            FROM user_provider_keys
+            WHERE user_id = $1
+            ORDER BY provider
+            """,
+            user_id,
+        )
+
+    from kerf_core.utils.encrypt import decrypt_secret
+
+    out = []
+    for row in rows:
+        entry = {
+            "provider": row["provider"],
+            "base_url": row["base_url"],
+            "created_at": row["created_at"],
+            "readable": True,
+            "masked_key": "",
+        }
+        try:
+            entry["masked_key"] = _mask_api_key(
+                decrypt_secret(row["encrypted_key"], "byo-provider-key").decode()
+            )
+        except Exception:
+            entry["readable"] = False
+        out.append(entry)
+
+    # Providers the operator configured server-side. A user with no key of
+    # their own still gets a working model picker through these, and the UI
+    # should say so rather than showing four empty boxes and no explanation.
+    operator_configured = sorted(
+        name for name, key in (
+            ("anthropic", settings.anthropic_api_key),
+            ("openai", settings.openai_api_key),
+            ("moonshot", settings.moonshot_api_key),
+            ("gemini", settings.gemini_api_key),
+        ) if key
+    )
+
+    return {
+        "keys": out,
+        "supported_providers": sorted(_BYO_SUPPORTED_PROVIDERS),
+        "operator_configured": operator_configured,
+    }
+
+
+@router.get("/usage")
+async def get_usage(
+    days: int = Query(default=30, ge=1, le=365),
+    project_id: Optional[str] = Query(default=None),
+    payload: dict = Depends(require_auth),
+):
+    """GET /api/usage — this user's token, storage and GPU usage.
+
+    ``usage_events`` has been written at every LLM turn, file upload and render
+    since it was added, and until now nothing read it back: the numbers existed
+    but no route returned them. This is that route.
+
+    Scoped to the caller, never to a workspace — usage rows carry a user_id and
+    showing one member's token spend to another is not something to do by
+    accident. ``project_id`` narrows further, it does not widen.
+
+    Kerf has no billing: ``usd_cost`` is an informational estimate recorded at
+    the time of the call, not an amount anyone is charged. The UI must say so.
+
+    Day bucketing uses ``substr(created_at, 1, 10)``, which reads the leading
+    YYYY-MM-DD of both backends' representation — ISO text on SQLite, and the
+    session-timezone rendering of a timestamptz on Postgres. On a server
+    running in UTC (the deployed configuration) those agree; on one running in
+    local time the day boundaries follow the server, which for a usage chart is
+    the more useful answer anyway.
+    """
+    user_id = payload.get("sub")
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+
+    params: list = [user_id, since]
+    scope = "WHERE user_id = $1 AND created_at >= $2"
+    if project_id:
+        params.append(project_id)
+        scope += " AND project_id = $3"
+
+    pool = await get_pool_required()
+    async with pool.acquire() as conn:
+        totals = await conn.fetchrow(
+            f"""
+            SELECT COUNT(*)                     AS events,
+                   COALESCE(SUM(input_tokens),  0) AS input_tokens,
+                   COALESCE(SUM(output_tokens), 0) AS output_tokens,
+                   COALESCE(SUM(bytes_delta),   0) AS bytes_delta,
+                   COALESCE(SUM(usd_cost),      0) AS usd_cost
+            FROM usage_events {scope}
+            """,
+            *params,
+        )
+        by_model = await conn.fetch(
+            f"""
+            SELECT COALESCE(model, '') AS model,
+                   COUNT(*)                     AS events,
+                   COALESCE(SUM(input_tokens),  0) AS input_tokens,
+                   COALESCE(SUM(output_tokens), 0) AS output_tokens,
+                   COALESCE(SUM(usd_cost),      0) AS usd_cost
+            FROM usage_events {scope} AND kind IN ('token', 'operator_token')
+            GROUP BY COALESCE(model, '')
+            ORDER BY SUM(usd_cost) DESC, COUNT(*) DESC
+            """,
+            *params,
+        )
+        by_kind = await conn.fetch(
+            f"""
+            SELECT kind,
+                   COUNT(*)                     AS events,
+                   COALESCE(SUM(input_tokens),  0) AS input_tokens,
+                   COALESCE(SUM(output_tokens), 0) AS output_tokens,
+                   COALESCE(SUM(bytes_delta),   0) AS bytes_delta,
+                   COALESCE(SUM(usd_cost),      0) AS usd_cost
+            FROM usage_events {scope}
+            GROUP BY kind
+            ORDER BY kind
+            """,
+            *params,
+        )
+        daily = await conn.fetch(
+            f"""
+            SELECT substr(created_at::text, 1, 10) AS day,
+                   COALESCE(SUM(input_tokens),  0) AS input_tokens,
+                   COALESCE(SUM(output_tokens), 0) AS output_tokens,
+                   COALESCE(SUM(usd_cost),      0) AS usd_cost
+            FROM usage_events {scope}
+            GROUP BY substr(created_at::text, 1, 10)
+            ORDER BY 1
+            """,
+            *params,
+        )
+        recent = await conn.fetch(
+            f"""
+            SELECT id, kind, model, input_tokens, output_tokens,
+                   bytes_delta, usd_cost, payer, project_id, created_at
+            FROM usage_events {scope}
+            ORDER BY created_at DESC
+            LIMIT 50
+            """,
+            *params,
+        )
+
+    def _num(v) -> float:
+        # SUM over a numeric column comes back as Decimal on Postgres, which
+        # is not JSON-serialisable. int stays int so token counts don't render
+        # as "1234.0".
+        return float(v or 0)
+
+    return {
+        "days": days,
+        "project_id": project_id,
+        "totals": {
+            "events": int(totals["events"] or 0),
+            "input_tokens": int(totals["input_tokens"] or 0),
+            "output_tokens": int(totals["output_tokens"] or 0),
+            "bytes_delta": int(totals["bytes_delta"] or 0),
+            "usd_cost": _num(totals["usd_cost"]),
+        },
+        "by_model": [
+            {
+                "model": r["model"] or "(unknown)",
+                "events": int(r["events"] or 0),
+                "input_tokens": int(r["input_tokens"] or 0),
+                "output_tokens": int(r["output_tokens"] or 0),
+                "usd_cost": _num(r["usd_cost"]),
+            }
+            for r in by_model
+        ],
+        "by_kind": [
+            {
+                "kind": r["kind"],
+                "events": int(r["events"] or 0),
+                "input_tokens": int(r["input_tokens"] or 0),
+                "output_tokens": int(r["output_tokens"] or 0),
+                "bytes_delta": int(r["bytes_delta"] or 0),
+                "usd_cost": _num(r["usd_cost"]),
+            }
+            for r in by_kind
+        ],
+        "daily": [
+            {
+                "day": r["day"],
+                "input_tokens": int(r["input_tokens"] or 0),
+                "output_tokens": int(r["output_tokens"] or 0),
+                "usd_cost": _num(r["usd_cost"]),
+            }
+            for r in daily
+        ],
+        "recent": [
+            {
+                "id": str(r["id"]),
+                "kind": r["kind"],
+                "model": r["model"],
+                "input_tokens": int(r["input_tokens"] or 0),
+                "output_tokens": int(r["output_tokens"] or 0),
+                "bytes_delta": int(r["bytes_delta"] or 0),
+                "usd_cost": _num(r["usd_cost"]),
+                "payer": r["payer"],
+                "project_id": str(r["project_id"]) if r["project_id"] else None,
+                "created_at": r["created_at"],
+            }
+            for r in recent
+        ],
+    }
 
 
 @router.delete("/provider-keys/{provider}", status_code=200)

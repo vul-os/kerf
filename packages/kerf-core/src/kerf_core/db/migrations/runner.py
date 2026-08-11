@@ -15,6 +15,7 @@ re-execute. Real (non-duplicate) errors still abort the deploy.
 import asyncio
 import hashlib
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -37,6 +38,56 @@ CREATE TABLE IF NOT EXISTS {_LEDGER} (
 # legacy-incompatible history is skipped. (Connection errors raise
 # earlier at connect(), so a real outage still aborts the deploy.)
 _ALREADY_APPLIED = (asyncpg.PostgresError,)
+
+# One-line `alter table <t> add column <c> …`, the only ALTER form these files
+# use. Anchored to the start of a line so a mention inside a comment doesn't
+# match.
+_RE_ADD_COLUMN = re.compile(
+    r"^\s*alter\s+table\s+(\w+)\s+add\s+column\s+(\w+)\b.*?;\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+async def _apply_sqlite_script(conn, sql: str) -> None:
+    """executescript, but skip an ADD COLUMN whose column is already present.
+
+    Postgres spells this ADD COLUMN IF NOT EXISTS; SQLite has no such form and
+    raises "duplicate column name", which aborts the whole ``executescript``
+    body and leaves everything after the ALTER unapplied. Two things make that
+    reachable in normal operation: the content-hash ledger deliberately re-runs
+    a file whenever its text changes, and a folded column exists twice in one
+    file — once in CREATE TABLE (for new installs) and once in the ALTER (for
+    existing ones).
+
+    So the file is split at its ALTERs and each one is checked against PRAGMA
+    table_info immediately before it runs — after the CREATE TABLE ahead of it
+    in the same file has taken effect. Checking the schema beats catching the
+    error: a string-matched message is a weaker signal, and by then the script
+    has already aborted.
+    """
+    if not _RE_ADD_COLUMN.search(sql):
+        await conn.executescript(sql)
+        return
+
+    async def _has_column(table: str, column: str) -> bool:
+        cur = await conn.execute(f"PRAGMA table_info({table})")
+        try:
+            return any(r[1] == column for r in await cur.fetchall())
+        finally:
+            await cur.close()
+
+    cursor = 0
+    for m in _RE_ADD_COLUMN.finditer(sql):
+        chunk = sql[cursor:m.start()]
+        if chunk.strip():
+            await conn.executescript(chunk)
+        table, column = m.group(1), m.group(2)
+        if not await _has_column(table, column):
+            await conn.executescript(m.group(0))
+        cursor = m.end()
+    tail = sql[cursor:]
+    if tail.strip():
+        await conn.executescript(tail)
 
 
 async def run_sqlite_migrations(database_url: str):
@@ -104,7 +155,7 @@ async def run_sqlite_migrations(database_url: str):
             sql = migration_file.read_text(encoding="utf-8")
             # executescript runs the DDL (autocommit); the DDL is IF-NOT-EXISTS
             # idempotent so a re-run after a partial failure is safe.
-            await conn.executescript(sql)
+            await _apply_sqlite_script(conn, sql)
             await conn.execute(
                 f"INSERT INTO {_LEDGER} (filename, content_sha) VALUES (?, ?) "
                 "ON CONFLICT (filename) DO UPDATE SET content_sha = excluded.content_sha",
@@ -127,10 +178,25 @@ async def run_migrations(database_url: str):
     conn = await asyncpg.connect(database_url)
     try:
         await conn.execute(_LEDGER_DDL)
+        # See the SQLite path for why the ledger tracks content and not just
+        # filenames: this repo folds schema changes back into the numbered
+        # files, and a filename-only ledger silently withholds every one of
+        # them from databases that already stamped that filename. Postgres is
+        # the scale backend, so it is exactly the deployment where a silently
+        # missing column costs the most.
+        await conn.execute(
+            f"ALTER TABLE {_LEDGER} ADD COLUMN IF NOT EXISTS content_sha text")
         applied = {
-            r["filename"]
-            for r in await conn.fetch(f"SELECT filename FROM {_LEDGER}")
+            r["filename"]: r["content_sha"]
+            for r in await conn.fetch(f"SELECT filename, content_sha FROM {_LEDGER}")
         }
+
+        async def _stamp(name: str, digest: str) -> None:
+            await conn.execute(
+                f"INSERT INTO {_LEDGER} (filename, content_sha) VALUES ($1, $2) "
+                "ON CONFLICT (filename) DO UPDATE SET content_sha = EXCLUDED.content_sha",
+                name, digest,
+            )
 
         migrations_dir = Path(__file__).parent
         migration_files = sorted(migrations_dir.glob("*.sql"))
@@ -139,7 +205,15 @@ async def run_migrations(database_url: str):
         stamped = 0
         for migration_file in migration_files:
             name = migration_file.name
-            if name in applied:
+            digest = hashlib.sha256(migration_file.read_bytes()).hexdigest()
+            # A NULL content_sha is a row stamped before this column existed —
+            # unknown content, so re-apply and record the hash. That costs one
+            # no-op pass per file on an existing database (the DDL is
+            # IF NOT EXISTS throughout, and anything that isn't gets swallowed
+            # by the legacy back-stamp below). Treating NULL as up-to-date
+            # would be quieter and would withhold exactly the folded changes
+            # this is here to deliver.
+            if applied.get(name) == digest:
                 continue
             # encoding="utf-8" is required, not cosmetic: read_text() defaults to the
             # platform locale encoding, which is cp1252 on Windows. Migration
@@ -163,31 +237,19 @@ async def run_migrations(database_url: str):
                 if line.strip() and not line.strip().startswith("--")
             ).strip()
             if not stripped:
-                await conn.execute(
-                    f"INSERT INTO {_LEDGER} (filename) VALUES ($1) "
-                    "ON CONFLICT DO NOTHING",
-                    name,
-                )
+                await _stamp(name, digest)
                 print(f"  • {name} (tombstone — folded into baseline)")
                 stamped += 1
                 continue
             try:
                 async with conn.transaction():
                     await conn.execute(sql)
-                await conn.execute(
-                    f"INSERT INTO {_LEDGER} (filename) VALUES ($1) "
-                    "ON CONFLICT DO NOTHING",
-                    name,
-                )
+                await _stamp(name, digest)
                 print(f"  ✓ {name}")
                 ran += 1
             except _ALREADY_APPLIED as exc:
                 # Pre-existing schema from a legacy/non-idempotent run.
-                await conn.execute(
-                    f"INSERT INTO {_LEDGER} (filename) VALUES ($1) "
-                    "ON CONFLICT DO NOTHING",
-                    name,
-                )
+                await _stamp(name, digest)
                 print(f"  • {name} (already present — stamped: {type(exc).__name__})")
                 stamped += 1
 

@@ -28,16 +28,36 @@
 -- The nonce is bundled into the encrypted_key blob (encrypt_secret prepends
 -- it), so the nonce column is redundant but kept for forward-compat in
 -- case we switch encryption strategies.
+--
+-- `provider` is deliberately free text with no CHECK: with a gateway in front
+-- (LiteLLM, an OpenAI-compatible proxy), the reachable set is whatever that
+-- gateway supports, and needing a schema migration every time a model vendor
+-- appears is exactly the friction this table should not have.
+--
+-- base_url overrides the provider's default endpoint — that is what makes a
+-- self-hosted gateway or an OpenAI-compatible clone usable without touching
+-- config. NULL means "use the provider default".
 create table if not exists user_provider_keys (
     user_id       text not null references users(id) on delete cascade,
     provider      text not null,
     encrypted_key blob not null,
     nonce         blob not null default '',
+    base_url      text,
     created_at    text not null default CURRENT_TIMESTAMP,
     primary key (user_id, provider)
 );
 create index if not exists user_provider_keys_user_idx
     on user_provider_keys(user_id);
+
+-- CREATE TABLE IF NOT EXISTS is a no-op on a database that already has the
+-- table, so folding a column into the statement above reaches new installs
+-- only. This ALTER is what carries it to existing ones. Postgres has
+-- ADD COLUMN IF NOT EXISTS; SQLite does not, so the runner skips an ALTER
+-- whose column is already present (see migrations/runner.py). Keep it on one
+-- line — that is the form the runner's guard recognises — and keep added
+-- columns nullable with no default, which SQLite's ADD COLUMN requires
+-- (a non-constant default such as CURRENT_TIMESTAMP is rejected outright).
+alter table user_provider_keys add column base_url text;
 
 -- users.prefer_byo dropped 2026-07-18: zero readers/writers anywhere in the
 -- app (only ever set to its default via CREATE TABLE, never read back or

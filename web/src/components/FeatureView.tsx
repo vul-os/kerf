@@ -6529,11 +6529,11 @@ function AddFeaturePopover({ onPick }: { onPick: (op: string) => void }) {
   const menuRef = useRef<HTMLDivElement | null>(null)
   useClickOutside(wrapRef, () => setOpen(false), open)
 
-  // Flatten all valid ops across categories for sequential focus.
-  const allOps = useMemo(
-    () => FEATURE_CATEGORIES.flatMap((cat) => cat.ops.filter((op) => KIND_BY_OP[op])),
-    [],
-  )
+  // A flattened op list was memoised here "for sequential focus" and never
+  // read. Sequential focus does work — handleMenuKeyDown below queries
+  // [role="menuitem"] out of the DOM and walks that, which stays correct if a
+  // category renders conditionally. The memo was the earlier approach and
+  // survived the switch.
   const COLS = 3
 
   const closeAndReturnFocus = useCallback(() => {

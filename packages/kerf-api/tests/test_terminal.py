@@ -132,6 +132,21 @@ def test_kerf_is_on_the_session_path():
     assert os.path.dirname(os.path.abspath(sys.executable)) in entries
 
 
+def test_the_cli_is_pointed_at_this_node():
+    """Without this, `kerf tools list` inside the terminal defaults to the
+    hosted endpoint and asks for a token — a confusing thing to meet in a
+    terminal running inside the node you meant."""
+    env = routes_terminal._session_env()
+    assert env["KERF_API_URL"].startswith("http://")
+    # Never a wildcard: that is a bind address, not something a client dials.
+    assert "0.0.0.0" not in env["KERF_API_URL"]
+
+
+def test_an_operator_chosen_api_url_wins(monkeypatch):
+    monkeypatch.setenv("KERF_API_URL", "http://elsewhere.internal:9000")
+    assert routes_terminal._session_env()["KERF_API_URL"] == "http://elsewhere.internal:9000"
+
+
 def test_the_session_is_marked_as_kerfs():
     """Anything inside — a prompt, a script, an agent deciding whether `kerf`
     is available — can detect the context without probing."""

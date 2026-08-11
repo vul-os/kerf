@@ -199,6 +199,20 @@ def _session_env() -> dict[str, str]:
     # a shell prompt, a script, an agent deciding whether `kerf` is available.
     env["KERF_TERMINAL"] = "1"
     env["TERM"] = env.get("TERM") or "xterm-256color"
+
+    # Point the CLI at the node serving this terminal. Without it `kerf tools
+    # list` defaults to the hosted endpoint and asks for a token, which is a
+    # confusing thing to meet in a terminal that is running *inside* the node
+    # you meant. Set only when the operator has not already chosen one.
+    if not env.get("KERF_API_URL"):
+        settings = get_settings()
+        host = str(getattr(settings, "host", "") or "127.0.0.1")
+        if not _is_loopback(host):
+            # A wildcard bind is not an address a client can dial.
+            host = "127.0.0.1"
+        port = str(getattr(settings, "port", "") or "8080")
+        env["KERF_API_URL"] = f"http://{host}:{port}"
+
     return env
 
 

@@ -86,3 +86,53 @@ def test_a_dialable_host_is_never_a_wildcard(host, expected):
     node, and some stacks refuse it outright."""
     bind.set_bind_host(host)
     assert bind.dialable_host() == expected
+
+
+# ── every entry point has to record it ──────────────────────────────────────
+
+def test_every_uvicorn_entry_point_records_its_bind_address():
+    """The fail-closed default only works if the processes that *do* know their
+    bind address say so.
+
+    kerf-desktop is why this test exists: it builds its own uvicorn.Config with
+    host="127.0.0.1" and, for one commit, did not call set_bind_host — which
+    would have refused a terminal and first-run setup on the single most
+    loopback-only deployment Kerf has. A source check rather than a runtime one
+    because these are process entry points; running them means starting servers.
+    """
+    import pathlib as _pathlib
+
+    packages = _pathlib.Path(__file__).resolve().parents[2]
+    entry_points = [
+        packages / "kerf-core" / "src" / "kerf_core" / "__main__.py",
+        packages / "kerf-cli" / "src" / "kerf_cli" / "serve.py",
+        packages / "kerf-desktop" / "src" / "kerf_desktop" / "main.py",
+    ]
+
+    for path in entry_points:
+        if not path.exists():
+            continue  # a package not installed in this tier
+        source = path.read_text()
+        if "uvicorn.run(" not in source and "uvicorn.Config(" not in source:
+            continue
+        assert "set_bind_host(" in source, (
+            f"{path.name} starts uvicorn without recording its bind address. "
+            f"kerf_core.bind assumes the worst when nobody says, so this "
+            f"silently disables the terminal and first-run setup."
+        )
+
+
+def test_the_entry_point_list_is_not_empty():
+    """A guard whose list of things to guard went stale reads exactly like one
+    that passes."""
+    import pathlib as _pathlib
+
+    packages = _pathlib.Path(__file__).resolve().parents[2]
+    found = [
+        p for p in [
+            packages / "kerf-core" / "src" / "kerf_core" / "__main__.py",
+            packages / "kerf-cli" / "src" / "kerf_cli" / "serve.py",
+            packages / "kerf-desktop" / "src" / "kerf_desktop" / "main.py",
+        ] if p.exists()
+    ]
+    assert len(found) >= 2, f"expected to find the server entry points, found {found}"

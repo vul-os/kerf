@@ -135,6 +135,13 @@ def main() -> None:
     import uvicorn
 
     from kerf_core.app import create_app
+    from kerf_core.bind import set_bind_host
+
+    # Record the bind address before serving. The terminal and first-run setup
+    # both refuse on a network-reachable bind and assume the worst when nobody
+    # has said — so without this the desktop app, which is the most
+    # loopback-only deployment there is, would be refused both.
+    set_bind_host(host)
 
     config = uvicorn.Config(
         create_app,

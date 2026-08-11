@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerf-marine"
-version = "0.1.8"
+version = "0.1.9"
 license = { text = "MIT" }
 classifiers = ["License :: OSI Approved :: MIT License"]
 description = "Marine / naval architecture plugin for Kerf — hydrostatics, stability, hull-section integration"

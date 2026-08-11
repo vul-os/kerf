@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerf-v1"
-version = "0.1.8"
+version = "0.1.9"
 description = "Kerf v1 plugin: JSON-RPC 2.0 dispatcher for kerf-sdk"
 requires-python = ">=3.11"
 license = { text = "MIT" }

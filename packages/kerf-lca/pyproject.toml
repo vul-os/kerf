@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerf-lca"
-version = "0.1.8"
+version = "0.1.9"
 license = { text = "MIT" }
 classifiers = ["License :: OSI Approved :: MIT License"]
 description = "Life Cycle Assessment (LCA) plugin for Kerf — embodied-carbon reporting against ICE v3"

@@ -38,7 +38,7 @@ export interface ElementPhase {
   notes?: string
 }
 
-interface PhaseFilter {
+export interface PhaseFilter {
   name: string
   visible_phases: PhaseValue[]
   demolished_visible: boolean
@@ -234,12 +234,29 @@ function PhaseTagger({ onTag }: { onTag: (entry: ElementPhase) => void }) {
 // Active Filter Selector + Custom Filter Editor
 // ---------------------------------------------------------------------------
 
-function FilterSelector({ activeFilter, onFilterChange }: { activeFilter: PhaseFilter; onFilterChange: (f: PhaseFilter) => void }) {
-  const [mode, setMode] = useState<'preset' | 'custom'>('preset')
-  const [selectedPreset, setSelectedPreset] = useState(DEFAULT_FILTERS[0].name)
-  const [customPhases, setCustomPhases] = useState<PhaseValue[]>(['existing'])
-  const [demolishedVisible, setDemolishedVisible] = useState(false)
-  const [futureVisible, setFutureVisible] = useState(false)
+export function FilterSelector({ activeFilter, onFilterChange }: { activeFilter: PhaseFilter; onFilterChange: (f: PhaseFilter) => void }) {
+  // Seeded from activeFilter, not from fixed defaults. Every one of these used
+  // to start at a hardcoded value and ignore the prop entirely, so the
+  // selector showed the first preset with nothing toggled no matter which
+  // filter was applied — the control disagreeing with the view it controls,
+  // which is worse than showing nothing.
+  //
+  // Seeding only, not syncing on every render: this is an uncontrolled
+  // component by design, and re-seeding would fight the user mid-edit.
+  //
+  // No filter applied is preset mode, not custom: a `some()` over the presets
+  // is false for undefined, which would open the custom editor on a panel with
+  // no custom filter to edit.
+  const isPreset = !activeFilter || DEFAULT_FILTERS.some((f) => f.name === activeFilter.name)
+  const [mode, setMode] = useState<'preset' | 'custom'>(isPreset ? 'preset' : 'custom')
+  const [selectedPreset, setSelectedPreset] = useState(
+    (isPreset ? activeFilter?.name : undefined) ?? DEFAULT_FILTERS[0].name)
+  const [customPhases, setCustomPhases] = useState<PhaseValue[]>(
+    activeFilter?.visible_phases?.length ? activeFilter.visible_phases : ['existing'])
+  const [demolishedVisible, setDemolishedVisible] = useState(
+    activeFilter?.demolished_visible ?? false)
+  const [futureVisible, setFutureVisible] = useState(
+    activeFilter?.future_visible ?? false)
 
   const handlePresetChange = useCallback((name: string) => {
     setSelectedPreset(name)

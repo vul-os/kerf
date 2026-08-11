@@ -14,7 +14,7 @@ import io
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Any
+from typing import Optional, Any, Literal
 
 import asyncpg
 import httpx
@@ -1215,9 +1215,60 @@ async def delete_workspace_avatar(slug: str, request: Request, payload: dict = D
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+async def read_json_body(request: Request) -> dict:
+    """Parse a JSON request body into a dict, answering 422 rather than 500.
+
+    ``await read_json_body(request)`` raises on an empty or malformed body, and every
+    caller here then does ``body.get(...)``, which raises again if the client
+    sent a JSON array or a bare string. Both escape as a 500 — a client's
+    malformed request reported as a server fault.
+
+    Some callers guarded this with a content-type check, which does not help:
+    the failure is an empty or truncated body, and such a request still
+    declares application/json. One helper covers both, and a missing body is
+    treated as ``{}`` because most of these routes have all-optional fields.
+    """
+    raw = await request.body()
+    if not raw.strip():
+        return {}
+    try:
+        body = json.loads(raw)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="request body must be valid JSON",
+        )
+    if not isinstance(body, dict):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="request body must be a JSON object",
+        )
+    return body
+
+
+# Two role vocabularies exist and they are not the same set. workspace_members
+# admits owner/admin/member and rejects anything else with a CHECK constraint;
+# the project-facing UI talks about editors and viewers. Every route that took
+# a role as a bare `str` handed it straight to that constraint, so any value
+# outside the enum came back as a 500 instead of a 422 — including the
+# perfectly reasonable "editor" the project members UI sends.
+#
+# Typing them as Literals moves the rejection to FastAPI's validation layer,
+# where it belongs, and does it once for every route sharing the model.
+WorkspaceRole = Literal["owner", "admin", "member"]
+InviteRole = Literal["owner", "admin", "member", "editor", "viewer"]
+
+# Invites accept the project vocabulary and collapse it: neither editor nor
+# viewer is a workspace-level distinction, so both land as member.
+_INVITE_ROLE_MAP: dict[str, str] = {
+    "owner": "owner", "admin": "admin", "member": "member",
+    "editor": "member", "viewer": "member",
+}
+
+
 class InviteMemberRequest(BaseModel):
     email: str
-    role: str = "member"
+    role: InviteRole = "member"
 
 
 @router.post("/workspaces/{slug}/members")
@@ -1238,8 +1289,10 @@ async def invite_workspace_member(slug: str, req: InviteMemberRequest, payload: 
         if not email:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="email is required")
 
-        role_map = {"owner": "owner", "admin": "admin", "member": "member", "editor": "member", "viewer": "member"}
-        mapped_role = role_map.get(req.role, "member")
+        # Validation already rejected anything outside InviteRole, so this is a
+        # total mapping rather than a .get() with a silent "member" fallback —
+        # which used to downgrade a typo'd role instead of reporting it.
+        mapped_role = _INVITE_ROLE_MAP[req.role]
 
         user = await users_queries.get_user_by_email(conn, email)
         if user:
@@ -1250,7 +1303,7 @@ async def invite_workspace_member(slug: str, req: InviteMemberRequest, payload: 
 
 
 class ChangeRoleRequest(BaseModel):
-    role: str
+    role: WorkspaceRole
 
 
 @router.patch("/workspaces/{slug}/members/{member_id}")
@@ -2669,7 +2722,7 @@ async def run_fem(pid: str, fid: str, request: Request, payload: dict = Depends(
         if not role or role == "viewer":
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="viewer cannot run FEM")
 
-        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        body = await read_json_body(request)
         input_spec = json.dumps(body) if body else "{}"
 
         row = await conn.fetchrow(
@@ -2738,7 +2791,7 @@ async def solve_mates(pid: str, fid: str, request: Request, payload: dict = Depe
         if row["kind"] != "assembly":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="file is not an assembly")
 
-        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        body = await read_json_body(request)
         fixed_component_id = body.get("fixed_component_id") if body else None
 
         try:
@@ -2793,7 +2846,7 @@ async def run_tolerance(pid: str, fid: str, request: Request, payload: dict = De
         if row["kind"] != "tolerance":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="file is not a .tolerance file")
 
-        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        body = await read_json_body(request)
         method = body.get("method", "monte_carlo") if body else "monte_carlo"
         samples = body.get("samples", 10000) if body else 10000
         rss_k = body.get("rss_k", 3.0) if body else 3.0
@@ -2830,7 +2883,7 @@ async def run_cam(pid: str, fid: str, request: Request, payload: dict = Depends(
         if not role or role == "viewer":
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="viewer cannot run CAM")
 
-        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        body = await read_json_body(request)
         input_spec = json.dumps(body) if body else "{}"
 
         row = await conn.fetchrow(
@@ -2890,7 +2943,7 @@ async def run_sim(pid: str, fid: str, request: Request, payload: dict = Depends(
         if not role or role == "viewer":
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="viewer cannot run simulation")
 
-        body = await request.json()
+        body = await read_json_body(request)
         analysis = body.get("analysis", {})
         netlist = body.get("netlist")
         input_spec = {"analysis": analysis}
@@ -2970,7 +3023,7 @@ async def lookup_derived_artifact(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
 
         try:
-            body = await request.json()
+            body = await read_json_body(request)
         except Exception:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid body")
 
@@ -3042,7 +3095,7 @@ async def store_derived_artifact(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
 
         try:
-            body = await request.json()
+            body = await read_json_body(request)
         except Exception:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid body")
 
@@ -4452,6 +4505,16 @@ async def create_share_link(pid: str, request: Request, payload: dict = Depends(
         if not role:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
 
+        # `role` above is the caller's WORKSPACE role (owner/admin/member);
+        # share_links.role is a SHARE role, and its CHECK only admits
+        # editor/viewer. The previous expression stored the workspace role
+        # verbatim for owners and admins, so every share link created by
+        # someone entitled to create one violated the constraint and 500'd —
+        # only a plain member reached the fallback and succeeded, which is
+        # exactly backwards. Map across the two vocabularies instead: someone
+        # who can administer the workspace may hand out write access, anyone
+        # else may hand out read.
+        share_role = "editor" if role in ("owner", "admin") else "viewer"
         token = secrets.token_urlsafe(32)
         row = await conn.fetchrow(
             """
@@ -4459,7 +4522,7 @@ async def create_share_link(pid: str, request: Request, payload: dict = Depends(
             VALUES ($1, $2, $3, $4)
             RETURNING *
             """,
-            pid, token, role if role in ("owner", "admin") else "editor", user_id,
+            pid, token, share_role, user_id,
         )
         return dict(row)
 
@@ -4554,11 +4617,12 @@ async def add_member(pid: str, req: InviteMemberRequest, payload: dict = Depends
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="owner or admin required")
 
         email = req.email.strip().lower()
+        mapped_role = _INVITE_ROLE_MAP[req.role]
         user = await users_queries.get_user_by_email(conn, email)
         if user:
-            member = await workspaces_queries.add_workspace_member(conn, ws_id, str(user["id"]), req.role)
+            member = await workspaces_queries.add_workspace_member(conn, ws_id, str(user["id"]), mapped_role)
             return {"added": member}
-        return {"invite": {"email": email, "role": req.role}}
+        return {"invite": {"email": email, "role": mapped_role}}
 
 
 @router.patch("/projects/{pid}/members/{uid}")
@@ -4896,7 +4960,7 @@ async def init_upload(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="viewer cannot upload")
 
         try:
-            req = InitUploadRequest(**await request.json())
+            req = InitUploadRequest(**await read_json_body(request))
         except Exception:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid body")
 
@@ -6172,21 +6236,27 @@ async def upload_avatar(
         now = datetime.utcnow()
         public_url = storage.public_url(key, now)
 
-        prev_key = None
+        # Read the outgoing key before overwriting it, rather than trying to
+        # return it from the UPDATE. The previous version used a `with prev as
+        # (...) update ... from prev returning prev.avatar_storage_key` CTE and
+        # then read `row["prev"]["avatar_storage_key"]` — a nesting that no
+        # driver produces. On Postgres the SQL ran and the lookup raised
+        # KeyError('prev'); on SQLite the SQL itself failed, because SQLite's
+        # RETURNING can only name columns of the table being updated. Either
+        # way every avatar upload 500'd, on every backend.
+        prev_row = await conn.fetchrow(
+            "SELECT avatar_storage_key FROM users WHERE id = $1", uuid.UUID(uid))
+        prev_key = prev_row["avatar_storage_key"] if prev_row else None
+
         row = await conn.fetchrow(
             """
-            with prev as (
-                select avatar_storage_key from users where id = $1
-            )
             update users
                set avatar_storage_key = $2,
                    avatar_updated_at = now(),
                    avatar_url = $3
-              from prev
-             where users.id = $1
-            returning prev.avatar_storage_key, users.id, users.email, users.name,
-                     users.avatar_url, users.avatar_updated_at, users.account_role,
-                     users.is_system, users.created_at
+             where id = $1
+            returning id, email, name, avatar_url, avatar_updated_at,
+                      account_role, is_system, created_at
             """,
             uuid.UUID(uid),
             key,
@@ -6196,8 +6266,8 @@ async def upload_avatar(
         if not row:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
 
-        if row["prev"]["avatar_storage_key"] and row["prev"]["avatar_storage_key"] != key:
-            await storage.delete_public(row["prev"]["avatar_storage_key"])
+        if prev_key and prev_key != key:
+            await storage.delete_public(prev_key)
 
         return {
             "id": str(row["id"]),
@@ -6221,20 +6291,21 @@ async def delete_avatar(
 
     pool = await get_pool_required()
     async with pool.acquire() as conn:
+        # Same shape as the upload above, and it was broken the same way — see
+        # the comment there. Read the key first, then clear it.
+        prev_row = await conn.fetchrow(
+            "SELECT avatar_storage_key FROM users WHERE id = $1", uuid.UUID(uid))
+        prev_key = prev_row["avatar_storage_key"] if prev_row else None
+
         row = await conn.fetchrow(
             """
-            with prev as (
-                select avatar_storage_key from users where id = $1
-            )
             update users
                set avatar_storage_key = null,
                    avatar_updated_at = now(),
                    avatar_url = ''
-              from prev
-             where users.id = $1
-            returning prev.avatar_storage_key, users.id, users.email, users.name,
-                     users.avatar_url, users.avatar_updated_at, users.account_role,
-                     users.is_system, users.created_at
+             where id = $1
+            returning id, email, name, avatar_url, avatar_updated_at,
+                      account_role, is_system, created_at
             """,
             uuid.UUID(uid),
         )
@@ -6242,9 +6313,10 @@ async def delete_avatar(
         if not row:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
 
-        if row["prev"]["avatar_storage_key"]:
-            storage = get_storage_required()
-            await storage.delete(row["prev"]["avatar_storage_key"])
+        if prev_key:
+            # The upload writes to the public bucket (avatars render as a bare
+            # <img src>), so the removal has to clear it from the same one.
+            await get_storage_required().delete_public(prev_key)
 
         return {
             "id": str(row["id"]),
@@ -6353,7 +6425,7 @@ async def update_distributor(
         reg = get_registry()
         if reg is None:
             return {"error": "distributor registry not initialized"}
-        body_data = await request.json()
+        body_data = await read_json_body(request)
         from kerf_api.distributors.service import Credentials, validate_credentials
 
         secret = body_data.get("secret", {})
@@ -6592,7 +6664,7 @@ async def set_publisher_verified(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin access required")
 
     try:
-        req = SetVerifiedRequest(**await request.json())
+        req = SetVerifiedRequest(**await read_json_body(request))
     except Exception:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid body")
 
@@ -7010,7 +7082,7 @@ async def jewelry_metal_cost(pid: str, request: Request, payload: dict = Depends
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
 
     try:
-        body = await request.json()
+        body = await read_json_body(request)
     except Exception:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid JSON body")
 
@@ -7163,7 +7235,7 @@ async def run_clash_detect(pid: str, fid: str, request: Request, payload: dict =
         content_str = row["content"] or "{}"
 
     try:
-        body = await request.json()
+        body = await read_json_body(request)
     except Exception:
         body = {}
 
@@ -7316,7 +7388,7 @@ async def building_energy_sim(pid: str, request: Request, payload: dict = Depend
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
 
     try:
-        body = await request.json()
+        body = await read_json_body(request)
     except Exception:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid JSON body")
 
@@ -7504,7 +7576,7 @@ async def pv_shading_sim(pid: str, request: Request, payload: dict = Depends(req
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
 
     try:
-        body = await request.json()
+        body = await read_json_body(request)
     except Exception:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid JSON body")
 

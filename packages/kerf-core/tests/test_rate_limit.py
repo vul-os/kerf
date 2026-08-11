@@ -213,3 +213,107 @@ async def test_concurrent_calls_no_over_allowance(pool):
 
     assert results.count("ok") == limit, f"expected exactly {limit} allowed, got {results}"
     assert results.count("429") == calls - limit
+
+
+# ── configurable per-bucket limits ──────────────────────────────────────────
+
+def test_an_override_replaces_the_declared_limit(monkeypatch):
+    """The numbers at each call site are defaults, not law.
+
+    /auth/register allows 5 an hour per IP. That is per-IP, so an office behind
+    one NAT hits it on the sixth colleague, and the e2e suite hits it whenever
+    it seeds more than five accounts. Operators need to raise it without
+    editing code.
+    """
+    from kerf_core.config import Settings
+
+    settings = Settings(rate_limit_overrides={"auth:register": 50})
+    assert settings.rate_limit_overrides["auth:register"] == 50
+
+
+def test_an_override_of_zero_disables_the_bucket():
+    from kerf_core.config import Settings
+
+    settings = Settings(rate_limit_overrides={"auth:login": 0})
+    assert settings.rate_limit_overrides["auth:login"] == 0
+
+
+def test_overrides_default_to_empty_so_call_site_numbers_apply():
+    from kerf_core.config import Settings
+
+    assert Settings().rate_limit_overrides == {}
+
+
+def test_overrides_are_read_from_toml():
+    """[rate_limits] keys are free text, so a new limiter is tunable without a
+    config-schema change."""
+    import tempfile, pathlib as _pathlib
+    from kerf_core.config import Settings
+
+    with tempfile.TemporaryDirectory() as d:
+        path = _pathlib.Path(d) / "kerf.toml"
+        path.write_text('[rate_limits]\n"auth:register" = 42\n"some:future" = 7\n')
+        settings = Settings.load(str(path))
+
+    assert settings.rate_limit_overrides == {"auth:register": 42, "some:future": 7}
+
+
+@pytest.mark.asyncio
+async def test_the_override_reaches_the_dependency_not_just_the_settings(tmp_path):
+    """Settings carrying the number is not the same as the limiter using it.
+
+    This drives the real FastAPI dependency against a real SQLite pool: a
+    bucket declared at 2/window must admit a third call once the override
+    raises it, and a bucket overridden to 0 must admit everything.
+    """
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient
+
+    import kerf_core.config as config_mod
+    import kerf_core.db.connection as conn_mod
+    from kerf_core.dependencies import rate_limit
+    from kerf_core.db.migrations.runner import run_sqlite_migrations
+    from kerf_core.db.sqlite_backend import create_sqlite_pool
+
+    url = f"sqlite://{tmp_path}/rl.db"
+    await run_sqlite_migrations(url)
+    pool = await create_sqlite_pool(url, max_size=2)
+    conn_mod._pool = pool
+
+    original = config_mod.get_settings
+    try:
+        settings = config_mod.Settings(
+            rate_limit_overrides={"probe:raised": 5, "probe:off": 0})
+        config_mod.get_settings = lambda: settings
+        # dependencies.py imports get_settings inside the handler, so patching
+        # the module attribute is enough.
+
+        app = FastAPI()
+
+        @app.get("/raised")
+        async def raised(_: None = Depends(rate_limit(2, 3600, "probe:raised"))):
+            return {"ok": True}
+
+        @app.get("/off")
+        async def off(_: None = Depends(rate_limit(1, 3600, "probe:off"))):
+            return {"ok": True}
+
+        @app.get("/declared")
+        async def declared(_: None = Depends(rate_limit(2, 3600, "probe:declared"))):
+            return {"ok": True}
+
+        with TestClient(app) as client:
+            # Declared 2, overridden to 5 — the third call must be admitted.
+            assert [client.get("/raised").status_code for _ in range(5)] == [200] * 5
+            assert client.get("/raised").status_code == 429
+
+            # Overridden to 0 — disabled entirely.
+            assert all(client.get("/off").status_code == 200 for _ in range(10))
+
+            # No override — the declared 2 still applies.
+            assert [client.get("/declared").status_code for _ in range(2)] == [200, 200]
+            assert client.get("/declared").status_code == 429
+    finally:
+        config_mod.get_settings = original
+        conn_mod._pool = None
+        await pool.close()

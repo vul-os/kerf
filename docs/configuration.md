@@ -161,6 +161,30 @@ provider's own API. Requests go through [LiteLLM](https://docs.litellm.ai/),
 so a model the built-in catalogue does not list can still be reached through a
 gateway by naming it with a provider prefix (`openrouter/meta/llama-4`).
 
+## [rate_limits]
+
+```toml
+[rate_limits]
+"auth:register" = 50     # default 5 per hour
+"auth:login" = 100       # default 10 per minute
+"auth:forgot_password" = 0   # 0 disables the limiter for this bucket
+```
+
+Each key is a rate-limiter bucket name; the value replaces the limit that
+bucket declares in code, and `0` disables it entirely. Keys are free text, so a
+limiter added later is tunable without a config change.
+
+**The auth limiters key on IP for unauthenticated requests, and that matters
+more than the numbers suggest.** `auth:register` defaults to 5 per hour, which
+is per-IP — a team behind one office NAT hits it on the sixth person to sign
+up. If you are onboarding a group, raise it first.
+
+Also settable as an environment variable, as JSON:
+
+```
+RATE_LIMIT_OVERRIDES='{"auth:register": 50}'
+```
+
 ## [limits]
 
 ```toml

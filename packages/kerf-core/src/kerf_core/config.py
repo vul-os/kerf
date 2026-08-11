@@ -165,6 +165,17 @@ def _flatten_kerf_toml(data: dict, toml_path: Path) -> dict[str, Any]:
     if "enabled" in usage:
         out["usage_enabled"] = usage["enabled"]
 
+    # [rate_limits] — one entry per rate_limit() key_prefix, e.g.
+    #   [rate_limits]
+    #   "auth:register" = 50
+    # 0 disables that bucket. Keys are free text so a new limiter needs no
+    # config change to become tunable.
+    rate_limits = data.get("rate_limits", {})
+    if rate_limits:
+        out["rate_limit_overrides"] = {
+            str(k): int(v) for k, v in rate_limits.items()
+        }
+
     limits = data.get("limits", {})
     for key in (
         "max_threads_per_project",
@@ -269,6 +280,9 @@ class Settings(BaseSettings):
     cdn_s3_endpoint: str = ""
 
     usage_enabled: bool = False
+    # Per-bucket rate-limit overrides, keyed on rate_limit()'s key_prefix.
+    # Empty means every limiter uses the number declared at its call site.
+    rate_limit_overrides: dict[str, int] = Field(default_factory=dict)
     max_threads_per_project: int = 50
     file_revisions_max: int = 200
 

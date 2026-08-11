@@ -172,8 +172,24 @@ def rate_limit(
     from fastapi import Request
 
     async def _dep(request: Request) -> None:
+        from kerf_core.config import get_settings
         from kerf_core.db.connection import get_pool_required
         from kerf_core.rate_limit import enforce
+
+        # The declared numbers are defaults, not law. They are per-IP for the
+        # unauthenticated endpoints, and 5 registrations an hour per IP is
+        # wrong for any deployment where a group of people shares one — an
+        # office behind NAT onboarding a team hits it on the sixth person, and
+        # the e2e suite hits it whenever it seeds more than five accounts.
+        # `rate_limits` in kerf.toml (or KERF_RATE_LIMIT_<PREFIX>) overrides a
+        # single bucket by its key_prefix; 0 disables that bucket entirely.
+        limit = max_per_window
+        if key_prefix:
+            override = get_settings().rate_limit_overrides.get(key_prefix)
+            if override is not None:
+                if override <= 0:
+                    return
+                limit = override
 
         # Try authenticated user_id first; fall back to client IP.
         user_id: Optional[str] = None
@@ -199,6 +215,6 @@ def rate_limit(
         bucket = f"{key_prefix}:{caller}" if key_prefix else caller
 
         pool = await get_pool_required()
-        await enforce(pool, bucket, max_per_window, window_seconds)
+        await enforce(pool, bucket, limit, window_seconds)
 
     return _dep

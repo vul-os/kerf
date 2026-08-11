@@ -104,6 +104,13 @@ function kerfServer(port: number, localMode: boolean, db: string) {
       `KERF_STRICT_PLUGINS=true ` +
       `KERF_FRONTEND_DIST=${DIST} ` +
       `KERF_DATABASE_URL=${db} DATABASE_URL=${db} ` +
+      // The auth limiters are per-IP, and every spec here shares localhost:
+      // /auth/register defaults to 5 an hour, which three seeding specs plus a
+      // retry exceed. It surfaced as a 429 mid-seed and an assertion failure
+      // several steps later, which reads as a flaky test rather than a tripped
+      // limiter. The limiter's own behaviour is covered by
+      // packages/kerf-core/tests/test_rate_limit.py; here it is only noise.
+      `RATE_LIMIT_OVERRIDES='{"auth:register":10000,"auth:login":10000}' ` +
       `python -m kerf_core --port ${port}`,
     url: `http://localhost:${port}/health`,
     // Plugin registration walks every installed kerf-* package; on a cold CI

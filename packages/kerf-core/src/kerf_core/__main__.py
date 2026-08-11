@@ -75,6 +75,13 @@ def main(argv: list[str] | None = None) -> None:
             "public/*",
         ]
 
+    # Record it before serving: the terminal and first-run setup gates decide
+    # what they allow from the *actual* bind address, and this is the only
+    # place that knows it.
+    from kerf_core.bind import set_bind_host  # noqa: PLC0415
+
+    set_bind_host(args.host)
+
     uvicorn.run(
         "kerf_core.app:create_app",
         host=args.host,

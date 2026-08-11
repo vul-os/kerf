@@ -88,7 +88,7 @@ async def sign_in(
     req: SignInRequest,
     # One password guarding a whole node makes brute force the obvious attack.
     _rl: None = Depends(rate_limit(max_per_window=10, window_seconds=60, key_prefix="setup:signin")),
-) -> dict[str, Any]:
+) -> Any:
     """POST /api/setup/signin — exchange the node password for a session.
 
     A single wrong-password answer for both "no password set" and "wrong
@@ -110,4 +110,8 @@ async def sign_in(
     from kerf_auth.routes import bootstrap_local  # noqa: PLC0415
     from fastapi import Response
 
+    # bootstrap_local returns an AuthResponse model, not a dict. Annotating
+    # this route `-> dict` made FastAPI validate the response against dict and
+    # 500 on every correct password — the return type here has to stay wide
+    # enough for whatever the session machinery hands back.
     return await bootstrap_local(Response())

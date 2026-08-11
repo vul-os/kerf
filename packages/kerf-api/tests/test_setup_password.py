@@ -32,7 +32,15 @@ for _entry in _PACKAGES_ROOT.iterdir():
     if _src.is_dir() and str(_src) not in sys.path:
         sys.path.insert(0, str(_src))
 
-from kerf_core import node_credential  # noqa: E402
+from kerf_core import bind, node_credential  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def loopback_bind(monkeypatch):
+    """A node is only claimable through the browser when it is bound to
+    loopback, and a TestClient binds nothing at all, so the address has to be
+    stated. The tests about refusing a network claim override it."""
+    monkeypatch.setattr(bind, "_bind_host", "127.0.0.1")
 
 
 @pytest.fixture()
@@ -162,6 +170,23 @@ def test_the_wrong_password_is_refused(client):
     assert resp.status_code == 401
 
 
+def test_the_right_password_returns_a_usable_session(client, monkeypatch):
+    """Every test here checked a refusal, so a 500 on the *correct* password
+    went unnoticed until the browser suite hit it: this route was annotated
+    `-> dict` while the session machinery returns a model, and FastAPI
+    rejected its own response. The success path is the one the product runs on.
+    """
+    monkeypatch.setenv("LOCAL_MODE", "true")
+    client.post("/api/setup/password", json={"password": "a-good-long-password"})
+
+    resp = client.post("/api/setup/signin", json={"password": "a-good-long-password"})
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["access_token"]
+    assert body["refresh_token"]
+
+
 def test_an_unclaimed_node_answers_signin_exactly_like_a_wrong_password(client):
     """Which of the two it is tells an attacker whether the node is still
     claimable, and that is the more useful fact of the pair."""
@@ -187,6 +212,37 @@ def test_a_suggested_password_is_long_and_unique():
     ("0.0.0.0", False), ("", False), ("192.168.1.5", False),
 ])
 def test_loopback_detection_matches_the_terminal_gate(host, expected):
-    """Both gates key on the same question — who can reach this — so they must
-    not disagree about what loopback means."""
-    assert node_credential._is_loopback(host) is expected
+    """Both gates key on the same question — who can reach this — so they read
+    it from the same place, and this is that place."""
+    assert bind.is_loopback(host) is expected
+
+
+def test_claiming_over_a_wildcard_bind_is_refused(monkeypatch):
+    """The bug this module's gate exists to prevent, in the configuration that
+    actually ships: `kerf serve` defaults to --host 0.0.0.0, and for a while
+    the gate read a Settings field that does not exist and then fell back to
+    "127.0.0.1" — so the default install told the browser it was safe to claim
+    a node the whole network could reach."""
+    monkeypatch.setattr(bind, "_bind_host", "0.0.0.0")
+
+    allowed, reason = node_credential.may_configure_over_network()
+
+    assert allowed is False
+    assert "0.0.0.0" in reason
+    assert "kerf admin set-password" in reason
+
+
+def test_an_unrecorded_bind_is_treated_as_public(monkeypatch):
+    """Embedded and third-party hosts never call set_bind_host. Assuming
+    loopback there would restore the same hole by a different route, so the
+    unknown case fails closed."""
+    monkeypatch.setattr(bind, "_bind_host", None)
+    monkeypatch.delenv("KERF_HOST", raising=False)
+
+    assert bind.is_loopback_bind() is False
+    assert node_credential.may_configure_over_network()[0] is False
+
+
+def test_a_recorded_loopback_bind_allows_the_claim(monkeypatch):
+    monkeypatch.setattr(bind, "_bind_host", "127.0.0.1")
+    assert node_credential.may_configure_over_network()[0] is True

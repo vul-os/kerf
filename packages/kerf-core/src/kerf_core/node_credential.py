@@ -27,6 +27,7 @@ from typing import Any, Optional
 
 import bcrypt
 
+from kerf_core.bind import get_bind_host, is_loopback
 from kerf_core.config import get_settings
 
 # Same construction as kerf_auth.hash_password: bcrypt over a peppered
@@ -72,12 +73,6 @@ class SetupState:
     reason: str
 
 
-def _is_loopback(host: str) -> bool:
-    if not host or host in ("*", "0.0.0.0", "::", "[::]"):  # noqa: S104 — comparing, not binding
-        return False
-    return host in ("localhost", "127.0.0.1", "::1", "[::1]") or host.startswith("127.")
-
-
 def may_configure_over_network() -> tuple[bool, str]:
     """Whether first-run setup may happen through the browser.
 
@@ -86,9 +81,8 @@ def may_configure_over_network() -> tuple[bool, str]:
     whoever arrives first, which is a race with a stranger, so it is refused
     and the operator uses the CLI instead.
     """
-    settings = get_settings()
-    host = str(getattr(settings, "host", "") or os.environ.get("KERF_HOST", "") or "127.0.0.1")
-    if _is_loopback(host):
+    host = get_bind_host()
+    if is_loopback(host):
         return True, "Loopback bind — you are the only one who can reach this."
     return False, (
         f"This server is bound to {host}, not loopback, so whoever reached it "

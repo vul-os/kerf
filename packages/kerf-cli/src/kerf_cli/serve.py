@@ -145,6 +145,12 @@ def run_serve(
     if config:
         os.environ["KERF_CONFIG"] = config
 
+    # The terminal and first-run setup gates decide what they allow from the
+    # bind address; this is the only place that knows what it is.
+    from kerf_core.bind import set_bind_host  # noqa: PLC0415
+
+    set_bind_host(host)
+
     uvicorn.run(
         "kerf_core.app:create_app",
         host=host,

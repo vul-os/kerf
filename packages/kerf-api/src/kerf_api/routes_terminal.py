@@ -59,6 +59,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from kerf_core.bind import dialable_host, get_bind_host, is_loopback
 from kerf_core.config import get_settings
 
 router = APIRouter()
@@ -72,17 +73,6 @@ _SCROLLBACK_BYTES = 256 * 1024
 # safety mechanism (the shell can do anything while it lives); it stops a
 # forgotten tab leaving a shell running forever.
 _ORPHAN_TTL_SECONDS = 60 * 60
-
-
-def _is_loopback(host: str) -> bool:
-    """True when a listen address reaches only this machine.
-
-    Empty and '*' mean "all interfaces" in the places this value comes from,
-    so they are decidedly not loopback.
-    """
-    if not host or host in ("*", "0.0.0.0", "::", "[::]"):  # noqa: S104 — comparing, not binding
-        return False
-    return host in ("localhost", "127.0.0.1", "::1", "[::1]") or host.startswith("127.")
 
 
 @dataclass
@@ -107,10 +97,10 @@ def capability() -> TerminalCapability:
             ),
         )
 
-    host = str(getattr(settings, "host", "") or os.environ.get("KERF_HOST", "") or "127.0.0.1")
+    host = get_bind_host()
     explicitly_enabled = bool(getattr(settings, "terminal_enabled", False))
 
-    if _is_loopback(host):
+    if is_loopback(host):
         return TerminalCapability(
             available=True,
             reason="Bound to loopback — a shell here has the authority you already have.",
@@ -206,12 +196,10 @@ def _session_env() -> dict[str, str]:
     # you meant. Set only when the operator has not already chosen one.
     if not env.get("KERF_API_URL"):
         settings = get_settings()
-        host = str(getattr(settings, "host", "") or "127.0.0.1")
-        if not _is_loopback(host):
-            # A wildcard bind is not an address a client can dial.
-            host = "127.0.0.1"
         port = str(getattr(settings, "port", "") or "8080")
-        env["KERF_API_URL"] = f"http://{host}:{port}"
+        # dialable_host() never returns a wildcard: that is a bind instruction,
+        # not an address a client can connect to.
+        env["KERF_API_URL"] = f"http://{dialable_host()}:{port}"
 
     return env
 

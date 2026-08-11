@@ -32,9 +32,18 @@ for _entry in _PACKAGES_ROOT.iterdir():
         sys.path.insert(0, str(_src))
 
 from kerf_api import routes_terminal  # noqa: E402
+from kerf_core import bind  # noqa: E402
 
 _POSIX_ONLY = pytest.mark.skipif(
     sys.platform == "win32", reason="POSIX pty; Windows goes through pywinpty")
+
+
+@pytest.fixture(autouse=True)
+def loopback_bind(monkeypatch):
+    """Most tests here are about a terminal that is allowed to exist, and one
+    is only allowed on a loopback bind. A TestClient binds nothing at all, so
+    the address has to be stated; the gate tests override it."""
+    monkeypatch.setattr(bind, "_bind_host", "127.0.0.1")
 
 
 @pytest.fixture()
@@ -49,19 +58,45 @@ def client() -> Generator[TestClient, None, None]:
 
 @pytest.mark.parametrize("host", ["127.0.0.1", "localhost", "::1", "127.0.1.1"])
 def test_loopback_binds_are_loopback(host):
-    assert routes_terminal._is_loopback(host) is True
+    assert bind.is_loopback(host) is True
 
 
 @pytest.mark.parametrize("host", ["0.0.0.0", "::", "", "*", "192.168.1.10", "example.com"])
 def test_everything_else_is_not(host):
     """The empty string and '*' mean 'all interfaces' where this value comes
     from, so treating them as loopback would open a shell to the network."""
-    assert routes_terminal._is_loopback(host) is False
+    assert bind.is_loopback(host) is False
+
+
+def test_the_gate_reads_the_real_bind_address(monkeypatch):
+    """It used to read `settings.host`, a field Settings has never had, and
+    fall back to "127.0.0.1" — so a server started with the shipped default of
+    --host 0.0.0.0 offered a shell to the whole network while reporting itself
+    as loopback-bound. The bind address now comes from the process that binds
+    it."""
+    monkeypatch.setattr(bind, "_bind_host", "0.0.0.0")
+    monkeypatch.setattr(routes_terminal, "get_settings",
+                        lambda: _settings(terminal_enabled=False))
+
+    assert routes_terminal.capability().available is False
+
+
+def test_an_unrecorded_bind_is_treated_as_public(monkeypatch):
+    """Nothing recorded a bind address, so nothing knows the server is only
+    reachable locally. Assuming it is would hand out shells to anything that
+    embeds Kerf without going through our entry points."""
+    monkeypatch.setattr(bind, "_bind_host", None)
+    monkeypatch.delenv("KERF_HOST", raising=False)
+    monkeypatch.setattr(routes_terminal, "get_settings",
+                        lambda: _settings(terminal_enabled=False))
+
+    assert routes_terminal.capability().available is False
 
 
 def test_a_public_bind_refuses_and_says_why(monkeypatch):
+    monkeypatch.setattr(bind, "_bind_host", "0.0.0.0")
     monkeypatch.setattr(routes_terminal, "get_settings",
-                        lambda: _settings(host="0.0.0.0", terminal_enabled=False))
+                        lambda: _settings(terminal_enabled=False))
 
     cap = routes_terminal.capability()
 
@@ -73,8 +108,9 @@ def test_a_public_bind_refuses_and_says_why(monkeypatch):
 
 
 def test_a_public_bind_can_be_opted_into(monkeypatch):
+    monkeypatch.setattr(bind, "_bind_host", "0.0.0.0")
     monkeypatch.setattr(routes_terminal, "get_settings",
-                        lambda: _settings(host="0.0.0.0", terminal_enabled=True))
+                        lambda: _settings(terminal_enabled=True))
 
     cap = routes_terminal.capability()
 
@@ -84,8 +120,9 @@ def test_a_public_bind_can_be_opted_into(monkeypatch):
 
 
 def test_loopback_needs_no_opt_in(monkeypatch):
+    monkeypatch.setattr(bind, "_bind_host", "127.0.0.1")
     monkeypatch.setattr(routes_terminal, "get_settings",
-                        lambda: _settings(host="127.0.0.1", terminal_enabled=False))
+                        lambda: _settings(terminal_enabled=False))
     assert routes_terminal.capability().available is True
 
 
@@ -98,8 +135,9 @@ def test_capability_never_claims_to_be_sandboxed(client):
 
 
 def test_a_refused_socket_closes_with_the_reason(monkeypatch):
+    monkeypatch.setattr(bind, "_bind_host", "0.0.0.0")
     monkeypatch.setattr(routes_terminal, "get_settings",
-                        lambda: _settings(host="0.0.0.0", terminal_enabled=False))
+                        lambda: _settings(terminal_enabled=False))
     app = FastAPI()
     app.include_router(routes_terminal.router, prefix="/api")
 
@@ -240,7 +278,8 @@ def test_an_unknown_session_id_starts_a_fresh_one(client):
 
 def _settings(**overrides):
     class _S:
-        host = "127.0.0.1"
+        # Deliberately no `host`: Settings has never had one, and a stub that
+        # invents it is how the gate came to trust a field that is not there.
         terminal_enabled = False
     s = _S()
     for key, value in overrides.items():

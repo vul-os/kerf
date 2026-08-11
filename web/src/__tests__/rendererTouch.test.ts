@@ -26,7 +26,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 // Extension-agnostic: Renderer migrated from .jsx to .tsx (T-513).

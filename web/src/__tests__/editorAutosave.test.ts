@@ -16,7 +16,7 @@
  * level wiring is sufficient to confirm the pipeline end-to-end.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { IDBFactory } from 'fake-indexeddb'
 import {
   stash,

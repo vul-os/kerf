@@ -44,27 +44,7 @@
 //     from the OCCT face frame.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  Trash2, ChevronUp, ChevronDown, Box, Circle, RotateCcw,
-  Disc, Layers, Drill, Sigma, AlertTriangle, Loader2, Play,
-  Move, Crosshair, GitBranch, Repeat, FlipHorizontal,
-  PencilLine, Pointer, Waves, Layers3, Aperture, Plus,
-  X, ChevronRight, LayoutGrid, Combine, Scissors, Grid3x3,
-  MoreHorizontal, SlidersHorizontal, Zap, Eye, Shield,
-  Wrench, AlignLeft, Activity,
-  Code, Settings, Cpu, FlaskConical, BarChart2, Filter,
-  RefreshCw, ChevronLast, Droplets, Wind, Gauge,
-  Spline, TrendingUp, Maximize2, Wand2, FlipVertical,
-  GitMerge, SplitSquareHorizontal, Route, Ruler, ArrowUpDown,
-  Workflow, Shuffle, Merge,
-  Cuboid, Navigation, Share2, PackageOpen,
-  BrainCircuit, Compass, Ungroup, Boxes,
-  Pencil, PenLine, Eraser, ScanLine,
-  Triangle, Hexagon, Minus, ChevronsUp,
-  Scan, FileSearch, FileCog, FileOutput,
-  Network, Component, LayoutDashboard, AlignCenter,
-  ScanSearch, Sticker, FileText, LayoutTemplate,
-} from 'lucide-react'
+import { Trash2, ChevronUp, ChevronDown, Box, Circle, RotateCcw, Disc, Layers, Drill, Sigma, AlertTriangle, Loader2, Play, Move, Crosshair, GitBranch, Repeat, FlipHorizontal, PencilLine, Pointer, Waves, Layers3, Aperture, Plus, X, ChevronRight, LayoutGrid, Combine, Scissors, Grid3x3, MoreHorizontal, SlidersHorizontal, Zap, Eye, Shield, Wrench, AlignLeft, Activity, Code, Settings, Cpu, BarChart2, RefreshCw, Droplets, Wind, Gauge, Spline, TrendingUp, Maximize2, Wand2, GitMerge, SplitSquareHorizontal, Route, Ruler, ArrowUpDown, Workflow, Shuffle, Merge, Cuboid, Navigation, Share2, PackageOpen, BrainCircuit, Compass, Ungroup, Boxes, Pencil, PenLine, Eraser, ScanLine, Scan, FileSearch, FileOutput, Network, Component, LayoutDashboard, AlignCenter, ScanSearch, Sticker, FileText, LayoutTemplate } from 'lucide-react'
 import FeatureRenderer from './FeatureRenderer.jsx'
 import {
   runFeatures, prewarmOcct, newFeatureId,

@@ -17,7 +17,7 @@ import { ArrowLeft, Play, Save, FolderOpen, GitBranch } from 'lucide-react'
 import NodeGraphCanvas   from '../components/nodescript/NodeGraphCanvas.jsx'
 import NodePalette       from '../components/nodescript/NodePalette.jsx'
 import PropertyInspector from '../components/nodescript/PropertyInspector.jsx'
-import { Graph, CycleError } from '../components/nodescript/graph_engine.js'
+import { Graph } from '../components/nodescript/graph_engine.js'
 import { getNodeDef }        from '../components/nodescript/node_library.js'
 import { isNodeError, type GraphResults } from '../components/nodescript/nodescriptTypes'
 

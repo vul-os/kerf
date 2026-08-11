@@ -16,7 +16,6 @@
 // .simulation file.
 
 import { useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
 import { Activity, AlertTriangle, BarChart3, Loader2, Play, TableProperties } from 'lucide-react'
 import { useWorkspace } from '../store/workspace.js'
 import { useAuth } from '../store/auth.js'

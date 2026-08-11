@@ -17,7 +17,7 @@
 //      same store setter (openRightDrawer / setRightDrawerTab).
 //  10. Drawer has exactly 3 tabs (chat / activity / git); History is absent.
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 
 // ---- Workspace store mock ---- we test the store actions directly,
 // so we need a minimal Zustand-compatible in-memory store.

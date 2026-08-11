@@ -15,10 +15,7 @@
 // 12.  Edge case: construction line passes through point A (same resolved id → pair filtered out)
 
 import { describe, it, expect } from 'vitest'
-import {
-  addPoint, addLine, addCircle, addArc, addBezier, addBspline,
-  addConstraint,
-} from '../lib/sketchEdit.js'
+import { addPoint, addLine, addCircle, addArc, addBezier, addConstraint } from '../lib/sketchEdit.js'
 import { constraintEntityRefs } from '../lib/sketchUI.js'
 
 // ---------------------------------------------------------------------------

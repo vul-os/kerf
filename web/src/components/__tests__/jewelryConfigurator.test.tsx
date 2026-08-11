@@ -9,24 +9,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import {
-  caratFromMm,
-  mmFromCarat,
-  ringSizeToDiameter,
-  ringDiameterToSize,
-  metalWeight,
-  castingWeight,
-  computeProngParams,
-  computeBezelParams,
-  computePaveLayout,
-  ringBandVolume,
-  idealProportions,
-  GEM_CATALOG,
-  CUT_CATALOG,
-  METAL_DENSITY,
-  METAL_HALLMARK,
-  UK_AU_SIZES,
-} from '../../lib/jewelryConfig.js'
+import { caratFromMm, mmFromCarat, ringSizeToDiameter, ringDiameterToSize, metalWeight, castingWeight, computeProngParams, computeBezelParams, computePaveLayout, ringBandVolume, idealProportions, GEM_CATALOG, CUT_CATALOG, UK_AU_SIZES } from '../../lib/jewelryConfig.js'
 
 // ── Panel import smoke ────────────────────────────────────────────────────────
 

@@ -23,7 +23,7 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Target, Download, AlertTriangle, CheckCircle, Loader2, MapPin } from 'lucide-react'
+import { Target, Download, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 

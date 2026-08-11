@@ -1,12 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  traceLength,
-  differentialSkew,
-  generateMeander,
-  applyMeander,
-  tuneTraceToTarget,
-  matchDifferentialPair,
-} from './lengthTuning.js'
+import { traceLength, differentialSkew, generateMeander, applyMeander, matchDifferentialPair } from './lengthTuning.js'
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 

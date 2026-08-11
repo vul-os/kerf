@@ -17,7 +17,7 @@
  *   landmarks are present in the serialised HTML.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 // @types/node isn't part of this project's toolchain (tsconfig.json's `types` array is
 // T-500's — see docs/typescript-migration.md), so these Node builtins (used only for this
 // file's source-inspection assertions) are untyped at this boundary.

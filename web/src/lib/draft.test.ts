@@ -1,5 +1,5 @@
 // draft.test.js
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import {
   defaultDraft, validateDraft, addEntity, removeEntity,
   moveEntity, offsetEntity, trimEntity, filletCorner,

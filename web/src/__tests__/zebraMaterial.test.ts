@@ -4,7 +4,7 @@
 // minimal stub via vi.mock. The factory is tested for its public API contract:
 // correct uniform defaults, configurability, and shader string content.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 
 // vi.mock is hoisted above imports by Vitest's transform, so the factory
 // function must NOT reference variables declared in this file. Everything

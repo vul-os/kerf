@@ -26,7 +26,7 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Droplets, Waves, Calculator, Loader2, AlertCircle, CheckCircle } from 'lucide-react'
+import { Droplets, Waves, Calculator, Loader2, AlertCircle } from 'lucide-react'
 
 // import.meta.env typing isn't configured project-wide yet (see baseline
 // ImportMeta.env errors elsewhere) — boundary this migration doesn't own.

@@ -18,7 +18,6 @@
  */
 
 import { useState, useCallback, useMemo } from 'react'
-import type { ReactNode } from 'react'
 
 // ---------------------------------------------------------------------------
 // Types

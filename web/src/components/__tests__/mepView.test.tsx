@@ -4,16 +4,7 @@
 // all interesting logic lives in mep.js which MEPView wraps.
 
 import { describe, it, expect } from 'vitest'
-import {
-  defaultMepRoute,
-  validateMepRoute,
-  addSegment,
-  addFitting,
-  addEndpoint,
-  computeRouteLength,
-  computePressureDrop,
-  connectEndpoints,
-} from '../../lib/mep.js'
+import { defaultMepRoute, validateMepRoute, addSegment, addEndpoint, computeRouteLength, computePressureDrop, connectEndpoints } from '../../lib/mep.js'
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 

@@ -20,15 +20,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, DragEvent } from 'react'
-import {
-  AlertCircle,
-  Box,
-  CheckCircle2,
-  FileBox,
-  Loader2,
-  Upload,
-  X,
-} from 'lucide-react'
+import { AlertCircle, Box, CheckCircle2, Loader2, Upload, X } from 'lucide-react'
 import { api, ApiError } from '../lib/api.js'
 
 // ---------------------------------------------------------------------------

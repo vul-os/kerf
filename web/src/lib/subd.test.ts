@@ -1,17 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  defaultSubD,
-  subdivide,
-  extrudeFace,
-  bevelEdge,
-  setEdgeCrease,
-  subdToMesh,
-  meshToSubd,
-  cubeMesh,
-  sphereMesh,
-  cylinderMesh,
-  type FlatMesh,
-} from './subd.js';
+import { defaultSubD, subdivide, extrudeFace, bevelEdge, setEdgeCrease, subdToMesh, meshToSubd, cubeMesh, cylinderMesh, type FlatMesh } from './subd.js';
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 

@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, useMemo } from 'react'
 import type { Ref } from 'react'
 import { snapshotSvg } from '../lib/snapshotHelpers.js'
-import type { SketchJSON, SketchEntity, SketchConstraint } from '../types/geometry.js'
+import type { SketchJSON } from '../types/geometry.js'
 import type { WorkspaceFile } from '../store/workspace.js'
 import {
   MousePointer2, Slash, Circle as CircleIcon, Spline, Square, Dot,

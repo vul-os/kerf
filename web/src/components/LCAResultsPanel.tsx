@@ -16,14 +16,7 @@
 //   className — additional CSS classes
 
 import { useState } from 'react'
-import {
-  BarChart2,
-  ChevronDown,
-  ChevronRight,
-  Info,
-  Leaf,
-  RefreshCw,
-} from 'lucide-react'
+import { BarChart2, ChevronDown, ChevronRight, Info, Leaf } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Local types

@@ -1,5 +1,5 @@
 // elementTypes.test.js — Vitest suite for elementTypes.js
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import {
   applyTypeToInstance,
   cloneType,

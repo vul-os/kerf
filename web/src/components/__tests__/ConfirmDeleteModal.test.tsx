@@ -13,8 +13,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest'
-import { renderToStaticMarkup } from 'react-dom/server'
-import { createElement, useState } from 'react'
+import { createElement } from 'react'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
 

@@ -25,7 +25,6 @@
 // the human-driven /projects smoke test.
 
 import { describe, it, expect } from 'vitest'
-import { renderToStaticMarkup } from 'react-dom/server'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -90,7 +89,7 @@ describe('initials()', () => {
 // We mock the minimal deps consumed by Layout.jsx so renderToStaticMarkup
 // can run without a full app context (no Router, no Zustand stores, etc.).
 
-import { vi, beforeAll, afterAll } from 'vitest'
+import { vi, beforeAll } from 'vitest'
 
 // Stub react-router-dom
 vi.mock('react-router-dom', () => ({

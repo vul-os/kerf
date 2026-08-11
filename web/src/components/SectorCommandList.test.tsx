@@ -4,10 +4,9 @@
 // used in Loader.test.jsx — no @testing-library/react required).
 // We assert on the static HTML string produced by the component.
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import SectorCommandList from './SectorCommandList.jsx'
-import { SECTOR_COMMANDS } from '../lib/sectorCommandIndex.js'
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -17,7 +17,7 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { createElement, useCallback } from 'react'
+import { createElement } from 'react'
 import { readFileSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { resolve, dirname } from 'path'

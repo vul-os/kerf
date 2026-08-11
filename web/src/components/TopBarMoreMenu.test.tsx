@@ -21,7 +21,7 @@
 //   - Tab closes the menu                           ✓
 //   - Children are rendered inside the popup        ✓
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { TopBarMoreMenu } from './TopBarMoreMenu.jsx'

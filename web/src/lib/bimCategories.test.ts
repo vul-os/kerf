@@ -1,13 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import {
-  CATEGORIES,
-  HOST_RULES,
-  validateCategory,
-  validateHostRef,
-  findHostedElements,
-  cascadeTransform,
-  removeWithHosted,
-} from './bimCategories.js'
+import { CATEGORIES, validateCategory, validateHostRef, findHostedElements, cascadeTransform, removeWithHosted } from './bimCategories.js'
 
 // ── CATEGORIES enum ────────────────────────────────────────────────────────────
 

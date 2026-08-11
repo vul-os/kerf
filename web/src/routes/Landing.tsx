@@ -22,43 +22,7 @@
  * Tailwind only. Mobile-first responsive.
  */
 import { Link } from 'react-router-dom'
-import {
-  ArrowRight,
-  Github,
-  Code2,
-  Layers,
-  PenTool,
-  FileText,
-  Boxes,
-  Sparkles,
-  Server,
-  Zap,
-  Check,
-  CircuitBoard,
-  Workflow,
-  Share2,
-  Building2,
-  Activity,
-  Wrench,
-  GitBranch,
-  Cpu,
-  Terminal,
-  Radio,
-  Copy,
-  Gem,
-  Settings2,
-  ChevronRight,
-  Wind,
-  Stethoscope,
-  Telescope,
-  Clock,
-  Box,
-  Anchor,
-  HardHat,
-  TreePine,
-  Cog,
-  Scissors,
-} from 'lucide-react'
+import { ArrowRight, Github, Code2, Layers, PenTool, FileText, Boxes, Sparkles, Server, Zap, Check, CircuitBoard, Workflow, Share2, Building2, Activity, Wrench, GitBranch, Cpu, Terminal, Radio, Copy, Cog, Scissors } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import Header from '../components/Header.jsx'
 import Footer from '../components/Footer.jsx'

@@ -1,39 +1,25 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import type { Ref } from 'react'
 import { snapshotSvg } from '../lib/snapshotHelpers.js'
-import type {
-  DrawingDoc, DrawingSheet, DrawingView as DrawingViewSpec,
-  DrawingDimension, DrawingAnnotation, DrawingCenterline, DrawingBreak, DrawingSymbol,
-  RenderablePart,
-} from '../store/workspace.js'
+import type { DrawingDoc, DrawingView as DrawingViewSpec, RenderablePart } from '../store/workspace.js'
 import type { TopologyMapLike } from '../lib/topology.js'
 import { sheetDimensions, titleBlockLayout, scaleBarGeometry } from '../lib/sheetFrames.js'
 import {
   projectFile, projectFileWithHLR, projectionLabel,
 } from '../lib/projection.js'
 import { applyMatrixToGeom } from '../lib/geom3.js'
-import {
-  hatchPatternId, hatchPatternDef, symbolGlyph, balloonGlyph,
-  CENTER_DASH, zigzagPoints, detectCenterlines,
-} from '../lib/annotations.js'
-import { autoLabel, hasManualOverride, ordinatePickLabels } from '../lib/dimensions.js'
+import { hatchPatternId, hatchPatternDef, symbolGlyph, CENTER_DASH, zigzagPoints, detectCenterlines } from '../lib/annotations.js'
+import { hasManualOverride, ordinatePickLabels } from '../lib/dimensions.js'
 import {
   extractSnapTargets, resolveSnap, snapLabel, SNAP_COLOR, SNAP_MARKER_MM,
 } from '../lib/drawingSnap.js'
 import { Plus, X as XIcon } from 'lucide-react'
 // ---------------------------------------------------------------------------
 // Drafting completeness helpers (hatch / leader / rich-text / dim-chain).
-import {
-  HATCH_PATTERNS,
-  addHatch,
-  addLeader,
-  addRichText,
-  addDimensionChain,
-  patternToSvgFill,
-} from '../lib/draftingComplete.js'
+import { HATCH_PATTERNS, patternToSvgFill } from '../lib/draftingComplete.js'
 // ---------------------------------------------------------------------------
 // GD&T FCF placement helpers.
-import { GDT_SYMBOL_MAP, renderFcf } from '../lib/gdntAnnotations.js'
+import { GDT_SYMBOL_MAP } from '../lib/gdntAnnotations.js'
 import { FcfPlacementModal } from './GdntToolbar.jsx'
 
 // Drawing renderer — a single SVG element. Renders the sheet, each view's

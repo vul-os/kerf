@@ -10,7 +10,7 @@
 //   onDeleteTool: (toolId) => void
 //   readOnly    : bool (optional, default false)
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { Plus, Trash2, Pencil, Wrench, X } from 'lucide-react'
 
 // ---------------------------------------------------------------------------

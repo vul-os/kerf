@@ -30,7 +30,7 @@ import { snapshotSvg } from '../lib/snapshotHelpers.js'
 import { Maximize2, RotateCcw, AlertTriangle, Layers, Eye, EyeOff, Zap, Loader, CheckCircle, ShieldAlert, X, Package, ChevronDown } from 'lucide-react'
 import { convertCircuitJsonToPcbSvg } from 'circuit-to-svg'
 import { runDRC } from '../lib/pcbDRC.js'
-import { orthogonalSnap, corner45, routeDiffPairCentreline, shovePairClearance, diffPairLengthMatch, polylineLength } from '../lib/pcbRouting.js'
+import { orthogonalSnap, corner45, routeDiffPairCentreline, shovePairClearance, diffPairLengthMatch } from '../lib/pcbRouting.js'
 import { pourToSvgPath } from '../lib/copperPour.js'
 
 // Parse the library SVG and return innerHTML + viewBox. Same approach as

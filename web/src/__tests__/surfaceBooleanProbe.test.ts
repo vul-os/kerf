@@ -14,7 +14,7 @@
 // No WASM required.  The probe logic is re-derived here from the source to
 // stay independent of import mechanics.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import path from 'path'

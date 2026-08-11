@@ -10,7 +10,7 @@
 // wires the dev overlay. The core hit/miss/store mechanics are covered by
 // the deeper suite in assembly.test.js.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import type { AssemblyExternalRef } from '../types/geometry.js'
 
 vi.mock('../lib/geom3.js', () => ({

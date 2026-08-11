@@ -28,14 +28,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-import {
-  toast,
-  dismissToast,
-  useToast,
-  _resetBus,
-  VARIANT_CONFIG,
-  type ToastOptions,
-} from './ToastBus.jsx'
+import { toast, dismissToast, _resetBus, VARIANT_CONFIG, type ToastOptions } from './ToastBus.jsx'
 
 // Also import the default export
 import ToastBusDefault from './ToastBus.jsx'

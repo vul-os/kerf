@@ -32,7 +32,7 @@ import { cullByFrustum, setUserVisible, frustumCullEnabled } from '../lib/frustu
 import { planInstances, instancingEnabled } from '../lib/instancingPlan.js'
 import { createZebraMaterial } from '../lib/zebraMaterial.js'
 import { recordTurntable as _recordTurntable } from '../lib/turntableRender.js'
-import { attachDfmOverlay, detachDfmOverlay, refreshDfm } from '../lib/dfmOverlay.js'
+import { attachDfmOverlay, detachDfmOverlay } from '../lib/dfmOverlay.js'
 import { renderHeroSet as _renderHeroSet } from '../lib/heroRender.js'
 import { captureHeroShot as _captureHeroShot } from '../lib/heroShot.js'
 import HeroRenderPanel from './HeroRenderPanel.jsx'
@@ -3429,4 +3429,3 @@ function _createInstBoxProxy(origMesh: THREE.InstancedMesh, geomBb: THREE.Box3 |
     return null
   }
 }
-

@@ -13,20 +13,7 @@
 // Pattern: dark mono palette, lucide-react icons, no external deps.
 
 import { useState, useCallback, type CSSProperties } from 'react'
-import {
-  Square,
-  Circle,
-  Scissors,
-  Grid3X3,
-  Play,
-  Loader2,
-  AlertTriangle,
-  CheckCircle,
-  ChevronDown,
-  ChevronRight,
-  Info,
-  FileDown,
-} from 'lucide-react'
+import { Square, Scissors, Grid3X3, Play, Loader2, AlertTriangle, CheckCircle, ChevronDown, ChevronRight, Info, FileDown } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Shared helpers

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { graphOps, deferToBackend, BACKEND_OPS } from './graphOps.js'
+import { graphOps } from './graphOps.js'
 
 // ── number_slider ─────────────────────────────────────────────────────────────
 

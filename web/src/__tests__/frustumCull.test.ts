@@ -12,7 +12,7 @@
 //   4. empty mesh list  → returns empty array
 //   5. missing bounding box → auto-computed; mesh passes through
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import * as THREE from 'three'
 
 // --------------------------------------------------------------------------

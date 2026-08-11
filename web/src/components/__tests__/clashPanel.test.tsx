@@ -16,7 +16,7 @@
  *  7. api.js exports runClashDetect method
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { resolve, dirname } from 'path'

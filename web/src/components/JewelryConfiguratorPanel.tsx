@@ -15,23 +15,7 @@ import type { ReactNode } from 'react'
 import { Gem, Circle, Settings2, ChevronDown, ChevronUp, Info } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-import {
-  caratFromMm,
-  mmFromCarat,
-  ringSizeToDiameter,
-  ringDiameterToSize,
-  metalWeight,
-  castingWeight,
-  computeProngParams,
-  computeBezelParams,
-  computePaveLayout,
-  ringBandVolume,
-  idealProportions,
-  GEM_CATALOG,
-  CUT_CATALOG,
-  METAL_DENSITY,
-  METAL_HALLMARK,
-} from '../lib/jewelryConfig.js'
+import { caratFromMm, mmFromCarat, ringSizeToDiameter, ringDiameterToSize, castingWeight, computeProngParams, computeBezelParams, computePaveLayout, ringBandVolume, idealProportions, GEM_CATALOG, CUT_CATALOG, METAL_DENSITY, METAL_HALLMARK } from '../lib/jewelryConfig.js'
 
 // ---------------------------------------------------------------------------
 // Shared constants

@@ -19,7 +19,7 @@
 
 import { useState, useMemo, useCallback } from 'react'
 import type { ReactNode } from 'react'
-import { Shirt, User, ChevronLeft, ChevronRight, Play, Square, AlertTriangle, CheckCircle } from 'lucide-react'
+import { Shirt, User, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for testing)

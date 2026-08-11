@@ -12,19 +12,8 @@
 //
 // Pattern: dark mono palette, no external chart deps.
 
-import { useState, useCallback, useMemo } from 'react'
-import {
-  Ship,
-  Sliders,
-  Play,
-  Loader2,
-  AlertTriangle,
-  CheckCircle,
-  ChevronDown,
-  ChevronRight,
-  Waves,
-  Ruler,
-} from 'lucide-react'
+import { useState, useCallback } from 'react'
+import { Ship, Play, Loader2, AlertTriangle, CheckCircle, ChevronDown, ChevronRight } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Local types

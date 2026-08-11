@@ -4,7 +4,7 @@
 // In the test environment the define-replaced global is unavailable, so we
 // set it on globalThis before importing, then restore it after each test.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 
 const ORIG = globalThis.__APP_VERSION__
 

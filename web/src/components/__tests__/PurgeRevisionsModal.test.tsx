@@ -14,7 +14,7 @@
  * asserting on the component's exported behaviour contract.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement } from 'react'
 import { fileURLToPath } from 'url'

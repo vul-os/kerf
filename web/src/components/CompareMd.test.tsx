@@ -6,7 +6,7 @@
  * No @testing-library/react dependency required.
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter } from 'react-router-dom'
 import CompareMd from './CompareMd.jsx'

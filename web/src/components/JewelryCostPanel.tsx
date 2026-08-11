@@ -13,7 +13,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import type { ReactNode } from 'react'
-import { Scale, ChevronDown, ChevronUp, RefreshCw, AlertTriangle, Plus, Trash2, Gem } from 'lucide-react'
+import { Scale, RefreshCw, AlertTriangle, Plus, Trash2 } from 'lucide-react'
 import { api } from '../lib/api.js'
 import type { JewelryCostResult } from '../types/api.js'
 

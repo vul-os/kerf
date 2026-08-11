@@ -412,7 +412,7 @@ describe('buildFaceModeHandlers — T-C3 touch drag', () => {
   })
 
   it('touch drag on translate handle → updateFeature called on pointerup (commit on pointerup)', () => {
-    const { onDown, onMove, onUp, updateFeature, hitEvent } = buildHarness({ pointerType: 'touch' })
+    const { onDown, updateFeature, hitEvent } = buildHarness({ pointerType: 'touch' })
 
     const downEv = hitEvent({ clientX: 400, clientY: 300 })
     onDown(downEv)
@@ -620,8 +620,10 @@ describe('buildFaceModeHandlers — T-C3 touch drag', () => {
 
     // Second finger move (pointerId=2) should be ignored.
     onMove(makePointerEvent({ pointerType: 'touch', pointerId: 2, clientX: 100, clientY: 100 }))
-    // dragRef should be unchanged (not corrupted by second finger).
-    expect(dragRef.current).not.toBeNull()
+    // Unchanged, not merely still present: the snapshot above exists to be
+    // compared against, and asserting only `not.toBeNull()` would pass even if
+    // the second finger had rewritten every field of the drag state.
+    expect(dragRef.current).toEqual(stateAfterDown)
 
     // Second finger pointerup should be ignored.
     onUp(makePointerEvent({ pointerType: 'touch', pointerId: 2, clientX: 100, clientY: 100 }))

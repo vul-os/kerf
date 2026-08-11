@@ -10,7 +10,7 @@
 //      target not in bodyMap error, postMessage side-effect fired, null return.
 //   6. Overlay toggle: clearCombs called when enabled=false.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import path from 'path'

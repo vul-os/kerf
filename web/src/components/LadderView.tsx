@@ -18,7 +18,7 @@
  *   Structural lint runs client-side on every parse; the backend MATIEC lint
  *   fires on a 600 ms debounce via POST /api/projects/:pid/plc/lint-ld.
  */
-import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { useEffect, useImperativeHandle, useRef, useState } from 'react'
 import type { ReactElement, Ref } from 'react'
 import MonacoEditor from '@monaco-editor/react'
 import { SquareCode, List, Code2, AlertTriangle, CheckCircle } from 'lucide-react'

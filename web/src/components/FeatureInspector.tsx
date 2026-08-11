@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Square, Minus, Circle, EyeOff, MessageSquare, Copy, X } from 'lucide-react'
 import { findFeature } from '../lib/topology.js'
-import type { Topology, TopologyPart, TopologyFace, TopologyEdge, TopologyVertex, FeatureKind, TopologyMapLike } from '../lib/topology.js'
+import type { TopologyPart, TopologyFace, TopologyEdge, TopologyVertex, FeatureKind, TopologyMapLike } from '../lib/topology.js'
 
 const KIND_ICON = { face: Square, edge: Minus, vertex: Circle }
 

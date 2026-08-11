@@ -11,7 +11,7 @@
 //   3. editorGridCols — all four combinations of chat/git collapsed state
 //   4. Key constants — CHAT_COLLAPSE_KEY / GIT_COLLAPSE_KEY are stable strings
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import {
   readCollapsed,
   writeCollapsed,

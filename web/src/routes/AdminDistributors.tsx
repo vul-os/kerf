@@ -11,10 +11,7 @@
 
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  ShieldCheck, Plus, Trash2, RefreshCw, AlertTriangle,
-  Check, X, Loader2, ExternalLink, Clock,
-} from 'lucide-react'
+import { ShieldCheck, Plus, Trash2, AlertTriangle, Check, X, Loader2, ExternalLink, Clock } from 'lucide-react'
 import Layout from '../components/Layout.jsx'
 import { api, ApiError } from '../lib/api.js'
 import { useAuth } from '../store/auth.js'

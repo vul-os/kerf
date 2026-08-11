@@ -8,23 +8,14 @@
 // No @testing-library/react. Uses renderToStaticMarkup from react-dom/server
 // (same pattern as SectorCommandList.test.jsx, LayoutViewer.test.jsx, etc.)
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 // ---------------------------------------------------------------------------
 // 1. Pure data-layer tests (no React)
 // ---------------------------------------------------------------------------
 
-import {
-  GDT_SYMBOLS,
-  GDT_SYMBOL_MAP,
-  DATUM_LABELS,
-  renderFcf,
-  addFcf,
-  addDatumLabel,
-  listFcfs,
-  listDatumLabels,
-} from '../../lib/gdntAnnotations.js'
+import { GDT_SYMBOLS, GDT_SYMBOL_MAP, renderFcf, addFcf, addDatumLabel, listFcfs, listDatumLabels } from '../../lib/gdntAnnotations.js'
 
 function flatDrawing() {
   return {

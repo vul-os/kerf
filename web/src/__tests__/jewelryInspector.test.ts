@@ -5,7 +5,7 @@
 // module is executed in the vitest jsdom env (jsdom is required for the React
 // module side-effects).
 
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import path from 'path'

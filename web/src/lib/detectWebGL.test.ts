@@ -16,7 +16,7 @@
  *  8.  experimental-webgl fallback → true
  */
 
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { detectWebGL } from './detectWebGL.js'
 
 // Restore helper used inside finally blocks below.

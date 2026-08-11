@@ -510,7 +510,7 @@ function readCollapsed() {
     if (!raw) return {}
     const parsed = JSON.parse(raw)
     if (parsed && typeof parsed === 'object') return parsed
-  } catch {}
+  } catch { /* unreadable or malformed storage falls back to {} below */ }
   return {}
 }
 
@@ -518,5 +518,5 @@ function writeCollapsed(map) {
   if (typeof window === 'undefined') return
   try {
     window.localStorage.setItem(COLLAPSED_LS_KEY, JSON.stringify(map))
-  } catch {}
+  } catch { /* private mode or a full quota: losing the collapse state is fine */ }
 }

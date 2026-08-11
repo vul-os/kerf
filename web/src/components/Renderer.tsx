@@ -1412,13 +1412,15 @@ function Renderer({
         light.dispose?.()
       }
       try { composer.dispose?.() } catch { /* older three lacks dispose */ }
-      try { bloomPass.dispose?.() } catch {}
-      try { renderPass.dispose?.() } catch {}
-      try { pmrem.dispose?.() } catch {}
-      try { envTexture?.dispose?.() } catch {}
-      try { gradientBg?.dispose?.() } catch {}
-      try { contactShadowMat.dispose?.() } catch {}
-      try { contactShadowPlane.geometry?.dispose?.() } catch {}
+      // Same as above: dispose() is version-dependent across three's
+      // post-processing addons, and teardown must not fail on a missing one.
+      try { bloomPass.dispose?.() } catch { /* older three lacks dispose */ }
+      try { renderPass.dispose?.() } catch { /* older three lacks dispose */ }
+      try { pmrem.dispose?.() } catch { /* older three lacks dispose */ }
+      try { envTexture?.dispose?.() } catch { /* older three lacks dispose */ }
+      try { gradientBg?.dispose?.() } catch { /* older three lacks dispose */ }
+      try { contactShadowMat.dispose?.() } catch { /* older three lacks dispose */ }
+      try { contactShadowPlane.geometry?.dispose?.() } catch { /* older three lacks dispose */ }
       controls.dispose()
       renderer.dispose()
       if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement)
@@ -3374,7 +3376,7 @@ function _restoreFromBboxProxy(mesh: any, _s: RendererState) {
     proxy.parent?.remove(proxy)
     proxy.geometry?.dispose()
     proxy.material?.dispose()
-  } catch {}
+  } catch { /* the proxy may already be disposed; restoring must still proceed */ }
   if (mesh.userData._lodOrigMaterial !== undefined) {
     mesh.material = mesh.userData._lodOrigMaterial
   }

@@ -29,7 +29,7 @@ const listWorkspaces = api.listWorkspaces as unknown as ReturnType<typeof vi.fn>
 beforeEach(() => {
   vi.useRealTimers()
   listWorkspaces.mockReset()
-  try { localStorage.clear() } catch {}
+  try { localStorage.clear() } catch { /* no storage in this environment */ }
   useWorkspaces.setState({
     workspaces: [], currentSlug: null, loading: false, loaded: false, error: null,
   })

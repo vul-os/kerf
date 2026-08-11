@@ -329,7 +329,9 @@ export default function SketchView({
 
   function onPointerDown(e) {
     if (e.pointerType !== 'touch') return
-    try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
+    // Throws when the pointer is already released or captured elsewhere;
+    // capture is an optimisation, not a precondition for the gesture.
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* capture is best-effort */ }
     if (pinchRef.current?.p1 && !pinchRef.current.p2) {
       pinchRef.current.p2 = { id: e.pointerId, x: e.clientX, y: e.clientY }
       pinchRef.current.initDist = Math.hypot(

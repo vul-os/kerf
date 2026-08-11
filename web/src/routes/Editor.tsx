@@ -1284,7 +1284,7 @@ export default function Editor() {
     e.preventDefault()
     draggingRef.current = true
     document.body.style.cursor = 'row-resize'
-    try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* capture is best-effort */ }
   }
   function onSplitPointerMove(e) {
     if (!draggingRef.current) return
@@ -1299,7 +1299,7 @@ export default function Editor() {
       draggingRef.current = false
       document.body.style.cursor = ''
     }
-    try { e.currentTarget.releasePointerCapture(e.pointerId) } catch {}
+    try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* already released */ }
   }
 
   // ----- Tab in the left rail's bottom section: Objects | Features -----
@@ -1311,7 +1311,7 @@ export default function Editor() {
     e.preventDefault()
     leftDraggingRef.current = true
     document.body.style.cursor = 'row-resize'
-    try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* capture is best-effort */ }
   }
   function onLeftSplitPointerMove(e) {
     if (!leftDraggingRef.current) return
@@ -1326,7 +1326,7 @@ export default function Editor() {
       leftDraggingRef.current = false
       document.body.style.cursor = ''
     }
-    try { e.currentTarget.releasePointerCapture(e.pointerId) } catch {}
+    try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* already released */ }
   }
 
   const [showShare, setShowShare] = useState(false)

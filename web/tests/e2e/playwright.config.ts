@@ -55,6 +55,10 @@ import { prepareDatabases } from './global-setup'
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..')
 const DIST = path.join(REPO_ROOT, 'web', 'dist')
 
+// Where auth.setup.ts writes the signed-in browser state the other projects
+// reuse. Under tests/e2e so a stale one is obvious and easy to delete.
+const LOCAL_AUTH_STATE = path.join(__dirname, '.auth', 'local.json')
+
 if (!existsSync(path.join(DIST, 'index.html'))) {
   throw new Error(
     `web/dist/index.html not found at ${DIST}.\n` +
@@ -111,7 +115,12 @@ function kerfServer(port: number, localMode: boolean, db: string) {
       // limiter. The limiter's own behaviour is covered by
       // packages/kerf-core/tests/test_rate_limit.py; here it is only noise.
       `RATE_LIMIT_OVERRIDES='{"auth:register":10000,"auth:login":10000}' ` +
-      `python -m kerf_core --port ${port}`,
+      // Loopback, explicitly. The server's own default is 0.0.0.0, which puts
+      // a test node on the LAN and — because first-run setup refuses to let a
+      // stranger claim a network-reachable node — makes auth.setup.ts fail
+      // with a 403 rather than a password.
+      `KERF_HOST=127.0.0.1 ` +
+      `python -m kerf_core --host 127.0.0.1 --port ${port}`,
     url: `http://localhost:${port}/health`,
     // Plugin registration walks every installed kerf-* package; on a cold CI
     // runner that is slower than a warm laptop.
@@ -177,14 +186,33 @@ export default defineConfig({
   // else under `local`. Workshop and Library are core MIT node capabilities
   // present in both projects.
   projects: [
+    // A local node now has a password, set on first load, so the suite sets
+    // one too: this runs first and writes a signed-in storageState the `local`
+    // project reuses. Without it every local spec lands on the setup screen
+    // instead of the app.
+    //
+    // The server-mode stack needs nothing here — it has accounts, and its
+    // specs sign up for their own.
+    {
+      name: 'setup-local',
+      testMatch: /auth\.setup\.ts/,
+      use: {
+        baseURL: process.env.E2E_BASE_URL || 'http://localhost:8081',
+      },
+    },
     {
       name: 'local',
+      dependencies: ['setup-local'],
       testIgnore: [
         '**/signup.spec.ts',
         '**/library.spec.ts',
         '**/workshop.spec.ts',
+        '**/auth.setup.ts',
       ],
-      use: { baseURL: process.env.E2E_BASE_URL || 'http://localhost:8081' },
+      use: {
+        baseURL: process.env.E2E_BASE_URL || 'http://localhost:8081',
+        storageState: LOCAL_AUTH_STATE,
+      },
     },
     {
       name: 'server-mode',

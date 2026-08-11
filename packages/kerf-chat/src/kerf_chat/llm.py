@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator
 
+
+_logger = logging.getLogger(__name__)
 
 SystemPrompt = """You are an expert CAD assistant helping a user iterate on a project that mixes JSCAD code, parametric sketches, B-rep features, assemblies, drawings, library parts, and (optionally) tscircuit electronics.
 
@@ -353,7 +356,45 @@ class Registry:
             self.providers["moonshot"] = MoonshotProvider(cfg.moonshot_api_key)
         if cfg.gemini_api_key:
             self.providers["gemini"] = GeminiProvider(cfg.gemini_api_key)
-        self.default_model = cfg.default_model or "claude-opus-4-7"
+        self.default_model = self._resolve_default(
+            cfg.default_model or "claude-opus-4-7")
+
+    def _resolve_default(self, configured: str) -> str:
+        """Pick a default model that can actually be reached.
+
+        A configured default can be unreachable two ways, and both are ordinary
+        rather than exotic. The model may have left the catalogue — vendors
+        retire ids, and a kerf.toml written a year ago outlives them — or its
+        provider may simply have no key configured on this node.
+
+        Either way the old behaviour was to keep the dead id and fail on use:
+        every chat request that did not name a model explicitly resolved to it,
+        raised "unknown model", and left a log line the user never sees. The
+        chat box just stopped working. Falling back to the first model the node
+        can actually reach keeps it working, and the warning explains why the
+        picker is not showing what the config asked for.
+        """
+        reachable = self.available()
+        if not reachable:
+            # No provider configured at all. Nothing to fall back to, and
+            # has_any() already reports that state to the routes, which show
+            # the "no model provider configured" message. Keep the configured
+            # value so the eventual error names what was asked for.
+            return configured
+
+        if any(m["id"] == configured for m in reachable):
+            return configured
+
+        replacement = reachable[0]["id"]
+        known = lookup_model(configured) is not None
+        _logger.warning(
+            "llm: configured default_model %r is %s; falling back to %r",
+            configured,
+            "not in the model catalogue" if not known
+            else f"served by {lookup_model(configured)['provider']!r}, which has no API key on this node",
+            replacement,
+        )
+        return replacement
 
     def available(self) -> list[dict]:
         out = []

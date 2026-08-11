@@ -548,3 +548,60 @@ def test_provider_names_are_unchanged(cls, expected):
     provider = cls("k")
     assert provider.name() == expected
     assert isinstance(provider, LiteLLMProvider)
+
+
+# ── the default model must be reachable ─────────────────────────────────────
+
+def test_a_retired_default_model_falls_back_instead_of_breaking_chat():
+    """Vendors retire model ids; a kerf.toml written a year ago outlives them.
+
+    Every chat request that does not name a model resolves to the configured
+    default, so an id that has left the catalogue used to raise "unknown model"
+    on every turn — a log line the user never sees and a chat box that simply
+    stops working.
+    """
+    from kerf_chat.llm import LLMConfig, Registry
+
+    registry = Registry(LLMConfig(anthropic_api_key="k", default_model="claude-sonnet-4-7"))
+
+    assert registry.default() != "claude-sonnet-4-7"
+    assert any(m["id"] == registry.default() for m in registry.available())
+
+
+def test_a_default_whose_provider_has_no_key_falls_back():
+    """Configuring an Anthropic default and only an OpenAI key is ordinary."""
+    from kerf_chat.llm import LLMConfig, Registry
+
+    registry = Registry(LLMConfig(openai_api_key="k", default_model="claude-opus-4-7"))
+
+    assert registry.default() == "gpt-4o"
+    registry.resolve(registry.default())  # must not raise
+
+
+def test_a_reachable_default_is_left_alone():
+    from kerf_chat.llm import LLMConfig, Registry
+
+    registry = Registry(LLMConfig(anthropic_api_key="k", default_model="claude-haiku-4-5"))
+    assert registry.default() == "claude-haiku-4-5"
+
+
+def test_with_no_provider_configured_the_configured_id_is_kept():
+    """There is nothing to fall back to, and the eventual error should name
+    what the operator actually asked for."""
+    from kerf_chat.llm import LLMConfig, Registry
+
+    registry = Registry(LLMConfig(default_model="claude-opus-4-7"))
+
+    assert registry.has_any() is False
+    assert registry.default() == "claude-opus-4-7"
+
+
+def test_every_default_a_registry_reports_can_be_resolved():
+    """The invariant behind all of the above: default() must never name a
+    model resolve() will reject."""
+    from kerf_chat.llm import CATALOG, LLMConfig, Registry
+
+    for key in ("anthropic_api_key", "openai_api_key", "moonshot_api_key", "gemini_api_key"):
+        for model in CATALOG:
+            registry = Registry(LLMConfig(**{key: "k"}, default_model=model["id"]))
+            registry.resolve(registry.default())

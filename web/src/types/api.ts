@@ -3,7 +3,7 @@
 // src/lib/api.js is a thin fetch wrapper: most of its ~80 methods just
 // `return request(path, { method, body })` without touching the parsed JSON,
 // so the exact response *row* shape for CRUD resources (Workspace, Project,
-// ProjectFile, Thread, ProjectMember, ShareLink, Revision, ...) is not
+// ProjectFile, Thread, ShareLink, Revision, ...) is not
 // visible in api.js itself. Those shapes below are grounded in how the
 // consuming code (src/store/workspace.js, src/components/*.jsx) destructures
 // the parsed responses — cited per type. Where a field is exercised only via
@@ -56,15 +56,11 @@ export interface ApiWorkspace {
   id: string
   slug: string
   name: string
-  /** Caller's role in this workspace; WorkspaceSwitcher.jsx falls back to 'member' when absent. */
+  /**
+   * Caller's role. Vestigial: there is one user on a node, and they own
+   * everything. Kept because the API still returns it.
+   */
   my_role?: string
-}
-
-export interface WorkspaceMember {
-  user_id: string
-  email: string
-  name?: string
-  role: string
 }
 
 // ---------------------------------------------------------------------------
@@ -171,15 +167,6 @@ export interface ChatStreamEvent {
 // ---------------------------------------------------------------------------
 
 /** ShareModal.jsx: `const ROLES = ['viewer', 'editor', 'owner']`. */
-export type ProjectRole = 'viewer' | 'editor' | 'owner'
-
-export interface ProjectMember {
-  user_id: string
-  email: string
-  name?: string
-  role: ProjectRole
-}
-
 /** ShareModal.jsx: `const LINK_ROLES = ['viewer', 'editor']` — links can't grant 'owner'. */
 export type ShareLinkRole = 'viewer' | 'editor'
 

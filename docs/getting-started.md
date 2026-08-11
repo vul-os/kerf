@@ -140,8 +140,16 @@ the path used inside the Docker image, not a source checkout, so it must be
 set explicitly here. Run this from the repo root (not `web/`), since the
 path above is relative to your current directory.
 
-On first load `local_mode = true` auto-creates a singleton user and signs you
-in without a login screen — you should land straight in the editor:
+On first load Kerf asks you to set a password. That is the node's one
+credential: you enter it to unlock the node, and `kerf admin set-password`
+changes it if you forget — there is no reset email, because a self-hosted node
+has no mail transport.
+
+If the server is bound to something other than loopback, the browser will
+refuse to let you set it and point you at that command instead. Claiming a node
+a stranger can reach is a race with that stranger.
+
+Past that, you land straight in the editor:
 
 ![The Kerf editor after first launch](/screenshots/editor.png)
 
@@ -163,7 +171,7 @@ The full schema is in `kerf.example.toml`. The most useful knobs for local dev:
 
 | Setting | Default | Notes |
 |---------|---------|-------|
-| `[server].local_mode` | `true` | Auto-login; no register/login screen |
+| `[server].local_mode` | `true` | Skips the marketing landing and opens straight into your projects. Not an auth switch — the node password applies either way. |
 | `[server].port` | `8080` | HTTP port |
 | `[database].url` | _(unset → embedded `~/.kerf/kerf.db`)_ | Set to `postgres://…` for scale mode; override via `DATABASE_URL` env var |
 | `[llm.anthropic].api_key` | _(empty)_ | Set this to activate the default model |

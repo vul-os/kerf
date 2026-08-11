@@ -6,12 +6,13 @@ import { useWorkspaces } from '../store/workspaces.js'
 import CreateWorkspaceDialog from './CreateWorkspaceDialog.jsx'
 import type { ApiWorkspace } from '../types/api.js'
 
-// ApiWorkspace (src/types/api.ts, T-501) doesn't carry avatar_url / member_count,
-// but the backend response and this component's existing usage both do — widened
-// locally rather than changing the shared type (T-501's call), per T-517 convention.
+// ApiWorkspace (src/types/api.ts, T-501) doesn't carry avatar_url /
+// project_count, but the backend response and this component's existing usage
+// both do — widened locally rather than changing the shared type (T-501's
+// call), per T-517 convention.
 type WorkspaceWithExtras = ApiWorkspace & {
   avatar_url?: string | null
-  member_count?: number
+  project_count?: number
 }
 
 function initials(name: string | null | undefined) {
@@ -154,12 +155,15 @@ export default function WorkspaceSwitcher() {
                       <span className="truncate">{ws.name}</span>
                       {active && <Check size={12} className="text-kerf-300 flex-shrink-0" />}
                     </div>
-                    <div className="text-[10px] font-mono uppercase tracking-wider text-ink-500 truncate">
-                      {ws.my_role || 'member'}
-                      {typeof ws.member_count === 'number' && (
-                        <span className="text-ink-600"> · {ws.member_count} member{ws.member_count === 1 ? '' : 's'}</span>
-                      )}
-                    </div>
+                    {/* This said "owner · 1 member" under every workspace on
+                        every node, because there is one user and they own all
+                        of them. A count that is always the same number is not
+                        information; the project count is. */}
+                    {typeof ws.project_count === 'number' && (
+                      <div className="text-[10px] font-mono uppercase tracking-wider text-ink-500 truncate">
+                        {ws.project_count} project{ws.project_count === 1 ? '' : 's'}
+                      </div>
+                    )}
                   </div>
                 </button>
               )

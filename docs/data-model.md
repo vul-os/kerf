@@ -8,10 +8,11 @@ additive — no destructive drops or renames after the initial cut-over.
 ## Relationship overview
 
 ```
-users
+node_credential           (the node's one password)
+
+users                     (one row: the owner)
   └─► workspaces          (created_by)
-        └─► workspace_members  (user_id, workspace_id, role)
-        └─► workspace_invites
+        └─► workspace_members  (vestigial: one user, always owner)
         └─► projects
               └─► files
                     └─► file_revisions
@@ -34,12 +35,15 @@ users ─► api_tokens        (workspace-scoped)
 
 ### `users`
 
-Every person or service account. Under *"accounts shrink to the box"* Kerf is
-single-owner on your own box — there is no central sign-up and OAuth sign-in
-(Google and GitHub alike) is retired; GitHub is used only as an ordinary git
-remote, never an identity provider. The `password_hash` / `google_id` columns
-below are legacy identity-provider fields kept for schema history — OAuth login
-is no longer offered.
+One row. Kerf is one node, one password: you set it on first load and exchange
+it for a session, and every request resolves to this user. There is no central
+sign-up, no way to create a second account, and no OAuth sign-in — GitHub is
+used as an ordinary git remote, never an identity provider.
+
+The node's password is **not** here. It lives in `node_credential`, a singleton
+table, because it authenticates the node rather than a person. The
+`password_hash` and `google_id` columns below are legacy identity-provider
+fields kept for schema history; nothing writes them.
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -72,16 +76,35 @@ Slugs are lowercase alphanumeric with hyphens (`^[a-z0-9]([a-z0-9-]{1,30}[a-z0-9
 | `created_by` | uuid → users | |
 | `created_at` / `updated_at` | timestamptz | |
 
+### `node_credential`
+
+The node's password. A singleton — boolean PK with a `CHECK` that pins it to
+one row — because a node has one password, not one per anything.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `singleton` | boolean PK | `CHECK (singleton)`; exactly one row |
+| `password_hash` | text | bcrypt over the peppered password |
+| `configured_at` / `updated_at` | timestamptz | |
+
+Claiming is one-shot: `POST /api/setup/password` succeeds once and 409s after,
+so a live session cannot lock the owner out. Changing it is
+`kerf admin set-password`, on the machine.
+
 ### `workspace_members`
 
 Many-to-many join with role. Composite PK `(workspace_id, user_id)`.
 
-`role`: `owner` | `admin` | `member`. The last owner of a workspace cannot be
-demoted or removed.
+`role`: `owner` | `admin` | `member`. Vestigial: with one user, every row is
+that user as `owner`. The routes that added, promoted and removed members are
+gone — see the "members and invites" commit — and the table is kept because
+`get_user_workspace_role` still reads it and dropping tables is not something
+these migrations do.
 
 ### `workspace_invites`
 
-Pending email invites. Consumed on `/api/workspaces/accept`.
+**Dead.** Nothing has written to it for some time; the endpoint that read it
+(`POST /api/workspaces/accept`) is removed. Kept for schema history.
 
 ---
 

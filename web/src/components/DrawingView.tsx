@@ -66,10 +66,6 @@ const MULTI_POINT_DIMS = new Set(['baseline', 'chain', 'ordinate'])
 const DIM_TOOLS = new Set([...TWO_POINT_DIMS, 'angular', ...MULTI_POINT_DIMS])
 const MEASURE_TOOLS = new Set(['measure-distance', 'measure-angle'])
 const SYMBOL_TOOLS = new Set(['surface_finish', 'weld', 'gdt', 'balloon'])
-const ANN_PLACE_TOOLS = new Set(['leader', 'note', 'text', 'centerline', 'break'])
-// ---------------------------------------------------------------------------
-// NEW: Drafting completeness tool ids.
-const DRAFTING_COMPLETENESS_TOOLS = new Set(['hatch', 'dc-leader', 'rich-text', 'dim-chain'])
 // ---------------------------------------------------------------------------
 // NEW: GD&T tool helpers. Tool ids follow the pattern:
 //   'gdt:datum:A' — place a datum label
@@ -77,6 +73,22 @@ const DRAFTING_COMPLETENESS_TOOLS = new Set(['hatch', 'dc-leader', 'rich-text', 
 function isGdtTool(t) {
   return typeof t === 'string' && t.startsWith('gdt:')
 }
+// Two more tool sets used to be declared beside DIM/MEASURE/SYMBOL above and
+// were never read:
+//
+//   ANN_PLACE_TOOLS            leader, note, text, centerline, break
+//   DRAFTING_COMPLETENESS_TOOLS  hatch, dc-leader, rich-text, dim-chain
+//
+// The list below hand-expands parts of both — leader, dc-leader, centerline and
+// break snap; note, text, hatch, rich-text and dim-chain do not. So either the
+// sets were the intended refactor and five tools are missing snapping, or the
+// inline list is deliberate and the sets were dead on arrival.
+//
+// I have not decided that for you. dim-chain is the one that looks wrong from
+// here — it is a dimension tool and every other dimension tool snaps — but
+// turning snapping on for five tools changes how they feel to use, and that is
+// a call for someone who has drawn with them. The dead sets are gone and their
+// contents are recorded here, next to the code that would consume them.
 function isSnappingTool(t) {
   return DIM_TOOLS.has(t) || MEASURE_TOOLS.has(t)
     || t === 'leader' || t === 'dc-leader' || t === 'centerline' || t === 'break'

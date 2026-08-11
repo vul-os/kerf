@@ -1240,9 +1240,11 @@ const ChatPanel = forwardRef<HTMLTextAreaElement, ChatPanelProps>(function ChatP
         {sending && (() => {
           // Check if there is an in-progress streaming message with live chips.
           const streamingMsg = messages && messages.find((m) => m._streaming)
-          const hasChips = streamingMsg && Array.isArray(streamingMsg._toolChips) && streamingMsg._toolChips.length > 0
-          // Only show the "thinking" indicator when there's no streaming message
-          // taking up space in the list (the streaming message renders itself).
+          // A `hasChips` flag was computed here and never used. The rule below
+          // does not need it: the streaming message renders its own chips, so
+          // the presence of that message is the whole condition — whether it
+          // has chips yet only affects what it draws, not whether the separate
+          // "thinking" indicator would duplicate it.
           const showThinking = !streamingMsg
           return (
             <div

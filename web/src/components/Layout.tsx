@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ChevronDown, LogOut, User as UserIcon, Settings, UserCog, Users } from 'lucide-react'
+import { ChevronDown, KeyRound, LogOut, User as UserIcon, Settings, UserCog, Users } from 'lucide-react'
 import clsx from 'clsx'
 import { LogoWordmark } from './Logo.jsx'
 import WorkspaceSwitcher from './WorkspaceSwitcher.jsx'
@@ -109,6 +109,15 @@ function UserMenu({ user, onLogout, currentWorkspaceSlug }) {
             >
               <UserCog size={14} className="text-ink-300" />
               Profile
+            </Link>
+            <Link
+              to="/settings"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-100 hover:bg-ink-800/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/50"
+            >
+              <KeyRound size={14} className="text-ink-300" />
+              Settings
             </Link>
           </div>
 

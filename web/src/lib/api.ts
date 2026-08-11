@@ -34,6 +34,8 @@ import type {
   BuildingEnergyResult,
   PvShadingResult,
   ToolCallResult,
+  ProviderKeysResponse,
+  UsageReport,
 } from '../types/api.js'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -321,6 +323,23 @@ export const api = {
   changePassword: (current_password: string, new_password: string) =>
     request<void>('/api/me/password', { method: 'POST', body: { current_password, new_password } }),
   deleteMe: () => request<void>('/api/me?confirm=DELETE', { method: 'DELETE' }),
+
+  // ---- Settings: LLM provider keys + usage ----
+  // Keys live per-user in the database rather than in config, so they can be
+  // changed from the UI without editing a file and restarting. The server
+  // never sends a saved key back — only a mask.
+  providerKeys: () => request<ProviderKeysResponse>('/api/provider-keys'),
+  saveProviderKey: (provider: string, api_key: string, base_url = '') =>
+    request<{ provider: string; saved: boolean; masked_key: string; base_url: string | null }>(
+      '/api/provider-keys',
+      { method: 'POST', body: { provider, api_key, base_url } },
+    ),
+  deleteProviderKey: (provider: string) =>
+    request<void>(`/api/provider-keys/${encodeURIComponent(provider)}`, { method: 'DELETE' }),
+  usage: (days = 30, projectId?: string) =>
+    request<UsageReport>(
+      `/api/usage?days=${days}${projectId ? `&project_id=${encodeURIComponent(projectId)}` : ''}`,
+    ),
   logout: () => {
     const { refreshToken, logout } = useAuth.getState()
     logout()

@@ -327,6 +327,87 @@ export interface ApiToken {
   token?: string
 }
 
+/** One saved LLM provider key. The key itself is never sent to the client. */
+export interface ProviderKey {
+  provider: string
+  /** Last four characters behind bullets, e.g. "••••a91f". Empty when unreadable. */
+  masked_key: string
+  /** Gateway / OpenAI-compatible endpoint; null means the provider default. */
+  base_url: string | null
+  created_at?: string
+  /**
+   * False when the stored ciphertext won't decrypt — reachable without
+   * corruption, since the encryption key derives from the server's jwt_secret
+   * and rotating that orphans every saved key. The row is still listed so the
+   * UI can prompt for a re-entry instead of silently forgetting.
+   */
+  readable: boolean
+}
+
+export interface ProviderKeysResponse {
+  keys: ProviderKey[]
+  supported_providers: string[]
+  /** Providers the operator configured server-side; usable without a personal key. */
+  operator_configured: string[]
+}
+
+export interface UsageTotals {
+  events: number
+  input_tokens: number
+  output_tokens: number
+  bytes_delta: number
+  /** Informational estimate recorded at call time. Kerf bills nobody. */
+  usd_cost: number
+}
+
+export interface UsageByModel {
+  model: string
+  events: number
+  input_tokens: number
+  output_tokens: number
+  usd_cost: number
+}
+
+export interface UsageByKind {
+  kind: string
+  events: number
+  input_tokens: number
+  output_tokens: number
+  bytes_delta: number
+  usd_cost: number
+}
+
+export interface UsageDay {
+  /** YYYY-MM-DD */
+  day: string
+  input_tokens: number
+  output_tokens: number
+  usd_cost: number
+}
+
+export interface UsageEvent {
+  id: string
+  kind: string
+  model: string | null
+  input_tokens: number
+  output_tokens: number
+  bytes_delta: number
+  usd_cost: number
+  payer: string
+  project_id: string | null
+  created_at: string
+}
+
+export interface UsageReport {
+  days: number
+  project_id: string | null
+  totals: UsageTotals
+  by_model: UsageByModel[]
+  by_kind: UsageByKind[]
+  daily: UsageDay[]
+  recent: UsageEvent[]
+}
+
 export interface AdminDistributor {
   name: string
   /** True once the admin has entered credentials; unconfigured rows are still listed (api.js admin comment). */

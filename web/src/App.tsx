@@ -36,6 +36,9 @@ const Library = lazy(() => import('./routes/Library.jsx'))
 const LibraryPart = lazy(() => import('./routes/LibraryPart.jsx'))
 const BOMPage = lazy(() => import('./routes/BOM.jsx'))
 const Profile = lazy(() => import('./routes/Profile.jsx'))
+// Account-level settings (LLM provider keys, usage). Distinct from
+// WorkspaceSettings below, which is per-workspace.
+const Settings = lazy(() => import('./routes/Settings.jsx'))
 const WorkspaceSettings = lazy(() => import('./routes/WorkspaceSettings.jsx'))
 const WorkspaceMembers = lazy(() => import('./routes/WorkspaceMembers.jsx'))
 const AdminDistributors = lazy(() => import('./routes/AdminDistributors.jsx'))
@@ -264,6 +267,7 @@ export default function App() {
 
       <Route element={<ProtectedRoute />}>
         <Route path="/profile" element={<Profile />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/w/:workspaceSlug/projects" element={<Projects />} />
         <Route path="/w/:workspaceSlug/settings" element={<WorkspaceSettings />} />

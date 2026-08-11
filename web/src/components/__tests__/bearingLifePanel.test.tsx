@@ -23,13 +23,14 @@ import { readFileSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { resolve, dirname } from 'path'
 
-import BearingLifePanel, {
+import BearingLifePanel from '../BearingLifePanel.jsx'
+import {
   fmtNum,
   resultTagClass,
   buildSelectParams,
   buildLifeParams,
   buildIso16281Params,
-} from '../BearingLifePanel.jsx'
+} from '../../lib/bearingLifeParams.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 

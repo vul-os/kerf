@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerf-woodworking"
-version = "0.1.7"
+version = "0.1.8"
 license = { text = "MIT" }
 classifiers = ["License :: OSI Approved :: MIT License"]
 description = "Woodworking / furniture / joinery + cut-list plugin for Kerf"

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerf-1dsim"
-version = "0.1.7"
+version = "0.1.8"
 license = { text = "MIT" }
 classifiers = ["License :: OSI Approved :: MIT License"]
 description = "1D system simulation (Modelica-compatible equation-based DAE solver) for Kerf"

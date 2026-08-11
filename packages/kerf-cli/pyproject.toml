@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kerf-cli"
-version = "0.1.7"
+version = "0.1.8"
 description = "Kerf CLI — thin client (kerf login) + self-host entrypoint (kerf serve)"
 readme = "README.md"
 requires-python = ">=3.11"

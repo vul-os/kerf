@@ -72,9 +72,32 @@
   --line: #93a0b3;
   --mono: 'SF Mono', 'JetBrains Mono', 'Menlo', 'Consolas', ui-monospace, monospace;
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  /* Shell width. Widened in one place at >=1600px rather than per-section, so the
-     auto-fill card grids can actually use a large display instead of leaving it empty. */
-  --shell: 1180px;
+  /* Shell width. One fluid rule instead of a 1180px column with a single step to
+     1400px at 1600px+: that step left 580px of dead margin either side on a
+     2560px display and 130px at 1440px. Past 1180px the shell tracks the window
+     at 92vw — gutters stay a constant ~4% of the screen instead of swallowing
+     the difference — until 1920px, where growing further would stretch the card
+     grids past the point where a row scans as a row. */
+  --shell: clamp(1180px, 92vw, 1920px);
+  /* One gutter token, used by .container AND the fixed nav, so the nav's logo
+     lands on the same vertical as the H1 under it at every width. */
+  --gutter: clamp(1.15rem, 2.2vw, 2.5rem);
+  /* Line-length cap for running prose. The shell is now wide enough that any
+     paragraph without one runs to ~950px — about 120 characters, roughly twice
+     what stays readable. Applied to the paragraphs, never to the grids. */
+  --measure: 72ch;
+  /* Section rhythm, scaled off the viewport rather than fixed at 4.75rem, so a
+     wider shell does not read as vertically cramped. */
+  --section-y: clamp(3.25rem, 5.2vw, 6.5rem);
+  --card-gap: clamp(.9rem, 1vw, 1.35rem);
+  /* Ceilings for the inline line-art. Every illustration on this page is drawn
+     at a 320–880px viewBox and stretches to its box, so a shell that now reaches
+     1920px was scaling the JSCAD panel to 3.3× and the before/after diagram to
+     3.2× — their 11px labels rendered at 35px beside 15px body copy. These caps
+     hold both at roughly the 2.4× they already had at the old 1400px shell; the
+     drawing then centres in whatever space is left. */
+  --panel-art: 820px;
+  --strip-art: 1400px;
 }
 
 html { scroll-behavior: smooth; overflow-x: hidden; }
@@ -98,7 +121,7 @@ a:not(.vulos-home, .vulos-foot):focus-visible, button:focus-visible {
   outline-offset: 3px;
 }
 .mono { font-family: var(--mono); }
-.container { max-width: var(--shell); margin: 0 auto; padding: 0 1.5rem; }
+.container { width: 100%; max-width: var(--shell); margin: 0 auto; padding: 0 var(--gutter); }
 .gold { color: var(--gold); }
 svg { display: block; }
 
@@ -110,13 +133,13 @@ svg { display: block; }
 
 /* ── Nav ── */
 .nav {
-  position: fixed; top: 10px; left: 1rem; right: 1rem; z-index: 100;
+  position: fixed; top: 10px; left: var(--gutter); right: var(--gutter); z-index: 100;
   max-width: var(--shell); margin: 0 auto;
   background: rgba(10, 11, 13, 0.82);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--border); border-radius: 12px;
-  padding: 0 1.25rem; height: 54px;
-  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 var(--gutter); height: 54px;
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
 }
 .nav-logo { display: flex; align-items: center; gap: .55rem; font-family: var(--mono); font-weight: 700; font-size: .95rem; color: var(--text); }
 .nav-logo svg { width: 24px; height: 24px; border-radius: 5px; }
@@ -129,21 +152,21 @@ svg { display: block; }
 .nav-cta:hover { background: var(--gold-2); }
 
 /* ── Section shared ── */
-section { padding: 4.75rem 0; }
-section.tight { padding: 3.25rem 0; }
+section { padding: var(--section-y) 0; }
+section.tight { padding: calc(var(--section-y) * .68) 0; }
 .rule { border-top: 1px solid var(--border-2); }
-.section-head { max-width: 680px; margin: 0 0 2.75rem; }
+.section-head { max-width: min(680px, 100%); margin: 0 0 clamp(2rem, 2.4vw, 3.25rem); }
 .section-head.center { text-align: center; margin-left: auto; margin-right: auto; }
 .eyebrow { font-family: var(--mono); font-size: .75rem; color: var(--gold); text-transform: uppercase; letter-spacing: .16em; }
 .section-head .eyebrow { margin-bottom: .8rem; }
 .section-head h2 { font-size: clamp(1.7rem, 3.2vw, 2.5rem); color: var(--text); letter-spacing: -.025em; line-height: 1.1; font-weight: 700; }
 .section-head h2 .muted { color: var(--text-3); }
-.section-head p { margin-top: .9rem; font-size: 1rem; color: var(--text-3); line-height: 1.7; max-width: 44rem; }
+.section-head p { margin-top: .9rem; font-size: 1rem; color: var(--text-3); line-height: 1.7; max-width: var(--measure); }
 .section-head p a, section p a, .lede a { color: var(--gold); text-decoration: underline; text-underline-offset: 2px; }
 .section-head.center p { margin-left: auto; margin-right: auto; }
 
 /* ── Hero ── */
-.hero { padding: 9rem 0 3.5rem; position: relative; overflow: hidden; }
+.hero { padding: clamp(7.5rem, 8vw, 10.5rem) 0 clamp(2.5rem, 3.5vw, 4.5rem); position: relative; overflow: hidden; }
 .hero-bg { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
 .hero-bg .grid { position: absolute; inset: 0; opacity: .16;
   background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,.5) 1px, transparent 0);
@@ -152,7 +175,11 @@ section.tight { padding: 3.25rem 0; }
   mask-image: radial-gradient(ellipse 70% 55% at 50% 25%, black 30%, transparent 80%); }
 .hero-bg .glow { position: absolute; top: -18%; left: 50%; transform: translateX(-50%); width: 1100px; height: 640px; opacity: .55;
   background: radial-gradient(ellipse at center, rgba(255,214,51,.16) 0%, rgba(255,214,51,.03) 38%, transparent 70%); }
-.hero-grid { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 1.12fr; gap: 3rem; align-items: center; }
+/* minmax(0, …) rather than bare fr: an fr track's minimum is auto, so the
+   pipeline-width SVG and the code chip inside can refuse to shrink and push
+   the track — and with it the page — past the window. */
+.hero-grid { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr); gap: clamp(2rem, 3.2vw, 4.25rem); align-items: center; }
+.hero-copy { max-width: 46rem; }
 .hero-badge {
   display: inline-flex; align-items: center; gap: .5rem;
   font-family: var(--mono); font-size: .75rem; font-weight: 500;
@@ -164,7 +191,7 @@ section.tight { padding: 3.25rem 0; }
 .hero h1 { font-weight: 700; font-size: clamp(2.3rem, 4.6vw, 3.9rem); color: var(--text); line-height: 1.04; letter-spacing: -.03em; margin-bottom: 1.15rem; }
 .hero h1 .mark { position: relative; color: var(--gold); white-space: nowrap; }
 .hero h1 .mark::after { content: ""; position: absolute; left: 0; right: 0; bottom: 2px; height: 9px; background: rgba(255,214,51,.16); transform: skewX(-12deg); border-radius: 2px; z-index: -1; }
-.hero p.lede { font-size: 1.06rem; color: var(--text-2); max-width: 34rem; margin: 0 0 1.4rem; line-height: 1.7; }
+.hero p.lede { font-size: 1.06rem; color: var(--text-2); max-width: min(100%, 36rem); margin: 0 0 1.4rem; line-height: 1.7; }
 .trust { list-style: none; display: flex; flex-wrap: wrap; gap: .4rem 1.3rem; font-family: var(--mono); font-size: .8125rem; color: var(--text-3); margin-bottom: 1.4rem; }
 .trust li { display: inline-flex; align-items: center; gap: .45rem; }
 .trust li::before { content: ""; width: 4px; height: 4px; border-radius: 50%; background: rgba(255,214,51,.7); }
@@ -224,13 +251,13 @@ section.tight { padding: 3.25rem 0; }
   -webkit-mask-image: linear-gradient(to right, #000 82%, rgba(0,0,0,.15) 100%);
           mask-image: linear-gradient(to right, #000 82%, rgba(0,0,0,.15) 100%);
 }
-.pipeline-scroll .illus-svg { min-width: 640px; color: var(--line); margin: 0 auto; }
+.pipeline-scroll .illus-svg { min-width: 640px; max-width: var(--strip-art); color: var(--line); margin: 0 auto; }
 .pipeline-caption { text-align: center; font-family: var(--mono); font-size: .8125rem; color: var(--dim); padding-bottom: 1.4rem; letter-spacing: .03em; }
 .scroll-hint { display: none; text-align: center; font-family: var(--mono); font-size: .8125rem; color: var(--gold-dim); letter-spacing: .06em; margin: .55rem 0 .1rem; }
 .is-scrollable + .scroll-hint { display: block; }
 
 /* ── Persona strip ── */
-.persona-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 1rem; }
+.persona-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(232px, 100%), 1fr)); gap: var(--card-gap); }
 .persona-card { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); overflow: hidden; transition: border-color .15s, background .15s, transform .15s; }
 .persona-card:hover { border-color: var(--text-4); background: var(--elevated); transform: translateY(-2px); }
 .persona-illust { border-bottom: 1px solid var(--border-2); aspect-ratio: 16/10; }
@@ -241,7 +268,7 @@ section.tight { padding: 3.25rem 0; }
 .persona-body p { font-size: .8rem; color: var(--text-3); line-height: 1.55; }
 
 /* ── Domain spotlights ── */
-.spot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(322px, 1fr)); gap: 1rem; }
+.spot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(322px, 100%), 1fr)); gap: var(--card-gap); }
 .spot-card { display: flex; border: 1px solid var(--border); border-radius: 13px; background: var(--surface); overflow: hidden; transition: border-color .15s, background .15s, transform .15s; }
 .spot-card:hover { border-color: var(--text-4); background: var(--elevated); transform: translateY(-2px); }
 .spot-illust { flex: none; width: 108px; border-right: 1px solid var(--border-2); display: flex; align-items: center; justify-content: center; padding: .55rem; }
@@ -258,13 +285,13 @@ section.tight { padding: 3.25rem 0; }
 .chatloop-panel { border: 1px solid var(--border); border-radius: 14px; background: var(--panel); padding: 1.2rem 1rem; }
 .chatloop-panel .lbl { font-family: var(--mono); font-size: .75rem; text-transform: uppercase; letter-spacing: .14em; color: var(--dim); margin-bottom: .8rem; padding-left: .25rem; }
 .chatloop-panel .scroller { overflow-x: auto; }
-.chatloop-panel .illus-svg { min-width: 720px; color: var(--line); }
+.chatloop-panel .illus-svg { min-width: 720px; max-width: var(--strip-art); margin: 0 auto; color: var(--line); }
 .chatloop-mobile { display: none; flex-direction: column; gap: .55rem; border: 1px solid var(--border); border-radius: 14px; background: var(--panel); padding: 1.1rem; }
 .chatloop-mobile .step { display: flex; align-items: center; gap: .7rem; padding: .6rem .75rem; border-radius: 8px; background: var(--elevated); border: 1px solid var(--border-2); }
 .chatloop-mobile .step .n { flex: none; width: 22px; height: 22px; border-radius: 50%; background: rgba(255,214,51,.12); color: var(--gold); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: .75rem; font-weight: 700; }
 .chatloop-mobile .step .t { font-size: .8rem; color: var(--text-2); }
 .chatloop-mobile .step .t b { color: var(--text); }
-.fact-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1.5rem; }
+.fact-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--card-gap); margin-top: 1.5rem; }
 .fact-card { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 1rem 1.1rem; }
 .fact-card .hd { display: flex; align-items: center; gap: .5rem; margin-bottom: .45rem; }
 .fact-card .hd svg { width: 14px; height: 14px; color: var(--gold); }
@@ -272,7 +299,7 @@ section.tight { padding: 3.25rem 0; }
 .fact-card p { font-family: var(--mono); font-size: .8125rem; color: var(--text-3); line-height: 1.55; }
 
 /* ── Sketch to fab ── */
-.step-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(214px, 1fr)); gap: 1rem; }
+.step-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(214px, 100%), 1fr)); gap: var(--card-gap); }
 .step-card { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 13px; background: var(--surface); overflow: hidden; transition: border-color .15s, transform .15s; }
 .step-card:hover { border-color: var(--text-4); transform: translateY(-2px); }
 .step-card .illus-box { border-bottom: 1px solid var(--border-2); aspect-ratio: 4/3; }
@@ -283,11 +310,11 @@ section.tight { padding: 3.25rem 0; }
 .step-sub { font-size: .76rem; color: var(--text-3); line-height: 1.45; }
 
 /* ── Authoring band (JSCAD) ── */
-.authoring-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 2rem; align-items: center; }
+.authoring-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: clamp(1.5rem, 2.4vw, 3rem); align-items: center; }
 .authoring-panel { border: 1px solid var(--border); border-radius: 14px; background: var(--panel); padding: 1rem; overflow: hidden; }
-.authoring-panel .illus-svg { color: var(--line); }
+.authoring-panel .illus-svg { color: var(--line); max-width: var(--panel-art); margin: 0 auto; }
 .authoring-text h3 { font-size: 1.3rem; font-weight: 700; color: var(--text); letter-spacing: -.02em; margin-bottom: .7rem; }
-.authoring-text p { font-size: .92rem; color: var(--text-3); line-height: 1.7; margin-bottom: 1rem; }
+.authoring-text p { font-size: .92rem; color: var(--text-3); line-height: 1.7; margin-bottom: 1rem; max-width: var(--measure); }
 .authoring-text ul { list-style: none; display: flex; flex-direction: column; gap: .55rem; }
 .authoring-text li { display: flex; gap: .6rem; align-items: flex-start; font-size: .86rem; color: var(--text-2); }
 .authoring-text li svg { width: 14px; height: 14px; color: var(--gold); flex: none; margin-top: .2rem; }
@@ -295,7 +322,7 @@ section.tight { padding: 3.25rem 0; }
 /* ── Capability grid ── */
 .group-label { font-family: var(--mono); font-size: .75rem; text-transform: uppercase; letter-spacing: .18em; color: var(--dim); margin: 1.75rem 0 .85rem; }
 .group-label:first-of-type { margin-top: 0; }
-.cap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+.cap-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: var(--card-gap); }
 .cap-card { border: 1px solid var(--border); border-radius: 13px; background: var(--surface); overflow: hidden; transition: border-color .15s, background .15s, transform .15s; }
 .cap-card:hover { border-color: var(--text-4); background: var(--elevated); transform: translateY(-2px); }
 .cap-card .illus-box { border-bottom: 1px solid var(--border-2); aspect-ratio: 16/10; }
@@ -305,7 +332,7 @@ section.tight { padding: 3.25rem 0; }
 .cap-sub { font-size: .76rem; color: var(--text-3); line-height: 1.45; }
 
 /* ── Rigor / BIM cards ── */
-.rigor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.15rem; }
+.rigor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--card-gap); }
 .rigor-card { border: 1px solid var(--border); border-radius: 14px; background: var(--surface); overflow: hidden; transition: border-color .15s; }
 .rigor-card:hover { border-color: var(--text-4); }
 .rigor-card .illus-box { border-bottom: 1px solid var(--border-2); padding: .5rem; }
@@ -315,7 +342,7 @@ section.tight { padding: 3.25rem 0; }
 .rigor-card .body p { font-size: .86rem; color: var(--text-3); line-height: 1.65; }
 
 /* ── Kernel depth ── */
-.proof-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+.proof-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: var(--card-gap); }
 .proof-card { border: 1px solid var(--border); border-radius: 14px; background: var(--surface); padding: 1.3rem 1.35rem; transition: border-color .15s, background .15s; }
 .proof-card:hover { border-color: var(--text-4); background: var(--elevated); }
 .proof-card .eyebrow { font-size: .75rem; letter-spacing: .1em; margin-bottom: .7rem; }
@@ -325,10 +352,10 @@ section.tight { padding: 3.25rem 0; }
 /* `start`, not the grid default `stretch`: the four stat tiles are short and
    the before/after panel beside them is not, so stretching left a third of the
    credibility card as empty ruled box. */
-.kernel-viz { display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.15rem; margin-top: 1.15rem; align-items: start; }
+.kernel-viz { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--card-gap); margin-top: 1.15rem; align-items: start; }
 .survival { border: 1px solid var(--border); border-radius: 14px; background: var(--panel); padding: 1.3rem; }
 .survival .lbl { font-family: var(--mono); font-size: .75rem; text-transform: uppercase; letter-spacing: .14em; color: var(--dim); margin-bottom: .8rem; }
-.survival svg { width: 100%; height: auto; }
+.survival svg { width: 100%; max-width: var(--panel-art); height: auto; margin: 0 auto; }
 .survival p { font-size: .78rem; color: var(--text-3); line-height: 1.6; margin-top: .85rem; }
 .survival p .k { color: var(--gold); font-family: var(--mono); }
 .stat-panel { border: 1px solid var(--border); border-radius: 14px; background: var(--surface); padding: 1.3rem; display: flex; flex-direction: column; gap: .9rem; }
@@ -350,11 +377,16 @@ section.tight { padding: 3.25rem 0; }
 
 /* ── Workshop ── */
 .workshop { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-.workshop-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 3.25rem; align-items: center; }
+/* The prose track is capped at the measure it can actually use (46rem ≈ the
+   --measure cap on the copy inside it), not at a share of the shell: past
+   ~1500px a 1.1fr track just added dead space between the last word of each
+   bullet and the diagram. Below that, 52% reproduces the old 1.1fr / 1fr split
+   to within a few px. */
+.workshop-grid { display: grid; grid-template-columns: minmax(0, min(52%, 46rem)) minmax(0, 1fr); gap: clamp(2rem, 3.4vw, 4.5rem); align-items: center; }
 .workshop-text h2 { font-size: clamp(1.6rem, 3vw, 2.15rem); font-weight: 700; color: var(--text); margin-bottom: 1rem; letter-spacing: -.02em; line-height: 1.2; }
-.workshop-text > p { font-size: .95rem; color: var(--text-3); line-height: 1.75; margin-bottom: 1.5rem; }
+.workshop-text > p { font-size: .95rem; color: var(--text-3); line-height: 1.75; margin-bottom: 1.5rem; max-width: var(--measure); }
 .workshop-points { list-style: none; display: flex; flex-direction: column; gap: .95rem; }
-.workshop-points li { display: flex; gap: .75rem; align-items: flex-start; }
+.workshop-points li { display: flex; gap: .75rem; align-items: flex-start; max-width: var(--measure); }
 .workshop-points .mark { flex: none; width: 20px; height: 20px; border-radius: 5px; background: rgba(255,214,51,.12); color: var(--gold); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: .75rem; font-weight: 700; margin-top: .1rem; }
 .workshop-points span { font-size: .87rem; color: var(--text-2); line-height: 1.6; }
 .workshop-points b { color: var(--text); }
@@ -371,7 +403,7 @@ section.tight { padding: 3.25rem 0; }
 .diagram .dashed { border-style: dashed; border-color: var(--border-2); }
 
 /* ── Install (syntax highlighted) ── */
-.install-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1.15rem; }
+.install-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--card-gap); }
 .install-cols .wide { grid-column: 1 / -1; }
 .code-box { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--panel); }
 .code-head { display: flex; align-items: center; justify-content: space-between; padding: .7rem 1.1rem; background: var(--elevated); border-bottom: 1px solid var(--border); }
@@ -386,7 +418,7 @@ pre.code { margin: 0; padding: 1.15rem 1.35rem; font-family: var(--mono); font-s
 .tok-str { color: var(--green); }
 .tok-cm { color: var(--code-dim); font-style: italic; }
 .tok-punct { color: var(--text-3); }
-.install-note { font-size: .82rem; color: var(--text-3); margin-top: 1.15rem; text-align: center; line-height: 1.7; }
+.install-note { font-size: .82rem; color: var(--text-3); margin: 1.15rem auto 0; max-width: var(--measure); text-align: center; line-height: 1.7; }
 .install-note code { font-family: var(--mono); color: var(--text-2); }
 .install-note a { color: var(--gold); text-decoration: underline; text-underline-offset: 2px; }
 
@@ -395,7 +427,7 @@ pre.code { margin: 0; padding: 1.15rem 1.35rem; font-family: var(--mono); font-s
 .dev-head { padding: 1.75rem 2rem 1.1rem; background: var(--elevated); border-bottom: 1px solid var(--border); }
 .dev-head h2 { font-family: var(--mono); font-size: 1.05rem; font-weight: 700; color: var(--text); margin-bottom: .35rem; }
 .dev-head p { font-size: .85rem; color: var(--text-3); }
-.dev-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); }
+.dev-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--border); }
 .dev-cell { padding: 1.5rem 1.75rem; background: var(--bg); }
 .dev-cell h3 { font-family: var(--mono); font-size: .75rem; color: var(--dim); text-transform: uppercase; letter-spacing: .1em; margin-bottom: .75rem; }
 .dev-cell pre { margin: 0; font-family: var(--mono); font-size: .8rem; color: var(--text-2); line-height: 1.95; overflow-x: auto; }
@@ -412,14 +444,20 @@ footer.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; }
 .footer-right { font-family: var(--mono); font-size: .8125rem; color: var(--dim); }
 
 /* ── Responsive ── */
-/* Large displays. The card grids above are auto-fill, so they already reflow at any width;
-   this is the one rule that lets a 1600px+ monitor show MORE columns rather than just wider
-   empty gutters either side of a 1180px column. */
-@media (min-width: 1600px) {
-  :root { --shell: 1400px; }
-}
+/* No large-display breakpoint here any more. --shell is a clamp, so the shell
+   grows continuously with the window instead of jumping 1180 → 1400 at 1600px
+   and then standing still: measured left gutter on a 2560px display was 580px
+   before, 100px after, and the card grids fill the extra width because they are
+   auto-fit. Everything below still narrows the multi-column bands. */
 @media (max-width: 900px) {
-  .hero-grid { grid-template-columns: 1fr; }
+  /* Between 900 and 680 every nav link is still shown, and at 768 the seven of
+     them plus the CTA needed 6px more than the bar had: `space-between` has no
+     minimum, so the row did not overflow — the logo and "domains" simply ran
+     together into "kerfdomains". Tightening the inter-link gap to 1rem gives
+     the row 50px of slack; the flex gap on .nav itself is the guarantee that
+     the two groups can never touch again at any width. */
+  .nav-links { gap: 1rem; }
+  .hero-grid { grid-template-columns: minmax(0, 1fr); }
   /* the wrapper, not the panel — hiding only the panel would leave the two
      floating chips stranded on an empty row. */
   .hero-visual { display: none; }
@@ -439,8 +477,6 @@ footer.site-footer { border-top: 1px solid var(--border); padding: 2.5rem 0; }
   .nav-links a.hide-sm { display: none; }
   .dev-grid { grid-template-columns: 1fr; }
   .stat-panel ul { grid-template-columns: 1fr 1fr; }
-  .hero { padding-top: 7.5rem; }
-  section { padding: 3.25rem 0; }
   .footer-inner { flex-direction: column; text-align: center; }
 }
 /* Below 430px the nav row still needed 285px of unshrinkable content — docs,

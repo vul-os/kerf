@@ -125,6 +125,16 @@ const STYLE = `
   --green:#7BB661; --cyan:#6bd4ff; --violet:#c8a2ff;
   --mono:'SF Mono','JetBrains Mono','Menlo','Consolas',ui-monospace,monospace;
   --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  /* Shell, gutter, measure and rhythm — the same four tokens site/index.html
+     defines, with the same values, so the two page types gutter identically.
+     Was a flat 1320px, which left 620px of dead margin either side on a 2560px
+     display; 92vw past 1180px keeps the gutter at ~4% of the window until the
+     1920px cap. */
+  --shell:clamp(1180px,92vw,1920px);
+  --gutter:clamp(1.15rem,2.2vw,2.5rem);
+  --measure:72ch;
+  --section-y:clamp(2.5rem,3.6vw,4.5rem);
+  --card-gap:clamp(.9rem,1vw,1.35rem);
 }
 *,*::before,*::after { box-sizing:border-box; }
 html { scroll-behavior:smooth; }
@@ -133,11 +143,14 @@ a { color:var(--text-2); text-decoration:none; }
 a:hover { color:var(--text); }
 :focus-visible { outline:2px solid var(--gold); outline-offset:2px; border-radius:3px; }
 
-/* Wider than the landing's 1180px: this page's job is a dense capability table, and on a
-   1440px+ display the extra room is the difference between a readable grid and a column. */
-.container { max-width:1320px; margin:0 auto; padding:0 1.5rem; }
+/* This page's job is a dense capability table, so it takes every pixel the shell
+   token gives it; the nav shares the same box so its logo sits over the H1. */
+.container { width:100%; max-width:var(--shell); margin:0 auto; padding:0 var(--gutter); }
 
-.nav { max-width:1320px; margin:0 auto; padding:1rem 1.5rem; display:flex; align-items:center; justify-content:space-between; }
+/* The flex gap is load-bearing, not decoration: space-between has no minimum, so
+   without it the logo and the first link close up and touch before the row ever
+   overflows — which is what index.html's bar did at 768px. */
+.nav { max-width:var(--shell); margin:0 auto; padding:1rem var(--gutter); display:flex; align-items:center; justify-content:space-between; gap:1rem; }
 .nav-logo { display:flex; align-items:center; gap:.55rem; font-family:var(--mono); font-weight:700; font-size:.95rem; color:var(--text); }
 .nav-logo svg { width:22px; height:22px; }
 .nav-links { display:flex; align-items:center; gap:1.6rem; font-family:var(--mono); font-size:.85rem; }
@@ -148,21 +161,26 @@ a:hover { color:var(--text); }
 .nav-cta:hover { background:rgba(255,214,51,.1); }
 .vulos-home img, .vulos-foot img { display:block; border-radius:5px; }
 
-section { padding:3.5rem 0; }
-.hero { padding:3.25rem 0 2.5rem; border-bottom:1px solid var(--border-2); }
+section { padding:var(--section-y) 0; }
+.hero { padding:calc(var(--section-y) * .93) 0 calc(var(--section-y) * .71); border-bottom:1px solid var(--border-2); }
 /* Two columns. The copy is capped at 46rem for readability, so with the stats stacked
    underneath the right half of the hero sat empty above ~1200px and the page read as one
    narrow column. Stats now occupy that space. */
-.hero-grid { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr); gap:3.5rem; align-items:start; }
+.hero-grid { display:grid; grid-template-columns:minmax(0,min(56%,46rem)) minmax(320px,1fr); gap:clamp(2rem,3.2vw,4rem); align-items:start; }
 @media (max-width:980px) { .hero-grid { grid-template-columns:1fr; gap:2rem; } }
 .eyebrow { font-family:var(--mono); font-size:.75rem; letter-spacing:.16em; text-transform:uppercase; color:var(--gold-dim); margin:0 0 .7rem; }
 h1 { font-size:clamp(1.9rem,4vw,2.9rem); line-height:1.12; letter-spacing:-.02em; margin:0 0 .9rem; }
 h2 { font-size:clamp(1.25rem,2.2vw,1.6rem); letter-spacing:-.01em; margin:0 0 1.1rem; }
-.lede { font-size:1.03rem; color:var(--text-3); max-width:46rem; margin:0; line-height:1.72; }
+.lede { font-size:1.03rem; color:var(--text-3); max-width:var(--measure); margin:0; line-height:1.72; }
 
 /* Summary strip — auto-fit means it reflows on its own instead of needing a breakpoint each. */
 .stat-strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px; background:var(--border-2); border:1px solid var(--border-2); border-radius:14px; overflow:hidden; }
-.hero .stat-strip { grid-template-columns:1fr 1fr; }
+/* 2×2 while the hero column is narrow, one row of four once it is not. A hard
+   1fr 1fr held the 2×2 all the way to 1920px, where each cell was 515px of
+   background around a five-character number. 156px is the one minimum that
+   still yields two columns both on a 360px phone (324px of column) and beside
+   the copy at 1280px (457px), where 150px would have given a ragged three. */
+.hero .stat-strip { grid-template-columns:repeat(auto-fit,minmax(min(156px,100%),1fr)); }
 .stat { background:var(--surface); padding:1.15rem 1.25rem; }
 .stat b { display:block; font-family:var(--mono); font-size:1.65rem; color:var(--gold); font-weight:700; letter-spacing:-.02em; line-height:1.1; }
 .stat span { display:block; margin-top:.25rem; font-size:.8rem; color:var(--text-3); line-height:1.45; }
@@ -172,7 +190,9 @@ h2 { font-size:clamp(1.25rem,2.2vw,1.6rem); letter-spacing:-.01em; margin:0 0 1.
 .cat-head h2 { margin:0; }
 .cat-head .count { font-family:var(--mono); font-size:.78rem; color:var(--dim); }
 
-.tool-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(310px,1fr)); gap:1rem; }
+/* auto-fit, not auto-fill: a category with three tools in it would otherwise
+   keep five empty tracks open at 1920px and the row would read as a fragment. */
+.tool-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(310px,100%),1fr)); gap:var(--card-gap); }
 .tool { display:flex; flex-direction:column; gap:.75rem; border:1px solid var(--border); border-radius:13px; background:var(--surface); padding:1.1rem 1.2rem; transition:border-color .15s, background .15s, transform .15s; }
 .tool:hover { border-color:var(--text-4); background:var(--elevated); transform:translateY(-2px); }
 .tool h3 { margin:0; font-size:1rem; color:var(--text); letter-spacing:-.01em; }
@@ -252,7 +272,7 @@ tbody tr:hover td.feat { background:#15171d; }
 .legend { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin:1.4rem 0 0; padding:0; list-style:none; font-family:var(--mono); font-size:.75rem; color:var(--text-3); }
 
 .honest { margin-top:2.25rem; border:1px solid var(--border); border-left:2px solid var(--gold-dim); border-radius:10px; background:var(--panel); padding:1.05rem 1.2rem; }
-.honest p { margin:0; font-size:.86rem; color:var(--text-3); line-height:1.68; }
+.honest p { margin:0; max-width:var(--measure); font-size:.86rem; color:var(--text-3); line-height:1.68; }
 
 .site-footer { border-top:1px solid var(--border-2); padding:2.25rem 0; margin-top:2rem; }
 .footer-inner { display:flex; flex-wrap:wrap; align-items:center; gap:1rem 2rem; font-family:var(--mono); font-size:.8rem; color:var(--dim); }
@@ -262,11 +282,13 @@ tbody tr:hover td.feat { background:#15171d; }
 .vulos-foot { display:flex; align-items:center; gap:.45rem; }
 .footer-right { margin-left:auto; }
 
+@media (max-width:900px) {
+  .nav-links { gap:1.1rem; }
+}
 @media (max-width:680px) {
   .nav-links { gap:1rem; }
   .nav-links a.hide-sm { display:none; }
   .footer-right { margin-left:0; }
-  section { padding:2.5rem 0; }
 }
 /* Same fix as site/index.html's own nav (commit fa8b6fe5): below ~430px the nav row still has
    more unshrinkable content than the bar can give it — here worse than index.html's, because

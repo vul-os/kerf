@@ -29,6 +29,15 @@ import {
  * running build. A refusal is not retried: the server has already said no and
  * looping would only make that louder.
  */
+/**
+ * How much typing to hold while the socket is down before dropping it.
+ *
+ * A line or two of keystrokes, not a session's worth: someone typing into a
+ * terminal whose server has gone away should not have all of it arrive at once
+ * when it returns.
+ */
+const MAX_PENDING_INPUT_BYTES = 4096
+
 export default function TerminalPanel() {
   const mountRef = useRef<HTMLDivElement | null>(null)
   const termRef = useRef<Terminal | null>(null)
@@ -102,6 +111,7 @@ export default function TerminalPanel() {
         attemptRef.current = 0
         setStatus('open')
         term.focus()
+        flushPending()
       }
 
       socket.onmessage = (event) => {
@@ -134,9 +144,35 @@ export default function TerminalPanel() {
       }
     }
 
+    // Typing while the socket is between connections used to be dropped on the
+    // floor: send() checked readyState and silently returned. A terminal that
+    // eats keystrokes without saying so is worse than one that pauses, and the
+    // window is real — a reattach after switching tabs, or any reconnect after
+    // a dropped connection. Hold the input and flush it when the socket opens.
+    //
+    // Bounded, because "hold everything forever" turns a server that is down
+    // into a paste of the last hour's typing the moment it comes back.
+    const pending: string[] = []
+    let pendingBytes = 0
+
+    const flushPending = () => {
+      const socket = socketRef.current
+      if (socket?.readyState !== WebSocket.OPEN) return
+      while (pending.length) {
+        socket.send(encoder.encode(pending.shift() as string))
+      }
+      pendingBytes = 0
+    }
+
     const send = (data: string) => {
       const socket = socketRef.current
-      if (socket?.readyState === WebSocket.OPEN) socket.send(encoder.encode(data))
+      if (socket?.readyState === WebSocket.OPEN) {
+        socket.send(encoder.encode(data))
+        return
+      }
+      if (pendingBytes + data.length > MAX_PENDING_INPUT_BYTES) return
+      pending.push(data)
+      pendingBytes += data.length
     }
     const inputSub = term.onData(send)
 

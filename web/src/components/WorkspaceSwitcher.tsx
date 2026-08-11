@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Building2, Check, ChevronDown, Plus, Settings, Loader2, Users } from 'lucide-react'
+import { Building2, Check, ChevronDown, Plus, Settings, Loader2 } from 'lucide-react'
 import clsx from 'clsx'
 import { useWorkspaces } from '../store/workspaces.js'
 import CreateWorkspaceDialog from './CreateWorkspaceDialog.jsx'
@@ -181,17 +181,6 @@ export default function WorkspaceSwitcher() {
 
             {current && (
               <>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => { setOpen(false); navigate(`/w/${current.slug}/members`) }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-ink-300 hover:bg-ink-800/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70"
-                >
-                  <span className="grid place-items-center w-5 h-5 text-ink-400">
-                    <Users size={13} />
-                  </span>
-                  <span>Members</span>
-                </button>
                 <button
                   type="button"
                   role="menuitem"

@@ -1,158 +1,11 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
-import { Copy, Trash2, Link as LinkIcon, UserPlus, Check, Loader2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Copy, Trash2, Link as LinkIcon, Check, Loader2 } from 'lucide-react'
 import { api } from '../lib/api.js'
 import Modal from './Modal.jsx'
-import type { ProjectMember, ProjectRole, ShareLink, ShareLinkRole } from '@/types'
+import type { ShareLink, ShareLinkRole } from '@/types'
 
-const ROLES: ProjectRole[] = ['viewer', 'editor', 'owner']
 const LINK_ROLES: ShareLinkRole[] = ['viewer', 'editor']
 
-interface TabProps {
-  active: boolean
-  onClick: () => void
-  children: ReactNode
-}
-
-function Tab({ active, onClick, children }: TabProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/70 ${
-        active
-          ? 'border-kerf-300 text-kerf-200'
-          : 'border-transparent text-ink-300 hover:text-ink-100'
-      }`}
-    >
-      {children}
-    </button>
-  )
-}
-
-interface MembersTabProps {
-  projectId: string
-}
-
-function MembersTab({ projectId }: MembersTabProps) {
-  const [members, setMembers] = useState<ProjectMember[] | null>(null)
-  const [email, setEmail] = useState('')
-  const [role, setRole] = useState<ProjectRole>('editor')
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-  const [reloadKey, setReloadKey] = useState(0)
-
-  useEffect(() => {
-    let cancelled = false
-    api.listMembers(projectId)
-      .then((m) => { if (!cancelled) setMembers(m || []) })
-      .catch((e) => { if (!cancelled) setErr(e?.message || String(e)) })
-    return () => { cancelled = true }
-  }, [projectId, reloadKey])
-
-  const reload = () => setReloadKey((k) => k + 1)
-
-  async function invite(e: FormEvent) {
-    e.preventDefault()
-    if (!email.trim()) return
-    setBusy(true); setErr('')
-    try {
-      await api.inviteMember(projectId, { email: email.trim(), role })
-      setEmail('')
-      reload()
-    } catch (ex) {
-      setErr((ex as Error)?.message || 'Failed to invite')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function changeRole(uid: string, r: string) {
-    try {
-      await api.updateMember(projectId, uid, { role: r })
-      reload()
-    } catch (e) {
-      setErr((e as Error)?.message || String(e))
-    }
-  }
-
-  async function remove(uid: string) {
-    if (!confirm('Remove this member?')) return
-    try {
-      await api.removeMember(projectId, uid)
-      reload()
-    } catch (e) {
-      setErr((e as Error)?.message || String(e))
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-3">
-      <form onSubmit={invite} className="flex gap-2">
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="email@example.com"
-          className="flex-1 bg-ink-850 border border-ink-700 rounded-md px-3 py-1.5 text-sm text-ink-100 placeholder:text-ink-400 outline-none focus:border-kerf-300/60"
-        />
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value as ProjectRole)}
-          className="bg-ink-850 border border-ink-700 rounded-md px-2 py-1.5 text-sm text-ink-100 outline-none focus:border-kerf-300/60"
-        >
-          {LINK_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-        </select>
-        <button
-          type="submit"
-          disabled={busy || !email.trim()}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-kerf-300 text-ink-950 text-sm font-medium hover:bg-kerf-200 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kerf-300/70 focus-visible:ring-offset-1 focus-visible:ring-offset-ink-900"
-        >
-          {busy ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />}
-          Invite
-        </button>
-      </form>
-      {err && <div className="text-xs text-red-400">{err}</div>}
-      <div className="flex flex-col gap-1">
-        {members === null ? (
-          <div className="text-xs text-ink-400 py-4 text-center">Loading members…</div>
-        ) : members.length === 0 ? (
-          <div className="text-xs text-ink-400 py-4 text-center">No members yet.</div>
-        ) : members.map((m) => (
-          <div key={m.user_id} className="flex items-center gap-3 py-2 px-2 rounded hover:bg-ink-800">
-            <div className="w-7 h-7 rounded-full bg-ink-700 flex items-center justify-center text-[11px] text-ink-200 font-semibold flex-shrink-0">
-              {(m.name || m.email || '?').slice(0, 1).toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm text-ink-100 truncate">{m.name || m.email}</div>
-              {m.name && (
-                <div className="text-[11px] text-ink-400 truncate">{m.email}</div>
-              )}
-            </div>
-            <select
-              value={m.role}
-              onChange={(e) => changeRole(m.user_id, e.target.value)}
-              disabled={m.role === 'owner'}
-              className="bg-ink-850 border border-ink-700 rounded px-2 py-1 text-xs text-ink-100 outline-none disabled:opacity-50"
-            >
-              {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-            </select>
-            {m.role !== 'owner' && (
-              <button
-                type="button"
-                onClick={() => remove(m.user_id)}
-                className="p-1 rounded text-ink-400 hover:text-red-400 hover:bg-ink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/70"
-                title="Remove"
-                aria-label={`Remove ${m.name || m.email}`}
-              >
-                <Trash2 size={13} />
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 interface LinksTabProps {
   projectId: string
@@ -311,8 +164,10 @@ export interface ShareModalProps {
 }
 
 export default function ShareModal({ projectId, onClose }: ShareModalProps) {
-  const [tab, setTab] = useState<'members' | 'links'>('members')
-
+  // A Members tab used to sit beside this one, adding people to the project by
+  // email. There is nobody to add — a node has one owner — and the endpoint
+  // behind it could only ever find that owner, so inviting anyone else wrote
+  // nothing and reported success. Sharing a project means handing out a link.
   return (
     <Modal
       open
@@ -321,12 +176,8 @@ export default function ShareModal({ projectId, onClose }: ShareModalProps) {
       widthClass="max-w-lg"
     >
       <div className="-mx-5 -mt-5">
-        <div className="px-4 border-b border-ink-800 flex gap-1">
-          <Tab active={tab === 'members'} onClick={() => setTab('members')}>Members</Tab>
-          <Tab active={tab === 'links'} onClick={() => setTab('links')}>Links</Tab>
-        </div>
         <div className="p-4 overflow-auto max-h-[60vh]">
-          {tab === 'members' ? <MembersTab projectId={projectId} /> : <LinksTab projectId={projectId} />}
+          <LinksTab projectId={projectId} />
         </div>
       </div>
     </Modal>

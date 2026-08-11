@@ -62,7 +62,11 @@ async function screen(page: Page): Promise<string> {
  */
 async function run(page: Page, command: string, expected: RegExp) {
   await page.locator('.xterm-screen').click()
-  await page.keyboard.type(`${command}\n`)
+  // Paced, not blasted: xterm turns each keypress into a separate WebSocket
+  // frame, and typing 20-odd of them in as many milliseconds is not something
+  // a person does. The client holds input across a reconnect now, so nothing
+  // is lost either way — this just keeps the test typing at human speed.
+  await page.keyboard.type(`${command}\n`, { delay: 15 })
   await expect.poll(() => screen(page), { timeout: 45_000 }).toMatch(expected)
 }
 

@@ -37,7 +37,6 @@ const Profile = lazy(() => import('./routes/Profile.jsx'))
 // WorkspaceSettings below, which is per-workspace.
 const Settings = lazy(() => import('./routes/Settings.jsx'))
 const WorkspaceSettings = lazy(() => import('./routes/WorkspaceSettings.jsx'))
-const WorkspaceMembers = lazy(() => import('./routes/WorkspaceMembers.jsx'))
 const AdminDistributors = lazy(() => import('./routes/AdminDistributors.jsx'))
 const AdminPublishers = lazy(() => import('./routes/AdminPublishers.jsx'))
 const Mechanical = lazy(() => import('./routes/domains/Mechanical.jsx'))
@@ -291,7 +290,6 @@ export default function App() {
         <Route path="/projects" element={<Projects />} />
         <Route path="/w/:workspaceSlug/projects" element={<Projects />} />
         <Route path="/w/:workspaceSlug/settings" element={<WorkspaceSettings />} />
-        <Route path="/w/:workspaceSlug/members" element={<WorkspaceMembers />} />
         <Route path="/projects/:projectId" element={<Editor />} />
         <Route path="/projects/:projectId/files/:fileId" element={<Editor />} />
         <Route path="/projects/:projectId/bom" element={<BOMPage />} />

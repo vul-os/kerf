@@ -137,15 +137,6 @@ describe('URL builders + request shape', () => {
     expect(vi.mocked(fetch).mock.calls[0][0]).toBe(`${API_URL}/api/workspaces/ws%2Fwith%20space`)
   })
 
-  it('inviteWorkspaceMember POSTs to the correct nested URL', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(jsonRes({}))
-    await api.inviteWorkspaceMember('acme', 'bob@x.com', 'editor')
-    const [url, init] = vi.mocked(fetch).mock.calls[0] as [string, any]
-    expect(url).toBe(`${API_URL}/api/workspaces/acme/members`)
-    expect(init.method).toBe('POST')
-    expect(JSON.parse(init.body)).toEqual({ email: 'bob@x.com', role: 'editor' })
-  })
-
   it('getActivity falls back to limit=50 when omitted and skips before= when null', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonRes({ events: [] }))
     await api.getActivity('p1')

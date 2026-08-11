@@ -14,7 +14,7 @@ import io
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Any, Literal
+from typing import Optional, Any
 
 import asyncpg
 import httpx
@@ -1119,45 +1119,6 @@ async def delete_workspace(slug: str, request: Request, payload: dict = Depends(
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-class AcceptInviteRequest(BaseModel):
-    token: str
-
-
-@router.post("/workspaces/accept")
-async def accept_workspace_invite(req: AcceptInviteRequest, payload: dict = Depends(require_auth)):
-    user_id = payload.get("sub")
-
-    if not req.token:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="token is required")
-
-    pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        async with conn.transaction():
-            row = await conn.fetchrow(
-                "SELECT id, workspace_id, email, role FROM workspace_invites WHERE token = $1",
-                req.token,
-            )
-            if not row:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="invite not found")
-
-            # Email-binding: the invite is bound to a specific invitee email.
-            # Verify the authenticated user's email matches the invite's email.
-            user_row = await conn.fetchrow(
-                "SELECT email FROM users WHERE id = $1", uuid.UUID(user_id)
-            )
-            if not user_row or user_row["email"].lower() != row["email"].lower():
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="invite is not for your account",
-                )
-
-            await workspaces_queries.add_workspace_member(conn, row["workspace_id"], user_id, row["role"])
-            await conn.execute("DELETE FROM workspace_invites WHERE id = $1", row["id"])
-
-            ws = await workspaces_queries.get_workspace(conn, row["workspace_id"])
-            return workspace_to_response(ws)
-
-
 @router.get("/workspaces/avatar/{id}")
 async def serve_workspace_avatar(request: Request, id: str):
     pool = await get_pool_required()
@@ -1235,126 +1196,6 @@ async def read_json_body(request: Request) -> dict:
             detail="request body must be a JSON object",
         )
     return body
-
-
-# Two role vocabularies exist and they are not the same set. workspace_members
-# admits owner/admin/member and rejects anything else with a CHECK constraint;
-# the project-facing UI talks about editors and viewers. Every route that took
-# a role as a bare `str` handed it straight to that constraint, so any value
-# outside the enum came back as a 500 instead of a 422 — including the
-# perfectly reasonable "editor" the project members UI sends.
-#
-# Typing them as Literals moves the rejection to FastAPI's validation layer,
-# where it belongs, and does it once for every route sharing the model.
-WorkspaceRole = Literal["owner", "admin", "member"]
-InviteRole = Literal["owner", "admin", "member", "editor", "viewer"]
-
-# Invites accept the project vocabulary and collapse it: neither editor nor
-# viewer is a workspace-level distinction, so both land as member.
-_INVITE_ROLE_MAP: dict[str, str] = {
-    "owner": "owner", "admin": "admin", "member": "member",
-    "editor": "member", "viewer": "member",
-}
-
-
-class InviteMemberRequest(BaseModel):
-    email: str
-    role: InviteRole = "member"
-
-
-@router.post("/workspaces/{slug}/members")
-async def invite_workspace_member(slug: str, req: InviteMemberRequest, payload: dict = Depends(require_auth)):
-    user_id = payload.get("sub")
-
-    pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        ws = await workspaces_queries.get_workspace_by_slug(conn, slug)
-        if not ws:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="workspace not found")
-
-        role = await get_user_workspace_role(conn, str(ws["id"]), user_id)
-        if not role or role not in ("owner", "admin"):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="owner or admin required")
-
-        email = req.email.strip().lower()
-        if not email:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="email is required")
-
-        # Validation already rejected anything outside InviteRole, so this is a
-        # total mapping rather than a .get() with a silent "member" fallback —
-        # which used to downgrade a typo'd role instead of reporting it.
-        mapped_role = _INVITE_ROLE_MAP[req.role]
-
-        user = await users_queries.get_user_by_email(conn, email)
-        if user:
-            member = await workspaces_queries.add_workspace_member(conn, ws["id"], str(user["id"]), mapped_role)
-            return {"added": member}
-
-        return {"invite": {"email": email, "role": mapped_role}}
-
-
-class ChangeRoleRequest(BaseModel):
-    role: WorkspaceRole
-
-
-@router.patch("/workspaces/{slug}/members/{member_id}")
-async def change_workspace_member_role(slug: str, member_id: str, req: ChangeRoleRequest, payload: dict = Depends(require_auth)):
-    user_id = payload.get("sub")
-
-    pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        ws = await workspaces_queries.get_workspace_by_slug(conn, slug)
-        if not ws:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="workspace not found")
-
-        role = await get_user_workspace_role(conn, str(ws["id"]), user_id)
-        if not role or role not in ("owner", "admin"):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="owner or admin required")
-
-        current = await workspaces_queries.get_workspace_member(conn, ws["id"], member_id)
-        if not current:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="member not found")
-
-        if current["role"] == "owner" and req.role != "owner":
-            owner_count = await conn.fetchval(
-                "SELECT count(*) FROM workspace_members WHERE workspace_id = $1 AND role = 'owner'",
-                ws["id"]
-            )
-            if owner_count <= 1:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="cannot demote the only owner")
-
-        member = await workspaces_queries.add_workspace_member(conn, ws["id"], member_id, req.role)
-        return member
-
-
-@router.delete("/workspaces/{slug}/members/{member_id}")
-async def remove_workspace_member(slug: str, member_id: str, request: Request, payload: dict = Depends(require_auth)):
-    user_id = payload.get("sub")
-
-    pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        ws = await workspaces_queries.get_workspace_by_slug(conn, slug)
-        if not ws:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="workspace not found")
-
-        role = await get_user_workspace_role(conn, str(ws["id"]), user_id)
-        if not role or role not in ("owner", "admin"):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="owner or admin required")
-
-        current = await workspaces_queries.get_workspace_member(conn, ws["id"], member_id)
-        if not current:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="member not found")
-
-        if current["role"] == "owner":
-            owner_count = await conn.fetchval(
-                "SELECT count(*) FROM workspace_members WHERE workspace_id = $1 AND role = 'owner'",
-                ws["id"]
-            )
-            if owner_count <= 1:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="cannot remove the only owner")
-
-        await workspaces_queries.remove_workspace_member(conn, ws["id"], member_id)
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/projects")
@@ -4559,103 +4400,6 @@ async def delete_share_link(pid: str, lid: str, request: Request, payload: dict 
             lid,
             pid,
         )
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.get("/projects/{pid}/members")
-async def list_members(pid: str, request: Request, payload: dict = Depends(require_auth)):
-    user_id = payload.get("sub")
-
-    pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        ws_id = await project_workspace_id(pid)
-        if not ws_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
-
-        role = await get_user_workspace_role(conn, ws_id, user_id)
-        if not role:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
-
-        members = await workspaces_queries.list_workspace_members(conn, ws_id)
-        # Not user_to_response(): workspace_members has no `id` column (its key
-        # is (workspace_id, user_id)), so that raised KeyError -> 500 on every
-        # backend, and it dropped `role` — the one field a member list is for.
-        # This shape is what the client's ProjectMember type declares.
-        return [
-            {
-                "user_id": str(m["user_id"]),
-                "email": m["email"],
-                "name": m["name"] or "",
-                "avatar_url": m.get("avatar_url") or "",
-                "role": m["role"],
-            }
-            for m in members
-        ]
-
-
-@router.post("/projects/{pid}/members")
-async def add_member(pid: str, req: InviteMemberRequest, payload: dict = Depends(require_auth)):
-    user_id = payload.get("sub")
-
-    pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        ws_id = await project_workspace_id(pid)
-        if not ws_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
-
-        role = await get_user_workspace_role(conn, ws_id, user_id)
-        if not role or role not in ("owner", "admin"):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="owner or admin required")
-
-        email = req.email.strip().lower()
-        mapped_role = _INVITE_ROLE_MAP[req.role]
-        user = await users_queries.get_user_by_email(conn, email)
-        if user:
-            member = await workspaces_queries.add_workspace_member(conn, ws_id, str(user["id"]), mapped_role)
-            return {"added": member}
-        return {"invite": {"email": email, "role": mapped_role}}
-
-
-@router.patch("/projects/{pid}/members/{uid}")
-async def update_member(pid: str, uid: str, req: ChangeRoleRequest, payload: dict = Depends(require_auth)):
-    user_id = payload.get("sub")
-
-    pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        ws_id = await project_workspace_id(pid)
-        if not ws_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
-
-        role = await get_user_workspace_role(conn, ws_id, user_id)
-        if not role or role not in ("owner", "admin"):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="owner or admin required")
-
-        # workspace_members.user_id is a foreign key, so a uid that names no
-        # user reached the INSERT and came back as a 500 — a client's stale or
-        # mistyped id reported as a server fault. Check first and answer 404.
-        target = await conn.fetchrow("SELECT id FROM users WHERE id = $1", uid)
-        if not target:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
-
-        member = await workspaces_queries.add_workspace_member(conn, ws_id, uid, req.role)
-        return member
-
-
-@router.delete("/projects/{pid}/members/{uid}")
-async def remove_member(pid: str, uid: str, request: Request, payload: dict = Depends(require_auth)):
-    user_id = payload.get("sub")
-
-    pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        ws_id = await project_workspace_id(pid)
-        if not ws_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="project not found")
-
-        role = await get_user_workspace_role(conn, ws_id, user_id)
-        if not role or role not in ("owner", "admin"):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="owner or admin required")
-
-        await workspaces_queries.remove_workspace_member(conn, ws_id, uid)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

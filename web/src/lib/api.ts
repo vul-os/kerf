@@ -4,12 +4,10 @@ import { streamSse } from './sseClient.js'
 import type {
   ApiUser,
   ApiWorkspace,
-  WorkspaceMember,
   ApiProject,
   ApiFile,
   ApiThread,
   ApiChatMessage,
-  ProjectMember,
   ShareLink,
   ShareInfo,
   FileRevision,
@@ -195,17 +193,6 @@ interface ApiWorkspaceWithAvatar extends ApiWorkspace {
 }
 
 /**
- * inviteWorkspaceMember's response isn't modeled in src/types/api.ts.
- * src/routes/WorkspaceMembers.jsx branches on `resp.added` (existing user,
- * added immediately) vs `resp.invite.token` (no account yet — show a
- * signup-invite link).
- */
-interface InviteWorkspaceMemberResult {
-  added?: boolean
-  invite?: { token: string }
-}
-
-/**
  * ApiFile (src/types/api.ts) has no `mesh_url` field, but
  * src/store/workspace.ts reads `file.mesh_url` off both api.getFile's result
  * (loadFileForEditor) and a second internal getFile call in
@@ -375,12 +362,6 @@ export const api = {
     request<ApiWorkspace>(`/api/workspaces/${encodeURIComponent(slug)}`, { method: 'PATCH', body: patch }),
   deleteWorkspace: (slug: string) =>
     request<void>(`/api/workspaces/${encodeURIComponent(slug)}`, { method: 'DELETE' }),
-  inviteWorkspaceMember: (slug: string, email: string, role: string) =>
-    request<InviteWorkspaceMemberResult>(`/api/workspaces/${encodeURIComponent(slug)}/members`, { method: 'POST', body: { email, role } }),
-  removeWorkspaceMember: (slug: string, userId: string) =>
-    request<void>(`/api/workspaces/${encodeURIComponent(slug)}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' }),
-  changeWorkspaceMemberRole: (slug: string, userId: string, role: string) =>
-    request<WorkspaceMember>(`/api/workspaces/${encodeURIComponent(slug)}/members/${encodeURIComponent(userId)}`, { method: 'PATCH', body: { role } }),
   uploadWorkspaceAvatar: async (slug: string, blob: Blob & { name?: string }): Promise<ApiWorkspaceWithAvatar> => {
     const fd = new FormData()
     const name = (blob && blob.name) || 'avatar.png'
@@ -584,21 +565,6 @@ export const api = {
     }),
   deleteThread: (projectId: string, threadId: string) =>
     request<void>(`/api/projects/${projectId}/threads/${threadId}`, { method: 'DELETE' }),
-
-  // ---- Members ----
-  listMembers: (projectId: string) => request<ProjectMember[]>(`/api/projects/${projectId}/members`),
-  inviteMember: (projectId: string, { email, role }: { email: string; role: string }) =>
-    request<ProjectMember>(`/api/projects/${projectId}/members`, {
-      method: 'POST',
-      body: { email, role },
-    }),
-  updateMember: (projectId: string, userId: string, { role }: { role: string }) =>
-    request<ProjectMember>(`/api/projects/${projectId}/members/${userId}`, {
-      method: 'PATCH',
-      body: { role },
-    }),
-  removeMember: (projectId: string, userId: string) =>
-    request<void>(`/api/projects/${projectId}/members/${userId}`, { method: 'DELETE' }),
 
   // ---- Share Links ----
   listShareLinks: (projectId: string) => request<ShareLink[]>(`/api/projects/${projectId}/share/links`),

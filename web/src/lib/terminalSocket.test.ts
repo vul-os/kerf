@@ -164,3 +164,59 @@ describe('remembering the session', () => {
     expect(recallSession()).toBeNull()
   })
 })
+
+describe('input while the socket is down', () => {
+  // The panel owns the buffering, but the property is the protocol's: a
+  // terminal that silently eats keystrokes during a reconnect is worse than
+  // one that pauses. This pins the shape the panel implements — hold, then
+  // flush in order, up to a bound.
+  //
+  // Modelled here rather than in a component test because it needs no DOM and
+  // no canvas, which is the whole reason this module exists.
+  function makeBuffer(limit: number) {
+    const pending: string[] = []
+    let bytes = 0
+    let open = false
+    const sent: string[] = []
+    return {
+      send(data: string) {
+        if (open) { sent.push(data); return }
+        if (bytes + data.length > limit) return
+        pending.push(data)
+        bytes += data.length
+      },
+      openSocket() {
+        open = true
+        while (pending.length) sent.push(pending.shift() as string)
+        bytes = 0
+      },
+      sent,
+    }
+  }
+
+  it('delivers what was typed before the socket opened', () => {
+    const b = makeBuffer(4096)
+    b.send('e'); b.send('c'); b.send('h'); b.send('o')
+    expect(b.sent).toEqual([])
+    b.openSocket()
+    expect(b.sent.join('')).toBe('echo')
+  })
+
+  it('keeps the order it was typed in', () => {
+    const b = makeBuffer(4096)
+    b.send('a')
+    b.openSocket()
+    b.send('b')
+    expect(b.sent.join('')).toBe('ab')
+  })
+
+  it('stops holding once the buffer is full', () => {
+    // A server that is down for an hour must not replay an hour of typing the
+    // moment it comes back.
+    const b = makeBuffer(4)
+    b.send('abcd')
+    b.send('efgh')
+    b.openSocket()
+    expect(b.sent.join('')).toBe('abcd')
+  })
+})

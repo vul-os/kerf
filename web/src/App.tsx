@@ -38,7 +38,6 @@ const Profile = lazy(() => import('./routes/Profile.jsx'))
 const Settings = lazy(() => import('./routes/Settings.jsx'))
 const WorkspaceSettings = lazy(() => import('./routes/WorkspaceSettings.jsx'))
 const AdminDistributors = lazy(() => import('./routes/AdminDistributors.jsx'))
-const AdminPublishers = lazy(() => import('./routes/AdminPublishers.jsx'))
 const Mechanical = lazy(() => import('./routes/domains/Mechanical.jsx'))
 const JewelryConfigurator = lazy(() => import('./routes/JewelryConfigurator.jsx'))
 const JewelryShare = lazy(() => import('./routes/JewelryShare.jsx'))
@@ -299,7 +298,6 @@ export default function App() {
         <Route path="/library" element={<Library />} />
         <Route path="/library/:slug" element={<LibraryPart />} />
         <Route path="/admin/distributors" element={<AdminDistributors />} />
-        <Route path="/admin/publishers" element={<AdminPublishers />} />
       </Route>
 
       <Route path="/pathtracer" element={<PathTracer />} />

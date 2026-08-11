@@ -149,14 +149,6 @@ describe('URL builders + request shape', () => {
     expect(vi.mocked(fetch).mock.calls[0][0]).toBe(`${API_URL}/api/projects/p1/activity?limit=25&before=2026-05-09T12%3A00%3A00Z`)
   })
 
-  it('admin.listPublishers builds a multi-key query string', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(jsonRes({ publishers: [] }))
-    await api.admin.listPublishers({ search: 'a&b', verifiedOnly: true, cursor: 'cur', limit: 20 })
-    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(
-      `${API_URL}/api/admin/publishers?search=a%26b&verified_only=true&cursor=cur&limit=20`,
-    )
-  })
-
   it('deleteMe encodes the confirm marker into the query string', async () => {
     // Partial Response stub — the test only reads the fields it sets.
     vi.mocked(fetch).mockResolvedValueOnce({ ok: true, status: 204, statusText: 'No Content' } as unknown as Response)

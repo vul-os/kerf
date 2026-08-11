@@ -18,8 +18,6 @@ import type {
   UploadInitResponse,
   ApiToken,
   AdminDistributor,
-  AdminPublishersPage,
-  AdminPublisher,
   ImportResult,
   CompileIfcResult,
   TopoRunResult,
@@ -740,30 +738,6 @@ export const api = {
     deleteDistributor: (name: string) =>
       request<void>(`/api/admin/distributors/${encodeURIComponent(name)}`, {
         method: 'DELETE',
-      }),
-
-    // Library Phase 3: verified-publisher curation. The backend
-    // returns user rows with a library_count rollup and a
-    // next_cursor for pagination. Search filters on email + name
-    // server-side; verified_only=true narrows to flagged accounts.
-    listPublishers: ({ search, verifiedOnly, cursor, limit }: {
-      search?: string
-      verifiedOnly?: boolean
-      cursor?: string
-      limit?: number
-    } = {}) => {
-      const qs = []
-      if (search) qs.push(`search=${encodeURIComponent(search)}`)
-      if (verifiedOnly) qs.push('verified_only=true')
-      if (cursor) qs.push(`cursor=${encodeURIComponent(cursor)}`)
-      if (limit) qs.push(`limit=${limit}`)
-      const tail = qs.length ? `?${qs.join('&')}` : ''
-      return request<AdminPublishersPage>(`/api/admin/publishers${tail}`)
-    },
-    setPublisherVerified: (userId: string, isVerified: boolean) =>
-      request<AdminPublisher>(`/api/admin/publishers/${encodeURIComponent(userId)}`, {
-        method: 'PUT',
-        body: { is_verified_publisher: !!isVerified },
       }),
   },
 

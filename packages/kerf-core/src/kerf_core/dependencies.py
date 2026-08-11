@@ -125,6 +125,24 @@ async def require_auth_unless_local(
     return decode_jwt(token)
 
 
+async def require_node_owner(payload: dict = Depends(require_auth)) -> dict:
+    """Auth for operating the node itself: supplier credentials, library moderation.
+
+    These used to demand ``users.account_role in ('admin', 'system')``. Nothing
+    in Kerf has ever written that column — it defaults to ``'user'`` and no
+    route, migration or seed changes it — so every endpoint behind that check
+    answered 403 to the only user who can exist. `kerf admin set-password`
+    reaches the machine; nothing reached these.
+
+    With one user per node, being signed in *is* being the owner, so this is
+    ``require_auth`` with a name that says what it means. It exists as its own
+    dependency because "operating the node" is a distinct thing from "using
+    it", and if node-level roles ever come back this is the one place they
+    land.
+    """
+    return payload
+
+
 async def get_user_id(request: Request) -> str:
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):

@@ -27,7 +27,6 @@ from urllib.parse import urlencode
 from kerf_core.db.errors import is_unique_violation
 from kerf_core.config import get_settings
 from kerf_core.db.connection import get_pool_required
-from kerf_core.db.queries import users as users_queries
 from kerf_core.db.queries import workspaces as workspaces_queries
 from kerf_core.db.queries import projects as projects_queries
 from kerf_core.db.queries import files as files_queries
@@ -40,7 +39,7 @@ from kerf_core.db.queries import jobs as jobs_queries
 from kerf_core.db.queries import usage_events as usage_queries
 from kerf_core.db.queries import upload_sessions as uploads_queries
 from kerf_core.db.queries import library as library_queries
-from kerf_core.dependencies import require_auth, optional_auth, rate_limit
+from kerf_core.dependencies import require_auth, require_node_owner, optional_auth, rate_limit
 from kerf_core.storage import get_storage_required
 from kerf_core.storage.materialize import blob_storage_key
 from kerf_chat import llm as llm_module
@@ -6085,46 +6084,14 @@ def set_registry(r):
     _distributor_registry = r
 
 
-async def require_admin(request: Request) -> bool:
-    payload = await require_auth.__wrapped__(request) if hasattr(require_auth, '__wrapped__') else None
-    if not payload:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
-    uid = payload.get("sub")
-    if not uid:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
-
-    pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "select account_role from users where id = $1",
-            uuid.UUID(uid),
-        )
-        if not row:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
-        if row["account_role"] not in ("admin", "system"):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin access required")
-        return True
-
-
 @router.get("/admin/distributors")
 async def list_distributors(
     request: Request,
-    payload: dict = Depends(require_auth),
+    payload: dict = Depends(require_node_owner),
 ):
     uid = payload.get("sub")
     if not uid:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
-
-    pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "select account_role from users where id = $1",
-            uuid.UUID(uid),
-        )
-        if not row:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
-        if row["account_role"] not in ("admin", "system"):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin access required")
 
     try:
         reg = get_registry()
@@ -6146,22 +6113,11 @@ class UpdateDistributorRequest(BaseModel):
 async def update_distributor(
     request: Request,
     name: str,
-    payload: dict = Depends(require_auth),
+    payload: dict = Depends(require_node_owner),
 ):
     uid = payload.get("sub")
     if not uid:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
-
-    pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "select account_role from users where id = $1",
-            uuid.UUID(uid),
-        )
-        if not row:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
-        if row["account_role"] not in ("admin", "system"):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin access required")
 
     try:
         reg = get_registry()
@@ -6193,22 +6149,11 @@ async def update_distributor(
 async def delete_distributor(
     request: Request,
     name: str,
-    payload: dict = Depends(require_auth),
+    payload: dict = Depends(require_node_owner),
 ):
     uid = payload.get("sub")
     if not uid:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
-
-    pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "select account_role from users where id = $1",
-            uuid.UUID(uid),
-        )
-        if not row:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
-        if row["account_role"] not in ("admin", "system"):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin access required")
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -6262,198 +6207,6 @@ async def refresh_part_distributors(
         pass
     return {"updated": 0, "content": row["content"]}
 
-
-# Admin Publishers (admin_publishers.go)
-
-
-class PublisherRow(BaseModel):
-    id: str
-    email: str
-    name: str
-    avatar_url: Optional[str] = ""
-    is_verified_publisher: bool
-    is_system: bool
-    account_role: str
-    library_count: int
-    created_at: str
-
-
-class PublisherListResponse(BaseModel):
-    rows: list[PublisherRow]
-    next_cursor: Optional[str] = None
-
-
-@router.get("/admin/publishers")
-async def list_publishers(
-    request: Request,
-    payload: dict = Depends(require_auth),
-):
-    uid = payload.get("sub")
-    if not uid:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
-
-    pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "select account_role from users where id = $1",
-            uuid.UUID(uid),
-        )
-        if not row:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
-        if row["account_role"] not in ("admin", "system"):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin access required")
-
-    search = request.query_params.get("search", "").strip()
-    verified_only = request.query_params.get("verified_only") == "true"
-    cursor = request.query_params.get("cursor", "").strip()
-    limit_str = request.query_params.get("limit", "50").strip()
-
-    limit = 50
-    try:
-        n = int(limit_str)
-        if n > 0 and n <= 200:
-            limit = n
-    except ValueError:
-        pass
-
-    args = []
-    conditions = ["u.is_system = false"]
-
-    if verified_only:
-        conditions.append("u.is_verified_publisher = true")
-
-    if search:
-        conditions.append("(lower(u.email) like $1 or lower(coalesce(u.name, '')) like $1)")
-        args.append(f"%{search.lower()}%")
-
-    if cursor:
-        try:
-            cursor_time = datetime.fromisoformat(cursor)
-            conditions.append(f"u.created_at < ${len(args) + 1}")
-            args.append(cursor_time)
-        except ValueError:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid cursor")
-
-    args.append(limit + 1)
-
-    query = f"""
-        select
-            u.id, u.email, coalesce(u.name, ''),
-            coalesce(u.avatar_url, ''),
-            u.is_verified_publisher, u.is_system, u.account_role,
-            u.created_at,
-            coalesce((
-                select count(distinct f.id)
-                from files f
-                join projects p on p.id = f.project_id
-                where p.created_by = u.id
-                  and f.kind = 'part'
-                  and f.deleted_at is null
-            ), 0) as library_count
-        from users u
-        where {" and ".join(conditions)}
-        order by u.created_at desc
-        limit ${len(args)}
-    """
-
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(query, *args)
-
-        result_rows = []
-        for r in rows[:limit]:
-            result_rows.append(PublisherRow(
-                id=str(r["id"]),
-                email=r["email"],
-                name=r["name"],
-                avatar_url=r["coalesce"] or "",
-                is_verified_publisher=r["is_verified_publisher"],
-                is_system=r["is_system"],
-                account_role=r["account_role"],
-                library_count=r["library_count"],
-                created_at=r["created_at"].isoformat() if isinstance(r["created_at"], datetime) else str(r["created_at"]),
-            ))
-
-        resp = PublisherListResponse(rows=result_rows)
-        if len(rows) > limit:
-            resp.next_cursor = result_rows[-1].created_at
-
-        return resp
-
-
-class SetVerifiedRequest(BaseModel):
-    is_verified_publisher: bool
-
-
-@router.put("/admin/publishers/{user_id}")
-async def set_publisher_verified(
-    request: Request,
-    user_id: str,
-    payload: dict = Depends(require_auth),
-):
-    uid = payload.get("sub")
-    if not uid:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
-
-    pool = await get_pool_required()
-    async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "select account_role from users where id = $1",
-            uuid.UUID(uid),
-        )
-        if not row:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthorized")
-        if row["account_role"] not in ("admin", "system"):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin access required")
-
-    try:
-        req = SetVerifiedRequest(**await read_json_body(request))
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid body")
-
-    async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            """
-            update users
-               set is_verified_publisher = $2
-             where id = $1
-            returning id, email, coalesce(name, ''), coalesce(avatar_url, ''),
-                     is_verified_publisher, is_system, account_role, created_at
-            """,
-            uuid.UUID(user_id),
-            req.is_verified_publisher,
-        )
-
-        if not row:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
-
-        library_count = await conn.fetchval(
-            """
-            select count(distinct f.id)
-              from files f
-              join projects p on p.id = f.project_id
-             where p.created_by = $1
-               and f.kind = 'part'
-               and f.deleted_at is null
-            """,
-            uuid.UUID(user_id),
-        )
-
-        return PublisherRow(
-            id=str(row["id"]),
-            email=row["email"],
-            name=row["name"],
-            avatar_url=row["coalesce"] or "",
-            is_verified_publisher=row["is_verified_publisher"],
-            is_system=row["is_system"],
-            account_role=row["account_role"],
-            library_count=library_count or 0,
-            created_at=row["created_at"].isoformat() if isinstance(row["created_at"], datetime) else str(row["created_at"]),
-        )
-
-
-# ---------------------------------------------------------------------------
-# KiCad import
-# ---------------------------------------------------------------------------
 
 @router.post("/projects/{pid}/imports/kicad")
 async def import_kicad_file(
@@ -6525,16 +6278,19 @@ async def import_kicad_file(
 async def library_list_parts(
     search: Optional[str] = None,
     category: Optional[str] = None,
-    verified_only: Optional[str] = None,
 ):
-    """GET /api/library/parts?search=&category=&verified_only= — parts catalog."""
+    """GET /api/library/parts?search=&category= — parts catalog.
+
+    `verified_only` used to be a third filter. It narrowed to publishers with
+    `is_verified_publisher`, a column nothing could set, so it returned nothing
+    on every node that ever ran it.
+    """
     pool = await get_pool_required()
     async with pool.acquire() as conn:
         result = await library_queries.list_public_parts(
             conn,
             search=search or None,
             category=category or None,
-            verified_only=(verified_only == "true"),
             limit=100,
             offset=0,
         )
@@ -6614,16 +6370,11 @@ async def library_submit_part(
 @router.get("/admin/library/submissions")
 async def admin_list_library_submissions(
     status_filter: Optional[str] = None,
-    auth: dict = Depends(require_auth),
+    auth: dict = Depends(require_node_owner),
 ):
-    """GET /api/admin/library/submissions — admin-only list."""
-    user_id = auth["sub"]
+    """GET /api/admin/library/submissions — this node's submission queue."""
     pool = await get_pool_required()
     async with pool.acquire() as conn:
-        user = await users_queries.get_user(conn, uuid.UUID(user_id))
-        if not user or user.get("account_role") != "admin":
-            raise HTTPException(status_code=403, detail="Admin only")
-
         rows = await library_queries.list_library_submissions(
             conn,
             status=status_filter or None,
@@ -6650,16 +6401,12 @@ class AdminSubmissionAction(BaseModel):
 async def admin_update_library_submission(
     submission_id: str,
     body: AdminSubmissionAction,
-    auth: dict = Depends(require_auth),
+    auth: dict = Depends(require_node_owner),
 ):
     """PUT /api/admin/library/submissions/{id} — approve or reject."""
     user_id = auth["sub"]
     pool = await get_pool_required()
     async with pool.acquire() as conn:
-        user = await users_queries.get_user(conn, uuid.UUID(user_id))
-        if not user or user.get("account_role") != "admin":
-            raise HTTPException(status_code=403, detail="Admin only")
-
         try:
             sub_id = uuid.UUID(submission_id)
         except ValueError:

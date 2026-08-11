@@ -67,10 +67,16 @@ async function run(page: Page, command: string, expected: RegExp) {
   // a person does. The client holds input across a reconnect now, so nothing
   // is lost either way — this just keeps the test typing at human speed.
   await page.keyboard.type(`${command}\n`, { delay: 15 })
-  await expect.poll(() => screen(page), { timeout: 45_000 }).toMatch(expected)
+  await expect.poll(() => screen(page), { timeout: 30_000 }).toMatch(expected)
 }
 
 test.describe('Terminal (local mode)', () => {
+  // The suite default is 120s, and the first test alone makes four shell
+  // round-trips that each wait up to 30s — a budget that cannot hold its own
+  // contents. Every probe is a real fork/exec/echo through a WebSocket, which
+  // is slow in a way no amount of tuning fixes.
+  test.setTimeout(240_000)
+
   test('opens a shell with kerf on PATH and pointed at this node', async ({ page }) => {
     await openEditorWithTerminal(page)
 

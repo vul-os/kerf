@@ -402,19 +402,6 @@ export interface AdminDistributor {
   [field: string]: unknown
 }
 
-export interface AdminPublisher {
-  id: string
-  email: string
-  name?: string
-  library_count: number
-  is_verified_publisher: boolean
-}
-
-export interface AdminPublishersPage {
-  /** `rows`, not `publishers` — the server sends PublisherListResponse(rows=...). */
-  rows: AdminPublisher[]
-  next_cursor: string | null
-}
 
 // ---------------------------------------------------------------------------
 // FreeCAD / IFC import (api.js "---- FreeCAD import ----" / "---- IFC import ----")

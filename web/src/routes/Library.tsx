@@ -6,18 +6,22 @@
 // endpoint (cloud-only) /api/library/parts is the data source; rows are
 // project-public Parts with `visibility='public'` on the Part itself.
 //
-// Curation is via the existing `is_verified_publisher` flag on user
-// accounts — verified rows float to the top and earn a small badge.
+// There used to be a "Verified only" filter here, backed by
+// `users.is_verified_publisher`. Nothing could ever set that column — the
+// routes that did were behind an account role no user has ever had — so the
+// filter returned an empty catalog on every node. Verification is not a claim
+// a node can make about itself; whose parts you trust is decided by whose feed
+// you follow.
 //
 // The Library is a design capability and is never gated — it works
 // identically self-hosted (backed by the MIT kerf-api /api/library/parts
-// route) and on the hosted tier.
+// route).
 
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   AlertCircle, CheckCircle2, Loader2, Package, Plus, Search,
-  Sparkles, Star, X,
+  Sparkles, X,
 } from 'lucide-react'
 import Layout from '../components/Layout.jsx'
 import Card from '../components/Card.jsx'
@@ -40,19 +44,7 @@ const CATEGORY_TABS = [
   { id: 'other', label: 'Other' },
 ]
 
-function VerifiedBadge() {
-  return (
-    <span
-      title="Verified publisher"
-      className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-kerf-300/20 text-kerf-300 border border-kerf-300/30 flex-shrink-0"
-    >
-      <Star size={8} className="fill-current" />
-    </span>
-  )
-}
-
 function PartCard({ row, onSelect, selected }) {
-  const verified = !!row.author?.is_verified_publisher
   return (
     <button
       type="button"
@@ -95,7 +87,6 @@ function PartCard({ row, onSelect, selected }) {
         )}
         <div className="mt-2 flex items-center gap-1.5 text-[11px] text-ink-400 truncate">
           <span className="truncate">{row.author?.name || 'unknown'}</span>
-          {verified && <VerifiedBadge />}
         </div>
       </div>
     </button>
@@ -104,7 +95,6 @@ function PartCard({ row, onSelect, selected }) {
 
 function DetailsPanel({ row, onClose }) {
   if (!row) return null
-  const verified = !!row.author?.is_verified_publisher
   return (
     <Card className="sticky top-20 p-4">
       <div className="flex items-start justify-between gap-3">
@@ -144,7 +134,6 @@ function DetailsPanel({ row, onClose }) {
 
       <div className="mt-3 flex items-center gap-1.5 text-xs text-ink-300">
         <span>by {row.author?.name || 'unknown'}</span>
-        {verified && <VerifiedBadge />}
       </div>
 
       {row.slug && (
@@ -367,18 +356,16 @@ function Field({
 export default function Library() {
   const navigate = useNavigate()
   const accessToken = useAuth((s) => s.accessToken)
-  // URL state — `?q=`, `?cat=`, `?verified=1` so links are shareable and
+  // URL state — `?q=`, `?cat=` so links are shareable and
   // refreshing preserves the user's filter set. The local form state
   // (`search`) tracks the input box separately so we can debounce it
   // before pushing the param back into the URL.
   const [searchParams, setSearchParams] = useSearchParams()
   const initialQ = searchParams.get('q') || ''
   const initialCat = searchParams.get('cat') || 'all'
-  const initialVerified = searchParams.get('verified') === '1'
   const [search, setSearch] = useState(initialQ)
   const [debouncedSearch, setDebouncedSearch] = useState(initialQ.trim())
   const category = initialCat
-  const verifiedOnly = initialVerified
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -419,13 +406,6 @@ export default function Library() {
     else next.delete('cat')
     setSearchParams(next, { replace: true })
   }
-  const setVerifiedOnly = (on) => {
-    const next = new URLSearchParams(searchParams)
-    if (on) next.set('verified', '1')
-    else next.delete('verified')
-    setSearchParams(next, { replace: true })
-  }
-
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -436,7 +416,6 @@ export default function Library() {
       .listParts({
         search: debouncedSearch || undefined,
         category: category === 'all' ? undefined : category,
-        verifiedOnly: verifiedOnly || undefined,
       })
       .then((resp) => {
         if (cancelled) return
@@ -452,7 +431,7 @@ export default function Library() {
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [debouncedSearch, category, verifiedOnly])
+  }, [debouncedSearch, category])
 
   const rows = data?.rows || []
   const headerSubtitle = useMemo(() => {
@@ -474,7 +453,7 @@ export default function Library() {
             Library
           </h1>
           <p className="mt-1 text-sm text-ink-400">
-            Curated and community parts. Verified publishers floated to top.
+            Public parts published by this node.
           </p>
           <p className="mt-1 text-xs text-ink-500">{headerSubtitle}</p>
         </div>
@@ -485,15 +464,6 @@ export default function Library() {
           >
             ← Workshop
           </Link>
-          <label className="flex items-center gap-2 text-xs text-ink-300 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={verifiedOnly}
-              onChange={(e) => setVerifiedOnly(e.target.checked)}
-              className="accent-kerf-300"
-            />
-            Verified only
-          </label>
           {accessToken && (
             <button
               type="button"

@@ -414,15 +414,27 @@ on the node's own toggles and the user's explicit publish/follow actions.
 
 ---
 
-## Admin (distributor + publisher management)
+## Operating the node (`/api/admin/…`)
 
-| Method | Path | Min role |
-|--------|------|----------|
-| GET | `/api/admin/distributors` | system |
-| PUT | `/api/admin/distributors/{name}` | system |
-| DELETE | `/api/admin/distributors/{name}` | system |
-| GET | `/api/admin/publishers` | system |
-| PUT | `/api/admin/publishers/{user_id}` | system |
+Configuring supplier feeds and moderating this node's library. Authenticated —
+that is the whole check, because there is one user and they own the node.
+
+These asked for `users.account_role in ('admin', 'system')` until recently.
+Nothing in Kerf writes that column: it defaults to `'user'`, and no route,
+migration or seed changes it. So every endpoint here answered 403 to the only
+user who can exist, on every install.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/admin/distributors` | Configured supplier feeds (Digi-Key and friends) that price `.part` files |
+| PUT | `/api/admin/distributors/{name}` | Enable, rate-limit, or set the credential for one |
+| DELETE | `/api/admin/distributors/{name}` | Remove one |
+| GET | `/api/admin/library/submissions` | This node's submission queue |
+| PUT | `/api/admin/library/submissions/{id}` | Approve or reject a submission |
+
+`/api/admin/publishers` is gone. It marked a user `is_verified_publisher`,
+which a node cannot meaningfully assert about itself — whose parts you trust is
+decided by whose feed you follow, not by a flag the publisher sets.
 
 ---
 

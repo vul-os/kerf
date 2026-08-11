@@ -430,11 +430,17 @@ class TestAdminListSubmissions:
         rows = r.json()["rows"]
         assert all(row["status"] == "pending" for row in rows)
 
-    def test_non_admin_cannot_list_403(self):
-        """Scenario 12: regular user gets 403."""
+    def test_any_signed_in_user_can_list(self):
+        """Was: "regular user gets 403".
+
+        The 403 came from `users.account_role in ('admin','system')`, a column
+        nothing has ever written — so the queue was unreachable on every node,
+        including by the person who owns it. Moderating this node's library is
+        the owner's job, and there is only the owner.
+        """
         conn = _FakeConn(user_is_admin=False)
         r = self._get(conn, _USER_ID)
-        assert r.status_code == 403, r.text
+        assert r.status_code == 200, r.text
 
     def test_unauthenticated_cannot_list(self):
         """Scenario 13: no auth → 401 or 403."""
@@ -534,17 +540,32 @@ class TestAdminModerateSubmission:
         r = self._put(conn, _ADMIN_ID, "not-a-uuid", {"action": "approve"})
         assert r.status_code == 400, r.text
 
-    def test_non_admin_cannot_approve_403(self):
-        """Scenario 23: regular user cannot approve → 403."""
-        conn = _FakeConn(user_is_admin=False)
-        r = self._put(conn, _USER_ID, _SUB_ID_PENDING, {"action": "approve"})
-        assert r.status_code == 403, r.text
+    def test_any_signed_in_user_can_approve(self):
+        """Was: "regular user cannot approve → 403" — see the note on listing.
 
-    def test_non_admin_cannot_reject_403(self):
-        """Scenario 24: regular user cannot reject → 403."""
-        conn = _FakeConn(user_is_admin=False)
+        Nothing could set account_role, so this 403 fired for every user that
+        can exist, and the approve/reject queue had no reachable caller.
+        """
+        approved = _make_submission(_SUB_ID_PENDING, _USER_ID, "approved")
+        conn = _FakeConn(approve_result=approved)
+        r = self._put(conn, _USER_ID, _SUB_ID_PENDING, {"action": "approve"})
+        assert r.status_code == 200, r.text
+
+    def test_any_signed_in_user_can_reject(self):
+        rejected = _make_submission(_SUB_ID_PENDING, _USER_ID, "rejected")
+        conn = _FakeConn(reject_result=rejected)
         r = self._put(conn, _USER_ID, _SUB_ID_PENDING, {"action": "reject"})
-        assert r.status_code == 403, r.text
+        assert r.status_code == 200, r.text
+
+    def test_moderation_still_needs_a_session(self):
+        """Dropping the role check must not drop the auth check with it."""
+        conn = _FakeConn()
+        with _patched_client(conn) as (c, _):
+            r = c.put(
+                f"/api/admin/library/submissions/{_SUB_ID_PENDING}",
+                json={"action": "approve"},
+            )
+        assert r.status_code in (401, 403), r.text
 
     def test_approve_response_shape(self):
         """Scenario 25: approved response has correct id + status shape."""

@@ -10,11 +10,17 @@ async def list_public_parts(
     conn: asyncpg.Connection,
     search: Optional[str] = None,
     category: Optional[str] = None,
-    verified_only: bool = False,
     limit: int = 100,
     offset: int = 0,
 ) -> Dict[str, Any]:
     """List parts (kind='part') from public projects.
+
+    There used to be a `verified_only` filter here, on
+    `users.is_verified_publisher`. Nothing could set that column — the routes
+    that did were gated on an account role no user has ever had — so ticking
+    "Verified only" in the Library returned an empty catalog every time.
+    Verification is not a claim a node can make about itself anyway; whose
+    parts you trust is decided by whose feed you follow.
 
     Returns {rows: [...], limit, total} matching the frontend shape:
       rows: [{file_id, project_id, slug, name, manufacturer, mpn,
@@ -27,9 +33,6 @@ async def list_public_parts(
     ]
     params: List[Any] = []
     param_idx = 1
-
-    if verified_only:
-        conditions.append("u.is_verified_publisher = TRUE")
 
     if category:
         conditions.append(f"(f.content::jsonb->>'category') ILIKE ${param_idx}")
@@ -66,7 +69,6 @@ async def list_public_parts(
             w.slug          AS workspace_slug,
             p.name          AS project_name,
             u.name          AS author,
-            u.is_verified_publisher,
             f.content::jsonb->>'manufacturer'     AS manufacturer,
             f.content::jsonb->>'mpn'              AS mpn,
             f.content::jsonb->>'category'         AS category,
@@ -77,7 +79,7 @@ async def list_public_parts(
         JOIN workspaces w ON w.id = p.workspace_id
         JOIN users u ON u.id = w.created_by
         {where_clause}
-        ORDER BY u.is_verified_publisher DESC, f.updated_at DESC
+        ORDER BY f.updated_at DESC
         LIMIT {limit_ph} OFFSET {offset_ph}
     """
 
@@ -111,7 +113,6 @@ async def get_public_part(
             w.slug          AS workspace_slug,
             p.name          AS project_name,
             u.name          AS author,
-            u.is_verified_publisher,
             f.updated_at
         FROM files f
         JOIN projects p ON p.id = f.project_id
@@ -164,7 +165,6 @@ _PART_DETAIL_SELECT = """
             w.slug          AS workspace_slug,
             p.name          AS project_name,
             u.name          AS author,
-            u.is_verified_publisher,
             f.updated_at
         FROM files f
         JOIN projects p ON p.id = f.project_id

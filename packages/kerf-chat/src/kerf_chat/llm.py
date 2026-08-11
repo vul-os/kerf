@@ -388,9 +388,13 @@ def _anthropic_sdk_supports_cache_control() -> bool:
 
 
 class AnthropicProvider(Provider):
-    def __init__(self, api_key: str, prompt_cache: bool = True):
+    def __init__(self, api_key: str, prompt_cache: bool = True, base_url: str = ""):
         self.api_key = api_key
         self.prompt_cache = prompt_cache
+        # Endpoint override for a gateway or an OpenAI-compatible clone.
+        # Empty means the SDK's default. Saved per user in
+        # user_provider_keys.base_url and set from Settings.
+        self.base_url = base_url
 
     def name(self) -> str:
         return "anthropic"
@@ -399,7 +403,11 @@ class AnthropicProvider(Provider):
         import anthropic
         import httpx
 
-        client = anthropic.Anthropic(api_key=self.api_key, http_client=httpx.Client(timeout=120.0))
+        client = anthropic.Anthropic(
+            api_key=self.api_key,
+            http_client=httpx.Client(timeout=120.0),
+            **({"base_url": self.base_url} if self.base_url else {}),
+        )
 
         max_tokens = req.max_tokens if req.max_tokens > 0 else 4096
 
@@ -558,6 +566,7 @@ class AnthropicProvider(Provider):
         client = anthropic.Anthropic(
             api_key=self.api_key,
             http_client=httpx.Client(timeout=120.0),
+            **({"base_url": self.base_url} if self.base_url else {}),
         )
 
         max_tokens = req.max_tokens if req.max_tokens > 0 else 4096
@@ -773,8 +782,12 @@ class AnthropicProvider(Provider):
 
 
 class OpenAIProvider(Provider):
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, base_url: str = ""):
         self.api_key = api_key
+        # Endpoint override for a gateway or an OpenAI-compatible clone.
+        # Empty means the SDK's default. Saved per user in
+        # user_provider_keys.base_url and set from Settings.
+        self.base_url = base_url
 
     def name(self) -> str:
         return "openai"
@@ -783,7 +796,11 @@ class OpenAIProvider(Provider):
         from openai import OpenAI
         import httpx
 
-        client = OpenAI(api_key=self.api_key, http_client=httpx.Client(timeout=120.0))
+        client = OpenAI(
+            api_key=self.api_key,
+            http_client=httpx.Client(timeout=120.0),
+            **({"base_url": self.base_url} if self.base_url else {}),
+        )
 
         tools = None
         if req.tools:
@@ -857,8 +874,14 @@ class OpenAIProvider(Provider):
 
 
 class MoonshotProvider(Provider):
-    def __init__(self, api_key: str):
+    _DEFAULT_BASE_URL = "https://api.moonshot.cn/v1"
+
+    def __init__(self, api_key: str, base_url: str = ""):
         self.api_key = api_key
+        # Endpoint override for a gateway or an OpenAI-compatible clone.
+        # Empty means the SDK's default. Saved per user in
+        # user_provider_keys.base_url and set from Settings.
+        self.base_url = base_url or self._DEFAULT_BASE_URL
 
     def name(self) -> str:
         return "moonshot"
@@ -866,7 +889,7 @@ class MoonshotProvider(Provider):
     def complete(self, req: CompleteRequest) -> CompleteResponse:
         from openai import OpenAI
 
-        client = OpenAI(api_key=self.api_key, base_url="https://api.moonshot.cn/v1")
+        client = OpenAI(api_key=self.api_key, base_url=self.base_url)
 
         messages = []
         for m in req.messages:
@@ -958,11 +981,27 @@ class GeminiProvider(Provider):
       - `types.Tool(function_declarations=[...FunctionDeclaration...])`
     """
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, base_url: str = ""):
         self.api_key = api_key
+        # Endpoint override for a gateway or a Vertex-style proxy. Empty means
+        # the SDK's default. Saved per user in user_provider_keys.base_url and
+        # set from Settings. google-genai takes this via HttpOptions rather
+        # than a constructor kwarg, hence _client() below.
+        self.base_url = base_url
 
     def name(self) -> str:
         return "gemini"
+
+    def _client(self):
+        """Build a genai client, honouring a configured base_url."""
+        from google import genai
+        if not self.base_url:
+            return genai.Client(api_key=self.api_key)
+        from google.genai import types as genai_types
+        return genai.Client(
+            api_key=self.api_key,
+            http_options=genai_types.HttpOptions(base_url=self.base_url),
+        )
 
     # ── Shared request-building helpers ─────────────────────────────────
 
@@ -1093,7 +1132,7 @@ class GeminiProvider(Provider):
 
     def complete(self, req: CompleteRequest) -> CompleteResponse:
         from google import genai
-        client = genai.Client(api_key=self.api_key)
+        client = self._client()
 
         contents, config = self._build_request_args(req)
 
@@ -1139,7 +1178,7 @@ class GeminiProvider(Provider):
         assistant_text_delta / tool_use_start / tool_use_complete /
         assistant_done."""
         from google import genai
-        client = genai.Client(api_key=self.api_key)
+        client = self._client()
 
         contents, config = self._build_request_args(req)
 

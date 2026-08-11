@@ -250,7 +250,8 @@ class TestPreferByoProvider:
         import kerf_api.routes as routes_mod
 
         encrypted = encrypt_secret(b"sk-ant-user-owned", "byo-provider-key")
-        pool, conn = _make_pool(fetchrow_return={"encrypted_key": encrypted})
+        pool, conn = _make_pool(
+            fetchrow_return={"encrypted_key": encrypted, "base_url": None})
         default_provider = MagicMock()
         default_provider.name = MagicMock(return_value="anthropic")
 
@@ -258,6 +259,30 @@ class TestPreferByoProvider:
 
         assert isinstance(result, routes_mod.llm_module.AnthropicProvider)
         assert result is not default_provider
+        assert result.base_url == ""  # NULL base_url -> the SDK default
+
+    def test_saved_base_url_travels_with_the_key(self):
+        """A gateway-issued key is rarely valid against the vendor's endpoint.
+
+        So the saved base_url has to be applied alongside the key it was saved
+        next to — swapping in the key while still pointing at api.anthropic.com
+        would authenticate against the wrong service.
+        """
+        from kerf_core.utils.encrypt import encrypt_secret
+        import kerf_api.routes as routes_mod
+
+        encrypted = encrypt_secret(b"gateway-issued-key", "byo-provider-key")
+        pool, conn = _make_pool(fetchrow_return={
+            "encrypted_key": encrypted,
+            "base_url": "https://gateway.internal/v1",
+        })
+        default_provider = MagicMock()
+        default_provider.name = MagicMock(return_value="openai")
+
+        result = _run(routes_mod._prefer_byo_provider(pool, str(uuid.uuid4()), default_provider))
+
+        assert isinstance(result, routes_mod.llm_module.OpenAIProvider)
+        assert result.base_url == "https://gateway.internal/v1"
 
     def test_lookup_scoped_to_user_and_provider(self):
         """The SELECT must filter on both user_id and provider (no cross-user leak)."""

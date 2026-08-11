@@ -902,7 +902,7 @@ async def _prefer_byo_provider(pool, user_id: Optional[str], provider):
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
-                SELECT encrypted_key
+                SELECT encrypted_key, base_url
                 FROM user_provider_keys
                 WHERE user_id = $1 AND provider = $2
                 """,
@@ -911,15 +911,19 @@ async def _prefer_byo_provider(pool, user_id: Optional[str], provider):
         if not row:
             return provider
         api_key = decrypt_secret(row["encrypted_key"], "byo-provider-key").decode()
+        # A saved base_url points at a gateway or an OpenAI-compatible clone.
+        # It travels with the key it was saved next to — a key issued by a
+        # gateway is rarely valid against the vendor's own endpoint.
+        base_url = row["base_url"] or ""
         provider_name = provider.name()
         if provider_name == "anthropic":
-            return llm_module.AnthropicProvider(api_key)
+            return llm_module.AnthropicProvider(api_key, base_url=base_url)
         if provider_name == "openai":
-            return llm_module.OpenAIProvider(api_key)
+            return llm_module.OpenAIProvider(api_key, base_url=base_url)
         if provider_name == "moonshot":
-            return llm_module.MoonshotProvider(api_key)
+            return llm_module.MoonshotProvider(api_key, base_url=base_url)
         if provider_name == "gemini":
-            return llm_module.GeminiProvider(api_key)
+            return llm_module.GeminiProvider(api_key, base_url=base_url)
         return provider
     except Exception as exc:
         _logger.debug("byo: no usable saved key for user_id=%s: %s", user_id, exc)

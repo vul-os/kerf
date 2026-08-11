@@ -3,18 +3,19 @@
 // Provides Z0 / propagation-delay / crosstalk / IBIS eye-diagram via the kerf-electronics
 // backend tools (si_impedance, si_propagation, si_crosstalk, si_report, si_ibis_channel_response).
 //
-// Backend contracts:
-//   POST /api/llm-tools/si_impedance   → {z0_ohms, zdiff_ohms?}
-//   POST /api/llm-tools/si_propagation → {td_ps_per_mm, flight_time_ps}
-//   POST /api/llm-tools/si_crosstalk   → {NEXT, FEXT}
-//   POST /api/llm-tools/si_report      → combined SI summary
-//   POST /api/llm-tools/si_ibis_channel_response → {waveform, eye_high_V, eye_low_V}
+// Backend contracts (via api.callTool → POST /api/tools/call):
+//   si_impedance   → {z0_ohms, zdiff_ohms?}
+//   si_propagation → {td_ps_per_mm, flight_time_ps}
+//   si_crosstalk   → {NEXT, FEXT}
+//   si_report      → combined SI summary
+//   si_ibis_channel_response → {waveform, eye_high_V, eye_low_V}
 //
 // References: IPC-2141A (2004), Wadell 1991 §3.7/4.3, Hall & Heck 2009 §3.
 
 import { useCallback, useState } from 'react'
 import { X, Activity, Zap } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { api } from '../../lib/api.js'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -49,6 +50,18 @@ interface IbisChannelResult {
   eye_low_V?: number
   eye_height_V?: number
   waveform?: unknown[]
+}
+
+interface IbisDeck {
+  models?: Record<string, unknown>[]
+}
+
+// The si_* tools answer with an {ok, result} envelope; on failure `ok` is
+// false and `message` carries the reason.
+interface SIEnvelope<T> {
+  ok?: boolean
+  result?: T
+  message?: string
 }
 
 // ── Numeric field helper ──────────────────────────────────────────────────────
@@ -165,12 +178,7 @@ function SIReportTab() {
     if (aggLen && parseFloat(aggLen) > 0) body.aggressor_parallel_length_mm = parseFloat(aggLen)
 
     try {
-      const res = await fetch('/api/llm-tools/si_report', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const data = await res.json()
+      const data = await api.callTool<SIEnvelope<SIReportResult>>('si_report', body)
       if (data?.ok) {
         setResult(data.result)
       } else {
@@ -306,29 +314,20 @@ function IBISEyeTab() {
 
     try {
       // Step 1: parse IBIS
-      const parseRes = await fetch('/api/llm-tools/si_ibis_parse', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ibs_text: ibsText }),
-      })
-      const parseData = await parseRes.json()
+      const parseData = await api.callTool<IbisDeck & { result?: IbisDeck }>(
+        'si_ibis_parse', { ibs_text: ibsText })
       const deck = parseData?.result ?? parseData
       if (!deck?.models?.length) throw new Error('No models in IBIS file.')
 
       const model = deck.models[0]
 
       // Step 2: channel sim
-      const chanRes = await fetch('/api/llm-tools/si_ibis_channel_response', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          ibis_model_dict: model,
-          z0_ohms:         parseFloat(z0) || 50,
-          length_mm:       parseFloat(length) || 100,
-          bitrate_bps:     parseFloat(bitrate) || 1e9,
-        }),
+      const chanData = await api.callTool<SIEnvelope<IbisChannelResult>>('si_ibis_channel_response', {
+        ibis_model_dict: model,
+        z0_ohms:         parseFloat(z0) || 50,
+        length_mm:       parseFloat(length) || 100,
+        bitrate_bps:     parseFloat(bitrate) || 1e9,
       })
-      const chanData = await chanRes.json()
       if (chanData?.ok) {
         setResult(chanData.result)
       } else {

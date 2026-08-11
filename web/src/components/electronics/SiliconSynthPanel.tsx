@@ -5,9 +5,9 @@
 // installed; the backend returns status="pending" in that case and we show
 // a clear installation guide.
 //
-// Backend contracts:
-//   POST /api/llm-tools/silicon_run_openlane  → {status, gds_path, log_path, returncode, warnings}
-//   POST /api/llm-tools/silicon_yosys_synth   → {ok, cells, area, warnings}  (optional)
+// Backend contracts (via api.callTool → POST /api/tools/call):
+//   silicon_run_openlane  → {status, gds_path, log_path, returncode, warnings}
+//   silicon_yosys_synth   → {ok, cells, area, warnings}  (optional)
 //
 // References:
 //   OpenLane 2: https://openlane2.readthedocs.io
@@ -15,6 +15,7 @@
 
 import { useCallback, useState } from 'react'
 import { X, Cpu, CheckCircle2, XCircle, AlertTriangle, Loader } from 'lucide-react'
+import { api } from '../../lib/api.js'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -28,6 +29,10 @@ interface SynthResult {
   warnings?: string[]
   error?: string
 }
+
+// A tool that returns a plain string comes back wrapped as {result: "..."};
+// everything else is the tool's own JSON. Both shapes are read below.
+type SynthResponse = SynthResult & { result?: SynthResult }
 
 export interface SiliconSynthPanelProps {
   onClose?: () => void
@@ -109,12 +114,7 @@ export default function SiliconSynthPanel({ onClose }: SiliconSynthPanelProps) {
     }
 
     try {
-      const res = await fetch('/api/llm-tools/silicon_run_openlane', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const data = await res.json()
+      const data = await api.callTool<SynthResponse>('silicon_run_openlane', body)
       const r = data?.result ?? data
 
       setResult(r)

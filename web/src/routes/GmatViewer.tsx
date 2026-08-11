@@ -5,34 +5,33 @@
  *
  * Shows a full-page wrapper around GmatTrajectoryViewer with a top bar
  * that holds the Load Mission control and mission metadata.
- * POSTs to /api/llm-tools/aerospace_load_gmat_trajectory when the user
- * clicks "Load Mission".
+ * Calls the aerospace_load_gmat_trajectory tool when the user clicks
+ * "Load Mission".
  */
 
 import { useCallback, useState } from 'react'
 import GmatTrajectoryViewer from '../components/aerospace/GmatTrajectoryViewer.jsx'
+import { api } from '../lib/api.js'
+import type { TrajectoryPoint, MissionEvent } from '../components/aerospace/aerospaceTypes'
+
+interface GmatTrajectoryResult {
+  trajectory?: TrajectoryPoint[]
+  events?: MissionEvent[]
+  mission?: { name?: string; epoch?: string } | null
+}
 
 export default function GmatViewer() {
-  const [trajectory, setTrajectory] = useState(null)   // null → use built-in fixture
-  const [events,     setEvents]     = useState(null)
+  const [trajectory, setTrajectory] = useState<TrajectoryPoint[] | null>(null)   // null → use built-in fixture
+  const [events,     setEvents]     = useState<MissionEvent[] | null>(null)
   const [loading,    setLoading]    = useState(false)
-  const [error,      setError]      = useState(null)
-  const [missionMeta, setMissionMeta] = useState(null)
+  const [error,      setError]      = useState<string | null>(null)
+  const [missionMeta, setMissionMeta] = useState<GmatTrajectoryResult['mission']>(null)
 
   const handleLoadMission = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/llm-tools/aerospace_load_gmat_trajectory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
-      if (!res.ok) {
-        const text = await res.text()
-        throw new Error(`Server error ${res.status}: ${text}`)
-      }
-      const data = await res.json()
+      const data = await api.callTool<GmatTrajectoryResult>('aerospace_load_gmat_trajectory')
       if (data.trajectory && Array.isArray(data.trajectory)) {
         setTrajectory(data.trajectory)
         setEvents(data.events || [])

@@ -17,6 +17,7 @@ import { ArrowLeft, Play, Save, FolderOpen, GitBranch } from 'lucide-react'
 import NodeGraphCanvas   from '../components/nodescript/NodeGraphCanvas.jsx'
 import NodePalette       from '../components/nodescript/NodePalette.jsx'
 import PropertyInspector from '../components/nodescript/PropertyInspector.jsx'
+import { api } from '../lib/api.js'
 import { Graph } from '../components/nodescript/graph_engine.js'
 import { getNodeDef }        from '../components/nodescript/node_library.js'
 import { isNodeError, type GraphResults } from '../components/nodescript/nodescriptTypes'
@@ -80,17 +81,6 @@ export default function NodeScriptPage() {
     setRunning(true)
     setRunError(null)
     try {
-      const api = {
-        async callTool(toolName, params) {
-          const res = await fetch(`/api/llm-tools/${toolName}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(params),
-          })
-          if (!res.ok) throw new Error(`${toolName} → HTTP ${res.status}`)
-          return res.json()
-        },
-      }
       const r = await graph.run(api)
       setResults(r)
       setResultPanelOpen(true)

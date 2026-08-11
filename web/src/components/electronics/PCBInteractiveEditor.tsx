@@ -1,13 +1,13 @@
 // PCBInteractiveEditor.jsx — Interactive PCB canvas with push-shove routing.
 //
 // Wires the Toolbar and Canvas sub-components together.
-// Backend contract:
-//   POST /api/llm-tools/electronics_route_trace           {start_pad, end_pad, layer, width}
-//   POST /api/llm-tools/electronics_delete_object         {id, type}
-//   POST /api/llm-tools/pcb_shove_trace                   {circuit_json, layer, points, clearance_mm}
-//   POST /api/llm-tools/electronics_tune_diff_pair_lengths {path_a, path_b, target_length_mm, …}
-//   GET  /api/llm-tools/pcb_drc                           → {ok, violations:[]}
-//   GET  /api/projects/:id/pcb                            → {pads, traces, keepouts}
+// Backend contract — tools go through api.callTool (POST /api/tools/call):
+//   electronics_route_trace            {start_pad, end_pad, layer, width}
+//   electronics_delete_object          {id, type}
+//   pcb_shove_trace                    {circuit_json, layer, points, clearance_mm}
+//   electronics_tune_diff_pair_lengths {path_a, path_b, target_length_mm, …}
+//   pcb_drc                            → {ok, violations:[]}
+//   GET /api/projects/:id/pcb          → {pads, traces, keepouts}
 //
 // Mock fixture is used when no project_id is provided or the load fails.
 
@@ -24,6 +24,7 @@ import MultiBoardPanel from './MultiBoardPanel.jsx'
 import PCB3DPanel from './PCB3DPanel.jsx'
 import EMCPanel from './EMCPanel.jsx'
 import PCBThermalPanel from './PCBThermalPanel.jsx'
+import { api } from '../../lib/api.js'
 import type { CircuitJson } from '../../types'
 
 // ─── Domain types ─────────────────────────────────────────────────────────────
@@ -47,6 +48,21 @@ type BoardAction =
   | { type: 'UNDO' }
   | { type: 'REDO' }
 
+// pcb_shove_trace answers with the whole board back plus the ids it moved;
+// distances are mm on the wire, mils in the editor.
+interface ShovedTrace {
+  id: string
+  points?: [number, number][]
+  layer: PcbLayer
+  width_mm?: number
+  net_id?: string
+}
+
+interface ShoveResult {
+  circuit_json?: { pcb_board?: { pcb_trace?: ShovedTrace[] } }
+  shoved_traces?: string[]
+}
+
 interface TuneResult {
   error?: string
   _demo?: boolean
@@ -57,6 +73,14 @@ interface TuneResult {
   meanders_b?: number
   skew_mm?: number
   is_skew_within_tolerance?: boolean
+}
+
+// electronics_tune_diff_pair_lengths answers with an {ok, result} envelope;
+// on failure `ok` is false and `message` carries the reason.
+interface TuneEnvelope {
+  ok?: boolean
+  result?: TuneResult
+  message?: string
 }
 
 // ─── Mock fixture ─────────────────────────────────────────────────────────────
@@ -249,11 +273,7 @@ export default function PCBInteractiveEditor() {
 
   useEffect(() => {
     function runDrc() {
-      fetch('/api/llm-tools/pcb_drc', {
-        method: 'GET',
-        headers: { 'content-type': 'application/json' },
-      })
-        .then((r) => (r.ok ? r.json() : null))
+      api.callTool<{ ok?: boolean }>('pcb_drc')
         .then((data) => {
           if (data != null) setDrcOk(data.ok !== false)
         })
@@ -315,42 +335,28 @@ export default function PCBInteractiveEditor() {
     }
 
     try {
-      const res = await fetch('/api/llm-tools/electronics_route_trace', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ start_pad, end_pad, layer: routeLayer, width }),
+      // Result intentionally unused today — electronics_route_trace's answer isn't
+      // consulted before the push-shove call below. Pre-existing, flagging rather than fixing.
+      await api.callTool('electronics_route_trace', { start_pad, end_pad, layer: routeLayer, width })
+      const shoveData = await api.callTool<ShoveResult>('pcb_shove_trace', {
+        circuit_json: circuitJson,
+        layer: routeLayer,
+        points: provisionalTrace.points.map((p) => [p.x, p.y]),
+        clearance_mm: 0.25,
       })
-      if (res.ok) {
-        // Response body intentionally unused today — electronics_route_trace's result isn't
-        // consulted before the push-shove call below. Pre-existing, flagging rather than fixing.
-        await res.json()
-        const shoveRes = await fetch('/api/llm-tools/pcb_shove_trace', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            circuit_json: circuitJson,
-            layer: routeLayer,
-            points: provisionalTrace.points.map((p) => [p.x, p.y]),
-            clearance_mm: 0.25,
-          }),
-        })
-        if (shoveRes.ok) {
-          const shoveData = await shoveRes.json()
-          const updatedTraces = (shoveData.circuit_json?.pcb_board?.pcb_trace ?? [])
-            .filter((t) => shoveData.shoved_traces?.includes(t.id))
-            .map((t) => ({
-              id: t.id,
-              points: (t.points ?? []).map(([x, y]) => ({ x: x / 0.0254, y: y / 0.0254 })),
-              layer: t.layer,
-              width: (t.width_mm ?? 0.25) / 0.0254,
-              net: t.net_id,
-            }))
-          setPushedTraceIds(shoveData.shoved_traces ?? [])
-          setTimeout(() => setPushedTraceIds([]), 1500)
-          dispatch({ type: 'SHOVE_TRACES', updatedTraces, newTrace: provisionalTrace })
-          return
-        }
-      }
+      const updatedTraces = (shoveData.circuit_json?.pcb_board?.pcb_trace ?? [])
+        .filter((t) => shoveData.shoved_traces?.includes(t.id))
+        .map((t) => ({
+          id: t.id,
+          points: (t.points ?? []).map(([x, y]) => ({ x: x / 0.0254, y: y / 0.0254 })),
+          layer: t.layer,
+          width: (t.width_mm ?? 0.25) / 0.0254,
+          net: t.net_id,
+        }))
+      setPushedTraceIds(shoveData.shoved_traces ?? [])
+      setTimeout(() => setPushedTraceIds([]), 1500)
+      dispatch({ type: 'SHOVE_TRACES', updatedTraces, newTrace: provisionalTrace })
+      return
     } catch {
       // backend unavailable — apply provisionally
     }
@@ -372,15 +378,11 @@ export default function PCBInteractiveEditor() {
     }
 
     try {
-      await fetch('/api/llm-tools/pcb_shove_trace', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          circuit_json: { pcb_board: { pcb_trace: [] } },
-          layer: trace.layer,
-          points: movedTrace.points.map((p) => [p.x, p.y]),
-          clearance_mm: 0.25,
-        }),
+      await api.callTool('pcb_shove_trace', {
+        circuit_json: { pcb_board: { pcb_trace: [] } },
+        layer: trace.layer,
+        points: movedTrace.points.map((p) => [p.x, p.y]),
+        clearance_mm: 0.25,
       })
     } catch {
       /* offline-friendly */
@@ -396,11 +398,7 @@ export default function PCBInteractiveEditor() {
     setSelectedId(null)
 
     try {
-      await fetch('/api/llm-tools/electronics_delete_object', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ id, type: objType }),
-      })
+      await api.callTool('electronics_delete_object', { id, type: objType })
     } catch {
       /* offline-friendly */
     }
@@ -441,23 +439,18 @@ export default function PCBInteractiveEditor() {
     setTuneResult(null)
 
     try {
-      const res = await fetch('/api/llm-tools/electronics_tune_diff_pair_lengths', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          path_a,
-          path_b,
-          target_length_mm: target,
-          skew_tolerance_mm: 0.025,
-          pattern: tunePattern,
-          segment_length_mm: 0.5,
-          spacing_mm: 0.3,
-          corner_radius_mm: 0.15,
-        }),
+      const data = await api.callTool<TuneEnvelope>('electronics_tune_diff_pair_lengths', {
+        path_a,
+        path_b,
+        target_length_mm: target,
+        skew_tolerance_mm: 0.025,
+        pattern: tunePattern,
+        segment_length_mm: 0.5,
+        spacing_mm: 0.3,
+        corner_radius_mm: 0.15,
       })
-      const data = await res.json()
       if (data?.ok) {
-        setTuneResult(data.result)
+        setTuneResult(data.result ?? null)
       } else {
         setTuneResult({ error: data?.message ?? 'Tuner backend error.' })
       }
@@ -465,7 +458,7 @@ export default function PCBInteractiveEditor() {
       // Backend unavailable in demo mode — show mock result
       setTuneResult({
         _demo: true,
-        message: 'Backend offline — demo mode. In production this posts to /api/llm-tools/electronics_tune_diff_pair_lengths.',
+        message: 'Backend offline — demo mode. In production this calls the electronics_tune_diff_pair_lengths tool.',
       })
     } finally {
       setTuneLoading(false)

@@ -6,16 +6,17 @@
  *   2. Registration Marks — auto-place 4 corner marks
  *   3. PDF/X-1a Export  — generate minimal ISO 15930-1 skeleton
  *
- * Tools:
- *   POST /api/llm-tools/packaging_prepress_check
- *   POST /api/llm-tools/packaging_prepress_gen_marks
- *   POST /api/llm-tools/packaging_prepress_export_pdf_x1a
+ * Tools (via api.callTool → POST /api/tools/call):
+ *   packaging_prepress_check
+ *   packaging_prepress_gen_marks
+ *   packaging_prepress_export_pdf_x1a
  *
  * References: ISO 15930-1:2001 (PDF/X-1a), ISO 12647-2:2013, GRACoL 2013.
  */
 
 import { useState, useCallback } from 'react'
 import { CheckCircle, XCircle, AlertTriangle, RefreshCw, Download } from 'lucide-react'
+import { api } from '../../lib/api.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -197,18 +198,6 @@ export default function PackagingPrePressPanel({ className = '' }: Props) {
   const [marksResult, setMarksResult] = useState<MarksResult | null>(null)
   const [exportResult, setExportResult] = useState<ExportResult | null>(null)
 
-  // --- Helpers ---
-
-  const callTool = useCallback(async <T,>(toolName: string, body: Record<string, unknown>): Promise<T> => {
-    const res = await fetch(`/api/llm-tools/${toolName}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return res.json()
-  }, [])
-
   // --- Check tab ---
 
   const handleCheck = useCallback(async () => {
@@ -216,7 +205,7 @@ export default function PackagingPrePressPanel({ className = '' }: Props) {
     setError(null)
     setCheckResult(null)
     try {
-      const result = await callTool<CheckResult>('packaging_prepress_check', {
+      const result = await api.callTool<CheckResult>('packaging_prepress_check', {
         trim_box:            trimBox,
         bleed_mm:            bleedMm,
         safety_zone_mm:      safetyMm,
@@ -250,7 +239,7 @@ export default function PackagingPrePressPanel({ className = '' }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [trimBox, bleedMm, safetyMm, finishing, artworkBbox, callTool])
+  }, [trimBox, bleedMm, safetyMm, finishing, artworkBbox])
 
   // --- Marks tab ---
 
@@ -259,7 +248,7 @@ export default function PackagingPrePressPanel({ className = '' }: Props) {
     setError(null)
     setMarksResult(null)
     try {
-      const result = await callTool<MarksResult>('packaging_prepress_gen_marks', {
+      const result = await api.callTool<MarksResult>('packaging_prepress_gen_marks', {
         trim_box: trimBox,
         bleed_mm: bleedMm,
         kind:     'corner_bracket',
@@ -283,7 +272,7 @@ export default function PackagingPrePressPanel({ className = '' }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [trimBox, bleedMm, callTool])
+  }, [trimBox, bleedMm])
 
   // --- Export tab ---
 
@@ -292,7 +281,7 @@ export default function PackagingPrePressPanel({ className = '' }: Props) {
     setError(null)
     setExportResult(null)
     try {
-      const result = await callTool<ExportResult>('packaging_prepress_export_pdf_x1a', {
+      const result = await api.callTool<ExportResult>('packaging_prepress_export_pdf_x1a', {
         trim_box:   trimBox,
         bleed_mm:   bleedMm,
         finishing,
@@ -311,7 +300,7 @@ export default function PackagingPrePressPanel({ className = '' }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [trimBox, bleedMm, finishing, callTool])
+  }, [trimBox, bleedMm, finishing])
 
   const TABS = [
     { id: 'check',  label: 'Pre-Press Check' },

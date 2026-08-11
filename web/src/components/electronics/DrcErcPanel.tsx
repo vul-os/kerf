@@ -2,9 +2,9 @@
 //
 // Displays violation list returned by the backend run_pcb_drc and run_erc tools.
 // Shows coloured markers (error = red, warning = yellow) and a summary badge.
-// Backend contracts:
-//   POST /api/llm-tools/run_pcb_drc  {circuit_json: [...]}  → {violations, error_count, warning_count}
-//   POST /api/llm-tools/run_erc      {circuit_json: [...]}  → {errors: [...], warnings: [...]}
+// Backend contracts (via api.callTool → POST /api/tools/call):
+//   run_pcb_drc  {circuit_json: [...]}  → {violations, error_count, warning_count}
+//   run_erc      {circuit_json: [...]}  → {errors: [...], warnings: [...]}
 //
 // Props:
 //   circuitJson      — array of CircuitJSON elements (board + schematic)
@@ -13,6 +13,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, XCircle, CheckCircle2, X, RefreshCw } from 'lucide-react'
+import { api } from '../../lib/api.js'
 import type { CircuitJson } from '../../types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -43,6 +44,11 @@ interface ErcResult {
   errors?: ErcItem[]
   warnings?: ErcItem[]
 }
+
+// A tool that returns a plain string comes back wrapped as {result: "..."};
+// everything else is the tool's own JSON. Both shapes are read below.
+type DrcResponse = DrcResult & { result?: DrcResult }
+type ErcResponse = ErcResult & { result?: ErcResult }
 
 export interface MarkerClickEvent {
   x?: number
@@ -127,6 +133,9 @@ export default function DrcErcPanel({ circuitJson, onClose, onMarkerClick }: Drc
   const abortRef = useRef<AbortController | null>(null)
 
   const runChecks = useCallback(async () => {
+    // api.callTool owns its own timeout signal, so the controller is only a
+    // staleness marker here: a superseded run still resolves, but its result
+    // is dropped rather than overwriting the newer one.
     if (abortRef.current) abortRef.current.abort()
     const ac = new AbortController()
     abortRef.current = ac
@@ -138,18 +147,8 @@ export default function DrcErcPanel({ circuitJson, onClose, onMarkerClick }: Drc
 
     try {
       const [drcRes, ercRes] = await Promise.allSettled([
-        fetch('/api/llm-tools/run_pcb_drc', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ circuit_json: board }),
-          signal: ac.signal,
-        }).then((r) => r.json()),
-        fetch('/api/llm-tools/run_erc', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ circuit_json: board }),
-          signal: ac.signal,
-        }).then((r) => r.json()),
+        api.callTool<DrcResponse>('run_pcb_drc', { circuit_json: board }),
+        api.callTool<ErcResponse>('run_erc', { circuit_json: board }),
       ])
 
       if (!ac.signal.aborted) {

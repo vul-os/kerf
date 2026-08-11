@@ -31,21 +31,31 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const SRC = resolve(__dirname, '..')
 
 /**
- * Panels still calling the dead URL, pending a per-panel migration to
- * `api.callTool`. Every one of these is a control that does nothing.
+ * Tool names these panels call that the backend registry does not define.
  *
- * Do not add to this list. Remove from it.
+ * The URL migration is done — every call goes through api.callTool now — but
+ * six controls still do nothing, for a different reason: the tool they name has
+ * no ToolSpec anywhere under packages/. They used to 404 on the route; they now
+ * 404 as `unknown tool: <name>` from /api/tools/call. Same dead button, one
+ * layer deeper.
+ *
+ * Recorded rather than deleted, because "no panel calls the dead URL" and
+ * "every panel works" are different claims and only the first is true.
+ *
+ * `pcb_drc` is the interesting one: `run_pcb_drc` exists and does the job, but
+ * the panel calls `pcb_drc` with no arguments as a liveness probe and
+ * run_pcb_drc requires circuit_json — so it is a rename plus a rethink.
  */
-const KNOWN_BROKEN = new Set([
-  'components/electronics/DrcErcPanel.tsx',
-  'components/electronics/PCBInteractiveEditor.tsx',
-  'components/electronics/SIPanel.tsx',
-  'components/electronics/SiliconSynthPanel.tsx',
-  'components/electronics/VirtualInstrumentBench.tsx',
-  'components/packaging/PackagingPrePressPanel.tsx',
-  'routes/GmatViewer.tsx',
-  'routes/NodeScript.tsx',
-])
+const TOOLS_THE_BACKEND_DOES_NOT_HAVE = [
+  'pcb_drc',
+  'electronics_route_trace',
+  'pcb_shove_trace',
+  'electronics_delete_object',
+  'aerospace_load_gmat_trajectory',
+] as const
+
+/** Files that may still call the dead URL. Nothing may. */
+const KNOWN_BROKEN = new Set<string>([])
 
 function sourceFiles(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -87,6 +97,19 @@ describe('tool dispatch', () => {
     const stale = [...KNOWN_BROKEN].filter((f) => !stillBroken.has(f))
 
     expect(stale, 'these are fixed — delete them from KNOWN_BROKEN').toEqual([])
+  })
+
+  it('records the panels whose tool does not exist in the backend', () => {
+    // Not a pass/fail on the panels — a check that this list still describes
+    // reality. Add one of these tools and this fails so the entry can go; stop
+    // calling one and likewise. The list cannot quietly become fiction, which
+    // is what happened when the URL allow-list was emptied on the grounds that
+    // the migration was complete.
+    const src = FILES.map((f) => readFileSync(f, 'utf8')).join('\n')
+    const stillCalled = TOOLS_THE_BACKEND_DOES_NOT_HAVE.filter((t) =>
+      src.includes(`callTool('${t}'`) || src.includes(`callTool<`) && src.includes(`>('${t}'`),
+    )
+    expect(stillCalled).toEqual([...TOOLS_THE_BACKEND_DOES_NOT_HAVE])
   })
 
   it('api.callTool is the documented path, and it carries auth', () => {

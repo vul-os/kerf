@@ -9,9 +9,9 @@
 //     offset/duty) that drives a transient sim; emits SPICE source line.
 //   Probes       — per-node V/I overlay via eda_probe_nodes.
 //
-// Backend:
-//   POST /api/llm-tools/eda_virtual_instrument
-//   POST /api/llm-tools/eda_probe_nodes
+// Backend (via api.callTool → POST /api/tools/call):
+//   eda_virtual_instrument
+//   eda_probe_nodes
 //
 // All instruments show demo-mode data when the backend is offline.
 // References: Tektronix TDS2000 operator's manual (scope), IEC 60469 §4 (AC RMS).
@@ -19,16 +19,13 @@
 import type { ComponentType, ReactNode } from 'react'
 import { useCallback, useState } from 'react'
 import { X, Activity, Radio, Zap, Crosshair } from 'lucide-react'
-
-const API_URL = typeof import.meta !== 'undefined'
-  ? (import.meta.env?.VITE_API_URL || '')
-  : ''
+import { api } from '../../lib/api.js'
 
 // ── Types ─────────────────────────────────────────────────────────────────
-// The virtual instrument bench is a thin client over POST /api/llm-tools/
-// eda_virtual_instrument + eda_probe_nodes; there's no shared type for these
-// payload shapes yet, so they're declared locally from the route's response
-// contract (mirrored in the DEMO_* fallbacks below).
+// The virtual instrument bench is a thin client over the eda_virtual_instrument
+// + eda_probe_nodes tools; there's no shared type for these payload shapes yet,
+// so they're declared locally from the tools' response contract (mirrored in
+// the DEMO_* fallbacks below).
 
 interface OscopeChannel {
   channel: string
@@ -266,16 +263,6 @@ function fmtSI(v: number | null | undefined, unit: string): string {
   return `${(v * 1e9).toPrecision(4)} n${unit}`
 }
 
-async function callTool<T>(toolName: string, payload: Record<string, unknown>): Promise<T> {
-  const res = await fetch(`${API_URL}/api/llm-tools/${toolName}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-  if (!res.ok) throw new Error(`${toolName} HTTP ${res.status}`)
-  return res.json()
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Oscilloscope tab
 // ─────────────────────────────────────────────────────────────────────────────
@@ -292,7 +279,7 @@ function OscopeTab({ waveforms }: { waveforms?: unknown[] }) {
     setErr(null)
     try {
       const chList = channels.split(',').map((c) => c.trim()).filter(Boolean)
-      const data = await callTool<OscopeResult>('eda_virtual_instrument', {
+      const data = await api.callTool<OscopeResult>('eda_virtual_instrument', {
         instrument: 'oscilloscope',
         waveforms: waveforms || [],
         channels: chList,
@@ -392,7 +379,7 @@ function MultimeterTab({ waveforms }: { waveforms?: unknown[] }) {
   const run = useCallback(async () => {
     setBusy(true)
     try {
-      const data = await callTool<MultimeterResult>('eda_virtual_instrument', {
+      const data = await api.callTool<MultimeterResult>('eda_virtual_instrument', {
         instrument: 'multimeter',
         waveforms: waveforms || [],
         node,
@@ -485,7 +472,7 @@ function FunctionGenTab() {
   const generate = useCallback(async () => {
     setBusy(true)
     try {
-      const data = await callTool<FGenResult>('eda_virtual_instrument', {
+      const data = await api.callTool<FGenResult>('eda_virtual_instrument', {
         instrument: 'function_generator',
         waveform,
         freq_hz: Number(freqHz),
@@ -595,7 +582,7 @@ function ProbesTab({ waveforms }: { waveforms?: unknown[] }) {
         nodes,
       }
       if (atTime !== '') payload.at_time = Number(atTime)
-      const data = await callTool<ProbesResult>('eda_probe_nodes', payload)
+      const data = await api.callTool<ProbesResult>('eda_probe_nodes', payload)
       setResult(data)
       setDemoMode(false)
     } catch {

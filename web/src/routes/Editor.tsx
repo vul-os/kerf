@@ -1,7 +1,8 @@
 import * as THREE from 'three'
+import TerminalPanel from '../components/TerminalPanel.jsx'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Share2, Save, Loader2, ArrowLeft, Check, X, RotateCcw, Undo2, Redo2, GitBranch, MessageSquare, PanelRightClose, PanelRightOpen, PanelLeftOpen, Plus, Box, SlidersHorizontal, ChevronDown, ArrowRight, RotateCw, Activity as ActivityIcon, FileDown, LogOut, UserCog, Settings, Users } from 'lucide-react'
+import { TerminalSquare, Share2, Save, Loader2, ArrowLeft, Check, X, RotateCcw, Undo2, Redo2, GitBranch, MessageSquare, PanelRightClose, PanelRightOpen, PanelLeftOpen, Plus, Box, SlidersHorizontal, ChevronDown, ArrowRight, RotateCw, Activity as ActivityIcon, FileDown, LogOut, UserCog, Settings, Users } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { LogoWordmark } from '../components/Logo.jsx'
 import FileTree from '../components/FileTree.jsx'
@@ -3090,6 +3091,21 @@ export default function Editor() {
             >
               <ActivityIcon size={12} /> Activity
             </button>
+            {/* The terminal renders its own "not available here" state from
+                the server's reason, so the tab is present unconditionally —
+                hiding it would leave someone wondering whether Kerf has one. */}
+            <button
+              type="button"
+              data-testid="right-drawer-tab-terminal"
+              onClick={() => setRightDrawerTab('terminal')}
+              className={`flex items-center gap-1.5 px-4 h-10 text-[11px] uppercase tracking-wider font-medium border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-kerf-300/70 ${
+                rightDrawer.tab === 'terminal'
+                  ? 'border-kerf-300 text-kerf-300'
+                  : 'border-transparent text-ink-400 hover:text-ink-200'
+              }`}
+            >
+              <TerminalSquare size={12} /> Terminal
+            </button>
             {/* Git panel is a core MIT node capability (local git only, no
                 OAuth), present unconditionally. */}
             <button
@@ -3152,6 +3168,11 @@ export default function Editor() {
             {rightDrawer.tab === 'activity' && projectId && (
               <ActivityTimelineBody projectId={projectId} />
             )}
+            {/* Mounted only while its tab is active: an xterm instance owns a
+                canvas and a WebSocket, and keeping one alive behind a hidden
+                tab costs both. The shell survives regardless — the session
+                lives server-side and re-attaches with its scrollback. */}
+            {rightDrawer.tab === 'terminal' && <TerminalPanel />}
             {rightDrawer.tab === 'git' && projectId && (
               <GitPanel
                 projectId={projectId}

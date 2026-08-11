@@ -379,7 +379,7 @@ export interface MaterialMenuEntry {
   color: string | null
 }
 
-export type RightDrawerTab = 'chat' | 'activity' | 'git' | 'history' | 'fea'
+export type RightDrawerTab = 'chat' | 'activity' | 'git' | 'history' | 'fea' | 'terminal'
 
 /** File-kind discriminant this store's editor pipeline routes on (fileKindFor()). */
 export type EditorFileKind =

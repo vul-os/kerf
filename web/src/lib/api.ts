@@ -337,6 +337,16 @@ export const api = {
       method: 'POST', body: { password }, auth: false,
     }),
 
+  // ---- Terminal ----
+  // Asked before a terminal is offered at all: whether one is allowed here is
+  // the server's decision (it knows its own listen address), and `reason` is
+  // written to be shown to a person verbatim.
+  terminalCapability: () =>
+    request<{
+      available: boolean; reason: string; platform: string
+      sandboxed: boolean; sessions: string[]
+    }>('/api/terminal/capability'),
+
   // ---- Settings: LLM provider keys + usage ----
   // Keys live per-user in the database rather than in config, so they can be
   // changed from the UI without editing a file and restarting. The server

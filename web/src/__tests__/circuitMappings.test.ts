@@ -262,13 +262,16 @@ describe('substituteComponentGeometry', () => {
     }))
     const content = JSON.stringify({ model_3d: '/api/blobs/uid/sha.step' })
     const result = await substituteComponentGeometry(content, fetchStep)
-    // If loadStep mock was picked up, we get a step result; if not the
-    // dynamic import falls back (ESM module cache in vitest). Either way
-    // the function must not throw and must return null or a valid result.
-    if (result !== null) {
-      expect(result.kind).toBe('step')
-      expect(Array.isArray(result.parts)).toBe(true)
-    }
+    // Asserted, not hedged. This was `if (result !== null) { ... }`, with a
+    // note that the loadStep mock might not be picked up because of vitest's
+    // ESM module cache — which meant the test named after returning a step
+    // result would pass just as happily when it returned null. Probing it
+    // across single-file and directory-wide runs, the mock is picked up every
+    // time. If that ever stops being true this fails with the reason attached,
+    // which is worth more than passing silently.
+    expect(result, 'loadStep mock was not picked up — see the note above').not.toBeNull()
+    expect(result.kind).toBe('step')
+    expect(Array.isArray(result.parts)).toBe(true)
     vi.doUnmock('../lib/stepLoader.js')
   })
 
@@ -283,9 +286,8 @@ describe('substituteComponentGeometry', () => {
     }))
     const content = JSON.stringify({ model_3d_paths: ['Packages/R.step'] })
     const result = await substituteComponentGeometry(content, fetchStep)
-    if (result !== null) {
-      expect(result.kind).toBe('step')
-    }
+    expect(result, 'loadStep mock was not picked up — see the note above').not.toBeNull()
+    expect(result.kind).toBe('step')
     vi.doUnmock('../lib/stepLoader.js')
   })
 

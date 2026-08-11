@@ -201,13 +201,19 @@ describe('CompareFeatureMatrix', () => {
       html.match(/domain-section-D7"[\s\S]*/)?.[0],
     ].filter(Boolean)
     expect(domainSections.length).toBeGreaterThan(0)
+    let ordered = 0
     domainSections.forEach((section) => {
       const kerfIdx = section.indexOf('data-testid="matrix-kerf-header"')
       const compIdx = section.indexOf('>SolidWorks<')
       if (kerfIdx !== -1 && compIdx !== -1) {
         expect(kerfIdx).toBeLessThan(compIdx)
+        ordered += 1
       }
     })
+    // A section that stopped rendering either header would skip the ordering
+    // check entirely, and a matrix rendering neither would pass this test
+    // while showing nothing at all.
+    expect(ordered).toBeGreaterThan(0)
   })
 })
 

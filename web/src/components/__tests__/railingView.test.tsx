@@ -122,10 +122,13 @@ describe('computeBalusterPositions', () => {
 
   it('does not include start or end points', () => {
     const bals = computeBalusterPositions(longPath, 120)
-    if (bals.length > 0) {
-      expect(bals[0].x).toBeGreaterThan(0)
-      expect(bals[bals.length - 1].x).toBeLessThan(6000)
-    }
+    // The endpoint checks used to sit behind `if (bals.length > 0)`, so a
+    // regression that returned no balusters at all would have passed this
+    // test — the one case where "does not include the endpoints" is trivially
+    // and uselessly true.
+    expect(bals.length).toBeGreaterThan(0)
+    expect(bals[0].x).toBeGreaterThan(0)
+    expect(bals[bals.length - 1].x).toBeLessThan(6000)
   })
 
   it('returns more balusters for smaller spacing', () => {

@@ -150,13 +150,19 @@ describe('groupByCategory', () => {
     // Check that the order is a subsequence of COMPARE_CATEGORIES order
     const catOrder = COMPARE_CATEGORIES.map((c) => c.id)
     let lastIdx = -1
+    let compared = 0
     groupIds.forEach((id) => {
       const idx = catOrder.indexOf(id)
       if (idx !== -1) {
         expect(idx).toBeGreaterThan(lastIdx)
         lastIdx = idx
+        compared += 1
       }
     })
+    // Without this the loop asserts nothing whenever no group id appears in
+    // catOrder — which is exactly what a broken grouping would produce, and
+    // is indistinguishable from "the order was fine".
+    expect(compared).toBeGreaterThan(1)
   })
 
   it('empty input returns empty array', () => {

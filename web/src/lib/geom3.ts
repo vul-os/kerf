@@ -53,7 +53,13 @@ export function geom3ToBufferGeometry(geom: Geom3 | null | undefined): THREE.Buf
 // Used by the assembly pipeline to bake per-component transforms into the
 // flattened parts list before handing it to the renderer.
 export function applyMatrixToGeom(
-  geom: Geom3 | THREE.BufferGeometry | null | undefined,
+  // `unknown`, not `Geom3 | BufferGeometry`: this function discriminates on
+  // the value at runtime (the isBufferGeometry brand below) and returns null
+  // for anything it does not recognise, so a narrower parameter type would
+  // claim a guarantee the body deliberately does not require. Callers hold
+  // geometry that came from a worker, a loader or a caller-supplied callback,
+  // where the static type is honestly unknown.
+  geom: unknown,
   matrix4?: THREE.Matrix4 | null,
 ): THREE.BufferGeometry | null {
   if (!geom) return null

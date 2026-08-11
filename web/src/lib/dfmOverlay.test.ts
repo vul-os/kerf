@@ -289,8 +289,10 @@ describe('refreshDfm', () => {
   it('severity colour applied — error marker uses error colour', () => {
     const scene = makeScene()
     attachDfmOverlay(scene, makeCamera(), makeRenderer(), [makeIssue({ severity: 'error' })])
-    const marker = scene.children[0]
-    expect(marker.material.color).toBe(severityColor('error'))
+    // children[] is Object3D; the overlay adds meshes.
+    const marker = scene.children[0] as THREE.Mesh
+    expect((marker.material as THREE.MeshBasicMaterial).color)
+      .toBe(severityColor('error'))
   })
 })
 

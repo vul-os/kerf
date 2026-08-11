@@ -119,7 +119,7 @@ describe('createZebraMaterial', () => {
     const mat = createZebraMaterial()
     expect(typeof mat.dispose).toBe('function')
     mat.dispose()
-    expect(mat._disposed).toBe(true)
+    expect(((mat as unknown as { _disposed?: boolean })._disposed)).toBe(true)
   })
 
   it('fragment shader references stripeCount and stripeAxis uniforms', () => {

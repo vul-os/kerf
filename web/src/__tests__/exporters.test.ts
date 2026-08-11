@@ -2,6 +2,7 @@
 // the FORMATS table, and the JSCAD-JSON serialiser. We deliberately avoid the
 // THREE.js exporter paths (STL/OBJ/PLY/GLTF/3MF) since those need a configured
 // renderer and are integration-tested in the running app.
+import * as doubles from '../test-support/threeDoubles.js'
 import { describe, it, expect } from 'vitest'
 import { FORMATS, sanitizeFilename, exportParts, downloadBlob } from '../lib/exporters.js'
 
@@ -54,7 +55,7 @@ describe('exportParts (JSCAD JSON path)', () => {
   const triPart = {
     id: 'tri',
     color: 0xff0000,
-    geom: { polygons: [{ vertices: [[0, 0, 0], [1, 0, 0], [0, 1, 0]] }] },
+    geom: doubles.geom3([{ vertices: [[0, 0, 0], [1, 0, 0], [0, 1, 0]] }]),
   }
 
   it('throws Unknown export format for an unknown id', async () => {
@@ -89,7 +90,7 @@ describe('exportParts (JSCAD JSON path)', () => {
   })
 
   it('refuses to JSCAD-serialise a non-Geom3 (BufferGeometry-only) part', async () => {
-    const stepPart = { id: 'step', geom: { isBufferGeometry: true } }
+    const stepPart = { id: 'step', geom: doubles.bufferGeometry() }
     await expect(exportParts([stepPart], 'jscad-json')).rejects.toThrow(/not a JSCAD Geom3/)
   })
 })

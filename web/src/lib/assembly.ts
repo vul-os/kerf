@@ -724,8 +724,10 @@ export const radToDeg = (r: number): number => Number(r) / DEG
  * returned parts. The real element type (e.g. `RenderablePart`) is owned by
  * the consumer (`src/store`), which `src/lib` must not import from — same
  * generic-over-the-consumer's-type pattern as T-502's `meshCache.get<T>`.
- * `geom` is left `unknown` here and passed straight through to
- * `applyMatrixToGeom`, which accepts any JSCAD Geom3 or Three.BufferGeometry.
+ * `geom` stays `unknown` and is passed straight to `applyMatrixToGeom`, which
+ * discriminates on the value and returns null for anything it does not
+ * recognise. Naming a narrower type here would be a claim about a value this
+ * module receives from a caller-supplied loader and never inspects.
  */
 export interface AssemblyLoadedPart {
   id: string

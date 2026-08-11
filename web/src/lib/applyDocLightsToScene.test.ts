@@ -136,8 +136,8 @@ describe('applyDocLightsToScene', () => {
     applyDocLightsToScene(scene, docLights, { target: [0, 0, 0], prevHandles: [prev1, prev2] })
 
     // Both prev lights must have been disposed.
-    expect(prev1._disposed).toBe(true)
-    expect(prev2._disposed).toBe(true)
+    expect(((prev1 as unknown as { _disposed?: boolean })._disposed)).toBe(true)
+    expect(((prev2 as unknown as { _disposed?: boolean })._disposed)).toBe(true)
 
     // remove() must have been called twice (for the two prev handles).
     expect(removeOrder).toHaveLength(2)
@@ -274,7 +274,7 @@ describe('applyDocLightsToScene', () => {
 
     // Second call should dispose the first batch.
     const second = applyDocLightsToScene(scene, [], { target: [0, 0, 0], prevHandles: first })
-    expect(first[0]._disposed).toBe(true)
+    expect(((first[0] as unknown as { _disposed?: boolean })._disposed)).toBe(true)
     expect(second).toHaveLength(0)
   })
 })

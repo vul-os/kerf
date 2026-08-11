@@ -13,6 +13,7 @@
  *   - selectLOD: 'full' when large angular size + below count threshold
  */
 
+import type * as THREE from 'three'
 import { describe, it, expect, vi } from 'vitest'
 
 // ---------------------------------------------------------------------------
@@ -168,6 +169,7 @@ const {
   return { MockVector3, MockSphere, MockBox3, MockMatrix4, MockFrustum, MockBufferAttribute, MockBufferGeometry }
 })
 
+
 vi.mock('three', () => ({
   Vector3:         MockVector3,
   Sphere:          MockSphere,
@@ -181,11 +183,34 @@ vi.mock('three', () => ({
 // Import AFTER mock registration.
 import {
   decimateBufferGeometry,
-  buildLODProxy,
-  angularSize,
-  selectLOD,
+  buildLODProxy as buildLODProxyTyped,
+  angularSize as angularSizeTyped,
+  selectLOD as selectLODTyped,
   LOD_THRESHOLD_COUNT,
 } from './lod.js'
+
+// This file replaces `three` with the hand-written Mock* classes above: lod.ts
+// reads a handful of fields off a geometry, a box and a camera, and a real
+// three object would pull in a GPU-bound module graph for no added coverage.
+// The mocks are genuinely not three's types, so the seam is cast — once, at
+// the three functions that take them, rather than at every value handed in.
+// Re-cast here and the call sites below stay readable and mock-typed.
+// The Mock* classes come out of vi.hoisted, so they are values here rather
+// than declared types — InstanceType<typeof X> names the instance shape.
+type MockGeometry = InstanceType<typeof MockBufferGeometry>
+type MockBox = InstanceType<typeof MockBox3>
+type MockVec3 = InstanceType<typeof MockVector3>
+
+// decimateBufferGeometry takes typed arrays, not three objects, so it needs no
+// seam. Only the parameters are loosened below; each return type is the real
+// one, so the assertions still check the shape lod.ts actually produces.
+const buildLODProxy = buildLODProxyTyped as unknown as
+  (geometry: MockGeometry, ratio?: number) => ReturnType<typeof buildLODProxyTyped>
+const angularSize = angularSizeTyped as unknown as
+  (box: MockBox, camera: { position: MockVec3 }) => number
+const selectLOD = selectLODTyped as unknown as
+  (box: MockBox, camera: { position: MockVec3 },
+   opts: Parameters<typeof selectLODTyped>[2]) => ReturnType<typeof selectLODTyped>
 
 // ---------------------------------------------------------------------------
 // Test mesh builder — icosphere subdivisions=2 → 320 tris

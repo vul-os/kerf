@@ -23,6 +23,7 @@
 import { useEffect, useRef } from 'react'
 import type { RefObject } from 'react'
 import * as THREE from 'three'
+import { disposeObject } from '../lib/threeNarrow.js'
 import { buildCloudMesh, CLOUD_DEFAULTS } from '../lib/clouds.js'
 
 /**
@@ -77,13 +78,10 @@ export default function CloudLayer({ kind = 'scattered', density, opacity, scene
       if (meshRef.current && typeof scene.remove === 'function') {
         scene.remove(meshRef.current)
       }
-      // Dispose geometry + material to avoid GPU leaks.
-      if (meshRef.current?.geometry?.dispose) {
-        meshRef.current.geometry.dispose()
-      }
-      if (meshRef.current?.material?.dispose) {
-        meshRef.current.material.dispose()
-      }
+      // Dispose geometry + material to avoid GPU leaks. disposeObject handles
+      // the material-array case, which the previous `?.dispose &&` guard
+      // silently skipped — leaking every material on a multi-material mesh.
+      disposeObject(meshRef.current)
       meshRef.current = null
     }
   }, [kind, density, opacity, sceneRef])

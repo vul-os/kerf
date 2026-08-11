@@ -92,8 +92,21 @@ export function LightGizmos({ lights = [], groupRef, onSelect: _onSelect }: Ligh
  * @param onSelect    - Callback (id: string) => void.
  * @returns True if a gizmo was hit.
  */
+/**
+ * The slice of THREE.Raycaster hitTestGizmoGroup needs.
+ *
+ * The hit type is `{ object }` rather than THREE.Intersection because that is
+ * all the function reads — it walks up from the hit object looking for a
+ * lightId and never touches point, distance, face or uv. Demanding a full
+ * Intersection would oblige every caller and every test to fabricate five
+ * fields nothing looks at, which is how a port stops describing its own
+ * requirements. A real Raycaster still satisfies this.
+ */
 export interface GizmoRaycaster {
-  intersectObjects(objects: THREE.Object3D[], recursive?: boolean): THREE.Intersection[];
+  intersectObjects(
+    objects: THREE.Object3D[],
+    recursive?: boolean,
+  ): { object: THREE.Object3D }[];
 }
 
 // Pre-existing: this file exports a non-component utility alongside the LightGizmos component,

@@ -109,7 +109,9 @@ describe('createProceduralSky', () => {
   it('returns a sky object and a sunPosition Vector3', () => {
     const { sky, sunPosition } = createProceduralSky()
     expect(sky).toBeDefined()
-    expect(sky.isSky).toBe(true)
+    // `isSky` is the runtime brand the Sky addon sets; its published types do
+    // not declare it.
+    expect((sky as unknown as { isSky?: boolean }).isSky).toBe(true)
     expect(sunPosition).toBeInstanceOf(Vector3Stub)
   })
 

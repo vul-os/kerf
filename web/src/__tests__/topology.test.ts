@@ -16,6 +16,7 @@
 // implicitly elsewhere; what we want to lock in here is the pure plane-key
 // clustering / edge-classification logic.
 
+import * as doubles from '../test-support/threeDoubles.js'
 import { describe, it, expect } from 'vitest'
 import {
   getTopology,
@@ -26,10 +27,10 @@ import {
 
 // -- helpers ---------------------------------------------------------------
 
-// Build a Geom3-shaped object with one polygon per `verts` entry.
-function makeGeom(polys) {
-  return { polygons: polys.map((vertices) => ({ vertices })) }
-}
+// Build a Geom3 with one polygon per `verts` entry. Via the shared factory so
+// the result carries `transforms` — a bare {polygons} literal is not a Geom3,
+// it is one that throws the first time anything transforms it.
+const makeGeom = (polys: number[][][]) => doubles.geom3FromTriangles(polys)
 
 // Unit cube centred at the origin. Six quad faces, axis-aligned. We use this
 // as the canonical "real solid" — it should yield 6 face clusters, 12 edges,

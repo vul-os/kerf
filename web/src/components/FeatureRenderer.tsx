@@ -41,6 +41,7 @@
 
 import { useEffect, useImperativeHandle, useRef, useState, forwardRef } from 'react'
 import * as THREE from 'three'
+import { disposeObject } from '../lib/threeNarrow.js'
 import { MonitorX } from 'lucide-react'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
@@ -319,8 +320,9 @@ const FeatureRenderer = forwardRef<FeatureRendererHandle, FeatureRendererProps>(
       while (ghostGroup.children.length) {
         const m = ghostGroup.children[0]
         ghostGroup.remove(m)
-        m.geometry?.dispose?.()
-        m.material?.dispose?.()
+        // children[] is Object3D, which declares neither geometry nor
+        // material; disposeObject narrows and handles the material-array case.
+        disposeObject(m)
       }
       stateRef.current.drag = null
       if (Math.abs(drag.distance) > 0.05) {
@@ -566,10 +568,12 @@ const FeatureRenderer = forwardRef<FeatureRendererHandle, FeatureRendererProps>(
           color: jewelryParams.color,
           transmission: jewelryParams.transmission,
           ior: jewelryParams.ior,
-          // Inert on three r160 — `dispersion` landed in r166. Kept so the gem
-          // params stay complete and it starts working on upgrade, but gems do
-          // NOT currently render dispersion however this is set.
-          dispersion: jewelryParams.dispersion ?? 0,
+          // Inert on three r160 — `dispersion` landed in r166, so it is absent
+          // from MeshPhysicalMaterialParameters and @types/three rejects it.
+          // Kept (behind the cast) so the gem params stay complete and it
+          // starts working on upgrade; gems do NOT currently render dispersion
+          // however this is set. Delete the cast when three moves past r166.
+          ...({ dispersion: jewelryParams.dispersion ?? 0 } as object),
           roughness: jewelryParams.roughness,
           thickness: jewelryParams.thickness,
           attenuationColor: new THREE.Color(jewelryParams.attenuationColor),

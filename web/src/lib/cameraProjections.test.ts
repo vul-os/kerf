@@ -94,6 +94,7 @@ import {
   fovToFocal,
   createCamera,
   swapCameraProjection,
+  cameraOf,
 } from './cameraProjections.js'
 
 // ── CAMERA_PROJECTIONS ────────────────────────────────────────────────────────
@@ -203,7 +204,7 @@ describe('createCamera', () => {
 
     it('is not wrapped in a tuple', () => {
       const result = createCamera('perspective')
-      expect(result.camera).toBeUndefined()
+      expect((result as { camera?: unknown }).camera).toBeUndefined()
     })
   })
 
@@ -221,7 +222,7 @@ describe('createCamera', () => {
 
     it('is not wrapped in a tuple', () => {
       const result = createCamera('orthographic')
-      expect(result.camera).toBeUndefined()
+      expect((result as { camera?: unknown }).camera).toBeUndefined()
     })
   })
 
@@ -238,7 +239,7 @@ describe('createCamera', () => {
 
     it('is not wrapped in a tuple', () => {
       const result = createCamera('two-point')
-      expect(result.camera).toBeUndefined()
+      expect((result as { camera?: unknown }).camera).toBeUndefined()
     })
   })
 
@@ -345,7 +346,7 @@ describe('swapCameraProjection', () => {
       target: [10, 20, 30],
       distance: 50,
     })
-    const newCam = result?.camera ?? result
+    const newCam = cameraOf(result)
     expect(newCam.userData.orbitTarget).toBeDefined()
     expect(newCam.userData.orbitTarget.x).toBeCloseTo(10)
     expect(newCam.userData.orbitTarget.y).toBeCloseTo(20)
@@ -355,7 +356,7 @@ describe('swapCameraProjection', () => {
   it('returns an OrthographicCamera when swapping to orthographic', () => {
     const oldCam = makeOldCam()
     const result = swapCameraProjection(oldCam, 'orthographic', { target: [0, 0, 0] })
-    const cam = result?.camera ?? result
+    const cam = cameraOf(result)
     expect(cam.type).toBe('OrthographicCamera')
   })
 
@@ -396,7 +397,7 @@ describe('swapCameraProjection', () => {
       },
     }
     const result = swapCameraProjection(oldCam, 'two-point', {})
-    const cam = result?.camera ?? result
+    const cam = cameraOf(result)
     expect(cam.userData.orbitTarget.x).toBeCloseTo(5)
     expect(cam.userData.orbitTarget.y).toBeCloseTo(10)
     expect(cam.userData.orbitTarget.z).toBeCloseTo(15)
@@ -405,7 +406,7 @@ describe('swapCameraProjection', () => {
   it('returns a PerspectiveCamera for two-point projection', () => {
     const oldCam = makeOldCam()
     const result = swapCameraProjection(oldCam, 'two-point', { target: [0, 0, 0] })
-    const cam = result?.camera ?? result
+    const cam = cameraOf(result)
     expect(cam.type).toBe('PerspectiveCamera')
   })
 })

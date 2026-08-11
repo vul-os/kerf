@@ -3,6 +3,7 @@ import type { ForwardedRef, KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { Sun, SlidersHorizontal, Check, ChevronDown, MonitorX, Layers } from 'lucide-react'
 import { useAuth } from '../store/auth.js'
 import * as THREE from 'three'
+import { isInstancedMesh, positionAttribute, setMaterialProp } from '../lib/threeNarrow.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { Line2 } from 'three/examples/jsm/lines/Line2.js'
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js'
@@ -1187,14 +1188,14 @@ function Renderer({
           // S2: InstancedMesh hit — map instanceId back to the Component.id
           // so the rest of the picking pipeline (gumball, selection highlight,
           // assembly editor) sees the same component-level id it expects.
-          if (!id && hitObj.isInstancedMesh && hitObj.userData.componentIds) {
+          if (!id && isInstancedMesh(hitObj) && hitObj.userData.componentIds) {
             const instanceId = hits[0].instanceId
             id = hitObj.userData.componentIds[instanceId] ?? null
           }
           // Wave 4J: box-proxy sibling hit — resolve via the parent original
           // InstancedMesh's componentIds so the selection pipeline is unaware
           // it's picking a proxy wireframe box (LOD-WIREFRAME-BOX-PROXY caveat).
-          if (!id && hitObj.isInstancedMesh && hitObj.userData._lodBoxProxyFor) {
+          if (!id && isInstancedMesh(hitObj) && hitObj.userData._lodBoxProxyFor) {
             const origMesh = meshGroup.children.find(
               (mm) => mm.uuid === hitObj.userData._lodBoxProxyFor,
             )
@@ -1333,7 +1334,7 @@ function Renderer({
       if (hits.length > 0) {
         const hitObj = hits[0].object
         id = hitObj.userData.id
-        if (!id && hitObj.isInstancedMesh && hitObj.userData.componentIds) {
+        if (!id && isInstancedMesh(hitObj) && hitObj.userData.componentIds) {
           id = hitObj.userData.componentIds[hits[0].instanceId] ?? null
         }
       }
@@ -1642,7 +1643,10 @@ function Renderer({
       entries.push({ id: part.id, geometry })
 
       // Bounding box for vertex sphere sizing — cheap, no topology.
-      const bb = new THREE.Box3().setFromBufferAttribute(geometry.getAttribute('position'))
+      const posAttr = positionAttribute(geometry)
+      const bb = posAttr
+        ? new THREE.Box3().setFromBufferAttribute(posAttr)
+        : new THREE.Box3()
       // Lazy aux slot: edges/vertices populated on first feature-mode entry.
       // `topology` stays null until ensurePartAux fills it in.
       const partAux = {
@@ -3052,7 +3056,10 @@ function pickFeature(
     const inst = hit.object
     const id = inst.userData.vertexIds[hit.instanceId]
     if (hover) {
-      hoverInstance(s, inst, hit.instanceId)
+      // Only the vertex-sphere InstancedMesh is in this raycast set, but the
+      // hit is statically an Object3D; hoverInstance writes instanceColor and
+      // would be a no-op on anything else.
+      if (isInstancedMesh(inst)) hoverInstance(s, inst, hit.instanceId)
       return null
     }
     return { partId: inst.userData.partId, kind: 'vertex', featureId: id }
@@ -3105,8 +3112,10 @@ function hoverInstance(s: RendererState, inst: THREE.InstancedMesh, instanceId: 
       colors[i * 3 + 2] = (INK_300 & 0xff) / 255
     }
     inst.instanceColor = new THREE.InstancedBufferAttribute(colors, 3)
-    inst.material.vertexColors = true
-    inst.material.needsUpdate = true
+    // Through setMaterialProp, not inst.material.x = y: on a multi-material
+    // mesh the latter writes to the array object and the colours never appear.
+    setMaterialProp(inst.material, 'vertexColors', true)
+    setMaterialProp(inst.material, 'needsUpdate', true)
   }
   if (s._hoveredInstance && (s._hoveredInstance.inst !== inst || s._hoveredInstance.id !== instanceId)) {
     const { inst: oldInst, id: oldId } = s._hoveredInstance
@@ -3308,7 +3317,7 @@ function disposeAll(s: RendererState) {
  * per-instance in the LOD apply loop (matrix rewrite, no geometry swap).
  */
 function _applyBboxProxy(mesh: THREE.Mesh, s: RendererState) {
-  if (!mesh || mesh.isInstancedMesh || mesh.userData._lodBboxProxy) return
+  if (!mesh || isInstancedMesh(mesh) || mesh.userData._lodBboxProxy) return
   try {
     // Compute the bounding box of the part geometry.
     const geom = mesh.geometry

@@ -38,6 +38,7 @@
 
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import { disposeSubtree } from '../lib/threeNarrow.js'
 import { useWorkspace } from '../store/workspace.js'
 import { newFeatureId } from '../lib/occtRunner.js'
 
@@ -611,10 +612,7 @@ export default function Gumball({ getThreeContext, meshes }: GumballProps) {
       detachDragListeners()
       domElement.style.touchAction = prevTouchAction
       scene.remove(group)
-      group.traverse((o) => {
-        o.geometry?.dispose?.()
-        o.material?.dispose?.()
-      })
+      disposeSubtree(group)
       groupRef.current = null
       if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay)
       overlayRef.current = null
@@ -978,10 +976,7 @@ function mountEdgeMode({
     detachDragListeners()
     domElement.style.touchAction = prevTouchAction
     scene.remove(group)
-    group.traverse((o) => {
-      o.geometry?.dispose?.()
-      o.material?.dispose?.()
-    })
+    disposeSubtree(group)
     groupRef.current = null
     if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay)
     overlayRef.current = null

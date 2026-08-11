@@ -11,6 +11,7 @@
  *   - makeEffectStack: dispose() clears the chain
  */
 
+import * as doubles from '../test-support/threeDoubles.js'
 import { describe, it, expect, vi } from 'vitest'
 import {
   POST_EFFECTS,
@@ -102,14 +103,13 @@ const ALL_PASSES: PostEffectsPasses = {
 }
 
 /** Build a minimal fake renderer that returns the given size. */
-function makeRenderer(w = 512, h = 512) {
-  return {
-    getSize(v2: { x: number; y: number }) { v2.x = w; v2.y = h; return v2 },
-  }
-}
-
-function makeScene() { return {} }
-function makeCamera() { return { aspect: 1, fov: 45, near: 0.1, far: 1000 } }
+// Real Scene and PerspectiveCamera — three constructs both without a GPU, so
+// there is no reason for a literal that only carries the fields these
+// assertions happen to read. WebGLRenderer is the one that cannot be built
+// headless; see src/test-support/threeDoubles.ts.
+const makeRenderer = (w = 512, h = 512) => doubles.renderer(w, h)
+const makeScene = () => doubles.scene()
+const makeCamera = () => doubles.camera({ aspect: 1, fov: 45, near: 0.1, far: 1000 })
 
 // ── 1. POST_EFFECTS registry ──────────────────────────────────────────────────
 

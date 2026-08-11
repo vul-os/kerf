@@ -54,7 +54,9 @@ const fakeThree = {
 }
 
 beforeEach(() => {
-  globalThis.THREE = fakeThree
+  // clouds.ts reads five symbols off the global; the fake supplies exactly
+  // those, so it is deliberately not the whole three module.
+  globalThis.THREE = fakeThree as unknown as typeof import('three')
 })
 
 afterEach(() => {
@@ -235,6 +237,8 @@ describe('buildCloudMesh', () => {
     delete globalThis.THREE
     expect(() => buildCloudMesh({ kind: 'scattered' })).toThrow('THREE.js not available')
     // Restore for afterEach
-    globalThis.THREE = fakeThree
+    // clouds.ts reads five symbols off the global; the fake supplies exactly
+  // those, so it is deliberately not the whole three module.
+  globalThis.THREE = fakeThree as unknown as typeof import('three')
   })
 })

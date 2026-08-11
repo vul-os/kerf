@@ -119,7 +119,50 @@ function buildPostProcessor(kind) {
  *   sensor    – sensor size key or raw mm value (default 'full-frame')
  * @returns {THREE.Camera | { camera: THREE.Camera, postProcessor: object }}
  */
-export function createCamera(kind: string, { aspect = 16 / 9, focal_mm = 50, sensor = 'full-frame' as string | number } = {}) {
+/** A capture camera plus the shader pass that unwraps what it sees. */
+export interface CameraWithPostProcessor {
+  camera: THREE.PerspectiveCamera
+  postProcessor: ReturnType<typeof buildPostProcessor>
+}
+
+export type CreateCameraResult =
+  | THREE.PerspectiveCamera
+  | THREE.OrthographicCamera
+  | CameraWithPostProcessor
+
+export interface CreateCameraOptions {
+  aspect?: number
+  focal_mm?: number
+  sensor?: string | number
+}
+
+/**
+ * The camera out of a {@link createCamera} result, whether it came back bare or
+ * paired with a post-processor.
+ *
+ * Call sites used to write `result?.camera ?? result`, which reads a property
+ * that does not exist on the bare-camera arm — it worked only by yielding
+ * undefined and falling through to the value itself.
+ */
+export function cameraOf(
+  result: CreateCameraResult,
+): THREE.PerspectiveCamera | THREE.OrthographicCamera {
+  return 'camera' in result ? result.camera : result
+}
+
+// Overloaded on `kind` so callers get the camera they asked for rather than
+// the whole union. Two of the five kinds return a {camera, postProcessor} pair
+// and three return a bare camera; without this every call site had to narrow,
+// and the one in switchProjection did it by reading `.camera` off a value that
+// might not have one.
+export function createCamera(
+  kind: 'perspective' | 'two-point', opts?: CreateCameraOptions): THREE.PerspectiveCamera
+export function createCamera(
+  kind: 'orthographic', opts?: CreateCameraOptions): THREE.OrthographicCamera
+export function createCamera(
+  kind: 'fisheye' | 'panoramic-360', opts?: CreateCameraOptions): CameraWithPostProcessor
+export function createCamera(kind: string, opts?: CreateCameraOptions): CreateCameraResult
+export function createCamera(kind: string, { aspect = 16 / 9, focal_mm = 50, sensor = 'full-frame' as string | number } = {}): CreateCameraResult {
   const sensor_mm  = resolveSensorMm(sensor)
   const hFov_rad   = focalToFov(focal_mm, sensor_mm)
   // THREE.PerspectiveCamera takes a *vertical* FOV in degrees.
@@ -225,9 +268,10 @@ export function swapCameraProjection(oldCam, kind, options: {
   const unitDir = len > 0 ? dir.divideScalar(len) : new THREE.Vector3(0, 0, -1)
 
   const result = createCamera(kind, { aspect, focal_mm, sensor })
-
-  // Extract the actual camera object whether we got a plain camera or a tuple.
-  const newCam = result?.camera ?? result
+  // fisheye and panoramic-360 come back paired with their post-processor, and
+  // that pair is what this function returns — the caller needs both. Only the
+  // positioning below works on the camera itself.
+  const newCam = cameraOf(result)
 
   // Place the new camera at the same distance from the target, looking toward it.
   newCam.position.copy(orbitTarget).addScaledVector(unitDir, -distance)

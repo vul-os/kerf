@@ -1,3 +1,4 @@
+import * as THREE from 'three'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Share2, Save, Loader2, ArrowLeft, Check, X, RotateCcw, Undo2, Redo2, GitBranch, MessageSquare, PanelRightClose, PanelRightOpen, PanelLeftOpen, PanelLeftClose, Plus, Box, SlidersHorizontal, ChevronDown, ArrowRight, RotateCw, Activity as ActivityIcon, FileDown, LogOut, UserCog, Settings, Users } from 'lucide-react'
@@ -1553,11 +1554,16 @@ export default function Editor() {
     if (!femFile) return null
     const desc = extractDisplayGeometryFromParts(w.parts)
     if (!desc) return null
-    return {
-      isBufferGeometry: true,
-      attributes: { position: { array: desc.positions } },
-      index: desc.indices ? { array: desc.indices } : null,
-    }
+    // A real BufferGeometry, not a duck-typed stand-in. FEMDeformedShape does
+    // `geo.setIndex(externalGeometry.index)`, and three's setIndex stores a
+    // non-array value verbatim — so the previous `{ array: desc.indices }`
+    // literal became the geometry's index attribute and the deformed-shape
+    // mesh path could never have rendered. It was truthy enough to take the
+    // mesh branch and then produce an unusable draw.
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(desc.positions, 3))
+    if (desc.indices) geometry.setIndex(new THREE.BufferAttribute(desc.indices, 1))
+    return geometry
   }, [femFile, w.parts])
 
   const printFile = isPrintFile(w.currentFile)

@@ -13,6 +13,7 @@
  *   - createAssemblyLoader factory helper
  */
 
+import type * as THREE from 'three'
 import { describe, it, expect, vi } from 'vitest'
 
 // ---------------------------------------------------------------------------
@@ -92,11 +93,15 @@ import type { BBox } from '@/types'
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeCamera() {
+// This file vi.mock()s the whole `three` module, so a real PerspectiveCamera
+// cannot be constructed here — hence the literal and the cast, rather than
+// src/test-support/threeDoubles.ts's factories. The cull code only reads these
+// two matrices off the camera.
+function makeCamera(): THREE.Camera {
   return {
     projectionMatrix:    { elements: new Array(16).fill(0) },
     matrixWorldInverse:  { elements: new Array(16).fill(0) },
-  }
+  } as unknown as THREE.Camera
 }
 
 function makeComponents(n: number, withBbox = false): AssemblyLoaderComponent[] {

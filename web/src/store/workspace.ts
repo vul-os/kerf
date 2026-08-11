@@ -9,6 +9,7 @@
 //     next chat message.
 //   - per-file part visibility (hiddenPartIds), session-only.
 //   - the live `parts` array for the currently-open file (JSCAD or STEP).
+import type { BufferGeometry } from 'three'
 import { create } from 'zustand'
 import { api, ApiError } from '../lib/api.js'
 import { runJscad, setSketchResolver, setSketchLister, setEquationsResolver as setJscadEquationsResolver, SKETCH_IMPORT_RE } from '../lib/jscadRunner.js'
@@ -142,20 +143,15 @@ export interface PartRef {
   feature_id?: string
 }
 
-/**
- * Opaque stand-in for three.js's `BufferGeometry`. This repo has no `@types/three`
- * (three ships no bundled types either) — `import type { BufferGeometry } from 'three'`
- * fails with TS7016 under strict. Installing `@types/three` was tried and reverted: it
- * surfaces ~130 latent errors across src/components/src/lib (out of this slice's scope,
- * and src/components is mid-a11y-sweep by another agent). workspace.ts only ever stores
- * and passes these values through (subdToBufferGeometry/meshDocToBufferGeometry produce
- * them; consumers elsewhere call real three.js methods on them) — never calls a
- * BufferGeometry method itself — so an opaque object type is honest here, not a mask for
- * unchecked `.foo` access the way a bare `any` would be.
- */
-type BufferGeometry = object
+// three.js's real BufferGeometry, now that @types/three is installed. This was
+// an opaque `type BufferGeometry = object` stand-in, which was honest about
+// what workspace.ts does with the value (store it, pass it on) but not about
+// what it is — and `object` is not assignable to the `Geom3 | BufferGeometry`
+// that ExportPart, TopologyPart and RendererPart all require, so every handoff
+// from the store to the renderer, the exporters or the topology code needed a
+// cast at the boundary.
 
-/** parts / drawingSourceParts entries: JSCAD parts (Geom3-backed) or STEP/mesh/subd-loaded parts (BufferGeometry-backed, three.js — no @types/three in this repo, so the geom field there is a boundary this slice doesn't own). */
+/** parts / drawingSourceParts entries: JSCAD parts (Geom3-backed) or STEP/mesh/subd-loaded parts (BufferGeometry-backed). */
 // Includes the assembly shapes because `parts` genuinely holds them when an .assembly file is
 // open — resolveAssemblyParts and buildBBoxProxy both feed this array, and both carry
 // componentId, which the union previously could not express.

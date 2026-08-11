@@ -444,7 +444,10 @@ function partHash(part: TopologyPart): string {
     const c = pos ? pos.count : 0
     return `bg:${c}:${g.index ? g.index.count : 0}`
   }
-  const polys = g.polygons || []
+  // Not a BufferGeometry, so it is the Geom3 arm of the union. TypeScript does
+  // not narrow through the `in` check above on its own, because Geom3 has no
+  // isBufferGeometry to discriminate against.
+  const polys = (g as Geom3).polygons || []
   if (polys.length === 0) return 'g3:0'
   const first = polys[0].vertices?.[0] || [0, 0, 0]
   const last = polys[polys.length - 1].vertices?.[0] || [0, 0, 0]

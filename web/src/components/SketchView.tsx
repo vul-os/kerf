@@ -25,6 +25,7 @@ import {
   Unlock, Crosshair, CircleDashed, CircleDot, Download,
 } from 'lucide-react'
 import * as THREE from 'three'
+import { isLine, isMesh } from '../lib/threeNarrow.js'
 import {
   parseSketch, serializeSketch, solveSketch, solveWithDrag,
   planeFaceFrame,
@@ -2951,11 +2952,12 @@ function SketchBackdrop3D({ sketch, view, loadParts, tool, onProjectEdge }) {
       const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1
       const raycaster = new THREE.Raycaster()
       raycaster.params.Line = { threshold: 2 }
-      raycaster.setFromCamera({ x: ndcX, y: ndcY }, s.camera)
+      raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), s.camera)
       const hits = raycaster.intersectObjects(s.edgeGroup.children, true)
       if (hits.length === 0) return
       const hit = hits[0]
-      const geom = hit.object.geometry
+      // The edge group holds Line objects; a hit is statically Object3D.
+      const geom = isLine(hit.object) || isMesh(hit.object) ? hit.object.geometry : null
       const posAttr = geom?.attributes?.position
       if (!posAttr) return
       const segIdx = hit.faceIndex ?? 0

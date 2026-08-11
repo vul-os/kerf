@@ -68,8 +68,9 @@ export function planInstances(components) {
     const m = new THREE.Matrix4()
     if (comp.transform && comp.transform.length === 16) {
       // matrix.set(n11,n12,...n44) — row by row (Three convention for .set).
-       
-      m.set(...comp.transform)
+      // The length check above establishes 16 elements, but a number[] carries
+      // no tuple type, so the spread has to be asserted into one.
+      m.set(...(comp.transform as unknown as Parameters<THREE.Matrix4['set']>))
     }
     bucket.transforms.push(m)
   }

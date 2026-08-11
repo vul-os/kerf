@@ -47,6 +47,7 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 import type { RefObject } from 'react'
+import { disposeObject } from '../lib/threeNarrow.js'
 import * as THREE from 'three'
 import type { CurvaturePoint, CurvatureStats } from '../lib/occtBridge.js'
 
@@ -192,8 +193,9 @@ export default function CurvatureCombOverlay({ sceneRef, workerRef, enabled, sca
     const scene = sceneRef?.current
     for (const obj of combObjectsRef.current) {
       if (scene) scene.remove?.(obj)
-      obj.geometry?.dispose()
-      obj.material?.dispose()
+      // disposeObject, not obj.material?.dispose(): the optional chain only
+      // guards a null material, so an array reached .dispose() and threw.
+      disposeObject(obj)
     }
     combObjectsRef.current = []
   }, [sceneRef])

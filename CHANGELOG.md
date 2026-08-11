@@ -14,6 +14,127 @@ The authoritative source for what's shipped vs. in-flight is
 
 ---
 
+## [0.1.10] - 2026-08-12
+
+Kerf becomes one node, one password. If you run a Kerf server that anyone else
+can reach, **read the security note first** — one of these fixes closes a hole
+that was open in the default configuration.
+
+### Security
+
+- **The terminal and first-run setup both trusted a `Settings` field that does
+  not exist.** Both gates decide what they allow from the server's listen
+  address, and both read `settings.host` — which `Settings` has never defined —
+  then fell back to `"127.0.0.1"`. The shipped default is `--host 0.0.0.0`. So
+  on a default `kerf serve`, the terminal offered a shell as the server's OS
+  user to anyone who could reach the port, and an unclaimed node could be
+  claimed by whoever got there first, while both reported themselves as
+  loopback-bound. The bind address now comes from the process that binds it
+  (`kerf_core.bind`), and an unrecorded one is assumed public.
+- **`/auth/bootstrap-local` handed out a full session with no credential.** In
+  `local_mode` — the default, and the only mode a desktop install has ever used
+  — anything that could reach the port was signed in. "Bound to loopback" is not
+  a credential: a hostile page can point a browser at loopback, and DNS
+  rebinding is the well-trodden way. The route is removed and replaced by a
+  password set on first load.
+
+### Added
+
+- **A real terminal**, in the editor's right drawer. A login shell over a
+  WebSocket with the `kerf` CLI already on its `PATH` and `KERF_API_URL`
+  pointed at the node you are looking at. Sessions outlive their socket, so a
+  dropped connection re-attaches and replays the scrollback rather than killing
+  a running build. Gated on the listen address, not on a role — see
+  [docs/terminal.md](docs/terminal.md), which is candid about the absence of a
+  sandbox and gives container, dedicated-user and systemd recipes.
+- **First-run setup.** A node asks for a password on first load and exchanges it
+  for a session (`/api/setup/*`). Claiming is one-shot, refused over a
+  non-loopback bind, and rate limited; recovery is `kerf admin set-password` on
+  the machine, because a self-hosted node has no mail transport.
+- **[docs/cli.md](docs/cli.md)** — the command surface written for an agent to
+  read: the list/show/call loop, the stdout-vs-stderr contract, MCP, and Kerf's
+  Part/Object/Component vocabulary.
+- A CI gate that fails when `site/docs/` drifts from `docs/`. It had drifted:
+  the marketing site was serving documentation for routes that no longer exist.
+
+### Changed — BREAKING
+
+Accounts are gone. Kerf is one node, one password, one user.
+
+- Removed: `/auth/register`, `/auth/login`, `/auth/forgot-password`,
+  `/auth/reset-password`, `/auth/bootstrap-local`, and the Google and GitHub
+  OAuth sign-in routes — which the docs had described as retired since
+  2026-07-17 while the code still served them.
+- Removed the pages that drove them: Login, Signup, ForgotPassword,
+  ResetPassword, AuthCallback. There is no `/login` and no `/signup`.
+- Removed workspace and project **members and invites**. That flow could not
+  work: adding someone looked their account up by email, found none (none can
+  be created), and wrote nothing, while the client built an invite link from a
+  `token` field the response never had.
+- Removed `/api/admin/publishers` and the `is_verified_publisher` flag from the
+  live surface. A node cannot meaningfully vouch for itself.
+- `kerf admin reset-password` is replaced by `kerf admin set-password`.
+- Kept: workspaces and projects as containers, API tokens for the CLI and SDK,
+  share links, and `/auth/refresh` + `/auth/logout`.
+
+### Fixed
+
+- **The whole `/api/admin/*` surface answered 403 to every user that can
+  exist** — seven routes gated on `users.account_role in ('admin','system')`, a
+  column nothing in Kerf writes. Configuring a supplier feed was impossible, so
+  "re-fetch distributor pricing" on a `.part` file could never work.
+- **`api.callTool` sent tool arguments under a key the server ignores** —
+  `params` where `POST /api/tools/call` reads `args`, so every tool dispatched
+  through the shared client helper ran with **no arguments**, returning 200
+  throughout.
+- **18 panels POST to `/api/llm-tools/<tool>`, a URL that has never existed**
+  (404), with no `Authorization` header for an endpoint behind auth (401). Ten
+  are migrated to `api.callTool` here; a test guards the rest so the list can
+  only shrink. Several of these panels fall back to computing an answer in the
+  browser on error, which is why the failure was invisible.
+- **The terminal was deaf after re-opening the panel.** `asyncio` allows one
+  callback per file descriptor, and the PTY reader was created per *connection*
+  on a per-*session* fd, so re-attaching unhooked the previous reader and then
+  the live one. It reported "connected", replayed its scrollback — which needs
+  no reader — and delivered nothing either way. Also leaked: the terminal test
+  file went from 6 seconds to two minutes.
+- The terminal lost its session on every tab switch, and dropped keystrokes
+  typed while the socket was reconnecting.
+- **The desktop app would have lost its terminal**, because it builds its own
+  uvicorn config and never recorded its bind address. A test now reads all
+  three entry points and fails any that starts uvicorn without saying where.
+- **`run_fem_solid_static` failed all eight of its tests** since the commit that
+  introduced them. The solver was right — a single tet4 with one node fixed
+  keeps three rigid-body rotations, so the stiffness matrix is singular — and
+  the fixture was wrong. It now constrains 3-2-1, and the old configuration is
+  kept as a test asserting the error.
+- **Four panels computed results and dropped them**: RoomCfd hiding its
+  temperature spread and mean velocity, ClothSim hiding that the solver
+  subsampled frames, CfdPostProcess ignoring a `fieldStats` prop it accepted and
+  typed, and a jewelry panel indexing a metal density table with a gem name.
+- **A PCB shove-router helper could never split anything** — it intersected a
+  segment with a zero-length segment, so the determinant was always zero and it
+  returned `null` on every call — beside a loop that decided what to skip and
+  had no body.
+- The browser path tracer set its scene twice (`await X ?? Y` parses as
+  `(await X) ?? Y`, and the async setter resolves to `undefined`), and ignored
+  the `width`/`height` it documented as overrides.
+- `POST /api/setup/signin` 500'd on the *correct* password: the route was
+  annotated `-> dict` while session issuance returns a model, so FastAPI
+  rejected its own response.
+- Five `llm_docs/*.md` files — what the chat model retrieves — described
+  register/login, OAuth, verified publishers, invite flows, and a
+  `kerf library-import` command that is not in the codebase.
+
+### Internal
+
+- eslint baseline in `web/src`: 353 → 333 since 0.1.9, ratcheted so it cannot
+  regress in either direction.
+- The E2E suite signs in through a Playwright setup project rather than relying
+  on the credential-free auto-bootstrap that no longer exists.
+
+---
+
 ## [0.1.9] - 2026-08-11
 
 ### Fixed

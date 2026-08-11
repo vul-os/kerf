@@ -107,7 +107,14 @@ export default function TerminalPanel() {
       socket.binaryType = 'arraybuffer'
       socketRef.current = socket
 
+      // Every handler below checks that it is still the current socket first.
+      // A socket that has been replaced is not merely uninteresting, it is
+      // actively harmful: its events reach into the state of the connection
+      // that replaced it. See the note on onclose.
+      const isCurrent = () => socketRef.current === socket
+
       socket.onopen = () => {
+        if (!isCurrent()) { socket.close(); return }
         attemptRef.current = 0
         setStatus('open')
         term.focus()
@@ -115,6 +122,7 @@ export default function TerminalPanel() {
       }
 
       socket.onmessage = (event) => {
+        if (!isCurrent()) return
         if (typeof event.data === 'string') {
           const hello = parseControl(event.data)
           if (hello) {
@@ -131,8 +139,21 @@ export default function TerminalPanel() {
       }
 
       socket.onclose = (event) => {
-        socketRef.current = null
-        if (disposed || closedByUs.current) return
+        // Only clear the ref if it still points at *this* socket.
+        //
+        // It used to clear unconditionally, and a close event is asynchronous:
+        // re-opening the panel closed the old socket, mounted a new one, and
+        // then the old close arrived and nulled the reference to the *new*
+        // connection. Everything after that saw "no socket" — so the terminal
+        // showed "connected", because status came from the new socket's
+        // onopen, and silently swallowed every keystroke. A terminal you
+        // cannot type into, whenever the close event lost the race, which is
+        // whenever the machine is busy.
+        const wasCurrent = isCurrent()
+        if (wasCurrent) socketRef.current = null
+        // A stale socket closing must not schedule a reconnect either — the
+        // connection that replaced it is already live.
+        if (!wasCurrent || disposed || closedByUs.current) return
         if (isRefusal(event.code)) {
           setStatus('refused')
           setRefusal(event.reason || 'The server refused a terminal session.')

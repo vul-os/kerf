@@ -220,3 +220,65 @@ describe('input while the socket is down', () => {
     expect(b.sent.join('')).toBe('abcd')
   })
 })
+
+describe('a socket that has been replaced', () => {
+  /**
+   * Re-opening the panel closes one socket and opens another, and a close
+   * event is asynchronous — so the old socket's onclose can land *after* the
+   * new one is live. The handlers used to act on the shared state
+   * unconditionally, which meant the stale close nulled the reference to the
+   * connection that had replaced it: the terminal reported "connected" and
+   * swallowed every keystroke.
+   *
+   * Modelled here because the real thing needs a WebSocket, a DOM and a race.
+   * What is pinned is the rule the component follows: a handler acts only if
+   * its own socket is still the current one.
+   */
+  function makeRefHolder() {
+    const state = { current: null as object | null, reconnects: 0, cleared: 0 }
+    const open = (socket: object) => { state.current = socket }
+    const close = (socket: object) => {
+      const wasCurrent = state.current === socket
+      if (wasCurrent) { state.current = null; state.cleared++ }
+      if (!wasCurrent) return
+      state.reconnects++
+    }
+    return { state, open, close }
+  }
+
+  it('a stale close leaves the live connection alone', () => {
+    const { state, open, close } = makeRefHolder()
+    const first = {}
+    const second = {}
+
+    open(first)
+    open(second)   // the panel remounted before `first` finished closing
+    close(first)   // ...and only now does the old close arrive
+
+    expect(state.current).toBe(second)
+    expect(state.cleared).toBe(0)
+  })
+
+  it('a stale close does not schedule a reconnect over a live connection', () => {
+    const { state, open, close } = makeRefHolder()
+    const first = {}
+    const second = {}
+
+    open(first)
+    open(second)
+    close(first)
+
+    expect(state.reconnects).toBe(0)
+  })
+
+  it('the current socket closing still clears and reconnects', () => {
+    const { state, open, close } = makeRefHolder()
+    const only = {}
+
+    open(only)
+    close(only)
+
+    expect(state.current).toBeNull()
+    expect(state.reconnects).toBe(1)
+  })
+})

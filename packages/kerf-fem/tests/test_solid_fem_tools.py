@@ -85,8 +85,26 @@ class TestToolSpecs:
 class TestFemSolidStatic:
     """
     Single tet4 element: 4 nodes at origin + unit-axis corners.
-    Fix node 0 in all DOFs; apply Fy = 1000 N at node 3.
-    Result must be non-zero max displacement.
+    Constrained 3-2-1; Fy = 1000 N at node 3. Max displacement must be non-zero.
+
+    THE CONSTRAINTS ARE THE POINT
+    -----------------------------
+    This fixture used to fix node 0 alone and every test in the class failed
+    with "Stiffness matrix is singular" — from the commit that introduced them.
+    The solver was right. Fixing one node of a free body removes its three
+    translations and leaves the three rotations about that node, so K keeps
+    three zero eigenvalues and there is no unique solution to find.
+
+    So the constraints here are the textbook 3-2-1 scheme, which removes all
+    six rigid-body modes with the fewest reactions:
+
+      node 0 (origin)  fixed in x, y, z  — kills the three translations
+      node 1 (1,0,0)   fixed in y, z     — kills rotation about z and about y
+      node 2 (0,1,0)   fixed in z        — kills rotation about x
+
+    `None` means "free in this direction": the solver treats a constraint value
+    of None as no constraint, which is what makes a partial fix expressible.
+    Node 3 carries the load and is left entirely free.
     """
 
     BASE_ARGS = {
@@ -96,9 +114,31 @@ class TestFemSolidStatic:
         "nu": 0.3,
         "density": 7850.0,
         "yield_strength": 275e6,
-        "constraints": [{"node_id": 0, "dofs": [0.0, 0.0, 0.0]}],
+        "constraints": [
+            {"node_id": 0, "dofs": [0.0, 0.0, 0.0]},
+            {"node_id": 1, "dofs": [None, 0.0, 0.0]},
+            {"node_id": 2, "dofs": [None, None, 0.0]},
+        ],
         "loads": [{"node_id": 3, "force": [0.0, 1000.0, 0.0]}],
     }
+
+    @pytest.mark.asyncio
+    async def test_one_fixed_node_is_still_a_mechanism(self):
+        """The configuration this fixture used to use, asserted as the error it
+        is rather than left as eight failing tests.
+
+        A single fixed node leaves three rigid-body rotations, and a user who
+        constrains a real mesh that way needs to be told so — not handed
+        displacements from a matrix that has no unique solution.
+        """
+        args = dict(self.BASE_ARGS)
+        args["constraints"] = [{"node_id": 0, "dofs": [0.0, 0.0, 0.0]}]
+
+        res = await invoke(run_fem_solid_static, args)
+
+        assert res.get("ok") is not True
+        assert "singular" in res.get("error", "").lower()
+        assert "constraint" in res.get("error", "").lower()
 
     @pytest.mark.asyncio
     async def test_returns_ok_true(self):

@@ -44,14 +44,6 @@ async def get_user_by_email(conn: asyncpg.Connection, email: str) -> Optional[Di
     return dict(row) if row else None
 
 
-async def get_user_by_google_id(conn: asyncpg.Connection, google_id: str) -> Optional[Dict[str, Any]]:
-    row = await conn.fetchrow(
-        "SELECT * FROM users WHERE google_id = $1",
-        google_id,
-    )
-    return dict(row) if row else None
-
-
 async def update_user(
     conn: asyncpg.Connection,
     user_id: uuid.UUID,

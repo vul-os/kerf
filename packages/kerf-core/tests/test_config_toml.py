@@ -228,11 +228,6 @@ def test_auth_section(tmp_path):
         access_ttl = "15m"
         refresh_ttl = "720h"
         password_pepper = "toml-pepper"
-
-          [auth.google]
-          client_id = "toml-google-id"
-          client_secret = "toml-google-secret"
-          redirect_url = "https://example.test/auth/google/callback"
         """,
     )
     s = Settings.load(str(toml_path))
@@ -240,9 +235,6 @@ def test_auth_section(tmp_path):
     assert s.jwt_access_ttl_minutes == 15
     assert s.jwt_refresh_ttl_days == 30  # 720h == 30d
     assert s.password_pepper == "toml-pepper"
-    assert s.google_client_id == "toml-google-id"
-    assert s.google_client_secret == "toml-google-secret"
-    assert s.google_redirect_url == "https://example.test/auth/google/callback"
 
 
 def test_storage_section(tmp_path):

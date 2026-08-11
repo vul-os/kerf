@@ -106,11 +106,6 @@ describe('URL builders + request shape', () => {
     expect(init.headers.authorization).toBe('Bearer tok-A')
   })
 
-  it('googleAuthUrl is a synchronous URL (no fetch)', () => {
-    expect(api.googleAuthUrl()).toBe(`${API_URL}/auth/google/start`)
-    expect(fetch).not.toHaveBeenCalled()
-  })
-
   it('listProjects appends a single tag query param', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonRes([]))
     await api.listProjects('ws-1', { tag: 'fixture' })

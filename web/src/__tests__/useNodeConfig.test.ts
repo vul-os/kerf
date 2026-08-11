@@ -1,23 +1,24 @@
-// useNodeConfig.test.js — verifies the /api/config consumer surfaces
-// OAuth availability fields (googleEnabled, githubEnabled, githubClientId)
-// from the runtime response, and that secrets are never present.
+// useNodeConfig.test.ts — the /api/config consumer.
+//
+// This file used to be almost entirely about OAuth availability: whether the
+// login screen should draw a Google button, a GitHub button, and whether a
+// client secret could ever leak into the payload. There is no federated
+// sign-in any more — a node has one password, set on first load — so all that
+// is gone and what remains is the one field that still varies per node.
 //
 // Strategy:
 //   - Mock global.fetch to return a controlled JSON payload.
 //   - Import the store module fresh per test via vi.resetModules() so the
 //     singleton state doesn't bleed between cases.
-//   - Exercise both the "server has new flags" path and the backwards-compat
-//     "older server binary, flags absent" path.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 async function freshStore() {
   vi.resetModules()
-  const mod = await import('../lib/useNodeConfig.js')
-  return mod
+  return await import('../lib/useNodeConfig.js')
 }
 
-function mockConfigFetch(payload, { status = 200 } = {}) {
+function mockConfigFetch(payload: unknown, { status = 200 } = {}) {
   globalThis.fetch = vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
@@ -26,150 +27,57 @@ function mockConfigFetch(payload, { status = 200 } = {}) {
 }
 
 beforeEach(() => {
-  // Hermetic: a developer's local .env may define VITE_GOOGLE_CLIENT_ID,
-  // which feeds the build-time googleEnabled fallback. Stub it empty so
-  // googleEnabled is driven solely by the mocked /api/config payload
-  // (matching CI, where no real client id is present).
-  vi.stubEnv('VITE_GOOGLE_CLIENT_ID', '')
-  // Each test supplies its own fetch mock.
   globalThis.fetch = vi.fn()
 })
 
 afterEach(() => {
-  vi.unstubAllEnvs()
   vi.restoreAllMocks()
-  delete globalThis.fetch
+  delete (globalThis as { fetch?: unknown }).fetch
 })
 
-describe('/api/config OAuth fields — full server response', () => {
-  it('googleEnabled is true when google_enabled=true in response', async () => {
-    mockConfigFetch({
-      local_mode: false,
-      google_client_id: 'goog-abc.apps.googleusercontent.com',
-      google_enabled: true,
-      github_enabled: false,
-      github_client_id: '',
-    })
+describe('/api/config', () => {
+  it('reads local_mode from the response', async () => {
+    mockConfigFetch({ local_mode: false })
     const { getCloudConfig } = await freshStore()
     await getCloudConfig().fetch()
-    const s = getCloudConfig()
-    expect(s.googleEnabled).toBe(true)
-    expect(s.googleClientId).toBe('goog-abc.apps.googleusercontent.com')
+    expect(getCloudConfig().localMode).toBe(false)
+    expect(getCloudConfig().ready).toBe(true)
   })
 
-  it('googleEnabled is false when google_enabled=false in response', async () => {
-    mockConfigFetch({
-      local_mode: false,
-      google_client_id: '',
-      google_enabled: false,
-      github_enabled: false,
-      github_client_id: '',
-    })
+  it('assumes a self-hosted node when an older binary omits the field', async () => {
+    // Defaulting the other way would send a self-hoster to a sign-in screen
+    // for accounts their node does not have.
+    mockConfigFetch({})
     const { getCloudConfig } = await freshStore()
     await getCloudConfig().fetch()
-    const s = getCloudConfig()
-    expect(s.googleEnabled).toBe(false)
-    expect(s.googleClientId).toBe('')
+    expect(getCloudConfig().localMode).toBe(true)
   })
 
-  it('githubEnabled is true when github_enabled=true in response', async () => {
-    mockConfigFetch({
-      local_mode: false,
-      google_enabled: false,
-      github_enabled: true,
-      github_client_id: 'Iv1.github-client-id',
-    })
+  it('falls back to defaults when the request fails', async () => {
+    // A misconfigured proxy should leave the app usable, not stuck.
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('network'))
     const { getCloudConfig } = await freshStore()
     await getCloudConfig().fetch()
-    const s = getCloudConfig()
-    expect(s.githubEnabled).toBe(true)
-    expect(s.githubClientId).toBe('Iv1.github-client-id')
+    expect(getCloudConfig().localMode).toBe(true)
+    expect(getCloudConfig().ready).toBe(true)
   })
 
-  it('githubEnabled is false when github_enabled=false', async () => {
-    mockConfigFetch({
-      local_mode: true,
-      github_enabled: false,
-      github_client_id: '',
-    })
+  it('falls back to defaults on a non-2xx response', async () => {
+    mockConfigFetch({ local_mode: false }, { status: 503 })
     const { getCloudConfig } = await freshStore()
     await getCloudConfig().fetch()
-    const s = getCloudConfig()
-    expect(s.githubEnabled).toBe(false)
-    expect(s.githubClientId).toBe('')
+    expect(getCloudConfig().localMode).toBe(true)
+    expect(getCloudConfig().ready).toBe(true)
   })
 
-  it('response never carries a client secret field', async () => {
-    // The response we parse should not propagate any secret-named key into
-    // the store. We verify by checking none of these keys land on the store.
-    mockConfigFetch({
-      local_mode: false,
-      google_client_id: 'goog-abc.apps.googleusercontent.com',
-      google_enabled: true,
-      google_client_secret: 'SHOULD_NOT_APPEAR',
-      github_enabled: true,
-      github_client_id: 'Iv1.abc',
-      github_client_secret: 'SHOULD_NOT_APPEAR',
-    })
+  it('fetches once, however many callers ask', async () => {
+    mockConfigFetch({ local_mode: true })
     const { getCloudConfig } = await freshStore()
-    await getCloudConfig().fetch()
-    const s = getCloudConfig()
-    expect(s).not.toHaveProperty('google_client_secret')
-    expect(s).not.toHaveProperty('googleClientSecret')
-    expect(s).not.toHaveProperty('github_client_secret')
-    expect(s).not.toHaveProperty('githubClientSecret')
-  })
-
-  it('existing field (localMode) is unchanged', async () => {
-    mockConfigFetch({
-      local_mode: false,
-      google_enabled: false,
-      github_enabled: false,
-    })
-    const { getCloudConfig } = await freshStore()
-    await getCloudConfig().fetch()
-    const s = getCloudConfig()
-    expect(s.localMode).toBe(false)
-    expect(s.ready).toBe(true)
-  })
-})
-
-describe('/api/config OAuth fields — backwards-compat (older server)', () => {
-  it('googleEnabled falls back to whether google_client_id is non-empty', async () => {
-    // Older binary: no google_enabled / github_enabled fields in response.
-    mockConfigFetch({
-      local_mode: false,
-      google_client_id: 'goog-abc.apps.googleusercontent.com',
-    })
-    const { getCloudConfig } = await freshStore()
-    await getCloudConfig().fetch()
-    const s = getCloudConfig()
-    // Falls back to !!googleClientId
-    expect(s.googleEnabled).toBe(true)
-    expect(s.githubEnabled).toBe(false)
-  })
-
-  it('googleEnabled is false when google_client_id absent in older response', async () => {
-    mockConfigFetch({
-      local_mode: true,
-    })
-    const { getCloudConfig } = await freshStore()
-    await getCloudConfig().fetch()
-    const s = getCloudConfig()
-    expect(s.googleEnabled).toBe(false)
-    expect(s.githubEnabled).toBe(false)
-  })
-})
-
-describe('/api/config failure handling', () => {
-  it('resets to OSS defaults (googleEnabled=false, githubEnabled=false) on fetch error', async () => {
-    globalThis.fetch = vi.fn().mockRejectedValue(new Error('network error'))
-    const { getCloudConfig } = await freshStore()
-    await getCloudConfig().fetch()
-    const s = getCloudConfig()
-    expect(s.ready).toBe(true)
-    expect(s.googleEnabled).toBe(false)
-    expect(s.githubEnabled).toBe(false)
-    expect(s.localMode).toBe(true)
+    await Promise.all([
+      getCloudConfig().fetch(),
+      getCloudConfig().fetch(),
+      getCloudConfig().fetch(),
+    ])
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1)
   })
 })

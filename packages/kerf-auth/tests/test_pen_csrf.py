@@ -249,52 +249,6 @@ def test_same_origin_preflight_returns_acao():
 
 
 # ---------------------------------------------------------------------------
-# Case 8 — GitHub OAuth state cookie has samesite=lax + httponly (source contract)
-# ---------------------------------------------------------------------------
-
-def test_github_oauth_state_cookie_has_samesite_lax_and_httponly():
-    """The kerf_github_login_state cookie must carry samesite=lax and httponly.
-
-    SameSite=Lax is the first line of defence against cross-site requests:
-    the browser will not send the cookie on cross-site POST requests, so an
-    attacker cannot forge a valid OAuth state submission even if they know
-    the cookie value.
-    """
-    import pathlib
-    src = pathlib.Path(auth.__file__).read_text()
-    # Locate the github_login_start function which sets the cookie.
-    start = src.find("async def github_login_start(")
-    assert start != -1, "github_login_start function not found in routes.py"
-    # Look within the next 2 000 chars (the function body).
-    body = src[start: start + 2000]
-    assert "samesite=" in body.lower() or "samesite=" in body, \
-        "github_login_state cookie must declare samesite="
-    assert "lax" in body.lower(), \
-        "github_login_state cookie samesite value must be 'lax'"
-    assert "httponly=True" in body, \
-        "github_login_state cookie must be httponly"
-
-
-# ---------------------------------------------------------------------------
-# Case 9 — Google OAuth state cookie has samesite=lax + httponly (source contract)
-# ---------------------------------------------------------------------------
-
-def test_google_oauth_state_cookie_has_samesite_lax_and_httponly():
-    """The kerf_oauth_state cookie must carry samesite=lax and httponly."""
-    import pathlib
-    src = pathlib.Path(auth.__file__).read_text()
-    start = src.find("async def google_start(")
-    assert start != -1, "google_start function not found in routes.py"
-    body = src[start: start + 2000]
-    assert "samesite=" in body.lower(), \
-        "kerf_oauth_state cookie must declare samesite="
-    assert "lax" in body.lower(), \
-        "kerf_oauth_state cookie samesite value must be 'lax'"
-    assert "httponly=True" in body, \
-        "kerf_oauth_state cookie must be httponly"
-
-
-# ---------------------------------------------------------------------------
 # Case 10 — state-mutating route with same-origin passes; cross-origin blocked
 # ---------------------------------------------------------------------------
 

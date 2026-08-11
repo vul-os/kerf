@@ -34,7 +34,6 @@ function readFirstExisting(base: string, exts: string[]) {
 
 const LOGIN_SRC = readFirstExisting('../Login', ['tsx', 'jsx'])
 const SIGNUP_SRC = readFirstExisting('../Signup', ['tsx', 'jsx'])
-const CALLBACK_SRC = readFirstExisting('../AuthCallback', ['tsx', 'jsx'])
 
 // ---------------------------------------------------------------------------
 // Login.jsx — error banner
@@ -93,29 +92,5 @@ describe('Signup.jsx — error banner a11y', () => {
     expect(alertLine).toBeGreaterThanOrEqual(0)
     const window = lines.slice(Math.max(0, alertLine - 1), alertLine + 4).join('\n')
     expect(window).toContain('aria-live="assertive"')
-  })
-})
-
-// ---------------------------------------------------------------------------
-// AuthCallback.jsx — spinner busy state
-// ---------------------------------------------------------------------------
-
-describe('AuthCallback.jsx — spinner busy state a11y', () => {
-  it('has role="status" on the loading container', () => {
-    expect(CALLBACK_SRC).toContain('role="status"')
-  })
-
-  it('has aria-live on the loading container (not a silent frame)', () => {
-    expect(CALLBACK_SRC).toMatch(/aria-live=/)
-  })
-
-  it('spinner SVG has aria-hidden (decorative, not announced separately)', () => {
-    // The SVG is decorative — aria-hidden prevents double-announcement
-    expect(CALLBACK_SRC).toContain('aria-hidden')
-  })
-
-  it('loading container includes descriptive text for screen readers', () => {
-    // The visible text inside the status region narrates what is happening
-    expect(CALLBACK_SRC).toMatch(/Signing you in/)
   })
 })

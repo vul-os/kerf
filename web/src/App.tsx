@@ -31,7 +31,6 @@ const Login = lazy(() => import('./routes/Login.jsx'))
 const Signup = lazy(() => import('./routes/Signup.jsx'))
 const ForgotPassword = lazy(() => import('./routes/ForgotPassword.jsx'))
 const ResetPassword = lazy(() => import('./routes/ResetPassword.jsx'))
-const AuthCallback = lazy(() => import('./routes/AuthCallback.jsx'))
 const Projects = lazy(() => import('./routes/Projects.jsx'))
 const Editor = lazy(() => import('./routes/Editor.jsx'))
 const Library = lazy(() => import('./routes/Library.jsx'))
@@ -219,7 +218,6 @@ export default function App() {
       />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/roadmap" element={<Roadmap />} />
       <Route path="/tools" element={<Tools />} />
       <Route path="/inspect" element={<GeometryInspect />} />

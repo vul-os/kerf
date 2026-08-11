@@ -315,8 +315,6 @@ export const api = {
     request<AuthSession>('/auth/reset-password', { method: 'POST', body: { token, password }, auth: false }),
   requestVerification: () =>
     request<void>('/auth/request-verification', { method: 'POST', body: {} }),
-  googleAuthUrl: () => `${API_URL}/auth/google/start`,
-  githubAuthUrl: () => `${API_URL}/auth/github/login/start`,
   refresh: () => refreshAccessToken(),
   me: () => request<ApiUser>('/api/me'),
   updateMe: (patch: Partial<ApiUser>) => request<ApiUser>('/api/me', { method: 'PATCH', body: patch }),

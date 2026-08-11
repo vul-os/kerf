@@ -117,13 +117,6 @@ def _flatten_kerf_toml(data: dict, toml_path: Path) -> dict[str, Any]:
         )
     if "password_pepper" in auth:
         out["password_pepper"] = auth["password_pepper"]
-    google = auth.get("google", {})
-    if "client_id" in google:
-        out["google_client_id"] = google["client_id"]
-    if "client_secret" in google:
-        out["google_client_secret"] = google["client_secret"]
-    if "redirect_url" in google:
-        out["google_redirect_url"] = google["redirect_url"]
 
     storage = data.get("storage", {})
     if "backend" in storage:
@@ -253,9 +246,6 @@ class Settings(BaseSettings):
     password_pepper: str = "dev-pepper"
     cors_origin: str = "http://localhost:5173"
     local_mode: bool = True
-    google_client_id: str = ""
-    google_client_secret: str = ""
-    google_redirect_url: str = "http://localhost:8080/auth/google/callback"
     anthropic_api_key: str = ""
     openai_api_key: str = ""
     moonshot_api_key: str = ""
@@ -322,10 +312,9 @@ class Settings(BaseSettings):
     system_user_password: str = ""
 
     cloud_git_prefix: str = "git"
-    cloud_github_client_id: str = ""
-    cloud_github_client_secret: str = ""
-    cloud_github_redirect_url: str = "http://localhost:8080/auth/github/callback"
-    # GitHub App fields (repo-connect / installation token flow).
+    # GitHub App fields (repo-connect / installation token flow). The OAuth
+    # *sign-in* client that used to live beside these is gone: a node has one
+    # password, and connecting a repo is a different thing from signing in.
     # Leave empty to disable; the app degrades gracefully when unset.
     cloud_github_app_id: str = ""
     cloud_github_app_slug: str = ""
@@ -417,16 +406,6 @@ class Settings(BaseSettings):
                 val = os.environ.get(env_name, "")
                 if val:
                     setattr(self, field, val)
-        return self
-
-    @model_validator(mode="after")
-    def _google_client_id_single_source(self):
-        # The Google OAuth client ID is a public value the frontend needs
-        # at build time (VITE_GOOGLE_CLIENT_ID). Rather than duplicate it,
-        # the backend falls back to that same var when GOOGLE_CLIENT_ID is
-        # unset — one value to configure.
-        if not self.google_client_id:
-            self.google_client_id = os.environ.get("VITE_GOOGLE_CLIENT_ID", "")
         return self
 
     @classmethod

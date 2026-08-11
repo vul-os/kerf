@@ -1,70 +1,45 @@
 // Lightweight bootstrap config hook. Hits /api/config exactly once per page
-// load and caches the result in a tiny zustand store. Every kerf node runs
-// the same software (there is no "cloud edition" to detect) — this hook
-// just surfaces the two things that legitimately vary per node: whether
-// it's running in local_mode (single-user, auto-login) or server mode, and
-// which OAuth providers the operator has configured credentials for.
+// load and caches the result in a tiny zustand store. Every kerf node runs the
+// same software (there is no "cloud edition" to detect) — this hook surfaces
+// the one thing that legitimately varies per node: whether it is running in
+// local_mode (one node, one password) or server mode.
 //
-// Shape returned by /api/config (per CONTRACT.md):
-//   {
-//     local_mode: bool,
-//     google_client_id?: string,
-//     google_enabled?: bool,
-//     github_enabled?: bool,
-//     github_client_id?: string,
-//   }
+// It used to also carry OAuth availability, so the login screen could decide
+// whether to draw Google and GitHub buttons. There is no federated sign-in any
+// more: a node has a single password set on first load, and an account exists
+// only to publish parts. See docs/auth.md.
 //
-// OAuth availability (googleEnabled / githubEnabled) is derived at runtime
-// from the server's kerf.toml so the same Docker image works across
-// environments without a rebuild. VITE_GOOGLE_CLIENT_ID is kept as a
-// build-time fallback for local dev that skips the /api/config fetch.
+// Shape returned by /api/config:
+//   { local_mode: bool }
 
 import { useEffect } from 'react'
 import { create } from 'zustand'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
-// Build-time fallback: if VITE_GOOGLE_CLIENT_ID was baked in (local dev
-// workflow), treat Google as enabled without needing the runtime flag.
-const BUILD_GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
-
-// Raw /api/config response shape (per CONTRACT.md, see header comment).
-interface CloudConfigResponse {
+interface NodeConfigResponse {
   local_mode?: boolean
-  google_client_id?: string
-  google_enabled?: boolean
-  github_enabled?: boolean
-  github_client_id?: string
 }
 
-interface CloudConfigValues {
+interface NodeConfigValues {
   ready: boolean
   localMode: boolean
-  googleClientId: string
-  googleEnabled: boolean
-  githubEnabled: boolean
-  githubClientId: string
 }
 
-const DEFAULTS: CloudConfigValues = {
+const DEFAULTS: NodeConfigValues = {
   ready: false,
-  // localMode default is true so an OSS build that fails to fetch
-  // /api/config (e.g. CORS misconfigured) still skips /login, matching
-  // server-side defaults. The cloud build always overrides via the
-  // /api/config response.
+  // localMode default is true so a build that fails to fetch /api/config
+  // (e.g. CORS misconfigured) still behaves like a self-hosted node, matching
+  // the server-side default.
   localMode: true,
-  googleClientId: BUILD_GOOGLE_CLIENT_ID,
-  googleEnabled: !!BUILD_GOOGLE_CLIENT_ID,
-  githubEnabled: false,
-  githubClientId: '',
 }
 
-interface CloudConfigStore extends CloudConfigValues {
+interface NodeConfigStore extends NodeConfigValues {
   _inflight: Promise<void> | null
   fetch: () => Promise<void> | null
 }
 
-const useStore = create<CloudConfigStore>((set, get) => ({
+const useStore = create<NodeConfigStore>((set, get) => ({
   ...DEFAULTS,
   _inflight: null,
 
@@ -74,34 +49,20 @@ const useStore = create<CloudConfigStore>((set, get) => ({
     const p = fetch(`${API_URL}/api/config`, { credentials: 'omit' })
       .then(async (r) => {
         if (!r.ok) throw new Error(`config ${r.status}`)
-        return r.json() as Promise<CloudConfigResponse>
+        return r.json() as Promise<NodeConfigResponse>
       })
       .then((data) => {
-        // Runtime client ID takes precedence over build-time env.
-        const googleClientId = data.google_client_id || BUILD_GOOGLE_CLIENT_ID
-        // google_enabled from server takes precedence; fall back to whether
-        // any client ID is present (handles older server binaries).
-        const googleEnabled = data.google_enabled != null
-          ? !!data.google_enabled
-          : !!googleClientId
-        const githubEnabled = !!data.github_enabled
-        const githubClientId = data.github_client_id || ''
         set({
           ready: true,
-          // local_mode is the single source of truth for "skip the login
-          // screen". Fall back to the OSS default (true) when an older
-          // binary hasn't surfaced the field yet.
+          // Fall back to the self-hosted default when an older binary has not
+          // surfaced the field yet.
           localMode: data.local_mode != null ? !!data.local_mode : true,
-          googleClientId,
-          googleEnabled,
-          githubEnabled,
-          githubClientId,
           _inflight: null,
         })
       })
       .catch((err: unknown) => {
-        // Treat network/unreachable as "OSS defaults". Surface in console
-        // so devs notice misconfigured proxies.
+        // Treat network/unreachable as defaults. Surface in console so devs
+        // notice misconfigured proxies.
         console.warn('[useNodeConfig] /api/config failed:', err)
         set({ ...DEFAULTS, ready: true, _inflight: null })
       })
@@ -110,23 +71,16 @@ const useStore = create<CloudConfigStore>((set, get) => ({
   },
 }))
 
-export function useNodeConfig(): CloudConfigValues {
+export function useNodeConfig(): NodeConfigValues {
   const state = useStore()
   useEffect(() => {
     if (!state.ready && !state._inflight) state.fetch()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  return {
-    ready: state.ready,
-    localMode: state.localMode,
-    googleClientId: state.googleClientId,
-    googleEnabled: state.googleEnabled,
-    githubEnabled: state.githubEnabled,
-    githubClientId: state.githubClientId,
-  }
+  return { ready: state.ready, localMode: state.localMode }
 }
 
 // Imperative accessor for code that can't use hooks (e.g. router loaders).
-export function getCloudConfig(): CloudConfigStore {
+export function getCloudConfig(): NodeConfigStore {
   return useStore.getState()
 }

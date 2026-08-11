@@ -61,11 +61,6 @@ access_ttl = "15m"
 refresh_ttl = "720h"
 password_pepper = "dev-only-pepper"
 
-  [auth.google]
-  client_id = ""
-  client_secret = ""
-  redirect_url = "http://localhost:8080/auth/google/callback"
-
 # ---------------------------------------------------------------------------
 # Storage
 #

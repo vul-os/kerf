@@ -260,22 +260,13 @@ async def get_config():
     Returns the minimal set of server-side flags the browser needs before the
     user is authenticated. No auth required — no secrets are returned here.
     """
-    payload = {
+    # OAuth sign-in used to be advertised here, with the public client IDs
+    # for the Google and GitHub buttons. There is no sign-in to federate any
+    # more: a node has one password, set on first load, and an account only
+    # exists to publish parts. See docs/auth.md.
+    return {
         "local_mode": settings.local_mode,
     }
-    # OAuth availability — public client IDs + bool flags only, no secrets.
-    # The frontend renders the Google/GitHub buttons from these runtime
-    # values (Vite can't inline per-env build-time vars). OAuth sign-in is
-    # a node feature: any self-hoster can supply their own Google/GitHub
-    # OAuth app credentials, so availability is driven purely by whether
-    # those credentials are configured — never by a "cloud edition" flag.
-    payload["google_enabled"] = bool(settings.google_client_id)
-    payload["github_enabled"] = bool(settings.cloud_github_client_id)
-    if settings.google_client_id:
-        payload["google_client_id"] = settings.google_client_id
-    if settings.cloud_github_client_id:
-        payload["github_client_id"] = settings.cloud_github_client_id
-    return payload
 
 
 @router.get("/me")

@@ -77,8 +77,16 @@ export class ProjectsPage {
     await this.openNewProjectModal()
     await this.modalNameInput.fill(name)
     await this.modalCreateButton.click()
-    // After creation the modal closes and we're redirected to the editor.
-    // Callers should await the editor URL if needed.
+
+    // Wait for the redirect to the new project's editor before returning.
+    //
+    // This used to return the moment the button was clicked, leaving the
+    // POST /api/projects in flight. A caller that navigated straight away —
+    // back to the list, to assert the card appeared — cancelled the request
+    // that was creating the thing it was about to look for. It only lost that
+    // race on a busy machine, so it read as a flaky assertion rather than as
+    // the missing await it was.
+    await this.page.waitForURL(/\/projects\/[0-9a-f-]{36}/, { timeout: 30_000 })
   }
 
   /**
@@ -106,9 +114,15 @@ export class ProjectsPage {
   async expectProjectVisible(name: string) {
     // Exact match: a renamed project ("<name>-renamed") contains the
     // original name as a substring, so hasText would false-match.
+    //
+    // The long timeout matches waitForList's, and for the same reason: the
+    // grid is populated by a fetch, and the default 5s is a deadline on how
+    // busy the machine is rather than on whether the app works. It failed
+    // exactly that way once the terminal specs started forking login shells
+    // alongside these.
     await expect(
       this.page.getByRole('heading', { level: 2, name, exact: true }),
-    ).toBeVisible()
+    ).toBeVisible({ timeout: 20_000 })
   }
 
   /**
@@ -117,7 +131,7 @@ export class ProjectsPage {
   async expectProjectGone(name: string) {
     await expect(
       this.page.getByRole('heading', { level: 2, name, exact: true }),
-    ).toHaveCount(0)
+    ).toHaveCount(0, { timeout: 20_000 })
   }
 
   /** Fill and submit the Rename modal (assumes it is already open). */

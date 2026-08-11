@@ -301,8 +301,12 @@ def test_T18_metal_deck_AR_limit_2_to_1():
     )
     r_wood = check_diaphragm_shear(spec_wood, V_lateral_lbs=1000.0)
     r_deck = check_diaphragm_shear(spec_deck, V_lateral_lbs=1000.0)
-    # Wood: AR=3 ≤ 4 → aspect OK; deck: AR=3 > 2 → aspect fail
-    assert "aspect" not in r_wood.governing_factor or r_wood.governing_factor == "shear_demand" or r_wood.governing_factor == "OK" or "shear_demand" in r_wood.governing_factor
+    # Wood: AR=3 ≤ 4 → aspect OK; deck: AR=3 > 2 → aspect fail.
+    # Asserted exactly. The previous four-way `or` — "aspect" absent, OR
+    # == "shear_demand", OR == "OK", OR "shear_demand" in it — passed for
+    # essentially any value that did not contain "aspect", which is a
+    # different and much weaker claim than the one the comment makes.
+    assert r_wood.governing_factor == "OK"
     assert "aspect_ratio" in r_deck.governing_factor
 
 

@@ -324,8 +324,20 @@ class TestCaratRangeExclusion:
         """0.1 ct round (≈3.1 mm) — well below all catalog minimums."""
         result = find_mounts("round_brilliant", carat=0.1, catalog=_MINI_CATALOG)
         assert result["ok"] is True
-        # All mounts should be rejected (size too small)
-        assert result["best"] is None or result["best"] is None
+
+        # The assertion here was `result["best"] is None or result["best"] is
+        # None` — the same clause twice, so it read as two checks and was one.
+        # The docstring's actual claim, that every mount is rejected for size,
+        # went untested. It is asserted now.
+        assert result["best"] is None
+        assert len(result["rejected"]) == len(_MINI_CATALOG)
+        size_rejections = [
+            r for r in result["rejected"] if "too small" in r["reject_reason"]
+        ]
+        assert size_rejections, (
+            "a 0.1 ct stone is below every seat minimum, so at least one "
+            f"rejection must cite size: {[r['reject_reason'] for r in result['rejected']]}"
+        )
 
     def test_rejected_entries_have_reject_reason(self):
         result = find_mounts("round_brilliant", carat=1.0, catalog=_MINI_CATALOG)

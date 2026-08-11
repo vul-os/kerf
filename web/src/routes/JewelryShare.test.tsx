@@ -54,8 +54,8 @@ import {
   buildSpecRows,
   validateComment,
   validateApproval,
-  detectWebGL,
-} from './JewelryShare.jsx'
+} from '../lib/jewelryShareFormat.js'
+import { detectWebGL } from '../lib/detectWebGL.js'
 import JewelryShare from './JewelryShare.jsx'
 
 // ---------------------------------------------------------------------------

@@ -12,6 +12,162 @@ The authoritative source for what's shipped vs. in-flight is
 
 ## [Unreleased]
 
+---
+
+## [0.1.8] - 2026-08-11
+
+### Added
+
+- **Settings — set LLM provider keys and see what they cost, without editing a
+  config file.** Kerf could read keys from environment variables or
+  `kerf.toml`, which is the wrong shape for how it is actually installed:
+  people install an app, they do not edit a config file, and changing a key
+  that way needs a restart. `/settings` stores them per user, encrypted at
+  rest, and shows each provider in one of three states — your own key (masked
+  to its last four characters), falling back to a key the operator configured
+  server-side, or nothing configured at all. That third state used to be
+  indistinguishable from the second, which is the difference between "the chat
+  works" and "the chat will fail when you try it". A key that no longer
+  decrypts gets its own state rather than disappearing: the encryption key
+  derives from `jwt_secret`, so rotating that orphans every saved key, and the
+  panel says so instead of silently reverting.
+
+- **`GET /api/usage` — the token, storage and compute figures that were
+  already being recorded.** `usage_events` had been written at six call sites
+  for a long time and read by nothing. It reports totals, per-model, per-kind,
+  per-day and the 50 most recent events, scoped to the caller. Every dollar
+  figure is labelled an estimate, twice: Kerf bills nobody, and a number with a
+  currency symbol is read as a bill unless it says otherwise.
+
+- **`GET /api/provider-keys`** — which providers a user has a key for. POST and
+  DELETE existed; nothing could read the state back, so a settings screen had
+  no way to render it. Keys are masked; the ciphertext is decrypted
+  server-side only to compute the mask.
+
+- **`[rate_limits]` in `kerf.toml` (or `RATE_LIMIT_OVERRIDES` as JSON).**
+  Overrides any limiter by its bucket name, with `0` disabling it. This
+  matters more than the numbers suggest: the auth limiters key on IP for
+  unauthenticated requests, and `/auth/register` allowed 5 per hour — a team
+  behind one office NAT hit it on the sixth person to sign up, with no way to
+  raise it short of editing the source.
+
+- **A per-provider base URL**, so a LiteLLM proxy, an OpenAI-compatible
+  endpoint or any gateway works without touching config.
+
+### Changed
+
+- **One LiteLLM client replaces four hand-written providers.** Anthropic,
+  OpenAI, Moonshot and Gemini each spoke their vendor's SDK directly — roughly
+  850 lines of message translation, streaming decoders and per-vendor quirk
+  handling, written four times, with four places for a bug to live. `llm.py`
+  goes from 1287 lines to 789, and the `anthropic`, `openai` and `google-genai`
+  dependencies are gone.
+
+  Two bugs fell out of the fold rather than being hunted. **The system prompt
+  never reached OpenAI or Moonshot** — the provider built its message list from
+  the conversation alone and never read the system field, so choosing GPT-4o or
+  Kimi ran the model with no CAD instructions at all. And **streaming was
+  Anthropic-only**: the other three inherited a `NotImplementedError`, so
+  picking any other model silently fell back to a blocking request.
+
+  Carried across deliberately, because each encodes a real production failure:
+  Anthropic prompt-cache breakpoints, temperature omitted rather than sent as
+  null, `tool_choice` as an object for a named tool, and Gemini 3's
+  `thought_signature`, whose absence on an echoed turn is a hard HTTP 400.
+
+- **A configured `default_model` that cannot be reached now falls back.** A
+  model that has left the catalogue, or one whose provider has no key on this
+  node, used to break every chat turn that did not name a model explicitly —
+  and said so only in a log line nobody sees.
+
+### Fixed
+
+- **Avatar upload and removal 500'd for every user, on every backend.** Both
+  routes ran a `with prev as (…) update … returning prev.avatar_storage_key`
+  CTE and then read a nested field no driver produces. On Postgres the SQL ran
+  and the lookup raised `KeyError`; on SQLite the statement itself failed.
+  Removal also deleted from the private bucket while upload wrote to the public
+  one, leaving the old avatar on the CDN.
+
+- **Every Library part detail page 404'd.** The catalogue advertises a
+  `<workspace>/<project>/<part>` slug and the route matched a single path
+  segment, so a slug with two slashes never reached the handler — which parsed
+  it as a UUID and rejected it anyway. The one identifier the catalogue
+  publishes was the one thing that could not be used.
+
+- **Every share link created by someone entitled to create one 500'd.** The
+  route stored the caller's workspace role into a column whose CHECK admits
+  only share roles, so owners and admins violated the constraint and only a
+  plain member reached the fallback — exactly backwards.
+
+- **The BIM phase filter selector never showed the filter that was applied.**
+  It took an `activeFilter` prop and used none of it, so with "Demolition Plan"
+  active the control displayed "Existing Plan" with nothing toggled.
+
+- **`POST /api/library/submissions` 500'd on Postgres**, binding a Python dict
+  to a `jsonb` column. It worked on SQLite only because that backend serialises
+  dicts on the way through.
+
+- **Fifteen routes 500'd on an empty or non-object JSON body**, and a further
+  three passed a client-supplied role straight to a CHECK constraint, so the
+  `editor` the members UI actually sends came back as a server error rather
+  than a validation failure.
+
+- **Updating a project member who is not a user 500'd** on the foreign key
+  instead of answering 404.
+
+- **The FEM deformed-shape mesh path could never have rendered.** The geometry
+  handed to it was a duck-typed literal, and three's `setIndex` stores a
+  non-array value verbatim — so it took the mesh branch and produced an
+  unusable draw.
+
+- **Material disposal skipped, threw, or silently did nothing on
+  multi-material meshes** in three places — leaking GPU allocations in one,
+  and preventing instance colours from ever appearing in another.
+
+- **A push-pull drag armed a 100ms timer per pointer frame whose callback did
+  nothing** — roughly 60 timers a second, created and destroyed, for a preview
+  RPC that does not exist.
+
+- Migration folding is safe on both backends. The ledger keyed on filename
+  alone, so a column folded into an existing numbered file reached new installs
+  and silently never reached existing databases. Both runners hash content now,
+  and the one supported `ADD COLUMN IF NOT EXISTS` form is made idempotent for
+  SQLite, which has no such syntax.
+
+- The auth rate limiter, the file-autosave idempotency window, every worker's
+  job-claim query and the CAM tool database all carried Postgres-only SQL that
+  500'd on the default embedded backend.
+
+### Testing
+
+- **Every route is called and asserted not to 5xx, on both backends.** 113
+  routes — 44 GET and 69 write — with request bodies synthesised from each
+  route's own OpenAPI schema. The write sweep and the Postgres sweep are new;
+  between them they found seven of the fixes above. The Postgres sweep is
+  opt-in via `DATABASE_URL` and is not part of core testing, because Postgres
+  is optional in Kerf.
+
+- **No test can reach a model provider.** When the four providers were folded
+  into LiteLLM, six test modules that mocked vendor SDKs stopped intercepting
+  anything and the suite began making real HTTPS calls. The root conftest now
+  blocks `litellm.completion`/`acompletion` outright.
+
+- `@types/three` is installed and the 3D surface type-checks — 137 errors
+  resolved, three of which were the runtime bugs listed above. The strict-mode
+  gate covers 51 `src/lib` files, and the frontend lint baseline drops from 509
+  to 353.
+
+### Known limitations
+
+- The drawing properties panel finds the selected view, centreline or break and
+  has no editor for any of them, so selecting one shows an empty panel. The
+  gap is recorded in the source next to where it would be closed.
+- `note`, `text`, `hatch`, `rich-text` and `dim-chain` do not snap while their
+  siblings do. `dim-chain` looks wrong — it is a dimension tool and every other
+  dimension tool snaps — but changing five tools' feel is a call for someone
+  who has drawn with them.
+
 ### Security
 
 - **One release, one manifest — `SHA256SUMS` now covers every published asset.**

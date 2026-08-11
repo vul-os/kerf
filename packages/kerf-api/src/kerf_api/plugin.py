@@ -54,6 +54,7 @@ async def register(app: FastAPI, ctx) -> PluginManifest:
     _try_include(app, "kerf_api.routes_aero_orbit",      tags=["aero"])
     _try_include(app, "kerf_api.routes_silicon_synth",   tags=["silicon"])
     _try_include(app, "kerf_api.routes_silicon",         tags=["silicon"])
+    _try_include(app, "kerf_api.routes_setup",           tags=["setup"])
     _try_include(app, "kerf_api.routes_terminal",        tags=["terminal"])
     _try_include(app, "kerf_api.routes_composites",      tags=["composites"])
     _try_include(app, "kerf_api.routes_composites_mfg",  tags=["composites"])

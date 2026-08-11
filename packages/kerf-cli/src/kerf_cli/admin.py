@@ -252,11 +252,94 @@ def add_admin_parser(sub: "argparse._SubParsersAction") -> None:  # type: ignore
     )
     rp_p.set_defaults(func=_cmd_admin)
 
+    sp_p = admin_sub.add_parser(
+        "set-password",
+        help="Set or change this node's password",
+        description=(
+            "Kerf is one node, one password: you set it on first load and\n"
+            "exchange it for a session. This is the way to change it, and the\n"
+            "only way on a node bound to anything but loopback — claiming an\n"
+            "unconfigured node over a network is a race with whoever else can\n"
+            "reach it, so the browser refuses and this does not.\n\n"
+            "It is also the recovery path. There is no reset email; a\n"
+            "self-hosted node has no mail transport.\n\n"
+            "Reads the password from stdin when not given, so it stays out of\n"
+            "your shell history:\n"
+            "    kerf admin set-password < password.txt\n\n"
+            "Requires DATABASE_URL, or uses the embedded SQLite database."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    sp_p.add_argument(
+        "--password",
+        default=None,
+        help="The new password. Omit to read one line from stdin (preferred).",
+    )
+    sp_p.add_argument(
+        "--generate",
+        action="store_true",
+        default=False,
+        help="Generate a strong password, set it, and print it once.",
+    )
+    sp_p.set_defaults(func=_cmd_admin)
+
     admin_p.set_defaults(func=_cmd_admin)
+
+
+def _cmd_set_password(args: "argparse.Namespace") -> int:
+    """Set the node password. Prints it only when it generated it."""
+    import asyncio
+    import sys
+
+    from kerf_core import node_credential
+    from kerf_core.db.config import default_database_url
+    from kerf_core.db.connection import get_pool
+
+    if args.generate:
+        password = node_credential.suggest_password()
+    elif args.password:
+        password = args.password
+    else:
+        if sys.stdin.isatty():
+            import getpass
+            password = getpass.getpass("New node password: ")
+        else:
+            password = sys.stdin.readline().strip()
+
+    if not password:
+        print("error: no password given", file=sys.stderr)
+        return 2
+
+    async def _run() -> int:
+        import os
+        pool = await get_pool(os.environ.get("DATABASE_URL") or default_database_url())
+        try:
+            async with pool.acquire() as conn:
+                try:
+                    await node_credential.set_password(conn, password)
+                except ValueError as exc:
+                    print(f"error: {exc}", file=sys.stderr)
+                    return 2
+        finally:
+            await pool.close()
+        return 0
+
+    rc = asyncio.run(_run())
+    if rc != 0:
+        return rc
+
+    if args.generate:
+        print(password)
+        print("\nThis is shown once. Store it now.", file=sys.stderr)
+    else:
+        print("Node password set.", file=sys.stderr)
+    return 0
 
 
 def _cmd_admin(args: argparse.Namespace) -> int:
     admin_command = getattr(args, "admin_command", None)
+    if admin_command == "set-password":
+        return _cmd_set_password(args)
     if admin_command == "repo-size":
         return _cmd_repo_size(args)
     if admin_command == "reset-password":

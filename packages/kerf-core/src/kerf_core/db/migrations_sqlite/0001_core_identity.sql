@@ -281,6 +281,26 @@ create index if not exists dental_cases_project_id_idx
 create index if not exists dental_cases_treatment_idx
     on dental_cases(treatment);
 
+-- ════════════ node_credential ════════════
+-- The node's single password. Kerf is moving from accounts to one credential
+-- per node: you install it, you set a password on first load, and that
+-- password is what a session is exchanged for. There are no roles, because
+-- there is nobody to have a different one from.
+--
+-- One row, enforced by the `singleton` primary key rather than by convention —
+-- a second row would silently make "the" password ambiguous.
+--
+-- `password_hash` is bcrypt over the peppered password, the same construction
+-- kerf_auth.hash_password uses for the account passwords this replaces.
+-- `configured_at` is null before first run, which is what the setup screen
+-- keys off.
+create table if not exists node_credential (
+    singleton      boolean primary key default true check (singleton),
+    password_hash  text not null,
+    configured_at  text not null default CURRENT_TIMESTAMP,
+    updated_at     text not null default CURRENT_TIMESTAMP
+);
+
 -- ════════════ rate_limit_buckets (T-310) ════════════
 -- Sliding-window counter keyed on caller (user_id or IP) + endpoint name.
 -- Each window_start is a window_seconds-rounded text; INSERT ... ON

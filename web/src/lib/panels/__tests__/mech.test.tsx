@@ -262,10 +262,22 @@ describe('mount — MechanismSynthesisPanel accepts content prop', () => {
 
 describe('mech.js — load() returns a Promise', () => {
   for (const { id } of EXPECTED) {
-    it(`entry "${id}" load() returns a thenable`, () => {
+    // Awaited, not merely started. This used to assert `typeof result.then`
+    // and drop the promise, so N dynamic imports resolved after the test file
+    // had finished — and once one of those module graphs grew a level deeper
+    // it resolved after teardown, which vitest reports as
+    // EnvironmentTeardownError pointing at whichever module happened to be
+    // last. Awaiting also makes the assertion mean more: a load() naming a
+    // file that has been moved or renamed now fails here rather than in
+    // whatever route lazily mounts the panel.
+    it(`entry "${id}" load() resolves to a module`, async () => {
       const e = MECH_ENTRIES.find((x) => x.id === id)
       const result = e.load()
       expect(typeof result.then).toBe('function')
+
+      const mod = await result
+      expect(mod).toBeTruthy()
+      expect(mod.default).toBeTruthy()
     })
   }
 })

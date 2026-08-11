@@ -64,10 +64,17 @@ describe('dcc.js fragment — shape', () => {
     expect(e.exts).toContain('.geonodes')
   })
 
-  it('every entry load() returns a Promise-like (thenable)', () => {
+  // Awaited, not merely started — see the note in mech.test.tsx. Firing every
+  // entry's dynamic import and dropping the promise leaves them to resolve
+  // after the file finishes, which surfaces as an EnvironmentTeardownError
+  // against whichever module resolves last as soon as one import graph grows.
+  it('every entry load() resolves to a module', async () => {
     for (const e of DCC_ENTRIES) {
       const result = e.load()
       expect(typeof result.then).toBe('function')
+
+      const mod = await result
+      expect(mod.default).toBeTruthy()
     }
   })
 

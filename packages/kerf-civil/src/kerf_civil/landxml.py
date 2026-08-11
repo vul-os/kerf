@@ -38,9 +38,23 @@ from typing import Any
 _NS = "http://www.landxml.org/schema/LandXML-1.2"
 _NS_PREFIX = "LandXML"
 
-# Register empty prefix so serialiser emits xmlns="..." on root element
-# instead of xmlns:ns0="..." on every element.
-ET.register_namespace("", _NS)
+# NOT ET.register_namespace("", _NS).
+#
+# That writes to a PROCESS-GLOBAL map, and Kerf has three writers that all want
+# the empty prefix for a different namespace — this one, kerf-cad-core's 3MF
+# writer, and kerf-plc's PLCopen writer. Whoever registered last won, so
+# exporting a 3MF and then a LandXML in the same process produced LandXML with
+# `ns0:` on every element: still valid XML, but not the shape LandXML consumers
+# expect, and non-deterministic in a way that depends on what the user exported
+# earlier in the session.
+#
+# ET.tostring(default_namespace=...) is the documented per-call alternative and
+# cannot be used here: it rejects any tree with unqualified attribute names,
+# and LandXML is full of them (version=, areaUnit=, …).
+#
+# So the writer builds unqualified tags and declares the namespace itself, as
+# an ordinary attribute on the root. The reader is unaffected — it already
+# reads the namespace off the document rather than assuming this constant.
 
 
 # ---------------------------------------------------------------------------
@@ -48,8 +62,12 @@ ET.register_namespace("", _NS)
 # ---------------------------------------------------------------------------
 
 def _tag(name: str) -> str:
-    """Fully-qualified XML tag with LandXML 1.2 namespace."""
-    return f"{{{_NS}}}{name}"
+    """A LandXML element name.
+
+    Unqualified: the namespace is declared once, as xmlns on the root, so the
+    serialiser has no prefix to invent and no global map to consult.
+    """
+    return name
 
 
 def _fmt(v: float, decimals: int = 6) -> str:
@@ -129,10 +147,8 @@ def export_landxml(
     parcels = parcels or []
 
     root = ET.Element(_tag("LandXML"))
+    root.set("xmlns", _NS)
     root.set("version", "1.2")
-    # Note: ET.register_namespace("", _NS) (at module level) ensures
-    # the serialiser emits xmlns="..." rather than xmlns:ns0="...".
-    # Do NOT also call root.set("xmlns", ...) — that would duplicate it.
 
     # --- Units (SI) ---
     units_el = ET.SubElement(root, _tag("Units"))

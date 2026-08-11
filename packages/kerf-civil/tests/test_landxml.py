@@ -4,7 +4,7 @@ Tests for kerf_civil.landxml — LandXML 1.2 import/export round-trip.
 import asyncio
 import math
 import pytest
-from kerf_civil.landxml import export_landxml, import_landxml
+from kerf_civil.landxml import _NS, export_landxml, import_landxml
 
 
 # ---------------------------------------------------------------------------
@@ -259,3 +259,57 @@ def test_tool_export_handler():
     data = json.loads(result)
     assert data["ok"] is True
     assert "<LandXML" in data["xml_str"]
+
+
+# ---------------------------------------------------------------------------
+# Namespace independence
+# ---------------------------------------------------------------------------
+
+class TestNamespaceIsNotGlobal:
+    """The writer must not depend on ElementTree's process-global prefix map.
+
+    It used to call ET.register_namespace("", _NS) at import time to get
+    xmlns="..." on the root instead of ns0: on every element. That map is
+    global, and Kerf has three writers that each want the empty prefix for a
+    different namespace — this one, kerf-cad-core's 3MF writer, and kerf-plc's
+    PLCopen writer. Whoever registered last won.
+
+    So exporting a 3MF and then a LandXML in the same process emitted LandXML
+    with ns0: throughout: still well-formed, but not the shape consumers expect,
+    and varying with whatever the user happened to export earlier. In the test
+    suite it showed up as four landxml failures that passed in isolation.
+    """
+
+    def _alignment(self):
+        return {
+            "name": "MainRoad",
+            "elements": [{"type": "Line", "start": (0.0, 0.0), "end": (1.0, 1.0)}],
+        }
+
+    def test_export_is_unprefixed_after_another_writer_claims_the_empty_prefix(self):
+        import xml.etree.ElementTree as ET
+
+        ET.register_namespace("", "http://example.invalid/some-other-format")
+
+        xml = export_landxml(alignments=[self._alignment()])
+
+        assert "<LandXML" in xml
+        assert "<Alignment" in xml
+        assert "ns0:" not in xml
+
+    def test_the_namespace_is_still_declared(self):
+        # Unprefixed is only correct if the default namespace is declared —
+        # otherwise the document says these elements are in no namespace at all.
+        xml = export_landxml(alignments=[self._alignment()])
+        assert f'xmlns="{_NS}"' in xml
+
+    def test_round_trip_survives_a_stolen_prefix(self):
+        import xml.etree.ElementTree as ET
+
+        ET.register_namespace("", "http://example.invalid/some-other-format")
+
+        xml = export_landxml(alignments=[self._alignment()])
+        result = import_landxml(xml)
+
+        assert len(result["alignments"]) == 1
+        assert result["alignments"][0]["name"] == "MainRoad"

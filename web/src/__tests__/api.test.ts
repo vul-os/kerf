@@ -96,6 +96,20 @@ describe('URL builders + request shape', () => {
     expect(init.headers.authorization).toBe('Bearer tok-A')
   })
 
+  it('callTool sends the arguments under the key the server reads', async () => {
+    // The server's ToolCallRequest is {tool, args, project_id}. This posted
+    // `params`, pydantic ignored the unknown key, `args` defaulted to {}, and
+    // every tool ran with no arguments at all — silently, with a 200.
+    vi.mocked(fetch).mockResolvedValueOnce(jsonRes({ ok: true }))
+    await api.callTool('shaft_diameter', { torque_nm: 42 })
+    const [url, init] = vi.mocked(fetch).mock.calls[0] as [string, any]
+    expect(url).toBe(`${API_URL}/api/tools/call`)
+    expect(JSON.parse(init.body)).toEqual({
+      tool: 'shaft_diameter',
+      args: { torque_nm: 42 },
+    })
+  })
+
   it('listProjects appends a single tag query param', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonRes([]))
     await api.listProjects('ws-1', { tag: 'fixture' })

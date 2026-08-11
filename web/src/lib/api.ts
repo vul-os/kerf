@@ -884,10 +884,16 @@ export const api = {
   // as `meshCache.get<T>` in src/lib/meshCache.ts, and for the same reason:
   // the concrete type is owned by the consumer, and src/lib must not reach into
   // it. Defaults to `ToolCallResult` so untyped callers keep the old behaviour.
-  callTool: <T = ToolCallResult>(toolName: string, params: Record<string, unknown> = {}) =>
+  // The server reads `args` (kerf_api.routes_tools.ToolCallRequest). This sent
+  // `params`, which pydantic ignored, so `args` fell back to its `{}` default
+  // and every tool dispatched through here ran with NO ARGUMENTS — a shaft
+  // diameter computed from nothing, an ISO 286 fit for no dimensions. The
+  // panels that hand-rolled their own fetch got this right; only the shared
+  // helper did not, so the bug tracked which helper a panel happened to use.
+  callTool: <T = ToolCallResult>(toolName: string, args: Record<string, unknown> = {}) =>
     request<T>('/api/tools/call', {
       method: 'POST',
-      body: { tool: toolName, params },
+      body: { tool: toolName, args },
     }),
 }
 
